@@ -1,4 +1,4 @@
-# Leant — a GHCi-style interactive REPL for Lean 4
+# Leant (Python) — a GHCi-style interactive REPL for Lean 4
 
 An interactive read-eval-print loop for Lean 4, modeled on Haskell's GHCi.
 Type expressions to evaluate them, type declarations to extend the session,
@@ -47,8 +47,10 @@ python leant.py --transcript [FILE]   # record a full session transcript
 python leant.py --transcript --timestamps  # ...with per-command timestamps
 ```
 
-On Windows, `leant.cmd` wraps the above — both here and at the
-repository root (so `leant` works directly from the project directory).
+On Windows, `leant.cmd` (in this directory) wraps the above.
+
+This is the Python implementation; the primary implementation is the
+Haskell one in [`Tools/Leant`](../Leant/README.md).
 
 When run inside a Lake project (e.g. this repository), all built project
 modules and dependencies (Mathlib, ...) are importable. Import narrow
@@ -148,6 +150,7 @@ used with `:t`/`:info` or evaluated bare, instead of a plain
 | `:doc NAME` | show the documentation string of a declaration |
 | `:search TEXT` | case-insensitive name search over the environment |
 | `:search? TYPE` | proof search: what proves TYPE? (via `exact?`) |
+| `:prove [PROP]` | interactive prove mode (see above); bare form resumes the last `sorry` |
 | `:set OPT VAL` | `set_option` persisting in the session |
 | `:undo` | revert the last state-changing command |
 | `:reset` | clear definitions, keep imports |
@@ -165,8 +168,8 @@ used with `:t`/`:info` or evaluated bare, instead of a plain
   your history (imports cannot be added incrementally to a Lean
   environment). Unavailable modules are detected up front (the backend
   otherwise ignores them silently, yielding an empty environment).
-- `sorry` prints its goal and a proof-state id; the backend's tactic mode is
-  not yet surfaced interactively.
+- `sorry` prints its goal and a proof-state id; `:prove` resumes it
+  interactively.
 - Interrupting evaluation (Ctrl+C) restarts the backend; the session is
   restored automatically from the replay cache on the next command.
 - Line history is stored in `~/.leant_history`.

@@ -1,6 +1,6 @@
 # Leant (Haskell) — a GHCi-style interactive REPL for Lean 4
 
-Haskell port of [Tools/Leant](../Leant/README.md) (the Python
+Haskell port of [Tools/LeantPy](../LeantPy/README.md) (the Python
 original). Same features, same commands, same heuristics — but a native
 binary with no Python dependency at runtime.
 
@@ -40,7 +40,7 @@ exit, like the Python launcher).
 
 ## Usage
 
-Identical to the Python version — see its [README](../Leant/README.md)
+Identical to the Python version — see its [README](../LeantPy/README.md)
 for the full command table and semantics. Summary:
 
 ```
