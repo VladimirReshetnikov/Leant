@@ -1,8 +1,24 @@
-# Leant (Haskell) — a GHCi-style interactive REPL for Lean 4
+# Leant — a GHCi-style interactive REPL for Lean 4
 
-Haskell port of [Tools/LeantPy](../LeantPy/README.md) (the Python
-original). Same features, same commands, same heuristics — but a native
-binary with no Python dependency at runtime.
+Type expressions and they are evaluated, type declarations and they
+enter the session, and a family of `:commands` gives you type queries,
+documentation, search, interactive proving, and `:synth` — automatic
+term synthesis whose every answer is checked by Lean before you see it.
+
+**Leant is experimental and under active development.** Commands change
+shape between commits and output formats are not stable.
+
+There is a manual: **[docs/Leant.pdf](docs/Leant.pdf)** — an overview and
+tutorial, with a detailed tour of `:synth` ([LaTeX source](docs/Leant.tex)).
+
+This repository holds two implementations. The Haskell one, documented
+below, lives at the root and is primary: a native binary with no Python
+dependency at runtime, and the only one with term synthesis. It began as
+a port of [LeantPy](LeantPy/README.md) (the Python original, still here),
+and the two share the command set and session semantics.
+
+Leant started inside the [ProveIt](https://github.com/VladimirReshetnikov/ProveIt)
+repository and was split out into its own with the history preserved.
 
 ## How the port replaces its dependencies
 
@@ -29,7 +45,7 @@ The Haskeline front-end (interrupt-safe step loop, logical multi-line input,
 ## Building
 
 Requires GHC 9.12.4 and cabal. The REPL core uses GHC boot libraries
-only, but `:synth` links the vendored [Djex](../../lib/Djex) synthesis
+only, but `:synth` links the vendored [Djex](lib/Djex) synthesis
 library (a read-only git submodule — run
 `git submodule update --init lib/Djex` once), which pulls
 `haskell-src-exts` and a few other packages from Hackage. The bundled
@@ -44,7 +60,7 @@ exit, like the Python launcher).
 
 ## Usage
 
-Identical to the Python version — see its [README](../LeantPy/README.md)
+Identical to the Python version — see its [README](LeantPy/README.md)
 for the full command table and semantics. Summary:
 
 ```
@@ -79,7 +95,7 @@ leant [FILE] [--project DIR] [--plain] [-i MOD]
 `:synth TYPE` constructs programs and proofs in the structural fragment
 `→ / × / ∧ / ⊕ / ∨ / ↔ / ¬ / ⊥ / ⊤ / ∀` over opaque variables — plus
 inductive datatypes (see below) — using the Djinn LJT engine from the
-vendored [Djex](../../lib/Djex) library — linked in-process, no
+vendored [Djex](lib/Djex) library — linked in-process, no
 subprocess. Design and phasing:
 [SYNTHESIS_PROPOSAL.md](SYNTHESIS_PROPOSAL.md) (phases 0–2 are
 implemented).

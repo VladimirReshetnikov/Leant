@@ -3,4 +3,4 @@
 -- Djinn engine in-process. Both packages target GHC 9.12.4.
 packages:
   .
-  ../../lib/Djex
+  lib/Djex

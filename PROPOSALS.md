@@ -1,7 +1,7 @@
 # Leant — proposed improvements and new features
 
-Applies to both implementations (Python `Tools/LeantPy`, Haskell
-`Tools/Leant`) unless marked otherwise. Ordered by expected
+Applies to both implementations (Python `LeantPy/`, Haskell at the
+repository root) unless marked otherwise. Ordered by expected
 value-for-effort within each tier. Effort: S (< half a day), M (a day or
 two), L (several days).
 

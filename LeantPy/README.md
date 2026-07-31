@@ -39,7 +39,7 @@ afterwards startup is instant.
 
 ```
 python leant.py                       # auto-detects the enclosing Lake project
-python leant.py --project C:/ProveIt  # explicit Lake project
+python leant.py --project C:/MyLeanProject  # explicit Lake project
 python leant.py --plain               # bare Lean (no project, stdlib only)
 python leant.py -i Mathlib.Tactic.Ring  # start with imports
 python leant.py MyFile.lean           # load a file at startup
@@ -50,7 +50,7 @@ python leant.py --transcript --timestamps  # ...with per-command timestamps
 On Windows, `leant.cmd` (in this directory) wraps the above.
 
 This is the Python implementation; the primary implementation is the
-Haskell one in [`Tools/Leant`](../Leant/README.md).
+Haskell one in [the repository root](../README.md).
 
 When run inside a Lake project (e.g. this repository), all built project
 modules and dependencies (Mathlib, ...) are importable. Import narrow
@@ -152,7 +152,7 @@ used with `:t`/`:info` or evaluated bare, instead of a plain
 | `:doc NAME` | show the documentation string of a declaration |
 | `:search TEXT` | case-insensitive name search over the environment |
 | `:search? TYPE` | proof search: what proves TYPE? (via `exact?`) |
-| `:synth TYPE` | term synthesis — Haskell [Tools/Leant](../Leant/README.md) only (in-process Djex engine); here it prints a pointer |
+| `:synth TYPE` | term synthesis — Haskell [the Haskell REPL](../README.md) only (in-process Djex engine); here it prints a pointer |
 | `:prove [PROP]` | interactive prove mode (see above); bare form resumes the last `sorry` |
 | `:set OPT VAL` | `set_option` persisting in the session |
 | `:undo` | revert the last state-changing command |

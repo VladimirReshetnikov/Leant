@@ -158,7 +158,7 @@
   urlcolor   = moss,
   citecolor  = moss,
   pdftitle   = {Leant — a GHCi-style REPL for Lean 4},
-  pdfauthor  = {The ProveIt project},
+  pdfauthor  = {The Leant project},
   pdfsubject = {An interactive REPL for Lean 4, with verified term synthesis},
   pdfkeywords= {Lean 4, REPL, term synthesis, Djinn, LJT, Exference},
   bookmarksnumbered = true }
@@ -181,7 +181,7 @@
   \small\color{lichen}
   An \textbf{experimental} tool in active development.
   Interfaces, output, and capabilities change frequently.\\[0.6em]
-  Part of the \emph{ProveIt} repository, \code{Tools/Leant}.\quad
+  \href{https://github.com/VladimirReshetnikov/Leant}{github.com/VladimirReshetnikov/Leant}\quad
   July 2026.
 \end{center}
 \vspace*{\stretch{1}}
@@ -221,10 +221,10 @@ this document and \code{:help} disagree, believe \code{:help}.
 \end{notice}
 
 Two implementations live side by side in the repository:
-\code{Tools/LeantPy} (the Python original, whose backend management is
-delegated to LeanInteract) and \code{Tools/Leant} (the Haskell port,
-now the primary implementation, which speaks the backend protocol
-directly). They share the command set and the same session semantics;
+\code{LeantPy/} (the Python original, whose backend management is
+delegated to LeanInteract) and the Haskell port at the repository
+root, now the primary implementation, which speaks the backend
+protocol directly. They share the command set and the same session semantics;
 term synthesis (\S\ref{sec:synth}) is Haskell-only, because it embeds
 the Djex synthesis library in-process. Everything below describes the
 Haskell implementation.
@@ -793,13 +793,13 @@ believed until Lean has type-checked it.
 %==============================================================================
 \section{Status}\label{sec:status}
 
-Leant is a working prototype under active development inside the
-\emph{ProveIt} repository. The Haskell implementation
-(\code{Tools/Leant}) is primary; the Python original
-(\code{Tools/LeantPy}) remains as a lighter alternative without
-synthesis. The synthesis design and its phased history are documented
-in \code{Tools/Leant/SYNTHESIS\_PROPOSAL.md}; transcript-level golden
-tests live in \code{Tools/Leant/test}. Expect sharp edges: the project exists to find out how far a
+Leant is a working prototype under active development. The Haskell
+implementation at the repository root is primary; the Python original
+(\code{LeantPy/}) remains as a lighter alternative without synthesis.
+The synthesis design and its phased history are documented in
+\code{SYNTHESIS\_PROPOSAL.md}; transcript-level golden tests live in
+\code{test/}. The project began inside the \emph{ProveIt} repository
+and was split out with its history intact. Expect sharp edges: the project exists to find out how far a
 conversational, verification-gated synthesis workflow can be pushed,
 and it moves at the speed of that question.
 \end{document}
