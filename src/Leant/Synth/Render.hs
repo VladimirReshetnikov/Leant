@@ -685,6 +685,9 @@ constructorFieldsAt occurrence info = case ciParametric info of
       FParamInd occurrenceHead _ occurrenceParameters constructors
         | occurrenceHead == familyHead ->
             Just (occurrenceParameters, lookup (ciLean info) constructors)
+      FParamRec _ occurrenceHead _ occurrenceParameters constructors
+        | occurrenceHead == familyHead ->
+            Just (occurrenceParameters, lookup (ciLean info) constructors)
       _ -> Nothing
     if length parameters == length formals
       -- The family planner already validated this occurrence against the

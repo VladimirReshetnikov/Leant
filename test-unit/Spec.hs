@@ -755,6 +755,45 @@ parametricFamilyEngineTests = testGroup "parametric family engine projection"
   , testCase "transport an Option-like rank-N family with Exference" $
       expectExactFamilyTerm "fun x => x _"
         (synthesizeWithProviders EngineExference 1024 [] optionRankNGoal)
+  , testCase "transport a recursive List rank-N family with Djinn" $
+      expectExactFamilyTerm "fun x => x _"
+        (synthesizeWithProviders EngineDjinn 0 [] listRankNGoal)
+  , testCase "transport a recursive List rank-N family with Exference" $
+      expectExactFamilyTerm "fun x => x _"
+        (synthesizeWithProviders EngineExference 1024 [] listRankNGoal)
+  , testCase "reuse a recursive provider schema independent of order" $ do
+      let target = recursiveBox True "Demo.RecBox consumer" consumerType
+          inhabitant = ProviderFrag "Demo.anyRecBox"
+            (FAll False "source"
+              (recursiveBox True "Demo.RecBox source" (FVar "source")))
+          schemaOnly = ProviderFrag "Demo.blockedRecBox"
+            (FAll False "renamed" (FArr FBot
+              (recursiveBox True "Demo.RecBox renamed" (FVar "renamed"))))
+          check providers =
+            let candidates = allFamilyCandidates
+                  (synthesizeWithProviders EngineExference 1024 providers target)
+            in if any ("Demo.anyRecBox" `isInfixOf`) candidates
+                then pure ()
+                else assertFailure $ "recursive provider source was lost in "
+                  ++ show (map providerLeanName providers) ++ ": "
+                  ++ show candidates
+      mapM_ check [[inhabitant, schemaOnly], [schemaOnly, inhabitant]]
+  , testCase "fit recursive rank-N fields at a structured occurrence" $ do
+      let result = FAtom False "Demo.Result"
+          consumer = FAll True "b" (FArr (FVar "b") result)
+          target = recursiveCell "Demo.RecCell consumer" consumer
+          schemaOnly = ProviderFrag "Demo.blockedRecCell"
+            (FAll False "renamed" (FArr FBot
+              (recursiveCell "Demo.RecCell renamed" (FVar "renamed"))))
+          goal = FAll True "c"
+            (FArr target (FArr (FVar "c") result))
+          candidates = allFamilyCandidates
+            (synthesizeWithProviders EngineExference 2048 [schemaOnly] goal)
+      if any (\term -> "match" `isInfixOf` term
+              && " _ " `isInfixOf` term) candidates
+        then pure ()
+        else assertFailure $ "recursive rank-N fields were not fitted: "
+          ++ show candidates
   , testCase "share fixed opaque constructor fields without free variables" $
       expectExactFamilyTerm "fun x => x _"
         (synthesizeWithProviders EngineExference 1024 [] guardRankNGoal)
@@ -1006,6 +1045,122 @@ parametricFamilyEngineTests = testGroup "parametric family engine projection"
         else if null candidates
           then assertFailure "distinct structural heads lost all conversions"
           else pure ()
+  , testCase "never conflate recursive heads sharing keys and constructors" $
+      let parameter = FVar "a"
+          family headName = FParamRec True headName "same display key"
+            [parameter]
+            [ ("Shared.nil", [])
+            , ("Shared.cons",
+                [parameter, FAtom False "same display key"])
+            ]
+          goal = FAll True "a"
+            (FArr (family "Demo.LeftList") (family "Demo.RightList"))
+          direct term = term == "fun _ x => x"
+            || term == "fun _ => fun x => x"
+          check engine =
+            let candidates = allFamilyCandidates
+                  (synthesizeWithProviders engine 1024 [] goal)
+            in if any direct candidates
+                then assertFailure $ "distinct recursive heads shared an "
+                  ++ "identity in " ++ show engine ++ ": " ++ show candidates
+                else pure ()
+      in mapM_ check [EngineDjinn, EngineExference]
+  , testCase "normalize recursive knots and ignore unused outer metadata" $ do
+      let result = FVar "r"
+          natural complete key = FParamRec complete "Nat" key []
+            [ ("Nat.zero", [])
+            , ("Nat.succ", [FAtom False key])
+            ]
+          left = natural True "Nat left"
+          right = natural True "Nat right"
+          hiddenPartial = natural False "Nat hidden"
+          parameter = FVar "p"
+          ambiguousOuter = FParamInd "Demo.Outer" "Demo.Outer p p"
+            [parameter, parameter]
+            [("Demo.Outer.mk", [hiddenPartial])]
+          unusedOuter = ProviderFrag "Demo.unusedOuter"
+            (FArr FBot ambiguousOuter)
+          goal = FArr result (FArr (FArr right result) (FArr left result))
+          candidates = allFamilyCandidates
+            (synthesizeWithProviders EngineExference 1024 [unusedOuter] goal)
+      if any ("match" `isInfixOf`) candidates
+        then pure ()
+        else assertFailure $ "unused outer metadata hid recursive matches: "
+          ++ show candidates
+  , testCase "reject recursive exact-head arity disagreements" $ do
+      let one = FParamRec True "Demo.ArityRec" "Demo.ArityRec a"
+            [FVar "a"] [("Demo.ArityRec.one", [])]
+          two = FParamRec True "Demo.ArityRec" "Demo.ArityRec a b"
+            [FVar "a", FVar "b"] [("Demo.ArityRec.two", [])]
+          goal = FAll True "a" (FAll True "b" (FArr one two))
+          check engine = case
+              synthesizeWithProviders engine 1024 [] goal of
+            Left err
+              | "incompatible proper-type arities" `isInfixOf` err -> pure ()
+              | otherwise -> assertFailure $ "unexpected arity error in "
+                  ++ show engine ++ ": " ++ err
+            Right outcome -> assertFailure $ "recursive arity mismatch was "
+              ++ "accepted in " ++ show engine ++ ": " ++ outcomeTag outcome
+      mapM_ check [EngineDjinn, EngineExference]
+  , testCase "keep partial and repeated recursive uses abstract" $ do
+      let parameter = FVar "p"
+          partial = recursiveList False "List p" parameter
+          repeatedKey = "Demo.PairRec p p"
+          repeated = FParamRec True "Demo.PairRec" repeatedKey
+            [parameter, parameter]
+            [ ("Demo.PairRec.more",
+                [parameter, FAtom False repeatedKey])
+            ]
+      expectIncompleteNoFamilyTerm
+        (synthesizeWithProviders EngineExference 512 []
+          (FArr partial parameter))
+      expectIncompleteNoFamilyTerm
+        (synthesizeWithProviders EngineExference 512 []
+          (FArr repeated parameter))
+  , testCase "keep complete and partial recursive uses abstract with intro" $ do
+      let parameter = FVar "p"
+          partial = recursiveTree False "Demo.Tree partial" parameter
+          complete = recursiveTree True "Demo.Tree complete" parameter
+          candidates = allFamilyCandidates
+            (synthesizeWithProviders EngineExference 1024 []
+              (FArr partial (FArr parameter complete)))
+      if any ("match" `isInfixOf`) candidates
+        then assertFailure $ "mixed completeness exposed elimination: "
+          ++ show candidates
+        else if any ("Demo.Tree.leaf" `isInfixOf`) candidates
+          then pure ()
+          else assertFailure $ "abstract recursive fallback lost introduction: "
+            ++ show candidates
+  , testCase "share recursive and nominal uses through an abstract head" $ do
+      let source = recursiveBox True "Demo.RecBox poly" polytype
+          target = FApp False "Demo.RecBox poly"
+            (AppNominal "Demo.RecBox") [polytype]
+          goal = FArr source target
+      expectExactFamilyTerm "fun x => x"
+        (synthesizeWithProviders EngineDjinn 0 [] goal)
+      let candidates = allFamilyCandidates
+            (synthesizeWithProviders EngineExference 1024 [] goal)
+      if null candidates
+        then assertFailure "recursive/nominal fallback lost all conversions"
+        else if any ("match" `isInfixOf`) candidates
+          then assertFailure $ "recursive/nominal fallback exposed a match: "
+            ++ show candidates
+          else if any ("fun x =>" `isInfixOf`) candidates
+            then pure ()
+            else assertFailure $ "abstract conversions ignored their source: "
+              ++ show candidates
+  , testCase "keep incompatible recursive schemas abstract query-wide" $ do
+      let result = FVar "r"
+          other = FVar "s"
+          leftKey = "Demo.Chain r"
+          rightKey = "Demo.Chain s"
+          left = FParamRec True "Demo.Chain" leftKey [result]
+            [ ("Demo.Chain.link", [result, FAtom False leftKey]) ]
+          right = FParamRec True "Demo.Chain" rightKey [other]
+            [ ("Demo.Chain.link", [FAtom False rightKey]) ]
+      expectIncompleteNoFamilyTerm
+        (synthesizeWithProviders EngineExference 512 []
+          (FArr left (FArr right result)))
   , testCase "retain the established recursive fallback for FParamRec" $ do
       let result = FVar "r"
           natural = FParamRec True "Nat" "Nat" []
@@ -1062,6 +1217,25 @@ parametricFamilyEngineTests = testGroup "parametric family engine projection"
   optionRankNGoal = FArr
     (FAll True "a" (option "Option a" (FVar "a")))
     (option "Option poly" polytype)
+  recursiveList complete key parameter = FParamRec complete "List" key
+    [parameter]
+    [ ("List.nil", [])
+    , ("List.cons", [parameter, FAtom False key])
+    ]
+  listRankNGoal = FArr
+    (FAll True "a" (recursiveList True "List a" (FVar "a")))
+    (recursiveList True "List poly" polytype)
+  recursiveBox complete key parameter = FParamRec complete "Demo.RecBox" key
+    [parameter]
+    [("Demo.RecBox.step", [parameter, FAtom False key])]
+  recursiveCell key parameter = FParamRec True "Demo.RecCell" key
+    [parameter] [("Demo.RecCell.mk", [parameter])]
+  recursiveTree complete key parameter = FParamRec complete "Demo.Tree" key
+    [parameter]
+    [ ("Demo.Tree.leaf", [parameter])
+    , ("Demo.Tree.branch", [FAtom False key, FAtom False key])
+    ]
+  consumerType = FAll True "b" (FArr (FVar "b") (FVar "b"))
   guard key parameter = FParamInd "Demo.Guard" key [parameter]
     [("Demo.Guard.mk", [FAtom False "Demo.Secret", parameter])]
   guardRankNGoal = FArr
@@ -1078,6 +1252,7 @@ parametricFamilyEngineTests = testGroup "parametric family engine projection"
         then pure ()
         else assertFailure $ "expected exact family candidate "
           ++ show expected ++ ", got: " ++ show candidates
+          ++ "; outcome: " ++ familyOutcomeSummary outcome
   expectIncompleteNoFamilyTerm outcome = case outcome of
     Right (SynthCandidates groups _) -> assertFailure $
       "abstract family unexpectedly exposed constructors: " ++ show groups
@@ -1089,6 +1264,12 @@ parametricFamilyEngineTests = testGroup "parametric family engine projection"
     Right (SynthCandidates groups _) -> concat groups
     Right _ -> []
     Left err -> error err
+  familyOutcomeSummary outcome = case outcome of
+    Left err -> "error " ++ show err
+    Right (SynthCandidates groups notes) ->
+      "candidates " ++ show groups ++ ", notes " ++ show notes
+    Right (SynthRefuted sound) -> "refuted " ++ show sound
+    Right (SynthNoTerm notes) -> "no term, notes " ++ show notes
 
 rankNFrontierTests :: TestTree
 rankNFrontierTests = testGroup "Djinn rank-N frontiers"
