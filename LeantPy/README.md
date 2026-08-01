@@ -1,4 +1,4 @@
-# Leant (Python) — a GHCi-style interactive REPL for Lean 4
+# LeantPy — a Python port of Leant
 
 An interactive read-eval-print loop for Lean 4, modeled on Haskell's GHCi.
 Type expressions to evaluate them, type declarations to extend the session,
