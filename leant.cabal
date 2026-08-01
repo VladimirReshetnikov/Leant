@@ -54,3 +54,23 @@ Executable leant
     time       >= 1.12 && < 1.15
   if os(windows)
     Build-Depends: Win32 >= 2.13 && < 2.15
+
+Test-Suite leant-synth-tests
+  Type:             exitcode-stdio-1.0
+  Default-Language: Haskell2010
+  Hs-Source-Dirs:   test-unit, src
+  Main-Is:          Spec.hs
+  Other-Modules:
+    Leant.Synth.Engine
+    Leant.Synth.Fragment
+    Leant.Synth.Render
+  Ghc-Options:
+    -Wall
+    -Wcompat
+    -Wincomplete-uni-patterns
+  Build-Depends:
+    base        >= 4.19  && < 5,
+    containers  >= 0.6   && < 0.9,
+    djex        >= 2026.7.17 && < 2027,
+    tasty       >= 1.4.2 && < 2,
+    tasty-hunit >= 0.10  && < 1

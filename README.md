@@ -162,8 +162,10 @@ saved: theorem and_swap : ∀ p q : Prop, p ∧ q → q ∧ p
 read through propositions-as-types, *"prove this"* — and sometimes the
 stronger question *"show me that no such term exists."* It covers the
 structural fragment `→ / × / ∧ / ⊕ / ∨ / ↔ / ¬ / ⊥ / ⊤ / ∀` over opaque
-variables, plus non-recursive inductive types, with bounded support for
-rank-N and impredicative quantification. Design and phasing:
+variables, plus structurally representable inductive data, with bounded
+support for rank-N and impredicative quantification. Exference can
+additionally reuse a small, goal-relevant slice of the live Lean
+environment. Design and phasing:
 [docs/SYNTHESIS_PROPOSAL.md](docs/SYNTHESIS_PROPOSAL.md).
 
 The engine is the vendored [Djex](lib/Djex) library, linked in-process.
@@ -357,9 +359,16 @@ complete constructor list:
 provably uninhabited — no closed term of this polymorphic type exists
 ```
 
-Recursive (`Nat`, `List`), indexed (`Eq`), and dependent-field
-(`Exists`) types stay atoms — their constructors still work as
-introduction rules, but elimination is where undecidability lives.
+Djinn keeps recursive types such as `Nat` and `List` opaque, with their
+constructors available only as introduction rules. When Lean can serialize
+the complete constructor inventory and a safe parameter vector, Exference
+may also inspect one constructor layer: it can synthesize a finite `match`, but
+recursive fields become ordinary branch-local values and are not
+immediately split again. This bounded rule cannot invent recursion or
+induction; it can, however, combine the finite case split with a live
+library provider for the recursive work. Partial inventories remain
+introduction-only, while indexed (`Eq`) and dependent-field (`Exists`)
+types remain opaque.
 
 ### Dependent formulas as cargo
 
@@ -416,6 +425,21 @@ finisher tactics, needing no premise database and no imports. Bare
   runs the two together — Djinn's candidates first, Exference's new
   ones after, refutations only from the engine entitled to them. The
   default `djinn` remains the complete, terminating LJT search.
+- Before an Exference search, Leant takes a bounded inventory from the
+  live Lean environment. It considers constants under namespaces named
+  by the target, plus exact declarations from the current session;
+  rejects generated names; prioritizes session declarations and exact
+  result-head matches; and serializes at most 80 providers. Increasing
+  positive penalties preserve that order during search, so the broader
+  fallback pool does not drown the most relevant constants. Thus a
+  target such as `(α → β) → List α → List β` can reuse
+  `List.map` instead of rebuilding recursion from scratch.
+- Providers receive collision-free private names inside Djex. Rendering
+  maps those names back to the exact fully-qualified Lean globals (and
+  uses Lean's `@` spelling for visible type applications) before the
+  backend verifies the candidate. Inventory extraction is deliberately
+  best-effort: if it cannot be produced, Exference still runs with the
+  structural declarations it already has.
 - Where a term's shape is ambiguous in Lean (a quantified hypothesis
   may be transported whole or instantiated), the renderer offers the
   alternatives and verification picks the one that elaborates.
@@ -445,13 +469,15 @@ history) replays automatically on the next command. The Haskeline
 front-end provides the interrupt-safe step loop, logical multi-line
 input, and completion.
 
-A `:synth` query passes through five checked stages: a Lean metaprogram
+A `:synth` query passes through checked stages: a Lean metaprogram
 (compiled once into a cached side environment) elaborates the goal and
 serializes it into the engine's fragment; the fragment translator
-accepts it or refuses with a reason; the engine searches; candidates are
-rendered back into Lean syntax with constructor names restored and
-binders named by role; and the backend re-elaborates each candidate
-against the original goal — only survivors are shown and bound.
+accepts it or refuses with a reason; for Exference, a second
+metaprogram builds the bounded live-provider inventory; the selected
+engine searches; candidates are rendered back into Lean syntax with
+constructor and exact provider names restored and binders named by
+role; and the backend re-elaborates each candidate against the original
+goal — only survivors are shown and bound.
 
 ## The Python edition
 
@@ -465,11 +491,21 @@ synthesis engine).
 
 ## Development
 
+The focused Haskell suite covers fragment/provider parsing, engine
+isolation, exact global rendering, and synthesis behavior:
+
+```bash
+cabal test leant-synth-tests --test-show-details=direct
+```
+
 Golden transcript tests live in [test/](test/): `bash test/run-tests.sh`
 pipes each `synth-*.txt` through `leant --plain` and diffs the filtered
 output against the checked-in `*.golden`; `-u` regenerates the goldens
-after an intentional behavior change. Ideas under consideration are
-tracked in [docs/PROPOSALS.md](docs/PROPOSALS.md) and
+after an intentional behavior change. These end-to-end goldens require
+the Lake project to provide the backend executable (`repl` or
+`repl.exe`); the focused suite remains runnable when that backend is not
+installed. Ideas under consideration are tracked in
+[docs/PROPOSALS.md](docs/PROPOSALS.md) and
 [docs/SYNTHESIS_PROPOSAL.md](docs/SYNTHESIS_PROPOSAL.md).
 
 ## License

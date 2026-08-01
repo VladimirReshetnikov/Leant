@@ -1,14 +1,17 @@
 # Proposal: automatic term synthesis in Leant, borrowing from Djex
 
-*Status: phases 0–2 implemented (`:synth` in this repository, engine =
-in-process Djex Djinn/LJT; see [README.md](../README.md#synth--automatic-term-synthesis)).
-Phase 4 remains future work; §7’s six increments are all implemented,
-and item F delivers the phase-3 engine without its Mathlib-scale
-inventory. Companion to [PROPOSALS.md](PROPOSALS.md).*
+*Status: phases 0–2 implemented (`:synth` in this repository, engines =
+in-process Djex Djinn/LJT and Exference; see
+[README.md](../README.md#synth--automatic-term-synthesis)). A bounded
+first slice of phase 3 is also implemented: live goal-relevant Lean
+providers, exact global rendering, relevance-preserving ratings, and
+one-layer recursive elimination. Phase 4 and a persistent,
+Mathlib-scale inventory remain future work. Companion to
+[PROPOSALS.md](PROPOSALS.md).*
 
 Djex — vendored read-only in this repository as the
-[`lib/Djex`](../lib/Djex) submodule (pinned at `6a9fc22`, the state
-this analysis reviewed) — merges two Haskell expression synthesizers — Djinn
+[`lib/Djex`](../lib/Djex) submodule (pinned at `882173f6`) — merges two
+Haskell expression synthesizers — Djinn
 (Dyckhoff's LJT calculus: complete, terminating intuitionistic proof
 search that emits programs) and Exference (ranked heuristic search with
 resource budgets and type-class evidence) — behind one
@@ -20,16 +23,17 @@ synthesis inside Leant, what they would buy us, and how to build it.
 
 *Scope note: Djex has moved well past the original Djinn and Exference.
 Recent work (reviewed from the commit history and the dated reports
-through 2026-07-29) adds bounded rank-N quantification, guarded
-impredicative instantiation, and a unified type-class constraint
-contract; §1.5 summarizes that implemented scope and §2.0 analyzes how
-it maps onto Lean's type system.*
+through 2026-07-31) adds bounded rank-N quantification, guarded
+impredicative instantiation, a unified type-class constraint contract,
+and bounded recursive deconstruction in Exference; §1.5 summarizes
+that implemented scope and §2.0 analyzes how it maps onto Lean's type
+system.*
 
 | Djex idea | Substance | Lean/Leant mapping |
 | --- | --- | --- |
 | **LJT engine (Djinn)** | Complete, *terminating* proof search for intuitionistic propositional logic over `->`, tuples, `Either`, `Void`, opaque type variables; emits a lambda term, or a definitive "no term exists" | Curry–Howard transfers directly: the same calculus decides the Lean fragment `→ × ⊕ Empty Unit` in `Type` and `→ ∧ ∨ ⊥ ⊤ ¬ ↔` in `Prop`, emitting `fun`/`⟨,⟩`/`Sum.inl`/`.casesOn` terms |
 | **Non-inhabitation verdicts** | "Proof-backed non-inhabitation result... when formula translation is complete" (library-api.md) | For *opaque* type variables, LJT failure means **no closed term exists at that polymorphic type** — a trustworthy negative answer no Lean tactic currently gives (`exact?` failing proves nothing) |
-| **Exference engine** | Best-first search over an *inventory* of typed constants with per-name ratings (`environment/*.ratings`), explicit step/queue/depth budgets, ranked candidate batches | Phase-3 idea: weighted search seeded from Leant's cached **browse environment** (the constant inventory we already extract for `:browse`/completion), with a ratings file for core/Mathlib |
+| **Exference engine** | Best-first search over an *inventory* of typed constants with per-name ratings (`environment/*.ratings`), explicit step/queue/depth budgets, ranked candidate batches | The implemented phase-3 slice builds a fresh bounded inventory from the live Lean environment, prioritizes exact session declarations and matching result heads, and gives later providers increasing penalties; persistent caching, transitive relevance, and user-maintained Mathlib ratings remain future work |
 | **Shared synthesis foundation** | Parser-independent vocabulary (`Name`, `Type`, `Constraint`, `Environment → Inventory → PreparedInventory → QueryResult (SearchBatch Candidate) → Expression`), each arrow a checked boundary | The template for Leant's internal engine boundary: one fragment grammar, one candidate term grammar, one verification protocol, with the engine behind it swappable. **Scope decision: this feature is Haskell-only** — the Haskell implementation links Djex in-process; the Python edition does not grow a synthesis host |
 | **Verification posture** | Engines are explicit about semantics ("neither backend guesses the other's"); truncated batches are labeled; a finished heuristic batch with no candidates "is not a proof of non-inhabitation" | Leant goes one better: **every candidate is elaborated by the Lean backend before display** (`example : (T) := term`), so the synthesizer never needs to be trusted — the same outsource-soundness pattern `:search?` and prove mode already use |
 | **Embeddable library** | `build-depends: djex`, GHC 9.12.4, sealed session + checked request + result envelope; also three CLIs (`djex djinn --render expression "a -> a"`) | Leant is built with **the same GHC 9.12.4** — it links Djex directly as a library, in-process, with no subprocess or protocol overhead |
@@ -38,7 +42,7 @@ it maps onto Lean's type system.*
 ## 1.5 The post-merger scope: what Djex implements today
 
 The current engines go beyond propositional LJT and monomorphic
-best-first search. From the commit history (`a069029` through `6a9fc22`)
+best-first search. From the commit history (`a069029` through `882173f6`)
 and the reports `2026-07-28-rank-n-inference-review.md` and
 `2026-07-29-hypothesis-instantiation.md`:
 
@@ -73,6 +77,12 @@ and the reports `2026-07-28-rank-n-inference-review.md` and
   did not supply is ever invented". Scoped providers instantiate their
   complete leading forall chain freshly per use; provider contexts
   become proof obligations.
+- **Bounded recursive deconstruction (Exference).** Recursive datatype
+  declarations remain available to search, but matching stops after one
+  constructor layer. Recursive fields enter that branch as ordinary
+  providers and are not eagerly deconstructed again. This admits useful
+  finite case terms without turning the engine into a recursion or
+  induction synthesizer.
 - **Verdict honesty as a fixed soundness bug.** Djinn once approximated
   every nested forall as one proposition and could report
   `ProvedUninhabitable` for inhabited types like
@@ -199,7 +209,7 @@ tilts the cost/benefit further toward doing this.
 | `tauto` / `itauto` (Mathlib) | Decides propositional goals (`itauto` is intuitionistic-complete) | `Prop`-only tactics; need Mathlib imported (minutes on this machine); no term display culture, no negative verdicts, nothing for `Type` |
 | `aesop` | General proof search | Heuristic, Mathlib, `Prop`-oriented, no non-inhabitation answers |
 | `decide` | Decidable ground propositions | Nothing polymorphic or data-level |
-| **Proposed `:synth`** | **Constructs** programs/proofs in the structural fragment, in `Type` *and* `Prop`, with core Lean only, multiple ranked candidates, and trustworthy "no closed term exists" verdicts | Dependent types, recursion (see §5) |
+| **`:synth`** | **Constructs** programs/proofs in the structural fragment, in `Type` *and* `Prop`, with core Lean only, multiple ranked candidates, and trustworthy "no closed term exists" verdicts | No dependent elimination, induction, or invented recursive definitions; Exference's recursive case analysis is deliberately one layer (see §5) |
 
 The sweet spot is *higher-order plumbing*: currying/uncurrying,
 projections, composition, distribution lemmas (`A × (B ⊕ C) → (A × B) ⊕
@@ -229,8 +239,10 @@ with explicit truncation labeling.
   and unlike `exact?` it needs no premise database.
 - **`sorry` flow**: `sorry` already prints its goal and offers `:prove`;
   the same hook can offer synthesis when the goal is in-fragment.
-- **Browse environment**: the phase-3 inventory (constants + types) is
-  exactly what `:browse`/completion already extract and cache.
+- **Live environment**: the first phase-3 slice now asks Lean directly
+  for a bounded, goal-relevant provider inventory. Reusing the browse
+  cache or adding a persistent synthesis cache remains an optimization,
+  not a soundness requirement.
 - **Verification loop**: `example : (T) := candidate` is one `runCmd` —
   infrastructure that exists, including timeout handling and crash
   replay.
@@ -249,7 +261,10 @@ with explicit truncation labeling.
  Fragment translator  ── out-of-fragment ──> honest refusal (":synth handles
         |                                    →/×/⊕/∀(non-dep)/⊥/⊤ over opaque
         v                                    variables; this goal uses X")
- Engine (LJT now; ranked search later)
+ Optional live-provider inventory (Exference only; bounded to 80)
+        |
+        v
+ Engine (Djinn/LJT or ranked Exference)
         |         candidates (internal term grammar)
         v
  Lean renderer (fun/⟨,⟩/Sum.casesOn/False.elim/absurd...)
@@ -274,7 +289,7 @@ Design rules, all inherited from Djex:
    distinction between Djinn and Exference verdicts.
 4. **One narrow engine boundary.** The translator/renderer speak to the
    engine through a small typed interface (goal in, candidate batch
-   out), so the LJT engine, a future ranked-search engine, or a
+   out), so the LJT engine, the ranked-search engine, or a
    different backend can be swapped without touching the REPL layer.
    Haskell-only: the engine lives in the Haskell implementation as a
    direct Djex library dependency; `leant.py` deliberately does not
@@ -338,16 +353,35 @@ Design rules, all inherited from Djex:
   over expanded inductives remain sound: the engine sees the complete
   constructor list, and Lean's elimination restrictions only make Lean
   *more* restrictive than the engine's model, never less.
-- **Phase 3 — ranked environment search (L, optional).** Exference's
-  contribution: inventory = browse-env constants, filtered by the
-  existing generated-name blacklist; per-name ratings file
-  (`leant.ratings`, format lifted from Djex's `environment/*.ratings`);
-  best-first search with step/queue/depth budgets surfaced as `:set`
-  options; batch truncation reported honestly. This is where `:synth
-  (α → β) → List α → List β` starts answering `fun f l => List.map f l`
-  — recursion arrives via *library reuse*, not via synthesizing
-  recursors, sidestepping termination questions exactly as Exference
-  does.
+- **Phase 3 — ranked environment search (L, bounded first slice
+  implemented).** Before an Exference query, a Lean metaprogram scans
+  environment names cheaply and retains declarations whose root
+  namespace occurs in the target, plus exact declarations made in the
+  current session. It rejects generated names, orders exact session
+  hits first, then declarations whose result head matches the target,
+  then the shorter-name fallback pool, and serializes at most 80
+  provider candidates. Providers outside the supported fragment are
+  dropped individually before search. Leant gives the survivors private
+  collision-free engine names, maps them back to the exact
+  fully-qualified Lean globals during rendering, and assigns increasing
+  positive rating penalties in discovery order so fallback constants do
+  not drown the best match. Search remains subject to its explicit
+  budgets (`:set synth-steps` exposes the step bound; queue/depth retain
+  conservative engine defaults) and reports truncation honestly. This is
+  enough for `(α → β) → List α → List β` to prefer
+  `List.map`. A persistent cache, transitive relevance across unrelated
+  namespaces, and user/core/Mathlib ratings are still future work.
+
+  For complete supported constructor inventories with safely recoverable
+  parameter vectors, Exference also receives nominal recursive
+  datatype declarations and may eliminate exactly one constructor
+  layer. Recursive fields become branch-local ordinary providers rather
+  than fresh elimination
+  targets, keeping the search finite. It can therefore synthesize a
+  finite `Nat`/`List` match and may delegate recursive work to a live
+  provider, but it cannot invent a recursive definition, induction, or
+  unbounded nested case split. Djinn retains the phase-2
+  opaque-type-plus-constructor-premise behavior.
 - **Phase 4 — research horizon (not scheduled).** Dependent goals,
   `Decidable` instance synthesis, interaction with `exact?` as a
   sub-oracle inside the search (Djex's `both` backend mode suggests the
@@ -367,9 +401,13 @@ Design rules, all inherited from Djex:
   found within bounds" — full impredicative inhabitation is
   undecidable, so this boundary is permanent, and the display must
   never upgrade it to a refutation.
-- **No recursion before phase 3**, and even then only by reusing library
-  functions; `:synth` will never invent `Nat.rec`-based programs. Djinn
-  has the same boundary and remains useful after twenty years.
+- **Recursive elimination is bounded to one layer in Exference.** A
+  recursive field exposed by a constructor match is available as a
+  normal branch-local value, but is not eagerly decomposed again. The
+  engine may reuse a library provider for the recursive continuation;
+  it does not invent a recursive definition, induction, or unbounded
+  eliminator. Djinn remains closed and deciding: recursive types are
+  opaque there, with constructors only as premises/introduction rules.
 - **Parametricity caveat**: "uninhabited" verdicts are about *closed
   terms at the polymorphic type* — `∀ α β, α → β` being uninhabited does
   not mean a particular instantiation is empty. The display must say
@@ -379,7 +417,10 @@ Design rules, all inherited from Djex:
 - **Performance**: LJT on interactive-size goals is microseconds; the
   cost center is the backend verification round-trip (~100–300 ms per
   candidate on this machine), so batches should verify lazily, top
-  candidate first.
+  candidate first. The live inventory is capped at 80 serialized
+  providers, but it is rebuilt per query and its root-namespace
+  relevance is intentionally shallow; a cache and Mathlib-scale
+  relevance index remain open work.
 - **Maintenance**: embedding Djex ties Leant to a large local
   package (and to its GHC version). Mitigation: the narrow engine
   boundary keeps Djex swappable for a small purpose-built LJT module
@@ -397,15 +438,16 @@ expensive parts of that machinery are either native to Lean or absorbed
 by kernel-side verification — Leant's share of the work shrank while the
 reachable goal space grew.
 
-Do phase 0 and phase 1: the effort is modest, every piece of supporting
-infrastructure (backend verification, browse env, prove mode) already
-exists in Leant, and the payoff — instant
-verified lambda terms, trustworthy uninhabitation answers, and a
-prove-mode step that composes rather than searches — is a capability no
-current Lean tool combination offers in one place. Phase 2 is worth it
-the moment phase 1 sees real use on structures; phase 3 should wait
-until the ratings/inventory design can be tried against Mathlib-scale
-environments without hurting Leant's startup discipline.
+Phases 0–2 have delivered instant verified lambda terms, trustworthy
+uninhabitation answers, inductive-data support, and a prove-mode step
+that composes rather than merely searches. The bounded phase-3 slice
+now validates the live-environment design without committing Leant to a
+global Mathlib index: exact globals survive the engine round-trip,
+ordered penalties keep an 80-provider query useful, and one-layer
+recursive elimination composes with library reuse. The next phase-3
+work should measure and cache inventories, improve relevance beyond a
+single target root, and expose stable user ratings without harming
+startup discipline.
 
 ## 7. Post-phase-2 proposals
 
@@ -485,21 +527,29 @@ backend-startup banner filtered). Pairs with PROPOSALS.md item 5
 (`--script` mode); until that lands, plain stdin piping — which the
 transcripts already use — suffices.
 
+The implementation now also has a focused Haskell suite, run with
+`cabal test leant-synth-tests --test-show-details=direct`, for fragment
+and provider parsing, engine isolation, rendering, and synthesis
+behavior. The shell goldens remain the true end-to-end layer and require
+the Lake project to supply `repl`/`repl.exe`; an environment without
+that backend can still run the focused suite.
+
 ### D. Constructors of recursive inductives as premises — M (implemented)
 
 Phase 2 leaves `Nat`, `List`, and friends as opaque atoms, so
 `:synth (∀ a, a → List a)` answers "no term found within bounds".
-Without touching elimination (which is where recursion and
-undecidability live), the *constructors* of a recursive inductive are
-still sound introduction rules: declare the atom's key as an abstract
-type and add `List.nil : K`, `List.cons : v → K → K` as value
-premises (fields translate through the existing fragment translation;
-recursive occurrences map to the atom's variable; constructors with
-out-of-fragment fields are simply omitted). Refutation soundness is
-unaffected — such goals already carry unsafe atoms, so negative
-verdicts are already downgraded. Only constructors of inductives that
-actually occur in the goal are declared, keeping the per-query
-environment small.
+For Djinn, the *constructors* of a recursive inductive are sound
+introduction rules without opening elimination: declare the atom's key
+as an abstract type and add `List.nil : K`,
+`List.cons : v → K → K` as value premises (fields translate through
+the existing fragment translation; recursive occurrences map to the
+atom's variable; constructors with out-of-fragment fields are simply
+omitted). Refutation soundness is unaffected — such goals already carry
+unsafe atoms, so negative verdicts are already downgraded. Only
+constructors of inductives that actually occur in the goal are
+declared, keeping the per-query environment small. The later Exference
+slice replaces this projection with a real nominal recursive datatype
+and its bounded one-layer eliminator; Djinn's behavior is unchanged.
 
 ### E. Rendering polish: anonymous constructors first — S, cosmetic (implemented)
 
@@ -512,27 +562,40 @@ preference order), and short-dot constructor names (`.some x`) where
 the expected type is known. Pure renderer work; every variant is
 still backend-verified.
 
-### F. Exference behind the same boundary — L, phase-3 vanguard (implemented)
+### F. Exference and bounded live providers — L, phase-3 slice (implemented)
 
-The deliberate on-ramp to phase 3 that avoids its hard part
-(Mathlib-scale inventories and ratings). Wire Djex's Exference
-adapter as a second engine behind the existing `Leant.Synth.Engine`
-boundary, selectable via `:set synth-engine djinn|exference|both`,
-with its step/queue/depth budgets surfaced as `:set` options. Seed
-its inventory with only what the pipeline already knows: the phase-2
-datatype declarations and (once A lands) the hypothesis premises.
-Value: ranked heuristic candidates on goals where LJT's complete
-search is the wrong tool, `both` mode as the UX dry run for phase 3,
-and the inventory/ratings design can then grow incrementally toward
-browse-env scale — the condition §6 set for starting phase 3 proper.
+Djex's Exference adapter sits behind the existing
+`Leant.Synth.Engine` boundary, selectable via `:set synth-engine
+djinn|exference|both`; `:set synth-steps` exposes Exference's step
+budget while queue/depth retain conservative engine defaults. Its
+structural inventory contains datatype declarations and
+hypothesis premises. The implemented extension now adds up to 80
+providers from the live Lean environment: target-root and exact-session
+filtering bounds discovery, result-head/short-name ordering supplies a
+relevance signal, increasing positive penalties preserve that signal
+during search, and a private-name map restores the exact Lean global in
+the rendered term. Providers that fall outside the fragment are dropped
+individually, and Lean verification remains the final authority.
+
+For complete constructor inventories whose applied parameters can be
+represented safely, the Exference projection also models recursive
+inductives nominally and enables one finite constructor match, with
+recursive fields retained as ordinary local values rather than
+recursively eliminated. Together,
+these changes let Exference discover both bounded structural case terms
+and library reuse such as `List.map`. `both` mode still keeps Djinn's
+closed, deciding projection separate, so importing a heuristic
+inventory cannot weaken its refutation semantics.
 
 ### Explicitly not proposed
 
 - **Dependent elimination or induction** — still prove mode's job
   (§5); the transport-only discipline is the design, not a gap.
-- **Mathlib-scale inventory now** — §6's condition stands: not before
-  the ratings/inventory design exists and startup discipline is
-  protected. F is the preparatory step.
+- **Unbounded Mathlib-wide inventory now** — the first useful bounded
+  slice exists, but it is deliberately root-local and rebuilt per
+  query. Persistent caching, transitive relevance, and stable
+  user/core/Mathlib ratings should land only with measurements that
+  protect startup and interactive latency.
 - **Engine-side universe reasoning** — kernel-side verification
   already discards universe-sloppy candidates; duplicating that in
   the engine buys nothing (§2.0).
