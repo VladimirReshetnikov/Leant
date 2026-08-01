@@ -23,7 +23,7 @@ import Data.List
   , tails
   )
 import Data.Maybe (fromMaybe, isJust)
-import Data.Time.Clock (diffUTCTime, getCurrentTime)
+import Data.Time.Clock (UTCTime, addUTCTime, diffUTCTime, getCurrentTime)
 import Data.Time.Format (defaultTimeLocale, formatTime)
 import Data.Time.LocalTime (getZonedTime)
 import System.Console.Haskeline
@@ -1961,23 +1961,38 @@ synthGo' st args retriedVars goal parsed = do
       -- lane and retains its existing merged-candidate behavior.
       structuralFirst = engine == EngineExference && refusal == Nothing
   limit <- synthTimeoutSeconds
-  let runSynthesis providers = runEngineBounded limit
+  started <- getCurrentTime
+  let deadline
+        | limit <= 0 = Nothing
+        | otherwise = Just (addUTCTime (fromIntegral limit) started)
+      runSynthesis providers = runEngineBefore deadline
         (synthesizeWithProviders
           engine (rsSynthSteps state) providers fragment)
   if structuralFirst
     then do
       baseline <- runSynthesis []
-      (candidatesChecked, shown) <- tryCandidates baseline
-      if shown
-        then pure ()
-        else do
-          providers <-
-            if discoverProviders
-              then loadSynthProviders st (pgProviderQuery parsed)
-              else pure []
-          if null providers
-            then report candidatesChecked baseline
-            else runSynthesis providers >>= report False
+      case baseline of
+        -- A provider inventory cannot repair an engine failure, and the two
+        -- lanes share one wall-clock deadline.  Preserve the baseline
+        -- diagnostic instead of spending another full timeout and replacing
+        -- it with a less informative fallback result.
+        Nothing -> report False baseline
+        Just (Left _) -> report False baseline
+        _ -> do
+          (checkedVariants, shown) <- tryCandidates baseline
+          if shown
+            then pure ()
+            else do
+              providers <-
+                if discoverProviders
+                  then loadSynthProviders st (pgProviderQuery parsed)
+                  else pure []
+              if null providers
+                then report (isJust checkedVariants) baseline
+                else do
+                  enriched <- runSynthesis providers
+                  report False (maybe enriched
+                    (`dropCheckedCandidates` enriched) checkedVariants)
     else do
       providers <-
         if discoverProviders
@@ -1992,10 +2007,27 @@ synthGo' st args retriedVars goal parsed = do
  where
   tryCandidates bounded = case bounded of
     Just (Right (SynthCandidates groups notes)) -> do
-      shown <- verifyGroups groups
+      let checkedGroups = take synthMaxTried groups
+      shown <- verifyGroups checkedGroups
       when shown (reportNotes notes)
-      pure (True, shown)
-    _ -> pure (False, False)
+      pure (Just (concat checkedGroups), shown)
+    _ -> pure (Nothing, False)
+
+  -- A failed baseline verification has already tried every variant in its
+  -- bounded group prefix.  Provider-enriched Exference commonly rediscovers
+  -- those same structural expressions, so remove the checked spellings before
+  -- verification to avoid duplicating backend work and failed environments.
+  dropCheckedCandidates checked bounded = case bounded of
+    Just (Right (SynthCandidates groups notes)) ->
+      let freshGroups = filter (not . null)
+            [ filter (`notElem` checked) group
+            | group <- take synthMaxTried groups
+            ]
+          freshOutcome
+            | null freshGroups = SynthNoTerm notes
+            | otherwise = SynthCandidates freshGroups notes
+      in Just (Right freshOutcome)
+    _ -> bounded
 
   report _ Nothing = do
     limit <- synthTimeoutSeconds
@@ -2127,6 +2159,27 @@ runEngineBounded limit outcome
       Just outcome <$ evaluate (forceOutcome synthMaxTried outcome)
   | otherwise = do
       done <- timeout (limit * 1000000)
+        (evaluate (forceOutcome synthMaxTried outcome))
+      pure (outcome <$ done)
+
+-- | Run an engine lane before one command-wide deadline.  Structural-first
+-- Exference may fall through to a provider-enriched lane; both searches,
+-- provider discovery, and intervening Lean verification consume the same
+-- configured wall-clock allowance rather than receiving a fresh timeout each.
+-- 'Nothing' as the deadline retains the explicit wait-forever setting.
+runEngineBefore
+  :: Maybe UTCTime -> Either String SynthOutcome
+  -> IO (Maybe (Either String SynthOutcome))
+runEngineBefore Nothing outcome =
+  Just outcome <$ evaluate (forceOutcome synthMaxTried outcome)
+runEngineBefore (Just deadline) outcome = do
+  now <- getCurrentTime
+  let remainingMicros = floor
+        (realToFrac (diffUTCTime deadline now) * 1000000 :: Double)
+  if remainingMicros <= 0
+    then pure Nothing
+    else do
+      done <- timeout remainingMicros
         (evaluate (forceOutcome synthMaxTried outcome))
       pure (outcome <$ done)
 

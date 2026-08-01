@@ -15,6 +15,7 @@ inductive Demo.Tag (n : Nat) : Type where
 :synth ((∀ a b : Type 1, Demo.Phantom2 a b) → Demo.Phantom2 (∀ x : Type, x → x) (∀ y : Type, y → y))
 :synth ((∀ a : Type 1, Demo.Guard a) → Demo.Guard (∀ b : Type, b → b))
 :synth Demo.Secret
+:synth (Unit → Demo.Secret)
 :set synth-engine djinn
 :synth ((∀ a : Type 1, Option a) → Option (∀ b : Type, b → b))
 :synth ((∀ a b : Type 1, Demo.Phantom2 a b) → Demo.Phantom2 (∀ x : Type, x → x) (∀ y : Type, y → y))
