@@ -1037,17 +1037,21 @@ parametricFamilyEngineTests = testGroup "parametric family engine projection"
         else assertFailure $ "recursive field escaped its data declaration: "
           ++ show candidates
   , testCase "scope a fixed opaque field in zero-parameter recursive data" $ do
-      let format = FParamRec True "Std.Format" "Format" []
+      let string = FAtom False "String"
+          format = FParamRec True "Std.Format" "Format" []
             [ ("Std.Format.nil", [])
-            , ("Std.Format.text", [FAtom False "String"])
+            , ("Std.Format.text", [string])
             , ("Std.Format.append",
                 [FAtom False "Format", FAtom False "Format"])
             ]
-      case synthesizeWithProviders EngineExference 128 []
-          (FArr format format) of
-        Left err -> assertFailure $
-          "fixed recursive field escaped its declaration: " ++ err
-        Right _ -> pure ()
+          candidates = allFamilyCandidates
+            (synthesizeWithProviders EngineExference 512 []
+              (FArr string format))
+      if any ("text x" `isInfixOf`) candidates
+        then pure ()
+        else assertFailure $
+          "an earlier fixed field did not construct recursive data: "
+            ++ show candidates
   ]
  where
   polytype = FAll True "b" (FArr (FVar "b") (FVar "b"))

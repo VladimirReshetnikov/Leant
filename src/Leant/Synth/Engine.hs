@@ -589,9 +589,22 @@ fragToDjinn structuralRecursive providers extras frag0 = do
   voidC <- viaShow (mkIdentifier "Void")
   unitC <- viaShow (tupleName Boxed 0)
   let usableProviders = filter usableProvider providers
-      plans = exactFamilyPlans
-        (map snd extras ++ [frag0] ++ map providerTypeFrag usableProviders)
-      rigidAtoms = structuralAtomKeys plans
+      queryFragments =
+        map snd extras ++ [frag0] ++ map providerTypeFrag usableProviders
+      plans = exactFamilyPlans queryFragments
+      structuralTemplateFragments =
+        [ field
+        | StructuralFamily template <- Map.elems plans
+        , (_, fields) <- templateConstructors template
+        , field <- fields
+        ]
+      (recursiveSelfKeys, recursiveFieldAtoms)
+        | structuralRecursive = recursiveStructuralAtoms
+            (queryFragments ++ structuralTemplateFragments)
+        | otherwise = (Set.empty, Set.empty)
+      rigidAtoms = Set.difference
+        (Set.union (structuralAtomKeys plans) recursiveFieldAtoms)
+        recursiveSelfKeys
       projection = ProjectionCompleteness
         { projectionFamiliesComplete = exactFamilyProjectionComplete plans
         , projectionFragmentsComplete =
@@ -865,17 +878,6 @@ fragToDjinn structuralRecursive providers extras frag0 = do
                       (RecInfo typeName (length parameters))
                       (tsRecFamilies s)
                   })
-                -- A recursive declaration can have fixed opaque fields which
-                -- are not parameters of the Lean family (for example,
-                -- @Std.Format.text : String -> Format@).  Such fields must be
-                -- private rigid proper types, not free variables in the data
-                -- declaration.  The recursive self key is harmless here:
-                -- it was installed in @tsInds@ above and resolves before the
-                -- rigid-atom fallback.
-                let fieldAtoms = foldl collectFragAtoms Set.empty
-                      (concatMap snd ctors)
-                modifyT (\s -> s
-                  { tsRigidAtoms = Set.union fieldAtoms (tsRigidAtoms s) })
                 let sole = length ctors == 1
                 constructors <- mapM
                   (\(j, (leanName, fields)) -> do
@@ -985,6 +987,50 @@ fragToDjinn structuralRecursive providers extras frag0 = do
   plainParameter parameter = case parameter of
     FVar key -> Just key
     _ -> Nothing
+
+  -- Fixed opaque fields consumed by Exference's structural recursive
+  -- declarations must be rigid before any fragment is translated.  Otherwise
+  -- traversal order can give an earlier goal occurrence (say @String@ in
+  -- @String -> Std.Format@) a flexible identity before @Format.text@ closes
+  -- the same field as a private proper type.  Collect every eligible complete
+  -- recursive schema query-wide, then remove the eligible recursive occurrence
+  -- keys themselves: self fields must still resolve through the shared
+  -- structural knot rather than becoming unrelated rigid atoms.
+  recursiveStructuralAtoms = foldl collect (Set.empty, Set.empty)
+   where
+    collect accum frag = case frag of
+      FArr parameter result -> descend accum [parameter, result]
+      FProd left right -> descend accum [left, right]
+      FSum left right -> descend accum [left, right]
+      FAll _ _ body -> collect accum body
+      FApp _ _ _ arguments -> descend accum arguments
+      -- Translating an exact nonrecursive occurrence consumes only its
+      -- parameter vector.  Its query-wide structural template fields are
+      -- supplied separately above; an abstract plan's occurrence inventory
+      -- must not rigidify otherwise unused metadata.
+      FParamInd _ _ parameters _ -> descend accum parameters
+      FInd _ constructors -> descend accum (concatMap snd constructors)
+      FParamRec complete _ key parameters constructors ->
+        recursive accum complete key parameters constructors
+      FRec complete key parameters constructors ->
+        recursive accum complete key parameters constructors
+      _ -> accum
+
+    descend = foldl collect
+
+    recursive accum@(selfKeys, fieldAtoms)
+        complete key parameters constructors =
+      let fields = concatMap snd constructors
+          eligible = complete && case distinctPlainParameters parameters of
+            Just _ -> True
+            Nothing -> False
+          accum'
+            | eligible =
+                ( Set.insert key selfKeys
+                , foldl collectFragAtoms fieldAtoms fields
+                )
+            | otherwise = accum
+      in descend accum' (parameters ++ fields)
 
 fragmentProjectionComplete :: Frag -> Bool
 fragmentProjectionComplete frag =
