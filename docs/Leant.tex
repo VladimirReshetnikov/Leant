@@ -754,6 +754,16 @@ synth engine: both
 note: exference: search truncated: step limit reached, queue limit pruned 31990
 \end{session}
 
+Before Exference searches, Lean discovers at most 80 live providers
+under the namespaces used by the target (plus exact session
+declarations). The serializer derives a canonical query from the
+sorted, deduplicated namespace roots and final result head, rather than
+from the goal's raw spelling. Successful inventories --- including an
+empty one --- are kept in a generation-aware 12-entry LRU. Imports,
+ordinary declarations, and session-restoring operations invalidate that
+generation; generated \code{it1}, \code{it2}, \dots\ bindings cannot be
+providers and preserve it.
+
 The pure searches answer in microseconds to milliseconds; the cost
 center is backend verification, a few hundred milliseconds per
 candidate. A wall-clock guard (default 20\,s,
@@ -787,10 +797,15 @@ the goal and serializes it into the engines' fragment: structural
 connectives are decomposed; qualifying inductives expand into
 constructor lists; everything else becomes an $\alpha$-normalized
 opaque atom. The fragment translator either accepts the result or
-refuses with a reason. The selected engine searches; its candidates
-are rendered back into Lean syntax, with constructor names restored,
-binders named by role, and anonymous-constructor and leading-dot
-spellings preferred over fully qualified fallbacks. Finally the
+refuses with a reason. The cached synthesis environment remembers the
+session history it has replayed: an unchanged history is reused, an
+append replays only its new suffix, and undo or another non-prefix
+change rebuilds from the cached import-and-serializer base. Generated
+result bindings participate in this replay so later goals can mention
+them without flushing the provider cache. The selected engine searches;
+its candidates are rendered back into Lean syntax, with constructor
+names restored, binders named by role, and anonymous-constructor and
+leading-dot spellings preferred over fully qualified fallbacks. Finally the
 backend re-elaborates each candidate against the original goal, and
 only survivors are shown and bound. The engine boundary is narrow by
 design: the searches behind it are swappable, and nothing they emit is

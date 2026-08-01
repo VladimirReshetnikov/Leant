@@ -37,6 +37,8 @@ Executable leant
     Leant.Json
     Leant.Synth.Engine
     Leant.Synth.Fragment
+    Leant.Synth.ProviderCache
+    Leant.Synth.Replay
     Leant.Synth.Render
   Ghc-Options:
     -Wall
@@ -63,6 +65,8 @@ Test-Suite leant-synth-tests
   Other-Modules:
     Leant.Synth.Engine
     Leant.Synth.Fragment
+    Leant.Synth.ProviderCache
+    Leant.Synth.Replay
     Leant.Synth.Render
   Ghc-Options:
     -Wall

@@ -438,6 +438,14 @@ finisher tactics, needing no premise database and no imports. Bare
   fallback pool does not drown the most relevant constants. Thus a
   target such as `(α → β) → List α → List β` can reuse
   `List.map` instead of rebuilding recursion from scratch.
+- The goal serializer also supplies a canonical provider query: the
+  target's sorted, deduplicated root namespaces and its final result
+  head. Leant keys a generation-aware, 12-entry LRU by that semantic
+  query rather than by raw goal text. Successful empty inventories are
+  cached too; discovery failures are not. Any operation that can change
+  imported or session declarations advances the generation and clears
+  the cache, while generated `it1`, `it2`, … bindings are excluded from
+  provider discovery and deliberately preserve it.
 - Providers receive collision-free private names inside Djex. Rendering
   maps those names back to the exact fully-qualified Lean globals (and
   uses Lean's `@` spelling for visible type applications) before the
@@ -482,6 +490,14 @@ engine searches; candidates are rendered back into Lean syntax with
 constructor and exact provider names restored and binders named by
 role; and the backend re-elaborates each candidate against the original
 goal — only survivors are shown and bound.
+
+The synthesis side environment tracks exactly which session history it
+has replayed. An unchanged history reuses it directly; an append replays
+only the new suffix; undo or another non-prefix change rebuilds from the
+cached import-and-serializer base. Generated result bindings still join
+that replay history so later goals can mention them, but because they
+cannot be providers they do not invalidate a reusable provider
+inventory.
 
 ## The Python edition
 

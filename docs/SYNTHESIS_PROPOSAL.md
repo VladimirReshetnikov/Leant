@@ -5,8 +5,9 @@ in-process Djex Djinn/LJT and Exference; see
 [README.md](../README.md#synth--automatic-term-synthesis)). A bounded
 first slice of phase 3 is also implemented: live goal-relevant Lean
 providers, exact global rendering, relevance-preserving ratings, and
-one-layer recursive elimination. Phase 4 and a persistent,
-Mathlib-scale inventory remain future work. Companion to
+one-layer recursive elimination, backed by a bounded semantic provider
+cache. Phase 4 and a persistent, Mathlib-scale inventory remain future
+work. Companion to
 [PROPOSALS.md](PROPOSALS.md).*
 
 Djex — vendored read-only in this repository as the
@@ -33,7 +34,7 @@ system.*
 | --- | --- | --- |
 | **LJT engine (Djinn)** | Complete, *terminating* proof search for intuitionistic propositional logic over `->`, tuples, `Either`, `Void`, opaque type variables; emits a lambda term, or a definitive "no term exists" | Curry–Howard transfers directly: the same calculus decides the Lean fragment `→ × ⊕ Empty Unit` in `Type` and `→ ∧ ∨ ⊥ ⊤ ¬ ↔` in `Prop`, emitting `fun`/`⟨,⟩`/`Sum.inl`/`.casesOn` terms |
 | **Non-inhabitation verdicts** | "Proof-backed non-inhabitation result... when formula translation is complete" (library-api.md) | For *opaque* type variables, LJT failure means **no closed term exists at that polymorphic type** — a trustworthy negative answer no Lean tactic currently gives (`exact?` failing proves nothing) |
-| **Exference engine** | Best-first search over an *inventory* of typed constants with per-name ratings (`environment/*.ratings`), explicit step/queue/depth budgets, ranked candidate batches | The implemented phase-3 slice builds a fresh bounded inventory from the live Lean environment, prioritizes exact session declarations and matching result heads, and gives later providers increasing penalties; persistent caching, transitive relevance, and user-maintained Mathlib ratings remain future work |
+| **Exference engine** | Best-first search over an *inventory* of typed constants with per-name ratings (`environment/*.ratings`), explicit step/queue/depth budgets, ranked candidate batches | The implemented phase-3 slice discovers a bounded inventory from the live Lean environment, prioritizes exact session declarations and matching result heads, gives later providers increasing penalties, and reuses successful inventories through a bounded generation-aware semantic cache; a persistent Mathlib-scale index, transitive relevance, and user-maintained ratings remain future work |
 | **Shared synthesis foundation** | Parser-independent vocabulary (`Name`, `Type`, `Constraint`, `Environment → Inventory → PreparedInventory → QueryResult (SearchBatch Candidate) → Expression`), each arrow a checked boundary | The template for Leant's internal engine boundary: one fragment grammar, one candidate term grammar, one verification protocol, with the engine behind it swappable. **Scope decision: this feature is Haskell-only** — the Haskell implementation links Djex in-process; the Python edition does not grow a synthesis host |
 | **Verification posture** | Engines are explicit about semantics ("neither backend guesses the other's"); truncated batches are labeled; a finished heuristic batch with no candidates "is not a proof of non-inhabitation" | Leant goes one better: **every candidate is elaborated by the Lean backend before display** (`example : (T) := term`), so the synthesizer never needs to be trusted — the same outsource-soundness pattern `:search?` and prove mode already use |
 | **Embeddable library** | `build-depends: djex`, GHC 9.12.4, sealed session + checked request + result envelope; also three CLIs (`djex djinn --render expression "a -> a"`) | Leant is built with **the same GHC 9.12.4** — it links Djex directly as a library, in-process, with no subprocess or protocol overhead |
@@ -245,9 +246,11 @@ with explicit truncation labeling.
 - **`sorry` flow**: `sorry` already prints its goal and offers `:prove`;
   the same hook can offer synthesis when the goal is in-fragment.
 - **Live environment**: the first phase-3 slice now asks Lean directly
-  for a bounded, goal-relevant provider inventory. Reusing the browse
-  cache or adding a persistent synthesis cache remains an optimization,
-  not a soundness requirement.
+  for a bounded, goal-relevant provider inventory. Its successful
+  answers, including an empty inventory, are shared by canonical target
+  roots and result head in a 12-entry generation-aware LRU. A persistent
+  Mathlib-scale index remains an optimization, not a soundness
+  requirement.
 - **Verification loop**: `example : (T) := candidate` is one `runCmd` —
   infrastructure that exists, including timeout handling and crash
   replay.
@@ -266,7 +269,8 @@ with explicit truncation labeling.
  Fragment translator  ── out-of-fragment ──> honest refusal (":synth handles
         |                                    →/×/⊕/∀(non-dep)/⊥/⊤ over opaque
         v                                    variables; this goal uses X")
- Optional live-provider inventory (Exference only; bounded to 80)
+ Optional live-provider inventory (Exference only; bounded to 80;
+                                   semantic 12-entry LRU)
         |
         v
  Engine (Djinn/LJT or ranked Exference)
@@ -374,8 +378,28 @@ Design rules, all inherited from Djex:
   budgets (`:set synth-steps` exposes the step bound; queue/depth retain
   conservative engine defaults) and reports truncation honestly. This is
   enough for `(α → β) → List α → List β` to prefer
-  `List.map`. A persistent cache, transitive relevance across unrelated
+  `List.map`.
+
+  Provider discovery does not key on raw goal spelling. The serializer's
+  single elaboration supplies a canonical query comprising sorted,
+  deduplicated target root namespaces and the final result head; generated
+  result names are removed from both. Successful inventories, including
+  empty ones, occupy a generation-aware 12-entry LRU, while failed
+  discovery is retried rather than cached. Imports, ordinary declarations,
+  their undo/reset/load/unpickle boundaries, and backend reconstruction
+  advance the provider world and clear its cache. Generated `it1`, `it2`,
+  … declarations cannot become providers, so appending or undoing one
+  deliberately preserves the current generation and its inventories. A
+  persistent Mathlib-scale index, transitive relevance across unrelated
   namespaces, and user/core/Mathlib ratings are still future work.
+
+  The separate synthesis environment uses the same history boundary but
+  avoids replaying a growing session from scratch: an exact history match
+  reuses the cached environment, an append replays only its suffix, and a
+  shortened or rewritten history falls back to replaying all entries over
+  the cached import-and-serializer base. Generated result declarations are
+  replayed so later goals can mention them even though they do not
+  invalidate provider inventories.
 
   For complete supported constructor inventories with safely recoverable
   parameter vectors, Exference also receives nominal recursive
@@ -424,9 +448,11 @@ Design rules, all inherited from Djex:
   cost center is the backend verification round-trip (~100–300 ms per
   candidate on this machine), so batches should verify lazily, top
   candidate first. The live inventory is capped at 80 serialized
-  providers, but it is rebuilt per query and its root-namespace
-  relevance is intentionally shallow; a cache and Mathlib-scale
-  relevance index remain open work.
+  providers. Its bounded semantic LRU avoids repeated discovery for the
+  same canonical roots/result head and provider world, while suffix-only
+  history replay avoids rebuilding the synthesis environment after each
+  generated result. Root-namespace relevance is intentionally shallow;
+  a persistent Mathlib-scale relevance index remains open work.
 - **Maintenance**: embedding Djex ties Leant to a large local
   package (and to its GHC version). Mitigation: the narrow engine
   boundary keeps Djex swappable for a small purpose-built LJT module
@@ -450,10 +476,11 @@ that composes rather than merely searches. The bounded phase-3 slice
 now validates the live-environment design without committing Leant to a
 global Mathlib index: exact globals survive the engine round-trip,
 ordered penalties keep an 80-provider query useful, and one-layer
-recursive elimination composes with library reuse. The next phase-3
-work should measure and cache inventories, improve relevance beyond a
-single target root, and expose stable user ratings without harming
-startup discipline.
+recursive elimination composes with library reuse. A bounded semantic
+LRU now removes repeated inventory round-trips without changing startup
+discipline, and synthesis-history appends replay only their suffix. The
+next phase-3 work should measure those latency gains, improve relevance
+beyond a single target root, and expose stable user ratings.
 
 ## 7. Post-phase-2 proposals
 
@@ -581,7 +608,13 @@ filtering bounds discovery, result-head/short-name ordering supplies a
 relevance signal, increasing positive penalties preserve that signal
 during search, and a private-name map restores the exact Lean global in
 the rendered term. Providers that fall outside the fragment are dropped
-individually, and Lean verification remains the final authority.
+individually, and Lean verification remains the final authority. The
+serializer derives a stable query from sorted, deduplicated target roots
+and its result head; successful inventories (including empty ones) live
+in a generation-aware 12-entry LRU. Provider-affecting environment
+changes invalidate that generation, while generated `itN` results do
+not. Session-history appends likewise replay only their new suffix into
+the cached synthesis environment.
 
 For complete constructor inventories whose applied parameters can be
 represented safely, the Exference projection also models recursive
@@ -598,10 +631,10 @@ inventory cannot weaken its refutation semantics.
 - **Dependent elimination or induction** — still prove mode's job
   (§5); the transport-only discipline is the design, not a gap.
 - **Unbounded Mathlib-wide inventory now** — the first useful bounded
-  slice exists, but it is deliberately root-local and rebuilt per
-  query. Persistent caching, transitive relevance, and stable
-  user/core/Mathlib ratings should land only with measurements that
-  protect startup and interactive latency.
+  slice and its 12-entry semantic cache exist, but discovery remains
+  deliberately root-local. A persistent cross-session index, transitive
+  relevance, and stable user/core/Mathlib ratings should land only with
+  measurements that protect startup and interactive latency.
 - **Engine-side universe reasoning** — kernel-side verification
   already discards universe-sloppy candidates; duplicating that in
   the engine buys nothing (§2.0).

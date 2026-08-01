@@ -19,17 +19,118 @@ import Leant.Synth.Engine
   )
 import Leant.Synth.Fragment
   ( Frag (..)
+  , GoalSort (..)
+  , ParsedGoal (..)
   , ProviderFrag (..)
+  , ProviderQuery (..)
+  , parseGoalSexp
   , parseProviderSexp
   )
+import Leant.Synth.ProviderCache
+  ( advanceProviderWorld
+  , canonicalProviderQuery
+  , emptyProviderCache
+  , historyEntryAffectsProviders
+  , initialProviderWorld
+  , insertProviderCache
+  , lookupProviderCache
+  , providerCacheSize
+  )
+import Leant.Synth.Replay (ReplayPlan (..), planReplay)
 import Leant.Synth.Render (renderLeanTerm)
 
 main :: IO ()
 main = defaultMain $ testGroup "Leant synthesis boundary"
-  [ providerParserTests
+  [ providerCacheTests
+  , replayPlanTests
+  , providerParserTests
   , providerEngineTests
   , rankNFrontierTests
   , visibleTypeApplicationTests
+  ]
+
+replayPlanTests :: TestTree
+replayPlanTests = testGroup "synthesis history replay"
+  [ testCase "reuse an exact cached history" $
+      planReplay ["def a := 1"] ["def a := 1"] @?= Reuse
+  , testCase "replay only an appended suffix" $
+      planReplay
+          ["def a := 1", "def b := a"]
+          ["def a := 1", "def b := a", "def «it!1» := b"]
+        @?= ReplaySuffix ["def «it!1» := b"]
+  , testCase "rebuild after undo shortens the history" $
+      planReplay ["def a := 1", "def b := a"] ["def a := 1"]
+        @?= ReplayAll ["def a := 1"]
+  , testCase "rebuild after an earlier entry is replaced" $
+      planReplay ["def a := 1", "def b := a"]
+          ["def a := 2", "def b := a"]
+        @?= ReplayAll ["def a := 2", "def b := a"]
+  , testCase "respect duplicates at the prefix boundary" $
+      planReplay ["a", "b"] ["a", "b", "b", "c"]
+        @?= ReplaySuffix ["b", "c"]
+  ]
+
+providerCacheTests :: TestTree
+providerCacheTests = testGroup "semantic provider cache"
+  [ testCase "canonicalize roots independently of traversal order" $
+      canonicalProviderQuery
+          [" List", "Prod", "List", "", "  Prod  "]
+          (Just " List.map ")
+        @?= ProviderQuery ["List", "Prod"] (Just "List.map")
+  , testCase "remove generated results without erasing normal namespaces" $ do
+      canonicalProviderQuery ["it!12", "List", "it!12"] (Just "it!7")
+        @?= ProviderQuery ["List"] Nothing
+      canonicalProviderQuery ["Foo"] (Just "Foo.it!7")
+        @?= ProviderQuery ["Foo"] (Just "Foo.it!7")
+  , testCase "parse and canonicalize provider metadata with a goal" $
+      parseGoalSexp
+          "(goal type (query (roots \"Prod\" \"List\" \"Prod\") \
+          \(head \"List\")) (-> (var \"a\") (var \"a\")))"
+        @?= Right (ParsedGoal GoalType
+          (ProviderQuery ["List", "Prod"] (Just "List"))
+          (FArr (FVar "a") (FVar "a")))
+  , testCase "retain an explicitly headless provider query" $
+      parseGoalSexp
+          "(goal prop (query (roots) (head)) (var \"p\"))"
+        @?= Right (ParsedGoal GoalProp
+          (ProviderQuery [] Nothing) (FVar "p"))
+  , testCase "refresh hits and evict the least-recently used entry" $ do
+      let world = initialProviderWorld
+          query n = ProviderQuery [n] (Just n)
+          cache0 = emptyProviderCache 2
+          cache1 = insertProviderCache world (query "A") "a" cache0
+          cache2 = insertProviderCache world (query "B") "b" cache1
+          (hitA, refreshed) =
+            lookupProviderCache world (query "A") cache2
+          cache3 = insertProviderCache world (query "C") "c" refreshed
+          (missB, afterMiss) =
+            lookupProviderCache world (query "B") cache3
+          (hitAAgain, _) =
+            lookupProviderCache world (query "A") afterMiss
+      hitA @?= Just "a"
+      missB @?= Nothing
+      hitAAgain @?= Just "a"
+      providerCacheSize cache3 @?= 2
+  , testCase "isolate identical queries across provider generations" $ do
+      let oldWorld = initialProviderWorld
+          newWorld = advanceProviderWorld oldWorld
+          query = ProviderQuery ["List"] (Just "List")
+          cache = insertProviderCache oldWorld query ([] :: [Int])
+            (emptyProviderCache 12)
+          (oldHit, cache') = lookupProviderCache oldWorld query cache
+          (newMiss, _) = lookupProviderCache newWorld query cache'
+      oldHit @?= Just []
+      newMiss @?= Nothing
+  , testCase "preserve inventories only across generated result bindings" $ do
+      map historyEntryAffectsProviders
+          [ "def «it!1» := (3)"
+          , "set_option autoImplicit true in def «it!2» : Nat := (3)"
+          , "set_option autoImplicit true in noncomputable def «it!3» \
+            \: Classical.choice _ := (Classical.choice _)"
+          ]
+        @?= [False, False, False]
+      historyEntryAffectsProviders "def userValue : Nat := 3" @?= True
+      historyEntryAffectsProviders "set_option pp.universes true" @?= True
   ]
 
 providerParserTests :: TestTree

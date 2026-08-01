@@ -60,6 +60,7 @@ import Leant.Synth.Fragment
   , GoalSort (..)
   , ParsedGoal (..)
   , ProviderFrag
+  , ProviderQuery
   , fragRefusal
   , fragUnsafeAtoms
   , glivenkoSplit
@@ -70,6 +71,18 @@ import Leant.Synth.Fragment
   , serializerProgram
   , synthPrelude
   )
+import Leant.Synth.ProviderCache
+  ( ProviderCache
+  , ProviderWorld
+  , advanceProviderWorld
+  , clearProviderCache
+  , emptyProviderCache
+  , historyEntryAffectsProviders
+  , initialProviderWorld
+  , insertProviderCache
+  , lookupProviderCache
+  )
+import Leant.Synth.Replay (ReplayPlan (..), planReplay)
 
 #ifdef mingw32_HOST_OS
 import Data.Bits ((.|.))
@@ -168,6 +181,12 @@ data ReplState = ReplState
     -- ^ the base environment with the session history replayed on top
     -- (so session-local names translate), tagged with the history it
     -- replayed; rebuilt when the history changes
+  , rsProviderWorld :: ProviderWorld
+    -- ^ generation of imports and user declarations eligible for live
+    -- provider discovery; generated it bindings do not advance it
+  , rsProviderCache :: ProviderCache [ProviderFrag]
+    -- ^ bounded semantic inventories keyed by provider world and the
+    -- serializer's canonical target roots/result head
   , rsSynthIts :: [String]
     -- ^ splice texts for `it1`, `it2`, ... - the last :synth batch's
     -- candidates.  In the session these are the mangled names the
@@ -190,6 +209,26 @@ data ReplState = ReplState
     -- ^ False when stdin is piped: prompts and echo go through emit (so the
     -- output and transcript read like a session) and Haskeline's own
     -- locale-encoded prompt printing is bypassed.
+  }
+
+-- | Move to a provider world whose imported and session declarations may
+-- differ.  Old generations cannot hit even before the bounded cache refills;
+-- clearing also makes the reclaimed capacity immediately useful.
+invalidateProviderWorld :: ReplState -> ReplState
+invalidateProviderWorld state = state
+  { rsProviderWorld = advanceProviderWorld (rsProviderWorld state)
+  , rsProviderCache = clearProviderCache (rsProviderCache state)
+  }
+
+-- | Environment identifiers are backend-local.  Import changes and backend
+-- restarts must discard every derived environment before another command can
+-- observe it.
+invalidateDerivedEnvironments :: ReplState -> ReplState
+invalidateDerivedEnvironments state = state
+  { rsBrowseEnv = Nothing
+  , rsSynthBase = Nothing
+  , rsSynthEnv = Nothing
+  , rsComplCache = []
   }
 
 -- | Interactive prove mode: the stack holds (proofState, goals, scriptEntry)
@@ -323,7 +362,9 @@ backendDied :: St -> IO ()
 backendDied st = do
   state <- readIORef st
   forM_ (rsBackend state) killBackend
-  modifyIORef' st (\s -> s { rsBackend = Nothing })
+  modifyIORef' st $ \current ->
+    invalidateProviderWorld
+      (invalidateDerivedEnvironments current { rsBackend = Nothing })
 
 -- Run a command in an environment. Nothing env = fresh (imports allowed).
 runCmd :: St -> Maybe Integer -> String -> IO (Either String JValue)
@@ -436,9 +477,8 @@ printResponse st transform v = case respFatal v of
 -- startup after a crash, and when imports change).
 rebuildSession :: St -> IO Bool
 rebuildSession st = do
-  modifyIORef' st (\s -> s
-    { rsBrowseEnv = Nothing, rsSynthBase = Nothing, rsSynthEnv = Nothing
-    , rsComplCache = [] })
+  modifyIORef' st
+    (invalidateProviderWorld . invalidateDerivedEnvironments)
   state <- readIORef st
   baseOk <- case rsImports state of
     [] -> do
@@ -620,11 +660,15 @@ bindIt st expr = do
     _ -> pure ()
 
 advanceEnv :: St -> Maybe Integer -> String -> IO ()
-advanceEnv st newEnv code = modifyIORef' st $ \s -> s
-  { rsEnvStack = rsEnv s : rsEnvStack s
-  , rsEnv = newEnv
-  , rsHistory = rsHistory s ++ [code]
-  }
+advanceEnv st newEnv code = modifyIORef' st $ \state ->
+  let advanced = state
+        { rsEnvStack = rsEnv state : rsEnvStack state
+        , rsEnv = newEnv
+        , rsHistory = rsHistory state ++ [code]
+        }
+  in if historyEntryAffectsProviders code
+       then invalidateProviderWorld advanced
+       else advanced
 
 evalInput :: St -> Bool -> String -> IO EvalOutcome
 evalInput st allowIncomplete rawText = do
@@ -838,14 +882,21 @@ dispatchCommand st line = do
           let (dropped, history) = case reverse (rsHistory state) of
                 h : hs -> (Just h, reverse hs)
                 [] -> (Nothing, [])
-          writeIORef st state
-            { rsEnv = prev, rsEnvStack = stack, rsHistory = history }
+              restored = state
+                { rsEnv = prev, rsEnvStack = stack, rsHistory = history }
+              updated = case dropped of
+                Just entry | historyEntryAffectsProviders entry ->
+                  invalidateProviderWorld restored
+                _ -> restored
+          writeIORef st updated
           forM_ dropped $ \d ->
             emitLn st =<< cDim st ("undid: " ++ takeWhile (/= '\n') d)
       pure True
     "reset" -> do
-      modifyIORef' st $ \s -> s
-        { rsHistory = [], rsEnvStack = [], rsEnv = rsBaseEnv s }
+      modifyIORef' st $ \s -> invalidateProviderWorld s
+        { rsHistory = [], rsEnvStack = [], rsEnv = rsBaseEnv s
+        , rsSynthEnv = Nothing
+        }
       imports <- rsImports <$> readIORef st
       emitLn st =<< cDim st
         ("session reset" ++ if null imports then "" else " (imports kept)")
@@ -1011,10 +1062,12 @@ cmdLoad st arg
                   Left err -> False <$ (emitLn st =<< cRed st err)
                   Right v -> do
                     errored <- printResponse st Nothing v
-                    modifyIORef' st (\s -> s { rsEnv = respEnv v })
-                    unless errored $ modifyIORef' st
-                      (\s -> s { rsHistory = [body] })
-                    pure True
+                    if errored
+                      then pure False
+                      else do
+                        modifyIORef' st $ \s -> invalidateProviderWorld s
+                          { rsEnv = respEnv v, rsHistory = [body] }
+                        pure True
               when bodyOk $ do
                 modifyIORef' st (\s -> s { rsLoadedFile = Just path })
                 finished <- getCurrentTime
@@ -1256,33 +1309,46 @@ ensureSynthBase st = do
                             (\s -> s { rsSynthBase = Just env })
                           pure (Right env)
 
--- | The synthesis environment: the base plus the session history, so
--- goals may mention session-local declarations.  Entries that fail to
--- replay (e.g. names clashing with the Lean import) are skipped with a
--- note; their declarations are then simply not visible to :synth.
+-- | The synthesis environment: the base plus the session history, so goals
+-- may mention session-local declarations.  A cached chronological prefix is
+-- extended by replaying only the appended suffix; undo or replacement starts
+-- again from the base.  Entries Lean rejects (e.g. names clashing with the
+-- Lean import) are skipped with a note, but a transport failure aborts the
+-- replay so a backend-local environment id is never cached after death.
 ensureSynthEnv :: St -> IO (Either String Integer)
 ensureSynthEnv st = do
   state <- readIORef st
+  let history = rsHistory state
   case rsSynthEnv state of
-    Just (env, hist) | hist == rsHistory state -> pure (Right env)
-    _ -> do
-      baseOr <- ensureSynthBase st
-      case baseOr of
-        Left err -> pure (Left err)
-        Right base -> do
-          history <- rsHistory <$> readIORef st
-          env <- replaySynth base history
-          modifyIORef' st (\s -> s { rsSynthEnv = Just (env, history) })
-          pure (Right env)
+    Just (env, cachedHistory) -> case planReplay cachedHistory history of
+      Reuse -> pure (Right env)
+      ReplaySuffix suffix -> finishReplay env history suffix
+      ReplayAll fullHistory -> replayAll fullHistory
+    Nothing -> replayAll history
  where
-  replaySynth env [] = pure env
+  replayAll history = do
+    baseOr <- ensureSynthBase st
+    case baseOr of
+      Left err -> pure (Left err)
+      Right base -> finishReplay base history history
+
+  finishReplay env history entries = do
+    replayed <- replaySynth env entries
+    case replayed of
+      Left err -> pure (Left err)
+      Right env' -> do
+        modifyIORef' st (\s -> s { rsSynthEnv = Just (env', history) })
+        pure (Right env')
+
+  replaySynth env [] = pure (Right env)
   replaySynth env (code : rest) = do
     result <- runCmd st (Just env) code
     case result of
+      Left err -> pure (Left err)
       Right v | not (hasErrors v), Nothing <- respFatal v
               , Just env' <- respEnv v ->
         replaySynth env' rest
-      _ -> do
+      Right _ -> do
         emitLn st =<< cDim st
           ("note: `" ++ takeWhile (/= '\n') code
            ++ "` is not visible to :synth (it did not replay over the "
@@ -1351,9 +1417,10 @@ parseHyps = go . filter (not . null . trim)
     (c : rest) -> findSep (c : pre) rest
     [] -> Nothing
 
-synthMaxShown, synthMaxTried :: Int
+synthMaxShown, synthMaxTried, providerCacheCapacity :: Int
 synthMaxShown = 5
 synthMaxTried = 12
+providerCacheCapacity = 12
 
 -- | Wall-clock guard on the engine, in seconds (0 waits indefinitely).
 -- Propositional goals answer in microseconds, but bounded hypothesis
@@ -1584,7 +1651,9 @@ synthGo' st args retriedVars goal parsed = do
         Nothing -> True
         Just _ -> providerMayOpen fragment
   providers <-
-    if discoverProviders then loadSynthProviders st goal else pure []
+    if discoverProviders
+      then loadSynthProviders st (pgProviderQuery parsed)
+      else pure []
   case refusal of
     Just reason
       | not (providerEngine && providerMayOpen fragment
@@ -1661,31 +1730,51 @@ synthGo' st args retriedVars goal parsed = do
 -- | Ask Lean for the bounded value inventory relevant to this goal.  A
 -- provider failure degrades to structural synthesis: inventory discovery is
 -- an optimization and never weakens the ordinary Djinn/Exference boundary.
-loadSynthProviders :: St -> String -> IO [ProviderFrag]
-loadSynthProviders st goal = do
-  envOr <- ensureSynthEnv st
-  case envOr of
-    Left _ -> pure []
-    Right env -> do
-      state <- readIORef st
-      let sessionNames = nub (concatMap sessionDeclNames (rsHistory state))
-      result <- runCmd st (Just env) (providerProgram sessionNames goal)
-      case result of
-        Right response
-          | not (hasErrors response), Nothing <- respFatal response ->
-              case
-                [ trim body
-                | (severity, body) <- respMessages response
-                , severity == "info"
-                , "(providers" `isPrefixOf` trim body
-                ] of
-                translated : _ -> case parseProviderSexp translated of
-                  Right providers -> pure providers
-                  Left err -> unavailable err
-                [] -> unavailable "Lean emitted no provider inventory"
-        Left err -> unavailable err
-        Right _ -> unavailable "Lean rejected provider discovery"
+loadSynthProviders :: St -> ProviderQuery -> IO [ProviderFrag]
+loadSynthProviders st query = do
+  cached <- atomicModifyIORef' st $ \state ->
+    let (result, cache') = lookupProviderCache
+          (rsProviderWorld state) query (rsProviderCache state)
+    in (state { rsProviderCache = cache' }, result)
+  case cached of
+    Just providers -> pure providers
+    Nothing -> discover
  where
+  discover = do
+    envOr <- ensureSynthEnv st
+    case envOr of
+      Left _ -> pure []
+      Right env -> do
+        state <- readIORef st
+        let world = rsProviderWorld state
+            sessionNames = nub
+              (concatMap sessionDeclNames (rsHistory state))
+        result <- runCmd st (Just env) (providerProgram sessionNames query)
+        case result of
+          Right response
+            | not (hasErrors response), Nothing <- respFatal response ->
+                case
+                  [ trim body
+                  | (severity, body) <- respMessages response
+                  , severity == "info"
+                  , isPrefixOf "(providers" (trim body)
+                  ] of
+                  translated : _ -> case parseProviderSexp translated of
+                    Right providers -> do
+                      modifyIORef' st $ \current ->
+                        if rsProviderWorld current == world
+                          then current
+                            { rsProviderCache = insertProviderCache
+                                world query providers
+                                (rsProviderCache current)
+                            }
+                          else current
+                      pure providers
+                    Left err -> unavailable err
+                  [] -> unavailable "Lean emitted no provider inventory"
+          Left err -> unavailable err
+          Right _ -> unavailable "Lean rejected provider discovery"
+
   unavailable reason = do
     debug <- lookupEnv "LEANT_SYNTH_DEBUG"
     when (isJust debug) $
@@ -2043,10 +2132,12 @@ cmdUnpickle st arg
             Right v -> do
               errored <- printResponse st Nothing v
               unless errored $ do
-                modifyIORef' st $ \s -> s
-                  { rsEnvStack = rsEnv s : rsEnvStack s
-                  , rsEnv = respEnv v
-                  }
+                modifyIORef' st $ \s ->
+                  invalidateProviderWorld
+                    (invalidateDerivedEnvironments s
+                      { rsEnvStack = rsEnv s : rsEnvStack s
+                      , rsEnv = respEnv v
+                      })
                 emitLn st =<< cDim st ("environment restored from " ++ path)
             Left err -> emitLn st =<< cRed st (show err)
 
@@ -2677,6 +2768,8 @@ run opts = do
         , rsBrowseEnv = Nothing
         , rsSynthBase = Nothing
         , rsSynthEnv = Nothing
+        , rsProviderWorld = initialProviderWorld
+        , rsProviderCache = emptyProviderCache providerCacheCapacity
         , rsSynthIts = []
         , rsSynthItsProve = False
         , rsSynthEngine = EngineDjinn

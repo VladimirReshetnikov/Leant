@@ -27,6 +27,7 @@ module Leant.Synth.Fragment
   , GoalSort (..)
   , ParsedGoal (..)
   , ProviderFrag (..)
+  , ProviderQuery (..)
   , synthPrelude
   , serializerProgram
   , providerProgram
@@ -42,6 +43,11 @@ module Leant.Synth.Fragment
 
 import Data.Char (isSpace)
 import Data.List (intercalate, nub)
+
+import Leant.Synth.ProviderCache
+  ( ProviderQuery (..)
+  , canonicalProviderQuery
+  )
 
 -- | The LJT core fragment.  @Iff@ and @Not@ are already lowered by the
 -- serializer (to a pair of arrows and an arrow to 'FBot').
@@ -87,6 +93,7 @@ data GoalSort = GoalProp | GoalType
 
 data ParsedGoal = ParsedGoal
   { pgSort :: GoalSort
+  , pgProviderQuery :: ProviderQuery
   , pgFrag :: Frag
   }
   deriving (Eq, Show)
@@ -314,8 +321,16 @@ serializerProgram goal = unlines
   , "    let tgt \8592 getMainTarget"
   , "    let isP \8592 Meta.isProp tgt"
   , "    let s \8592 LeantSynth.go 100 0 [] tgt"
+  , "    let roots := tgt.getUsedConstants.toList.map Name.getRoot"
+  , "    let rootText := String.intercalate \" \" (roots.map fun n =>"
+  , "      LeantSynth.esc n.toString)"
+  , "    let head \8592 LeantSynth.resultHead? tgt"
+  , "    let headText := match head with"
+  , "      | some n => \"(head \" ++ LeantSynth.esc n.toString ++ \")\""
+  , "      | none => \"(head)\""
   , "    logInfo (\"(goal \" ++ (if isP then \"prop\" else \"type\")"
-  , "      ++ \" \" ++ s ++ \")\")"
+  , "      ++ \" (query (roots \" ++ rootText ++ \") \" ++ headText"
+  , "      ++ \") \" ++ s ++ \")\")"
   , "  sorry"
   ]
 
@@ -326,17 +341,21 @@ serializerProgram goal = unlines
 -- root namespace occurs in the target (plus exact session declarations),
 -- ranks exact result-head matches first, serializes at most 80 providers, and
 -- leaves final admissibility to the Haskell fragment parser and Lean's own
--- candidate verification.
-providerProgram :: [String] -> String -> String
-providerProgram sessionNames goal = unlines
-  [ "open Lean Meta Elab Tactic in"
-  , "set_option autoImplicit true in"
+-- candidate verification.  The already-elaborated serializer query is the
+-- complete goal-dependent input; provider discovery does not elaborate the
+-- raw goal a second time.
+providerProgram :: [String] -> ProviderQuery -> String
+providerProgram sessionNames query = unlines
+  [ "open Lean Meta Elab Command in"
   , "set_option linter.unusedVariables false in"
-  , "example : (" ++ goal ++ ") := by"
-  , "  run_tac withMainContext do"
-  , "    let target \8592 getMainTarget"
+  , "run_cmd do"
+  , "  Lean.Elab.Command.liftTermElabM do"
   , "    let env \8592 getEnv"
-  , "    let roots := target.getUsedConstants.toList.map Name.getRoot"
+  , "    let roots : List String := ["
+      ++ intercalate ", " (map leanString (providerQueryRoots query)) ++ "]"
+  , "    let targetHead : Option String := "
+      ++ maybe "none" (("some " ++) . leanString)
+        (providerQueryResultHead query)
   , "    let sessions : List String := ["
       ++ intercalate ", " (map leanString sessionNames) ++ "]"
   , "    let aux : List String :="
@@ -347,10 +366,10 @@ providerProgram sessionNames goal = unlines
   , "    let keep (n : Name) : Bool :="
   , "      !n.isInternalDetail &&"
   , "      !n.components.any fun c => match c with"
-  , "        | .str _ s => aux.contains s"
+  , "        | .str _ s => s.startsWith \"it!\" || aux.contains s"
   , "        | _ => false"
   , "    let names := env.constants.fold (init := #[]) fun a n _ =>"
-  , "      if keep n && (roots.contains n.getRoot"
+  , "      if keep n && (roots.contains n.getRoot.toString"
   , "          || sessions.contains n.toString) then a.push n else a"
   , "    let shorter (a b : Name) : Bool :="
   , "      let sa := a.toString"
@@ -361,7 +380,6 @@ providerProgram sessionNames goal = unlines
   , "      sessions.contains n.toString"
   , "    let otherCandidates := sorted.toList.filter fun n =>"
   , "      !sessions.contains n.toString"
-  , "    let targetHead \8592 LeantSynth.resultHead? target"
   , "    let mut sessionHits : Array Name := #[]"
   , "    let mut preferred : Array Name := #[]"
   , "    let mut fallback : Array Name := #[]"
@@ -373,7 +391,7 @@ providerProgram sessionNames goal = unlines
   , "        let head \8592 LeantSynth.resultHead? info.type"
   , "        if sessions.contains n.toString then"
   , "          sessionHits := sessionHits.push n"
-  , "        else if head == targetHead then"
+  , "        else if head.map (fun n => n.toString) == targetHead then"
   , "          preferred := preferred.push n"
   , "        else"
   , "          fallback := fallback.push n"
@@ -388,7 +406,6 @@ providerProgram sessionNames goal = unlines
   , "        body := body ++ \" (provider \" ++ LeantSynth.esc n.toString"
   , "          ++ \" \" ++ frag ++ \")\""
   , "    logInfo (\"(providers\" ++ body ++ \")\")"
-  , "  sorry"
   ]
  where
   leanString s = '"' : concatMap escape s ++ "\""
@@ -423,7 +440,7 @@ tokenize (c : rest)
     pure (x : a, b)
   str [] = Left "unterminated string in goal translation"
 
--- | Parse the serializer's @(goal SORT FRAG)@ message.
+-- | Parse the serializer's @(goal SORT QUERY FRAG)@ message.
 parseGoalSexp :: String -> Either String ParsedGoal
 parseGoalSexp text = do
   toks <- tokenize text
@@ -433,11 +450,30 @@ parseGoalSexp text = do
         "prop" -> Right GoalProp
         "type" -> Right GoalType
         other -> Left ("unknown goal sort " ++ other)
-      (frag, rest') <- parseFrag rest
+      (query, afterQuery) <- parseProviderQuery rest
+      (frag, rest') <- parseFrag afterQuery
       case rest' of
-        [TR] -> Right (ParsedGoal gs frag)
+        [TR] -> Right (ParsedGoal gs query frag)
         _ -> Left "trailing tokens in goal translation"
     _ -> Left "malformed goal translation"
+
+parseProviderQuery :: [Tok] -> Either String (ProviderQuery, [Tok])
+parseProviderQuery
+    (TL : TSym "query" : TL : TSym "roots" : rest) = do
+  (roots, afterRoots) <- stringList rest
+  case afterRoots of
+    TL : TSym "head" : TR : TR : remaining ->
+      Right (canonicalProviderQuery roots Nothing, remaining)
+    TL : TSym "head" : TStr resultHead : TR : TR : remaining ->
+      Right (canonicalProviderQuery roots (Just resultHead), remaining)
+    _ -> Left "malformed provider query result head"
+ where
+  stringList (TR : remaining) = Right ([], remaining)
+  stringList (TStr value : remaining) = do
+    (values, final) <- stringList remaining
+    Right (value : values, final)
+  stringList _ = Left "malformed provider query roots"
+parseProviderQuery _ = Left "malformed provider query"
 
 -- | Parse the provider inventory emitted by 'providerProgram'.
 parseProviderSexp :: String -> Either String [ProviderFrag]
