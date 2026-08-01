@@ -31,8 +31,9 @@ where the unit of work is a line, not a file.
 **Leant is experimental and under active development.** Commands change
 shape between commits and output formats are not stable.
 
-There is a manual: **[docs/Leant.pdf](docs/Leant.pdf)** — an overview and
-tutorial, with a detailed tour of `:synth` ([LaTeX source](docs/Leant.tex)).
+There is a manual: **[docs/Leant.pdf](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Leant.pdf)**
+— an overview and tutorial, with a detailed tour of `:synth`
+([LaTeX source](docs/Leant.tex)).
 
 ## Highlights
 
