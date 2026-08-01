@@ -1,0 +1,9 @@
+inductive Demo.RecBox (a : Type 1) : Type 1 where
+| step : a → Demo.RecBox a → Demo.RecBox a
+
+:set synth-steps 512
+:set synth-engine exference
+:synth ((∀ a : Type 1, Demo.RecBox a) → Demo.RecBox (∀ b : Type, b → b))
+:set synth-engine djinn
+:synth ((∀ a : Type 1, Demo.RecBox a) → Demo.RecBox (∀ b : Type, b → b))
+:quit

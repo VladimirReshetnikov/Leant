@@ -1,0 +1,22 @@
+
+   __                  __
+  / /  ___ ___ ____   / /_
+ / /__/ -_) _ `/ _ \_/ __/
+/____/\__/\_,_/_//_/ \__/
+Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to exit.
+λ> inductive Demo.RecBox (a : Type 1) : Type 1 where
+…> | step : a → Demo.RecBox a → Demo.RecBox a
+…>
+λ> :set synth-steps 512
+synth steps: 512
+λ> :set synth-engine exference
+synth engine: exference
+λ> :synth ((∀ a : Type 1, Demo.RecBox a) → Demo.RecBox (∀ b : Type, b → b))
+preparing synthesis environment (session imports + Lean)...
+  it1  fun x => x _
+note: search truncated: step limit reached, queue limit pruned 2183
+λ> :set synth-engine djinn
+synth engine: djinn
+λ> :synth ((∀ a : Type 1, Demo.RecBox a) → Demo.RecBox (∀ b : Type, b → b))
+  it1  fun x => x _
+λ> :quit
