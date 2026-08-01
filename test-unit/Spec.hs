@@ -471,7 +471,35 @@ providerEngineTests = testGroup "foreign providers"
 
 rankNFrontierTests :: TestTree
 rankNFrontierTests = testGroup "Djinn rank-N frontiers"
-  [ testCase "render a balanced four-site pairwise plan for Lean" $ do
+  [ testCase "render four-binder hypothesis instantiation for Lean" $ do
+      let variable = FVar
+          forall4 a b c d resultFrag =
+            FAll True a
+              (FAll True b (FAll True c (FAll True d resultFrag)))
+          hypothesis = forall4 "a" "b" "c" "d"
+            (FArr (variable "a")
+              (FArr (variable "b")
+                (FArr (variable "c")
+                  (FArr (variable "d") (variable "R")))))
+          body = FArr hypothesis
+            (FArr (variable "A")
+              (FArr (variable "B")
+                (FArr (variable "C")
+                  (FArr (variable "D") (variable "R")))))
+          goal = FAll True "A" (FAll True "B" (FAll True "C"
+            (FAll True "D" (FAll True "R" body))))
+      case synthesizeWithProviders EngineDjinn 0 [] goal of
+        Right (SynthCandidates groups _) ->
+          let candidates = concat groups
+          in if any ("f _ _ _ _ x y z w" `isInfixOf`) candidates
+              then pure ()
+              else assertFailure $
+                "expected a fully applied four-binder candidate, got: "
+                  ++ show candidates
+        Right other -> assertFailure $
+          "unexpected four-binder synthesis outcome: " ++ outcomeTag other
+        Left err -> assertFailure err
+  , testCase "render a balanced four-site pairwise plan for Lean" $ do
       let variable = FVar
           product4 a b c d = FProd a (FProd b (FProd c d))
           forall4 a b c d body =
