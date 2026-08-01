@@ -1,0 +1,15 @@
+# The REPL speaks LF, so its transcripts and the shell that diffs them
+# must stay LF in the working tree no matter what core.autocrlf says.
+*.sh            text eol=lf
+test/*.txt      text eol=lf
+test/*.golden   text eol=lf
+
+# Haskell and Lean sources are LF everywhere too.
+*.hs            text eol=lf
+*.cabal         text eol=lf
+cabal.project   text eol=lf
+
+# Windows launchers genuinely want CRLF.
+*.cmd           text eol=crlf
+
+*.pdf           binary
