@@ -171,8 +171,10 @@ Both engines consume the same shared datatype declarations.
   query-supplied polytype. The direct Lean rendering is `fun x => x _` (or one
   `_` per family parameter).
 - **Exference** can perform the same family transport and keeps its normal
-  ranked constructor/case search, including live providers. It never emits
-  negative evidence.
+  ranked constructor/case search. In standalone mode, a structurally accepted
+  goal first runs without live providers and its candidates are Lean-verified;
+  providers are discovered and searched only after no baseline variant
+  verifies. It never emits negative evidence.
 - **Both** mode keeps the established isolation: Djinn candidates first,
   Exference-only candidates after, and negative evidence only from Djinn when
   its projection was complete.
@@ -219,13 +221,17 @@ The focused Haskell tests cover:
 
 The end-to-end
 [rank-N transcript](../../test/synth-parametric-rankn.txt) covers real `Option`
-under Djinn, plus two-parameter `Demo.Phantom2` and fixed-field `Demo.Guard`
-transport under both engines. A term-parameterized `Demo.Tag` control confirms
-that the legacy occurrence-local path still constructs its value. The
-Exference core has provider-free family-transport coverage; the live `Option`
-inventory is excluded from the golden because its eighty root-local providers
-can exhaust the configured heuristic queue before the direct candidate is
-ranked.
+under standalone Exference as well as Djinn. Exference's provider-free baseline
+is Lean-verified before inventory discovery, so the eighty root-local providers
+can no longer crowd this direct transport out of the bounded frontier. The
+transcript also covers two-parameter `Demo.Phantom2` and fixed-field
+`Demo.Guard` transport under both engines. Atomic `Demo.Secret` and structural
+`Unit → Demo.Secret` controls demonstrate, respectively, the direct provider
+path and provider fallback after a structural baseline miss. A
+term-parameterized `Demo.Tag` control confirms that the legacy occurrence-local
+path still constructs its value. See the focused
+[provider-isolation report](2026-08-01-provider-isolated-exference-baseline.md)
+for the dispatch, shared-deadline, and failed-variant filtering rules.
 
 ## Deferred recursive work
 
