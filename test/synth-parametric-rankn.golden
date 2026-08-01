@@ -5,6 +5,7 @@
 /____/\__/\_,_/_//_/ \__/
 Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to exit.
 λ> axiom Demo.Secret : Type
+λ> axiom Demo.secretValue : Demo.Secret
 λ> inductive Demo.Guard (a : Type 1) : Type 1 where
 …> | mk : Demo.Secret → a → Demo.Guard a
 …>
@@ -17,13 +18,19 @@ Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to e
 …>
 λ> :set synth-engine exference
 synth engine: exference
-λ> :synth ((∀ a b : Type 1, Demo.Phantom2 a b) → Demo.Phantom2 (∀ x : Type, x → x) (∀ y : Type, y → y))
+λ> :synth ((∀ a : Type 1, Option a) → Option (∀ b : Type, b → b))
 preparing synthesis environment (session imports + Lean)...
+  it1  fun x => x _
+note: search truncated: step limit reached, queue limit pruned 25228
+λ> :synth ((∀ a b : Type 1, Demo.Phantom2 a b) → Demo.Phantom2 (∀ x : Type, x → x) (∀ y : Type, y → y))
   it1  fun x => x _ _
-note: search truncated: step limit reached, queue limit pruned 37864
+note: search truncated: step limit reached, queue limit pruned 21734
 λ> :synth ((∀ a : Type 1, Demo.Guard a) → Demo.Guard (∀ b : Type, b → b))
   it1  fun x => x _
-note: search truncated: step limit reached, queue limit pruned 37185
+note: search truncated: step limit reached, queue limit pruned 24423
+λ> :synth Demo.Secret
+  it1  Demo.secretValue
+note: search truncated: step limit reached, queue limit pruned 40555
 λ> :set synth-engine djinn
 synth engine: djinn
 λ> :synth ((∀ a : Type 1, Option a) → Option (∀ b : Type, b → b))

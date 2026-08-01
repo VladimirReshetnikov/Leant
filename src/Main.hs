@@ -1952,47 +1952,69 @@ synthGo' st args retriedVars goal parsed = do
       discoverProviders = providerEngine && case refusal of
         Nothing -> True
         Just _ -> fragProviderMayOpen fragment
-  providers <-
-    if discoverProviders
-      then loadSynthProviders st (pgProviderQuery parsed)
-      else pure []
-  case refusal of
-    Just reason
-      | not (providerEngine && fragProviderMayOpen fragment
-          && not (null providers)) ->
-          emitLn st =<< cRed st ("out of fragment: " ++ reason)
-    _ -> do
-      limit <- synthTimeoutSeconds
-      bounded <- runEngineBounded limit
+      -- Exference's live provider inventory can add eighty values to one
+      -- 1024-node frontier.  Preserve the ordinary structural search as an
+      -- isolated first lane: if one of its candidates survives Lean
+      -- verification, discovering providers cannot improve whether the goal
+      -- is solved and must not crowd that term out.  Atomic/refused goals go
+      -- straight to providers, while @both@ already has an isolated Djinn
+      -- lane and retains its existing merged-candidate behavior.
+      structuralFirst = engine == EngineExference && refusal == Nothing
+  limit <- synthTimeoutSeconds
+  let runSynthesis providers = runEngineBounded limit
         (synthesizeWithProviders
           engine (rsSynthSteps state) providers fragment)
-      case bounded of
-        Nothing -> do
-          emitLn st =<< cYellow st
-            ("the engine did not finish within " ++ show limit
-             ++ "s \8212 no answer, not a verdict")
-          emitLn st =<< cDim st
-            ("(bounded hypothesis instantiation can widen the search a lot; "
-             ++ "set LEANT_SYNTH_TIMEOUT to another number of seconds, "
-             ++ "or 0 to wait indefinitely)")
-        Just outcome -> report outcome
+  if structuralFirst
+    then do
+      baseline <- runSynthesis []
+      (candidatesChecked, shown) <- tryCandidates baseline
+      if shown
+        then pure ()
+        else do
+          providers <-
+            if discoverProviders
+              then loadSynthProviders st (pgProviderQuery parsed)
+              else pure []
+          if null providers
+            then report candidatesChecked baseline
+            else runSynthesis providers >>= report False
+    else do
+      providers <-
+        if discoverProviders
+          then loadSynthProviders st (pgProviderQuery parsed)
+          else pure []
+      case refusal of
+        Just reason
+          | not (providerEngine && fragProviderMayOpen fragment
+              && not (null providers)) ->
+              emitLn st =<< cRed st ("out of fragment: " ++ reason)
+        _ -> runSynthesis providers >>= report False
  where
-  report outcome = case outcome of
+  tryCandidates bounded = case bounded of
+    Just (Right (SynthCandidates groups notes)) -> do
+      shown <- verifyGroups groups
+      when shown (reportNotes notes)
+      pure (True, shown)
+    _ -> pure (False, False)
+
+  report _ Nothing = do
+    limit <- synthTimeoutSeconds
+    emitLn st =<< cYellow st
+      ("the engine did not finish within " ++ show limit
+       ++ "s \8212 no answer, not a verdict")
+    emitLn st =<< cDim st
+      ("(bounded hypothesis instantiation can widen the search a lot; "
+       ++ "set LEANT_SYNTH_TIMEOUT to another number of seconds, "
+       ++ "or 0 to wait indefinitely)")
+  report candidatesChecked (Just outcome) = case outcome of
     Left err -> emitLn st =<< cRed st ("synthesis engine error: " ++ err)
     Right (SynthCandidates groups notes) -> do
-      -- LEANT_SYNTH_DEBUG shows the engine's rendered variants before
-      -- verification; the pipeline is otherwise opaque when a candidate
-      -- is dropped
-      debug <- lookupEnv "LEANT_SYNTH_DEBUG"
-      when (isJust debug) $
-        forM_ (zip [1 :: Int ..] (take synthMaxTried groups)) $
-          \(i, group) -> forM_ group $ \variant ->
-            emitLn st =<< cDim st ("debug " ++ show i ++ ": " ++ variant)
-      shown <- verifyAndDisplay st args goal (take synthMaxTried groups)
+      shown <-
+        if candidatesChecked then pure False else verifyGroups groups
       unless shown $ emitLn st =<< cRed st
         ("the engine proposed " ++ show (length groups)
          ++ " candidate(s) but none survived Lean verification")
-      forM_ notes $ \note -> emitLn st =<< cDim st ("note: " ++ note)
+      reportNotes notes
     Right (SynthRefuted sound)
       | sound -> do
           wantClassical <- rsSynthClassical <$> readIORef st
@@ -2023,7 +2045,21 @@ synthGo' st args retriedVars goal parsed = do
              ++ "not a refutation)")
     Right (SynthNoTerm notes) -> do
       emitLn st =<< cYellow st "no term found within the search bounds"
-      forM_ notes $ \note -> emitLn st =<< cDim st ("note: " ++ note)
+      reportNotes notes
+
+  verifyGroups groups = do
+    -- LEANT_SYNTH_DEBUG shows the engine's rendered variants before
+    -- verification; the pipeline is otherwise opaque when a candidate is
+    -- dropped.
+    debug <- lookupEnv "LEANT_SYNTH_DEBUG"
+    when (isJust debug) $
+      forM_ (zip [1 :: Int ..] (take synthMaxTried groups)) $
+        \(i, group) -> forM_ group $ \variant ->
+          emitLn st =<< cDim st ("debug " ++ show i ++ ": " ++ variant)
+    verifyAndDisplay st args goal (take synthMaxTried groups)
+
+  reportNotes notes =
+    forM_ notes $ \note -> emitLn st =<< cDim st ("note: " ++ note)
 
 -- | Ask Lean for the bounded value inventory relevant to this goal.  A
 -- provider failure degrades to structural synthesis: inventory discovery is

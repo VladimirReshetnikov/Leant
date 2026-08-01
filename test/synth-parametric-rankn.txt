@@ -1,4 +1,5 @@
 axiom Demo.Secret : Type
+axiom Demo.secretValue : Demo.Secret
 inductive Demo.Guard (a : Type 1) : Type 1 where
 | mk : Demo.Secret → a → Demo.Guard a
 
@@ -10,8 +11,10 @@ inductive Demo.Tag (n : Nat) : Type where
 | mk : Demo.Tag n
 
 :set synth-engine exference
+:synth ((∀ a : Type 1, Option a) → Option (∀ b : Type, b → b))
 :synth ((∀ a b : Type 1, Demo.Phantom2 a b) → Demo.Phantom2 (∀ x : Type, x → x) (∀ y : Type, y → y))
 :synth ((∀ a : Type 1, Demo.Guard a) → Demo.Guard (∀ b : Type, b → b))
+:synth Demo.Secret
 :set synth-engine djinn
 :synth ((∀ a : Type 1, Option a) → Option (∀ b : Type, b → b))
 :synth ((∀ a b : Type 1, Demo.Phantom2 a b) → Demo.Phantom2 (∀ x : Type, x → x) (∀ y : Type, y → y))
