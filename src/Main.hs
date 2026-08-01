@@ -23,6 +23,7 @@ import Data.List
   , tails
   )
 import Data.Maybe (fromMaybe, isJust)
+import qualified Data.Set as Set
 import Data.Time.Clock (UTCTime, addUTCTime, diffUTCTime, getCurrentTime)
 import Data.Time.Format (defaultTimeLocale, formatTime)
 import Data.Time.LocalTime (getZonedTime)
@@ -84,6 +85,7 @@ import Leant.Synth.Engine
   , SynthOutcome (..)
   , forceOutcome
   , parseSynthEngine
+  , providerStages
   , synthEngineName
   , synthesizeWithProviders
   , synthesizeTuned
@@ -1963,12 +1965,12 @@ synthGo' st args retriedVars goal parsed = do
   let deadline
         | limit <= 0 = Nothing
         | otherwise = Just (addUTCTime (fromIntegral limit) started)
-      runSynthesis providers = runEngineBefore deadline
+      runSynthesis laneEngine providers = runEngineBefore deadline
         (synthesizeWithProviders
-          engine (rsSynthSteps state) providers fragment)
+          laneEngine (rsSynthSteps state) providers fragment)
   if structuralFirst
     then do
-      baseline <- runSynthesis []
+      baseline <- runSynthesis engine []
       case baseline of
         -- A provider inventory cannot repair an engine failure, and the two
         -- lanes share one wall-clock deadline.  Preserve the baseline
@@ -1994,7 +1996,7 @@ synthGo' st args retriedVars goal parsed = do
               if null providers
                 then report (isJust checkedVariants) baseline
                 else runProviderLanes runSynthesis
-                  (maybe [] id checkedVariants)
+                  (Set.fromList (maybe [] id checkedVariants))
                   (providerStages engine providers)
     else do
       providers <-
@@ -2005,26 +2007,16 @@ synthGo' st args retriedVars goal parsed = do
         Just reason
           | not (fragProviderMayOpen fragment && not (null providers)) ->
               emitLn st =<< cRed st ("out of fragment: " ++ reason)
-        _ -> runProviderLanes runSynthesis []
+        _ -> runProviderLanes runSynthesis Set.empty
           (providerStages engine providers)
  where
-  -- Djinn's bounded candidate prefix can be crowded by a lossy or merely
-  -- irrelevant foreign declaration.  Give Lean's highest-ranked provider an
-  -- isolated chance first, then widen to the full bounded inventory if it
-  -- does not verify.  Exference already ranks providers internally and keeps
-  -- its established single enriched lane.  Every stage shares the command
-  -- deadline and later stages skip spellings Lean already rejected.
-  providerStages EngineExference providers = [providers]
-  providerStages _ providers@(provider : _ : _) = [[provider], providers]
-  providerStages _ providers = [providers]
-
   runProviderLanes runLane checked lanes = case lanes of
     [] -> report False (Just (Right (SynthNoTerm [])))
-    [providers] -> do
-      bounded <- runLane providers
+    [(laneEngine, providers)] -> do
+      bounded <- runLane laneEngine providers
       report False (dropCheckedCandidates checked bounded)
-    providers : remaining -> do
-      bounded <- runLane providers
+    (laneEngine, providers) : remaining -> do
+      bounded <- runLane laneEngine providers
       let fresh = dropCheckedCandidates checked bounded
       case fresh of
         Nothing -> report False fresh
@@ -2034,7 +2026,8 @@ synthGo' st args retriedVars goal parsed = do
           if shown
             then pure ()
             else runProviderLanes runLane
-              (checked ++ maybe [] id attempted) remaining
+              (Set.union checked (Set.fromList (maybe [] id attempted)))
+              remaining
 
   tryCandidates bounded = case bounded of
     Just (Right (SynthCandidates groups notes)) -> do
@@ -2051,7 +2044,7 @@ synthGo' st args retriedVars goal parsed = do
   dropCheckedCandidates checked bounded = case bounded of
     Just (Right (SynthCandidates groups notes)) ->
       let freshGroups = filter (not . null)
-            [ filter (`notElem` checked) group
+            [ filter (`Set.notMember` checked) group
             | group <- take synthMaxTried groups
             ]
           freshOutcome

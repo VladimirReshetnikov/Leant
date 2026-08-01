@@ -30,6 +30,7 @@ import Leant.Backend (findBackendProject)
 import Leant.Synth.Engine
   ( SynthEngine (..)
   , SynthOutcome (..)
+  , providerStages
   , synthesizeWith
   , synthesizeWithProviders
   )
@@ -84,6 +85,7 @@ main = defaultMain $ testGroup "Leant synthesis boundary"
   , snapshotMetadataTests
   , sessionReplayTests
   , providerCacheTests
+  , providerScheduleTests
   , replayPlanTests
   , providerProgramTests
   , candidateVerificationTests
@@ -483,6 +485,44 @@ providerParserTests = testGroup "provider inventory parser"
   , testCase "rejects trailing inventory data" $
       parseProviderSexp "(providers) extra" @?=
         Left "trailing tokens in provider translation"
+  ]
+
+providerScheduleTests :: TestTree
+providerScheduleTests = testGroup "live provider widening"
+  [ testCase "keep Exference on one rated full-inventory lane" $
+      providerStages EngineExference ([1 .. 80] :: [Int]) @?=
+        [(EngineExference, [1 .. 80])]
+  , testCase "widen Djinn through sparse discovery-order prefixes" $
+      providerStages EngineDjinn ([1 .. 80] :: [Int]) @?=
+        [ (EngineDjinn, [1])
+        , (EngineDjinn, [1 .. 4])
+        , (EngineDjinn, [1 .. 16])
+        , (EngineDjinn, [1 .. 80])
+        ]
+  , testCase "run only intermediate combined prefixes through Djinn" $
+      providerStages EngineBoth ([1 .. 17] :: [Int]) @?=
+        [ (EngineBoth, [1])
+        , (EngineDjinn, [1 .. 4])
+        , (EngineDjinn, [1 .. 16])
+        , (EngineBoth, [1 .. 17])
+        ]
+  , testCase "deduplicate milestones at short inventory boundaries" $ do
+      let inventory size = [1 .. size] :: [Int]
+      providerStages EngineDjinn (inventory 0) @?= []
+      providerStages EngineDjinn (inventory 1) @?= [(EngineDjinn, [1])]
+      providerStages EngineDjinn (inventory 2) @?=
+        [(EngineDjinn, [1]), (EngineDjinn, [1, 2])]
+      providerStages EngineDjinn (inventory 4) @?=
+        [(EngineDjinn, [1]), (EngineDjinn, [1 .. 4])]
+      providerStages EngineBoth (inventory 1) @?=
+        [(EngineBoth, [1])]
+      providerStages EngineBoth (inventory 2) @?=
+        [(EngineBoth, [1]), (EngineBoth, [1, 2])]
+      providerStages EngineBoth (inventory 5) @?=
+        [ (EngineBoth, [1])
+        , (EngineDjinn, [1 .. 4])
+        , (EngineBoth, [1 .. 5])
+        ]
   ]
 
 providerEngineTests :: TestTree

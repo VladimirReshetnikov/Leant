@@ -24,6 +24,7 @@ module Leant.Synth.Engine
   , SynthOutcome (..)
   , parseSynthEngine
   , synthEngineName
+  , providerStages
   , synthesize
   , synthesizeWithProviders
   , synthesizeWith
@@ -168,6 +169,30 @@ synthEngineName engine = case engine of
   EngineDjinn -> "djinn"
   EngineExference -> "exference"
   EngineBoth -> "both"
+
+-- | Bounded live-provider widening in discovery order.  Djinn's fixed
+-- candidate window can be crowded by a large environment even when a short
+-- prefix contains every declaration needed for a composition.  Give it sparse
+-- geometric prefixes before the complete bounded inventory: at most four
+-- searches for the current eighty-provider discovery cap.  Exference keeps
+-- its rated full-inventory lane.  Combined mode preserves its existing
+-- singleton run and complete final run; intermediate prefixes are Djinn-only
+-- so widening does not repeatedly spend Exference's step budget.
+providerStages :: SynthEngine -> [a] -> [(SynthEngine, [a])]
+providerStages _ [] = []
+providerStages EngineExference providers =
+  [(EngineExference, providers)]
+providerStages engine providers =
+  [ (stageEngine size, take size providers)
+  | size <- filter (< providerCount) [1, 4, 16] ++ [providerCount]
+  ]
+ where
+  providerCount = length providers
+  stageEngine size = case engine of
+    EngineDjinn -> EngineDjinn
+    _
+      | size == 1 || size == providerCount -> EngineBoth
+      | otherwise -> EngineDjinn
 
 -- | Run the selected in-process search on a translated goal.  The
 -- step budget applies to Exference only (Djinn's complete search needs

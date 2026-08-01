@@ -16,6 +16,11 @@ axiom Demo.Index : Type
 axiom Demo.consume {a : Type} : Demo.Middle a → Demo.Output a
 axiom Demo.produce {a : Type} : Demo.Input a → Demo.Middle a
 
+axiom Demo.Token : Type
+class Demo.C (a : Type) : Prop where witness : True
+instance : Demo.C Nat := ⟨True.intro⟩
+axiom Demo.global {a : Type} [Demo.C a] : Demo.Token
+
 :set synth-engine djinn
 :synth Demo.Seed
 :synth (Demo.Seed → Demo.Seed)
@@ -24,12 +29,8 @@ axiom Demo.produce {a : Type} : Demo.Input a → Demo.Middle a
 :synth ((∀ x : Type, x → x) → Demo.SealedBox (∀ x : Type, x → x))
 :synth (Demo.Input Demo.Index → Demo.Output Demo.Index)
 :set synth-engine both
+:synth (Demo.Input Demo.Index → Demo.Output Demo.Index)
 :synth (Demo.Seed → Demo.SealedBox Demo.Seed)
-
-axiom Demo.Token : Type
-class Demo.C (a : Type) : Prop where witness : True
-instance : Demo.C Nat := ⟨True.intro⟩
-axiom Demo.global {a : Type} [Demo.C a] : Demo.Token
 
 :set synth-steps 1024
 :set synth-engine exference
