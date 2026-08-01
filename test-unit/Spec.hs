@@ -25,6 +25,7 @@ import Leant.Synth.Fragment
   , ProviderQuery (..)
   , parseGoalSexp
   , parseProviderSexp
+  , providerProgram
   )
 import Leant.Synth.ProviderCache
   ( advanceProviderWorld
@@ -43,10 +44,43 @@ main :: IO ()
 main = defaultMain $ testGroup "Leant synthesis boundary"
   [ providerCacheTests
   , replayPlanTests
+  , providerProgramTests
   , providerParserTests
   , providerEngineTests
   , rankNFrontierTests
   , visibleTypeApplicationTests
+  ]
+
+providerProgramTests :: TestTree
+providerProgramTests = testGroup "provider discovery program"
+  [ testCase "demote implementation workers but trust session declarations" $ do
+      let program = providerProgram ["Demo.listImpl"]
+            (ProviderQuery ["Demo"] (Just "List"))
+          classifier = unlines
+            [ "    let implementationWorker (n : Name) : Bool :="
+            , "      match n with"
+            , "      | .str _ s =>"
+            , "        s == \"go\" || s == \"loop\""
+            , "          || s.endsWith \"TR\" || s.endsWith \"Impl\""
+            , "          || s.endsWith \"Aux\""
+            , "      | _ => false"
+            ]
+          sessionOverride = unlines
+            [ "        if session then"
+            , "          if exactHead then"
+            , "            sessionPreferred := sessionPreferred.push n"
+            , "          else"
+            , "            sessionFallback := sessionFallback.push n"
+            , "        else if implementationWorker n then"
+            ]
+          tierOrder = unlines
+            [ "    let chosen := (sessionPreferred.toList ++ preferred.toList"
+            , "      ++ sessionFallback.toList ++ fallback.toList"
+            , "      ++ workerPreferred.toList ++ workerFallback.toList).take 80"
+            ]
+      classifier `isInfixOf` program @?= True
+      sessionOverride `isInfixOf` program @?= True
+      tierOrder `isInfixOf` program @?= True
   ]
 
 replayPlanTests :: TestTree

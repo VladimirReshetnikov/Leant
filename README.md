@@ -432,10 +432,14 @@ finisher tactics, needing no premise database and no imports. Bare
 - Before an Exference search, Leant takes a bounded inventory from the
   live Lean environment. It considers constants under namespaces named
   by the target, plus exact declarations from the current session;
-  rejects generated names; prioritizes session declarations and exact
-  result-head matches; and serializes at most 80 providers. Increasing
-  positive penalties preserve that order during search, so the broader
-  fallback pool does not drown the most relevant constants. Thus a
+  rejects generated names; prioritizes exact-result session and public
+  declarations before unrelated session values; and serializes at most
+  80 providers. Conventional implementation workers ending in `TR`,
+  `Impl`, or `Aux` (or a `.go`/`.loop` component) remain eligible but
+  move behind public fallbacks; exact user-session declarations always
+  bypass that spelling heuristic. Increasing positive penalties preserve
+  the order during search, so the broader fallback pool does not drown
+  the most relevant constants. Thus a
   target such as `(α → β) → List α → List β` can reuse
   `List.map` instead of rebuilding recursion from scratch.
 - The goal serializer also supplies a canonical provider query: the

@@ -756,7 +756,10 @@ note: exference: search truncated: step limit reached, queue limit pruned 31990
 
 Before Exference searches, Lean discovers at most 80 live providers
 under the namespaces used by the target (plus exact session
-declarations). The serializer derives a canonical query from the
+declarations). Exact-result session and public declarations lead the
+ranking; conventional implementation-worker names remain eligible but
+follow public fallbacks, while session declarations bypass that naming
+heuristic. The serializer derives a canonical query from the
 sorted, deduplicated namespace roots and final result head, rather than
 from the goal's raw spelling. Successful inventories --- including an
 empty one --- are kept in a generation-aware 12-entry LRU. Imports,

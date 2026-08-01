@@ -339,11 +339,12 @@ serializerProgram goal = unlines
 -- large imported environment can contain over one hundred thousand
 -- declarations.  The Lean side therefore retains only declarations whose
 -- root namespace occurs in the target (plus exact session declarations),
--- ranks exact result-head matches first, serializes at most 80 providers, and
--- leaves final admissibility to the Haskell fragment parser and Lean's own
--- candidate verification.  The already-elaborated serializer query is the
--- complete goal-dependent input; provider discovery does not elaborate the
--- raw goal a second time.
+-- ranks exact result-head matches first, demotes conventional implementation
+-- workers without excluding them, serializes at most 80 providers, and leaves
+-- final admissibility to the Haskell fragment parser and Lean's own candidate
+-- verification.  Exact session declarations bypass the worker-name heuristic.
+-- The already-elaborated serializer query is the complete goal-dependent
+-- input; provider discovery does not elaborate the raw goal a second time.
 providerProgram :: [String] -> ProviderQuery -> String
 providerProgram sessionNames query = unlines
   [ "open Lean Meta Elab Command in"
@@ -368,6 +369,13 @@ providerProgram sessionNames query = unlines
   , "      !n.components.any fun c => match c with"
   , "        | .str _ s => s.startsWith \"it!\" || aux.contains s"
   , "        | _ => false"
+  , "    let implementationWorker (n : Name) : Bool :="
+  , "      match n with"
+  , "      | .str _ s =>"
+  , "        s == \"go\" || s == \"loop\""
+  , "          || s.endsWith \"TR\" || s.endsWith \"Impl\""
+  , "          || s.endsWith \"Aux\""
+  , "      | _ => false"
   , "    let names := env.constants.fold (init := #[]) fun a n _ =>"
   , "      if keep n && (roots.contains n.getRoot.toString"
   , "          || sessions.contains n.toString) then a.push n else a"
@@ -380,23 +388,37 @@ providerProgram sessionNames query = unlines
   , "      sessions.contains n.toString"
   , "    let otherCandidates := sorted.toList.filter fun n =>"
   , "      !sessions.contains n.toString"
-  , "    let mut sessionHits : Array Name := #[]"
+  , "    let mut sessionPreferred : Array Name := #[]"
   , "    let mut preferred : Array Name := #[]"
+  , "    let mut sessionFallback : Array Name := #[]"
   , "    let mut fallback : Array Name := #[]"
+  , "    let mut workerPreferred : Array Name := #[]"
+  , "    let mut workerFallback : Array Name := #[]"
   , "    -- Exact session declarations bypass the root-pool scan cap."
   , "    for n in sessionCandidates ++ otherCandidates.take 2048 do"
   , "      match env.find? n with"
   , "      | none => pure ()"
   , "      | some info =>"
   , "        let head \8592 LeantSynth.resultHead? info.type"
-  , "        if sessions.contains n.toString then"
-  , "          sessionHits := sessionHits.push n"
-  , "        else if head.map (fun n => n.toString) == targetHead then"
+  , "        let exactHead := head.map (fun n => n.toString) == targetHead"
+  , "        let session := sessions.contains n.toString"
+  , "        if session then"
+  , "          if exactHead then"
+  , "            sessionPreferred := sessionPreferred.push n"
+  , "          else"
+  , "            sessionFallback := sessionFallback.push n"
+  , "        else if implementationWorker n then"
+  , "          if exactHead then"
+  , "            workerPreferred := workerPreferred.push n"
+  , "          else"
+  , "            workerFallback := workerFallback.push n"
+  , "        else if exactHead then"
   , "          preferred := preferred.push n"
   , "        else"
   , "          fallback := fallback.push n"
-  , "    let chosen := (sessionHits.toList ++ preferred.toList"
-  , "      ++ fallback.toList).take 80"
+  , "    let chosen := (sessionPreferred.toList ++ preferred.toList"
+  , "      ++ sessionFallback.toList ++ fallback.toList"
+  , "      ++ workerPreferred.toList ++ workerFallback.toList).take 80"
   , "    let mut body := \"\""
   , "    for n in chosen do"
   , "      match env.find? n with"

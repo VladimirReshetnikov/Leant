@@ -34,7 +34,7 @@ system.*
 | --- | --- | --- |
 | **LJT engine (Djinn)** | Complete, *terminating* proof search for intuitionistic propositional logic over `->`, tuples, `Either`, `Void`, opaque type variables; emits a lambda term, or a definitive "no term exists" | Curry–Howard transfers directly: the same calculus decides the Lean fragment `→ × ⊕ Empty Unit` in `Type` and `→ ∧ ∨ ⊥ ⊤ ¬ ↔` in `Prop`, emitting `fun`/`⟨,⟩`/`Sum.inl`/`.casesOn` terms |
 | **Non-inhabitation verdicts** | "Proof-backed non-inhabitation result... when formula translation is complete" (library-api.md) | For *opaque* type variables, LJT failure means **no closed term exists at that polymorphic type** — a trustworthy negative answer no Lean tactic currently gives (`exact?` failing proves nothing) |
-| **Exference engine** | Best-first search over an *inventory* of typed constants with per-name ratings (`environment/*.ratings`), explicit step/queue/depth budgets, ranked candidate batches | The implemented phase-3 slice discovers a bounded inventory from the live Lean environment, prioritizes exact session declarations and matching result heads, gives later providers increasing penalties, and reuses successful inventories through a bounded generation-aware semantic cache; a persistent Mathlib-scale index, transitive relevance, and user-maintained ratings remain future work |
+| **Exference engine** | Best-first search over an *inventory* of typed constants with per-name ratings (`environment/*.ratings`), explicit step/queue/depth budgets, ranked candidate batches | The implemented phase-3 slice discovers a bounded inventory from the live Lean environment, prioritizes exact-result session and public declarations, demotes conventional implementation workers without filtering them, gives later providers increasing penalties, and reuses successful inventories through a bounded generation-aware semantic cache; a persistent Mathlib-scale index, transitive relevance, and user-maintained ratings remain future work |
 | **Shared synthesis foundation** | Parser-independent vocabulary (`Name`, `Type`, `Constraint`, `Environment → Inventory → PreparedInventory → QueryResult (SearchBatch Candidate) → Expression`), each arrow a checked boundary | The template for Leant's internal engine boundary: one fragment grammar, one candidate term grammar, one verification protocol, with the engine behind it swappable. **Scope decision: this feature is Haskell-only** — the Haskell implementation links Djex in-process; the Python edition does not grow a synthesis host |
 | **Verification posture** | Engines are explicit about semantics ("neither backend guesses the other's"); truncated batches are labeled; a finished heuristic batch with no candidates "is not a proof of non-inhabitation" | Leant goes one better: **every candidate is elaborated by the Lean backend before display** (`example : (T) := term`), so the synthesizer never needs to be trusted — the same outsource-soundness pattern `:search?` and prove mode already use |
 | **Embeddable library** | `build-depends: djex`, GHC 9.12.4, sealed session + checked request + result envelope; also three CLIs (`djex djinn --render expression "a -> a"`) | Leant is built with **the same GHC 9.12.4** — it links Djex directly as a library, in-process, with no subprocess or protocol overhead |
@@ -366,12 +366,14 @@ Design rules, all inherited from Djex:
   implemented).** Before an Exference query, a Lean metaprogram scans
   environment names cheaply and retains declarations whose root
   namespace occurs in the target, plus exact declarations made in the
-  current session. It rejects generated names, orders exact session
-  hits first, then declarations whose result head matches the target,
-  then the shorter-name fallback pool, and serializes at most 80
-  provider candidates. Providers outside the supported fragment are
-  dropped individually before search. Leant gives the survivors private
-  collision-free engine names, maps them back to the exact
+  current session. It rejects generated names, orders exact-result
+  session hits first, then exact-result public declarations, then the
+  session and public fallback pools, and serializes at most 80 provider
+  candidates. Conventional implementation-worker names (`TR`, `Impl`,
+  `Aux`, `.go`, and `.loop`) remain eligible after those public tiers;
+  exact session declarations bypass the heuristic. Providers outside the
+  supported fragment are dropped individually before search. Leant gives
+  the survivors private collision-free engine names, maps them back to the exact
   fully-qualified Lean globals during rendering, and assigns increasing
   positive rating penalties in discovery order so fallback constants do
   not drown the best match. Search remains subject to its explicit
