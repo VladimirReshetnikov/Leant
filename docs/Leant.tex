@@ -757,9 +757,10 @@ synth engine: both
 note: exference: search truncated: step limit reached, queue limit pruned 31990
 \end{session}
 
-Before Exference searches, Lean discovers at most 80 live providers
+Before Exference searches, Lean discovers at most 80 live term providers
 under the namespaces used by the target (plus exact session
-declarations). Exact-result session and public declarations lead the
+declarations). Type constructors and type families, whose fully peeled
+result is a sort, are excluded before search. Exact-result session and public declarations lead the
 ranking; conventional implementation-worker names remain eligible but
 follow public fallbacks, while session declarations bypass that naming
 heuristic. The serializer derives a canonical query from the

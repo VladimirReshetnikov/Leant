@@ -439,7 +439,9 @@ finisher tactics, needing no premise database and no imports. Bare
   by the target, plus exact declarations from the current session;
   rejects generated names; prioritizes exact-result session and public
   declarations before unrelated session values; and serializes at most
-  80 providers. Conventional implementation workers ending in `TR`,
+  80 term providers. Declarations whose fully peeled result is a sort
+  (type constructors and type families) are excluded before search.
+  Conventional implementation workers ending in `TR`,
   `Impl`, or `Aux` (or a `.go`/`.loop` component) remain eligible but
   move behind public fallbacks; exact user-session declarations always
   bypass that spelling heuristic. Increasing positive penalties preserve

@@ -28,10 +28,11 @@ import Leant.Synth.Fragment
   , ParsedGoal (..)
   , ProviderFrag (..)
   , ProviderQuery (..)
-  , candidateVerificationPrograms
+  , candidateVerificationProgram
   , parseGoalSexp
   , parseProviderSexp
   , providerProgram
+  , synthPrelude
   )
 import Leant.Synth.ProviderCache
   ( advanceProviderWorld
@@ -204,12 +205,12 @@ providerProgramTests = testGroup "provider discovery program"
             , "      | _ => false"
             ]
           sessionOverride = unlines
-            [ "        if session then"
-            , "          if exactHead then"
-            , "            sessionPreferred := sessionPreferred.push n"
-            , "          else"
-            , "            sessionFallback := sessionFallback.push n"
-            , "        else if implementationWorker n then"
+            [ "          if session then"
+            , "            if exactHead then"
+            , "              sessionPreferred := sessionPreferred.push n"
+            , "            else"
+            , "              sessionFallback := sessionFallback.push n"
+            , "          else if implementationWorker n then"
             ]
           tierOrder = unlines
             [ "    let chosen := (sessionPreferred.toList ++ preferred.toList"
@@ -219,15 +220,20 @@ providerProgramTests = testGroup "provider discovery program"
       classifier `isInfixOf` program @?= True
       sessionOverride `isInfixOf` program @?= True
       tierOrder `isInfixOf` program @?= True
+  , testCase "exclude type constructors without excluding polymorphic values" $ do
+      let program = providerProgram []
+            (ProviderQuery ["Widget"] (Just "Widget"))
+      "partial def resultIsSort (e : Expr) : MetaM Bool := do"
+        `isInfixOf` synthPrelude @?= True
+      "        let typeLevel \8592 LeantSynth.resultIsSort info.type\n        if typeLevel then pure () else"
+        `isInfixOf` program @?= True
   ]
 
 candidateVerificationTests :: TestTree
 candidateVerificationTests = testGroup "candidate verification programs"
   [ testCase "retry valid opaque inhabitants as noncomputable" $
-      candidateVerificationPrograms "Widget" "Widget.saved" @?=
-        [ "set_option autoImplicit true in example : (Widget) := (Widget.saved)"
-        , "set_option autoImplicit true in noncomputable example : (Widget) := (Widget.saved)"
-        ]
+      candidateVerificationProgram "Widget" "Widget.saved" @?=
+        "set_option autoImplicit true in noncomputable example : (Widget) := (Widget.saved)"
   ]
 
 replayPlanTests :: TestTree

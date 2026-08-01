@@ -94,7 +94,7 @@ import Leant.Synth.Fragment
   , ParsedGoal (..)
   , ProviderFrag
   , ProviderQuery
-  , candidateVerificationPrograms
+  , candidateVerificationProgram
   , fragRefusal
   , fragUnsafeAtoms
   , glivenkoSplit
@@ -2283,16 +2283,11 @@ synthVerify st goal = go synthMaxShown 0
 
   tryGroup [] = pure Nothing
   tryGroup (term : variants) = do
-    verified <- tryPrograms (candidateVerificationPrograms goal term)
-    if verified then pure (Just term) else tryGroup variants
-
-  tryPrograms [] = pure False
-  tryPrograms (code : rest) = do
-    result <- runCurrentCmd st code
+    result <- runCurrentCmd st (candidateVerificationProgram goal term)
     case result of
       Right v | not (hasErrors v), Nothing <- respFatal v
-              , null (respSorries v) -> pure True
-      _ -> tryPrograms rest
+              , null (respSorries v) -> pure (Just term)
+      _ -> tryGroup variants
 
 completionCandidates :: St -> String -> IO [String]
 completionCandidates st prefix = do

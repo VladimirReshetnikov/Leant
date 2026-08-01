@@ -31,7 +31,7 @@ module Leant.Synth.Fragment
   , synthPrelude
   , serializerProgram
   , providerProgram
-  , candidateVerificationPrograms
+  , candidateVerificationProgram
   , parseGoalSexp
   , parseProviderSexp
   , fragRefusal
@@ -139,6 +139,15 @@ synthPrelude = unlines
   , "    withLocalDecl n bi dom fun fv =>"
   , "      resultHead? (body.instantiate1 fv)"
   , "  | _ => pure e.getAppFn.constName?"
+  , ""
+  , "-- Type constructors and type families are not term inhabitants."
+  , "partial def resultIsSort (e : Expr) : MetaM Bool := do"
+  , "  let e \8592 whnfR e.consumeMData"
+  , "  match e with"
+  , "  | Expr.forallE n dom body bi =>"
+  , "    withLocalDecl n bi dom fun fv =>"
+  , "      resultIsSort (body.instantiate1 fv)"
+  , "  | _ => pure e.isSort"
   , ""
   , "mutual"
   , ""
@@ -400,23 +409,25 @@ providerProgram sessionNames query = unlines
   , "      match env.find? n with"
   , "      | none => pure ()"
   , "      | some info =>"
-  , "        let head \8592 LeantSynth.resultHead? info.type"
-  , "        let exactHead := head.map (fun n => n.toString) == targetHead"
-  , "        let session := sessions.contains n.toString"
-  , "        if session then"
-  , "          if exactHead then"
-  , "            sessionPreferred := sessionPreferred.push n"
+  , "        let typeLevel \8592 LeantSynth.resultIsSort info.type"
+  , "        if typeLevel then pure () else"
+  , "          let head \8592 LeantSynth.resultHead? info.type"
+  , "          let exactHead := head.map (fun n => n.toString) == targetHead"
+  , "          let session := sessions.contains n.toString"
+  , "          if session then"
+  , "            if exactHead then"
+  , "              sessionPreferred := sessionPreferred.push n"
+  , "            else"
+  , "              sessionFallback := sessionFallback.push n"
+  , "          else if implementationWorker n then"
+  , "            if exactHead then"
+  , "              workerPreferred := workerPreferred.push n"
+  , "            else"
+  , "              workerFallback := workerFallback.push n"
+  , "          else if exactHead then"
+  , "            preferred := preferred.push n"
   , "          else"
-  , "            sessionFallback := sessionFallback.push n"
-  , "        else if implementationWorker n then"
-  , "          if exactHead then"
-  , "            workerPreferred := workerPreferred.push n"
-  , "          else"
-  , "            workerFallback := workerFallback.push n"
-  , "        else if exactHead then"
-  , "          preferred := preferred.push n"
-  , "        else"
-  , "          fallback := fallback.push n"
+  , "            fallback := fallback.push n"
   , "    let chosen := (sessionPreferred.toList ++ preferred.toList"
   , "      ++ sessionFallback.toList ++ fallback.toList"
   , "      ++ workerPreferred.toList ++ workerFallback.toList).take 80"
@@ -436,19 +447,15 @@ providerProgram sessionNames query = unlines
   escape '\\' = "\\\\"
   escape c = [c]
 
--- | Lean commands used to verify one rendered synthesis candidate.  The
--- ordinary form catches elaboration and type errors.  Some valid inhabitants
--- (notably axioms and opaque snapshot values) are unavailable to Lean's code
--- generator, so retry them in a noncomputable declaration before rejecting
--- the candidate.
-candidateVerificationPrograms :: String -> String -> [String]
-candidateVerificationPrograms goal term =
-  [ command ""
-  , command "noncomputable "
-  ]
- where
-  command keyword = "set_option autoImplicit true in " ++ keyword
-    ++ "example : (" ++ goal ++ ") := (" ++ term ++ ")"
+-- | Lean command used to verify one rendered synthesis candidate.
+-- @noncomputable@ disables executable-code generation without weakening
+-- elaboration, universe checking, safety checking, or the kernel type check.
+-- It therefore admits opaque and axiom-backed inhabitants without requiring a
+-- second backend round trip for every ordinary type-invalid candidate.
+candidateVerificationProgram :: String -> String -> String
+candidateVerificationProgram goal term =
+  "set_option autoImplicit true in noncomputable example : ("
+    ++ goal ++ ") := (" ++ term ++ ")"
 
 -- S-expression parsing ------------------------------------------------------
 
