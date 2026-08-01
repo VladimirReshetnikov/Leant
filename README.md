@@ -11,19 +11,10 @@ shape between commits and output formats are not stable.
 There is a manual: **[docs/Leant.pdf](docs/Leant.pdf)** — an overview and
 tutorial, with a detailed tour of `:synth` ([LaTeX source](docs/Leant.tex)).
 
-This repository holds two implementations. The Haskell one, documented
-below, lives at the root and is primary: a native binary with no Python
-dependency at runtime, and the only one with term synthesis. It began as
-a port of [LeantPy](LeantPy/README.md) (the Python original, still here),
-and the two share the command set and session semantics.
-
-Leant started inside the [ProveIt](https://github.com/VladimirReshetnikov/ProveIt)
-repository and was split out into its own with the history preserved.
-
 ## How the port replaces its dependencies
 
 The Python version delegates backend management to
-[LeanInteract](https://github.com/augustepoiroux/LeanInteract). This port
+[LeanInteract](https://github.com/augustepoiroux/LeanInteract). This version
 implements that layer directly (`src/Leant/Backend.hs`):
 
 - **Backend discovery** — finds the `repl.exe` that LeanInteract built
