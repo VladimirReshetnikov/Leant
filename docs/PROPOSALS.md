@@ -1,7 +1,7 @@
 # Leant — proposed improvements and new features
 
-Applies to both implementations (Python `LeantPy/`, Haskell at the
-repository root) unless marked otherwise. Ordered by expected
+Applies to both implementations (the primary Haskell one at the
+repository root, and Python `LeantPy/`) unless marked otherwise. Ordered by expected
 value-for-effort within each tier. Effort: S (< half a day), M (a day or
 two), L (several days).
 
@@ -123,7 +123,8 @@ filtering, `:browse!`, `@`-stripping, and session-declaration section.
 ### 14. Self-managing backend in Haskell — M
 `leant` (the Haskell implementation) currently reuses the binary LeanInteract built. Teach it to
 clone and `lake build` the matching REPL revision itself (toolchain read
-from `lean-toolchain`), making the Haskell port fully standalone.
+from `lean-toolchain`), making the Haskell implementation fully
+standalone.
 
 ### 15. `:load` incremental reload — L
 `:reload` currently re-elaborates the whole file. The backend supports
