@@ -23,15 +23,22 @@ import Leant.Synth.Engine
   , synthesizeWithProviders
   )
 import Leant.Synth.Fragment
-  ( Frag (..)
+  ( AppHead (..)
+  , Frag (..)
   , GoalSort (..)
   , ParsedGoal (..)
   , ProviderFrag (..)
   , ProviderQuery (..)
   , candidateVerificationProgram
+  , fragHasDepth
+  , fragProviderMayOpen
+  , fragRefusal
+  , fragUnsafeAtoms
+  , glivenkoSplit
   , parseGoalSexp
   , parseProviderSexp
   , providerProgram
+  , propAtoms
   , synthPrelude
   )
 import Leant.Synth.ProviderCache
@@ -69,6 +76,7 @@ main = defaultMain $ testGroup "Leant synthesis boundary"
   , candidateVerificationTests
   , providerParserTests
   , providerEngineTests
+  , typeApplicationTests
   , rankNFrontierTests
   , visibleTypeApplicationTests
   ]
@@ -227,6 +235,17 @@ providerProgramTests = testGroup "provider discovery program"
         `isInfixOf` synthPrelude @?= True
       "        let typeLevel \8592 LeantSynth.resultIsSort info.type\n        if typeLevel then pure () else"
         `isInfixOf` program @?= True
+  , testCase "retain only proper-type applications and constructor kinds" $ do
+      "partial def isTypeKind (e : Expr) : MetaM Bool := do"
+        `isInfixOf` synthPrelude @?= True
+      "        if \8592 isTypeKind t then"
+        `isInfixOf` synthPrelude @?= True
+      "        if !argType.isSort then return none"
+        `isInfixOf` synthPrelude @?= True
+      "  if !resultType.isSort || args.isEmpty then pure none"
+        `isInfixOf` synthPrelude @?= True
+      "              match \8592 appOf fuel depth blocked e with"
+        `isInfixOf` synthPrelude @?= True
   ]
 
 candidateVerificationTests :: TestTree
@@ -345,6 +364,16 @@ providerParserTests = testGroup "provider inventory parser"
                 , ("Demo.Phantom.next",
                     [FAtom False "Demo.Phantom α"])
                 ])
+          ]
+  , testCase "retain nominal application arity and argument order" $
+      parseProviderSexp
+          "(providers (provider \"Demo.bi\" \
+          \(app unsafe \"Demo.Bi \945 \946\" (app-nominal \"Demo.Bi\") \
+          \(var \"\945\") (var \"\946\"))))"
+        @?= Right
+          [ ProviderFrag "Demo.bi"
+              (FApp False "Demo.Bi \945 \946" (AppNominal "Demo.Bi")
+                [FVar "\945", FVar "\946"])
           ]
   , testCase "accepts an empty bounded inventory" $
       parseProviderSexp "(providers)" @?= Right []
@@ -469,6 +498,153 @@ providerEngineTests = testGroup "foreign providers"
           "expected a phantom-parameter provider, got: " ++ show candidates
   ]
 
+typeApplicationTests :: TestTree
+typeApplicationTests = testGroup "retained type applications"
+  [ testCase "parse variable and nominal application heads" $ do
+      parseGoalSexp
+          "(goal type (query (roots \"Demo\") (head \"Demo.Wrap\")) \
+          \(-> (all \"a\" (app safe \"F a\" \
+          \(app-variable \"F\") (var \"a\"))) \
+          \(app unsafe \"Demo.Wrap ((b : Type) \8594 b \8594 b)\" \
+          \(app-nominal \"Demo.Wrap\") \
+          \(all \"b\" (-> (var \"b\") (var \"b\"))))))"
+        @?= Right (ParsedGoal GoalType
+          (ProviderQuery ["Demo"] (Just "Demo.Wrap"))
+          (FArr
+            (FAll True "a"
+              (FApp True "F a" (AppVariable "F") [FVar "a"]))
+            (FApp False "Demo.Wrap ((b : Type) \8594 b \8594 b)"
+              (AppNominal "Demo.Wrap")
+              [FAll True "b" (FArr (FVar "b") (FVar "b"))])))
+  , testCase "reject an application without proper-type arguments" $
+      parseProviderSexp
+          "(providers (provider \"Demo.bad\" \
+          \(app unsafe \"Demo.Wrap\" (app-nominal \"Demo.Wrap\"))))"
+        @?= Left "type application has no arguments"
+  , testCase "instantiate through a rigid nominal family with Djinn" $
+      expectTerm "x _" (synthesizeWithProviders EngineDjinn 0 [] nominalGoal)
+  , testCase "instantiate through a rigid nominal family with Exference" $
+      expectTerm "x _"
+        (synthesizeWithProviders EngineExference 1024 [] nominalGoal)
+  , testCase "instantiate a foreign polymorphic family provider" $
+      expectTerm "Demo.polyWrap"
+        (synthesizeWithProviders EngineExference 1024
+          [ProviderFrag "Demo.polyWrap" nominalHypothesis]
+          (wrap "Demo.Wrap ((b : Type) \8594 b \8594 b)" polytype))
+  , testCase "retain higher-kinded bound-variable applications" $ do
+      let goal = FAll True "F" (FArr variableHypothesis
+            (variableApp "F ((b : Type) \8594 b \8594 b)" "F" polytype))
+      expectTerm "x _" (synthesizeWithProviders EngineDjinn 0 [] goal)
+      expectTerm "x _"
+        (synthesizeWithProviders EngineExference 1024 [] goal)
+  , testCase "instantiate two proper-type arguments in source order" $ do
+      let bi key a b = FApp False key (AppNominal "Demo.Bi") [a, b]
+          hypothesis = FAll True "a" (FAll True "b"
+            (bi "Demo.Bi a b" (FVar "a") (FVar "b")))
+          goal = FArr hypothesis
+            (bi "Demo.Bi poly poly" polytype polytype)
+      expectTerm "x _ _" (synthesizeWithProviders EngineDjinn 0 [] goal)
+      expectTerm "x _ _"
+        (synthesizeWithProviders EngineExference 1024 [] goal)
+  , testCase "keep distinct Lean family heads rigid" $ do
+      let sameKeyHypothesis = FAll True "a"
+            (FApp False "same display key"
+              (AppNominal "Demo.Wrap") [FVar "a"])
+          goal = FArr sameKeyHypothesis
+            (FApp False "same display key"
+              (AppNominal "Demo.Other") [polytype])
+      case synthesizeWithProviders EngineDjinn 0 [] goal of
+        Right SynthCandidates{} ->
+          assertFailure "distinct nominal heads produced a candidate"
+        Right _ -> pure ()
+        Left err -> assertFailure err
+  , testCase "preserve application argument order" $ do
+      let app a b = FApp True "same display key"
+            (AppVariable "F") [a, b]
+          goal = FAll True "F" (FAll True "a" (FAll True "b"
+            (FArr (app (FVar "a") (FVar "b"))
+              (app (FVar "b") (FVar "a")))))
+      case synthesizeWithProviders EngineDjinn 0 [] goal of
+        Right (SynthRefuted True) -> pure ()
+        Right other -> assertFailure $
+          "expected ordered applications to be distinct, got: "
+            ++ outcomeTag other
+        Left err -> assertFailure err
+  , testCase "keep application arguments atomic for classical splitting" $ do
+      let applied = variableApp "F poly" "F" polytype
+      glivenkoSplit applied @?= Just ([], applied)
+      propAtoms applied @?= [applied]
+  , testCase "find depth markers inside retained applications" $
+      let truncated =
+            FApp True "F a ?" (AppVariable "F") [FVar "a", FDepth]
+      in do
+        fragHasDepth truncated @?= True
+        fragProviderMayOpen truncated @?= False
+        fragRefusal truncated
+          @?= Just "the goal exceeds the translator's depth bound"
+  , testCase "distinguish safe and unsafe negative evidence" $ do
+      let safeApp = variableApp "F a" "F" (FVar "a")
+          safeImpossible = FAll True "F" (FAll True "a"
+            (FArr safeApp FBot))
+          unsafeImpossible = FAll True "a"
+            (FArr (wrap "Demo.Wrap a" (FVar "a")) FBot)
+      fragUnsafeAtoms safeImpossible @?= []
+      fragUnsafeAtoms unsafeImpossible @?= ["Demo.Wrap a"]
+      fragRefusal safeApp @?= Nothing
+      fragProviderMayOpen safeApp @?= True
+      fragUnsafeAtoms
+          (FApp True "outer" (AppVariable "F") [FAtom False "Nat"])
+        @?= ["Nat"]
+      case synthesizeWithProviders EngineDjinn 0 [] safeImpossible of
+        Right (SynthRefuted True) -> pure ()
+        Right other -> assertFailure $
+          "expected a sound variable-application refutation, got: "
+            ++ outcomeTag other
+        Left err -> assertFailure err
+      case synthesizeWithProviders EngineDjinn 0 [] unsafeImpossible of
+        Right (SynthRefuted False) -> pure ()
+        Right other -> assertFailure $
+          "expected an unsafe nominal refutation, got: " ++ outcomeTag other
+        Left err -> assertFailure err
+  , testCase "poison refutations with the complete nominal application" $ do
+      let target = wrap "Demo.Wrap ((b : Type) \8594 b \8594 b)" polytype
+      fragRefusal target @?= Just
+        ("the goal is a single opaque type application \
+         \`Demo.Wrap ((b : Type) \8594 b \8594 b)` \8212 :synth can transport \
+         \and instantiate retained type applications, but cannot construct \
+         \an unknown Lean family")
+      fragUnsafeAtoms target
+        @?= ["Demo.Wrap ((b : Type) \8594 b \8594 b)"]
+      case synthesizeWithProviders EngineDjinn 0 [] target of
+        Right (SynthRefuted True) ->
+          assertFailure "unsafe nominal application produced a sound refutation"
+        Right SynthCandidates{} ->
+          assertFailure "bare abstract nominal application produced a candidate"
+        Right _ -> pure ()
+        Left err -> assertFailure err
+  ]
+ where
+  polytype = FAll True "b" (FArr (FVar "b") (FVar "b"))
+  wrap key argument =
+    FApp False key (AppNominal "Demo.Wrap") [argument]
+  nominalHypothesis = FAll True "a" (wrap "Demo.Wrap a" (FVar "a"))
+  nominalGoal = FArr nominalHypothesis
+    (wrap "Demo.Wrap ((b : Type) \8594 b \8594 b)" polytype)
+  variableApp key headName argument =
+    FApp True key (AppVariable headName) [argument]
+  variableHypothesis = FAll True "a"
+    (variableApp "F a" "F" (FVar "a"))
+  expectTerm needle outcome = case outcome of
+    Right (SynthCandidates groups _) ->
+      if any (needle `isInfixOf`) (concat groups)
+        then pure ()
+        else assertFailure $
+          "expected a candidate containing " ++ show needle
+            ++ ", got: " ++ show groups
+    Right other -> assertFailure $
+      "unexpected synthesis outcome: " ++ outcomeTag other
+    Left err -> assertFailure err
+
 rankNFrontierTests :: TestTree
 rankNFrontierTests = testGroup "Djinn rank-N frontiers"
   [ testCase "render four-binder hypothesis instantiation for Lean" $ do
@@ -580,7 +756,7 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
         (TypeConstructor integerName :: Type String)
       let expression = VisibleTypeApplication (Global providerName) argument
       renderLeanTerm Map.empty
-          (Map.singleton "leantProvider0" "Demo.identity")
+          (Map.singleton "leantProvider0" "Demo.identity") Map.empty
           [] (FAtom False "Nat") expression
         @?= Right ["@Demo.identity Int"]
   , testCase "render compound closed type arguments in Lean syntax" $ do
@@ -595,9 +771,23 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
       argument <- expectRight $ specifiedVisibleTypeArgument compound
       let expression = VisibleTypeApplication (Global providerName) argument
       renderLeanTerm Map.empty
-          (Map.singleton "leantProvider0" "Demo.identity")
+          (Map.singleton "leantProvider0" "Demo.identity") Map.empty
           [] (FAtom False "Nat") expression
         @?= Right ["@Demo.identity (Option (Int → Bool))"]
+  , testCase "restore every nominal argument with explicit Lean syntax" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      privateName <- expectRight $ mkIdentifier "LeantType0"
+      integerName <- expectRight $ mkIdentifier "Int"
+      let wrapped = TypeApplication
+            (TypeConstructor privateName) (TypeConstructor integerName)
+              :: Type String
+      argument <- expectRight $ specifiedVisibleTypeArgument wrapped
+      let expression = VisibleTypeApplication (Global providerName) argument
+      renderLeanTerm Map.empty
+          (Map.singleton "leantProvider0" "Demo.identity")
+          (Map.singleton "LeantType0" "Demo.Wrap")
+          [] (FAtom False "Nat") expression
+        @?= Right ["@Demo.identity (@Demo.Wrap Int)"]
   ]
 
 firstGroup :: Either String SynthOutcome -> AssertionResult

@@ -35,6 +35,7 @@
 module Leant.Synth.Render
   ( CtorInfo (..)
   , CtorMap
+  , TypeMap
   , renderLeanTerm
   ) where
 
@@ -75,6 +76,9 @@ type CtorMap = Map.Map String CtorInfo
 -- | Collision-free engine provider spelling to exact Lean global name.
 type ProviderMap = Map.Map String String
 
+-- | Collision-free engine type spelling to exact Lean type-family name.
+type TypeMap = Map.Map String String
+
 -- | Render one candidate expression against the goal fragment.  The
 -- candidate proves the premise-extended goal (constructor premises of
 -- recursive inductives are antecedents; see 'Leant.Synth.Engine'), so
@@ -83,9 +87,10 @@ type ProviderMap = Map.Map String String
 -- group of textual variants, best guess first; the caller verifies
 -- them in order and keeps the first that elaborates.
 renderLeanTerm
-  :: CtorMap -> ProviderMap -> [(String, Frag)] -> Frag -> Expression String
+  :: CtorMap -> ProviderMap -> TypeMap -> [(String, Frag)] -> Frag
+  -> Expression String
   -> Either String [String]
-renderLeanTerm cm providers premises goalFrag expr0 = do
+renderLeanTerm cm providers typeNames premises goalFrag expr0 = do
   stripped <- stripPremises (map fst premises) (normalizeExpr 0 expr0)
   base <- uniquify stripped
   -- premises participate in domain fitting under their marked names,
@@ -113,7 +118,8 @@ renderLeanTerm cm providers premises goalFrag expr0 = do
         styles = [Idiomatic, Explicit]
     concat <$> mapM
       (\set -> mapM
-        (\style -> render cm providers style doms 0 (markSites doms set expr))
+        (\style ->
+          render cm providers typeNames style doms 0 (markSites doms set expr))
         styles)
       sets
 
@@ -781,9 +787,10 @@ markOrCount doms set = go
 data Style = Idiomatic | Explicit
   deriving (Eq)
 
-render :: CtorMap -> ProviderMap -> Style -> Map.Map String Frag -> Int
-       -> Expression String -> Either String String
-render cm providers style doms = go
+render
+  :: CtorMap -> ProviderMap -> TypeMap -> Style -> Map.Map String Frag
+  -> Int -> Expression String -> Either String String
+render cm providers typeNames style doms = go
  where
   go :: Int -> Expression String -> Either String String
   go req expr = case expr of
@@ -822,7 +829,7 @@ render cm providers style doms = go
           Right (at req 1 (unwords (headTxt : argTxts)))
     VisibleTypeApplication function argument -> do
       functionTxt <- visibleFunctionText function
-      argumentTxt <- renderVisibleTypeArgument argument
+      argumentTxt <- renderVisibleTypeArgument typeNames argument
       Right (at req 1 (functionTxt ++ " " ++ argumentTxt))
     Lambda [] body -> go req body
     Lambda pats body -> do
@@ -943,8 +950,9 @@ render cm providers style doms = go
 -- application argument.  Specified arguments are closed monotypes, so the
 -- impossible variable and forall cases remain explicit defensive failures at
 -- this backend boundary rather than inventing Lean binder scope.
-renderVisibleTypeArgument :: VisibleTypeArgument -> Either String String
-renderVisibleTypeArgument argument = case visibleTypeArgumentType argument of
+renderVisibleTypeArgument
+  :: TypeMap -> VisibleTypeArgument -> Either String String
+renderVisibleTypeArgument typeNames argument = case visibleTypeArgumentType argument of
   Nothing -> Right "_"
   Just typeExpression -> renderType 2 typeExpression
  where
@@ -975,22 +983,28 @@ renderVisibleTypeArgument argument = case visibleTypeArgumentType argument of
   -- corresponding nominal constructors differ only in these cases; all other
   -- validated identifiers retain their canonical (possibly qualified) name.
   renderTypeName :: Name -> Either String String
-  renderTypeName name = case nameSpecial name of
-    Just ListConstructor -> Right "List"
-    Just FunctionConstructor ->
-      Left "cannot render an unsaturated function type constructor in Lean"
-    Just (TupleConstructor Boxed 0) -> Right "Unit"
-    Just (TupleConstructor Boxed _) ->
-      Left "cannot render an unsaturated tuple type constructor in Lean"
-    Just (TupleConstructor Unboxed _) ->
-      Left "cannot render an unboxed tuple type constructor in Lean"
-    Just ConsConstructor ->
-      Left "cannot render a list value constructor as a Lean type"
-    Nothing -> Right $ case nameSpelling name of
-      Just "Either" -> "Sum"
-      Just "Maybe" -> "Option"
-      Just "Void" -> "Empty"
-      _ -> renderCanonical name
+  renderTypeName name = case nameSpelling name >>= (`Map.lookup` typeNames) of
+    -- The serializer records every elaborated application argument, including
+    -- implicit and instance parameters.  Prefix a restored nominal head with
+    -- @ so Lean consumes that complete explicit argument vector; @ is also
+    -- valid when every source binder was already explicit.
+    Just leanName -> Right ("@" ++ leanName)
+    Nothing -> case nameSpecial name of
+      Just ListConstructor -> Right "List"
+      Just FunctionConstructor ->
+        Left "cannot render an unsaturated function type constructor in Lean"
+      Just (TupleConstructor Boxed 0) -> Right "Unit"
+      Just (TupleConstructor Boxed _) ->
+        Left "cannot render an unsaturated tuple type constructor in Lean"
+      Just (TupleConstructor Unboxed _) ->
+        Left "cannot render an unboxed tuple type constructor in Lean"
+      Just ConsConstructor ->
+        Left "cannot render a list value constructor as a Lean type"
+      Nothing -> Right $ case nameSpelling name of
+        Just "Either" -> "Sum"
+        Just "Maybe" -> "Option"
+        Just "Void" -> "Empty"
+        _ -> renderCanonical name
 
   at :: Int -> Int -> String -> String
   at req level text = if level >= req then text else "(" ++ text ++ ")"

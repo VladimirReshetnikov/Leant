@@ -6,23 +6,27 @@
 -- S-expression over the LJT core connectives.  Everything structural
 -- (@->@, @And@\/@Prod@\/@PProd@, @Or@\/@Sum@\/@PSum@, @Iff@, @Not@,
 -- @False@\/@Empty@\/@PEmpty@, @True@\/@Unit@\/@PUnit@, non-dependent and
--- sort-quantified foralls) is decomposed; a non-recursive, non-indexed
+-- sort-quantified foralls) is decomposed.  First-order constructor binders
+-- and proper-type applications headed by either such a binder or an unknown
+-- Lean constant retain their application spine; term-indexed applications
+-- remain opaque.  A non-recursive, non-indexed
 -- inductive applied to all of its parameters whose constructor fields
 -- are explicit and non-dependent expands into a generalized sum of
 -- products (phase 2); recursive occurrences retain a bounded constructor
 -- description for the Exference projection, and every other subterm becomes
--- an opaque atom
--- carried by its pretty-printed spelling, so alpha-equal dependent
--- subformulas compare equal and can be transported (never analyzed).  Each atom carries a safety bit: an atom built purely from
--- universally quantified variables keeps negative verdicts sound, while
--- an atom mentioning any constant (e.g. @Nat@, @P 3@) downgrades
+-- an opaque atom carried by its pretty-printed spelling, so alpha-equal
+-- dependent subformulas compare equal and can be transported (never
+-- analyzed).  Each atom or application carries a safety bit: a node built
+-- purely from universally quantified variables keeps negative verdicts sound,
+-- while an atom mentioning any constant (e.g. @Nat@, @P 3@) downgrades
 -- \"provably uninhabited\" to \"no term found within bounds\".
 --
 -- This module is deliberately Djex-free: it parses the S-expression into
 -- 'Frag' and answers refusal/safety questions.  'Leant.Synth.Engine'
 -- owns the narrow boundary to the synthesis engine.
 module Leant.Synth.Fragment
-  ( Frag (..)
+  ( AppHead (..)
+  , Frag (..)
   , Slot (..)
   , GoalSort (..)
   , ParsedGoal (..)
@@ -34,6 +38,8 @@ module Leant.Synth.Fragment
   , candidateVerificationProgram
   , parseGoalSexp
   , parseProviderSexp
+  , fragHasDepth
+  , fragProviderMayOpen
   , fragRefusal
   , fragUnsafeAtoms
   , fragSpine
@@ -50,6 +56,14 @@ import Leant.Synth.ProviderCache
   , canonicalProviderQuery
   )
 
+-- | The head of a retained type-level application.  Bound type functions
+-- remain variables, while Lean constants retain nominal identity without
+-- exposing any implementation or constructor structure.
+data AppHead
+  = AppVariable String
+  | AppNominal String
+  deriving (Eq, Show)
+
 -- | The LJT core fragment.  @Iff@ and @Not@ are already lowered by the
 -- serializer (to a pair of arrows and an arrow to 'FBot').
 data Frag
@@ -64,6 +78,11 @@ data Frag
     -- for an implicit\/instance one (the elaborator introduces it)
   | FVar String         -- ^ opaque type variable (auto-implicit or opened binder)
   | FAtom Bool String   -- ^ opaque atom: safe-for-refutation flag, display key
+  | FApp Bool String AppHead [Frag]
+    -- ^ A proper-type application whose arguments are themselves types.  The
+    -- flag and display key describe the complete Lean expression; the head
+    -- records whether it is a bound type function or a rigid Lean constant.
+    -- Term-indexed/dependent applications remain 'FAtom'.
   | FInd String [(String, [Frag])]
     -- ^ expanded inductive occurrence (phase 2): display key, then one
     -- entry per constructor (full Lean name, field fragments).  Emitted
@@ -149,6 +168,21 @@ synthPrelude = unlines
   , "      resultIsSort (body.instantiate1 fv)"
   , "  | _ => pure e.isSort"
   , ""
+  , "-- A quantified fragment variable may itself be a first-order type"
+  , "-- constructor.  Admit only kind arrows whose domains and final result"
+  , "-- are universes; Nat \8594 Type and dependent term-indexed families stay"
+  , "-- opaque because their argument is a term, not a proper type."
+  , "partial def isTypeKind (e : Expr) : MetaM Bool := do"
+  , "  let e \8592 whnfR e.consumeMData"
+  , "  match e with"
+  , "  | Expr.sort _ => pure true"
+  , "  | Expr.forallE n dom body bi =>"
+  , "    let dom \8592 whnfR dom.consumeMData"
+  , "    if !dom.isSort then pure false"
+  , "    else withLocalDecl n bi dom fun fv =>"
+  , "      isTypeKind (body.instantiate1 fv)"
+  , "  | _ => pure false"
+  , ""
   , "mutual"
   , ""
   , "partial def go (fuel depth : Nat) (blocked : List String) (e : Expr)"
@@ -167,8 +201,7 @@ synthPrelude = unlines
   , "      else atomOf e"
   , "    | Expr.forallE _ t b bi =>"
   , "      if b.hasLooseBVars then do"
-  , "        let ts \8592 whnfR t"
-  , "        if ts.isSort then"
+  , "        if \8592 isTypeKind t then"
   , "          withLocalDeclD (Name.mkSimple (\"s\" ++ toString depth)) t"
   , "              fun fv => do"
   , "            let inner \8592 go fuel (depth + 1) blocked (b.instantiate1 fv)"
@@ -220,8 +253,52 @@ synthPrelude = unlines
   , "          | none =>"
   , "            match \8592 recOf fuel depth blocked e with"
   , "            | some s => pure s"
-  , "            | none => atomOf e"
-  , "      | _ => atomOf e"
+  , "            | none =>"
+  , "              match \8592 appOf fuel depth blocked e with"
+  , "              | some s => pure s"
+  , "              | none => atomOf e"
+  , "      | _ =>"
+  , "        match \8592 appOf fuel depth blocked e with"
+  , "        | some s => pure s"
+  , "        | none => atomOf e"
+  , ""
+  , "-- Preserve applications whose head is a bound type function or a rigid"
+  , "-- Lean constant, whose result is a type, and whose arguments are all"
+  , "-- proper types.  Term indices,"
+  , "-- proof arguments, and other dependent applications remain one opaque"
+  , "-- atom.  A blocked recursive occurrence also remains an atom so recOf's"
+  , "-- constructor-premise knot keeps sharing the exact occurrence key."
+  , "partial def appOf (fuel depth : Nat) (blocked : List String) (e : Expr)"
+  , "    : MetaM (Option String) := do"
+  , "  let args := e.getAppArgs"
+  , "  let resultType \8592 whnfR (\8592 inferType e)"
+  , "  if !resultType.isSort || args.isEmpty then pure none"
+  , "  else do"
+  , "    let pp \8592 Meta.ppExpr e"
+  , "    let key := toString pp"
+  , "    if blocked.contains key then pure none"
+  , "    else do"
+  , "      for arg in args do"
+  , "        let argType \8592 whnfR (\8592 inferType arg)"
+  , "        if !argType.isSort then return none"
+  , "      let head? \8592 match e.getAppFn with"
+  , "        | Expr.fvar _ => do"
+  , "          let headPP \8592 Meta.ppExpr e.getAppFn"
+  , "          pure (some (\"(app-variable \" ++ esc (toString headPP) ++ \")\"))"
+  , "        | Expr.const n _ =>"
+  , "          pure (some (\"(app-nominal \" ++ esc n.toString ++ \")\"))"
+  , "        | _ => pure none"
+  , "      match head? with"
+  , "      | none => pure none"
+  , "      | some head => do"
+  , "        let safe := e.getUsedConstants.isEmpty && !e.isSort"
+  , "        let mut rendered := \"\""
+  , "        for arg in args do"
+  , "          let argument \8592 go fuel depth blocked arg"
+  , "          rendered := rendered ++ \" \" ++ argument"
+  , "        pure (some (\"(app \""
+  , "          ++ (if safe then \"safe\" else \"unsafe\") ++ \" \""
+  , "          ++ esc key ++ \" \" ++ head ++ rendered ++ \")\"))"
   , ""
   , "-- Phase 2: a non-recursive, non-indexed, non-mutual, non-nested"
   , "-- inductive applied to all of its parameters expands into a"
@@ -554,12 +631,18 @@ parseFrag (TL : TSym tag : rest) = case tag of
     _ -> Left "malformed (var ...)"
   "atom" -> case rest of
     TSym safety : TStr key : TR : rest' -> do
-      safe <- case safety of
-        "safe" -> Right True
-        "unsafe" -> Right False
-        other -> Left ("unknown atom safety " ++ other)
+      safe <- parseSafety "atom" safety
       Right (FAtom safe key, rest')
     _ -> Left "malformed (atom ...)"
+  "app" -> case rest of
+    TSym safety : TStr key : headTokens -> do
+      safe <- parseSafety "application" safety
+      (head', afterHead) <- parseAppHead headTokens
+      (arguments, rest') <- parseFrags afterHead
+      if null arguments
+        then Left "type application has no arguments"
+        else Right (FApp safe key head' arguments, rest')
+    _ -> Left "malformed (app ...)"
   "all" -> allTag True rest
   "alli" -> allTag False rest
   "ind" -> case rest of
@@ -579,6 +662,17 @@ parseFrag (TL : TSym tag : rest) = case tag of
     _ -> Left "malformed (rec ...)"
   other -> Left ("unknown fragment tag " ++ other)
  where
+  parseSafety context safety = case safety of
+    "safe" -> Right True
+    "unsafe" -> Right False
+    other -> Left ("unknown " ++ context ++ " safety " ++ other)
+  parseAppHead
+      (TL : TSym "app-variable" : TStr name : TR : toks) =
+    Right (AppVariable name, toks)
+  parseAppHead
+      (TL : TSym "app-nominal" : TStr name : TR : toks) =
+    Right (AppNominal name, toks)
+  parseAppHead _ = Left "malformed type-application head"
   parseCtors (TR : toks) = Right ([], toks)
   parseCtors (TL : TSym "ctor" : TStr name : toks) = do
     (fields, toks') <- parseFields toks
@@ -611,31 +705,55 @@ parseFrag _ = Left "expected ( in goal translation"
 
 -- Fragment analysis ---------------------------------------------------------
 
+-- | Whether translation exhausted its structural fuel anywhere in a
+-- fragment.  A live provider cannot repair missing type structure, so this
+-- predicate is shared by refusal and provider-admission logic.
+fragHasDepth :: Frag -> Bool
+fragHasDepth frag = case frag of
+  FArr a b -> fragHasDepth a || fragHasDepth b
+  FProd a b -> fragHasDepth a || fragHasDepth b
+  FSum a b -> fragHasDepth a || fragHasDepth b
+  FAll _ _ b -> fragHasDepth b
+  FApp _ _ _ arguments -> any fragHasDepth arguments
+  FInd _ ctors -> any (any fragHasDepth . snd) ctors
+  FRec _ _ params ctors ->
+    any fragHasDepth params || any (any fragHasDepth . snd) ctors
+  FDepth -> True
+  _ -> False
+
+-- | Whether a foreign value may open an otherwise atomic goal.  Quantifier
+-- prefixes are transparent, but a depth-truncated fragment is never
+-- provider-openable: its hidden structure may affect both fitting and kinds.
+fragProviderMayOpen :: Frag -> Bool
+fragProviderMayOpen frag
+  | fragHasDepth frag = False
+  | otherwise = case peel frag of
+      FAtom{} -> True
+      FApp{} -> True
+      _ -> False
+ where
+  peel (FAll _ _ body) = peel body
+  peel body = body
+
 -- | An honest refusal, when the goal offers the engine nothing structural
 -- to work with, with the reason.
 fragRefusal :: Frag -> Maybe String
 fragRefusal frag
-  | hasDepth frag = Just
+  | fragHasDepth frag = Just
       "the goal exceeds the translator's depth bound"
   | FAtom _ key <- peel frag = Just
       ("the goal is a single opaque atom `" ++ key
        ++ "` \8212 :synth handles \8594/\215/\8853/\8704/\8869/\8868 over \
           \opaque variables; dependent or non-propositional structure is \
           \transported, never analyzed")
+  | FApp False key _ _ <- peel frag = Just
+      ("the goal is a single opaque type application `" ++ key
+       ++ "` \8212 :synth can transport and instantiate retained type "
+       ++ "applications, but cannot construct an unknown Lean family")
   | otherwise = Nothing
  where
   peel (FAll _ _ b) = peel b
   peel f = f
-  hasDepth f = case f of
-    FArr a b -> hasDepth a || hasDepth b
-    FProd a b -> hasDepth a || hasDepth b
-    FSum a b -> hasDepth a || hasDepth b
-    FAll _ _ b -> hasDepth b
-    FInd _ ctors -> any (any hasDepth . snd) ctors
-    FRec _ _ params ctors ->
-      any hasDepth params || any (any hasDepth . snd) ctors
-    FDepth -> True
-    _ -> False
 
 -- | The goal's leading binder spine (arrows and quantifiers, stopping
 -- at the first other connective).  Djinn models quantifiers as implicit
@@ -675,6 +793,9 @@ glivenkoSplit = go []
     FArr a b -> quantFree a && quantFree b
     FProd a b -> quantFree a && quantFree b
     FSum a b -> quantFree a && quantFree b
+    -- A retained type application is one propositional atom here.  A forall
+    -- in one of its type arguments is not an exposed logical quantifier.
+    FApp{} -> True
     FInd _ ctors -> all (all quantFree . snd) ctors
     FRec _ _ params ctors ->
       all quantFree params && all (all quantFree . snd) ctors
@@ -691,6 +812,7 @@ propAtoms = nub . go
     FArr a b -> go a ++ go b
     FProd a b -> go a ++ go b
     FSum a b -> go a ++ go b
+    FApp{} -> [f]
     FInd _ ctors -> concatMap (concatMap go . snd) ctors
     FVar _ -> [f]
     FAtom _ _ -> [f]
@@ -706,6 +828,8 @@ fragUnsafeAtoms = nub . go
     FProd a b -> go a ++ go b
     FSum a b -> go a ++ go b
     FAll _ _ b -> go b
+    FApp safe key _ arguments ->
+      (if safe then [] else [key]) ++ concatMap go arguments
     FInd _ ctors -> concatMap (concatMap go . snd) ctors
     FRec _ key params ctors ->
       key : concatMap go params ++ concatMap (concatMap go . snd) ctors

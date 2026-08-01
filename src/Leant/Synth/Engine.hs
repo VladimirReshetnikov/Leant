@@ -43,12 +43,17 @@ import Language.Haskell.Djex
   , Boxity (Boxed)
   , Completion (..)
   , DataConstructor (..)
-  , Declaration (DataTypeDeclaration, ValueDeclaration)
+  , Declaration
+      ( AbstractTypeDeclaration
+      , DataTypeDeclaration
+      , ValueDeclaration
+      )
   , Diagnostic
   , ExferenceOptions (..)
   , ExferenceSessionPolicy (..)
   , Expression
   , Name
+  , Kind (FunctionKind, ProperTypeKind)
   , Penalty (..)
   , Progress (..)
   , Selection (..)
@@ -91,11 +96,18 @@ import Language.Haskell.Djex
   )
 
 import Leant.Synth.Fragment
-  ( Frag (..)
+  ( AppHead (..)
+  , Frag (..)
   , ProviderFrag (..)
+  , fragHasDepth
   , fragUnsafeAtoms
   )
-import Leant.Synth.Render (CtorInfo (..), CtorMap, renderLeanTerm)
+import Leant.Synth.Render
+  ( CtorInfo (..)
+  , CtorMap
+  , TypeMap
+  , renderLeanTerm
+  )
 
 -- | What the engine established for one goal.  Candidate terms are a lazy
 -- ranked list of rendered variant groups (one group per engine candidate;
@@ -220,7 +232,7 @@ synthesizeTunedWithProviders engine steps limits providers extras
     pure (mergeOutcomes djinn exference)
  where
   prepare structuralRecursive activeProviders = do
-    (goal0, decls, providerDecls, ctorMap, providerMap, premises) <-
+    (goal0, decls, providerDecls, ctorMap, providerMap, typeMap, premises) <-
       fragToDjinn structuralRecursive activeProviders extras engineFrag
     -- Premises (caller-supplied assumptions, and Djinn's constructor
     -- premises for recursive inductives) enter as goal antecedents.  The
@@ -229,7 +241,7 @@ synthesizeTunedWithProviders engine steps limits providers extras
     let goal = foldr (\(_, _, t) acc -> FunctionType t acc) goal0 premises
         premisePairs = [(name, prem) | (name, prem, _) <- premises]
         render expr =
-          renderLeanTerm ctorMap providerMap premisePairs fitFrag expr
+          renderLeanTerm ctorMap providerMap typeMap premisePairs fitFrag expr
     pure (goal, decls, providerDecls, render)
 
 -- | The complete LJT search: candidates, or a refutation whose
@@ -404,8 +416,11 @@ progressNotes progress = case progress of
 -- keyed by their pretty-printed spelling so alpha-equal occurrences share
 -- one variable (transportable, never analyzed).  Nested quantifiers are
 -- passed structurally as 'ForallType'; Djex carries them as alpha-aware
--- atoms and applies its bounded rank-N rules.  Expanded inductive
--- occurrences become fresh @data@ declarations, one per display key,
+-- atoms and applies its bounded rank-N rules.  Retained proper-type
+-- applications become real 'TypeApplication' nodes: bound heads remain
+-- higher-kinded variables, while exact Lean constant heads receive shared
+-- private abstract declarations and a renderer map back to Lean.  Expanded
+-- inductive occurrences become fresh @data@ declarations, one per display key,
 -- collected in dependency order (fields are translated before the
 -- declaration that contains them).
 
@@ -433,11 +448,21 @@ data TransState = TransState
   , tsPrems :: [(String, Frag, Type String)]
     -- ^ constructor premises (Lean name, fragment for the renderer's
     -- domain fitting, engine type), in order
+  , tsAppFamilies :: Map.Map String AppFamily
+    -- ^ exact Lean application head -> private rigid engine constructor
+  , tsAppNext :: Int
+  , tsTypeMap :: TypeMap
+    -- ^ private engine type spelling -> exact Lean application head
   }
 
 data RecInfo = RecInfo
   { recTypeName :: Name
   , recTypeArity :: Int
+  }
+
+data AppFamily = AppFamily
+  { appTypeName :: Name
+  , appTypeArity :: Int
   }
 
 newtype Trans a = Trans
@@ -498,6 +523,7 @@ fragToDjinn
       , [DjinnDecl]
       , CtorMap
       , Map.Map String String
+      , TypeMap
       , [(String, Frag, Type String)]
       )
 fragToDjinn structuralRecursive providers extras frag0 = do
@@ -521,6 +547,8 @@ fragToDjinn structuralRecursive providers extras frag0 = do
           case occurrence of
             Just known -> pure known
             Nothing -> TypeVariable <$> variable ("a:" ++ key)
+        FApp _ key head' arguments ->
+          appOccurrence premisesEnabled key head' arguments
         FAll _ binder body -> do
           v <- variable ("v:" ++ binder)
           body' <- go premisesEnabled body
@@ -533,6 +561,47 @@ fragToDjinn structuralRecursive providers extras frag0 = do
               recDataOccurrence key parameterKeys ctors
           | otherwise -> recOccurrence premisesEnabled key ctors
         FDepth -> failT "internal: depth marker survived refusal check"
+
+      -- Retained type applications are the bridge to Djex's guarded
+      -- impredicative instantiation.  A bound higher-kinded head shares the
+      -- enclosing forall variable.  A Lean constant becomes one private,
+      -- rigid abstract constructor shared by goal and provider occurrences;
+      -- its hidden semantics still poison negative verdicts on the fragment
+      -- side, and Lean verifies every positive candidate.
+      appOccurrence premisesEnabled key head' arguments = do
+        translated <- mapM (go premisesEnabled) arguments
+        case head' of
+          AppVariable spelling -> do
+            headType <- TypeVariable <$> variable ("v:" ++ spelling)
+            pure (applyTypeArguments headType translated)
+          AppNominal spelling -> do
+            nominal <- nominalHead spelling (length arguments)
+            case nominal of
+              Just headType -> pure (applyTypeArguments headType translated)
+              Nothing -> TypeVariable <$> variable ("a:" ++ key)
+
+      nominalHead spelling arity = do
+        families <- getsT tsAppFamilies
+        case Map.lookup spelling families of
+          Just family
+            | appTypeArity family == arity ->
+                pure (Just (TypeConstructor (appTypeName family)))
+            | otherwise -> pure Nothing
+          Nothing -> do
+            index <- getsT tsAppNext
+            let privateSpelling = "LeantType" ++ show index
+            typeName <- nameT privateSpelling
+            let kind = foldr FunctionKind ProperTypeKind
+                  (replicate arity ProperTypeKind)
+                declaration = AbstractTypeDeclaration () typeName kind
+                family = AppFamily typeName arity
+            modifyT (\s -> s
+              { tsAppFamilies = Map.insert spelling family (tsAppFamilies s)
+              , tsAppNext = index + 1
+              , tsTypeMap = Map.insert privateSpelling spelling (tsTypeMap s)
+              , tsDecls = tsDecls s ++ [declaration]
+              })
+            pure (Just (TypeConstructor typeName))
 
       -- One declaration per display key: translate the fields first
       -- (declaring any nested inductives before this one), parameterize
@@ -695,6 +764,9 @@ fragToDjinn structuralRecursive providers extras frag0 = do
     , tsRecs = Map.empty
     , tsRecFamilies = Map.empty
     , tsPrems = []
+    , tsAppFamilies = Map.empty
+    , tsAppNext = 0
+    , tsTypeMap = Map.empty
     }
   let (providerDecls, providerNames) = unzip translatedProviders
   Right
@@ -703,21 +775,11 @@ fragToDjinn structuralRecursive providers extras frag0 = do
     , providerDecls
     , tsCtorMap finalState
     , Map.fromList providerNames
+    , tsTypeMap finalState
     , extrasT ++ tsPrems finalState
     )
  where
-  usableProvider = not . hasDepth . providerTypeFrag
-
-  hasDepth frag = case frag of
-    FArr a b -> hasDepth a || hasDepth b
-    FProd a b -> hasDepth a || hasDepth b
-    FSum a b -> hasDepth a || hasDepth b
-    FAll _ _ body -> hasDepth body
-    FInd _ ctors -> any (any hasDepth . snd) ctors
-    FRec _ _ parameters ctors ->
-      any hasDepth parameters || any (any hasDepth . snd) ctors
-    FDepth -> True
-    _ -> False
+  usableProvider = not . fragHasDepth . providerTypeFrag
 
   recursiveFamily key ctors = case ctors of
     (leanName, _) : _ ->

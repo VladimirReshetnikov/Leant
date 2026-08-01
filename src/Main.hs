@@ -95,6 +95,7 @@ import Leant.Synth.Fragment
   , ProviderFrag
   , ProviderQuery
   , candidateVerificationProgram
+  , fragProviderMayOpen
   , fragRefusal
   , fragUnsafeAtoms
   , glivenkoSplit
@@ -1950,14 +1951,14 @@ synthGo' st args retriedVars goal parsed = do
       -- cannot repair a structural translation that stopped at FDepth.
       discoverProviders = providerEngine && case refusal of
         Nothing -> True
-        Just _ -> providerMayOpen fragment
+        Just _ -> fragProviderMayOpen fragment
   providers <-
     if discoverProviders
       then loadSynthProviders st (pgProviderQuery parsed)
       else pure []
   case refusal of
     Just reason
-      | not (providerEngine && providerMayOpen fragment
+      | not (providerEngine && fragProviderMayOpen fragment
           && not (null providers)) ->
           emitLn st =<< cRed st ("out of fragment: " ++ reason)
     _ -> do
@@ -2023,10 +2024,6 @@ synthGo' st args retriedVars goal parsed = do
     Right (SynthNoTerm notes) -> do
       emitLn st =<< cYellow st "no term found within the search bounds"
       forM_ notes $ \note -> emitLn st =<< cDim st ("note: " ++ note)
-
-  providerMayOpen (FAll _ _ body) = providerMayOpen body
-  providerMayOpen (FAtom _ _) = True
-  providerMayOpen _ = False
 
 -- | Ask Lean for the bounded value inventory relevant to this goal.  A
 -- provider failure degrades to structural synthesis: inventory discovery is
