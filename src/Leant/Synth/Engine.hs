@@ -353,34 +353,50 @@ exferenceRun steps render goal decls = do
     (mkExferenceSessionWithPolicy policy environment)
   targetName <- viaShow (mkIdentifier "leantSynth")
   target <- viaShow (mkDefinitionName targetName)
-  let query = QueryRequest
-        { requestTarget = target
-        , requestGoal = fmap convert goal
-        , requestContexts = []
-        , requestOptions = defaultExferenceOptions
-            { exferenceMaximumSteps = steps
-            , exferenceMultiConstructorPatterns = True
-              -- the queue is the memory hog; a modest bound keeps the
-              -- search interactive on small machines, reported honestly
-              -- as pruning
-            , exferenceMaximumQueueSize = Just 1024
-            }
-        }
-  request <- viaDiagnostic (mkExferenceRequest query)
-  results <- viaDiagnostic (runExferenceQuery session request)
-  let selection =
-        selectQueryResults SelectAll (const (0 :: Int)) (const True) results
-      groups = nub
-        [ group
-        | candidate <- take candidateWindow (selectionCandidates selection)
-        , let expr = fmap (("x" ++) . show)
-                (functionClauseExpression (candidateOutput candidate))
-        , Right group <- [render expr]
-        ]
-      notes = maybe [] progressNotes (selectionProgress selection)
-  pure $ if null groups
-    then SynthNoTerm notes
-    else SynthCandidates groups notes
+  let runLane allowUnused = do
+        let query = QueryRequest
+              { requestTarget = target
+              , requestGoal = fmap convert goal
+              , requestContexts = []
+              , requestOptions = defaultExferenceOptions
+                  { exferenceAllowUnused = allowUnused
+                  , exferenceMaximumSteps = steps
+                  , exferenceMultiConstructorPatterns = True
+                    -- the queue is the memory hog; a modest bound keeps the
+                    -- search interactive on small machines, reported honestly
+                    -- as pruning
+                  , exferenceMaximumQueueSize = Just 1024
+                  }
+              }
+        request <- viaDiagnostic (mkExferenceRequest query)
+        results <- viaDiagnostic (runExferenceQuery session request)
+        let selection =
+              selectQueryResults SelectAll (const (0 :: Int))
+                (const True) results
+            groups = nub
+              [ group
+              | candidate <- take candidateWindow
+                  (selectionCandidates selection)
+              , let expr = fmap (("x" ++) . show)
+                      (functionClauseExpression (candidateOutput candidate))
+              , Right group <- [render expr]
+              ]
+            notes = maybe [] progressNotes (selectionProgress selection)
+        pure (groups, notes)
+  (strictGroups, strictNotes) <- runLane False
+  if not (null strictGroups)
+    then pure $ SynthCandidates strictGroups strictNotes
+    else do
+      -- Exference normally prefers terms which use every introduced binder.
+      -- Lean accepts intentional omission, however, and recursive projection
+      -- often needs it: after matching @Headed a@, the recursive tail must stay
+      -- unopened while the @a@ field is returned.  Retry only after the strict
+      -- lane has produced no term, preserving its established candidate order
+      -- and provider preference for every existing successful query.
+      (relaxedGroups, relaxedNotes) <- runLane True
+      pure $ if null relaxedGroups
+        then SynthNoTerm (nub $ strictNotes ++ relaxedNotes)
+        else SynthCandidates relaxedGroups relaxedNotes
 
 -- | Both engines on one goal: Djinn's candidates first (they carry the
 -- smallest-term ranking), Exference's new ones after, and negative
@@ -1371,7 +1387,15 @@ choosePlan spelling uses = case nub (map useArity uses) of
     | (complete, key, parameters, constructors) <-
         recursiveOccurrences
     , complete
-    , hasDistinctPlainParameters parameters
+    -- Exact query-wide family identity lets a whole structured proper type
+    -- contribute a positive schema candidate.  Serialized occurrences do not
+    -- yet distinguish declaration-parameter fields from coincidentally equal
+    -- fixed fields, so this is deliberately speculative: genericization
+    -- matches the complete fragment before descending, closes the template,
+    -- and must specialize back to every occurrence.  A second occurrence can
+    -- therefore disambiguate fixed fields; repeated or alpha-equal parameter
+    -- vectors stay abstract, and every emitted term is still checked by Lean.
+    , pairwiseDistinct parameters
     , let template = recursiveTemplate spelling key parameters constructors
     , templateClosed template
     , all (recursiveTemplateFits spelling template) recursiveOccurrences

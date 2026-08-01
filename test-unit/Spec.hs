@@ -899,6 +899,63 @@ parametricFamilyEngineTests = testGroup "parametric family engine projection"
         then pure ()
         else assertFailure $ "recursive rank-N fields were not fitted: "
           ++ show candidates
+  , testCase "project a parameter through one recursive layer" $ do
+      let parameter = FVar "p"
+          headed = recursiveHeaded "Demo.Headed p" parameter
+          candidates = allFamilyCandidates
+            (synthesizeWithProviders EngineExference 1024 []
+              (FAll True "p" (FArr headed parameter)))
+      if any ("match" `isInfixOf`) candidates
+        then pure ()
+        else assertFailure $
+          "one-layer recursive projection produced no candidate: "
+            ++ show candidates
+  , testCase "project an impredicative parameter through one recursive layer" $ do
+      let headed = recursiveHeaded "Demo.Headed poly" polytype
+          candidates = allFamilyCandidates
+            (synthesizeWithProviders EngineExference 1024 []
+              (FArr headed polytype))
+      if any (\term -> "match" `isInfixOf` term
+              && "_ =>" `isInfixOf` term) candidates
+        then pure ()
+        else assertFailure $
+          "impredicative recursive projection produced no candidate: "
+            ++ show candidates
+  , testCase "disambiguate a fixed field from a structured recursive parameter" $ do
+      let natural = FAtom False "Nat"
+          fixed = FProd natural natural
+          boolean = FAtom False "Bool"
+          family key parameter = FParamRec True "Demo.FixedRec" key
+            [parameter]
+            [("Demo.FixedRec.mk", [fixed, FAtom False key])]
+          target = family "Demo.FixedRec (Nat × Nat)" fixed
+          schemaOnly = ProviderFrag "Demo.blockedFixedRec"
+            (FArr FBot (family "Demo.FixedRec Bool" boolean))
+          candidates = allFamilyCandidates
+            (synthesizeWithProviders EngineExference 1024 [schemaOnly]
+              (FArr target fixed))
+      if any ("match" `isInfixOf`) candidates
+        then pure ()
+        else assertFailure $
+          "a second recursive occurrence did not preserve its fixed field: "
+            ++ show candidates
+  , testCase "keep structured recursive Djinn construction natively bounded" $ do
+      let structured = FParamRec True "Demo.StructuredRec"
+            "Demo.StructuredRec poly" [polytype]
+            [ ("Demo.StructuredRec.done", [polytype])
+            , ("Demo.StructuredRec.again",
+                [FAtom False "Demo.StructuredRec poly"])
+            ]
+          candidates = allFamilyCandidates
+            (synthesizeWithProviders EngineDjinn 0 []
+              (FArr polytype structured))
+      if not (any (".done" `isInfixOf`) candidates)
+        then assertFailure $ "structured native constructor was lost: "
+          ++ show candidates
+        else if any (".again" `isInfixOf`) candidates
+          then assertFailure $ "structured recursive family fell back to "
+            ++ "reopenable constructor premises: " ++ show candidates
+          else pure ()
   , testCase "share fixed opaque constructor fields without free variables" $
       expectExactFamilyTerm "fun x => x _"
         (synthesizeWithProviders EngineExference 1024 [] guardRankNGoal)
@@ -1340,6 +1397,9 @@ parametricFamilyEngineTests = testGroup "parametric family engine projection"
     [("Demo.RecBox.step", [parameter, FAtom False key])]
   recursiveCell key parameter = FParamRec True "Demo.RecCell" key
     [parameter] [("Demo.RecCell.mk", [parameter])]
+  recursiveHeaded key parameter = FParamRec True "Demo.Headed" key
+    [parameter]
+    [("Demo.Headed.mk", [parameter, FAtom False key])]
   nativeRecursive key parameter = FParamRec True "Demo.NativeRec" key
     [parameter]
     [ ("Demo.NativeRec.done", [parameter])

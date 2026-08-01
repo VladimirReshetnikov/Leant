@@ -49,6 +49,7 @@ import Language.Haskell.Synthesis.Generated
   ( Expression (..)
   , Pattern (..)
   , VisibleTypeArgument
+  , discardUnusedPatternBindingsBy
   , visibleTypeArgumentType
   )
 import Language.Haskell.Synthesis.Name
@@ -104,7 +105,11 @@ renderLeanTerm
   -> Either String [String]
 renderLeanTerm cm providers typeNames premises goalFrag expr0 = do
   stripped <- stripPremises (map fst premises) (normalizeExpr 0 expr0)
-  base <- uniquify stripped
+  -- Exference's relaxed fallback retains candidates with intentionally
+  -- ignored inputs.  Turn those unused binders into real pattern wildcards
+  -- before assigning Lean-facing names; this keeps recursive projections
+  -- finite and renders the omission explicitly as @.mk value _@.
+  base <- uniquify $ discardUnusedPatternBindingsBy id stripped
   -- premises participate in domain fitting under their marked names,
   -- so case splits on them reveal their branch binders' domains
   let seed = [(premiseMark ++ name, frag) | (name, frag) <- premises]
