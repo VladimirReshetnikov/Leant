@@ -235,7 +235,8 @@ input becomes a command against a persistent Lean environment, and
 every claim Leant makes, including every synthesized term, is
 checked by that backend before it is shown. Sessions survive backend
 crashes (the session history replays automatically), can be saved and
-restored (\code{:pickle}/\code{:unpickle}), and can be recorded as
+restored (\code{:pickle}/\code{:unpickle}, including synthesis-ready
+companions for Leant-created snapshots), and can be recorded as
 transcripts.
 
 %==============================================================================
@@ -284,11 +285,11 @@ header and just keep going), and an empty line submits it.
 \cmdrow{:info NAME, :i}{show the definition of \code{NAME} (\code{\#print})}
 \cmdrow{:load FILE, :l}{reset the session and load a \code{.lean} file}
 \cmdrow{:reload, :r}{reload the last loaded file}
-\cmdrow{:import MOD}{add an import (rebuilds the session)}
-\cmdrow{:imports}{list active imports}
+\cmdrow{:import MOD}{add an import (rebuilds the session; unavailable over an opaque snapshot)}
+\cmdrow{:imports}{list active imports, or imports restored by \code{:reset}}
 \cmdrow{:undo}{revert the last state-changing command}
-\cmdrow{:reset}{clear all definitions (keeps imports)}
-\cmdrow{:history}{show the session's state-changing commands}
+\cmdrow{:reset}{clear definitions or a snapshot base (keeps configured imports)}
+\cmdrow{:history}{show commands after the current import/snapshot base}
 \cmdrow{:set OPT VAL}{a Lean \code{set\_option} that persists in the session}
 \end{cmdtable}
 
@@ -319,8 +320,8 @@ header and just keep going), and an empty line submits it.
 \begin{cmdtable}
 \cmdrow{:transcript [F|on|off]}{record a transcript of the session}
 \cmdrow{:timestamps [on|off]}{timestamp transcript entries}
-\cmdrow{:pickle FILE}{save the environment to \code{FILE} (\code{.olean})}
-\cmdrow{:unpickle FILE}{restore an environment}
+\cmdrow{:pickle FILE}{save the environment and synthesis companion}
+\cmdrow{:unpickle FILE}{restore an environment as a new undo/history base}
 \cmdrow{:env}{show the backend environment id}
 \cmdrow{:time}{toggle per-command timing}
 \cmdrow{:!\ CMD}{run a shell command}
@@ -815,6 +816,17 @@ backend re-elaborates each candidate against the original goal, and
 only survivors are shown and bound. The engine boundary is narrow by
 design: the searches behind it are swappable, and nothing they emit is
 believed until Lean has type-checked it.
+
+An unpickled environment is an explicit history barrier. Leant copies it to
+a private process-lifetime artifact so backend restart can restore that base
+before replaying the commands entered afterward; the reconstructed undo stack
+therefore still bottoms out at the snapshot. \code{:reset} and \code{:load}
+leave snapshot mode, whereas \code{:import} requires that explicit transition
+because imports cannot be added to an opaque Lean environment. A Leant
+\code{:pickle} also writes a content-fingerprinted, serializer-ABI-keyed
+synthesis companion. Foreign or stale sidecars are ignored without rejecting
+the main upstream snapshot; if that snapshot exposes Lean's metaprogramming
+API, Leant compiles current synthesis tooling directly over it.
 
 %==============================================================================
 \section{Status}\label{sec:status}

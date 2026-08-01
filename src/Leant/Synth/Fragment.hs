@@ -31,6 +31,7 @@ module Leant.Synth.Fragment
   , synthPrelude
   , serializerProgram
   , providerProgram
+  , candidateVerificationPrograms
   , parseGoalSexp
   , parseProviderSexp
   , fragRefusal
@@ -434,6 +435,20 @@ providerProgram sessionNames query = unlines
   escape '"' = "\\\""
   escape '\\' = "\\\\"
   escape c = [c]
+
+-- | Lean commands used to verify one rendered synthesis candidate.  The
+-- ordinary form catches elaboration and type errors.  Some valid inhabitants
+-- (notably axioms and opaque snapshot values) are unavailable to Lean's code
+-- generator, so retry them in a noncomputable declaration before rejecting
+-- the candidate.
+candidateVerificationPrograms :: String -> String -> [String]
+candidateVerificationPrograms goal term =
+  [ command ""
+  , command "noncomputable "
+  ]
+ where
+  command keyword = "set_option autoImplicit true in " ++ keyword
+    ++ "example : (" ++ goal ++ ") := (" ++ term ++ ")"
 
 -- S-expression parsing ------------------------------------------------------
 

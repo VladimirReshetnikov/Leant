@@ -55,7 +55,9 @@ There is a manual: **[docs/Leant.pdf](https://raw.githubusercontent.com/Vladimir
   automatically; prove-mode scripts are printed before the mode exits,
   so work is never lost.
 - **Sessions as artifacts.** `:transcript` records everything;
-  `:pickle`/`:unpickle` snapshot and restore environments as `.olean`;
+  `:pickle`/`:unpickle` snapshot and restore environments as `.olean`.
+  Leant-created snapshots also carry a fingerprinted synthesis companion,
+  while ordinary upstream snapshots remain compatible;
   `:load`/`:reload` round-trip `.lean` files.
 
 ## Getting started
@@ -108,8 +110,8 @@ session environment; `#`-commands pass straight through.
 | `:info NAME`, `:i` | show a definition (`#print`, rendered as a valid declaration) |
 | `:load FILE`, `:l` | reset the session and load a `.lean` file |
 | `:reload`, `:r` | reload the last loaded file |
-| `:import MOD` | add an import (rebuilds the session, replaying history) |
-| `:imports` | list active imports |
+| `:import MOD` | add an import (rebuilds and replays history; rejected over an opaque snapshot) |
+| `:imports` | list active imports, or the imports restored by the next `:reset` |
 | `:browse [NS]` | list declarations in a namespace (`:browse!` includes generated auxiliaries) |
 | `:doc NAME` | show the documentation string of a declaration |
 | `:search TEXT` | case-insensitive name search over the environment |
@@ -118,13 +120,13 @@ session environment; `#`-commands pass straight through.
 | `:prove [PROP]` | interactive prove mode; bare form resumes the last `sorry` |
 | `:set OPT VAL` | `set_option` persisting in the session |
 | `:undo` | revert the last state-changing command |
-| `:reset` | clear definitions, keep imports |
-| `:history` | list state-changing commands |
+| `:reset` | clear definitions or an active snapshot base, keeping configured imports |
+| `:history` | list state-changing commands after the current import/snapshot base |
 | `:env` | show the backend environment id |
 | `:time` | toggle per-command timing |
 | `:transcript [FILE\|on\|off]` | record a full transcript of the session |
 | `:timestamps [on\|off]` | timestamp each command in the transcript |
-| `:pickle FILE` / `:unpickle FILE` | save/restore the environment as `.olean` |
+| `:pickle FILE` / `:unpickle FILE` | save the environment plus synthesis companion / restore it as a new undo base |
 | `:! CMD` | run a shell command |
 
 Built-ins and keywords that are not constants in the environment
@@ -488,6 +490,22 @@ history) replays automatically on the next command. The Haskeline
 front-end provides the interrupt-safe step loop, logical multi-line
 input, and completion.
 
+An unpickled environment becomes an explicit history and undo barrier.
+Leant keeps a private process-lifetime copy, so backend restart does not
+depend on the user leaving the source file in place; commands entered after
+the barrier replay normally and remain undoable. `:reset` or `:load` leaves
+snapshot mode and rebuilds configured imports, while `:import` asks for one
+of those explicit transitions because Lean cannot add imports to an existing
+opaque environment.
+
+`:pickle` publishes the ordinary `.olean` first-class artifact together with
+a versioned `.leant.json` sidecar and, when synthesis tooling can be prepared,
+a `.leant-synth.olean` sibling. Content fingerprints and the serializer ABI
+prevent stale siblings from being trusted. Missing, stale, or foreign metadata
+does not block `:unpickle`; such a snapshot is restored as an upstream snapshot
+and Leant builds synthesis tooling over it when its imports expose Lean's
+metaprogramming API.
+
 A `:synth` query passes through checked stages: a Lean metaprogram
 (compiled once into a cached side environment) elaborates the goal and
 serializes it into the engine's fragment; the fragment translator
@@ -501,7 +519,9 @@ goal — only survivors are shown and bound.
 The synthesis side environment tracks exactly which session history it
 has replayed. An unchanged history reuses it directly; an append replays
 only the new suffix; undo or another non-prefix change rebuilds from the
-cached import-and-serializer base. Generated result bindings still join
+cached import-and-serializer base. For a restored Leant snapshot that base is
+the saved synthesis companion, so snapshot-only declarations remain visible
+to goal translation and live-provider discovery. Generated result bindings still join
 that replay history so later goals can mention them, but because they
 cannot be providers they do not invalidate a reusable provider
 inventory.

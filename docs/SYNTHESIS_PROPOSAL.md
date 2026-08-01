@@ -403,6 +403,16 @@ Design rules, all inherited from Djex:
   replayed so later goals can mention them even though they do not
   invalidate provider inventories.
 
+  `:unpickle` now establishes an explicit base/undo barrier rather than an
+  untracked environment jump. Leant keeps a managed copy for backend replay
+  and reconstructs the complete newest-first undo stack for post-snapshot
+  history transactionally. Its own `:pickle` also saves a synthesis-ready
+  sibling keyed by main/companion content fingerprints and the serializer
+  ABI. On restore, that sibling exposes snapshot-only declarations to goal
+  translation and provider discovery; an external snapshot instead gets a
+  best-effort serializer compiled directly over its environment, with an
+  honest refusal when the Lean metaprogramming API is absent.
+
   For complete supported constructor inventories with safely recoverable
   parameter vectors, Exference also receives nominal recursive
   datatype declarations and may eliminate exactly one constructor

@@ -1,7 +1,12 @@
 module Main (main) where
 
+import Control.Exception (finally)
+import qualified Data.ByteString.Char8 as BS
 import Data.List (isInfixOf)
 import qualified Data.Map.Strict as Map
+import System.Directory (getTemporaryDirectory, removeFile)
+import System.FilePath ((</>), normalise)
+import System.IO (hClose, openBinaryTempFile)
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.HUnit ((@?=), assertFailure, testCase)
 
@@ -23,6 +28,7 @@ import Leant.Synth.Fragment
   , ParsedGoal (..)
   , ProviderFrag (..)
   , ProviderQuery (..)
+  , candidateVerificationPrograms
   , parseGoalSexp
   , parseProviderSexp
   , providerProgram
@@ -39,16 +45,148 @@ import Leant.Synth.ProviderCache
   )
 import Leant.Synth.Replay (ReplayPlan (..), planReplay)
 import Leant.Synth.Render (renderLeanTerm)
+import Leant.Session.Replay (itCounterAfterHistory, replayHistoryWith)
+import Leant.Session.Snapshot
+  ( SnapshotCompanion (..)
+  , SnapshotFingerprint (..)
+  , SnapshotMetadata (..)
+  , decodeSnapshotMetadata
+  , encodeSnapshotMetadata
+  , fingerprintSnapshot
+  , resolveSnapshotPath
+  , snapshotCompanionPath
+  , snapshotMetadataPath
+  )
 
 main :: IO ()
 main = defaultMain $ testGroup "Leant synthesis boundary"
-  [ providerCacheTests
+  [ snapshotMetadataTests
+  , sessionReplayTests
+  , providerCacheTests
   , replayPlanTests
   , providerProgramTests
+  , candidateVerificationTests
   , providerParserTests
   , providerEngineTests
   , rankNFrontierTests
   , visibleTypeApplicationTests
+  ]
+
+sessionReplayTests :: TestTree
+sessionReplayTests = testGroup "transactional session replay"
+  [ testCase "reconstruct the newest-first undo chain" $ do
+      replayed <- replayHistoryWith step (0 :: Int) ["one", "two"]
+      replayed @?= Right (2, [1, 0])
+  , testCase "report the failing command without a partial result" $ do
+      replayed <- replayHistoryWith step (0 :: Int) ["one", "bad", "two"]
+      replayed @?= Left "bad"
+  , testCase "restore generated-result numbering above a snapshot base" $ do
+      itCounterAfterHistory 37
+        ["def user := 1", "def \171it!38\187 := (2)", "def \171it!41\187 := (3)"]
+        @?= 41
+      itCounterAfterHistory 37
+        [ "set_option autoImplicit true in def \171it!38\187 : Nat := 2"
+        , "set_option autoImplicit true in noncomputable def \171it!40\187"
+        ] @?= 40
+      itCounterAfterHistory 37 ["def user := 1"] @?= 37
+  ]
+ where
+  step environment command = pure $ case command of
+    "one" -> Just (environment + 1)
+    "two" -> Just (environment + 1)
+    _ -> Nothing
+
+snapshotMetadataTests :: TestTree
+snapshotMetadataTests = testGroup "environment snapshot metadata"
+  [ testCase "derive stable sibling paths" $ do
+      temporary <- getTemporaryDirectory
+      let workingDirectory = normalise (temporary </> "project-root")
+      snapshotCompanionPath "state.olean"
+        @?= "state.leant-synth.olean"
+      snapshotMetadataPath "state.olean" @?= "state.leant.json"
+      snapshotCompanionPath "state" @?= "state.leant-synth.olean"
+      resolveSnapshotPath workingDirectory ("snapshots" </> "state.olean")
+        @?= normalise
+          (workingDirectory </> "snapshots" </> "state.olean")
+  , testCase "round-trip fingerprints, counter, and companion identity" $ do
+      let mainFingerprint = SnapshotFingerprint 123 "0123456789abcdef"
+          companionFingerprint = SnapshotFingerprint 456 "fedcba9876543210"
+          metadata = SnapshotMetadata
+            { snapshotItCounter = 37
+            , snapshotMainFingerprint = mainFingerprint
+            , snapshotSynthesisCompanion = Just SnapshotCompanion
+                { snapshotCompanionFile = "state.leant-synth.olean"
+                , snapshotCompanionFingerprint = companionFingerprint
+                , snapshotCompanionABI = "leant-synth-fnv1a64-abc"
+                }
+            }
+      decodeSnapshotMetadata (encodeSnapshotMetadata metadata)
+        @?= Right metadata
+      decodeSnapshotMetadata
+          (encodeSnapshotMetadata SnapshotMetadata
+            { snapshotItCounter = 0
+            , snapshotMainFingerprint = mainFingerprint
+            , snapshotSynthesisCompanion = Nothing
+            })
+        @?= Right SnapshotMetadata
+          { snapshotItCounter = 0
+          , snapshotMainFingerprint = mainFingerprint
+          , snapshotSynthesisCompanion = Nothing
+          }
+  , testCase "fingerprint snapshot contents without loading them whole" $ do
+      temporary <- getTemporaryDirectory
+      (path, handle) <- openBinaryTempFile temporary "leant-fingerprint.olean"
+      BS.hPut handle (BS.pack "hello")
+      hClose handle
+      fingerprint <- fingerprintSnapshot path `finally` removeFile path
+      fingerprint @?= SnapshotFingerprint 5 "a430d84680aabd0b"
+  , testCase "reject incompatible or invalid sidecars" $ do
+      decodeSnapshotMetadata
+          ("{\"format\":\"leant-snapshot\",\"version\":2,"
+            ++ "\"itCounter\":0,\"main\":{\"bytes\":0,"
+            ++ "\"fnv1a64\":\"cbf29ce484222325\"},"
+            ++ "\"synthesisCompanion\":null}")
+        @?= Left "unsupported snapshot metadata version 2"
+      decodeSnapshotMetadata
+          ("{\"format\":\"leant-snapshot\",\"version\":1,"
+            ++ "\"itCounter\":-1,\"main\":{\"bytes\":0,"
+            ++ "\"fnv1a64\":\"cbf29ce484222325\"},"
+            ++ "\"synthesisCompanion\":null}")
+        @?= Left "snapshot it-counter is out of range"
+      decodeSnapshotMetadata
+          ("{\"format\":\"leant-snapshot\",\"version\":1,"
+            ++ "\"itCounter\":0,\"main\":{\"bytes\":0,"
+            ++ "\"fnv1a64\":\"cbf29ce484222325\"},"
+            ++ "\"synthesisCompanion\":{\"file\":\"../stale.olean\","
+            ++ "\"fingerprint\":{\"bytes\":0,"
+            ++ "\"fnv1a64\":\"cbf29ce484222325\"},"
+            ++ "\"abi\":\"leant-synth-fnv1a64-abc\"}}")
+        @?= Left "snapshot companion path must be a sibling filename"
+      decodeSnapshotMetadata
+          ("{\"format\":\"leant-snapshot\",\"version\":1.4,"
+            ++ "\"itCounter\":0,\"main\":{\"bytes\":0,"
+            ++ "\"fnv1a64\":\"cbf29ce484222325\"},"
+            ++ "\"synthesisCompanion\":null}")
+        @?= Left "missing or invalid snapshot metadata field `version`"
+      decodeSnapshotMetadata
+          ("{\"format\":\"leant-snapshot\",\"version\":1,"
+            ++ "\"itCounter\":0.4,\"main\":{\"bytes\":0,"
+            ++ "\"fnv1a64\":\"cbf29ce484222325\"},"
+            ++ "\"synthesisCompanion\":null}")
+        @?= Left "missing or invalid snapshot metadata field `itCounter`"
+      decodeSnapshotMetadata
+          ("{\"format\":\"leant-snapshot\",\"version\":1,"
+            ++ "\"itCounter\":0,\"main\":{\"bytes\":1e2,"
+            ++ "\"fnv1a64\":\"cbf29ce484222325\"},"
+            ++ "\"synthesisCompanion\":null}")
+        @?= Left "missing or invalid snapshot metadata field `bytes`"
+      decodeSnapshotMetadata
+          ("{\"format\":\"leant-snapshot\",\"version\":1,"
+            ++ "\"itCounter\":" ++ show (maxBound :: Int) ++ ","
+            ++ "\"main\":{\"bytes\":0,"
+            ++ "\"fnv1a64\":\"cbf29ce484222325\"},"
+            ++ "\"synthesisCompanion\":null}")
+        @?= Left "snapshot it-counter is out of range"
   ]
 
 providerProgramTests :: TestTree
@@ -81,6 +219,15 @@ providerProgramTests = testGroup "provider discovery program"
       classifier `isInfixOf` program @?= True
       sessionOverride `isInfixOf` program @?= True
       tierOrder `isInfixOf` program @?= True
+  ]
+
+candidateVerificationTests :: TestTree
+candidateVerificationTests = testGroup "candidate verification programs"
+  [ testCase "retry valid opaque inhabitants as noncomputable" $
+      candidateVerificationPrograms "Widget" "Widget.saved" @?=
+        [ "set_option autoImplicit true in example : (Widget) := (Widget.saved)"
+        , "set_option autoImplicit true in noncomputable example : (Widget) := (Widget.saved)"
+        ]
   ]
 
 replayPlanTests :: TestTree

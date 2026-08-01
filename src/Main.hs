@@ -28,16 +28,31 @@ import Data.Time.Format (defaultTimeLocale, formatTime)
 import Data.Time.LocalTime (getZonedTime)
 import System.Console.Haskeline
 import System.Directory
-  ( doesDirectoryExist
+  ( copyFile
+  , doesDirectoryExist
   , doesFileExist
   , getHomeDirectory
+  , getTemporaryDirectory
   , listDirectory
+  , makeAbsolute
+  , removeFile
+  , renameFile
   )
 import System.Environment (getArgs, lookupEnv)
 import System.Exit (ExitCode (..), exitWith)
-import System.FilePath ((</>), (<.>), takeDirectory, takeFileName)
+import System.FilePath
+  ( (</>)
+  , (<.>)
+  , takeDirectory
+  , takeFileName
+  )
 import System.IO
-import System.IO.Error (catchIOError, isEOFError)
+import System.IO.Error
+  ( catchIOError
+  , isDoesNotExistError
+  , isEOFError
+  , tryIOError
+  )
 import System.Process (callCommand)
 import System.Timeout (timeout)
 
@@ -46,6 +61,24 @@ import Leant.Builtins (builtinInfo)
 import Leant.Classify
 import Leant.Format (formatInfo, indentDefBody)
 import Leant.Json
+import Leant.Session.Replay
+  ( generatedItBinding
+  , itCounterAfterHistory
+  , replayHistoryWith
+  )
+import Leant.Session.Snapshot
+  ( SnapshotBase (..)
+  , SnapshotCompanion (..)
+  , SnapshotFingerprint
+  , SnapshotMetadata (..)
+  , decodeSnapshotMetadata
+  , encodeSnapshotMetadata
+  , fingerprintSnapshot
+  , resolveSnapshotPath
+  , snapshotCompanionPath
+  , snapshotMetadataPath
+  , synthesisToolingABI
+  )
 import Leant.Synth.Engine
   ( SynthEngine (..)
   , SynthOutcome (..)
@@ -61,6 +94,7 @@ import Leant.Synth.Fragment
   , ParsedGoal (..)
   , ProviderFrag
   , ProviderQuery
+  , candidateVerificationPrograms
   , fragRefusal
   , fragUnsafeAtoms
   , glivenkoSplit
@@ -155,6 +189,10 @@ data ReplState = ReplState
   , rsProjectDir :: Maybe FilePath
   , rsEnv :: Maybe Integer
   , rsBaseEnv :: Maybe Integer
+  , rsSnapshotBase :: Maybe SnapshotBase
+    -- ^ opaque environment restored by :unpickle, replayed before the
+    -- post-snapshot history after backend restart.  A Leant-created sibling
+    -- environment carries Lean's synthesis tooling and snapshot declarations.
   , rsEnvStack :: [Maybe Integer]
   , rsImports :: [String]
   , rsHistory :: [String]
@@ -211,6 +249,20 @@ data ReplState = ReplState
     -- locale-encoded prompt printing is bypassed.
   }
 
+-- | Backend-local identifiers rebuilt from an import or snapshot base plus
+-- chronological history.  Reconstruction is accumulated off to the side and
+-- installed atomically, so a failed replay cannot truncate history or damage
+-- the undo chain of the still-live session.
+data ReconstructedSession = ReconstructedSession
+  { reconstructedBaseEnv :: Maybe Integer
+  , reconstructedCurrentEnv :: Maybe Integer
+  , reconstructedEnvStack :: [Maybe Integer]
+  }
+
+data SnapshotEnvironmentError
+  = SnapshotTransportError String
+  | SnapshotRejected String
+
 -- | Move to a provider world whose imported and session declarations may
 -- differ.  Old generations cannot hit even before the bounded cache refills;
 -- clearing also makes the reclaimed capacity immediately useful.
@@ -218,6 +270,7 @@ invalidateProviderWorld :: ReplState -> ReplState
 invalidateProviderWorld state = state
   { rsProviderWorld = advanceProviderWorld (rsProviderWorld state)
   , rsProviderCache = clearProviderCache (rsProviderCache state)
+  , rsComplCache = []
   }
 
 -- | Environment identifiers are backend-local.  Import changes and backend
@@ -344,9 +397,28 @@ promptOf st = do
 -- or interrupt (port of AutoLeanServer's restart-and-replay behavior).
 ensureBackend :: St -> IO (Either String Backend)
 ensureBackend st = do
+  processOr <- ensureBackendProcess st
+  case processOr of
+    Left err -> pure (Left err)
+    Right (backend, False) -> pure (Right backend)
+    Right (backend, True) -> do
+      rebuilt <- rebuildSession st
+      if rebuilt then pure (Right backend)
+        else do
+          -- Do not leave a partially replayed backend installed.  A later
+          -- request could otherwise observe ids from an incomplete session.
+          backendDied st
+          pure (Left "failed to rebuild the session")
+
+-- Start only the process.  Replacement operations (:reset, :load, and
+-- :unpickle) deliberately use this lower boundary: if the old session can no
+-- longer replay, those commands must still be able to establish a new base.
+-- The Bool reports whether this call spawned an unreconstructed backend.
+ensureBackendProcess :: St -> IO (Either String (Backend, Bool))
+ensureBackendProcess st = do
   state <- readIORef st
   case rsBackend state of
-    Just backend -> pure (Right backend)
+    Just backend -> pure (Right (backend, False))
     Nothing -> do
       emitLn st =<< cDim st "starting Lean backend..."
       result <- try (spawnBackend (rsConfig state))
@@ -354,14 +426,10 @@ ensureBackend st = do
         Left err -> pure (Left (show err))
         Right backend -> do
           modifyIORef' st (\s -> s { rsBackend = Just backend })
-          rebuilt <- rebuildSession st
-          if rebuilt then pure (Right backend)
-            else do
-              -- Do not leave a partially replayed backend installed.  A
-              -- later fixed/current request could otherwise observe ids from
-              -- the failed reconstruction as if the session were complete.
-              backendDied st
-              pure (Left "failed to rebuild the session")
+          pure (Right (backend, True))
+
+abandonReplacementBackend :: St -> Bool -> IO ()
+abandonReplacementBackend st spawned = when spawned (backendDied st)
 
 backendDied :: St -> IO ()
 backendDied st = do
@@ -391,6 +459,28 @@ runCurrentCmd st code = runPayloadAfterBackend st $ \state ->
 commandPayload :: Maybe Integer -> String -> JValue
 commandPayload env code = JObj
   (("cmd", JStr code) : [("env", JInt e) | Just e <- [env]])
+
+pickleEnvironmentPayload :: FilePath -> Integer -> JValue
+pickleEnvironmentPayload path env = JObj
+  [("pickleTo", JStr path), ("env", JInt env)]
+
+unpickleEnvironmentPayload :: FilePath -> JValue
+unpickleEnvironmentPayload path = JObj [("unpickleEnvFrom", JStr path)]
+
+restoreEnvironmentArtifact
+  :: St -> FilePath -> IO (Either SnapshotEnvironmentError Integer)
+restoreEnvironmentArtifact st path = do
+  result <- runPayload st (unpickleEnvironmentPayload path)
+  pure $ case result of
+    Left err -> Left (SnapshotTransportError err)
+    Right response
+      | Just fatal <- respFatal response ->
+          Left (SnapshotRejected (trim fatal))
+      | hasErrors response ->
+          Left (SnapshotRejected "Lean rejected the snapshot environment")
+      | Just env <- respEnv response -> Right env
+      | otherwise ->
+          Left (SnapshotRejected "snapshot restore returned no environment")
 
 -- Apply one tactic to a proof state.
 runTactic :: St -> Integer -> String -> IO (Either String JValue)
@@ -503,61 +593,122 @@ printResponse st transform v = case respFatal v of
 
 -- Session (re)construction --------------------------------------------------
 
--- Build the base environment from imports and replay history (used on
--- startup after a crash, and when imports change).
+restoreSnapshotBase :: St -> SnapshotBase -> IO (Either () (Maybe Integer))
+restoreSnapshotBase st snapshot = do
+  let path = snapshotEnvironmentPath snapshot
+  emitLn st =<< cDim st ("restoring snapshot base: " ++ path ++ " ...")
+  result <- runPayload st (unpickleEnvironmentPayload path)
+  case result of
+    Left err -> do
+      emitLn st . (++ err) =<< cRed st "snapshot restore failed: "
+      pure (Left ())
+    Right response -> do
+      errored <- printResponse st Nothing response
+      case (errored, respEnv response) of
+        (False, Just env) -> pure (Right (Just env))
+        (False, Nothing) -> do
+          emitLn st =<< cRed st "snapshot restore returned no environment"
+          pure (Left ())
+        (True, _) -> pure (Left ())
+
+buildImportedBase :: St -> [String] -> IO (Either () (Maybe Integer))
+buildImportedBase st imports = case imports of
+  [] -> pure (Right Nothing)
+  _ -> do
+    emitLn st =<< cDim st ("importing: " ++ intercalate ", " imports ++ " ...")
+    warnMissingModules st imports
+    started <- getCurrentTime
+    result <- runCmd st Nothing (unlines (map ("import " ++) imports))
+    case result of
+      Left err -> do
+        emitLn st . (++ err) =<< cRed st "import failed: "
+        pure (Left ())
+      Right response -> do
+        errored <- printResponse st Nothing response
+        if errored then pure (Left ()) else do
+          -- A failed import can yield a silently empty environment; probe it.
+          probe <- runCmd st (respEnv response)
+            "example : True := True.intro"
+          case probe of
+            Right checked | not (hasErrors checked) -> do
+              finished <- getCurrentTime
+              emitLn st =<< cDim st ("imports ready in "
+                ++ show (round (diffUTCTime finished started) :: Integer)
+                ++ "s")
+              pure (Right (respEnv response))
+            _ -> do
+              emitLn st =<< cRed st
+                "import failed: the resulting environment is unusable"
+              pure (Left ())
+
+reconstructSession
+  :: St
+  -> Maybe SnapshotBase
+  -> [String]
+  -> [String]
+  -> IO (Maybe ReconstructedSession)
+reconstructSession st snapshot imports history = do
+  baseOr <- case snapshot of
+    Just snapshotBase -> restoreSnapshotBase st snapshotBase
+    Nothing -> buildImportedBase st imports
+  case baseOr of
+    Left () -> pure Nothing
+    Right base -> do
+      replayed <- replayHistoryWith replayOne base history
+      case replayed of
+        Left code -> do
+          emitLn st =<< cRed st ("replay failed at: "
+            ++ takeWhile (/= '\n') code)
+          pure Nothing
+        Right (current, stack) -> pure (Just ReconstructedSession
+          { reconstructedBaseEnv = base
+          , reconstructedCurrentEnv = current
+          , reconstructedEnvStack = stack
+          })
+ where
+  replayOne current code = do
+    result <- runCmd st current code
+    pure $ case result of
+      Right response
+        | not (hasErrors response)
+        , Nothing <- respFatal response
+        , Just next <- respEnv response -> Just (Just next)
+      _ -> Nothing
+
+installReconstruction :: St -> ReconstructedSession -> IO ()
+installReconstruction st rebuilt = modifyIORef' st
+  (applyReconstruction rebuilt)
+
+applyReconstruction :: ReconstructedSession -> ReplState -> ReplState
+applyReconstruction rebuilt state =
+  invalidateProviderWorld (invalidateDerivedEnvironments state
+    { rsBaseEnv = reconstructedBaseEnv rebuilt
+    , rsEnv = reconstructedCurrentEnv rebuilt
+    , rsEnvStack = reconstructedEnvStack rebuilt
+    })
+
+clearSessionTransients :: ReplState -> ReplState
+clearSessionTransients state = state
+  { rsProve = Nothing
+  , rsLastSorry = Nothing
+  , rsItCounter = 0
+  , rsSynthIts = []
+  , rsSynthItsProve = False
+  }
+
+-- Build the base environment from imports or an opaque restored snapshot,
+-- then replay history recorded after that base (used on startup after a
+-- crash, and when the base changes).
 rebuildSession :: St -> IO Bool
 rebuildSession st = do
-  modifyIORef' st
-    (invalidateProviderWorld . invalidateDerivedEnvironments)
   state <- readIORef st
-  baseOk <- case rsImports state of
-    [] -> do
-      modifyIORef' st (\s -> s { rsBaseEnv = Nothing })
+  rebuilt <- reconstructSession st (rsSnapshotBase state)
+    (rsImports state) (rsHistory state)
+  case rebuilt of
+    Nothing -> pure False
+    Just session -> do
+      installReconstruction st session
       pure True
-    imports -> do
-      emitLn st =<< cDim st ("importing: " ++ intercalate ", " imports ++ " ...")
-      warnMissingModules st imports
-      started <- getCurrentTime
-      result <- runCmd st Nothing (unlines (map ("import " ++) imports))
-      case result of
-        Left err -> do
-          emitLn st . (++ err) =<< cRed st "import failed: "
-          pure False
-        Right v -> do
-          errored <- printResponse st Nothing v
-          if errored then pure False else do
-            -- a failed import yields a silently *empty* environment; probe
-            probe <- runCmd st (respEnv v) "example : True := True.intro"
-            case probe of
-              Right pv | not (hasErrors pv) -> do
-                modifyIORef' st (\s -> s { rsBaseEnv = respEnv v })
-                finished <- getCurrentTime
-                emitLn st =<< cDim st ("imports ready in "
-                  ++ show (round (diffUTCTime finished started) :: Integer) ++ "s")
-                pure True
-              _ -> do
-                emitLn st =<< cRed st
-                  "import failed: the resulting environment is unusable"
-                pure False
-  if not baseOk then pure False else do
-    stateNow <- readIORef st
-    modifyIORef' st (\s -> s { rsEnv = rsBaseEnv stateNow, rsEnvStack = [] })
-    replay (rsHistory stateNow) []
- where
-  replay [] done = do
-    modifyIORef' st (\s -> s { rsHistory = reverse done })
-    pure True
-  replay (code : rest) done = do
-    result <- runCurrentCmd st code
-    case result of
-      Right v | not (hasErrors v) -> do
-        modifyIORef' st (\s -> s { rsEnv = respEnv v })
-        replay rest (code : done)
-      _ -> do
-        emitLn st =<< cRed st ("replay failed at: "
-          ++ takeWhile (/= '\n') code)
-        modifyIORef' st (\s -> s { rsHistory = reverse done })
-        pure False
 
 -- Module availability (the backend silently ignores unresolvable imports).
 moduleAvailable :: St -> String -> IO Bool
@@ -679,14 +830,36 @@ rewriteIt s@(c : rest) = case stripItName s of
 bindIt :: St -> String -> IO ()
 bindIt st expr = do
   state <- readIORef st
-  let n = rsItCounter state + 1
-      code = "def " ++ itName n ++ " := (" ++ expr ++ ")"
-  result <- runCurrentCmd st code
+  candidate <- firstUnusedItCounter st (rsItCounter state + 1) 10000
+  forM_ candidate $ \n -> do
+    let code = "def " ++ itName n ++ " := (" ++ expr ++ ")"
+    result <- runCurrentCmd st code
+    case result of
+      Right v | not (hasErrors v), Nothing <- respFatal v -> do
+        modifyIORef' st (\s -> s { rsItCounter = n })
+        advanceEnv st (respEnv v) code
+      _ -> pure ()
+
+-- External snapshots do not necessarily have Leant metadata.  Probe forward
+-- before binding so an existing generated name cannot make every subsequent
+-- evaluation silently fail to update bare `it`.
+firstUnusedItCounter :: St -> Int -> Int -> IO (Maybe Int)
+firstUnusedItCounter _ _ 0 = pure Nothing
+firstUnusedItCounter _ candidate _
+  | candidate >= maxBound = pure Nothing
+firstUnusedItCounter st candidate attempts = do
+  result <- runCurrentCmd st ("#check " ++ itName candidate)
   case result of
-    Right v | not (hasErrors v), Nothing <- respFatal v -> do
-      modifyIORef' st (\s -> s { rsItCounter = n })
-      advanceEnv st (respEnv v) code
-    _ -> pure ()
+    Right response
+      | not (hasErrors response), Nothing <- respFatal response ->
+          firstUnusedItCounter st (candidate + 1) (attempts - 1)
+    _ -> pure (Just candidate)
+
+itCounterForHistory :: ReplState -> [String] -> Int
+itCounterForHistory state history =
+  itCounterAfterHistory baseCounter history
+ where
+  baseCounter = maybe 0 snapshotBaseItCounter (rsSnapshotBase state)
 
 advanceEnv :: St -> Maybe Integer -> String -> IO ()
 advanceEnv st newEnv code = modifyIORef' st $ \state ->
@@ -785,8 +958,8 @@ helpText = unlines
   , "  :info NAME, :i NAME      show the definition of NAME (#print)"
   , "  :load FILE, :l FILE      reset the session and load a .lean file"
   , "  :reload, :r              reload the last loaded file"
-  , "  :import MOD              add an import (rebuilds the session)"
-  , "  :imports                 list active imports"
+  , "  :import MOD              add an import (rebuilds; not over a snapshot)"
+  , "  :imports                 list active or post-reset imports"
   , "  :browse [NAMESPACE]      list declarations in a namespace or the session"
   , "  :browse! NAMESPACE       ...including compiler-generated auxiliaries"
   , "  :prove [PROP]            interactively prove PROP tactic by tactic"
@@ -802,14 +975,14 @@ helpText = unlines
   , "                           (on|off, default on)"
   , "  :set OPT VAL             set_option OPT VAL (persists in the session)"
   , "  :undo                    revert the last state-changing command"
-  , "  :reset                   clear all definitions (keeps imports)"
-  , "  :history                 show state-changing commands of this session"
+  , "  :reset                   clear definitions/snapshot (keeps imports)"
+  , "  :history                 show commands after the current base"
   , "  :env                     show the current environment id"
   , "  :time                    toggle per-command timing"
   , "  :transcript [FILE|on|off] record a full transcript of the session"
   , "  :timestamps [on|off]     timestamp each command in the transcript"
-  , "  :pickle FILE             save the current environment to FILE (.olean)"
-  , "  :unpickle FILE           restore an environment from FILE"
+  , "  :pickle FILE             save environment + synthesis companion"
+  , "  :unpickle FILE           restore as a new undo/history base"
   , "  :! CMD                   run a shell command"
   , "Any #-prefixed Lean command (#eval, #check, #print axioms) works directly."
   ]
@@ -848,9 +1021,14 @@ dispatchCommand st line = do
     "synth" -> True <$ cmdSynth st arg
     "import" -> True <$ cmdImport st (words (map decomma arg))
     "imports" -> do
-      imports <- rsImports <$> readIORef st
+      state <- readIORef st
+      let imports = rsImports state
+      forM_ (rsSnapshotBase state) $ \snapshot ->
+        emitLn st =<< cDim st ("snapshot base active: "
+          ++ snapshotSourcePath snapshot
+          ++ " (listed imports take effect after :reset)")
       if null imports
-        then emitLn st =<< cDim st "(no imports)"
+        then emitLn st =<< cDim st "(no configured imports)"
         else forM_ imports (\m -> emitLn st ("import " ++ m))
       pure True
     "set" -> do
@@ -909,7 +1087,15 @@ dispatchCommand st line = do
                 h : hs -> (Just h, reverse hs)
                 [] -> (Nothing, [])
               restored = state
-                { rsEnv = prev, rsEnvStack = stack, rsHistory = history }
+                { rsEnv = prev
+                , rsEnvStack = stack
+                , rsHistory = history
+                , rsItCounter = itCounterForHistory state history
+                , rsSynthIts = []
+                , rsSynthItsProve = False
+                , rsLastSorry = Nothing
+                , rsComplCache = []
+                }
               updated = case dropped of
                 Just entry | historyEntryAffectsProviders entry ->
                   invalidateProviderWorld restored
@@ -919,17 +1105,35 @@ dispatchCommand st line = do
             emitLn st =<< cDim st ("undid: " ++ takeWhile (/= '\n') d)
       pure True
     "reset" -> do
-      modifyIORef' st $ \s -> invalidateProviderWorld s
-        { rsHistory = [], rsEnvStack = [], rsEnv = rsBaseEnv s
-        , rsSynthEnv = Nothing
-        }
-      imports <- rsImports <$> readIORef st
-      emitLn st =<< cDim st
-        ("session reset" ++ if null imports then "" else " (imports kept)")
+      state <- readIORef st
+      backendOr <- ensureBackendProcess st
+      case backendOr of
+        Left err -> emitLn st =<< cRed st err
+        Right (_, spawned) -> do
+          rebuilt <- reconstructSession st Nothing (rsImports state) []
+          case rebuilt of
+            Nothing -> do
+              abandonReplacementBackend st spawned
+              emitLn st =<< cRed st "reset failed; session unchanged"
+            Just session -> do
+              modifyIORef' st $ \current -> clearSessionTransients
+                (applyReconstruction session current
+                  { rsSnapshotBase = Nothing, rsHistory = [] })
+              forM_ (rsSnapshotBase state) cleanupSnapshotBase
+              emitLn st =<< cDim st
+                ("session reset"
+                  ++ (if null (rsImports state)
+                        then "" else " (imports kept)")
+                  ++ if isJust (rsSnapshotBase state)
+                       then "; snapshot base cleared" else "")
       pure True
     "history" -> do
-      history <- filter (not . ("def \171it!" `isPrefixOf`)) . rsHistory
-        <$> readIORef st
+      state <- readIORef st
+      forM_ (rsSnapshotBase state) $ \snapshot ->
+        emitLn st =<< cDim st ("(history starts after snapshot base "
+          ++ snapshotSourcePath snapshot ++ ")")
+      let history = filter (not . isJust . generatedItBinding)
+            (rsHistory state)
       if null history
         then emitLn st =<< cDim st "(empty)"
         else forM_ (zip [1 :: Int ..] history) $ \(i, h) ->
@@ -1027,20 +1231,25 @@ cmdImport st mods
   | null mods = emitLn st =<< cRed st "usage: :import MODULE"
   | otherwise = do
       state <- readIORef st
-      fresh <- newModules st (rsImports state) mods
-      if null fresh
-        then emitLn st =<< cDim st "no new modules to import"
-        else do
-          let oldImports = rsImports state
-          modifyIORef' st (\s -> s { rsImports = oldImports ++ fresh })
-          emitLn st =<< cDim st
-            "rebuilding session with new imports (this re-elaborates history)..."
-          ok <- rebuildSession st
-          unless ok $ do
-            modifyIORef' st (\s -> s { rsImports = oldImports })
-            emitLn st =<< cRed st "import failed; session unchanged"
-            _ <- rebuildSession st
-            pure ()
+      case rsSnapshotBase state of
+        Just _ -> emitLn st =<< cRed st
+          "cannot add imports to an opaque snapshot; use :reset or :load first"
+        Nothing -> do
+          fresh <- newModules st (rsImports state) mods
+          if null fresh
+            then emitLn st =<< cDim st "no new modules to import"
+            else do
+              let imports = rsImports state ++ fresh
+              emitLn st =<< cDim st
+                "rebuilding session with new imports (this re-elaborates history)..."
+              rebuilt <- reconstructSession st Nothing imports (rsHistory state)
+              case rebuilt of
+                Nothing -> emitLn st =<< cRed st
+                  "import failed; session unchanged"
+                Just session -> do
+                  modifyIORef' st $ \current ->
+                    applyReconstruction session current { rsImports = imports }
+                  emitLn st =<< cDim st "imports added"
 
 newModules :: St -> [String] -> [String] -> IO [String]
 newModules st existing mods = go (nub mods) []
@@ -1068,36 +1277,61 @@ cmdLoad st arg
         else do
           contents <- readFileUtf8 path
           let (fileImports, body) = splitHeader contents
-          -- GHCi-style :load resets the session to the file contents
-          modifyIORef' st $ \s -> s { rsHistory = [], rsEnvStack = [] }
           state <- readIORef st
           fresh <- newModules st (rsImports state) fileImports
-          modifyIORef' st (\s -> s { rsImports = rsImports s ++ fresh })
+          let imports = rsImports state ++ fresh
           emitLn st =<< cDim st ("loading " ++ path ++ " ...")
           started <- getCurrentTime
-          ok <- rebuildSession st
-          if not ok
-            then emitLn st =<< cRed st "failed to elaborate imports"
-            else do
-              bodyOk <- if null (trim body) then pure True else do
-                baseEnv <- rsBaseEnv <$> readIORef st
-                result <- runCmd st baseEnv body
-                case result of
-                  Left err -> False <$ (emitLn st =<< cRed st err)
-                  Right v -> do
-                    errored <- printResponse st Nothing v
-                    if errored
-                      then pure False
-                      else do
-                        modifyIORef' st $ \s -> invalidateProviderWorld s
-                          { rsEnv = respEnv v, rsHistory = [body] }
-                        pure True
-              when bodyOk $ do
-                modifyIORef' st (\s -> s { rsLoadedFile = Just path })
-                finished <- getCurrentTime
-                emitLn st =<< cDim st ("loaded " ++ takeFileName path
-                  ++ " (" ++ show (length (lines body)) ++ " lines) in "
-                  ++ show (round (diffUTCTime finished started) :: Integer) ++ "s")
+          backendOr <- ensureBackendProcess st
+          case backendOr of
+            Left err -> emitLn st =<< cRed st err
+            Right (_, spawned) -> do
+              baseSession <- reconstructSession st Nothing imports []
+              case baseSession of
+                Nothing -> do
+                  abandonReplacementBackend st spawned
+                  emitLn st =<< cRed st
+                    "failed to elaborate imports; session unchanged"
+                Just imported -> do
+                  loaded <- if null (trim body)
+                    then pure (Just imported)
+                    else do
+                      result <- runCmd st (reconstructedBaseEnv imported) body
+                      case result of
+                        Left err -> do
+                          emitLn st =<< cRed st err
+                          pure Nothing
+                        Right response -> do
+                          errored <- printResponse st Nothing response
+                          case (errored, respEnv response) of
+                            (False, Just env) -> pure (Just imported
+                              { reconstructedCurrentEnv = Just env
+                              , reconstructedEnvStack =
+                                  [reconstructedBaseEnv imported]
+                              })
+                            (False, Nothing) -> do
+                              emitLn st =<< cRed st
+                                "file elaboration returned no environment"
+                              pure Nothing
+                            (True, _) -> pure Nothing
+                  case loaded of
+                    Nothing -> do
+                      abandonReplacementBackend st spawned
+                      emitLn st =<< cRed st "load failed; session unchanged"
+                    Just session -> do
+                      modifyIORef' st $ \current -> clearSessionTransients
+                        (applyReconstruction session current
+                          { rsSnapshotBase = Nothing
+                          , rsImports = imports
+                          , rsHistory = [body | not (null (trim body))]
+                          , rsLoadedFile = Just path
+                          })
+                      forM_ (rsSnapshotBase state) cleanupSnapshotBase
+                      finished <- getCurrentTime
+                      emitLn st =<< cDim st ("loaded " ++ takeFileName path
+                        ++ " (" ++ show (length (lines body)) ++ " lines) in "
+                        ++ show (round (diffUTCTime finished started) :: Integer)
+                        ++ "s")
  where
   splitHeader contents = go (lines contents) []
    where
@@ -1156,22 +1390,33 @@ ensureBrowseEnv' quiet st = do
   state <- readIORef st
   case rsBrowseEnv state of
     Just env -> pure (Right env)
-    Nothing -> do
-      unless quiet $
-        emitLn st =<< cDim st "preparing browse environment (session imports + Lean)..."
-      let imports = nub (rsImports state ++ ["Lean.Elab.Command"])
-      result <- runCmd st Nothing (unlines (map ("import " ++) imports))
-      case result of
-        Left err -> pure (Left err)
-        Right v
-          | hasErrors v || isJust (respFatal v) -> do
-              _ <- printResponse st Nothing v
-              pure (Left "failed to build the browse environment")
-          | otherwise -> case respEnv v of
-              Nothing -> pure (Left "browse environment has no id")
-              Just env -> do
+    Nothing -> case rsSnapshotBase state of
+      -- The synthesis base is also a Lean-tooling environment and, unlike a
+      -- fresh import environment, retains declarations hidden in the opaque
+      -- snapshot.
+      Just _ -> do
+        envOr <- ensureSynthBase st
+        case envOr of
+          Left err -> pure (Left err)
+          Right env -> do
+            modifyIORef' st (\s -> s { rsBrowseEnv = Just env })
+            pure (Right env)
+      Nothing -> do
+        unless quiet $
+          emitLn st =<< cDim st
+            "preparing browse environment (session imports + Lean)..."
+        let imports = nub (rsImports state ++ ["Lean.Elab.Command"])
+        result <- runCmd st Nothing (unlines (map ("import " ++) imports))
+        case result of
+          Left err -> pure (Left err)
+          Right response
+            | hasErrors response || isJust (respFatal response) -> do
+                _ <- printResponse st Nothing response
+                pure (Left "failed to build the browse environment")
+            | Just env <- respEnv response -> do
                 modifyIORef' st (\s -> s { rsBrowseEnv = Just env })
                 pure (Right env)
+            | otherwise -> pure (Left "browse environment has no id")
 
 leanStringLit :: String -> String
 leanStringLit s = '"' : concatMap escape s ++ "\""
@@ -1302,35 +1547,68 @@ ensureSynthBase st = do
   state <- readIORef st
   case rsSynthBase state of
     Just env -> pure (Right env)
-    Nothing -> do
-      emitLn st =<< cDim st
-        "preparing synthesis environment (session imports + Lean)..."
-      let imports = nub (rsImports state ++ ["Lean"])
-      result <- runCmd st Nothing (unlines (map ("import " ++) imports))
-      case result of
-        Left err -> pure (Left err)
-        Right v
-          | hasErrors v || isJust (respFatal v) -> do
-              _ <- printResponse st Nothing v
-              pure (Left "failed to build the synthesis environment")
-          | otherwise -> case respEnv v of
-              Nothing -> pure (Left "synthesis environment has no id")
-              Just importEnv -> do
-                prelude <- runCmd st (Just importEnv) synthPrelude
-                case prelude of
-                  Left err -> pure (Left err)
-                  Right pv
-                    | hasErrors pv || isJust (respFatal pv) -> do
-                        _ <- printResponse st Nothing pv
-                        pure (Left
-                          "failed to compile the synthesis serializer")
-                    | otherwise -> case respEnv pv of
-                        Nothing -> pure
-                          (Left "synthesis environment has no id")
-                        Just env -> do
-                          modifyIORef' st
-                            (\s -> s { rsSynthBase = Just env })
-                          pure (Right env)
+    Nothing -> case rsSnapshotBase state of
+      Just snapshot -> prepareSnapshotBase snapshot
+      Nothing -> prepareImportedBase state
+ where
+  remember env = do
+    modifyIORef' st (\state -> state { rsSynthBase = Just env })
+    pure (Right env)
+
+  compilePrelude imported externalSnapshot = do
+    prelude <- runCmd st (Just imported) synthPrelude
+    case prelude of
+      Left err -> pure (Left err)
+      Right response
+        | hasErrors response || isJust (respFatal response) ->
+            if externalSnapshot
+              then pure (Left ("`:synth` is unavailable for this external "
+                ++ "snapshot because it does not contain Lean's "
+                ++ "metaprogramming API; recreate it with Leant `:pickle` "
+                ++ "to save a synthesis companion"))
+              else do
+                _ <- printResponse st Nothing response
+                pure (Left "failed to compile the synthesis serializer")
+        | Just env <- respEnv response -> remember env
+        | otherwise -> pure (Left "synthesis environment has no id")
+
+  prepareSnapshotBase snapshot = do
+    emitLn st =<< cDim st
+      "preparing synthesis environment from snapshot base..."
+    case snapshotToolingPath snapshot of
+      Nothing -> rebuildFromMain snapshot
+      Just tooling -> do
+        restored <- restoreEnvironmentArtifact st tooling
+        case restored of
+          Right env -> compilePrelude env False
+          Left (SnapshotTransportError err) -> pure (Left err)
+          Left (SnapshotRejected err) -> do
+            snapshotWarning st ("synthesis companion could not be restored: "
+              ++ err ++ "; rebuilding from the main snapshot")
+            rebuildFromMain snapshot
+
+  rebuildFromMain snapshot = do
+    restored <- restoreEnvironmentArtifact st
+      (snapshotEnvironmentPath snapshot)
+    case restored of
+      Left (SnapshotTransportError err) -> pure (Left err)
+      Left (SnapshotRejected err) -> pure (Left err)
+      Right snapshotEnv -> compilePrelude snapshotEnv True
+
+  prepareImportedBase state = do
+    emitLn st =<< cDim st
+      "preparing synthesis environment (session imports + Lean)..."
+    let imports = nub (rsImports state ++ ["Lean"])
+    result <- runCmd st Nothing (unlines (map ("import " ++) imports))
+    case result of
+      Left err -> pure (Left err)
+      Right response
+        | hasErrors response || isJust (respFatal response) -> do
+            _ <- printResponse st Nothing response
+            pure (Left "failed to build the synthesis environment")
+        | Just importEnv <- respEnv response ->
+            compilePrelude importEnv False
+        | otherwise -> pure (Left "synthesis environment has no id")
 
 -- | The synthesis environment: the base plus the session history, so goals
 -- may mention session-local declarations.  A cached chronological prefix is
@@ -1970,16 +2248,19 @@ synthBind st goal term = do
  where
   attempt keyword = do
     state <- readIORef st
-    let n = rsItCounter state + 1
-        code = "set_option autoImplicit true in " ++ keyword ++ "def "
-          ++ itName n ++ " : (" ++ goal ++ ") := (" ++ term ++ ")"
-    result <- runCurrentCmd st code
-    case result of
-      Right v | not (hasErrors v), Nothing <- respFatal v -> do
-        modifyIORef' st (\s -> s { rsItCounter = n })
-        advanceEnv st (respEnv v) code
-        pure (Just n)
-      _ -> pure Nothing
+    candidate <- firstUnusedItCounter st (rsItCounter state + 1) 10000
+    case candidate of
+      Nothing -> pure Nothing
+      Just n -> do
+        let code = "set_option autoImplicit true in " ++ keyword ++ "def "
+              ++ itName n ++ " : (" ++ goal ++ ") := (" ++ term ++ ")"
+        result <- runCurrentCmd st code
+        case result of
+          Right v | not (hasErrors v), Nothing <- respFatal v -> do
+            modifyIORef' st (\s -> s { rsItCounter = n })
+            advanceEnv st (respEnv v) code
+            pure (Just n)
+          _ -> pure Nothing
 
 -- | Verify candidate groups against the backend, best first, lazily:
 -- stop once enough verified candidates are collected (design rule: only
@@ -2002,13 +2283,16 @@ synthVerify st goal = go synthMaxShown 0
 
   tryGroup [] = pure Nothing
   tryGroup (term : variants) = do
-    let code = "set_option autoImplicit true in example : (" ++ goal
-          ++ ") := (" ++ term ++ ")"
+    verified <- tryPrograms (candidateVerificationPrograms goal term)
+    if verified then pure (Just term) else tryGroup variants
+
+  tryPrograms [] = pure False
+  tryPrograms (code : rest) = do
     result <- runCurrentCmd st code
     case result of
       Right v | not (hasErrors v), Nothing <- respFatal v
-              , null (respSorries v) -> pure (Just term)
-      _ -> tryGroup variants
+              , null (respSorries v) -> pure True
+      _ -> tryPrograms rest
 
 completionCandidates :: St -> String -> IO [String]
 completionCandidates st prefix = do
@@ -2116,41 +2400,498 @@ sessionDeclNames entry =
     [] -> False
   isIdentChar c = not (isSpace c) && c `notElem` "({[:="
 
+snapshotArgumentPath :: ReplState -> FilePath -> FilePath
+snapshotArgumentPath state =
+  resolveSnapshotPath (bcWorkingDir (rsConfig state)) . withOlean
+
+removeFileIfExists :: FilePath -> IO ()
+removeFileIfExists path = catchIOError (removeFile path) $ \err ->
+  unless (isDoesNotExistError err) (ioError err)
+
+ioResult :: IO a -> IO (Either String a)
+ioResult action = do
+  result <- tryIOError action
+  pure (either (Left . show) Right result)
+
+-- Reserve a collision-resistant sibling name, but leave it absent for the
+-- backend, whose pickle operation creates the artifact itself.
+freshSiblingPath :: FilePath -> IO (Either String FilePath)
+freshSiblingPath target = ioResult $ do
+  (path, handle) <- openBinaryTempFile (takeDirectory target)
+    (takeFileName target ++ ".tmp")
+  hClose handle
+  removeFile path
+  pure path
+
+copyManagedArtifact :: FilePath -> IO (Either String FilePath)
+copyManagedArtifact source = do
+  temporary <- getTemporaryDirectory
+  reserved <- freshSiblingPath (temporary </> "leant-session.olean")
+  case reserved of
+    Left err -> pure (Left err)
+    Right path -> do
+      copied <- ioResult (copyFile source path)
+      case copied of
+        Left err -> do
+          cleanupManagedArtifact path
+          pure (Left err)
+        Right () -> pure (Right path)
+
+cleanupSnapshotBase :: SnapshotBase -> IO ()
+cleanupSnapshotBase snapshot = forM_ paths cleanupManagedArtifact
+ where
+  paths = snapshotEnvironmentPath snapshot
+    : maybe [] pure (snapshotToolingPath snapshot)
+
+-- Publish one prepared artifact without sacrificing an existing destination
+-- if the final rename fails (notably important on Windows, where replacing an
+-- existing file via rename is not uniformly atomic).
+publishArtifact :: FilePath -> FilePath -> IO (Either String ())
+publishArtifact temporary destination = do
+  exists <- doesFileExist destination
+  if not exists
+    then ioResult (renameFile temporary destination)
+    else do
+      backupOr <- freshSiblingPath destination
+      case backupOr of
+        Left err -> pure (Left err)
+        Right backup -> do
+          movedOld <- ioResult (renameFile destination backup)
+          case movedOld of
+            Left err -> pure (Left err)
+            Right () -> do
+              installed <- ioResult (renameFile temporary destination)
+              case installed of
+                Right () -> do
+                  _ <- ioResult (removeFileIfExists backup)
+                  pure (Right ())
+                Left err -> do
+                  restored <- ioResult (renameFile backup destination)
+                  pure $ case restored of
+                    Right () -> Left err
+                    Left restoreErr -> Left (err ++ "; the previous artifact "
+                      ++ "remains at " ++ backup ++ " (restore failed: "
+                      ++ restoreErr ++ ")")
+
+detachMetadataMarker :: FilePath -> IO (Either String (Maybe FilePath))
+detachMetadataMarker marker = do
+  existsOr <- ioResult (doesFileExist marker)
+  case existsOr of
+    Left err -> pure (Left err)
+    Right False -> pure (Right Nothing)
+    Right True -> do
+      backupOr <- freshSiblingPath marker
+      case backupOr of
+        Left err -> pure (Left err)
+        Right backup -> do
+          moved <- ioResult (renameFile marker backup)
+          pure $ case moved of
+            Left err -> Left err
+            Right () -> Right (Just backup)
+
+restoreMetadataMarker :: St -> FilePath -> Maybe FilePath -> IO ()
+restoreMetadataMarker _ _ Nothing = pure ()
+restoreMetadataMarker st marker (Just backup) = do
+  restored <- ioResult (renameFile backup marker)
+  case restored of
+    Left err -> snapshotWarning st ("previous snapshot metadata remains at "
+      ++ backup ++ " because restore failed: " ++ err)
+    Right () -> pure ()
+
+writeFileUtf8Atomic :: FilePath -> String -> IO (Either String ())
+writeFileUtf8Atomic destination contents = do
+  temporaryOr <- freshSiblingPath destination
+  case temporaryOr of
+    Left err -> pure (Left err)
+    Right temporary -> do
+      written <- ioResult $ withFile temporary WriteMode $ \handle -> do
+        hSetEncoding handle utf8
+        hPutStr handle contents
+      case written of
+        Left err -> do
+          cleanupManagedArtifact temporary
+          pure (Left err)
+        Right () -> do
+          published <- publishArtifact temporary destination
+          cleanupManagedArtifact temporary
+          pure published
+
+snapshotWarning :: St -> String -> IO ()
+snapshotWarning st message = do
+  prefix <- cYellow st "warning: "
+  emitLn st (prefix ++ message)
+
+removeArtifactWithWarning :: St -> String -> FilePath -> IO ()
+removeArtifactWithWarning st description path = do
+  removed <- ioResult (removeFileIfExists path)
+  case removed of
+    Left err -> snapshotWarning st
+      (description ++ " could not be removed: " ++ err)
+    Right () -> pure ()
+
+currentSynthesisCompanionABI :: String
+currentSynthesisCompanionABI =
+  synthesisToolingABI ("transport-environment-v1\n" ++ synthPrelude)
+
+-- Read optional Leant metadata.  Invalid metadata never makes the main
+-- upstream snapshot unusable; it merely disables result-counter restoration
+-- and the synthesis companion.
+readSnapshotSidecar
+  :: St -> FilePath -> FilePath -> IO (Int, Maybe FilePath)
+readSnapshotSidecar st sourcePath managedEnvironment = do
+  let metadataPath = snapshotMetadataPath sourcePath
+  exists <- doesFileExist metadataPath
+  if not exists then pure (0, Nothing) else do
+    textOr <- ioResult (readFileUtf8 metadataPath)
+    case textOr >>= decodeSnapshotMetadata of
+      Left err -> do
+        snapshotWarning st ("ignoring snapshot metadata: " ++ err)
+        pure (0, Nothing)
+      Right metadata -> do
+        mainFingerprintOr <- ioResult (fingerprintSnapshot managedEnvironment)
+        case mainFingerprintOr of
+          Left err -> do
+            snapshotWarning st ("could not validate snapshot metadata: " ++ err)
+            pure (0, Nothing)
+          Right mainFingerprint
+            | mainFingerprint /= snapshotMainFingerprint metadata -> do
+                snapshotWarning st
+                  "ignoring stale snapshot metadata (main file changed)"
+                pure (0, Nothing)
+            | otherwise -> do
+                companion <- validateCompanion metadata
+                pure (snapshotItCounter metadata, companion)
+ where
+  validateCompanion metadata = case snapshotSynthesisCompanion metadata of
+    Nothing -> pure Nothing
+    Just companion
+      | snapshotCompanionABI companion /= currentSynthesisCompanionABI -> do
+          snapshotWarning st
+            "snapshot synthesis companion was made by different tooling"
+          pure Nothing
+      | otherwise -> do
+          let path = takeDirectory sourcePath
+                </> snapshotCompanionFile companion
+          exists <- doesFileExist path
+          if not exists then do
+            snapshotWarning st "snapshot synthesis companion is missing"
+            pure Nothing
+          else do
+            managedOr <- copyManagedArtifact path
+            case managedOr of
+              Left err -> do
+                snapshotWarning st
+                  ("snapshot synthesis companion could not be copied: " ++ err)
+                pure Nothing
+              Right managed -> do
+                fingerprintOr <- ioResult (fingerprintSnapshot managed)
+                case fingerprintOr of
+                  Right fingerprint
+                    | fingerprint == snapshotCompanionFingerprint companion ->
+                        pure (Just managed)
+                  _ -> do
+                    cleanupManagedArtifact managed
+                    snapshotWarning st
+                      "snapshot synthesis companion is stale or unreadable"
+                    pure Nothing
+
+manageSnapshotBase
+  :: St -> FilePath -> IO (Either String SnapshotBase)
+manageSnapshotBase st source = do
+  environmentOr <- copyManagedArtifact source
+  case environmentOr of
+    Left err -> pure (Left err)
+    Right environment -> do
+      (counter, tooling) <- readSnapshotSidecar st source environment
+      pure (Right SnapshotBase
+        { snapshotSourcePath = source
+        , snapshotEnvironmentPath = environment
+        , snapshotToolingPath = tooling
+        , snapshotBaseItCounter = counter
+        })
+
+cleanupManagedArtifact :: FilePath -> IO ()
+cleanupManagedArtifact path =
+  catchIOError (removeFileIfExists path) (const (pure ()))
+
+currentEnvironmentId :: St -> IO (Either String Integer)
+currentEnvironmentId st = do
+  backendOr <- ensureBackend st
+  case backendOr of
+    Left err -> pure (Left err)
+    Right _ -> do
+      state <- readIORef st
+      case rsEnv state of
+        Just env -> pure (Right env)
+        Nothing -> do
+          materialized <- runCmd st Nothing "#check True"
+          pure $ case materialized of
+            Right response
+              | not (hasErrors response)
+              , Nothing <- respFatal response
+              , Just env <- respEnv response -> Right env
+            _ -> Left "could not materialize the current environment"
+
+-- Build a pickleable Lean-equipped copy of the logical session without the
+-- compiled serializer itself.  Upstream environment snapshots restore
+-- constants but not Lean's LCNF compiler extension, so the serializer must be
+-- compiled anew after unpickling this transport environment.
+prepareSnapshotToolingEnvironment :: St -> IO (Either String Integer)
+prepareSnapshotToolingEnvironment st = do
+  state <- readIORef st
+  baseOr <- case rsSnapshotBase state of
+    Nothing -> importedBase state
+    Just snapshot -> snapshotBase snapshot
+  case baseOr of
+    Left err -> pure (Left err)
+    Right base -> do
+      probeResult <- runCmd st (Just base) synthPrelude
+      case probeResult of
+        Left err -> pure (Left err)
+        Right response -> case checkedEnvironment
+            "failed to compile snapshot synthesis tooling" (Right response) of
+          Left _ -> pure (Left ("the session base does not expose compatible "
+            ++ "Lean metaprogramming APIs"))
+          Right probeBase -> replayHistory base probeBase (rsHistory state)
+ where
+  importedBase state = do
+    let imports = nub (rsImports state ++ ["Lean"])
+    result <- runCmd st Nothing (unlines (map ("import " ++) imports))
+    pure $ checkedEnvironment
+      "failed to build snapshot synthesis tooling" result
+
+  snapshotBase snapshot = case snapshotToolingPath snapshot of
+    Just tooling -> do
+      restored <- restoreEnvironmentArtifact st tooling
+      case restored of
+        Right environment -> pure (Right environment)
+        Left (SnapshotTransportError err) -> pure (Left err)
+        Left (SnapshotRejected err) -> do
+          snapshotWarning st ("existing synthesis companion was rejected: "
+            ++ err ++ "; rebuilding from the main snapshot")
+          restoreMain snapshot
+    Nothing -> restoreMain snapshot
+
+  restoreMain snapshot = flattenRestore <$> restoreEnvironmentArtifact st
+    (snapshotEnvironmentPath snapshot)
+
+  -- Validate each entry against a prelude-equipped branch before adding it
+  -- to the clean transport branch.  Internal LeantSynth name collisions are
+  -- therefore skipped exactly as they are in ordinary synthesis replay.
+  replayHistory environment _ [] = pure (Right environment)
+  replayHistory environment probeEnvironment (code : rest) = do
+    probeResult <- runCmd st (Just probeEnvironment) code
+    case acceptedEnvironment probeResult of
+      Left err -> pure (Left err)
+      Right Nothing -> do
+        skipped code
+        replayHistory environment probeEnvironment rest
+      Right (Just nextProbe) -> do
+        transportResult <- runCmd st (Just environment) code
+        case acceptedEnvironment transportResult of
+          Left err -> pure (Left err)
+          Right Nothing -> do
+            skipped code
+            replayHistory environment probeEnvironment rest
+          Right (Just nextEnvironment) ->
+            replayHistory nextEnvironment nextProbe rest
+
+  acceptedEnvironment result = case result of
+    Left err -> Left err
+    Right response
+      | not (hasErrors response), Nothing <- respFatal response
+      , Just environment <- respEnv response -> Right (Just environment)
+      | otherwise -> Right Nothing
+
+  skipped code = emitLn st =<< cDim st
+    ("note: `" ++ takeWhile (/= '\n') code
+      ++ "` is not visible in the snapshot synthesis companion")
+
+  checkedEnvironment label result = case result of
+    Left err -> Left err
+    Right response
+      | Just fatal <- respFatal response -> Left (trim fatal)
+      | hasErrors response -> Left label
+      | Just environment <- respEnv response -> Right environment
+      | otherwise -> Left (label ++ ": no environment returned")
+
+  flattenRestore = either (Left . renderRestoreError) Right
+
+  renderRestoreError (SnapshotTransportError err) = err
+  renderRestoreError (SnapshotRejected err) = err
+
+pickleEnvironment :: St -> FilePath -> Integer -> IO (Either String ())
+pickleEnvironment st path env = do
+  result <- runPayload st (pickleEnvironmentPayload path env)
+  pure $ case result of
+    Left err -> Left err
+    Right response
+      | Just fatal <- respFatal response -> Left (trim fatal)
+      | errors@(_ : _) <- [ trim message
+                          | (severity, message) <- respMessages response
+                          , severity == "error" ] ->
+          Left (intercalate "\n" errors)
+      | otherwise -> Right ()
+
+prepareSnapshotArtifact
+  :: St
+  -> FilePath
+  -> Integer
+  -> IO (Either String (FilePath, SnapshotFingerprint))
+prepareSnapshotArtifact st destination env = do
+  temporaryOr <- freshSiblingPath destination
+  case temporaryOr of
+    Left err -> pure (Left err)
+    Right temporary -> do
+      pickled <- pickleEnvironment st temporary env
+      case pickled of
+        Left err -> do
+          cleanupManagedArtifact temporary
+          pure (Left err)
+        Right () -> do
+          fingerprintOr <- ioResult (fingerprintSnapshot temporary)
+          case fingerprintOr of
+            Left err -> do
+              cleanupManagedArtifact temporary
+              pure (Left err)
+            Right fingerprint -> pure (Right (temporary, fingerprint))
+
 cmdPickle :: St -> String -> IO ()
 cmdPickle st arg
   | null arg = emitLn st =<< cRed st "usage: :pickle FILE"
   | otherwise = do
-      let path = withOlean arg
-      result <- runPayloadAfterBackend st $ \state -> JObj
-        [ ("pickleTo", JStr path)
-        , ("env", JInt (fromMaybe 0 (rsEnv state)))
-        ]
-      case result of
-        Right v -> do
-          errored <- printResponse st Nothing v
-          unless errored $
-            emitLn st =<< cDim st ("environment saved to " ++ path)
+      state <- readIORef st
+      let environmentPath = snapshotArgumentPath state arg
+          companionPath = snapshotCompanionPath environmentPath
+          metadataPath = snapshotMetadataPath environmentPath
+      currentOr <- currentEnvironmentId st
+      case currentOr of
         Left err -> emitLn st =<< cRed st err
+        Right current -> do
+          mainOr <- prepareSnapshotArtifact st environmentPath current
+          case mainOr of
+            Left err -> emitLn st . ("snapshot failed: " ++) =<< cRed st err
+            Right (mainTemporary, mainFingerprint) -> do
+              synthOr <- prepareSnapshotToolingEnvironment st
+              companionPrepared <- case synthOr of
+                Left err -> do
+                  snapshotWarning st ("saved the Lean environment, but not "
+                    ++ "its synthesis companion: " ++ err)
+                  pure Nothing
+                Right synthEnv -> do
+                  prepared <- prepareSnapshotArtifact st companionPath synthEnv
+                  case prepared of
+                    Left err -> do
+                      snapshotWarning st ("saved the Lean environment, but not "
+                        ++ "its synthesis companion: " ++ err)
+                      pure Nothing
+                    Right artifact -> pure (Just artifact)
+              markerDetached <- detachMetadataMarker metadataPath
+              case markerDetached of
+                Left err -> do
+                  cleanupManagedArtifact mainTemporary
+                  forM_ companionPrepared (cleanupManagedArtifact . fst)
+                  emitLn st . ("snapshot publish failed: " ++) =<< cRed st err
+                Right oldMarker -> do
+                  mainPublished <- publishArtifact mainTemporary environmentPath
+                  case mainPublished of
+                    Left err -> do
+                      cleanupManagedArtifact mainTemporary
+                      forM_ companionPrepared (cleanupManagedArtifact . fst)
+                      restoreMetadataMarker st metadataPath oldMarker
+                      emitLn st . ("snapshot publish failed: " ++) =<< cRed st err
+                    Right () -> do
+                      forM_ oldMarker cleanupManagedArtifact
+                      companionMetadata <- case companionPrepared of
+                        Nothing -> do
+                          removeArtifactWithWarning st
+                            "stale synthesis companion" companionPath
+                          pure Nothing
+                        Just (temporary, fingerprint) -> do
+                          published <- publishArtifact temporary companionPath
+                          cleanupManagedArtifact temporary
+                          case published of
+                            Left err -> do
+                              snapshotWarning st
+                                ("synthesis companion publish failed: " ++ err)
+                              removeArtifactWithWarning st
+                                "stale synthesis companion" companionPath
+                              pure Nothing
+                            Right () -> pure (Just SnapshotCompanion
+                              { snapshotCompanionFile = takeFileName companionPath
+                              , snapshotCompanionFingerprint = fingerprint
+                              , snapshotCompanionABI = currentSynthesisCompanionABI
+                              })
+                      currentState <- readIORef st
+                      let metadata = SnapshotMetadata
+                            { snapshotItCounter = rsItCounter currentState
+                            , snapshotMainFingerprint = mainFingerprint
+                            , snapshotSynthesisCompanion = companionMetadata
+                            }
+                      metadataWritten <- writeFileUtf8Atomic metadataPath
+                        (encodeSnapshotMetadata metadata ++ "\n")
+                      case metadataWritten of
+                        Left err -> snapshotWarning st
+                          ("snapshot metadata could not be published: " ++ err)
+                        Right () -> pure ()
+                      emitLn st =<< cDim st
+                        ("environment saved to " ++ environmentPath
+                          ++ if isJust companionMetadata
+                               then " (synthesis companion saved)" else "")
 
 cmdUnpickle :: St -> String -> IO ()
 cmdUnpickle st arg
   | null arg = emitLn st =<< cRed st "usage: :unpickle FILE"
   | otherwise = do
-      let path = withOlean arg
-          payload = JObj [("unpickleEnvFrom", JStr path)]
-      result <- runPayload st payload
-      case result of
-        Right v -> do
-          errored <- printResponse st Nothing v
-          unless errored $ do
-            modifyIORef' st $ \s ->
-              invalidateProviderWorld
-                (invalidateDerivedEnvironments s
-                  { rsEnvStack = rsEnv s : rsEnvStack s
-                  , rsEnv = respEnv v
-                  })
-            emitLn st =<< cDim st ("environment restored from " ++ path)
-        Left err -> emitLn st =<< cRed st err
+      state <- readIORef st
+      let path = snapshotArgumentPath state arg
+      managedOr <- manageSnapshotBase st path
+      case managedOr of
+        Left err -> emitLn st .
+          ("snapshot could not be copied safely: " ++) =<< cRed st err
+        Right snapshot -> do
+          backendOr <- ensureBackendProcess st
+          case backendOr of
+            Left err -> do
+              cleanupSnapshotBase snapshot
+              emitLn st =<< cRed st err
+            Right (_, spawned) -> do
+              result <- runPayload st (unpickleEnvironmentPayload
+                (snapshotEnvironmentPath snapshot))
+              case result of
+                Right response -> do
+                  errored <- printResponse st Nothing response
+                  case (errored, respEnv response) of
+                    (False, Just env) -> do
+                      current <- readIORef st
+                      let counter = snapshotBaseItCounter snapshot
+                          restored = (clearSessionTransients current)
+                            { rsSnapshotBase = Just snapshot
+                            , rsBaseEnv = Just env
+                            , rsEnv = Just env
+                            , rsEnvStack = []
+                            , rsHistory = []
+                            , rsLoadedFile = Nothing
+                            , rsItCounter = counter
+                            }
+                      writeIORef st (invalidateProviderWorld
+                        (invalidateDerivedEnvironments restored))
+                      forM_ (rsSnapshotBase current) cleanupSnapshotBase
+                      emitLn st =<< cDim st
+                        ("environment restored from " ++ path
+                          ++ " (new undo/history base)")
+                    (False, Nothing) -> do
+                      cleanupSnapshotBase snapshot
+                      abandonReplacementBackend st spawned
+                      emitLn st =<< cRed st
+                        "snapshot restore returned no environment; session unchanged"
+                    (True, _) -> do
+                      cleanupSnapshotBase snapshot
+                      abandonReplacementBackend st spawned
+                Left err -> do
+                  cleanupSnapshotBase snapshot
+                  abandonReplacementBackend st spawned
+                  emitLn st =<< cRed st err
 
 withOlean :: String -> String
 withOlean path =
@@ -2744,7 +3485,8 @@ run opts = do
       putStrLn "--repl-exe / set LEANT_BACKEND to a repl.exe built from"
       putStrLn "https://github.com/leanprover-community/repl for your toolchain."
       exitWith (ExitFailure 1)
-    Just exe -> do
+    Just exe0 -> do
+      exe <- makeAbsolute exe0
       project <- case (optPlain opts, optProject opts) of
         (True, _) -> pure Nothing
         (_, Just dir) -> pure (Just dir)
@@ -2752,8 +3494,9 @@ run opts = do
       -- plain mode runs in the backend's own Lake project
       let backendProject = takeDirectory (takeDirectory
             (takeDirectory (takeDirectory (takeDirectory exe))))
-          workingDir = fromMaybe backendProject project
-          config = BackendConfig
+          workingDir0 = fromMaybe backendProject project
+      workingDir <- makeAbsolute workingDir0
+      let config = BackendConfig
             { bcLakePath = optLake opts
             , bcReplExe = exe
             , bcWorkingDir = workingDir
@@ -2764,6 +3507,7 @@ run opts = do
         , rsProjectDir = project
         , rsEnv = Nothing
         , rsBaseEnv = Nothing
+        , rsSnapshotBase = Nothing
         , rsEnvStack = []
         , rsImports = optImports opts
         , rsHistory = []
@@ -2842,3 +3586,4 @@ run opts = do
       state <- readIORef st
       when (isJust (rsTranscript state)) (transcriptStop st)
       forM_ (rsBackend state) killBackend
+      forM_ (rsSnapshotBase state) cleanupSnapshotBase
