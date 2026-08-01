@@ -169,14 +169,17 @@ stronger question *"show me that no such term exists."* It covers the
 structural fragment `→ / × / ∧ / ⊕ / ∨ / ↔ / ¬ / ⊥ / ⊤ / ∀` over opaque
 variables, plus structurally representable inductive data, with bounded
 support for rank-N and impredicative quantification. Proper-type applications
-of one non-recursive inductive family are shared across the whole query, so
-`Option a`, `Option (forall b, b -> b)`, and provider occurrences retain both
-their common nominal identity and their constructors. Exference can
-additionally reuse a small, goal-relevant slice of the live Lean
-environment. Design and phasing:
+of one inductive family are shared by exact Lean head across the whole query,
+so differently instantiated `Option`, `Except`, `List`, and user-family
+occurrences retain one nominal identity. Compatible non-recursive families
+keep their constructors and cases; compatible recursive families additionally
+retain bounded one-layer elimination in Exference. Exference can also reuse a
+small, goal-relevant slice of the live Lean environment. Design and phasing:
 [docs/SYNTHESIS_PROPOSAL.md](docs/SYNTHESIS_PROPOSAL.md). The implementation
-invariants are recorded in the dated
-[query-wide family report](docs/reports/2026-08-01-query-wide-parametric-inductive-families.md).
+invariants are recorded in the dated reports for
+[finite families](docs/reports/2026-08-01-query-wide-parametric-inductive-families.md)
+and
+[recursive families](docs/reports/2026-08-01-query-wide-recursive-family-identity.md).
 
 The engine is the vendored [Djex](lib/Djex) library, linked in-process.
 Djex began as a merger of two classic Haskell synthesizers — **Djinn**
@@ -471,20 +474,28 @@ claims, and every positive candidate from either engine is still checked by
 Lean. A contradictory arity for one exact Lean head is rejected outright
 rather than abstracted or conflated.
 
-Djinn keeps recursive types such as `Nat` and `List` opaque, with their
-constructors available only as introduction rules. When Lean can serialize
-the complete constructor inventory and a safe parameter vector, Exference
-may also inspect one constructor layer: it can synthesize a finite `match`, but
-recursive fields become ordinary branch-local values and are not
-immediately split again. This bounded rule cannot invent recursion or
-induction; it can, however, combine the finite case split with a live
-library provider for the recursive work. Partial inventories remain
-introduction-only, while indexed (`Eq`) and dependent-field (`Exists`)
-types remain opaque. The fragment now records exact heads and proper-type
-parameters for recursive occurrences too, but query-wide `FParamRec` schema
-sharing is deliberately deferred: recursive families retain this established
-Djinn/Exference behavior rather than borrowing the non-recursive rule
-unsafely.
+Recursive proper-type applications now receive the same query-wide exact-head
+identity discipline, with a recursive-specific schema check. This lets both
+engines transport a quantified family value directly to a supplied
+impredicative parameter—for example, the verified answer to a base-less
+`RecBox` query is `fun x => x _`. Recursive self fields are normalized to the
+generic applied family before schemas are compared, so `List a` and `List b`
+can validate one recursive knot even though Lean serialized different display
+keys.
+
+The available structure remains intentionally asymmetric. Djinn represents the
+shared recursive head abstractly and receives constructors only as
+introduction premises. Exference may inspect one constructor layer only when
+every reachable occurrence has a complete, compatible schema and at least one
+occurrence supplies distinct plain type parameters as a generic template.
+Recursive fields then become ordinary branch-local values and are not
+immediately split again. Partial inventories, unresolved repeated or structured
+parameter vectors, incompatible schemas, and nominal collisions all choose one
+shared abstract exact family; their occurrence constructors are still
+introduction rules, but no `match` is exposed and Djinn search exhaustion is
+not promoted to a refutation. Indexed (`Eq`) and dependent-field (`Exists`)
+types remain opaque. The main impredicative gain is direct family transport,
+not recursion or induction.
 
 ### Dependent formulas as cargo
 
@@ -585,21 +596,23 @@ finisher tactics, needing no premise database and no imports. Bare
 - Proper-type applications headed by a bound constructor variable or an
   opaque/non-inductive Lean constant retain their ordered arguments. Private
   abstract declarations keep constant heads rigid, and rendering restores
-  their exact Lean names. Qualifying non-recursive inductives now add a
-  query-wide exact-head plan: compatible `Option`, `Except`, and user-family
-  occurrences share one parameterized data declaration while preserving
-  constructor introduction and case elimination. Ambiguous or incompatible
-  schemas fall back query-wide to one abstract family and disable negative
-  evidence; term/dependent parameters retain the occurrence-local path.
-  An order-independent query-wide pre-scan collects fixed opaque fields from
-  eligible structural recursive families before lowering any fragment. It
-  seeds those fields as private rigid proper types while subtracting each
-  recursive self key, so self references resolve through the recursive
-  datatype entry in `tsInds` rather than becoming unrelated rigid atoms. Thus
-  a zero-parameter type such as `Std.Format` cannot acquire an accidental free
-  variable through its `String` field.
-  Query-wide recursive-family sharing (`FParamRec`, including `List`) remains
-  the next distinct boundary.
+  their exact Lean names. Qualifying non-recursive inductives add a query-wide
+  exact-head plan: compatible `Option`, `Except`, and user-family occurrences
+  share one parameterized data declaration while preserving constructor
+  introduction and case elimination. Recursive `FParamRec` occurrences now
+  use a parallel exact-head plan with recursive-knot normalization. Exference
+  receives a shared one-layer recursive declaration only for a complete,
+  compatible schema; Djinn and every recursive fallback use one abstract exact
+  family plus occurrence constructor premises. Ambiguous, partial,
+  incompatible, or nominally colliding schemas disable negative evidence;
+  term/dependent parameters retain the occurrence-local path.
+  Planning reaches nested inventories through a fixed point, but only when a
+  selected structural declaration or an active constructor premise consumes
+  them. Fixed opaque fields are seeded as private rigid proper types, while
+  recursive self keys are subtracted so the knot resolves through the shared
+  datatype rather than an unrelated atom. Thus unused metadata cannot poison
+  a plan, and a zero-parameter type such as `Std.Format` cannot acquire an
+  accidental free variable through its `String` field.
 - Where a term's shape is ambiguous in Lean (a quantified hypothesis
   may be transported whole or instantiated), the renderer offers the
   alternatives and verification picks the one that elaborates.

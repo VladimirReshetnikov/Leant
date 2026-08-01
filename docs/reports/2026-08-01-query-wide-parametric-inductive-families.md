@@ -51,9 +51,10 @@ unsupported application remains opaque. The distinction is semantic rather
 than spelling-based and is made by Lean after elaboration.
 
 `FParamRec` records the corresponding exact head and proper-type vector for a
-recursive occurrence, but this report does not add query-wide recursive-family
-sharing or broaden recursive elimination; see
-[Deferred recursive work](#deferred-recursive-work).
+recursive occurrence. The finite-family change documented here did not yet
+share those occurrences query-wide; that boundary was implemented immediately
+afterward and is documented in the
+[recursive-family successor report](2026-08-01-query-wide-recursive-family-identity.md).
 
 ## Query-wide planning
 
@@ -135,17 +136,23 @@ plan. It does not descend into a nested `FParamInd` constructor inventory,
 because that inventory is translated only if the nested family's own plan is
 structural.
 
-Exference's existing one-layer recursive representation needs the same closure
-invariant even though query-wide recursive-family sharing is deferred. An
-order-independent query-wide pre-scan collects fixed opaque constructor fields
-for every eligible structural recursive family before any fragment is lowered.
-It adds those fields to the private rigid proper-type seed, then subtracts all
-recursive self keys from the combined seed. Consequently a recursive self
-reference resolves through `tsInds` after the datatype knot is installed,
-rather than becoming an unrelated rigid atom merely because it appeared before
-the recursive result during traversal. This prevents a zero-parameter provider
-result such as `Std.Format` from producing an ill-scoped Djex declaration
-through its fixed `String` field.
+The finite-family implementation also established the closure invariant needed
+by Exference's one-layer recursive representation. Its original
+order-independent pre-scan collected fixed opaque constructor fields for every
+eligible structural recursive family before any fragment was lowered, then
+subtracted recursive self keys from the combined rigid seed. Consequently a
+recursive self reference resolved through `tsInds` after the datatype knot was
+installed rather than becoming an unrelated rigid atom merely because it
+appeared before the recursive result during traversal. This prevented a
+zero-parameter provider result such as `Std.Format` from producing an
+ill-scoped Djex declaration through its fixed `String` field.
+
+The successor recursive-family planner now applies that invariant only to
+selected, reachable recursive schemas and normalizes every blocked self atom
+to its exact applied head. This preserves the original `Std.Format` guarantee
+without allowing unused constructor metadata to rigidify unrelated atoms; see
+the
+[recursive-family report](2026-08-01-query-wide-recursive-family-identity.md).
 
 ## Rendering at an occurrence
 
@@ -233,22 +240,26 @@ path still constructs its value. See the focused
 [provider-isolation report](2026-08-01-provider-isolated-exference-baseline.md)
 for the dispatch, shared-deadline, and failed-variant filtering rules.
 
-## Deferred recursive work
+## Successor: recursive exact-family identity
 
-Recursive exact-family sharing is a separate design problem, not an omitted
-case of the finite-data algorithm. Current behavior remains:
+Recursive exact-family sharing was a separate design problem, not an omitted
+case of this finite-data algorithm. The next implementation slice completed
+that work with a recursive-specific policy:
 
-- Djinn treats a recursive occurrence as opaque and receives its constructors
-  as sound introduction premises.
-- Exference may receive a complete nominal recursive datatype and inspect one
-  constructor layer; recursive fields remain ordinary branch-local values.
-- When Exference's structural recursive projection is enabled, a query-wide
-  pre-scan closes the fixed fields of eligible recursive families before any
-  fragment is lowered while excluding recursive self keys from the rigid seed,
-  preserving resolution through `tsInds`.
+- every reachable `FParamRec` occurrence is grouped by exact Lean head and
+  arity across the query;
+- blocked self fields are normalized to the exact applied family before schema
+  comparison;
+- a complete compatible schema gives Exference one validated parameterized
+  recursive declaration with the same bounded one-layer eliminator;
+- Djinn and every partial, ambiguous, incompatible, or nominally colliding
+  family use one abstract exact head plus occurrence constructor premises; and
+- the renderer fits recursive constructor fields from the actual occurrence,
+  retaining structured rank-N domains.
 
-Sharing `FParamRec` query-wide will need a validated recursive knot, a schema
-policy for differently instantiated occurrences, and occurrence-specialized
-renderer fields for the shared recursive constructor map. Until then, `List`
-retains the established bounded behavior while `Option`, `Except`, and
-qualifying user-defined non-recursive families use the new exact-head plan.
+This means `List` and qualifying user-defined recursive families now share
+identity across differently instantiated proper-type occurrences. The main
+impredicative result is direct transport such as `fun x => x _`; recursive
+elimination remains bounded, and neither engine invents recursion or induction.
+The complete planning, fallback, and validation contract is in the
+[2026-08-01 recursive-family report](2026-08-01-query-wide-recursive-family-identity.md).

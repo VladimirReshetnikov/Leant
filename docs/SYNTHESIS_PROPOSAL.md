@@ -10,11 +10,12 @@ cache. Standalone Exference protects structural synthesis with a
 Lean-verified provider-free baseline and consults that inventory only after a
 baseline miss. The translator additionally retains first-order proper-type
 applications for bound constructor variables and opaque Lean families, and
-now shares compatible proper-type applications of each non-recursive
-inductive family across the complete query without sacrificing constructor
-introduction or case elimination. Query-wide recursive-family sharing,
-Phase 4, and a persistent Mathlib-scale inventory remain future
-work. Companion to
+shares compatible proper-type applications of non-recursive and recursive
+inductive families across the complete query. Finite data retains constructor
+introduction and case elimination; recursive data retains direct rank-N
+transport in both engines and a validated one-layer eliminator in Exference.
+Phase 4 and a persistent Mathlib-scale inventory remain future work. Companion
+to
 [PROPOSALS.md](PROPOSALS.md).*
 
 Djex — vendored read-only in this repository as the
@@ -105,15 +106,16 @@ best-first search. From the commit history and the reports
   applications poison negative evidence, and Lean still verifies every
   positive candidate.
 - **Query-wide proper-type inductive families (Leant bridge).** A qualifying
-  non-recursive inductive now serializes as an exact head, an ordered vector of
+  inductive serializes as an exact head, an ordered vector of
   proper-type parameters, and its complete occurrence-specialized constructor
   inventory. Before translation, Leant collects every use from the goal,
   caller premises, and usable providers and chooses one representation for the
-  head. A unique compatible generic schema becomes one parameterized Djex
-  `data` declaration; constructor maps retain the generic formals and recover
-  the actual occurrence fields while rendering. Thus `Option`, `Except`, and
-  user inductives support guarded rank-N/impredicative transport in both
-  engines while keeping constructor introduction and case elimination.
+  head. For non-recursive data, a unique compatible generic schema becomes one
+  parameterized Djex `data` declaration; constructor maps retain the generic
+  formals and recover the actual occurrence fields while rendering. Thus
+  `Option`, `Except`, and user inductives support guarded
+  rank-N/impredicative transport in both engines while keeping constructor
+  introduction and case elimination.
   Fixed opaque fields become private rigid proper types rather than accidental
   free declaration variables. Ambiguous/repeated parameter vectors,
   incompatible schemas, or a structural/nominal collision
@@ -121,14 +123,24 @@ best-first search. From the commit history and the reports
   can still transport values but exposes no constructors and forfeits Djinn
   negative evidence. Term/dependent parameters retain the established
   occurrence-local path. Conflicting arities for one exact head are rejected
-  rather than conflated. Recursive occurrences record their exact head for a
-  later slice but deliberately retain `FRec` behavior today. Before any
-  fragment is lowered, an order-independent query-wide pre-scan collects the
-  fixed opaque fields of eligible structural recursive families. It seeds
-  those fields through the same private rigid-type mechanism while subtracting
-  each recursive self key, so self references resolve through `tsInds` after
-  the recursive knot is installed instead of becoming unrelated rigid atoms.
-  This keeps zero-parameter providers such as `Std.Format` well scoped.
+  rather than conflated.
+
+  Recursive `FParamRec` uses follow a recursive-specific version of the same
+  plan. Blocked self atoms are normalized to the exact applied family before
+  schemas are compared. A complete generic source occurrence with
+  pairwise-distinct plain parameters gives Exference one query-wide
+  parameterized recursive declaration and its established one-layer match;
+  Djinn keeps the exact head abstract and receives occurrence constructors as
+  introduction premises.
+  Partial inventories, incompatible schemas, nominal collisions, and
+  unrecoverable templates use that same abstract-plus-premises representation
+  in both engines. Planning discovers nested exact families through a
+  reachability-aware fixed point: it follows only selected data templates and
+  active constructor premises, so unused inventories cannot affect a plan.
+  Fixed opaque fields use the private rigid-type mechanism, while recursive
+  self keys are excluded from that seed so the shared knot resolves through
+  `tsInds`. This keeps zero-parameter providers such as `Std.Format` well
+  scoped.
 - **Bounded recursive deconstruction (Exference).** Recursive datatype
   declarations remain available to search, but matching stops after one
   constructor layer. Recursive fields enter that branch as ordinary
@@ -551,18 +563,17 @@ Design rules, all inherited from Djex:
   normal branch-local value, but is not eagerly decomposed again. The
   engine may reuse a library provider for the recursive continuation;
   it does not invent a recursive definition, induction, or unbounded
-  eliminator. Djinn remains closed and deciding: recursive types are
-  opaque there, with constructors only as premises/introduction rules.
-- **Query-wide recursive families are deferred.** `FParamRec` records the
-  exact recursive head and proper-type parameters, but both projections still
-  use the established `FRec` machinery: constructor premises in Djinn and one
-  finite constructor layer in Exference when its inventory is complete. The
-  non-recursive template/unification rule is not applied to `List` or another
-  recursive family until recursive knots and occurrence-specialized renderer
-  fields have their own validated design. This does not defer fixed-field
-  identity: a query-wide pre-scan seeds fixed fields for eligible structural
-  recursive families before lowering begins and removes recursive self keys
-  from that rigid seed so the knot still resolves through `tsInds`.
+  eliminator. Djinn keeps recursive heads abstract and constructors only as
+  premises/introduction rules.
+- **Query-wide recursive identity does not imply recursive synthesis.**
+  `FParamRec` now preserves one exact applied family across the goal, caller
+  premises, and usable providers, which enables direct rank-N transport in
+  both engines. Only a complete compatible schema gives Exference its bounded
+  one-layer declaration. Djinn, partial inventories, incompatible schemas,
+  repeated/structured uses with no validating generic occurrence, and nominal
+  collisions receive an abstract exact family plus sound occurrence
+  constructor premises. This supports transport and introduction, not
+  recursive definitions, induction, or unbounded deconstruction.
 - **Abstract-family fallbacks do not prove absence.** If exact-head uses have
   ambiguous parameters, incompatible schemas, or mixed
   structural/nominal evidence, Leant keeps one rigid abstract family for
@@ -804,8 +815,8 @@ and dependent-fallback paths.
 The original retained-application slice intentionally runs after
 `indOf`/`recOf`, so it never steals constructor structure from a qualifying
 inductive. Section H implements the complementary query-wide family rule for
-non-recursive data. Recursive `FParamRec` sharing remains separate because its
-knot and bounded elimination policy cannot safely reuse the finite-data rule.
+non-recursive data; Section I gives recursive `FParamRec` its separate knot and
+bounded-elimination policy.
 
 ### H. Query-wide proper-type inductive families — M (implemented)
 
@@ -851,14 +862,65 @@ covers two-parameter `Phantom2` and a fixed-field `Guard` under both engines,
 plus an atomic `Demo.Secret` provider control and a structurally shaped
 `Unit → Demo.Secret` baseline-miss control that both require the provider lane.
 A term-parameterized `Tag` control stays on the legacy occurrence-local path.
-The exact recursive tag `FParamRec` is recorded but intentionally delegates to
-current recursive handling. Its fixed fields are nevertheless collected by an
-order-independent query-wide pre-scan before fragment lowering; recursive self
-keys are subtracted from the rigid seed so self references resolve through
-`tsInds`. Query-wide `List`-style sharing is the next distinct datatype
-boundary, not unfinished work in this finite-data slice. See the
+Recursive exact-head identity is the separate extension described in Section
+I. See the
 [2026-08-01 technical report](reports/2026-08-01-query-wide-parametric-inductive-families.md)
 for the invariants and fallback matrix.
+
+### I. Query-wide proper-type recursive families — M (implemented)
+
+The recursive serializer node `FParamRec` carries completeness, exact Lean
+head, occurrence display key, ordered proper-type parameters, and constructors.
+Planning groups these occurrences with nominal uses by exact head and checks
+one arity across the goal, caller premises, and usable provider inventory. It
+does not reuse the finite-data template unchecked: a recursive structural
+template must come from a complete occurrence whose parameters are distinct
+plain variables, be closed over those formals, and specialize back to every
+recursive occurrence.
+
+Before template comparison, the blocked self atom serialized with an
+occurrence display key is rewritten as an application of the exact head to
+that occurrence's parameter vector. The ordinary capture-safe genericization
+can then compare `List a`, `List b`, and structured result occurrences as one
+recursive schema without relying on display keys or constructor namespaces.
+Distinct exact heads remain separate even if those incidental spellings
+collide, and inconsistent arities are rejected.
+
+Exference materializes a selected plan as one parameterized recursive Djex
+datatype, installing the applied occurrence in the recursive map before its
+constructor fields are lowered. Matching remains the existing one-layer rule:
+recursive branch fields are values, not a request for another automatic split.
+The renderer prefers the constructor fields serialized on the actual result or
+scrutinee occurrence and uses generic specialization only as a fallback, so a
+rank-N field is fitted at the proper occurrence.
+
+Djinn never receives that recursive datatype. It declares one abstract exact
+family and registers each reachable occurrence's constructors as premises,
+preserving sound introduction. Exference uses the same representation when an
+inventory is partial, no generic occurrence resolves repeated or structured
+parameter uses, schemas disagree, or structural and nominal evidence collide.
+These fallbacks preserve positive family transport but expose no recursive
+match and make Djinn's projection incomplete for negative-evidence purposes.
+
+Nested constructor inventories are metadata until lowering will consume them.
+The planner therefore grows its exact-family use set to a fixed point only
+through selected structural templates and constructor premises active in that
+engine lane. This makes provider and traversal order irrelevant without
+letting an unused abstract inventory poison another family. Fixed opaque
+constructor fields are collected from the selected reachable schemas and made
+rigid before translation; normalized recursive self keys are subtracted from
+that seed so they resolve through the installed knot.
+
+Focused tests cover both-engine `List` transport, provider-order independence,
+self-knot normalization, occurrence-specific rank-N field fitting, abstract
+fallbacks, constructor introduction, exact-head and arity separation, and the
+legacy `Nat`, `List.map`, and `Std.Format` behavior. A separate Lean 4.31
+golden declares a base-less `Demo.RecBox` whose only constructor requires both
+a parameter and a recursive value, then verifies `fun x => x _` under
+standalone Exference and Djinn. With no base constructor, introduction cannot
+mask a missing family identity. The implementation contract is recorded in
+the
+[2026-08-01 recursive-family report](reports/2026-08-01-query-wide-recursive-family-identity.md).
 
 ### Explicitly not proposed
 
