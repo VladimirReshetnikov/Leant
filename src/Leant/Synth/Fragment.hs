@@ -136,10 +136,20 @@ data ParsedGoal = ParsedGoal
 -- provider name remains the exact fully-qualified Lean spelling; the engine
 -- gives it a collision-free private name and the renderer maps that name back
 -- before Lean re-elaborates the candidate.
-data ProviderFrag = ProviderFrag
-  { providerLeanName :: String
-  , providerTypeFrag :: Frag
-  }
+data ProviderFrag
+  = ProviderFrag
+      { providerLeanName :: String
+      , providerTypeFrag :: Frag
+      }
+  | ProviderFragWithBinders
+      { providerLeanName :: String
+      , providerTypeFrag :: Frag
+      , providerTypeBinderNames :: [String]
+        -- ^ Original Lean names for the leading type binders retained as
+        -- FAll. Empty spellings mark binders that cannot be addressed by
+        -- Lean named-argument syntax. The plain constructor is retained for
+        -- caller-owned inventories that have no elaborator metadata.
+      }
   deriving (Eq, Show)
 
 -- | Compiled once into the synthesis environment (session imports plus
@@ -197,6 +207,39 @@ synthPrelude = unlines
   , "      isTypeKind (body.instantiate1 fv)"
   , "  | _ => pure false"
   , ""
+  , "-- Retain the source binder names corresponding to the leading FAlls"
+  , "-- emitted by go. Instance binders erased below are deliberately skipped"
+  , "-- so Render can use named Lean arguments without exposing dictionaries."
+  , "partial def leadingTypeBinderNames (fuel : Nat) (e : Expr)"
+  , "    : MetaM (Array String) := do"
+  , "  match fuel with"
+  , "  | 0 => pure #[]"
+  , "  | Nat.succ fuel => do"
+  , "    let e \8592 instantiateMVars e"
+  , "    let e \8592 whnfR e.consumeMData"
+  , "    match e with"
+  , "    | Expr.forallE n t b bi =>"
+  , "      let t \8592 whnfR t.consumeMData"
+  , "      if b.hasLooseBVars then"
+  , "        if \8592 isTypeKind t then"
+  , "          withLocalDecl n bi t fun fv => do"
+  , "            let rest \8592 leadingTypeBinderNames fuel"
+  , "              (b.instantiate1 fv)"
+  , "            let spelling := if n.isAnonymous then \"\" else n.toString"
+  , "            pure (#[spelling] ++ rest)"
+  , "        else pure #[]"
+  , "      else if bi.isInstImplicit then"
+  , "        leadingTypeBinderNames fuel b"
+  , "      else if bi.isExplicit then"
+  , "        pure #[]"
+  , "      else do"
+  , "        if \8592 isTypeKind t then do"
+  , "          let rest \8592 leadingTypeBinderNames fuel b"
+  , "          let spelling := if n.isAnonymous then \"\" else n.toString"
+  , "          pure (#[spelling] ++ rest)"
+  , "        else pure #[]"
+  , "    | _ => pure #[]"
+  , ""
   , "-- Share an inductive family across occurrences only when every applied"
   , "-- parameter is a proper type.  Term parameters and dependent family"
   , "-- arguments keep the established occurrence-local representation."
@@ -208,7 +251,8 @@ synthPrelude = unlines
   , ""
   , "mutual"
   , ""
-  , "partial def go (fuel depth : Nat) (blocked : List String) (e : Expr)"
+  , "partial def go (providerMode : Bool) (fuel depth : Nat)"
+  , "    (blocked : List String) (e : Expr)"
   , "    : MetaM String := do"
   , "  match fuel with"
   , "  | 0 => pure \"(depth)\""
@@ -227,28 +271,39 @@ synthPrelude = unlines
   , "        if \8592 isTypeKind t then"
   , "          withLocalDeclD (Name.mkSimple (\"s\" ++ toString depth)) t"
   , "              fun fv => do"
-  , "            let inner \8592 go fuel (depth + 1) blocked (b.instantiate1 fv)"
+  , "            let inner \8592 go providerMode fuel (depth + 1) blocked"
+  , "              (b.instantiate1 fv)"
   , "            let tag := if bi.isExplicit then \"(all \" else \"(alli \""
   , "            pure (tag ++ esc (\"s\" ++ toString depth) ++ \" \""
   , "              ++ inner ++ \")\")"
   , "        else atomOf e"
+  , "      else if providerMode && bi.isInstImplicit then"
+  , "        -- Typeclass evidence is reconstructed by Lean when the"
+  , "        -- provider is applied; it is neither a type quantifier nor"
+  , "        -- a term premise at the synthesis boundary."
+  , "        go providerMode fuel depth blocked b"
   , "      else if bi.isExplicit then do"
-  , "        let d \8592 go fuel depth blocked t"
-  , "        let r \8592 go fuel depth blocked b"
+  , "        let d \8592 go providerMode fuel depth blocked t"
+  , "        let r \8592 go providerMode fuel depth blocked b"
   , "        pure (\"(-> \" ++ d ++ \" \" ++ r ++ \")\")"
   , "      else do"
-  , "        -- an unused implicit binder is introduced by the elaborator,"
-  , "        -- so the term neither binds nor applies it"
-  , "        let r \8592 go fuel depth blocked b"
-  , "        pure (\"(alli \" ++ esc (\"i\" ++ toString depth) ++ \" \""
-  , "          ++ r ++ \")\")"
+  , "        let properType \8592 isTypeKind t"
+  , "        if providerMode && !properType then atomOf e"
+  , "        else do"
+  , "          -- An unused ordinary implicit type parameter still needs a"
+  , "          -- scheme binder so Djex can choose a visible instantiation."
+  , "          -- Goal mode retains the historical elaborator-binder model;"
+  , "          -- provider mode admits only binders over proper types."
+  , "          let r \8592 go providerMode fuel depth blocked b"
+  , "          pure (\"(alli \" ++ esc (\"i\" ++ toString depth) ++ \" \""
+  , "            ++ r ++ \")\")"
   , "    | _ =>"
   , "      match e.getAppFn with"
   , "      | Expr.const n _ => do"
   , "        let args := e.getAppArgs"
   , "        let bin (tag : String) : MetaM String := do"
-  , "          let a \8592 go fuel depth blocked args[0]!"
-  , "          let b \8592 go fuel depth blocked args[1]!"
+  , "          let a \8592 go providerMode fuel depth blocked args[0]!"
+  , "          let b \8592 go providerMode fuel depth blocked args[1]!"
   , "          pure (\"(\" ++ tag ++ \" \" ++ a ++ \" \" ++ b ++ \")\")"
   , "        if args.size == 0 &&"
   , "            (n == ``False || n == ``Empty || n == ``PEmpty) then"
@@ -263,25 +318,25 @@ synthPrelude = unlines
   , "            (n == ``Or || n == ``Sum || n == ``PSum) then"
   , "          bin \"sum\""
   , "        else if args.size == 2 && n == ``Iff then do"
-  , "          let a \8592 go fuel depth blocked args[0]!"
-  , "          let b \8592 go fuel depth blocked args[1]!"
+  , "          let a \8592 go providerMode fuel depth blocked args[0]!"
+  , "          let b \8592 go providerMode fuel depth blocked args[1]!"
   , "          pure (\"(prod (-> \" ++ a ++ \" \" ++ b ++ \") (-> \""
   , "            ++ b ++ \" \" ++ a ++ \"))\")"
   , "        else if args.size == 1 && n == ``Not then do"
-  , "          let a \8592 go fuel depth blocked args[0]!"
+  , "          let a \8592 go providerMode fuel depth blocked args[0]!"
   , "          pure (\"(-> \" ++ a ++ \" (bot))\")"
   , "        else do"
-  , "          match \8592 indOf fuel depth blocked e with"
+  , "          match \8592 indOf providerMode fuel depth blocked e with"
   , "          | some s => pure s"
   , "          | none =>"
-  , "            match \8592 recOf fuel depth blocked e with"
+  , "            match \8592 recOf providerMode fuel depth blocked e with"
   , "            | some s => pure s"
   , "            | none =>"
-  , "              match \8592 appOf fuel depth blocked e with"
+  , "              match \8592 appOf providerMode fuel depth blocked e with"
   , "              | some s => pure s"
   , "              | none => atomOf e"
   , "      | _ =>"
-  , "        match \8592 appOf fuel depth blocked e with"
+  , "        match \8592 appOf providerMode fuel depth blocked e with"
   , "        | some s => pure s"
   , "        | none => atomOf e"
   , ""
@@ -291,7 +346,8 @@ synthPrelude = unlines
   , "-- proof arguments, and other dependent applications remain one opaque"
   , "-- atom.  A blocked recursive occurrence also remains an atom so recOf's"
   , "-- constructor-premise knot keeps sharing the exact occurrence key."
-  , "partial def appOf (fuel depth : Nat) (blocked : List String) (e : Expr)"
+  , "partial def appOf (providerMode : Bool) (fuel depth : Nat)"
+  , "    (blocked : List String) (e : Expr)"
   , "    : MetaM (Option String) := do"
   , "  let args := e.getAppArgs"
   , "  let resultType \8592 whnfR (\8592 inferType e)"
@@ -317,7 +373,7 @@ synthPrelude = unlines
   , "        let safe := e.getUsedConstants.isEmpty && !e.isSort"
   , "        let mut rendered := \"\""
   , "        for arg in args do"
-  , "          let argument \8592 go fuel depth blocked arg"
+  , "          let argument \8592 go providerMode fuel depth blocked arg"
   , "          rendered := rendered ++ \" \" ++ argument"
   , "        pure (some (\"(app \""
   , "          ++ (if safe then \"safe\" else \"unsafe\") ++ \" \""
@@ -329,7 +385,8 @@ synthPrelude = unlines
   , "-- explicit and non-dependent.  Proper-type parameter vectors retain"
   , "-- their exact family head for query-wide sharing; term/dependent"
   , "-- parameter vectors keep the occurrence-local ind representation."
-  , "partial def indOf (fuel depth : Nat) (blocked : List String) (e : Expr)"
+  , "partial def indOf (providerMode : Bool) (fuel depth : Nat)"
+  , "    (blocked : List String) (e : Expr)"
   , "    : MetaM (Option String) := do"
   , "  match e.getAppFn with"
   , "  | Expr.const n us =>"
@@ -344,7 +401,7 @@ synthPrelude = unlines
   , "        let mut ctors := \"\""
   , "        for c in iv.ctors do"
   , "          let ct \8592 inferType (mkAppN (Expr.const c us) args)"
-  , "          match \8592 ctorFields fuel depth blocked ct with"
+  , "          match \8592 ctorFields providerMode fuel depth blocked ct with"
   , "          | none => return none"
   , "          | some fs =>"
   , "            ctors := ctors ++ \" (ctor \" ++ esc c.toString ++ fs ++ \")\""
@@ -353,7 +410,7 @@ synthPrelude = unlines
   , "        if \8592 allProperTypeParams args then do"
   , "          let mut params := \"\""
   , "          for arg in args do"
-  , "            let param \8592 go fuel depth blocked arg"
+  , "            let param \8592 go providerMode fuel depth blocked arg"
   , "            params := params ++ \" \" ++ param"
   , "          pure (some (\"(param-ind \" ++ esc n.toString ++ \" \""
   , "            ++ esc key ++ \" (params\" ++ params ++ \")\""
@@ -369,7 +426,8 @@ synthPrelude = unlines
   , "-- whose instantiated fields are explicit and"
   , "-- non-dependent, with this occurrence's own key blocked so field"
   , "-- occurrences of the type serialize as the matching atom."
-  , "partial def recOf (fuel depth : Nat) (blocked : List String) (e : Expr)"
+  , "partial def recOf (providerMode : Bool) (fuel depth : Nat)"
+  , "    (blocked : List String) (e : Expr)"
   , "    : MetaM (Option String) := do"
   , "  match e.getAppFn with"
   , "  | Expr.const n us =>"
@@ -388,7 +446,7 @@ synthPrelude = unlines
   , "          let properParams \8592 allProperTypeParams args"
   , "          let mut params := \"\""
   , "          for arg in args do"
-  , "            let param \8592 go fuel depth blocked arg"
+  , "            let param \8592 go providerMode fuel depth blocked arg"
   , "            params := params ++ \" \" ++ param"
   , "          let blocked := key :: blocked"
   , "          let mut ctors := \"\""
@@ -396,7 +454,7 @@ synthPrelude = unlines
   , "          let mut complete := true"
   , "          for c in iv.ctors do"
   , "            let ct \8592 inferType (mkAppN (Expr.const c us) args)"
-  , "            match \8592 ctorFields fuel depth blocked ct with"
+  , "            match \8592 ctorFields providerMode fuel depth blocked ct with"
   , "            | none => complete := false"
   , "            | some fs =>"
   , "              found := true"
@@ -415,16 +473,16 @@ synthPrelude = unlines
   , "    | _ => pure none"
   , "  | _ => pure none"
   , ""
-  , "partial def ctorFields (fuel depth : Nat) (blocked : List String)"
-  , "    (t : Expr)"
+  , "partial def ctorFields (providerMode : Bool) (fuel depth : Nat)"
+  , "    (blocked : List String) (t : Expr)"
   , "    : MetaM (Option String) := do"
   , "  let t \8592 whnfR t"
   , "  match t with"
   , "  | Expr.forallE _ dom body bi =>"
   , "    if body.hasLooseBVars || !bi.isExplicit then pure none"
   , "    else do"
-  , "      let d \8592 go fuel depth blocked dom"
-  , "      match \8592 ctorFields fuel depth blocked body with"
+  , "      let d \8592 go providerMode fuel depth blocked dom"
+  , "      match \8592 ctorFields providerMode fuel depth blocked body with"
   , "      | none => pure none"
   , "      | some rest => pure (some (\" \" ++ d ++ rest))"
   , "  | _ => pure (some \"\")"
@@ -448,7 +506,7 @@ serializerProgram goal = unlines
   , "  run_tac withMainContext do"
   , "    let tgt \8592 getMainTarget"
   , "    let isP \8592 Meta.isProp tgt"
-  , "    let s \8592 LeantSynth.go 100 0 [] tgt"
+  , "    let s \8592 LeantSynth.go false 100 0 [] tgt"
   , "    let roots := tgt.getUsedConstants.toList.map Name.getRoot"
   , "    let rootText := String.intercalate \" \" (roots.map fun n =>"
   , "      LeantSynth.esc n.toString)"
@@ -555,9 +613,13 @@ providerProgram sessionNames query = unlines
   , "      match env.find? n with"
   , "      | none => pure ()"
   , "      | some info =>"
-  , "        let frag \8592 LeantSynth.go 80 0 [] info.type"
+  , "        let frag \8592 LeantSynth.go true 80 0 [] info.type"
+  , "        let binders \8592 LeantSynth.leadingTypeBinderNames 80 info.type"
+  , "        let binderText := String.join"
+  , "          (binders.toList.map fun binder =>"
+  , "            \" \" ++ LeantSynth.esc binder)"
   , "        body := body ++ \" (provider \" ++ LeantSynth.esc n.toString"
-  , "          ++ \" \" ++ frag ++ \")\""
+  , "          ++ \" (binders\" ++ binderText ++ \") \" ++ frag ++ \")\""
   , "    logInfo (\"(providers\" ++ body ++ \")\")"
   ]
  where
@@ -652,13 +714,31 @@ parseProviderSexp text = do
  where
   providers (TR : rest) = Right ([], rest)
   providers (TL : TSym "provider" : TStr name : rest) = do
-    (frag, rest') <- parseFrag rest
+    (binderMetadata, fragTokens) <- providerBinders rest
+    (frag, rest') <- parseFrag fragTokens
     case rest' of
       TR : more -> do
         (tailProviders, final) <- providers more
-        Right (ProviderFrag name frag : tailProviders, final)
+        let provider = case binderMetadata of
+              Nothing -> ProviderFrag name frag
+              Just names -> ProviderFragWithBinders name frag names
+        Right (provider : tailProviders, final)
       _ -> Left "malformed (provider ...)"
   providers _ = Left "malformed provider inventory"
+
+  -- Accept the historical metadata-free form for caller-owned inventories
+  -- and old snapshots. New live discovery always emits an aligned binder
+  -- list, including an explicit empty list for monomorphic providers.
+  providerBinders (TL : TSym "binders" : rest) = do
+    (names, remaining) <- binderNames rest
+    Right (Just names, remaining)
+  providerBinders rest = Right (Nothing, rest)
+
+  binderNames (TR : rest) = Right ([], rest)
+  binderNames (TStr name : rest) = do
+    (names, remaining) <- binderNames rest
+    Right (name : names, remaining)
+  binderNames _ = Left "malformed provider binder metadata"
 
 parseFrag :: [Tok] -> Either String (Frag, [Tok])
 parseFrag (TL : TSym tag : rest) = case tag of

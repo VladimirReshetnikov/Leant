@@ -25,4 +25,17 @@ axiom Demo.produce {a : Type} : Demo.Input a → Demo.Middle a
 :synth (Demo.Input Demo.Index → Demo.Output Demo.Index)
 :set synth-engine both
 :synth (Demo.Seed → Demo.SealedBox Demo.Seed)
+
+axiom Demo.Token : Type
+class Demo.C (a : Type) : Prop where witness : True
+instance : Demo.C Nat := ⟨True.intro⟩
+axiom Demo.global {a : Type} [Demo.C a] : Demo.Token
+
+:set synth-steps 1024
+:set synth-engine exference
+:synth (Nat → Demo.Token)
+:set synth-engine djinn
+:synth (Nat → Demo.Token)
+:set synth-engine both
+:synth (Nat → Demo.Token)
 :quit

@@ -628,7 +628,7 @@ fragToDjinn
       , [DjinnDecl]
       , [DjinnDecl]
       , CtorMap
-      , Map.Map String String
+      , Map.Map String (String, Maybe [String])
       , TypeMap
       , [(String, Frag, Type String)]
       , ProjectionCompleteness
@@ -660,9 +660,16 @@ fragToDjinn recursiveProjection providers extras frag0 = do
       (recursiveSelfKeys, recursiveFieldAtoms) =
         recursiveStructuralAtoms recursiveProjection plans
           (queryFragments ++ structuralTemplateFragments)
+      providerAtoms = foldl
+        (\atoms provider -> collectProviderSurfaceAtoms atoms $
+            providerTypeFrag provider)
+        Set.empty usableProviders
       rigidAtoms = Set.difference
-        (Set.union
-          (structuralAtomKeys recursiveProjection plans) recursiveFieldAtoms)
+        (Set.unions
+          [ structuralAtomKeys recursiveProjection plans
+          , recursiveFieldAtoms
+          , providerAtoms
+          ])
         recursiveSelfKeys
       projection = ProjectionCompleteness
         { projectionFamiliesComplete =
@@ -1077,13 +1084,19 @@ fragToDjinn recursiveProjection providers extras frag0 = do
           extras
         goal <- go True frag0
         translatedProviders <- mapM
-          (\(index, ProviderFrag leanName providerFrag) -> do
+          (\(index, provider) -> do
+            let leanName = providerLeanName provider
+                providerFrag = providerTypeFrag provider
+                binderNames = case provider of
+                  ProviderFrag{} -> Nothing
+                  ProviderFragWithBinders
+                      { providerTypeBinderNames = names } -> Just names
             privateName <- nameT ("leantProvider" ++ show index)
             providerType <- go False providerFrag
             pure
               ( ValueDeclaration
                   (ValueSignature () privateName providerType)
-              , ("leantProvider" ++ show index, leanName)
+              , ("leantProvider" ++ show index, (leanName, binderNames))
               ))
           (zip [0 :: Int ..] usableProviders)
         pure (extrasT, goal, translatedProviders)
@@ -1299,6 +1312,27 @@ collectFragAtoms atoms frag = case frag of
   _ -> atoms
  where
   descend = foldl collectFragAtoms
+
+-- A live provider's surface atoms denote exact Lean types, not caller-owned
+-- type variables. Close them as private nominal types in the provider-enriched
+-- lane so a scheme such as @forall a. Demo.Token@ does not acquire an extra
+-- implicitly generalized Djex binder before @a@. Constructor inventories are
+-- metadata rather than part of the occurrence type; their fixed fields keep
+-- using the query-wide structural planning rules above.
+collectProviderSurfaceAtoms :: Set.Set String -> Frag -> Set.Set String
+collectProviderSurfaceAtoms atoms frag = case frag of
+  FArr parameter result -> descend atoms [parameter, result]
+  FProd left right -> descend atoms [left, right]
+  FSum left right -> descend atoms [left, right]
+  FAll _ _ body -> collectProviderSurfaceAtoms atoms body
+  FAtom _ key -> Set.insert key atoms
+  FApp _ _ _ arguments -> descend atoms arguments
+  FParamInd _ _ parameters _ -> descend atoms parameters
+  FParamRec _ _ _ parameters _ -> descend atoms parameters
+  FRec _ _ parameters _ -> descend atoms parameters
+  _ -> atoms
+ where
+  descend = foldl collectProviderSurfaceAtoms
 
 collectExactFamilyUses
   :: RecursiveProjection

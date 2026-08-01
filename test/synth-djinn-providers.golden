@@ -43,4 +43,26 @@ synth engine: both
 λ> :synth (Demo.Seed → Demo.SealedBox Demo.Seed)
   it1  Demo.sealedBox
 note: exference: search truncated: step limit reached, queue limit pruned 25900
+λ>
+λ> axiom Demo.Token : Type
+λ> class Demo.C (a : Type) : Prop where witness : True
+λ> instance : Demo.C Nat := ⟨True.intro⟩
+λ> axiom Demo.global {a : Type} [Demo.C a] : Demo.Token
+λ>
+λ> :set synth-steps 1024
+synth steps: 1024
+λ> :set synth-engine exference
+synth engine: exference
+λ> :synth (Nat → Demo.Token)
+  it1  fun x => match x with | .zero => Demo.global («a» := Nat) | .succ _ => Demo.global («a» := Nat)
+note: search truncated: step limit reached, queue limit pruned 44665
+λ> :set synth-engine djinn
+synth engine: djinn
+λ> :synth (Nat → Demo.Token)
+  it1  fun _ => Demo.global («a» := Nat)
+λ> :set synth-engine both
+synth engine: both
+λ> :synth (Nat → Demo.Token)
+  it1  fun _ => Demo.global («a» := Nat)
+note: exference: search truncated: step limit reached, queue limit pruned 8061
 λ> :quit

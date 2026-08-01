@@ -40,6 +40,7 @@ module Leant.Synth.Render
   ) where
 
 import Control.Monad (foldM)
+import Data.Char (isControl)
 import Data.List (intercalate, nub, sortOn, subsequences)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -84,8 +85,9 @@ data CtorInfo = CtorInfo
 -- | Engine-side constructor spellings of the declared datatypes.
 type CtorMap = Map.Map String CtorInfo
 
--- | Collision-free engine provider spelling to exact Lean global name.
-type ProviderMap = Map.Map String String
+-- | Collision-free engine provider spelling to the exact Lean global name
+-- and the original names of its engine-visible leading type binders.
+type ProviderMap = Map.Map String (String, Maybe [String])
 
 -- | Collision-free engine type spelling to its exact Lean type or type-family
 -- spelling.  Family heads are restored with their full explicit argument
@@ -330,10 +332,10 @@ declaredCtor :: CtorMap -> Name -> Maybe CtorInfo
 declaredCtor cm name = nameSpelling name >>= (`Map.lookup` cm)
 
 -- | A caller-owned foreign value, looked up through its private engine
--- spelling.  The mapped text is the exact fully-qualified Lean name emitted by
+-- spelling.  The mapped text and binder metadata come directly from Lean
 -- environment introspection, so no Haskell-name rendering or qualification
--- heuristic is applied to it.
-declaredProvider :: ProviderMap -> Name -> Maybe String
+-- heuristic is applied to them.
+declaredProvider :: ProviderMap -> Name -> Maybe (String, Maybe [String])
 declaredProvider providers name =
   nameSpelling name >>= (`Map.lookup` providers)
 
@@ -993,7 +995,7 @@ render cm providers typeNames style doms = go
   go req expr = case expr of
     Local x -> renderUse req x []
     Global name -> case declaredProvider providers name of
-      Just leanName -> Right (at req 2 leanName)
+      Just (leanName, _) -> Right (at req 2 leanName)
       Nothing -> do
         kind <- globalKind cm name
         case kind of
@@ -1024,10 +1026,20 @@ render cm providers typeNames style doms = go
           headTxt <- renderHead headExpr
           argTxts <- mapM (go 2) args
           Right (at req 1 (unwords (headTxt : argTxts)))
-    VisibleTypeApplication function argument -> do
-      functionTxt <- visibleFunctionText function
-      argumentTxt <- renderVisibleTypeArgument typeNames argument
-      Right (at req 1 (functionTxt ++ " " ++ argumentTxt))
+    VisibleTypeApplication function argument ->
+      case namedProviderApplication expr of
+        Left failure -> Left failure
+        Right (Just (leanName, assignments)) -> do
+          rendered <- mapM
+            (\(binder, value) -> do
+              valueTxt <- renderNamedVisibleTypeArgument typeNames value
+              pure (" (" ++ binder ++ " := " ++ valueTxt ++ ")"))
+            assignments
+          Right (at req 1 (leanName ++ concat rendered))
+        Right Nothing -> do
+          functionTxt <- visibleFunctionText function
+          argumentTxt <- renderVisibleTypeArgument typeNames argument
+          Right (at req 1 (functionTxt ++ " " ++ argumentTxt))
     Lambda [] body -> go req body
     Lambda pats body -> do
       binders <- mapM (renderPattern cm style True) pats
@@ -1104,7 +1116,7 @@ render cm providers typeNames style doms = go
   spine f args = (f, args)
 
   renderHead (Global name) = case declaredProvider providers name of
-    Just leanName -> Right leanName
+    Just (leanName, _) -> Right leanName
     Nothing -> do
       kind <- globalKind cm name
       case kind of
@@ -1126,7 +1138,7 @@ render cm providers typeNames style doms = go
     VisibleTypeApplication{} -> go 1 function
     Local{} -> ("@" ++) <$> go 2 function
     Global name -> case declaredProvider providers name of
-      Just leanName -> Right ("@" ++ leanName)
+      Just (leanName, _) -> Right ("@" ++ leanName)
       Nothing -> do
         kind <- globalKind cm name
         Right $ "@" ++ case kind of
@@ -1135,6 +1147,60 @@ render cm providers typeNames style doms = go
           GUnit -> "Unit.unit"
           GCtor info -> ciLean info
     _ -> go 1 function
+
+  -- A positional Lean @ application exposes every intervening implicit and
+  -- instance binder. For a discovered global, use the source binder names
+  -- retained by the provider serializer instead: class evidence between type
+  -- binders remains implicit and Lean's instance search reconstructs it.
+  namedProviderApplication expression =
+    case providerVisibleSpine expression [] of
+      Nothing -> Right Nothing
+      Just (providerName, arguments) ->
+        case declaredProvider providers providerName of
+          Just (leanName, Just binderNames) ->
+            let selected = take (length arguments) binderNames
+            in if length selected /= length arguments
+              then Left $ "cannot align visible type arguments for Lean provider "
+                ++ leanName
+              else case traverse renderProviderBinder selected of
+                Nothing -> Left $ "cannot address a type binder of Lean provider "
+                  ++ leanName
+                Just renderedNames
+                  | nub renderedNames /= renderedNames ->
+                      Left $ "cannot align duplicate type binders for Lean provider "
+                        ++ leanName
+                  | otherwise -> Right $ Just
+                      (leanName, zip renderedNames arguments)
+          _ -> Right Nothing
+
+  providerVisibleSpine expression arguments = case expression of
+    VisibleTypeApplication function argument ->
+      providerVisibleSpine function (argument : arguments)
+    Global name -> Just (name, arguments)
+    _ -> Nothing
+
+  -- Quoted identifiers remain valid even when the source binder is a Lean
+  -- keyword. Name.toString already quotes some exotic spellings and leaves
+  -- ordinary or keyword spellings bare, so preserve a valid existing quote
+  -- and quote every other safe spelling. Known live metadata never falls back
+  -- positionally: doing so would expose erased instance binders.
+  renderProviderBinder name
+    | null name || name == "_" = Nothing
+    | otherwise = case quotedBody name of
+        Just body
+          | not (null body) && all safeBinderCharacter body -> Just name
+          | otherwise -> Nothing
+        Nothing
+          | all safeBinderCharacter name -> Just ("«" ++ name ++ "»")
+          | otherwise -> Nothing
+
+  quotedBody ('«' : rest) = case reverse rest of
+    '»' : reversedBody -> Just (reverse reversedBody)
+    _ -> Nothing
+  quotedBody _ = Nothing
+
+  safeBinderCharacter character =
+    not (isControl character) && character /= '«' && character /= '»'
 
   -- non-final match-alternative bodies must not swallow following
   -- alternatives, so open bodies are parenthesized uniformly
@@ -1149,27 +1215,41 @@ render cm providers typeNames style doms = go
 -- this backend boundary rather than inventing Lean binder scope.
 renderVisibleTypeArgument
   :: TypeMap -> VisibleTypeArgument -> Either String String
-renderVisibleTypeArgument typeNames argument = case visibleTypeArgumentType argument of
-  Nothing -> Right "_"
-  Just typeExpression -> renderType 2 typeExpression
+renderVisibleTypeArgument = renderVisibleTypeArgumentWith True
+
+-- A named Lean argument such as @(a := Nat)@ already identifies the source
+-- binder without switching the provider head into fully explicit mode. Keep
+-- restored nullary types ordinary, while an applied restored head still uses
+-- @\@@ because its recorded argument vector includes Lean's implicit slots.
+renderNamedVisibleTypeArgument
+  :: TypeMap -> VisibleTypeArgument -> Either String String
+renderNamedVisibleTypeArgument = renderVisibleTypeArgumentWith False
+
+renderVisibleTypeArgumentWith
+  :: Bool -> TypeMap -> VisibleTypeArgument -> Either String String
+renderVisibleTypeArgumentWith explicitStandalone typeNames argument =
+  case visibleTypeArgumentType argument of
+    Nothing -> Right "_"
+    Just typeExpression -> renderType False 2 typeExpression
  where
   -- 0 = arrow/product, 1 = type application, 2 = atom.
-  renderType :: Int -> SharedType.Type Void -> Either String String
-  renderType req typeExpression = case typeExpression of
+  renderType :: Bool -> Int -> SharedType.Type Void -> Either String String
+  renderType applicationHead req typeExpression = case typeExpression of
     SharedType.TypeVariable variable -> absurd variable
     SharedType.TypeConstructor name ->
-      at req 2 <$> renderTypeName name
+      at req 2 <$> renderTypeName
+        (explicitStandalone || applicationHead) name
     SharedType.TypeApplication function argumentType -> do
-      functionTxt <- renderType 1 function
-      argumentTxt <- renderType 2 argumentType
+      functionTxt <- renderType True 1 function
+      argumentTxt <- renderType False 2 argumentType
       Right (at req 1 (functionTxt ++ " " ++ argumentTxt))
     SharedType.FunctionType parameter result -> do
-      parameterTxt <- renderType 1 parameter
-      resultTxt <- renderType 0 result
+      parameterTxt <- renderType False 1 parameter
+      resultTxt <- renderType False 0 result
       Right (at req 0 (parameterTxt ++ " → " ++ resultTxt))
     SharedType.TupleType Boxed [] -> Right (at req 2 "Unit")
     SharedType.TupleType Boxed elements -> do
-      elementTxts <- mapM (renderType 1) elements
+      elementTxts <- mapM (renderType False 1) elements
       Right (at req 0 (intercalate " × " elementTxts))
     SharedType.TupleType Unboxed _ ->
       Left "cannot render an unboxed tuple as a Lean type argument"
@@ -1179,29 +1259,30 @@ renderVisibleTypeArgument typeNames argument = case visibleTypeArgumentType argu
   -- The engine's structural encodings use their Haskell names.  Lean's
   -- corresponding nominal constructors differ only in these cases; all other
   -- validated identifiers retain their canonical (possibly qualified) name.
-  renderTypeName :: Name -> Either String String
-  renderTypeName name = case nameSpelling name >>= (`Map.lookup` typeNames) of
-    -- The serializer records every elaborated application argument, including
-    -- implicit and instance parameters.  Prefix a restored nominal head with
-    -- @ so Lean consumes that complete explicit argument vector; @ is also
-    -- valid when every source binder was already explicit.
-    Just leanName -> Right ("@" ++ leanName)
-    Nothing -> case nameSpecial name of
-      Just ListConstructor -> Right "List"
-      Just FunctionConstructor ->
-        Left "cannot render an unsaturated function type constructor in Lean"
-      Just (TupleConstructor Boxed 0) -> Right "Unit"
-      Just (TupleConstructor Boxed _) ->
-        Left "cannot render an unsaturated tuple type constructor in Lean"
-      Just (TupleConstructor Unboxed _) ->
-        Left "cannot render an unboxed tuple type constructor in Lean"
-      Just ConsConstructor ->
-        Left "cannot render a list value constructor as a Lean type"
-      Nothing -> Right $ case nameSpelling name of
-        Just "Either" -> "Sum"
-        Just "Maybe" -> "Option"
-        Just "Void" -> "Empty"
-        _ -> renderCanonical name
+  renderTypeName :: Bool -> Name -> Either String String
+  renderTypeName explicit name =
+    case nameSpelling name >>= (`Map.lookup` typeNames) of
+      -- The serializer records every elaborated application argument,
+      -- including implicit and instance parameters. Prefix an applied
+      -- restored nominal head with @ so Lean consumes that complete explicit
+      -- vector; @ is also valid when every source binder was already explicit.
+      Just leanName -> Right ((if explicit then "@" else "") ++ leanName)
+      Nothing -> case nameSpecial name of
+        Just ListConstructor -> Right "List"
+        Just FunctionConstructor ->
+          Left "cannot render an unsaturated function type constructor in Lean"
+        Just (TupleConstructor Boxed 0) -> Right "Unit"
+        Just (TupleConstructor Boxed _) ->
+          Left "cannot render an unsaturated tuple type constructor in Lean"
+        Just (TupleConstructor Unboxed _) ->
+          Left "cannot render an unboxed tuple type constructor in Lean"
+        Just ConsConstructor ->
+          Left "cannot render a list value constructor as a Lean type"
+        Nothing -> Right $ case nameSpelling name of
+          Just "Either" -> "Sum"
+          Just "Maybe" -> "Option"
+          Just "Void" -> "Empty"
+          _ -> renderCanonical name
 
   at :: Int -> Int -> String -> String
   at req level text = if level >= req then text else "(" ++ text ++ ")"
