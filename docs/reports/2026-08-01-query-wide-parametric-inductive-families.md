@@ -182,8 +182,9 @@ Both engines consume the same shared datatype declarations.
 - **Every mode** first runs a structurally accepted goal without live providers
   and Lean-verifies that lane. Providers are discovered and searched only after
   a nonterminal miss; a complete Djinn refutation remains terminal.
-  Djinn-backed fallback first isolates the top-ranked provider before widening;
-  `both` still places Djinn candidates before new Exference candidates.
+  Djinn-backed fallback widens through discovery-order prefixes of 1, 4, and
+  16 providers before the full inventory; `both` still places Djinn candidates
+  before new Exference candidates in its singleton and terminal combined lanes.
 
 Every rendered candidate is re-elaborated by Lean against the original goal.
 The engine is useful for discovery, not part of the trusted kernel boundary.

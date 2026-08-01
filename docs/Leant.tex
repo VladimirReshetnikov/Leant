@@ -810,7 +810,7 @@ declarations lead the ranking;
 conventional implementation-worker names remain eligible but follow
 public fallbacks, while session declarations bypass that naming
 heuristic. Exference searches the ranked inventory directly; Djinn
-first tries the top provider in isolation before widening to the full
+tries discovery-order prefixes of 1, 4, and 16 providers before the full
 bounded inventory, and may specialize a loaded scheme at a closed
 monotype or guarded rank-N polytype. The serializer derives a canonical
 query from the

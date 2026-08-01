@@ -380,8 +380,9 @@ The diagram compresses the verified lane policy. Every engine mode starts a
 structurally accepted fragment with a provider-free search. Lean verifies that
 lane's rendered candidates before Leant discovers live providers. A verified
 term or complete Djinn refutation ends the command; after a nonterminal miss,
-Exference searches the full bounded inventory while Djinn-backed modes
-first try the top-ranked provider alone and then widen. Provider-eligible
+Exference searches the full bounded inventory while Djinn-backed modes try
+discovery-order prefixes of 1, 4, and 16 providers before the full inventory.
+Provider-eligible
 atomic/refused goals skip the baseline and go
 directly to those stages. Combined mode still merges Djinn candidates before
 new Exference candidates. All stages share one command deadline, and variants
@@ -515,7 +516,7 @@ Design rules, all inherited from Djex:
   instantiations render as named Lean arguments without exposing intervening
   instance binders. Exference assigns
   increasing positive rating penalties in discovery order so fallback
-  constants do not drown the best match; Djinn instead uses the isolated-first
+  constants do not drown the best match; Djinn instead uses the sparse-prefix
   schedule below. Exference remains subject to its explicit budgets
   (`:set synth-steps` exposes the step bound; queue/depth retain conservative
   engine defaults) and reports truncation honestly. This is enough for
@@ -528,11 +529,13 @@ Design rules, all inherited from Djex:
   only when that baseline completes with a nonterminal miss. Atomic or
   provider-open refused goals have no useful structural baseline and keep the
   direct provider path. A complete Djinn refutation remains terminal.
-  Exference searches the ranked inventory directly; Djinn-backed modes first
-  isolate the top provider and then widen after a miss.
+  Exference searches the ranked inventory directly; Djinn-backed modes try the
+  top provider, then prefixes of 4 and 16, and finally the full inventory after
+  verified misses. Milestones at or beyond the actual inventory size are
+  omitted.
 
   All lanes share the command's one wall-clock deadline. Time spent on the
-  baseline, its Lean checks, provider discovery, and an isolated provider stage
+  baseline, its Lean checks, provider discovery, and earlier provider prefixes
   reduces the allowance left for wider fallback instead of granting another
   full timeout. If earlier variants fail verification, their exact rendered
   spellings are subtracted from later groups before those groups are verified,
@@ -813,7 +816,7 @@ hypothesis premises. The implemented extension now adds up to 80
 providers from the live Lean environment: target-root and exact-session
 filtering bounds discovery, result-head/short-name ordering supplies a
 relevance signal, Exference's increasing positive penalties preserve that
-signal during heuristic search, Djinn uses the isolated-first schedule below,
+signal during heuristic search, Djinn uses the sparse-prefix schedule below,
 and a private-name map restores the exact Lean global in the rendered term.
 For live declarations it also carries the original names of leading
 proper-type binders. Explicit Djex instantiation evidence can then render as a
@@ -837,9 +840,12 @@ Exference searches the ranked inventory as one enriched lane.
 Djinn, including the Djinn half of `both`, can reuse the same declarations and
 Djex now specializes context-free loaded schemes at closed monotypes or guarded
 rank-N polytypes. Because a lossy or irrelevant declaration can crowd Djinn's
-fixed candidate prefix, Leant tries the highest-ranked provider alone before widening
-to the full bounded inventory. One command deadline covers every stage, and variants rejected by
-Lean are removed before later verification. The policy prevents a broad
+fixed candidate window, Leant tries discovery-order prefixes of 1, 4, and 16
+providers before the full bounded inventory. In `both` mode, the singleton and
+terminal lanes run both engines while intermediate prefixes run Djinn only, so
+Exference's step budget is not spent at every width. One command deadline
+covers every stage, and variants rejected by Lean are removed before later
+verification. The policy prevents a broad
 inventory from crowding out a structural or preferred-provider term while
 intentionally foregoing provider alternatives after structural success.
 The complete dispatch and verification contract is recorded in the

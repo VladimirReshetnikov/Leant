@@ -363,10 +363,16 @@ binder and leaves dictionary reconstruction to Lean:
 
 Djinn first searches with only the highest-ranked provider, which prevents a
 lossily projected or irrelevant declaration from crowding the fixed candidate
-prefix. If that isolated candidate does not verify, Leant widens to the full
-bounded inventory so compositions remain possible. The exact live transcript
-also covers an atomic provider, provider-free first-result ordering, a
-two-provider composition reached only after widening, and combined-mode reuse.
+prefix. If that isolated candidate does not verify, Leant tries the first four
+and first sixteen providers before the full bounded inventory. These sparse
+prefixes preserve discovery order while reaching small compositions before
+unrelated declarations can displace them from Djinn's candidate window. In
+`both` mode, only the singleton and full lanes rerun Exference; intermediate
+prefixes are Djinn-only. The exact live transcript deliberately places an
+unrelated class-constrained provider before a two-provider composition and
+verifies that the width-four lane recovers
+`Demo.consume (Demo.produce x)`. It also covers an atomic provider,
+provider-free first-result ordering, and combined-mode reuse.
 It is checked in
 [`synth-djinn-providers`](test/synth-djinn-providers.txt).
 
@@ -614,9 +620,11 @@ finisher tactics, needing no premise database and no imports. Bare
   providers are discovered only after a nonterminal miss. A complete Djinn
   refutation remains terminal and retains the explicit classical fallback.
   Provider-eligible atomic/refused goals go directly to provider search.
-  Djinn and `both` first isolate the highest-ranked provider, then widen to the
-  full bounded inventory after a verified miss; Exference keeps its internally
-  rated full-inventory lane. All lanes consume one command-wide
+  Djinn first isolates the highest-ranked provider, then widens through the
+  first 4 and 16 providers before the full bounded inventory after verified
+  misses; Exference keeps its internally rated full-inventory lane. Combined
+  mode runs both engines for the singleton and full lanes but uses Djinn alone
+  for the intermediate prefixes. All lanes consume one command-wide
   `LEANT_SYNTH_TIMEOUT` deadline, and spellings that already failed Lean
   verification are removed before a wider fallback is checked. This policy
   deliberately favors a structural solution over breadth: provider
@@ -634,7 +642,7 @@ finisher tactics, needing no premise database and no imports. Bare
   `Impl`, or `Aux` (or a `.go`/`.loop` component) remain eligible but
   move behind public fallbacks; exact user-session declarations always
   bypass that spelling heuristic. Exference assigns increasing positive
-  penalties in this order, while Djinn receives the isolated-first schedule
+  penalties in this order, while Djinn receives the sparse-prefix schedule
   above. Thus a
   target such as `(α → β) → List α → List β` can reuse
   `List.map` instead of rebuilding recursion from scratch.
@@ -737,12 +745,14 @@ backend re-elaborates its rendered candidates against the original goal. After
 a nonterminal miss, a second metaprogram builds the bounded live-provider
 inventory and runs the fallback search; a complete Djinn refutation instead
 keeps its proof-backed verdict and explicit classical policy.
-Atomic/provider-open refusals use that
-provider path directly. Djinn-backed fallback first tries the top-ranked
-provider alone and then widens; combined mode still merges Djinn candidates
-before new Exference candidates. Constructor and exact provider names are
-restored and binders named by role before every verification; only survivors
-are shown and bound.
+Atomic/provider-open refusals use that provider path directly. Djinn-backed
+fallback tries discovery-order prefixes of 1, 4, and 16 providers before the
+full inventory, omitting milestones at or beyond the actual inventory size.
+Combined mode runs both engines at the singleton and terminal full widths and
+Djinn alone at intermediate widths; within a combined lane, Djinn candidates
+still precede new Exference candidates. Constructor and exact provider names
+are restored and binders named by role before every verification; only
+survivors are shown and bound.
 
 The synthesis side environment tracks exactly which session history it
 has replayed. An unchanged history reuses it directly; an append replays

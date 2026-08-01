@@ -30,9 +30,18 @@ The successor in the same implementation now admits those providers to Djinn.
 Within fixed bounds, Djex specializes retained context-free loaded schemes at
 closed monotypes or guarded rank-N polytypes. Leant first gives the
 highest-ranked provider an isolated Djinn lane, preventing a lossy or irrelevant
-later declaration from crowding the fixed candidate prefix; after a
-nonterminal miss it widens to the full bounded inventory so multi-provider
-compositions remain possible.
+later declaration from crowding the fixed candidate prefix. After a verified
+miss it tries discovery-order prefixes of four and sixteen providers before the
+full bounded inventory, allowing small multi-provider compositions to surface
+before unrelated declarations displace them from the candidate window.
+
+The live regression makes that boundary concrete. `Demo.consume` is ranked
+first, an unrelated constrained `Demo.global` second, and the required
+`Demo.produce` third. Prefixes three through six retain the verified
+`fun x => Demo.consume (Demo.produce x)` candidate; adding `Demo.C.mk` at rank
+seven displaces it with a large candidate that Lean rejects, and the full
+nine-provider lane still misses. The scheduled width-four lane therefore
+recovers a real composition that the former singleton-then-full policy lost.
 
 ## Dispatch policy
 
@@ -46,8 +55,8 @@ The resulting dispatch matrix is:
 | Engine and goal class | First search | Provider fallback | Result behavior |
 | --- | --- | --- | --- |
 | `EngineExference`, structural/in-fragment | Provider-free Exference | Full ranked inventory after no baseline term verifies | Stop at the first verified lane |
-| `EngineDjinn`, structural/in-fragment | Provider-free Djinn | After a nonterminal miss: top provider, then full bounded inventory | Preserve a complete refutation; otherwise stop at the first verified lane |
-| `EngineBoth`, structural/in-fragment | Provider-free combined search | After a nonterminal miss: top provider, then full bounded inventory | Djinn candidates remain before new Exference candidates |
+| `EngineDjinn`, structural/in-fragment | Provider-free Djinn | After a nonterminal miss: provider prefixes 1, 4, 16, then full bounded inventory | Preserve a complete refutation; otherwise stop at the first verified lane |
+| `EngineBoth`, structural/in-fragment | Provider-free combined search | Combined singleton, Djinn-only intermediate prefixes 4 and 16, then combined full inventory | Djinn candidates remain before new Exference candidates; avoid repeating Exference at intermediate widths |
 | Any engine, atomic/provider-open refused | Provider-enriched stages | No separate baseline | Preserve access to live values |
 
 A hard refusal that providers cannot open remains an honest out-of-fragment
@@ -55,10 +64,11 @@ result. The direct path refers to atomic/refused goals for which provider
 discovery is already admissible; provider isolation does not broaden the
 fragment or make providers repair depth truncation.
 
-`EngineBoth` now follows the same verified baseline/fallback policy. Inside each
-fallback invocation, both Djinn and Exference receive the active provider
-slice; their public merge order remains Djinn candidates first and new
-Exference candidates afterward.
+`EngineBoth` now follows the same verified baseline/fallback policy. Inside the
+combined singleton and terminal fallback invocations, both Djinn and Exference
+receive the active provider slice; their public merge order remains Djinn
+candidates first and new Exference candidates afterward. Intermediate widths
+four and sixteen are Djinn-only.
 
 A terminal Djinn refutation is scoped to the complete provider-free structural
 calculus. It is not presented as an exhaustive theorem about all declarations
