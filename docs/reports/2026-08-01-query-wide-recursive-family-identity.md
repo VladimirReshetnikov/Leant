@@ -90,7 +90,8 @@ occurrences may use structured or repeated proper types. This is what permits
 a source such as `List a` to establish the schema used by
 `List (∀ b, b → b)`. If a query contains only structured or repeated
 occurrences and no recoverable generic source, it conservatively uses the
-abstract plan.
+abstract plan. That is the initial implementation contract recorded by this
+report; the positive-only structured-source successor is described below.
 
 The decision matrix is:
 
@@ -239,10 +240,87 @@ Every candidate from either engine is still rendered and re-elaborated by Lean
 against the exact original goal. Shared identity changes discovery, not the
 trusted boundary.
 
+## Successor: impredicative one-layer field projection
+
+The follow-up projection admits the useful eliminator that the initial strict
+policy missed:
+
+```lean
+inductive Demo.Headed (a : Type 1) : Type 1 where
+| mk : a → Demo.Headed a → Demo.Headed a
+
+-- goal
+Demo.Headed (∀ x : Type, x → x) → (∀ x : Type, x → x)
+```
+
+The intended candidate is finite:
+
+```lean
+fun h => match h with | .mk value _ => value
+```
+
+Exference opens exactly one constructor layer. The recursive tail becomes an
+ordinary branch-local value and is deliberately ignored; it is never scheduled
+for another automatic match. The change therefore adds field projection, not
+recursion, induction, a fold, or an unbounded eliminator.
+
+### Strict-first omission policy
+
+Exference's established lane requires every introduced binder to be used.
+That remains the first search, with its existing ordering and candidate prefix.
+Only when it produces no renderable candidate group does Leant rerun the same
+session and environment with unused inputs allowed. A successful strict lane
+ends the pair unchanged; the relaxed lane is not appended as an alternative
+enumeration and is not reached merely because a later Lean verification rejects
+a strict spelling.
+
+Both requests retain the configured `synth-steps` limit and the same bounded
+queue. A complete miss may therefore spend two engine step budgets for one
+Exference invocation. It does not receive two wall-clock allowances: the whole
+`:synth` command remains beneath its single outer `LEANT_SYNTH_TIMEOUT`
+deadline. This inner strict/relaxed pair is independent of standalone
+Exference's provider-free/provider-enriched scheduling; if both outer passes
+are needed, each invocation follows the same rule within the one shared command
+deadline.
+
+Search and checking may retain a typed name for the ignored field. At the
+stable output boundary, and idempotently again before Leant assigns Lean-facing
+names, an unused pattern binding becomes a real wildcard. The rendered term
+therefore says `.mk value _` rather than inventing a misleading tail name, and
+Lean re-elaborates that exact wildcard term against the original goal.
+
+### Structured parameters are positive approximations
+
+The initial native-plan rule required a complete occurrence with distinct plain
+type variables. The follow-up admits any pairwise-distinct proper-type parameter
+vector, including a supplied polytype, as a possible template source. The
+existing guards still require one exact head and arity, complete recursive
+inventories, a closed capture-safe template, specialization back to every
+observed occurrence, agreement among viable templates, and no nominal or
+finite-family collision.
+
+This widening is deliberately not a claim that the recovered schema is the
+original Lean declaration. `FParamRec` carries occurrence-specialized
+constructor fields, but it does not preserve declaration-level provenance for
+each parameter occurrence. If a fixed constructor field happens to equal the
+sole structured actual parameter, whole-fragment replacement cannot tell that
+coincidence from a genuinely generic field. Multiple occurrences often
+disambiguate the template, but an unseen parameter vector can still expose the
+missing provenance.
+
+For that reason a structured source is a speculative positive approximation.
+It may unlock native Djinn construction or Exference's one-layer projection,
+but every resulting candidate must pass Lean kernel elaboration at the exact
+original type. It contributes no new negative evidence: recursive occurrences
+already prevent Djinn exhaustion from becoming an uninhabitation proof, and
+Exference never reports one. A future serializer can replace the approximation
+with faithful generic reconstruction by carrying declaration-parameter
+provenance explicitly.
+
 ## Validation coverage
 
-The focused Haskell suite contains 106 unit tests. The recursive-family cases
-cover:
+At the initial implementation commits, the focused Haskell suite contains 106
+unit tests. The recursive-family cases cover:
 
 - direct `List` rank-N transport under Djinn and Exference;
 - native Djinn construction of a polymorphic recursive family;
@@ -260,6 +338,11 @@ cover:
 - arity disagreement rejection; and
 - preservation of the established one-layer `Nat`, `List.map`, and fixed-field
   `Std.Format` behavior.
+
+The successor adds focused controls for generic payload projection,
+impredicative payload projection with a wildcard recursive tail, and native
+Djinn construction from a structured recursive parameter without exposing a
+reopenable recursive constructor premise.
 
 The fifth end-to-end golden,
 [`synth-recursive-rankn.txt`](../../test/synth-recursive-rankn.txt), declares:

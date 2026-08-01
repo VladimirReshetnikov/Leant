@@ -17,4 +17,11 @@ inductive Demo.Outer (a : Type 1) : Type 1 where
 | again : Demo.Outer a → Demo.Outer a
 
 :synth ((∀ a : Type 1, Demo.Outer a → Demo.Seed) → (∀ x : Type, x) → Demo.Outer (∀ y : Type, y))
+
+inductive Demo.Headed (a : Type 1) : Type 1 where
+| mk : a → Demo.Headed a → Demo.Headed a
+
+:set synth-steps 128
+:set synth-engine exference
+:synth (Demo.Headed (∀ x : Type, x → x) → (∀ x : Type, x → x))
 :quit

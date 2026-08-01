@@ -89,6 +89,25 @@ is preserved directly; a provider inventory cannot repair either condition.
 This prevents the two-lane policy from silently doubling the configured
 wall-clock allowance or replacing a useful baseline diagnostic.
 
+### Nested strict/relaxed engine lanes
+
+A later recursive-projection follow-up adds a separate pair inside each
+Exference invocation. The first request keeps Exference's normal requirement
+that every introduced binder be used. Only when that request produces no
+renderable candidate group does the same session and environment run again
+with unused inputs admitted. Each request may spend the configured
+`synth-steps` budget, but neither renews the outer command deadline described
+above.
+
+This inner pair does not change provider discovery or fallback ordering. A
+strict candidate preserves the established prefix and ends that invocation;
+the relaxed lane exists to express finite omissions such as returning a
+constructor payload while leaving its recursive tail unopened. If both the
+provider-free and provider-enriched passes are ultimately reached, each pass
+may apply this strict-first pair, still under one `LEANT_SYNTH_TIMEOUT`
+allowance. Unused pattern binders render as real `_` wildcards and the resulting
+term remains subject to the same Lean verification as every other candidate.
+
 ## Deliberate tradeoff
 
 After any baseline term verifies, Leant does not discover providers and does

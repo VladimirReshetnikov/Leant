@@ -14,6 +14,9 @@ shares compatible proper-type applications of non-recursive and recursive
 inductive families across the complete query. Finite data retains constructor
 introduction and case elimination; recursive data retains direct rank-N
 transport in both engines and a validated one-layer eliminator in Exference.
+That eliminator preserves the established strict candidate prefix, retrying
+with intentionally unused inputs only after a strict search miss and rendering
+the omitted fields as Lean wildcards.
 Phase 4 and a persistent Mathlib-scale inventory remain future work. Companion
 to
 [PROPOSALS.md](PROPOSALS.md).*
@@ -127,11 +130,17 @@ best-first search. From the commit history and the reports
 
   Recursive `FParamRec` uses follow a recursive-specific version of the same
   plan. Blocked self atoms are normalized to the exact applied family before
-  schemas are compared. A complete generic source occurrence with
-  pairwise-distinct plain parameters gives both engines one query-wide
-  parameterized recursive declaration. Djinn receives bounded positive
-  constructor introduction from the native declaration; Exference retains its
-  established one-layer match.
+  schemas are compared. A complete occurrence with pairwise-distinct
+  proper-type parameters may give both engines one query-wide parameterized
+  recursive declaration. Plain variables carry the clearest generic evidence;
+  a structured parameter is only a positive speculative approximation because
+  occurrence-specialized constructor fields do not record which fragments came
+  from the declaration's original parameters. Closure, specialization back to
+  every observed occurrence, and template-equivalence checks constrain that
+  approximation, and Lean kernel verification remains mandatory for every
+  generated term. It supplies no new negative evidence. Djinn receives bounded
+  positive constructor introduction from the native declaration; Exference
+  retains its established one-layer match.
   Partial inventories, incompatible schemas, nominal collisions, and
   unrecoverable templates use that same abstract-plus-premises representation
   in both engines. Planning discovers nested exact families through a
@@ -144,9 +153,13 @@ best-first search. From the commit history and the reports
 - **Bounded recursive deconstruction (Exference).** Recursive datatype
   declarations remain available to search, but matching stops after one
   constructor layer. Recursive fields enter that branch as ordinary
-  providers and are not eagerly deconstructed again. This admits useful
-  finite case terms without turning the engine into a recursion or
-  induction synthesizer.
+  providers and are not eagerly deconstructed again. Exference first keeps its
+  usual all-inputs-used policy. Only when that lane produces no renderable
+  candidate group does Leant rerun the same query with unused inputs admitted,
+  so a payload may be returned while the recursive tail is ignored. The
+  renderer turns the ignored pattern binder into `_`. This admits useful finite
+  case terms without turning the engine into a recursion or induction
+  synthesizer.
 - **Verdict honesty as a fixed soundness bug.** Djinn once approximated
   every nested forall as one proposition and could report
   `ProvedUninhabitable` for inhabited types like
@@ -359,6 +372,16 @@ verification. The intentional tradeoff is that provider alternatives are not
 enumerated once a structural baseline succeeds. See the
 [provider-isolated baseline report](reports/2026-08-01-provider-isolated-exference-baseline.md).
 
+There is a smaller strict/relaxed pair inside each Exference invocation.
+Search first uses the default policy that every introduced binder must be used;
+only an empty strict candidate-group prefix triggers a retry with unused inputs
+allowed. Each lane may spend the configured `synth-steps` budget, but both run
+under the command's single outer `LEANT_SYNTH_TIMEOUT` deadline. Thus a miss can
+consume two engine step budgets without receiving a second wall-clock timeout.
+This pair is independent of the provider-free/provider-enriched orchestration
+above; if both provider passes are reached, each invocation applies the same
+strict-first rule within the one shared command deadline.
+
 Design rules, all inherited from Djex:
 
 1. **Checked boundaries.** The translator refuses anything outside the
@@ -566,16 +589,23 @@ Design rules, all inherited from Djex:
   eliminator. For a complete compatible exact family, Djinn instead keeps the
   native declaration but permits only Djex's bounded positive introduction: one
   layer per SCC and at most two independent SCCs on a logical path. Recursive
-  inputs remain opaque.
+  inputs remain opaque. Exference preserves its strict ranking whenever that
+  search finds a candidate; only a strict miss retries with unused inputs, and
+  ignored constructor fields render as `_` rather than misleading names.
 - **Query-wide recursive identity does not imply recursive synthesis.**
   `FParamRec` now preserves one exact applied family across the goal, caller
   premises, and usable providers, which enables direct rank-N transport in
   both engines. A complete compatible schema gives both engines a native
   declaration: Djinn uses bounded positive construction and Exference its
   one-layer elimination. Partial inventories, incompatible schemas,
-  repeated/structured uses with no validating generic occurrence, and nominal
-  collisions receive an abstract exact family plus sound occurrence constructor
-  premises. This supports transport and introduction, not recursive
+  repeated parameter vectors with no other validating source, and nominal
+  collisions receive an abstract exact family plus sound occurrence
+  constructor premises. A pairwise-distinct structured parameter vector may
+  now seed a native plan for positive candidate generation, but this is
+  deliberately speculative: occurrence-specialized fields carry no
+  declaration-parameter provenance. Observed specialization checks and final
+  Lean elaboration guard the candidates; the approximation does not justify a
+  negative result. This supports transport and introduction, not recursive
   definitions, induction, or unbounded deconstruction.
 - **Abstract-family fallbacks do not prove absence.** If exact-head uses have
   ambiguous parameters, incompatible schemas, or mixed
@@ -601,9 +631,11 @@ Design rules, all inherited from Djex:
   generated result. Standalone Exference's provider-free baseline and any
   provider-enriched fallback share one wall-clock deadline; a verified
   baseline avoids discovery entirely, at the cost of not listing provider
-  alternatives after structural success. Root-namespace relevance is
-  intentionally shallow; a persistent Mathlib-scale relevance index remains
-  open work.
+  alternatives after structural success. Within each Exference invocation, a
+  strict miss may additionally spend one fresh `synth-steps` budget on the
+  allow-unused retry, still beneath that single outer deadline. Root-namespace
+  relevance is intentionally shallow; a persistent Mathlib-scale relevance
+  index remains open work.
 - **Maintenance**: embedding Djex ties Leant to a large local
   package (and to its GHC version). Mitigation: the narrow engine
   boundary keeps Djex swappable for a small purpose-built LJT module
@@ -781,6 +813,16 @@ while intentionally foregoing provider alternatives after structural success.
 The complete dispatch and verification contract is recorded in the
 [2026-08-01 provider-isolation report](reports/2026-08-01-provider-isolated-exference-baseline.md).
 
+Every Exference invocation also has a strict-first omission policy. The normal
+lane requires every introduced binder to be used and retains the established
+candidate prefix whenever it succeeds. If it produces no renderable candidate
+group, Leant reruns the same session and environment with unused inputs
+allowed. This is what makes a one-layer recursive projection able to return a
+payload while deliberately ignoring the recursive tail. Each lane receives
+the configured step bound; the outer command deadline is not renewed. Unused
+pattern bindings are rendered as `_` before Lean-facing naming and the result
+must still elaborate against the exact original goal.
+
 For complete constructor inventories whose applied parameters can be
 represented safely, both engine projections model exact recursive inductives
 nominally. Djinn enables bounded positive construction; Exference enables one
@@ -877,9 +919,19 @@ head, occurrence display key, ordered proper-type parameters, and constructors.
 Planning groups these occurrences with nominal uses by exact head and checks
 one arity across the goal, caller premises, and usable provider inventory. It
 does not reuse the finite-data template unchecked: a recursive structural
-template must come from a complete occurrence whose parameters are distinct
-plain variables, be closed over those formals, and specialize back to every
-recursive occurrence.
+template must come from a complete occurrence whose parameters are pairwise
+distinct, be closed over private formals, specialize back to every recursive
+occurrence, and agree with every other viable template.
+
+For a plain-variable parameter vector this is ordinary generic evidence. For a
+structured vector it is intentionally only a positive speculative
+approximation. `FParamRec` stores fields specialized at each occurrence but not
+their declaration-level parameter provenance, so whole-fragment replacement
+cannot prove that a coincidentally equal fixed field was originally generic.
+Closure and all-observed-occurrence fitting reject many false templates, but
+they cannot establish behavior at an unseen parameter vector. Consequently
+structured sources may unlock candidates that are always re-elaborated by the
+Lean kernel, while recursive uses continue to withhold negative evidence.
 
 Before template comparison, the blocked self atom serialized with an
 occurrence display key is rewritten as an application of the exact head to
@@ -895,15 +947,20 @@ constructor fields are lowered. Matching remains the existing one-layer rule:
 recursive branch fields are values, not a request for another automatic split.
 The renderer prefers the constructor fields serialized on the actual result or
 scrutinee occurrence and uses generic specialization only as a fallback, so a
-rank-N field is fitted at the proper occurrence.
+rank-N field is fitted at the proper occurrence. Exference first searches with
+all introduced inputs required. If that lane has no renderable candidate group,
+it retries with omission permitted; an unused recursive field then becomes a
+real `_` wildcard before Lean-facing names are assigned. Both lanes have the
+configured step bound and remain beneath the one outer command timeout.
 
 Djinn receives that native recursive datatype as well, but Djex exposes only
 bounded positive constructor layers and no recursive match. Both engines use an
 abstract exact family plus reachable constructor premises when an inventory is
-partial, no generic occurrence resolves repeated or structured parameter uses,
-schemas disagree, or structural and nominal evidence collide. These fallbacks
-preserve positive family transport but expose no recursive match and make
-Djinn's projection incomplete for negative-evidence purposes.
+partial, no viable pairwise-distinct source resolves repeated parameters, a
+structured template fails its closure/fitting checks, schemas disagree, or
+structural and nominal evidence collide. These fallbacks preserve positive
+family transport but expose no recursive match and make Djinn's projection
+incomplete for negative-evidence purposes.
 
 Nested constructor inventories are metadata until lowering will consume them.
 The planner therefore grows its exact-family use set to a fixed point only

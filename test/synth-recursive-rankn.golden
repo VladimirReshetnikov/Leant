@@ -32,4 +32,19 @@ synth engine: djinn
 …>
 λ> :synth ((∀ a : Type 1, Demo.Outer a → Demo.Seed) → (∀ x : Type, x) → Demo.Outer (∀ y : Type, y))
   it1  fun _ x => .wrap (.done x)
+λ>
+λ> inductive Demo.Headed (a : Type 1) : Type 1 where
+…> | mk : a → Demo.Headed a → Demo.Headed a
+…>
+λ> :set synth-steps 128
+synth steps: 128
+λ> :set synth-engine exference
+synth engine: exference
+λ> :synth (Demo.Headed (∀ x : Type, x → x) → (∀ x : Type, x → x))
+  it1  fun x => let y := x; match y with | ⟨f, _⟩ => f
+  it2  fun x => let y := x; match y with | ⟨_, _⟩ => (fun _ z => z)
+  it3  fun x => let y := x; match y with | ⟨f, _⟩ => (fun _ z => f _ (f _ z))
+  it4  fun x => let y := x; match y with | ⟨f, _⟩ => (fun _ z => f _ (f _ (f _ z)))
+  it5  fun x => let y := x; match y with | ⟨f, _⟩ => (fun _ z => f _ (f _ (f _ (f _ z))))
+note: search truncated: step limit reached
 λ> :quit

@@ -173,8 +173,11 @@ of one inductive family are shared by exact Lean head across the whole query,
 so differently instantiated `Option`, `Except`, `List`, and user-family
 occurrences retain one nominal identity. Compatible non-recursive families
 keep their constructors and cases; compatible recursive families additionally
-retain bounded one-layer elimination in Exference. Exference can also reuse a
-small, goal-relevant slice of the live Lean environment. Design and phasing:
+retain bounded one-layer elimination in Exference. If its usual all-inputs-used
+search has no candidate, Leant retries that same Exference query with omissions
+allowed; this can project an impredicative payload while rendering the unopened
+recursive tail as `_`. Exference can also reuse a small, goal-relevant slice of
+the live Lean environment. Design and phasing:
 [docs/SYNTHESIS_PROPOSAL.md](docs/SYNTHESIS_PROPOSAL.md). The implementation
 invariants are recorded in the dated reports for
 [finite families](docs/reports/2026-08-01-query-wide-parametric-inductive-families.md)
@@ -484,16 +487,22 @@ can validate one recursive knot even though Lean serialized different display
 keys.
 
 The available structure remains intentionally asymmetric. When every reachable
-occurrence has a complete, compatible schema and at least one occurrence
-supplies distinct plain type parameters as a generic template, both engines
-receive one shared native recursive declaration. Djinn may introduce one
+occurrence has a complete, compatible schema and a pairwise-distinct parameter
+vector yields a closed template that fits every observed occurrence, both
+engines receive one shared native recursive declaration. A plain-variable
+vector is direct generic evidence; a structured vector is only a speculative
+positive approximation because the serialized fields lack declaration-level
+parameter provenance. Every resulting term is re-elaborated by Lean, and the
+approximation supplies no negative evidence. Djinn may introduce one
 constructor layer from each of at most two independent recursive SCCs on a
 positive logical path, but it cannot eliminate recursive inputs; Exference may
 inspect one constructor layer, whose recursive fields become ordinary
-branch-local values and are not immediately split again. Partial inventories,
-unresolved repeated or structured parameter vectors, incompatible schemas, and
-nominal collisions all choose one shared abstract exact family; their
-occurrence constructors remain introduction premises, but no `match` is
+branch-local values and are not immediately split again. It first preserves
+the established all-inputs-used candidate prefix and tries the omission lane
+only after a miss. Partial inventories, unresolved repeated parameters,
+structured templates that fail the closure/fitting checks, incompatible
+schemas, and nominal collisions all choose one shared abstract exact family;
+their occurrence constructors remain introduction premises, but no `match` is
 exposed, and Djinn search exhaustion is not promoted to a refutation. Indexed
 (`Eq`) and dependent-field (`Exists`)
 types remain opaque. The main impredicative gain is direct family transport,
@@ -605,10 +614,14 @@ finisher tactics, needing no premise database and no imports. Bare
   use a parallel exact-head plan with recursive-knot normalization. Both
   engines receive a shared native recursive declaration only for a complete,
   compatible schema: Djinn gains bounded positive introduction and Exference
-  its one-layer eliminator. Every recursive fallback uses one abstract exact
-  family plus occurrence constructor premises. Ambiguous, partial,
-  incompatible, or nominally colliding schemas disable negative evidence;
-  term/dependent parameters retain the occurrence-local path.
+  its one-layer eliminator. A pairwise-distinct structured parameter vector may
+  seed a positive candidate plan when its closed template specializes back to
+  every observed occurrence; this remains speculative until Lean verification
+  because occurrence inventories do not retain parameter provenance. Every
+  recursive fallback uses one abstract exact family plus occurrence constructor
+  premises. Repeated, partial, incompatible, or nominally colliding schemas
+  disable negative evidence; term/dependent parameters retain the
+  occurrence-local path.
   Planning reaches nested inventories through a fixed point, but only when a
   selected structural declaration or an active constructor premise consumes
   them. Fixed opaque fields are seeded as private rigid proper types, while
