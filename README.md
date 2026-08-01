@@ -168,10 +168,15 @@ read through propositions-as-types, *"prove this"* — and sometimes the
 stronger question *"show me that no such term exists."* It covers the
 structural fragment `→ / × / ∧ / ⊕ / ∨ / ↔ / ¬ / ⊥ / ⊤ / ∀` over opaque
 variables, plus structurally representable inductive data, with bounded
-support for rank-N and impredicative quantification. Exference can
+support for rank-N and impredicative quantification. Proper-type applications
+of one non-recursive inductive family are shared across the whole query, so
+`Option a`, `Option (forall b, b -> b)`, and provider occurrences retain both
+their common nominal identity and their constructors. Exference can
 additionally reuse a small, goal-relevant slice of the live Lean
 environment. Design and phasing:
-[docs/SYNTHESIS_PROPOSAL.md](docs/SYNTHESIS_PROPOSAL.md).
+[docs/SYNTHESIS_PROPOSAL.md](docs/SYNTHESIS_PROPOSAL.md). The implementation
+invariants are recorded in the dated
+[query-wide family report](docs/reports/2026-08-01-query-wide-parametric-inductive-families.md).
 
 The engine is the vendored [Djex](lib/Djex) library, linked in-process.
 Djex began as a merger of two classic Haskell synthesizers — **Djinn**
@@ -287,10 +292,38 @@ synth engine: exference
   it1  fun _ x => x _
 ```
 
-Only arguments whose own type is a universe take this path.  Term-indexed
-families such as `P 3` remain a single opaque atom.  A nominal application
-also remains unsafe for negative evidence: its hidden Lean constant can help
-find and verify a term, but can never justify a refutation.
+The same transport now works without throwing away datatype structure.
+`Option`, `Except`, and qualifying user inductives have complete constructor
+schemas, while their exact Lean heads are shared across all proper-type
+instantiations in one query. The provider-free engine tests exercise built-in
+one- and two-parameter families through both engines. This live session keeps
+Exference's root-local provider inventory focused with a small user family and
+uses real `Option` under Djinn:
+
+```text
+λ> inductive Demo.Phantom2 (a b : Type 1) : Type 1 where
+…> | mk : Demo.Phantom2 a b
+…>
+λ> :set synth-engine exference
+synth engine: exference
+λ> :synth ((∀ a b : Type 1, Demo.Phantom2 a b) → Demo.Phantom2 (∀ x : Type, x → x) (∀ y : Type, y → y))
+  it1  fun x => x _ _
+λ> :set synth-engine djinn
+synth engine: djinn
+λ> :synth ((∀ a : Type 1, Option a) → Option (∀ b : Type, b → b))
+  it1  fun x => x _
+λ> :synth ((∀ a b : Type 1, Demo.Phantom2 a b) → Demo.Phantom2 (∀ x : Type, x → x) (∀ y : Type, y → y))
+  it1  fun x => x _ _
+```
+
+Only application arguments whose own type is a universe take the retained
+proper-type path. A non-inductive term-indexed family such as `P 3` remains a
+single opaque atom. An inductive with term or dependent parameters keeps the
+older occurrence-local representation when its constructor shape is safe;
+it is never silently conflated with the proper-type family projection. An
+opaque nominal application also remains unsafe for negative evidence: its
+hidden Lean constant can help find and verify a term, but can never justify a
+refutation.
 
 And a Church-encoded pair converts into a real conjunction — the
 quantified hypothesis is instantiated once at `p` and once at `q`, fed
@@ -368,7 +401,11 @@ A non-recursive, non-indexed inductive or structure — built-in
 (`Bool`, `Option`, `Ordering`, `Except`, `Decidable`, …) or
 session-declared — expands into a generalized sum of products:
 constructors become introduction rules, case analysis the elimination
-rule, and candidates render with the real constructor names.
+rule, and candidates render with the real constructor names. When all applied
+parameters are proper types, Leant also retains the exact family head and
+ordered parameter vector. A query-wide pre-scan validates one shared
+parameterized declaration, so rank-N transport no longer requires choosing
+between nominal identity and useful constructor structure.
 `Except.map`, synthesized rather than remembered:
 
 ```text
@@ -401,6 +438,34 @@ complete constructor list:
 provably uninhabited — no closed term of this polymorphic type exists
 ```
 
+Fixed constructor fields are not mistaken for family parameters. Here
+`Demo.Secret` becomes one private rigid proper type inside the engine, while
+the varying `a` remains the parameter of `Demo.Guard`; both engines can still
+transport the whole family at an impredicative argument:
+
+```text
+λ> axiom Demo.Secret : Type
+λ> inductive Demo.Guard (a : Type 1) : Type 1 where
+…> | mk : Demo.Secret → a → Demo.Guard a
+…>
+λ> :synth ((∀ a : Type 1, Demo.Guard a) → Demo.Guard (∀ b : Type, b → b))
+  it1  fun x => x _
+```
+
+Sharing is conservative and independent of traversal order. Every occurrence
+of an exact head in the goal, caller premises, and usable Exference providers
+must agree on arity and on one generic constructor schema. Repeated or
+otherwise ambiguous parameter vectors may borrow a template from a later,
+unambiguous occurrence only when specialization reproduces every inventory.
+If no unique compatible template exists—or the same head also arrived through
+an opaque nominal fallback—the whole head becomes one shared abstract family.
+Transport can still succeed, but constructors and cases are withheld, and
+Djinn cannot turn search exhaustion into a refutation. Unsafe atoms in caller
+premises likewise forfeit negative evidence. Exference never makes negative
+claims, and every positive candidate from either engine is still checked by
+Lean. A contradictory arity for one exact Lean head is rejected outright
+rather than abstracted or conflated.
+
 Djinn keeps recursive types such as `Nat` and `List` opaque, with their
 constructors available only as introduction rules. When Lean can serialize
 the complete constructor inventory and a safe parameter vector, Exference
@@ -410,7 +475,11 @@ immediately split again. This bounded rule cannot invent recursion or
 induction; it can, however, combine the finite case split with a live
 library provider for the recursive work. Partial inventories remain
 introduction-only, while indexed (`Eq`) and dependent-field (`Exists`)
-types remain opaque.
+types remain opaque. The fragment now records exact heads and proper-type
+parameters for recursive occurrences too, but query-wide `FParamRec` schema
+sharing is deliberately deferred: recursive families retain this established
+Djinn/Exference behavior rather than borrowing the non-recursive rule
+unsafely.
 
 ### Dependent formulas as cargo
 
@@ -499,10 +568,21 @@ finisher tactics, needing no premise database and no imports. Bare
 - Proper-type applications headed by a bound constructor variable or an
   opaque/non-inductive Lean constant retain their ordered arguments. Private
   abstract declarations keep constant heads rigid, and rendering restores
-  their exact Lean names. Qualifying inductives still take the existing
-  constructor-expansion path; sharing one parametric family across distinct
-  `Option`/`List` occurrences is the next application-bridge boundary rather
-  than something this slice silently approximates.
+  their exact Lean names. Qualifying non-recursive inductives now add a
+  query-wide exact-head plan: compatible `Option`, `Except`, and user-family
+  occurrences share one parameterized data declaration while preserving
+  constructor introduction and case elimination. Ambiguous or incompatible
+  schemas fall back query-wide to one abstract family and disable negative
+  evidence; term/dependent parameters retain the occurrence-local path.
+  An order-independent query-wide pre-scan collects fixed opaque fields from
+  eligible structural recursive families before lowering any fragment. It
+  seeds those fields as private rigid proper types while subtracting each
+  recursive self key, so self references resolve through the recursive
+  datatype entry in `tsInds` rather than becoming unrelated rigid atoms. Thus
+  a zero-parameter type such as `Std.Format` cannot acquire an accidental free
+  variable through its `String` field.
+  Query-wide recursive-family sharing (`FParamRec`, including `List`) remains
+  the next distinct boundary.
 - Where a term's shape is ambiguous in Lean (a quantified hypothesis
   may be transported whole or instantiated), the renderer offers the
   alternatives and verification picks the one that elaborates.

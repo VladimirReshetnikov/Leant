@@ -7,13 +7,17 @@ first slice of phase 3 is also implemented: live goal-relevant Lean
 providers, exact global rendering, relevance-preserving ratings, and
 one-layer recursive elimination, backed by a bounded semantic provider
 cache. The translator additionally retains first-order proper-type
-applications for bound constructor variables and opaque Lean families.
-Phase 4 and a persistent, Mathlib-scale inventory remain future
+applications for bound constructor variables and opaque Lean families, and
+now shares compatible proper-type applications of each non-recursive
+inductive family across the complete query without sacrificing constructor
+introduction or case elimination. Query-wide recursive-family sharing,
+Phase 4, and a persistent Mathlib-scale inventory remain future
 work. Companion to
 [PROPOSALS.md](PROPOSALS.md).*
 
 Djex — vendored read-only in this repository as the
-[`lib/Djex`](../lib/Djex) submodule (pinned at `3af73efa`) — merges two
+[`lib/Djex`](../lib/Djex) submodule (pinned by the repository gitlink) —
+merges two
 Haskell expression synthesizers — Djinn
 (Dyckhoff's LJT calculus: complete, terminating intuitionistic proof
 search that emits programs) and Exference (ranked heuristic search with
@@ -26,7 +30,7 @@ synthesis inside Leant, what they would buy us, and how to build it.
 
 *Scope note: Djex has moved well past the original Djinn and Exference.
 Recent work (reviewed from the commit history and the dated reports
-through 2026-07-31) adds bounded rank-N quantification, guarded
+through 2026-08-01) adds bounded rank-N quantification, guarded
 impredicative instantiation, a unified type-class constraint contract,
 and bounded recursive deconstruction in Exference; §1.5 summarizes
 that implemented scope and §2.0 analyzes how it maps onto Lean's type
@@ -45,8 +49,8 @@ system.*
 ## 1.5 The post-merger scope: what Djex implements today
 
 The current engines go beyond propositional LJT and monomorphic
-best-first search. From the commit history (`a069029` through `3af73efa`)
-and the reports `2026-07-28-rank-n-inference-review.md`,
+best-first search. From the commit history and the reports
+`2026-07-28-rank-n-inference-review.md`,
 `2026-07-29-hypothesis-instantiation.md`,
 `2026-08-01-triple-rank-n-frontiers.md`, and
 `2026-08-01-four-binder-instantiation.md`:
@@ -97,9 +101,32 @@ and the reports `2026-07-28-rank-n-inference-review.md`,
   constructor-variable analogue. Only arguments whose inferred type is a
   universe qualify, so term-indexed families remain opaque. Constant-headed
   applications poison negative evidence, and Lean still verifies every
-  positive candidate. Qualifying inductives continue through their structural
-  `FInd`/`FRec` projection; family sharing for `Option`/`List` is the next
-  deliberate bridge gap.
+  positive candidate.
+- **Query-wide proper-type inductive families (Leant bridge).** A qualifying
+  non-recursive inductive now serializes as an exact head, an ordered vector of
+  proper-type parameters, and its complete occurrence-specialized constructor
+  inventory. Before translation, Leant collects every use from the goal,
+  caller premises, and usable providers and chooses one representation for the
+  head. A unique compatible generic schema becomes one parameterized Djex
+  `data` declaration; constructor maps retain the generic formals and recover
+  the actual occurrence fields while rendering. Thus `Option`, `Except`, and
+  user inductives support guarded rank-N/impredicative transport in both
+  engines while keeping constructor introduction and case elimination.
+  Fixed opaque fields become private rigid proper types rather than accidental
+  free declaration variables. Ambiguous/repeated parameter vectors,
+  incompatible schemas, or a structural/nominal collision
+  conservatively choose one abstract family for the whole query. That fallback
+  can still transport values but exposes no constructors and forfeits Djinn
+  negative evidence. Term/dependent parameters retain the established
+  occurrence-local path. Conflicting arities for one exact head are rejected
+  rather than conflated. Recursive occurrences record their exact head for a
+  later slice but deliberately retain `FRec` behavior today. Before any
+  fragment is lowered, an order-independent query-wide pre-scan collects the
+  fixed opaque fields of eligible structural recursive families. It seeds
+  those fields through the same private rigid-type mechanism while subtracting
+  each recursive self key, so self references resolve through `tsInds` after
+  the recursive knot is installed instead of becoming unrelated rigid atoms.
+  This keeps zero-parameter providers such as `Std.Format` well scoped.
 - **Bounded recursive deconstruction (Exference).** Recursive datatype
   declarations remain available to search, but matching stops after one
   constructor layer. Recursive fields enter that branch as ordinary
@@ -362,7 +389,8 @@ Design rules, all inherited from Djex:
   (polarity- and atom-aware) and to verdict labeling (§2.0). The
   Python REPL's `:synth` prints a pointer to the Haskell implementation
   rather than growing its own host.
-- **Phase 2 — local inductives (M/L, implemented).** Treat
+- **Phase 2 — local and query-wide non-recursive inductives (M/L,
+  implemented).** Treat
   non-recursive, non-dependent inductives and structures as generalized
   sums of products: constructors as right-rules, `casesOn` as
   left-rules — precisely how Djinn admits Haskell `data` declarations.
@@ -371,16 +399,36 @@ Design rules, all inherited from Djex:
   explicit non-dependent constructor fields — the check runs on the
   *instantiated* constructor telescope, so a `Sigma` whose second
   component ignores the first qualifies too) into its constructor list;
-  the engine declares one fresh datatype per alpha-normalized occurrence
-  key, parameterized over the goal variables its fields mention, and the
-  renderer maps the engine's constructor spellings back to the Lean
-  names. This covers built-ins (`Bool`, `Option`, `Ordering`, `Except`,
-  `Decidable`) and session-declared types alike — no `:browse`
+  occurrence-local `FInd` values still receive one fresh datatype per
+  alpha-normalized occurrence key, parameterized over the goal variables their
+  fields mention. When every applied parameter itself inhabits a universe, the
+  serializer instead emits `FParamInd`: exact Lean head, display key, ordered
+  parameters, and the complete specialized constructor list. A pre-scan over
+  the goal, caller premises, and usable providers chooses one exact-head plan
+  before traversal can bias it. A pairwise-distinct parameter occurrence may
+  supply the generic template only when substituting every other occurrence's
+  parameters reproduces its constructor schema; compatible templates must be
+  alpha-equivalent. The engine then declares one shared parameterized datatype
+  and the renderer fits each constructor or pattern using the fields from the
+  actual Lean occurrence. This covers built-ins (`Bool`, `Option`, `Ordering`,
+  `Except`, `Decidable`) and session-declared types alike — no `:browse`
   machinery was needed; the instantiated-telescope route is simpler and
-  stronger than fetching polymorphic constructor signatures. Refutations
-  over expanded inductives remain sound: the engine sees the complete
-  constructor list, and Lean's elimination restrictions only make Lean
-  *more* restrictive than the engine's model, never less.
+  stronger than fetching polymorphic constructor signatures.
+
+  Whole-fragment substitution is capture-avoiding, nested exact-family
+  inventories belong to their own plans, and a fixed opaque field receives a
+  private rigid `AbstractTypeDeclaration` so a shared data declaration never
+  contains an accidental free variable. If parameter positions are repeated
+  or ambiguous and no later generic occurrence resolves them, constructor
+  inventories disagree, or an opaque nominal use of the same head appears,
+  Leant installs one abstract exact family query-wide. Positive
+  nominal transport remains available, but constructors/cases and sound
+  negative evidence do not. An inconsistent arity for one exact head is an
+  invalid query representation and is rejected. Term/dependent parameters
+  continue through the occurrence-local representation. Refutations over
+  genuinely expanded inductives remain sound: the engine sees the complete
+  constructor list, and Lean's elimination restrictions only make Lean *more*
+  restrictive than the engine's model, never less.
 - **Phase 3 — ranked environment search (L, bounded first slice
   implemented).** Before an Exference query, a Lean metaprogram scans
   environment names cheaply and retains declarations whose root
@@ -469,6 +517,24 @@ Design rules, all inherited from Djex:
   it does not invent a recursive definition, induction, or unbounded
   eliminator. Djinn remains closed and deciding: recursive types are
   opaque there, with constructors only as premises/introduction rules.
+- **Query-wide recursive families are deferred.** `FParamRec` records the
+  exact recursive head and proper-type parameters, but both projections still
+  use the established `FRec` machinery: constructor premises in Djinn and one
+  finite constructor layer in Exference when its inventory is complete. The
+  non-recursive template/unification rule is not applied to `List` or another
+  recursive family until recursive knots and occurrence-specialized renderer
+  fields have their own validated design. This does not defer fixed-field
+  identity: a query-wide pre-scan seeds fixed fields for eligible structural
+  recursive families before lowering begins and removes recursive self keys
+  from that rigid seed so the knot still resolves through `tsInds`.
+- **Abstract-family fallbacks do not prove absence.** If exact-head uses have
+  ambiguous parameters, incompatible schemas, or mixed
+  structural/nominal evidence, Leant keeps one rigid abstract family for
+  positive transport and marks the projection incomplete. Unsafe structure in
+  the goal or caller premises does the same. Djinn reports only "no term found
+  within bounds" for exhaustion of either approximation; Exference never
+  makes a negative claim. Inconsistent arities are rejected rather than sent
+  through this fallback.
 - **Parametricity caveat**: "uninhabited" verdicts are about *closed
   terms at the polymorphic type* — `∀ α β, α → β` being uninhabited does
   not mean a particular instantiation is empty. The display must say
@@ -502,7 +568,8 @@ by kernel-side verification — Leant's share of the work shrank while the
 reachable goal space grew.
 
 Phases 0–2 have delivered instant verified lambda terms, trustworthy
-uninhabitation answers, inductive-data support, and a prove-mode step
+uninhabitation answers, inductive-data support, query-wide non-recursive family
+transport across rank-N/impredicative arguments, and a prove-mode step
 that composes rather than merely searches. The bounded phase-3 slice
 now validates the live-environment design without committing Leant to a
 global Mathlib index: exact globals survive the engine round-trip,
@@ -681,12 +748,63 @@ separation, classical atomization, depth traversal, and evidence honesty; a
 Lean 4.31 transcript verifies the nominal, higher-kinded-variable, provider,
 and dependent-fallback paths.
 
-This slice intentionally runs after `indOf`/`recOf`. A qualifying inductive
-therefore keeps its useful constructor structure but does not yet share one
-parametric family across differently instantiated occurrences. The next slice
-should make that choice query-wide (or build a genuinely parametric family
-declaration), so `Option`/`List` can retain guarded wrapper instantiation
-without sacrificing their existing introduction and one-layer elimination.
+The original retained-application slice intentionally runs after
+`indOf`/`recOf`, so it never steals constructor structure from a qualifying
+inductive. Section H implements the complementary query-wide family rule for
+non-recursive data. Recursive `FParamRec` sharing remains separate because its
+knot and bounded elimination policy cannot safely reuse the finite-data rule.
+
+### H. Query-wide proper-type inductive families — M (implemented)
+
+The serializer now distinguishes `FParamInd`, carrying an exact head, display
+key, parameters, and constructors, from legacy occurrence-local `FInd`.
+Admission depends on the kind of every applied parameter, not its spelling:
+each argument's inferred type must reduce to a universe. Term and dependent
+parameters therefore stay on the legacy path, while structured but proper
+arguments—including a query-supplied polytype—remain eligible.
+
+Planning is query-wide and exact-head keyed. It includes the goal, caller
+premises, and every provider that survived depth admission. A structural plan
+exists only when one recoverable generic constructor template specializes
+back to every occurrence. Parameter replacement matches whole fragments
+before descending, respects alpha-equivalence, avoids binder capture, and
+treats nested exact-family constructor inventories as metadata owned by the
+nested family's independent plan. Repeated parameters are ambiguous unless a
+different occurrence supplies a validating generic template. Distinct Lean
+heads never share a plan even when display keys collide.
+
+The structural plan creates one parameterized `DataTypeDeclaration`. Its
+constructor map records generic formals, while rendering prefers the validated
+fields attached to the actual result or scrutinee occurrence; this is what
+keeps rank-N constructor arguments and match binders fitted correctly. Opaque
+fixed fields are closed as private rigid proper-type declarations and restored
+to their exact parenthesized Lean type when a visible type argument reaches the
+renderer.
+
+Any nominal use of the same head, incompatible inventory, or unrecoverable
+template chooses one abstract family for all occurrences. An arity conflict is
+rejected outright because no single Lean family representation can cover it.
+This deliberately trades constructor search for identity-preserving transport.
+It also marks Djinn's projection incomplete, as do unsafe atoms in either the
+goal or caller premises, so an exhausted approximate search never becomes a
+refutation. Exference has no negative evidence; positive candidates from both
+engines still pass the ordinary Lean elaboration check.
+
+Provider-free Haskell tests cover one- and two-parameter transport in both
+engines. The end-to-end rank-N transcript exercises real `Option` under Djinn,
+and two-parameter `Phantom2` plus a fixed-field `Guard` under both engines; a
+term-parameterized `Tag` control stays on the legacy occurrence-local path.
+Exference's live `Option` inventory is intentionally not used as a golden
+oracle: its eighty root-local providers can exhaust the configured heuristic
+queue before the direct candidate is ranked, which is an honest bounded miss.
+The exact recursive tag `FParamRec` is recorded but intentionally delegates to
+current recursive handling. Its fixed fields are nevertheless collected by an
+order-independent query-wide pre-scan before fragment lowering; recursive self
+keys are subtracted from the rigid seed so self references resolve through
+`tsInds`. Query-wide `List`-style sharing is the next distinct datatype
+boundary, not unfinished work in this finite-data slice. See the
+[2026-08-01 technical report](reports/2026-08-01-query-wide-parametric-inductive-families.md)
+for the invariants and fallback matrix.
 
 ### Explicitly not proposed
 
