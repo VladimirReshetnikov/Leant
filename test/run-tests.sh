@@ -33,8 +33,11 @@ for arg in "$@"; do
 done
 
 filter() {
-  grep -v -e '^no Lake project' -e '^starting Lean backend' \
-          -e '^backend responding' -e '^replaying session'
+  # Drop the volatile startup lines, and any CR a Windows checkout may
+  # still introduce: the REPL itself always writes LF.
+  tr -d '\r' \
+    | grep -v -e '^no Lake project' -e '^starting Lean backend' \
+              -e '^backend responding' -e '^replaying session'
 }
 
 failures=0
