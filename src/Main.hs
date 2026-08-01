@@ -3572,10 +3572,20 @@ run opts = do
         (True, _) -> pure Nothing
         (_, Just dir) -> pure (Just dir)
         _ -> findProject
-      -- plain mode runs in the backend's own Lake project
-      let backendProject = takeDirectory (takeDirectory
-            (takeDirectory (takeDirectory (takeDirectory exe))))
-          workingDir0 = fromMaybe backendProject project
+      -- Plain mode runs in the backend's own Lake project. LeanInteract cache
+      -- layouts vary across platforms, so locate its lakefile instead of
+      -- assuming a fixed depth above @.lake/build/bin/repl@.
+      workingDir0 <- case project of
+        Just directory -> pure directory
+        Nothing -> do
+          backendProject <- findBackendProject exe
+          case backendProject of
+            Just directory -> pure directory
+            Nothing -> do
+              putStrLn "error: could not locate the Lean backend's Lake project."
+              putStrLn "Pass --project, or point --repl-exe / LEANT_BACKEND at"
+              putStrLn "an executable built below a lakefile.lean or lakefile.toml."
+              exitWith (ExitFailure 1)
       workingDir <- makeAbsolute workingDir0
       let config = BackendConfig
             { bcLakePath = optLake opts
@@ -3626,7 +3636,7 @@ run opts = do
             warning <- cYellow st "warning: "
             emitLn st (warning ++ dir ++ " has no .lake build - run `lake build` there first")
         Nothing -> emitLn st =<< cDim st
-          ("no Lake project; using the backend's own project (" ++ backendProject ++ ")")
+          ("no Lake project; using the backend's own project (" ++ workingDir ++ ")")
 
       -- startup probe (spawns the backend and surfaces setup problems early)
       started <- getCurrentTime

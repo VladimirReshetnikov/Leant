@@ -4,9 +4,18 @@ import Control.Exception (finally)
 import qualified Data.ByteString.Char8 as BS
 import Data.List (isInfixOf)
 import qualified Data.Map.Strict as Map
-import System.Directory (getTemporaryDirectory, removeFile)
-import System.FilePath ((</>), normalise)
+import System.Directory
+  ( canonicalizePath
+  , createDirectory
+  , createDirectoryIfMissing
+  , createFileLink
+  , getTemporaryDirectory
+  , removeFile
+  , removePathForcibly
+  )
+import System.FilePath ((</>), normalise, takeDirectory)
 import System.IO (hClose, openBinaryTempFile)
+import System.Info (os)
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.HUnit ((@?=), assertFailure, testCase)
 
@@ -17,6 +26,7 @@ import Language.Haskell.Djex
   , specifiedVisibleTypeArgument
   )
 
+import Leant.Backend (findBackendProject)
 import Leant.Synth.Engine
   ( SynthEngine (..)
   , SynthOutcome (..)
@@ -69,7 +79,8 @@ import Leant.Session.Snapshot
 
 main :: IO ()
 main = defaultMain $ testGroup "Leant synthesis boundary"
-  [ snapshotMetadataTests
+  [ backendDiscoveryTests
+  , snapshotMetadataTests
   , sessionReplayTests
   , providerCacheTests
   , replayPlanTests
@@ -83,6 +94,50 @@ main = defaultMain $ testGroup "Leant synthesis boundary"
   , rankNFrontierTests
   , visibleTypeApplicationTests
   ]
+
+backendDiscoveryTests :: TestTree
+backendDiscoveryTests = testGroup "Lean backend discovery"
+  [ testCase "find the Lake project above a cached REPL executable" $
+      withTemporaryDirectory "leant-backend-project" $ \root -> do
+        let project = root </> "cache" </> "owner" </> "repl" </> "revision"
+            executable = project </> ".lake" </> "build" </> "bin" </> "repl"
+        createDirectoryIfMissing True $ takeDirectory executable
+        writeFile (project </> "lakefile.toml") "name = \"repl\"\n"
+        writeFile executable ""
+        expected <- canonicalizePath project
+        found <- findBackendProject executable
+        found @?= Just expected
+  , testCase "follow a backend symlink to its real Lake project" $
+      if os == "mingw32" then pure () else
+        withTemporaryDirectory "leant-backend-link" $ \root -> do
+          let project = root </> "cache" </> "repl" </> "revision"
+              executable = project </> ".lake" </> "build" </> "bin" </> "repl"
+              linked = root </> "convenience" </> "repl"
+          createDirectoryIfMissing True $ takeDirectory executable
+          createDirectoryIfMissing True $ takeDirectory linked
+          writeFile (project </> "lakefile.lean") "package repl\n"
+          writeFile executable ""
+          createFileLink executable linked
+          expected <- canonicalizePath project
+          found <- findBackendProject linked
+          found @?= Just expected
+  , testCase "reject a backend executable without an enclosing Lake project" $
+      withTemporaryDirectory "leant-backend-orphan" $ \root -> do
+        let executable = root </> "bin" </> "repl"
+        createDirectoryIfMissing True $ takeDirectory executable
+        writeFile executable ""
+        found <- findBackendProject executable
+        found @?= Nothing
+  ]
+
+withTemporaryDirectory :: String -> (FilePath -> IO a) -> IO a
+withTemporaryDirectory template action = do
+  temporary <- getTemporaryDirectory
+  (path, handle) <- openBinaryTempFile temporary template
+  hClose handle
+  removeFile path
+  createDirectory path
+  action path `finally` removePathForcibly path
 
 sessionReplayTests :: TestTree
 sessionReplayTests = testGroup "transactional session replay"

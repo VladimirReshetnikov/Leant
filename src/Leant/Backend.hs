@@ -8,6 +8,7 @@ module Leant.Backend
   ( Backend (..)
   , BackendConfig (..)
   , discoverReplExe
+  , findBackendProject
   , findProject
   , isBuiltProject
   , spawnBackend
@@ -22,10 +23,12 @@ import Data.List (sortOn)
 import Data.Maybe (catMaybes, listToMaybe)
 import Data.Ord (Down (..))
 import System.Directory
-  ( doesDirectoryExist
+  ( canonicalizePath
+  , doesDirectoryExist
   , doesFileExist
   , getCurrentDirectory
   , listDirectory
+  , makeAbsolute
   )
 import System.Environment (lookupEnv)
 import System.Exit (ExitCode)
@@ -127,26 +130,41 @@ discoverReplExe = do
         entries <- listDirectory dir
         filterM doesDirectoryExist (map (dir </>) entries)
 
+-- | Locate the Lake project which built a REPL executable. LeanInteract cache
+-- roots vary between platforms and can insert additional project directories,
+-- so derive this from the nearest real lakefile rather than a fixed number of
+-- parent traversals from @.lake/build/bin/repl@.
+findBackendProject :: FilePath -> IO (Maybe FilePath)
+findBackendProject executable = do
+  absolute <- makeAbsolute executable
+  exists <- doesFileExist absolute
+  resolved <- if exists then canonicalizePath absolute else pure absolute
+  listToMaybe <$> filterM hasLakefile
+    (ancestorDirectories $ takeDirectory resolved)
+
 -- | Nearest enclosing Lake project that has been built, falling back to the
 -- nearest project of any kind (port of the Python find_project).
 findProject :: IO (Maybe FilePath)
 findProject = do
-  cwd <- getCurrentDirectory
-  candidates <- filterM hasLakefile (ancestry cwd)
+  currentDirectory <- getCurrentDirectory
+  candidates <- filterM hasLakefile (ancestorDirectories currentDirectory)
   built <- filterM isBuiltProject candidates
   pure (listToMaybe built `orElse` listToMaybe candidates)
  where
   orElse (Just x) _ = Just x
   orElse Nothing y = y
 
-  ancestry dir =
-    let parent = takeDirectory dir
-    in dir : if parent == dir then [] else ancestry parent
+ancestorDirectories :: FilePath -> [FilePath]
+ancestorDirectories dir =
+  dir : if parent == dir then [] else ancestorDirectories parent
+ where
+  parent = takeDirectory dir
 
-  hasLakefile dir = do
-    toml <- doesFileExist (dir </> "lakefile.toml")
-    lean <- doesFileExist (dir </> "lakefile.lean")
-    pure (toml || lean)
+hasLakefile :: FilePath -> IO Bool
+hasLakefile dir = do
+  toml <- doesFileExist (dir </> "lakefile.toml")
+  lean <- doesFileExist (dir </> "lakefile.lean")
+  pure (toml || lean)
 
 isBuiltProject :: FilePath -> IO Bool
 isBuiltProject dir =
