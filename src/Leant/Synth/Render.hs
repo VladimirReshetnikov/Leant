@@ -42,6 +42,7 @@ module Leant.Synth.Render
 import Control.Monad (foldM)
 import Data.List (intercalate, nub, sortOn, subsequences)
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import Data.Void (Void, absurd)
 
 import Language.Haskell.Synthesis.Generated
@@ -60,7 +61,13 @@ import Language.Haskell.Synthesis.Name
   )
 import qualified Language.Haskell.Synthesis.Type as SharedType
 
-import Leant.Synth.Fragment (Frag (..), Slot (..), fragSpine, leadingTypeArgs)
+import Leant.Synth.Fragment
+  ( AppHead (..)
+  , Frag (..)
+  , Slot (..)
+  , fragSpine
+  , leadingTypeArgs
+  )
 
 -- | One constructor of a datatype 'Leant.Synth.Engine' declared to
 -- represent an expanded inductive occurrence (phase 2).
@@ -68,6 +75,9 @@ data CtorInfo = CtorInfo
   { ciLean :: String    -- ^ full Lean constructor name
   , ciFields :: [Frag]  -- ^ field fragments
   , ciSole :: Bool      -- ^ the inductive's only constructor
+  , ciParametric :: Maybe (String, [String])
+    -- ^ exact family head and private fragment formals when 'ciFields' is a
+    -- generic family schema rather than an occurrence-specialized inventory
   }
 
 -- | Engine-side constructor spellings of the declared datatypes.
@@ -76,7 +86,9 @@ type CtorMap = Map.Map String CtorInfo
 -- | Collision-free engine provider spelling to exact Lean global name.
 type ProviderMap = Map.Map String String
 
--- | Collision-free engine type spelling to exact Lean type-family name.
+-- | Collision-free engine type spelling to its exact Lean type or type-family
+-- spelling.  Family heads are restored with their full explicit argument
+-- vector; rigid opaque field types have no engine-visible arguments.
 type TypeMap = Map.Map String String
 
 -- | Render one candidate expression against the goal fragment.  The
@@ -568,7 +580,8 @@ fitCore cm force cf ce n ds = case (cf, ce) of
   (resultFrag, _)
     | isDeclaredData resultFrag
     , (Global g, args@(_ : _)) <- appSpine ce
-    , Just (CtorInfo _ fields _) <- declaredCtor cm g
+    , Just info <- declaredCtor cm g
+    , Just fields <- constructorFieldsAt resultFrag info
     , length args == length fields ->
         let step (done, k, dss) (field, arg) =
               let (arg', k', dss') = fit cm force field arg k dss
@@ -608,7 +621,8 @@ fitCore cm force cf ce n ds = case (cf, ce) of
                   | Right GInr <- globalKind cm g -> bindDomainPairs p b
                 (Just scrutineeFrag, Constructor g ps)
                   | isDeclaredData scrutineeFrag
-                  , Just (CtorInfo _ fields _) <- declaredCtor cm g
+                  , Just info <- declaredCtor cm g
+                  , Just fields <- constructorFieldsAt scrutineeFrag info
                   , length ps == length fields ->
                       concat (zipWith bindDomainPairs ps fields)
                 (Just f, TuplePattern _) -> bindDomainPairs pat f
@@ -619,7 +633,12 @@ fitCore cm force cf ce n ds = case (cf, ce) of
         (alts', n1, ds1) = foldl goAlt ([], n, ds) alts
     in (Case scrut alts', n1, ds1)
   (_, Let pat rhs body) ->
-    let (body', n1, ds1) = fit cm force cf body n ds
+    let aliasDoms = case rhs of
+          Local source -> case lookup source ds of
+            Just sourceFrag -> bindDomainPairs pat sourceFrag
+            Nothing -> []
+          _ -> []
+        (body', n1, ds1) = fit cm force cf body n (aliasDoms ++ ds)
     in (Let pat rhs body', n1, ds1)
   _ -> (ce, n, ds)
  where
@@ -632,7 +651,9 @@ fitCore cm force cf ce n ds = case (cf, ce) of
   -- match binders therefore need the same fragment-directed fitting.  The
   -- constructor-map guard above keeps opaque/partial recursive occurrences
   -- out even when their fragment constructor is present here.
+  isDeclaredData FParamInd{} = True
   isDeclaredData FInd{} = True
+  isDeclaredData FParamRec{} = True
   isDeclaredData FRec{} = True
   isDeclaredData _ = False
   peelAlls (FAll _ _ b) = peelAlls b
@@ -649,6 +670,174 @@ fitCore cm force cf ce n ds = case (cf, ce) of
     FAll _ _ rest -> argDoms rest
     FArr dom rest -> Just dom : argDoms rest
     _ -> repeat Nothing
+
+-- | Recover the constructor's field fragments at the exact result or
+-- scrutinee occurrence being fitted.  Legacy occurrence-local declarations
+-- already carry specialized fields.  Shared parametric declarations instead
+-- substitute their private schema formals with this occurrence's ordered Lean
+-- parameters, so constructor arguments and pattern binders receive the right
+-- rank-N domains even when the declaration template came from a provider.
+constructorFieldsAt :: Frag -> CtorInfo -> Maybe [Frag]
+constructorFieldsAt occurrence info = case ciParametric info of
+  Nothing -> Just (ciFields info)
+  Just (familyHead, formals) -> do
+    (parameters, occurrenceFields) <- case occurrence of
+      FParamInd occurrenceHead _ occurrenceParameters constructors
+        | occurrenceHead == familyHead ->
+            Just (occurrenceParameters, lookup (ciLean info) constructors)
+      _ -> Nothing
+    if length parameters == length formals
+      -- The family planner already validated this occurrence against the
+      -- shared template.  Prefer its own fields: besides avoiding needless
+      -- reconstruction, this preserves alpha-renaming chosen by the Lean
+      -- serializer when an actual parameter name would otherwise be captured
+      -- by a constructor-local forall.  The generic specialization remains a
+      -- defensive fallback for a fitting fragment without constructor data.
+      then Just $ case occurrenceFields of
+        Just fields -> fields
+        Nothing -> map
+          (specializeFrag (zip formals parameters)) (ciFields info)
+      else Nothing
+
+-- | Capture-avoiding substitution for the defensive generic-field fallback.
+-- Family formals use private spellings, but actual occurrence parameters may
+-- reuse a constructor-local binder name, so conflicting binders are renamed
+-- before an actual fragment is inserted.
+specializeFrag :: [(String, Frag)] -> Frag -> Frag
+specializeFrag replacements = go Set.empty
+ where
+  replacementFree = Set.unions
+    [ freeFragVariables Set.empty replacement
+    | (_, replacement) <- replacements
+    ]
+  replacementNames = Set.unions
+    [ Set.insert formal (fragVariableNames replacement)
+    | (formal, replacement) <- replacements
+    ]
+
+  go bound frag = case frag of
+    FVar variable
+      | variable `Set.notMember` bound
+      , Just replacement <- lookup variable replacements -> replacement
+      | otherwise -> frag
+    FArr parameter result -> FArr (recur parameter) (recur result)
+    FProd left right -> FProd (recur left) (recur right)
+    FSum left right -> FSum (recur left) (recur right)
+    FAll explicit binder body
+      | binder `Set.member` replacementFree ->
+          let fresh = freshFragBinder
+                (bound `Set.union` replacementNames
+                  `Set.union` fragVariableNames body)
+              renamed = renameFragBinder binder fresh body
+          in FAll explicit fresh (go (Set.insert fresh bound) renamed)
+      | otherwise ->
+          FAll explicit binder (go (Set.insert binder bound) body)
+    FApp safe key head' arguments ->
+      FApp safe key head' (map recur arguments)
+    FParamInd headName key parameters constructors ->
+      FParamInd headName key (map recur parameters)
+        (mapCtorFields bound constructors)
+    FInd key constructors -> FInd key (mapCtorFields bound constructors)
+    FParamRec complete headName key parameters constructors ->
+      FParamRec complete headName key (map recur parameters)
+        (mapCtorFields bound constructors)
+    FRec complete key parameters constructors ->
+      FRec complete key (map recur parameters)
+        (mapCtorFields bound constructors)
+    other -> other
+   where
+    recur = go bound
+
+  mapCtorFields bound = map
+    (\(name, fields) -> (name, map (go bound) fields))
+
+freeFragVariables :: Set.Set String -> Frag -> Set.Set String
+freeFragVariables bound frag = case frag of
+  FArr parameter result -> descend [parameter, result]
+  FProd left right -> descend [left, right]
+  FSum left right -> descend [left, right]
+  FAll _ binder body -> freeFragVariables (Set.insert binder bound) body
+  FVar variable
+    | variable `Set.member` bound -> Set.empty
+    | otherwise -> Set.singleton variable
+  FApp _ _ head' arguments ->
+    let headVariables = case head' of
+          AppVariable variable
+            | variable `Set.member` bound -> Set.empty
+            | otherwise -> Set.singleton variable
+          AppNominal _ -> Set.empty
+    in headVariables `Set.union` descend arguments
+  FParamInd _ _ parameters _ -> descend parameters
+  FInd _ constructors -> descend (concatMap snd constructors)
+  FParamRec _ _ _ parameters constructors ->
+    descend (parameters ++ concatMap snd constructors)
+  FRec _ _ parameters constructors ->
+    descend (parameters ++ concatMap snd constructors)
+  _ -> Set.empty
+ where
+  descend = Set.unions . map (freeFragVariables bound)
+
+fragVariableNames :: Frag -> Set.Set String
+fragVariableNames frag = case frag of
+  FArr parameter result -> descend [parameter, result]
+  FProd left right -> descend [left, right]
+  FSum left right -> descend [left, right]
+  FAll _ binder body -> Set.insert binder (fragVariableNames body)
+  FVar variable -> Set.singleton variable
+  FApp _ _ head' arguments ->
+    let headNames = case head' of
+          AppVariable variable -> Set.singleton variable
+          AppNominal _ -> Set.empty
+    in headNames `Set.union` descend arguments
+  FParamInd _ _ parameters constructors ->
+    descend (parameters ++ concatMap snd constructors)
+  FInd _ constructors -> descend (concatMap snd constructors)
+  FParamRec _ _ _ parameters constructors ->
+    descend (parameters ++ concatMap snd constructors)
+  FRec _ _ parameters constructors ->
+    descend (parameters ++ concatMap snd constructors)
+  _ -> Set.empty
+ where
+  descend = Set.unions . map fragVariableNames
+
+freshFragBinder :: Set.Set String -> String
+freshFragBinder reserved = choose (0 :: Int)
+ where
+  choose index =
+    let candidate = "\0leant-render-bound:" ++ show index
+    in if candidate `Set.member` reserved
+        then choose (index + 1)
+        else candidate
+
+renameFragBinder :: String -> String -> Frag -> Frag
+renameFragBinder old new frag = case frag of
+  FArr parameter result -> FArr (go parameter) (go result)
+  FProd left right -> FProd (go left) (go right)
+  FSum left right -> FSum (go left) (go right)
+  FAll explicit binder body
+    | binder == old -> frag
+    | otherwise -> FAll explicit binder (go body)
+  FVar variable
+    | variable == old -> FVar new
+    | otherwise -> frag
+  FApp safe key head' arguments ->
+    let renamedHead = case head' of
+          AppVariable variable
+            | variable == old -> AppVariable new
+          _ -> head'
+    in FApp safe key renamedHead (map go arguments)
+  FParamInd headName key parameters constructors ->
+    FParamInd headName key (map go parameters) (mapCtorFields constructors)
+  FInd key constructors -> FInd key (mapCtorFields constructors)
+  FParamRec complete headName key parameters constructors ->
+    FParamRec complete headName key (map go parameters)
+      (mapCtorFields constructors)
+  FRec complete key parameters constructors ->
+    FRec complete key (map go parameters) (mapCtorFields constructors)
+  _ -> frag
+ where
+  go = renameFragBinder old new
+  mapCtorFields = map (\(name, fields) -> (name, map go fields))
 
 -- | Binders whose domain type the goal fragment determines, recursing
 -- through tuple destructuring.

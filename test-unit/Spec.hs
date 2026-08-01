@@ -20,6 +20,7 @@ import Language.Haskell.Djex
 import Leant.Synth.Engine
   ( SynthEngine (..)
   , SynthOutcome (..)
+  , synthesizeWith
   , synthesizeWithProviders
   )
 import Leant.Synth.Fragment
@@ -77,6 +78,8 @@ main = defaultMain $ testGroup "Leant synthesis boundary"
   , providerParserTests
   , providerEngineTests
   , typeApplicationTests
+  , parametricFamilyFragmentTests
+  , parametricFamilyEngineTests
   , rankNFrontierTests
   , visibleTypeApplicationTests
   ]
@@ -645,6 +648,444 @@ typeApplicationTests = testGroup "retained type applications"
       "unexpected synthesis outcome: " ++ outcomeTag other
     Left err -> assertFailure err
 
+parametricFamilyFragmentTests :: TestTree
+parametricFamilyFragmentTests = testGroup "parametric family fragments"
+  [ testCase "parse and debug an exact-head non-recursive family" $ do
+      let family = FParamInd "Demo.Box" "Demo.Box a" [FVar "a"]
+            [("Demo.Box.mk", [FVar "a"])]
+          parsed = ParsedGoal GoalType
+            (ProviderQuery ["Demo"] (Just "Demo.Box")) family
+      parseGoalSexp
+          "(goal type (query (roots \"Demo\") (head \"Demo.Box\")) \
+          \(param-ind \"Demo.Box\" \"Demo.Box a\" (params (var \"a\")) \
+          \(ctor \"Demo.Box.mk\" (var \"a\"))))"
+        @?= Right parsed
+      "FParamInd \"Demo.Box\" \"Demo.Box a\""
+        `isInfixOf` show family @?= True
+  , testCase "parse an exact-head complete recursive family" $
+      parseProviderSexp
+          "(providers (provider \"Demo.list\" \
+          \(param-rec complete \"List\" \"List a\" \
+          \(params (var \"a\")) (ctor \"List.nil\") \
+          \(ctor \"List.cons\" (var \"a\") \
+          \(atom unsafe \"List a\")))))"
+        @?= Right
+          [ ProviderFrag "Demo.list"
+              (FParamRec True "List" "List a" [FVar "a"]
+                [ ("List.nil", [])
+                , ("List.cons", [FVar "a", FAtom False "List a"])
+                ])
+          ]
+  , testCase "retain occurrence-local recursion for a term parameter" $
+      parseGoalSexp
+          "(goal type (query (roots \"Demo\") (head \"Demo.R\")) \
+          \(rec complete \"Demo.R (Demo.termByType Unit)\" \
+          \(params (atom unsafe \"Demo.termByType Unit\")) \
+          \(ctor \"Demo.R.next\" \
+          \(atom unsafe \"Demo.R (Demo.termByType Unit)\"))))"
+        @?= Right (ParsedGoal GoalType
+          (ProviderQuery ["Demo"] (Just "Demo.R"))
+          (FRec True "Demo.R (Demo.termByType Unit)"
+            [FAtom False "Demo.termByType Unit"]
+            [("Demo.R.next",
+              [FAtom False "Demo.R (Demo.termByType Unit)"])]))
+  , testCase "retain occurrence-local finite data for a term parameter" $
+      parseGoalSexp
+          "(goal type (query (roots \"Demo\") (head \"Demo.Tag\")) \
+          \(ind \"Demo.Tag (Demo.termByType Unit)\" \
+          \(ctor \"Demo.Tag.mk\")))"
+        @?= Right (ParsedGoal GoalType
+          (ProviderQuery ["Demo"] (Just "Demo.Tag"))
+          (FInd "Demo.Tag (Demo.termByType Unit)"
+            [("Demo.Tag.mk", [])]))
+  , testCase "gate family sharing on universe-inhabiting parameters" $ do
+      "def allProperTypeParams (args : Array Expr) : MetaM Bool := do"
+        `isInfixOf` synthPrelude @?= True
+      unlines
+          [ "    let argType \8592 whnfR (\8592 inferType arg)"
+          , "    if !argType.isSort then return false"
+          ]
+        `isInfixOf` synthPrelude @?= True
+      "        if \8592 allProperTypeParams args then do"
+        `isInfixOf` synthPrelude @?= True
+      "          let properParams \8592 allProperTypeParams args"
+        `isInfixOf` synthPrelude @?= True
+      "          else if properParams then"
+        `isInfixOf` synthPrelude @?= True
+  , testCase "reject depth hidden in a family parameter" $ do
+      let truncated = FParamInd "Demo.Phantom" "Demo.Phantom ?"
+            [FDepth] [("Demo.Phantom.base", [])]
+      fragHasDepth truncated @?= True
+      fragProviderMayOpen truncated @?= False
+      fragRefusal truncated
+        @?= Just "the goal exceeds the translator's depth bound"
+  , testCase "traverse family parameters for unsafe evidence" $ do
+      let parameter = FAtom False "Demo.Hidden"
+          field = FAtom False "Demo.Field"
+          finite = FParamInd "Demo.Box" "Demo.Box Demo.Hidden"
+            [parameter] [("Demo.Box.mk", [field])]
+          recursive = FParamRec True "Demo.Tree" "Demo.Tree Demo.Hidden"
+            [parameter] [("Demo.Tree.node", [field])]
+      fragUnsafeAtoms finite @?= ["Demo.Hidden", "Demo.Field"]
+      fragUnsafeAtoms recursive @?=
+        ["Demo.Tree Demo.Hidden", "Demo.Hidden", "Demo.Field"]
+      fragProviderMayOpen finite @?= False
+      fragProviderMayOpen recursive @?= False
+  , testCase "keep parameters nominal in the classical projection" $ do
+      let hiddenQuantifier = FAll True "a" (FVar "a")
+          field = FVar "p"
+          finite = FParamInd "Demo.Phantom" "Demo.Phantom poly"
+            [hiddenQuantifier] [("Demo.Phantom.mk", [field])]
+          exposed = FParamInd "Demo.Box" "Demo.Box poly"
+            [hiddenQuantifier] [("Demo.Box.mk", [hiddenQuantifier])]
+          recursive = FParamRec True "Demo.Tree" "Demo.Tree poly"
+            [hiddenQuantifier] [("Demo.Tree.nil", [])]
+      glivenkoSplit finite @?= Just ([], finite)
+      propAtoms finite @?= [field]
+      glivenkoSplit exposed @?= Nothing
+      glivenkoSplit recursive @?= Nothing
+      propAtoms recursive @?= []
+  ]
+
+parametricFamilyEngineTests :: TestTree
+parametricFamilyEngineTests = testGroup "parametric family engine projection"
+  [ testCase "transport an Option-like rank-N family with Djinn" $
+      expectExactFamilyTerm "fun x => x _"
+        (synthesizeWithProviders EngineDjinn 0 [] optionRankNGoal)
+  , testCase "transport an Option-like rank-N family with Exference" $
+      expectExactFamilyTerm "fun x => x _"
+        (synthesizeWithProviders EngineExference 1024 [] optionRankNGoal)
+  , testCase "share fixed opaque constructor fields without free variables" $
+      expectExactFamilyTerm "fun x => x _"
+        (synthesizeWithProviders EngineExference 1024 [] guardRankNGoal)
+  , testCase "preserve constructor introduction and case elimination" $ do
+      let parameter = FVar "a"
+          box = unaryFamily "Demo.Box" "Demo.Box.mk" "Demo.Box a" parameter
+          introduction = FAll True "a" (FArr parameter box)
+          elimination = FAll True "a" (FArr box parameter)
+          introduced = allFamilyCandidates
+            (synthesizeWithProviders EngineExference 1024 [] introduction)
+          eliminated = allFamilyCandidates
+            (synthesizeWithProviders EngineExference 1024 [] elimination)
+      if any (\term -> "Demo.Box.mk" `isInfixOf` term
+              || "\10216" `isInfixOf` term) introduced
+        then pure ()
+        else assertFailure $ "missing shared-family constructor: "
+          ++ show introduced
+      if any ("match" `isInfixOf`) eliminated
+        then pure ()
+        else assertFailure $ "missing shared-family case: "
+          ++ show eliminated
+  , testCase "specialize constructor fitting at a rank-N occurrence" $ do
+      let box = unaryFamily "Demo.Box" "Demo.Box.mk" "Demo.Box poly"
+            polytype
+          candidates = allFamilyCandidates
+            (synthesizeWithProviders EngineExference 1024 []
+              (FArr box polytype))
+      if any (\term -> "| .mk f => f" `isInfixOf` term
+              || "| Demo.Box.mk f => f" `isInfixOf` term) candidates
+        then pure ()
+        else assertFailure $ "rank-N constructor fields were not fitted: "
+          ++ show candidates
+  , testCase "pre-scan a nested provider for the compatible schema" $ do
+      let result = FVar "r"
+          repeated = binaryFamily "Demo.Pairish r r" result result
+            [result]
+          left = FVar "p"
+          right = FVar "q"
+          generic = binaryFamily "Demo.Pairish p q" left right [left]
+          provider = ProviderFrag "Demo.blockedPairish"
+            (FAll False "p" (FAll False "q"
+              (FArr (FAtom False "Demo.Blocker") generic)))
+          candidates = allFamilyCandidates
+            (synthesizeWithProviders EngineExference 1024 [provider]
+              (FArr repeated result))
+      if any ("match" `isInfixOf`) candidates
+        then pure ()
+        else assertFailure $ "provider template was not shared: "
+          ++ show candidates
+  , testCase "exclude a depth-limited provider from family planning" $ do
+      let parameter = FVar "a"
+          box = unaryFamily "Demo.Box" "Demo.Box.mk" "Demo.Box a" parameter
+          incompatible = FParamInd "Demo.Box" "Demo.Box hidden"
+            [FAtom False "Demo.Hidden"] [("Demo.Box.mk", [])]
+          provider = ProviderFrag "Demo.tooDeep"
+            (FArr FDepth incompatible)
+          candidates = allFamilyCandidates
+            (synthesizeWithProviders EngineExference 1024 [provider]
+              (FArr box parameter))
+      if any ("match" `isInfixOf`) candidates
+        then pure ()
+        else assertFailure $ "a rejected provider poisoned family planning: "
+          ++ show candidates
+  , testCase "never soundly refute through an unsafe caller premise" $ do
+      let result = FVar "r"
+          premise = FArr (FAtom False "Fin 1") result
+      case synthesizeWith EngineDjinn 0 [("Demo.fromFin", premise)]
+          result result of
+        Right (SynthRefuted True) -> assertFailure
+          "opaque structure in a caller premise produced a sound refutation"
+        Right _ -> pure ()
+        Left err -> assertFailure err
+  , testCase "pre-scan a nested caller premise for the compatible schema" $ do
+      let result = FVar "r"
+          repeated = binaryFamily "Demo.Pairish r r" result result
+            [result]
+          left = FVar "p"
+          right = FVar "q"
+          generic = binaryFamily "Demo.Pairish p q" left right [left]
+          premise = FAll False "p" (FAll False "q"
+            (FArr (FAtom False "Demo.Blocker") generic))
+          goal = FArr repeated result
+          candidates = allFamilyCandidates
+            (synthesizeWith EngineDjinn 0 [("Demo.blockedPairish", premise)]
+              goal goal)
+      if any ("match" `isInfixOf`) candidates
+        then pure ()
+        else assertFailure $ "caller-premise template was not shared: "
+          ++ show candidates
+  , testCase "ignore occurrence display keys in nested exact fields" $ do
+      let left = FVar "p"
+          right = FVar "q"
+          inner key parameter = FApp False key
+            (AppNominal "Demo.Inner") [parameter]
+          outer key innerKey parameter = FParamInd "Demo.Outer" key
+            [parameter] [("Demo.Outer.mk", [inner innerKey parameter])]
+          leftOuter = outer "Demo.Outer p" "Demo.Inner p" left
+          rightOuter = outer "Demo.Outer q" "Demo.Inner q" right
+          candidates = allFamilyCandidates
+            (synthesizeWithProviders EngineDjinn 0 []
+              (FArr leftOuter
+                (FArr rightOuter (inner "Demo.Inner p" left))))
+      if any ("match" `isInfixOf`) candidates
+        then pure ()
+        else assertFailure $ "nested display keys split one schema: "
+          ++ show candidates
+  , testCase "compare fixed rank-N fields modulo binder names" $ do
+      let identity binder = FAll True binder
+            (FArr (FVar binder) (FVar binder))
+          leftIdentity = identity "x"
+          rightIdentity = identity "y"
+          family key parameter field = FParamInd "Demo.PolyField" key
+            [parameter] [("Demo.PolyField.mk", [field])]
+          left = family "Demo.PolyField p" (FVar "p") leftIdentity
+          right = family "Demo.PolyField q" (FVar "q") rightIdentity
+          candidates = allFamilyCandidates
+            (synthesizeWithProviders EngineDjinn 0 []
+              (FArr left (FArr right leftIdentity)))
+      if any ("match" `isInfixOf`) candidates
+        then pure ()
+        else assertFailure $ "alpha-renamed fixed fields split one schema: "
+          ++ show candidates
+  , testCase "do not capture shadowing binders while genericizing" $ do
+      let identity binder = FAll True binder
+            (FArr (FVar binder) (FVar binder))
+          family parameter = FParamInd "Demo.PolyField" "same display key"
+            [FVar parameter]
+            [("Demo.PolyField.mk", [identity parameter])]
+          left = family "a"
+          right = family "b"
+          candidates = allFamilyCandidates
+            (synthesizeWithProviders EngineDjinn 0 []
+              (FArr left (FArr right (identity "result"))))
+      if any ("match" `isInfixOf`) candidates
+        then pure ()
+        else assertFailure $ "local forall binders were captured: "
+          ++ show candidates
+  , testCase "avoid capture while specializing actual parameters" $ do
+      let field parameter binder = FAll True binder
+            (FArr (FVar parameter) (FVar binder))
+          family parameter binder = FParamInd
+            "Demo.DepField" "same display key" [FVar parameter]
+            [("Demo.DepField.mk", [field parameter binder])]
+          left = family "a" "b"
+          right = family "b" "a"
+          candidates = allFamilyCandidates
+            (synthesizeWithProviders EngineDjinn 0 []
+              (FArr right (FArr left (field "a" "b"))))
+      if any ("match" `isInfixOf`) candidates
+        then pure ()
+        else assertFailure $ "actual family parameter was captured: "
+          ++ show candidates
+  , testCase "treat duplicate exact parameters as ambiguous despite metadata" $
+      let parameter = FVar "p"
+          inner fields = FParamInd "Demo.Inner" "Demo.Inner p" [parameter]
+            [("Demo.Inner.mk", fields)]
+          leftInner = inner [parameter]
+          rightInner = inner []
+          outer = FParamInd "Demo.Outer" "Demo.Outer inner inner"
+            [leftInner, rightInner]
+            [("Demo.Outer.mk", [leftInner])]
+      in expectIncompleteNoFamilyTerm
+          (synthesizeWithProviders EngineDjinn 0 []
+            (FArr outer leftInner))
+  , testCase "ignore nested exact-family metadata in outer schemas" $ do
+      let inner key parameter fields = FParamInd
+            "Demo.Inner" key [parameter] [("Demo.Inner.mk", fields)]
+          outer key parameter field = FParamInd
+            "Demo.Outer" key [parameter] [("Demo.Outer.mk", [field])]
+          leftParameter = FVar "p"
+          rightParameter = FVar "q"
+          leftInner = inner "Demo.Inner p" leftParameter [leftParameter]
+          rightInner = inner "Demo.Inner q" rightParameter []
+          leftOuter = outer "Demo.Outer p" leftParameter leftInner
+          rightOuter = outer "Demo.Outer q" rightParameter rightInner
+          candidates = allFamilyCandidates
+            (synthesizeWithProviders EngineDjinn 0 []
+              (FArr rightOuter (FArr leftOuter leftInner)))
+      if any ("match" `isInfixOf`) candidates
+        then pure ()
+        else assertFailure $ "nested metadata poisoned the outer schema: "
+          ++ show candidates
+  , testCase "keep inner-only metadata out of an outer declaration" $ do
+      let parameter = FVar "p"
+          inner = FParamInd "Demo.Inner" "Demo.Inner p" [parameter]
+            [("Demo.Inner.mk",
+              [FVar "innerClosedOver", FAtom False "Demo.InnerOnly"])]
+          outer = FParamInd "Demo.Outer" "Demo.Outer p" [parameter]
+            [("Demo.Outer.mk", [inner])]
+          candidates = allFamilyCandidates
+            (synthesizeWithProviders EngineDjinn 0 [] (FArr outer inner))
+      if any ("match" `isInfixOf`) candidates
+        then pure ()
+        else assertFailure $ "inner-only metadata poisoned outer data: "
+          ++ show candidates
+  , testCase "choose a later unambiguous repeated-parameter template" $ do
+      let result = FVar "r"
+          repeated = binaryFamily "Demo.Pairish r r" result result
+            [result]
+          left = FVar "p"
+          right = FVar "q"
+          generic = binaryFamily "Demo.Pairish p q" left right [left]
+          candidates = allFamilyCandidates
+            (synthesizeWithProviders EngineDjinn 0 []
+              (FArr repeated (FArr generic result)))
+      if any ("match" `isInfixOf`) candidates
+        then pure ()
+        else assertFailure $ "later family template was not selected: "
+          ++ show candidates
+  , testCase "keep an all-ambiguous repeated family abstract" $ do
+      let result = FVar "r"
+          repeated = binaryFamily "Demo.Pairish r r" result result
+            [result]
+      expectIncompleteNoFamilyTerm
+        (synthesizeWithProviders EngineDjinn 0 [] (FArr repeated result))
+  , testCase "fall back query-wide when constructor schemas disagree" $ do
+      let result = FVar "r"
+          other = FVar "s"
+          extractable = unaryFamily "Demo.Box" "Demo.Box.mk"
+            "Demo.Box r" result
+          incompatible = FParamInd "Demo.Box" "Demo.Box s" [other]
+            [("Demo.Box.mk", [])]
+      expectIncompleteNoFamilyTerm
+        (synthesizeWithProviders EngineDjinn 0 []
+          (FArr extractable (FArr incompatible result)))
+  , testCase "make nominal and structural uses one abstract family" $ do
+      let source = FAll True "a"
+            (unaryFamily "Demo.Box" "Demo.Box.mk" "Demo.Box a"
+              (FVar "a"))
+          target = FApp False "Demo.Box poly"
+            (AppNominal "Demo.Box") [polytype]
+          goal = FArr source target
+      expectExactFamilyTerm "fun x => x _"
+        (synthesizeWithProviders EngineDjinn 0 [] goal)
+      expectExactFamilyTerm "fun x => x _"
+        (synthesizeWithProviders EngineExference 1024 [] goal)
+  , testCase "never transport between distinct exact family heads" $ do
+      let parameter = FVar "a"
+          source = unaryFamily "Demo.LeftBox" "Demo.LeftBox.mk"
+            "same display key" parameter
+          target = unaryFamily "Demo.RightBox" "Demo.RightBox.mk"
+            "same display key" parameter
+          candidates = allFamilyCandidates
+            (synthesizeWithProviders EngineDjinn 0 []
+              (FAll True "a" (FArr source target)))
+      if any (== "fun _ x => x") candidates
+        then assertFailure $ "distinct heads transported directly: "
+          ++ show candidates
+        else if null candidates
+          then assertFailure "distinct structural heads lost all conversions"
+          else pure ()
+  , testCase "retain the established recursive fallback for FParamRec" $ do
+      let result = FVar "r"
+          natural = FParamRec True "Nat" "Nat" []
+            [ ("Nat.zero", [])
+            , ("Nat.succ", [FAtom False "Nat"])
+            ]
+          candidates = allFamilyCandidates
+            (synthesizeWithProviders EngineExference 1024 []
+              (FArr result
+                (FArr (FArr natural result) (FArr natural result))))
+      if any ("match" `isInfixOf`) candidates
+        then pure ()
+        else assertFailure $ "FParamRec lost FRec elimination: "
+          ++ show candidates
+  , testCase "scope an opaque recursive field inside shared finite data" $ do
+      let element = FVar "a"
+          listKey = "List a"
+          list = FParamRec True "List" listKey [element]
+            [ ("List.nil", [])
+            , ("List.cons", [element, FAtom False listKey])
+            ]
+          wrapper = FParamInd "Demo.ListBox" "Demo.ListBox a" [element]
+            [("Demo.ListBox.mk", [list])]
+          candidates = allFamilyCandidates
+            (synthesizeWithProviders EngineDjinn 0 []
+              (FArr wrapper list))
+      if any ("match" `isInfixOf`) candidates
+        then pure ()
+        else assertFailure $ "recursive field escaped its data declaration: "
+          ++ show candidates
+  , testCase "scope a fixed opaque field in zero-parameter recursive data" $ do
+      let format = FParamRec True "Std.Format" "Format" []
+            [ ("Std.Format.nil", [])
+            , ("Std.Format.text", [FAtom False "String"])
+            , ("Std.Format.append",
+                [FAtom False "Format", FAtom False "Format"])
+            ]
+      case synthesizeWithProviders EngineExference 128 []
+          (FArr format format) of
+        Left err -> assertFailure $
+          "fixed recursive field escaped its declaration: " ++ err
+        Right _ -> pure ()
+  ]
+ where
+  polytype = FAll True "b" (FArr (FVar "b") (FVar "b"))
+  option key parameter = FParamInd "Option" key [parameter]
+    [ ("Option.none", [])
+    , ("Option.some", [parameter])
+    ]
+  optionRankNGoal = FArr
+    (FAll True "a" (option "Option a" (FVar "a")))
+    (option "Option poly" polytype)
+  guard key parameter = FParamInd "Demo.Guard" key [parameter]
+    [("Demo.Guard.mk", [FAtom False "Demo.Secret", parameter])]
+  guardRankNGoal = FArr
+    (FAll True "a" (guard "Demo.Guard a" (FVar "a")))
+    (guard "Demo.Guard poly" polytype)
+  unaryFamily headName constructor key parameter =
+    FParamInd headName key [parameter] [(constructor, [parameter])]
+  binaryFamily key left right fields =
+    FParamInd "Demo.Pairish" key [left, right]
+      [("Demo.Pairish.mk", fields)]
+  expectExactFamilyTerm expected outcome =
+    let candidates = allFamilyCandidates outcome
+    in if expected `elem` candidates
+        then pure ()
+        else assertFailure $ "expected exact family candidate "
+          ++ show expected ++ ", got: " ++ show candidates
+  expectIncompleteNoFamilyTerm outcome = case outcome of
+    Right (SynthCandidates groups _) -> assertFailure $
+      "abstract family unexpectedly exposed constructors: " ++ show groups
+    Right (SynthRefuted True) ->
+      assertFailure "abstract family produced a sound refutation"
+    Right _ -> pure ()
+    Left err -> assertFailure err
+  allFamilyCandidates outcome = case outcome of
+    Right (SynthCandidates groups _) -> concat groups
+    Right _ -> []
+    Left err -> error err
+
 rankNFrontierTests :: TestTree
 rankNFrontierTests = testGroup "Djinn rank-N frontiers"
   [ testCase "render four-binder hypothesis instantiation for Lean" $ do
@@ -667,10 +1108,17 @@ rankNFrontierTests = testGroup "Djinn rank-N frontiers"
       case synthesizeWithProviders EngineDjinn 0 [] goal of
         Right (SynthCandidates groups _) ->
           let candidates = concat groups
-          in if any ("f _ _ _ _ x y z w" `isInfixOf`) candidates
+              -- Djex de-duplicates candidates by their eta-normal meaning
+              -- while retaining the first checked spelling.  The compact
+              -- partially applied spelling and the explicitly eta-expanded
+              -- one therefore witness the same four type instantiations.
+              instantiated candidate =
+                "f _ _ _ _ x y z w" `isInfixOf` candidate
+                  || "=> f _ _ _ _" `isInfixOf` candidate
+          in if any instantiated candidates
               then pure ()
               else assertFailure $
-                "expected a fully applied four-binder candidate, got: "
+                "expected a four-binder instantiation candidate, got: "
                   ++ show candidates
         Right other -> assertFailure $
           "unexpected four-binder synthesis outcome: " ++ outcomeTag other
@@ -786,8 +1234,19 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
       renderLeanTerm Map.empty
           (Map.singleton "leantProvider0" "Demo.identity")
           (Map.singleton "LeantType0" "Demo.Wrap")
-          [] (FAtom False "Nat") expression
+        [] (FAtom False "Nat") expression
         @?= Right ["@Demo.identity (@Demo.Wrap Int)"]
+  , testCase "restore a rigid opaque field as one parenthesized type" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      privateName <- expectRight $ mkIdentifier "LeantAtom0"
+      argument <- expectRight $ specifiedVisibleTypeArgument
+        (TypeConstructor privateName :: Type String)
+      let expression = VisibleTypeApplication (Global providerName) argument
+      renderLeanTerm Map.empty
+          (Map.singleton "leantProvider0" "Demo.identity")
+          (Map.singleton "LeantAtom0" "(Nat × Nat)")
+          [] (FAtom False "Nat") expression
+        @?= Right ["@Demo.identity @(Nat × Nat)"]
   ]
 
 firstGroup :: Either String SynthOutcome -> AssertionResult

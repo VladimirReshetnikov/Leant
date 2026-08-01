@@ -1,0 +1,42 @@
+
+   __                  __
+  / /  ___ ___ ____   / /_
+ / /__/ -_) _ `/ _ \_/ __/
+/____/\__/\_,_/_//_/ \__/
+Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to exit.
+λ> axiom Demo.Secret : Type
+λ> inductive Demo.Guard (a : Type 1) : Type 1 where
+…> | mk : Demo.Secret → a → Demo.Guard a
+…>
+λ> inductive Demo.Phantom2 (a b : Type 1) : Type 1 where
+…> | mk : Demo.Phantom2 a b
+…>
+λ> def Demo.termByType (_ : Type) : Nat := 0
+λ> inductive Demo.Tag (n : Nat) : Type where
+…> | mk : Demo.Tag n
+…>
+λ> :set synth-engine exference
+synth engine: exference
+λ> :synth ((∀ a b : Type 1, Demo.Phantom2 a b) → Demo.Phantom2 (∀ x : Type, x → x) (∀ y : Type, y → y))
+preparing synthesis environment (session imports + Lean)...
+  it1  fun x => x _ _
+note: search truncated: step limit reached, queue limit pruned 37864
+λ> :synth ((∀ a : Type 1, Demo.Guard a) → Demo.Guard (∀ b : Type, b → b))
+  it1  fun x => x _
+note: search truncated: step limit reached, queue limit pruned 37185
+λ> :set synth-engine djinn
+synth engine: djinn
+λ> :synth ((∀ a : Type 1, Option a) → Option (∀ b : Type, b → b))
+  it1  fun x => x _
+  it2  fun _ => .none
+  it3  fun _ => .some (fun _ x => x)
+note: search truncated: candidate limit reached (60)
+λ> :synth ((∀ a b : Type 1, Demo.Phantom2 a b) → Demo.Phantom2 (∀ x : Type, x → x) (∀ y : Type, y → y))
+  it1  fun x => x _ _
+  it2  fun _ => ⟨⟩
+λ> :synth ((∀ a : Type 1, Demo.Guard a) → Demo.Guard (∀ b : Type, b → b))
+  it1  fun x => x _
+note: search truncated: candidate limit reached (60)
+λ> :synth (Demo.Tag (Demo.termByType Unit))
+  it1  ⟨⟩
+λ> :quit

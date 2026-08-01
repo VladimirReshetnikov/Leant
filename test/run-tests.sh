@@ -34,8 +34,11 @@ done
 
 filter() {
   # Drop the volatile startup lines, and any CR a Windows checkout may
-  # still introduce: the REPL itself always writes LF.
+  # still introduce.  Normalize prompt-only continuation lines too: the REPL
+  # writes one trailing separator after the prompt, which is presentation
+  # whitespace rather than a semantic part of the transcript.
   tr -d '\r' \
+    | sed 's/[[:space:]]*$//' \
     | grep -v -e '^no Lake project' -e '^starting Lean backend' \
               -e '^backend responding' -e '^replaying session'
 }

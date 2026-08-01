@@ -12,8 +12,11 @@
 -- remain opaque.  A non-recursive, non-indexed
 -- inductive applied to all of its parameters whose constructor fields
 -- are explicit and non-dependent expands into a generalized sum of
--- products (phase 2); recursive occurrences retain a bounded constructor
--- description for the Exference projection, and every other subterm becomes
+-- products (phase 2).  Such inductive occurrences retain their exact family
+-- head and ordered parameters when every parameter is a proper type; term-
+-- parameterized occurrences keep the established occurrence-local form.
+-- Recursive occurrences retain a bounded constructor description for the
+-- Exference projection, and every other subterm becomes
 -- an opaque atom carried by its pretty-printed spelling, so alpha-equal
 -- dependent subformulas compare equal and can be transported (never
 -- analyzed).  Each atom or application carries a safety bit: a node built
@@ -83,12 +86,22 @@ data Frag
     -- flag and display key describe the complete Lean expression; the head
     -- records whether it is a bound type function or a rigid Lean constant.
     -- Term-indexed/dependent applications remain 'FAtom'.
+  | FParamInd String String [Frag] [(String, [Frag])]
+    -- ^ A shareable non-recursive inductive-family occurrence: exact Lean
+    -- family head, occurrence display key, ordered proper-type parameters,
+    -- and the occurrence-specialized complete constructor inventory.  This
+    -- is emitted only when every applied parameter itself inhabits a sort.
   | FInd String [(String, [Frag])]
     -- ^ expanded inductive occurrence (phase 2): display key, then one
     -- entry per constructor (full Lean name, field fragments).  Emitted
     -- only when the serializer saw the complete constructor list with
     -- non-dependent explicit fields, so the node itself never poisons a
     -- refutation; its fields answer for themselves
+  | FParamRec Bool String String [Frag] [(String, [Frag])]
+    -- ^ A shareable recursive-family occurrence: completeness, exact Lean
+    -- family head, occurrence display key, ordered proper-type parameters,
+    -- and occurrence-specialized constructors.  Recursive self fields still
+    -- use the display key as an opaque knot at this representation boundary.
   | FRec Bool String [Frag] [(String, [Frag])]
     -- ^ recursive (or nested) inductive occurrence.  Djinn treats it as an
     -- opaque atom with the listed constructors as sound introduction
@@ -182,6 +195,15 @@ synthPrelude = unlines
   , "    else withLocalDecl n bi dom fun fv =>"
   , "      isTypeKind (body.instantiate1 fv)"
   , "  | _ => pure false"
+  , ""
+  , "-- Share an inductive family across occurrences only when every applied"
+  , "-- parameter is a proper type.  Term parameters and dependent family"
+  , "-- arguments keep the established occurrence-local representation."
+  , "def allProperTypeParams (args : Array Expr) : MetaM Bool := do"
+  , "  for arg in args do"
+  , "    let argType \8592 whnfR (\8592 inferType arg)"
+  , "    if !argType.isSort then return false"
+  , "  pure true"
   , ""
   , "mutual"
   , ""
@@ -303,7 +325,9 @@ synthPrelude = unlines
   , "-- Phase 2: a non-recursive, non-indexed, non-mutual, non-nested"
   , "-- inductive applied to all of its parameters expands into a"
   , "-- generalized sum of products, provided every constructor field is"
-  , "-- explicit and non-dependent; anything else falls back to an atom."
+  , "-- explicit and non-dependent.  Proper-type parameter vectors retain"
+  , "-- their exact family head for query-wide sharing; term/dependent"
+  , "-- parameter vectors keep the occurrence-local ind representation."
   , "partial def indOf (fuel depth : Nat) (blocked : List String) (e : Expr)"
   , "    : MetaM (Option String) := do"
   , "  match e.getAppFn with"
@@ -324,7 +348,17 @@ synthPrelude = unlines
   , "          | some fs =>"
   , "            ctors := ctors ++ \" (ctor \" ++ esc c.toString ++ fs ++ \")\""
   , "        let pp \8592 Meta.ppExpr e"
-  , "        pure (some (\"(ind \" ++ esc (toString pp) ++ ctors ++ \")\"))"
+  , "        let key := toString pp"
+  , "        if \8592 allProperTypeParams args then do"
+  , "          let mut params := \"\""
+  , "          for arg in args do"
+  , "            let param \8592 go fuel depth blocked arg"
+  , "            params := params ++ \" \" ++ param"
+  , "          pure (some (\"(param-ind \" ++ esc n.toString ++ \" \""
+  , "            ++ esc key ++ \" (params\" ++ params ++ \")\""
+  , "            ++ ctors ++ \")\"))"
+  , "        else"
+  , "          pure (some (\"(ind \" ++ esc key ++ ctors ++ \")\"))"
   , "    | _ => pure none"
   , "  | _ => pure none"
   , ""
@@ -350,6 +384,7 @@ synthPrelude = unlines
   , "        if blocked.contains key then pure none"
   , "        else do"
   , "          let args := e.getAppArgs"
+  , "          let properParams \8592 allProperTypeParams args"
   , "          let mut params := \"\""
   , "          for arg in args do"
   , "            let param \8592 go fuel depth blocked arg"
@@ -367,6 +402,11 @@ synthPrelude = unlines
   , "              ctors := ctors ++ \" (ctor \" ++ esc c.toString"
   , "                ++ fs ++ \")\""
   , "          if !found then pure none"
+  , "          else if properParams then"
+  , "            pure (some (\"(param-rec \""
+  , "              ++ (if complete then \"complete\" else \"partial\")"
+  , "              ++ \" \" ++ esc n.toString ++ \" \" ++ esc key"
+  , "              ++ \" (params\" ++ params ++ \")\" ++ ctors ++ \")\"))"
   , "          else pure (some (\"(rec \""
   , "            ++ (if complete then \"complete\" else \"partial\")"
   , "            ++ \" \" ++ esc key ++ \" (params\" ++ params ++ \")\""
@@ -645,17 +685,28 @@ parseFrag (TL : TSym tag : rest) = case tag of
     _ -> Left "malformed (app ...)"
   "all" -> allTag True rest
   "alli" -> allTag False rest
+  "param-ind" -> case rest of
+    TStr headName : TStr key : TL : TSym "params" : rest' -> do
+      (params, rest'') <- parseFrags rest'
+      (ctors, rest''') <- parseCtors rest''
+      Right (FParamInd headName key params ctors, rest''')
+    _ -> Left "malformed (param-ind ...)"
   "ind" -> case rest of
     TStr key : rest' -> do
       (ctors, rest'') <- parseCtors rest'
       Right (FInd key ctors, rest'')
     _ -> Left "malformed (ind ...)"
+  "param-rec" -> case rest of
+    TSym inventory : TStr headName : TStr key
+        : TL : TSym "params" : rest' -> do
+      complete <- parseInventory inventory
+      (params, rest'') <- parseFrags rest'
+      (ctors, rest''') <- parseCtors rest''
+      Right (FParamRec complete headName key params ctors, rest''')
+    _ -> Left "malformed (param-rec ...)"
   "rec" -> case rest of
     TSym inventory : TStr key : TL : TSym "params" : rest' -> do
-      complete <- case inventory of
-        "complete" -> Right True
-        "partial" -> Right False
-        other -> Left ("unknown recursive inventory " ++ other)
+      complete <- parseInventory inventory
       (params, rest'') <- parseFrags rest'
       (ctors, rest''') <- parseCtors rest''
       Right (FRec complete key params ctors, rest''')
@@ -666,6 +717,10 @@ parseFrag (TL : TSym tag : rest) = case tag of
     "safe" -> Right True
     "unsafe" -> Right False
     other -> Left ("unknown " ++ context ++ " safety " ++ other)
+  parseInventory inventory = case inventory of
+    "complete" -> Right True
+    "partial" -> Right False
+    other -> Left ("unknown recursive inventory " ++ other)
   parseAppHead
       (TL : TSym "app-variable" : TStr name : TR : toks) =
     Right (AppVariable name, toks)
@@ -715,7 +770,11 @@ fragHasDepth frag = case frag of
   FSum a b -> fragHasDepth a || fragHasDepth b
   FAll _ _ b -> fragHasDepth b
   FApp _ _ _ arguments -> any fragHasDepth arguments
+  FParamInd _ _ params ctors ->
+    any fragHasDepth params || any (any fragHasDepth . snd) ctors
   FInd _ ctors -> any (any fragHasDepth . snd) ctors
+  FParamRec _ _ _ params ctors ->
+    any fragHasDepth params || any (any fragHasDepth . snd) ctors
   FRec _ _ params ctors ->
     any fragHasDepth params || any (any fragHasDepth . snd) ctors
   FDepth -> True
@@ -796,7 +855,12 @@ glivenkoSplit = go []
     -- A retained type application is one propositional atom here.  A forall
     -- in one of its type arguments is not an exposed logical quantifier.
     FApp{} -> True
+    -- A non-recursive family is exposed through its specialized fields; its
+    -- parameter vector records nominal identity rather than new connectives.
+    FParamInd _ _ _ ctors -> all (all quantFree . snd) ctors
     FInd _ ctors -> all (all quantFree . snd) ctors
+    FParamRec _ _ _ params ctors ->
+      all quantFree params && all (all quantFree . snd) ctors
     FRec _ _ params ctors ->
       all quantFree params && all (all quantFree . snd) ctors
     FAll{} -> False
@@ -813,7 +877,11 @@ propAtoms = nub . go
     FProd a b -> go a ++ go b
     FSum a b -> go a ++ go b
     FApp{} -> [f]
+    FParamInd _ _ _ ctors -> concatMap (concatMap go . snd) ctors
     FInd _ ctors -> concatMap (concatMap go . snd) ctors
+    -- Recursive occurrences stay nominal in the classical projection, just
+    -- like the established FRec representation.
+    FParamRec{} -> []
     FVar _ -> [f]
     FAtom _ _ -> [f]
     _ -> []
@@ -830,7 +898,11 @@ fragUnsafeAtoms = nub . go
     FAll _ _ b -> go b
     FApp safe key _ arguments ->
       (if safe then [] else [key]) ++ concatMap go arguments
+    FParamInd _ _ params ctors ->
+      concatMap go params ++ concatMap (concatMap go . snd) ctors
     FInd _ ctors -> concatMap (concatMap go . snd) ctors
+    FParamRec _ _ key params ctors ->
+      key : concatMap go params ++ concatMap (concatMap go . snd) ctors
     FRec _ key params ctors ->
       key : concatMap go params ++ concatMap (concatMap go . snd) ctors
     FAtom False key -> [key]

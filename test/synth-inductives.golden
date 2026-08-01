@@ -28,7 +28,7 @@ preparing synthesis environment (session imports + Lean)...
 λ> :synth (∀ a b : Type, Option a → b)
 provably uninhabited — no closed term of this polymorphic type exists
 λ> inductive Traffic | red | amber | green
-λ> 
+λ>
 λ> :synth Traffic
   it1  .red
   it2  .amber
@@ -36,7 +36,7 @@ provably uninhabited — no closed term of this polymorphic type exists
 λ> structure Pair (A B : Type) where
 …>   fst : A
 …>   snd : B
-…> 
+…>
 λ> :synth (∀ a b : Type, a → b → Pair a b)
   it1  fun _ _ x y => ⟨x, y⟩
 λ> :synth (∀ a b : Type, Pair a b → a)

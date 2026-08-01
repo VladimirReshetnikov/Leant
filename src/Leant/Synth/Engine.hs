@@ -10,14 +10,13 @@
 -- projection was complete) /and/ the Leant-side translation introduced no
 -- atom that hides concrete structure ('fragUnsafeAtoms').
 --
--- Phase 2: expanded inductive occurrences ('FInd') become Djinn @data@
--- declarations -- constructors as right-rules, case analysis as
--- left-rules, exactly how Djinn admits Haskell datatypes.  Each distinct
--- occurrence key (one per alpha-normalized instantiation) is declared
--- once, parameterized over the goal variables its fields mention, and
--- the goal references the declared constructor applied to those
--- variables.  The engine-side constructor names are fresh; the mapping
--- back to the Lean spellings rides along to the renderer.
+-- Phase 2: expanded inductive occurrences become Djinn @data@ declarations --
+-- constructors as right-rules, case analysis as left-rules, exactly how Djinn
+-- admits Haskell datatypes.  Exact-head 'FParamInd' occurrences are pre-scanned
+-- across the whole query and share one validated parameterized declaration;
+-- legacy 'FInd' occurrences remain keyed by their alpha-normalized display
+-- spelling.  Engine-side type and constructor names are fresh, and mappings
+-- back to their exact Lean spellings ride along to the renderer.
 module Leant.Synth.Engine
   ( SynthEngine (..)
   , SynthOutcome (..)
@@ -34,6 +33,7 @@ module Leant.Synth.Engine
 import Data.Foldable (toList)
 import Data.List (intercalate, isPrefixOf, nub, sortOn)
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import Data.Void (Void)
 
 import Language.Haskell.Djex
@@ -217,23 +217,26 @@ synthesizeTunedWithProviders
 synthesizeTunedWithProviders engine steps limits providers extras
     engineFrag fitFrag = case engine of
   EngineDjinn -> do
-    (goal, decls, _, render) <- prepare False []
-    djinnRun limits fitFrag render goal decls
+    (goal, decls, _, render, complete) <- prepare False []
+    djinnRun limits fitFrag complete render goal decls
   EngineExference -> do
-    (goal, decls, providerDecls, render) <- prepare True providers
+    (goal, decls, providerDecls, render, _) <- prepare True providers
     exferenceRun steps render goal (decls ++ providerDecls)
   EngineBoth -> do
-    (djinnGoal, djinnDecls, _, djinnRender) <- prepare False []
-    djinn <- djinnRun limits fitFrag djinnRender djinnGoal djinnDecls
-    (exferenceGoal, exferenceDecls, providerDecls, exferenceRender) <-
+    (djinnGoal, djinnDecls, _, djinnRender, djinnComplete) <-
+      prepare False []
+    djinn <- djinnRun limits fitFrag djinnComplete djinnRender
+      djinnGoal djinnDecls
+    (exferenceGoal, exferenceDecls, providerDecls, exferenceRender, _) <-
       prepare True providers
     exference <- exferenceRun steps exferenceRender exferenceGoal
       (exferenceDecls ++ providerDecls)
     pure (mergeOutcomes djinn exference)
  where
   prepare structuralRecursive activeProviders = do
-    (goal0, decls, providerDecls, ctorMap, providerMap, typeMap, premises) <-
-      fragToDjinn structuralRecursive activeProviders extras engineFrag
+    ( goal0, decls, providerDecls, ctorMap, providerMap, typeMap, premises
+      , complete) <- fragToDjinn structuralRecursive activeProviders extras
+        engineFrag
     -- Premises (caller-supplied assumptions, and Djinn's constructor
     -- premises for recursive inductives) enter as goal antecedents.  The
     -- Exference projection instead receives a real recursive declaration and
@@ -242,18 +245,19 @@ synthesizeTunedWithProviders engine steps limits providers extras
         premisePairs = [(name, prem) | (name, prem, _) <- premises]
         render expr =
           renderLeanTerm ctorMap providerMap typeMap premisePairs fitFrag expr
-    pure (goal, decls, providerDecls, render)
+    pure (goal, decls, providerDecls, render, complete)
 
 -- | The complete LJT search: candidates, or a refutation whose
 -- soundness depends on the translation having hidden nothing.
 djinnRun
   :: (Int, Maybe Integer)
   -> Frag
+  -> ProjectionCompleteness
   -> (Expression String -> Either String [String])
   -> Type String
   -> [DjinnDecl]
   -> Either String SynthOutcome
-djinnRun (cutoff, budget) frag render goal decls = do
+djinnRun (cutoff, budget) frag projection render goal decls = do
   standard <- viaDiagnostic standardDjinnSession
   targetName <- viaShow (mkIdentifier "leantSynth")
   target <- viaShow (mkDefinitionName targetName)
@@ -292,8 +296,16 @@ djinnRun (cutoff, budget) frag render goal decls = do
       terms = map snd (sortOn fst rendered)
   pure $ case resultEvidence result of
     ValidatedCandidates -> SynthCandidates terms notes
-    ProvedUninhabitable ->
-      SynthRefuted (budget == Nothing && null (fragUnsafeAtoms frag))
+    ProvedUninhabitable
+      | not (projectionFamiliesComplete projection) -> SynthNoTerm
+          ("an exact Lean family stayed opaque because its constructor schema \
+           \was ambiguous or incompatible" : notes)
+      | otherwise ->
+          SynthRefuted
+            ( budget == Nothing
+              && projectionFragmentsComplete projection
+              && fragmentProjectionComplete frag
+            )
     RequiresTargetReference -> SynthNoTerm
       ("only a recursive reference to the definition itself would inhabit \
        \this type" : notes)
@@ -412,16 +424,20 @@ progressNotes progress = case progress of
 
 -- Fragment -> Djinn type ----------------------------------------------------
 --
--- Opaque variables and atoms both become Djinn type variables; atoms are
+-- Opaque variables and ordinary atoms become Djinn type variables; atoms are
 -- keyed by their pretty-printed spelling so alpha-equal occurrences share
--- one variable (transportable, never analyzed).  Nested quantifiers are
--- passed structurally as 'ForallType'; Djex carries them as alpha-aware
+-- one variable (transportable, never analyzed).  A fixed opaque constructor
+-- field in a shared data schema instead receives one private rigid proper
+-- type, because it is not a parameter of the Lean family.  Nested quantifiers
+-- are passed structurally as 'ForallType'; Djex carries them as alpha-aware
 -- atoms and applies its bounded rank-N rules.  Retained proper-type
 -- applications become real 'TypeApplication' nodes: bound heads remain
 -- higher-kinded variables, while exact Lean constant heads receive shared
 -- private abstract declarations and a renderer map back to Lean.  Expanded
--- inductive occurrences become fresh @data@ declarations, one per display key,
--- collected in dependency order (fields are translated before the
+-- exact-head inductive families become shared parameterized @data@
+-- declarations after query-wide schema validation.  Occurrence-local legacy
+-- inductives still become fresh declarations per display key.  Declarations
+-- are collected in dependency order (fields are translated before the
 -- declaration that contains them).
 
 -- | The neutral declaration shape sealed into a 'DjinnSession' (the
@@ -449,10 +465,19 @@ data TransState = TransState
     -- ^ constructor premises (Lean name, fragment for the renderer's
     -- domain fitting, engine type), in order
   , tsAppFamilies :: Map.Map String AppFamily
-    -- ^ exact Lean application head -> private rigid engine constructor
+    -- ^ exact Lean family head -> its one query-wide private engine
+    -- constructor, whether structurally declared or abstract
+  , tsFamilyPlans :: Map.Map String ExactFamilyPlan
+    -- ^ query-wide choice of one structural schema or one opaque fallback
+    -- for every exact Lean head visible anywhere in the query
   , tsAppNext :: Int
+  , tsRigidAtoms :: Set.Set String
+    -- ^ opaque proper types used as fixed fields in a shared data schema;
+    -- these must be rigid constructors, not undeclared datatype variables
+  , tsAtomFamilies :: Map.Map String Name
+  , tsAtomNext :: Int
   , tsTypeMap :: TypeMap
-    -- ^ private engine type spelling -> exact Lean application head
+    -- ^ private engine type spelling -> exact Lean type or family head
   }
 
 data RecInfo = RecInfo
@@ -463,6 +488,38 @@ data RecInfo = RecInfo
 data AppFamily = AppFamily
   { appTypeName :: Name
   , appTypeArity :: Int
+  }
+
+-- | One exact-head use found before translation starts.  The pre-scan is what
+-- makes the representation independent of traversal order: a provider can
+-- contribute the only unambiguous constructor template, while a nominal
+-- fallback anywhere in the query conservatively makes the whole family
+-- abstract.
+data ExactFamilyUse
+  = ParametricUse [Frag] [(String, [Frag])]
+  | NominalUse Int
+
+data ParametricTemplate = ParametricTemplate
+  { templateArity :: Int
+  , templateFormals :: [String]
+  , templateConstructors :: [(String, [Frag])]
+  }
+  deriving (Eq, Show)
+
+data ExactFamilyPlan
+  = StructuralFamily ParametricTemplate
+  | AbstractFamily Int Bool
+    -- ^ arity and whether this fallback hid an otherwise complete FParamInd
+    -- schema (and must therefore forfeit Djinn refutation completeness)
+  | InvalidFamilyArities [Int]
+  deriving (Eq, Show)
+
+data ProjectionCompleteness = ProjectionCompleteness
+  { projectionFamiliesComplete :: Bool
+    -- ^ no structural exact family was forced to stay opaque
+  , projectionFragmentsComplete :: Bool
+    -- ^ engine goal and caller premises contain neither unsafe atoms nor
+    -- depth truncation; the fitting fragment is checked separately at verdict
   }
 
 newtype Trans a = Trans
@@ -525,12 +582,22 @@ fragToDjinn
       , Map.Map String String
       , TypeMap
       , [(String, Frag, Type String)]
+      , ProjectionCompleteness
       )
 fragToDjinn structuralRecursive providers extras frag0 = do
   eitherC <- viaShow (mkIdentifier "Either")
   voidC <- viaShow (mkIdentifier "Void")
   unitC <- viaShow (tupleName Boxed 0)
-  let go premisesEnabled frag = case frag of
+  let usableProviders = filter usableProvider providers
+      plans = exactFamilyPlans
+        (map snd extras ++ [frag0] ++ map providerTypeFrag usableProviders)
+      rigidAtoms = structuralAtomKeys plans
+      projection = ProjectionCompleteness
+        { projectionFamiliesComplete = exactFamilyProjectionComplete plans
+        , projectionFragmentsComplete =
+            all fragmentProjectionComplete (frag0 : map snd extras)
+        }
+      go premisesEnabled frag = case frag of
         FArr a b -> FunctionType
           <$> go premisesEnabled a <*> go premisesEnabled b
         FProd a b -> (\x y -> TupleType Boxed [x, y])
@@ -546,14 +613,26 @@ fragToDjinn structuralRecursive providers extras frag0 = do
           occurrence <- getsT (Map.lookup key . tsInds)
           case occurrence of
             Just known -> pure known
-            Nothing -> TypeVariable <$> variable ("a:" ++ key)
-        FApp _ key head' arguments ->
-          appOccurrence premisesEnabled key head' arguments
+            Nothing -> do
+              rigid <- getsT (Set.member key . tsRigidAtoms)
+              if rigid
+                then rigidAtom key
+                else TypeVariable <$> variable ("a:" ++ key)
+        FApp _ _ head' arguments ->
+          appOccurrence premisesEnabled head' arguments
         FAll _ binder body -> do
           v <- variable ("v:" ++ binder)
           body' <- go premisesEnabled body
           pure (ForallType [v] [] body')
+        FParamInd headName _ parameters _ ->
+          parametricIndOccurrence premisesEnabled headName parameters
         FInd key ctors -> indOccurrence premisesEnabled key ctors
+        FParamRec complete _ key parameters ctors
+          | structuralRecursive
+          , complete
+          , Just parameterKeys <- distinctPlainParameters parameters ->
+              recDataOccurrence key parameterKeys ctors
+          | otherwise -> recOccurrence premisesEnabled key ctors
         FRec complete key parameters ctors
           | structuralRecursive
           , complete
@@ -568,40 +647,132 @@ fragToDjinn structuralRecursive providers extras frag0 = do
       -- rigid abstract constructor shared by goal and provider occurrences;
       -- its hidden semantics still poison negative verdicts on the fragment
       -- side, and Lean verifies every positive candidate.
-      appOccurrence premisesEnabled key head' arguments = do
+      appOccurrence premisesEnabled head' arguments = do
         translated <- mapM (go premisesEnabled) arguments
         case head' of
           AppVariable spelling -> do
             headType <- TypeVariable <$> variable ("v:" ++ spelling)
             pure (applyTypeArguments headType translated)
           AppNominal spelling -> do
-            nominal <- nominalHead spelling (length arguments)
-            case nominal of
-              Just headType -> pure (applyTypeArguments headType translated)
-              Nothing -> TypeVariable <$> variable ("a:" ++ key)
+            headType <- exactFamilyHead spelling (length arguments)
+            pure (applyTypeArguments headType translated)
 
-      nominalHead spelling arity = do
+      parametricIndOccurrence premisesEnabled spelling parameters = do
+        translated <- mapM (go premisesEnabled) parameters
+        headType <- exactFamilyHead spelling (length parameters)
+        pure (applyTypeArguments headType translated)
+
+      -- Every exact Lean head has exactly one engine-side constructor for the
+      -- whole query.  The pre-scan decides whether that constructor can carry
+      -- a validated data schema or must remain abstract.  Installing the
+      -- family before translating structural fields also keeps nested family
+      -- declarations dependency ordered without risking duplicate heads.
+      exactFamilyHead spelling arity = do
         families <- getsT tsAppFamilies
         case Map.lookup spelling families of
           Just family
             | appTypeArity family == arity ->
-                pure (Just (TypeConstructor (appTypeName family)))
-            | otherwise -> pure Nothing
+                pure (TypeConstructor (appTypeName family))
+            | otherwise -> failT
+                ("internal: exact Lean family " ++ show spelling
+                  ++ " appeared at arities " ++ show (appTypeArity family)
+                  ++ " and " ++ show arity)
           Nothing -> do
-            index <- getsT tsAppNext
-            let privateSpelling = "LeantType" ++ show index
+            familyPlans <- getsT tsFamilyPlans
+            case Map.lookup spelling familyPlans of
+              Just (StructuralFamily template)
+                | templateArity template == arity ->
+                    declareParametricFamily spelling template
+                | otherwise -> arityFailure spelling arity
+                    [templateArity template]
+              Just (AbstractFamily plannedArity _)
+                | plannedArity == arity ->
+                    declareAbstractFamily spelling arity
+                | otherwise -> arityFailure spelling arity [plannedArity]
+              Just (InvalidFamilyArities arities) ->
+                arityFailure spelling arity arities
+              Nothing ->
+                -- This is only reachable for a fragment introduced while a
+                -- generic constructor schema is translated.  It still gets a
+                -- single conservative nominal declaration.
+                declareAbstractFamily spelling arity
+
+      arityFailure spelling arity arities = failT
+        ("internal: exact Lean family " ++ show spelling
+          ++ " has incompatible proper-type arities "
+          ++ show (nub (arity : arities)))
+
+      declareAbstractFamily spelling arity = do
+        (_, _, typeName) <- freshExactFamily spelling arity
+        let kind = foldr FunctionKind ProperTypeKind
+              (replicate arity ProperTypeKind)
+            declaration = AbstractTypeDeclaration () typeName kind
+        modifyT (\s -> s { tsDecls = tsDecls s ++ [declaration] })
+        pure (TypeConstructor typeName)
+
+      declareParametricFamily spelling template = do
+        (index, _, typeName) <-
+          freshExactFamily spelling (templateArity template)
+        parameterVariables <- mapM
+          (variable . ("v:" ++)) (templateFormals template)
+        let sole = length (templateConstructors template) == 1
+        constructors <- mapM
+          (\(j, (leanName, fields)) -> do
+            fieldTypes <- mapM (go True) fields
+            let constructorSpelling =
+                  "LeantFamilyC" ++ show index ++ "_" ++ show j
+            cname <- nameT constructorSpelling
+            modifyT (\s -> s { tsCtorMap = Map.insert constructorSpelling
+                (CtorInfo leanName fields sole
+                  (Just (spelling, templateFormals template)))
+                (tsCtorMap s) })
+            pure (DataConstructor () cname fieldTypes))
+          (zip [0 :: Int ..] (templateConstructors template))
+        let declaration = DataTypeDeclaration () typeName
+              [ TypeParameter parameter Nothing
+              | parameter <- parameterVariables
+              ] constructors
+        modifyT (\s -> s { tsDecls = tsDecls s ++ [declaration] })
+        pure (TypeConstructor typeName)
+
+      freshExactFamily spelling arity = do
+        index <- getsT tsAppNext
+        let privateSpelling = "LeantType" ++ show index
+        typeName <- nameT privateSpelling
+        let family = AppFamily typeName arity
+        modifyT (\s -> s
+          { tsAppFamilies = Map.insert spelling family (tsAppFamilies s)
+          , tsAppNext = index + 1
+          , tsTypeMap = Map.insert privateSpelling spelling (tsTypeMap s)
+          })
+        pure (index, privateSpelling, typeName)
+
+      -- A fixed opaque field such as @Secret@ is not one of the Lean
+      -- inductive's parameters.  Modeling it as an engine type variable would
+      -- make the generated data declaration ill scoped, so give every such
+      -- exact field one shared private proper-type declaration.  Other atoms
+      -- retain the established flexible transport representation.
+      rigidAtom key = do
+        atoms <- getsT tsAtomFamilies
+        case Map.lookup key atoms of
+          Just typeName -> pure (TypeConstructor typeName)
+          Nothing -> do
+            index <- getsT tsAtomNext
+            let privateSpelling = "LeantAtom" ++ show index
             typeName <- nameT privateSpelling
-            let kind = foldr FunctionKind ProperTypeKind
-                  (replicate arity ProperTypeKind)
-                declaration = AbstractTypeDeclaration () typeName kind
-                family = AppFamily typeName arity
+            let declaration =
+                  AbstractTypeDeclaration () typeName ProperTypeKind
             modifyT (\s -> s
-              { tsAppFamilies = Map.insert spelling family (tsAppFamilies s)
-              , tsAppNext = index + 1
-              , tsTypeMap = Map.insert privateSpelling spelling (tsTypeMap s)
+              { tsAtomFamilies = Map.insert key typeName (tsAtomFamilies s)
+              , tsAtomNext = index + 1
+              -- Parenthesize the full pretty-printed type: the renderer adds
+              -- Lean's @ prefix, and keys may themselves be applications or
+              -- arrows rather than a single identifier.
+              , tsTypeMap = Map.insert privateSpelling ("(" ++ key ++ ")")
+                  (tsTypeMap s)
               , tsDecls = tsDecls s ++ [declaration]
               })
-            pure (Just (TypeConstructor typeName))
+            pure (TypeConstructor typeName)
 
       -- One declaration per display key: translate the fields first
       -- (declaring any nested inductives before this one), parameterize
@@ -632,7 +803,7 @@ fragToDjinn structuralRecursive providers extras frag0 = do
                 let spelling = "LeantC" ++ show index ++ "_" ++ show j
                 cname <- nameT spelling
                 modifyT (\s -> s { tsCtorMap = Map.insert spelling
-                    (CtorInfo leanName fields sole) (tsCtorMap s) })
+                    (CtorInfo leanName fields sole Nothing) (tsCtorMap s) })
                 pure (DataConstructor () cname fieldTypes))
               (zip [0 :: Int ..] translated)
             -- kinds stay implicit: Djinn's lowering rejects explicit
@@ -694,6 +865,17 @@ fragToDjinn structuralRecursive providers extras frag0 = do
                       (RecInfo typeName (length parameters))
                       (tsRecFamilies s)
                   })
+                -- A recursive declaration can have fixed opaque fields which
+                -- are not parameters of the Lean family (for example,
+                -- @Std.Format.text : String -> Format@).  Such fields must be
+                -- private rigid proper types, not free variables in the data
+                -- declaration.  The recursive self key is harmless here:
+                -- it was installed in @tsInds@ above and resolves before the
+                -- rigid-atom fallback.
+                let fieldAtoms = foldl collectFragAtoms Set.empty
+                      (concatMap snd ctors)
+                modifyT (\s -> s
+                  { tsRigidAtoms = Set.union fieldAtoms (tsRigidAtoms s) })
                 let sole = length ctors == 1
                 constructors <- mapM
                   (\(j, (leanName, fields)) -> do
@@ -702,7 +884,8 @@ fragToDjinn structuralRecursive providers extras frag0 = do
                     cname <- nameT spelling
                     modifyT (\s -> s
                       { tsCtorMap = Map.insert spelling
-                          (CtorInfo leanName fields sole) (tsCtorMap s) })
+                          (CtorInfo leanName fields sole Nothing)
+                          (tsCtorMap s) })
                     pure (DataConstructor () cname fieldTypes))
                   (zip [0 :: Int ..] ctors)
                 let decl = DataTypeDeclaration () typeName
@@ -716,7 +899,10 @@ fragToDjinn structuralRecursive providers extras frag0 = do
       -- constructors become premise types the caller prepends to the
       -- goal as antecedents - introduction rules without elimination.
       recOccurrence premisesEnabled key ctors = do
-        occurrence <- TypeVariable <$> variable ("a:" ++ key)
+        rigid <- getsT (Set.member key . tsRigidAtoms)
+        occurrence <- if rigid
+          then rigidAtom key
+          else TypeVariable <$> variable ("a:" ++ key)
         registered <- getsT (Map.member key . tsRecs)
         if registered || not premisesEnabled
           then pure occurrence
@@ -751,7 +937,7 @@ fragToDjinn structuralRecursive providers extras frag0 = do
                   (ValueSignature () privateName providerType)
               , ("leantProvider" ++ show index, leanName)
               ))
-          (zip [0 :: Int ..] (filter usableProvider providers))
+          (zip [0 :: Int ..] usableProviders)
         pure (extrasT, goal, translatedProviders)
   ((extrasT, goal, translatedProviders), finalState) <-
     runTrans translate TransState
@@ -765,7 +951,11 @@ fragToDjinn structuralRecursive providers extras frag0 = do
     , tsRecFamilies = Map.empty
     , tsPrems = []
     , tsAppFamilies = Map.empty
+    , tsFamilyPlans = plans
     , tsAppNext = 0
+    , tsRigidAtoms = rigidAtoms
+    , tsAtomFamilies = Map.empty
+    , tsAtomNext = 0
     , tsTypeMap = Map.empty
     }
   let (providerDecls, providerNames) = unzip translatedProviders
@@ -777,6 +967,7 @@ fragToDjinn structuralRecursive providers extras frag0 = do
     , Map.fromList providerNames
     , tsTypeMap finalState
     , extrasT ++ tsPrems finalState
+    , projection
     )
  where
   usableProvider = not . fragHasDepth . providerTypeFrag
@@ -794,3 +985,404 @@ fragToDjinn structuralRecursive providers extras frag0 = do
   plainParameter parameter = case parameter of
     FVar key -> Just key
     _ -> Nothing
+
+fragmentProjectionComplete :: Frag -> Bool
+fragmentProjectionComplete frag =
+  not (fragHasDepth frag) && null (fragUnsafeAtoms frag)
+
+-- | Decide each exact-head family representation from the complete query,
+-- before translation order can bias the choice.  A nominal use means Lean did
+-- not expose a constructor schema at that occurrence, so every use of that
+-- head becomes one shared abstract family.  Otherwise a structural template
+-- is accepted only when one unique schema can be recovered and specializing
+-- it reproduces every serialized occurrence exactly.
+exactFamilyPlans :: [Frag] -> Map.Map String ExactFamilyPlan
+exactFamilyPlans = Map.mapWithKey choosePlan
+  . foldl collectExactFamilyUses Map.empty
+
+structuralAtomKeys :: Map.Map String ExactFamilyPlan -> Set.Set String
+structuralAtomKeys = Map.foldl' collectPlan Set.empty
+ where
+  collectPlan keys plan = case plan of
+    StructuralFamily template -> foldl collectConstructor keys
+      (templateConstructors template)
+    _ -> keys
+  collectConstructor keys (_, fields) = foldl collectFragAtoms keys fields
+
+collectFragAtoms :: Set.Set String -> Frag -> Set.Set String
+collectFragAtoms atoms frag = case frag of
+  FArr parameter result -> descend atoms [parameter, result]
+  FProd left right -> descend atoms [left, right]
+  FSum left right -> descend atoms [left, right]
+  FAll _ _ body -> collectFragAtoms atoms body
+  FAtom _ key -> Set.insert key atoms
+  FApp _ _ _ arguments -> descend atoms arguments
+  -- An exact nested family's inventory belongs to its independent query-wide
+  -- plan.  Translating this field consumes only the head and parameter vector,
+  -- so inventory-only atoms must not become rigid on the outer declaration's
+  -- behalf.
+  FParamInd _ _ parameters _ -> descend atoms parameters
+  FInd _ constructors -> descend atoms (concatMap snd constructors)
+  FParamRec _ _ key parameters constructors ->
+    descend (Set.insert key atoms) (parameters ++ concatMap snd constructors)
+  FRec _ key parameters constructors ->
+    descend (Set.insert key atoms) (parameters ++ concatMap snd constructors)
+  _ -> atoms
+ where
+  descend = foldl collectFragAtoms
+
+collectExactFamilyUses
+  :: Map.Map String [ExactFamilyUse]
+  -> Frag
+  -> Map.Map String [ExactFamilyUse]
+collectExactFamilyUses uses frag = case frag of
+  FArr parameter result -> descend uses [parameter, result]
+  FProd left right -> descend uses [left, right]
+  FSum left right -> descend uses [left, right]
+  FAll _ _ body -> collectExactFamilyUses uses body
+  FApp _ _ head' arguments ->
+    let withUse = case head' of
+          AppVariable _ -> uses
+          AppNominal spelling -> insertUse spelling
+            (NominalUse (length arguments)) uses
+    in descend withUse arguments
+  FParamInd spelling _ parameters constructors ->
+    descend
+      (insertUse spelling (ParametricUse parameters constructors) uses)
+      (parameters ++ concatMap snd constructors)
+  FInd _ constructors -> descend uses (concatMap snd constructors)
+  -- Recursive exact heads intentionally retain the established FRec
+  -- projection in this slice, but nominal applications nested in their
+  -- parameters or fields still participate in the nonrecursive pre-scan.
+  FParamRec _ _ _ parameters constructors ->
+    descend uses (parameters ++ concatMap snd constructors)
+  FRec _ _ parameters constructors ->
+    descend uses (parameters ++ concatMap snd constructors)
+  _ -> uses
+ where
+  descend = foldl collectExactFamilyUses
+  insertUse spelling use = Map.insertWith (flip (++)) spelling [use]
+
+choosePlan :: String -> [ExactFamilyUse] -> ExactFamilyPlan
+choosePlan spelling uses = case nub (map useArity uses) of
+  [arity]
+    | any isNominalUse uses -> AbstractFamily arity (not (null occurrences))
+    | otherwise -> case compatibleTemplates of
+        template : rest
+          | all (templatesEquivalent template) rest ->
+              StructuralFamily template
+        _ -> AbstractFamily arity True
+  arities -> InvalidFamilyArities arities
+ where
+  occurrences =
+    [ (parameters, constructors)
+    | ParametricUse parameters constructors <- uses
+    ]
+  compatibleTemplates =
+    [ template
+    | occurrence@(parameters, _) <- occurrences
+    , pairwiseDistinct parameters
+    , let template = genericTemplate spelling occurrence
+    , templateClosed template
+    , all (templateFits template) occurrences
+    ]
+
+  useArity use = case use of
+    ParametricUse parameters _ -> length parameters
+    NominalUse arity -> arity
+  isNominalUse NominalUse{} = True
+  isNominalUse _ = False
+
+exactFamilyProjectionComplete :: Map.Map String ExactFamilyPlan -> Bool
+exactFamilyProjectionComplete = all complete . Map.elems
+ where
+  complete plan = case plan of
+    AbstractFamily _ hidesStructure -> not hidesStructure
+    InvalidFamilyArities{} -> False
+    StructuralFamily{} -> True
+
+pairwiseDistinct :: [Frag] -> Bool
+pairwiseDistinct [] = True
+pairwiseDistinct (parameter : rest) =
+  not (any (schemaEquivalent parameter) rest) && pairwiseDistinct rest
+
+genericTemplate
+  :: String
+  -> ([Frag], [(String, [Frag])])
+  -> ParametricTemplate
+genericTemplate spelling (parameters, constructors) = ParametricTemplate
+  { templateArity = length parameters
+  , templateFormals = formals
+  , templateConstructors = replaceConstructorFields replacements constructors
+  }
+ where
+  formals =
+    [ "\0leant-family:" ++ spelling ++ ":" ++ show index
+    | index <- [0 :: Int .. length parameters - 1]
+    ]
+  replacements = zip parameters (map FVar formals)
+
+-- A shared declaration may mention only its fresh family parameters and
+-- variables bound by a field-local forall.  Fixed opaque atoms are closed
+-- separately as private rigid declarations; an unexpected free FVar or
+-- higher-kinded variable head makes the family abstract instead of producing
+-- an ill-scoped Djex data declaration.
+templateClosed :: ParametricTemplate -> Bool
+templateClosed template = all
+  (Set.null . freeSchemaVariables (Set.fromList (templateFormals template)))
+  [ field
+  | (_, fields) <- templateConstructors template
+  , field <- fields
+  ]
+
+freeSchemaVariables :: Set.Set String -> Frag -> Set.Set String
+freeSchemaVariables bound frag = case frag of
+  FArr parameter result -> descend [parameter, result]
+  FProd left right -> descend [left, right]
+  FSum left right -> descend [left, right]
+  FAll _ binder body -> freeSchemaVariables (Set.insert binder bound) body
+  FVar variableName
+    | variableName `Set.member` bound -> Set.empty
+    | otherwise -> Set.singleton variableName
+  FApp _ _ head' arguments ->
+    let headVariables = case head' of
+          AppVariable variableName
+            | variableName `Set.member` bound -> Set.empty
+            | otherwise -> Set.singleton variableName
+          AppNominal _ -> Set.empty
+    in headVariables `Set.union` descend arguments
+  -- As in 'collectFragAtoms', the nested exact family's constructors are
+  -- validated by its own plan and do not occur in this field's engine type.
+  FParamInd _ _ parameters _ -> descend parameters
+  FInd _ constructors -> descend (concatMap snd constructors)
+  FParamRec _ _ _ parameters constructors ->
+    descend (parameters ++ concatMap snd constructors)
+  FRec _ _ parameters constructors ->
+    descend (parameters ++ concatMap snd constructors)
+  _ -> Set.empty
+ where
+  descend = Set.unions . map (freeSchemaVariables bound)
+
+templateFits
+  :: ParametricTemplate
+  -> ([Frag], [(String, [Frag])])
+  -> Bool
+templateFits template (parameters, constructors) =
+  length parameters == templateArity template
+    && constructorsEquivalent
+      (replaceConstructorFields
+        (zip (map FVar (templateFormals template)) parameters)
+        (templateConstructors template))
+      constructors
+
+templatesEquivalent :: ParametricTemplate -> ParametricTemplate -> Bool
+templatesEquivalent left right =
+  templateArity left == templateArity right
+    && templateFormals left == templateFormals right
+    && constructorsEquivalent
+      (templateConstructors left) (templateConstructors right)
+
+constructorsEquivalent
+  :: [(String, [Frag])]
+  -> [(String, [Frag])]
+  -> Bool
+constructorsEquivalent left right =
+  length left == length right
+    && and (zipWith constructorEquivalent left right)
+ where
+  constructorEquivalent (leftName, leftFields) (rightName, rightFields) =
+    leftName == rightName
+      && length leftFields == length rightFields
+      && and (zipWith schemaEquivalent leftFields rightFields)
+
+-- Display keys, safety flags, completeness, and nested constructor inventories
+-- are occurrence metadata, not part of a field type's identity.  An exact node
+-- is identified by its head and parameter vector; a legacy occurrence-local
+-- node by its display key.  The surrounding family's top-level constructor
+-- inventory is still checked separately by 'constructorsEquivalent'.
+schemaEquivalent :: Frag -> Frag -> Bool
+schemaEquivalent = go []
+ where
+  go binders left right = case (left, right) of
+    (FArr a b, FArr c d) -> both binders a c b d
+    (FProd a b, FProd c d) -> both binders a c b d
+    (FSum a b, FSum c d) -> both binders a c b d
+    (FTop, FTop) -> True
+    (FBot, FBot) -> True
+    (FAll leftExplicit leftBinder leftBody,
+        FAll rightExplicit rightBinder rightBody) ->
+      leftExplicit == rightExplicit
+        && go ((leftBinder, rightBinder) : binders) leftBody rightBody
+    (FVar a, FVar b) -> equivalentName binders a b
+    (FAtom _ a, FAtom _ b) -> a == b
+    (FApp _ _ leftHead leftArguments,
+        FApp _ _ rightHead rightArguments) ->
+      equivalentHead binders leftHead rightHead
+        && equivalentLists binders leftArguments rightArguments
+    (FParamInd leftHead _ leftParameters _,
+        FParamInd rightHead _ rightParameters _) ->
+      leftHead == rightHead
+        && equivalentLists binders leftParameters rightParameters
+    (FInd leftKey _, FInd rightKey _) -> leftKey == rightKey
+    (FParamRec _ leftHead _ leftParameters _,
+        FParamRec _ rightHead _ rightParameters _) ->
+      leftHead == rightHead
+        && equivalentLists binders leftParameters rightParameters
+    (FRec _ leftKey _ _, FRec _ rightKey _ _) -> leftKey == rightKey
+    (FDepth, FDepth) -> True
+    _ -> False
+
+  both binders a c b d = go binders a c && go binders b d
+  equivalentLists binders xs ys = length xs == length ys
+    && and (zipWith (go binders) xs ys)
+  equivalentHead binders leftHead rightHead = case (leftHead, rightHead) of
+    (AppVariable leftName, AppVariable rightName) ->
+      equivalentName binders leftName rightName
+    (AppNominal leftName, AppNominal rightName) -> leftName == rightName
+    _ -> False
+  equivalentName binders leftName rightName = case lookup leftName binders of
+    Just expected -> expected == rightName
+    Nothing -> case lookup rightName [(right, left) | (left, right) <- binders] of
+      Just _ -> False
+      Nothing -> leftName == rightName
+
+replaceConstructorFields
+  :: [(Frag, Frag)]
+  -> [(String, [Frag])]
+  -> [(String, [Frag])]
+replaceConstructorFields replacements = map
+  (\(name, fields) -> (name, map (replaceFrag replacements) fields))
+
+-- | Exact whole-fragment replacement, followed by structural descent only
+-- when no parameter matches the current node.  Matching the whole node first
+-- is important for higher-kinded or otherwise structured parameters: their
+-- internal variables are not declaration parameters in their own right.
+replaceFrag :: [(Frag, Frag)] -> Frag -> Frag
+replaceFrag replacements = go Set.empty
+ where
+  replacementFreeVariables = Set.unions
+    [ freeSchemaVariables Set.empty replacement
+    | (_, replacement) <- replacements
+    ]
+  reservedNames = Set.unions
+    [ schemaNames parameter `Set.union` schemaNames replacement
+    | (parameter, replacement) <- replacements
+    ]
+
+  go shadowed frag = case
+      [ replacement
+      | (parameter, replacement) <- replacements
+      -- A constructor-local forall may reuse an outer family parameter's
+      -- spelling.  The occurrence below that binder denotes the local
+      -- variable, not the family argument, so it must not be genericized.
+      , Set.null
+          (freeSchemaVariables Set.empty parameter `Set.intersection` shadowed)
+      -- Every binder that could capture a replacement is alpha-renamed on
+      -- entry below.  Retain this guard at the replacement site as a
+      -- defensive invariant for fragments introduced by future constructors.
+      , Set.null
+          (freeSchemaVariables Set.empty replacement
+            `Set.intersection` shadowed)
+      , schemaEquivalent parameter frag
+      ] of
+    replacement : _ -> replacement
+    [] -> case frag of
+      FArr parameter result ->
+        FArr (recur parameter) (recur result)
+      FProd left right -> FProd (recur left) (recur right)
+      FSum left right -> FSum (recur left) (recur right)
+      FAll explicit binder body
+        | binder `Set.member` replacementFreeVariables ->
+            let fresh = freshBinderName
+                  (reservedNames `Set.union` schemaNames body
+                    `Set.union` shadowed)
+                renamed = renameBoundVariable binder fresh body
+            in FAll explicit fresh
+                (go (Set.insert fresh shadowed) renamed)
+        | otherwise ->
+            FAll explicit binder (go (Set.insert binder shadowed) body)
+      FApp safe key head' arguments ->
+        FApp safe key head' (map recur arguments)
+      FParamInd headName key parameters constructors ->
+        FParamInd headName key (map recur parameters)
+          (mapCtorFields shadowed constructors)
+      FInd key constructors ->
+        FInd key (mapCtorFields shadowed constructors)
+      FParamRec complete headName key parameters constructors ->
+        FParamRec complete headName key (map recur parameters)
+          (mapCtorFields shadowed constructors)
+      FRec complete key parameters constructors ->
+        FRec complete key (map recur parameters)
+          (mapCtorFields shadowed constructors)
+      other -> other
+   where
+    recur = go shadowed
+
+  mapCtorFields shadowed = map
+    (\(name, fields) -> (name, map (go shadowed) fields))
+
+  freshBinderName reserved = choose (0 :: Int)
+   where
+    choose index =
+      let candidate = "\0leant-bound:" ++ show index
+      in if candidate `Set.member` reserved
+          then choose (index + 1)
+          else candidate
+
+-- | Every syntactic variable and binder name in a schema.  Exact nominal
+-- heads and display keys live in a separate namespace and need not constrain
+-- alpha-renaming.
+schemaNames :: Frag -> Set.Set String
+schemaNames frag = case frag of
+  FArr parameter result -> descend [parameter, result]
+  FProd left right -> descend [left, right]
+  FSum left right -> descend [left, right]
+  FAll _ binder body -> Set.insert binder (schemaNames body)
+  FVar variableName -> Set.singleton variableName
+  FApp _ _ head' arguments ->
+    let headNames = case head' of
+          AppVariable variableName -> Set.singleton variableName
+          AppNominal _ -> Set.empty
+    in headNames `Set.union` descend arguments
+  FParamInd _ _ parameters constructors ->
+    descend (parameters ++ concatMap snd constructors)
+  FInd _ constructors -> descend (concatMap snd constructors)
+  FParamRec _ _ _ parameters constructors ->
+    descend (parameters ++ concatMap snd constructors)
+  FRec _ _ parameters constructors ->
+    descend (parameters ++ concatMap snd constructors)
+  _ -> Set.empty
+ where
+  descend = Set.unions . map schemaNames
+
+-- | Rename the occurrences bound by one surrounding 'FAll'.  A nested binder
+-- with the same spelling shadows it and therefore stops the descent.
+renameBoundVariable :: String -> String -> Frag -> Frag
+renameBoundVariable old new frag = case frag of
+  FArr parameter result -> FArr (go parameter) (go result)
+  FProd left right -> FProd (go left) (go right)
+  FSum left right -> FSum (go left) (go right)
+  FAll explicit binder body
+    | binder == old -> frag
+    | otherwise -> FAll explicit binder (go body)
+  FVar variableName
+    | variableName == old -> FVar new
+    | otherwise -> frag
+  FApp safe key head' arguments ->
+    let renamedHead = case head' of
+          AppVariable variableName
+            | variableName == old -> AppVariable new
+          _ -> head'
+    in FApp safe key renamedHead (map go arguments)
+  FParamInd headName key parameters constructors ->
+    FParamInd headName key (map go parameters) (mapCtorFields constructors)
+  FInd key constructors -> FInd key (mapCtorFields constructors)
+  FParamRec complete headName key parameters constructors ->
+    FParamRec complete headName key (map go parameters)
+      (mapCtorFields constructors)
+  FRec complete key parameters constructors ->
+    FRec complete key (map go parameters) (mapCtorFields constructors)
+  _ -> frag
+ where
+  go = renameBoundVariable old new
+  mapCtorFields = map (\(name, fields) -> (name, map go fields))
