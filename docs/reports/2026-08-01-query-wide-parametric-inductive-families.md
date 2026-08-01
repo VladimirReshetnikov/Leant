@@ -63,7 +63,7 @@ input comprises:
 
 - caller premises,
 - the engine goal, and
-- every Exference provider that survived depth admission.
+- every live provider that survived depth admission.
 
 Uses are grouped by exact Lean head. A structural occurrence contributes its
 parameter vector and complete specialized constructor inventory. A retained
@@ -178,13 +178,12 @@ Both engines consume the same shared datatype declarations.
   query-supplied polytype. The direct Lean rendering is `fun x => x _` (or one
   `_` per family parameter).
 - **Exference** can perform the same family transport and keeps its normal
-  ranked constructor/case search. In standalone mode, a structurally accepted
-  goal first runs without live providers and its candidates are Lean-verified;
-  providers are discovered and searched only after no baseline variant
-  verifies. It never emits negative evidence.
-- **Both** mode keeps the established isolation: Djinn candidates first,
-  Exference-only candidates after, and negative evidence only from Djinn when
-  its projection was complete.
+  ranked constructor/case search. It never emits negative evidence.
+- **Every mode** first runs a structurally accepted goal without live providers
+  and Lean-verifies that lane. Providers are discovered and searched only after
+  a nonterminal miss; a complete Djinn refutation remains terminal.
+  Djinn-backed fallback first isolates the top-ranked provider before widening;
+  `both` still places Djinn candidates before new Exference candidates.
 
 Every rendered candidate is re-elaborated by Lean against the original goal.
 The engine is useful for discovery, not part of the trusted kernel boundary.
@@ -228,15 +227,18 @@ The focused Haskell tests cover:
 
 The end-to-end
 [rank-N transcript](../../test/synth-parametric-rankn.txt) covers real `Option`
-under standalone Exference as well as Djinn. Exference's provider-free baseline
-is Lean-verified before inventory discovery, so the eighty root-local providers
-can no longer crowd this direct transport out of the bounded frontier. The
+under standalone Exference as well as Djinn. The provider-free baseline is
+Lean-verified before inventory discovery, so the eighty root-local providers
+can no longer crowd this direct transport out of either bounded frontier. The
 transcript also covers two-parameter `Demo.Phantom2` and fixed-field
 `Demo.Guard` transport under both engines. Atomic `Demo.Secret` and structural
 `Unit → Demo.Secret` controls demonstrate, respectively, the direct provider
 path and provider fallback after a structural baseline miss. A
 term-parameterized `Demo.Tag` control confirms that the legacy occurrence-local
-path still constructs its value. See the focused
+path still constructs its value. A separate Djinn provider transcript checks
+closed, opaque, and rank-N specialization of an ordinary polymorphic Lean
+definition, the atomic provider path, provider-free ordering, and widening to a
+two-provider composition. See the focused
 [provider-isolation report](2026-08-01-provider-isolated-exference-baseline.md)
 for the dispatch, shared-deadline, and failed-variant filtering rules.
 
@@ -250,10 +252,12 @@ that work with a recursive-specific policy:
   arity across the query;
 - blocked self fields are normalized to the exact applied family before schema
   comparison;
-- a complete compatible schema gives Exference one validated parameterized
-  recursive declaration with the same bounded one-layer eliminator;
-- Djinn and every partial, ambiguous, incompatible, or nominally colliding
-  family use one abstract exact head plus occurrence constructor premises; and
+- a complete compatible schema gives both engines one validated parameterized
+  recursive declaration: Djinn receives bounded positive construction and
+  Exference receives the one-layer eliminator;
+- every partial, ambiguous, incompatible, or nominally colliding family uses
+  one abstract exact head plus occurrence constructor premises in both engines;
+  and
 - the renderer fits recursive constructor fields from the actual occurrence,
   retaining structured rank-N domains.
 

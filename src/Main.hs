@@ -2010,7 +2010,7 @@ synthGo' st args retriedVars goal parsed = do
  where
   -- Djinn's bounded candidate prefix can be crowded by a lossy or merely
   -- irrelevant foreign declaration.  Give Lean's highest-ranked provider an
-  -- isolated chance first, then widen to the complete bounded inventory if it
+  -- isolated chance first, then widen to the full bounded inventory if it
   -- does not verify.  Exference already ranks providers internally and keeps
   -- its established single enriched lane.  Every stage shares the command
   -- deadline and later stages skip spellings Lean already rejected.

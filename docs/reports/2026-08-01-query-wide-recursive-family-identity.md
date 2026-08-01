@@ -68,7 +68,7 @@ Its roots are:
 
 - the synthesis goal;
 - caller premises; and
-- every Exference provider that survived depth admission.
+- every live provider that survived depth admission.
 
 One head must have one parameter arity. Conflicting arities are rejected
 rather than abstracted or conflated. A nominal occurrence of the same head, a
@@ -278,9 +278,9 @@ Both requests retain the configured `synth-steps` limit and the same bounded
 queue. A complete miss may therefore spend two engine step budgets for one
 Exference invocation. It does not receive two wall-clock allowances: the whole
 `:synth` command remains beneath its single outer `LEANT_SYNTH_TIMEOUT`
-deadline. This inner strict/relaxed pair is independent of standalone
-Exference's provider-free/provider-enriched scheduling; if both outer passes
-are needed, each invocation follows the same rule within the one shared command
+deadline. This inner strict/relaxed pair is independent of the outer
+provider-free/provider-enriched scheduling; if both outer passes are needed,
+each Exference invocation follows the same rule within the one shared command
 deadline.
 
 Search and checking may retain a typed name for the ignored field. At the
@@ -326,7 +326,7 @@ unit tests. The recursive-family cases cover:
 - native Djinn construction of a polymorphic recursive family;
 - composition of two independent native recursive SCCs, with same-SCC
   reopening and false negative evidence excluded;
-- an Exference provider supplying the only useful source occurrence, in both
+- a live provider supplying the only useful source occurrence, in both
   provider orders;
 - normalization of differently spelled recursive self knots;
 - reachability isolation for an unused abstract outer inventory;

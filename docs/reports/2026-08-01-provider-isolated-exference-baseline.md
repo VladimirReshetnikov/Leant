@@ -1,17 +1,18 @@
-# Provider-isolated Exference baseline
+# Provider-isolated baseline and staged Djinn fallback
 
 **Date:** 2026-08-01
 
-**Scope:** Leant's REPL orchestration around standalone Djex Exference search
+**Scope:** Leant's REPL orchestration around Djex provider search
 
 ## Outcome
 
-Standalone Exference now protects ordinary structural synthesis from pressure
-created by the live Lean provider inventory. When the serialized goal is
-accepted as an in-fragment structural query, Leant runs Exference once with no
+Every engine mode protects ordinary structural synthesis from pressure created
+by the live Lean provider inventory. When the serialized goal is accepted as an
+in-fragment structural query, Leant runs the selected engine once with no
 providers and asks Lean to elaborate the rendered candidates against the exact
-goal. Only when no baseline variant verifies does it discover the bounded live
-inventory and run provider-enriched Exference.
+goal. After a nonterminal baseline miss it discovers the bounded live inventory
+and runs provider-enriched search. A complete Djinn refutation remains terminal
+and keeps the REPL's explicit constructive-to-classical fallback policy.
 
 This restores live transport for goals such as:
 
@@ -25,32 +26,45 @@ frontier before that term was ranked. Provider isolation makes the structural
 answer independent of that unrelated inventory, while Lean verification keeps
 the ordinary trust boundary intact.
 
+The successor in the same implementation now admits those providers to Djinn.
+Within fixed bounds, Djex specializes retained context-free loaded schemes at
+closed monotypes or guarded rank-N polytypes. Leant first gives the
+highest-ranked provider an isolated Djinn lane, preventing a lossy or irrelevant
+later declaration from crowding the fixed candidate prefix; after a
+nonterminal miss it widens to the full bounded inventory so multi-provider
+compositions remain possible.
+
 ## Dispatch policy
 
-The policy applies only when both conditions hold:
+The baseline policy applies when both conditions hold:
 
-1. the selected engine is exactly `EngineExference`; and
+1. any synthesis engine is selected; and
 2. fragment translation reports no structural refusal.
 
 The resulting dispatch matrix is:
 
 | Engine and goal class | First search | Provider fallback | Result behavior |
 | --- | --- | --- | --- |
-| `EngineExference`, structural/in-fragment | Provider-free Exference | Only after no baseline term verifies | Stop at the first verified lane |
-| `EngineExference`, atomic or provider-open refused | Provider-enriched Exference | Not a separate lane | Preserve access to live values |
-| `EngineBoth` | Existing combined engine behavior | Existing combined engine behavior | Djinn candidates first, then Exference-only candidates |
-| `EngineDjinn` | Djinn | None | Unchanged |
+| `EngineExference`, structural/in-fragment | Provider-free Exference | Full ranked inventory after no baseline term verifies | Stop at the first verified lane |
+| `EngineDjinn`, structural/in-fragment | Provider-free Djinn | After a nonterminal miss: top provider, then full bounded inventory | Preserve a complete refutation; otherwise stop at the first verified lane |
+| `EngineBoth`, structural/in-fragment | Provider-free combined search | After a nonterminal miss: top provider, then full bounded inventory | Djinn candidates remain before new Exference candidates |
+| Any engine, atomic/provider-open refused | Provider-enriched stages | No separate baseline | Preserve access to live values |
 
 A hard refusal that providers cannot open remains an honest out-of-fragment
 result. The direct path refers to atomic/refused goals for which provider
 discovery is already admissible; provider isolation does not broaden the
 fragment or make providers repair depth truncation.
 
-`EngineBoth` deliberately does not adopt the standalone two-pass policy. Its
-Djinn projection is already isolated from providers inside the engine, and its
-public contract is to merge Djinn candidates with later Exference-only
-alternatives. Changing it would alter candidate enumeration rather than merely
-protect standalone Exference.
+`EngineBoth` now follows the same verified baseline/fallback policy. Inside each
+fallback invocation, both Djinn and Exference receive the active provider
+slice; their public merge order remains Djinn candidates first and new
+Exference candidates afterward.
+
+A terminal Djinn refutation is scoped to the complete provider-free structural
+calculus. It is not presented as an exhaustive theorem about all declarations
+or axioms in Lean's live environment, whose inventory is intentionally bounded
+and best-effort. For `Prop`, the REPL's existing classical fallback remains the
+explicit policy for adding classical principles after constructive refutation.
 
 ## Verification before fallback
 
@@ -63,30 +77,32 @@ each variant as:
 example : (Goal) := candidate
 ```
 
-Only a survivor ends the command. An engine result whose variants all fail
-Lean verification is a baseline miss and may proceed to provider discovery.
-Thus isolation changes search scheduling, not the trusted boundary: no term is
-shown or bound without kernel-checked elaboration against the original goal.
+Only a survivor ends a candidate-producing lane. An engine result whose
+variants all fail Lean verification is a baseline miss and may proceed to
+provider discovery; a complete Djinn refutation ends the lane as a proof-backed
+verdict instead. Thus isolation changes search scheduling, not the trusted
+boundary: no term is shown or bound without kernel-checked elaboration against
+the original goal.
 
-If provider-enriched Exference rediscovers an exact rendered spelling that was
-already rejected during baseline verification, Leant removes that spelling
-from the fallback groups before asking Lean again. Empty groups are discarded;
-if every enriched variant was already checked, the fallback becomes an
-ordinary bounded no-term outcome. This avoids repeating failed backend work
-and failed temporary elaboration environments while leaving genuinely new
-provider candidates available.
+If a provider-enriched lane rediscovers an exact rendered spelling already
+rejected during baseline or an earlier provider stage, Leant removes that
+spelling before asking Lean again. Empty groups are discarded; if every wider
+variant was already checked, the fallback becomes an ordinary bounded no-term
+outcome. This avoids repeating failed backend work and failed temporary
+elaboration environments while leaving genuinely new provider candidates
+available.
 
 ## One command deadline
 
-The baseline and fallback do not each receive a fresh timeout. Leant computes
-one command deadline from `LEANT_SYNTH_TIMEOUT` before the first search. The
-fallback engine receives only the time remaining after baseline search, Lean
-verification, and provider discovery. `LEANT_SYNTH_TIMEOUT=0` retains the
-explicit wait-forever behavior.
+The baseline and provider stages do not each receive a fresh timeout. Leant
+computes one command deadline from `LEANT_SYNTH_TIMEOUT` before the first
+search. Each later engine lane receives only the time remaining after earlier
+search, Lean verification, and provider discovery.
+`LEANT_SYNTH_TIMEOUT=0` retains the explicit wait-forever behavior.
 
 A baseline timeout is reported as no answer, not a verdict, and an engine error
 is preserved directly; a provider inventory cannot repair either condition.
-This prevents the two-lane policy from silently doubling the configured
+This prevents the multi-lane policy from silently multiplying the configured
 wall-clock allowance or replacing a useful baseline diagnostic.
 
 ### Nested strict/relaxed engine lanes
@@ -116,14 +132,15 @@ optimizes for reliably finding an already available structural term under a
 bounded frontier, avoids the latency of provider discovery, and keeps the
 first result stable as the environment grows. A user who needs provider
 alternatives after structural success does not currently get an exhaustive
-combined list from standalone Exference; `both` retains its separate merged
-behavior, but is not a substitute for enumerating every Exference provider
+combined list from any mode. Combined search still merges the two engines
+inside a reached lane, but is not a substitute for enumerating every provider
 alternative.
 
 ## Validation
 
 The focused engine tests continue to cover provider-free proper-type family
-transport. The Lean 4.31 rank-N golden adds three end-to-end controls:
+transport and now exercise exact, polymorphic, and combined-mode providers in
+Djinn. The Lean 4.31 rank-N golden adds three Exference controls:
 
 - real `Option` transport under standalone Exference verifies that the
   structural baseline succeeds before a root-local inventory can crowd it out;
@@ -133,17 +150,29 @@ transport. The Lean 4.31 rank-N golden adds three end-to-end controls:
   inhabitant, then resolves through the same live provider, proving that a
   structural miss reaches fallback.
 
-Djinn golden coverage remains unchanged, and `EngineBoth` retains its existing
-isolation and candidate ordering tests. Failed-baseline variant removal is part
-of the fallback orchestration described above; it is independent of whether a
-particular golden miss emitted a structural spelling to reject.
+A dedicated Djinn provider golden adds seven end-to-end controls:
+
+- atomic `Demo.Seed` resolves directly through `Demo.seedValue`, covering the
+  provider-open refusal path;
+- `Demo.Seed → Demo.Seed` returns structural identity without discovering a
+  same-typed live definition, pinning provider-free first-result ordering;
+- an ordinary universe-polymorphic `Demo.sealedBox` definition specializes at
+  `Nat`, at opaque `Demo.Seed`, and at `∀ x : Type, x → x`; and
+- `Demo.consume` alone cannot solve `Demo.Input Demo.Index → Demo.Output
+  Demo.Index`, but the widened inventory composes it with `Demo.produce`; and
+- combined mode reuses the same verified `Demo.sealedBox` provider.
+
+Failed-variant removal is part of the fallback orchestration described above;
+it is independent of whether a particular golden miss emitted a spelling to
+reject.
 
 ## Relationship to parametric family sharing
 
 The scheduling policy is independent of the fragment representation described
 in the
 [query-wide family report](2026-08-01-query-wide-parametric-inductive-families.md).
-That projection makes real `Option` transport available to Exference; the
+That projection makes real `Option` transport available to either engine; the
 provider-isolated baseline ensures the live environment cannot hide it before
-Lean gets the chance to verify it. Atomic and structural-miss controls ensure
-the protection does not turn provider search off when it is actually needed.
+Lean gets the chance to verify it. Atomic, structural-miss, and polymorphic
+Djinn controls ensure the protection does not turn provider search off when it
+is actually needed.

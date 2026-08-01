@@ -176,8 +176,8 @@ keep their constructors and cases; compatible recursive families additionally
 retain bounded one-layer elimination in Exference. If its usual all-inputs-used
 search has no candidate, Leant retries that same Exference query with omissions
 allowed; this can project an impredicative payload while rendering the unopened
-recursive tail as `_`. Exference can also reuse a small, goal-relevant slice of
-the live Lean environment. Design and phasing:
+recursive tail as `_`. Both engines can also reuse a small, goal-relevant slice
+of the live Lean environment. Design and phasing:
 [docs/SYNTHESIS_PROPOSAL.md](docs/SYNTHESIS_PROPOSAL.md). The implementation
 invariants are recorded in the dated reports for
 [finite families](docs/reports/2026-08-01-query-wide-parametric-inductive-families.md)
@@ -195,10 +195,10 @@ engines; fixes for long-standing soundness bugs (an exhausted search
 over an *approximated* goal no longer counts as a refutation); and,
 most importantly here, a principled treatment of **rank-N and
 impredicative types** — goal-side quantifiers open through
-polarity-aware plan families, quantified hypotheses are instantiated at
-a bounded, sequent-supplied set of types, and impredicative
-instantiation is admitted under a guard that never invents a polytype
-the query did not supply.
+polarity-aware plan families, quantified hypotheses and context-free loaded
+schemes are instantiated at a bounded set of query and environment types, and
+impredicative instantiation is admitted under a guard that never invents a
+polytype the checked input did not supply.
 
 Three rules run through the design:
 
@@ -304,10 +304,12 @@ schemas, while their exact Lean heads are shared across all proper-type
 instantiations in one query. The provider-free engine tests exercise built-in
 one- and two-parameter families through both engines. Standalone Exference now
 tries an in-fragment goal without live providers first and asks Lean to verify
-that baseline before it discovers an environment inventory. The live golden
+that baseline before it discovers an environment inventory. Djinn and `both`
+now use the same provider-free ordering rule. The live golden
 therefore exercises real `Option` through Exference as well as Djinn; separate
 atomic and structural-miss controls confirm that a needed provider still wins
-when the baseline is inapplicable or has no verified term:
+when the baseline is inapplicable or ends without a verified term or complete
+Djinn refutation:
 
 ```text
 λ> inductive Demo.Phantom2 (a b : Type 1) : Type 1 where
@@ -326,6 +328,34 @@ synth engine: djinn
 λ> :synth ((∀ a b : Type 1, Demo.Phantom2 a b) → Demo.Phantom2 (∀ x : Type, x → x) (∀ y : Type, y → y))
   it1  fun x => x _ _
 ```
+
+Live polymorphic definitions now participate in Djinn's bounded
+instantiation too. This ordinary Lean definition is discovered only after the
+provider-free lane ends with a nonterminal miss, then specialized independently
+at a closed built-in type, an opaque session type, and a rank-N type:
+
+```text
+λ> def Demo.sealedBox {a : Type u} (value : a) : Demo.SealedBox a :=
+…>   .mk value rfl
+…>
+λ> :set synth-engine djinn
+synth engine: djinn
+λ> :synth (Nat → Demo.SealedBox Nat)
+  it1  Demo.sealedBox
+λ> :synth (Demo.Seed → Demo.SealedBox Demo.Seed)
+  it1  Demo.sealedBox
+λ> :synth ((∀ x : Type, x → x) → Demo.SealedBox (∀ x : Type, x → x))
+  it1  Demo.sealedBox
+```
+
+Djinn first searches with only the highest-ranked provider, which prevents a
+lossily projected or irrelevant declaration from crowding the fixed candidate
+prefix. If that isolated candidate does not verify, Leant widens to the full
+bounded inventory so compositions remain possible. The exact live transcript
+also covers an atomic provider, provider-free first-result ordering, a
+two-provider composition reached only after widening, and combined-mode reuse.
+It is checked in
+[`synth-djinn-providers`](test/synth-djinn-providers.txt).
 
 Only application arguments whose own type is a universe take the retained
 proper-type path. A non-inductive term-indexed family such as `P 3` remains a
@@ -383,7 +413,10 @@ The wording is careful: the verdict is about *closed terms of the
 polymorphic type* (instantiate `b := Option a` and `id` inhabits it),
 and in `Prop` it is about *constructive* provability. When the
 translation had to hide structure behind an opaque atom, the verdict
-backs off to "no term found within bounds".
+backs off to "no term found within bounds". The proof is scoped to the
+complete provider-free structural calculus, not an exhaustive claim about
+every axiom or declaration in the live Lean environment: provider discovery is
+intentionally bounded and best-effort.
 
 ### Classical candidates
 
@@ -464,7 +497,7 @@ transport the whole family at an impredicative argument:
 ```
 
 Sharing is conservative and independent of traversal order. Every occurrence
-of an exact head in the goal, caller premises, and usable Exference providers
+of an exact head in the goal, caller premises, and usable live providers
 must agree on arity and on one generic constructor schema. Repeated or
 otherwise ambiguous parameter vectors may borrow a template from a later,
 unambiguous occurrence only when specialization reproduces every inventory.
@@ -563,19 +596,21 @@ finisher tactics, needing no premise database and no imports. Bare
   runs the two together — Djinn's candidates first, Exference's new
   ones after, refutations only from the engine entitled to them. The
   default `djinn` remains the complete, terminating LJT search.
-- Standalone Exference gives every structurally accepted goal a provider-free
+- Every engine mode gives a structurally accepted goal a provider-free
   baseline lane. Its rendered candidates are checked by Lean first, and live
-  providers are discovered and searched only if no baseline variant verifies.
-  Provider-eligible atomic/refused goals go directly to the provider lane.
-  `both` mode is unchanged: its Djinn lane was already provider-isolated and it
-  retains merged Djinn-then-Exference candidates. Both standalone Exference
-  lanes consume one command-wide `LEANT_SYNTH_TIMEOUT` deadline, and baseline
-  spellings that already failed Lean verification are removed before fallback
-  candidates are checked again. This policy deliberately favors a structural
-  solution over breadth: provider alternatives are not enumerated after a
-  baseline term succeeds. See the dated
+  providers are discovered only after a nonterminal miss. A complete Djinn
+  refutation remains terminal and retains the explicit classical fallback.
+  Provider-eligible atomic/refused goals go directly to provider search.
+  Djinn and `both` first isolate the highest-ranked provider, then widen to the
+  full bounded inventory after a verified miss; Exference keeps its internally
+  rated full-inventory lane. All lanes consume one command-wide
+  `LEANT_SYNTH_TIMEOUT` deadline, and spellings that already failed Lean
+  verification are removed before a wider fallback is checked. This policy
+  deliberately favors a structural solution over breadth: provider
+  alternatives are not enumerated after a baseline term succeeds. See the
+  dated
   [provider-isolation report](docs/reports/2026-08-01-provider-isolated-exference-baseline.md).
-- When Exference needs live values, Leant takes a bounded inventory from the
+- When an engine needs live values, Leant takes a bounded inventory from the
   live Lean environment. It considers constants under namespaces named
   by the target, plus exact declarations from the current session;
   rejects generated names; prioritizes exact-result session and public
@@ -585,9 +620,9 @@ finisher tactics, needing no premise database and no imports. Bare
   Conventional implementation workers ending in `TR`,
   `Impl`, or `Aux` (or a `.go`/`.loop` component) remain eligible but
   move behind public fallbacks; exact user-session declarations always
-  bypass that spelling heuristic. Increasing positive penalties preserve
-  the order during search, so the broader fallback pool does not drown
-  the most relevant constants. Thus a
+  bypass that spelling heuristic. Exference assigns increasing positive
+  penalties in this order, while Djinn receives the isolated-first schedule
+  above. Thus a
   target such as `(α → β) → List α → List β` can reuse
   `List.map` instead of rebuilding recursion from scratch.
 - The goal serializer also supplies a canonical provider query: the
@@ -602,7 +637,7 @@ finisher tactics, needing no premise database and no imports. Bare
   maps those names back to the exact fully-qualified Lean globals (and
   uses Lean's `@` spelling for visible type applications) before the
   backend verifies the candidate. Inventory extraction is deliberately
-  best-effort: if it cannot be produced, Exference still runs with the
+  best-effort: if it cannot be produced, each engine still runs with the
   structural declarations it already has.
 - Proper-type applications headed by a bound constructor variable or an
   opaque/non-inductive Lean constant retain their ordered arguments. Private
@@ -641,11 +676,11 @@ finisher tactics, needing no premise database and no imports. Bare
   verification, a few hundred milliseconds per candidate. A wall-clock
   guard (default 20 s, `LEANT_SYNTH_TIMEOUT=N`, `0` waits indefinitely)
   covers quantified goals whose bounded instantiation widens the
-  space. For standalone Exference the same deadline covers its baseline and
-  any provider fallback rather than restarting for the second lane; hitting it
-  is reported as "no answer", never as a verdict.
-- `LEANT_SYNTH_DEBUG=1` prints the translated fragment and the rendered
-  variants — the fastest way to see why a candidate was dropped.
+  space. The same deadline covers the baseline and every provider fallback
+  rather than restarting for each lane; hitting it is reported as "no answer",
+  never as a verdict.
+- `LEANT_SYNTH_DEBUG=1` prints the translated fragment, discovered providers,
+  and rendered variants — the fastest way to see why a candidate was dropped.
 
 ## How it works
 
@@ -679,15 +714,18 @@ metaprogramming API.
 A `:synth` query passes through checked stages: a Lean metaprogram
 (compiled once into a cached side environment) elaborates the goal and
 serializes it into the engine's fragment; the fragment translator
-accepts it or refuses with a reason. For standalone Exference and an accepted
+accepts it or refuses with a reason. For every engine mode and an accepted
 structural fragment, the engine first searches without providers and the
-backend re-elaborates its rendered candidates against the original goal. Only
-if none survives does a second metaprogram build the bounded live-provider
-inventory and run the fallback search. Atomic/provider-open refusals use that
-provider path directly, while `both` retains its existing isolated Djinn and
-merged Exference behavior. Constructor and exact provider names are restored
-and binders named by role before every verification; only survivors are shown
-and bound.
+backend re-elaborates its rendered candidates against the original goal. After
+a nonterminal miss, a second metaprogram builds the bounded live-provider
+inventory and runs the fallback search; a complete Djinn refutation instead
+keeps its proof-backed verdict and explicit classical policy.
+Atomic/provider-open refusals use that
+provider path directly. Djinn-backed fallback first tries the top-ranked
+provider alone and then widens; combined mode still merges Djinn candidates
+before new Exference candidates. Constructor and exact provider names are
+restored and binders named by role before every verification; only survivors
+are shown and bound.
 
 The synthesis side environment tracks exactly which session history it
 has replayed. An unchanged history reuses it directly; an append replays
