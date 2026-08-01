@@ -9,7 +9,9 @@
 -- sort-quantified foralls) is decomposed; a non-recursive, non-indexed
 -- inductive applied to all of its parameters whose constructor fields
 -- are explicit and non-dependent expands into a generalized sum of
--- products (phase 2); every other subterm becomes an opaque atom
+-- products (phase 2); recursive occurrences retain a bounded constructor
+-- description for the Exference projection, and every other subterm becomes
+-- an opaque atom
 -- carried by its pretty-printed spelling, so alpha-equal dependent
 -- subformulas compare equal and can be transported (never analyzed).  Each atom carries a safety bit: an atom built purely from
 -- universally quantified variables keeps negative verdicts sound, while
@@ -24,9 +26,12 @@ module Leant.Synth.Fragment
   , Slot (..)
   , GoalSort (..)
   , ParsedGoal (..)
+  , ProviderFrag (..)
   , synthPrelude
   , serializerProgram
+  , providerProgram
   , parseGoalSexp
+  , parseProviderSexp
   , fragRefusal
   , fragUnsafeAtoms
   , fragSpine
@@ -36,7 +41,7 @@ module Leant.Synth.Fragment
   ) where
 
 import Data.Char (isSpace)
-import Data.List (nub)
+import Data.List (intercalate, nub)
 
 -- | The LJT core fragment.  @Iff@ and @Not@ are already lowered by the
 -- serializer (to a pair of arrows and an arrow to 'FBot').
@@ -58,12 +63,15 @@ data Frag
     -- only when the serializer saw the complete constructor list with
     -- non-dependent explicit fields, so the node itself never poisons a
     -- refutation; its fields answer for themselves
-  | FRec String [(String, [Frag])]
-    -- ^ recursive (or nested) inductive occurrence: an opaque atom for
-    -- elimination, but its listed constructors are sound introduction
-    -- rules the engine receives as premises.  The constructor list may
-    -- be partial (only in-fragment constructors are carried), and the
-    -- key always poisons refutations - structure stays hidden
+  | FRec Bool String [Frag] [(String, [Frag])]
+    -- ^ recursive (or nested) inductive occurrence.  Djinn treats it as an
+    -- opaque atom with the listed constructors as sound introduction
+    -- premises.  The flag records whether every Lean constructor was
+    -- serialized, followed by the display key and the applied inductive
+    -- parameters.  Exference lowers only complete occurrences whose explicit
+    -- parameter vector is structurally safe to a nominal recursive datatype;
+    -- partial or unsupported occurrences remain introduction-only.  The key
+    -- always poisons Djinn refutations.
   | FDepth              -- ^ translator depth bound reached
   deriving (Eq, Show)
 
@@ -80,6 +88,16 @@ data GoalSort = GoalProp | GoalType
 data ParsedGoal = ParsedGoal
   { pgSort :: GoalSort
   , pgFrag :: Frag
+  }
+  deriving (Eq, Show)
+
+-- | One Lean environment value lowered to the synthesis fragment.  The
+-- provider name remains the exact fully-qualified Lean spelling; the engine
+-- gives it a collision-free private name and the renderer maps that name back
+-- before Lean re-elaborates the candidate.
+data ProviderFrag = ProviderFrag
+  { providerLeanName :: String
+  , providerTypeFrag :: Frag
   }
   deriving (Eq, Show)
 
@@ -102,6 +120,17 @@ synthPrelude = unlines
   , "  let pp \8592 Meta.ppExpr e"
   , "  pure (\"(atom \" ++ (if safe then \"safe\" else \"unsafe\") ++ \" \""
   , "    ++ esc (toString pp) ++ \")\")"
+  , ""
+  , "-- Peel every term/type binder and expose the nominal head of a result."
+  , "-- Provider discovery uses this only for ranking; failure to find a head"
+  , "-- leaves the provider in the lower-priority bounded pool."
+  , "partial def resultHead? (e : Expr) : MetaM (Option Name) := do"
+  , "  let e \8592 whnfR e.consumeMData"
+  , "  match e with"
+  , "  | Expr.forallE n dom body bi =>"
+  , "    withLocalDecl n bi dom fun fv =>"
+  , "      resultHead? (body.instantiate1 fv)"
+  , "  | _ => pure e.getAppFn.constName?"
   , ""
   , "mutual"
   , ""
@@ -205,9 +234,10 @@ synthPrelude = unlines
   , "    | _ => pure none"
   , "  | _ => pure none"
   , ""
-  , "-- A recursive (or nested) inductive stays an opaque atom for"
-  , "-- elimination, but its constructors are still sound introduction"
-  , "-- rules: emit the ones whose instantiated fields are explicit and"
+  , "-- Preserve bounded constructor structure for a recursive (or nested)"
+  , "-- inductive.  Djinn consumes these constructors as introduction rules;"
+  , "-- Exference may additionally inspect one layer.  Emit only constructors"
+  , "-- whose instantiated fields are explicit and"
   , "-- non-dependent, with this occurrence's own key blocked so field"
   , "-- occurrences of the type serialize as the matching atom."
   , "partial def recOf (fuel depth : Nat) (blocked : List String) (e : Expr)"
@@ -226,19 +256,27 @@ synthPrelude = unlines
   , "        if blocked.contains key then pure none"
   , "        else do"
   , "          let args := e.getAppArgs"
+  , "          let mut params := \"\""
+  , "          for arg in args do"
+  , "            let param \8592 go fuel depth blocked arg"
+  , "            params := params ++ \" \" ++ param"
   , "          let blocked := key :: blocked"
   , "          let mut ctors := \"\""
   , "          let mut found := false"
+  , "          let mut complete := true"
   , "          for c in iv.ctors do"
   , "            let ct \8592 inferType (mkAppN (Expr.const c us) args)"
   , "            match \8592 ctorFields fuel depth blocked ct with"
-  , "            | none => pure ()"
+  , "            | none => complete := false"
   , "            | some fs =>"
   , "              found := true"
   , "              ctors := ctors ++ \" (ctor \" ++ esc c.toString"
   , "                ++ fs ++ \")\""
   , "          if !found then pure none"
-  , "          else pure (some (\"(rec \" ++ esc key ++ ctors ++ \")\"))"
+  , "          else pure (some (\"(rec \""
+  , "            ++ (if complete then \"complete\" else \"partial\")"
+  , "            ++ \" \" ++ esc key ++ \" (params\" ++ params ++ \")\""
+  , "            ++ ctors ++ \")\"))"
   , "    | _ => pure none"
   , "  | _ => pure none"
   , ""
@@ -280,6 +318,83 @@ serializerProgram goal = unlines
   , "      ++ \" \" ++ s ++ \")\")"
   , "  sorry"
   ]
+
+-- | Discover a bounded foreign-value inventory for Exference.  Scanning the
+-- full Lean environment is cheap compared with serializing all of it, but a
+-- large imported environment can contain over one hundred thousand
+-- declarations.  The Lean side therefore retains only declarations whose
+-- root namespace occurs in the target (plus exact session declarations),
+-- ranks exact result-head matches first, serializes at most 80 providers, and
+-- leaves final admissibility to the Haskell fragment parser and Lean's own
+-- candidate verification.
+providerProgram :: [String] -> String -> String
+providerProgram sessionNames goal = unlines
+  [ "open Lean Meta Elab Tactic in"
+  , "set_option autoImplicit true in"
+  , "set_option linter.unusedVariables false in"
+  , "example : (" ++ goal ++ ") := by"
+  , "  run_tac withMainContext do"
+  , "    let target \8592 getMainTarget"
+  , "    let env \8592 getEnv"
+  , "    let roots := target.getUsedConstants.toList.map Name.getRoot"
+  , "    let sessions : List String := ["
+      ++ intercalate ", " (map leanString sessionNames) ++ "]"
+  , "    let aux : List String :="
+  , "      [\"rec\", \"recOn\", \"casesOn\", \"brecOn\", \"binductionOn\","
+  , "       \"below\", \"ibelow\", \"noConfusion\", \"noConfusionType\","
+  , "       \"ctorElim\", \"ctorElimType\", \"ctorIdx\", \"sizeOf_spec\","
+  , "       \"injEq\", \"inj\", \"eq_def\", \"decEq\"]"
+  , "    let keep (n : Name) : Bool :="
+  , "      !n.isInternalDetail &&"
+  , "      !n.components.any fun c => match c with"
+  , "        | .str _ s => aux.contains s"
+  , "        | _ => false"
+  , "    let names := env.constants.fold (init := #[]) fun a n _ =>"
+  , "      if keep n && (roots.contains n.getRoot"
+  , "          || sessions.contains n.toString) then a.push n else a"
+  , "    let shorter (a b : Name) : Bool :="
+  , "      let sa := a.toString"
+  , "      let sb := b.toString"
+  , "      if sa.length == sb.length then sa < sb else sa.length < sb.length"
+  , "    let sorted := names.qsort shorter"
+  , "    let sessionCandidates := sorted.toList.filter fun n =>"
+  , "      sessions.contains n.toString"
+  , "    let otherCandidates := sorted.toList.filter fun n =>"
+  , "      !sessions.contains n.toString"
+  , "    let targetHead \8592 LeantSynth.resultHead? target"
+  , "    let mut sessionHits : Array Name := #[]"
+  , "    let mut preferred : Array Name := #[]"
+  , "    let mut fallback : Array Name := #[]"
+  , "    -- Exact session declarations bypass the root-pool scan cap."
+  , "    for n in sessionCandidates ++ otherCandidates.take 2048 do"
+  , "      match env.find? n with"
+  , "      | none => pure ()"
+  , "      | some info =>"
+  , "        let head \8592 LeantSynth.resultHead? info.type"
+  , "        if sessions.contains n.toString then"
+  , "          sessionHits := sessionHits.push n"
+  , "        else if head == targetHead then"
+  , "          preferred := preferred.push n"
+  , "        else"
+  , "          fallback := fallback.push n"
+  , "    let chosen := (sessionHits.toList ++ preferred.toList"
+  , "      ++ fallback.toList).take 80"
+  , "    let mut body := \"\""
+  , "    for n in chosen do"
+  , "      match env.find? n with"
+  , "      | none => pure ()"
+  , "      | some info =>"
+  , "        let frag \8592 LeantSynth.go 80 0 [] info.type"
+  , "        body := body ++ \" (provider \" ++ LeantSynth.esc n.toString"
+  , "          ++ \" \" ++ frag ++ \")\""
+  , "    logInfo (\"(providers\" ++ body ++ \")\")"
+  , "  sorry"
+  ]
+ where
+  leanString s = '"' : concatMap escape s ++ "\""
+  escape '"' = "\\\""
+  escape '\\' = "\\\\"
+  escape c = [c]
 
 -- S-expression parsing ------------------------------------------------------
 
@@ -324,6 +439,28 @@ parseGoalSexp text = do
         _ -> Left "trailing tokens in goal translation"
     _ -> Left "malformed goal translation"
 
+-- | Parse the provider inventory emitted by 'providerProgram'.
+parseProviderSexp :: String -> Either String [ProviderFrag]
+parseProviderSexp text = do
+  toks <- tokenize text
+  case toks of
+    TL : TSym "providers" : rest -> do
+      (parsedProviders, rest') <- providers rest
+      case rest' of
+        [] -> Right parsedProviders
+        _ -> Left "trailing tokens in provider translation"
+    _ -> Left "malformed provider translation"
+ where
+  providers (TR : rest) = Right ([], rest)
+  providers (TL : TSym "provider" : TStr name : rest) = do
+    (frag, rest') <- parseFrag rest
+    case rest' of
+      TR : more -> do
+        (tailProviders, final) <- providers more
+        Right (ProviderFrag name frag : tailProviders, final)
+      _ -> Left "malformed (provider ...)"
+  providers _ = Left "malformed provider inventory"
+
 parseFrag :: [Tok] -> Either String (Frag, [Tok])
 parseFrag (TL : TSym tag : rest) = case tag of
   "->" -> binary FArr rest
@@ -351,9 +488,14 @@ parseFrag (TL : TSym tag : rest) = case tag of
       Right (FInd key ctors, rest'')
     _ -> Left "malformed (ind ...)"
   "rec" -> case rest of
-    TStr key : rest' -> do
-      (ctors, rest'') <- parseCtors rest'
-      Right (FRec key ctors, rest'')
+    TSym inventory : TStr key : TL : TSym "params" : rest' -> do
+      complete <- case inventory of
+        "complete" -> Right True
+        "partial" -> Right False
+        other -> Left ("unknown recursive inventory " ++ other)
+      (params, rest'') <- parseFrags rest'
+      (ctors, rest''') <- parseCtors rest''
+      Right (FRec complete key params ctors, rest''')
     _ -> Left "malformed (rec ...)"
   other -> Left ("unknown fragment tag " ++ other)
  where
@@ -368,6 +510,11 @@ parseFrag (TL : TSym tag : rest) = case tag of
     (field, toks') <- parseFrag toks
     (fields, toks'') <- parseFields toks'
     Right (field : fields, toks'')
+  parseFrags (TR : toks) = Right ([], toks)
+  parseFrags toks = do
+    (frag, toks') <- parseFrag toks
+    (frags, toks'') <- parseFrags toks'
+    Right (frag : frags, toks'')
   binary ctor toks = do
     (a, toks') <- parseFrag toks
     (b, toks'') <- parseFrag toks'
@@ -405,7 +552,8 @@ fragRefusal frag
     FSum a b -> hasDepth a || hasDepth b
     FAll _ _ b -> hasDepth b
     FInd _ ctors -> any (any hasDepth . snd) ctors
-    FRec _ ctors -> any (any hasDepth . snd) ctors
+    FRec _ _ params ctors ->
+      any hasDepth params || any (any hasDepth . snd) ctors
     FDepth -> True
     _ -> False
 
@@ -448,7 +596,8 @@ glivenkoSplit = go []
     FProd a b -> quantFree a && quantFree b
     FSum a b -> quantFree a && quantFree b
     FInd _ ctors -> all (all quantFree . snd) ctors
-    FRec _ ctors -> all (all quantFree . snd) ctors
+    FRec _ _ params ctors ->
+      all quantFree params && all (all quantFree . snd) ctors
     FAll{} -> False
     _ -> True
 
@@ -478,6 +627,7 @@ fragUnsafeAtoms = nub . go
     FSum a b -> go a ++ go b
     FAll _ _ b -> go b
     FInd _ ctors -> concatMap (concatMap go . snd) ctors
-    FRec key ctors -> key : concatMap (concatMap go . snd) ctors
+    FRec _ key params ctors ->
+      key : concatMap go params ++ concatMap (concatMap go . snd) ctors
     FAtom False key -> [key]
     _ -> []

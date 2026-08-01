@@ -41,18 +41,23 @@ module Leant.Synth.Render
 import Control.Monad (foldM)
 import Data.List (intercalate, nub, sortOn, subsequences)
 import qualified Data.Map.Strict as Map
+import Data.Void (Void, absurd)
 
 import Language.Haskell.Synthesis.Generated
   ( Expression (..)
   , Pattern (..)
+  , VisibleTypeArgument
+  , visibleTypeArgumentType
   )
 import Language.Haskell.Synthesis.Name
-  ( Boxity (Boxed)
+  ( Boxity (..)
   , Name
-  , SpecialName (TupleConstructor)
+  , SpecialName (..)
   , nameSpecial
   , nameSpelling
+  , renderCanonical
   )
+import qualified Language.Haskell.Synthesis.Type as SharedType
 
 import Leant.Synth.Fragment (Frag (..), Slot (..), fragSpine, leadingTypeArgs)
 
@@ -67,6 +72,9 @@ data CtorInfo = CtorInfo
 -- | Engine-side constructor spellings of the declared datatypes.
 type CtorMap = Map.Map String CtorInfo
 
+-- | Collision-free engine provider spelling to exact Lean global name.
+type ProviderMap = Map.Map String String
+
 -- | Render one candidate expression against the goal fragment.  The
 -- candidate proves the premise-extended goal (constructor premises of
 -- recursive inductives are antecedents; see 'Leant.Synth.Engine'), so
@@ -75,9 +83,9 @@ type CtorMap = Map.Map String CtorInfo
 -- group of textual variants, best guess first; the caller verifies
 -- them in order and keeps the first that elaborates.
 renderLeanTerm
-  :: CtorMap -> [(String, Frag)] -> Frag -> Expression String
+  :: CtorMap -> ProviderMap -> [(String, Frag)] -> Frag -> Expression String
   -> Either String [String]
-renderLeanTerm cm premises goalFrag expr0 = do
+renderLeanTerm cm providers premises goalFrag expr0 = do
   stripped <- stripPremises (map fst premises) (normalizeExpr 0 expr0)
   base <- uniquify stripped
   -- premises participate in domain fitting under their marked names,
@@ -105,7 +113,7 @@ renderLeanTerm cm premises goalFrag expr0 = do
         styles = [Idiomatic, Explicit]
     concat <$> mapM
       (\set -> mapM
-        (\style -> render cm style doms 0 (markSites doms set expr))
+        (\style -> render cm providers style doms 0 (markSites doms set expr))
         styles)
       sets
 
@@ -163,6 +171,8 @@ substLocals sub expr
       Global _ -> expr
       Hole _ -> expr
       Apply f a -> Apply (substLocals sub f) (substLocals sub a)
+      VisibleTypeApplication f a ->
+        VisibleTypeApplication (substLocals sub f) a
       Tuple es -> Tuple (map (substLocals sub) es)
       Lambda pats body ->
         Lambda pats (substLocals (removeBound pats sub) body)
@@ -248,6 +258,7 @@ binderOrder e = case e of
   Global _ -> []
   Hole _ -> []
   Apply f a -> binderOrder f ++ binderOrder a
+  VisibleTypeApplication f _ -> binderOrder f
   Tuple es -> concatMap binderOrder es
   Lambda pats b -> concatMap patternNames pats ++ binderOrder b
   Let pat rhs b ->
@@ -265,6 +276,7 @@ mapExprNames f = go
     Global g -> Global g
     Hole h -> Hole h
     Apply a b -> Apply (go a) (go b)
+    VisibleTypeApplication a t -> VisibleTypeApplication (go a) t
     Tuple es -> Tuple (map go es)
     Lambda pats b -> Lambda (map goPat pats) (go b)
     Let pat rhs b -> Let (goPat pat) (go rhs) (go b)
@@ -293,6 +305,14 @@ globalKind cm name
 -- its engine spelling.
 declaredCtor :: CtorMap -> Name -> Maybe CtorInfo
 declaredCtor cm name = nameSpelling name >>= (`Map.lookup` cm)
+
+-- | A caller-owned foreign value, looked up through its private engine
+-- spelling.  The mapped text is the exact fully-qualified Lean name emitted by
+-- environment introspection, so no Haskell-name rendering or qualification
+-- heuristic is applied to it.
+declaredProvider :: ProviderMap -> Name -> Maybe String
+declaredProvider providers name =
+  nameSpelling name >>= (`Map.lookup` providers)
 
 -- Pattern normalization ------------------------------------------------------
 --
@@ -335,6 +355,8 @@ normalizeExpr fresh expr = case expr of
   Global _ -> expr
   Hole _ -> expr
   Apply f a -> Apply (normalizeExpr fresh f) (normalizeExpr fresh a)
+  VisibleTypeApplication f a ->
+    VisibleTypeApplication (normalizeExpr fresh f) a
   Tuple es -> Tuple (map (normalizeExpr fresh) es)
   Lambda pats body ->
     let step (i, done, wrap) pat =
@@ -400,6 +422,9 @@ uniquify expr0 = fst <$> go Map.empty 0 expr0
       (f', n1) <- go env n f
       (a', n2) <- go env n1 a
       Right (Apply f' a', n2)
+    VisibleTypeApplication f a -> do
+      (f', n1) <- go env n f
+      Right (VisibleTypeApplication f' a, n1)
     Tuple es -> do
       (es', n') <- goList env n es
       Right (Tuple es', n')
@@ -498,6 +523,7 @@ fit cm force frag expr n doms =
     Tuple _ -> True
     Global _ -> True
     Apply h _ -> introCore h
+    VisibleTypeApplication h _ -> introCore h
     _ -> False
 
   spineHasExplicitAll f = SlotAll True `elem` fragSpine f
@@ -533,8 +559,9 @@ fitCore cm force cf ce n ds = case (cf, ce) of
     let (x', n1, ds1) = fit cm force b x n ds in (Apply h x', n1, ds1)
   -- a fully applied declared constructor: fit each argument against
   -- the corresponding field fragment
-  (FInd _ _, _)
-    | (Global g, args@(_ : _)) <- appSpine ce
+  (resultFrag, _)
+    | isDeclaredData resultFrag
+    , (Global g, args@(_ : _)) <- appSpine ce
     , Just (CtorInfo _ fields _) <- declaredCtor cm g
     , length args == length fields ->
         let step (done, k, dss) (field, arg) =
@@ -549,7 +576,8 @@ fitCore cm force cf ce n ds = case (cf, ce) of
   -- against the successive explicit-arrow domains of its type, so
   -- binders inside those arguments are named and fitted too
   (_, _)
-    | (Local h, args@(_ : _)) <- appSpine ce
+    | (headExpr, args@(_ : _)) <- appSpine ce
+    , Just h <- localHead headExpr
     , Just hFrag <- lookup h ds ->
         let step (done, k, dss) (mdom, arg) = case mdom of
               Just dom ->
@@ -558,7 +586,10 @@ fitCore cm force cf ce n ds = case (cf, ce) of
               Nothing -> (done ++ [arg], k, dss)
             (args', n1, ds1) =
               foldl step ([], n, ds) (zip (argDoms hFrag) args)
-        in (foldl Apply (Local h) args', n1, ds1)
+        in (foldl Apply headExpr args', n1, ds1)
+  (_, VisibleTypeApplication function argument) ->
+    let (function', n1, ds1) = fitCore cm force cf function n ds
+    in (VisibleTypeApplication function' argument, n1, ds1)
   (_, Case scrut alts) ->
     let scrutFrag = case scrut of
           Local s -> peelAlls <$> lookup s ds
@@ -569,8 +600,9 @@ fitCore cm force cf ce n ds = case (cf, ce) of
                   | Right GInl <- globalKind cm g -> bindDomainPairs p a
                 (Just (FSum _ b), Constructor g [p])
                   | Right GInr <- globalKind cm g -> bindDomainPairs p b
-                (Just (FInd _ _), Constructor g ps)
-                  | Just (CtorInfo _ fields _) <- declaredCtor cm g
+                (Just scrutineeFrag, Constructor g ps)
+                  | isDeclaredData scrutineeFrag
+                  , Just (CtorInfo _ fields _) <- declaredCtor cm g
                   , length ps == length fields ->
                       concat (zipWith bindDomainPairs ps fields)
                 (Just f, TuplePattern _) -> bindDomainPairs pat f
@@ -589,11 +621,22 @@ fitCore cm force cf ce n ds = case (cf, ce) of
     (Right GInl, GInl) -> True
     (Right GInr, GInr) -> True
     _ -> False
+  -- Complete recursive families are declared nominally for Exference just
+  -- like expanded non-recursive inductives.  Their constructor arguments and
+  -- match binders therefore need the same fragment-directed fitting.  The
+  -- constructor-map guard above keeps opaque/partial recursive occurrences
+  -- out even when their fragment constructor is present here.
+  isDeclaredData FInd{} = True
+  isDeclaredData FRec{} = True
+  isDeclaredData _ = False
   peelAlls (FAll _ _ b) = peelAlls b
   peelAlls f = f
   appSpine expr = spineAcc expr []
   spineAcc (Apply f a) acc = spineAcc f (a : acc)
   spineAcc f acc = (f, acc)
+  localHead (Local h) = Just h
+  localHead (VisibleTypeApplication function _) = localHead function
+  localHead _ = Nothing
   -- the domain of the hypothesis type's n-th term argument (its
   -- quantifier slots consume no term arguments)
   argDoms frag = case frag of
@@ -668,6 +711,9 @@ markOrCount doms set = go
           let (h', i1) = go headExpr i
               (args', i2) = goArgs args i1
           in (foldl Apply h' args', i2)
+    VisibleTypeApplication function argument ->
+      let (function', i') = visibleFunction function i
+      in (VisibleTypeApplication function' argument, i')
     Tuple es ->
       let (es', i') = goMany es i in (Tuple es', i')
     Lambda pats body ->
@@ -687,6 +733,23 @@ markOrCount doms set = go
       in (Case scrut' alts', i2)
     Global _ -> (expr, i)
     Hole _ -> (expr, i)
+
+  -- A visible application is already an intentional instantiation site.
+  -- Exference emits the complete leading binder prefix, so do not also tag
+  -- its local head for the older inferred-placeholder variants.  Term
+  -- arguments inside the function are still ordinary expression uses and
+  -- must participate in the traversal.
+  visibleFunction expr i = case expr of
+    Local _ -> (expr, i)
+    Apply _ _ ->
+      let (headExpr, args) = spine expr []
+          (headExpr', i1) = visibleFunction headExpr i
+          (args', i2) = goMany args i1
+      in (foldl Apply headExpr' args', i2)
+    VisibleTypeApplication function argument ->
+      let (function', i') = visibleFunction function i
+      in (VisibleTypeApplication function' argument, i')
+    _ -> go expr i
 
   goMany [] i = ([], i)
   goMany (e : es) i =
@@ -718,25 +781,27 @@ markOrCount doms set = go
 data Style = Idiomatic | Explicit
   deriving (Eq)
 
-render :: CtorMap -> Style -> Map.Map String Frag -> Int
+render :: CtorMap -> ProviderMap -> Style -> Map.Map String Frag -> Int
        -> Expression String -> Either String String
-render cm style doms = go
+render cm providers style doms = go
  where
   go :: Int -> Expression String -> Either String String
   go req expr = case expr of
     Local x -> renderUse req x []
-    Global name -> do
-      kind <- globalKind cm name
-      case kind of
-        GUnit -> Right (at req 2 "\10216\10217")
-        GInl -> Right (at req 0 ".inl")
-        GInr -> Right (at req 0 ".inr")
-        GCtor info -> case style of
-          Idiomatic
-            | ciSole info && null (ciFields info) ->
-                Right (at req 2 "\10216\10217")
-            | otherwise -> Right (at req 0 (shortDot (ciLean info)))
-          Explicit -> Right (at req 2 (ciLean info))
+    Global name -> case declaredProvider providers name of
+      Just leanName -> Right (at req 2 leanName)
+      Nothing -> do
+        kind <- globalKind cm name
+        case kind of
+          GUnit -> Right (at req 2 "\10216\10217")
+          GInl -> Right (at req 0 ".inl")
+          GInr -> Right (at req 0 ".inr")
+          GCtor info -> case style of
+            Idiomatic
+              | ciSole info && null (ciFields info) ->
+                  Right (at req 2 "\10216\10217")
+              | otherwise -> Right (at req 0 (shortDot (ciLean info)))
+            Explicit -> Right (at req 2 (ciLean info))
     Apply _ _ -> do
       let (headExpr, args) = spine expr []
       case headExpr of
@@ -755,6 +820,10 @@ render cm style doms = go
           headTxt <- renderHead headExpr
           argTxts <- mapM (go 2) args
           Right (at req 1 (unwords (headTxt : argTxts)))
+    VisibleTypeApplication function argument -> do
+      functionTxt <- visibleFunctionText function
+      argumentTxt <- renderVisibleTypeArgument argument
+      Right (at req 1 (functionTxt ++ " " ++ argumentTxt))
     Lambda [] body -> go req body
     Lambda pats body -> do
       binders <- mapM (renderPattern cm style True) pats
@@ -830,16 +899,38 @@ render cm style doms = go
   spine (Apply f a) args = spine f (a : args)
   spine f args = (f, args)
 
-  renderHead (Global name) = do
-    kind <- globalKind cm name
-    case kind of
-      GInl -> Right ".inl"
-      GInr -> Right ".inr"
-      GUnit -> Right "\10216\10217"
-      GCtor info -> Right $ case style of
-        Idiomatic -> shortDot (ciLean info)
-        Explicit -> ciLean info
+  renderHead (Global name) = case declaredProvider providers name of
+    Just leanName -> Right leanName
+    Nothing -> do
+      kind <- globalKind cm name
+      case kind of
+        GInl -> Right ".inl"
+        GInr -> Right ".inr"
+        GUnit -> Right "\10216\10217"
+        GCtor info -> Right $ case style of
+          Idiomatic -> shortDot (ciLean info)
+          Explicit -> ciLean info
   renderHead other = go 1 other
+
+  -- Djex's visible type application is Haskell's @f \@T@.  Lean exposes an
+  -- implicit binder position by prefixing the head with @\@@; this is also
+  -- valid for an already-explicit binder.  Prefix only the first nominal/local
+  -- node in a VTA chain.  Higher-rank results reached through an ordinary term
+  -- application have no general positional Lean spelling, so they retain the
+  -- conservative ordinary-application fallback and verification decides.
+  visibleFunctionText function = case function of
+    VisibleTypeApplication{} -> go 1 function
+    Local{} -> ("@" ++) <$> go 2 function
+    Global name -> case declaredProvider providers name of
+      Just leanName -> Right ("@" ++ leanName)
+      Nothing -> do
+        kind <- globalKind cm name
+        Right $ "@" ++ case kind of
+          GInl -> "Sum.inl"
+          GInr -> "Sum.inr"
+          GUnit -> "Unit.unit"
+          GCtor info -> ciLean info
+    _ -> go 1 function
 
   -- non-final match-alternative bodies must not swallow following
   -- alternatives, so open bodies are parenthesized uniformly
@@ -847,6 +938,62 @@ render cm style doms = go
     patTxt <- renderPattern cm style False pat
     bodyTxt <- go 1 body
     Right ("| " ++ patTxt ++ " => " ++ bodyTxt)
+
+-- | Render Djex's bounded visible type argument as an ordinary Lean
+-- application argument.  Specified arguments are closed monotypes, so the
+-- impossible variable and forall cases remain explicit defensive failures at
+-- this backend boundary rather than inventing Lean binder scope.
+renderVisibleTypeArgument :: VisibleTypeArgument -> Either String String
+renderVisibleTypeArgument argument = case visibleTypeArgumentType argument of
+  Nothing -> Right "_"
+  Just typeExpression -> renderType 2 typeExpression
+ where
+  -- 0 = arrow/product, 1 = type application, 2 = atom.
+  renderType :: Int -> SharedType.Type Void -> Either String String
+  renderType req typeExpression = case typeExpression of
+    SharedType.TypeVariable variable -> absurd variable
+    SharedType.TypeConstructor name ->
+      at req 2 <$> renderTypeName name
+    SharedType.TypeApplication function argumentType -> do
+      functionTxt <- renderType 1 function
+      argumentTxt <- renderType 2 argumentType
+      Right (at req 1 (functionTxt ++ " " ++ argumentTxt))
+    SharedType.FunctionType parameter result -> do
+      parameterTxt <- renderType 1 parameter
+      resultTxt <- renderType 0 result
+      Right (at req 0 (parameterTxt ++ " → " ++ resultTxt))
+    SharedType.TupleType Boxed [] -> Right (at req 2 "Unit")
+    SharedType.TupleType Boxed elements -> do
+      elementTxts <- mapM (renderType 1) elements
+      Right (at req 0 (intercalate " × " elementTxts))
+    SharedType.TupleType Unboxed _ ->
+      Left "cannot render an unboxed tuple as a Lean type argument"
+    SharedType.ForallType{} ->
+      Left "cannot render a quantified visible Lean type argument"
+
+  -- The engine's structural encodings use their Haskell names.  Lean's
+  -- corresponding nominal constructors differ only in these cases; all other
+  -- validated identifiers retain their canonical (possibly qualified) name.
+  renderTypeName :: Name -> Either String String
+  renderTypeName name = case nameSpecial name of
+    Just ListConstructor -> Right "List"
+    Just FunctionConstructor ->
+      Left "cannot render an unsaturated function type constructor in Lean"
+    Just (TupleConstructor Boxed 0) -> Right "Unit"
+    Just (TupleConstructor Boxed _) ->
+      Left "cannot render an unsaturated tuple type constructor in Lean"
+    Just (TupleConstructor Unboxed _) ->
+      Left "cannot render an unboxed tuple type constructor in Lean"
+    Just ConsConstructor ->
+      Left "cannot render a list value constructor as a Lean type"
+    Nothing -> Right $ case nameSpelling name of
+      Just "Either" -> "Sum"
+      Just "Maybe" -> "Option"
+      Just "Void" -> "Empty"
+      _ -> renderCanonical name
+
+  at :: Int -> Int -> String -> String
+  at req level text = if level >= req then text else "(" ++ text ++ ")"
 
 -- | @binder@ selects the irrefutable subset used after @fun@\/@let@;
 -- match alternatives additionally allow constructor patterns.  The

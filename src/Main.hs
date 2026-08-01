@@ -52,18 +52,21 @@ import Leant.Synth.Engine
   , forceOutcome
   , parseSynthEngine
   , synthEngineName
-  , synthesize
+  , synthesizeWithProviders
   , synthesizeTuned
   )
 import Leant.Synth.Fragment
   ( Frag (..)
-  , ParsedGoal (..)
   , GoalSort (..)
+  , ParsedGoal (..)
+  , ProviderFrag
   , fragRefusal
   , fragUnsafeAtoms
   , glivenkoSplit
   , parseGoalSexp
+  , parseProviderSexp
   , propAtoms
+  , providerProgram
   , serializerProgram
   , synthPrelude
   )
@@ -685,7 +688,6 @@ evalExpression st text = do
               printed <- printBuiltinInfo st text
               unless printed $ case evalResult of
                 Right v -> () <$ printResponse st Nothing v
-                Left err -> emitLn st =<< cRed st err
 
 printBuiltinInfo :: St -> String -> IO Bool
 printBuiltinInfo st token = case builtinInfo token of
@@ -1570,24 +1572,39 @@ synthGo st args retriedVars goal parsed = do
   synthGo' st args retriedVars goal parsed
 
 synthGo' :: St -> [String] -> Maybe [String] -> String -> ParsedGoal -> IO ()
-synthGo' st args retriedVars goal parsed = case fragRefusal (pgFrag parsed) of
-  Just reason -> emitLn st =<< cRed st ("out of fragment: " ++ reason)
-  Nothing -> do
-    limit <- synthTimeoutSeconds
-    state <- readIORef st
-    bounded <- runEngineBounded limit
-      (synthesize (rsSynthEngine state) (rsSynthSteps state)
-        (pgFrag parsed))
-    case bounded of
-      Nothing -> do
-        emitLn st =<< cYellow st
-          ("the engine did not finish within " ++ show limit
-           ++ "s \8212 no answer, not a verdict")
-        emitLn st =<< cDim st
-          ("(bounded hypothesis instantiation can widen the search a lot; "
-           ++ "set LEANT_SYNTH_TIMEOUT to another number of seconds, "
-           ++ "or 0 to wait indefinitely)")
-      Just outcome -> report outcome
+synthGo' st args retriedVars goal parsed = do
+  state <- readIORef st
+  let fragment = pgFrag parsed
+      engine = rsSynthEngine state
+      refusal = fragRefusal fragment
+      providerEngine = engine /= EngineDjinn
+      -- A live value can inhabit an otherwise opaque atomic goal, but it
+      -- cannot repair a structural translation that stopped at FDepth.
+      discoverProviders = providerEngine && case refusal of
+        Nothing -> True
+        Just _ -> providerMayOpen fragment
+  providers <-
+    if discoverProviders then loadSynthProviders st goal else pure []
+  case refusal of
+    Just reason
+      | not (providerEngine && providerMayOpen fragment
+          && not (null providers)) ->
+          emitLn st =<< cRed st ("out of fragment: " ++ reason)
+    _ -> do
+      limit <- synthTimeoutSeconds
+      bounded <- runEngineBounded limit
+        (synthesizeWithProviders
+          engine (rsSynthSteps state) providers fragment)
+      case bounded of
+        Nothing -> do
+          emitLn st =<< cYellow st
+            ("the engine did not finish within " ++ show limit
+             ++ "s \8212 no answer, not a verdict")
+          emitLn st =<< cDim st
+            ("(bounded hypothesis instantiation can widen the search a lot; "
+             ++ "set LEANT_SYNTH_TIMEOUT to another number of seconds, "
+             ++ "or 0 to wait indefinitely)")
+        Just outcome -> report outcome
  where
   report outcome = case outcome of
     Left err -> emitLn st =<< cRed st ("synthesis engine error: " ++ err)
@@ -1636,6 +1653,44 @@ synthGo' st args retriedVars goal parsed = case fragRefusal (pgFrag parsed) of
     Right (SynthNoTerm notes) -> do
       emitLn st =<< cYellow st "no term found within the search bounds"
       forM_ notes $ \note -> emitLn st =<< cDim st ("note: " ++ note)
+
+  providerMayOpen (FAll _ _ body) = providerMayOpen body
+  providerMayOpen (FAtom _ _) = True
+  providerMayOpen _ = False
+
+-- | Ask Lean for the bounded value inventory relevant to this goal.  A
+-- provider failure degrades to structural synthesis: inventory discovery is
+-- an optimization and never weakens the ordinary Djinn/Exference boundary.
+loadSynthProviders :: St -> String -> IO [ProviderFrag]
+loadSynthProviders st goal = do
+  envOr <- ensureSynthEnv st
+  case envOr of
+    Left _ -> pure []
+    Right env -> do
+      state <- readIORef st
+      let sessionNames = nub (concatMap sessionDeclNames (rsHistory state))
+      result <- runCmd st (Just env) (providerProgram sessionNames goal)
+      case result of
+        Right response
+          | not (hasErrors response), Nothing <- respFatal response ->
+              case
+                [ trim body
+                | (severity, body) <- respMessages response
+                , severity == "info"
+                , "(providers" `isPrefixOf` trim body
+                ] of
+                translated : _ -> case parseProviderSexp translated of
+                  Right providers -> pure providers
+                  Left err -> unavailable err
+                [] -> unavailable "Lean emitted no provider inventory"
+        Left err -> unavailable err
+        Right _ -> unavailable "Lean rejected provider discovery"
+ where
+  unavailable reason = do
+    debug <- lookupEnv "LEANT_SYNTH_DEBUG"
+    when (isJust debug) $
+      emitLn st =<< cDim st ("provider inventory unavailable: " ++ reason)
+    pure []
 
 -- | Run the pure engine under the wall-clock guard, forcing enough of
 -- the outcome that the whole search happens inside the guard (the
@@ -2248,6 +2303,7 @@ proveInput st text = do
           emitLn st =<< cDim st "finish with :qed [NAME], inspect with :script"
       pure True
  where
+  popTactics :: Int -> IO Int
   popTactics n = go n 0
    where
     go 0 acc = pure acc
