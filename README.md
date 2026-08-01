@@ -1,11 +1,14 @@
-# Leant — a GHCi-style REPL for Lean 4
+# Leant — a Djex-based synthesis REPL for Lean 4
 
-An interactive read-eval-print loop for Lean 4, in the spirit of GHCi:
-type expressions and they are evaluated, type declarations and they
-enter the session, and a family of `:commands` gives you type queries,
-documentation, search, interactive tactic proving, and `:synth` —
-automatic term synthesis whose every answer is checked by Lean before
-you see it.
+Leant brings [Djex](lib/Djex)-powered program and proof synthesis to
+Lean 4, wrapped in an interactive read-eval-print loop. The centerpiece
+is `:synth`: give it a type and it constructs terms of that type —
+ranked, bound into the session, and every candidate re-elaborated by
+Lean before you see it — or proves that no such term exists. Around the
+synthesizer, Leant is a full REPL in the GHCi-inspired mold Djex itself
+follows: type expressions and they are evaluated, type declarations and
+they enter the session, and a family of `:commands` gives you type
+queries, documentation, search, and interactive tactic proving.
 
 ```text
 λ> 2 + 2
@@ -33,19 +36,19 @@ tutorial, with a detailed tour of `:synth` ([LaTeX source](docs/Leant.tex)).
 
 ## Highlights
 
-- **A real REPL.** Definitions persist via the backend's environment
-  threading; `it` holds the last result; TAB completes `:commands` and
-  dotted identifiers; multi-line input opens automatically on
-  syntactically incomplete lines and a blank line submits (`:{` … `:}`
-  delimits an explicit block, as in GHCi).
-- **Interactive proving.** `:prove` turns the prompt into a
-  tactic-by-tactic loop with unlimited `:undo`, and `:qed` saves the
-  finished proof as a real theorem in the session.
 - **Verified term synthesis.** `:synth TYPE` constructs programs and
   proofs — ranked, bound as `it1`, `it2`, …, and every candidate
   re-elaborated by the Lean backend before it is shown. When no
   constructive inhabitant exists it can *prove* that, and for refuted
   propositional goals it offers classical candidates instead.
+- **Interactive proving.** `:prove` turns the prompt into a
+  tactic-by-tactic loop with unlimited `:undo`, and `:qed` saves the
+  finished proof as a real theorem in the session.
+- **A real REPL.** Definitions persist via the backend's environment
+  threading; `it` holds the last result; TAB completes `:commands` and
+  dotted identifiers; multi-line input opens automatically on
+  syntactically incomplete lines and a blank line submits (`:{` … `:}`
+  delimits an explicit block, as in GHCi).
 - **Crash-proof sessions.** If the backend dies, times out, or is
   interrupted, it restarts and the session (imports + history) replays
   automatically; prove-mode scripts are printed before the mode exits,

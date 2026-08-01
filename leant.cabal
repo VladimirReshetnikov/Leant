@@ -1,7 +1,7 @@
 Cabal-Version: 3.0
 Name:          leant
 Version:       0.1.0
-Synopsis:      A GHCi-style interactive REPL for Lean 4
+Synopsis:      A Djex-based synthesis REPL for Lean 4
 Description:
   An interactive read-eval-print loop for Lean 4: expressions evaluate,
   declarations extend the session, and colon-commands provide type queries,
