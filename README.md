@@ -285,10 +285,10 @@ Explicit `∀` binders — leading, nested, trailing, or interleaved — are
 woven into the candidate's lambda automatically, and uses of quantified
 hypotheses get placeholder type arguments wherever Lean needs them
 (`f _ x`), so bounded rank-N candidates verify. Full impredicative
-inhabitation is undecidable, so Djinn uses a deterministic quadratic
-plan family rather than a power set. Its singleton and pairwise
-open/opaque frontiers cover every choice across five independent
-quantified sites; a six-site goal needing exactly three open and three
+inhabitation is undecidable, so Djinn uses a deterministic cubic plan
+family rather than a power set. Its singleton, pairwise, and triple
+open/opaque frontiers cover every choice across seven independent
+quantified sites; an eight-site goal needing exactly four open and four
 opaque sites remains a deliberate bounded gap. Beyond the guard the
 answer is "no term found within bounds" and nothing stronger.
 

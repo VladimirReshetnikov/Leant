@@ -503,6 +503,44 @@ rankNFrontierTests = testGroup "Djinn rank-N frontiers"
         else assertFailure $
           "expected a rendered pairwise rank-N candidate, got: "
             ++ show candidates
+  , testCase "render a balanced six-site triple plan for Lean" $ do
+      let variable = FVar
+          product4 a b c d = FProd a (FProd b (FProd c d))
+          forall4 a b c d body =
+            FAll True a (FAll True b (FAll True c (FAll True d body)))
+          wide a b c d = forall4 a b c d
+            (product4 (variable a) (variable b) (variable c) (variable d))
+          consumer codomain a b c d = forall4 a b c d
+            (FArr
+              (product4 (variable a) (variable b) (variable c) (variable d))
+              codomain)
+          identity a = FAll True a (FArr (variable a) (variable a))
+          q = variable "q"
+          r = variable "r"
+          goal = FArr
+            (wide "a" "b" "c" "d")
+            (FArr
+              (consumer q "s" "t" "u" "v")
+              (FArr
+                (consumer r "i" "j" "k" "l")
+                (FProd
+                  (wide "w" "x" "y" "z")
+                  (FProd
+                    (consumer q "m" "n" "o" "p")
+                    (FProd
+                      (consumer r "h" "i1" "j1" "k1")
+                      (FProd (identity "e")
+                        (FProd (identity "f") (identity "g"))))))))
+          candidates = firstGroup
+            (synthesizeWithProviders EngineDjinn 0 [] goal)
+      if any (\candidate ->
+          "fun " `isInfixOf` candidate
+            && "\10216" `isInfixOf` candidate
+            && "fun _" `isInfixOf` candidate) candidates
+        then pure ()
+        else assertFailure $
+          "expected a rendered triple rank-N candidate, got: "
+            ++ show candidates
   ]
 
 visibleTypeApplicationTests :: TestTree

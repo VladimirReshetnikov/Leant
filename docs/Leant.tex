@@ -382,8 +382,8 @@ quantifiers open through polarity-aware plan families, quantified
 hypotheses are instantiated at a bounded set of sequent-supplied
 types, and impredicative instantiation is admitted under a guard that
 never invents a polytype the query did not supply. Djinn's current
-singleton and pairwise open/opaque frontiers grow quadratically and
-cover every choice through five independent quantified sites without
+singleton, pairwise, and triple open/opaque frontiers grow cubically and
+cover every choice through seven independent quantified sites without
 enumerating a power set. That scope is still being improved, and Leant
 keeps the boundary to the engines narrow on purpose, so each
 improvement arrives by version bump. The engines speak Haskell types;
@@ -786,8 +786,8 @@ It will not analyze dependent structure; atoms are transported, never
 opened. Quantifier handling beyond the propositional fragment follows
 Djex's bounded rank-N and guarded impredicativity rules, which are
 sound and terminating over an undecidable space and widen as Djex
-improves. The current plan family is exhaustive through five
-independent quantified sites; a six-site three-open/three-opaque goal
+improves. The current plan family is exhaustive through seven
+independent quantified sites; an eight-site four-open/four-opaque goal
 is the next deliberate gap. Such higher-rank goals answer ``no term
 found within bounds'' and nothing stronger. And although Djex can resolve
 type-class evidence itself, Leant leaves instance arguments to Lean's

@@ -43,10 +43,10 @@ system.*
 ## 1.5 The post-merger scope: what Djex implements today
 
 The current engines go beyond propositional LJT and monomorphic
-best-first search. From the commit history (`a069029` through `6d6ff475`)
+best-first search. From the commit history (`a069029` through `8dd7d2b3`)
 and the reports `2026-07-28-rank-n-inference-review.md`,
 `2026-07-29-hypothesis-instantiation.md`, and
-`2026-07-31-pairwise-rank-n-frontiers.md`:
+`2026-08-01-triple-rank-n-frontiers.md`:
 
 - **Alpha-aware opaque atoms as the default boundary.** Quantified
   subterms are carried as alpha-normalized `TypeAtom`s with lexical
@@ -56,11 +56,11 @@ and the reports `2026-07-28-rank-n-inference-review.md`,
   occurrence-scoped skolems via a polarized translation (arrow domains
   reverse polarity; products/sums preserve it). Search runs a *plan
   family*: the fully-opened and fully-opaque plans, the historical two
-  singleton occurrence frontiers, and a deterministic pair-opaque and
-  pair-open tail. Nested selections open the union of their required
-  ancestor chains. The family grows quadratically and is exhaustive for
-  five independent quantified sites without enumerating a power set;
-  the central three-open/three-opaque layer at six sites is the next
+  singleton occurrence frontiers, followed by deterministic pair and
+  triple opaque/open tails. Nested selections open the union of their
+  required ancestor chains. The family grows cubically and is exhaustive for
+  seven independent quantified sites without enumerating a power set;
+  the central four-open/four-opaque layer at eight sites is the next
   deliberate, documented gap.
 - **Bounded hypothesis-side instantiation (Djinn).** A quantified
   hypothesis generates bounded premise axioms
@@ -137,9 +137,9 @@ opposite directions.
   bounded introduction rule. What
   transfers is not the workaround but the *logic*: positive ∀ =
   introduce a fresh opaque atom (Lean: a local constant), negative ∀ =
-  bounded instantiation rule. Djex's deterministic singleton and
-  pairwise frontiers transfer as a quadratic search-space cap that is
-  exhaustive through five independent sites without becoming a power
+  bounded instantiation rule. Djex's deterministic singleton, pairwise,
+  and triple frontiers transfer as a cubic search-space cap that is
+  exhaustive through seven independent sites without becoming a power
   set.
 - **Instantiation evidence is trivial.** Djex manufactures reserved
   `$`-namespace axiom symbols and erases them before code generation
@@ -439,7 +439,7 @@ Design rules, all inherited from Djex:
 - **Quantifier verdicts are bounded, not complete**: second-order
   instantiation follows Djex's guarded, sequent-supplied discipline;
   beyond it (including instantiation chains longer than three binders
-  and the six-site three-open/three-opaque plan gap) the answer is "no term
+  and the eight-site four-open/four-opaque plan gap) the answer is "no term
   found within bounds" — full impredicative inhabitation is undecidable,
   so this boundary is permanent, and the display must never upgrade it
   to a refutation.
