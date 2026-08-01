@@ -1,4 +1,5 @@
 axiom Demo.Seed : Type
+axiom Demo.seedValue : Demo.Seed
 universe u
 inductive Demo.SealedBox (a : Type u) : Type u where
 | mk (value : a) (proof : value = value) : Demo.SealedBox a
@@ -8,11 +9,20 @@ def Demo.sealedBox {a : Type u} (value : a) : Demo.SealedBox a :=
 
 def Demo.seedIdentity (value : Demo.Seed) : Demo.Seed := value
 
+axiom Demo.Input : Type → Type
+axiom Demo.Middle : Type → Type
+axiom Demo.Output : Type → Type
+axiom Demo.Index : Type
+axiom Demo.consume {a : Type} : Demo.Middle a → Demo.Output a
+axiom Demo.produce {a : Type} : Demo.Input a → Demo.Middle a
+
 :set synth-engine djinn
+:synth Demo.Seed
 :synth (Demo.Seed → Demo.Seed)
 :synth (Nat → Demo.SealedBox Nat)
 :synth (Demo.Seed → Demo.SealedBox Demo.Seed)
 :synth ((∀ x : Type, x → x) → Demo.SealedBox (∀ x : Type, x → x))
+:synth (Demo.Input Demo.Index → Demo.Output Demo.Index)
 :set synth-engine both
 :synth (Demo.Seed → Demo.SealedBox Demo.Seed)
 :quit

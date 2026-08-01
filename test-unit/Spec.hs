@@ -479,6 +479,32 @@ providerEngineTests = testGroup "foreign providers"
       firstGroup
           (synthesizeWithProviders EngineBoth 128 [provider] natural)
         @?= ["Demo.zero"]
+  , testCase "compose two polymorphic providers through Djinn" $ do
+      let natural = FAtom False "Nat"
+          parameter = FVar "a"
+          family headName key argument =
+            FApp False key (AppNominal headName) [argument]
+          input argument = family "Demo.Input" "Demo.Input a" argument
+          middle argument = family "Demo.Middle" "Demo.Middle a" argument
+          output argument = family "Demo.Output" "Demo.Output a" argument
+          providers =
+            [ ProviderFrag "Demo.consume" (FAll False "a"
+                (FArr (middle parameter) (output parameter)))
+            , ProviderFrag "Demo.produce" (FAll False "a"
+                (FArr (input parameter) (middle parameter)))
+            ]
+          goal = FArr
+            (family "Demo.Input" "Demo.Input Nat" natural)
+            (family "Demo.Output" "Demo.Output Nat" natural)
+          candidates = firstGroup
+            (synthesizeWithProviders EngineDjinn 256 providers goal)
+      if any (\candidate ->
+          "Demo.consume" `isInfixOf` candidate
+            && "Demo.produce" `isInfixOf` candidate) candidates
+        then pure ()
+        else assertFailure $
+          "expected a composed Djinn provider candidate, got: "
+            ++ show candidates
   , testCase "eliminate one layer of a recursive Nat" $ do
       let result = FVar "r"
           natural = FRec True "Nat" []

@@ -5,6 +5,7 @@
 /____/\__/\_,_/_//_/ \__/
 Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to exit.
 λ> axiom Demo.Seed : Type
+λ> axiom Demo.seedValue : Demo.Seed
 λ> universe u
 λ> inductive Demo.SealedBox (a : Type u) : Type u where
 …> | mk (value : a) (proof : value = value) : Demo.SealedBox a
@@ -14,10 +15,19 @@ Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to e
 …>
 λ> def Demo.seedIdentity (value : Demo.Seed) : Demo.Seed := value
 λ>
+λ> axiom Demo.Input : Type → Type
+λ> axiom Demo.Middle : Type → Type
+λ> axiom Demo.Output : Type → Type
+λ> axiom Demo.Index : Type
+λ> axiom Demo.consume {a : Type} : Demo.Middle a → Demo.Output a
+λ> axiom Demo.produce {a : Type} : Demo.Input a → Demo.Middle a
+λ>
 λ> :set synth-engine djinn
 synth engine: djinn
-λ> :synth (Demo.Seed → Demo.Seed)
+λ> :synth Demo.Seed
 preparing synthesis environment (session imports + Lean)...
+  it1  Demo.seedValue
+λ> :synth (Demo.Seed → Demo.Seed)
   it1  fun x => x
 λ> :synth (Nat → Demo.SealedBox Nat)
   it1  Demo.sealedBox
@@ -25,6 +35,9 @@ preparing synthesis environment (session imports + Lean)...
   it1  Demo.sealedBox
 λ> :synth ((∀ x : Type, x → x) → Demo.SealedBox (∀ x : Type, x → x))
   it1  Demo.sealedBox
+λ> :synth (Demo.Input Demo.Index → Demo.Output Demo.Index)
+  it1  fun x => Demo.consume (Demo.produce x)
+note: search truncated: candidate limit reached (60)
 λ> :set synth-engine both
 synth engine: both
 λ> :synth (Demo.Seed → Demo.SealedBox Demo.Seed)
