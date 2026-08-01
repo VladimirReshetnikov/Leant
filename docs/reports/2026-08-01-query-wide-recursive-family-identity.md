@@ -25,12 +25,14 @@ as:
 fun x => x _
 ```
 
-The result is deliberately about family identity rather than recursive
-program synthesis. Djinn keeps the recursive family abstract and receives its
-constructors as sound introduction premises. Exference receives one validated
-recursive datatype declaration only when the query supplies a complete,
-compatible schema; even then it may inspect only one constructor layer. No
-path invents a recursive definition, induction, or unbounded deconstruction.
+The result is deliberately about family identity rather than recursive program
+synthesis. Follow-up commit `e01b270` gives both engines one validated native
+recursive datatype declaration when the query supplies a complete, compatible
+schema. Djinn uses Djex's bounded positive constructor projection—one layer per
+SCC, with at most two independent SCCs on a logical path—while Exference may
+inspect one constructor layer. Partial and otherwise unsafe plans retain the
+abstract-family constructor-premise fallback. No path invents a recursive
+definition, induction, or unbounded deconstruction.
 
 ## Fragment boundary
 
@@ -94,8 +96,8 @@ The decision matrix is:
 
 | Query-wide evidence for one recursive head | Djinn | Exference |
 | --- | --- | --- |
-| Unique complete compatible schema | Abstract exact family + constructor premises | Shared parameterized recursive data; one-layer elimination |
-| Structured/repeated use validated by a generic occurrence | Abstract exact family + constructor premises | Same shared recursive data |
+| Unique complete compatible schema | Shared parameterized recursive data; bounded positive introduction | Shared parameterized recursive data; one-layer elimination |
+| Structured/repeated use validated by a generic occurrence | Same shared recursive data | Same shared recursive data |
 | Partial inventory | Abstract exact family + occurrence constructor premises | Abstract exact family + occurrence constructor premises |
 | No recoverable template | Abstract exact family + occurrence constructor premises | Abstract exact family + occurrence constructor premises |
 | Incompatible schemas | Abstract exact family + occurrence constructor premises | Abstract exact family + occurrence constructor premises |
@@ -150,10 +152,10 @@ The planner therefore grows its use map monotonically to a fixed point:
    lowering will register; and
 5. repeat until no new use is reached.
 
-Exference does not follow occurrence constructor premises when it selected a
-recursive data declaration, because the declaration template is the consumed
-inventory. Djinn and abstract recursive fallbacks follow active introduction
-premises instead. Provider occurrences do not acquire constructor premises.
+Neither engine follows occurrence constructor premises when it selected a
+native recursive declaration, because the declaration template is the consumed
+inventory. Abstract recursive fallbacks follow active introduction premises
+instead. Provider occurrences do not acquire constructor premises.
 
 The use set only grows. If newly reached evidence makes a provisional plan
 abstract, already inspected fields remain in the scan as a conservative
@@ -163,8 +165,9 @@ recursive plan.
 
 ## Lowering and fixed fields
 
-For a selected Exference plan, Leant creates one parameterized
-`DataTypeDeclaration` keyed by the exact Lean head. At each occurrence it:
+For a selected native plan, Leant creates one parameterized
+`DataTypeDeclaration` keyed by the exact Lean head in both engines. At each
+occurrence it:
 
 1. translates the actual proper-type arguments;
 2. applies the shared private family constructor;
@@ -176,6 +179,10 @@ Installing the occurrence first is essential: a recursive field must resolve
 to the applied shared datatype, not become a fresh atom because it appeared
 earlier in traversal order.
 
+Djex owns the engine asymmetry after that shared lowering. Djinn exposes only
+its bounded positive constructor projection, whereas Exference may also inspect
+one constructor layer.
+
 Concrete constructor fields that are not family parameters must also remain
 rigid. The query-wide pre-scan collects fixed opaque fields only from selected,
 reachable structural schemas and creates private proper-type declarations for
@@ -184,7 +191,7 @@ that seed, so the self reference continues to resolve through the recursive
 knot. The existing `Std.Format` regression verifies that a zero-parameter
 recursive declaration with a `String` field stays closed and constructible.
 
-For Djinn or an abstract Exference fallback, Leant declares one abstract
+For an abstract fallback in either engine, Leant declares one abstract
 proper-kinded constructor for the exact head. Each active occurrence is the
 application of that same head to its own translated parameters. Leant installs
 that application before lowering occurrence constructor fields, then registers
@@ -234,10 +241,13 @@ trusted boundary.
 
 ## Validation coverage
 
-The focused Haskell suite contains 99 unit tests. The recursive-family cases
+The focused Haskell suite contains 106 unit tests. The recursive-family cases
 cover:
 
 - direct `List` rank-N transport under Djinn and Exference;
+- native Djinn construction of a polymorphic recursive family;
+- composition of two independent native recursive SCCs, with same-SCC
+  reopening and false negative evidence excluded;
 - an Exference provider supplying the only useful source occurrence, in both
   provider orders;
 - normalization of differently spelled recursive self knots;
@@ -259,12 +269,24 @@ inductive Demo.RecBox (a : Type 1) : Type 1 where
 | step : a → Demo.RecBox a → Demo.RecBox a
 ```
 
-It then checks the same impredicative transport under standalone Exference and
+It first checks the same impredicative transport under standalone Exference and
 Djinn. `RecBox` deliberately has no base constructor: its only constructor
 requires both an `a` and an existing recursive knot, so constructor
-introduction cannot fake the expected `fun x => x _`. Lean 4.31 elaborates the
-candidate in both lanes. At the implementation commits above, all 99 focused
-tests and all five live golden transcripts pass.
+introduction cannot fake the expected `fun x => x _`.
+
+The transcript then declares independent recursive `Demo.Inner` and
+`Demo.Outer` families. An unused generic observer supplies the complete
+plain-parameter schema needed for native planning without offering an `Outer`
+result. From a nested `forall` payload premise, standalone Djinn must therefore
+construct and Lean 4.31 must verify:
+
+```lean
+fun _ x => .wrap (.done x)
+```
+
+This live control distinguishes the native two-SCC projection from the
+abstract constructor-premise fallback. At the implementation commits above,
+all 106 focused tests and all five live golden transcripts pass.
 
 ## Deliberate boundary
 

@@ -6,4 +6,15 @@ inductive Demo.RecBox (a : Type 1) : Type 1 where
 :synth ((∀ a : Type 1, Demo.RecBox a) → Demo.RecBox (∀ b : Type, b → b))
 :set synth-engine djinn
 :synth ((∀ a : Type 1, Demo.RecBox a) → Demo.RecBox (∀ b : Type, b → b))
+
+opaque Demo.Seed : Type
+inductive Demo.Inner (a : Type 1) : Type 1 where
+| done : a → Demo.Inner a
+| again : Demo.Inner a → Demo.Inner a
+
+inductive Demo.Outer (a : Type 1) : Type 1 where
+| wrap : Demo.Inner a → Demo.Outer a
+| again : Demo.Outer a → Demo.Outer a
+
+:synth ((∀ a : Type 1, Demo.Outer a → Demo.Seed) → (∀ x : Type, x) → Demo.Outer (∀ y : Type, y))
 :quit

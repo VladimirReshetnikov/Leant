@@ -14,7 +14,8 @@
 -- constructors as right-rules, case analysis as left-rules, exactly how Djinn
 -- admits Haskell datatypes.  Exact-head 'FParamInd' and 'FParamRec' occurrences
 -- are pre-scanned across the whole query and share one validated parameterized
--- declaration (with recursive elimination still restricted to Exference);
+-- declaration.  Djinn uses bounded positive recursive introduction while
+-- recursive elimination remains restricted to Exference;
 -- legacy 'FInd' occurrences remain keyed by their alpha-normalized display
 -- spelling.  Engine-side type and constructor names are fresh, and mappings
 -- back to their exact Lean spellings ride along to the renderer.
@@ -516,7 +517,8 @@ data ParametricTemplate = ParametricTemplate
 data ExactFamilyPlan
   = StructuralFamily ParametricTemplate
   | RecursiveStructuralFamily ParametricTemplate
-    -- ^ Exference may retain its established one-layer recursive projection
+    -- ^ Both engines retain exact recursive data natively; Djinn exposes
+    -- bounded positive introduction and Exference one-layer elimination.
   | AbstractFamily Int Bool
     -- ^ arity and whether this fallback hid an exposed inductive schema (and
     -- must therefore forfeit Djinn refutation completeness)

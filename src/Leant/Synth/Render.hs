@@ -93,10 +93,10 @@ type TypeMap = Map.Map String String
 
 -- | Render one candidate expression against the goal fragment.  The
 -- candidate proves the premise-extended goal (constructor premises of
--- recursive inductives are antecedents; see 'Leant.Synth.Engine'), so
--- the matching leading binders are stripped first and their uses
--- replaced by the actual Lean constructor names.  Returns a nonempty
--- group of textual variants, best guess first; the caller verifies
+-- conservative recursive fallbacks are antecedents; see
+-- 'Leant.Synth.Engine'), so the matching leading binders are stripped first
+-- and their uses replaced by the actual Lean constructor names.  Returns a
+-- nonempty group of textual variants, best guess first; the caller verifies
 -- them in order and keeps the first that elaborates.
 renderLeanTerm
   :: CtorMap -> ProviderMap -> TypeMap -> [(String, Frag)] -> Frag
@@ -646,11 +646,11 @@ fitCore cm force cf ce n ds = case (cf, ce) of
     (Right GInl, GInl) -> True
     (Right GInr, GInr) -> True
     _ -> False
-  -- Complete recursive families are declared nominally for Exference just
-  -- like expanded non-recursive inductives.  Their constructor arguments and
-  -- match binders therefore need the same fragment-directed fitting.  The
-  -- constructor-map guard above keeps opaque/partial recursive occurrences
-  -- out even when their fragment constructor is present here.
+  -- Complete exact recursive families are declared nominally for both engines
+  -- just like expanded non-recursive inductives.  Their constructor arguments
+  -- and Exference match binders therefore need the same fragment-directed
+  -- fitting.  The constructor-map guard above keeps opaque/partial recursive
+  -- occurrences out even when their fragment constructor is present here.
   isDeclaredData FParamInd{} = True
   isDeclaredData FInd{} = True
   isDeclaredData FParamRec{} = True

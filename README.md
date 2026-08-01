@@ -483,17 +483,19 @@ generic applied family before schemas are compared, so `List a` and `List b`
 can validate one recursive knot even though Lean serialized different display
 keys.
 
-The available structure remains intentionally asymmetric. Djinn represents the
-shared recursive head abstractly and receives constructors only as
-introduction premises. Exference may inspect one constructor layer only when
-every reachable occurrence has a complete, compatible schema and at least one
-occurrence supplies distinct plain type parameters as a generic template.
-Recursive fields then become ordinary branch-local values and are not
-immediately split again. Partial inventories, unresolved repeated or structured
-parameter vectors, incompatible schemas, and nominal collisions all choose one
-shared abstract exact family; their occurrence constructors are still
-introduction rules, but no `match` is exposed and Djinn search exhaustion is
-not promoted to a refutation. Indexed (`Eq`) and dependent-field (`Exists`)
+The available structure remains intentionally asymmetric. When every reachable
+occurrence has a complete, compatible schema and at least one occurrence
+supplies distinct plain type parameters as a generic template, both engines
+receive one shared native recursive declaration. Djinn may introduce one
+constructor layer from each of at most two independent recursive SCCs on a
+positive logical path, but it cannot eliminate recursive inputs; Exference may
+inspect one constructor layer, whose recursive fields become ordinary
+branch-local values and are not immediately split again. Partial inventories,
+unresolved repeated or structured parameter vectors, incompatible schemas, and
+nominal collisions all choose one shared abstract exact family; their
+occurrence constructors remain introduction premises, but no `match` is
+exposed, and Djinn search exhaustion is not promoted to a refutation. Indexed
+(`Eq`) and dependent-field (`Exists`)
 types remain opaque. The main impredicative gain is direct family transport,
 not recursion or induction.
 
@@ -600,9 +602,10 @@ finisher tactics, needing no premise database and no imports. Bare
   exact-head plan: compatible `Option`, `Except`, and user-family occurrences
   share one parameterized data declaration while preserving constructor
   introduction and case elimination. Recursive `FParamRec` occurrences now
-  use a parallel exact-head plan with recursive-knot normalization. Exference
-  receives a shared one-layer recursive declaration only for a complete,
-  compatible schema; Djinn and every recursive fallback use one abstract exact
+  use a parallel exact-head plan with recursive-knot normalization. Both
+  engines receive a shared native recursive declaration only for a complete,
+  compatible schema: Djinn gains bounded positive introduction and Exference
+  its one-layer eliminator. Every recursive fallback uses one abstract exact
   family plus occurrence constructor premises. Ambiguous, partial,
   incompatible, or nominally colliding schemas disable negative evidence;
   term/dependent parameters retain the occurrence-local path.

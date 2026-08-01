@@ -15,8 +15,9 @@
 -- products (phase 2).  Such inductive occurrences retain their exact family
 -- head and ordered parameters when every parameter is a proper type; term-
 -- parameterized occurrences keep the established occurrence-local form.
--- Recursive occurrences retain a bounded constructor description for the
--- Exference projection, and every other subterm becomes
+-- Recursive occurrences retain a bounded constructor description for native
+-- exact-family introduction in both engines, Exference elimination, or a
+-- conservative constructor-premise fallback; every other subterm becomes
 -- an opaque atom carried by its pretty-printed spelling, so alpha-equal
 -- dependent subformulas compare equal and can be transported (never
 -- analyzed).  Each atom or application carries a safety bit: a node built

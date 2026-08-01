@@ -128,10 +128,10 @@ best-first search. From the commit history and the reports
   Recursive `FParamRec` uses follow a recursive-specific version of the same
   plan. Blocked self atoms are normalized to the exact applied family before
   schemas are compared. A complete generic source occurrence with
-  pairwise-distinct plain parameters gives Exference one query-wide
-  parameterized recursive declaration and its established one-layer match;
-  Djinn keeps the exact head abstract and receives occurrence constructors as
-  introduction premises.
+  pairwise-distinct plain parameters gives both engines one query-wide
+  parameterized recursive declaration. Djinn receives bounded positive
+  constructor introduction from the native declaration; Exference retains its
+  established one-layer match.
   Partial inventories, incompatible schemas, nominal collisions, and
   unrecoverable templates use that same abstract-plus-premises representation
   in both engines. Planning discovers nested exact families through a
@@ -563,17 +563,20 @@ Design rules, all inherited from Djex:
   normal branch-local value, but is not eagerly decomposed again. The
   engine may reuse a library provider for the recursive continuation;
   it does not invent a recursive definition, induction, or unbounded
-  eliminator. Djinn keeps recursive heads abstract and constructors only as
-  premises/introduction rules.
+  eliminator. For a complete compatible exact family, Djinn instead keeps the
+  native declaration but permits only Djex's bounded positive introduction: one
+  layer per SCC and at most two independent SCCs on a logical path. Recursive
+  inputs remain opaque.
 - **Query-wide recursive identity does not imply recursive synthesis.**
   `FParamRec` now preserves one exact applied family across the goal, caller
   premises, and usable providers, which enables direct rank-N transport in
-  both engines. Only a complete compatible schema gives Exference its bounded
-  one-layer declaration. Djinn, partial inventories, incompatible schemas,
+  both engines. A complete compatible schema gives both engines a native
+  declaration: Djinn uses bounded positive construction and Exference its
+  one-layer elimination. Partial inventories, incompatible schemas,
   repeated/structured uses with no validating generic occurrence, and nominal
-  collisions receive an abstract exact family plus sound occurrence
-  constructor premises. This supports transport and introduction, not
-  recursive definitions, induction, or unbounded deconstruction.
+  collisions receive an abstract exact family plus sound occurrence constructor
+  premises. This supports transport and introduction, not recursive
+  definitions, induction, or unbounded deconstruction.
 - **Abstract-family fallbacks do not prove absence.** If exact-head uses have
   ambiguous parameters, incompatible schemas, or mixed
   structural/nominal evidence, Leant keeps one rigid abstract family for
@@ -716,22 +719,22 @@ behavior. The shell goldens remain the true end-to-end layer and require
 the Lake project to supply `repl`/`repl.exe`; an environment without
 that backend can still run the focused suite.
 
-### D. Constructors of recursive inductives as premises — M (implemented)
+### D. Recursive constructor introduction — M (implemented)
 
-Phase 2 leaves `Nat`, `List`, and friends as opaque atoms, so
-`:synth (∀ a, a → List a)` answers "no term found within bounds".
-For Djinn, the *constructors* of a recursive inductive are sound
-introduction rules without opening elimination: declare the atom's key
-as an abstract type and add `List.nil : K`,
-`List.cons : v → K → K` as value premises (fields translate through
-the existing fragment translation; recursive occurrences map to the
-atom's variable; constructors with out-of-fragment fields are simply
-omitted). Refutation soundness is unaffected — such goals already carry
-unsafe atoms, so negative verdicts are already downgraded. Only
-constructors of inductives that actually occur in the goal are
-declared, keeping the per-query environment small. The later Exference
-slice replaces this projection with a real nominal recursive datatype
-and its bounded one-layer eliminator; Djinn's behavior is unchanged.
+The initial phase-2 projection kept `Nat`, `List`, and friends abstract and
+added their constructors as sound introduction premises. That representation
+remains the conservative fallback for partial, incompatible, legacy, or
+otherwise unsafe recursive inventories: recursive occurrences map to the
+shared abstract family, no `match` is exposed, and negative verdicts are
+downgraded.
+
+The query-wide exact-family follow-up upgrades a complete compatible
+`FParamRec` schema to one native recursive datatype in both engines. Djinn then
+uses Djex's bounded positive projection—one constructor layer per recursive SCC
+and at most two independent SCCs on a logical path—without gaining recursive
+elimination. Exference retains its one-layer eliminator. This supports finite
+construction such as `List.nil` and nested independent wrappers while still
+excluding invented recursion, induction, and unbounded deconstruction.
 
 ### E. Rendering polish: anonymous constructors first — S, cosmetic (implemented)
 
@@ -779,14 +782,14 @@ The complete dispatch and verification contract is recorded in the
 [2026-08-01 provider-isolation report](reports/2026-08-01-provider-isolated-exference-baseline.md).
 
 For complete constructor inventories whose applied parameters can be
-represented safely, the Exference projection also models recursive
-inductives nominally and enables one finite constructor match, with
-recursive fields retained as ordinary local values rather than
-recursively eliminated. Together,
-these changes let Exference discover both bounded structural case terms
-and library reuse such as `List.map`. `both` mode still keeps Djinn's
-closed, deciding projection separate, so importing a heuristic
-inventory cannot weaken its refutation semantics.
+represented safely, both engine projections model exact recursive inductives
+nominally. Djinn enables bounded positive construction; Exference enables one
+finite constructor match, with recursive fields retained as ordinary local
+values rather than recursively eliminated. Together, these changes let the
+engines discover bounded constructor terms and library reuse such as
+`List.map`. `both` mode still keeps Djinn's closed, provider-free projection
+separate, so importing a heuristic inventory cannot weaken its refutation
+semantics.
 
 ### G. Retained proper-type applications — M (first slice implemented)
 
@@ -894,13 +897,13 @@ The renderer prefers the constructor fields serialized on the actual result or
 scrutinee occurrence and uses generic specialization only as a fallback, so a
 rank-N field is fitted at the proper occurrence.
 
-Djinn never receives that recursive datatype. It declares one abstract exact
-family and registers each reachable occurrence's constructors as premises,
-preserving sound introduction. Exference uses the same representation when an
-inventory is partial, no generic occurrence resolves repeated or structured
-parameter uses, schemas disagree, or structural and nominal evidence collide.
-These fallbacks preserve positive family transport but expose no recursive
-match and make Djinn's projection incomplete for negative-evidence purposes.
+Djinn receives that native recursive datatype as well, but Djex exposes only
+bounded positive constructor layers and no recursive match. Both engines use an
+abstract exact family plus reachable constructor premises when an inventory is
+partial, no generic occurrence resolves repeated or structured parameter uses,
+schemas disagree, or structural and nominal evidence collide. These fallbacks
+preserve positive family transport but expose no recursive match and make
+Djinn's projection incomplete for negative-evidence purposes.
 
 Nested constructor inventories are metadata until lowering will consume them.
 The planner therefore grows its exact-family use set to a fixed point only
@@ -912,14 +915,13 @@ rigid before translation; normalized recursive self keys are subtracted from
 that seed so they resolve through the installed knot.
 
 Focused tests cover both-engine `List` transport, provider-order independence,
-self-knot normalization, occurrence-specific rank-N field fitting, abstract
-fallbacks, constructor introduction, exact-head and arity separation, and the
-legacy `Nat`, `List.map`, and `Std.Format` behavior. A separate Lean 4.31
-golden declares a base-less `Demo.RecBox` whose only constructor requires both
-a parameter and a recursive value, then verifies `fun x => x _` under
-standalone Exference and Djinn. With no base constructor, introduction cannot
-mask a missing family identity. The implementation contract is recorded in
-the
+self-knot normalization, occurrence-specific rank-N field fitting, native Djinn
+constructor rendering, independent-SCC composition, recursive evidence
+withholding, abstract fallbacks, exact-head and arity separation, and the legacy
+`Nat`, `List.map`, and `Std.Format` behavior. Lean goldens verify base-less
+identity transport under standalone Exference and Djinn, plus native Djinn
+construction of an impredicative payload through two independent recursive
+SCCs. The implementation contract is recorded in the
 [2026-08-01 recursive-family report](reports/2026-08-01-query-wide-recursive-family-identity.md).
 
 ### Explicitly not proposed
