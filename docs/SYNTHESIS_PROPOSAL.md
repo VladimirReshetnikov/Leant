@@ -107,6 +107,14 @@ best-first search. From the commit history and the reports
   did not supply is ever invented". Scoped providers instantiate their
   complete leading forall chain freshly per use; provider contexts
   become proof obligations.
+- **Lean-visible provider instantiation evidence (Leant bridge).** Live
+  provider discovery records the original names of leading proper-type
+  binders while erasing unused instance evidence only in the provider lane.
+  Djex can therefore retain a vacuous specialization as an explicit type
+  application, and Leant restores it with a named Lean argument such as
+  `global («a» := Nat)`. Intervening class binders remain implicit for Lean's
+  instance search. Unused implicit term binders are not misclassified as type
+  quantifiers, and goal serialization keeps its established behavior.
 - **Retained proper-type applications (Leant bridge).** The Lean serializer
   now preserves ordered applications headed by either a bound first-order
   type constructor or an opaque/non-inductive Lean constant. Bound heads
@@ -502,7 +510,10 @@ Design rules, all inherited from Djex:
   exact session declarations bypass the heuristic. Providers outside the
   supported fragment are dropped individually before search. Leant gives
   the survivors private collision-free engine names and maps them back to the
-  exact fully-qualified Lean globals during rendering. Exference assigns
+  exact fully-qualified Lean globals during rendering. It also retains the
+  source names of engine-visible proper-type binders, so visible Djex
+  instantiations render as named Lean arguments without exposing intervening
+  instance binders. Exference assigns
   increasing positive rating penalties in discovery order so fallback
   constants do not drown the best match; Djinn instead uses the isolated-first
   schedule below. Exference remains subject to its explicit budgets
@@ -804,6 +815,10 @@ filtering bounds discovery, result-head/short-name ordering supplies a
 relevance signal, Exference's increasing positive penalties preserve that
 signal during heuristic search, Djinn uses the isolated-first schedule below,
 and a private-name map restores the exact Lean global in the rendered term.
+For live declarations it also carries the original names of leading
+proper-type binders. Explicit Djex instantiation evidence can then render as a
+named Lean argument while class dictionaries remain implicit and are rebuilt
+by the elaborator.
 Providers that fall outside the fragment are dropped
 individually, and Lean verification remains the final authority. The
 serializer derives a stable query from sorted, deduplicated target roots
@@ -927,7 +942,9 @@ plus an atomic `Demo.Secret` provider control and a structurally shaped
 A separate live transcript checks an ordinary universe-polymorphic
 `Demo.sealedBox` definition through Djinn at `Nat`, an opaque session type, and
 a rank-N function type, plus atomic direct-provider admission, provider-free
-ordering, widening to a two-provider composition, and combined-mode reuse.
+ordering, widening to a two-provider composition, combined-mode reuse, and a
+constrained vacuous provider whose closed type choice is visible through both
+engines without exposing its instance argument.
 A term-parameterized `Tag` control stays on the legacy occurrence-local path.
 Recursive exact-head identity is the separate extension described in Section
 I. See the

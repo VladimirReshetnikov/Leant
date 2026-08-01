@@ -348,6 +348,19 @@ synth engine: djinn
   it1  Demo.sealedBox
 ```
 
+Vacuous type choices are retained when Lean needs to see them. Here the class
+argument lies between the chosen type and the result, so Leant names the type
+binder and leaves dictionary reconstruction to Lean:
+
+```text
+λ> axiom Demo.Token : Type
+λ> class Demo.C (a : Type) : Prop where witness : True
+λ> instance : Demo.C Nat := ⟨True.intro⟩
+λ> axiom Demo.global {a : Type} [Demo.C a] : Demo.Token
+λ> :synth (Nat → Demo.Token)
+  it1  fun _ => Demo.global («a» := Nat)
+```
+
 Djinn first searches with only the highest-ranked provider, which prevents a
 lossily projected or irrelevant declaration from crowding the fixed candidate
 prefix. If that isolated candidate does not verify, Leant widens to the full
@@ -634,11 +647,15 @@ finisher tactics, needing no premise database and no imports. Bare
   the cache, while generated `it1`, `it2`, … bindings are excluded from
   provider discovery and deliberately preserve it.
 - Providers receive collision-free private names inside Djex. Rendering
-  maps those names back to the exact fully-qualified Lean globals (and
-  uses Lean's `@` spelling for visible type applications) before the
-  backend verifies the candidate. Inventory extraction is deliberately
-  best-effort: if it cannot be produced, each engine still runs with the
-  structural declarations it already has.
+  maps those names back to the exact fully-qualified Lean globals before the
+  backend verifies the candidate. Live discovery also retains the source names
+  of leading proper-type binders. When Djex makes a vacuous specialization
+  visible, Leant renders a named argument such as
+  `Demo.global («a» := Nat)`; intervening instance binders stay implicit and
+  Lean reconstructs their dictionaries. Historical caller-owned inventories
+  without binder metadata retain the positional `@` fallback. Inventory
+  extraction is deliberately best-effort: if it cannot be produced, each
+  engine still runs with the structural declarations it already has.
 - Proper-type applications headed by a bound constructor variable or an
   opaque/non-inductive Lean constant retain their ordered arguments. Private
   abstract declarations keep constant heads rigid, and rendering restores
