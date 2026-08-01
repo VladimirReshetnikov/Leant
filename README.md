@@ -281,12 +281,24 @@ the matching projection each time:
   ⋯
 ```
 
+Context-free hypothesis chains now reach four leading binders. Leant
+inserts all four inferred type arguments, and Lean verifies both the
+eta-reduced and fully applied forms:
+
+```text
+λ> :synth (∀ A B C D R : Type, (∀ a b c d : Type, a → b → c → d → R) → A → B → C → D → R)
+  it1  fun _ _ _ _ _ f => f _ _ _ _
+  ⋯
+  it5  fun _ _ _ _ _ f x y z w => f _ _ _ _ x y z w
+```
+
 Explicit `∀` binders — leading, nested, trailing, or interleaved — are
 woven into the candidate's lambda automatically, and uses of quantified
 hypotheses get placeholder type arguments wherever Lean needs them
-(`f _ x`), so bounded rank-N candidates verify. Full impredicative
-inhabitation is undecidable, so Djinn uses a deterministic cubic plan
-family rather than a power set. Its singleton, pairwise, and triple
+(`f _ x`), so bounded rank-N candidates verify. Chains with five or more
+leading binders remain outside Djinn's fixed instantiation bound. Full
+impredicative inhabitation is undecidable, so Djinn uses a deterministic
+cubic plan family rather than a power set. Its singleton, pairwise, and triple
 open/opaque frontiers cover every choice across seven independent
 quantified sites; an eight-site goal needing exactly four open and four
 opaque sites remains a deliberate bounded gap. Beyond the guard the

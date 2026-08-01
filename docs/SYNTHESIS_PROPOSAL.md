@@ -43,10 +43,11 @@ system.*
 ## 1.5 The post-merger scope: what Djex implements today
 
 The current engines go beyond propositional LJT and monomorphic
-best-first search. From the commit history (`a069029` through `8dd7d2b3`)
+best-first search. From the commit history (`a069029` through `3af73efa`)
 and the reports `2026-07-28-rank-n-inference-review.md`,
-`2026-07-29-hypothesis-instantiation.md`, and
-`2026-08-01-triple-rank-n-frontiers.md`:
+`2026-07-29-hypothesis-instantiation.md`,
+`2026-08-01-triple-rank-n-frontiers.md`, and
+`2026-08-01-four-binder-instantiation.md`:
 
 - **Alpha-aware opaque atoms as the default boundary.** Quantified
   subterms are carried as alpha-normalized `TypeAtom`s with lexical
@@ -70,7 +71,10 @@ and the reports `2026-07-28-rank-n-inference-review.md`,
   last class is **guarded impredicativity** — a binder may be solved
   with a polytype, but only one the query supplied. A worklist follows
   strictly shallower exposed foralls under per-scheme and global caps;
-  chains beyond three binders stay opaque. This closes goals like
+  chains beyond four binders stay opaque. One- through three-binder tuple
+  order remains historical; four-binder search fairly mixes source-order,
+  repeated, sparse, and Cartesian candidates under the same caps. This closes
+  goals like
   `(forall a. a -> a) -> b -> b` and polymorphic transport through a
   container while remaining terminating.
 - **Guarded impredicative provider subsumption (Exference).** A
@@ -438,7 +442,7 @@ Design rules, all inherited from Djex:
   reason.
 - **Quantifier verdicts are bounded, not complete**: second-order
   instantiation follows Djex's guarded, sequent-supplied discipline;
-  beyond it (including instantiation chains longer than three binders
+  beyond it (including instantiation chains longer than four binders
   and the eight-site four-open/four-opaque plan gap) the answer is "no term
   found within bounds" — full impredicative inhabitation is undecidable,
   so this boundary is permanent, and the display must never upgrade it

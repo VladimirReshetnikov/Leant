@@ -382,11 +382,13 @@ quantifiers open through polarity-aware plan families, quantified
 hypotheses are instantiated at a bounded set of sequent-supplied
 types, and impredicative instantiation is admitted under a guard that
 never invents a polytype the query did not supply. Djinn's current
-singleton, pairwise, and triple open/opaque frontiers grow cubically and
-cover every choice through seven independent quantified sites without
-enumerating a power set. That scope is still being improved, and Leant
-keeps the boundary to the engines narrow on purpose, so each
-improvement arrives by version bump. The engines speak Haskell types;
+context-free hypothesis rule reaches four leading binders without
+raising its fixed search caps; chains with five or more stay opaque.
+Its singleton, pairwise, and triple open/opaque frontiers grow
+cubically and cover every choice through seven independent quantified
+sites without enumerating a power set. That scope is still being
+improved, and Leant keeps the boundary to the engines narrow on
+purpose, so each improvement arrives by version bump. The engines speak Haskell types;
 Leant translates Lean goals into their fragment and their answers back
 into Lean.
 
@@ -492,6 +494,25 @@ doubt, run one:
   it1  fun _ _ _ _ => .none
   it2  fun _ _ x f => match x with | .none => (.none) | .some y => f y
 \end{session}
+
+\subsection{Rank-N and impredicative goals}\label{sec:rankn}
+
+A polymorphic hypothesis can be instantiated at types the goal itself
+supplies. Context-free chains now reach four leading binders, and Leant
+inserts the inferred type arguments which Djinn leaves implicit. Lean
+then verifies each rendered candidate against the original type:
+
+\begin{session}
+λ> :synth (∀ A B C D R : Type, (∀ a b c d : Type, a → b → c → d → R) → A → B → C → D → R)
+  it1  fun _ _ _ _ _ f => f _ _ _ _
+  ⋯
+  it5  fun _ _ _ _ _ f x y z w => f _ _ _ _ x y z w
+\end{session}
+
+The candidate vocabulary comes only from the sequent, including
+quantified subtrees already present there; this is guarded
+impredicativity, not general second-order search. Chains with five or
+more leading binders remain a deliberate incomplete boundary.
 
 \subsection{Impossibility, proved}\label{sec:negative}
 
@@ -788,7 +809,9 @@ Djex's bounded rank-N and guarded impredicativity rules, which are
 sound and terminating over an undecidable space and widen as Djex
 improves. The current plan family is exhaustive through seven
 independent quantified sites; an eight-site four-open/four-opaque goal
-is the next deliberate gap. Such higher-rank goals answer ``no term
+is the next deliberate occurrence-plan gap, while hypothesis
+instantiation chains with five or more binders remain opaque. Such
+higher-rank goals answer ``no term
 found within bounds'' and nothing stronger. And although Djex can resolve
 type-class evidence itself, Leant leaves instance arguments to Lean's
 elaborator during verification, which sits nearer the instance tables
