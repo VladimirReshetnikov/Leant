@@ -139,7 +139,10 @@ a tactic; goals reprint after each one; `:undo` takes back steps without
 limit; `:script` shows the accumulated proof; `:auto` tries common
 finishers; `:qed [NAME]` turns the script into a real theorem in the
 session. `?`-tactics (`exact?`, `simp?`, `rw?`) record the tactic they
-*found* rather than the question-mark form.
+*found* rather than the question-mark form. Proof-state identifiers belong
+to one backend process: if that process stops, Leant leaves prove mode and
+prints the accumulated script instead of submitting a stale identifier after
+the session restarts.
 
 ```text
 λ> :prove ∀ p q : Prop, p ∧ q → q ∧ p

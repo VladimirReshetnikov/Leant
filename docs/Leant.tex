@@ -333,7 +333,9 @@ header and just keep going), and an empty line submits it.
 backend's proof-state protocol. Every line is a tactic; \code{:undo}
 pops one step; \code{:qed NAME} assembles the accumulated script into
 a theorem and replays it into the session, so the result is usable
-afterwards.
+afterwards. Proof-state identifiers are local to one backend process; if
+it stops, Leant leaves prove mode and prints the accumulated script rather
+than submitting a stale identifier after session reconstruction.
 
 \begin{session}
 λ> :prove ∀ p q : Prop, (p → q) → p → q ∧ p

@@ -356,19 +356,40 @@ ensureBackend st = do
           modifyIORef' st (\s -> s { rsBackend = Just backend })
           rebuilt <- rebuildSession st
           if rebuilt then pure (Right backend)
-            else pure (Left "failed to rebuild the session")
+            else do
+              -- Do not leave a partially replayed backend installed.  A
+              -- later fixed/current request could otherwise observe ids from
+              -- the failed reconstruction as if the session were complete.
+              backendDied st
+              pure (Left "failed to rebuild the session")
 
 backendDied :: St -> IO ()
 backendDied st = do
   state <- readIORef st
   forM_ (rsBackend state) killBackend
+  -- Proof states and the last-sorry handle are backend-local too. Preserve
+  -- the human-readable script, but never submit either token after respawn.
+  proveEmergencyExit st "the Lean backend stopped; leaving prove mode"
   modifyIORef' st $ \current ->
-    invalidateProviderWorld
-      (invalidateDerivedEnvironments current { rsBackend = Nothing })
+    invalidateProviderWorld (invalidateDerivedEnvironments current
+      { rsBackend = Nothing, rsLastSorry = Nothing })
 
--- Run a command in an environment. Nothing env = fresh (imports allowed).
+-- Run a command in an exact backend-local environment. Nothing env = fresh
+-- (imports allowed). Callers targeting the interactive session must use
+-- 'runCurrentCmd', which resolves its environment only after a dead backend
+-- has been respawned and the session replayed.
 runCmd :: St -> Maybe Integer -> String -> IO (Either String JValue)
-runCmd st env code = runPayload st $ JObj
+runCmd st env code = runPayload st (commandPayload env code)
+
+-- | Run against the current interactive environment, resolving the id after
+-- 'ensureBackend'.  Environment ids are local to one backend process, so
+-- capturing @rsEnv@ before restart/replay can address an unrelated new id.
+runCurrentCmd :: St -> String -> IO (Either String JValue)
+runCurrentCmd st code = runPayloadAfterBackend st $ \state ->
+  commandPayload (rsEnv state) code
+
+commandPayload :: Maybe Integer -> String -> JValue
+commandPayload env code = JObj
   (("cmd", JStr code) : [("env", JInt e) | Just e <- [env]])
 
 -- Apply one tactic to a proof state.
@@ -377,13 +398,22 @@ runTactic st proofState tactic = runPayload st $ JObj
   [("tactic", JStr tactic), ("proofState", JInt proofState)]
 
 runPayload :: St -> JValue -> IO (Either String JValue)
-runPayload st payload = do
+runPayload st payload = runPayloadAfterBackend st (const payload)
+
+-- | Ensure/rebuild first, then construct the request from the resulting
+-- state. This is the common timeout/death boundary for commands and snapshot
+-- operations alike.
+runPayloadAfterBackend
+  :: St
+  -> (ReplState -> JValue)
+  -> IO (Either String JValue)
+runPayloadAfterBackend st makePayload = do
   backendOr <- ensureBackend st
   case backendOr of
     Left err -> pure (Left err)
     Right backend -> do
       state <- readIORef st
-      result <- request backend (rsTimeout state) payload
+      result <- request backend (rsTimeout state) (makePayload state)
       case result of
         Right v -> pure (Right v)
         Left RequestTimeout -> do
@@ -518,8 +548,7 @@ rebuildSession st = do
     modifyIORef' st (\s -> s { rsHistory = reverse done })
     pure True
   replay (code : rest) done = do
-    env <- rsEnv <$> readIORef st
-    result <- runCmd st env code
+    result <- runCurrentCmd st code
     case result of
       Right v | not (hasErrors v) -> do
         modifyIORef' st (\s -> s { rsEnv = respEnv v })
@@ -652,7 +681,7 @@ bindIt st expr = do
   state <- readIORef st
   let n = rsItCounter state + 1
       code = "def " ++ itName n ++ " := (" ++ expr ++ ")"
-  result <- runCmd st (rsEnv state) code
+  result <- runCurrentCmd st code
   case result of
     Right v | not (hasErrors v), Nothing <- respFatal v -> do
       modifyIORef' st (\s -> s { rsItCounter = n })
@@ -686,8 +715,7 @@ evalInput st allowIncomplete rawText = do
           pure EvalDone
         else if isDeclaration text
           then do
-            env <- rsEnv <$> readIORef st
-            result <- runCmd st env text
+            result <- runCurrentCmd st text
             case result of
               Left err -> do
                 emitLn st =<< cRed st err
@@ -710,20 +738,19 @@ evalInput st allowIncomplete rawText = do
 -- GHCi-style: try #eval, fall back to #check, then raw, then built-in help.
 evalExpression :: St -> String -> IO ()
 evalExpression st text = do
-  env <- rsEnv <$> readIORef st
-  evalResult <- runCmd st env ("#eval (" ++ text ++ ")")
+  evalResult <- runCurrentCmd st ("#eval (" ++ text ++ ")")
   case evalResult of
     Right v | not (hasErrors v), Nothing <- respFatal v -> do
       _ <- printResponse st Nothing v
       bindIt st text
     Left err -> emitLn st =<< cRed st err
     _ -> do
-      checkResult <- runCmd st env ("#check (" ++ text ++ ")")
+      checkResult <- runCurrentCmd st ("#check (" ++ text ++ ")")
       case checkResult of
         Right v | not (hasErrors v), Nothing <- respFatal v ->
           () <$ printResponse st Nothing v
         _ -> do
-          rawResult <- runCmd st env text
+          rawResult <- runCurrentCmd st text
           case rawResult of
             Right v | not (hasErrors v), Nothing <- respFatal v -> do
               _ <- printResponse st Nothing v
@@ -865,8 +892,7 @@ dispatchCommand st line = do
         _ | null arg ->
               emitLn st =<< cRed st "usage: :set OPTION VALUE"
           | otherwise -> do
-              env <- rsEnv <$> readIORef st
-              result <- runCmd st env ("set_option " ++ arg)
+              result <- runCurrentCmd st ("set_option " ++ arg)
               case result of
                 Left err -> emitLn st =<< cRed st err
                 Right v -> do
@@ -965,8 +991,7 @@ cmdType st rawArg
   | otherwise = do
       state <- readIORef st
       let arg = substIt (rsItCounter state) (rsSynthIts state) rawArg
-          env = rsEnv state
-      result <- runCmd st env ("#check (" ++ arg ++ ")")
+      result <- runCurrentCmd st ("#check (" ++ arg ++ ")")
       case result of
         Left err -> emitLn st =<< cRed st err
         Right v
@@ -979,13 +1004,12 @@ cmdInfo :: St -> String -> IO ()
 cmdInfo st arg
   | null arg = emitLn st =<< cRed st "usage: :info NAME"
   | otherwise = do
-      env <- rsEnv <$> readIORef st
-      printResult <- runCmd st env ("#print " ++ arg)
+      printResult <- runCurrentCmd st ("#print " ++ arg)
       case printResult of
         Left err -> emitLn st =<< cRed st err
         Right v
           | hasErrors v || isJust (respFatal v) -> do
-              checkResult <- runCmd st env ("#check (" ++ arg ++ ")")
+              checkResult <- runCurrentCmd st ("#check (" ++ arg ++ ")")
               case checkResult of
                 Right cv | not (hasErrors cv), Nothing <- respFatal cv ->
                   () <$ printResponse st Nothing cv
@@ -1210,8 +1234,7 @@ cmdSearch :: St -> Bool -> String -> IO ()
 cmdSearch st byType arg
   | null arg = emitLn st =<< cRed st "usage: :search TEXT  |  :search? TYPE"
   | byType = do
-      env <- rsEnv <$> readIORef st
-      result <- runCmd st env ("example : (" ++ arg ++ ") := by exact?")
+      result <- runCurrentCmd st ("example : (" ++ arg ++ ") := by exact?")
       case result of
         Left err -> emitLn st =<< cRed st err
         Right v
@@ -1950,7 +1973,7 @@ synthBind st goal term = do
     let n = rsItCounter state + 1
         code = "set_option autoImplicit true in " ++ keyword ++ "def "
           ++ itName n ++ " : (" ++ goal ++ ") := (" ++ term ++ ")"
-    result <- runCmd st (rsEnv state) code
+    result <- runCurrentCmd st code
     case result of
       Right v | not (hasErrors v), Nothing <- respFatal v -> do
         modifyIORef' st (\s -> s { rsItCounter = n })
@@ -1979,10 +2002,9 @@ synthVerify st goal = go synthMaxShown 0
 
   tryGroup [] = pure Nothing
   tryGroup (term : variants) = do
-    env <- rsEnv <$> readIORef st
     let code = "set_option autoImplicit true in example : (" ++ goal
           ++ ") := (" ++ term ++ ")"
-    result <- runCmd st env code
+    result <- runCurrentCmd st code
     case result of
       Right v | not (hasErrors v), Nothing <- respFatal v
               , null (respSorries v) -> pure (Just term)
@@ -2098,48 +2120,37 @@ cmdPickle :: St -> String -> IO ()
 cmdPickle st arg
   | null arg = emitLn st =<< cRed st "usage: :pickle FILE"
   | otherwise = do
-      backendOr <- ensureBackend st
-      case backendOr of
+      let path = withOlean arg
+      result <- runPayloadAfterBackend st $ \state -> JObj
+        [ ("pickleTo", JStr path)
+        , ("env", JInt (fromMaybe 0 (rsEnv state)))
+        ]
+      case result of
+        Right v -> do
+          errored <- printResponse st Nothing v
+          unless errored $
+            emitLn st =<< cDim st ("environment saved to " ++ path)
         Left err -> emitLn st =<< cRed st err
-        Right backend -> do
-          state <- readIORef st
-          let path = withOlean arg
-              payload = JObj
-                [ ("pickleTo", JStr path)
-                , ("env", JInt (fromMaybe 0 (rsEnv state)))
-                ]
-          result <- request backend (rsTimeout state) payload
-          case result of
-            Right v -> do
-              errored <- printResponse st Nothing v
-              unless errored $
-                emitLn st =<< cDim st ("environment saved to " ++ path)
-            Left err -> emitLn st =<< cRed st (show err)
 
 cmdUnpickle :: St -> String -> IO ()
 cmdUnpickle st arg
   | null arg = emitLn st =<< cRed st "usage: :unpickle FILE"
   | otherwise = do
-      backendOr <- ensureBackend st
-      case backendOr of
+      let path = withOlean arg
+          payload = JObj [("unpickleEnvFrom", JStr path)]
+      result <- runPayload st payload
+      case result of
+        Right v -> do
+          errored <- printResponse st Nothing v
+          unless errored $ do
+            modifyIORef' st $ \s ->
+              invalidateProviderWorld
+                (invalidateDerivedEnvironments s
+                  { rsEnvStack = rsEnv s : rsEnvStack s
+                  , rsEnv = respEnv v
+                  })
+            emitLn st =<< cDim st ("environment restored from " ++ path)
         Left err -> emitLn st =<< cRed st err
-        Right backend -> do
-          state <- readIORef st
-          let path = withOlean arg
-              payload = JObj [("unpickleEnvFrom", JStr path)]
-          result <- request backend (rsTimeout state) payload
-          case result of
-            Right v -> do
-              errored <- printResponse st Nothing v
-              unless errored $ do
-                modifyIORef' st $ \s ->
-                  invalidateProviderWorld
-                    (invalidateDerivedEnvironments s
-                      { rsEnvStack = rsEnv s : rsEnvStack s
-                      , rsEnv = respEnv v
-                      })
-                emitLn st =<< cDim st ("environment restored from " ++ path)
-            Left err -> emitLn st =<< cRed st (show err)
 
 withOlean :: String -> String
 withOlean path =
@@ -2247,7 +2258,7 @@ cmdProve st rawArg = do
             (trim rawArg)
       entered <- if not (null arg)
         then do
-          result <- runCmd st (rsEnv state)
+          result <- runCurrentCmd st
             ("example : (" ++ arg ++ ") := by sorry")
           case result of
             Left err -> False <$ (emitLn st =<< cRed st err)
@@ -2482,7 +2493,7 @@ cmdQed st arg = do
                       && "is not a proposition" `isInfixOf` d)
                     (respMessages v)
                   save kw = do
-                    result <- runCmd st (rsEnv state) (codeFor kw)
+                    result <- runCurrentCmd st (codeFor kw)
                     case result of
                       Left err -> do
                         emitLn st =<< cRed st err
