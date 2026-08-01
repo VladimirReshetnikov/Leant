@@ -509,6 +509,28 @@ then verifies each rendered candidate against the original type:
   it5  fun _ _ _ _ _ f x y z w => f _ _ _ _ x y z w
 \end{session}
 
+Leant also retains applications whose arguments are proper types. A
+bound first-order constructor remains a higher-kinded variable in Djex;
+an opaque Lean family receives one rigid nominal head across its
+occurrences. Both engines can therefore see the query-supplied
+polytype without learning any hidden implementation:
+
+\begin{session}
+λ> axiom Wrap : Type 1 → Type
+λ> :synth ((∀ a : Type 1, Wrap a) → Wrap (∀ b : Type, b → b))
+  it1  fun x => x _
+λ> :set synth-engine exference
+synth engine: exference
+λ> :synth (∀ (F : Type 1 → Type), (∀ a : Type 1, F a) → F (∀ b : Type, b → b))
+  it1  fun _ x => x _
+\end{session}
+
+The serializer admits only first-order kind arrows between universes and
+only application arguments whose own type is a universe. Term-indexed
+families such as \code{P 3} remain opaque. A retained nominal application
+can support a positive, Lean-verified candidate but always poisons a
+negative verdict because its constant hides structure.
+
 The candidate vocabulary comes only from the sequent, including
 quantified subtrees already present there; this is guarded
 impredicativity, not general second-order search. Chains with five or
@@ -804,7 +826,11 @@ bounded instantiation can widen the space; hitting it is reported as
 Some plain statements of present limits. It will not synthesize
 recursion or induction; recursive types contribute constructors only.
 It will not analyze dependent structure; atoms are transported, never
-opened. Quantifier handling beyond the propositional fragment follows
+opened. Opaque and bound-variable proper-type applications retain their
+ordered arguments, but qualifying inductives still use the separate
+constructor-expansion projection; sharing one parametric family across
+distinct \code{Option}/\code{List} occurrences remains the next bridge
+boundary. Quantifier handling beyond the propositional fragment follows
 Djex's bounded rank-N and guarded impredicativity rules, which are
 sound and terminating over an undecidable space and widen as Djex
 improves. The current plan family is exhaustive through seven
@@ -825,7 +851,8 @@ A \code{:synth} query passes through five checked stages. A Lean
 metaprogram (compiled once into a cached side environment) elaborates
 the goal and serializes it into the engines' fragment: structural
 connectives are decomposed; qualifying inductives expand into
-constructor lists; everything else becomes an $\alpha$-normalized
+constructor lists; proper-type applications retain rigid or bound heads
+and ordered arguments; everything else becomes an $\alpha$-normalized
 opaque atom. The fragment translator either accepts the result or
 refuses with a reason. The cached synthesis environment remembers the
 session history it has replayed: an unchanged history is reused, an

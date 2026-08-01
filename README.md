@@ -271,6 +271,27 @@ hypothesis to the whole goal `Q → Q`, an impredicative instantiation:
   it3  fun f x => f _ x
 ```
 
+The bridge now preserves proper-type application spines too.  A bound
+first-order constructor `F` stays a higher-kinded Djex variable, while an
+opaque Lean family keeps one rigid nominal head across its occurrences.
+That exposes the quantified argument to both engines without exposing the
+family's implementation:
+
+```text
+λ> axiom Wrap : Type 1 → Type
+λ> :synth ((∀ a : Type 1, Wrap a) → Wrap (∀ b : Type, b → b))
+  it1  fun x => x _
+λ> :set synth-engine exference
+synth engine: exference
+λ> :synth (∀ (F : Type 1 → Type), (∀ a : Type 1, F a) → F (∀ b : Type, b → b))
+  it1  fun _ x => x _
+```
+
+Only arguments whose own type is a universe take this path.  Term-indexed
+families such as `P 3` remain a single opaque atom.  A nominal application
+also remains unsafe for negative evidence: its hidden Lean constant can help
+find and verify a term, but can never justify a refutation.
+
 And a Church-encoded pair converts into a real conjunction — the
 quantified hypothesis is instantiated once at `p` and once at `q`, fed
 the matching projection each time:
@@ -475,6 +496,13 @@ finisher tactics, needing no premise database and no imports. Bare
   backend verifies the candidate. Inventory extraction is deliberately
   best-effort: if it cannot be produced, Exference still runs with the
   structural declarations it already has.
+- Proper-type applications headed by a bound constructor variable or an
+  opaque/non-inductive Lean constant retain their ordered arguments. Private
+  abstract declarations keep constant heads rigid, and rendering restores
+  their exact Lean names. Qualifying inductives still take the existing
+  constructor-expansion path; sharing one parametric family across distinct
+  `Option`/`List` occurrences is the next application-bridge boundary rather
+  than something this slice silently approximates.
 - Where a term's shape is ambiguous in Lean (a quantified hypothesis
   may be transported whole or instantiated), the renderer offers the
   alternatives and verification picks the one that elaborates.

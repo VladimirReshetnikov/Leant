@@ -6,12 +6,14 @@ in-process Djex Djinn/LJT and Exference; see
 first slice of phase 3 is also implemented: live goal-relevant Lean
 providers, exact global rendering, relevance-preserving ratings, and
 one-layer recursive elimination, backed by a bounded semantic provider
-cache. Phase 4 and a persistent, Mathlib-scale inventory remain future
+cache. The translator additionally retains first-order proper-type
+applications for bound constructor variables and opaque Lean families.
+Phase 4 and a persistent, Mathlib-scale inventory remain future
 work. Companion to
 [PROPOSALS.md](PROPOSALS.md).*
 
 Djex — vendored read-only in this repository as the
-[`lib/Djex`](../lib/Djex) submodule (pinned at `6d6ff475`) — merges two
+[`lib/Djex`](../lib/Djex) submodule (pinned at `3af73efa`) — merges two
 Haskell expression synthesizers — Djinn
 (Dyckhoff's LJT calculus: complete, terminating intuitionistic proof
 search that emits programs) and Exference (ranked heuristic search with
@@ -85,6 +87,19 @@ and the reports `2026-07-28-rank-n-inference-review.md`,
   did not supply is ever invented". Scoped providers instantiate their
   complete leading forall chain freshly per use; provider contexts
   become proof obligations.
+- **Retained proper-type applications (Leant bridge).** The Lean serializer
+  now preserves ordered applications headed by either a bound first-order
+  type constructor or an opaque/non-inductive Lean constant. Bound heads
+  become higher-kinded Djex variables; constants share collision-free rigid
+  `AbstractTypeDeclaration`s across goal and provider occurrences, with an
+  exact-name map for visible type-argument rendering. This makes both engines
+  synthesize `(forall a, Wrap a) -> Wrap (forall b, b -> b)` and its
+  constructor-variable analogue. Only arguments whose inferred type is a
+  universe qualify, so term-indexed families remain opaque. Constant-headed
+  applications poison negative evidence, and Lean still verifies every
+  positive candidate. Qualifying inductives continue through their structural
+  `FInd`/`FRec` projection; family sharing for `Option`/`List` is the next
+  deliberate bridge gap.
 - **Bounded recursive deconstruction (Exference).** Recursive datatype
   declarations remain available to search, but matching stops after one
   constructor layer. Recursive fields enter that branch as ordinary
@@ -641,6 +656,37 @@ these changes let Exference discover both bounded structural case terms
 and library reuse such as `List.map`. `both` mode still keeps Djinn's
 closed, deciding projection separate, so importing a heuristic
 inventory cannot weaken its refutation semantics.
+
+### G. Retained proper-type applications — M (first slice implemented)
+
+The original atom fallback erased the relation between `Wrap a` and
+`Wrap (forall b, b -> b)`: each pretty-printed expression became an
+unrelated flexible atom before Djex could apply its guarded
+impredicativity. The implemented fragment node records the complete
+safety/display key, a bound-variable or exact nominal head, and an ordered
+nonempty argument vector. Serializer admission is deliberately semantic:
+first-order constructor binders are chains of universe domains ending in a
+universe, and each retained application argument must itself inhabit a
+universe. Thus `F a` and opaque `Wrap a` are retained, while dependent
+`P 3` remains an atom.
+
+Both projections lower this node to Djex `TypeApplication`. Nominal heads
+share private abstract constructors with explicit proper kinds; distinct Lean
+heads remain rigid even when their display keys collide. The complete nominal
+key still poisons a Djinn refutation, Exference makes no negative claim, and
+Lean elaboration remains the authority for candidates. The renderer maps a
+private nominal name back if it reaches a visible type argument. Pure tests
+cover both engines, multiple ordered arguments, provider use, rigid-head
+separation, classical atomization, depth traversal, and evidence honesty; a
+Lean 4.31 transcript verifies the nominal, higher-kinded-variable, provider,
+and dependent-fallback paths.
+
+This slice intentionally runs after `indOf`/`recOf`. A qualifying inductive
+therefore keeps its useful constructor structure but does not yet share one
+parametric family across differently instantiated occurrences. The next slice
+should make that choice query-wide (or build a genuinely parametric family
+declaration), so `Option`/`List` can retain guarded wrapper instantiation
+without sacrificing their existing introduction and one-layer elimination.
 
 ### Explicitly not proposed
 
