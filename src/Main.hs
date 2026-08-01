@@ -1976,6 +1976,12 @@ synthGo' st args retriedVars goal parsed = do
         -- it with a less informative fallback result.
         Nothing -> report False baseline
         Just (Left _) -> report False baseline
+        -- A complete Djinn refutation is a terminal logical verdict under the
+        -- REPL's provider-free proof-search contract, not a bounded search
+        -- miss.  Reporting it here also preserves the explicit
+        -- constructive-to-classical fallback policy.  An approximate
+        -- refutation remains eligible for provider search.
+        Just (Right (SynthRefuted True)) -> report False baseline
         _ -> do
           (checkedVariants, shown) <- tryCandidates baseline
           if shown
