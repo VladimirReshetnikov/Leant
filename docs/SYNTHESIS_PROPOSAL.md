@@ -10,7 +10,7 @@ Mathlib-scale inventory remain future work. Companion to
 [PROPOSALS.md](PROPOSALS.md).*
 
 Djex — vendored read-only in this repository as the
-[`lib/Djex`](../lib/Djex) submodule (pinned at `882173f6`) — merges two
+[`lib/Djex`](../lib/Djex) submodule (pinned at `6d6ff475`) — merges two
 Haskell expression synthesizers — Djinn
 (Dyckhoff's LJT calculus: complete, terminating intuitionistic proof
 search that emits programs) and Exference (ranked heuristic search with
@@ -42,9 +42,10 @@ system.*
 ## 1.5 The post-merger scope: what Djex implements today
 
 The current engines go beyond propositional LJT and monomorphic
-best-first search. From the commit history (`a069029` through `882173f6`)
-and the reports `2026-07-28-rank-n-inference-review.md` and
-`2026-07-29-hypothesis-instantiation.md`:
+best-first search. From the commit history (`a069029` through `6d6ff475`)
+and the reports `2026-07-28-rank-n-inference-review.md`,
+`2026-07-29-hypothesis-instantiation.md`, and
+`2026-07-31-pairwise-rank-n-frontiers.md`:
 
 - **Alpha-aware opaque atoms as the default boundary.** Quantified
   subterms are carried as alpha-normalized `TypeAtom`s with lexical
@@ -53,11 +54,13 @@ and the reports `2026-07-28-rank-n-inference-review.md` and
 - **Positive rank-N opening (Djinn).** Goal-position `forall`s open into
   occurrence-scoped skolems via a polarized translation (arrow domains
   reverse polarity; products/sums preserve it). Search runs a *plan
-  family*: the fully-opened and fully-opaque plans plus two linear
-  occurrence frontiers (each site opened among opaque siblings, and
-  kept opaque among opened siblings) — at most `2n + 2` plans, which is
-  exhaustive for three independent quantified sites; four-site balanced
-  subsets are a deliberate, documented gap.
+  family*: the fully-opened and fully-opaque plans, the historical two
+  singleton occurrence frontiers, and a deterministic pair-opaque and
+  pair-open tail. Nested selections open the union of their required
+  ancestor chains. The family grows quadratically and is exhaustive for
+  five independent quantified sites without enumerating a power set;
+  the central three-open/three-opaque layer at six sites is the next
+  deliberate, documented gap.
 - **Bounded hypothesis-side instantiation (Djinn).** A quantified
   hypothesis generates bounded premise axioms
   `Opaque(∀ as. t) → t[as := ss]` whose instantiation candidates are
@@ -129,12 +132,14 @@ opposite directions.
   polarized translation, occurrence-scoped skolems, and plan frontiers
   are careful engineering *around* that. Lean has uniform Π-types:
   `(∀ a, a → a) → b → b` is an unremarkable type, goal-side
-  ∀-introduction is literally `intro`, and Djex's still-pending
-  "goal-side forall-introduction slice" is a non-problem. What
+  ∀-introduction is literally `intro`, while Djex needs an explicit
+  bounded introduction rule. What
   transfers is not the workaround but the *logic*: positive ∀ =
   introduce a fresh opaque atom (Lean: a local constant), negative ∀ =
-  bounded instantiation rule. The `2n + 2` plan-family discipline
-  transfers as-is as a search-space cap.
+  bounded instantiation rule. Djex's deterministic singleton and
+  pairwise frontiers transfer as a quadratic search-space cap that is
+  exhaustive through five independent sites without becoming a power
+  set.
 - **Instantiation evidence is trivial.** Djex manufactures reserved
   `$`-namespace axiom symbols and erases them before code generation
   because GHC re-instantiates value occurrences implicitly. In Lean the
@@ -397,10 +402,11 @@ Design rules, all inherited from Djex:
   reason.
 - **Quantifier verdicts are bounded, not complete**: second-order
   instantiation follows Djex's guarded, sequent-supplied discipline;
-  beyond it (and beyond three-binder chains) the answer is "no term
-  found within bounds" — full impredicative inhabitation is
-  undecidable, so this boundary is permanent, and the display must
-  never upgrade it to a refutation.
+  beyond it (including instantiation chains longer than three binders
+  and the six-site three-open/three-opaque plan gap) the answer is "no term
+  found within bounds" — full impredicative inhabitation is undecidable,
+  so this boundary is permanent, and the display must never upgrade it
+  to a refutation.
 - **Recursive elimination is bounded to one layer in Exference.** A
   recursive field exposed by a constructor match is available as a
   normal branch-local value, but is not eagerly decomposed again. The

@@ -28,6 +28,7 @@ main :: IO ()
 main = defaultMain $ testGroup "Leant synthesis boundary"
   [ providerParserTests
   , providerEngineTests
+  , rankNFrontierTests
   , visibleTypeApplicationTests
   ]
 
@@ -178,6 +179,42 @@ providerEngineTests = testGroup "foreign providers"
         then pure ()
         else assertFailure $
           "expected a phantom-parameter provider, got: " ++ show candidates
+  ]
+
+rankNFrontierTests :: TestTree
+rankNFrontierTests = testGroup "Djinn rank-N frontiers"
+  [ testCase "render a balanced four-site pairwise plan for Lean" $ do
+      let variable = FVar
+          product4 a b c d = FProd a (FProd b (FProd c d))
+          forall4 a b c d body =
+            FAll True a (FAll True b (FAll True c (FAll True d body)))
+          wide a b c d = forall4 a b c d
+            (product4 (variable a) (variable b) (variable c) (variable d))
+          consumer codomain a b c d = forall4 a b c d
+            (FArr
+              (product4 (variable a) (variable b) (variable c) (variable d))
+              codomain)
+          identity a = FAll True a (FArr (variable a) (variable a))
+          result = variable "q"
+          goal = FArr
+            (wide "a" "b" "c" "d")
+            (FArr
+              (consumer result "s" "t" "u" "v")
+              (FProd
+                (wide "w" "x" "y" "z")
+                (FProd
+                  (consumer result "i" "j" "k" "l")
+                  (FProd (identity "e") (identity "f")))))
+          candidates = firstGroup
+            (synthesizeWithProviders EngineDjinn 0 [] goal)
+      if any (\candidate ->
+          "fun " `isInfixOf` candidate
+            && "\10216" `isInfixOf` candidate
+            && "fun _" `isInfixOf` candidate) candidates
+        then pure ()
+        else assertFailure $
+          "expected a rendered pairwise rank-N candidate, got: "
+            ++ show candidates
   ]
 
 visibleTypeApplicationTests :: TestTree
