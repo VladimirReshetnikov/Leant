@@ -1,4 +1,4 @@
-# Leant — a GHCi-style interactive REPL for Lean 4
+# Leant — a REPL for Lean 4, inspired by GHCi, with Djex integrated
 
 Type expressions and they are evaluated, type declarations and they
 enter the session, and a family of `:commands` gives you type queries,
