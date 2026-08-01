@@ -1,0 +1,18 @@
+axiom Demo.Seed : Type
+universe u
+inductive Demo.SealedBox (a : Type u) : Type u where
+| mk (value : a) (proof : value = value) : Demo.SealedBox a
+
+def Demo.sealedBox {a : Type u} (value : a) : Demo.SealedBox a :=
+  .mk value rfl
+
+def Demo.seedIdentity (value : Demo.Seed) : Demo.Seed := value
+
+:set synth-engine djinn
+:synth (Demo.Seed → Demo.Seed)
+:synth (Nat → Demo.SealedBox Nat)
+:synth (Demo.Seed → Demo.SealedBox Demo.Seed)
+:synth ((∀ x : Type, x → x) → Demo.SealedBox (∀ x : Type, x → x))
+:set synth-engine both
+:synth (Demo.Seed → Demo.SealedBox Demo.Seed)
+:quit

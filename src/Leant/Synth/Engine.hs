@@ -176,11 +176,10 @@ synthesize :: SynthEngine -> Int -> Frag -> Either String SynthOutcome
 synthesize engine steps = synthesizeWithProviders engine steps []
 
 -- | Run synthesis with a bounded caller-owned inventory of foreign values.
--- Providers affect Exference only: Djinn remains the closed, deciding
--- structural search, while Exference may reuse the supplied environment and
--- Lean subsequently verifies every rendered use.  Foreign names never enter
--- Djex's nominal namespace directly; each receives a collision-free private
--- engine name carried back through the renderer map.
+-- Both engines may reuse the supplied environment, and Lean subsequently
+-- verifies every rendered use.  Foreign names never enter Djex's nominal
+-- namespace directly; each receives a collision-free private engine name
+-- carried back through the renderer map.
 synthesizeWithProviders
   :: SynthEngine -> Int -> [ProviderFrag] -> Frag
   -> Either String SynthOutcome
@@ -219,17 +218,18 @@ synthesizeTunedWithProviders
 synthesizeTunedWithProviders engine steps limits providers extras
     engineFrag fitFrag = case engine of
   EngineDjinn -> do
-    (goal, decls, _, render, complete) <- prepare djinnRecursiveProjection []
-    djinnRun limits fitFrag complete render goal decls
+    (goal, decls, providerDecls, render, complete) <-
+      prepare djinnRecursiveProjection providers
+    djinnRun limits fitFrag complete render goal (decls ++ providerDecls)
   EngineExference -> do
     (goal, decls, providerDecls, render, _) <-
       prepare exferenceRecursiveProjection providers
     exferenceRun steps render goal (decls ++ providerDecls)
   EngineBoth -> do
-    (djinnGoal, djinnDecls, _, djinnRender, djinnComplete) <-
-      prepare djinnRecursiveProjection []
+    (djinnGoal, djinnDecls, djinnProviderDecls, djinnRender, djinnComplete) <-
+      prepare djinnRecursiveProjection providers
     djinn <- djinnRun limits fitFrag djinnComplete djinnRender
-      djinnGoal djinnDecls
+      djinnGoal (djinnDecls ++ djinnProviderDecls)
     (exferenceGoal, exferenceDecls, providerDecls, exferenceRender, _) <-
       prepare exferenceRecursiveProjection providers
     exference <- exferenceRun steps exferenceRender exferenceGoal

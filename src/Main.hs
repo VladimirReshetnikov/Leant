@@ -1946,20 +1946,18 @@ synthGo' st args retriedVars goal parsed = do
   let fragment = pgFrag parsed
       engine = rsSynthEngine state
       refusal = fragRefusal fragment
-      providerEngine = engine /= EngineDjinn
       -- A live value can inhabit an otherwise opaque atomic goal, but it
       -- cannot repair a structural translation that stopped at FDepth.
-      discoverProviders = providerEngine && case refusal of
+      discoverProviders = case refusal of
         Nothing -> True
         Just _ -> fragProviderMayOpen fragment
-      -- Exference's live provider inventory can add eighty values to one
-      -- 1024-node frontier.  Preserve the ordinary structural search as an
-      -- isolated first lane: if one of its candidates survives Lean
-      -- verification, discovering providers cannot improve whether the goal
-      -- is solved and must not crowd that term out.  Atomic/refused goals go
-      -- straight to providers, while @both@ already has an isolated Djinn
-      -- lane and retains its existing merged-candidate behavior.
-      structuralFirst = engine == EngineExference && refusal == Nothing
+      -- A live provider inventory can add eighty values to either engine's
+      -- search.  Preserve the ordinary structural search as an isolated first
+      -- lane: if one of its candidates survives Lean verification, discovering
+      -- providers cannot improve whether the goal is solved and must not crowd
+      -- that term out.  Atomic/provider-open refusals go straight to the
+      -- provider lane because the baseline has no usable structure.
+      structuralFirst = refusal == Nothing
   limit <- synthTimeoutSeconds
   started <- getCurrentTime
   let deadline
@@ -1989,10 +1987,9 @@ synthGo' st args retriedVars goal parsed = do
                   else pure []
               if null providers
                 then report (isJust checkedVariants) baseline
-                else do
-                  enriched <- runSynthesis providers
-                  report False (maybe enriched
-                    (`dropCheckedCandidates` enriched) checkedVariants)
+                else runProviderLanes runSynthesis
+                  (maybe [] id checkedVariants)
+                  (providerStages engine providers)
     else do
       providers <-
         if discoverProviders
@@ -2000,11 +1997,39 @@ synthGo' st args retriedVars goal parsed = do
           else pure []
       case refusal of
         Just reason
-          | not (providerEngine && fragProviderMayOpen fragment
-              && not (null providers)) ->
+          | not (fragProviderMayOpen fragment && not (null providers)) ->
               emitLn st =<< cRed st ("out of fragment: " ++ reason)
-        _ -> runSynthesis providers >>= report False
+        _ -> runProviderLanes runSynthesis []
+          (providerStages engine providers)
  where
+  -- Djinn's bounded candidate prefix can be crowded by a lossy or merely
+  -- irrelevant foreign declaration.  Give Lean's highest-ranked provider an
+  -- isolated chance first, then widen to the complete bounded inventory if it
+  -- does not verify.  Exference already ranks providers internally and keeps
+  -- its established single enriched lane.  Every stage shares the command
+  -- deadline and later stages skip spellings Lean already rejected.
+  providerStages EngineExference providers = [providers]
+  providerStages _ providers@(provider : _ : _) = [[provider], providers]
+  providerStages _ providers = [providers]
+
+  runProviderLanes runLane checked lanes = case lanes of
+    [] -> report False (Just (Right (SynthNoTerm [])))
+    [providers] -> do
+      bounded <- runLane providers
+      report False (dropCheckedCandidates checked bounded)
+    providers : remaining -> do
+      bounded <- runLane providers
+      let fresh = dropCheckedCandidates checked bounded
+      case fresh of
+        Nothing -> report False fresh
+        Just (Left _) -> report False fresh
+        _ -> do
+          (attempted, shown) <- tryCandidates fresh
+          if shown
+            then pure ()
+            else runProviderLanes runLane
+              (checked ++ maybe [] id attempted) remaining
+
   tryCandidates bounded = case bounded of
     Just (Right (SynthCandidates groups notes)) -> do
       let checkedGroups = take synthMaxTried groups
@@ -2013,10 +2038,10 @@ synthGo' st args retriedVars goal parsed = do
       pure (Just (concat checkedGroups), shown)
     _ -> pure (Nothing, False)
 
-  -- A failed baseline verification has already tried every variant in its
-  -- bounded group prefix.  Provider-enriched Exference commonly rediscovers
-  -- those same structural expressions, so remove the checked spellings before
-  -- verification to avoid duplicating backend work and failed environments.
+  -- A failed earlier lane has already tried every variant in its bounded group
+  -- prefix.  A wider provider lane can rediscover those same expressions, so
+  -- remove the checked spellings before verification to avoid duplicating
+  -- backend work and failed environments.
   dropCheckedCandidates checked bounded = case bounded of
     Just (Right (SynthCandidates groups notes)) ->
       let freshGroups = filter (not . null)
@@ -2135,6 +2160,11 @@ loadSynthProviders st query = do
                                 (rsProviderCache current)
                             }
                           else current
+                      debug <- lookupEnv "LEANT_SYNTH_DEBUG"
+                      when (isJust debug) $
+                        forM_ providers $ \provider ->
+                          emitLn st =<< cDim st
+                            ("debug provider: " ++ show provider)
                       pure providers
                     Left err -> unavailable err
                   [] -> unavailable "Lean emitted no provider inventory"
@@ -2162,8 +2192,8 @@ runEngineBounded limit outcome
         (evaluate (forceOutcome synthMaxTried outcome))
       pure (outcome <$ done)
 
--- | Run an engine lane before one command-wide deadline.  Structural-first
--- Exference may fall through to a provider-enriched lane; both searches,
+-- | Run an engine lane before one command-wide deadline.  Structural search
+-- may fall through to one or more provider-enriched lanes; all searches,
 -- provider discovery, and intervening Lean verification consume the same
 -- configured wall-clock allowance rather than receiving a fresh timeout each.
 -- 'Nothing' as the deadline retains the explicit wait-forever setting.

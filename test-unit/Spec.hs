@@ -465,18 +465,20 @@ providerEngineTests = testGroup "foreign providers"
       firstGroup
           (synthesizeWithProviders EngineExference 128 providers natural)
         @?= ["Demo.zero"]
-  , testCase "keep foreign providers out of deciding Djinn search" $ do
+  , testCase "render an exact qualified provider through Djinn" $ do
       let natural = FAtom False "Nat"
           boolean = FAtom False "Bool"
           provider = ProviderFrag "Demo.toBool" (FArr natural boolean)
-      case synthesizeWithProviders EngineDjinn 256 [provider]
-          (FArr natural boolean) of
-        Right (SynthCandidates groups _) ->
-          if any (elem "Demo.toBool") groups
-            then assertFailure "Djinn used an Exference-only provider"
-            else pure ()
-        Right _ -> pure ()
-        Left err -> assertFailure err
+      firstGroup
+          (synthesizeWithProviders EngineDjinn 256 [provider]
+            (FArr natural boolean))
+        @?= ["Demo.toBool"]
+  , testCase "reuse a provider through both engines" $ do
+      let natural = FAtom False "Nat"
+          provider = ProviderFrag "Demo.zero" natural
+      firstGroup
+          (synthesizeWithProviders EngineBoth 128 [provider] natural)
+        @?= ["Demo.zero"]
   , testCase "eliminate one layer of a recursive Nat" $ do
       let result = FVar "r"
           natural = FRec True "Nat" []
@@ -585,10 +587,21 @@ typeApplicationTests = testGroup "retained type applications"
       expectTerm "x _"
         (synthesizeWithProviders EngineExference 1024 [] nominalGoal)
   , testCase "instantiate a foreign polymorphic family provider" $
-      expectTerm "Demo.polyWrap"
-        (synthesizeWithProviders EngineExference 1024
-          [ProviderFrag "Demo.polyWrap" nominalHypothesis]
-          (wrap "Demo.Wrap ((b : Type) \8594 b \8594 b)" polytype))
+      let provider = ProviderFrag "Demo.polyWrap" nominalHypothesis
+          goal = wrap "Demo.Wrap ((b : Type) \8594 b \8594 b)" polytype
+          check engine = expectTerm "Demo.polyWrap"
+            (synthesizeWithProviders engine 1024 [provider] goal)
+      in mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "apply a foreign polymorphic provider at rank N" $
+      let argument = FVar "a"
+          provider = ProviderFrag "Demo.sealedBox"
+            (FAll False "a" (FArr argument
+              (wrap "Demo.Wrap a" argument)))
+          goal = FArr polytype
+            (wrap "Demo.Wrap ((b : Type) \8594 b \8594 b)" polytype)
+          check engine = expectTerm "Demo.sealedBox"
+            (synthesizeWithProviders engine 1024 [provider] goal)
+      in mapM_ check [EngineDjinn, EngineExference, EngineBoth]
   , testCase "retain higher-kinded bound-variable applications" $ do
       let goal = FAll True "F" (FArr variableHypothesis
             (variableApp "F ((b : Type) \8594 b \8594 b)" "F" polytype))

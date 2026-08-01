@@ -462,7 +462,8 @@ serializerProgram goal = unlines
   , "  sorry"
   ]
 
--- | Discover a bounded foreign-value inventory for Exference.  Scanning the
+-- | Discover a bounded foreign-value inventory for Djinn and Exference.
+-- Scanning the
 -- full Lean environment is cheap compared with serializing all of it, but a
 -- large imported environment can contain over one hundred thousand
 -- declarations.  The Lean side therefore retains only declarations whose

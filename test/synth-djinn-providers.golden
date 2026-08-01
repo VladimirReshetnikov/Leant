@@ -1,0 +1,33 @@
+
+   __                  __
+  / /  ___ ___ ____   / /_
+ / /__/ -_) _ `/ _ \_/ __/
+/____/\__/\_,_/_//_/ \__/
+Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to exit.
+λ> axiom Demo.Seed : Type
+λ> universe u
+λ> inductive Demo.SealedBox (a : Type u) : Type u where
+…> | mk (value : a) (proof : value = value) : Demo.SealedBox a
+…>
+λ> def Demo.sealedBox {a : Type u} (value : a) : Demo.SealedBox a :=
+…>   .mk value rfl
+…>
+λ> def Demo.seedIdentity (value : Demo.Seed) : Demo.Seed := value
+λ>
+λ> :set synth-engine djinn
+synth engine: djinn
+λ> :synth (Demo.Seed → Demo.Seed)
+preparing synthesis environment (session imports + Lean)...
+  it1  fun x => x
+λ> :synth (Nat → Demo.SealedBox Nat)
+  it1  Demo.sealedBox
+λ> :synth (Demo.Seed → Demo.SealedBox Demo.Seed)
+  it1  Demo.sealedBox
+λ> :synth ((∀ x : Type, x → x) → Demo.SealedBox (∀ x : Type, x → x))
+  it1  Demo.sealedBox
+λ> :set synth-engine both
+synth engine: both
+λ> :synth (Demo.Seed → Demo.SealedBox Demo.Seed)
+  it1  Demo.sealedBox
+note: exference: search truncated: step limit reached, queue limit pruned 25900
+λ> :quit
