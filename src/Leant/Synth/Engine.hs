@@ -218,29 +218,31 @@ synthesizeTunedWithProviders
 synthesizeTunedWithProviders engine steps limits providers extras
     engineFrag fitFrag = case engine of
   EngineDjinn -> do
-    (goal, decls, _, render, complete) <- prepare False []
+    (goal, decls, _, render, complete) <- prepare djinnRecursiveProjection []
     djinnRun limits fitFrag complete render goal decls
   EngineExference -> do
-    (goal, decls, providerDecls, render, _) <- prepare True providers
+    (goal, decls, providerDecls, render, _) <-
+      prepare exferenceRecursiveProjection providers
     exferenceRun steps render goal (decls ++ providerDecls)
   EngineBoth -> do
     (djinnGoal, djinnDecls, _, djinnRender, djinnComplete) <-
-      prepare False []
+      prepare djinnRecursiveProjection []
     djinn <- djinnRun limits fitFrag djinnComplete djinnRender
       djinnGoal djinnDecls
     (exferenceGoal, exferenceDecls, providerDecls, exferenceRender, _) <-
-      prepare True providers
+      prepare exferenceRecursiveProjection providers
     exference <- exferenceRun steps exferenceRender exferenceGoal
       (exferenceDecls ++ providerDecls)
     pure (mergeOutcomes djinn exference)
  where
-  prepare structuralRecursive activeProviders = do
+  prepare recursiveProjection activeProviders = do
     ( goal0, decls, providerDecls, ctorMap, providerMap, typeMap, premises
-      , complete) <- fragToDjinn structuralRecursive activeProviders extras
+      , complete) <- fragToDjinn recursiveProjection activeProviders extras
         engineFrag
-    -- Premises (caller-supplied assumptions, and Djinn's constructor
-    -- premises for recursive inductives) enter as goal antecedents.  The
-    -- Exference projection instead receives a real recursive declaration and
+    -- Caller-supplied assumptions and constructor premises for conservative
+    -- recursive fallbacks enter as goal antecedents.  Validated exact
+    -- recursive families are native declarations for both engines: Djinn
+    -- grants one positive constructor layer, while Exference additionally
     -- uses its bounded one-layer eliminator.
     let goal = foldr (\(_, _, t) acc -> FunctionType t acc) goal0 premises
         premisePairs = [(name, prem) | (name, prem, _) <- premises]
@@ -521,6 +523,28 @@ data ExactFamilyPlan
   | InvalidFamilyArities [Int]
   deriving (Eq, Show)
 
+-- | Which recursive inventories may become native data declarations.  Exact
+-- heads have query-wide identity and schema validation, so both engines can
+-- use them.  Legacy 'FRec' inventories have only a constructor-namespace
+-- heuristic; retain that positive, Lean-verified projection for Exference but
+-- keep Djinn on its conservative introduction-premise fallback.
+data RecursiveProjection = RecursiveProjection
+  { exactRecursiveData :: Bool
+  , legacyRecursiveData :: Bool
+  }
+
+djinnRecursiveProjection :: RecursiveProjection
+djinnRecursiveProjection = RecursiveProjection
+  { exactRecursiveData = True
+  , legacyRecursiveData = False
+  }
+
+exferenceRecursiveProjection :: RecursiveProjection
+exferenceRecursiveProjection = RecursiveProjection
+  { exactRecursiveData = True
+  , legacyRecursiveData = True
+  }
+
 data ProjectionCompleteness = ProjectionCompleteness
   { projectionFamiliesComplete :: Bool
     -- ^ no structural exact family was forced to stay opaque
@@ -577,7 +601,7 @@ variable key = do
       pure v
 
 fragToDjinn
-  :: Bool
+  :: RecursiveProjection
   -> [ProviderFrag]
   -> [(String, Frag)]
   -> Frag
@@ -591,7 +615,7 @@ fragToDjinn
       , [(String, Frag, Type String)]
       , ProjectionCompleteness
       )
-fragToDjinn structuralRecursive providers extras frag0 = do
+fragToDjinn recursiveProjection providers extras frag0 = do
   eitherC <- viaShow (mkIdentifier "Either")
   voidC <- viaShow (mkIdentifier "Void")
   unitC <- viaShow (tupleName Boxed 0)
@@ -603,27 +627,28 @@ fragToDjinn structuralRecursive providers extras frag0 = do
           ++ [ (False, providerTypeFrag provider)
              | provider <- usableProviders
              ]
-      plans = exactFamilyPlans structuralRecursive planningRoots
+      plans = exactFamilyPlans recursiveProjection planningRoots
       structuralTemplateFragments =
         [ field
         | plan <- Map.elems plans
         , template <- case plan of
             StructuralFamily selected -> [selected]
-            RecursiveStructuralFamily selected -> [selected]
+            RecursiveStructuralFamily selected
+              | exactRecursiveData recursiveProjection -> [selected]
             _ -> []
         , (_, fields) <- templateConstructors template
         , field <- fields
         ]
-      (recursiveSelfKeys, recursiveFieldAtoms)
-        | structuralRecursive = recursiveStructuralAtoms plans
-            (queryFragments ++ structuralTemplateFragments)
-        | otherwise = (Set.empty, Set.empty)
+      (recursiveSelfKeys, recursiveFieldAtoms) =
+        recursiveStructuralAtoms recursiveProjection plans
+          (queryFragments ++ structuralTemplateFragments)
       rigidAtoms = Set.difference
         (Set.union
-          (structuralAtomKeys structuralRecursive plans) recursiveFieldAtoms)
+          (structuralAtomKeys recursiveProjection plans) recursiveFieldAtoms)
         recursiveSelfKeys
       projection = ProjectionCompleteness
-        { projectionFamiliesComplete = exactFamilyProjectionComplete plans
+        { projectionFamiliesComplete =
+            exactFamilyProjectionComplete recursiveProjection plans
         , projectionFragmentsComplete =
             all fragmentProjectionComplete (frag0 : map snd extras)
         }
@@ -658,7 +683,7 @@ fragToDjinn structuralRecursive providers extras frag0 = do
           parametricIndOccurrence premisesEnabled headName parameters
         FInd key ctors -> indOccurrence premisesEnabled key ctors
         FParamRec _ spelling key parameters ctors
-          | structuralRecursive
+          | exactRecursiveData recursiveProjection
           , Just (RecursiveStructuralFamily template) <-
               Map.lookup spelling plans ->
               exactRecDataOccurrence premisesEnabled spelling key parameters
@@ -666,7 +691,7 @@ fragToDjinn structuralRecursive providers extras frag0 = do
           | otherwise ->
               exactRecOccurrence premisesEnabled spelling key parameters ctors
         FRec complete key parameters ctors
-          | structuralRecursive
+          | legacyRecursiveData recursiveProjection
           , complete
           , Just parameterKeys <- distinctPlainParameters parameters ->
               recDataOccurrence key parameterKeys ctors
@@ -719,11 +744,12 @@ fragToDjinn structuralRecursive providers extras frag0 = do
                     [templateArity template]
               Just (RecursiveStructuralFamily template)
                 | templateArity template == arity ->
-                    -- Djinn intentionally receives recursive families as an
-                    -- opaque constructor plus constructor premises.  Only
-                    -- Exference's guarded branch above materializes one data
-                    -- layer for elimination.
-                    declareAbstractFamily spelling arity
+                    if exactRecursiveData recursiveProjection
+                      then failT
+                        ("internal: structural recursive family "
+                          ++ show spelling
+                          ++ " reached its head before installing its knot")
+                      else declareAbstractFamily spelling arity
                 | otherwise -> arityFailure spelling arity
                     [templateArity template]
               Just (AbstractFamily plannedArity _)
@@ -858,11 +884,13 @@ fragToDjinn structuralRecursive providers extras frag0 = do
                              , tsDecls = tsDecls s ++ [decl] })
             pure occurrence
 
-      -- Exference can safely inspect one layer of recursive data.  Exact
-      -- FParamRec occurrences use their serialized Lean head as the family
-      -- identity.  One complete distinct-plain-variable occurrence supplied
-      -- the generic declaration, and the query-wide plan has proved that every
-      -- use is a complete specialization of that schema.
+      -- Both engines retain validated exact recursive data natively.
+      -- 'FParamRec' occurrences use their serialized Lean head as the family
+      -- identity.  One complete distinct-plain-variable occurrence supplies
+      -- the generic declaration, and the query-wide plan proves that every use
+      -- is a complete specialization.  Djex then owns the backend asymmetry:
+      -- bounded positive introduction in Djinn and one-layer elimination in
+      -- Exference.
       exactRecDataOccurrence premisesEnabled spelling key occurrenceParameters
           template = do
         translated <- mapM (go premisesEnabled) occurrenceParameters
@@ -1088,8 +1116,8 @@ fragToDjinn structuralRecursive providers extras frag0 = do
     FVar key -> Just key
     _ -> Nothing
 
-  -- Fixed opaque fields consumed by Exference's structural recursive
-  -- declarations must be rigid before any fragment is translated.  Otherwise
+  -- Fixed opaque fields consumed by native structural recursive declarations
+  -- must be rigid before any fragment is translated.  Otherwise
   -- traversal order can give an earlier goal occurrence (say @String@ in
   -- @String -> Std.Format@) a flexible identity before @Format.text@ closes
   -- the same field as a private proper type.  Consume only query-wide selected
@@ -1097,7 +1125,8 @@ fragToDjinn structuralRecursive providers extras frag0 = do
   -- itself: self fields must still resolve through the shared structural knot
   -- rather than becoming unrelated rigid atoms.  Legacy FRec inventories keep
   -- their established occurrence-local scan below.
-  recursiveStructuralAtoms plans = foldl collect (Set.empty, Set.empty)
+  recursiveStructuralAtoms projectionPolicy plans =
+    foldl collect (Set.empty, Set.empty)
    where
     collect accum frag = case frag of
       FArr parameter result -> descend accum [parameter, result]
@@ -1113,7 +1142,8 @@ fragToDjinn structuralRecursive providers extras frag0 = do
       FInd _ constructors -> descend accum (concatMap snd constructors)
       FParamRec _ spelling key parameters _ ->
         let structural = case Map.lookup spelling plans of
-              Just RecursiveStructuralFamily{} -> True
+              Just RecursiveStructuralFamily{} ->
+                exactRecursiveData projectionPolicy
               _ -> False
             accum'
               | structural = (Set.insert key (fst accum), snd accum)
@@ -1123,7 +1153,8 @@ fragToDjinn structuralRecursive providers extras frag0 = do
         in descend accum' parameters
       FRec complete key parameters constructors ->
         recursive accum
-          (complete && hasDistinctPlainParameters parameters)
+          (legacyRecursiveData projectionPolicy
+            && complete && hasDistinctPlainParameters parameters)
           key parameters constructors
       _ -> accum
 
@@ -1151,14 +1182,14 @@ fragmentProjectionComplete frag =
 -- is accepted only when one unique schema can be recovered and specializing
 -- it reproduces every serialized occurrence exactly.
 exactFamilyPlans
-  :: Bool
+  :: RecursiveProjection
   -> [(Bool, Frag)]
   -> Map.Map String ExactFamilyPlan
-exactFamilyPlans structuralRecursive roots = settle initialUses
+exactFamilyPlans recursiveProjection roots = settle initialUses
  where
   initialUses = foldl
     (\uses (premisesEnabled, frag) ->
-      collectExactFamilyUses structuralRecursive premisesEnabled uses frag)
+      collectExactFamilyUses recursiveProjection premisesEnabled uses frag)
     Map.empty roots
 
   -- Constructor inventories are metadata until translation commits to using
@@ -1172,7 +1203,7 @@ exactFamilyPlans structuralRecursive roots = settle initialUses
     let plans = Map.mapWithKey choosePlan uses
         fields = structuralFields plans ++ recursivePremiseFields plans uses
         uses' = foldl
-          (collectExactFamilyUses structuralRecursive True) uses fields
+          (collectExactFamilyUses recursiveProjection True) uses fields
     in if uses' == uses then plans else settle uses'
 
   structuralFields plans =
@@ -1181,7 +1212,7 @@ exactFamilyPlans structuralRecursive roots = settle initialUses
     , template <- case plan of
         StructuralFamily selected -> [selected]
         RecursiveStructuralFamily selected
-          | structuralRecursive -> [selected]
+          | exactRecursiveData recursiveProjection -> [selected]
         _ -> []
     , (_, fields) <- templateConstructors template
     , field <- fields
@@ -1198,9 +1229,10 @@ exactFamilyPlans structuralRecursive roots = settle initialUses
     ]
 
   recursiveUsesPremises plans spelling =
-    not structuralRecursive || case Map.lookup spelling plans of
-      Just RecursiveStructuralFamily{} -> False
-      _ -> True
+    not (exactRecursiveData recursiveProjection) ||
+      case Map.lookup spelling plans of
+        Just RecursiveStructuralFamily{} -> False
+        _ -> True
 
   recursiveUsePremises use = case use of
     RecursiveUse _ premisesEnabled _ _ _ -> premisesEnabled
@@ -1211,16 +1243,16 @@ exactFamilyPlans structuralRecursive roots = settle initialUses
     _ -> []
 
 structuralAtomKeys
-  :: Bool
+  :: RecursiveProjection
   -> Map.Map String ExactFamilyPlan
   -> Set.Set String
-structuralAtomKeys structuralRecursive = Map.foldl' collectPlan Set.empty
+structuralAtomKeys recursiveProjection = Map.foldl' collectPlan Set.empty
  where
   collectPlan keys plan = case plan of
     StructuralFamily template -> foldl collectConstructor keys
       (templateConstructors template)
     RecursiveStructuralFamily template
-      | structuralRecursive -> foldl collectConstructor keys
+      | exactRecursiveData recursiveProjection -> foldl collectConstructor keys
           (templateConstructors template)
     _ -> keys
   collectConstructor keys (_, fields) = foldl collectFragAtoms keys fields
@@ -1251,12 +1283,12 @@ collectFragAtoms atoms frag = case frag of
   descend = foldl collectFragAtoms
 
 collectExactFamilyUses
-  :: Bool
+  :: RecursiveProjection
   -> Bool
   -> Map.Map String [ExactFamilyUse]
   -> Frag
   -> Map.Map String [ExactFamilyUse]
-collectExactFamilyUses structuralRecursive premisesEnabled uses frag =
+collectExactFamilyUses recursiveProjection premisesEnabled uses frag =
   case frag of
   FArr parameter result -> descend uses [parameter, result]
   FProd left right -> descend uses [left, right]
@@ -1283,14 +1315,14 @@ collectExactFamilyUses structuralRecursive premisesEnabled uses frag =
   FRec complete _ parameters constructors ->
     let fields
           | premisesEnabled
-              || (structuralRecursive && complete
+              || (legacyRecursiveData recursiveProjection && complete
                 && hasDistinctPlainParameters parameters) =
               concatMap snd constructors
           | otherwise = []
     in descend uses (parameters ++ fields)
   _ -> uses
  where
-  collect = collectExactFamilyUses structuralRecursive premisesEnabled
+  collect = collectExactFamilyUses recursiveProjection premisesEnabled
   descend = foldl collect
   insertUse spelling use = Map.alter append spelling
    where
@@ -1401,14 +1433,17 @@ normalizedRecursiveOccurrence spelling key parameters constructors =
       constructors
   )
 
-exactFamilyProjectionComplete :: Map.Map String ExactFamilyPlan -> Bool
-exactFamilyProjectionComplete = all complete . Map.elems
+exactFamilyProjectionComplete
+  :: RecursiveProjection
+  -> Map.Map String ExactFamilyPlan
+  -> Bool
+exactFamilyProjectionComplete recursiveProjection = all complete . Map.elems
  where
   complete plan = case plan of
     AbstractFamily _ hidesStructure -> not hidesStructure
     InvalidFamilyArities{} -> False
     StructuralFamily{} -> True
-    RecursiveStructuralFamily{} -> True
+    RecursiveStructuralFamily{} -> exactRecursiveData recursiveProjection
 
 pairwiseDistinct :: [Frag] -> Bool
 pairwiseDistinct [] = True

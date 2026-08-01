@@ -816,6 +816,56 @@ parametricFamilyEngineTests = testGroup "parametric family engine projection"
   , testCase "transport a recursive List rank-N family with Exference" $
       expectExactFamilyTerm "fun x => x _"
         (synthesizeWithProviders EngineExference 1024 [] listRankNGoal)
+  , testCase "construct a polymorphic recursive family natively with Djinn" $
+      do
+        let parameter = FVar "p"
+            recursive = nativeRecursive "Demo.NativeRec p" parameter
+            goal = FAll True "p" (FArr parameter recursive)
+            candidates = allFamilyCandidates
+              (synthesizeWithProviders EngineDjinn 0 [] goal)
+        if any ("=> .done" `isInfixOf`) candidates
+          then pure ()
+          else assertFailure $
+            "native recursive constructor did not specialize under forall: "
+              ++ show candidates
+  , testCase "compose independent native recursive components in Djinn" $ do
+      let parameter = FVar "p"
+          innerKey = "Demo.NativeInner p"
+          inner = nativeInner innerKey parameter
+          outerKey = "Demo.NativeOuter p"
+          outer = nativeOuter outerKey parameter inner
+          candidates = allFamilyCandidates
+            (synthesizeWithProviders EngineDjinn 0 []
+              (FAll True "p" (FArr parameter outer)))
+      if any (\term -> ".wrap" `isInfixOf` term
+              && ".done" `isInfixOf` term) candidates
+        then pure ()
+        else assertFailure $
+          "independent native recursive components did not compose: "
+            ++ show candidates
+  , testCase "bound native Djinn recursion to one constructor layer" $ do
+      let parameter = FVar "p"
+          recursive = nativeRecursive "Demo.NativeRec p" parameter
+          candidates = allFamilyCandidates
+            (synthesizeWithProviders EngineDjinn 0 []
+              (FArr parameter recursive))
+      if not (any ("done" `isInfixOf`) candidates)
+        then assertFailure $ "native recursive base constructor was lost: "
+          ++ show candidates
+        else if any ("again" `isInfixOf`) candidates
+          then assertFailure $ "Djinn reopened native recursion below its "
+            ++ "first constructor layer: " ++ show candidates
+          else pure ()
+  , testCase "withhold evidence after native recursive atomization" $ do
+      let parameter = FVar "p"
+          recursive = nativeRecursive "Demo.NativeRec p" parameter
+      case synthesizeWithProviders EngineDjinn 0 []
+          (FArr recursive parameter) of
+        Right (SynthNoTerm _) -> pure ()
+        Right other -> assertFailure $
+          "native recursive elimination returned unexpected evidence: "
+            ++ outcomeTag other
+        Left err -> assertFailure err
   , testCase "reuse a recursive provider schema independent of order" $ do
       let target = recursiveBox True "Demo.RecBox consumer" consumerType
           inhabitant = ProviderFrag "Demo.anyRecBox"
@@ -1166,26 +1216,31 @@ parametricFamilyEngineTests = testGroup "parametric family engine projection"
             [ ("Demo.PairRec.more",
                 [parameter, FAtom False repeatedKey])
             ]
-      expectIncompleteNoFamilyTerm
-        (synthesizeWithProviders EngineExference 512 []
-          (FArr partial parameter))
-      expectIncompleteNoFamilyTerm
-        (synthesizeWithProviders EngineExference 512 []
-          (FArr repeated parameter))
+      mapM_ (\engine -> do
+          expectIncompleteNoFamilyTerm
+            (synthesizeWithProviders engine 512 []
+              (FArr partial parameter))
+          expectIncompleteNoFamilyTerm
+            (synthesizeWithProviders engine 512 []
+              (FArr repeated parameter)))
+        [EngineDjinn, EngineExference]
   , testCase "keep complete and partial recursive uses abstract with intro" $ do
       let parameter = FVar "p"
           partial = recursiveTree False "Demo.Tree partial" parameter
           complete = recursiveTree True "Demo.Tree complete" parameter
-          candidates = allFamilyCandidates
-            (synthesizeWithProviders EngineExference 1024 []
-              (FArr partial (FArr parameter complete)))
-      if any ("match" `isInfixOf`) candidates
-        then assertFailure $ "mixed completeness exposed elimination: "
-          ++ show candidates
-        else if any ("Demo.Tree.leaf" `isInfixOf`) candidates
-          then pure ()
-          else assertFailure $ "abstract recursive fallback lost introduction: "
-            ++ show candidates
+          check engine =
+            let candidates = allFamilyCandidates
+                  (synthesizeWithProviders engine 1024 []
+                    (FArr partial (FArr parameter complete)))
+            in if any ("match" `isInfixOf`) candidates
+                then assertFailure $ "mixed completeness exposed elimination "
+                  ++ "in " ++ show engine ++ ": " ++ show candidates
+                else if any ("Demo.Tree.leaf" `isInfixOf`) candidates
+                  then pure ()
+                  else assertFailure $ "abstract recursive fallback lost "
+                    ++ "introduction in " ++ show engine ++ ": "
+                    ++ show candidates
+      mapM_ check [EngineDjinn, EngineExference]
   , testCase "share recursive and nominal uses through an abstract head" $ do
       let source = recursiveBox True "Demo.RecBox poly" polytype
           target = FApp False "Demo.RecBox poly"
@@ -1285,6 +1340,21 @@ parametricFamilyEngineTests = testGroup "parametric family engine projection"
     [("Demo.RecBox.step", [parameter, FAtom False key])]
   recursiveCell key parameter = FParamRec True "Demo.RecCell" key
     [parameter] [("Demo.RecCell.mk", [parameter])]
+  nativeRecursive key parameter = FParamRec True "Demo.NativeRec" key
+    [parameter]
+    [ ("Demo.NativeRec.done", [parameter])
+    , ("Demo.NativeRec.again", [FAtom False key])
+    ]
+  nativeInner key parameter = FParamRec True "Demo.NativeInner" key
+    [parameter]
+    [ ("Demo.NativeInner.done", [parameter])
+    , ("Demo.NativeInner.again", [FAtom False key])
+    ]
+  nativeOuter key parameter inner = FParamRec True "Demo.NativeOuter" key
+    [parameter]
+    [ ("Demo.NativeOuter.wrap", [inner])
+    , ("Demo.NativeOuter.again", [FAtom False key])
+    ]
   recursiveTree complete key parameter = FParamRec complete "Demo.Tree" key
     [parameter]
     [ ("Demo.Tree.leaf", [parameter])
