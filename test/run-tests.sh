@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Golden transcript tests for Leant's :synth (SYNTHESIS_PROPOSAL.md §7 C).
+# Golden transcript tests for Leant's :synth (docs/SYNTHESIS_PROPOSAL.md §7 C).
 #
 #   ./run-tests.sh            run all synth-*.txt, diff against *.golden
 #   ./run-tests.sh -u         regenerate the golden files instead

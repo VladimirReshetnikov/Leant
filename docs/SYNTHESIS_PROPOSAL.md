@@ -1,13 +1,13 @@
 # Proposal: automatic term synthesis in Leant, borrowing from Djex
 
 *Status: phases 0–2 implemented (`:synth` in this repository, engine =
-in-process Djex Djinn/LJT; see [README.md](README.md#synth--automatic-term-synthesis-haskell-only)).
+in-process Djex Djinn/LJT; see [README.md](../README.md#synth--automatic-term-synthesis-haskell-only)).
 Phase 4 remains future work; §7’s six increments are all implemented,
 and item F delivers the phase-3 engine without its Mathlib-scale
 inventory. Companion to [PROPOSALS.md](PROPOSALS.md).*
 
 Djex — vendored read-only in this repository as the
-[`lib/Djex`](lib/Djex) submodule (pinned at `6a9fc22`, the state
+[`lib/Djex`](../lib/Djex) submodule (pinned at `6a9fc22`, the state
 this analysis reviewed) — merges two Haskell expression synthesizers — Djinn
 (Dyckhoff's LJT calculus: complete, terminating intuitionistic proof
 search that emits programs) and Exference (ranked heuristic search with

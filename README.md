@@ -87,7 +87,7 @@ leant [FILE] [--project DIR] [--plain] [-i MOD]
 `→ / × / ∧ / ⊕ / ∨ / ↔ / ¬ / ⊥ / ⊤ / ∀` over opaque variables — plus
 inductive datatypes (see below) — using the vendored [Djex](lib/Djex)
 library — linked in-process, no subprocess. Design and phasing:
-[SYNTHESIS_PROPOSAL.md](SYNTHESIS_PROPOSAL.md) (phases 0–2 are
+[docs/SYNTHESIS_PROPOSAL.md](docs/SYNTHESIS_PROPOSAL.md) (phases 0–2 are
 implemented).
 
 ```
