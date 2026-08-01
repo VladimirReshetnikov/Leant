@@ -81,13 +81,12 @@ leant [FILE] [--project DIR] [--plain] [-i MOD]
   is not a proposition), resumption of the last `sorry`, and crash-safe
   script dumps.
 
-## `:synth` — automatic term synthesis (Haskell-only)
+## `:synth` — automatic term synthesis
 
 `:synth TYPE` constructs programs and proofs in the structural fragment
 `→ / × / ∧ / ⊕ / ∨ / ↔ / ¬ / ⊥ / ⊤ / ∀` over opaque variables — plus
-inductive datatypes (see below) — using the Djinn LJT engine from the
-vendored [Djex](lib/Djex) library — linked in-process, no
-subprocess. Design and phasing:
+inductive datatypes (see below) — using the vendored [Djex](lib/Djex)
+library — linked in-process, no subprocess. Design and phasing:
 [SYNTHESIS_PROPOSAL.md](SYNTHESIS_PROPOSAL.md) (phases 0–2 are
 implemented).
 
@@ -170,21 +169,3 @@ negations render as `absurd`.
   pipes each `synth-*.txt` through `leant --plain` and diffs the
   filtered output against the checked-in `*.golden`; `-u` regenerates
   the goldens after an intentional behavior change.
-
-## Differences from the Python version
-
-- No `AutoLeanServer` memory guard (the Python version needs one because
-  LeanInteract refuses to start above a RAM threshold); the backend is only
-  restarted on actual failure.
-- `:browse` is *improved* rather than merely ported. The Python version
-  required `:import Lean` in the user's session first; here `:browse NS`
-  builds (and caches) a separate environment - session imports plus
-  `Lean.Elab.Command` - runs the introspection metaprogram there, and
-  appends declarations made in the session itself. Compiler-generated
-  auxiliaries (`.rec`, `.noConfusion`, `.eq_1`, ...) are filtered out;
-  `:browse! NS` shows everything.
-- Backend discovery reuses the binary LeanInteract built rather than
-  building its own. To set one up from scratch:
-  `git clone https://github.com/leanprover-community/repl && cd repl &&
-  lake build`, then point `LEANT_BACKEND` at
-  `.lake/build/bin/repl.exe`.
