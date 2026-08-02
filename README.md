@@ -424,6 +424,22 @@ quantified sites; an eight-site goal needing exactly four open and four
 opaque sites remains a deliberate bounded gap. Beyond the guard the
 answer is "no term found within bounds" and nothing stronger.
 
+Instance-implicit goal binders keep a separate render-only position. The
+engines remain dictionary-independent, while Leant inserts the wildcard that
+prevents the next synthesized lambda binder from being mistaken for the class
+instance. Uses of a constrained rank-N hypothesis leave its nested instance
+argument implicit, so Lean reconstructs the evidence during verification:
+
+```text
+λ> :synth (∀ (A R : Type) [Demo.C A], (∀ (a : Type) [Demo.C a], a → R) → A → R)
+  it1  fun _ _ _ f => f _
+```
+
+Because erased dictionary evidence can carry proof power, its presence also
+makes an otherwise empty Djinn search inconclusive rather than a refutation.
+The live regression runs this goal under Djinn, Exference, and `both` in
+[`synth-instance-implicit`](test/synth-instance-implicit.txt).
+
 ### Impossibility, proved
 
 When Djinn's complete search exhausts a fully translated goal, failure
@@ -675,6 +691,12 @@ finisher tactics, needing no premise database and no imports. Bare
   without binder metadata retain the positional `@` fallback. Inventory
   extraction is deliberately best-effort: if it cannot be produced, each
   engine still runs with the structural declarations it already has.
+- Non-dependent instance-implicit binders in a goal are serialized as
+  render-only slots. They are erased before either engine searches, reserve a
+  wildcard in an introduced Lean lambda, stay implicit at hypothesis and
+  provider applications, and poison complete negative evidence. This keeps
+  dictionary reconstruction with Lean without shifting later synthesized
+  term arguments.
 - Proper-type applications headed by a bound constructor variable or an
   opaque/non-inductive Lean constant retain their ordered arguments. Private
   abstract declarations keep constant heads rigid, and rendering restores

@@ -115,6 +115,13 @@ best-first search. From the commit history and the reports
   `global («a» := Nat)`. Intervening class binders remain implicit for Lean's
   instance search. Unused implicit term binders are not misclassified as type
   quantifiers, and goal serialization keeps its established behavior.
+- **Instance-implicit goal alignment (Leant bridge).** A non-dependent
+  instance binder is neither a type quantifier nor an ordinary engine premise.
+  The fragment retains it as a render-only slot, erases its dictionary before
+  search, and inserts a wildcard into an introduced Lean lambda. Nested
+  instance arguments at hypothesis and provider uses remain implicit, so Lean
+  reconstructs them during verification. Since the erased dictionary can
+  carry proof power, Djinn exhaustion across this boundary is inconclusive.
 - **Retained proper-type applications (Leant bridge).** The Lean serializer
   now preserves ordered applications headed by either a bound first-order
   type constructor or an opaque/non-inductive Lean constant. Bound heads
@@ -248,13 +255,13 @@ opposite directions.
   verification discards them. No universe reasoning needs to live in
   the engine.
 - **Class contexts collapse into elaboration.** Djex implements nominal
-  instance resolution (givens, superclasses, instances). In Lean,
-  instance-implicit binders `[Monad m]` in a goal become ordinary
-  opaque hypotheses for the engine (Djinn's dictionary-independent
-  posture), and any candidate that *uses* a class method simply leaves
-  the instance argument implicit — Lean's elaborator, running during
-  verification, is a better evidence resolver than anything we would
-  port.
+  instance resolution (givens, superclasses, instances). In Lean, a
+  non-dependent instance-implicit binder `[Monad m]` is retained only as a
+  render position and incompleteness witness; neither engine receives its
+  dictionary as proof power. A candidate that uses a constrained hypothesis or
+  class method leaves the instance argument implicit. Lean's elaborator,
+  running during verification, is a better evidence resolver than anything we
+  would port.
 
 ### What becomes *harder* in Lean — and why Djex's shape is still right
 
@@ -966,6 +973,12 @@ types around that constrained provider. Its first 12 rendered groups all fail
 Lean's instance check; `Demo.global («a» := Demo.Good)` appears at combined
 group 14 and verifies. The former append merge under a 12-group cap misses the
 same query, while the source-local 24-group frontier reaches it.
+A separate instance-implicit transcript checks that an outer class binder does
+not consume the next synthesized lambda variable and that a constrained rank-N
+hypothesis is applied with its nested dictionary left implicit. The same term
+verifies under standalone Djinn, standalone Exference, and combined mode; a
+pure Djinn control also pins conservative negative evidence after dictionary
+erasure.
 A term-parameterized `Tag` control stays on the legacy occurrence-local path.
 Recursive exact-head identity is the separate extension described in Section
 I. See the

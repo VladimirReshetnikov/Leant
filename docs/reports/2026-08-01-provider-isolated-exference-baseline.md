@@ -194,6 +194,14 @@ and fail Lean verification; group fourteen renders
 `Demo.global («a» := Demo.Good)` and succeeds. The former append merge with a
 12-group global cap reports twelve rejected candidates for the same transcript.
 
+The `synth-instance-implicit` golden covers the adjacent goal-side dictionary
+boundary. A non-dependent instance binder is erased from engine proof power but
+retained as a render-only slot, so the next ordinary lambda binder stays aligned
+with its Lean domain. It checks direct identity under Djinn, then a constrained
+rank-N hypothesis under Djinn, Exference, and combined mode. Pure tests also pin
+that the diagnostic instance spelling does not split alpha-equivalent family
+schemas and that Djinn exhaustion remains nonterminal after dictionary erasure.
+
 Pure tests pin the complete `D1–D4, E1–E12, D5–D12` order, alternating tails,
 partial-variant and late-source deduplication, empty-result normalization,
 note/refutation semantics, and an asymmetric checked prefix. The last case

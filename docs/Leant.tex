@@ -859,9 +859,15 @@ higher-rank goals answer ``no term
 found within bounds'' and nothing stronger. And although Djex can resolve
 type-class evidence itself, Leant leaves instance arguments to Lean's
 elaborator during verification, which sits nearer the instance tables
-anyway. The fragment is bounded on purpose: inside it, answers are
-fast and verified. Refutations are final for the complete provider-free
-structural calculus; the bounded, best-effort live-provider inventory is
+anyway. A non-dependent instance-implicit goal binder is retained as a
+render-only slot: it contributes no dictionary premise to either engine, but
+Leant inserts its wildcard before later lambda arguments and withholds complete
+negative evidence across the erased boundary. Constrained rank-N hypotheses
+therefore keep their instance applications implicit without shifting the
+candidate's term binders. The fragment is bounded on purpose: inside it,
+answers are fast and verified. Refutations are final for the complete
+provider-free structural calculus; the bounded, best-effort live-provider
+inventory is
 not an exhaustive theorem about every declaration or axiom in the Lean
 environment.
 
