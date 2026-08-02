@@ -138,9 +138,12 @@ renderLeanTerm cm providers typeNames premises goalFrag expr0 = do
         -- elaborates
         styles = [Idiomatic, Explicit]
     concat <$> mapM
-      (\set -> mapM
-        (\style ->
-          render cm providers typeNames style doms 0 (markSites doms set expr))
+      (\set -> concat <$> mapM
+        (\style -> mapM
+          (\visibleBinderDomain ->
+            render cm providers typeNames style visibleBinderDomain doms 0
+              (markSites doms set expr))
+          visibleBinderDomains)
         styles)
       sets
 
@@ -1003,10 +1006,29 @@ markOrCount doms set = go
 data Style = Idiomatic | Explicit
   deriving (Eq)
 
+-- A positional local application provides too little expected-type
+-- information for Lean to solve some impredicative binder universes from @_@
+-- alone. Keep that historical best guess first, then offer bounded Type- and
+-- Prop-directed variants for backend verification. Named global arguments do
+-- not need this fallback because their binder type supplies the direction.
+data VisibleBinderDomain
+  = InferredVisibleBinderDomain
+  | TypeVisibleBinderDomain
+  | PropVisibleBinderDomain
+  deriving (Eq)
+
+visibleBinderDomains :: [VisibleBinderDomain]
+visibleBinderDomains =
+  [ InferredVisibleBinderDomain
+  , TypeVisibleBinderDomain
+  , PropVisibleBinderDomain
+  ]
+
 render
-  :: CtorMap -> ProviderMap -> TypeMap -> Style -> Map.Map String Frag
+  :: CtorMap -> ProviderMap -> TypeMap -> Style -> VisibleBinderDomain
+  -> Map.Map String Frag
   -> Int -> Expression String -> Either String String
-render cm providers typeNames style doms = go
+render cm providers typeNames style visibleBinderDomain doms = go
  where
   go :: Int -> Expression String -> Either String String
   go req expr = case expr of
@@ -1055,7 +1077,11 @@ render cm providers typeNames style doms = go
           Right (at req 1 (leanName ++ concat rendered))
         Right Nothing -> do
           functionTxt <- visibleFunctionText function
-          argumentTxt <- renderVisibleTypeArgument typeNames argument
+          argumentTxt <-
+            if localVisibleHead function
+              then renderVisibleTypeArgumentWith
+                visibleBinderDomain True typeNames argument
+              else renderVisibleTypeArgument typeNames argument
           Right (at req 1 (functionTxt ++ " " ++ argumentTxt))
     Lambda [] body -> go req body
     Lambda pats body -> do
@@ -1167,6 +1193,11 @@ render cm providers typeNames style doms = go
           GCtor info -> ciLean info
     _ -> go 1 function
 
+  localVisibleHead function = case function of
+    VisibleTypeApplication inner _ -> localVisibleHead inner
+    Local{} -> True
+    _ -> False
+
   -- A positional Lean @ application exposes every intervening implicit and
   -- instance binder. For a discovered global, use the source binder names
   -- retained by the provider serializer instead: class evidence between type
@@ -1234,7 +1265,8 @@ render cm providers typeNames style doms = go
 -- consulting the enclosing term or source-variable scope.
 renderVisibleTypeArgument
   :: TypeMap -> VisibleTypeArgument -> Either String String
-renderVisibleTypeArgument = renderVisibleTypeArgumentWith True
+renderVisibleTypeArgument =
+  renderVisibleTypeArgumentWith InferredVisibleBinderDomain True
 
 -- A named Lean argument such as @(a := Nat)@ already identifies the source
 -- binder without switching the provider head into fully explicit mode. Keep
@@ -1242,11 +1274,14 @@ renderVisibleTypeArgument = renderVisibleTypeArgumentWith True
 -- @\@@ because its recorded argument vector includes Lean's implicit slots.
 renderNamedVisibleTypeArgument
   :: TypeMap -> VisibleTypeArgument -> Either String String
-renderNamedVisibleTypeArgument = renderVisibleTypeArgumentWith False
+renderNamedVisibleTypeArgument =
+  renderVisibleTypeArgumentWith InferredVisibleBinderDomain False
 
 renderVisibleTypeArgumentWith
-  :: Bool -> TypeMap -> VisibleTypeArgument -> Either String String
-renderVisibleTypeArgumentWith explicitStandalone typeNames argument =
+  :: VisibleBinderDomain -> Bool -> TypeMap -> VisibleTypeArgument
+  -> Either String String
+renderVisibleTypeArgumentWith visibleBinderDomain explicitStandalone typeNames
+    argument =
   case ( isInferredVisibleTypeArgument argument
        , visibleTypeArgumentClosedType argument) of
     (True, Nothing) -> Right "_"
@@ -1289,9 +1324,15 @@ renderVisibleTypeArgumentWith explicitStandalone typeNames argument =
       | otherwise -> do
           bodyTxt <- renderType False 0 body
           let binderTxt variable =
-                "(" ++ closedVisibleTypeVariableSpelling variable ++ " : _)"
+                "(" ++ closedVisibleTypeVariableSpelling variable ++ " : "
+                  ++ visibleBinderDomainText ++ ")"
           Right $ at req 0
             ("\8704 " ++ unwords (map binderTxt variables) ++ ", " ++ bodyTxt)
+
+  visibleBinderDomainText = case visibleBinderDomain of
+    InferredVisibleBinderDomain -> "_"
+    TypeVisibleBinderDomain -> "Type _"
+    PropVisibleBinderDomain -> "Prop"
 
   -- The engine's structural encodings use their Haskell names.  Lean's
   -- corresponding nominal constructors differ only in these cases; all other

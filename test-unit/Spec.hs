@@ -18,11 +18,12 @@ import System.FilePath ((</>), normalise, takeDirectory)
 import System.IO (hClose, openBinaryTempFile)
 import System.Info (os)
 import Test.Tasty (TestTree, defaultMain, testGroup)
-import Test.Tasty.HUnit ((@?=), assertFailure, testCase)
+import Test.Tasty.HUnit ((@?=), assertBool, assertFailure, testCase)
 
 import Language.Haskell.Djex
   ( Constraint (..)
-  , Expression (Global, VisibleTypeApplication)
+  , Expression (Global, Lambda, Local, VisibleTypeApplication)
+  , Pattern (Bind)
   , Type (..)
   , inferredVisibleTypeArgument
   , mkIdentifier
@@ -2053,6 +2054,24 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
           (Map.singleton "leantProvider0" ("Demo.identity", Nothing)) Map.empty
           [] (FAtom False "Nat") expression
         @?= Right ["@Demo.identity (∀ (a0_0 : _), a0_0 → a0_0)"]
+  , testCase "offer kind-directed local quantified arguments" $ do
+      argument <- expectRight $ specifiedVisibleTypeArgument
+        (ForallType ["a"] []
+          (FunctionType (TypeVariable "a") (TypeVariable "a")))
+      let token = FAtom False "Demo.Token"
+          expression = Lambda [Bind "provider"] $
+            VisibleTypeApplication (Local "provider") argument
+          rendered = renderLeanTerm Map.empty Map.empty Map.empty []
+            (FArr (FAll False "hidden" token) token) expression
+      case rendered of
+        Left err -> assertFailure err
+        Right variants -> do
+          assertBool ("missing inferred-sort local variant: " ++ show variants)
+            $ any ("(a0_0 : _)" `isInfixOf`) variants
+          assertBool ("missing Type-directed local variant: " ++ show variants)
+            $ any ("(a0_0 : Type _)" `isInfixOf`) variants
+          assertBool ("missing Prop-directed local variant: " ++ show variants)
+            $ any ("(a0_0 : Prop)" `isInfixOf`) variants
   , testCase "render alpha-renamed quantified arguments identically" $ do
       providerName <- expectRight $ mkIdentifier "leantProvider0"
       let source variable = ForallType [variable] []
