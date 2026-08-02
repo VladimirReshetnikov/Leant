@@ -7,6 +7,7 @@ Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to e
 λ> :prove ∀ p : Prop, Decidable p → Decidable (¬ p)
 entering prove mode — type tactics; :help for commands
 ⊢ (p : Prop) → Decidable p → Decidable ¬p
+suggestion: intro
 ⊢> :synth
 preparing synthesis environment (session imports + Lean)...
   it1  fun _ x => match x with | .isFalse k => .isTrue k | .isTrue y => .isFalse (fun k1 => k1 y)
@@ -19,11 +20,13 @@ left prove mode; the script was:
 λ> :prove ∀ p q : Prop, (p → q) → p → q ∧ p
 entering prove mode — type tactics; :help for commands
 ⊢ ∀ (p q : Prop), (p → q) → p → q ∧ p
+suggestion: intro
 ⊢> intro p q h hp
 p q : Prop
 h : p → q
 hp : p
 ⊢ q ∧ p
+suggestion: exact ⟨h hp, hp⟩
 ⊢> :synth
 (synthesizing with hypotheses p q h hp as premises)
   it1  fun _ _ f x => ⟨f x, x⟩

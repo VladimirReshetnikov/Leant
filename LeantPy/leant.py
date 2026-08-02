@@ -503,6 +503,7 @@ Commands (GHCi-style):
   :browse! NAMESPACE       ...including compiler-generated auxiliaries
   :prove [PROP]            interactively prove PROP tactic by tactic
                            (no argument: resume the last `sorry`)
+                           suggests a verified next tactic automatically
   :doc NAME                show the documentation string of NAME
   :search TEXT             search declaration names (case-insensitive)
   :search? TYPE            proof search: what proves TYPE? (via exact?)
@@ -1416,6 +1417,7 @@ Multi-line tactics work as usual (:{ :} or automatic continuation).
   :goals             reprint the current goals
   :undo [N]          take back the last N tactics (default 1)
   :script            show the tactic script so far
+  :suggest           reprint Lean's suggested next tactic
   :auto              try common finishing tactics on the current goal
   :qed [NAME]        finish — save as `theorem NAME` in the session
                      (a `def` if the statement is not a proposition)
@@ -1424,10 +1426,18 @@ Multi-line tactics work as usual (:{ :} or automatic continuation).
 
 Tip: `exact?`, `simp?`, `rw?` record the tactic they *found* in the script,
 not the question mark form.
+Automatic suggestions are advisory and never enter the script.
 """
 
     AUTO_TACTICS = ["rfl", "trivial", "decide", "simp", "omega",
                     "exact?", "aesop"]
+
+    # Ordered from cheap, deterministic steps to progressively broader
+    # search. A candidate is shown only after Lean accepts it against the
+    # current proof state.
+    SUGGESTION_TACTICS = ["rfl", "assumption", "intro", "exact?", "simp?",
+                          "decide", "omega", "aesop?", "constructor", "apply?"]
+    SUGGESTION_HEARTBEAT_LIMIT = 20_000
 
     def format_goals(self, goals: list[str]):
         if not goals:
@@ -1465,10 +1475,12 @@ not the question mark form.
                 return
             s = res.sorries[0]
             self.prove = {"stmt": arg,
-                          "stack": [(s.proof_state, [s.goal or ""], None)]}
+                          "stack": [(s.proof_state, [s.goal or ""], None)],
+                          "suggestions": {}}
         elif self.last_sorry is not None:
             ps, goal = self.last_sorry
-            self.prove = {"stmt": None, "stack": [(ps, [goal], None)]}
+            self.prove = {"stmt": None, "stack": [(ps, [goal], None)],
+                          "suggestions": {}}
             print(dim("resuming from the last `sorry` — on :qed the script is "
                       "printed for you to paste (the original declaration "
                       "already elaborated)"))
@@ -1478,6 +1490,7 @@ not the question mark form.
             return
         print(dim("entering prove mode — type tactics; :help for commands"))
         self.format_goals(self.prove["stack"][-1][1])
+        self.suggest_tactic()
 
     @staticmethod
     def parse_try_this(messages) -> str | None:
@@ -1524,6 +1537,51 @@ not the question mark form.
         self.prove["stack"].append((res.proof_state, list(res.goals), script_entry))
         return True
 
+    @staticmethod
+    def emit_suggestion(suggestion: str):
+        lines = suggestion.splitlines()
+        if lines:
+            print(dim(f"suggestion: {lines[0]}"))
+            for line in lines[1:]:
+                print(dim(f"            {line}"))
+
+    def suggest_tactic(self):
+        """Suggest a Lean-verified next tactic without advancing the user's
+        proof stack. Results (including no suggestion) are cached per proof
+        state so :goals, :undo, and :suggest do not repeat search."""
+        if self.prove is None:
+            return
+        from lean_interact import ProofStep
+        ps, goals, _ = self.prove["stack"][-1]
+        if not goals:
+            return
+        cache = self.prove["suggestions"]
+        if ps in cache:
+            if cache[ps] is not None:
+                self.emit_suggestion(cache[ps])
+            return
+        for tactic in self.SUGGESTION_TACTICS:
+            bounded = (f"set_option maxHeartbeats "
+                       f"{self.SUGGESTION_HEARTBEAT_LIMIT} in {tactic}")
+            try:
+                res = self.server.run(ProofStep(proof_state=ps, tactic=bounded),
+                                      timeout=self.timeout)
+            except Exception as e:  # noqa: BLE001  (timeout, server death, ...)
+                self.prove_emergency_exit(
+                    f"the backend failed while suggesting a tactic ({e!r})")
+                return
+            if is_error(res):
+                continue
+            errors = [m for m in getattr(res, "messages", [])
+                      if m.severity == "error"]
+            if errors or getattr(res, "proof_state", None) is None:
+                continue
+            suggestion = self.parse_try_this(res.messages) or tactic
+            cache[ps] = suggestion
+            self.emit_suggestion(suggestion)
+            return
+        cache[ps] = None
+
     def prove_script(self) -> list[str]:
         return [e for (_, _, e) in self.prove["stack"] if e]
 
@@ -1553,6 +1611,7 @@ not the question mark form.
                 print(self.PROVE_HELP)
             elif cmd == "goals":
                 self.format_goals(self.prove["stack"][-1][1])
+                self.suggest_tactic()
             elif cmd == "undo":
                 n = int(arg) if arg.isdigit() else 1
                 popped = 0
@@ -1566,6 +1625,7 @@ not the question mark form.
                     print(red("nothing to undo"))
                 else:
                     self.format_goals(self.prove["stack"][-1][1])
+                    self.suggest_tactic()
             elif cmd == "script":
                 script = self.prove_script()
                 if script:
@@ -1574,6 +1634,8 @@ not the question mark form.
                     print(dim("(no tactics yet)"))
             elif cmd == "auto":
                 self.cmd_auto()
+            elif cmd == "suggest":
+                self.suggest_tactic()
             elif cmd == "qed":
                 self.cmd_qed(arg)
             elif cmd == "abort":
@@ -1587,7 +1649,8 @@ not the question mark form.
                     print(dim("left prove mode"))
             else:
                 print(red(f"no :{cmd} inside prove mode — tactics, :goals, "
-                          ":undo, :script, :auto, :qed, :abort, :help, :quit"))
+                          ":undo, :script, :suggest, :auto, :qed, :abort, "
+                          ":help, :quit"))
             return True
         # anything else is a tactic
         if self.apply_tactic(self.subst_it(stripped)):
@@ -1595,6 +1658,8 @@ not the question mark form.
             self.format_goals(goals)
             if not goals:
                 print(dim("finish with :qed [NAME], inspect with :script"))
+            else:
+                self.suggest_tactic()
         return True
 
     def cmd_auto(self):
@@ -1612,6 +1677,8 @@ not the question mark form.
                     self.format_goals(after_goals)
                     if not after_goals:
                         print(dim("finish with :qed [NAME]"))
+                    else:
+                        self.suggest_tactic()
                     return
                 # advanced but did not close a goal — take it back
                 self.prove["stack"].pop()
@@ -1782,7 +1849,8 @@ COMMAND_NAMES = [
     ":help", ":quit", ":type", ":info", ":load", ":reload", ":import",
     ":imports", ":browse", ":browse!", ":doc", ":prove", ":search", ":search?",
     ":set", ":undo", ":reset", ":history", ":env", ":time", ":transcript",
-    ":timestamps", ":pickle", ":unpickle",
+    ":timestamps", ":pickle", ":unpickle", ":goals", ":script", ":suggest",
+    ":auto", ":qed", ":abort",
 ]
 
 IDENT_WORD_RE = re.compile(r"[\w.«»₀-₉'!?]+$")

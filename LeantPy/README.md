@@ -93,9 +93,11 @@ run verbatim and, on success, advance the session environment.
 ```
 λ> :prove ∀ n : Nat, 0 + n = n
 ⊢ ∀ (n : Nat), 0 + n = n
+suggestion: intro
 ⊢> intro n
 n : Nat
 ⊢ 0 + n = n
+suggestion: rfl
 ⊢> induction n
 — goal 1 of 2 — ...
 ⊢2> exact?
@@ -108,8 +110,10 @@ saved: theorem zeroAdd : ∀ n : Nat, 0 + n = n
 ```
 
 Goals reprint after every tactic (numbered when there are several; the
-prompt shows the count). `:undo [N]` takes back tactics without limit;
-`:script` shows the accumulated proof; `:auto` tries common finishers;
+prompt shows the count), followed by a Lean-verified suggestion that does not
+advance the state or enter the script. `:suggest` reprints the cached
+suggestion. `:undo [N]` takes back tactics without limit; `:script` shows the
+accumulated proof; `:auto` tries common finishers;
 `:qed [NAME]` turns the script into a real `theorem` in the session
 (auto-named `prove_N`; a `def` when the statement is not a proposition,
 e.g. a `Decidable` instance); `:abort` leaves the mode, printing the

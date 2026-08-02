@@ -135,21 +135,25 @@ Built-ins and keywords that are not constants in the environment
 
 `:prove PROP` opens a tactic loop against the backend's proof-state
 protocol (bare `:prove` resumes the most recent `sorry`). Every line is
-a tactic; goals reprint after each one; `:undo` takes back steps without
-limit; `:script` shows the accumulated proof; `:auto` tries common
-finishers; `:qed [NAME]` turns the script into a real theorem in the
-session. `?`-tactics (`exact?`, `simp?`, `rw?`) record the tactic they
-*found* rather than the question-mark form.
+a tactic; goals reprint after each one, followed by a Lean-verified
+suggestion for the next tactic. Suggestions are advisory: they never advance
+the proof or enter the script, and `:suggest` reprints the cached suggestion.
+`:undo` takes back steps without limit; `:script` shows the accumulated proof;
+`:auto` tries common finishers; `:qed [NAME]` turns the script into a real
+theorem in the session. `?`-tactics (`exact?`, `simp?`, `rw?`) record the
+tactic they *found* rather than the question-mark form.
 
 ```text
 λ> :prove ∀ p q : Prop, p ∧ q → q ∧ p
 entering prove mode — type tactics; :help for commands
 ⊢ ∀ (p q : Prop), p ∧ q → q ∧ p
+suggestion: intro
 ⊢> intro p q h
 p q : Prop
 h : p ∧ q
 ⊢ q ∧ p
-⊢> exact ⟨h.2, h.1⟩
+suggestion: exact And.comm.mp h
+⊢> exact And.comm.mp h
 All goals accomplished 🎉
 finish with :qed [NAME], inspect with :script
 ⊢> :qed and_swap
@@ -466,7 +470,7 @@ synthesis engine).
 ## Development
 
 Golden transcript tests live in [test/](test/): `bash test/run-tests.sh`
-pipes each `synth-*.txt` through `leant --plain` and diffs the filtered
+passes each `*.txt` through `leant --plain` and diffs the filtered
 output against the checked-in `*.golden`; `-u` regenerates the goldens
 after an intentional behavior change. Ideas under consideration are
 tracked in [docs/PROPOSALS.md](docs/PROPOSALS.md) and

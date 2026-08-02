@@ -1,0 +1,49 @@
+
+   __                  __
+  / /  ___ ___ ____   / /_
+ / /__/ -_) _ `/ _ \_/ __/
+/____/\__/\_,_/_//_/ \__/
+Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to exit.
+λ> :prove ∀ p q : Prop, p ∧ q → q ∧ p
+entering prove mode — type tactics; :help for commands
+⊢ ∀ (p q : Prop), p ∧ q → q ∧ p
+suggestion: intro
+⊢> :goals
+⊢ ∀ (p q : Prop), p ∧ q → q ∧ p
+suggestion: intro
+⊢> intro p q h
+p q : Prop
+h : p ∧ q
+⊢ q ∧ p
+suggestion: exact And.comm.mp h
+⊢> :suggest
+suggestion: exact And.comm.mp h
+⊢> exact And.comm.mp h
+All goals accomplished 🎉
+finish with :qed [NAME], inspect with :script
+⊢> :qed and_swap
+saved: theorem and_swap : ∀ p q : Prop, p ∧ q → q ∧ p
+λ> :prove ∀ n : Nat, n = n
+entering prove mode — type tactics; :help for commands
+⊢ ∀ (n : Nat), n = n
+suggestion: intro
+⊢> intro n
+n : Nat
+⊢ n = n
+suggestion: rfl
+⊢> :undo
+undid: intro n
+⊢ ∀ (n : Nat), n = n
+suggestion: intro
+⊢> :suggest
+suggestion: intro
+⊢> intro n
+n : Nat
+⊢ n = n
+suggestion: rfl
+⊢> rfl
+All goals accomplished 🎉
+finish with :qed [NAME], inspect with :script
+⊢> :qed nat_refl
+saved: theorem nat_refl : ∀ n : Nat, n = n
+λ> :quit

@@ -333,16 +333,21 @@ header and just keep going), and an empty line submits it.
 backend's proof-state protocol. Every line is a tactic; \code{:undo}
 pops one step; \code{:qed NAME} assembles the accumulated script into
 a theorem and replays it into the session, so the result is usable
-afterwards.
+afterwards.  Each displayed proof state is followed by an automatically
+discovered tactic suggestion that Lean has already checked.  The suggestion
+is advisory---it does not advance the state or enter the script---and
+\code{:suggest} reprints it without rerunning the search.
 
 \begin{session}
 λ> :prove ∀ p q : Prop, (p → q) → p → q ∧ p
 ⊢ ∀ (p q : Prop), (p → q) → p → q ∧ p
+suggestion: intro
 ⊢> intro p q h hp
 p q : Prop
 h : p → q
 hp : p
 ⊢ q ∧ p
+suggestion: exact ⟨h hp, hp⟩
 ⊢> exact ⟨h hp, hp⟩
 All goals accomplished
 ⊢> :qed mp_and

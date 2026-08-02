@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Golden transcript tests for Leant's :synth (docs/SYNTHESIS_PROPOSAL.md §7 C).
+# Golden transcript tests for Leant's interactive commands.
 #
-#   ./run-tests.sh            run all synth-*.txt, diff against *.golden
+#   ./run-tests.sh            run all *.txt, diff against *.golden
 #   ./run-tests.sh -u         regenerate the golden files instead
 #   ./run-tests.sh basic      run only synth-basic.txt
 #
@@ -42,7 +42,7 @@ filter() {
 
 failures=0
 ran=0
-for input in synth-*.txt; do
+for input in *.txt; do
   case "$input" in
     *"$pattern"*) ;;
     *) continue ;;

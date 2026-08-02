@@ -1,0 +1,14 @@
+:prove ∀ p q : Prop, p ∧ q → q ∧ p
+:goals
+intro p q h
+:suggest
+exact And.comm.mp h
+:qed and_swap
+:prove ∀ n : Nat, n = n
+intro n
+:undo
+:suggest
+intro n
+rfl
+:qed nat_refl
+:quit

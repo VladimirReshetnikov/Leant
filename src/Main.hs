@@ -194,6 +194,9 @@ data ReplState = ReplState
 data ProveState = ProveState
   { pvStmt :: Maybe String  -- ^ Nothing when resumed from a `sorry`
   , pvStack :: [(Integer, [String], Maybe String)]
+  , pvSuggestions :: [(Integer, Maybe String)]
+    -- ^ automatic tactic suggestions, cached by proof-state id; caching
+    -- failures too keeps :goals/:undo from repeating potentially costly search
   }
 
 type St = IORef ReplState
@@ -718,6 +721,7 @@ helpText = unlines
   , "  :browse! NAMESPACE       ...including compiler-generated auxiliaries"
   , "  :prove [PROP]            interactively prove PROP tactic by tactic"
   , "                           (no argument: resume the last `sorry`)"
+  , "                           suggests a verified next tactic automatically"
   , "  :doc NAME                show the documentation string of NAME"
   , "  :search TEXT             search declaration names (case-insensitive)"
   , "  :search? TYPE            proof search: what proves TYPE? (via exact?)"
@@ -746,7 +750,8 @@ commandNames =
   [ ":help", ":quit", ":type", ":info", ":load", ":reload", ":import"
   , ":imports", ":browse", ":browse!", ":doc", ":prove", ":search", ":search?"
   , ":set", ":synth", ":undo", ":reset", ":history", ":env", ":time"
-  , ":transcript", ":timestamps", ":pickle", ":unpickle"
+  , ":transcript", ":timestamps", ":pickle", ":unpickle", ":goals"
+  , ":script", ":suggest", ":auto", ":qed", ":abort"
   ]
 
 -- Returns False when the REPL should exit.
@@ -2017,6 +2022,7 @@ proveHelp = unlines
   , "  :goals             reprint the current goals"
   , "  :undo [N]          take back the last N tactics (default 1)"
   , "  :script            show the tactic script so far"
+  , "  :suggest           reprint Lean's suggested next tactic"
   , "  :auto              try common finishing tactics on the current goal"
   , "  :synth             synthesize terms for the goal, with the hypotheses"
   , "                     as premises (then `exact it1` records the step)"
@@ -2027,10 +2033,23 @@ proveHelp = unlines
   , ""
   , "Tip: `exact?`, `simp?`, `rw?` record the tactic they *found* in the"
   , "script, not the question mark form."
+  , "Automatic suggestions are advisory and never enter the script."
   ]
 
 autoTactics :: [String]
 autoTactics = ["rfl", "trivial", "decide", "simp", "omega", "exact?", "aesop"]
+
+-- Ordered from cheap, deterministic steps to progressively broader search.
+-- Each candidate is actually run against the current immutable proof state;
+-- a tactic is suggested only if Lean accepts it and returns a successor state.
+suggestionTactics :: [String]
+suggestionTactics =
+  [ "rfl", "assumption", "intro", "exact?", "simp?", "decide"
+  , "omega", "aesop?", "constructor", "apply?"
+  ]
+
+suggestionHeartbeatLimit :: Int
+suggestionHeartbeatLimit = 20000
 
 respGoals :: JValue -> [String]
 respGoals v = fromMaybe [] $ do
@@ -2079,6 +2098,58 @@ parseTryThis messages = listToMaybe'
 proveScript :: ProveState -> [String]
 proveScript pv = reverse [e | (_, _, Just e) <- pvStack pv]
 
+emitSuggestion :: St -> String -> IO ()
+emitSuggestion st suggestion = case lines suggestion of
+  [] -> pure ()
+  first : rest -> do
+    emitLn st =<< cDim st ("suggestion: " ++ first)
+    forM_ rest $ \line -> emitLn st =<< cDim st ("            " ++ line)
+
+-- | Find and display a useful next tactic without changing the user's proof
+-- stack. The backend proof-state protocol is persistent, so speculative
+-- children do not affect the state to which the next user tactic is applied.
+suggestTactic :: St -> IO ()
+suggestTactic st = do
+  state <- readIORef st
+  case rsProve state of
+    Just pv | (ps, goals, _) : _ <- pvStack pv, not (null goals) ->
+      case lookup ps (pvSuggestions pv) of
+        Just cached -> forM_ cached (emitSuggestion st)
+        Nothing -> probe ps suggestionTactics
+    _ -> pure ()
+ where
+  probe ps [] = cache ps Nothing
+  probe ps (tactic : rest) = do
+    -- Keep proactive help responsive even when a project has a very large
+    -- premise database. A heartbeat exhaustion is an ordinary tactic error,
+    -- unlike the REPL's wall-clock timeout, so it does not kill the backend or
+    -- invalidate the user's proof state.
+    let bounded = "set_option maxHeartbeats "
+          ++ show suggestionHeartbeatLimit ++ " in " ++ tactic
+    result <- runTactic st ps bounded
+    case result of
+      Left err -> proveEmergencyExit st
+        ("the backend failed while suggesting a tactic: " ++ err)
+      Right v
+        | Nothing <- respFatal v
+        , null [() | (severity, _) <- respMessages v, severity == "error"]
+        , Just _ <- respProofState v -> do
+            let suggestion = fromMaybe tactic (parseTryThis (respMessages v))
+            cache ps (Just suggestion)
+            emitSuggestion st suggestion
+        | otherwise -> probe ps rest
+
+  cache ps suggestion = modifyIORef' st $ \s -> s
+    { rsProve = case rsProve s of
+        Just pv
+          | (currentPs, _, _) : _ <- pvStack pv
+          , currentPs == ps -> Just pv
+              { pvSuggestions = (ps, suggestion) : pvSuggestions pv }
+        -- The proof state can only change here through an emergency exit, but
+        -- preserve a newer state defensively rather than restoring old data.
+        newer -> newer
+    }
+
 proveEmergencyExit :: St -> String -> IO ()
 proveEmergencyExit st why = do
   state <- readIORef st
@@ -2110,7 +2181,7 @@ cmdProve st rawArg = do
               case respSorries v of
                 ((Just ps, goal) : _) | null errs -> do
                   modifyIORef' st (\s -> s { rsProve = Just (ProveState
-                    (Just arg) [(ps, [goal], Nothing)]) })
+                    (Just arg) [(ps, [goal], Nothing)] []) })
                   pure True
                 _ -> do
                   forM_ errs $ \e ->
@@ -2121,7 +2192,7 @@ cmdProve st rawArg = do
         else case rsLastSorry state of
           Just (ps, goal) -> do
             modifyIORef' st (\s -> s { rsProve = Just (ProveState
-              Nothing [(ps, [goal], Nothing)]) })
+              Nothing [(ps, [goal], Nothing)] []) })
             emitLn st =<< cDim st
               ("resuming from the last `sorry` \8212 on :qed the script is "
                ++ "printed for you to paste")
@@ -2136,6 +2207,7 @@ cmdProve st rawArg = do
           case pvStack pv of
             (_, goals, _) : _ -> formatGoals st goals
             [] -> pure ()
+        suggestTactic st
 
 -- Apply one tactic; returns True if the proof state advanced.
 applyTactic :: St -> Bool -> String -> IO Bool
@@ -2202,14 +2274,19 @@ proveInput st text = do
       case word of
         w | w `elem` ["q", "quit", "exit"] -> pure False
         w | w `elem` ["h", "help", "?"] -> True <$ emit st proveHelp
-        "goals" -> True <$ (formatGoals st =<< currentGoals st)
+        "goals" -> do
+          formatGoals st =<< currentGoals st
+          suggestTactic st
+          pure True
         "undo" -> do
           let n = if all (`elem` "0123456789") arg && not (null arg)
                 then read arg else 1 :: Int
           popped <- popTactics n
           if popped == 0
             then emitLn st =<< cRed st "nothing to undo"
-            else formatGoals st =<< currentGoals st
+            else do
+              formatGoals st =<< currentGoals st
+              suggestTactic st
           pure True
         "script" -> do
           state <- readIORef st
@@ -2218,6 +2295,7 @@ proveInput st text = do
               mapM_ (emitLn st) script
             _ -> emitLn st =<< cDim st "(no tactics yet)"
           pure True
+        "suggest" -> True <$ suggestTactic st
         "auto" -> True <$ cmdAuto st
         "synth" -> True <$ cmdSynth st arg
         "qed" -> True <$ cmdQed st arg
@@ -2235,7 +2313,7 @@ proveInput st text = do
         _ -> do
           emitLn st =<< cRed st ("no :" ++ word ++ " inside prove mode \8212 "
             ++ "tactics, :goals, :undo, :script, :auto, :synth, :qed, "
-            ++ ":abort, :quit")
+            ++ ":suggest, :abort, :quit")
           pure True
     else do
       state <- readIORef st
@@ -2244,10 +2322,12 @@ proveInput st text = do
       when advanced $ do
         goals <- currentGoals st
         formatGoals st goals
-        when (null goals) $
-          emitLn st =<< cDim st "finish with :qed [NAME], inspect with :script"
+        if null goals
+          then emitLn st =<< cDim st "finish with :qed [NAME], inspect with :script"
+          else suggestTactic st
       pure True
  where
+  popTactics :: Int -> IO Int
   popTactics n = go n 0
    where
     go 0 acc = pure acc
@@ -2286,8 +2366,9 @@ cmdAuto st = do
                 ++ intercalate ", " (tried ++ [tac]) ++ ")")
               emitLn st (closed ++ note)
               formatGoals st goals
-              when (null goals) $
-                emitLn st =<< cDim st "finish with :qed [NAME]"
+              if null goals
+                then emitLn st =<< cDim st "finish with :qed [NAME]"
+                else suggestTactic st
             else do
               -- advanced without closing a goal: take it back
               modifyIORef' st $ \s -> s { rsProve = case rsProve s of
