@@ -106,15 +106,24 @@ best-first search. From the commit history and the reports
   quantified subtree of the requested scheme: "no quantifier the query
   did not supply is ever invented". Scoped providers instantiate their
   complete leading forall chain freshly per use; provider contexts
-  become proof obligations.
+  become proof obligations. A separate bounded route for vacuous provider
+  binders appends alpha-deduplicated, complete, lexically closed, context-free
+  `forall` roots found in proven proper-type query positions after the
+  established monotype candidates. Explicit instance heads remain a
+  monotype-only source of choices.
 - **Lean-visible provider instantiation evidence (Leant bridge).** Live
   provider discovery records the original names of leading proper-type
   binders while erasing unused instance evidence only in the provider lane.
   Djex can therefore retain a vacuous specialization as an explicit type
   application, and Leant restores it with a named Lean argument such as
   `global («a» := Nat)`. Intervening class binders remain implicit for Lean's
-  instance search. Unused implicit term binders are not misclassified as type
-  quantifiers, and goal serialization keeps its established behavior.
+  instance search. Specified quantified arguments use a shared closed,
+  alpha-normalized representation distinct from the inferred placeholder, so
+  Leant can render `global («a» := (∀ (a0_0 : _), a0_0 → a0_0))`
+  structurally while preserving nested shadowing. Context-bearing quantified
+  arguments fail closed rather than guessing that a Haskell constraint denotes
+  a Lean instance binder. Unused implicit term binders are not misclassified
+  as type quantifiers, and goal serialization keeps its established behavior.
 - **Instance-implicit goal alignment (Leant bridge).** A non-dependent
   instance binder is neither a type quantifier nor an ordinary engine premise.
   The fragment retains it as a render-only slot, erases its dictionary before
@@ -616,7 +625,13 @@ Design rules, all inherited from Djex:
   and the eight-site four-open/four-opaque plan gap) the answer is "no term
   found within bounds" — full impredicative inhabitation is undecidable,
   so this boundary is permanent, and the display must never upgrade it
-  to a refutation.
+  to a refutation. Exference's query-derived provider route admits only
+  complete closed, context-free `forall` roots observed in proven arrow or
+  tuple proper-type positions; it excludes the query root and children of
+  opaque type applications, keeps instance-head specialization monotype-only,
+  and retains the four-binder and 32-combination caps. Leant rejects a
+  constrained quantified visible argument rather than guessing how a Haskell
+  class context should become Lean binders.
 - **Recursive elimination is bounded to one layer in Exference.** A
   recursive field exposed by a constructor match is available as a
   normal branch-local value, but is not eagerly decomposed again. The

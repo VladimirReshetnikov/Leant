@@ -361,6 +361,25 @@ binder and leaves dictionary reconstruction to Lean:
   it1  fun _ => Demo.global («a» := Nat)
 ```
 
+Closed, context-free quantified choices follow the same path instead of
+collapsing to an inferred `_`. Djex keeps their binders alpha-safe, and Leant
+uses stable local names plus `_` binder domains so the provider's expected
+universe remains authoritative:
+
+```text
+λ> class Demo.PolyC (a : Type 1) : Prop where witness : True
+λ> instance : Demo.PolyC (∀ x : Type, x → x) := ⟨True.intro⟩
+λ> axiom Demo.polyGlobal {a : Type 1} [Demo.PolyC a] : Demo.Token
+λ> :synth ((∀ x : Type, x → x) → Demo.Token)
+  it1  fun _ => Demo.polyGlobal («a» := (∀ (a0_0 : _), a0_0 → a0_0))
+```
+
+The dedicated
+[`synth-quantified-provider`](test/synth-quantified-provider.txt) transcript
+checks that explicit impredicative evidence survives under standalone Djinn,
+standalone Exference, and combined search. Open or context-bearing quantified
+arguments are rejected at this bridge rather than guessed into Lean syntax.
+
 Djinn first searches with only the highest-ranked provider, which prevents a
 lossily projected or irrelevant declaration from crowding the fixed candidate
 prefix. If that isolated candidate does not verify, Leant tries the first four
