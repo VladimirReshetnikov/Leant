@@ -44,14 +44,16 @@ import Data.Char (isControl)
 import Data.List (intercalate, nub, sortOn, subsequences)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
-import Data.Void (Void, absurd)
 
 import Language.Haskell.Synthesis.Generated
-  ( Expression (..)
+  ( ClosedVisibleTypeVariable
+  , Expression (..)
   , Pattern (..)
   , VisibleTypeArgument
+  , closedVisibleTypeVariableSpelling
   , discardUnusedPatternBindingsBy
-  , visibleTypeArgumentType
+  , isInferredVisibleTypeArgument
+  , visibleTypeArgumentClosedType
   )
 import Language.Haskell.Synthesis.Name
   ( Boxity (..)
@@ -1227,9 +1229,9 @@ render cm providers typeNames style doms = go
     Right ("| " ++ patTxt ++ " => " ++ bodyTxt)
 
 -- | Render Djex's bounded visible type argument as an ordinary Lean
--- application argument.  Specified arguments are closed monotypes, so the
--- impossible variable and forall cases remain explicit defensive failures at
--- this backend boundary rather than inventing Lean binder scope.
+-- application argument. Specified arguments are lexically closed and
+-- alpha-normalized by Djex, so quantified binders can be restored without
+-- consulting the enclosing term or source-variable scope.
 renderVisibleTypeArgument
   :: TypeMap -> VisibleTypeArgument -> Either String String
 renderVisibleTypeArgument = renderVisibleTypeArgumentWith True
@@ -1245,14 +1247,24 @@ renderNamedVisibleTypeArgument = renderVisibleTypeArgumentWith False
 renderVisibleTypeArgumentWith
   :: Bool -> TypeMap -> VisibleTypeArgument -> Either String String
 renderVisibleTypeArgumentWith explicitStandalone typeNames argument =
-  case visibleTypeArgumentType argument of
-    Nothing -> Right "_"
-    Just typeExpression -> renderType False 2 typeExpression
+  case ( isInferredVisibleTypeArgument argument
+       , visibleTypeArgumentClosedType argument) of
+    (True, Nothing) -> Right "_"
+    (False, Just typeExpression) -> renderType False 2 typeExpression
+    (True, Just _) -> Left
+      "internal: inferred visible type argument has a closed representation"
+    (False, Nothing) -> Left
+      "internal: specified visible type argument has no closed representation"
  where
-  -- 0 = arrow/product, 1 = type application, 2 = atom.
-  renderType :: Bool -> Int -> SharedType.Type Void -> Either String String
+  -- 0 = forall/arrow/product, 1 = type application, 2 = atom.
+  renderType
+    :: Bool
+    -> Int
+    -> SharedType.Type ClosedVisibleTypeVariable
+    -> Either String String
   renderType applicationHead req typeExpression = case typeExpression of
-    SharedType.TypeVariable variable -> absurd variable
+    SharedType.TypeVariable variable -> Right $ at req 2
+      $ closedVisibleTypeVariableSpelling variable
     SharedType.TypeConstructor name ->
       at req 2 <$> renderTypeName
         (explicitStandalone || applicationHead) name
@@ -1270,8 +1282,16 @@ renderVisibleTypeArgumentWith explicitStandalone typeNames argument =
       Right (at req 0 (intercalate " × " elementTxts))
     SharedType.TupleType Unboxed _ ->
       Left "cannot render an unboxed tuple as a Lean type argument"
-    SharedType.ForallType{} ->
-      Left "cannot render a quantified visible Lean type argument"
+    SharedType.ForallType variables constraints body
+      | not (null constraints) ->
+          Left "cannot render a constrained quantified visible Lean type argument"
+      | null variables -> renderType applicationHead req body
+      | otherwise -> do
+          bodyTxt <- renderType False 0 body
+          let binderTxt variable =
+                "(" ++ closedVisibleTypeVariableSpelling variable ++ " : _)"
+          Right $ at req 0
+            ("\8704 " ++ unwords (map binderTxt variables) ++ ", " ++ bodyTxt)
 
   -- The engine's structural encodings use their Haskell names.  Lean's
   -- corresponding nominal constructors differ only in these cases; all other

@@ -21,8 +21,10 @@ import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.HUnit ((@?=), assertFailure, testCase)
 
 import Language.Haskell.Djex
-  ( Expression (Global, VisibleTypeApplication)
+  ( Constraint (..)
+  , Expression (Global, VisibleTypeApplication)
   , Type (..)
+  , inferredVisibleTypeArgument
   , mkIdentifier
   , specifiedVisibleTypeArgument
   )
@@ -2022,6 +2024,76 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
           (Map.singleton "LeantAtom0" "(Nat × Nat)")
           [] (FAtom False "Nat") expression
         @?= Right ["@Demo.identity @(Nat × Nat)"]
+  , testCase "keep inferred visible type arguments distinct from foralls" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      let expression = VisibleTypeApplication
+            (Global providerName) inferredVisibleTypeArgument
+      renderLeanTerm Map.empty
+          (Map.singleton "leantProvider0" ("Demo.identity", Nothing)) Map.empty
+          [] (FAtom False "Nat") expression
+        @?= Right ["@Demo.identity _"]
+  , testCase "render a closed quantified named provider argument" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      argument <- expectRight $ specifiedVisibleTypeArgument
+        (ForallType ["source"] []
+          (FunctionType (TypeVariable "source") (TypeVariable "source")))
+      let expression = VisibleTypeApplication (Global providerName) argument
+      renderLeanTerm Map.empty
+          (Map.singleton "leantProvider0" ("Demo.global", Just ["a"])) Map.empty
+          [] (FAtom False "Demo.Token") expression
+        @?= Right
+          ["Demo.global («a» := (∀ (a0_0 : _), a0_0 → a0_0))"]
+  , testCase "parenthesize a positional quantified type argument" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      argument <- expectRight $ specifiedVisibleTypeArgument
+        (ForallType ["a"] []
+          (FunctionType (TypeVariable "a") (TypeVariable "a")))
+      let expression = VisibleTypeApplication (Global providerName) argument
+      renderLeanTerm Map.empty
+          (Map.singleton "leantProvider0" ("Demo.identity", Nothing)) Map.empty
+          [] (FAtom False "Nat") expression
+        @?= Right ["@Demo.identity (∀ (a0_0 : _), a0_0 → a0_0)"]
+  , testCase "render alpha-renamed quantified arguments identically" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      let source variable = ForallType [variable] []
+            (FunctionType (TypeVariable variable) (TypeVariable variable))
+              :: Type String
+      leftArgument <- expectRight $ specifiedVisibleTypeArgument (source "a")
+      rightArgument <- expectRight $ specifiedVisibleTypeArgument (source "renamed")
+      let renderArgument argument = renderLeanTerm Map.empty
+            (Map.singleton "leantProvider0" ("Demo.global", Just ["a"]))
+            Map.empty [] (FAtom False "Demo.Token")
+            (VisibleTypeApplication (Global providerName) argument)
+      renderArgument leftArgument @?= renderArgument rightArgument
+  , testCase "preserve nested quantified shadowing with distinct names" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      let quantified = ForallType ["x"] []
+            (FunctionType (TypeVariable "x")
+              (ForallType ["x"] []
+                (FunctionType (TypeVariable "x") (TypeVariable "x"))))
+              :: Type String
+      argument <- expectRight $ specifiedVisibleTypeArgument quantified
+      let expression = VisibleTypeApplication (Global providerName) argument
+      renderLeanTerm Map.empty
+          (Map.singleton "leantProvider0" ("Demo.global", Just ["a"])) Map.empty
+          [] (FAtom False "Demo.Token") expression
+        @?= Right
+          [ "Demo.global («a» := (∀ (a0_0 : _), a0_0 → "
+              ++ "∀ (a1_0 : _), a1_0 → a1_0))"
+          ]
+  , testCase "reject constrained quantified Lean type arguments" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      className <- expectRight $ mkIdentifier "C"
+      let constrained = ForallType ["a"]
+            [Constraint className [TypeVariable "a"]]
+            (TypeVariable "a") :: Type String
+      argument <- expectRight $ specifiedVisibleTypeArgument constrained
+      let expression = VisibleTypeApplication (Global providerName) argument
+      renderLeanTerm Map.empty
+          (Map.singleton "leantProvider0" ("Demo.global", Just ["a"])) Map.empty
+          [] (FAtom False "Demo.Token") expression
+        @?= Left
+          "cannot render a constrained quantified visible Lean type argument"
   ]
 
 firstGroup :: Either String SynthOutcome -> AssertionResult
