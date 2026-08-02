@@ -128,8 +128,12 @@ best-first search. From the commit history and the reports
   variants because Lean may lack enough expected-type information to solve the
   quantified argument's universe from `_` alone; backend verification chooses
   the first elaborating spelling. Named globals retain their source-directed
-  rendering. Context-bearing quantified arguments fail closed rather than
-  guessing that a Haskell constraint denotes a Lean instance binder. Unused
+  rendering. Each of the inferred, `Type _`, and `Prop` lanes retains its own
+  12 site-and-style variants, so selective local instantiation sites remain
+  reachable under a hard 36-spelling bound; domain-insensitive duplicates
+  collapse back to the historical group size. Context-bearing quantified
+  arguments fail closed rather than guessing that a Haskell constraint denotes
+  a Lean instance binder. Unused
   implicit term binders are not misclassified as type quantifiers, and goal
   serialization keeps its established behavior.
 - **Instance-implicit goal alignment (Leant bridge).** A non-dependent

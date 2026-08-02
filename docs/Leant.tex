@@ -182,7 +182,7 @@
   An \textbf{experimental} tool in active development.
   Interfaces, output, and capabilities change frequently.\\[0.6em]
   \href{https://github.com/VladimirReshetnikov/Leant}{github.com/VladimirReshetnikov/Leant}\quad
-  July 2026.
+  August 2026.
 \end{center}
 \vspace*{\stretch{1}}
 \end{titlepage}
@@ -509,6 +509,33 @@ then verifies each rendered candidate against the original type:
   it5  fun _ _ _ _ _ f x y z w => f _ _ _ _ x y z w
 \end{session}
 
+Vacuous local providers can retain the same query-supplied choice even
+when their result is an opaque Lean type. Here \code{Demo.Token} becomes
+a fixed ambient query rigid, not an unresolved inference variable:
+
+\begin{session}
+λ> axiom Demo.Token : Type
+λ> :synth ((∀ x : Type, x → x) → ({a : Type 1} → Demo.Token) → Demo.Token)
+  it1  fun _ x => @x (∀ (a0_0 : Type _), a0_0 → a0_0)
+λ> :set synth-engine exference
+synth engine: exference
+λ> :synth ((∀ x : Type, x → x) → ({a : Type 1} → Demo.Token) → Demo.Token)
+  it1  fun f x => f _ (@x (∀ (a0_0 : Type _), a0_0 → a0_0))
+\end{session}
+
+This visible specialization is available only for a fully vacuous,
+context-free leading provider chain, and only selects a closed proper type
+already present in the checked query. Fixed ambient rigids may occur in the
+provider result; a free flexible variable still rejects the route. A local
+value has no global binder name, so Leant renders a positional \code{@}
+application. For a quantified argument it tries binder domains \code{\_},
+\code{Type \_}, and \code{Prop}, in that order, and backend verification keeps
+the first spelling which elaborates. Named globals retain their
+source-directed applications. Each domain lane retains at most twelve
+site-and-style spellings, for a hard 36-variant bound only when the local
+quantified argument is domain-sensitive; ordinary duplicate spellings collapse
+to the historical smaller group.
+
 Leant also retains applications whose arguments are proper types. A
 bound first-order constructor remains a higher-kinded variable in Djex;
 an opaque Lean family receives one rigid nominal head across its
@@ -531,10 +558,14 @@ families such as \code{P 3} remain opaque. A retained nominal application
 can support a positive, Lean-verified candidate but always poisons a
 negative verdict because its constant hides structure.
 
-The candidate vocabulary comes only from the sequent, including
-quantified subtrees already present there; this is guarded
-impredicativity, not general second-order search. Chains with five or
-more leading binders remain a deliberate incomplete boundary.
+The candidate vocabulary comes only from proven proper-type positions below
+arrows and tuples in the sequent, including quantified subtrees already
+present there; this is guarded impredicativity, not general second-order
+search. A visible provider chain is capped at four binders and 32 argument
+combinations. The separate explicit-instance-head route remains
+monotype-only, and open or context-bearing specified arguments fail closed.
+Chains with five or more leading binders remain a deliberate incomplete
+boundary.
 
 \subsection{Impossibility, proved}\label{sec:negative}
 
@@ -864,9 +895,13 @@ render-only slot: it contributes no dictionary premise to either engine, but
 Leant inserts its wildcard before later lambda arguments and withholds complete
 negative evidence across the erased boundary. Constrained rank-N hypotheses
 therefore keep their instance applications implicit without shifting the
-candidate's term binders. The fragment is bounded on purpose: inside it,
-answers are fast and verified. Refutations are final for the complete
-provider-free structural calculus; the bounded, best-effort live-provider
+candidate's term binders. Provider projection does not serialize Lean's
+instance registry into Djex, so a polytype visible only inside an instance
+head is not a candidate: it must already occur in the checked query. Extending
+that boundary would require bounded, checked caller-supplied evidence rather
+than an approximation through Haskell classes. The fragment is bounded on
+purpose: inside it, answers are fast and verified. Refutations are final for
+the complete provider-free structural calculus; the bounded, best-effort live-provider
 inventory is
 not an exhaustive theorem about every declaration or axiom in the Lean
 environment.

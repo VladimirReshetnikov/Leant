@@ -71,7 +71,11 @@ visible argument, in order:
 
 They are textual variants of one checked Djex candidate, not separate search
 proofs. The existing backend-verification loop keeps the first variant that
-elaborates. Named global applications retain their previous output.
+elaborates. Each domain receives an independent 12-variant site-and-style
+budget so a late selective local application is not displaced by the other
+kind hints; the domain-sensitive hard bound is 36, and ordinary duplicate
+spellings collapse to the historical smaller group. Named global applications
+retain their previous output.
 
 ## Validation
 
@@ -82,4 +86,4 @@ facade fixture whose `forall r.` definition compiles with GHC 9.12.
 The Leant side has a pure all-engine regression that requires the
 Type-directed local application inside each standalone verification frontier,
 plus a real Lean 4.31 golden transcript for Djinn, Exference, and combined
-mode. The complete Leant synthesis suite contains 148 passing tests.
+mode. The complete Leant synthesis suite contains 149 passing tests.
