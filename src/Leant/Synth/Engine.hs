@@ -881,6 +881,9 @@ fragToDjinn recursiveProjection providers extras frag0 = do
           v <- variable ("v:" ++ binder)
           body' <- go premisesEnabled body
           pure (ForallType [v] [] body')
+        -- Lean reconstructs instance evidence at applications.  Keep it out
+        -- of both engine type systems; Render retains the introduction slot.
+        FInst _ body -> go premisesEnabled body
         FParamInd headName _ parameters _ ->
           parametricIndOccurrence premisesEnabled headName parameters
         FInd key ctors -> indOccurrence premisesEnabled key ctors
@@ -1341,6 +1344,7 @@ fragToDjinn recursiveProjection providers extras frag0 = do
       FProd left right -> descend accum [left, right]
       FSum left right -> descend accum [left, right]
       FAll _ _ body -> collect accum body
+      FInst _ body -> collect accum body
       FApp _ _ _ arguments -> descend accum arguments
       -- Translating an exact nonrecursive occurrence consumes only its
       -- parameter vector.  Its query-wide structural template fields are
@@ -1471,6 +1475,7 @@ collectFragAtoms atoms frag = case frag of
   FProd left right -> descend atoms [left, right]
   FSum left right -> descend atoms [left, right]
   FAll _ _ body -> collectFragAtoms atoms body
+  FInst _ body -> collectFragAtoms atoms body
   FAtom _ key -> Set.insert key atoms
   FApp _ _ _ arguments -> descend atoms arguments
   -- An exact nested family's inventory belongs to its independent query-wide
@@ -1502,6 +1507,7 @@ collectProviderSurfaceAtoms atoms frag = case frag of
   FProd left right -> descend atoms [left, right]
   FSum left right -> descend atoms [left, right]
   FAll _ _ body -> collectProviderSurfaceAtoms atoms body
+  FInst _ body -> collectProviderSurfaceAtoms atoms body
   FAtom _ key -> Set.insert key atoms
   FApp _ _ _ arguments -> descend atoms arguments
   FParamInd _ _ parameters _ -> descend atoms parameters
@@ -1523,6 +1529,7 @@ collectExactFamilyUses recursiveProjection premisesEnabled uses frag =
   FProd left right -> descend uses [left, right]
   FSum left right -> descend uses [left, right]
   FAll _ _ body -> collect uses body
+  FInst _ body -> collect uses body
   FApp _ key head' arguments ->
     let withUse = case head' of
           AppVariable _ -> uses
@@ -1722,6 +1729,7 @@ freeSchemaVariables bound frag = case frag of
   FProd left right -> descend [left, right]
   FSum left right -> descend [left, right]
   FAll _ binder body -> freeSchemaVariables (Set.insert binder bound) body
+  FInst _ body -> freeSchemaVariables bound body
   FVar variableName
     | variableName `Set.member` bound -> Set.empty
     | otherwise -> Set.singleton variableName
@@ -1794,6 +1802,11 @@ schemaEquivalent = go []
         FAll rightExplicit rightBinder rightBody) ->
       leftExplicit == rightExplicit
         && go ((leftBinder, rightBinder) : binders) leftBody rightBody
+    -- Instance evidence is erased before either engine sees a schema.  Pretty
+    -- keys retain only diagnostics and must not split alpha-equivalent family
+    -- templates whose enclosing binder spellings differ.
+    (FInst _ leftBody, FInst _ rightBody) ->
+      go binders leftBody rightBody
     (FVar a, FVar b) -> equivalentName binders a b
     (FAtom _ a, FAtom _ b) -> a == b
     (FApp _ _ leftHead leftArguments,
@@ -1882,6 +1895,7 @@ replaceFrag replacements = go Set.empty
                 (go (Set.insert fresh shadowed) renamed)
         | otherwise ->
             FAll explicit binder (go (Set.insert binder shadowed) body)
+      FInst key body -> FInst key (recur body)
       FApp safe key head' arguments ->
         FApp safe key head' (map recur arguments)
       FParamInd headName key parameters constructors ->
@@ -1919,6 +1933,7 @@ schemaNames frag = case frag of
   FProd left right -> descend [left, right]
   FSum left right -> descend [left, right]
   FAll _ binder body -> Set.insert binder (schemaNames body)
+  FInst _ body -> schemaNames body
   FVar variableName -> Set.singleton variableName
   FApp _ _ head' arguments ->
     let headNames = case head' of
@@ -1946,6 +1961,7 @@ renameBoundVariable old new frag = case frag of
   FAll explicit binder body
     | binder == old -> frag
     | otherwise -> FAll explicit binder (go body)
+  FInst key body -> FInst key (go body)
   FVar variableName
     | variableName == old -> FVar new
     | otherwise -> frag

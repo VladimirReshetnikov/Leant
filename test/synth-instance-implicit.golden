@@ -1,0 +1,27 @@
+
+   __                  __
+  / /  ___ ___ ____   / /_
+ / /__/ -_) _ `/ _ \_/ __/
+/____/\__/\_,_/_//_/ \__/
+Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to exit.
+λ> class Demo.C (a : Type) : Prop where
+…>   trivial : True
+…>
+λ> :set synth-engine djinn
+synth engine: djinn
+λ> :synth (∀ (A : Type) [Demo.C A], A → A)
+preparing synthesis environment (session imports + Lean)...
+  it1  fun _ _ x => x
+λ> :synth (∀ (A R : Type) [Demo.C A], (∀ (a : Type) [Demo.C a], a → R) → A → R)
+  it1  fun _ _ _ f => f _
+λ> :set synth-engine exference
+synth engine: exference
+λ> :synth (∀ (A R : Type) [Demo.C A], (∀ (a : Type) [Demo.C a], a → R) → A → R)
+  it1  fun _ _ _ f => f _
+note: search truncated: step limit reached, queue limit pruned 24457
+λ> :set synth-engine both
+synth engine: both
+λ> :synth (∀ (A R : Type) [Demo.C A], (∀ (a : Type) [Demo.C a], a → R) → A → R)
+  it1  fun _ _ _ f => f _
+note: exference: search truncated: step limit reached, queue limit pruned 24457
+λ> :quit

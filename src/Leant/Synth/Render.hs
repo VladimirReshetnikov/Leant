@@ -274,6 +274,7 @@ roleRename (expr, _, domPairs) =
       FArr _ r -> endsBot r
       _ -> False
   peel (FAll _ _ b) = peel b
+  peel (FInst _ b) = peel b
   peel f = f
 
 -- | Bound placeholder names in binding order.
@@ -519,7 +520,7 @@ fit cm force frag expr n doms =
       (pats', remaining, doms1, exhausted) = walk frag pats doms
       (etaPats, core1, coreFrag, n1)
         | exhausted && (force || introCore core)
-            && spineHasExplicitAll remaining =
+            && spineNeedsBinder remaining =
             etaExpand remaining core n
         | otherwise = ([], core, remaining, n)
       (core2, n2, doms2) = fitCore cm force coreFrag core1 n1 doms1
@@ -542,6 +543,9 @@ fit cm force frag expr n doms =
   walk (FAll True _ rest) ps ds =
     let (ps', f', ds', ex) = walk rest ps ds
     in (Wildcard : ps', f', ds', ex)
+  walk (FInst _ rest) ps ds =
+    let (ps', f', ds', ex) = walk rest ps ds
+    in (Wildcard : ps', f', ds', ex)
   walk f ps ds = (ps, f, ds, False)
 
   introCore e = case e of
@@ -551,7 +555,8 @@ fit cm force frag expr n doms =
     VisibleTypeApplication h _ -> introCore h
     _ -> False
 
-  spineHasExplicitAll f = SlotAll True `elem` fragSpine f
+  spineNeedsBinder f =
+    SlotAll True `elem` fragSpine f || SlotInst `elem` fragSpine f
 
   etaExpand f core k = case f of
     FArr _ rest ->
@@ -563,6 +568,9 @@ fit cm force frag expr n doms =
       let (ps, core', f', k') = etaExpand rest core k
       in (Wildcard : ps, core', f', k')
     FAll False _ rest -> etaExpand rest core k
+    FInst _ rest ->
+      let (ps, core', f', k') = etaExpand rest core k
+      in (Wildcard : ps, core', f', k')
     _ -> ([], core, f, k)
 
 -- | Recurse through introduction forms whose component types the goal
@@ -664,6 +672,7 @@ fitCore cm force cf ce n ds = case (cf, ce) of
   isDeclaredData FRec{} = True
   isDeclaredData _ = False
   peelAlls (FAll _ _ b) = peelAlls b
+  peelAlls (FInst _ b) = peelAlls b
   peelAlls f = f
   appSpine expr = spineAcc expr []
   spineAcc (Apply f a) acc = spineAcc f (a : acc)
@@ -675,6 +684,7 @@ fitCore cm force cf ce n ds = case (cf, ce) of
   -- quantifier slots consume no term arguments)
   argDoms frag = case frag of
     FAll _ _ rest -> argDoms rest
+    FInst _ rest -> argDoms rest
     FArr dom rest -> Just dom : argDoms rest
     _ -> repeat Nothing
 
@@ -742,6 +752,7 @@ specializeFrag replacements = go Set.empty
           in FAll explicit fresh (go (Set.insert fresh bound) renamed)
       | otherwise ->
           FAll explicit binder (go (Set.insert binder bound) body)
+    FInst key body -> FInst key (recur body)
     FApp safe key head' arguments ->
       FApp safe key head' (map recur arguments)
     FParamInd headName key parameters constructors ->
@@ -767,6 +778,7 @@ freeFragVariables bound frag = case frag of
   FProd left right -> descend [left, right]
   FSum left right -> descend [left, right]
   FAll _ binder body -> freeFragVariables (Set.insert binder bound) body
+  FInst _ body -> freeFragVariables bound body
   FVar variable
     | variable `Set.member` bound -> Set.empty
     | otherwise -> Set.singleton variable
@@ -793,6 +805,7 @@ fragVariableNames frag = case frag of
   FProd left right -> descend [left, right]
   FSum left right -> descend [left, right]
   FAll _ binder body -> Set.insert binder (fragVariableNames body)
+  FInst _ body -> fragVariableNames body
   FVar variable -> Set.singleton variable
   FApp _ _ head' arguments ->
     let headNames = case head' of
@@ -827,6 +840,7 @@ renameFragBinder old new frag = case frag of
   FAll explicit binder body
     | binder == old -> frag
     | otherwise -> FAll explicit binder (go body)
+  FInst key body -> FInst key (go body)
   FVar variable
     | variable == old -> FVar new
     | otherwise -> frag
@@ -883,6 +897,7 @@ stripMark x = if marked x then drop 1 x else x
 trailingAlls :: Frag -> Int -> Int
 trailingAlls frag 0 = leadingTypeArgs frag
 trailingAlls (FAll _ _ rest) k = trailingAlls rest k
+trailingAlls (FInst _ rest) k = trailingAlls rest k
 trailingAlls (FArr _ rest) k = trailingAlls rest (k - 1)
 trailingAlls _ _ = 0
 
@@ -1099,6 +1114,7 @@ render cm providers typeNames style doms = go
   weaveArgs _ [] = []
   weaveArgs (FAll True _ rest) as = "_" : weaveArgs rest as
   weaveArgs (FAll False _ rest) as = weaveArgs rest as
+  weaveArgs (FInst _ rest) as = weaveArgs rest as
   weaveArgs (FArr _ rest) (a : as) = a : weaveArgs rest as
   weaveArgs _ as = as
 
@@ -1108,6 +1124,7 @@ render cm providers typeNames style doms = go
       _ -> False
     _ -> False
   peelA (FAll _ _ b) = peelA b
+  peelA (FInst _ b) = peelA b
   peelA f = f
 
   at req level text = if level >= req then text else "(" ++ text ++ ")"

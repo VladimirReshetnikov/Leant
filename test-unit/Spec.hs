@@ -99,6 +99,7 @@ main = defaultMain $ testGroup "Leant synthesis boundary"
   , providerProgramTests
   , candidateVerificationTests
   , providerParserTests
+  , instanceImplicitTests
   , providerEngineTests
   , typeApplicationTests
   , parametricFamilyFragmentTests
@@ -316,13 +317,17 @@ providerProgramTests = testGroup "provider discovery program"
         `isInfixOf` synthPrelude @?= True
       "              match \8592 appOf providerMode fuel depth blocked e with"
         `isInfixOf` synthPrelude @?= True
-  , testCase "erase provider instances without changing goal serialization" $ do
-      let instanceErasure = unlines
-            [ "      else if providerMode && bi.isInstImplicit then"
-            , "        -- Typeclass evidence is reconstructed by Lean when the"
-            , "        -- provider is applied; it is neither a type quantifier nor"
-            , "        -- a term premise at the synthesis boundary."
-            , "        go providerMode fuel depth blocked b"
+  , testCase "erase provider instances but mark goal binders" $ do
+      let instanceHandling = unlines
+            [ "      else if bi.isInstImplicit then"
+            , "        -- Typeclass evidence is reconstructed by Lean when a value is"
+            , "        -- applied, so Djex never consumes it as a term premise. Providers"
+            , "        -- erase the binder completely. Goal mode retains a render-only"
+            , "        -- marker because Lean lambdas must still bind instance arguments."
+            , "        if providerMode then"
+            , "          go providerMode fuel depth blocked b"
+            , "        else do"
+            , "          let instanceType \8592 Meta.ppExpr t"
             ]
           implicitScheme = unlines
             [ "      else do"
@@ -332,7 +337,7 @@ providerProgramTests = testGroup "provider discovery program"
             , "          -- An unused ordinary implicit type parameter still needs a"
             , "          -- scheme binder so Djex can choose a visible instantiation."
             ]
-      instanceErasure `isInfixOf` synthPrelude @?= True
+      instanceHandling `isInfixOf` synthPrelude @?= True
       implicitScheme `isInfixOf` synthPrelude @?= True
       "let s \8592 LeantSynth.go false 100 0 [] tgt"
         `isInfixOf` serializerProgram "Demo.Token" @?= True
@@ -495,6 +500,56 @@ providerParserTests = testGroup "provider inventory parser"
       parseProviderSexp "(providers) extra" @?=
         Left "trailing tokens in provider translation"
   ]
+
+instanceImplicitTests :: TestTree
+instanceImplicitTests = testGroup "instance-implicit synthesis"
+  [ testCase "parse a render-only instance binder distinctly" $ do
+      let body = FAll True "A"
+            (FInst "Gap.C A" (FArr (FVar "A") (FVar "A")))
+      parseGoalSexp
+          "(goal type (query (roots \"Gap\") (head)) \
+          \(all \"A\" (inst \"Gap.C A\" (-> (var \"A\") (var \"A\")))))"
+        @?= Right (ParsedGoal GoalType
+          (ProviderQuery ["Gap"] Nothing) body)
+      fragUnsafeAtoms body @?= ["Gap.C A"]
+  , testCase "bind an erased instance before ordinary term arguments" $ do
+      let goal = FAll True "A"
+            (FInst "Gap.C A" (FArr (FVar "A") (FVar "A")))
+          check engine =
+            expectInstanceTerm "fun _ _ x => x"
+              (synthesizeWithProviders engine 4096 [] goal)
+      mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "reconstruct evidence for a constrained rank-N hypothesis" $ do
+      let goal = FAll True "A" (FAll True "R"
+            (FInst "Gap.C A"
+              (FArr
+                (FAll True "a"
+                  (FInst "Gap.C a" (FArr (FVar "a") (FVar "R"))))
+                (FArr (FVar "A") (FVar "R")))))
+          check engine =
+            expectInstanceTerm "fun _ _ _ f => f _"
+              (synthesizeWithProviders engine 4096 [] goal)
+      mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "withhold a refutation after erasing dictionary evidence" $ do
+      let impossible = FAll True "A" (FInst "Gap.C A" FBot)
+      case synthesizeWithProviders EngineDjinn 0 [] impossible of
+        Right (SynthRefuted False) -> pure ()
+        Right other -> assertFailure $
+          "erased instance evidence produced the wrong verdict: "
+            ++ outcomeTag other
+        Left err -> assertFailure err
+  ]
+ where
+  expectInstanceTerm expected outcome = case outcome of
+    Right (SynthCandidates groups _) ->
+      if any (== expected) (concat groups)
+        then pure ()
+        else assertFailure $
+          "expected instance-aware candidate " ++ show expected
+            ++ ", got: " ++ show groups
+    Right other -> assertFailure $
+      "unexpected instance-aware outcome: " ++ outcomeTag other
+    Left err -> assertFailure err
 
 providerScheduleTests :: TestTree
 providerScheduleTests = testGroup "live provider widening"
@@ -1269,6 +1324,22 @@ parametricFamilyEngineTests = testGroup "parametric family engine projection"
         then pure ()
         else assertFailure $ "rank-N constructor fields were not fitted: "
           ++ show candidates
+  , testCase "ignore alpha-varying instance keys in family schemas" $ do
+      let result = FAtom False "Demo.Result"
+          family parameter key instanceKey =
+            FParamInd "Demo.Constrained" key [parameter]
+              [("Demo.Constrained.mk", [FInst instanceKey result])]
+          left = family (FVar "a") "Demo.Constrained a" "Demo.C a"
+          right = family (FVar "b") "Demo.Constrained b" "Demo.C b"
+          goal = FAll True "a" (FAll True "b"
+            (FInst "Demo.C b" (FArr left (FArr right result))))
+          candidates = allFamilyCandidates
+            (synthesizeWithProviders EngineExference 1024 [] goal)
+      if any (isInfixOf "match") candidates
+        then pure ()
+        else assertFailure $
+          "diagnostic instance keys split one erased family schema: "
+            ++ show candidates
   , testCase "pre-scan a nested provider for the compatible schema" $ do
       let result = FVar "r"
           repeated = binaryFamily "Demo.Pairish r r" result result

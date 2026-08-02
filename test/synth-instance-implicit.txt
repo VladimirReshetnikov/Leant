@@ -1,0 +1,11 @@
+class Demo.C (a : Type) : Prop where
+  trivial : True
+
+:set synth-engine djinn
+:synth (∀ (A : Type) [Demo.C A], A → A)
+:synth (∀ (A R : Type) [Demo.C A], (∀ (a : Type) [Demo.C a], a → R) → A → R)
+:set synth-engine exference
+:synth (∀ (A R : Type) [Demo.C A], (∀ (a : Type) [Demo.C a], a → R) → A → R)
+:set synth-engine both
+:synth (∀ (A R : Type) [Demo.C A], (∀ (a : Type) [Demo.C a], a → R) → A → R)
+:quit

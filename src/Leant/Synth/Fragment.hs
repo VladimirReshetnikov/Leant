@@ -79,7 +79,12 @@ data Frag
   | FAll Bool String Frag
     -- ^ forall over a sort (Type\/Prop\/Sort u); the flag is 'True' for
     -- an explicit binder (needs a lambda in the Lean term) and 'False'
-    -- for an implicit\/instance one (the elaborator introduces it)
+    -- for an ordinary implicit one (the elaborator introduces it)
+  | FInst String Frag
+    -- ^ A non-dependent instance-implicit term binder.  Djex deliberately
+    -- ignores dictionary evidence, while the Lean renderer must still bind a
+    -- wildcard at an introduction site.  The display key keeps Djinn
+    -- exhaustion conservative because the hidden dictionary can carry data.
   | FVar String         -- ^ opaque type variable (auto-implicit or opened binder)
   | FAtom Bool String   -- ^ opaque atom: safe-for-refutation flag, display key
   | FApp Bool String AppHead [Frag]
@@ -120,6 +125,7 @@ data Frag
 data Slot
   = SlotArrow Frag      -- ^ an arrow; carries the domain fragment
   | SlotAll Bool        -- ^ a quantifier; 'True' when the binder is explicit
+  | SlotInst            -- ^ an erased instance binder that Lean must still bind
   deriving (Eq, Show)
 
 data GoalSort = GoalProp | GoalType
@@ -277,11 +283,18 @@ synthPrelude = unlines
   , "            pure (tag ++ esc (\"s\" ++ toString depth) ++ \" \""
   , "              ++ inner ++ \")\")"
   , "        else atomOf e"
-  , "      else if providerMode && bi.isInstImplicit then"
-  , "        -- Typeclass evidence is reconstructed by Lean when the"
-  , "        -- provider is applied; it is neither a type quantifier nor"
-  , "        -- a term premise at the synthesis boundary."
-  , "        go providerMode fuel depth blocked b"
+  , "      else if bi.isInstImplicit then"
+  , "        -- Typeclass evidence is reconstructed by Lean when a value is"
+  , "        -- applied, so Djex never consumes it as a term premise. Providers"
+  , "        -- erase the binder completely. Goal mode retains a render-only"
+  , "        -- marker because Lean lambdas must still bind instance arguments."
+  , "        if providerMode then"
+  , "          go providerMode fuel depth blocked b"
+  , "        else do"
+  , "          let instanceType \8592 Meta.ppExpr t"
+  , "          let r \8592 go providerMode fuel depth blocked b"
+  , "          pure (\"(inst \" ++ esc (toString instanceType) ++ \" \""
+  , "            ++ r ++ \")\")"
   , "      else if bi.isExplicit then do"
   , "        let d \8592 go providerMode fuel depth blocked t"
   , "        let r \8592 go providerMode fuel depth blocked b"
@@ -767,6 +780,11 @@ parseFrag (TL : TSym tag : rest) = case tag of
     _ -> Left "malformed (app ...)"
   "all" -> allTag True rest
   "alli" -> allTag False rest
+  "inst" -> case rest of
+    TStr key : toks -> do
+      (body, toks') <- parseFrag toks
+      close (FInst key body) toks'
+    _ -> Left "malformed (inst ...)"
   "param-ind" -> case rest of
     TStr headName : TStr key : TL : TSym "params" : rest' -> do
       (params, rest'') <- parseFrags rest'
@@ -851,6 +869,7 @@ fragHasDepth frag = case frag of
   FProd a b -> fragHasDepth a || fragHasDepth b
   FSum a b -> fragHasDepth a || fragHasDepth b
   FAll _ _ b -> fragHasDepth b
+  FInst _ b -> fragHasDepth b
   FApp _ _ _ arguments -> any fragHasDepth arguments
   FParamInd _ _ params ctors ->
     any fragHasDepth params || any (any fragHasDepth . snd) ctors
@@ -874,6 +893,7 @@ fragProviderMayOpen frag
       _ -> False
  where
   peel (FAll _ _ body) = peel body
+  peel (FInst _ body) = peel body
   peel body = body
 
 -- | An honest refusal, when the goal offers the engine nothing structural
@@ -894,16 +914,18 @@ fragRefusal frag
   | otherwise = Nothing
  where
   peel (FAll _ _ b) = peel b
+  peel (FInst _ b) = peel b
   peel f = f
 
 -- | The goal's leading binder spine (arrows and quantifiers, stopping
 -- at the first other connective).  Djinn models quantifiers as implicit
 -- polymorphism and its candidates bind only arrows; the renderer weaves
--- anonymous binders for explicit quantifier slots into the candidate's
--- lambda, and skips implicit ones (Lean introduces those itself).
+-- anonymous binders for explicit quantifier slots and erased instance slots
+-- into the candidate's lambda, while skipping ordinary implicit type binders.
 fragSpine :: Frag -> [Slot]
 fragSpine (FArr dom body) = SlotArrow dom : fragSpine body
 fragSpine (FAll explicit _ body) = SlotAll explicit : fragSpine body
+fragSpine (FInst _ body) = SlotInst : fragSpine body
 fragSpine _ = []
 
 -- | How many explicit type arguments a value of this type needs before
@@ -914,6 +936,7 @@ fragSpine _ = []
 leadingTypeArgs :: Frag -> Int
 leadingTypeArgs (FAll True _ body) = 1 + leadingTypeArgs body
 leadingTypeArgs (FAll False _ body) = leadingTypeArgs body
+leadingTypeArgs (FInst _ body) = leadingTypeArgs body
 leadingTypeArgs _ = 0
 
 -- | Split a goal into its leading quantifier prefix and a
@@ -946,6 +969,7 @@ glivenkoSplit = go []
     FRec _ _ params ctors ->
       all quantFree params && all (all quantFree . snd) ctors
     FAll{} -> False
+    FInst{} -> False
     _ -> True
 
 -- | The distinct atomic subformulas (opaque variables and atoms) of a
@@ -978,6 +1002,7 @@ fragUnsafeAtoms = nub . go
     FProd a b -> go a ++ go b
     FSum a b -> go a ++ go b
     FAll _ _ b -> go b
+    FInst key b -> key : go b
     FApp safe key _ arguments ->
       (if safe then [] else [key]) ++ concatMap go arguments
     FParamInd _ _ params ctors ->
