@@ -384,9 +384,12 @@ Exference searches the full bounded inventory while Djinn-backed modes try
 discovery-order prefixes of 1, 4, and 16 providers before the full inventory.
 Provider-eligible
 atomic/refused goals skip the baseline and go
-directly to those stages. Combined mode still merges Djinn candidates before
-new Exference candidates. All stages share one command deadline, and variants
-that failed earlier verification are removed before later verification. The
+directly to those stages. In a combined invocation, fresh candidate groups are
+scheduled `D1–D4, E1–E12, D5–D12`; those 24 groups retain both standalone
+12-group frontiers, and later tails alternate. All stages share one command
+deadline. Variants that failed earlier verification are removed from each
+source stream before the later lane is forced or capped, so newly empty groups
+spend no fresh slot. The
 intentional tradeoff is that provider alternatives are not enumerated once a
 structural baseline succeeds. See the
 [provider-isolated baseline report](reports/2026-08-01-provider-isolated-exference-baseline.md).
@@ -538,8 +541,10 @@ Design rules, all inherited from Djex:
   baseline, its Lean checks, provider discovery, and earlier provider prefixes
   reduces the allowance left for wider fallback instead of granting another
   full timeout. If earlier variants fail verification, their exact rendered
-  spellings are subtracted from later groups before those groups are verified,
-  avoiding duplicate failed backend work. A successful baseline returns
+  spellings are subtracted independently from each later engine stream before
+  its 12- or 24-group prefix is forced; newly empty groups are dropped. This
+  avoids duplicate failed backend work without letting rediscovery consume the
+  fresh frontier. A successful baseline returns
   immediately, so this policy guarantees availability of a structural solution
   under provider pressure but deliberately does not enumerate provider-based
   alternatives after that success.
@@ -844,8 +849,11 @@ fixed candidate window, Leant tries discovery-order prefixes of 1, 4, and 16
 providers before the full bounded inventory. In `both` mode, the singleton and
 terminal lanes run both engines while intermediate prefixes run Djinn only, so
 Exference's step budget is not spent at every width. One command deadline
-covers every stage, and variants rejected by Lean are removed before later
-verification. The policy prevents a broad
+covers every stage, and variants rejected by Lean are removed source-locally
+before later lane caps are taken. Within a combined lane, stable exact-spelling
+deduplication schedules `D1–D4, E1–E12, D5–D12`, then alternating tails; its
+24-group window preserves each engine's standalone 12-group opportunity. The
+policy prevents a broad
 inventory from crowding out a structural or preferred-provider term while
 intentionally foregoing provider alternatives after structural success.
 The complete dispatch and verification contract is recorded in the
@@ -867,10 +875,12 @@ nominally. Djinn enables bounded positive construction; Exference enables one
 finite constructor match, with recursive fields retained as ordinary local
 values rather than recursively eliminated. Together, these changes let the
 engines discover bounded constructor terms and library reuse such as
-`List.map`. `both` mode still merges Djinn candidates before Exference's new
-ones. Providers add positive capabilities, and every candidate must pass Lean
-verification. Any negative verdict still comes from Djinn and is exposed only
-when its completeness checks justify it.
+`List.map`. In `both` mode Djinn retains the first four positions, Exference
+then receives its full 12-group frontier, and Djinn groups five through twelve
+complete the 24-group combined window before alternating tails. Providers add
+positive capabilities, and every candidate must pass Lean verification. Any
+negative verdict still comes from Djinn and is exposed only when its
+completeness checks justify it.
 
 ### G. Retained proper-type applications — M (first slice implemented)
 
@@ -951,6 +961,11 @@ a rank-N function type, plus atomic direct-provider admission, provider-free
 ordering, widening to a two-provider composition, combined-mode reuse, and a
 constrained vacuous provider whose closed type choice is visible through both
 engines without exposing its instance argument.
+A dedicated combined-frontier transcript adds seven singleton distractor
+types around that constrained provider. Its first 12 rendered groups all fail
+Lean's instance check; `Demo.global («a» := Demo.Good)` appears at combined
+group 14 and verifies. The former append merge under a 12-group cap misses the
+same query, while the source-local 24-group frontier reaches it.
 A term-parameterized `Tag` control stays on the legacy occurrence-local path.
 Recursive exact-head identity is the separate extension described in Section
 I. See the

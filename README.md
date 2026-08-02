@@ -376,6 +376,12 @@ provider-free first-result ordering, and combined-mode reuse.
 It is checked in
 [`synth-djinn-providers`](test/synth-djinn-providers.txt).
 
+The separate
+[`synth-both-frontier`](test/synth-both-frontier.txt) transcript pins the
+combined quota end to end. Seven distractor types make the first 12 rendered
+groups fail Lean's class-instance check; the 24-group lane reaches and verifies
+`Demo.global («a» := Demo.Good)` beyond that former cap.
+
 Only application arguments whose own type is a universe take the retained
 proper-type path. A non-inductive term-indexed family such as `P 3` remains a
 single opaque atom. An inductive with term or dependent parameters keeps the
@@ -612,9 +618,12 @@ finisher tactics, needing no premise database and no imports. Bare
 - A second engine is available: `:set synth-engine exference` switches
   to Djex's ranked heuristic search (explicit budgets, no negative
   verdicts; `:set synth-steps N` bounds it, default 4096), and `both`
-  runs the two together — Djinn's candidates first, Exference's new
-  ones after, refutations only from the engine entitled to them. The
-  default `djinn` remains the complete, terminating LJT search.
+  runs the two together. Standalone lanes send at most 12 fresh candidate
+  groups to Lean; a combined lane gets 24 and preserves both standalone
+  frontiers. Writing `D` and `E` for fresh Djinn and Exference groups, its
+  order is `D1–D4, E1–E12, D5–D12`, followed by alternating tails.
+  Refutations still come only from Djinn. The default `djinn` remains the
+  complete, terminating LJT search.
 - Every engine mode gives a structurally accepted goal a provider-free
   baseline lane. Its rendered candidates are checked by Lean first, and live
   providers are discovered only after a nonterminal miss. A complete Djinn
@@ -625,8 +634,10 @@ finisher tactics, needing no premise database and no imports. Bare
   misses; Exference keeps its internally rated full-inventory lane. Combined
   mode runs both engines for the singleton and full lanes but uses Djinn alone
   for the intermediate prefixes. All lanes consume one command-wide
-  `LEANT_SYNTH_TIMEOUT` deadline, and spellings that already failed Lean
-  verification are removed before a wider fallback is checked. This policy
+  `LEANT_SYNTH_TIMEOUT` deadline. Before a later lane is forced or capped,
+  spellings that already failed Lean are removed from each source stream and
+  newly empty groups are dropped. Rediscovered failures therefore consume no
+  fresh quota. This policy
   deliberately favors a structural solution over breadth: provider
   alternatives are not enumerated after a baseline term succeeds. See the
   dated
@@ -749,10 +760,12 @@ Atomic/provider-open refusals use that provider path directly. Djinn-backed
 fallback tries discovery-order prefixes of 1, 4, and 16 providers before the
 full inventory, omitting milestones at or beyond the actual inventory size.
 Combined mode runs both engines at the singleton and terminal full widths and
-Djinn alone at intermediate widths; within a combined lane, Djinn candidates
-still precede new Exference candidates. Constructor and exact provider names
-are restored and binders named by role before every verification; only
-survivors are shown and bound.
+Djinn alone at intermediate widths. Within a combined lane, stable exact-text
+deduplication keeps the first scheduled spelling and preserves variant order
+inside each group: `D1–D4, E1–E12, D5–D12` form the 24-group frontier, then the
+tails alternate. Empty or duplicate-only groups spend no slot. Constructor and
+exact provider names are restored and binders named by role before every
+verification; only survivors are shown and bound.
 
 The synthesis side environment tracks exactly which session history it
 has replayed. An unchanged history reuses it directly; an append replays

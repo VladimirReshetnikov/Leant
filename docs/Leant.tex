@@ -787,10 +787,13 @@ between them does not.
 The default engine is Djinn: complete, terminating, and the only
 source of refutations. \code{:set synth-engine exference} switches to
 the ranked heuristic search, and \code{both} runs the two together ---
-Djinn's candidates first, Exference's new ones appended, negative
-verdicts only from the engine entitled to them. Exference runs under
-explicit budgets (\code{:set synth-steps}, default 4096), and
-truncation is always reported:
+negative verdicts still come only from Djinn. Standalone lanes send at
+most 12 fresh candidate groups to Lean. A combined lane gets 24 and
+retains both standalone frontiers: writing D and E for fresh Djinn and
+Exference groups, its order is \code{D1–D4, E1–E12, D5–D12}, then
+alternating tails. Exference runs under explicit budgets
+(\code{:set synth-steps}, default 4096), and truncation is always
+reported:
 
 \begin{session}
 λ> :set synth-engine both
@@ -820,6 +823,12 @@ empty one --- are kept in a generation-aware 12-entry LRU. Imports,
 ordinary declarations, and session-restoring operations invalidate that
 generation; generated \code{it1}, \code{it2}, \dots\ bindings cannot be
 providers and preserve it.
+
+Exact rendered spellings keep their first scheduled occurrence. Before a
+later provider lane is forced or capped, spellings already rejected by Lean
+are removed from each engine's source stream and newly empty groups are
+dropped. Rediscovered failures therefore spend none of that lane's 12- or
+24-group fresh frontier.
 
 The pure searches answer in microseconds to milliseconds; the cost
 center is backend verification, a few hundred milliseconds per

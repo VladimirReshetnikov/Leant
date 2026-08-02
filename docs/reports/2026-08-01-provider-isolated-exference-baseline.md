@@ -56,7 +56,7 @@ The resulting dispatch matrix is:
 | --- | --- | --- | --- |
 | `EngineExference`, structural/in-fragment | Provider-free Exference | Full ranked inventory after no baseline term verifies | Stop at the first verified lane |
 | `EngineDjinn`, structural/in-fragment | Provider-free Djinn | After a nonterminal miss: provider prefixes 1, 4, 16, then full bounded inventory | Preserve a complete refutation; otherwise stop at the first verified lane |
-| `EngineBoth`, structural/in-fragment | Provider-free combined search | Combined singleton, Djinn-only intermediate prefixes 4 and 16, then combined full inventory | Djinn candidates remain before new Exference candidates; avoid repeating Exference at intermediate widths |
+| `EngineBoth`, structural/in-fragment | Provider-free combined search | Combined singleton, Djinn-only intermediate prefixes 4 and 16, then combined full inventory | Preserve each engine's 12-group frontier inside 24 combined groups; avoid repeating Exference at intermediate widths |
 | Any engine, atomic/provider-open refused | Provider-enriched stages | No separate baseline | Preserve access to live values |
 
 A hard refusal that providers cannot open remains an honest out-of-fragment
@@ -66,9 +66,21 @@ fragment or make providers repair depth truncation.
 
 `EngineBoth` now follows the same verified baseline/fallback policy. Inside the
 combined singleton and terminal fallback invocations, both Djinn and Exference
-receive the active provider slice; their public merge order remains Djinn
-candidates first and new Exference candidates afterward. Intermediate widths
-four and sixteen are Djinn-only.
+receive the active provider slice. Writing `D` and `E` for successive fresh
+Djinn and Exference groups, stable exact-spelling deduplication schedules
+`D1–D4, E1–E12, D5–D12`; tails alternate after that 24-group frontier. This
+keeps Djinn's primary small-term ranking while retaining every group either
+engine could have sent through its standalone 12-group window. If one stream
+ends early, the other drains in its own order. Intermediate widths four and
+sixteen are Djinn-only.
+
+Deduplication is deliberately textual and source-aware. Variants retain their
+order inside one ranked group, the first scheduled occurrence of an exact Lean
+spelling wins, and a group emptied by deduplication consumes no slot. Empty
+rendered candidate streams normalize to an ordinary no-term outcome. A real
+candidate from either engine wins the positive merge and must still elaborate
+in Lean; Exference contributes no negative evidence, so Djinn's sound or
+approximate refutation survives only when neither engine has a candidate.
 
 A terminal Djinn refutation is scoped to the complete provider-free structural
 calculus. It is not presented as an exhaustive theorem about all declarations
@@ -96,11 +108,13 @@ the original goal.
 
 If a provider-enriched lane rediscovers an exact rendered spelling already
 rejected during baseline or an earlier provider stage, Leant removes that
-spelling before asking Lean again. Empty groups are discarded; if every wider
-variant was already checked, the fallback becomes an ordinary bounded no-term
-outcome. This avoids repeating failed backend work and failed temporary
-elaboration environments while leaving genuinely new provider candidates
-available.
+spelling from each engine's source stream before the later stream is merged,
+forced, or capped. Empty groups are discarded; if every wider variant was
+already checked, the fallback becomes an ordinary bounded no-term outcome.
+Rediscovered failures therefore cannot spend the next lane's 12/24 fresh-group
+quota or hide an unseen tail candidate. This avoids repeating failed backend
+work and failed temporary elaboration environments while leaving genuinely new
+provider candidates available.
 
 ## One command deadline
 
@@ -172,9 +186,20 @@ A dedicated Djinn provider golden adds seven end-to-end controls:
   Demo.Index`, but the widened inventory composes it with `Demo.produce`; and
 - combined mode reuses the same verified `Demo.sealedBox` provider.
 
-Failed-variant removal is part of the fallback orchestration described above;
-it is independent of whether a particular golden miss emitted a spelling to
-reject.
+The separate `synth-both-frontier` golden makes the combined cap observable.
+Seven singleton distractor types precede `Demo.Good`, and the only available
+`Demo.Token` provider requires a class instance at its otherwise vacuous type
+argument. Combined groups one through twelve choose types without instances
+and fail Lean verification; group fourteen renders
+`Demo.global («a» := Demo.Good)` and succeeds. The former append merge with a
+12-group global cap reports twelve rejected candidates for the same transcript.
+
+Pure tests pin the complete `D1–D4, E1–E12, D5–D12` order, alternating tails,
+partial-variant and late-source deduplication, empty-result normalization,
+note/refutation semantics, and an asymmetric checked prefix. The last case
+proves filtering happens source-locally before quotas: twelve rejected
+Exference spellings cannot turn its next combined allowance into only six fresh
+groups.
 
 ## Relationship to parametric family sharing
 
