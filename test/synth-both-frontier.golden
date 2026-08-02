@@ -1,0 +1,31 @@
+
+   __                  __
+  / /  ___ ___ ____   / /_
+ / /__/ -_) _ `/ _ \_/ __/
+/____/\__/\_,_/_//_/ \__/
+Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to exit.
+λ> inductive Demo.A1 where | mk
+λ> inductive Demo.A2 where | mk
+λ> inductive Demo.A3 where | mk
+λ> inductive Demo.A4 where | mk
+λ> inductive Demo.A5 where | mk
+λ> inductive Demo.A6 where | mk
+λ> inductive Demo.A7 where | mk
+λ> inductive Demo.Good where | mk
+λ>
+λ> axiom Demo.Token : Type
+λ> class Demo.C (a : Type) : Prop where
+…>   witness : True
+…> instance : Demo.C Demo.Good := ⟨True.intro⟩
+…> axiom Demo.global {a : Type} [Demo.C a] : Demo.Token
+…>
+λ> :set synth-engine both
+synth engine: both
+λ> :set synth-steps 1
+synth steps: 1
+λ> :synth (Demo.A1 → Demo.A2 → Demo.A3 → Demo.A4 → Demo.A5 → Demo.A6 → Demo.A7 → Demo.Good → Demo.Token)
+preparing synthesis environment (session imports + Lean)...
+  it1  fun x y z w x1 x2 x3 x4 => match x with | ⟨⟩ => (match y with | ⟨⟩ => (match z with | ⟨⟩ => (match w with | ⟨⟩ => (match x1 with | ⟨⟩ => (match x2 with | ⟨⟩ => (match x3 with | ⟨⟩ => (match x4 with | ⟨⟩ => Demo.global («a» := Demo.Good))))))))
+note: search truncated: candidate limit reached (60)
+note: exference: search truncated: step limit reached
+λ> :quit

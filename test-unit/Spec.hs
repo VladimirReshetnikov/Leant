@@ -4,6 +4,7 @@ import Control.Exception (finally)
 import qualified Data.ByteString.Char8 as BS
 import Data.List (isInfixOf)
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import System.Directory
   ( canonicalizePath
   , createDirectory
@@ -30,9 +31,16 @@ import Leant.Backend (findBackendProject)
 import Leant.Synth.Engine
   ( SynthEngine (..)
   , SynthOutcome (..)
+  , mergeCandidateGroups
+  , mergeOutcomes
+  , mergeOutcomesSkipping
   , providerStages
+  , synthMaxShown
+  , synthMaxTried
+  , synthVerificationWindow
   , synthesizeWith
   , synthesizeWithProviders
+  , withoutCheckedCandidates
   )
 import Leant.Synth.Fragment
   ( AppHead (..)
@@ -86,6 +94,7 @@ main = defaultMain $ testGroup "Leant synthesis boundary"
   , sessionReplayTests
   , providerCacheTests
   , providerScheduleTests
+  , combinedEngineMergeTests
   , replayPlanTests
   , providerProgramTests
   , candidateVerificationTests
@@ -523,6 +532,142 @@ providerScheduleTests = testGroup "live provider widening"
         , (EngineDjinn, [1 .. 4])
         , (EngineBoth, [1 .. 5])
         ]
+  ]
+
+combinedEngineMergeTests :: TestTree
+combinedEngineMergeTests = testGroup "combined-engine verification frontier"
+  [ testCase "reserve a bounded frontier for fresh Exference groups" $ do
+      let groups prefix = [[prefix ++ show i] | i <- [1 :: Int .. 20]]
+          merged = mergeCandidateGroups (groups "d") (groups "e")
+      synthVerificationWindow EngineDjinn @?= synthMaxTried
+      synthVerificationWindow EngineExference @?= synthMaxTried
+      synthVerificationWindow EngineBoth @?= 2 * synthMaxTried
+      take (synthVerificationWindow EngineBoth) merged @?=
+        map (\i -> ["d" ++ show i]) [1 :: Int .. 4]
+          ++ map (\i -> ["e" ++ show i]) [1 :: Int .. 12]
+          ++ map (\i -> ["d" ++ show i]) [5 :: Int .. 12]
+      take synthMaxShown merged @?=
+        [["d1"], ["d2"], ["d3"], ["d4"], ["e1"]]
+      merged !! (synthMaxTried - 1) @?= ["e8"]
+      take 4 (drop (synthVerificationWindow EngineBoth) merged) @?=
+        [["e13"], ["d13"], ["e14"], ["d14"]]
+  , testCase "reach a constrained Exference choice beyond twelve groups" $ do
+      let token = FAtom False "Demo.Token"
+          finite name = FParamInd name name [] [(name ++ ".mk", [])]
+          inputs =
+            [finite ("Demo.A" ++ show i) | i <- [1 :: Int .. 7]]
+              ++ [finite "Demo.Good"]
+          goal = foldr FArr token inputs
+          provider = ProviderFragWithBinders "Demo.global"
+            (FAll False "a" token) ["a"]
+          isGood = any (isInfixOf "Demo.global (\171a\187 := Demo.Good)")
+      case synthesizeWithProviders EngineBoth 1 [provider] goal of
+        Right (SynthCandidates groups _) -> do
+          any isGood (take synthMaxTried groups) @?= False
+          any isGood
+              (take (synthVerificationWindow EngineBoth) groups)
+            @?= True
+        Right other -> assertFailure $
+          "expected combined candidates, got: " ++ outcomeTag other
+        Left err -> assertFailure err
+  , testCase "drain either ranked lane without losing its order" $ do
+      mergeCandidateGroups [["d1"], ["d2"]]
+          [["e1"], ["e2"], ["e3"]]
+        @?= [["d1"], ["d2"], ["e1"], ["e2"], ["e3"]]
+      mergeCandidateGroups [] [["e1"], ["e2"]]
+        @?= [["e1"], ["e2"]]
+      mergeCandidateGroups [["d1"], ["d2"]] []
+        @?= [["d1"], ["d2"]]
+  , testCase "deduplicate variants in final scheduled order" $ do
+      mergeCandidateGroups
+          [ ["d1", "d1", "d1-alt"]
+          , []
+          , ["d1-alt"]
+          , ["d2"]
+          , ["shared"]
+          ]
+          [["shared", "e1-alt"], ["d2", "e2"]]
+        @?=
+          [ ["d1", "d1-alt"]
+          , ["d2"]
+          , ["shared"]
+          , ["e1-alt"]
+          , ["e2"]
+          ]
+  , testCase "let early Exference spellings outrank late Djinn duplicates" $
+      mergeCandidateGroups
+          ( [ ["d1"], ["d2"], ["d3"], ["d4"] ]
+          ++ [ ["d" ++ show i] | i <- [5 :: Int .. 12] ]
+          ++ [ ["shared", "d-alt"] ]
+          )
+          [["shared", "e-alt"]]
+        @?=
+          ( [ ["d1"], ["d2"], ["d3"], ["d4"]
+            , ["shared", "e-alt"]
+            ]
+          ++ [ ["d" ++ show i] | i <- [5 :: Int .. 12] ]
+          ++ [["d-alt"]]
+          )
+  , testCase "remove checked spellings before spending a fresh lane quota" $ do
+      let checked = Set.fromList ["old" ++ show i | i <- [1 :: Int .. 20]]
+          groups = [["old" ++ show i] | i <- [1 :: Int .. 20]]
+            ++ [["fresh", "old1"], ["later"]]
+      withoutCheckedCandidates checked (SynthCandidates groups ["ranked"])
+        @?= SynthCandidates [["fresh"], ["later"]] ["ranked"]
+      withoutCheckedCandidates (Set.singleton "only")
+          (SynthCandidates [["only"], []] ["empty"])
+        @?= SynthNoTerm ["empty"]
+  , testCase "reserve source-local quotas after checked-lane filtering" $ do
+      let groups prefix count =
+            [[prefix ++ show i] | i <- [1 :: Int .. count]]
+          checked = Set.fromList ["e" ++ show i | i <- [1 :: Int .. 12]]
+          merged = mergeOutcomesSkipping checked
+            (SynthCandidates (groups "d" 30) [])
+            (SynthCandidates (groups "e" 24) [])
+      case merged of
+        SynthCandidates candidateGroups _ ->
+          take (synthVerificationWindow EngineBoth) candidateGroups @?=
+            groups "d" 4
+              ++ [["e" ++ show i] | i <- [13 :: Int .. 24]]
+              ++ [["d" ++ show i] | i <- [5 :: Int .. 12]]
+        other -> assertFailure $
+          "expected filtered combined candidates, got: " ++ outcomeTag other
+  , testCase "normalize empty rendered candidates without inventing evidence" $ do
+      mergeOutcomes
+          (SynthCandidates [[], []] ["djinn empty"])
+          (SynthNoTerm ["exference empty"])
+        @?= SynthNoTerm
+          ["djinn empty", "exference: exference empty"]
+      mergeOutcomes
+          (SynthCandidates [] ["djinn empty"])
+          (SynthCandidates [["e1"]] ["ranked"])
+        @?= SynthCandidates [["e1"]]
+          ["djinn empty", "exference: ranked"]
+  , testCase "preserve Djinn refutations unless a real candidate wins" $ do
+      mergeOutcomes (SynthRefuted True)
+          (SynthCandidates [[]] ["empty"])
+        @?= SynthRefuted True
+      mergeOutcomes (SynthRefuted False) (SynthNoTerm ["none"])
+        @?= SynthRefuted False
+      mergeOutcomes (SynthRefuted True)
+          (SynthCandidates [["e1"]] ["ranked"])
+        @?= SynthCandidates [["e1"]] ["exference: ranked"]
+  , testCase "retain note provenance for every candidate-bearing merge" $ do
+      mergeOutcomes
+          (SynthCandidates [["d1"]] ["smallest"])
+          (SynthCandidates [["e1"]] ["rated"])
+        @?= SynthCandidates [["d1"], ["e1"]]
+          ["smallest", "exference: rated"]
+      mergeOutcomes
+          (SynthCandidates [["d1"]] ["smallest"])
+          (SynthNoTerm ["finished"])
+        @?= SynthCandidates [["d1"]]
+          ["smallest", "exference: finished"]
+      mergeOutcomes
+          (SynthNoTerm ["bounded"])
+          (SynthCandidates [["e1"]] ["rated"])
+        @?= SynthCandidates [["e1"]]
+          ["bounded", "exference: rated"]
   ]
 
 providerEngineTests :: TestTree

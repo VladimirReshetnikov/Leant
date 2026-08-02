@@ -25,11 +25,19 @@ module Leant.Synth.Engine
   , parseSynthEngine
   , synthEngineName
   , providerStages
+  , mergeCandidateGroups
+  , mergeOutcomes
+  , mergeOutcomesSkipping
+  , withoutCheckedCandidates
   , synthesize
   , synthesizeWithProviders
+  , synthesizeWithProvidersSkipping
   , synthesizeWith
   , synthesizeTuned
   , forceOutcome
+  , synthMaxShown
+  , synthMaxTried
+  , synthVerificationWindow
   , candidateWindow
   ) where
 
@@ -124,6 +132,24 @@ data SynthOutcome
     -- translation, no structure-hiding atoms)
   | SynthNoTerm [String]
     -- ^ no candidate and no logical claim, with notes
+  deriving (Eq, Show)
+
+-- | Product-wide verification limits.  Combined-engine scheduling keeps
+-- Exference's first fresh group inside the displayed frontier while the
+-- caller applies the larger tried frontier to backend work.
+synthMaxShown, synthMaxTried :: Int
+synthMaxShown = 5
+synthMaxTried = 12
+
+-- | How many fresh candidate groups an ordinary lane may send to Lean.
+-- A combined lane receives the existing per-engine budget for /both/ engines;
+-- selecting @both@ therefore cannot hide a candidate that either engine would
+-- have reached on its own.
+synthVerificationWindow :: SynthEngine -> Int
+synthVerificationWindow engine = case engine of
+  EngineBoth -> 2 * synthMaxTried
+  EngineDjinn -> synthMaxTried
+  EngineExference -> synthMaxTried
 
 -- | How many engine candidates are collected and take part in the size
 -- ranking.  Djinn's sorted mode computes the whole collection before
@@ -209,8 +235,18 @@ synthesizeWithProviders
   :: SynthEngine -> Int -> [ProviderFrag] -> Frag
   -> Either String SynthOutcome
 synthesizeWithProviders engine steps providers frag =
+  synthesizeWithProvidersSkipping engine steps Set.empty providers frag
+
+-- | 'synthesizeWithProviders' while omitting exact rendered spellings already
+-- checked by an earlier REPL lane.  Filtering happens on each engine's own
+-- ranked stream before a combined merge, so Djinn and Exference each retain
+-- their full fresh-group quota.
+synthesizeWithProvidersSkipping
+  :: SynthEngine -> Int -> Set.Set String -> [ProviderFrag] -> Frag
+  -> Either String SynthOutcome
+synthesizeWithProvidersSkipping engine steps checked providers frag =
   synthesizeTunedWithProviders engine steps
-    (candidateWindow, Nothing) providers [] frag frag
+    (candidateWindow, Nothing) checked providers [] frag frag
 
 -- | 'synthesize' with caller-supplied premises (name, fragment) - used
 -- by the classical fallback to hand the engine excluded-middle
@@ -235,21 +271,26 @@ synthesizeTuned
   :: SynthEngine -> Int -> (Int, Maybe Integer) -> [(String, Frag)]
   -> Frag -> Frag -> Either String SynthOutcome
 synthesizeTuned engine steps limits extras engineFrag fitFrag = do
-  synthesizeTunedWithProviders engine steps limits [] extras engineFrag fitFrag
+  synthesizeTunedWithProviders engine steps limits Set.empty [] extras
+    engineFrag fitFrag
 
 synthesizeTunedWithProviders
-  :: SynthEngine -> Int -> (Int, Maybe Integer) -> [ProviderFrag]
-  -> [(String, Frag)] -> Frag -> Frag -> Either String SynthOutcome
-synthesizeTunedWithProviders engine steps limits providers extras
+  :: SynthEngine -> Int -> (Int, Maybe Integer) -> Set.Set String
+  -> [ProviderFrag] -> [(String, Frag)] -> Frag -> Frag
+  -> Either String SynthOutcome
+synthesizeTunedWithProviders engine steps limits checked providers extras
     engineFrag fitFrag = case engine of
   EngineDjinn -> do
     (goal, decls, providerDecls, render, complete) <-
       prepare djinnRecursiveProjection providers
-    djinnRun limits fitFrag complete render goal (decls ++ providerDecls)
+    outcome <- djinnRun limits fitFrag complete render goal
+      (decls ++ providerDecls)
+    pure (withoutCheckedCandidates checked outcome)
   EngineExference -> do
     (goal, decls, providerDecls, render, _) <-
       prepare exferenceRecursiveProjection providers
-    exferenceRun steps render goal (decls ++ providerDecls)
+    outcome <- exferenceRun steps render goal (decls ++ providerDecls)
+    pure (withoutCheckedCandidates checked outcome)
   EngineBoth -> do
     (djinnGoal, djinnDecls, djinnProviderDecls, djinnRender, djinnComplete) <-
       prepare djinnRecursiveProjection providers
@@ -259,7 +300,7 @@ synthesizeTunedWithProviders engine steps limits providers extras
       prepare exferenceRecursiveProjection providers
     exference <- exferenceRun steps exferenceRender exferenceGoal
       (exferenceDecls ++ providerDecls)
-    pure (mergeOutcomes djinn exference)
+    pure (mergeOutcomesSkipping checked djinn exference)
  where
   prepare recursiveProjection activeProviders = do
     ( goal0, decls, providerDecls, ctorMap, providerMap, typeMap, premises
@@ -423,26 +464,137 @@ exferenceRun steps render goal decls = do
         then SynthNoTerm (nub $ strictNotes ++ relaxedNotes)
         else SynthCandidates relaxedGroups relaxedNotes
 
--- | Both engines on one goal: Djinn's candidates first (they carry the
--- smallest-term ranking), Exference's new ones after, and negative
--- verdicts only when neither engine produced a candidate - a refutation
--- stays Djinn's alone.
-mergeOutcomes :: SynthOutcome -> SynthOutcome -> SynthOutcome
-mergeOutcomes djinn exference = case (djinn, exference) of
-  (SynthCandidates a na, SynthCandidates b nb) ->
-    SynthCandidates (a ++ filter (`notElem` a) b) (na ++ tag nb)
-  (SynthCandidates a na, other) ->
-    SynthCandidates a (na ++ tag (notesOf other))
-  (other, SynthCandidates b nb) ->
-    SynthCandidates b (notesOf other ++ tag nb)
-  (SynthRefuted sound, _) -> SynthRefuted sound
-  (SynthNoTerm na, other) -> SynthNoTerm (na ++ tag (notesOf other))
+-- | Merge two ranked group streams without letting either engine's bounded
+-- tail suppress a candidate from the other.  Djinn owns the first four fresh
+-- groups (its small-term order is the primary ranking), Exference then gets
+-- its full twelve-group lane budget, and Djinn fills the remaining eight
+-- groups of its own budget.  Thus the first 24 fresh groups contain everything
+-- either engine could have sent through a standalone twelve-group frontier,
+-- while Exference's first distinct group remains fifth.  Tails alternate
+-- after that combined frontier.
+--
+-- A group is one ranked candidate with textual Lean variants.  Exact
+-- spellings are retained at their first scheduled occurrence, variants keep
+-- their order, and a group emptied by stable deduplication does not spend a
+-- scheduling turn.  In particular, an early Exference spelling beats an
+-- otherwise identical /later/ Djinn spelling.
+mergeCandidateGroups :: [[String]] -> [[String]] -> [[String]]
+mergeCandidateGroups = djinnHead (synthMaxShown - 1) Set.empty
  where
+  djinnHead remaining seen djinn exference
+    | remaining <= 0 =
+        exferenceFront synthMaxTried seen djinn exference
+    | otherwise = case nextFresh seen djinn of
+        Just (group, seen', djinn') ->
+          group : djinnHead (remaining - 1) seen' djinn' exference
+        Nothing -> drain seen exference
+
+  exferenceFront remaining seen djinn exference
+    | remaining <= 0 = djinnFront
+        (synthMaxTried - (synthMaxShown - 1)) seen djinn exference
+    | otherwise = case nextFresh seen exference of
+        Just (group, seen', exference') ->
+          group : exferenceFront (remaining - 1) seen' djinn exference'
+        Nothing -> drain seen djinn
+
+  djinnFront remaining seen djinn exference
+    | remaining <= 0 = alternateExference seen djinn exference
+    | otherwise = case nextFresh seen djinn of
+        Just (group, seen', djinn') ->
+          group : djinnFront (remaining - 1) seen' djinn' exference
+        Nothing -> drain seen exference
+
+  alternateExference seen djinn exference =
+    case nextFresh seen exference of
+      Just (group, seen', exference') ->
+        group : alternateDjinn seen' djinn exference'
+      Nothing -> drain seen djinn
+
+  alternateDjinn seen djinn exference = case nextFresh seen djinn of
+    Just (group, seen', djinn') ->
+      group : alternateExference seen' djinn' exference
+    Nothing -> drain seen exference
+
+  drain seen groups = case nextFresh seen groups of
+    Just (group, seen', groups') -> group : drain seen' groups'
+    Nothing -> []
+
+  nextFresh _ [] = Nothing
+  nextFresh seen (group : groups) =
+    let (fresh, seen') = retainFresh seen group
+    in if null fresh
+      then nextFresh seen' groups
+      else Just (fresh, seen', groups)
+
+  retainFresh seen = go seen
+   where
+    go retained [] = ([], retained)
+    go retained (spelling : spellings)
+      | spelling `Set.member` retained = go retained spellings
+      | otherwise =
+          let (fresh, retained') =
+                go (Set.insert spelling retained) spellings
+          in (spelling : fresh, retained')
+
+-- | Both engines on one goal: merge their real candidates through the fair
+-- frontier above, and return negative evidence only when neither engine
+-- produced a candidate.  A refutation remains Djinn's alone; Exference
+-- completion without candidates is not negative evidence.
+mergeOutcomes :: SynthOutcome -> SynthOutcome -> SynthOutcome
+mergeOutcomes = mergeOutcomesSkipping Set.empty
+
+-- | 'mergeOutcomes' after removing already-checked spellings from each source
+-- stream independently.  Source-local filtering is essential: removing them
+-- from an already scheduled combined stream could spend one engine's reserved
+-- quota on empty groups from the other.
+mergeOutcomesSkipping
+  :: Set.Set String -> SynthOutcome -> SynthOutcome -> SynthOutcome
+mergeOutcomesSkipping checked djinn0 exference0 =
+  case (djinn, exference) of
+    (SynthCandidates a na, SynthCandidates b nb) ->
+      SynthCandidates (mergeCandidateGroups a b) (na ++ tag nb)
+    (SynthCandidates a na, other) ->
+      SynthCandidates a (na ++ tag (notesOf other))
+    (other, SynthCandidates b nb) ->
+      SynthCandidates b (notesOf other ++ tag nb)
+    (SynthRefuted sound, _) -> SynthRefuted sound
+    (SynthNoTerm na, other) -> SynthNoTerm (na ++ tag (notesOf other))
+ where
+  djinn = normalize (withoutCheckedCandidates checked djinn0)
+  exference = normalize (withoutCheckedCandidates checked exference0)
+
   tag = map ("exference: " ++)
+
+  candidatesOr fallback groups notes
+    | null groups = fallback
+    | otherwise = SynthCandidates groups notes
+
+  normalize outcome = case outcome of
+    SynthCandidates groups notes ->
+      candidatesOr (SynthNoTerm notes)
+        (mergeCandidateGroups groups []) notes
+    other -> other
+
   notesOf outcome = case outcome of
     SynthCandidates _ notes -> notes
     SynthNoTerm notes -> notes
     SynthRefuted _ -> []
+
+-- | Remove spellings already sent to Lean by an earlier structural/provider
+-- lane.  Empty groups do not consume the next lane's verification budget, and
+-- the transformation stays lazy so 'forceOutcome' can pull the first bounded
+-- /fresh/ prefix while it is still under the command deadline.
+withoutCheckedCandidates :: Set.Set String -> SynthOutcome -> SynthOutcome
+withoutCheckedCandidates checked outcome = case outcome of
+  SynthCandidates groups notes -> case freshGroups groups of
+    [] -> SynthNoTerm notes
+    fresh -> SynthCandidates fresh notes
+  other -> other
+ where
+  freshGroups groups = filter (not . null)
+    [ filter (`Set.notMember` checked) group
+    | group <- groups
+    ]
 
 viaDiagnostic :: Either Diagnostic a -> Either String a
 viaDiagnostic = either (Left . renderDiagnostic) Right

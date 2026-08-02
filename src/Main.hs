@@ -86,8 +86,11 @@ import Leant.Synth.Engine
   , forceOutcome
   , parseSynthEngine
   , providerStages
+  , synthMaxShown
+  , synthMaxTried
+  , synthVerificationWindow
   , synthEngineName
-  , synthesizeWithProviders
+  , synthesizeWithProvidersSkipping
   , synthesizeTuned
   )
 import Leant.Synth.Fragment
@@ -1721,9 +1724,7 @@ parseHyps = go . filter (not . null . trim)
     (c : rest) -> findSep (c : pre) rest
     [] -> Nothing
 
-synthMaxShown, synthMaxTried, providerCacheCapacity :: Int
-synthMaxShown = 5
-synthMaxTried = 12
+providerCacheCapacity :: Int
 providerCacheCapacity = 12
 
 -- | Wall-clock guard on the engine, in seconds (0 waits indefinitely).
@@ -1965,27 +1966,31 @@ synthGo' st args retriedVars goal parsed = do
   let deadline
         | limit <= 0 = Nothing
         | otherwise = Just (addUTCTime (fromIntegral limit) started)
-      runSynthesis laneEngine providers = runEngineBefore deadline
-        (synthesizeWithProviders
-          laneEngine (rsSynthSteps state) providers fragment)
+      runSynthesis checked laneEngine providers =
+        let groupLimit = synthVerificationWindow laneEngine
+            outcome = synthesizeWithProvidersSkipping
+              laneEngine (rsSynthSteps state) checked providers fragment
+        in runEngineBefore groupLimit deadline outcome
   if structuralFirst
     then do
-      baseline <- runSynthesis engine []
+      let baselineLimit = synthVerificationWindow engine
+      baseline <- runSynthesis Set.empty engine []
       case baseline of
         -- A provider inventory cannot repair an engine failure, and the two
         -- lanes share one wall-clock deadline.  Preserve the baseline
         -- diagnostic instead of spending another full timeout and replacing
         -- it with a less informative fallback result.
-        Nothing -> report False baseline
-        Just (Left _) -> report False baseline
+        Nothing -> report baselineLimit False baseline
+        Just (Left _) -> report baselineLimit False baseline
         -- A complete Djinn refutation is a terminal logical verdict under the
         -- REPL's provider-free proof-search contract, not a bounded search
         -- miss.  Reporting it here also preserves the explicit
         -- constructive-to-classical fallback policy.  An approximate
         -- refutation remains eligible for provider search.
-        Just (Right (SynthRefuted True)) -> report False baseline
+        Just (Right (SynthRefuted True)) ->
+          report baselineLimit False baseline
         _ -> do
-          (checkedVariants, shown) <- tryCandidates baseline
+          (checkedVariants, shown) <- tryCandidates baselineLimit baseline
           if shown
             then pure ()
             else do
@@ -1994,7 +1999,7 @@ synthGo' st args retriedVars goal parsed = do
                   then loadSynthProviders st (pgProviderQuery parsed)
                   else pure []
               if null providers
-                then report (isJust checkedVariants) baseline
+                then report baselineLimit (isJust checkedVariants) baseline
                 else runProviderLanes runSynthesis
                   (Set.fromList (maybe [] id checkedVariants))
                   (providerStages engine providers)
@@ -2011,49 +2016,34 @@ synthGo' st args retriedVars goal parsed = do
           (providerStages engine providers)
  where
   runProviderLanes runLane checked lanes = case lanes of
-    [] -> report False (Just (Right (SynthNoTerm [])))
+    [] -> report synthMaxTried False (Just (Right (SynthNoTerm [])))
     [(laneEngine, providers)] -> do
-      bounded <- runLane laneEngine providers
-      report False (dropCheckedCandidates checked bounded)
+      let groupLimit = synthVerificationWindow laneEngine
+      bounded <- runLane checked laneEngine providers
+      report groupLimit False bounded
     (laneEngine, providers) : remaining -> do
-      bounded <- runLane laneEngine providers
-      let fresh = dropCheckedCandidates checked bounded
+      let groupLimit = synthVerificationWindow laneEngine
+      fresh <- runLane checked laneEngine providers
       case fresh of
-        Nothing -> report False fresh
-        Just (Left _) -> report False fresh
+        Nothing -> report groupLimit False fresh
+        Just (Left _) -> report groupLimit False fresh
         _ -> do
-          (attempted, shown) <- tryCandidates fresh
+          (attempted, shown) <- tryCandidates groupLimit fresh
           if shown
             then pure ()
             else runProviderLanes runLane
               (Set.union checked (Set.fromList (maybe [] id attempted)))
               remaining
 
-  tryCandidates bounded = case bounded of
+  tryCandidates groupLimit bounded = case bounded of
     Just (Right (SynthCandidates groups notes)) -> do
-      let checkedGroups = take synthMaxTried groups
-      shown <- verifyGroups checkedGroups
+      let checkedGroups = take groupLimit groups
+      shown <- verifyGroups groupLimit checkedGroups
       when shown (reportNotes notes)
       pure (Just (concat checkedGroups), shown)
     _ -> pure (Nothing, False)
 
-  -- A failed earlier lane has already tried every variant in its bounded group
-  -- prefix.  A wider provider lane can rediscover those same expressions, so
-  -- remove the checked spellings before verification to avoid duplicating
-  -- backend work and failed environments.
-  dropCheckedCandidates checked bounded = case bounded of
-    Just (Right (SynthCandidates groups notes)) ->
-      let freshGroups = filter (not . null)
-            [ filter (`Set.notMember` checked) group
-            | group <- take synthMaxTried groups
-            ]
-          freshOutcome
-            | null freshGroups = SynthNoTerm notes
-            | otherwise = SynthCandidates freshGroups notes
-      in Just (Right freshOutcome)
-    _ -> bounded
-
-  report _ Nothing = do
+  report _ _ Nothing = do
     limit <- synthTimeoutSeconds
     emitLn st =<< cYellow st
       ("the engine did not finish within " ++ show limit
@@ -2062,13 +2052,15 @@ synthGo' st args retriedVars goal parsed = do
       ("(bounded hypothesis instantiation can widen the search a lot; "
        ++ "set LEANT_SYNTH_TIMEOUT to another number of seconds, "
        ++ "or 0 to wait indefinitely)")
-  report candidatesChecked (Just outcome) = case outcome of
+  report groupLimit candidatesChecked (Just outcome) = case outcome of
     Left err -> emitLn st =<< cRed st ("synthesis engine error: " ++ err)
     Right (SynthCandidates groups notes) -> do
       shown <-
-        if candidatesChecked then pure False else verifyGroups groups
+        if candidatesChecked
+          then pure False
+          else verifyGroups groupLimit groups
       unless shown $ emitLn st =<< cRed st
-        ("the engine proposed " ++ show (length groups)
+        ("the engine proposed " ++ show (length (take groupLimit groups))
          ++ " candidate(s) but none survived Lean verification")
       reportNotes notes
     Right (SynthRefuted sound)
@@ -2103,16 +2095,16 @@ synthGo' st args retriedVars goal parsed = do
       emitLn st =<< cYellow st "no term found within the search bounds"
       reportNotes notes
 
-  verifyGroups groups = do
+  verifyGroups groupLimit groups = do
     -- LEANT_SYNTH_DEBUG shows the engine's rendered variants before
     -- verification; the pipeline is otherwise opaque when a candidate is
     -- dropped.
     debug <- lookupEnv "LEANT_SYNTH_DEBUG"
     when (isJust debug) $
-      forM_ (zip [1 :: Int ..] (take synthMaxTried groups)) $
+      forM_ (zip [1 :: Int ..] (take groupLimit groups)) $
         \(i, group) -> forM_ group $ \variant ->
           emitLn st =<< cDim st ("debug " ++ show i ++ ": " ++ variant)
-    verifyAndDisplay st args goal (take synthMaxTried groups)
+    verifyAndDisplay st args goal (take groupLimit groups)
 
   reportNotes notes =
     forM_ notes $ \note -> emitLn st =<< cDim st ("note: " ++ note)
@@ -2179,16 +2171,17 @@ loadSynthProviders st query = do
 -- | Run the pure engine under the wall-clock guard, forcing enough of
 -- the outcome that the whole search happens inside the guard (the
 -- engine is lazy; see 'forceOutcome').  'Nothing' means the guard
--- fired.
+-- fired.  The excluded-middle retry passes its deliberately cheap frontier;
+-- the full double-negation retry preserves the ordinary per-engine window.
 runEngineBounded
-  :: Int -> Either String SynthOutcome
+  :: Int -> Int -> Either String SynthOutcome
   -> IO (Maybe (Either String SynthOutcome))
-runEngineBounded limit outcome
+runEngineBounded groupLimit limit outcome
   | limit <= 0 =
-      Just outcome <$ evaluate (forceOutcome synthMaxTried outcome)
+      Just outcome <$ evaluate (forceOutcome groupLimit outcome)
   | otherwise = do
       done <- timeout (limit * 1000000)
-        (evaluate (forceOutcome synthMaxTried outcome))
+        (evaluate (forceOutcome groupLimit outcome))
       pure (outcome <$ done)
 
 -- | Run an engine lane before one command-wide deadline.  Structural search
@@ -2197,11 +2190,11 @@ runEngineBounded limit outcome
 -- configured wall-clock allowance rather than receiving a fresh timeout each.
 -- 'Nothing' as the deadline retains the explicit wait-forever setting.
 runEngineBefore
-  :: Maybe UTCTime -> Either String SynthOutcome
+  :: Int -> Maybe UTCTime -> Either String SynthOutcome
   -> IO (Maybe (Either String SynthOutcome))
-runEngineBefore Nothing outcome =
-  Just outcome <$ evaluate (forceOutcome synthMaxTried outcome)
-runEngineBefore (Just deadline) outcome = do
+runEngineBefore groupLimit Nothing outcome =
+  Just outcome <$ evaluate (forceOutcome groupLimit outcome)
+runEngineBefore groupLimit (Just deadline) outcome = do
   now <- getCurrentTime
   let remainingMicros = floor
         (realToFrac (diffUTCTime deadline now) * 1000000 :: Double)
@@ -2209,7 +2202,7 @@ runEngineBefore (Just deadline) outcome = do
     then pure Nothing
     else do
       done <- timeout remainingMicros
-        (evaluate (forceOutcome synthMaxTried outcome))
+        (evaluate (forceOutcome groupLimit outcome))
       pure (outcome <$ done)
 
 -- | The Glivenko fallback (SYNTHESIS_PROPOSAL.md \167 7 B): a sound
@@ -2257,7 +2250,7 @@ synthClassical st args goal parsed = case glivenkoSplit (pgFrag parsed) of
           -- bounded, and losing completeness costs nothing here (a
           -- miss falls through to the complete ¬¬ route, and negative
           -- verdicts from this run are discarded anyway)
-          bounded <- runEngineBounded limit
+          bounded <- runEngineBounded synthMaxTried limit
             (synthesizeTuned engine steps (synthMaxTried, Just 100000)
               emPremises emEngineFrag (pgFrag parsed))
           debug <- lookupEnv "LEANT_SYNTH_DEBUG"
@@ -2296,12 +2289,13 @@ synthClassical st args goal parsed = case glivenkoSplit (pgFrag parsed) of
               | otherwise = "fun " ++ unwords binders
                   ++ " => Classical.byContradiction ((" ++ term ++ ") "
                   ++ unwords binders ++ ")"
-        bounded <- runEngineBounded limit
+        let groupLimit = synthVerificationWindow engine
+        bounded <- runEngineBounded groupLimit limit
           (synthesizeTuned engine steps (synthMaxTried, Nothing) []
             nnFrag nnFrag)
         case bounded of
           Just (Right (SynthCandidates groups _)) -> verifyAndDisplay
-            st args goal (map (map wrap) (take synthMaxTried groups))
+            st args goal (map (map wrap) (take groupLimit groups))
           _ -> pure False
 
 -- | Verify candidate groups, bind the survivors as `it1`, `it2`, ...,

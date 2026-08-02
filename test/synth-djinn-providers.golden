@@ -67,5 +67,6 @@ synth engine: djinn
 synth engine: both
 λ> :synth (Nat → Demo.Token)
   it1  fun _ => Demo.global («a» := Nat)
+  it2  fun x => match x with | .zero => Demo.global («a» := Nat) | .succ _ => Demo.global («a» := Nat)
 note: exference: search truncated: step limit reached, queue limit pruned 8061
 λ> :quit

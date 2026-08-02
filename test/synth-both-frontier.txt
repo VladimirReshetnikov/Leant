@@ -1,0 +1,19 @@
+inductive Demo.A1 where | mk
+inductive Demo.A2 where | mk
+inductive Demo.A3 where | mk
+inductive Demo.A4 where | mk
+inductive Demo.A5 where | mk
+inductive Demo.A6 where | mk
+inductive Demo.A7 where | mk
+inductive Demo.Good where | mk
+
+axiom Demo.Token : Type
+class Demo.C (a : Type) : Prop where
+  witness : True
+instance : Demo.C Demo.Good := ⟨True.intro⟩
+axiom Demo.global {a : Type} [Demo.C a] : Demo.Token
+
+:set synth-engine both
+:set synth-steps 1
+:synth (Demo.A1 → Demo.A2 → Demo.A3 → Demo.A4 → Demo.A5 → Demo.A6 → Demo.A7 → Demo.Good → Demo.Token)
+:quit
