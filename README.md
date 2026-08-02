@@ -282,6 +282,26 @@ hypothesis to the whole goal `Q → Q`, an impredicative instantiation:
   it3  fun f x => f _ x
 ```
 
+A vacuous local provider can retain that closed quantified choice explicitly.
+This matters when its result is an opaque Lean type: Leant keeps the result as
+an ambient query parameter, while Djex supplies only the type argument already
+present in the goal. Both engines now reach the application, and backend
+verification selects the `Type _` universe hint needed by Lean's positional
+`@` syntax:
+
+```text
+λ> axiom Demo.Token : Type
+λ> :synth ((∀ x : Type, x → x) → ({a : Type 1} → Demo.Token) → Demo.Token)
+  it1  fun _ x => @x (∀ (a0_0 : Type _), a0_0 → a0_0)
+λ> :set synth-engine exference
+synth engine: exference
+λ> :synth ((∀ x : Type, x → x) → ({a : Type 1} → Demo.Token) → Demo.Token)
+  it1  fun f x => f _ (@x (∀ (a0_0 : Type _), a0_0 → a0_0))
+```
+
+The search and rendering boundaries are recorded in the
+[scoped quantified-provider report](docs/reports/2026-08-01-scoped-quantified-local-providers.md).
+
 The bridge now preserves proper-type application spines too.  A bound
 first-order constructor `F` stays a higher-kinded Djex variable, while an
 opaque Lean family keeps one rigid nominal head across its occurrences.

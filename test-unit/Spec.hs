@@ -38,6 +38,7 @@ import Leant.Synth.Engine
   , mergeOutcomes
   , mergeOutcomesSkipping
   , providerStages
+  , synthEngineName
   , synthMaxShown
   , synthMaxTried
   , synthVerificationWindow
@@ -928,6 +929,27 @@ typeApplicationTests = testGroup "retained type applications"
           check engine = expectTerm "Demo.global («a» := Nat)"
             (synthesizeWithProviders engine 1024 [provider] goal)
       in mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "apply a scoped vacuous provider at a query polytype" $ do
+      let token = FAtom False "Demo.Token"
+          provider = FAll False "hidden" token
+          goal = FArr polytype $ FArr provider token
+          quantifiedTypeVariant term =
+            '@' `elem` term
+              && "(∀ (a0_0 : Type _), a0_0 → a0_0)" `isInfixOf` term
+          check engine = case
+              synthesizeWithProviders engine 1024 [] goal of
+            Right (SynthCandidates groups _) ->
+              assertBool
+                ("scoped quantified application fell outside the first "
+                  ++ show synthMaxTried ++ " " ++ synthEngineName engine
+                  ++ " groups: " ++ show (take synthMaxTried groups))
+                $ any quantifiedTypeVariant
+                $ concat $ take synthMaxTried groups
+            Right other -> assertFailure $
+              "unexpected scoped-provider outcome from "
+                ++ synthEngineName engine ++ ": " ++ outcomeTag other
+            Left err -> assertFailure err
+      mapM_ check [EngineDjinn, EngineExference, EngineBoth]
   , testCase "retain higher-kinded bound-variable applications" $ do
       let goal = FAll True "F" (FArr variableHypothesis
             (variableApp "F ((b : Type) \8594 b \8594 b)" "F" polytype))

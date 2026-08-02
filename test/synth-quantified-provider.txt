@@ -11,4 +11,10 @@ axiom Demo.polyGlobal {a : Type 1} [Demo.C a] : Demo.Token
 :synth ((∀ x : Type, x → x) → Demo.Token)
 :set synth-engine both
 :synth ((∀ x : Type, x → x) → Demo.Token)
+:set synth-engine djinn
+:synth ((∀ x : Type, x → x) → ({a : Type 1} → Demo.Token) → Demo.Token)
+:set synth-engine exference
+:synth ((∀ x : Type, x → x) → ({a : Type 1} → Demo.Token) → Demo.Token)
+:set synth-engine both
+:synth ((∀ x : Type, x → x) → ({a : Type 1} → Demo.Token) → Demo.Token)
 :quit

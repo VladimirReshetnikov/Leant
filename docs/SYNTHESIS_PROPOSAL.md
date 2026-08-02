@@ -10,7 +10,9 @@ cache. Every engine mode protects structural synthesis with a Lean-verified
 provider-free baseline and consults that inventory only after a nonterminal
 baseline miss; complete Djinn refutations retain their proof-backed verdict;
 Djinn-backed fallback can now specialize loaded schemes at closed monotypes and
-guarded rank-N polytypes. The translator additionally retains first-order
+guarded rank-N polytypes. Both engines can also retain a query-supplied closed
+polytype at a vacuous local provider whose result mentions fixed ambient query
+variables. The translator additionally retains first-order
 proper-type applications for bound constructor variables and opaque Lean families, and
 shares compatible proper-type applications of non-recursive and recursive
 inductive families across the complete query. Finite data retains constructor
@@ -109,8 +111,9 @@ best-first search. From the commit history and the reports
   become proof obligations. A separate bounded route for vacuous provider
   binders appends alpha-deduplicated, complete, lexically closed, context-free
   `forall` roots found in proven proper-type query positions after the
-  established monotype candidates. Explicit instance heads remain a
-  monotype-only source of choices.
+  established monotype candidates. The provider may retain ambient rigids
+  opened from the same query but no unresolved free flexible variable.
+  Explicit instance heads remain a monotype-only source of choices.
 - **Lean-visible provider instantiation evidence (Leant bridge).** Live
   provider discovery records the original names of leading proper-type
   binders while erasing unused instance evidence only in the provider lane.
@@ -120,10 +123,15 @@ best-first search. From the commit history and the reports
   instance search. Specified quantified arguments use a shared closed,
   alpha-normalized representation distinct from the inferred placeholder, so
   Leant can render `global («a» := (∀ (a0_0 : _), a0_0 → a0_0))`
-  structurally while preserving nested shadowing. Context-bearing quantified
-  arguments fail closed rather than guessing that a Haskell constraint denotes
-  a Lean instance binder. Unused implicit term binders are not misclassified
-  as type quantifiers, and goal serialization keeps its established behavior.
+  structurally while preserving nested shadowing. A positional local
+  application receives bounded `_`, `Type _`, and `Prop` binder-domain
+  variants because Lean may lack enough expected-type information to solve the
+  quantified argument's universe from `_` alone; backend verification chooses
+  the first elaborating spelling. Named globals retain their source-directed
+  rendering. Context-bearing quantified arguments fail closed rather than
+  guessing that a Haskell constraint denotes a Lean instance binder. Unused
+  implicit term binders are not misclassified as type quantifiers, and goal
+  serialization keeps its established behavior.
 - **Instance-implicit goal alignment (Leant bridge).** A non-dependent
   instance binder is neither a type quantifier nor an ordinary engine premise.
   The fragment retains it as a render-only slot, erases its dictionary before
@@ -629,9 +637,11 @@ Design rules, all inherited from Djex:
   complete closed, context-free `forall` roots observed in proven arrow or
   tuple proper-type positions; it excludes the query root and children of
   opaque type applications, keeps instance-head specialization monotype-only,
-  and retains the four-binder and 32-combination caps. Leant rejects a
-  constrained quantified visible argument rather than guessing how a Haskell
-  class context should become Lean binders.
+  and retains the four-binder and 32-combination caps. A vacuous provider may
+  mention ambient rigids opened from the query, but a free flexible variable
+  still disables this route. Leant rejects a constrained quantified visible
+  argument rather than guessing how a Haskell class context should become Lean
+  binders.
 - **Recursive elimination is bounded to one layer in Exference.** A
   recursive field exposed by a constructor match is available as a
   normal branch-local value, but is not eagerly decomposed again. The
@@ -983,6 +993,12 @@ a rank-N function type, plus atomic direct-provider admission, provider-free
 ordering, widening to a two-provider composition, combined-mode reuse, and a
 constrained vacuous provider whose closed type choice is visible through both
 engines without exposing its instance argument.
+A quantified-provider transcript additionally checks a local
+`{a : Type 1} → Demo.Token` value under Djinn, Exference, and combined mode.
+Each engine preserves the query-supplied `∀ x : Type, x → x` choice, and the
+Lean 4.31 backend accepts the renderer's `Type _`-directed positional
+application. See the
+[scoped local-provider report](reports/2026-08-01-scoped-quantified-local-providers.md).
 A dedicated combined-frontier transcript adds seven singleton distractor
 types around that constrained provider. Its first 12 rendered groups all fail
 Lean's instance check; `Demo.global («a» := Demo.Good)` appears at combined
