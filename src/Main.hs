@@ -2039,13 +2039,20 @@ proveHelp = unlines
 autoTactics :: [String]
 autoTactics = ["rfl", "trivial", "decide", "simp", "omega", "exact?", "aesop"]
 
--- Ordered from cheap, deterministic steps to progressively broader search.
--- Each candidate is actually run against the current immutable proof state;
--- a tactic is suggested only if Lean accepts it and returns a successor state.
+-- Suggestion probes: quick certain finishers first, then structural progress
+-- steps, then broader searches. Each candidate is actually run against the
+-- current immutable proof state; a tactic is suggested only if Lean accepts
+-- it and returns a successor state. Unlike :auto, probing does not stop at
+-- the first accepted candidate: one that merely advances the goal is
+-- remembered while the search keeps looking for one that closes it outright.
+-- `apply?` is deliberately absent: its partial `refine ?_` suggestions are
+-- rarely actionable, and probing it over the proof-state protocol can panic
+-- the REPL backend (a UTF-8 slicing bug in repl v1.3.18), destroying every
+-- live proof state.
 suggestionTactics :: [String]
 suggestionTactics =
-  [ "rfl", "assumption", "intro", "exact?", "simp?", "decide"
-  , "omega", "aesop?", "constructor", "apply?"
+  [ "rfl", "assumption", "trivial", "decide", "omega", "exact?"
+  , "intro", "constructor", "simp?", "aesop?"
   ]
 
 suggestionHeartbeatLimit :: Int
@@ -2098,6 +2105,97 @@ parseTryThis messages = listToMaybe'
 proveScript :: ProveState -> [String]
 proveScript pv = reverse [e | (_, _, Just e) <- pvStack pv]
 
+-- Depth-aware scanning of pretty-printed goal text ---------------------------
+
+bracketDepthStep :: Int -> Char -> Int
+bracketDepthStep d c
+  | c `elem` "([{\10216\10627" = d + 1          -- ( [ { \10216 \10627
+  | c `elem` ")]}\10217\10628" = max 0 (d - 1)
+  | otherwise = d
+
+-- Split at occurrences of a character that sit outside every bracket pair.
+splitDepth0 :: Char -> String -> [String]
+splitDepth0 sep = go 0 ""
+ where
+  go _ acc [] = [reverse acc]
+  go d acc (c : rest)
+    | d == 0 && c == sep = reverse acc : go 0 "" rest
+    | otherwise = go (bracketDepthStep d c) (c : acc) rest
+
+-- | Name the binders a bare `intro` would introduce, from the pretty-printed
+-- goal: leading \8704 binder groups contribute their own names, then each
+-- depth-0 arrow of the body -- and a bare \172 conclusion, which intro also
+-- unfolds -- contributes a fresh hypothesis name. The result is only shown
+-- after Lean accepts it against the live proof state, so a mis-parse costs
+-- one wasted probe, never a wrong suggestion.
+introNames :: String -> Maybe [String]
+introNames goal = do
+  target <- case targetLines of
+    [] -> Nothing
+    t : more -> Just (unwords (concatMap words (drop 1 t : more)))
+  (binders, body) <- case target of
+    '\8704' : rest -> parseBinders (dropWhile isSpace rest) []
+    _ -> Just ([], target)
+  -- count arrows only up to the first depth-0 \8704 of the body; anything
+  -- beyond it belongs to a nested quantifier with its own binder names
+  let (cutSegments, wasCut) = case splitDepth0 '\8704' body of
+        prefix : _ : _ -> (splitDepth0 '\8594' prefix, True)
+        _ -> (splitDepth0 '\8594' body, False)
+      arrows = length cutSegments - 1
+      negBonus = if not wasCut && bareNegation (last cutSegments) then 1 else 0
+      used = hypNames ++ binders
+      fresh = take (arrows + negBonus)
+        [n | n <- "h" : ["h" ++ show i | i <- [1 :: Int ..]], n `notElem` used]
+      names = binders ++ fresh
+  if null names then Nothing else Just names
+ where
+  (hypLines, targetLines) = break ("\8866" `isPrefixOf`) (lines goal)
+  -- wrapped hypothesis and target lines are indented continuations
+  hypNames = concat
+    [ words namesPart
+    | l@(c0 : _) <- hypLines
+    , not ("case " `isPrefixOf` l), not (isSpace c0)
+    , namesPart : _ : _ <- [splitDepth0 ':' l]
+    ]
+  parseBinders s acc = case dropWhile isSpace s of
+    ',' : rest -> Just (reverse acc, dropWhile isSpace rest)
+    '(' : rest -> do
+      (content, rest') <- balancedParen (1 :: Int) "" rest
+      namesPart <- case splitDepth0 ':' content of
+        np : _ : _ -> Just np
+        _ -> Nothing
+      names <- traverse checkName (words namesPart)
+      if null names then Nothing else parseBinders rest' (reverse names ++ acc)
+    "" -> Nothing
+    s'@(c0 : _)
+      -- implicit/instance groups: bare `intro` still introduces them, but
+      -- suggesting explicit names for them is more confusing than helpful
+      | c0 `elem` "{[\10627" -> Nothing
+      | otherwise -> do
+          let (tok, rest') = break (\c -> isSpace c || c == ',') s'
+          name <- checkName tok
+          parseBinders rest' (name : acc)
+  balancedParen depth acc str = case str of
+    [] -> Nothing
+    ')' : rest
+      | depth == 1 -> Just (reverse acc, rest)
+      | otherwise -> balancedParen (depth - 1) (')' : acc) rest
+    '(' : rest -> balancedParen (depth + 1) ('(' : acc) rest
+    c : rest -> balancedParen depth (c : acc) rest
+  checkName tok
+    | null tok = Nothing
+    | any (`elem` "()[]{},:\10013\8866\10216\10217") tok = Nothing
+    | otherwise = Just tok
+  bareNegation seg =
+    case filter (not . null) (splitDepth0 ' ' (trim seg)) of
+      [tok] -> "\172" `isPrefixOf` tok
+      _ -> False
+
+annotateSuggestion :: String -> String -> String
+annotateSuggestion note text = case lines text of
+  [] -> text
+  first : rest -> intercalate "\n" ((first ++ "  (" ++ note ++ ")") : rest)
+
 emitSuggestion :: St -> String -> IO ()
 emitSuggestion st suggestion = case lines suggestion of
   [] -> pure ()
@@ -2108,18 +2206,34 @@ emitSuggestion st suggestion = case lines suggestion of
 -- | Find and display a useful next tactic without changing the user's proof
 -- stack. The backend proof-state protocol is persistent, so speculative
 -- children do not affect the state to which the next user tactic is applied.
+-- A candidate that merely makes progress is remembered while the search
+-- keeps looking for one that closes the goal; the annotation on the shown
+-- suggestion says which kind it is.
 suggestTactic :: St -> IO ()
 suggestTactic st = do
   state <- readIORef st
   case rsProve state of
-    Just pv | (ps, goals, _) : _ <- pvStack pv, not (null goals) ->
+    Just pv | (ps, goals@(g : _), _) : _ <- pvStack pv ->
       case lookup ps (pvSuggestions pv) of
         Just cached -> forM_ cached (emitSuggestion st)
-        Nothing -> probe ps suggestionTactics
+        Nothing ->
+          probe ps (length goals) (concatMap (expand g) suggestionTactics)
+            Nothing
     _ -> pure ()
  where
-  probe ps [] = cache ps Nothing
-  probe ps (tactic : rest) = do
+  -- `intro` names the binders it would introduce when the goal's shape
+  -- allows it, keeping the bare form as a fallback should Lean reject them
+  expand g "intro" = case introNames g of
+    Just names -> ["intro " ++ unwords names, "intro"]
+    Nothing -> ["intro"]
+  expand _ t = [t]
+
+  probe ps _ [] best = do
+    cache ps best
+    forM_ best (emitSuggestion st)
+  probe ps nGoals ("intro" : rest) best@(Just b)
+    | "intro " `isPrefixOf` b = probe ps nGoals rest best  -- named form held
+  probe ps nGoals (tactic : rest) best = do
     -- Keep proactive help responsive even when a project has a very large
     -- premise database. A heartbeat exhaustion is an ordinary tactic error,
     -- unlike the REPL's wall-clock timeout, so it does not kill the backend or
@@ -2134,10 +2248,26 @@ suggestTactic st = do
         | Nothing <- respFatal v
         , null [() | (severity, _) <- respMessages v, severity == "error"]
         , Just _ <- respProofState v -> do
-            let suggestion = fromMaybe tactic (parseTryThis (respMessages v))
-            cache ps (Just suggestion)
-            emitSuggestion st suggestion
-        | otherwise -> probe ps rest
+            let text = fromMaybe tactic (parseTryThis (respMessages v))
+                remaining = length (respGoals v)
+                -- library-search tactics can "close" the probe state with
+                -- metavariables and say so in a Remaining-subgoals comment;
+                -- never present those as closing the goal
+                partial = any (("-- Remaining subgoals:" `isPrefixOf`) . trim)
+                  (lines text)
+            if remaining < nGoals && not partial
+              then do
+                let suggestion = annotateSuggestion "closes the goal" text
+                cache ps (Just suggestion)
+                emitSuggestion st suggestion
+              else probe ps nGoals rest $ case best of
+                Just _ -> best
+                Nothing
+                  | remaining > nGoals -> Just (annotateSuggestion
+                      ("splits into " ++ show (remaining - nGoals + 1)
+                       ++ " goals") text)
+                  | otherwise -> Just text
+        | otherwise -> probe ps nGoals rest best
 
   cache ps suggestion = modifyIORef' st $ \s -> s
     { rsProve = case rsProve s of

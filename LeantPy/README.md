@@ -93,13 +93,14 @@ run verbatim and, on success, advance the session environment.
 ```
 λ> :prove ∀ n : Nat, 0 + n = n
 ⊢ ∀ (n : Nat), 0 + n = n
-suggestion: intro
+suggestion: omega  (closes the goal)
 ⊢> intro n
 n : Nat
 ⊢ 0 + n = n
-suggestion: rfl
+suggestion: omega  (closes the goal)
 ⊢> induction n
 — goal 1 of 2 — ...
+suggestion: rfl  (closes the goal)
 ⊢2> exact?
 recorded as: exact Nat.zero_add 0
 ⊢> :auto
@@ -111,8 +112,10 @@ saved: theorem zeroAdd : ∀ n : Nat, 0 + n = n
 
 Goals reprint after every tactic (numbered when there are several; the
 prompt shows the count), followed by a Lean-verified suggestion that does not
-advance the state or enter the script. `:suggest` reprints the cached
-suggestion. `:undo [N]` takes back tactics without limit; `:script` shows the
+advance the state or enter the script. The probe search prefers a candidate
+that closes the goal outright and annotates the suggestion accordingly
+(`closes the goal`, `splits into 2 goals`), and an `intro` suggestion names
+the binders it would introduce. `:suggest` reprints the cached suggestion. `:undo [N]` takes back tactics without limit; `:script` shows the
 accumulated proof; `:auto` tries common finishers;
 `:qed [NAME]` turns the script into a real `theorem` in the session
 (auto-named `prove_N`; a `def` when the statement is not a proposition,

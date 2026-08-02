@@ -334,20 +334,25 @@ backend's proof-state protocol. Every line is a tactic; \code{:undo}
 pops one step; \code{:qed NAME} assembles the accumulated script into
 a theorem and replays it into the session, so the result is usable
 afterwards.  Each displayed proof state is followed by an automatically
-discovered tactic suggestion that Lean has already checked.  The suggestion
-is advisory---it does not advance the state or enter the script---and
-\code{:suggest} reprints it without rerunning the search.
+discovered tactic suggestion that Lean has already checked.  The probe
+search prefers a candidate that closes the goal outright and annotates the
+suggestion accordingly (\code{closes the goal}, \code{splits into 2
+goals}); an \code{intro} suggestion names the binders it would introduce.
+The suggestion is advisory---it does not advance the state or enter the
+script---and \code{:suggest} reprints it without rerunning the search.
+Below, the very first suggestion is already a complete proof; the session
+ignores it and proceeds step by step instead.
 
 \begin{session}
 λ> :prove ∀ p q : Prop, (p → q) → p → q ∧ p
 ⊢ ∀ (p q : Prop), (p → q) → p → q ∧ p
-suggestion: intro
+suggestion: exact fun p q a a_1 => ⟨a a_1, a_1⟩  (closes the goal)
 ⊢> intro p q h hp
 p q : Prop
 h : p → q
 hp : p
 ⊢ q ∧ p
-suggestion: exact ⟨h hp, hp⟩
+suggestion: exact ⟨h hp, hp⟩  (closes the goal)
 ⊢> exact ⟨h hp, hp⟩
 All goals accomplished
 ⊢> :qed mp_and

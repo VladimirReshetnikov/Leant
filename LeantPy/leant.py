@@ -1432,11 +1432,17 @@ Automatic suggestions are advisory and never enter the script.
     AUTO_TACTICS = ["rfl", "trivial", "decide", "simp", "omega",
                     "exact?", "aesop"]
 
-    # Ordered from cheap, deterministic steps to progressively broader
-    # search. A candidate is shown only after Lean accepts it against the
-    # current proof state.
-    SUGGESTION_TACTICS = ["rfl", "assumption", "intro", "exact?", "simp?",
-                          "decide", "omega", "aesop?", "constructor", "apply?"]
+    # Suggestion probes: quick certain finishers first, then structural
+    # progress steps, then broader searches. A candidate is shown only after
+    # Lean accepts it against the current proof state. Unlike :auto, probing
+    # does not stop at the first accepted candidate: one that merely advances
+    # the goal is remembered while the search keeps looking for one that
+    # closes it outright. `apply?` is deliberately absent: its partial
+    # `refine ?_` suggestions are rarely actionable, and probing it over the
+    # proof-state protocol can panic the REPL backend (a UTF-8 slicing bug
+    # in repl v1.3.18), destroying every live proof state.
+    SUGGESTION_TACTICS = ["rfl", "assumption", "trivial", "decide", "omega",
+                          "exact?", "intro", "constructor", "simp?", "aesop?"]
     SUGGESTION_HEARTBEAT_LIMIT = 20_000
 
     def format_goals(self, goals: list[str]):
@@ -1545,10 +1551,134 @@ Automatic suggestions are advisory and never enter the script.
             for line in lines[1:]:
                 print(dim(f"            {line}"))
 
+    _BRACKET_OPEN = "([{⟨⦃"
+    _BRACKET_CLOSE = ")]}⟩⦄"
+
+    @classmethod
+    def _split_depth0(cls, sep: str, text: str) -> list[str]:
+        """Split at occurrences of `sep` outside every bracket pair."""
+        parts, buf, depth = [], [], 0
+        for c in text:
+            if depth == 0 and c == sep:
+                parts.append("".join(buf))
+                buf = []
+                continue
+            if c in cls._BRACKET_OPEN:
+                depth += 1
+            elif c in cls._BRACKET_CLOSE:
+                depth = max(0, depth - 1)
+            buf.append(c)
+        parts.append("".join(buf))
+        return parts
+
+    @classmethod
+    def intro_names(cls, goal: str) -> list[str] | None:
+        """Name the binders a bare `intro` would introduce, from the
+        pretty-printed goal: leading ∀ binder groups contribute their own
+        names, then each depth-0 arrow of the body — and a bare ¬
+        conclusion, which intro also unfolds — contributes a fresh
+        hypothesis name. The result is only shown after Lean accepts it
+        against the live proof state, so a mis-parse costs one wasted
+        probe, never a wrong suggestion."""
+        lines = goal.splitlines()
+        hyp_lines: list[str] = []
+        target = None
+        for i, line in enumerate(lines):
+            if line.startswith("⊢"):
+                target = " ".join((line[1:] + " " + " ".join(lines[i + 1:])).split())
+                break
+            hyp_lines.append(line)
+        if target is None:
+            return None
+
+        def valid(tok: str) -> bool:
+            return bool(tok) and not any(c in tok for c in "()[]{},:✝⊢⟨⟩")
+
+        used: list[str] = []
+        for line in hyp_lines:
+            if not line or line.startswith("case ") or line[0].isspace():
+                continue
+            parts = cls._split_depth0(":", line)
+            if len(parts) > 1:
+                used.extend(parts[0].split())
+
+        binders: list[str] = []
+        body = target
+        if target.startswith("∀"):
+            s = target[1:].lstrip()
+            body = None
+            while body is None:
+                if not s:
+                    return None
+                if s.startswith(","):
+                    body = s[1:].lstrip()
+                elif s.startswith("("):
+                    depth, j = 1, 1
+                    while j < len(s) and depth:
+                        if s[j] == "(":
+                            depth += 1
+                        elif s[j] == ")":
+                            depth -= 1
+                        j += 1
+                    if depth:
+                        return None
+                    parts = cls._split_depth0(":", s[1:j - 1])
+                    names = parts[0].split() if len(parts) > 1 else []
+                    if not names or not all(valid(n) for n in names):
+                        return None
+                    binders.extend(names)
+                    s = s[j:].lstrip()
+                elif s[0] in "{[⦃":
+                    # implicit/instance groups: bare `intro` still introduces
+                    # them, but naming them explicitly is more confusing
+                    # than helpful
+                    return None
+                else:
+                    tok = re.match(r"[^\s,]+", s).group(0)
+                    if not valid(tok):
+                        return None
+                    binders.append(tok)
+                    s = s[len(tok):].lstrip()
+
+        # count arrows only up to the first depth-0 ∀ of the body; anything
+        # beyond it belongs to a nested quantifier with its own binder names
+        forall_parts = cls._split_depth0("∀", body)
+        was_cut = len(forall_parts) > 1
+        segments = cls._split_depth0("→", forall_parts[0])
+        arrows = len(segments) - 1
+        neg_bonus = 0
+        if not was_cut:
+            toks = [t for t in cls._split_depth0(" ", segments[-1].strip()) if t]
+            if len(toks) == 1 and toks[0].startswith("¬"):
+                neg_bonus = 1
+
+        used_all = used + binders
+        fresh: list[str] = []
+        i = 0
+        while len(fresh) < arrows + neg_bonus:
+            cand = "h" if i == 0 else f"h{i}"
+            i += 1
+            if cand not in used_all:
+                fresh.append(cand)
+                used_all.append(cand)
+        names = binders + fresh
+        return names or None
+
+    @staticmethod
+    def annotate_suggestion(text: str, note: str) -> str:
+        lines = text.splitlines()
+        if not lines:
+            return text
+        lines[0] += f"  ({note})"
+        return "\n".join(lines)
+
     def suggest_tactic(self):
         """Suggest a Lean-verified next tactic without advancing the user's
-        proof stack. Results (including no suggestion) are cached per proof
-        state so :goals, :undo, and :suggest do not repeat search."""
+        proof stack. A candidate that merely makes progress is remembered
+        while the search keeps looking for one that closes the goal; the
+        annotation on the shown suggestion says which kind it is. Results
+        (including no suggestion) are cached per proof state so :goals,
+        :undo, and :suggest do not repeat search."""
         if self.prove is None:
             return
         from lean_interact import ProofStep
@@ -1560,7 +1690,21 @@ Automatic suggestions are advisory and never enter the script.
             if cache[ps] is not None:
                 self.emit_suggestion(cache[ps])
             return
+        # `intro` names the binders it would introduce when the goal's shape
+        # allows it, keeping the bare form as a fallback should Lean reject
+        # the names
+        candidates: list[str] = []
         for tactic in self.SUGGESTION_TACTICS:
+            if tactic == "intro":
+                names = self.intro_names(goals[0])
+                if names:
+                    candidates.append("intro " + " ".join(names))
+            candidates.append(tactic)
+        best = None
+        for tactic in candidates:
+            if tactic == "intro" and best is not None \
+                    and best.startswith("intro "):
+                continue  # the named intro variant already held
             bounded = (f"set_option maxHeartbeats "
                        f"{self.SUGGESTION_HEARTBEAT_LIMIT} in {tactic}")
             try:
@@ -1576,11 +1720,28 @@ Automatic suggestions are advisory and never enter the script.
                       if m.severity == "error"]
             if errors or getattr(res, "proof_state", None) is None:
                 continue
-            suggestion = self.parse_try_this(res.messages) or tactic
-            cache[ps] = suggestion
-            self.emit_suggestion(suggestion)
-            return
-        cache[ps] = None
+            text = self.parse_try_this(res.messages) or tactic
+            remaining = len(res.goals)
+            # library-search tactics can "close" the probe state with
+            # metavariables and say so in a Remaining-subgoals comment;
+            # never present those as closing the goal
+            partial = any(ln.strip().startswith("-- Remaining subgoals:")
+                          for ln in text.splitlines())
+            if remaining < len(goals) and not partial:
+                suggestion = self.annotate_suggestion(text, "closes the goal")
+                cache[ps] = suggestion
+                self.emit_suggestion(suggestion)
+                return
+            if best is None:
+                if remaining > len(goals):
+                    best = self.annotate_suggestion(
+                        text,
+                        f"splits into {remaining - len(goals) + 1} goals")
+                else:
+                    best = text
+        cache[ps] = best
+        if best is not None:
+            self.emit_suggestion(best)
 
     def prove_script(self) -> list[str]:
         return [e for (_, _, e) in self.prove["stack"] if e]

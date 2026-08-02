@@ -7,17 +7,17 @@ Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to e
 λ> :prove ∀ p q : Prop, p ∧ q → q ∧ p
 entering prove mode — type tactics; :help for commands
 ⊢ ∀ (p q : Prop), p ∧ q → q ∧ p
-suggestion: intro
+suggestion: intro p q h
 ⊢> :goals
 ⊢ ∀ (p q : Prop), p ∧ q → q ∧ p
-suggestion: intro
+suggestion: intro p q h
 ⊢> intro p q h
 p q : Prop
 h : p ∧ q
 ⊢ q ∧ p
-suggestion: exact And.comm.mp h
+suggestion: exact And.comm.mp h  (closes the goal)
 ⊢> :suggest
-suggestion: exact And.comm.mp h
+suggestion: exact And.comm.mp h  (closes the goal)
 ⊢> exact And.comm.mp h
 All goals accomplished 🎉
 finish with :qed [NAME], inspect with :script
@@ -26,24 +26,45 @@ saved: theorem and_swap : ∀ p q : Prop, p ∧ q → q ∧ p
 λ> :prove ∀ n : Nat, n = n
 entering prove mode — type tactics; :help for commands
 ⊢ ∀ (n : Nat), n = n
-suggestion: intro
+suggestion: omega  (closes the goal)
 ⊢> intro n
 n : Nat
 ⊢ n = n
-suggestion: rfl
+suggestion: rfl  (closes the goal)
 ⊢> :undo
 undid: intro n
 ⊢ ∀ (n : Nat), n = n
-suggestion: intro
+suggestion: omega  (closes the goal)
 ⊢> :suggest
-suggestion: intro
+suggestion: omega  (closes the goal)
 ⊢> intro n
 n : Nat
 ⊢ n = n
-suggestion: rfl
+suggestion: rfl  (closes the goal)
 ⊢> rfl
 All goals accomplished 🎉
 finish with :qed [NAME], inspect with :script
 ⊢> :qed nat_refl
 saved: theorem nat_refl : ∀ n : Nat, n = n
+λ> :prove (∀ a b : Nat, a + b = b + a) ∧ (∀ a b : Nat, a * b = b * a)
+entering prove mode — type tactics; :help for commands
+⊢ (∀ (a b : Nat), a + b = b + a) ∧ ∀ (a b : Nat), a * b = b * a
+suggestion: constructor  (splits into 2 goals)
+⊢> constructor
+— goal 1 of 2 —
+case left
+⊢ ∀ (a b : Nat), a + b = b + a
+— goal 2 of 2 —
+case right
+⊢ ∀ (a b : Nat), a * b = b * a
+suggestion: omega  (closes the goal)
+⊢2> omega
+case right
+⊢ ∀ (a b : Nat), a * b = b * a
+suggestion: exact fun a b => Nat.mul_comm a b  (closes the goal)
+⊢> exact fun a b => Nat.mul_comm a b
+All goals accomplished 🎉
+finish with :qed [NAME], inspect with :script
+⊢> :qed add_mul_comm
+saved: theorem add_mul_comm : (∀ a b : Nat, a + b = b + a) ∧ (∀ a b : Nat, a * b = b * a)
 λ> :quit

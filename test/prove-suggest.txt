@@ -11,4 +11,9 @@ intro n
 intro n
 rfl
 :qed nat_refl
+:prove (∀ a b : Nat, a + b = b + a) ∧ (∀ a b : Nat, a * b = b * a)
+constructor
+omega
+exact fun a b => Nat.mul_comm a b
+:qed add_mul_comm
 :quit

@@ -136,8 +136,12 @@ Built-ins and keywords that are not constants in the environment
 `:prove PROP` opens a tactic loop against the backend's proof-state
 protocol (bare `:prove` resumes the most recent `sorry`). Every line is
 a tactic; goals reprint after each one, followed by a Lean-verified
-suggestion for the next tactic. Suggestions are advisory: they never advance
-the proof or enter the script, and `:suggest` reprints the cached suggestion.
+suggestion for the next tactic. The probe search prefers a candidate that
+closes the goal outright and annotates the suggestion accordingly
+(`closes the goal`, `splits into 2 goals`), and an `intro` suggestion
+names the binders it would introduce. Suggestions are advisory: they never
+advance the proof or enter the script, and `:suggest` reprints the cached
+suggestion.
 `:undo` takes back steps without limit; `:script` shows the accumulated proof;
 `:auto` tries common finishers; `:qed [NAME]` turns the script into a real
 theorem in the session. `?`-tactics (`exact?`, `simp?`, `rw?`) record the
@@ -147,12 +151,12 @@ tactic they *found* rather than the question-mark form.
 λ> :prove ∀ p q : Prop, p ∧ q → q ∧ p
 entering prove mode — type tactics; :help for commands
 ⊢ ∀ (p q : Prop), p ∧ q → q ∧ p
-suggestion: intro
+suggestion: intro p q h
 ⊢> intro p q h
 p q : Prop
 h : p ∧ q
 ⊢ q ∧ p
-suggestion: exact And.comm.mp h
+suggestion: exact And.comm.mp h  (closes the goal)
 ⊢> exact And.comm.mp h
 All goals accomplished 🎉
 finish with :qed [NAME], inspect with :script
