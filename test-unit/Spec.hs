@@ -22,7 +22,7 @@ import Test.Tasty.HUnit ((@?=), assertBool, assertFailure, testCase)
 
 import Language.Haskell.Djex
   ( Constraint (..)
-  , Expression (Global, Lambda, Local, VisibleTypeApplication)
+  , Expression (Global, Lambda, Local, Tuple, VisibleTypeApplication)
   , Pattern (Bind)
   , Type (..)
   , inferredVisibleTypeArgument
@@ -2094,6 +2094,43 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
             $ any ("(a0_0 : Type _)" `isInfixOf`) variants
           assertBool ("missing Prop-directed local variant: " ++ show variants)
             $ any ("(a0_0 : Prop)" `isInfixOf`) variants
+  , testCase "retain mixed local instantiations in each kind-hint lane" $ do
+      argument <- expectRight $ specifiedVisibleTypeArgument
+        (ForallType ["a"] []
+          (FunctionType (TypeVariable "a") (TypeVariable "a")))
+      let token = FAtom False "Demo.Token"
+          provider = FAll False "hidden" token
+          ambiguousFunction binder =
+            FAll True binder (FArr token token)
+          first = ambiguousFunction "firstType"
+          second = ambiguousFunction "secondType"
+          third = ambiguousFunction "thirdType"
+          goal = FArr provider $ FArr first $ FArr second $ FArr third $
+            FProd token (FProd first (FProd second third))
+          expression = Lambda
+            [Bind "provider", Bind "first", Bind "second", Bind "third"] $
+            Tuple
+              [ VisibleTypeApplication (Local "provider") argument
+              , Tuple [Local "first", Tuple [Local "second", Local "third"]]
+              ]
+          expected binderDomain =
+            "fun x f g h => \10216@x "
+              ++ "(\8704 (a0_0 : " ++ binderDomain ++ "), a0_0 \8594 a0_0), "
+              ++ "\10216f, \10216g, h _\10217\10217\10217"
+          rendered = renderLeanTerm Map.empty Map.empty Map.empty []
+            goal expression
+      case rendered of
+        Left err -> assertFailure err
+        Right variants -> do
+          assertBool ("renderer exceeded its three 12-variant lanes: "
+              ++ show variants)
+            (length variants <= 36)
+          mapM_
+            (\binderDomain -> assertBool
+              (binderDomain ++ " lane lost its third-site-only variant: "
+                ++ show variants)
+              (expected binderDomain `elem` variants))
+            ["_", "Type _", "Prop"]
   , testCase "render alpha-renamed quantified arguments identically" $ do
       providerName <- expectRight $ mkIdentifier "leantProvider0"
       let source variable = ForallType [variable] []

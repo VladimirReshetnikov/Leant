@@ -117,13 +117,25 @@ renderLeanTerm cm providers typeNames premises goalFrag expr0 = do
   -- premises participate in domain fitting under their marked names,
   -- so case splits on them reveal their branch binders' domains
   let seed = [(premiseMark ++ name, frag) | (name, frag) <- premises]
-  texts <- concat <$> mapM variantsFor
-    (nub [fit cm force goalFrag base 0 seed | force <- [False, True]])
-  case nub texts of
+  let fitted = nub
+        [fit cm force goalFrag base 0 seed | force <- [False, True]]
+  -- Twelve was the complete historical budget for site/style variants. Keep
+  -- that budget independently in each universe-domain lane: with three sites
+  -- there are already eight selective subsets, so one shared budget cannot
+  -- retain those spellings across even two domains. The final group therefore
+  -- remains bounded at 36 variants. Named, monomorphic, and otherwise
+  -- domain-insensitive spellings collapse back to the old size in the final
+  -- 'nub'; only a local quantified application pays the larger backend bound.
+  lanes <- mapM
+    (\visibleBinderDomain -> do
+      texts <- concat <$> mapM (variantsFor visibleBinderDomain) fitted
+      pure $ take visibleBinderDomainVariantLimit $ nub texts)
+    visibleBinderDomains
+  case nub $ concat lanes of
     [] -> Left "no renderable variant"
-    group -> Right (take 12 group)
+    group -> Right group
  where
-  variantsFor fitted = do
+  variantsFor visibleBinderDomain fitted = do
     let (expr, domPairs) = roleRename fitted
         doms = Map.fromList domPairs
         sites = countSites doms expr
@@ -138,12 +150,10 @@ renderLeanTerm cm providers typeNames premises goalFrag expr0 = do
         -- elaborates
         styles = [Idiomatic, Explicit]
     concat <$> mapM
-      (\set -> concat <$> mapM
-        (\style -> mapM
-          (\visibleBinderDomain ->
-            render cm providers typeNames style visibleBinderDomain doms 0
-              (markSites doms set expr))
-          visibleBinderDomains)
+      (\set -> mapM
+        (\style ->
+          render cm providers typeNames style visibleBinderDomain doms 0
+            (markSites doms set expr))
         styles)
       sets
 
@@ -1023,6 +1033,10 @@ visibleBinderDomains =
   , TypeVisibleBinderDomain
   , PropVisibleBinderDomain
   ]
+
+-- Applied separately to the three bounded domain lanes in 'renderLeanTerm'.
+visibleBinderDomainVariantLimit :: Int
+visibleBinderDomainVariantLimit = 12
 
 render
   :: CtorMap -> ProviderMap -> TypeMap -> Style -> VisibleBinderDomain
