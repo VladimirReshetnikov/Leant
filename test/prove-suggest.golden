@@ -7,10 +7,10 @@ Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to e
 λ> :prove ∀ p q : Prop, p ∧ q → q ∧ p
 entering prove mode — type tactics; :help for commands
 ⊢ ∀ (p q : Prop), p ∧ q → q ∧ p
-suggestion: intro p q h
+suggestion: intro p q h <;> exact And.comm.mp h  (closes the goal)
 ⊢> :goals
 ⊢ ∀ (p q : Prop), p ∧ q → q ∧ p
-suggestion: intro p q h
+suggestion: intro p q h <;> exact And.comm.mp h  (closes the goal)
 ⊢> intro p q h
 p q : Prop
 h : p ∧ q
@@ -67,4 +67,46 @@ All goals accomplished 🎉
 finish with :qed [NAME], inspect with :script
 ⊢> :qed add_mul_comm
 saved: theorem add_mul_comm : (∀ a b : Nat, a + b = b + a) ∧ (∀ a b : Nat, a * b = b * a)
+λ> :prove (∀ a b : Nat, a + b = b + a) ∧ (∀ a b : Nat, a + 2 * b = b + b + a)
+entering prove mode — type tactics; :help for commands
+⊢ (∀ (a b : Nat), a + b = b + a) ∧ ∀ (a b : Nat), a + 2 * b = b + b + a
+suggestion: constructor <;> omega  (closes the goal)
+⊢> constructor <;> omega
+All goals accomplished 🎉
+finish with :qed [NAME], inspect with :script
+⊢> :qed two_omegas
+saved: theorem two_omegas : (∀ a b : Nat, a + b = b + a) ∧ (∀ a b : Nat, a + 2 * b = b + b + a)
+λ> :prove ∀ p : Prop, p → ¬p → False
+entering prove mode — type tactics; :help for commands
+⊢ ∀ (p : Prop), p → ¬p → False
+suggestion: simp only [imp_false, Classical.not_not, imp_self, implies_true]  (closes the goal)
+⊢> intro p h h1
+p : Prop
+h : p
+h1 : ¬p
+⊢ False
+suggestion: contradiction  (closes the goal)
+⊢> contradiction
+All goals accomplished 🎉
+finish with :qed [NAME], inspect with :script
+⊢> :qed no_contra
+saved: theorem no_contra : ∀ p : Prop, p → ¬p → False
+λ> :prove (∃ x : Nat, 2 < x ∧ x < 4) → ∃ y : Nat, 2 < y
+entering prove mode — type tactics; :help for commands
+⊢ (∃ x, 2 < x ∧ x < 4) → ∃ y, 2 < y
+suggestion: intro h
+⊢> intro h
+h : ∃ x, 2 < x ∧ x < 4
+⊢ ∃ y, 2 < y
+suggestion: obtain ⟨x, h1⟩ := h
+⊢> obtain ⟨x, h1⟩ := h
+x : Nat
+h1 : 2 < x ∧ x < 4
+⊢ ∃ y, 2 < y
+suggestion: obtain ⟨h, h2⟩ := h1 <;> exact Exists.intro x h  (closes the goal)
+⊢> obtain ⟨h, h2⟩ := h1 <;> exact Exists.intro x h
+All goals accomplished 🎉
+finish with :qed [NAME], inspect with :script
+⊢> :qed ex_two_lt
+saved: theorem ex_two_lt : (∃ x : Nat, 2 < x ∧ x < 4) → ∃ y : Nat, 2 < y
 λ> :quit

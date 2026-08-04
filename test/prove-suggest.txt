@@ -16,4 +16,16 @@ constructor
 omega
 exact fun a b => Nat.mul_comm a b
 :qed add_mul_comm
+:prove (∀ a b : Nat, a + b = b + a) ∧ (∀ a b : Nat, a + 2 * b = b + b + a)
+constructor <;> omega
+:qed two_omegas
+:prove ∀ p : Prop, p → ¬p → False
+intro p h h1
+contradiction
+:qed no_contra
+:prove (∃ x : Nat, 2 < x ∧ x < 4) → ∃ y : Nat, 2 < y
+intro h
+obtain ⟨x, h1⟩ := h
+obtain ⟨h, h2⟩ := h1 <;> exact Exists.intro x h
+:qed ex_two_lt
 :quit

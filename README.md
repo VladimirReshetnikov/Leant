@@ -136,11 +136,18 @@ Built-ins and keywords that are not constants in the environment
 `:prove PROP` opens a tactic loop against the backend's proof-state
 protocol (bare `:prove` resumes the most recent `sorry`). Every line is
 a tactic; goals reprint after each one, followed by a Lean-verified
-suggestion for the next tactic. The probe search prefers a candidate that
+suggestion for the next tactic. The candidate probes are shaped by the
+goal and its hypotheses: an `intro` suggestion names the binders it
+would introduce, a disjunction goal is probed with `left`/`right`, and
+a hypothesis whose type a single step can take apart is probed with
+`cases h` or `obtain ⟨x, h1⟩ := h`. The search prefers a candidate that
 closes the goal outright and annotates the suggestion accordingly
-(`closes the goal`, `splits into 2 goals`), and an `intro` suggestion
-names the binders it would introduce. Suggestions are advisory: they never
-advance the proof or enter the script, and `:suggest` reprints the cached
+(`closes the goal`, `splits into 2 goals`); when no single tactic
+closes it, a second phase chains quick finishers onto the best
+progressing candidates (`constructor <;> omega`, `obtain ⟨h, h2⟩ := h1
+<;> exact Exists.intro x h`), so even the opening suggestion is often a
+complete checked proof. Suggestions are advisory: they never advance
+the proof or enter the script, and `:suggest` reprints the cached
 suggestion.
 `:undo` takes back steps without limit; `:script` shows the accumulated proof;
 `:auto` tries common finishers; `:qed [NAME]` turns the script into a real
@@ -151,7 +158,7 @@ tactic they *found* rather than the question-mark form.
 λ> :prove ∀ p q : Prop, p ∧ q → q ∧ p
 entering prove mode — type tactics; :help for commands
 ⊢ ∀ (p q : Prop), p ∧ q → q ∧ p
-suggestion: intro p q h
+suggestion: intro p q h <;> exact And.comm.mp h  (closes the goal)
 ⊢> intro p q h
 p q : Prop
 h : p ∧ q
@@ -460,16 +467,6 @@ accepts it or refuses with a reason; the engine searches; candidates are
 rendered back into Lean syntax with constructor names restored and
 binders named by role; and the backend re-elaborates each candidate
 against the original goal — only survivors are shown and bound.
-
-## The Python edition
-
-[LeantPy/](LeantPy/README.md) contains the Python edition of Leant: a
-single-file GHCi-style shell over
-[LeanInteract](https://github.com/augustepoiroux/LeanInteract) with the
-same command set and session semantics. The Haskell implementation is
-the primary one, where new development happens; we keep the Python
-edition up to date with it (minus `:synth`, which needs the in-process
-synthesis engine).
 
 ## Development
 

@@ -3,9 +3,9 @@
 
 -- | leant - a GHCi-style interactive REPL for Lean 4.
 --
--- Haskell port of Tools/LeantPy/leant.py. The Haskeline loop follows the
--- structure of the Djex REPL driver (interrupt-safe step function, logical
--- multi-line input, command completion).
+-- The Haskeline loop follows the structure of the Djex REPL driver
+-- (interrupt-safe step function, logical multi-line input, command
+-- completion).
 module Main (main) where
 
 import Control.Exception (SomeException, evaluate, finally, try)
@@ -22,7 +22,7 @@ import Data.List
   , stripPrefix
   , tails
   )
-import Data.Maybe (fromMaybe, isJust)
+import Data.Maybe (fromMaybe, isJust, listToMaybe)
 import Data.Time.Clock (diffUTCTime, getCurrentTime)
 import Data.Time.Format (defaultTimeLocale, formatTime)
 import Data.Time.LocalTime (getZonedTime)
@@ -2040,20 +2040,107 @@ autoTactics :: [String]
 autoTactics = ["rfl", "trivial", "decide", "simp", "omega", "exact?", "aesop"]
 
 -- Suggestion probes: quick certain finishers first, then structural progress
--- steps, then broader searches. Each candidate is actually run against the
--- current immutable proof state; a tactic is suggested only if Lean accepts
--- it and returns a successor state. Unlike :auto, probing does not stop at
--- the first accepted candidate: one that merely advances the goal is
--- remembered while the search keeps looking for one that closes it outright.
+-- steps shaped by the goal and its hypotheses, then broader searches. Each
+-- candidate is actually run against the current immutable proof state; a
+-- tactic is suggested only if Lean accepts it and returns a successor state.
+-- Unlike :auto, probing does not stop at the first accepted candidate: ones
+-- that merely advance the goal are remembered while the search keeps looking
+-- for one that closes it outright, and if no single tactic does, a second
+-- phase chains the finishers onto the remembered candidates
+-- (`t <;> finisher`) hunting for a complete proof.
 -- `apply?` is deliberately absent: its partial `refine ?_` suggestions are
 -- rarely actionable, and probing it over the proof-state protocol can panic
 -- the REPL backend (a UTF-8 slicing bug in repl v1.3.18), destroying every
 -- live proof state.
-suggestionTactics :: [String]
-suggestionTactics =
-  [ "rfl", "assumption", "trivial", "decide", "omega", "exact?"
-  , "intro", "constructor", "simp?", "aesop?"
+-- `assumption` and `contradiction` sit before `trivial`, which subsumes
+-- both, so the more informative name is the one that gets shown.
+suggestionFinishers :: [String]
+suggestionFinishers =
+  ["rfl", "assumption", "contradiction", "trivial", "decide", "omega"]
+
+-- | Build the ordered candidate list for one pretty-printed goal. Shape
+-- analysis only picks which candidates are worth probing -- `left`/`right`
+-- instead of `constructor` on a disjunction goal, `cases`/`obtain` on a
+-- hypothesis whose type a single step can take apart, `simp_all?` only when
+-- there are hypotheses to use -- so a mis-parse costs a wasted probe, never
+-- a wrong suggestion.
+goalCandidates :: String -> [String]
+goalCandidates g = concat
+  [ suggestionFinishers
+  , ["exact?"]
+  , introCands
+  , destructCands  -- take hypotheses apart before building the goal
+  , splitCands
+  , ["simp?"]
+  , ["simp_all?" | not (null hyps)]
+  , ["aesop?"]
   ]
+ where
+  hyps = goalHypGroups g
+  used = concatMap fst hyps
+  -- `intro` names the binders it would introduce when the goal's shape
+  -- allows it, keeping the bare form as a fallback should Lean reject them
+  introCands = case introNames g of
+    Just names -> ["intro " ++ unwords names, "intro"]
+    Nothing -> ["intro"]
+  splitCands
+    | (typeConnective . fst =<< goalTarget g) == Just '\8744' =
+        ["left", "right"]
+    | otherwise = ["constructor"]
+  destructCands = take 2
+    [ cand
+    | (name : _, ty) <- hyps
+    , Just cand <- [destructFor name ty]
+    ]
+  destructFor name ty = case typeConnective ty of
+    Just '\8744' -> Just ("cases " ++ name)                        -- h : a ∨ b
+    Just '\8707' -> Just (obtainWith (freshX : take 1 freshHs) name)
+    Just c | c `elem` "\8743\8596" ->                              -- ∧ and ↔
+      Just (obtainWith (take 2 freshHs) name)
+    Nothing | trim ty == "Bool" -> Just ("cases " ++ name)
+    _ -> Nothing
+  obtainWith fields name =
+    "obtain \10216" ++ intercalate ", " fields ++ "\10217 := " ++ name
+  freshHs = [n | n <- "h" : ["h" ++ show i | i <- [1 :: Int ..]]
+               , n `notElem` used]
+  freshX = fromMaybe "x" $ listToMaybe
+    [n | n <- ["x", "y", "z"] ++ ["x" ++ show i | i <- [1 :: Int ..]]
+       , n `notElem` used]
+
+-- | Hypothesis groups of a pretty-printed goal as (names, type) pairs, with
+-- wrapped continuation lines rejoined. Groups with inaccessible (\10013) or
+-- otherwise unusable names are dropped.
+goalHypGroups :: String -> [([String], String)]
+goalHypGroups g =
+  [ (names, trim (intercalate ":" tyParts))
+  | grp <- joinWrapped hypLines
+  , not ("case " `isPrefixOf` grp)
+  , namesPart : tyParts@(_ : _) <- [splitDepth0 ':' grp]
+  , names@(_ : _) <- [words namesPart]
+  , all usable names
+  ]
+ where
+  (hypLines, _) = break ("\8866" `isPrefixOf`) (lines g)
+  joinWrapped [] = []
+  joinWrapped (l : ls) =
+    let (conts, rest) = span indented ls
+    in unwords (concatMap words (l : conts)) : joinWrapped rest
+  indented (c : _) = isSpace c
+  indented [] = True
+  usable n = not (any (`elem` "()[]{},:\10013\8866\10216\10217") n)
+
+-- | The top-level connective of a pretty-printed type, approximated by
+-- Lean's precedence order: a leading binder, else the loosest depth-0
+-- connective (\8594, then \8596, \8744, \8743). Only an approximation --
+-- callers verify every derived candidate against the live proof state.
+typeConnective :: String -> Maybe Char
+typeConnective t0 = case dropWhile isSpace t0 of
+  "" -> Nothing
+  t@(c : _)
+    | c `elem` "\8704\8707" -> Just c
+    | otherwise -> listToMaybe [op | op <- "\8594\8596\8744\8743", depth0 op t]
+ where
+  depth0 op s = length (splitDepth0 op s) > 1
 
 suggestionHeartbeatLimit :: Int
 suggestionHeartbeatLimit = 20000
@@ -2206,9 +2293,11 @@ emitSuggestion st suggestion = case lines suggestion of
 -- | Find and display a useful next tactic without changing the user's proof
 -- stack. The backend proof-state protocol is persistent, so speculative
 -- children do not affect the state to which the next user tactic is applied.
--- A candidate that merely makes progress is remembered while the search
--- keeps looking for one that closes the goal; the annotation on the shown
--- suggestion says which kind it is.
+-- Candidates that merely make progress are remembered (up to three) while
+-- the search keeps looking for one that closes the goal; if none does, a
+-- second phase chains the quick finishers onto each remembered candidate
+-- (`t <;> finisher`) so the suggestion can still be a complete verified
+-- proof. The annotation on the shown suggestion says which kind it is.
 suggestTactic :: St -> IO ()
 suggestTactic st = do
   state <- readIORef st
@@ -2216,58 +2305,103 @@ suggestTactic st = do
     Just pv | (ps, goals@(g : _), _) : _ <- pvStack pv ->
       case lookup ps (pvSuggestions pv) of
         Just cached -> forM_ cached (emitSuggestion st)
-        Nothing ->
-          probe ps (length goals) (concatMap (expand g) suggestionTactics)
-            Nothing
+        Nothing -> probe ps (length goals) (goalCandidates g) []
     _ -> pure ()
  where
-  -- `intro` names the binders it would introduce when the goal's shape
-  -- allows it, keeping the bare form as a fallback should Lean reject them
-  expand g "intro" = case introNames g of
-    Just names -> ["intro " ++ unwords names, "intro"]
-    Nothing -> ["intro"]
-  expand _ t = [t]
-
-  probe ps _ [] best = do
-    cache ps best
-    forM_ best (emitSuggestion st)
-  probe ps nGoals ("intro" : rest) best@(Just b)
-    | "intro " `isPrefixOf` b = probe ps nGoals rest best  -- named form held
-  probe ps nGoals (tactic : rest) best = do
-    -- Keep proactive help responsive even when a project has a very large
-    -- premise database. A heartbeat exhaustion is an ordinary tactic error,
-    -- unlike the REPL's wall-clock timeout, so it does not kill the backend or
-    -- invalidate the user's proof state.
+  -- Run one heartbeat-bounded candidate against the immutable proof state.
+  -- The bound keeps proactive help responsive even when a project has a very
+  -- large premise database. A heartbeat exhaustion is an ordinary tactic
+  -- error, unlike the REPL's wall-clock timeout, so it does not kill the
+  -- backend or invalidate the user's proof state. Returns Nothing when the
+  -- backend died (the emergency exit has already run), Just Nothing when
+  -- Lean rejected the candidate.
+  probeOnce :: Integer -> String -> IO (Maybe (Maybe JValue))
+  probeOnce ps tactic = do
     let bounded = "set_option maxHeartbeats "
           ++ show suggestionHeartbeatLimit ++ " in " ++ tactic
     result <- runTactic st ps bounded
     case result of
-      Left err -> proveEmergencyExit st
+      Left err -> Nothing <$ proveEmergencyExit st
         ("the backend failed while suggesting a tactic: " ++ err)
       Right v
         | Nothing <- respFatal v
         , null [() | (severity, _) <- respMessages v, severity == "error"]
-        , Just _ <- respProofState v -> do
-            let text = fromMaybe tactic (parseTryThis (respMessages v))
-                remaining = length (respGoals v)
-                -- library-search tactics can "close" the probe state with
-                -- metavariables and say so in a Remaining-subgoals comment;
-                -- never present those as closing the goal
-                partial = any (("-- Remaining subgoals:" `isPrefixOf`) . trim)
-                  (lines text)
-            if remaining < nGoals && not partial
-              then do
-                let suggestion = annotateSuggestion "closes the goal" text
-                cache ps (Just suggestion)
-                emitSuggestion st suggestion
-              else probe ps nGoals rest $ case best of
-                Just _ -> best
-                Nothing
-                  | remaining > nGoals -> Just (annotateSuggestion
-                      ("splits into " ++ show (remaining - nGoals + 1)
-                       ++ " goals") text)
-                  | otherwise -> Just text
-        | otherwise -> probe ps nGoals rest best
+        , Just _ <- respProofState v -> pure (Just (Just v))
+        | otherwise -> pure (Just Nothing)
+
+  probe ps nGoals [] helds = chainPhase ps nGoals helds
+  probe ps nGoals ("intro" : rest) helds
+    | any (("intro " `isPrefixOf`) . fst) helds =
+        probe ps nGoals rest helds  -- the named intro variant already held
+  probe ps nGoals (tactic : rest) helds = do
+    outcome <- probeOnce ps tactic
+    case outcome of
+      Nothing -> pure ()
+      Just Nothing -> probe ps nGoals rest helds
+      Just (Just v) -> do
+        let text = fromMaybe tactic (parseTryThis (respMessages v))
+            remaining = length (respGoals v)
+            -- library-search tactics can "close" the probe state with
+            -- metavariables and say so in a Remaining-subgoals comment;
+            -- never present those as closing the goal
+            partial = any (("-- Remaining subgoals:" `isPrefixOf`) . trim)
+              (lines text)
+        if remaining < nGoals && not partial
+          then conclude ps (Just (annotateSuggestion "closes the goal" text))
+          else probe ps nGoals rest $ if length helds >= 3 then helds
+            else helds ++ [(text, if remaining > nGoals
+                   then Just ("splits into "
+                     ++ show (remaining - nGoals + 1) ++ " goals")
+                   else Nothing)]
+
+  -- No single candidate closed the goal: try to discharge each remembered
+  -- candidate's residual subgoals in one more step. `<;>` (rather than `;`)
+  -- makes the finisher run on every subgoal the candidate produces, so
+  -- acceptance means the chain is a complete proof of the current goal.
+  -- `exact?` is only chained onto the first candidate to bound the cost of
+  -- the expensive library searches; a candidate whose text spans lines is
+  -- never chained, since composing it would not yield a tactic the user
+  -- could type back. If no chain closes either, the first remembered
+  -- candidate is shown with its own annotation.
+  chainPhase ps _ [] = conclude ps Nothing
+  chainPhase ps nGoals helds@(first : _) =
+    goHeld (zip (True : repeat False) helds)
+   where
+    fallback = conclude ps (Just (annotateHeld first))
+    goHeld [] = fallback
+    goHeld ((isFirst, (text, _)) : more)
+      | '\n' `elem` text = goHeld more
+      | otherwise =
+          goChain text (suggestionFinishers ++ ["exact?" | isFirst]) more
+    goChain _ [] more = goHeld more
+    goChain text (fin : rest) more = do
+      outcome <- probeOnce ps (text ++ " <;> " ++ fin)
+      case outcome of
+        Nothing -> pure ()
+        Just (Just v)
+          | length (respGoals v) < nGoals
+          , Just chained <- renderChain text fin v ->
+              conclude ps (Just (annotateSuggestion "closes the goal" chained))
+        Just _ -> goChain text rest more
+    -- The chained text must be something the user can type back verbatim.
+    -- A literal finisher composes trivially; `exact?` has to splice in the
+    -- term it found, which is only sound when the chain ran it against
+    -- exactly one subgoal (one Try-this message) and the found tactic fits
+    -- on one line (a Remaining-subgoals comment never does).
+    renderChain text "exact?" v = case
+      [ d | (sev, d) <- respMessages v, sev == "info"
+          , "Try this:" `isPrefixOf` dropWhile isSpace d ] of
+      [only] | Just found <- parseTryThis [("info", only)]
+             , '\n' `notElem` found ->
+        Just (text ++ " <;> " ++ found)
+      _ -> Nothing
+    renderChain text fin _ = Just (text ++ " <;> " ++ fin)
+
+  annotateHeld (text, note) = maybe text (`annotateSuggestion` text) note
+
+  conclude ps suggestion = do
+    cache ps suggestion
+    forM_ suggestion (emitSuggestion st)
 
   cache ps suggestion = modifyIORef' st $ \s -> s
     { rsProve = case rsProve s of
@@ -2793,8 +2927,7 @@ run opts = do
   case replExe of
     Nothing -> do
       putStrLn "error: could not find the Lean REPL backend executable."
-      putStrLn "Build it once via the Python sibling (Tools/LeantPy), or pass"
-      putStrLn "--repl-exe / set LEANT_BACKEND to a repl.exe built from"
+      putStrLn "Pass --repl-exe / set LEANT_BACKEND to a repl.exe built from"
       putStrLn "https://github.com/leanprover-community/repl for your toolchain."
       exitWith (ExitFailure 1)
     Just exe -> do

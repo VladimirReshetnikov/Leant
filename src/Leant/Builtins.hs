@@ -1,6 +1,5 @@
 -- | Help for built-ins and keywords that are not constants in the environment
--- (content adapted from the Lean 4 manual and Theorem Proving in Lean 4;
--- port of the BUILTIN_HELP table in leant.py).
+-- (content adapted from the Lean 4 manual and Theorem Proving in Lean 4).
 module Leant.Builtins
   ( builtinInfo
   ) where

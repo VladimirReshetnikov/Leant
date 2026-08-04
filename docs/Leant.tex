@@ -220,14 +220,9 @@ the title page and may not match the tool you build tomorrow. When
 this document and \code{:help} disagree, believe \code{:help}.
 \end{notice}
 
-Two implementations live side by side in the repository: the Haskell
-implementation at the repository root — the primary one, where
-development happens, speaking the backend protocol directly — and
-\code{LeantPy/}, a lighter Python edition built on LeanInteract that
-is kept up to date with it. They share the command set and the same session semantics;
-term synthesis (\S\ref{sec:synth}) is Haskell-only, because it embeds
-the Djex synthesis library in-process. Everything below describes the
-Haskell implementation.
+Leant is implemented in Haskell and speaks the backend protocol
+directly; term synthesis (\S\ref{sec:synth}) embeds the Djex synthesis
+library in-process.
 
 Under the hood, Leant drives the community
 \code{leanprover-community/repl} binary over a JSON protocol: every
@@ -334,10 +329,18 @@ backend's proof-state protocol. Every line is a tactic; \code{:undo}
 pops one step; \code{:qed NAME} assembles the accumulated script into
 a theorem and replays it into the session, so the result is usable
 afterwards.  Each displayed proof state is followed by an automatically
-discovered tactic suggestion that Lean has already checked.  The probe
-search prefers a candidate that closes the goal outright and annotates the
-suggestion accordingly (\code{closes the goal}, \code{splits into 2
-goals}); an \code{intro} suggestion names the binders it would introduce.
+discovered tactic suggestion that Lean has already checked.  The
+candidate probes are shaped by the goal and its hypotheses: an
+\code{intro} suggestion names the binders it would introduce, a
+disjunction goal is probed with \code{left}/\code{right}, and a
+hypothesis whose type a single step can take apart is probed with
+\code{cases} or \code{obtain}.  The search prefers a candidate that
+closes the goal outright and annotates the suggestion accordingly
+(\code{closes the goal}, \code{splits into 2 goals}); when no single
+tactic closes it, a second phase chains quick finishers onto the best
+progressing candidates (\code{constructor <;> omega}, or an
+\code{obtain} step chained with the \code{exact} it enables), so even
+the opening suggestion is often a complete checked proof.
 The suggestion is advisory---it does not advance the state or enter the
 script---and \code{:suggest} reprints it without rerunning the search.
 Below, the very first suggestion is already a complete proof; the session
@@ -803,10 +806,7 @@ believed until Lean has type-checked it.
 %==============================================================================
 \section{Status}\label{sec:status}
 
-Leant is a working prototype under active development. The Haskell
-implementation at the repository root is primary; the Python edition
-(\code{LeantPy/}) is kept up to date with it as a lighter alternative
-without synthesis.
+Leant is a working prototype under active development.
 The synthesis design and its phased history are documented in
 \code{docs/SYNTHESIS\_PROPOSAL.md}; transcript-level golden tests live in
 \code{test/}. The project began inside the \emph{ProveIt} repository

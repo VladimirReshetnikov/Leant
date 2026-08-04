@@ -1,5 +1,4 @@
--- | Input classification and multi-line continuation heuristics
--- (port of the corresponding section of leant.py).
+-- | Input classification and multi-line continuation heuristics.
 module Leant.Classify
   ( isDeclaration
   , firstToken
