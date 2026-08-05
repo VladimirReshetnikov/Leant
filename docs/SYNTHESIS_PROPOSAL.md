@@ -2,15 +2,18 @@
 
 *Status: phases 0–2 implemented (`:synth` in this repository, engine =
 in-process Djex Djinn/LJT; see [README.md](../README.md#synth--automatic-term-synthesis)).
-Phase 4 remains future work; §7’s seven increments are all implemented:
+Phase 4 remains future work; §7’s eight increments are all implemented:
 item F delivers the phase-3 engine without its Mathlib-scale
-inventory, and item G its inventory idea in curated miniature (library
-premises — `:synth ((a → b) → List a → List b)` answers `List.map`).
-Companion to [PROPOSALS.md](PROPOSALS.md).*
+inventory, item G its inventory idea in curated miniature (library
+premises — `:synth ((a → b) → List a → List b)` answers `List.map`),
+and item H the ratings file and the argument-first enumeration that
+keep that inventory growable. Companion to
+[PROPOSALS.md](PROPOSALS.md).*
 
 Djex — vendored read-only in this repository as the
-[`lib/Djex`](../lib/Djex) submodule (pinned at `6a9fc22`, the state
-this analysis reviewed) — merges two Haskell expression synthesizers — Djinn
+[`lib/Djex`](../lib/Djex) submodule (pinned at `621510b`; the analysis
+below reviewed `6a9fc22`, and the pin has since advanced for item H's
+oldest-first enumeration) — merges two Haskell expression synthesizers — Djinn
 (Dyckhoff's LJT calculus: complete, terminating intuitionistic proof
 search that emits programs) and Exference (ranked heuristic search with
 resource budgets and type-class evidence) — behind one
@@ -568,6 +571,64 @@ as bounded elimination, `List.flatten`); growing it toward the
 browse-env inventory with a ratings file remains phase 3 proper, and
 the offer/filter/verify pipeline built here is the interface that
 growth will reuse.
+
+### H. Ratings inventory and argument-first enumeration — M (implemented)
+
+Item G's curated table grown toward the phase-3 design, in two halves.
+
+**The inventory.** The hardcoded `(inductive, function, arity)` table
+became a rated name list: `defaultRatings` ships ~17 core `List`/`Nat`
+functions in Djex's `*.ratings` format (lower is better; ≥ 100
+disables), a project `leant.ratings` (lines of `Name Rating`, `#`
+comments) merges over it at startup, and the merged names compile into
+the synthesis prelude. Arity (leading sort-typed binders) and
+subject relevance (used constants ∩ the goal's recursive inductives)
+are derived from each constant's type at premise time, so growing the
+inventory is editing a list, not writing code. Ratings order the
+offers: they decide which instantiations survive the cap and — because
+the engine now consults antecedents oldest-first — which the search
+reaches for first. `List.head?` was tried and rated out: an
+Option-valued codomain expands into case analysis and floods the batch
+with match junk.
+
+**The enumeration.** Measured on modeled List goals, the previous
+enumeration never produced an argument-using proof within the first
+300 candidates once introduction premises were present — nil-composite
+junk saturated any window, so no ranking downstream could save the
+`List.flatten x` sitting beyond it. Two measured non-fixes are worth
+recording: the `Interleave` fair strategy still drowned (the junk tree
+is bushy on both sides of every choice point), and deferring
+implication application (index-first `reduceAtomicImp`) just moved the
+cascade to atom arrival. The actual levers were arrival order, in both
+repositories:
+
+- *Djex* (`Consult LJT antecedent evidence oldest-first`): atom
+  proofs, atom-implication buckets, and nested implications were all
+  stored newest-first, so every choice point reached for the most
+  recently *derived* evidence — freshly composed junk before the
+  goal's own arguments and named premises. All three now store
+  oldest-first; search space and completeness are untouched, only
+  enumeration order moves. (One Djex test pinned a choice budget tuned
+  to the old order and was recalibrated.)
+- *Leant* (engine boundary): premises now enter the engine goal at the
+  innermost point of the binder spine — after the goal's own arrows,
+  not just under its quantifier prefix — so the goal's arguments are
+  the oldest atoms in scope when the premises arrive. The renderer
+  strips the premise binders from their new position behind the
+  goal-arrow lambdas.
+
+Together: `fun f x => List.map f x`, `fun x => List.flatten x`,
+`fun x => List.length x`, `fun x y => List.replicate x y` are now the
+*first* candidates of their queries, with the constructor-junk
+candidates ranked behind or out of the window entirely. Known residual:
+a premise's use of a *second* distinct argument of the same type
+(`List.append x y` on `List a → List a → List a`) still sits behind
+the first argument's exhaustive subtree and misses the candidate
+window; the displayed candidates remain honest (`fun x _ => x` is the
+smallest inhabitant, and `List.append x x` shows the function), but
+surfacing the mixed-argument application likely needs a
+distinct-arguments preference at the engine's atom choice points —
+future work.
 
 ### Explicitly not proposed
 

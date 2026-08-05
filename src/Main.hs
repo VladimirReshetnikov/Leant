@@ -191,6 +191,11 @@ data ReplState = ReplState
   , rsSynthLibrary :: Bool
     -- ^ :set synth-library on|off - seed the search with curated
     -- library functions over the goal's recursive inductives
+  , rsRatings :: [(String, Double)]
+    -- ^ the library inventory with ratings (lower is better), best
+    -- first: the defaults merged with the project's `leant.ratings`
+    -- at startup.  Compiled into the synthesis prelude, so a
+    -- mid-session edit of the file takes effect next session
   , rsTimeout :: Maybe Int
   , rsColor :: Bool
   , rsInteractive :: Bool
@@ -1268,7 +1273,9 @@ ensureSynthBase st = do
           | otherwise -> case respEnv v of
               Nothing -> pure (Left "synthesis environment has no id")
               Just importEnv -> do
-                prelude <- runCmd st (Just importEnv) synthPrelude
+                names <- map fst . rsRatings <$> readIORef st
+                prelude <- runCmd st (Just importEnv)
+                  (synthPrelude names)
                 case prelude of
                   Left err -> pure (Left err)
                   Right pv
@@ -1605,7 +1612,8 @@ synthGo' st args retriedVars goal parsed = case fragRefusal (pgFrag parsed) of
     limit <- synthTimeoutSeconds
     state <- readIORef st
     let libPrems
-          | rsSynthLibrary state = selectLibraryPremises parsed
+          | rsSynthLibrary state =
+              selectLibraryPremises (rsRatings state) parsed
           | otherwise = []
     debug <- lookupEnv "LEANT_SYNTH_DEBUG"
     when (isJust debug) $ forM_ libPrems $ \(name, prem) ->
@@ -1690,19 +1698,80 @@ synthGo' st args retriedVars goal parsed = case fragRefusal (pgFrag parsed) of
       emitLn st =<< cYellow st "no term found within the search bounds"
       forM_ notes $ \note -> emitLn st =<< cDim st ("note: " ++ note)
 
+-- | The default library inventory with ratings, Djex @*.ratings@ style:
+-- lower is better, and a rating of 100 or more disables an entry.  A
+-- project file @leant.ratings@ (lines of @Name Rating@, @#@ comments)
+-- merges over these at startup - override an entry to re-rank or
+-- disable it, add new names to grow the inventory toward the
+-- browse-env scale of SYNTHESIS_PROPOSAL.md phase 3.
+defaultRatings :: [(String, Double)]
+defaultRatings =
+  [ ("List.map", 1.0)
+  , ("List.append", 1.5)
+  , ("List.flatten", 1.5)
+  , ("List.foldr", 2.0)
+  , ("List.reverse", 2.0)
+  , ("List.length", 2.0)
+  , ("Nat.add", 2.0)
+  , ("List.replicate", 2.2)
+  , ("List.foldl", 2.5)
+  , ("List.flatMap", 2.5)
+  , ("List.join", 3.0)
+  , ("List.zip", 3.0)
+  , ("Nat.mul", 3.0)
+  , ("List.take", 3.2)
+  , ("List.drop", 3.2)
+  , ("List.zipWith", 3.4)
+  , ("List.filterMap", 3.5)
+  -- List.head? earned its exclusion: its Option-valued codomain
+  -- expands into case analysis and floods the batch with match junk
+  ]
+
+-- | The merged inventory, best rating first: defaults overlaid with the
+-- working directory's @leant.ratings@, entries rated out (>= 100) and
+-- names that could not splice into a Lean name literal dropped.
+loadRatings :: IO [(String, Double)]
+loadRatings = do
+  exists <- doesFileExist "leant.ratings"
+  user <- if not exists then pure [] else do
+    contents <- readFile "leant.ratings"
+    pure
+      [ (name, rating)
+      | line <- lines contents
+      , let payload = takeWhile (/= '#') line
+      , [name, ratingText] <- [words payload]
+      , (rating, "") <- reads ratingText
+      ]
+  let merged = foldl override defaultRatings user
+      override table (name, rating) =
+        (name, rating) : [entry | entry@(n, _) <- table, n /= name]
+  pure $ sortOn snd
+    [ entry
+    | entry@(name, rating) <- merged
+    , rating < 100
+    , not (null name)
+    , all nameChar name
+    ]
+ where
+  nameChar c = isAlphaNum c || c `elem` "_.'!?"
+
 -- | The serializer's library premises, filtered to the ones this goal
 -- can honestly use: in-fragment (no depth marker), and mentioning no
 -- recursive inductive the goal does not itself mention (an unknown
 -- occurrence would drag a fresh opaque atom and its constructor
 -- premises into the search).  Two functions with the same type at the
 -- offered instantiation (List.flatten and List.join, say) would only
--- double the engine's work, so the type dedups.  Every premise
+-- double the engine's work, so the type dedups, keeping the
+-- better-rated name (offers arrive in rating order).  Every premise
 -- multiplies the junk-proof space, so the survivors are capped, keeping
 -- first a premise whose type is exactly the goal (the type-directed
--- library lookup answer) and then preferring small types, which apply
--- directly rather than through invented arguments.
-selectLibraryPremises :: ParsedGoal -> [(String, Frag)]
-selectLibraryPremises parsed = take 8 (sortOn rank offered)
+-- library lookup answer) and then preferring the better rating, with
+-- small types - which apply directly rather than through invented
+-- arguments - breaking ties.  The order matters beyond the cap: the
+-- engine tries antecedents oldest-first, so the front of this list is
+-- the front of the search.
+selectLibraryPremises :: [(String, Double)] -> ParsedGoal -> [(String, Frag)]
+selectLibraryPremises ratings parsed = take 8 (sortOn rank offered)
  where
   goalKeys = fragRecKeys (pgFrag parsed)
   offered = nubBy (\x y -> snd x == snd y)
@@ -1711,7 +1780,12 @@ selectLibraryPremises parsed = take 8 (sortOn rank offered)
     , not (fragHasDepth frag)
     , all (`elem` goalKeys) (fragRecKeys frag)
     ]
-  rank (_, frag) = (frag /= pgFrag parsed, fragSize frag)
+  rank (name, frag) =
+    ( frag /= pgFrag parsed
+    , fromMaybe 99 (lookup name ratings)
+    , fragSize frag
+    )
+  fragSize :: Frag -> Int
   fragSize f = 1 + case f of
     FArr a b -> fragSize a + fragSize b
     FProd a b -> fragSize a + fragSize b
@@ -3152,6 +3226,7 @@ run opts = do
             , bcReplExe = exe
             , bcWorkingDir = workingDir
             }
+      ratings <- loadRatings
       st <- newIORef ReplState
         { rsBackend = Nothing
         , rsConfig = config
@@ -3179,6 +3254,7 @@ run opts = do
         , rsSynthSteps = 4096
         , rsSynthClassical = True
         , rsSynthLibrary = True
+        , rsRatings = ratings
         , rsTimeout = if optTimeout opts <= 0 then Nothing
             else Just (optTimeout opts)
         , rsColor = useColor

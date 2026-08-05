@@ -387,27 +387,38 @@ introduction rules, but elimination is where undecidability lives.
 
 `:synth` will never invent a `Nat.rec`-based program, but it does not
 have to: for the everyday recursive types, the library already wrote
-the recursion. A goal that mentions `List` or `Nat` brings a curated
-handful of library functions with it (`List.map`, `List.foldr`,
-`List.append`, `List.flatten`, `Nat.add`), instantiated at the goal's
-own types and handed to the engine as extra premises — the phase-3
-promise of *recursion via library reuse*, in miniature:
+the recursion. A goal that mentions `List` or `Nat` brings a rated
+inventory of library functions with it (`List.map`, `List.foldr`,
+`List.append`, `List.flatten`, `List.length`, `List.replicate`,
+`Nat.add`, …), instantiated at the goal's own types and handed to the
+engine as extra premises — the phase-3 promise of *recursion via
+library reuse*, in miniature. The enumeration prefers proofs that use
+the goal's own arguments, so the library answer is the *first*
+candidate:
 
 ```text
 λ> :synth ((a → b) → List a → List b)
-  it1  List.map
-  it2  fun _ _ => List.nil
-  ⋯
-λ> :synth ((a → b → b) → b → List a → b)
-  it1  List.foldr
-  it2  fun _ x _ => x
-  it3  fun f x y => List.foldr f x y
+  it1  fun f x => List.map f x
+  it2  fun f x => List.reverse (List.map f x)
   ⋯
 λ> :synth (List (List a) → List a)
-  it1  List.flatten
-  it2  fun x => List.flatten x
+  it1  fun x => List.flatten x
+  it2  fun x => List.reverse (List.flatten x)
+  ⋯
+λ> :synth (List a → Nat)
+  it1  fun x => List.length x
+  it2  fun x => Nat.add (List.length x) (List.length x)
+  ⋯
+λ> :synth (Nat → a → List a)
+  it1  fun x y => List.replicate x y
   ⋯
 ```
+
+The inventory is a ratings list in Djex's `*.ratings` format — lower
+is better, 100 or more disables — and a project file `leant.ratings`
+(lines of `Name Rating`, `#` comments) merges over the defaults at
+startup, so re-ranking, disabling, or growing the inventory is
+editing a list, not writing code.
 
 The library search runs beside the plain constructor search, and its
 candidates come first — they are found in a mode where the recursive
@@ -472,10 +483,11 @@ finisher tactics, needing no premise database and no imports. Bare
 ### Engines, budgets, and the fine print
 
 - Library premises are on by default (`:set synth-library on|off`);
-  the curated table lives in the goal serializer and only ever *offers*
-  premises — the driver filters them against the goal's own types and
-  the backend verifies every candidate, so a useless entry costs search
-  time, never soundness.
+  the rated inventory (defaults merged with `leant.ratings`) only ever
+  *offers* premises — the driver filters them against the goal's own
+  types and the backend verifies every candidate, so a useless entry
+  costs search time, never soundness. The ratings file is read at
+  startup; edits take effect next session.
 - A second engine is available: `:set synth-engine exference` switches
   to Djex's ranked heuristic search (explicit budgets, no negative
   verdicts; `:set synth-steps N` bounds it, default 4096), and `both`

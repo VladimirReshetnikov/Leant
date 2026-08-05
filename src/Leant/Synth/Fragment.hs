@@ -39,7 +39,7 @@ module Leant.Synth.Fragment
   ) where
 
 import Data.Char (isSpace)
-import Data.List (nub)
+import Data.List (intercalate, nub)
 
 -- | The LJT core fragment.  @Iff@ and @Not@ are already lowered by the
 -- serializer (to a pair of arrows and an arrow to 'FBot').
@@ -94,9 +94,13 @@ data ParsedGoal = ParsedGoal
 -- | Compiled once into the synthesis environment (session imports plus
 -- @Lean@): the goal serializer as ordinary definitions.  @run_tac@ runs
 -- interpreted and cannot host @let rec@, so the recursion lives in a
--- compiled @partial def@ that the per-goal command merely calls.
-synthPrelude :: String
-synthPrelude = unlines
+-- compiled @partial def@ that the per-goal command merely calls.  The
+-- argument is the library inventory (SYNTHESIS_PROPOSAL.md item G/H):
+-- constant names in rating order, best first, spliced in as the
+-- premise-offer list.  Names are validated by the caller; anything
+-- missing from the environment is skipped at premise time.
+synthPrelude :: [String] -> String
+synthPrelude inventory = unlines
   [ "namespace LeantSynth"
   , "open Lean Meta"
   , ""
@@ -267,20 +271,24 @@ synthPrelude = unlines
   , "end"
   , ""
   , "-- Phase-3 vanguard: library premises.  A goal that mentions a"
-  , "-- recursive inductive brings a curated handful of library"
-  , "-- functions with it, instantiated at the goal's own element types"
-  , "-- (\"recursion via library reuse\", SYNTHESIS_PROPOSAL.md \167 4)."
-  , "-- Offers only - the driver filters them and the backend verifies"
-  , "-- every candidate, so a useless premise costs search time, never"
-  , "-- soundness."
+  , "-- recursive inductive brings rated library functions with it,"
+  , "-- instantiated at the goal's own element types (\"recursion via"
+  , "-- library reuse\", SYNTHESIS_PROPOSAL.md \167 4).  Offers only - the"
+  , "-- driver filters them and the backend verifies every candidate, so"
+  , "-- a useless premise costs search time, never soundness."
   , ""
-  , "def libTable : List (Name \215 Name \215 Nat) :="
-  , "  [ (`List, `List.map, 2)"
-  , "  , (`List, `List.foldr, 2)"
-  , "  , (`List, `List.append, 1)"
-  , "  , (`List, `List.flatten, 1)"
-  , "  , (`List, `List.join, 1)"
-  , "  , (`Nat, `Nat.add, 0) ]"
+  , "def libInventory : List Name :="
+  , case inventory of
+      [] -> "  []"
+      _ -> "  [ " ++ intercalate "\n  , "
+        [ "`" ++ name | name <- inventory ] ++ " ]"
+  , ""
+  , "-- How many leading type parameters an inventory entry takes: its"
+  , "-- leading sort-typed binders, the ones the offers instantiate."
+  , "def invArity : Expr \8594 Nat"
+  , "  | Expr.forallE _ t b _ =>"
+  , "    if t.isSort then 1 + invArity b else 0"
+  , "  | _ => 0"
   , ""
   , "-- All assignments of `arity` type parameters drawn from `tys`."
   , "def assignments : Nat \8594 List Expr \8594 List (List Expr)"
@@ -365,21 +373,26 @@ synthPrelude = unlines
   , "        tkeys := tkeys ++ [k]"
   , "        tys := tys ++ [a]"
   , "  let env \8592 getEnv"
+  , "  let heads := uniq.map (fun o => o.getAppFn.constName!)"
   , "  let mut out := \"\""
-  , "  for entry in libTable do"
-  , "    let (ind, fn, arity) := entry"
-  , "    if uniq.any (fun o => o.getAppFn.isConstOf ind)"
-  , "        && env.contains fn then"
-  , "      let info \8592 getConstInfo fn"
-  , "      for asg in assignments arity tys do"
-  , "        try"
-  , "          let us \8592 Meta.mkFreshLevelMVars info.numLevelParams"
-  , "          let ty0 := info.instantiateTypeLevelParams us"
-  , "          if let some ty := instHead arity ty0 asg then"
-  , "            let s \8592 go 100 0 [] ty"
-  , "            out := out ++ \" (prem \" ++ esc fn.toString"
-  , "              ++ \" \" ++ s ++ \")\""
-  , "        catch _ => pure ()"
+  , "  for fn in libInventory do"
+  , "    if let some info := env.find? fn then"
+  , "      let arity := invArity info.type"
+  , "      -- an entry fires when its type mentions one of the goal's"
+  , "      -- recursive inductives; the driver's filter then insists the"
+  , "      -- instantiated type mentions no inductive the goal lacks"
+  , "      if arity \8804 3"
+  , "          && info.type.getUsedConstants.any"
+  , "               (fun n => heads.contains n) then"
+  , "        for asg in assignments arity tys do"
+  , "          try"
+  , "            let us \8592 Meta.mkFreshLevelMVars info.numLevelParams"
+  , "            let ty0 := info.instantiateTypeLevelParams us"
+  , "            if let some ty := instHead arity ty0 asg then"
+  , "              let s \8592 go 100 0 [] ty"
+  , "              out := out ++ \" (prem \" ++ esc fn.toString"
+  , "                ++ \" \" ++ s ++ \")\""
+  , "          catch _ => pure ()"
   , "  pure out"
   , ""
   , "-- Walk the goal's leading spine exactly as `go` does (same binder"

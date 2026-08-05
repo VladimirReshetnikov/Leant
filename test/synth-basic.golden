@@ -19,9 +19,9 @@ provably uninhabited — no closed term of this polymorphic type exists
 λ> :synth (Nat → Nat)
   it1  fun x => x
   it2  fun x => Nat.add x x
-  it3  Nat.succ
-  it4  fun _ => Nat.zero
-  it5  fun _ => Nat.succ Nat.zero
+  it3  fun _ => Nat.zero
+  it4  fun _ => Nat.succ Nat.zero
+  it5  fun x => Nat.succ x
 λ> :synth (∀ p q : Prop, (p ↔ q) → ¬p → ¬q)
   it1  fun _ _ ⟨_, f⟩ k x => k (f x)
 λ> :synth (((A → B) → A) → (A → A))

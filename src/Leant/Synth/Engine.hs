@@ -89,7 +89,8 @@ import Language.Haskell.Djex
   , tupleName
   )
 
-import Leant.Synth.Fragment (Frag (..), fragUnsafeAtoms)
+import Leant.Synth.Fragment
+  (Frag (..), Slot (..), fragSpine, fragUnsafeAtoms)
 import Leant.Synth.Render (CtorInfo (..), CtorMap, renderLeanTerm)
 
 -- | What the engine established for one goal.  Candidate terms are a lazy
@@ -179,24 +180,43 @@ synthesizeTuned
   :: SynthEngine -> Int -> (Int, Maybe Integer) -> [(String, Frag)]
   -> Frag -> Frag -> Either String SynthOutcome
 synthesizeTuned engine steps limits extras engineFrag fitFrag = do
-  (goal0, decls, ctorMap, premises) <- fragToDjinn extras engineFrag
-  -- premises (caller-supplied assumptions, and constructor premises of
-  -- recursive inductives) enter as goal antecedents under the goal's
-  -- leading quantifier prefix - a premise type mentions the goal's
-  -- variables, so outside the prefix (or in a top-level declaration,
-  -- which would generalize them) its occurrences would be unrelated to
-  -- the bound ones and the premise could never connect.  Candidates
-  -- still bind the premise lambdas first (the prefix contributes no
-  -- lambdas of its own); the renderer strips the matching binders and
-  -- substitutes the names
-  let antecedents body =
-        foldr (\(_, _, t) acc -> FunctionType t acc) body premises
-      insertPremises ty = case ty of
-        ForallType vs ctx body -> ForallType vs ctx (insertPremises body)
-        body -> antecedents body
-      goal = insertPremises goal0
-      premisePairs = [(name, prem) | (name, prem, _) <- premises]
-      render expr = renderLeanTerm ctorMap premisePairs fitFrag expr
+  (goal0, decls, ctorMap, extrasPrems, ctorPrems) <-
+    fragToDjinn extras engineFrag
+  -- Premises enter as goal antecedents under the quantifier prefix (a
+  -- premise type mentions the goal's variables; outside the prefix -
+  -- or in a top-level declaration, which would generalize them - its
+  -- occurrences would be unrelated to the bound ones and the premise
+  -- could never connect), and the two premise kinds sit on opposite
+  -- sides of the goal's own arrows.  Caller-supplied premises (library
+  -- functions, the classical fallback's excluded-middle instances) go
+  -- innermost: Djinn applies implication antecedents to the atoms
+  -- already in scope, in arrival order, so with the goal's arguments
+  -- introduced first the enumeration reaches the proofs that use them
+  -- before the closed junk built from introductions alone (measured on
+  -- the List goals: argument-using proofs move from beyond the 300th
+  -- candidate to the first handful).  Constructor premises of
+  -- recursive inductives stay outside the arrows: an argument
+  -- implication like @f : List a \8594 b@ that is already indexed when the
+  -- first constructor-built atom arrives is consumed by the invertible
+  -- contraction on that atom alone, losing the richer alternatives
+  -- (@f (List.cons x List.nil)@) that arise when the implication
+  -- instead arrives to a scope with several atom proofs to choose
+  -- from.  The renderer strips both premise blocks around the goal's
+  -- arrow binders and substitutes the names
+  let antecedents prems body =
+        foldr (\(_, _, t) acc -> FunctionType t acc) body prems
+      insertInner ty = case ty of
+        FunctionType d body -> FunctionType d (insertInner body)
+        body -> antecedents extrasPrems body
+      insertOuter ty = case ty of
+        ForallType vs ctx body -> ForallType vs ctx (insertOuter body)
+        body -> antecedents ctorPrems (insertInner body)
+      goal = insertOuter goal0
+      pairsOf prems = [(name, prem) | (name, prem, _) <- prems]
+      spineArrows = length [() | SlotArrow _ <- fragSpine engineFrag]
+      render expr = renderLeanTerm ctorMap
+        (pairsOf ctorPrems, spineArrows, pairsOf extrasPrems)
+        fitFrag expr
   case engine of
     EngineDjinn -> djinnRun limits fitFrag render goal decls
     EngineExference -> exferenceRun steps render goal decls
@@ -440,7 +460,9 @@ fragToDjinn
   :: [(String, Frag)]
   -> Frag
   -> Either String
-      (Type String, [DjinnDecl], CtorMap, [(String, Frag, Type String)])
+      ( Type String, [DjinnDecl], CtorMap
+      , [(String, Frag, Type String)]   -- caller-supplied premises
+      , [(String, Frag, Type String)] ) -- constructor premises
 fragToDjinn extras frag0 = do
   eitherC <- viaShow (mkIdentifier "Either")
   voidC <- viaShow (mkIdentifier "Void")
@@ -550,4 +572,4 @@ fragToDjinn extras frag0 = do
     , tsPrems = []
     }
   Right (goal, tsDecls finalState, tsCtorMap finalState
-        , extrasT ++ tsPrems finalState)
+        , extrasT, tsPrems finalState)

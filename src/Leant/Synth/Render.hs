@@ -68,21 +68,25 @@ data CtorInfo = CtorInfo
 type CtorMap = Map.Map String CtorInfo
 
 -- | Render one candidate expression against the goal fragment.  The
--- candidate proves the premise-extended goal (constructor premises of
--- recursive inductives are antecedents; see 'Leant.Synth.Engine'), so
--- the matching leading binders are stripped first and their uses
--- replaced by the actual Lean constructor names.  Returns a nonempty
--- group of textual variants, best guess first; the caller verifies
--- them in order and keeps the first that elaborates.
+-- candidate proves the premise-extended goal (see
+-- 'Leant.Synth.Engine': constructor premises are antecedents before
+-- the engine goal's arrow binders, caller-supplied premises after
+-- them), so both premise binder blocks around the kept goal-arrow
+-- lambdas are stripped and their uses replaced by the actual Lean
+-- names.  Returns a nonempty group of textual variants, best guess
+-- first; the caller verifies them in order and keeps the first that
+-- elaborates.
 renderLeanTerm
-  :: CtorMap -> [(String, Frag)] -> Frag -> Expression String
-  -> Either String [String]
-renderLeanTerm cm premises goalFrag expr0 = do
-  stripped <- stripPremises (map fst premises) (normalizeExpr 0 expr0)
+  :: CtorMap -> ([(String, Frag)], Int, [(String, Frag)]) -> Frag
+  -> Expression String -> Either String [String]
+renderLeanTerm cm (outerPrems, skip, innerPrems) goalFrag expr0 = do
+  stripped <- stripPremises (map fst outerPrems) skip
+    (map fst innerPrems) (normalizeExpr 0 expr0)
   base <- uniquify stripped
   -- premises participate in domain fitting under their marked names,
   -- so case splits on them reveal their branch binders' domains
-  let seed = [(premiseMark ++ name, frag) | (name, frag) <- premises]
+  let premises = outerPrems ++ innerPrems
+      seed = [(premiseMark ++ name, frag) | (name, frag) <- premises]
   texts <- concat <$> mapM variantsFor
     (nub [fit cm force goalFrag base 0 seed | force <- [False, True]])
   case nub texts of
@@ -120,10 +124,12 @@ siteSubsets k = [] : full : sortOn (\s -> (length s, s)) middle
 
 -- Premise stripping ----------------------------------------------------------
 --
--- The engine's candidate binds one leading lambda per constructor
--- premise.  Those binders are removed and every use of one is replaced
--- by a reserved-marker local carrying the Lean constructor name; the
--- marker survives uniquification untouched and prints as the bare name.
+-- The engine's candidate binds one lambda per premise: the constructor
+-- premises before the lambdas of the engine goal's own arrow spine,
+-- the caller-supplied premises after them.  Both premise blocks are
+-- removed and every use of one is replaced by a reserved-marker local
+-- carrying the Lean name; the marker survives uniquification untouched
+-- and prints as the bare name.
 
 premiseMark :: String
 premiseMark = "\3"
@@ -132,17 +138,22 @@ marked :: String -> Bool
 marked = (premiseMark ==) . take 1
 
 stripPremises
-  :: [String] -> Expression String -> Either String (Expression String)
-stripPremises [] expr = Right expr
-stripPremises names expr = do
+  :: [String] -> Int -> [String] -> Expression String
+  -> Either String (Expression String)
+stripPremises [] _ [] expr = Right expr
+stripPremises outerNames skip innerNames expr = do
   let (pats, core) = spine expr
-  if length pats < length names
+  if length pats < length outerNames + skip + length innerNames
     then Left "candidate does not bind the constructor premises"
     else do
-      let (premPats, rest) = splitAt (length names) pats
-      subst <- foldM bindPat Map.empty (zip premPats names)
+      let (outerPats, afterOuter) = splitAt (length outerNames) pats
+          (goalPats, afterGoal) = splitAt skip afterOuter
+          (innerPats, rest) = splitAt (length innerNames) afterGoal
+      subst <- foldM bindPat Map.empty
+        (zip outerPats outerNames ++ zip innerPats innerNames)
+      let kept = goalPats ++ rest
       Right (substLocals subst
-        (if null rest then core else Lambda rest core))
+        (if null kept then core else Lambda kept core))
  where
   spine (Lambda ps b) = let (more, c) = spine b in (ps ++ more, c)
   spine e = ([], e)
