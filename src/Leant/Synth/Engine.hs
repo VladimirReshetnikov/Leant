@@ -18,6 +18,12 @@
 -- the goal references the declared constructor applied to those
 -- variables.  The engine-side constructor names are fresh; the mapping
 -- back to the Lean spellings rides along to the renderer.
+--
+-- Caller-supplied premises (library functions over the goal's recursive
+-- inductives, excluded-middle instances of the classical fallback)
+-- enter through 'synthesizeWith'\/'synthesizeTuned' and become goal
+-- antecedents under the leading quantifier prefix, so premise types may
+-- mention the goal's bound variables.
 module Leant.Synth.Engine
   ( SynthEngine (..)
   , SynthOutcome (..)
@@ -175,10 +181,20 @@ synthesizeTuned
 synthesizeTuned engine steps limits extras engineFrag fitFrag = do
   (goal0, decls, ctorMap, premises) <- fragToDjinn extras engineFrag
   -- premises (caller-supplied assumptions, and constructor premises of
-  -- recursive inductives) enter as goal antecedents (same scope as the
-  -- goal's variables - a top-level declaration would generalize them);
-  -- the renderer strips the matching binders and substitutes the names
-  let goal = foldr (\(_, _, t) acc -> FunctionType t acc) goal0 premises
+  -- recursive inductives) enter as goal antecedents under the goal's
+  -- leading quantifier prefix - a premise type mentions the goal's
+  -- variables, so outside the prefix (or in a top-level declaration,
+  -- which would generalize them) its occurrences would be unrelated to
+  -- the bound ones and the premise could never connect.  Candidates
+  -- still bind the premise lambdas first (the prefix contributes no
+  -- lambdas of its own); the renderer strips the matching binders and
+  -- substitutes the names
+  let antecedents body =
+        foldr (\(_, _, t) acc -> FunctionType t acc) body premises
+      insertPremises ty = case ty of
+        ForallType vs ctx body -> ForallType vs ctx (insertPremises body)
+        body -> antecedents body
+      goal = insertPremises goal0
       premisePairs = [(name, prem) | (name, prem, _) <- premises]
       render expr = renderLeanTerm ctorMap premisePairs fitFrag expr
   case engine of

@@ -1,0 +1,45 @@
+
+   __                  __
+  / /  ___ ___ ____   / /_
+ / /__/ -_) _ `/ _ \_/ __/
+/____/\__/\_,_/_//_/ \__/
+Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to exit.
+λ> :synth ((a → b) → List a → List b)
+preparing synthesis environment (session imports + Lean)...
+  it1  List.map
+  it2  fun _ _ => List.nil
+note: search truncated: choice-point limit reached
+λ> :synth ((a → b → b) → b → List a → b)
+  it1  List.foldr
+  it2  fun _ x _ => x
+  it3  fun f x y => List.foldr f x y
+  it4  fun _ x y => List.foldr (fun _ z => z) x y
+  it5  fun f x y => List.foldr f x (List.append y y)
+note: search truncated: candidate limit reached (60)
+λ> :synth (List (List a) → List a)
+  it1  List.flatten
+  it2  fun x => List.flatten x
+  it3  fun x => List.map (fun y => y) (List.flatten x)
+  it4  fun x => List.append (List.flatten x) (List.flatten x)
+  it5  fun x => List.map (fun y => y) (List.append (List.flatten x) (List.flatten x))
+note: search truncated: candidate limit reached (60)
+λ> :synth (List a → List a → List a)
+  it1  List.append
+  it2  fun _ x => x
+  it3  fun x _ => x
+  it4  fun x => List.append x
+  it5  fun x _ => List.append x x
+note: search truncated: candidate limit reached (60)
+λ> :synth (∀ a : Type, a → List a)
+  it1  fun _ _ => List.nil
+  it2  fun _ x => List.cons x List.nil
+note: search truncated: choice-point limit reached
+λ> :synth ((List a → b) → a → b)
+  it1  fun f _ => f List.nil
+  it2  fun f x => f (List.cons x List.nil)
+note: search truncated: choice-point limit reached
+λ> :set synth-library off
+synth library: off
+λ> :synth ((a → b) → List a → List b)
+  it1  fun _ _ => List.nil
+λ> :quit

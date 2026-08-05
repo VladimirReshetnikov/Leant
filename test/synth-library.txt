@@ -1,0 +1,9 @@
+:synth ((a → b) → List a → List b)
+:synth ((a → b → b) → b → List a → b)
+:synth (List (List a) → List a)
+:synth (List a → List a → List a)
+:synth (∀ a : Type, a → List a)
+:synth ((List a → b) → a → b)
+:set synth-library off
+:synth ((a → b) → List a → List b)
+:quit

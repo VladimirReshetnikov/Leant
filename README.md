@@ -183,7 +183,9 @@ read through propositions-as-types, *"prove this"* — and sometimes the
 stronger question *"show me that no such term exists."* It covers the
 structural fragment `→ / × / ∧ / ⊕ / ∨ / ↔ / ¬ / ⊥ / ⊤ / ∀` over opaque
 variables, plus non-recursive inductive types, with bounded support for
-rank-N and impredicative quantification. Design and phasing:
+rank-N and impredicative quantification — and for `List` and `Nat`
+goals it composes real library functions (`List.map`, `List.foldr`, …)
+into the candidates. Design and phasing:
 [docs/SYNTHESIS_PROPOSAL.md](docs/SYNTHESIS_PROPOSAL.md).
 
 The engine is the vendored [Djex](lib/Djex) library, linked in-process.
@@ -381,6 +383,45 @@ Recursive (`Nat`, `List`), indexed (`Eq`), and dependent-field
 (`Exists`) types stay atoms — their constructors still work as
 introduction rules, but elimination is where undecidability lives.
 
+### Recursion from the library
+
+`:synth` will never invent a `Nat.rec`-based program, but it does not
+have to: for the everyday recursive types, the library already wrote
+the recursion. A goal that mentions `List` or `Nat` brings a curated
+handful of library functions with it (`List.map`, `List.foldr`,
+`List.append`, `List.flatten`, `Nat.add`), instantiated at the goal's
+own types and handed to the engine as extra premises — the phase-3
+promise of *recursion via library reuse*, in miniature:
+
+```text
+λ> :synth ((a → b) → List a → List b)
+  it1  List.map
+  it2  fun _ _ => List.nil
+  ⋯
+λ> :synth ((a → b → b) → b → List a → b)
+  it1  List.foldr
+  it2  fun _ x _ => x
+  it3  fun f x y => List.foldr f x y
+  ⋯
+λ> :synth (List (List a) → List a)
+  it1  List.flatten
+  it2  fun x => List.flatten x
+  ⋯
+```
+
+The library search runs beside the plain constructor search, and its
+candidates come first — they are found in a mode where the recursive
+occurrences are sealed atoms, so every candidate must route through
+the goal's own arguments and the offered functions rather than
+through constructor junk (`List.nil` inhabits every `List` goal; a
+search that may use it drowns in closed terms that ignore the
+input). Both searches' candidates are verified and shown together,
+and `:set synth-library off` restores the constructors-only
+behavior. Negative verdicts are unaffected: goals that mention a
+recursive inductive already report "no term found within bounds"
+rather than a refutation, and the library run never contributes a
+negative verdict at all.
+
 ### Dependent formulas as cargo
 
 Dependent subformulas (`∀ n : Nat, P n`) are carried as opaque atoms,
@@ -430,6 +471,11 @@ finisher tactics, needing no premise database and no imports. Bare
 
 ### Engines, budgets, and the fine print
 
+- Library premises are on by default (`:set synth-library on|off`);
+  the curated table lives in the goal serializer and only ever *offers*
+  premises — the driver filters them against the goal's own types and
+  the backend verifies every candidate, so a useless entry costs search
+  time, never soundness.
 - A second engine is available: `:set synth-engine exference` switches
   to Djex's ranked heuristic search (explicit budgets, no negative
   verdicts; `:set synth-steps N` bounds it, default 4096), and `both`

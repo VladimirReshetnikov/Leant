@@ -2,9 +2,11 @@
 
 *Status: phases 0–2 implemented (`:synth` in this repository, engine =
 in-process Djex Djinn/LJT; see [README.md](../README.md#synth--automatic-term-synthesis)).
-Phase 4 remains future work; §7’s six increments are all implemented,
-and item F delivers the phase-3 engine without its Mathlib-scale
-inventory. Companion to [PROPOSALS.md](PROPOSALS.md).*
+Phase 4 remains future work; §7’s seven increments are all implemented:
+item F delivers the phase-3 engine without its Mathlib-scale
+inventory, and item G its inventory idea in curated miniature (library
+premises — `:synth ((a → b) → List a → List b)` answers `List.map`).
+Companion to [PROPOSALS.md](PROPOSALS.md).*
 
 Djex — vendored read-only in this repository as the
 [`lib/Djex`](../lib/Djex) submodule (pinned at `6a9fc22`, the state
@@ -518,6 +520,54 @@ Value: ranked heuristic candidates on goals where LJT's complete
 search is the wrong tool, `both` mode as the UX dry run for phase 3,
 and the inventory/ratings design can then grow incrementally toward
 browse-env scale — the condition §6 set for starting phase 3 proper.
+
+### G. Library premises for recursive inductives — M, phase-3 in miniature (implemented)
+
+Item D gave recursive inductives their introduction rules; this gives
+them their library. The serializer keeps a small curated table
+(`List.map`, `List.foldr`, `List.append`, `List.flatten`/`List.join`,
+`Nat.add`); when the goal mentions the matching inductive, each entry
+is instantiated at the goal's own types — the sort-typed locals plus
+the occurrences' element types — and offered as a premise
+(`(prem "List.map" TYPE)` entries after the goal S-expression). The
+instantiation is *syntactic* (fresh level metavariables, direct
+substitution, no unification): an auto-implicit goal variable lives at
+a rigid `Sort u` that a typechecked instantiation could never meet,
+yet the candidate that uses the premise re-elaborates against the
+pretty-printed goal, where auto-implicits are flexible again —
+verification is the arbiter, as always. The driver filters the offers
+(in-fragment; no recursive inductive the goal does not itself mention;
+type-level dedup so `flatten`/`join` cost one premise; capped at 8,
+exact goal match first).
+
+Two searches run and merge. The base search is untouched — same
+constructor premises, no budget, so verdicts and their soundness are
+exactly as before. The library search strips the recursive occurrences
+to plain atoms and adds the library premises under a choice-point
+budget: with nil/cons in play the engine floods any candidate window
+with closed junk terms (`List.nil` inhabits every `List` goal) before
+enumerating a proof that uses the goal's arguments, whereas over
+sealed atoms every candidate must route through a hypothesis or an
+offered function. Library candidates display first; negative verdicts
+come only from the base run. `:set synth-library on|off` toggles the
+whole mechanism.
+
+Landing this exposed a latent premise-scoping bug worth recording:
+premises used to be prepended *outside* the goal's leading quantifier
+prefix, so on an explicit-`∀` goal a premise mentioning a quantified
+variable never connected to the bound occurrences — which is why
+`:synth (∀ a : Type, a → List a)` produced only `List.nil` while the
+auto-implicit spelling also found `List.cons x List.nil`. Premise
+antecedents now sit under the prefix (capture by the goal's binders is
+precisely the intent), fixing item D's promise for explicit binders
+too.
+
+The curated table is deliberately the smallest thing that delivers
+the phase-3 flagship examples (`List.map` from its type, `List.foldr`
+as bounded elimination, `List.flatten`); growing it toward the
+browse-env inventory with a ratings file remains phase 3 proper, and
+the offer/filter/verify pipeline built here is the interface that
+growth will reuse.
 
 ### Explicitly not proposed
 

@@ -28,7 +28,10 @@ module Leant.Synth.Fragment
   , serializerProgram
   , parseGoalSexp
   , fragRefusal
+  , fragHasDepth
+  , fragRecKeys
   , fragUnsafeAtoms
+  , stripRecCtors
   , fragSpine
   , glivenkoSplit
   , leadingTypeArgs
@@ -80,6 +83,11 @@ data GoalSort = GoalProp | GoalType
 data ParsedGoal = ParsedGoal
   { pgSort :: GoalSort
   , pgFrag :: Frag
+  , pgPrems :: [(String, Frag)]
+    -- ^ library premises the serializer offered (phase-3 vanguard):
+    -- curated functions over the goal's recursive inductives,
+    -- instantiated at the goal's own element types.  Unfiltered here -
+    -- the driver decides which are usable
   }
   deriving (Eq, Show)
 
@@ -258,6 +266,149 @@ synthPrelude = unlines
   , ""
   , "end"
   , ""
+  , "-- Phase-3 vanguard: library premises.  A goal that mentions a"
+  , "-- recursive inductive brings a curated handful of library"
+  , "-- functions with it, instantiated at the goal's own element types"
+  , "-- (\"recursion via library reuse\", SYNTHESIS_PROPOSAL.md \167 4)."
+  , "-- Offers only - the driver filters them and the backend verifies"
+  , "-- every candidate, so a useless premise costs search time, never"
+  , "-- soundness."
+  , ""
+  , "def libTable : List (Name \215 Name \215 Nat) :="
+  , "  [ (`List, `List.map, 2)"
+  , "  , (`List, `List.foldr, 2)"
+  , "  , (`List, `List.append, 1)"
+  , "  , (`List, `List.flatten, 1)"
+  , "  , (`List, `List.join, 1)"
+  , "  , (`Nat, `Nat.add, 0) ]"
+  , ""
+  , "-- All assignments of `arity` type parameters drawn from `tys`."
+  , "def assignments : Nat \8594 List Expr \8594 List (List Expr)"
+  , "  | 0, _ => [[]]"
+  , "  | Nat.succ k, tys =>"
+  , "    (assignments k tys).foldr"
+  , "      (fun rest acc =>"
+  , "        tys.foldr (fun t acc2 => (t :: rest) :: acc2) acc)"
+  , "      []"
+  , ""
+  , "-- Recursive-inductive occurrences reachable without crossing a"
+  , "-- binder (an occurrence under a nested quantifier could mention its"
+  , "-- bound variable, which no top-level premise may reference)."
+  , "partial def collectSafe (fuel : Nat) (e : Expr)"
+  , "    : MetaM (Array Expr) := do"
+  , "  match fuel with"
+  , "  | 0 => pure #[]"
+  , "  | Nat.succ fuel => do"
+  , "    let e \8592 whnfR e.consumeMData"
+  , "    match e with"
+  , "    | Expr.forallE _ t b _ =>"
+  , "      if b.hasLooseBVars then pure #[]"
+  , "      else pure ((\8592 collectSafe fuel t) ++ (\8592 collectSafe fuel b))"
+  , "    | _ =>"
+  , "      match e.getAppFn with"
+  , "      | Expr.const n _ => do"
+  , "        let mut acc := #[]"
+  , "        if let some (ConstantInfo.inductInfo iv) :="
+  , "            (\8592 getEnv).find? n then"
+  , "          if iv.numIndices == 0 && (iv.isRec || iv.isNested)"
+  , "              && !iv.isUnsafe && iv.all.length == 1"
+  , "              && e.getAppNumArgs == iv.numParams then"
+  , "            acc := acc.push e"
+  , "        for a in e.getAppArgs do"
+  , "          acc := acc ++ (\8592 collectSafe fuel a)"
+  , "        pure acc"
+  , "      | _ => pure #[]"
+  , ""
+  , "-- Substitute the leading type parameters of a constant's type."
+  , "def instHead : Nat \8594 Expr \8594 List Expr \8594 Option Expr"
+  , "  | 0, t, _ => some t"
+  , "  | Nat.succ k, Expr.forallE _ _ b _, a :: as =>"
+  , "    instHead k (b.instantiate1 a) as"
+  , "  | _, _, _ => none"
+  , ""
+  , "-- Instantiate the table's functions at the goal's own types and"
+  , "-- serialize each instantiated type through `go`, so premise atoms"
+  , "-- share the goal's display keys.  The instantiation is syntactic"
+  , "-- (fresh level metavariables, direct substitution, no unification):"
+  , "-- an auto-implicit goal variable lives at a rigid `Sort u` that a"
+  , "-- typechecked instantiation could never meet, yet the candidate"
+  , "-- that uses the premise re-elaborates against the pretty-printed"
+  , "-- goal, where auto-implicits are flexible again.  Verification is"
+  , "-- the arbiter; an unusable offer just fails there."
+  , "def mkPremises (occs : Array Expr) : MetaM String := do"
+  , "  let mut okeys : List String := []"
+  , "  let mut uniq : List Expr := []"
+  , "  for o in occs do"
+  , "    let k := toString (\8592 Meta.ppExpr o)"
+  , "    if !okeys.contains k then"
+  , "      okeys := okeys ++ [k]"
+  , "      uniq := uniq ++ [o]"
+  , "  -- instantiation candidates: the goal's own type variables (the"
+  , "  -- sort-typed locals - auto-implicits arrive as free fvars, spine"
+  , "  -- binders as the s-locals premSpine introduced), then the"
+  , "  -- occurrences' element types"
+  , "  let mut tkeys : List String := []"
+  , "  let mut tys : List Expr := []"
+  , "  for fvarId in (\8592 getLCtx).getFVarIds do"
+  , "    let d \8592 fvarId.getDecl"
+  , "    if !d.isImplementationDetail then"
+  , "      let t \8592 whnfR d.type"
+  , "      if t.isSort then"
+  , "        let k := toString (\8592 Meta.ppExpr (Expr.fvar fvarId))"
+  , "        if !tkeys.contains k && tkeys.length < 5 then"
+  , "          tkeys := tkeys ++ [k]"
+  , "          tys := tys ++ [Expr.fvar fvarId]"
+  , "  for o in uniq do"
+  , "    for a in o.getAppArgs do"
+  , "      let k := toString (\8592 Meta.ppExpr a)"
+  , "      if !tkeys.contains k && tkeys.length < 5 then"
+  , "        tkeys := tkeys ++ [k]"
+  , "        tys := tys ++ [a]"
+  , "  let env \8592 getEnv"
+  , "  let mut out := \"\""
+  , "  for entry in libTable do"
+  , "    let (ind, fn, arity) := entry"
+  , "    if uniq.any (fun o => o.getAppFn.isConstOf ind)"
+  , "        && env.contains fn then"
+  , "      let info \8592 getConstInfo fn"
+  , "      for asg in assignments arity tys do"
+  , "        try"
+  , "          let us \8592 Meta.mkFreshLevelMVars info.numLevelParams"
+  , "          let ty0 := info.instantiateTypeLevelParams us"
+  , "          if let some ty := instHead arity ty0 asg then"
+  , "            let s \8592 go 100 0 [] ty"
+  , "            out := out ++ \" (prem \" ++ esc fn.toString"
+  , "              ++ \" \" ++ s ++ \")\""
+  , "        catch _ => pure ()"
+  , "  pure out"
+  , ""
+  , "-- Walk the goal's leading spine exactly as `go` does (same binder"
+  , "-- names, same depth counter, so premise types and the goal agree on"
+  , "-- variable spellings and occurrence keys), collecting binder-free"
+  , "-- occurrences from the domains, then emit the premise offers."
+  , "partial def premSpine (fuel depth : Nat) (acc : Array Expr)"
+  , "    (e : Expr) : MetaM String := do"
+  , "  match fuel with"
+  , "  | 0 => mkPremises acc"
+  , "  | Nat.succ fuel => do"
+  , "    let e \8592 instantiateMVars e"
+  , "    let e \8592 whnfR e.consumeMData"
+  , "    match e with"
+  , "    | Expr.forallE _ t b _ =>"
+  , "      if b.hasLooseBVars then do"
+  , "        let ts \8592 whnfR t"
+  , "        if ts.isSort then"
+  , "          withLocalDeclD (Name.mkSimple (\"s\" ++ toString depth)) t"
+  , "              fun fv =>"
+  , "            premSpine fuel (depth + 1) acc (b.instantiate1 fv)"
+  , "        else mkPremises acc"
+  , "      else do"
+  , "        let acc := acc ++ (\8592 collectSafe fuel t)"
+  , "        premSpine fuel depth acc b"
+  , "    | _ => do"
+  , "      let acc := acc ++ (\8592 collectSafe fuel e)"
+  , "      mkPremises acc"
+  , ""
   , "end LeantSynth"
   ]
 
@@ -276,8 +427,9 @@ serializerProgram goal = unlines
   , "    let tgt \8592 getMainTarget"
   , "    let isP \8592 Meta.isProp tgt"
   , "    let s \8592 LeantSynth.go 100 0 [] tgt"
+  , "    let prems \8592 LeantSynth.premSpine 100 0 #[] tgt"
   , "    logInfo (\"(goal \" ++ (if isP then \"prop\" else \"type\")"
-  , "      ++ \" \" ++ s ++ \")\")"
+  , "      ++ \" \" ++ s ++ prems ++ \")\")"
   , "  sorry"
   ]
 
@@ -319,8 +471,9 @@ parseGoalSexp text = do
         "type" -> Right GoalType
         other -> Left ("unknown goal sort " ++ other)
       (frag, rest') <- parseFrag rest
-      case rest' of
-        [TR] -> Right (ParsedGoal gs frag)
+      (prems, rest'') <- parsePrems rest'
+      case rest'' of
+        [TR] -> Right (ParsedGoal gs frag prems)
         _ -> Left "trailing tokens in goal translation"
     _ -> Left "malformed goal translation"
 
@@ -382,13 +535,26 @@ parseFrag (TL : TSym tag : rest) = case tag of
   close _ _ = Left "expected ) in goal translation"
 parseFrag _ = Left "expected ( in goal translation"
 
+-- | Parse the serializer's trailing @(prem "name" FRAG)@ entries (library
+-- premises); absent entries parse as the empty list, so the format stays
+-- backward compatible.
+parsePrems :: [Tok] -> Either String ([(String, Frag)], [Tok])
+parsePrems (TL : TSym "prem" : TStr name : toks) = do
+  (frag, toks') <- parseFrag toks
+  case toks' of
+    TR : toks'' -> do
+      (rest, toks''') <- parsePrems toks''
+      Right ((name, frag) : rest, toks''')
+    _ -> Left "expected ) in premise"
+parsePrems toks = Right ([], toks)
+
 -- Fragment analysis ---------------------------------------------------------
 
 -- | An honest refusal, when the goal offers the engine nothing structural
 -- to work with, with the reason.
 fragRefusal :: Frag -> Maybe String
 fragRefusal frag
-  | hasDepth frag = Just
+  | fragHasDepth frag = Just
       "the goal exceeds the translator's depth bound"
   | FAtom _ key <- peel frag = Just
       ("the goal is a single opaque atom `" ++ key
@@ -399,15 +565,34 @@ fragRefusal frag
  where
   peel (FAll _ _ b) = peel b
   peel f = f
-  hasDepth f = case f of
-    FArr a b -> hasDepth a || hasDepth b
-    FProd a b -> hasDepth a || hasDepth b
-    FSum a b -> hasDepth a || hasDepth b
-    FAll _ _ b -> hasDepth b
-    FInd _ ctors -> any (any hasDepth . snd) ctors
-    FRec _ ctors -> any (any hasDepth . snd) ctors
-    FDepth -> True
-    _ -> False
+
+-- | Whether the translator's depth bound fired anywhere in the fragment.
+fragHasDepth :: Frag -> Bool
+fragHasDepth f = case f of
+  FArr a b -> fragHasDepth a || fragHasDepth b
+  FProd a b -> fragHasDepth a || fragHasDepth b
+  FSum a b -> fragHasDepth a || fragHasDepth b
+  FAll _ _ b -> fragHasDepth b
+  FInd _ ctors -> any (any fragHasDepth . snd) ctors
+  FRec _ ctors -> any (any fragHasDepth . snd) ctors
+  FDepth -> True
+  _ -> False
+
+-- | Display keys of the recursive-inductive occurrences.  Used to keep
+-- library premises honest: a premise whose type mentions a recursive
+-- inductive the goal itself never mentions would drag a fresh opaque
+-- atom (and its constructor premises) into every search.
+fragRecKeys :: Frag -> [String]
+fragRecKeys = nub . go
+ where
+  go f = case f of
+    FArr a b -> go a ++ go b
+    FProd a b -> go a ++ go b
+    FSum a b -> go a ++ go b
+    FAll _ _ b -> go b
+    FInd _ ctors -> concatMap (concatMap go . snd) ctors
+    FRec key ctors -> key : concatMap (concatMap go . snd) ctors
+    _ -> []
 
 -- | The goal's leading binder spine (arrows and quantifiers, stopping
 -- at the first other connective).  Djinn models quantifiers as implicit
@@ -466,6 +651,25 @@ propAtoms = nub . go
     FVar _ -> [f]
     FAtom _ _ -> [f]
     _ -> []
+
+-- | Forget the constructor lists of recursive-inductive occurrences,
+-- leaving plain opaque atoms.  The library-premise search runs on this
+-- form: nil\/cons introduction rules let the engine inhabit every List
+-- goal through closed junk terms in endlessly many ways, flooding the
+-- candidate window before any proof that uses the goal's own arguments
+-- is enumerated.  Without them, a candidate can only reach a
+-- recursive-inductive atom through a hypothesis or a library premise -
+-- exactly the candidates the library run is for.
+stripRecCtors :: Frag -> Frag
+stripRecCtors f = case f of
+  FArr a b -> FArr (stripRecCtors a) (stripRecCtors b)
+  FProd a b -> FProd (stripRecCtors a) (stripRecCtors b)
+  FSum a b -> FSum (stripRecCtors a) (stripRecCtors b)
+  FAll e n b -> FAll e n (stripRecCtors b)
+  FInd key ctors ->
+    FInd key [(name, map stripRecCtors fields) | (name, fields) <- ctors]
+  FRec key _ -> FAtom False key
+  _ -> f
 
 -- | Display keys of atoms that poison a negative verdict (they mention
 -- concrete constants whose structure the engine cannot see).

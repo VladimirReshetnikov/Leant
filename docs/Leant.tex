@@ -308,6 +308,9 @@ header and just keep going), and an empty line submits it.
 \cmdrow{:set synth-steps N}{Exference's step budget (default 4096)}
 \cmdrow{:set synth-classical B}{offer classical candidates for
   constructively refuted goals (\code{on}$\mid$\code{off}, default on)}
+\cmdrow{:set synth-library B}{library premises for recursive
+  inductives (\code{on}$\mid$\code{off}, default on;
+  \S\ref{sec:synth-library})}
 \end{cmdtable}
 
 \subsection{Persistence and utility}
@@ -616,7 +619,46 @@ analysis is not:
   it2  Nat.succ Nat.zero
 λ> :synth (∀ a : Type, a → List a)
   it1  fun _ _ => List.nil
+  it2  fun _ x => List.cons x List.nil
 \end{session}
+
+\subsection{Recursion from the library}\label{sec:synth-library}
+
+\code{:synth} will never invent a \code{Nat.rec}-based program, but
+for the everyday recursive types it does not have to: the library
+already wrote the recursion. A goal that mentions \code{List} or
+\code{Nat} brings a curated handful of library functions with it ---
+\code{List.map}, \code{List.foldr}, \code{List.append},
+\code{List.flatten}, \code{Nat.add} --- instantiated at the goal's
+own types and offered to the engine as extra premises. Asking for a
+function \emph{by its type} then works for types whose one sensible
+inhabitant is recursive:
+
+\begin{session}
+λ> :synth ((a → b) → List a → List b)
+  it1  List.map
+  it2  fun _ _ => List.nil
+λ> :synth ((a → b → b) → b → List a → b)
+  it1  List.foldr
+  it2  fun _ x _ => x
+  it3  fun f x y => List.foldr f x y
+λ> :synth (List (List a) → List a)
+  it1  List.flatten
+  it2  fun x => List.flatten x
+\end{session}
+
+(Trailing candidates and the truncation notes are elided here.) The
+library search runs beside the constructor search of the previous
+section, in a mode where the recursive occurrences are sealed atoms:
+without \code{nil}/\code{cons} in play, every candidate must route
+through the goal's own arguments and the offered functions, which is
+what keeps \code{List.map} ahead of the endless supply of closed
+terms that ignore the input. Both searches' survivors are shown
+together, library candidates first; \code{:set synth-library off}
+restores the constructors-only behavior. As always, the premises are
+only \emph{offers}: every candidate is re-elaborated by the backend,
+so a useless premise costs search time, never a wrong answer, and
+negative verdicts never come from the library run at all.
 
 \subsection{Classical candidates}\label{sec:classical}
 

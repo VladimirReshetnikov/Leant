@@ -20,6 +20,8 @@ import Data.List
   , isPrefixOf
   , isSuffixOf
   , nub
+  , nubBy
+  , sortOn
   , stripPrefix
   , tails
   )
@@ -50,6 +52,7 @@ import Leant.Json
 import Leant.Synth.Engine
   ( SynthEngine (..)
   , SynthOutcome (..)
+  , candidateWindow
   , forceOutcome
   , parseSynthEngine
   , synthEngineName
@@ -60,12 +63,15 @@ import Leant.Synth.Fragment
   ( Frag (..)
   , ParsedGoal (..)
   , GoalSort (..)
+  , fragHasDepth
+  , fragRecKeys
   , fragRefusal
   , fragUnsafeAtoms
   , glivenkoSplit
   , parseGoalSexp
   , propAtoms
   , serializerProgram
+  , stripRecCtors
   , synthPrelude
   )
 
@@ -182,6 +188,9 @@ data ReplState = ReplState
   , rsSynthClassical :: Bool
     -- ^ :set synth-classical on|off - offer classical candidates for
     -- constructively refuted goals
+  , rsSynthLibrary :: Bool
+    -- ^ :set synth-library on|off - seed the search with curated
+    -- library functions over the goal's recursive inductives
   , rsTimeout :: Maybe Int
   , rsColor :: Bool
   , rsInteractive :: Bool
@@ -732,6 +741,8 @@ helpText = unlines
   , "  :set synth-steps N       Exference step budget (default 4096)"
   , "  :set synth-classical B   classical candidates for refuted goals"
   , "                           (on|off, default on)"
+  , "  :set synth-library B     library premises for recursive inductives"
+  , "                           (on|off, default on)"
   , "  :set OPT VAL             set_option OPT VAL (persists in the session)"
   , "  :undo                    revert the last state-changing command"
   , "  :reset                   clear all definitions (keeps imports)"
@@ -822,6 +833,19 @@ dispatchCommand st line = do
           enabled <- rsSynthClassical <$> readIORef st
           emitLn st =<< cDim st
             ("synth classical: " ++ if enabled then "on" else "off")
+        ["synth-library", value]
+          | value `elem` ["on", "true"] -> do
+              modifyIORef' st (\s -> s { rsSynthLibrary = True })
+              emitLn st =<< cDim st "synth library: on"
+          | value `elem` ["off", "false"] -> do
+              modifyIORef' st (\s -> s { rsSynthLibrary = False })
+              emitLn st =<< cDim st "synth library: off"
+          | otherwise -> emitLn st =<< cRed st
+              "usage: :set synth-library on|off"
+        ["synth-library"] -> do
+          enabled <- rsSynthLibrary <$> readIORef st
+          emitLn st =<< cDim st
+            ("synth library: " ++ if enabled then "on" else "off")
         _ | null arg ->
               emitLn st =<< cRed st "usage: :set OPTION VALUE"
           | otherwise -> do
@@ -1580,9 +1604,33 @@ synthGo' st args retriedVars goal parsed = case fragRefusal (pgFrag parsed) of
   Nothing -> do
     limit <- synthTimeoutSeconds
     state <- readIORef st
+    let libPrems
+          | rsSynthLibrary state = selectLibraryPremises parsed
+          | otherwise = []
+    debug <- lookupEnv "LEANT_SYNTH_DEBUG"
+    when (isJust debug) $ forM_ libPrems $ \(name, prem) ->
+      emitLn st =<< cDim st ("debug premise: " ++ name ++ " : " ++ show prem)
+    -- the base run is the unchanged search (constructor premises, no
+    -- budget), so verdicts and their soundness are exactly as without
+    -- library premises.  The library run strips the recursive
+    -- inductives to plain atoms - with nil/cons introduction rules in
+    -- play the engine floods its candidate window with closed junk
+    -- terms before any proof that uses the goal's arguments, whereas
+    -- without them every candidate must route through a hypothesis or
+    -- a library premise.  Its choice-point budget costs nothing: the
+    -- goal mentions a recursive inductive, so any refutation is
+    -- already downgraded, and negative verdicts of the library run
+    -- are discarded by the merge anyway.
+    let base = synthesize (rsSynthEngine state) (rsSynthSteps state)
+          (pgFrag parsed)
     bounded <- runEngineBounded limit
-      (synthesize (rsSynthEngine state) (rsSynthSteps state)
-        (pgFrag parsed))
+      (if null libPrems
+        then base
+        else mergeLibraryOutcomes base
+          (synthesizeTuned (rsSynthEngine state) (rsSynthSteps state)
+            (candidateWindow, Just 100000)
+            [(name, stripRecCtors prem) | (name, prem) <- libPrems]
+            (stripRecCtors (pgFrag parsed)) (pgFrag parsed)))
     case bounded of
       Nothing -> do
         emitLn st =<< cYellow st
@@ -1641,6 +1689,61 @@ synthGo' st args retriedVars goal parsed = case fragRefusal (pgFrag parsed) of
     Right (SynthNoTerm notes) -> do
       emitLn st =<< cYellow st "no term found within the search bounds"
       forM_ notes $ \note -> emitLn st =<< cDim st ("note: " ++ note)
+
+-- | The serializer's library premises, filtered to the ones this goal
+-- can honestly use: in-fragment (no depth marker), and mentioning no
+-- recursive inductive the goal does not itself mention (an unknown
+-- occurrence would drag a fresh opaque atom and its constructor
+-- premises into the search).  Two functions with the same type at the
+-- offered instantiation (List.flatten and List.join, say) would only
+-- double the engine's work, so the type dedups.  Every premise
+-- multiplies the junk-proof space, so the survivors are capped, keeping
+-- first a premise whose type is exactly the goal (the type-directed
+-- library lookup answer) and then preferring small types, which apply
+-- directly rather than through invented arguments.
+selectLibraryPremises :: ParsedGoal -> [(String, Frag)]
+selectLibraryPremises parsed = take 8 (sortOn rank offered)
+ where
+  goalKeys = fragRecKeys (pgFrag parsed)
+  offered = nubBy (\x y -> snd x == snd y)
+    [ prem
+    | prem@(_, frag) <- pgPrems parsed
+    , not (fragHasDepth frag)
+    , all (`elem` goalKeys) (fragRecKeys frag)
+    ]
+  rank (_, frag) = (frag /= pgFrag parsed, fragSize frag)
+  fragSize f = 1 + case f of
+    FArr a b -> fragSize a + fragSize b
+    FProd a b -> fragSize a + fragSize b
+    FSum a b -> fragSize a + fragSize b
+    FAll _ _ b -> fragSize b
+    _ -> 0
+
+-- | Combine the base search with the library-premise search: library
+-- candidates first (they use the goal's arguments through real library
+-- functions - the feature), the base run's other candidates after,
+-- and negative verdicts only from the base run (the library run is
+-- budgeted, so its negatives claim nothing).
+mergeLibraryOutcomes
+  :: Either String SynthOutcome -> Either String SynthOutcome
+  -> Either String SynthOutcome
+mergeLibraryOutcomes base lib = case (base, lib) of
+  (Left err, _) -> Left err
+  (_, Left err) -> Left err
+  (Right x, Right y) -> Right (merge x y)
+ where
+  merge x y = case (x, y) of
+    (SynthCandidates a na, SynthCandidates b nb) ->
+      SynthCandidates (b ++ filter (`notElem` b) a) (nub (na ++ nb))
+    (SynthCandidates a na, other) ->
+      SynthCandidates a (na ++ notesOf other)
+    (other, SynthCandidates b nb) ->
+      SynthCandidates b (notesOf other ++ nb)
+    (other, _) -> other
+  notesOf outcome = case outcome of
+    SynthCandidates _ notes -> notes
+    SynthNoTerm notes -> notes
+    SynthRefuted _ -> []
 
 -- | Run the pure engine under the wall-clock guard, forcing enough of
 -- the outcome that the whole search happens inside the guard (the
@@ -3075,6 +3178,7 @@ run opts = do
         , rsSynthEngine = EngineDjinn
         , rsSynthSteps = 4096
         , rsSynthClassical = True
+        , rsSynthLibrary = True
         , rsTimeout = if optTimeout opts <= 0 then Nothing
             else Just (optTimeout opts)
         , rsColor = useColor
