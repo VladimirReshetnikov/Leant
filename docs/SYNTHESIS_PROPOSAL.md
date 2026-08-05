@@ -11,7 +11,7 @@ keep that inventory growable. Companion to
 [PROPOSALS.md](PROPOSALS.md).*
 
 Djex — vendored read-only in this repository as the
-[`lib/Djex`](../lib/Djex) submodule (pinned at `621510b`; the analysis
+[`lib/Djex`](../lib/Djex) submodule (pinned at `eec8bff`; the analysis
 below reviewed `6a9fc22`, and the pin has since advanced for item H's
 oldest-first enumeration) — merges two Haskell expression synthesizers — Djinn
 (Dyckhoff's LJT calculus: complete, terminating intuitionistic proof
