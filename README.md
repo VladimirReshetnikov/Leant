@@ -176,6 +176,32 @@ finish with :qed [NAME], inspect with :script
 saved: theorem and_swap : ∀ p q : Prop, p ∧ q → q ∧ p
 ```
 
+At its best the suggestion machinery hands you a finished induction:
+here it combines `induction` (the goal mentions a data-typed
+variable), `simp_all` unfolding the function the goal is about, and
+`omega` for the leftover arithmetic — a complete verified proof of a
+theorem about a function defined two lines earlier:
+
+```text
+λ> def double : Nat → Nat
+…>   | 0 => 0
+…>   | n + 1 => double n + 2
+…>
+λ> :prove ∀ n : Nat, double n = 2 * n
+entering prove mode — type tactics; :help for commands
+⊢ ∀ (n : Nat), double n = 2 * n
+suggestion: intro n
+⊢> intro n
+n : Nat
+⊢ double n = 2 * n
+suggestion: induction n <;> simp_all [double] <;> omega  (closes the goal)
+⊢> induction n <;> simp_all [double] <;> omega
+All goals accomplished 🎉
+finish with :qed [NAME], inspect with :script
+⊢> :qed double_two_mul
+saved: theorem double_two_mul : ∀ n : Nat, double n = 2 * n
+```
+
 ## `:synth` — automatic term synthesis
 
 `:synth TYPE` answers the question *"write me a term of this type"* —

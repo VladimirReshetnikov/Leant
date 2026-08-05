@@ -373,6 +373,78 @@ finish with :qed [NAME], inspect with :script
 saved: theorem mp_and : ∀ p q : Prop, (p → q) → p → q ∧ p
 \end{session}
 
+Accepting a suggestion is just typing it.  On a conjunction of two
+arithmetic facts, the opening suggestion is already the whole chained
+proof, and the session is two lines long:
+
+\begin{session}
+λ> :prove (∀ a b : Nat, a + b = b + a) ∧ (∀ a b : Nat, a + 2 * b = b + b + a)
+entering prove mode — type tactics; :help for commands
+⊢ (∀ (a b : Nat), a + b = b + a) ∧ ∀ (a b : Nat), a + 2 * b = b + b + a
+suggestion: constructor <;> omega  (closes the goal)
+⊢> constructor <;> omega
+All goals accomplished
+finish with :qed [NAME], inspect with :script
+⊢> :qed two_omegas
+saved: theorem two_omegas : (∀ a b : Nat, a + b = b + a) ∧ (∀ a b : Nat, a + 2 * b = b + b + a)
+\end{session}
+
+That chain was suggested because \emph{both} halves fall to
+\code{omega}.  When they need different tools, the suggestion adapts
+to whichever goal is in focus --- arithmetic for the first half, a
+found library lemma for the second:
+
+\begin{session}
+λ> :prove (∀ a b : Nat, a + b = b + a) ∧ (∀ a b : Nat, a * b = b * a)
+entering prove mode — type tactics; :help for commands
+⊢ (∀ (a b : Nat), a + b = b + a) ∧ ∀ (a b : Nat), a * b = b * a
+suggestion: constructor  (splits into 2 goals)
+⊢> constructor
+— goal 1 of 2 —
+case left
+⊢ ∀ (a b : Nat), a + b = b + a
+— goal 2 of 2 —
+case right
+⊢ ∀ (a b : Nat), a * b = b * a
+suggestion: omega  (closes the goal)
+⊢2> omega
+case right
+⊢ ∀ (a b : Nat), a * b = b * a
+suggestion: exact fun a b => Nat.mul_comm a b  (closes the goal)
+⊢> exact fun a b => Nat.mul_comm a b
+All goals accomplished
+finish with :qed [NAME], inspect with :script
+⊢> :qed add_mul_comm
+saved: theorem add_mul_comm : (∀ a b : Nat, a + b = b + a) ∧ (∀ a b : Nat, a * b = b * a)
+\end{session}
+
+The probes are shaped by the hypotheses as much as by the goal.  An
+existential hypothesis draws an \code{obtain} suggestion that names
+its witness; once the conjunction inside is the thing in the way, the
+suggested step is the \code{obtain} that splits it, chained with the
+\code{exact} it enables:
+
+\begin{session}
+λ> :prove (∃ x : Nat, 2 < x ∧ x < 4) → ∃ y : Nat, 2 < y
+entering prove mode — type tactics; :help for commands
+⊢ (∃ x, 2 < x ∧ x < 4) → ∃ y, 2 < y
+suggestion: intro h
+⊢> intro h
+h : ∃ x, 2 < x ∧ x < 4
+⊢ ∃ y, 2 < y
+suggestion: obtain ⟨x, h1⟩ := h
+⊢> obtain ⟨x, h1⟩ := h
+x : Nat
+h1 : 2 < x ∧ x < 4
+⊢ ∃ y, 2 < y
+suggestion: obtain ⟨h, h2⟩ := h1 <;> exact Exists.intro x h  (closes the goal)
+⊢> obtain ⟨h, h2⟩ := h1 <;> exact Exists.intro x h
+All goals accomplished
+finish with :qed [NAME], inspect with :script
+⊢> :qed ex_two_lt
+saved: theorem ex_two_lt : (∃ x : Nat, 2 < x ∧ x < 4) → ∃ y : Nat, 2 < y
+\end{session}
+
 A suggestion is not limited to one step.  Here the goal needs
 structural induction on a user-defined function; once \code{intro}
 brings the variable into the context, the suggested chain arrives as a
@@ -396,6 +468,33 @@ All goals accomplished
 finish with :qed [NAME], inspect with :script
 ⊢> :qed myLen_length
 saved: theorem myLen_length : ∀ l : List Nat, myLen l = l.length
+\end{session}
+
+The same pattern scales to arithmetic recursion.  The chain below was
+assembled from three of the probes at once: \code{induction} because
+the goal mentions a data-typed variable, \code{simp\_all} unfolding
+the definition the goal is about, and \code{omega} for the arithmetic
+the simplifier leaves behind --- a finished proof of a small theorem
+about a function defined moments earlier:
+
+\begin{session}
+λ> def double : Nat → Nat
+…>   | 0 => 0
+…>   | n + 1 => double n + 2
+…>
+λ> :prove ∀ n : Nat, double n = 2 * n
+entering prove mode — type tactics; :help for commands
+⊢ ∀ (n : Nat), double n = 2 * n
+suggestion: intro n
+⊢> intro n
+n : Nat
+⊢ double n = 2 * n
+suggestion: induction n <;> simp_all [double] <;> omega  (closes the goal)
+⊢> induction n <;> simp_all [double] <;> omega
+All goals accomplished
+finish with :qed [NAME], inspect with :script
+⊢> :qed double_two_mul
+saved: theorem double_two_mul : ∀ n : Nat, double n = 2 * n
 \end{session}
 
 A \code{sorry} in an ordinary declaration prints its goal and offers
