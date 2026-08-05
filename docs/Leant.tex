@@ -357,6 +357,7 @@ ignores it and proceeds step by step instead.
 
 \begin{session}
 λ> :prove ∀ p q : Prop, (p → q) → p → q ∧ p
+entering prove mode — type tactics; :help for commands
 ⊢ ∀ (p q : Prop), (p → q) → p → q ∧ p
 suggestion: exact fun p q a a_1 => ⟨a a_1, a_1⟩  (closes the goal)
 ⊢> intro p q h hp
@@ -367,6 +368,7 @@ hp : p
 suggestion: exact ⟨h hp, hp⟩  (closes the goal)
 ⊢> exact ⟨h hp, hp⟩
 All goals accomplished
+finish with :qed [NAME], inspect with :script
 ⊢> :qed mp_and
 saved: theorem mp_and : ∀ p q : Prop, (p → q) → p → q ∧ p
 \end{session}
@@ -382,6 +384,7 @@ complete verified proof:
 …>   | _ :: t => myLen t + 1
 …>
 λ> :prove ∀ l : List Nat, myLen l = l.length
+entering prove mode — type tactics; :help for commands
 ⊢ ∀ (l : List Nat), myLen l = l.length
 suggestion: intro l
 ⊢> intro l
@@ -390,6 +393,7 @@ l : List Nat
 suggestion: induction l <;> simp_all [myLen]  (closes the goal)
 ⊢> induction l <;> simp_all [myLen]
 All goals accomplished
+finish with :qed [NAME], inspect with :script
 ⊢> :qed myLen_length
 saved: theorem myLen_length : ∀ l : List Nat, myLen l = l.length
 \end{session}
@@ -444,6 +448,10 @@ Three rules run through the design:
   found within bounds,'' which claims nothing.
 \end{itemize}
 
+Transcripts in this section are lightly abridged: trailing candidates
+beyond the ones shown, and trailing truncation notes, are elided.
+Every line that does appear is a verbatim record of a live session.
+
 \subsection{Higher-order plumbing}\label{sec:plumbing}
 
 The sweet spot is the structural fragment: arrows, products, sums,
@@ -466,6 +474,24 @@ backward implication projected out by the pattern
 \code{⟨\_, f⟩}. Binders are named by role (functions \code{f g h},
 values \code{x y z}, negations and continuations \code{k}), a small
 thing that makes large candidates much easier to read.
+
+The everyday combinators all come out on the first try, and each
+first candidate is the term you would have written yourself ---
+\code{flip}, composition, \code{curry}, \code{uncurry}, and product
+associativity:
+
+\begin{session}
+λ> :synth ((a → b → c) → b → a → c)
+  it1  fun f x y => f y x
+λ> :synth ((b → c) → (a → b) → a → c)
+  it1  fun f g x => f (g x)
+λ> :synth ((A × B → C) → A → B → C)
+  it1  fun f x y => f ⟨x, y⟩
+λ> :synth ((A → B → C) → A × B → C)
+  it1  fun f ⟨x, y⟩ => f x y
+λ> :synth (((A × B) × C) → A × (B × C))
+  it1  fun ⟨⟨x, y⟩, z⟩ => ⟨x, ⟨y, z⟩⟩
+\end{session}
 
 Candidates are ranked smallest-first and \emph{bound into the session}
 as \code{it1}, \code{it2}, \dots, with bare \code{it} the best one.
@@ -494,13 +520,37 @@ De Morgan and the absorption law:
   it1  fun _ _ => ⟨fun ⟨x, _⟩ => x, fun y => ⟨y, .inl y⟩⟩
 \end{session}
 
+Under propositions-as-types, the proof terms \emph{are} plumbing, and
+the synthesized spellings make that visible: \code{Iff} symmetry is a
+swap, and \code{¬(p ∧ q) ↔ (p → ¬q)} is nothing but currying:
+
+\begin{session}
+λ> :synth (∀ p q : Prop, (p ↔ q) → (q ↔ p))
+  it1  fun _ _ ⟨f, g⟩ => ⟨g, f⟩
+λ> :synth (∀ p q : Prop, ¬(p ∧ q) ↔ (p → ¬q))
+  it1  fun _ _ => ⟨fun k x y => k ⟨x, y⟩, fun k1 ⟨z, w⟩ => k1 z w⟩
+\end{session}
+
+The textbook curiosities are in range too. No proposition is
+equivalent to its own negation, and the synthesized proof is the
+classic self-application trick --- the term below applies \code{k} to
+itself through \code{f} twice, the propositional shadow of
+$\omega\,\omega$:
+
+\begin{session}
+λ> :synth (∀ p : Prop, (p ↔ ¬p) → False)
+  it1  fun _ ⟨k, f⟩ => k (f (fun x => k x x)) (f (fun y => k y y))
+\end{session}
+
 \subsection{Programs you already know}\label{sec:monads}
 
 Some types have one sensible inhabitant, and asking for it by type is
-quicker than remembering which library corner it lives in. Take the
-bind of the state monad:
+quicker than remembering which library corner it lives in. The bind
+of the reader monad, then the bind of the state monad:
 
 \begin{session}
+λ> :synth ((S → A) → (A → S → B) → S → B)
+  it1  fun f g x => g (f x) x
 λ> :synth ((S → A × S) → (A → S → B × S) → S → B × S)
   it1  fun f g x => match f x with | ⟨a, b⟩ => g a b
   it2  fun f g x => match f x with | ⟨a, _⟩ => g a x
@@ -530,6 +580,39 @@ doubt, run one:
   it1  fun _ _ _ _ => .none
   it2  fun _ _ x f => match x with | .none => (.none) | .some y => f y
 \end{session}
+
+\subsection{Rank-N and impredicative goals}\label{sec:rankn}
+
+A polymorphic hypothesis is not just cargo: Djex instantiates it at
+types the goal itself supplies --- including, under a guard, at
+\emph{polymorphic} ones. Here the first candidate applies the
+identity hypothesis to the whole goal \code{Q → Q}, an impredicative
+instantiation:
+
+\begin{session}
+λ> :synth ((∀ p : Prop, p → p) → Q → Q)
+  it1  fun f => f _
+  it2  fun _ x => x
+  it3  fun f x => f _ x
+\end{session}
+
+And a Church-encoded pair converts into a real conjunction --- the
+quantified hypothesis is instantiated once at \code{p} and once at
+\code{q}, fed the matching projection each time:
+
+\begin{session}
+λ> :synth (∀ p q : Prop, (∀ r : Prop, (p → q → r) → r) → p ∧ q)
+  it1  fun _ _ f => ⟨f _ (fun x _ => x), f _ (fun _ y => y)⟩
+\end{session}
+
+(Trailing candidates are elided.) Explicit \code{∀} binders ---
+leading, nested, trailing, or
+interleaved --- are woven into the candidate's lambda automatically,
+and uses of quantified hypotheses get placeholder type arguments
+wherever Lean needs them (\code{f \_ x}), so bounded rank-N
+candidates verify. Full impredicative inhabitation is undecidable;
+beyond the guard the answer is ``no term found within bounds'' and
+nothing stronger.
 
 \subsection{Impossibility, proved}\label{sec:negative}
 
@@ -645,6 +728,12 @@ proofs that use the goal's own arguments, so asking for a function
 λ> :synth (Nat → a → List a)
   it1  fun x y => List.replicate x y
   it2  fun x y => List.reverse (List.replicate x y)
+λ> :synth (List a → List b → List (a × b))
+  it1  fun x y => List.zip x y
+  it2  fun _ _ => List.nil
+λ> :synth ((a → b → c) → List a → List b → List c)
+  it1  fun f x y => List.zipWith f x y
+  it2  fun _ _ _ => List.nil
 \end{session}
 
 (Trailing candidates and the truncation notes are elided here.) The
@@ -694,9 +783,17 @@ term whose spelling shows what was used:
 \end{session}
 
 These are the proofs a human would write: one case split on excluded
-middle, one \code{absurd} where the contradiction lands. Less famous
-gaps between the two logics come out the same way. Weak excluded
-middle, and the G\"odel--Dummett formula:
+middle, one \code{absurd} where the contradiction lands. The hard
+direction of De Morgan needs excluded middle twice, once per
+disjunct, and the candidate reads as exactly that case analysis:
+
+\begin{session}
+λ> :synth (∀ p q : Prop, ¬(¬p ∧ ¬q) → p ∨ q)
+  it1  fun _ _ k => match Classical.em _ with | .inl x => .inl x | .inr k1 => (match Classical.em _ with | .inl y => .inr y | .inr k2 => absurd ⟨k1, k2⟩ k)
+\end{session}
+
+Less famous gaps between the two logics come out the same way. Weak
+excluded middle, and the G\"odel--Dummett formula:
 
 \begin{session}
 λ> :synth (∀ p : Prop, ¬p ∨ ¬¬p)
@@ -755,21 +852,30 @@ comes from \code{hd}:
 
 \begin{session}
 λ> :prove ∀ p q : Prop, Decidable p → (p → q) → (¬p → q) → q
-⊢ ∀ (p q : Prop), Decidable p → (p → q) → (¬p → q) → q
+entering prove mode — type tactics; :help for commands
+⊢ ∀ (p q : Prop) (a : Decidable p), (p → q) → (¬p → q) → q
+suggestion: exact fun p q a a_1 a_2 => dite p a_1 a_2  (closes the goal)
 ⊢> intro p q hd hpq hnq
 p q : Prop
 hd : Decidable p
 hpq : p → q
 hnq : ¬p → q
 ⊢ q
+suggestion: exact dite p hpq hnq  (closes the goal)
 ⊢> :synth
 (synthesizing with hypotheses p q hd hpq hnq as premises)
   it1  fun _ _ x f g => match x with | .isFalse k => g k | .isTrue y => f y
 ⊢> exact it1
 All goals accomplished
+finish with :qed [NAME], inspect with :script
 ⊢> :qed byCases
 saved: theorem byCases : ∀ p q : Prop, Decidable p → (p → q) → (¬p → q) → q
 \end{session}
+
+Note the contrast with the tactic suggestion above it: the suggestion
+\emph{found} the library's \code{dite}, while \code{:synth}
+\emph{composed} the case split from the goal's own material. Both are
+verified; they simply answer different questions.
 
 It also slots into an ordinary multi-goal proof. Split a conjunction
 with \code{constructor} and let \code{:synth} deal with each half in
@@ -778,12 +884,15 @@ projections from \code{h} showing up without being asked for:
 
 \begin{session}
 λ> :prove ∀ p q r : Prop, (p → q) ∧ (q → r) → p → r ∧ (p → q)
+entering prove mode — type tactics; :help for commands
 ⊢ ∀ (p q r : Prop), (p → q) ∧ (q → r) → p → r ∧ (p → q)
+suggestion: intro p q r h h1 <;> simp_all  (closes the goal)
 ⊢> intro p q r h hp
 p q r : Prop
 h : (p → q) ∧ (q → r)
 hp : p
 ⊢ r ∧ (p → q)
+suggestion: simp_all only [forall_const, imp_self, and_self]  (closes the goal)
 ⊢> constructor
 — goal 1 of 2 —
 case left
@@ -797,6 +906,7 @@ p q r : Prop
 h : (p → q) ∧ (q → r)
 hp : p
 ⊢ p → q
+suggestion: simp_all only [forall_const]  (closes the goal)
 ⊢2> :synth
 (synthesizing with hypotheses p q r h hp as premises)
   it1  fun _ _ _ ⟨f, g⟩ x => g (f x)
@@ -806,11 +916,13 @@ p q r : Prop
 h : (p → q) ∧ (q → r)
 hp : p
 ⊢ p → q
+suggestion: simp_all only [forall_const, imp_self]  (closes the goal)
 ⊢> :synth
 (synthesizing with hypotheses p q r h hp as premises)
   it1  fun _ _ _ ⟨f, _⟩ x _ => f x
 ⊢> exact it1
 All goals accomplished
+finish with :qed [NAME], inspect with :script
 ⊢> :qed chain
 saved: theorem chain : ∀ p q r : Prop, (p → q) ∧ (q → r) → p → r ∧ (p → q)
 \end{session}
@@ -822,6 +934,26 @@ no imports. The division of labor that
 emerges is pleasant: the genuinely dependent moves (quantifiers,
 induction, rewriting) stay yours, and the propositional bookkeeping
 between them does not.
+
+The classical fallback of \S\ref{sec:classical} follows \code{:synth}
+into prove mode. Double-negation elimination has no constructive
+proof, so the candidate arrives as an excluded-middle case split, and
+\code{:qed} turns it into a named theorem --- no tactic beyond
+\code{exact} was typed:
+
+\begin{session}
+λ> :prove ∀ p : Prop, ¬¬p → p
+entering prove mode — type tactics; :help for commands
+⊢ ∀ (p : Prop), ¬¬p → p
+suggestion: exact fun p a => Classical.byContradiction a  (closes the goal)
+⊢> :synth
+  it1  fun _ k => match Classical.em _ with | .inl x => x | .inr k1 => absurd k1 k
+⊢> exact it1
+All goals accomplished
+finish with :qed [NAME], inspect with :script
+⊢> :qed not_not_elim
+saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
+\end{session}
 
 \subsection{Engines and budgets}\label{sec:engines}
 

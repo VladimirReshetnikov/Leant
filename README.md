@@ -224,7 +224,21 @@ candidates (and, where applicable, a truncation note).
 ### Higher-order plumbing
 
 The sweet spot is the "plumbing" terms one writes constantly. Free
-capital identifiers are auto-bound, so quick queries stay quick.
+capital identifiers are auto-bound, so quick queries stay quick, and
+the first candidate is reliably the term you would have written —
+here `flip`, composition, `uncurry`, and product associativity:
+
+```text
+λ> :synth ((a → b → c) → b → a → c)
+  it1  fun f x y => f y x
+λ> :synth ((b → c) → (a → b) → a → c)
+  it1  fun f g x => f (g x)
+λ> :synth ((A → B → C) → A × B → C)
+  it1  fun f ⟨x, y⟩ => f x y
+λ> :synth (((A × B) × C) → A × (B × C))
+  it1  fun ⟨⟨x, y⟩, z⟩ => ⟨x, ⟨y, z⟩⟩
+```
+
 Candidates are ranked smallest-first and *bound into the session* as
 `it1`, `it2`, …, with bare `it` the best one — they are ordinary
 definitions, so you can evaluate them immediately:
@@ -235,12 +249,30 @@ definitions, so you can evaluate them immediately:
   it2  fun x _ => x
 λ> #eval it2 "left" "right"
 "left"
+```
+
+Read through propositions-as-types, the same plumbing proves logical
+identities, and the proof terms *are* the plumbing: `Iff` symmetry is
+a swap, `¬(p ∧ q) ↔ (p → ¬q)` is currying, and De Morgan's law packs
+one direction each into an anonymous constructor:
+
+```text
+λ> :synth (∀ p q : Prop, (p ↔ q) → (q ↔ p))
+  it1  fun _ _ ⟨f, g⟩ => ⟨g, f⟩
+λ> :synth (∀ p q : Prop, ¬(p ∧ q) ↔ (p → ¬q))
+  it1  fun _ _ => ⟨fun k x y => k ⟨x, y⟩, fun k1 ⟨z, w⟩ => k1 z w⟩
 λ> :synth (∀ p q : Prop, ¬(p ∨ q) ↔ ¬p ∧ ¬q)
   it1  fun _ _ => ⟨fun k => ⟨fun x => k (.inl x), fun y => k (.inr y)⟩, fun ⟨k1, k2⟩ z => match z with | .inl w => k1 w | .inr x1 => k2 x1⟩
 ```
 
-Both inhabitants of `a → a → a` that matter, and one direction each of
-De Morgan's law, packed into an `Iff` by the anonymous constructor.
+It reaches the textbook curiosities too — `(p ↔ ¬p) → False` comes
+out by the classic self-application trick:
+
+```text
+λ> :synth (∀ p : Prop, (p ↔ ¬p) → False)
+  it1  fun _ ⟨k, f⟩ => k (f (fun x => k x x)) (f (fun y => k y y))
+```
+
 Binders are named by role — functions `f g h`, values `x y z`,
 negations and continuations `k` — which keeps large candidates
 readable.
@@ -248,18 +280,20 @@ readable.
 ### Programs you already know
 
 Some types have one sensible inhabitant, and asking for it by type is
-quicker than remembering which library corner it lives in. The bind of
-the state monad:
+quicker than remembering which library corner it lives in. The binds
+of the reader and state monads:
 
 ```text
+λ> :synth ((S → A) → (A → S → B) → S → B)
+  it1  fun f g x => g (f x) x
 λ> :synth ((S → A × S) → (A → S → B × S) → S → B × S)
   it1  fun f g x => match f x with | ⟨a, b⟩ => g a b
   it2  fun f g x => match f x with | ⟨a, _⟩ => g a x
   ⋯
 ```
 
-The first candidate threads the state correctly. The second is
-type-correct and runs `g` on the *initial* state — the classic
+For the state monad, `it1` threads the state correctly, while `it2`
+is type-correct and runs `g` on the *initial* state — the classic
 state-threading bug, which the type admits just as happily. Types alone
 cannot tell these apart, which is why all candidates are shown and each
 is one keystroke from a test run. With inductive expansion (below) the
@@ -340,6 +374,16 @@ provably uninhabited — no closed term of this polymorphic type exists
 (constructively — a classical proof may still exist; this is not a disproof of the proposition)
 ```
 
+The hard direction of De Morgan needs excluded middle twice, once per
+disjunct, and the candidate reads as exactly that case analysis:
+
+```text
+λ> :set synth-classical on
+synth classical: on
+λ> :synth (∀ p q : Prop, ¬(¬p ∧ ¬q) → p ∨ q)
+  it1  fun _ _ k => match Classical.em _ with | .inl x => .inl x | .inr k1 => (match Classical.em _ with | .inl y => .inr y | .inr k2 => absurd ⟨k1, k2⟩ k)
+```
+
 ### Inductive types
 
 A non-recursive, non-indexed inductive or structure — built-in
@@ -412,6 +456,12 @@ candidate:
 λ> :synth (Nat → a → List a)
   it1  fun x y => List.replicate x y
   ⋯
+λ> :synth (List a → List b → List (a × b))
+  it1  fun x y => List.zip x y
+  ⋯
+λ> :synth ((a → b → c) → List a → List b → List c)
+  it1  fun f x y => List.zipWith f x y
+  ⋯
 ```
 
 The inventory is a ratings list in Djex's `*.ratings` format — lower
@@ -460,11 +510,13 @@ those hypotheses, so `exact it1` closes the goal:
 λ> :prove ∀ p q : Prop, (p → q) → p → q ∧ p
 entering prove mode — type tactics; :help for commands
 ⊢ ∀ (p q : Prop), (p → q) → p → q ∧ p
+suggestion: exact fun p q a a_1 => ⟨a a_1, a_1⟩  (closes the goal)
 ⊢> intro p q h hp
 p q : Prop
 h : p → q
 hp : p
 ⊢ q ∧ p
+suggestion: exact ⟨h hp, hp⟩  (closes the goal)
 ⊢> :synth
 (synthesizing with hypotheses p q h hp as premises)
   it1  fun _ _ f x => ⟨f x, x⟩
@@ -479,6 +531,26 @@ Unlike `exact?`, which finds an *existing* lemma, this composes a new
 term from the goal's own material — a constructive complement to the
 finisher tactics, needing no premise database and no imports. Bare
 `:synth` outside prove mode targets the last `sorry`.
+
+The classical fallback follows you into prove mode: double-negation
+elimination has no constructive proof, so `:synth` offers the
+excluded-middle case split, and `:qed` turns it into a theorem —
+proved, verified, and named without writing a single tactic beyond
+`exact`:
+
+```text
+λ> :prove ∀ p : Prop, ¬¬p → p
+entering prove mode — type tactics; :help for commands
+⊢ ∀ (p : Prop), ¬¬p → p
+suggestion: exact fun p a => Classical.byContradiction a  (closes the goal)
+⊢> :synth
+  it1  fun _ k => match Classical.em _ with | .inl x => x | .inr k1 => absurd k1 k
+⊢> exact it1
+All goals accomplished 🎉
+finish with :qed [NAME], inspect with :script
+⊢> :qed not_not_elim
+saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
+```
 
 ### Engines, budgets, and the fine print
 
