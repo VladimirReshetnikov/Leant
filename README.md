@@ -138,15 +138,20 @@ protocol (bare `:prove` resumes the most recent `sorry`). Every line is
 a tactic; goals reprint after each one, followed by a Lean-verified
 suggestion for the next tactic. The candidate probes are shaped by the
 goal and its hypotheses: an `intro` suggestion names the binders it
-would introduce, a disjunction goal is probed with `left`/`right`, and
-a hypothesis whose type a single step can take apart is probed with
-`cases h` or `obtain ⟨x, h1⟩ := h`. The search prefers a candidate that
+would introduce, a disjunction goal is probed with `left`/`right`, a
+hypothesis whose type a single step can take apart is probed with
+`cases h` or `obtain ⟨x, h1⟩ := h`, and a data-typed variable the goal
+mentions is probed with `induction`. The search prefers a candidate that
 closes the goal outright and annotates the suggestion accordingly
 (`closes the goal`, `splits into 2 goals`); when no single tactic
 closes it, a second phase chains quick finishers onto the best
 progressing candidates (`constructor <;> omega`, `obtain ⟨h, h2⟩ := h1
 <;> exact Exists.intro x h`), so even the opening suggestion is often a
-complete checked proof. Suggestions are advisory: they never advance
+complete checked proof. The chains also try `simp_all`, unfolding the
+definitions the goal mentions and calling in `omega` on whatever
+arithmetic remains, which is how an induction suggestion can arrive as
+a finished proof: `induction l <;> simp_all [myLen]`, or `induction n
+<;> simp_all [double] <;> omega`. Suggestions are advisory: they never advance
 the proof or enter the script, and `:suggest` reprints the cached
 suggestion.
 `:undo` takes back steps without limit; `:script` shows the accumulated proof;

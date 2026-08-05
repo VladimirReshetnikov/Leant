@@ -28,4 +28,20 @@ intro h
 obtain ⟨x, h1⟩ := h
 obtain ⟨h, h2⟩ := h1 <;> exact Exists.intro x h
 :qed ex_two_lt
+def myLen : List Nat → Nat
+  | [] => 0
+  | _ :: t => myLen t + 1
+
+:prove ∀ l : List Nat, myLen l = l.length
+intro l
+induction l <;> simp_all [myLen]
+:qed myLen_length
+def double : Nat → Nat
+  | 0 => 0
+  | n + 1 => double n + 2
+
+:prove ∀ n : Nat, double n = 2 * n
+intro n
+induction n <;> simp_all [double] <;> omega
+:qed double_two_mul
 :quit

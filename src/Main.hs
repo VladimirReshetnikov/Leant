@@ -11,7 +11,8 @@ module Main (main) where
 import Control.Exception (SomeException, evaluate, finally, try)
 import Control.Monad (forM_, unless, when)
 import Control.Monad.IO.Class (liftIO)
-import Data.Char (isAlpha, isAlphaNum, isAscii, isDigit, isSpace, toLower)
+import Data.Char
+  (isAlpha, isAlphaNum, isAscii, isDigit, isLower, isSpace, isUpper, toLower)
 import Data.IORef
 import Data.List
   ( intercalate
@@ -1541,7 +1542,6 @@ autoShapedTokens text = nub (go Nothing text)
             && prevChar /= Just '.'
             && not (qualifier rest)
       in [t | keep] ++ go (Just (last t)) rest
-  identChar c = isAlphaNum c || c == '_' || c == '\''
   autoShape (c : rest) = plainLetter c && all suffixChar rest
   autoShape [] = False
   plainLetter c =
@@ -2046,7 +2046,8 @@ autoTactics = ["rfl", "trivial", "decide", "simp", "omega", "exact?", "aesop"]
 -- Unlike :auto, probing does not stop at the first accepted candidate: ones
 -- that merely advance the goal are remembered while the search keeps looking
 -- for one that closes it outright, and if no single tactic does, a second
--- phase chains the finishers onto the remembered candidates
+-- phase chains the finishers -- plus `simp_all`, with and without the
+-- definitions the goal mentions -- onto the remembered candidates
 -- (`t <;> finisher`) hunting for a complete proof.
 -- `apply?` is deliberately absent: its partial `refine ?_` suggestions are
 -- rarely actionable, and probing it over the proof-state protocol can panic
@@ -2061,9 +2062,10 @@ suggestionFinishers =
 -- | Build the ordered candidate list for one pretty-printed goal. Shape
 -- analysis only picks which candidates are worth probing -- `left`/`right`
 -- instead of `constructor` on a disjunction goal, `cases`/`obtain` on a
--- hypothesis whose type a single step can take apart, `simp_all?` only when
--- there are hypotheses to use -- so a mis-parse costs a wasted probe, never
--- a wrong suggestion.
+-- hypothesis whose type a single step can take apart, `induction` on a
+-- data-typed variable the target mentions, `simp_all?` only when there are
+-- hypotheses to use -- so a mis-parse costs a wasted probe, never a wrong
+-- suggestion.
 goalCandidates :: String -> [String]
 goalCandidates g = concat
   [ suggestionFinishers
@@ -2071,6 +2073,7 @@ goalCandidates g = concat
   , introCands
   , destructCands  -- take hypotheses apart before building the goal
   , splitCands
+  , inductionCands
   , ["simp?"]
   , ["simp_all?" | not (null hyps)]
   , ["aesop?"]
@@ -2078,6 +2081,7 @@ goalCandidates g = concat
  where
   hyps = goalHypGroups g
   used = concatMap fst hyps
+  targetIdents = maybe [] (identSplit . fst) (goalTarget g)
   -- `intro` names the binders it would introduce when the goal's shape
   -- allows it, keeping the bare form as a fallback should Lean reject them
   introCands = case introNames g of
@@ -2101,6 +2105,25 @@ goalCandidates g = concat
     _ -> Nothing
   obtainWith fields name =
     "obtain \10216" ++ intercalate ", " fields ++ "\10217 := " ++ name
+  -- A variable of a data type (`n : Nat`, `l : List Nat`, a user inductive)
+  -- that the target actually mentions is a candidate for induction. The
+  -- head-constant test only needs to rule out shapes induction cannot help
+  -- with -- sorts, `Bool` (destructFor's `cases` already covers it), and
+  -- anything with a logical connective on top; a data-looking hypothesis
+  -- whose type is not really inductive just wastes the probe.
+  inductionCands = take 1
+    [ "induction " ++ name
+    | (names, ty) <- hyps
+    , isInductionTy ty
+    , name <- names
+    , name `elem` targetIdents
+    ]
+  isInductionTy ty =
+    typeConnective ty == Nothing
+    && case words (trim ty) of
+         hd@(c0 : _) : _ ->
+           isUpper c0 && hd `notElem` ["Bool", "Prop", "Type", "Sort"]
+         _ -> False
   freshHs = [n | n <- "h" : ["h" ++ show i | i <- [1 :: Int ..]]
                , n `notElem` used]
   freshX = fromMaybe "x" $ listToMaybe
@@ -2209,6 +2232,66 @@ splitDepth0 sep = go 0 ""
     | d == 0 && c == sep = reverse acc : go 0 "" rest
     | otherwise = go (bracketDepthStep d c) (c : acc) rest
 
+-- | Maximal identifier-character runs of pretty-printed Lean text. The
+-- namespace/projection dot is a separator, so @l.length@ yields both @l@
+-- and @length@ -- the right reading for "does the target mention this
+-- variable" checks.
+identSplit :: String -> [String]
+identSplit s = case dropWhile (not . identChar) s of
+  "" -> []
+  s' -> let (tok, rest) = span identChar s' in tok : identSplit rest
+
+identChar :: Char -> Bool
+identChar c = isAlphaNum c || c `elem` "_'"
+
+-- | Tokens of the goal target that plausibly name definitions the goal is
+-- about, for `simp_all [f]` chain candidates that unfold them: lowercase-
+-- initial, not qualified or projected (no dot keeps @l.length@ and
+-- @List.length@ out), and bound neither by a hypothesis nor by a binder
+-- inside the target itself. A false positive costs one rejected probe.
+goalDefNames :: String -> [String]
+goalDefNames g = case goalTarget g of
+  Nothing -> []
+  Just (target, _) ->
+    take 2 $ nub
+      [ tok
+      | tok@(c0 : _) <- dotted target
+      , isLower c0
+      , tok `notElem` concatMap fst (goalHypGroups g)
+      , tok `notElem` binderBound target
+      , tok `notElem` ["fun", "if", "then", "else", "match", "with", "let",
+                       "do", "by", "at", "in", "have", "show", "this"]
+      ]
+ where
+  dotted = filter (all (/= '.')) . tokens
+  tokens s = case dropWhile (not . dottedChar) s of
+    "" -> []
+    s' -> let (tok, rest) = span dottedChar s' in tok : tokens rest
+  dottedChar c = identChar c || c == '.'
+  -- names bound by a \8704/\8707/\955/`fun` binder: everything between the
+  -- binder head and its depth-0 `,` or `=>` (types in the group included --
+  -- they are capitalized or rebound elsewhere, so over-excluding is safe)
+  binderBound = goB '\0'
+   where
+    goB _ [] = []
+    goB prev s@(c : rest)
+      | c `elem` "\8704\8707\955" = takeGroup rest
+      | not (identChar prev)
+      , Just r <- stripPrefix "fun" s
+      , maybe True (not . identChar) (listToMaybe r) = takeGroup r
+      | otherwise = goB c rest
+    takeGroup s =
+      let (grp, rest) = breakGroupEnd 0 s
+      in identSplit grp ++ goB '\0' rest
+    breakGroupEnd d s = case s of
+      [] -> ("", "")
+      ',' : rest | d == 0 -> ("", rest)
+      '=' : '>' : rest | d == 0 -> ("", rest)
+      '\8614' : rest | d == 0 -> ("", rest)
+      c : rest ->
+        let (grp, rest') = breakGroupEnd (bracketDepthStep d c) rest
+        in (c : grp, rest')
+
 -- | Name the binders a bare `intro` would introduce, from the pretty-printed
 -- goal: leading \8704 binder groups contribute their own names, then each
 -- depth-0 arrow of the body -- and a bare \172 conclusion, which intro also
@@ -2305,9 +2388,18 @@ suggestTactic st = do
     Just pv | (ps, goals@(g : _), _) : _ <- pvStack pv ->
       case lookup ps (pvSuggestions pv) of
         Just cached -> forM_ cached (emitSuggestion st)
-        Nothing -> probe ps (length goals) (goalCandidates g) []
+        Nothing ->
+          probe ps (length goals) (chainExtras g) (goalCandidates g) []
     _ -> pure ()
  where
+  -- Chain finishers beyond the quick certain ones: `simp_all` can use the
+  -- case hypotheses an `induction` or `cases` step introduces, and when
+  -- the target mentions definitions, `simp_all [f]` unfolds them -- the
+  -- move that closes `induction l <;> simp_all [myLen]` proofs. Probed
+  -- after `exact?` so an informative found term still wins over a
+  -- sledgehammer when both close the goal.
+  chainExtras g =
+    "simp_all" : ["simp_all [" ++ d ++ "]" | d <- goalDefNames g]
   -- Run one heartbeat-bounded candidate against the immutable proof state.
   -- The bound keeps proactive help responsive even when a project has a very
   -- large premise database. A heartbeat exhaustion is an ordinary tactic
@@ -2329,15 +2421,15 @@ suggestTactic st = do
         , Just _ <- respProofState v -> pure (Just (Just v))
         | otherwise -> pure (Just Nothing)
 
-  probe ps nGoals [] helds = chainPhase ps nGoals helds
-  probe ps nGoals ("intro" : rest) helds
+  probe ps nGoals extras [] helds = chainPhase ps nGoals extras helds
+  probe ps nGoals extras ("intro" : rest) helds
     | any (("intro " `isPrefixOf`) . fst) helds =
-        probe ps nGoals rest helds  -- the named intro variant already held
-  probe ps nGoals (tactic : rest) helds = do
+        probe ps nGoals extras rest helds  -- the named intro variant held
+  probe ps nGoals extras (tactic : rest) helds = do
     outcome <- probeOnce ps tactic
     case outcome of
       Nothing -> pure ()
-      Just Nothing -> probe ps nGoals rest helds
+      Just Nothing -> probe ps nGoals extras rest helds
       Just (Just v) -> do
         let text = fromMaybe tactic (parseTryThis (respMessages v))
             remaining = length (respGoals v)
@@ -2348,7 +2440,7 @@ suggestTactic st = do
               (lines text)
         if remaining < nGoals && not partial
           then conclude ps (Just (annotateSuggestion "closes the goal" text))
-          else probe ps nGoals rest $ if length helds >= 3 then helds
+          else probe ps nGoals extras rest $ if length helds >= 3 then helds
             else helds ++ [(text, if remaining > nGoals
                    then Just ("splits into "
                      ++ show (remaining - nGoals + 1) ++ " goals")
@@ -2359,20 +2451,21 @@ suggestTactic st = do
   -- makes the finisher run on every subgoal the candidate produces, so
   -- acceptance means the chain is a complete proof of the current goal.
   -- `exact?` is only chained onto the first candidate to bound the cost of
-  -- the expensive library searches; a candidate whose text spans lines is
-  -- never chained, since composing it would not yield a tactic the user
-  -- could type back. If no chain closes either, the first remembered
-  -- candidate is shown with its own annotation.
-  chainPhase ps _ [] = conclude ps Nothing
-  chainPhase ps nGoals helds@(first : _) =
+  -- the expensive library searches; the `simp_all` extras come after it so
+  -- an informative found term beats a sledgehammer. A candidate whose text
+  -- spans lines is never chained, since composing it would not yield a
+  -- tactic the user could type back. If no chain closes either, the first
+  -- remembered candidate is shown with its own annotation.
+  chainPhase ps _ _ [] = conclude ps Nothing
+  chainPhase ps nGoals extras helds@(first : _) =
     goHeld (zip (True : repeat False) helds)
    where
     fallback = conclude ps (Just (annotateHeld first))
     goHeld [] = fallback
     goHeld ((isFirst, (text, _)) : more)
       | '\n' `elem` text = goHeld more
-      | otherwise =
-          goChain text (suggestionFinishers ++ ["exact?" | isFirst]) more
+      | otherwise = goChain text
+          (suggestionFinishers ++ ["exact?" | isFirst] ++ extras) more
     goChain _ [] more = goHeld more
     goChain text (fin : rest) more = do
       outcome <- probeOnce ps (text ++ " <;> " ++ fin)
@@ -2382,6 +2475,18 @@ suggestTactic st = do
           | length (respGoals v) < nGoals
           , Just chained <- renderChain text fin v ->
               conclude ps (Just (annotateSuggestion "closes the goal" chained))
+          -- a simp_all link that was accepted without closing may have
+          -- rewritten the residual goals into omega's arithmetic reach
+          -- (`induction n <;> simp_all [f] <;> omega`); one extension probe
+          | "simp_all" `isPrefixOf` fin -> do
+              let fin' = fin ++ " <;> omega"
+              outcome' <- probeOnce ps (text ++ " <;> " ++ fin')
+              case outcome' of
+                Nothing -> pure ()
+                Just (Just v') | length (respGoals v') < nGoals ->
+                  conclude ps $ Just $ annotateSuggestion "closes the goal"
+                    (text ++ " <;> " ++ fin')
+                Just _ -> goChain text rest more
         Just _ -> goChain text rest more
     -- The chained text must be something the user can type back verbatim.
     -- A literal finisher composes trivially; `exact?` has to splice in the

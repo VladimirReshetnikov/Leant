@@ -332,15 +332,21 @@ afterwards.  Each displayed proof state is followed by an automatically
 discovered tactic suggestion that Lean has already checked.  The
 candidate probes are shaped by the goal and its hypotheses: an
 \code{intro} suggestion names the binders it would introduce, a
-disjunction goal is probed with \code{left}/\code{right}, and a
+disjunction goal is probed with \code{left}/\code{right}, a
 hypothesis whose type a single step can take apart is probed with
-\code{cases} or \code{obtain}.  The search prefers a candidate that
-closes the goal outright and annotates the suggestion accordingly
-(\code{closes the goal}, \code{splits into 2 goals}); when no single
-tactic closes it, a second phase chains quick finishers onto the best
-progressing candidates (\code{constructor <;> omega}, or an
+\code{cases} or \code{obtain}, and a data-typed variable the goal
+mentions is probed with \code{induction}.  The search prefers a
+candidate that closes the goal outright and annotates the suggestion
+accordingly (\code{closes the goal}, \code{splits into 2 goals}); when
+no single tactic closes it, a second phase chains quick finishers onto
+the best progressing candidates (\code{constructor <;> omega}, or an
 \code{obtain} step chained with the \code{exact} it enables), so even
-the opening suggestion is often a complete checked proof.
+the opening suggestion is often a complete checked proof.  The chains
+also try \code{simp\_all}, unfolding the definitions the goal mentions
+and calling in \code{omega} on whatever arithmetic remains, which is
+how an induction suggestion can arrive as a finished proof:
+\code{induction l <;> simp\_all [myLen]}, or
+\code{induction n <;> simp\_all [double] <;> omega}.
 The suggestion is advisory---it does not advance the state or enter the
 script---and \code{:suggest} reprints it without rerunning the search.
 Below, the very first suggestion is already a complete proof; the session
@@ -360,6 +366,29 @@ suggestion: exact ⟨h hp, hp⟩  (closes the goal)
 All goals accomplished
 ⊢> :qed mp_and
 saved: theorem mp_and : ∀ p q : Prop, (p → q) → p → q ∧ p
+\end{session}
+
+A suggestion is not limited to one step.  Here the goal needs
+structural induction on a user-defined function; once \code{intro}
+brings the variable into the context, the suggested chain arrives as a
+complete verified proof:
+
+\begin{session}
+λ> def myLen : List Nat → Nat
+…>   | [] => 0
+…>   | _ :: t => myLen t + 1
+…>
+λ> :prove ∀ l : List Nat, myLen l = l.length
+⊢ ∀ (l : List Nat), myLen l = l.length
+suggestion: intro l
+⊢> intro l
+l : List Nat
+⊢ myLen l = l.length
+suggestion: induction l <;> simp_all [myLen]  (closes the goal)
+⊢> induction l <;> simp_all [myLen]
+All goals accomplished
+⊢> :qed myLen_length
+saved: theorem myLen_length : ∀ l : List Nat, myLen l = l.length
 \end{session}
 
 A \code{sorry} in an ordinary declaration prints its goal and offers

@@ -109,4 +109,38 @@ All goals accomplished 🎉
 finish with :qed [NAME], inspect with :script
 ⊢> :qed ex_two_lt
 saved: theorem ex_two_lt : (∃ x : Nat, 2 < x ∧ x < 4) → ∃ y : Nat, 2 < y
+λ> def myLen : List Nat → Nat
+…>   | [] => 0
+…>   | _ :: t => myLen t + 1
+…> 
+λ> :prove ∀ l : List Nat, myLen l = l.length
+entering prove mode — type tactics; :help for commands
+⊢ ∀ (l : List Nat), myLen l = l.length
+suggestion: intro l
+⊢> intro l
+l : List Nat
+⊢ myLen l = l.length
+suggestion: induction l <;> simp_all [myLen]  (closes the goal)
+⊢> induction l <;> simp_all [myLen]
+All goals accomplished 🎉
+finish with :qed [NAME], inspect with :script
+⊢> :qed myLen_length
+saved: theorem myLen_length : ∀ l : List Nat, myLen l = l.length
+λ> def double : Nat → Nat
+…>   | 0 => 0
+…>   | n + 1 => double n + 2
+…> 
+λ> :prove ∀ n : Nat, double n = 2 * n
+entering prove mode — type tactics; :help for commands
+⊢ ∀ (n : Nat), double n = 2 * n
+suggestion: intro n
+⊢> intro n
+n : Nat
+⊢ double n = 2 * n
+suggestion: induction n <;> simp_all [double] <;> omega  (closes the goal)
+⊢> induction n <;> simp_all [double] <;> omega
+All goals accomplished 🎉
+finish with :qed [NAME], inspect with :script
+⊢> :qed double_two_mul
+saved: theorem double_two_mul : ∀ n : Nat, double n = 2 * n
 λ> :quit
