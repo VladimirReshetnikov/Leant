@@ -8,9 +8,12 @@
 
 Leant now preserves the complete type-argument assignment established by one
 successful active instance head. If a provider has leading binders
-`[a, b, c, d]`, one resolver choice contributes one ordered vector
-`[Ta, Tb, Tc, Td]`. It never contributes four unrelated scalar candidates and
-never asks Djex to reconstruct the relationship with a Cartesian product.
+`[a, b, c, d]`, one resolver choice contributes one ordered, ground-kinded
+vector `[(Ka, Ta), (Kb, Tb), (Kc, Tc), (Kd, Td)]`. It never contributes four
+unrelated scalar candidates and never asks Djex to reconstruct the relationship
+with a Cartesian product. Each `K` is the bounded first-order kind which Lean
+proved for that exact argument: a chain of `Type`-domain arrows ending in
+`Type`.
 
 This closes the correlation gap left by the earlier
 [provider-local instance-head evidence](2026-08-05-provider-local-instance-head-evidence.md)
@@ -44,7 +47,7 @@ bounds.
 
 ## Complete Lean-side resolution
 
-Discovery still opens at most four leading proper-type binders and retains the
+Discovery still opens at most four leading type binders and retains the
 provider's erased instance constraints. For each constraint it visits active
 heads in Lean resolver order, with at most 32 heads inspected per provider.
 Every selected head is evaluated inside its own
@@ -58,9 +61,11 @@ A head is accepted only after its complete provider obligation closes:
 3. Every other erased constraint in the provider telescope is synthesized in
    source order under that same context.
 4. All opened type arguments are instantiated, closed, free of universe and
-   expression metavariables, context-free, and universe-kinded.
-5. The arguments serialize in the provider's leading-binder order as one
-   vector.
+   expression metavariables, and context-free. The type of each argument must
+   reduce to a bounded `Type -> ... -> Type` kind; Leant records its arrow
+   count instead of erasing it to proper type.
+5. The kinded arguments serialize in the provider's leading-binder order as
+   one vector.
 
 Keeping the seed fixed matters. Re-running ordinary instance synthesis for the
 seed constraint could select a different head and would no longer enumerate
@@ -83,10 +88,20 @@ The live provider inventory carries complete vectors explicitly:
 (provider "Gap.correlated"
   (binders "a" "b" "c" "d")
   (instantiations
-    (args TYPE-A TYPE-B TYPE-C TYPE-D)
-    (args OTHER-A OTHER-B OTHER-C OTHER-D))
+    (args (kinded 0 TYPE-A) (kinded 0 TYPE-B)
+          (kinded 0 TYPE-C) (kinded 0 TYPE-D))
+    (args (kinded 0 OTHER-A) (kinded 0 OTHER-B)
+          (kinded 0 OTHER-C) (kinded 0 OTHER-D)))
   PROVIDER-TYPE)
 ```
+
+The integer after `kinded` is the remaining `Type`-arrow arity: zero denotes
+proper type, one denotes `Type -> Type`, and so on. A higher-kinded nominal
+argument also carries its canonical Lean head and any already supplied
+proper-type arguments, so `Higher.Wrap` and `Higher.Pair Nat` do not depend on
+a pretty-printed atom spelling; for example, a bare wrapper is encoded as
+`(kinded 1 (nominal "Higher.Wrap"))`. Historical exact vectors without
+`kinded` are still read as all-proper-kind assignments.
 
 `(instantiations)` is a valid explicit empty block. An `(args)` vector is
 invalid because it cannot correspond to a polymorphic provider
@@ -104,6 +119,7 @@ bug.
 The finite limits now apply to complete assignments:
 
 - at most four ordered arguments in one vector;
+- at most 80 `Type`-arrow domains in one argument kind;
 - at most 32 active heads inspected for one provider;
 - at most 16 alpha-distinct complete vectors retained for one provider; and
 - at most 32 provider/vector associations passed to one Djex execution.
@@ -116,50 +132,58 @@ condition is discarded as a whole. Its siblings and its provider declaration
 remain available.
 
 Each surviving vector is translated in one shared state, preserving argument
-order, binder alpha-scope, rigid family identity, and the exact private
-provider name. Provider-prefix fallback slices the assignment metadata with
-its owning declaration, so a later or alpha-identically typed provider cannot
-donate a vector to an earlier lane.
+order, binder alpha-scope, rigid family identity, each argument's kind-arrow
+count, and the exact private provider name. Leant reconstructs a Djex
+`GroundKind` by folding that count into `FunctionKind ProperTypeKind ...` and
+pairs it with the translated argument. Provider-prefix fallback slices the
+assignment metadata with its owning declaration, so a later or
+alpha-identically typed provider cannot donate a vector to an earlier lane.
 
 ## Checked Djex boundary
 
 Leant constructs the shared contract:
 
 ```haskell
-ProviderInstantiationAssignment
-  { providerInstantiationAssignmentProvider = privateProviderName
-  , providerInstantiationAssignmentArguments = [t1, t2, t3, t4]
+KindedProviderInstantiationAssignment
+  { kindedProviderInstantiationAssignmentProvider = privateProviderName
+  , kindedProviderInstantiationAssignmentArguments =
+      [(k1, t1), (k2, t2), (k3, t3), (k4, t4)]
   }
 ```
 
 and calls:
 
 ```haskell
-runDjinnQueryWithInstantiationAssignments
-runExferenceQueryWithInstantiationAssignments
+runDjinnQueryWithKindedInstantiationAssignments
+runExferenceQueryWithKindedInstantiationAssignments
 ```
 
 Both adapters bound the outer list before entering assignments and bound each
 argument spine before entering its members. They resolve the exact retained
-polymorphic provider, require exact arity and a context-free scheme, elaborate
-arguments in the sealed synonym/kind environment, prove the complete
-positional specialization is kind-correct, require closed context-free visible
-arguments, and alpha-deduplicate whole vectors per provider. Constructing the
-record is an assertion; these checked runners remain the Djex trust boundary.
+polymorphic provider, require exact arity and a context-free scheme, validate
+the supplied binder kinds against every occurrence in the retained body,
+elaborate each argument at its supplied positional kind, prove the complete
+specialization is kind-correct, require closed context-free visible arguments,
+and alpha-deduplicate whole vectors per provider. All assignments for one exact
+provider must agree on one binder-kind vector. Constructing the record is an
+assertion; these checked runners remain the Djex trust boundary.
 
 Djinn consumes one vector once as a direct specialized proof premise. Its
 independent proof checker validates the specialized formula before rendering
 the term; the renderer then replaces the private proof identity with the real
 provider and ordered named type arguments. Exference likewise tries each
 vector once at exact global lookup. The exact route supports non-vacuous
-leading binders because the assignment already determines their ordered
-substitution; it neither performs a Cartesian product nor depends on the legacy
-scalar route's vacuous-body guard.
+leading binders and also constraint-only or otherwise vacuous higher-kinded
+binders: Lean supplies the kind fact which the erased provider body cannot
+infer. It neither performs a Cartesian product nor depends on the legacy
+runner's vacuous-to-`Type` default.
 
-The historical `ProviderInstantiationCandidate` runners remain supported as
-an independent scalar-pool compatibility API. Empty exact-assignment calls
-delegate exactly to the historical runners, preserving their diagnostics,
-ordering, and budget observations.
+The historical `ProviderInstantiationCandidate` runners and unkinded exact
+assignment runners remain supported as compatibility APIs. The latter still
+infer binder kinds from the provider body and default a vacuous binder to
+`Type`; Leant deliberately uses the kinded contract above. Empty kinded calls
+remain exactly inert, preserving historical diagnostics, ordering, and budget
+observations.
 
 ## Scope and validation
 
@@ -171,21 +195,36 @@ refutation. Closing one selected seed may use other heads for that seed's
 instance subgoals and the provider's remaining constraints; all of them must
 agree in one metavariable context. Open, contextual, depth-truncated,
 wrong-kind, wrong-arity, incomplete, or unsatisfied assignments fail closed.
+Unsaturated structural built-ins `And`, `Prod`, `PProd`, `Or`, `Sum`, `PSum`,
+`Iff`, and `Not` also remain unsupported as higher-kinded assignment heads
+until their unsaturated renderer identities are modeled. Saturated occurrences
+keep their existing structural translations.
 
 Pure regressions cover exact parsing, legacy unary parsing, finite outer and
 inner bounds, four ordered quantified arguments in all engines, early aggregate
-capping, and cross-provider non-donation. Live extraction covers two
+capping, cross-provider non-donation, kind/order preservation, and a vacuous
+`Type -> Type` assignment whose exact visible application is required under
+Djinn, Exference, and combined mode. Live extraction covers two
 independently determining constraints, a selected head with its own instance
 prerequisite, and a correlated pair reached only after sixteen unsatisfied
 distractor heads. Each case succeeds under standalone Djinn and standalone
 Exference; the distractors and an unsatisfied remaining constraint contribute
 no partial vector.
 
-On 2026-08-05, `cabal build exe:leant -j1` and
-`cabal test all -j1 --test-show-details=direct` passed, including all 161 Leant
-unit cases and the vendored Djex matrices. The dedicated Lean 4.31 constraint-
-closure transcript passed all six exact applications, and the existing
-quantified-provider transcript remained unchanged and passing. All eleven
-`synth-*` golden transcripts passed; the only refreshed output was the stable
-Exference queue-pruning count in the existing Djinn-provider transcript, while
-its candidate and truncation reason remained unchanged.
+The 2026-08-06 higher-kind transcript
+[`synth-provider-higher-kind-assignment`](../../test/synth-provider-higher-kind-assignment.txt)
+adds a constraint-only provider `Higher.vacuous {F : Type -> Type}`. Its active
+instance fixes `F := Higher.Wrap`, and the golden output contains
+`Higher.vacuous («F» := Higher.Wrap)` under standalone Djinn, standalone
+Exference, and combined search. The same transcript retains the earlier mixed
+higher-kinded/rank-N vector, so the new vacuous path does not weaken positional
+kind or argument-order preservation.
+
+On 2026-08-06, `cabal build all -j1` and
+`cabal test leant-synth-tests -j1 --test-show-details=direct` passed, including
+all 171 Leant unit cases against the updated vendored Djex. The dedicated
+higher-kind transcript passed its exact applications under Djinn, Exference,
+and combined search. All `synth-*` golden transcripts passed; the only
+refreshed output was the stable Exference queue-pruning count in the existing
+Djinn-provider transcript, while its candidate and truncation reason remained
+unchanged.

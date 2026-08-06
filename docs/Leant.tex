@@ -45,8 +45,10 @@
   Ligatures    = TeX ]
 \setmonofont{DejaVuSansMono}[
   Extension    = .ttf,
-  UprightFont  = *, ItalicFont = *-Oblique,
-  BoldFont     = *-Bold, BoldItalicFont = *-BoldOblique,
+  UprightFont  = *, ItalicFont = *,
+  ItalicFeatures = {FakeSlant = 0.2},
+  BoldFont     = *-Bold, BoldItalicFont = *-Bold,
+  BoldItalicFeatures = {FakeSlant = 0.2},
   Scale        = 0.83 ]
 \setmathfont{LibertinusMath-Regular.otf}
 
@@ -784,30 +786,60 @@ synth engine: both
   it1  Gap.polyGlobal («a» := (∀ (a0_0 : _), a0_0 → a0_0))
 \end{session}
 
-Discovery opens no more than four leading proper-type binders on one exact
+An active head can also determine a higher-kinded binder which is absent from
+the provider body. Leant preserves the argument's bounded
+\code{Type~->~\dots~->~Type} kind, so both checked engines keep this
+constraint-only application visible:
+
+\begin{session}
+λ> namespace Higher
+λ> axiom Wrap : Type → Type
+λ> class VacuousChoice (F : Type → Type) : Prop where witness : True
+λ> instance : VacuousChoice Wrap := ⟨True.intro⟩
+λ> axiom VacuousToken : Type
+λ> axiom vacuous {F : Type → Type} [VacuousChoice F] : VacuousToken
+λ> end Higher
+λ> :set synth-engine djinn
+synth engine: djinn
+λ> :synth Higher.VacuousToken
+  it1  Higher.vacuous («F» := Higher.Wrap)
+λ> :set synth-engine exference
+synth engine: exference
+λ> :synth Higher.VacuousToken
+  it1  Higher.vacuous («F» := Higher.Wrap)
+\end{session}
+
+Discovery opens no more than four leading type binders on one exact
 provider while retaining its erased instance constraints. It inspects at most
 32 active heads per provider in Lean resolver order. Each selected head and its
 complete constraint closure run under restored metavariable state. The seed
 head stays fixed while its returned instance subgoals and every other provider
 constraint are solved in that same context; a failure or unresolved binder
 rejects the head as a whole. One success contributes one complete vector in
-leading-binder order, never an uncorrelated scalar pool.
+leading-binder order, never an uncorrelated scalar pool. For each argument,
+discovery also reduces its type to the admitted first-order kind language and
+retains the number of \code{Type} arrow domains. Zero denotes proper type;
+positive counts preserve bare and partially applied constructors.
 
 Leant retains at most 16 alpha-distinct vectors per provider and passes no more
 than 32 provider/vector associations to Djex. Each vector has exact provider
 arity and at most four arguments. The command takes that aggregate prefix
 before an argument affects family planning, rigidity, or translation. Live
 provider metadata uses
-\code{(instantiations (args ...))}; metadata-free and binder-only inventories
-remain valid, while the historical \code{(candidates ...)} form parses as
-unary vectors only. A vector containing depth truncation (\code{FDepth}) or an
-instance binder (\code{FInst}) is discarded in full, including an instance
-binder revealed by reducing an alias. Provider-prefix fallback keeps metadata
-attached to its exact declaration. The checked Djinn and Exference assignment
-runners validate provider identity, arity, positional kind correctness,
-closure, and context before consuming each vector once without Cartesian
-reconstruction. Thus a later or alpha-identically typed provider cannot donate
-its assignment to an earlier one.
+\code{(instantiations (args (kinded N ...) ...))}. Leant folds each bounded
+arrow count into a Djex \code{GroundKind}, pairs it with the translated type,
+and calls \code{runDjinnQueryWithKindedInstantiationAssignments} or
+\code{runExferenceQueryWithKindedInstantiationAssignments}. Metadata-free and
+binder-only inventories remain valid. Historical exact arguments stay in their
+original vectors and default each position to proper kind; the
+\code{(candidates ...)} form parses as proper-kind unary vectors only. A vector
+containing depth truncation (\code{FDepth}) or an instance binder
+(\code{FInst}) is discarded in full, including an instance binder revealed by
+reducing an alias. Provider-prefix fallback keeps metadata attached to its
+exact declaration. The checked runners validate provider identity, arity,
+supplied positional kinds, closure, and context before consuming each vector
+once without Cartesian reconstruction. Thus a later or alpha-identically typed
+provider cannot donate its assignment to an earlier one.
 
 Leant also retains applications whose arguments are proper types. A bound
 first-order constructor remains a higher-kinded variable in Djex; an opaque
@@ -827,7 +859,11 @@ synth engine: exference
 
 The serializer admits only first-order kind arrows between universes and only
 application arguments whose own type is a universe. Term-indexed families such
-as \code{P 3} remain opaque. A retained nominal application can support a
+as \code{P 3} remain opaque. Unsaturated structural built-ins
+\code{And}, \code{Prod}, \code{PProd}, \code{Or}, \code{Sum}, \code{PSum},
+\code{Iff}, and \code{Not} remain excluded as higher-kinded assignment heads
+until their unsaturated renderer identity is modeled; saturated uses keep
+their structural translation. A retained nominal application can support a
 positive, Lean-verified candidate but always poisons a negative verdict because
 its constant hides structure. Query-derived candidate types come only from
 proven proper-type positions below arrows and tuples in the sequent, including
@@ -848,6 +884,12 @@ local-provider report} and the
 instance-head report}, followed by the
 \href{reports/2026-08-05-correlated-instance-head-assignments.md}{correlated
 assignment report}.
+
+Unit regressions pin the kinded wire format, kind and argument order, finite
+bounds, and the exact vacuous application under Djinn, Exference, and combined
+mode. The live \code{synth-provider-higher-kind-assignment} transcript retains
+the mixed higher-kinded/rank-N vector and requires
+\code{Higher.vacuous («F» := Higher.Wrap)} in all three modes.
 
 \subsection{Impossibility, proved}\label{sec:negative}
 
@@ -1257,9 +1299,10 @@ constraint closure. One successful head yields one ordered vector; an
 incomplete or unusable head yields nothing. Provider slicing retains the
 vector only with its source declaration; after whole-vector context/depth and
 arity filtering Leant takes the command-wide prefix before planning or
-translation, then calls the checked Djinn or Exference assignment runner. Lean
-still reconstructs every dictionary during final elaboration---only the closed
-proper-type vector crosses the bridge.
+translation. Each argument crosses with its bounded \code{Type}-arrow kind;
+Leant reconstructs a Djex \code{GroundKind} and calls the checked kinded Djinn
+or Exference assignment runner. Lean still reconstructs every dictionary
+during final elaboration---only the closed kind/type vector crosses the bridge.
 
 Exact rendered spellings keep their first scheduled occurrence. Before a
 later provider lane is forced or capped, spellings already rejected by Lean
@@ -1302,8 +1345,11 @@ Leant inserts its wildcard before later lambda arguments and withholds complete
 negative evidence across the erased boundary. Constrained rank-N hypotheses
 therefore keep their instance applications implicit without shifting the
 candidate's term binders. Provider discovery now consults active Lean instance
-heads only to obtain bounded proper-type assignments for the exact provider
-whose erased constraints they collectively solve. It never serializes
+heads only to obtain bounded ground-kinded assignments for the exact provider
+whose erased constraints they collectively solve. Constraint-only vacuous
+higher-kinded binders are supported when each argument kind is a bounded
+\code{Type~->~\dots~->~Type} chain; unsaturated structural built-in heads
+remain excluded. Leant never serializes
 dictionaries or general instance resolution into Djex. A selected head is
 accepted only after its own subgoals and every remaining provider constraint
 close in one isolated metavariable context. Up to 32 heads are inspected and

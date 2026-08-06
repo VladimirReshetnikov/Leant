@@ -122,7 +122,7 @@ best-first search. From the commit history and the reports
   source of choices; the separately checked caller-evidence channel below may
   carry a quantified proper type justified by a richer source frontend.
 - **Lean-visible provider instantiation evidence (Leant bridge).** Live
-  provider discovery records the original names of leading proper-type
+  provider discovery records the original names of leading type
   binders while erasing unused instance evidence only in the provider lane.
   Djex can therefore retain a vacuous specialization as an explicit type
   application, and Leant restores it with a named Lean argument such as
@@ -145,7 +145,7 @@ best-first search. From the commit history and the reports
   serialization keeps its established behavior.
 - **Correlated active-instance assignments (Leant bridge).** For each exact
   live provider independently, the generated Lean metaprogram opens at most
-  four leading proper-type binders while retaining the erased instance
+  four leading type binders while retaining the erased instance
   constraints which can determine them. It inspects at most 32 active instance
   heads per provider in Lean resolver order. Every selected head and its full
   constraint closure run under `Lean.withoutModifyingState`, so no attempt can
@@ -157,35 +157,56 @@ best-first search. From the commit history and the reports
   One success yields one complete ordered argument vector. At most 16
   alpha-distinct vectors survive per provider; Leant never flattens them into a
   scalar pool or reconstructs cross-head Cartesian products. Every argument
-  must be closed and universe-kinded. Serialization runs in goal mode so a
-  contextual binder remains visible as `FInst`; the Haskell bridge rejects a
+  must be closed, and its inferred type must reduce to the bounded first-order
+  kind language `Type -> ... -> Type`. Discovery retains the arrow count next
+  to that exact argument; zero is proper type, while a positive count preserves
+  a bare or partially applied constructor. Serialization runs in goal mode so
+  a contextual binder remains visible as `FInst`; the Haskell bridge rejects a
   whole vector containing `FDepth` or `FInst`, including an instance binder
   exposed only after reducing an alias.
 
   The provider inventory grammar uses an optional
-  `(instantiations (args ...))` block after binder metadata. Historical
-  metadata-free entries, binder-only entries, and explicit empty blocks still
-  parse. The legacy `(candidates ...)` form is read as unary vectors only; it
-  does not recreate a multi-binder product. Assignments stay inside the same
-  `ProviderFrag` as their declaration, so the 1/4/16/full provider-prefix
-  schedule cannot expose a later provider's vector in an earlier lane. Leant
-  caps the command-wide association list at 32 complete vectors before any
-  argument participates in family planning, rigidity, or translation.
+  `(instantiations (args (kinded N ...) ...))` block after binder metadata.
+  `N` is the remaining `Type`-arrow arity and is bounded independently of the
+  four provider-binder positions. Historical metadata-free entries,
+  binder-only entries, and explicit empty blocks still parse. Historical exact
+  arguments without the wrapper remain in their original vectors and default
+  each position to proper kind. The legacy `(candidates ...)` form is read as
+  unary proper-kind vectors only; neither compatibility path recreates a
+  multi-binder product. Assignments stay inside the same `ProviderFrag` as
+  their declaration, so the 1/4/16/full provider-prefix schedule cannot expose
+  a later provider's vector in an earlier lane. Leant caps the command-wide
+  association list at 32 complete vectors before any argument participates in
+  family planning, rigidity, or translation.
 
-  The pinned Djex API exposes checked
-  `runDjinnQueryWithInstantiationAssignments` and
-  `runExferenceQueryWithInstantiationAssignments` runners. Each resolves the
-  exact sealed-session provider, validates vector width and exact arity,
-  synonym/kind correctness of the complete positional specialization, closure,
-  and context freedom, and alpha-deduplicates whole vectors only within that
+  Leant reconstructs a Djex `GroundKind` from each arrow count and constructs
+  `KindedProviderInstantiationAssignment` values. The pinned Djex API exposes
+  checked `runDjinnQueryWithKindedInstantiationAssignments` and
+  `runExferenceQueryWithKindedInstantiationAssignments` runners. Each resolves
+  the exact sealed-session provider, validates vector width and exact arity,
+  checks the supplied binder-kind vector against the retained provider body,
+  elaborates every argument at its supplied positional kind, checks closure and
+  context freedom, and alpha-deduplicates whole vectors only within that
   provider. Djinn compiles each vector into one proof-producing direct premise;
-  Exference tries it once at exact global lookup, including when a provider
-  binder is non-vacuous. Neither path donates a choice to an alpha-identically
-  typed sibling or rebuilds a Cartesian product. Empty assignment input is
-  exactly the historical runner. The earlier scalar candidate API remains a
-  compatibility path. This is bounded caller-supplied evidence, not general
-  rank-N subsumption or impredicative inference; see the
+  Exference tries it once at exact global lookup. Because the caller supplies a
+  kind fact which an erased body cannot infer, both paths now accept
+  constraint-only or otherwise vacuous higher-kinded binders as well as
+  non-vacuous ones. Neither path donates a choice to an alpha-identically typed
+  sibling or rebuilds a Cartesian product. Empty kinded input is exactly inert.
+  The earlier scalar and unkinded assignment APIs remain compatibility paths;
+  the unkinded route still defaults an unconstrained binder to `Type`. This is
+  bounded caller-supplied evidence, not general rank-N subsumption or
+  impredicative inference; see the
   [correlated assignment report](reports/2026-08-05-correlated-instance-head-assignments.md).
+
+  Unsaturated structural built-ins `And`, `Prod`, `PProd`, `Or`, `Sum`, `PSum`,
+  `Iff`, and `Not` remain excluded as higher-kinded assignment heads until
+  their renderer identities are modeled; saturated uses keep their structural
+  translation. Unit regressions cover the kinded wire, kind/order retention,
+  bounds, and exact vacuous success in Djinn, Exference, and combined mode. The
+  live `synth-provider-higher-kind-assignment` transcript requires both its
+  mixed kinded/rank-N vector and
+  `Higher.vacuous («F» := Higher.Wrap)` in all three modes.
 - **Instance-implicit goal alignment (Leant bridge).** A non-dependent
   instance binder is neither a type quantifier nor an ordinary engine premise.
   The fragment retains it as a render-only slot, erases its dictionary before
@@ -591,14 +612,15 @@ Design rules, all inherited from Djex:
   supported fragment are dropped individually before search. Leant gives
   the survivors private collision-free engine names and maps them back to the
   exact fully-qualified Lean globals during rendering. It also retains the
-  source names of engine-visible proper-type binders, so visible Djex
+  source names of engine-visible type binders, so visible Djex
   instantiations render as named Lean arguments without exposing intervening
   instance binders. For a provider whose erased instance constraint can
   determine those binders, discovery also records the bounded active-head
-  assignments described in §1.5. The metadata is provider-local and optional,
-  and both engine adapters receive it only through Djex's checked exact-vector
-  runners. Exference assigns
-  increasing positive rating penalties in discovery order so fallback
+  assignments described in §1.5, including each argument's bounded
+  `Type`-arrow kind. The metadata is provider-local and optional. Leant
+  reconstructs a Djex `GroundKind` for every argument, and both engine adapters
+  receive it only through Djex's checked kinded exact-vector runners.
+  Exference assigns increasing positive rating penalties in discovery order so fallback
   constants do not drown the best match; Djinn instead uses the sparse-prefix
   schedule below. Exference remains subject to its explicit budgets
   (`:set synth-steps` exposes the step bound; queue/depth retain conservative
@@ -705,11 +727,15 @@ Design rules, all inherited from Djex:
   associations reach a checked Djex runner. The selected head's subgoals and
   all remaining provider constraints must close under one isolated
   metavariable context. Any open, wrong-arity, depth-truncated, or contextual
-  vector fails closed as a whole. A vacuous provider may
-  mention ambient rigids opened from the query, but a free flexible variable
-  still disables this route. Leant rejects a constrained quantified visible
-  argument rather than guessing how a Haskell class context should become Lean
-  binders.
+  vector fails closed as a whole. Each argument's kind must be a bounded
+  `Type -> ... -> Type` chain; its arrow count crosses the bridge and is checked
+  against the exact provider binder. This admits constraint-only or otherwise
+  vacuous higher-kinded binders, but not unsaturated structural built-ins whose
+  renderer identity is still absent (`And`, `Prod`, `PProd`, `Or`, `Sum`,
+  `PSum`, `Iff`, and `Not`). A vacuous provider may mention ambient rigids
+  opened from the query, but a free flexible variable still disables this
+  route. Leant rejects a constrained quantified visible argument rather than
+  guessing how a Haskell class context should become Lean binders.
 - **Recursive elimination is bounded to one layer in Exference.** A
   recursive field exposed by a constructor match is available as a
   normal branch-local value, but is not eagerly decomposed again. The
@@ -927,7 +953,7 @@ relevance signal, Exference's increasing positive penalties preserve that
 signal during heuristic search, Djinn uses the sparse-prefix schedule below,
 and a private-name map restores the exact Lean global in the rendered term.
 For live declarations it also carries the original names of leading
-proper-type binders. Explicit Djex instantiation evidence can then render as a
+type binders. Explicit Djex instantiation evidence can then render as a
 named Lean argument while class dictionaries remain implicit and are rebuilt
 by the elaborator.
 Providers that fall outside the fragment are dropped

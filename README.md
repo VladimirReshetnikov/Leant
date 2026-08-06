@@ -507,28 +507,63 @@ synth engine: both
   it1  Gap.polyGlobal («a» := (∀ (a0_0 : _), a0_0 → a0_0))
 ```
 
+The instance may determine a higher-kinded binder which never occurs in the
+provider body. Leant retains the argument's bounded `Type -> ... -> Type` kind
+instead of collapsing it to proper type, so both checked engines preserve this
+constraint-only specialization:
+
+```text
+λ> namespace Higher
+λ> axiom Wrap : Type → Type
+λ> class VacuousChoice (F : Type → Type) : Prop where witness : True
+λ> instance : VacuousChoice Wrap := ⟨True.intro⟩
+λ> axiom VacuousToken : Type
+λ> axiom vacuous {F : Type → Type} [VacuousChoice F] : VacuousToken
+λ> end Higher
+λ> :set synth-engine djinn
+synth engine: djinn
+λ> :synth Higher.VacuousToken
+  it1  Higher.vacuous («F» := Higher.Wrap)
+λ> :set synth-engine exference
+synth engine: exference
+λ> :synth Higher.VacuousToken
+  it1  Higher.vacuous («F» := Higher.Wrap)
+```
+
 Extraction is deliberately finite and local. It opens at most four leading
-proper-type binders on one provider, retains the erased instance constraints,
+type binders on one provider, retains the erased instance constraints,
 and inspects at most 32 active heads in Lean's resolver order. Each attempt is
 state-isolated. The selected head remains fixed while its instance subgoals and
 every other provider constraint are solved under the same metavariable context;
 if any obligation or opened binder remains unresolved, that head contributes
 nothing. A success contributes one complete vector in leading-binder order,
 not a flat pool whose Cartesian product would lose the head's correlation.
+For every argument, discovery also reduces its type to the admitted bounded
+kind language and records the number of `Type`-arrow domains. Zero means
+proper type; positive counts preserve bare and partially applied constructors.
 
 At most 16 alpha-distinct vectors survive per provider, and Leant passes at
 most 32 provider/vector associations in total. Every vector has exact provider
 arity and at most four arguments. That aggregate prefix is taken before an
 argument can affect family planning, rigidity, or type translation, so
 evidence beyond the boundary is not entered. Live metadata uses
-`(instantiations (args ...))`; the historical `(candidates ...)` form remains
-readable as unary vectors only, alongside metadata-free and binder-only
-inventories. A complete vector fails closed if any argument contains depth
-truncation (`FDepth`) or an instance binder (`FInst`), including a constraint
-hidden behind a reducible alias. Provider-prefix lanes slice the metadata with
-its declaration, and Djex resolves every vector by the exact private provider
-name, so a later or alpha-identically typed provider cannot donate evidence to
-an earlier one.
+`(instantiations (args (kinded N ...) ...))`. Leant reconstructs each Djex
+`GroundKind` by folding that bounded arrow count into `FunctionKind` over
+`ProperTypeKind`, pairs it with the translated type, and calls
+`runDjinnQueryWithKindedInstantiationAssignments` or
+`runExferenceQueryWithKindedInstantiationAssignments`. The historical
+`(candidates ...)` form remains readable as unary, proper-kind vectors only,
+alongside metadata-free and binder-only inventories. A complete vector fails
+closed if any argument contains depth truncation (`FDepth`) or an instance
+binder (`FInst`), including a constraint hidden behind a reducible alias.
+Provider-prefix lanes slice the metadata with its declaration, and Djex
+resolves every vector by the exact private provider name, so a later or
+alpha-identically typed provider cannot donate evidence to an earlier one.
+
+Unsaturated structural built-ins `And`, `Prod`, `PProd`, `Or`, `Sum`, `PSum`,
+`Iff`, and `Not` remain excluded as higher-kinded assignment heads until their
+unsaturated renderer identity is represented. Saturated uses retain their
+ordinary structural translation.
 
 The dedicated
 [`synth-quantified-provider`](test/synth-quantified-provider.txt) transcript
@@ -538,8 +573,13 @@ standalone Exference, and combined search. Its reducible
 instance but is excluded because it is contextual. This is bounded,
 evidence-directed rank-N/impredicative support, not general impredicative
 inference; open or context-bearing quantified arguments are rejected rather
-than guessed into Lean syntax. The current exact-vector contract is recorded
-in the
+than guessed into Lean syntax. The
+[`synth-provider-higher-kind-assignment`](test/synth-provider-higher-kind-assignment.txt)
+transcript separately requires the mixed kinded/rank-N vector and the exact
+vacuous `Higher.vacuous («F» := Higher.Wrap)` application under Djinn,
+Exference, and combined search. Unit regressions pin the kinded wire format,
+kind/order retention, finite bounds, and the same vacuous success in all three
+engine modes. The current exact-vector contract is recorded in the
 [correlated instance-head assignment report](docs/reports/2026-08-05-correlated-instance-head-assignments.md);
 the earlier scalar API remains documented in the
 [provider-local instance-head report](docs/reports/2026-08-05-provider-local-instance-head-evidence.md).
@@ -984,7 +1024,7 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
 - Providers receive collision-free private names inside Djex. Rendering
   maps those names back to the exact fully-qualified Lean globals before the
   backend verifies the candidate. Live discovery also retains the source names
-  of leading proper-type binders. When Djex makes a vacuous specialization
+  of leading type binders. When Djex makes a vacuous specialization
   visible, Leant renders a named argument such as
   `Demo.global («a» := Nat)`; intervening instance binders stay implicit and
   Lean reconstructs their dictionaries. Historical caller-owned inventories
@@ -993,17 +1033,21 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   engine still runs with the structural declarations it already has.
 - For an exact polymorphic provider whose erased constraints can determine its
   visible type arguments, discovery may attach active-instance-head evidence.
-  It opens at most four proper-type binders and inspects at most 32 heads in
+  It opens at most four type binders and inspects at most 32 heads in
   resolver order under isolated metavariable state. A selected head is retained
   only after its own subgoals and every remaining provider constraint close;
-  one success yields one ordered vector, and incomplete heads yield nothing.
-  At most 16 distinct vectors survive per provider. `FDepth` and `FInst`
-  fragments reject their complete vector after parsing, the command-wide
-  vector list is capped at 32 before planning or translation, and
-  provider-prefix fallback carries each vector only with its source
-  declaration. The checked Djinn and Exference assignment entry points verify
-  exact provider identity, arity, positional kind correctness, closure, and
-  context before consuming a vector once without Cartesian reconstruction.
+  one success yields one ordered vector of kind/type pairs, and incomplete
+  heads yield nothing. Each argument retains a bounded `Type`-arrow kind;
+  Leant reconstructs the corresponding Djex `GroundKind` and sends the vector
+  through the checked kinded Djinn or Exference assignment entry point. At most
+  16 distinct vectors survive per provider. `FDepth` and `FInst` fragments
+  reject their complete vector after parsing, the command-wide vector list is
+  capped at 32 before planning or translation, and provider-prefix fallback
+  carries each vector only with its source declaration. The checked runners
+  verify exact provider identity, arity, supplied positional kinds, closure,
+  and context before consuming a vector once without Cartesian reconstruction.
+  This includes constraint-only or otherwise vacuous higher-kinded binders;
+  unsaturated structural built-in heads remain conservatively excluded.
 - Non-dependent instance-implicit binders in a goal are serialized as
   render-only slots. They are erased before either engine searches, reserve a
   wildcard in an introduced Lean lambda, stay implicit at hypothesis and
