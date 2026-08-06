@@ -52,6 +52,7 @@ import Leant.Synth.Fragment
   , GoalSort (..)
   , ParsedGoal (..)
   , ProviderFrag (..)
+  , ProviderInstantiationArgument (..)
   , ProviderQuery (..)
   , candidateVerificationProgram
   , fragHasDepth
@@ -311,8 +312,10 @@ providerProgramTests = testGroup "provider discovery program"
         `isInfixOf` synthPrelude [] @?= True
       "        let typeLevel \8592 LeantSynth.resultIsSort info.type\n        if typeLevel then pure () else"
         `isInfixOf` program @?= True
-  , testCase "retain only proper-type applications and constructor kinds" $ do
+  , testCase "retain proper applications and bounded constructor kinds" $ do
       "partial def isTypeKind (e : Expr) : MetaM Bool := do"
+        `isInfixOf` synthPrelude [] @?= True
+      "partial def typeKindArity? (remaining : Nat) (e : Expr)"
         `isInfixOf` synthPrelude [] @?= True
       "        if \8592 isTypeKind t then"
         `isInfixOf` synthPrelude [] @?= True
@@ -336,8 +339,8 @@ providerProgramTests = testGroup "provider discovery program"
             ]
           implicitScheme = unlines
             [ "      else do"
-            , "        let properType \8592 isTypeKind t"
-            , "        if providerMode && !properType then atomOf e"
+            , "        let typeKind \8592 isTypeKind t"
+            , "        if providerMode && !typeKind then atomOf e"
             , "        else do"
             , "          -- An unused ordinary implicit type parameter still needs a"
             , "          -- scheme binder so Djex can choose a visible instantiation."
@@ -379,9 +382,15 @@ providerProgramTests = testGroup "provider discovery program"
         `isInfixOf` prelude @?= True
       "|| hasInstanceBinder candidate then"
         `isInfixOf` prelude @?= True
-      "pure (some (← go false fuel 0 [] candidate))"
+      "match ← typeKindArity? fuel kind with"
+        `isInfixOf` prelude @?= True
+      "providerNominalCandidateFragment? fuel candidate"
+        `isInfixOf` prelude @?= True
+      "let mut assignments : Array (Array (Nat × String)) := #[]"
         `isInfixOf` prelude @?= True
       "LeantSynth.providerInstantiationAssignments 80 info.type"
+        `isInfixOf` program @?= True
+      "\" (kinded \" ++ toString argument.1 ++ \" \""
         `isInfixOf` program @?= True
       "\" (instantiations\" ++ assignmentText ++ \")\""
         `isInfixOf` program @?= True
@@ -543,8 +552,10 @@ providerParserTests = testGroup "provider inventory parser"
           [ ProviderFragWithEvidence "Gap.global"
               (FAll False "i0" (FAtom False "Gap.Token"))
               ["a"]
-              [ [FAll True "s0" (FArr (FVar "s0") (FVar "s0"))]
-              , [FAtom False "Nat"]
+              [ [ ProviderInstantiationArgument 0
+                    (FAll True "s0" (FArr (FVar "s0") (FVar "s0")))
+                ]
+              , [ProviderInstantiationArgument 0 (FAtom False "Nat")]
               ]
           ]
   , testCase "retain exact ordered provider instantiations" $
@@ -561,14 +572,75 @@ providerParserTests = testGroup "provider inventory parser"
               (FAll False "a"
                 (FAll False "b" (FAtom False "Gap.Token")))
               ["a", "b"]
-              [ [ FAll True "s0" (FArr (FVar "s0") (FVar "s0"))
-                , FAll True "s1"
-                    (FArr (FVar "s1")
-                      (FArr (FVar "s1") (FVar "s1")))
+              [ [ ProviderInstantiationArgument 0
+                    (FAll True "s0" (FArr (FVar "s0") (FVar "s0")))
+                , ProviderInstantiationArgument 0
+                    (FAll True "s1"
+                      (FArr (FVar "s1")
+                        (FArr (FVar "s1") (FVar "s1"))))
                 ]
-              , [FAtom False "Nat", FAtom False "Bool"]
+              , [ ProviderInstantiationArgument 0 (FAtom False "Nat")
+                , ProviderInstantiationArgument 0 (FAtom False "Bool")
+                ]
               ]
           ]
+  , testCase "retain explicit provider argument kinds" $
+      parseProviderSexp
+          "(providers (provider \"Gap.global\" (binders \"F\" \"a\") \
+          \(instantiations (args \
+          \(kinded 1 (atom unsafe \"Gap.Wrap\")) \
+          \(kinded 0 (atom unsafe \"Nat\")))) \
+          \(alli \"F\" (alli \"a\" (-> \
+          \(app unsafe \"F a\" (app-variable \"F\") (var \"a\")) \
+          \(atom unsafe \"Gap.Token\"))))))"
+        @?= Right
+          [ ProviderFragWithEvidence "Gap.global"
+              (FAll False "F" (FAll False "a"
+                (FArr
+                  (FApp False "F a" (AppVariable "F") [FVar "a"])
+                  (FAtom False "Gap.Token"))))
+              ["F", "a"]
+              [ [ ProviderInstantiationArgument 1
+                    (FAtom False "Gap.Wrap")
+                , ProviderInstantiationArgument 0 (FAtom False "Nat")
+                ]
+              ]
+          ]
+  , testCase "retain canonical nominal provider arguments" $
+      parseProviderSexp
+          "(providers (provider \"Gap.partial\" (binders \"F\") \
+          \(instantiations (args \
+          \(kinded 1 (nominal \"Gap.Pair\" \
+          \(atom unsafe \"Nat\"))))) \
+          \(alli \"F\" (-> \
+          \(app unsafe \"F Bool\" (app-variable \"F\") \
+          \(atom unsafe \"Bool\")) \
+          \(atom unsafe \"Gap.Token\")))))"
+        @?= Right
+          [ ProviderFragWithEvidence "Gap.partial"
+              (FAll False "F"
+                (FArr
+                  (FApp False "F Bool" (AppVariable "F")
+                    [FAtom False "Bool"])
+                  (FAtom False "Gap.Token")))
+              ["F"]
+              [ [ ProviderInstantiationNominalArgument 1 "Gap.Pair"
+                    [FAtom False "Nat"]
+                ]
+              ]
+          ]
+  , testCase "reject invalid provider argument kinds" $ do
+      let inventory arity =
+            "(providers (provider \"Gap.global\" (binders \"F\") "
+              ++ "(instantiations (args (kinded " ++ arity
+              ++ " (atom unsafe \"Gap.Wrap\")))) "
+              ++ "(alli \"F\" (atom unsafe \"Gap.Token\"))))"
+          rejected arity = case parseProviderSexp (inventory arity) of
+            Left "invalid provider instantiation argument kind arity" ->
+              pure ()
+            other -> assertFailure $
+              "accepted invalid provider kind " ++ arity ++ ": " ++ show other
+      mapM_ rejected ["-1", "81", "not-a-kind"]
   , testCase "distinguish an explicit empty evidence block" $
       parseProviderSexp
           "(providers (provider \"Gap.token\" (binders) (candidates) \
@@ -603,7 +675,7 @@ providerParserTests = testGroup "provider inventory parser"
           @?= Right
             [ ProviderFragWithEvidence "Gap.global"
                 (FAll False "a" (FAtom False "Gap.Token"))
-                ["a"] [[contextual]]
+                ["a"] [[ProviderInstantiationArgument 0 contextual]]
             ]
         fragHasInstanceBinder contextual @?= True
         fragHasInstanceBinder
@@ -855,7 +927,8 @@ providerEngineTests = testGroup "foreign providers"
       let void = FParamInd "Demo.Void" "Demo.Void" [] []
           polytype = FAll True "p" (FArr (FVar "p") (FVar "p"))
           provider = ProviderFragWithEvidence "Demo.impossible"
-            (FAll False "a" void) ["a"] [[polytype]]
+            (FAll False "a" void) ["a"]
+              [[ProviderInstantiationArgument 0 polytype]]
           exact = (==
             "Demo.impossible («a» := (∀ (a0_0 : _), a0_0 → a0_0))")
           check engine = case
@@ -1099,17 +1172,93 @@ typeApplicationTests = testGroup "retained type applications"
   , testCase "instantiate a provider-only constrained rank-N choice" $
       let token = FAtom False "Gap.Token"
           provider = ProviderFragWithEvidence "Gap.global"
-            (FAll False "a" token) ["a"] [[polytype]]
+            (FAll False "a" token) ["a"] [[properArgument polytype]]
           check engine = expectTerm "Gap.global («a» := (∀"
             (synthesizeWithProviders engine 1024 [provider] token)
       in mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "retain mixed higher-kinded and rank-N provider arguments" $ do
+      let natural = FAtom False "Nat"
+          token = FAtom False "Higher.Token"
+          applied = FApp False "Higher.Wrap Nat"
+            (AppNominal "Higher.Wrap") [natural]
+          provider = ProviderFragWithEvidence "Higher.global"
+            (FAll False "F" (FAll False "a" (FAll False "hidden"
+              (FArr
+                (FApp True "F a" (AppVariable "F") [FVar "a"])
+                token))))
+            ["F", "a", "hidden"]
+            [ [ ProviderInstantiationNominalArgument 1 "Higher.Wrap" []
+              , properArgument natural
+              , properArgument polytype
+              ]
+            ]
+          expected =
+            "Higher.global («F» := Higher.Wrap) («a» := (Nat)) "
+              ++ "(«hidden» := (∀ (a0_0 : _), a0_0 → a0_0))"
+          check engine = case
+              synthesizeWithProviders engine 2048 [provider]
+                (FArr applied token) of
+            Right (SynthCandidates groups _) ->
+              assertBool
+                ("mixed higher-kinded assignment was lost in "
+                  ++ synthEngineName engine ++ ": " ++ show groups)
+                (any (== expected) (concat groups))
+            Right other -> assertFailure $
+              "unexpected mixed higher-kinded assignment outcome from "
+                ++ synthEngineName engine ++ ": " ++ outcomeTag other
+            Left err -> assertFailure err
+      mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "share a partially applied higher-kinded provider argument" $ do
+      let natural = FAtom False "Nat"
+          boolean = FAtom False "Bool"
+          token = FAtom False "Higher.Token"
+          saturated = FApp False "Higher.Pair Nat Bool"
+            (AppNominal "Higher.Pair") [natural, boolean]
+          provider = ProviderFragWithEvidence "Higher.partial"
+            (FAll False "F"
+              (FArr
+                (FApp True "F Bool" (AppVariable "F") [boolean])
+                token))
+            ["F"]
+            [[ProviderInstantiationNominalArgument 1 "Higher.Pair" [natural]]]
+          expected = "Higher.partial («F» := (@Higher.Pair (Nat)))"
+          check engine = case
+              synthesizeWithProviders engine 2048 [provider]
+                (FArr saturated token) of
+            Right (SynthCandidates groups _) ->
+              assertBool
+                ("partial higher-kinded assignment was lost in "
+                  ++ synthEngineName engine ++ ": " ++ show groups)
+                (any (== expected) (concat groups))
+            Right other -> assertFailure $
+              "unexpected partial higher-kinded assignment outcome from "
+                ++ synthEngineName engine ++ ": " ++ outcomeTag other
+            Left err -> assertFailure err
+      mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "skip unsupported vacuous higher-kinded assignments" $ do
+      let token = FAtom False "Higher.Token"
+          provider = ProviderFragWithEvidence "Higher.vacuous"
+            (FAll False "F" token) ["F"]
+            [[ProviderInstantiationNominalArgument 1 "Higher.Wrap" []]]
+          check engine = case
+              synthesizeWithProviders engine 512 [provider] token of
+            Right (SynthCandidates groups _) ->
+              assertBool
+                ("vacuous higher-kinded evidence leaked into "
+                  ++ synthEngineName engine ++ ": " ++ show groups)
+                (all (not . isInfixOf "Higher.Wrap") (concat groups))
+            Right _ -> pure ()
+            Left err -> assertFailure $
+              "unsupported vacuous evidence aborted "
+                ++ synthEngineName engine ++ ": " ++ err
+      mapM_ check [EngineDjinn, EngineExference, EngineBoth]
   , testCase "retain four ordered quantified provider arguments" $ do
       let token = FAtom False "Gap.Token"
           quantified binder arity =
             let variable = FVar binder
             in FAll True binder
                 (foldr FArr variable (replicate arity variable))
-          assignment =
+          assignment = map properArgument
             [ quantified "p1" 1
             , quantified "p2" 2
             , quantified "p3" 3
@@ -1144,9 +1293,10 @@ typeApplicationTests = testGroup "retained type applications"
           provider name result assignments = ProviderFragWithEvidence name
             (FAll False "a" result) ["a"] assignments
           providers =
-            [ provider "Gap.first" token (replicate 16 [polytype])
+            [ provider "Gap.first" token
+                (replicate 16 [properArgument polytype])
             , provider "Gap.second" (FAtom False "Gap.Other")
-                (replicate 16 [polytype])
+                (replicate 16 [properArgument polytype])
             , provider "Gap.third" (FAtom False "Gap.Last")
                 [error "entered the 33rd provider instantiation assignment"]
             ]
@@ -1159,7 +1309,7 @@ typeApplicationTests = testGroup "retained type applications"
                 (FAll False "a" token) ["a"]
             , ProviderFragWithEvidence "Gap.unrelated"
                 (FAll False "a" (FAtom False "Gap.Other")) ["a"]
-                [[polytype]]
+                [[properArgument polytype]]
             ]
           donated = isInfixOf "Gap.first («a» := (∀"
           check engine = case
@@ -1287,6 +1437,7 @@ typeApplicationTests = testGroup "retained type applications"
   ]
  where
   polytype = FAll True "b" (FArr (FVar "b") (FVar "b"))
+  properArgument = ProviderInstantiationArgument 0
   wrap key argument =
     FApp False key (AppNominal "Demo.Wrap") [argument]
   nominalHypothesis = FAll True "a" (wrap "Demo.Wrap a" (FVar "a"))
@@ -1422,6 +1573,28 @@ parametricFamilyEngineTests = testGroup "parametric family engine projection"
   , testCase "transport a recursive List rank-N family with Exference" $
       expectExactFamilyTerm "fun x => x _"
         (synthesizeWithProviders EngineExference 1024 [] listRankNGoal)
+  , testCase "keep structural families with partial nominal evidence" $ do
+      let natural = FAtom False "Nat"
+          boolean = FAtom False "Bool"
+          other = FAtom False "Higher.Other"
+          pair = FParamInd "Higher.Pair" "Higher.Pair Nat Bool"
+            [natural, boolean]
+            [("Higher.Pair.mk", [natural, boolean])]
+          provider = ProviderFragWithEvidence "Higher.unrelated"
+            (FAll False "F"
+              (FArr
+                (FApp True "F Bool" (AppVariable "F") [boolean])
+                other))
+            ["F"]
+            [[ProviderInstantiationNominalArgument 1 "Higher.Pair" [natural]]]
+          candidates = allFamilyCandidates
+            (synthesizeWithProviders EngineExference 1024 [provider]
+              (FArr pair natural))
+      if any ("match" `isInfixOf`) candidates
+        then pure ()
+        else assertFailure $
+          "partial evidence forced a structural family opaque: "
+            ++ show candidates
   , testCase "construct a polymorphic recursive family natively with Djinn" $
       do
         let parameter = FVar "p"

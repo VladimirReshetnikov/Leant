@@ -1,0 +1,20 @@
+namespace Higher
+axiom Token : Type
+axiom Wrap : Type → Type
+axiom Pair : Type → Type → Type
+class Choice (F G : Type → Type) (a : Type) (hidden : Type 1) : Prop where
+  witness : True
+instance : Choice Wrap (Pair Nat) Bool (∀ x : Type, x → x) :=
+  ⟨True.intro⟩
+axiom global {F G : Type → Type} {a : Type} {hidden : Type 1}
+    [Choice F G a hidden] : F a → G a → Token
+end Higher
+
+:set synth-steps 2048
+:set synth-engine djinn
+:synth (Higher.Wrap Bool → Higher.Pair Nat Bool → Higher.Token)
+:set synth-engine exference
+:synth (Higher.Wrap Bool → Higher.Pair Nat Bool → Higher.Token)
+:set synth-engine both
+:synth (Higher.Wrap Bool → Higher.Pair Nat Bool → Higher.Token)
+:quit

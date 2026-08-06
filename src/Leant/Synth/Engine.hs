@@ -119,11 +119,13 @@ import Leant.Synth.Fragment
   ( AppHead (..)
   , Frag (..)
   , ProviderFrag (..)
+  , ProviderInstantiationArgument (..)
   , Slot (..)
   , fragHasDepth
   , fragHasInstanceBinder
   , fragSpine
   , fragUnsafeAtoms
+  , maximumProviderArgumentKindArity
   )
 import Leant.Synth.Render
   ( CtorInfo (..)
@@ -681,7 +683,7 @@ progressNotes progress = case progress of
 -- field in a shared data schema instead receives one private rigid proper
 -- type, because it is not a parameter of the Lean family.  Nested quantifiers
 -- are passed structurally as 'ForallType'; Djex carries them as alpha-aware
--- atoms and applies its bounded rank-N rules.  Retained proper-type
+-- atoms and applies its bounded rank-N rules.  Retained first-order type-kind
 -- applications become real 'TypeApplication' nodes: bound heads remain
 -- higher-kinded variables, while exact Lean constant heads receive shared
 -- private abstract declarations and a renderer map back to Lean.  Expanded
@@ -752,6 +754,9 @@ data ExactFamilyUse
     -- ^ completeness, whether constructor premises are consumed, occurrence
     -- display key, parameters, and constructors
   | NominalUse Int
+  | EvidenceUse Int
+    -- ^ Exact higher-kinded assignment head and total arity. Unlike a
+    -- saturated nominal occurrence, this does not hide a constructor schema.
   deriving (Eq, Show)
 
 data ParametricTemplate = ParametricTemplate
@@ -882,8 +887,17 @@ fragToDjinn recursiveProjection providers extras frag0 = do
           | (index, provider) <- zip [0 :: Int ..] usableProviders
           , assignment <- usableProviderAssignments provider
           ]
+      providerArguments = concatMap snd boundedProviderAssignments
       providerAssignmentFragments =
-        concatMap snd boundedProviderAssignments
+        concatMap providerArgumentFragments providerArguments
+      -- Residual higher-kinded nominal applications contribute a neutral
+      -- exact-head arity fact while only their already supplied arguments are
+      -- ordinary planning roots. This lets @Pair Nat@ share @Pair@ at arity
+      -- two without forcing a saturated structural occurrence opaque.
+      providerAssignmentPlanningFragments =
+        concatMap providerArgumentPlanningFragments providerArguments
+      providerAssignmentFamilyUses =
+        foldl collectProviderArgumentFamilyUse Map.empty providerArguments
       queryFragments =
         map snd extras ++ [frag0] ++ map providerTypeFrag usableProviders
           ++ providerAssignmentFragments
@@ -892,8 +906,11 @@ fragToDjinn recursiveProjection providers extras frag0 = do
           ++ [ (False, providerTypeFrag provider)
              | provider <- usableProviders
              ]
-          ++ [ (False, argument) | argument <- providerAssignmentFragments ]
-      plans = exactFamilyPlans recursiveProjection planningRoots
+          ++ [ (False, argument)
+             | argument <- providerAssignmentPlanningFragments
+             ]
+      plans = exactFamilyPlans recursiveProjection
+        providerAssignmentFamilyUses planningRoots
       structuralTemplateFragments =
         [ field
         | plan <- Map.elems plans
@@ -927,6 +944,26 @@ fragToDjinn recursiveProjection providers extras frag0 = do
         , projectionFragmentsComplete =
             all fragmentProjectionComplete (frag0 : map snd extras)
         }
+      providerArgumentType argument = case argument of
+        ProviderInstantiationNominalArgument remaining spelling supplied ->
+          nominalArgumentType remaining spelling supplied
+        ProviderInstantiationArgument 0 frag -> go False frag
+        ProviderInstantiationArgument remaining frag -> case frag of
+          -- Compatibility for snapshots written by the first kinded wire
+          -- format. New live discovery always uses the canonical nominal
+          -- payload above rather than trusting a pretty-printed atom.
+          FAtom _ spelling -> exactFamilyHead spelling remaining
+          FApp _ _ (AppNominal spelling) supplied ->
+            nominalArgumentType remaining spelling supplied
+          _ -> failT
+            "higher-kinded provider argument did not retain a closed \
+            \nominal Lean head"
+
+      nominalArgumentType remaining spelling supplied = do
+        translated <- mapM (go False) supplied
+        headType <- exactFamilyHead spelling (length supplied + remaining)
+        pure (applyTypeArguments headType translated)
+
       go premisesEnabled frag = case frag of
         FArr a b -> FunctionType
           <$> go premisesEnabled a <*> go premisesEnabled b
@@ -1350,7 +1387,7 @@ fragToDjinn recursiveProjection providers extras frag0 = do
             providerType <- go False providerFrag
             instantiations <- mapM
               (\arguments -> do
-                argumentTypes <- mapM (go False) arguments
+                argumentTypes <- mapM providerArgumentType arguments
                 pure ProviderInstantiationAssignment
                   { providerInstantiationAssignmentProvider = privateName
                   , providerInstantiationAssignmentArguments = argumentTypes
@@ -1415,12 +1452,125 @@ fragToDjinn recursiveProjection providers extras frag0 = do
           not (null assignment)
             && length assignment == arity
             && length assignment <= maximumProviderInstantiationArguments
-            && all
-              (\argument ->
-                not (fragHasDepth argument || fragHasInstanceBinder argument))
-              assignment)
+            && all usableProviderArgument assignment
+            && providerAssignmentKindsMatch
+              (providerTypeFrag provider) assignment)
         assignments
     _ -> []
+
+  usableProviderArgument argument =
+    providerInstantiationArgumentKindArity argument >= 0
+      && providerInstantiationArgumentKindArity argument
+        <= maximumProviderArgumentKindArity
+      && supportedProviderArgumentHead argument
+      && all
+        (\frag -> not (fragHasDepth frag || fragHasInstanceBinder frag))
+        (providerArgumentFragments argument)
+
+  -- Saturated logical products, sums, Iff, and Not have dedicated structural
+  -- fragment encodings. Until their unsaturated renderer identity is modeled,
+  -- reject a caller-authored nominal payload just as live discovery does.
+  supportedProviderArgumentHead argument = case argument of
+    ProviderInstantiationNominalArgument remaining spelling _ ->
+      remaining == 0 || spelling `notElem` structuralHigherKindHeads
+    ProviderInstantiationArgument remaining frag
+      | remaining > 0 -> case frag of
+          FAtom _ spelling -> spelling `notElem` structuralHigherKindHeads
+          FApp _ _ (AppNominal spelling) _ ->
+            spelling `notElem` structuralHigherKindHeads
+          _ -> True
+      | otherwise -> True
+  structuralHigherKindHeads =
+    ["And", "Prod", "PProd", "Or", "Sum", "PSum", "Iff", "Not"]
+
+  providerArgumentFragments argument = case argument of
+    ProviderInstantiationArgument _ frag -> [frag]
+    ProviderInstantiationNominalArgument _ _ supplied -> supplied
+
+  providerArgumentPlanningFragments argument = case argument of
+    ProviderInstantiationNominalArgument _ _ supplied -> supplied
+    ProviderInstantiationArgument remaining frag
+      | remaining > 0 -> case frag of
+          FAtom{} -> []
+          FApp _ _ (AppNominal _) supplied -> supplied
+          _ -> [frag]
+      | otherwise -> [frag]
+
+  collectProviderArgumentFamilyUse uses argument = case argument of
+    ProviderInstantiationNominalArgument remaining spelling supplied ->
+      insertEvidenceUse spelling (length supplied + remaining) uses
+    ProviderInstantiationArgument remaining frag
+      | remaining > 0 -> case frag of
+          FAtom _ spelling -> insertEvidenceUse spelling remaining uses
+          FApp _ _ (AppNominal spelling) supplied ->
+            insertEvidenceUse spelling (length supplied + remaining) uses
+          _ -> uses
+      | otherwise -> uses
+   where
+    insertEvidenceUse spelling arity = Map.alter append spelling
+     where
+      evidence = EvidenceUse arity
+      append Nothing = Just [evidence]
+      append (Just previous)
+        | evidence `elem` previous = Just previous
+        | otherwise = Just (previous ++ [evidence])
+
+  -- Djex infers provider forall kinds from use sites and defaults a vacuous
+  -- binder to Type. Drop a vector whose Lean-side kind fact cannot be expressed
+  -- by that existing boundary, rather than allowing one unsupported assignment
+  -- to reject the whole engine request. A future kind-aware Djex API can remove
+  -- this conservative filter for constraint-only higher-kinded binders.
+  providerAssignmentKindsMatch provider assignment =
+    case providerBinderKindArities provider of
+      expected
+        | length expected == length assignment -> and
+            (zipWith
+              (\argument kindArity ->
+                Just (providerInstantiationArgumentKindArity argument)
+                  == kindArity)
+              assignment expected)
+      _ -> False
+
+  providerBinderKindArities provider = case provider of
+    FAll _ binder body ->
+      inferredBinderKindArity binder body : providerBinderKindArities body
+    FInst _ body -> providerBinderKindArities body
+    _ -> []
+
+  inferredBinderKindArity binder body =
+    case Set.toList (binderKindConstraints binder body) of
+      [] -> Just 0
+      [arity] -> Just arity
+      _ -> Nothing
+
+  binderKindConstraints binder = collect
+   where
+    collect frag = case frag of
+      FArr parameter result -> descend [parameter, result]
+      FProd left right -> descend [left, right]
+      FSum left right -> descend [left, right]
+      FAll _ shadow body
+        | shadow == binder -> Set.empty
+        | otherwise -> collect body
+      FInst _ body -> collect body
+      FVar spelling
+        | spelling == binder -> Set.singleton 0
+        | otherwise -> Set.empty
+      FApp _ _ head' arguments ->
+        let headConstraint = case head' of
+              AppVariable spelling
+                | spelling == binder -> Set.singleton (length arguments)
+              _ -> Set.empty
+        in headConstraint `Set.union` descend arguments
+      FParamInd _ _ parameters constructors ->
+        descend (parameters ++ concatMap snd constructors)
+      FInd _ constructors -> descend (concatMap snd constructors)
+      FParamRec _ _ _ parameters constructors ->
+        descend (parameters ++ concatMap snd constructors)
+      FRec _ _ parameters constructors ->
+        descend (parameters ++ concatMap snd constructors)
+      _ -> Set.empty
+    descend = Set.unions . map collect
 
   providerInstantiationArity provider = case provider of
     FAll _ _ body -> 1 + providerInstantiationArity body
@@ -1509,14 +1659,15 @@ fragmentProjectionComplete frag =
 -- it reproduces every serialized occurrence exactly.
 exactFamilyPlans
   :: RecursiveProjection
+  -> Map.Map String [ExactFamilyUse]
   -> [(Bool, Frag)]
   -> Map.Map String ExactFamilyPlan
-exactFamilyPlans recursiveProjection roots = settle initialUses
+exactFamilyPlans recursiveProjection evidenceUses roots = settle initialUses
  where
   initialUses = foldl
     (\uses (premisesEnabled, frag) ->
       collectExactFamilyUses recursiveProjection premisesEnabled uses frag)
-    Map.empty roots
+    evidenceUses roots
 
   -- Constructor inventories are metadata until translation commits to using
   -- them.  Grow the reachable-use set only through selected data templates and
@@ -1684,12 +1835,14 @@ collectExactFamilyUses recursiveProjection premisesEnabled uses frag =
 choosePlan :: String -> [ExactFamilyUse] -> ExactFamilyPlan
 choosePlan spelling uses = case nub (map useArity uses) of
   [arity]
-    | length occurrences == length uses -> case compatibleTemplates of
+    | null substantiveUses -> AbstractFamily arity False
+    | length occurrences == length substantiveUses ->
+        case compatibleTemplates of
         template : rest
           | all (templatesEquivalent template) rest ->
               StructuralFamily template
         _ -> AbstractFamily arity True
-    | length recursiveOccurrences == length uses ->
+    | length recursiveOccurrences == length substantiveUses ->
         case compatibleRecursiveTemplates of
           template : rest
             | all (templatesEquivalent template) rest ->
@@ -1698,6 +1851,9 @@ choosePlan spelling uses = case nub (map useArity uses) of
     | otherwise -> AbstractFamily arity (any hidesStructure uses)
   arities -> InvalidFamilyArities arities
  where
+  substantiveUses = [use | use <- uses, substantive use]
+  substantive EvidenceUse{} = False
+  substantive _ = True
   occurrences =
     [ (parameters, constructors)
     | ParametricUse parameters constructors <- uses
@@ -1737,10 +1893,12 @@ choosePlan spelling uses = case nub (map useArity uses) of
     ParametricUse parameters _ -> length parameters
     RecursiveUse _ _ _ parameters _ -> length parameters
     NominalUse arity -> arity
+    EvidenceUse arity -> arity
   hidesStructure use = case use of
     ParametricUse{} -> True
     RecursiveUse{} -> True
     NominalUse{} -> False
+    EvidenceUse{} -> False
 
 hasDistinctPlainParameters :: [Frag] -> Bool
 hasDistinctPlainParameters parameters = case mapM plain parameters of

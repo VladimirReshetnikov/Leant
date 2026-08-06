@@ -35,7 +35,9 @@ module Leant.Synth.Fragment
   , GoalSort (..)
   , ParsedGoal (..)
   , ProviderFrag (..)
+  , ProviderInstantiationArgument (..)
   , ProviderQuery (..)
+  , maximumProviderArgumentKindArity
   , synthPrelude
   , serializerProgram
   , providerProgram
@@ -57,6 +59,7 @@ module Leant.Synth.Fragment
 
 import Data.Char (isSpace)
 import Data.List (intercalate, nub)
+import Text.Read (readMaybe)
 
 import Leant.Synth.ProviderCache
   ( ProviderQuery (..)
@@ -146,6 +149,34 @@ data ParsedGoal = ParsedGoal
   }
   deriving (Eq, Show)
 
+-- | One exact provider-binder argument together with its ground kind.  Lean's
+-- admitted type-kind fragment is a chain of universe-domain arrows ending in
+-- a universe, so the number of arrows reconstructs the full Djex kind.  Zero
+-- retains the historical proper-type argument representation; positive
+-- arities let a bare or partially applied Lean constructor cross the otherwise
+-- kind-erasing fragment boundary without pretending it is a proper type.
+data ProviderInstantiationArgument
+  = ProviderInstantiationArgument
+      { providerInstantiationArgumentKindArity :: Int
+      , providerInstantiationArgumentFrag :: Frag
+        -- ^ Legacy and proper-kind fragment payload.
+      }
+  | ProviderInstantiationNominalArgument
+      { providerInstantiationArgumentKindArity :: Int
+      , providerInstantiationArgumentNominalHead :: String
+        -- ^ Exact Lean constant name, never a pretty-printed expression.
+      , providerInstantiationArgumentNominalArguments :: [Frag]
+        -- ^ Already supplied proper-type arguments; the kind arity counts the
+        -- remaining arguments.
+      }
+  deriving (Eq, Show)
+
+-- | Wire and engine bound for the admitted @Type -> ... -> Type@ arrow chain.
+-- Live discovery skips a deeper candidate; the parser rejects an untrusted
+-- snapshot that claims one, keeping both sides of the protocol aligned.
+maximumProviderArgumentKindArity :: Int
+maximumProviderArgumentKindArity = 80
+
 -- | One Lean environment value lowered to the synthesis fragment.  The
 -- provider name remains the exact fully-qualified Lean spelling; the engine
 -- gives it a collision-free private name and the renderer maps that name back
@@ -168,12 +199,14 @@ data ProviderFrag
       { providerLeanName :: String
       , providerTypeFrag :: Frag
       , providerTypeBinderNames :: [String]
-      , providerInstantiationAssignments :: [[Frag]]
-        -- ^ Exact ordered proper-type assignments learned from active instance
-        -- heads for this provider's erased instance binders.  Each inner list
-        -- follows the provider's leading FAll order. Evidence remains attached
-        -- to the provider so staged inventories cannot donate an instantiation
-        -- discovered for a later declaration to an earlier one.
+      , providerInstantiationAssignments ::
+          [[ProviderInstantiationArgument]]
+        -- ^ Exact ordered, ground-kinded assignments learned from active
+        -- instance heads for this provider's erased instance binders.  Each
+        -- inner list follows the provider's leading FAll order. Evidence
+        -- remains attached to the provider so staged inventories cannot donate
+        -- an instantiation discovered for a later declaration to an earlier
+        -- one.
       }
   deriving (Eq, Show)
 
@@ -235,6 +268,26 @@ synthPrelude inventory = unlines
   , "    else withLocalDecl n bi dom fun fv =>"
   , "      isTypeKind (body.instantiate1 fv)"
   , "  | _ => pure false"
+  , ""
+  , "-- Preserve the admitted ground kind of an exact provider argument."
+  , "-- Every accepted domain is itself a universe, so the arrow count is"
+  , "-- enough to reconstruct Djex's Type -> ... -> Type kind language."
+  , "partial def typeKindArity? (remaining : Nat) (e : Expr)"
+  , "    : MetaM (Option Nat) := do"
+  , "  let e \8592 whnfR e.consumeMData"
+  , "  match e with"
+  , "  | Expr.sort _ => pure (some 0)"
+  , "  | Expr.forallE n dom body bi =>"
+  , "    match remaining with"
+  , "    | 0 => pure none"
+  , "    | Nat.succ remaining =>"
+  , "      let dom \8592 whnfR dom.consumeMData"
+  , "      if !dom.isSort then pure none"
+  , "      else withLocalDecl n bi dom fun fv => do"
+  , "        match \8592 typeKindArity? remaining (body.instantiate1 fv) with"
+  , "        | none => pure none"
+  , "        | some arity => pure (some (arity + 1))"
+  , "  | _ => pure none"
   , ""
   , "-- Retain the source binder names corresponding to the leading FAlls"
   , "-- emitted by go. Instance binders erased below are deliberately skipped"
@@ -323,13 +376,13 @@ synthPrelude inventory = unlines
   , "        let r \8592 go providerMode fuel depth blocked b"
   , "        pure (\"(-> \" ++ d ++ \" \" ++ r ++ \")\")"
   , "      else do"
-  , "        let properType \8592 isTypeKind t"
-  , "        if providerMode && !properType then atomOf e"
+  , "        let typeKind \8592 isTypeKind t"
+  , "        if providerMode && !typeKind then atomOf e"
   , "        else do"
   , "          -- An unused ordinary implicit type parameter still needs a"
   , "          -- scheme binder so Djex can choose a visible instantiation."
   , "          -- Goal mode retains the historical elaborator-binder model;"
-  , "          -- provider mode admits only binders over proper types."
+  , "          -- provider mode admits only first-order type-kind binders."
   , "          let r \8592 go providerMode fuel depth blocked b"
   , "          pure (\"(alli \" ++ esc (\"i\" ++ toString depth) ++ \" \""
   , "            ++ r ++ \")\")"
@@ -567,8 +620,29 @@ synthPrelude inventory = unlines
   , "    | Expr.forallE _ _ _ bi => bi.isInstImplicit"
   , "    | _ => false).isSome"
   , ""
-  , "def providerCandidateFragment? (fuel : Nat) (candidate : Expr)"
+  , "-- Preserve canonical identity for a bare or partially applied nominal"
+  , "-- constructor. Structural logical heads use separate fragment nodes, so"
+  , "-- omit them here until their unsaturated renderer identity is modeled."
+  , "def providerNominalCandidateFragment? (fuel : Nat) (candidate : Expr)"
   , "    : MetaM (Option String) := do"
+  , "  match candidate.getAppFn with"
+  , "  | Expr.const n _ =>"
+  , "    if n == ``And || n == ``Prod || n == ``PProd"
+  , "        || n == ``Or || n == ``Sum || n == ``PSum"
+  , "        || n == ``Iff || n == ``Not then"
+  , "      pure none"
+  , "    else do"
+  , "      let mut rendered := \"\""
+  , "      for arg in candidate.getAppArgs do"
+  , "        let argType \8592 whnfR (\8592 inferType arg)"
+  , "        if !argType.isSort then return none"
+  , "        let argument \8592 go false fuel 0 [] arg"
+  , "        rendered := rendered ++ \" \" ++ argument"
+  , "      pure (some (\"(nominal \" ++ esc n.toString ++ rendered ++ \")\"))"
+  , "  | _ => pure none"
+  , ""
+  , "def providerCandidateFragment? (fuel : Nat) (candidate : Expr)"
+  , "    : MetaM (Option (Nat × String)) := do"
   , "  let candidate ← instantiateMVars candidate"
   , "  if candidate.hasMVar || candidate.hasLevelMVar"
   , "      || candidate.hasFVar || candidate.hasLooseBVars"
@@ -576,9 +650,14 @@ synthPrelude inventory = unlines
   , "    pure none"
   , "  else do"
   , "    let kind ← whnfR (← inferType candidate)"
-  , "    if ← isTypeKind kind then"
-  , "      pure (some (← go false fuel 0 [] candidate))"
-  , "    else pure none"
+  , "    match ← typeKindArity? fuel kind with"
+  , "    | none => pure none"
+  , "    | some 0 =>"
+  , "      pure (some (0, ← go false fuel 0 [] candidate))"
+  , "    | some arity =>"
+  , "      match ← providerNominalCandidateFragment? fuel candidate with"
+  , "      | none => pure none"
+  , "      | some fragment => pure (some (arity, fragment))"
   , ""
   , "-- Resolve a fixed ordered obligation list by applying active instance"
   , "-- heads in the same order as Lean's resolver.  Return the successful"
@@ -609,7 +688,7 @@ synthPrelude inventory = unlines
   , "    pure none"
   , ""
   , "-- Match active instance heads independently, in Lean's resolver order,"
-  , "-- and record each complete ordered proper-type assignment they induce."
+  , "-- and record each complete ordered ground-kinded assignment they induce."
   , "-- Each attempted head and its complete constraint closure run under a"
   , "-- restored metavariable state so one choice cannot constrain a later"
   , "-- choice.  The selected head stays fixed while its instance subgoals and"
@@ -619,11 +698,11 @@ synthPrelude inventory = unlines
   , "-- The inventory is provider-local and bounded: 32 heads inspected, 16"
   , "-- distinct complete assignments."
   , "partial def providerInstantiationAssignments (fuel : Nat) (source : Expr)"
-  , "    : MetaM (Array (Array String)) := do"
+  , "    : MetaM (Array (Array (Nat \215 String))) := do"
   , "  let (typeArgs, constraints) ← providerEvidenceSpine fuel 4 source"
   , "  if typeArgs.isEmpty || constraints.isEmpty then return #[]"
   , "  let mut inspected := 0"
-  , "  let mut assignments : Array (Array String) := #[]"
+  , "  let mut assignments : Array (Array (Nat \215 String)) := #[]"
   , "  for constraint in constraints, constraintIndex in [:constraints.size] do"
   , "    if inspected < 32 && assignments.size < 16 then"
   , "      let instances ← try"
@@ -651,7 +730,7 @@ synthPrelude inventory = unlines
   , "              match ← closeProviderConstraints fuel pending with"
   , "              | none => pure none"
   , "              | some closedMCtx => withMCtx closedMCtx do"
-  , "                let mut arguments : Array String := #[]"
+  , "                let mut arguments : Array (Nat \215 String) := #[]"
   , "                let mut complete := true"
   , "                for candidate in typeArgs do"
   , "                  match ← providerCandidateFragment? fuel candidate with"
@@ -955,7 +1034,9 @@ providerProgram sessionNames query = unlines
   , "        let assignmentText := String.join"
   , "          (assignments.toList.map fun assignment =>"
   , "            \" (args\" ++ String.join"
-  , "              (assignment.toList.map fun argument => \" \" ++ argument)"
+  , "              (assignment.toList.map fun argument =>"
+  , "                \" (kinded \" ++ toString argument.1 ++ \" \""
+  , "                  ++ argument.2 ++ \")\")"
   , "              ++ \")\")"
   , "        let evidenceText := if assignments.isEmpty then \"\" else"
   , "          \" (instantiations\" ++ assignmentText ++ \")\""
@@ -1106,18 +1187,59 @@ parseProviderSexp text = do
     Right (Just assignments, remaining)
   providerEvidence (TL : TSym "candidates" : rest) = do
     (candidates, remaining) <- evidenceFrags rest
-    Right (Just (map (: []) candidates), remaining)
+    Right
+      ( Just
+          (map
+            ((: []) . ProviderInstantiationArgument 0)
+            candidates)
+      , remaining
+      )
   providerEvidence rest = Right (Nothing, rest)
 
   assignmentFrags (TR : rest) = Right ([], rest)
   assignmentFrags (TL : TSym "args" : rest) = do
-    (arguments, remaining) <- evidenceFrags rest
+    (arguments, remaining) <- assignmentArguments rest
     if null arguments
       then Left "provider instantiation assignment has no arguments"
       else do
         (assignments, final) <- assignmentFrags remaining
         Right (arguments : assignments, final)
   assignmentFrags _ = Left "malformed provider instantiation assignments"
+
+  assignmentArguments (TR : rest) = Right ([], rest)
+  assignmentArguments tokens = do
+    (argument, remaining) <- providerArgument tokens
+    (arguments, final) <- assignmentArguments remaining
+    Right (argument : arguments, final)
+
+  -- New live inventories make every argument's admitted first-order ground
+  -- kind explicit. Historical exact snapshots omitted this wrapper and are
+  -- interpreted as proper-kind arguments, matching their old contract.
+  providerArgument
+      (TL : TSym "kinded" : TSym arityText : rest) = do
+    arity <- case readMaybe arityText of
+      Just parsed
+        | parsed >= 0 && parsed <= maximumProviderArgumentKindArity ->
+            Right parsed
+      _ -> Left "invalid provider instantiation argument kind arity"
+    case rest of
+      TL : TSym "nominal" : TStr headName : nominalTokens -> do
+        (arguments, remaining) <- evidenceFrags nominalTokens
+        case remaining of
+          TR : final -> Right
+            ( ProviderInstantiationNominalArgument arity headName arguments
+            , final
+            )
+          _ -> Left "malformed kinded nominal provider argument"
+      _ -> do
+        (frag, remaining) <- parseFrag rest
+        case remaining of
+          TR : final ->
+            Right (ProviderInstantiationArgument arity frag, final)
+          _ -> Left "malformed kinded provider instantiation argument"
+  providerArgument tokens = do
+    (frag, remaining) <- parseFrag tokens
+    Right (ProviderInstantiationArgument 0 frag, remaining)
 
   evidenceFrags (TR : rest) = Right ([], rest)
   evidenceFrags tokens = do

@@ -1,0 +1,38 @@
+
+   __                  __
+  / /  ___ ___ ____   / /_
+ / /__/ -_) _ `/ _ \_/ __/
+/____/\__/\_,_/_//_/ \__/
+Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to exit.
+λ> namespace Higher
+λ> axiom Token : Type
+λ> axiom Wrap : Type → Type
+λ> axiom Pair : Type → Type → Type
+λ> class Choice (F G : Type → Type) (a : Type) (hidden : Type 1) : Prop where
+…>   witness : True
+…> instance : Choice Wrap (Pair Nat) Bool (∀ x : Type, x → x) :=
+…>   ⟨True.intro⟩
+…> axiom global {F G : Type → Type} {a : Type} {hidden : Type 1}
+…>     [Choice F G a hidden] : F a → G a → Token
+…> end Higher
+…>
+λ> :set synth-steps 2048
+synth steps: 2048
+λ> :set synth-engine djinn
+synth engine: djinn
+λ> :synth (Higher.Wrap Bool → Higher.Pair Nat Bool → Higher.Token)
+preparing synthesis environment (session imports + Lean)...
+  it1  Higher.global («F» := Higher.Wrap) («G» := (@Higher.Pair Nat)) («a» := Bool) («hidden» := (∀ (a0_0 : _), a0_0 → a0_0))
+note: search truncated: candidate limit reached (60)
+λ> :set synth-engine exference
+synth engine: exference
+λ> :synth (Higher.Wrap Bool → Higher.Pair Nat Bool → Higher.Token)
+  it1  Higher.global («F» := Higher.Wrap) («G» := (@Higher.Pair Nat)) («a» := Bool) («hidden» := (∀ (a0_0 : _), a0_0 → a0_0))
+note: search truncated: step limit reached, queue limit pruned 116000
+λ> :set synth-engine both
+synth engine: both
+λ> :synth (Higher.Wrap Bool → Higher.Pair Nat Bool → Higher.Token)
+  it1  Higher.global («F» := Higher.Wrap) («G» := (@Higher.Pair Nat)) («a» := Bool) («hidden» := (∀ (a0_0 : _), a0_0 → a0_0))
+note: search truncated: candidate limit reached (60)
+note: exference: search truncated: step limit reached, queue limit pruned 16431
+λ> :quit
