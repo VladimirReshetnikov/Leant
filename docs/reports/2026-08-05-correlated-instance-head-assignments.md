@@ -274,5 +274,7 @@ On 2026-08-06, `cabal build all -j1` and
 all 175 Leant unit cases against the updated vendored Djex. The dedicated
 higher-kind transcript passed its exact single-vector, heterogeneous-vector,
 and multiple-alternative applications under Djinn, Exference, and combined
-search. The complete `synth-*` matrix remains the release gate; this alignment
-change regenerated no golden output.
+search. All 13 `synth-*` golden transcripts passed under the normal per-query
+timeouts; `synth-djinn-providers` was rerun in isolation at the same default
+timeout after one load-sensitive aggregate miss. This alignment change
+regenerated no golden output.
