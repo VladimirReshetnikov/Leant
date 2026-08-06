@@ -45,6 +45,43 @@ directly makes the exact application reachable in standalone Djinn,
 standalone Exference, and combined mode without widening the old product
 bounds.
 
+## Multiple and heterogeneous live vectors
+
+Several successful heads for one exact provider remain several alternatives;
+whole-vector deduplication removes only repeated alpha-equivalent vectors. The
+higher-kind live regression uses:
+
+```lean
+axiom Wrap : Type -> Type
+axiom Pair : Type -> Type -> Type
+axiom Triple : Type -> Type -> Type -> Type
+
+instance : AlternativeChoice Wrap := <| True.intro |>
+instance : AlternativeChoice (Pair Nat) := <| True.intro |>
+axiom alternative {F : Type -> Type}
+    [AlternativeChoice F] : AlternativeToken
+
+instance : MultiVacuousChoice Wrap (Triple Nat) := <| True.intro |>
+axiom multiVacuous {F : Type -> Type} {G : Type -> Type -> Type}
+    [MultiVacuousChoice F G] : MultiVacuousToken
+```
+
+The two `alternative` heads contribute the distinct complete unary vectors
+`[(kind-1, Wrap)]` and `[(kind-1, Pair Nat)]`. Standalone Djinn renders
+`Higher.alternative («F» := Higher.Wrap)` before
+`Higher.alternative («F» := (@Higher.Pair Nat))`; standalone Exference ranks
+the same exact alternatives in the opposite order. Combined mode is Djinn-first
+and stable-deduplicates the Exference spellings. Thus result order belongs to
+each engine's ranking policy, while the regression requires both exact
+applications once in every mode.
+
+The `multiVacuous` head contributes one heterogeneous vector
+`[(kind-1, Wrap), (kind-2, Triple Nat)]`. It renders exactly as
+`Higher.multiVacuous («F» := Higher.Wrap) («G» := (@Higher.Triple Nat))` in
+all three modes. This simultaneously checks a bare unary constructor, a
+partially applied ternary constructor with residual binary kind, and positional
+kind agreement across a complete correlated vector.
+
 ## Complete Lean-side resolution
 
 Discovery still opens at most four leading type binders and retains the
@@ -119,7 +156,10 @@ bug.
 The finite limits now apply to complete assignments:
 
 - at most four ordered arguments in one vector;
-- at most 80 `Type`-arrow domains in one argument kind;
+- at most 64 `Type`-arrow domains in live discovery, the serialized wire, and
+  engine filtering, producing at most 129 constructor nodes;
+- at most 129 constructor nodes in each supplied Djex `GroundKind`, checked
+  independently at the adapter trust boundary;
 - at most 32 active heads inspected for one provider;
 - at most 16 alpha-distinct complete vectors retained for one provider; and
 - at most 32 provider/vector associations passed to one Djex execution.
@@ -160,13 +200,19 @@ runExferenceQueryWithKindedInstantiationAssignments
 
 Both adapters bound the outer list before entering assignments and bound each
 argument spine before entering its members. They resolve the exact retained
-polymorphic provider, require exact arity and a context-free scheme, validate
-the supplied binder kinds against every occurrence in the retained body,
-elaborate each argument at its supplied positional kind, prove the complete
-specialization is kind-correct, require closed context-free visible arguments,
-and alpha-deduplicate whole vectors per provider. All assignments for one exact
-provider must agree on one binder-kind vector. Constructing the record is an
-assertion; these checked runners remain the Djex trust boundary.
+polymorphic provider, require exact arity and a context-free scheme, and then
+productively preflight every supplied `GroundKind` in that assignment under the
+pinned 129-node ceiling. The preflight counts at most 129 constructors and
+returns the one-over-bound sentinel if work remains, without entering the
+pending subtree or paired type. It therefore rejects oversized and cyclic
+caller-built kinds before recursive kind inference, same-provider equality, or
+kind conversion. The adapters then validate supplied binder kinds against every
+occurrence in the retained body, require one binder-kind vector per exact
+provider, elaborate each argument at its supplied positional kind, require
+closed context-free visible arguments, prove the complete specialization is
+kind-correct, and alpha-deduplicate whole vectors per provider. Constructing
+the record is an assertion; these checked runners remain the Djex trust
+boundary.
 
 Djinn consumes one vector once as a direct specialized proof premise. Its
 independent proof checker validates the specialized formula before rendering
@@ -200,12 +246,12 @@ Unsaturated structural built-ins `And`, `Prod`, `PProd`, `Or`, `Sum`, `PSum`,
 until their unsaturated renderer identities are modeled. Saturated occurrences
 keep their existing structural translations.
 
-Pure regressions cover exact parsing, legacy unary parsing, finite outer and
-inner bounds, four ordered quantified arguments in all engines, early aggregate
-capping, cross-provider non-donation, kind/order preservation, and a vacuous
-`Type -> Type` assignment whose exact visible application is required under
-Djinn, Exference, and combined mode. Live extraction covers two
-independently determining constraints, a selected head with its own instance
+Pure regressions cover exact parsing, legacy unary parsing, finite outer,
+inner, and 129-node kind bounds, four ordered quantified arguments in all
+engines, early aggregate capping, cross-provider non-donation, kind/order
+preservation, repeated-vector deduplication, and distinct same-provider
+alternatives under Djinn, Exference, and combined mode. Live extraction covers
+two independently determining constraints, a selected head with its own instance
 prerequisite, and a correlated pair reached only after sixteen unsatisfied
 distractor heads. Each case succeeds under standalone Djinn and standalone
 Exference; the distractors and an unsatisfied remaining constraint contribute
@@ -213,18 +259,20 @@ no partial vector.
 
 The 2026-08-06 higher-kind transcript
 [`synth-provider-higher-kind-assignment`](../../test/synth-provider-higher-kind-assignment.txt)
-adds a constraint-only provider `Higher.vacuous {F : Type -> Type}`. Its active
-instance fixes `F := Higher.Wrap`, and the golden output contains
-`Higher.vacuous («F» := Higher.Wrap)` under standalone Djinn, standalone
-Exference, and combined search. The same transcript retains the earlier mixed
-higher-kinded/rank-N vector, so the new vacuous path does not weaken positional
-kind or argument-order preservation.
+adds constraint-only providers with vacuous higher-kinded binders. Besides
+`Higher.vacuous («F» := Higher.Wrap)`, its golden output contains the
+heterogeneous arity-1/arity-2 `Higher.multiVacuous` application and both exact
+`Wrap` and `Pair Nat` alternatives of `Higher.alternative` under standalone
+Djinn, standalone Exference, and combined search. Djinn and Exference rank the
+two alternatives differently, while combined mode retains Djinn's order; all
+three still contain exactly the same required applications. The transcript
+also retains the earlier mixed higher-kinded/rank-N vector, so these vacuous
+paths do not weaken positional kind or argument-order preservation.
 
 On 2026-08-06, `cabal build all -j1` and
 `cabal test leant-synth-tests -j1 --test-show-details=direct` passed, including
-all 171 Leant unit cases against the updated vendored Djex. The dedicated
-higher-kind transcript passed its exact applications under Djinn, Exference,
-and combined search. All `synth-*` golden transcripts passed; the only
-refreshed output was the stable Exference queue-pruning count in the existing
-Djinn-provider transcript, while its candidate and truncation reason remained
-unchanged.
+all 175 Leant unit cases against the updated vendored Djex. The dedicated
+higher-kind transcript passed its exact single-vector, heterogeneous-vector,
+and multiple-alternative applications under Djinn, Exference, and combined
+search. The complete `synth-*` matrix remains the release gate; this alignment
+change regenerated no golden output.

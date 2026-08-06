@@ -26,6 +26,7 @@ import Language.Haskell.Djex
   , Pattern (Bind)
   , Type (..)
   , inferredVisibleTypeArgument
+  , maximumProviderInstantiationKindNodes
   , mkIdentifier
   , specifiedVisibleTypeArgument
   )
@@ -61,6 +62,7 @@ import Leant.Synth.Fragment
   , fragRefusal
   , fragUnsafeAtoms
   , glivenkoSplit
+  , maximumProviderArgumentKindArity
   , parseGoalSexp
   , parseProviderSexp
   , providerProgram
@@ -384,6 +386,7 @@ providerProgramTests = testGroup "provider discovery program"
         `isInfixOf` prelude @?= True
       "match ← typeKindArity? fuel kind with"
         `isInfixOf` prelude @?= True
+      "if arity > 64 then" `isInfixOf` prelude @?= True
       "providerNominalCandidateFragment? fuel candidate"
         `isInfixOf` prelude @?= True
       "let mut assignments : Array (Array (Nat × String)) := #[]"
@@ -656,7 +659,15 @@ providerParserTests = testGroup "provider inventory parser"
               pure ()
             other -> assertFailure $
               "accepted invalid provider kind " ++ arity ++ ": " ++ show other
-      mapM_ rejected ["-1", "81", "not-a-kind"]
+          accepted arity = case parseProviderSexp (inventory arity) of
+            Right _ -> pure ()
+            other -> assertFailure $
+              "rejected valid provider kind " ++ arity ++ ": " ++ show other
+      maximumProviderArgumentKindArity @?= 64
+      maximumProviderArgumentKindArity @?=
+        (maximumProviderInstantiationKindNodes - 1) `div` 2
+      accepted "64"
+      mapM_ rejected ["-1", "65", "not-a-kind"]
   , testCase "distinguish an explicit empty evidence block" $
       parseProviderSexp
           "(providers (provider \"Gap.token\" (binders) (candidates) \
@@ -1266,6 +1277,29 @@ typeApplicationTests = testGroup "retained type applications"
                 (any (== expected) (concat groups))
             Right other -> assertFailure $
               "unexpected vacuous higher-kinded assignment outcome from "
+                ++ synthEngineName engine ++ ": " ++ outcomeTag other
+            Left err -> assertFailure err
+      mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "drop an over-limit provider kind without losing later evidence" $ do
+      let token = FAtom False "Higher.Token"
+          overLimit = ProviderFragWithEvidence "Higher.overLimit"
+            (FAll False "F" token) ["F"]
+            [ [ ProviderInstantiationNominalArgument 65 "Higher.TooWide" []
+              ]
+            ]
+          valid = ProviderFragWithEvidence "Higher.vacuous"
+            (FAll False "F" token) ["F"]
+            [[ProviderInstantiationNominalArgument 1 "Higher.Wrap" []]]
+          expected = "Higher.vacuous («F» := Higher.Wrap)"
+          check engine = case
+              synthesizeWithProviders engine 512 [overLimit, valid] token of
+            Right (SynthCandidates groups _) ->
+              assertBool
+                ("later provider evidence was lost in "
+                  ++ synthEngineName engine ++ ": " ++ show groups)
+                (any (== expected) (concat groups))
+            Right other -> assertFailure $
+              "unexpected over-limit provider outcome from "
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
             Left err -> assertFailure err
       mapM_ check [EngineDjinn, EngineExference, EngineBoth]

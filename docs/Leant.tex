@@ -809,6 +809,19 @@ synth engine: exference
   it1  Higher.vacuous («F» := Higher.Wrap)
 \end{session}
 
+One exact provider may retain several distinct successful instance-head
+vectors. In the same transcript, heads for \code{AlternativeChoice Wrap} and
+\code{AlternativeChoice (Pair Nat)} produce exactly
+\code{Higher.alternative («F» := Higher.Wrap)} and
+\code{Higher.alternative («F» := (@Higher.Pair Nat))}. Standalone Djinn ranks
+\code{Wrap} first, standalone Exference ranks \code{Pair Nat} first, and
+combined mode uses Djinn's order after stable exact-spelling deduplication.
+That is an engine-ranking difference: every mode must retain both exact
+alternatives once. The transcript also carries one heterogeneous two-binder
+vector whose positional kind arities are one and two, and requires
+\code{Higher.multiVacuous («F» := Higher.Wrap) («G» := (@Higher.Triple Nat))}
+in all three modes.
+
 Discovery opens no more than four leading type binders on one exact
 provider while retaining its erased instance constraints. It inspects at most
 32 active heads per provider in Lean resolver order. Each selected head and its
@@ -829,7 +842,14 @@ provider metadata uses
 \code{(instantiations (args (kinded N ...) ...))}. Leant folds each bounded
 arrow count into a Djex \code{GroundKind}, pairs it with the translated type,
 and calls \code{runDjinnQueryWithKindedInstantiationAssignments} or
-\code{runExferenceQueryWithKindedInstantiationAssignments}. Metadata-free and
+\code{runExferenceQueryWithKindedInstantiationAssignments}. Live discovery,
+wire parsing, and engine filtering all admit at most 64 \code{Type}-arrow
+domains, whose simple right-associated kind has \code{2 * 64 + 1 = 129}
+constructors. After an assignment passes Djex's provider, scheme, context, and
+exact-arity checks, the pinned adapters productively preflight all of that
+assignment's supplied kinds before recursive kind inference, same-provider
+comparison, kind conversion, or paired type elaboration. Oversized and cyclic
+caller-built kinds therefore fail finitely. Metadata-free and
 binder-only inventories remain valid. Historical exact arguments stay in their
 original vectors and default each position to proper kind; the
 \code{(candidates ...)} form parses as proper-kind unary vectors only. A vector
@@ -886,10 +906,12 @@ instance-head report}, followed by the
 assignment report}.
 
 Unit regressions pin the kinded wire format, kind and argument order, finite
-bounds, and the exact vacuous application under Djinn, Exference, and combined
-mode. The live \code{synth-provider-higher-kind-assignment} transcript retains
-the mixed higher-kinded/rank-N vector and requires
-\code{Higher.vacuous («F» := Higher.Wrap)} in all three modes.
+bounds, whole-vector deduplication, and the exact vacuous applications under
+Djinn, Exference, and combined mode. The live
+\code{synth-provider-higher-kind-assignment} transcript retains the mixed
+higher-kinded/rank-N vector, the heterogeneous arity-one/arity-two
+multi-vacuous vector, and both exact \code{Wrap} and \code{Pair Nat}
+alternatives for one provider. Engine-specific ordering remains ranking policy.
 
 \subsection{Impossibility, proved}\label{sec:negative}
 
@@ -1301,7 +1323,11 @@ vector only with its source declaration; after whole-vector context/depth and
 arity filtering Leant takes the command-wide prefix before planning or
 translation. Each argument crosses with its bounded \code{Type}-arrow kind;
 Leant reconstructs a Djex \code{GroundKind} and calls the checked kinded Djinn
-or Exference assignment runner. Lean still reconstructs every dictionary
+or Exference assignment runner. Leant rejects residual kind arities above 64
+before that bridge, and pinned Djex independently rejects a supplied
+\code{GroundKind} above 129 constructor nodes before recursive operations on
+that assignment.
+Lean still reconstructs every dictionary
 during final elaboration---only the closed kind/type vector crosses the bridge.
 
 Exact rendered spellings keep their first scheduled occurrence. Before a

@@ -165,6 +165,16 @@ best-first search. From the commit history and the reports
   whole vector containing `FDepth` or `FInst`, including an instance binder
   exposed only after reducing an alias.
 
+  Distinct successful heads for one provider remain distinct complete vectors.
+  The live higher-kind regression retains unary kind-1 alternatives
+  `Higher.Wrap` and `Higher.Pair Nat` for `Higher.alternative`; Djinn ranks
+  `Wrap` first, Exference ranks `Pair Nat` first, and combined mode follows the
+  Djinn-first merge, but every mode must return both exact applications once.
+  The same regression retains the heterogeneous vector
+  `[(kind-1, Higher.Wrap), (kind-2, Higher.Triple Nat)]` for
+  `Higher.multiVacuous`, proving that positional kind arities stay attached to
+  one vector rather than becoming cross-head choices.
+
   The provider inventory grammar uses an optional
   `(instantiations (args (kinded N ...) ...))` block after binder metadata.
   `N` is the remaining `Type`-arrow arity and is bounded independently of the
@@ -179,15 +189,21 @@ best-first search. From the commit history and the reports
   association list at 32 complete vectors before any argument participates in
   family planning, rigidity, or translation.
 
-  Leant reconstructs a Djex `GroundKind` from each arrow count and constructs
-  `KindedProviderInstantiationAssignment` values. The pinned Djex API exposes
+  Live discovery, wire parsing, and engine filtering admit at most 64
+  `Type`-arrow domains in one argument kind. Leant reconstructs the resulting
+  at-most-129-node Djex `GroundKind` values and constructs
+  `KindedProviderInstantiationAssignment` records. The pinned Djex API exposes
   checked `runDjinnQueryWithKindedInstantiationAssignments` and
   `runExferenceQueryWithKindedInstantiationAssignments` runners. Each resolves
-  the exact sealed-session provider, validates vector width and exact arity,
-  checks the supplied binder-kind vector against the retained provider body,
-  elaborates every argument at its supplied positional kind, checks closure and
-  context freedom, and alpha-deduplicates whole vectors only within that
-  provider. Djinn compiles each vector into one proof-producing direct premise;
+  the exact sealed-session provider and validates vector width, exact arity, and
+  scheme context. It then productively preflights all kinds in that assignment
+  before recursive kind inference, same-provider comparison, conversion, or
+  paired type elaboration. Oversized or cyclic caller-built kinds fail
+  finitely. Only after that guard does the runner check the supplied binder-kind
+  vector against the retained provider body, elaborate every argument at its
+  supplied positional kind, check closure and context freedom, prove the whole
+  specialization, and alpha-deduplicate complete vectors within that provider.
+  Djinn compiles each vector into one proof-producing direct premise;
   Exference tries it once at exact global lookup. Because the caller supplies a
   kind fact which an erased body cannot infer, both paths now accept
   constraint-only or otherwise vacuous higher-kinded binders as well as
@@ -203,10 +219,12 @@ best-first search. From the commit history and the reports
   `Iff`, and `Not` remain excluded as higher-kinded assignment heads until
   their renderer identities are modeled; saturated uses keep their structural
   translation. Unit regressions cover the kinded wire, kind/order retention,
-  bounds, and exact vacuous success in Djinn, Exference, and combined mode. The
-  live `synth-provider-higher-kind-assignment` transcript requires both its
-  mixed kinded/rank-N vector and
-  `Higher.vacuous («F» := Higher.Wrap)` in all three modes.
+  bounds, whole-vector deduplication, and exact vacuous success in Djinn,
+  Exference, and combined mode. The live
+  `synth-provider-higher-kind-assignment` transcript requires its mixed
+  kinded/rank-N vector, the heterogeneous arity-1/arity-2 multi-vacuous vector,
+  and both exact `Wrap` and `Pair Nat` alternatives for one provider in all
+  three modes while leaving their order to engine ranking.
 - **Instance-implicit goal alignment (Leant bridge).** A non-dependent
   instance binder is neither a type quantifier nor an ordinary engine premise.
   The fragment retains it as a render-only slot, erases its dictionary before

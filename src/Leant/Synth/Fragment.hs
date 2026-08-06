@@ -172,10 +172,12 @@ data ProviderInstantiationArgument
   deriving (Eq, Show)
 
 -- | Wire and engine bound for the admitted @Type -> ... -> Type@ arrow chain.
--- Live discovery skips a deeper candidate; the parser rejects an untrusted
--- snapshot that claims one, keeping both sides of the protocol aligned.
+-- Djex bounds each supplied kind at 129 constructors; this simple chain uses
+-- @2 * arity + 1@ constructors, so 64 is the largest admissible arity. Live
+-- discovery skips a deeper candidate and the parser rejects an untrusted
+-- snapshot that claims one, keeping every side of the protocol aligned.
 maximumProviderArgumentKindArity :: Int
-maximumProviderArgumentKindArity = 80
+maximumProviderArgumentKindArity = 64
 
 -- | One Lean environment value lowered to the synthesis fragment.  The
 -- provider name remains the exact fully-qualified Lean spelling; the engine
@@ -655,9 +657,12 @@ synthPrelude inventory = unlines
   , "    | some 0 =>"
   , "      pure (some (0, ← go false fuel 0 [] candidate))"
   , "    | some arity =>"
-  , "      match ← providerNominalCandidateFragment? fuel candidate with"
-  , "      | none => pure none"
-  , "      | some fragment => pure (some (arity, fragment))"
+  , "      if arity > " ++ show maximumProviderArgumentKindArity ++ " then"
+  , "        pure none"
+  , "      else"
+  , "        match ← providerNominalCandidateFragment? fuel candidate with"
+  , "        | none => pure none"
+  , "        | some fragment => pure (some (arity, fragment))"
   , ""
   , "-- Resolve a fixed ordered obligation list by applying active instance"
   , "-- heads in the same order as Lean's resolver.  Return the successful"

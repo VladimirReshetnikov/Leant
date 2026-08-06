@@ -530,6 +530,19 @@ synth engine: exference
   it1  Higher.vacuous («F» := Higher.Wrap)
 ```
 
+One exact provider may retain several distinct successful instance-head
+vectors. In the same transcript, heads for `AlternativeChoice Wrap` and
+`AlternativeChoice (Pair Nat)` produce exactly
+`Higher.alternative («F» := Higher.Wrap)` and
+`Higher.alternative («F» := (@Higher.Pair Nat))`. Standalone Djinn ranks
+`Wrap` first, standalone Exference ranks `Pair Nat` first, and combined mode
+uses Djinn's order after stable exact-spelling deduplication. The order is
+engine policy; the semantic requirement is that every mode retain both exact
+alternatives once. The transcript also carries one heterogeneous two-binder
+vector with kind arities one and two, respectively, and requires
+`Higher.multiVacuous («F» := Higher.Wrap) («G» := (@Higher.Triple Nat))` in
+all three modes.
+
 Extraction is deliberately finite and local. It opens at most four leading
 type binders on one provider, retains the erased instance constraints,
 and inspects at most 32 active heads in Lean's resolver order. Each attempt is
@@ -551,7 +564,14 @@ evidence beyond the boundary is not entered. Live metadata uses
 `GroundKind` by folding that bounded arrow count into `FunctionKind` over
 `ProperTypeKind`, pairs it with the translated type, and calls
 `runDjinnQueryWithKindedInstantiationAssignments` or
-`runExferenceQueryWithKindedInstantiationAssignments`. The historical
+`runExferenceQueryWithKindedInstantiationAssignments`. Live discovery, wire
+parsing, and engine filtering all admit at most 64 `Type`-arrow domains, whose
+simple right-associated kind has `2 * 64 + 1 = 129` constructors. After an
+assignment passes Djex's provider, scheme, context, and exact-arity checks, the
+pinned adapters productively preflight all of that assignment's supplied kinds
+before recursive kind inference, same-provider comparison, kind conversion, or
+paired type elaboration. Oversized and cyclic caller-built kinds therefore fail
+finitely. The historical
 `(candidates ...)` form remains readable as unary, proper-kind vectors only,
 alongside metadata-free and binder-only inventories. A complete vector fails
 closed if any argument contains depth truncation (`FDepth`) or an instance
@@ -576,10 +596,12 @@ inference; open or context-bearing quantified arguments are rejected rather
 than guessed into Lean syntax. The
 [`synth-provider-higher-kind-assignment`](test/synth-provider-higher-kind-assignment.txt)
 transcript separately requires the mixed kinded/rank-N vector and the exact
-vacuous `Higher.vacuous («F» := Higher.Wrap)` application under Djinn,
-Exference, and combined search. Unit regressions pin the kinded wire format,
-kind/order retention, finite bounds, and the same vacuous success in all three
-engine modes. The current exact-vector contract is recorded in the
+vacuous and heterogeneous multi-vacuous applications under Djinn, Exference,
+and combined search. It also requires the two distinct `Wrap` and `Pair Nat`
+applications of one provider exactly once, while allowing the engines to rank
+them differently. Unit regressions pin the kinded wire format, kind/order
+retention, whole-vector deduplication, finite bounds, and the same successes in
+all three engine modes. The current exact-vector contract is recorded in the
 [correlated instance-head assignment report](docs/reports/2026-08-05-correlated-instance-head-assignments.md);
 the earlier scalar API remains documented in the
 [provider-local instance-head report](docs/reports/2026-08-05-provider-local-instance-head-evidence.md).
@@ -1039,7 +1061,10 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   one success yields one ordered vector of kind/type pairs, and incomplete
   heads yield nothing. Each argument retains a bounded `Type`-arrow kind;
   Leant reconstructs the corresponding Djex `GroundKind` and sends the vector
-  through the checked kinded Djinn or Exference assignment entry point. At most
+  through the checked kinded Djinn or Exference assignment entry point. Leant
+  rejects residual kind arities above 64 before that bridge, and pinned Djex
+  independently rejects a supplied `GroundKind` above 129 constructor nodes
+  before recursive operations on that assignment. At most
   16 distinct vectors survive per provider. `FDepth` and `FInst` fragments
   reject their complete vector after parsing, the command-wide vector list is
   capped at 32 before planning or translation, and provider-prefix fallback
