@@ -55,6 +55,7 @@ import Leant.Synth.Fragment
   , ProviderQuery (..)
   , candidateVerificationProgram
   , fragHasDepth
+  , fragHasInstanceBinder
   , fragProviderMayOpen
   , fragRefusal
   , fragUnsafeAtoms
@@ -353,6 +354,24 @@ providerProgramTests = testGroup "provider discovery program"
       "let binders \8592 LeantSynth.leadingTypeBinderNames 80 info.type"
         `isInfixOf` providerProgram []
           (ProviderQuery ["Demo"] (Just "Demo.Token")) @?= True
+  , testCase "bound active instance-head evidence per provider" $ do
+      let prelude = synthPrelude []
+          program = providerProgram []
+            (ProviderQuery ["Gap"] (Just "Gap.Token"))
+      "providerEvidenceSpine fuel 4 source" `isInfixOf` prelude @?= True
+      "if inspected < 32 && candidates.size < 16"
+        `isInfixOf` prelude @?= True
+      "for inst in instances.toList.reverse do"
+        `isInfixOf` prelude @?= True
+      "Lean.withoutModifyingState do" `isInfixOf` prelude @?= True
+      "|| hasInstanceBinder candidate then"
+        `isInfixOf` prelude @?= True
+      "pure (some (← go false fuel 0 [] candidate))"
+        `isInfixOf` prelude @?= True
+      "LeantSynth.providerInstantiationCandidates 80 info.type"
+        `isInfixOf` program @?= True
+      "\" (candidates\" ++ candidateText ++ \")\""
+        `isInfixOf` program @?= True
   ]
 
 candidateVerificationTests :: TestTree
@@ -500,6 +519,46 @@ providerParserTests = testGroup "provider inventory parser"
           [ ProviderFragWithBinders "Demo.token"
               (FAtom False "Demo.Token") []
           ]
+  , testCase "retain provider-local instance-head instantiations" $
+      parseProviderSexp
+          "(providers (provider \"Gap.global\" (binders \"a\") \
+          \(candidates \
+          \(all \"s0\" (-> (var \"s0\") (var \"s0\"))) \
+          \(atom unsafe \"Nat\")) \
+          \(alli \"i0\" (atom unsafe \"Gap.Token\"))))"
+        @?= Right
+          [ ProviderFragWithEvidence "Gap.global"
+              (FAll False "i0" (FAtom False "Gap.Token"))
+              ["a"]
+              [ FAll True "s0" (FArr (FVar "s0") (FVar "s0"))
+              , FAtom False "Nat"
+              ]
+          ]
+  , testCase "distinguish an explicit empty evidence block" $
+      parseProviderSexp
+          "(providers (provider \"Gap.token\" (binders) (candidates) \
+          \(atom unsafe \"Gap.Token\")))"
+        @?= Right
+          [ ProviderFragWithEvidence "Gap.token"
+              (FAtom False "Gap.Token") [] []
+          ]
+  , testCase "retain contextual evidence for fail-closed filtering" $
+      let contextual = FAll False "a"
+            (FInst "Inhabited a" (FVar "a"))
+      in do
+        parseProviderSexp
+            "(providers (provider \"Gap.global\" (binders \"a\") \
+            \(candidates (alli \"a\" \
+            \(inst \"Inhabited a\" (var \"a\")))) \
+            \(alli \"a\" (atom unsafe \"Gap.Token\"))))"
+          @?= Right
+            [ ProviderFragWithEvidence "Gap.global"
+                (FAll False "a" (FAtom False "Gap.Token"))
+                ["a"] [contextual]
+            ]
+        fragHasInstanceBinder contextual @?= True
+        fragHasInstanceBinder
+          (FAll True "a" (FArr (FVar "a") (FVar "a"))) @?= False
   , testCase "rejects trailing inventory data" $
       parseProviderSexp "(providers) extra" @?=
         Left "trailing tokens in provider translation"
@@ -946,6 +1005,33 @@ typeApplicationTests = testGroup "retained type applications"
           check engine = expectTerm "Demo.global («a» := Nat)"
             (synthesizeWithProviders engine 1024 [provider] goal)
       in mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "instantiate a provider-only constrained rank-N choice" $
+      let token = FAtom False "Gap.Token"
+          provider = ProviderFragWithEvidence "Gap.global"
+            (FAll False "a" token) ["a"] [polytype]
+          check engine = expectTerm "Gap.global («a» := (∀"
+            (synthesizeWithProviders engine 1024 [provider] token)
+      in mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "do not donate evidence between provider lanes" $ do
+      let token = FAtom False "Gap.Token"
+          providers =
+            [ ProviderFragWithBinders "Gap.first"
+                (FAll False "a" token) ["a"]
+            , ProviderFragWithEvidence "Gap.unrelated"
+                (FAll False "a" (FAtom False "Gap.Other")) ["a"]
+                [polytype]
+            ]
+          donated = isInfixOf "Gap.first («a» := (∀"
+          check engine = case
+              synthesizeWithProviders engine 1024 providers token of
+            Right (SynthCandidates groups _) ->
+              assertBool
+                ("a later provider donated rank-N evidence to Gap.first in "
+                  ++ synthEngineName engine ++ ": " ++ show groups)
+                (not (any donated (concat groups)))
+            Right _ -> pure ()
+            Left err -> assertFailure err
+      mapM_ check [EngineDjinn, EngineExference, EngineBoth]
   , testCase "apply a scoped vacuous provider at a query polytype" $ do
       let token = FAtom False "Demo.Token"
           provider = FAll False "hidden" token

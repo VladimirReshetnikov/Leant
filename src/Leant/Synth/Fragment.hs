@@ -43,6 +43,7 @@ module Leant.Synth.Fragment
   , parseGoalSexp
   , parseProviderSexp
   , fragHasDepth
+  , fragHasInstanceBinder
   , fragProviderMayOpen
   , fragRefusal
   , fragRecKeys
@@ -162,6 +163,16 @@ data ProviderFrag
         -- FAll. Empty spellings mark binders that cannot be addressed by
         -- Lean named-argument syntax. The plain constructor is retained for
         -- caller-owned inventories that have no elaborator metadata.
+      }
+  | ProviderFragWithEvidence
+      { providerLeanName :: String
+      , providerTypeFrag :: Frag
+      , providerTypeBinderNames :: [String]
+      , providerInstantiationEvidence :: [Frag]
+        -- ^ Proper-type assignments learned from active instance heads for
+        -- this provider's erased instance binders. Evidence remains attached
+        -- to the provider so staged inventories cannot donate an
+        -- instantiation discovered for a later declaration to an earlier one.
       }
   deriving (Eq, Show)
 
@@ -513,6 +524,97 @@ synthPrelude inventory = unlines
   , ""
   , "end"
   , ""
+  , "-- Open only the provider prefix represented by its serialized FAlls,"
+  , "-- retaining erased instance constraints next to the fresh type metas"
+  , "-- they can determine.  Four type binders bound the candidate product;"
+  , "-- the ordinary serializer fuel bounds intervening instance binders."
+  , "partial def providerEvidenceSpine (fuel remainingTypes : Nat)"
+  , "    (e : Expr) : MetaM (Array Expr × Array Expr) := do"
+  , "  match fuel with"
+  , "  | 0 => pure (#[], #[])"
+  , "  | Nat.succ fuel => do"
+  , "    let e ← instantiateMVars e"
+  , "    let e ← whnfR e.consumeMData"
+  , "    match e with"
+  , "    | Expr.forallE n t b bi => do"
+  , "      let t ← instantiateMVars t"
+  , "      let t ← whnfR t.consumeMData"
+  , "      if b.hasLooseBVars then"
+  , "        if remainingTypes == 0 then pure (#[], #[])"
+  , "        else if ← isTypeKind t then do"
+  , "          let typeArg ← mkFreshExprMVar t MetavarKind.natural n"
+  , "          let (types, constraints) ← providerEvidenceSpine fuel"
+  , "            (remainingTypes - 1) (b.instantiate1 typeArg)"
+  , "          pure (#[typeArg] ++ types, constraints)"
+  , "        else pure (#[], #[])"
+  , "      else if bi.isInstImplicit then do"
+  , "        let (types, constraints) ← providerEvidenceSpine fuel"
+  , "          remainingTypes b"
+  , "        pure (types, #[t] ++ constraints)"
+  , "      else if bi.isExplicit || remainingTypes == 0 then"
+  , "        pure (#[], #[])"
+  , "      else if ← isTypeKind t then do"
+  , "        let typeArg ← mkFreshExprMVar t MetavarKind.natural n"
+  , "        let (types, constraints) ← providerEvidenceSpine fuel"
+  , "          (remainingTypes - 1) b"
+  , "        pure (#[typeArg] ++ types, constraints)"
+  , "      else pure (#[], #[])"
+  , "    | _ => pure (#[], #[])"
+  , ""
+  , "def hasInstanceBinder (e : Expr) : Bool :="
+  , "  (e.find? fun subterm => match subterm with"
+  , "    | Expr.forallE _ _ _ bi => bi.isInstImplicit"
+  , "    | _ => false).isSome"
+  , ""
+  , "def providerCandidateFragment? (fuel : Nat) (candidate : Expr)"
+  , "    : MetaM (Option String) := do"
+  , "  let candidate ← instantiateMVars candidate"
+  , "  if candidate.hasMVar || candidate.hasLevelMVar"
+  , "      || candidate.hasFVar || candidate.hasLooseBVars"
+  , "      || hasInstanceBinder candidate then"
+  , "    pure none"
+  , "  else do"
+  , "    let kind ← whnfR (← inferType candidate)"
+  , "    if ← isTypeKind kind then"
+  , "      pure (some (← go false fuel 0 [] candidate))"
+  , "    else pure none"
+  , ""
+  , "-- Match active instance heads independently, in Lean's resolver order,"
+  , "-- and record every closed proper-type assignment they induce.  Each"
+  , "-- attempted head runs under a restored metavariable state so one choice"
+  , "-- cannot constrain a later choice.  The inventory is intentionally"
+  , "-- provider-local and bounded: 32 heads inspected, 16 distinct types."
+  , "partial def providerInstantiationCandidates (fuel : Nat) (source : Expr)"
+  , "    : MetaM (Array String) := do"
+  , "  let (typeArgs, constraints) ← providerEvidenceSpine fuel 4 source"
+  , "  if typeArgs.isEmpty || constraints.isEmpty then return #[]"
+  , "  let mut inspected := 0"
+  , "  let mut candidates : Array String := #[]"
+  , "  for constraint in constraints do"
+  , "    if inspected < 32 && candidates.size < 16 then"
+  , "      let instances ← try"
+  , "        Lean.Meta.SynthInstance.getInstances constraint"
+  , "      catch _ =>"
+  , "        pure #[]"
+  , "      for inst in instances.toList.reverse do"
+  , "        if inspected < 32 && candidates.size < 16 then"
+  , "          inspected := inspected + 1"
+  , "          let fragments ← Lean.withoutModifyingState do"
+  , "            let goal ← mkFreshExprMVar constraint MetavarKind.synthetic"
+  , "            match ← Lean.Meta.SynthInstance.tryResolve goal inst with"
+  , "            | none => pure #[]"
+  , "            | some (mctx, _) => withMCtx mctx do"
+  , "              let mut fragments : Array String := #[]"
+  , "              for candidate in typeArgs do"
+  , "                match ← providerCandidateFragment? fuel candidate with"
+  , "                | none => pure ()"
+  , "                | some fragment => fragments := fragments.push fragment"
+  , "              pure fragments"
+  , "          for fragment in fragments do"
+  , "            if candidates.size < 16 && !candidates.contains fragment then"
+  , "              candidates := candidates.push fragment"
+  , "  pure candidates"
+  , ""
   , "-- Phase-3 vanguard: library premises.  A goal that mentions a"
   , "-- recursive inductive brings rated library functions with it,"
   , "-- instantiated at the goal's own element types (\"recursion via"
@@ -792,11 +894,18 @@ providerProgram sessionNames query = unlines
   , "      | some info =>"
   , "        let frag \8592 LeantSynth.go true 80 0 [] info.type"
   , "        let binders \8592 LeantSynth.leadingTypeBinderNames 80 info.type"
+  , "        let candidates \8592"
+  , "          LeantSynth.providerInstantiationCandidates 80 info.type"
   , "        let binderText := String.join"
   , "          (binders.toList.map fun binder =>"
   , "            \" \" ++ LeantSynth.esc binder)"
+  , "        let candidateText := String.join"
+  , "          (candidates.toList.map fun candidate => \" \" ++ candidate)"
+  , "        let evidenceText := if candidates.isEmpty then \"\" else"
+  , "          \" (candidates\" ++ candidateText ++ \")\""
   , "        body := body ++ \" (provider \" ++ LeantSynth.esc n.toString"
-  , "          ++ \" (binders\" ++ binderText ++ \") \" ++ frag ++ \")\""
+  , "          ++ \" (binders\" ++ binderText ++ \")\" ++ evidenceText"
+  , "          ++ \" \" ++ frag ++ \")\""
   , "    logInfo (\"(providers\" ++ body ++ \")\")"
   ]
  where
@@ -892,21 +1001,35 @@ parseProviderSexp text = do
  where
   providers (TR : rest) = Right ([], rest)
   providers (TL : TSym "provider" : TStr name : rest) = do
-    (binderMetadata, fragTokens) <- providerBinders rest
+    (binderMetadata, evidenceMetadata, fragTokens) <- providerMetadata rest
     (frag, rest') <- parseFrag fragTokens
     case rest' of
       TR : more -> do
         (tailProviders, final) <- providers more
-        let provider = case binderMetadata of
-              Nothing -> ProviderFrag name frag
-              Just names -> ProviderFragWithBinders name frag names
+        let provider = case evidenceMetadata of
+              Just evidence -> ProviderFragWithEvidence name frag
+                (case binderMetadata of
+                  Nothing -> []
+                  Just names -> names)
+                evidence
+              Nothing -> case binderMetadata of
+                Nothing -> ProviderFrag name frag
+                Just names -> ProviderFragWithBinders name frag names
         Right (provider : tailProviders, final)
       _ -> Left "malformed (provider ...)"
   providers _ = Left "malformed provider inventory"
 
   -- Accept the historical metadata-free form for caller-owned inventories
   -- and old snapshots. New live discovery always emits an aligned binder
-  -- list, including an explicit empty list for monomorphic providers.
+  -- list, including an explicit empty list for monomorphic providers. The
+  -- evidence block is independently optional so binder-only snapshots remain
+  -- valid while new inventories can associate instance-head choices with the
+  -- exact provider that exposed the erased constraint.
+  providerMetadata tokens = do
+    (binderMetadata, afterBinders) <- providerBinders tokens
+    (evidenceMetadata, remaining) <- providerEvidence afterBinders
+    Right (binderMetadata, evidenceMetadata, remaining)
+
   providerBinders (TL : TSym "binders" : rest) = do
     (names, remaining) <- binderNames rest
     Right (Just names, remaining)
@@ -917,6 +1040,17 @@ parseProviderSexp text = do
     (names, remaining) <- binderNames rest
     Right (name : names, remaining)
   binderNames _ = Left "malformed provider binder metadata"
+
+  providerEvidence (TL : TSym "candidates" : rest) = do
+    (evidence, remaining) <- evidenceFrags rest
+    Right (Just evidence, remaining)
+  providerEvidence rest = Right (Nothing, rest)
+
+  evidenceFrags (TR : rest) = Right ([], rest)
+  evidenceFrags tokens = do
+    (frag, remaining) <- parseFrag tokens
+    (frags, final) <- evidenceFrags remaining
+    Right (frag : frags, final)
 
 parseFrag :: [Tok] -> Either String (Frag, [Tok])
 parseFrag (TL : TSym tag : rest) = case tag of
@@ -1057,6 +1191,32 @@ fragHasDepth frag = case frag of
   FRec _ _ params ctors ->
     any fragHasDepth params || any (any fragHasDepth . snd) ctors
   FDepth -> True
+  _ -> False
+
+-- | Whether a serialized type contains contextual typeclass evidence. Such a
+-- type is not a context-free instantiation candidate: provider-mode
+-- serialization would erase the dictionary binder and silently strengthen it.
+-- Candidate extraction serializes in goal mode and applies this exact-tree
+-- check after parsing, catching binders exposed by reducible aliases as well
+-- as binders visible to the earlier Lean expression scan.
+fragHasInstanceBinder :: Frag -> Bool
+fragHasInstanceBinder frag = case frag of
+  FArr a b -> fragHasInstanceBinder a || fragHasInstanceBinder b
+  FProd a b -> fragHasInstanceBinder a || fragHasInstanceBinder b
+  FSum a b -> fragHasInstanceBinder a || fragHasInstanceBinder b
+  FAll _ _ b -> fragHasInstanceBinder b
+  FInst{} -> True
+  FApp _ _ _ arguments -> any fragHasInstanceBinder arguments
+  FParamInd _ _ params ctors ->
+    any fragHasInstanceBinder params
+      || any (any fragHasInstanceBinder . snd) ctors
+  FInd _ ctors -> any (any fragHasInstanceBinder . snd) ctors
+  FParamRec _ _ _ params ctors ->
+    any fragHasInstanceBinder params
+      || any (any fragHasInstanceBinder . snd) ctors
+  FRec _ _ params ctors ->
+    any fragHasInstanceBinder params
+      || any (any fragHasInstanceBinder . snd) ctors
   _ -> False
 
 -- | Whether a foreign value may open an otherwise atomic goal.  Quantifier

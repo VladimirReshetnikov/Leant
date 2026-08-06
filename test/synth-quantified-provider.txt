@@ -4,7 +4,21 @@ class Demo.C (a : Type 1) : Prop where
 instance : Demo.C (∀ x : Type, x → x) := ⟨True.intro⟩
 axiom Demo.polyGlobal {a : Type 1} [Demo.C a] : Demo.Token
 
+axiom Gap.Token : Type
+class Gap.C (a : Type 1) : Prop where
+  witness : True
+instance : Gap.C (∀ x : Type, x → x) := ⟨True.intro⟩
+abbrev Gap.Contextual := {a : Type} → [Inhabited a] → a
+instance : Gap.C Gap.Contextual := ⟨True.intro⟩
+axiom Gap.polyGlobal {a : Type 1} [Gap.C a] : Gap.Token
+
 :set synth-steps 1024
+:set synth-engine djinn
+:synth Gap.Token
+:set synth-engine exference
+:synth Gap.Token
+:set synth-engine both
+:synth Gap.Token
 :set synth-engine djinn
 :synth ((∀ x : Type, x → x) → Demo.Token)
 :set synth-engine exference

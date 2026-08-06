@@ -73,6 +73,7 @@ import Language.Haskell.Djex
   , Kind (FunctionKind, ProperTypeKind)
   , Penalty (..)
   , Progress (..)
+  , ProviderInstantiationCandidate (..)
   , Selection (..)
   , SelectionMode (SelectAll)
   , TruncationReason (..)
@@ -93,6 +94,7 @@ import Language.Haskell.Djex
   , expressionSize
   , functionClauseExpression
   , mapDeclarationTypeVariables
+  , maximumProviderInstantiationCandidates
   , mkDefinitionName
   , mkDjinnRequest
   , mkDjinnSession
@@ -104,8 +106,8 @@ import Language.Haskell.Djex
   , renderDiagnostic
   , resultEvidence
   , resultSearch
-  , runDjinnQuery
-  , runExferenceQuery
+  , runDjinnQueryWithInstantiationCandidates
+  , runExferenceQueryWithInstantiationCandidates
   , selectQueryResults
   , standardDjinnSession
   , tupleName
@@ -118,6 +120,7 @@ import Leant.Synth.Fragment
   , ProviderFrag (..)
   , Slot (..)
   , fragHasDepth
+  , fragHasInstanceBinder
   , fragSpine
   , fragUnsafeAtoms
   )
@@ -289,30 +292,33 @@ synthesizeTunedWithProviders
 synthesizeTunedWithProviders engine steps limits checked providers extras
     engineFrag fitFrag = case engine of
   EngineDjinn -> do
-    (goal, decls, providerDecls, render, complete) <-
+    (goal, decls, providerDecls, instantiations, render, complete) <-
       prepare djinnRecursiveProjection providers
     outcome <- djinnRun limits fitFrag complete render goal
-      (decls ++ providerDecls)
+      (decls ++ providerDecls) instantiations
     pure (withoutCheckedCandidates checked outcome)
   EngineExference -> do
-    (goal, decls, providerDecls, render, _) <-
+    (goal, decls, providerDecls, instantiations, render, _) <-
       prepare exferenceRecursiveProjection providers
     outcome <- exferenceRun steps render goal (decls ++ providerDecls)
+      instantiations
     pure (withoutCheckedCandidates checked outcome)
   EngineBoth -> do
-    (djinnGoal, djinnDecls, djinnProviderDecls, djinnRender, djinnComplete) <-
+    ( djinnGoal, djinnDecls, djinnProviderDecls, djinnInstantiations
+      , djinnRender, djinnComplete) <-
       prepare djinnRecursiveProjection providers
     djinn <- djinnRun limits fitFrag djinnComplete djinnRender
-      djinnGoal (djinnDecls ++ djinnProviderDecls)
-    (exferenceGoal, exferenceDecls, providerDecls, exferenceRender, _) <-
+      djinnGoal (djinnDecls ++ djinnProviderDecls) djinnInstantiations
+    ( exferenceGoal, exferenceDecls, providerDecls, exferenceInstantiations
+      , exferenceRender, _) <-
       prepare exferenceRecursiveProjection providers
     exference <- exferenceRun steps exferenceRender exferenceGoal
-      (exferenceDecls ++ providerDecls)
+      (exferenceDecls ++ providerDecls) exferenceInstantiations
     pure (mergeOutcomesSkipping checked djinn exference)
  where
   prepare recursiveProjection activeProviders = do
-    ( goal0, decls, providerDecls, ctorMap, providerMap, typeMap
-      , extrasPrems, ctorPrems, complete) <-
+    ( goal0, decls, providerDecls, instantiations, ctorMap, providerMap
+      , typeMap, extrasPrems, ctorPrems, complete) <-
         fragToDjinn recursiveProjection activeProviders extras engineFrag
     -- Premises enter under the quantifier prefix, where their occurrences of
     -- the goal's bound variables remain connected.  The two premise kinds sit
@@ -341,7 +347,7 @@ synthesizeTunedWithProviders engine steps limits checked providers extras
           renderLeanTerm ctorMap providerMap typeMap
             (pairsOf ctorPrems, spineArrows, pairsOf extrasPrems)
             fitFrag expr
-    pure (goal, decls, providerDecls, render, complete)
+    pure (goal, decls, providerDecls, instantiations, render, complete)
 
 -- | The complete LJT search: candidates, or a refutation whose
 -- soundness depends on the translation having hidden nothing.
@@ -352,8 +358,9 @@ djinnRun
   -> (Expression String -> Either String [String])
   -> Type String
   -> [DjinnDecl]
+  -> [ProviderInstantiationCandidate String]
   -> Either String SynthOutcome
-djinnRun (cutoff, budget) frag projection render goal decls = do
+djinnRun (cutoff, budget) frag projection render goal decls instantiations = do
   standard <- viaDiagnostic standardDjinnSession
   targetName <- viaShow (mkIdentifier "leantSynth")
   target <- viaShow (mkDefinitionName targetName)
@@ -376,7 +383,8 @@ djinnRun (cutoff, budget) frag projection render goal decls = do
             }
         }
   request <- viaDiagnostic (mkDjinnRequest query)
-  result <- viaDiagnostic (runDjinnQuery session request)
+  result <- viaDiagnostic
+    (runDjinnQueryWithInstantiationCandidates session instantiations request)
   let batch = resultSearch result
       notes = progressNotes (batchProgress batch)
       -- Djinn ranks by unused-binder fraction, which happily puts a
@@ -415,17 +423,32 @@ exferenceRun
   -> (Expression String -> Either String [String])
   -> Type String
   -> [DjinnDecl]
+  -> [ProviderInstantiationCandidate String]
   -> Either String SynthOutcome
-exferenceRun steps render goal decls = do
+exferenceRun steps render goal decls instantiations = do
   standard <- viaDiagnostic standardDjinnSession
   let allDecls =
         environmentDeclarations (djinnSessionEnvironment standard)
           ++ decls
       names = nub
-        (concatMap declarationTypeVariables allDecls ++ toList goal)
+        ( concatMap declarationTypeVariables allDecls
+          ++ toList goal
+          ++ concatMap
+            (toList . providerInstantiationCandidateType) instantiations
+        )
       table = Map.fromList (zip names [0 :: Int ..])
       convert v = FlexibleVariable (table Map.! v)
   let convertedDecls = map (mapDeclarationTypeVariables convert) allDecls
+      convertedInstantiations =
+        [ ProviderInstantiationCandidate
+            { providerInstantiationCandidateProvider = provider
+            , providerInstantiationCandidateType = fmap convert candidateType
+            }
+        | ProviderInstantiationCandidate
+            { providerInstantiationCandidateProvider = provider
+            , providerInstantiationCandidateType = candidateType
+            } <- instantiations
+        ]
       providerNames =
         [ valueName signature
         | ValueDeclaration signature <- convertedDecls
@@ -461,7 +484,9 @@ exferenceRun steps render goal decls = do
                   }
               }
         request <- viaDiagnostic (mkExferenceRequest query)
-        results <- viaDiagnostic (runExferenceQuery session request)
+        results <- viaDiagnostic
+          (runExferenceQueryWithInstantiationCandidates session
+            convertedInstantiations request)
         let selection =
               selectQueryResults SelectAll (const (0 :: Int))
                 (const True) results
@@ -830,6 +855,7 @@ fragToDjinn
       ( Type String
       , [DjinnDecl]
       , [DjinnDecl]
+      , [ProviderInstantiationCandidate String]
       , CtorMap
       , Map.Map String (String, Maybe [String])
       , TypeMap
@@ -842,13 +868,17 @@ fragToDjinn recursiveProjection providers extras frag0 = do
   voidC <- viaShow (mkIdentifier "Void")
   unitC <- viaShow (tupleName Boxed 0)
   let usableProviders = filter usableProvider providers
+      providerEvidenceFragments =
+        concatMap usableProviderEvidence usableProviders
       queryFragments =
         map snd extras ++ [frag0] ++ map providerTypeFrag usableProviders
+          ++ providerEvidenceFragments
       planningRoots =
         [ (True, frag) | frag <- map snd extras ++ [frag0] ]
           ++ [ (False, providerTypeFrag provider)
              | provider <- usableProviders
              ]
+          ++ [ (False, evidence) | evidence <- providerEvidenceFragments ]
       plans = exactFamilyPlans recursiveProjection planningRoots
       structuralTemplateFragments =
         [ field
@@ -868,11 +898,13 @@ fragToDjinn recursiveProjection providers extras frag0 = do
         (\atoms provider -> collectProviderSurfaceAtoms atoms $
             providerTypeFrag provider)
         Set.empty usableProviders
+      providerAndEvidenceAtoms = foldl collectProviderSurfaceAtoms
+        providerAtoms providerEvidenceFragments
       rigidAtoms = Set.difference
         (Set.unions
           [ structuralAtomKeys recursiveProjection plans
           , recursiveFieldAtoms
-          , providerAtoms
+          , providerAndEvidenceAtoms
           ])
         recursiveSelfKeys
       projection = ProjectionCompleteness
@@ -1298,12 +1330,23 @@ fragToDjinn recursiveProjection providers extras frag0 = do
                   ProviderFrag{} -> Nothing
                   ProviderFragWithBinders
                       { providerTypeBinderNames = names } -> Just names
+                  ProviderFragWithEvidence
+                      { providerTypeBinderNames = names } -> Just names
             privateName <- nameT ("leantProvider" ++ show index)
             providerType <- go False providerFrag
+            instantiations <- mapM
+              (\candidate -> do
+                candidateType <- go False candidate
+                pure ProviderInstantiationCandidate
+                  { providerInstantiationCandidateProvider = privateName
+                  , providerInstantiationCandidateType = candidateType
+                  })
+              (usableProviderEvidence provider)
             pure
               ( ValueDeclaration
                   (ValueSignature () privateName providerType)
               , ("leantProvider" ++ show index, (leanName, binderNames))
+              , instantiations
               ))
           (zip [0 :: Int ..] usableProviders)
         pure (extrasT, goal, translatedProviders)
@@ -1326,11 +1369,18 @@ fragToDjinn recursiveProjection providers extras frag0 = do
     , tsAtomNext = 0
     , tsTypeMap = Map.empty
     }
-  let (providerDecls, providerNames) = unzip translatedProviders
+  let providerDecls = [declaration | (declaration, _, _) <- translatedProviders]
+      providerNames = [mapping | (_, mapping, _) <- translatedProviders]
+      -- The checked runner owns the same aggregate bound. Truncate here in
+      -- provider-discovery/evidence order so a large valid environment cannot
+      -- turn an otherwise usable synthesis lane into a boundary diagnostic.
+      instantiations = take maximumProviderInstantiationCandidates $ concat
+        [ candidates | (_, _, candidates) <- translatedProviders ]
   Right
     ( goal
     , tsDecls finalState
     , providerDecls
+    , instantiations
     , tsCtorMap finalState
     , Map.fromList providerNames
     , tsTypeMap finalState
@@ -1340,6 +1390,15 @@ fragToDjinn recursiveProjection providers extras frag0 = do
     )
  where
   usableProvider = not . fragHasDepth . providerTypeFrag
+
+  usableProviderEvidence provider = case provider of
+    ProviderFragWithEvidence
+        { providerInstantiationEvidence = evidence } ->
+      filter
+        (\candidate ->
+          not (fragHasDepth candidate || fragHasInstanceBinder candidate))
+        evidence
+    _ -> []
 
   recursiveFamily key ctors = case ctors of
     (leanName, _) : _ ->

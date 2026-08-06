@@ -10,12 +10,34 @@ Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to e
 …> instance : Demo.C (∀ x : Type, x → x) := ⟨True.intro⟩
 …> axiom Demo.polyGlobal {a : Type 1} [Demo.C a] : Demo.Token
 …>
+λ> axiom Gap.Token : Type
+λ> class Gap.C (a : Type 1) : Prop where
+…>   witness : True
+…> instance : Gap.C (∀ x : Type, x → x) := ⟨True.intro⟩
+…> abbrev Gap.Contextual := {a : Type} → [Inhabited a] → a
+…> instance : Gap.C Gap.Contextual := ⟨True.intro⟩
+…> axiom Gap.polyGlobal {a : Type 1} [Gap.C a] : Gap.Token
+…>
 λ> :set synth-steps 1024
 synth steps: 1024
 λ> :set synth-engine djinn
 synth engine: djinn
-λ> :synth ((∀ x : Type, x → x) → Demo.Token)
+λ> :synth Gap.Token
 preparing synthesis environment (session imports + Lean)...
+  it1  Gap.polyGlobal («a» := (∀ (a0_0 : _), a0_0 → a0_0))
+λ> :set synth-engine exference
+synth engine: exference
+λ> :synth Gap.Token
+  it1  Gap.polyGlobal («a» := (∀ (a0_0 : _), a0_0 → a0_0))
+note: search truncated: step limit reached, queue limit pruned 8034
+λ> :set synth-engine both
+synth engine: both
+λ> :synth Gap.Token
+  it1  Gap.polyGlobal («a» := (∀ (a0_0 : _), a0_0 → a0_0))
+note: exference: search truncated: step limit reached, queue limit pruned 5977
+λ> :set synth-engine djinn
+synth engine: djinn
+λ> :synth ((∀ x : Type, x → x) → Demo.Token)
   it1  fun _ => Demo.polyGlobal («a» := (∀ (a0_0 : _), a0_0 → a0_0))
 λ> :set synth-engine exference
 synth engine: exference
@@ -24,7 +46,7 @@ synth engine: exference
   it2  fun f => f _ (f _ (Demo.polyGlobal («a» := (∀ (a0_0 : _), a0_0 → a0_0))))
   it3  fun f => f _ (f _ (f _ (Demo.polyGlobal («a» := (∀ (a0_0 : _), a0_0 → a0_0)))))
   it4  fun f => f _ (f _ (f _ (f _ (Demo.polyGlobal («a» := (∀ (a0_0 : _), a0_0 → a0_0))))))
-note: search truncated: step limit reached, queue limit pruned 9423
+note: search truncated: step limit reached, queue limit pruned 9598
 λ> :set synth-engine both
 synth engine: both
 λ> :synth ((∀ x : Type, x → x) → Demo.Token)
