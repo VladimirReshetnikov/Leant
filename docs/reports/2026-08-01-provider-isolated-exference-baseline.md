@@ -10,9 +10,12 @@ Every engine mode protects ordinary structural synthesis from pressure created
 by the live Lean provider inventory. When the serialized goal is accepted as an
 in-fragment structural query, Leant runs the selected engine once with no
 providers and asks Lean to elaborate the rendered candidates against the exact
-goal. After a nonterminal baseline miss it discovers the bounded live inventory
-and runs provider-enriched search. A complete Djinn refutation remains terminal
-and keeps the REPL's explicit constructive-to-classical fallback policy.
+goal. Whenever no baseline term verifies it discovers the bounded live
+inventory and runs provider-enriched search. A complete Djinn refutation is
+retained as a sound fallback while those constructive lanes run: the first
+Lean-verified provider candidate wins, while empty, unavailable, timed-out, or
+unsuccessful provider search restores the refutation before the REPL considers
+its explicit constructive-to-classical fallback policy.
 
 This restores live transport for goals such as:
 
@@ -55,7 +58,7 @@ The resulting dispatch matrix is:
 | Engine and goal class | First search | Provider fallback | Result behavior |
 | --- | --- | --- | --- |
 | `EngineExference`, structural/in-fragment | Provider-free Exference | Full ranked inventory after no baseline term verifies | Stop at the first verified lane |
-| `EngineDjinn`, structural/in-fragment | Provider-free Djinn | After a nonterminal miss: provider prefixes 1, 4, 16, then full bounded inventory | Preserve a complete refutation; otherwise stop at the first verified lane |
+| `EngineDjinn`, structural/in-fragment | Provider-free Djinn | After no baseline term verifies: provider prefixes 1, 4, 16, then full bounded inventory | A verified provider candidate overrides a retained complete refutation; otherwise restore that refutation |
 | `EngineBoth`, structural/in-fragment | Provider-free combined search | Combined singleton, Djinn-only intermediate prefixes 4 and 16, then combined full inventory | Preserve each engine's 12-group frontier inside 24 combined groups; avoid repeating Exference at intermediate widths |
 | Any engine, atomic/provider-open refused | Provider-enriched stages | No separate baseline | Preserve access to live values |
 
@@ -79,14 +82,19 @@ order inside one ranked group, the first scheduled occurrence of an exact Lean
 spelling wins, and a group emptied by deduplication consumes no slot. Empty
 rendered candidate streams normalize to an ordinary no-term outcome. A real
 candidate from either engine wins the positive merge and must still elaborate
-in Lean; Exference contributes no negative evidence, so Djinn's sound or
-approximate refutation survives only when neither engine has a candidate.
+in Lean; Exference contributes no negative evidence. Only a sound provider-free
+Djinn refutation is retained as the cross-lane fallback, and it survives only
+when no provider candidate passes Lean verification. Approximate refutations
+remain ordinary nonterminal results.
 
-A terminal Djinn refutation is scoped to the complete provider-free structural
-calculus. It is not presented as an exhaustive theorem about all declarations
-or axioms in Lean's live environment, whose inventory is intentionally bounded
-and best-effort. For `Prop`, the REPL's existing classical fallback remains the
-explicit policy for adding classical principles after constructive refutation.
+A complete Djinn refutation is scoped to the provider-free structural
+calculus. It is retained provisionally while Leant searches the intentionally
+bounded, best-effort live inventory, because it is not an exhaustive theorem
+about all declarations or axioms in Lean's environment. A Lean-verified
+provider candidate overrides it; otherwise the original proof-backed verdict
+survives. For `Prop`, the REPL's existing classical fallback remains the
+explicit policy for adding classical principles only after those constructive
+provider lanes fail.
 
 ## Verification before fallback
 
@@ -101,10 +109,11 @@ example : (Goal) := candidate
 
 Only a survivor ends a candidate-producing lane. An engine result whose
 variants all fail Lean verification is a baseline miss and may proceed to
-provider discovery; a complete Djinn refutation ends the lane as a proof-backed
-verdict instead. Thus isolation changes search scheduling, not the trusted
-boundary: no term is shown or bound without kernel-checked elaboration against
-the original goal.
+provider discovery. A complete Djinn refutation also proceeds, but its
+proof-backed verdict is retained as fallback and cannot be weakened by provider
+discovery failure, timeout, engine error, exhaustion, or rejected candidates.
+Thus isolation changes search scheduling, not the trusted boundary: no term is
+shown or bound without kernel-checked elaboration against the original goal.
 
 If a provider-enriched lane rediscovers an exact rendered spelling already
 rejected during baseline or an earlier provider stage, Leant removes that
@@ -185,6 +194,17 @@ A dedicated Djinn provider golden adds seven end-to-end controls:
 - `Demo.consume` alone cannot solve `Demo.Input Demo.Index → Demo.Output
   Demo.Index`, but the widened inventory composes it with `Demo.produce`; and
 - combined mode reuses the same verified `Demo.sealedBox` provider.
+
+The `synth-provider-refutation-fallback` golden adds the complementary
+negative-evidence boundary. An empty-family goal is soundly refuted without
+providers, then an exact rank-N provider supplies a Lean-verified term under
+standalone Djinn, standalone Exference, and combined mode. A final no-provider
+control confirms that the same provider-free refutation is preserved when no
+live declaration can override it. A Peirce-shaped control leaves classical
+fallback enabled and confirms that its exact constructive provider wins before
+the retry can run. Focused pure tests additionally pin a direct override, the
+exact empty-family rank-N assignment, and preservation of sound refutation when
+an available provider cannot inhabit the goal.
 
 The separate `synth-both-frontier` golden makes the combined cap observable.
 Seven singleton distractor types precede `Demo.Good`, and the only available

@@ -180,8 +180,10 @@ Both engines consume the same shared datatype declarations.
 - **Exference** can perform the same family transport and keeps its normal
   ranked constructor/case search. It never emits negative evidence.
 - **Every mode** first runs a structurally accepted goal without live providers
-  and Lean-verifies that lane. Providers are discovered and searched only after
-  a nonterminal miss; a complete Djinn refutation remains terminal.
+  and Lean-verifies that lane. Providers are discovered and searched whenever
+  no baseline term verifies. A complete Djinn refutation is retained as a
+  fallback while those constructive lanes run; a verified provider candidate
+  wins, and otherwise the original sound refutation is restored.
   Djinn-backed fallback widens through discovery-order prefixes of 1, 4, and
   16 providers before the full inventory. In `both` singleton and terminal
   lanes, Djinn keeps the first four fresh groups, Exference receives its full

@@ -8,8 +8,10 @@ providers, exact global rendering, relevance-preserving ratings, curated rated
 `List`/`Nat` library premises, and one-layer recursive elimination, backed by a
 bounded semantic provider cache. Every engine mode protects structural
 synthesis with a Lean-verified provider-free baseline and consults provider or
-library inventory only after the applicable baseline policy; complete Djinn
-refutations retain their proof-backed verdict. Djinn-backed fallback can
+library inventory whenever no baseline term verifies. Complete Djinn
+refutations are retained as proof-backed fallbacks while constructive provider
+lanes run; a verified provider candidate wins, and otherwise the refutation is
+restored before any classical retry. Djinn-backed fallback can
 specialize loaded schemes at closed monotypes and guarded rank-N polytypes.
 Both engines can also retain a query-supplied closed polytype at a vacuous
 local provider whose result mentions fixed ambient query variables. Live
@@ -53,7 +55,7 @@ system.*
 | --- | --- | --- |
 | **LJT engine (Djinn)** | Complete, *terminating* proof search for intuitionistic propositional logic over `->`, tuples, `Either`, `Void`, opaque type variables; emits a lambda term, or a definitive "no term exists" | Curry–Howard transfers directly: the same calculus decides the Lean fragment `→ × ⊕ Empty Unit` in `Type` and `→ ∧ ∨ ⊥ ⊤ ¬ ↔` in `Prop`, emitting `fun`/`⟨,⟩`/`Sum.inl`/`.casesOn` terms |
 | **Non-inhabitation verdicts** | "Proof-backed non-inhabitation result... when formula translation is complete" (library-api.md) | For *opaque* type variables, LJT failure means **no closed term exists at that polymorphic type** — a trustworthy negative answer no Lean tactic currently gives (`exact?` failing proves nothing) |
-| **Exference engine and live inventory** | Best-first search over an *inventory* of typed constants with per-name ratings (`environment/*.ratings`), explicit step/queue/depth budgets, ranked candidate batches | The implemented phase-3 slice protects every structurally accepted mode with a Lean-verified provider-free baseline, then discovers a bounded live inventory only after a nonterminal miss. A complete Djinn refutation remains terminal. Exference applies relevance penalties; Djinn first isolates the highest-ranked provider and can instantiate retained polymorphic schemes. Exact-result ordering, worker demotion, and a generation-aware semantic cache serve both. A curated core `List`/`Nat` inventory and project `leant.ratings` overrides are implemented; a persistent Mathlib-scale index and transitive relevance remain future work |
+| **Exference engine and live inventory** | Best-first search over an *inventory* of typed constants with per-name ratings (`environment/*.ratings`), explicit step/queue/depth budgets, ranked candidate batches | The implemented phase-3 slice protects every structurally accepted mode with a Lean-verified provider-free baseline, then discovers a bounded live inventory whenever no baseline term verifies. A complete Djinn refutation is retained as fallback while those constructive lanes run; a verified provider candidate wins, and otherwise the refutation is restored. Exference applies relevance penalties; Djinn first isolates the highest-ranked provider and can instantiate retained polymorphic schemes. Exact-result ordering, worker demotion, and a generation-aware semantic cache serve both. A curated core `List`/`Nat` inventory and project `leant.ratings` overrides are implemented; a persistent Mathlib-scale index and transitive relevance remain future work |
 | **Shared synthesis foundation** | Parser-independent vocabulary (`Name`, `Type`, `Constraint`, `Environment → Inventory → PreparedInventory → QueryResult (SearchBatch Candidate) → Expression`), each arrow a checked boundary | The template for Leant's internal engine boundary: one fragment grammar, one candidate term grammar, one verification protocol, with the engine behind it swappable. Leant links Djex in-process |
 | **Verification posture** | Engines are explicit about semantics ("neither backend guesses the other's"); truncated batches are labeled; a finished heuristic batch with no candidates "is not a proof of non-inhabitation" | Leant goes one better: **every candidate is elaborated by the Lean backend before display** (`example : (T) := term`), so the synthesizer never needs to be trusted — the same outsource-soundness pattern `:search?` and prove mode already use |
 | **Embeddable library** | `build-depends: djex`, GHC 9.12.4, sealed session + checked request + result envelope; also three CLIs (`djex djinn --render expression "a -> a"`) | Leant is built with **the same GHC 9.12.4** — it links Djex directly as a library, in-process, with no subprocess or protocol overhead |
@@ -455,9 +457,11 @@ with explicit truncation labeling.
 The diagram compresses the verified lane policy. Every engine mode starts a
 structurally accepted fragment with a provider-free search. Lean verifies that
 lane's rendered candidates before Leant discovers live providers. A verified
-term or complete Djinn refutation ends the command; after a nonterminal miss,
-Exference searches the full bounded inventory while Djinn-backed modes try
-discovery-order prefixes of 1, 4, and 16 providers before the full inventory.
+term ends the command. If no term verifies, Exference searches the full bounded
+inventory while Djinn-backed modes try discovery-order prefixes of 1, 4, and
+16 providers before the full inventory. A complete provider-free Djinn
+refutation is retained across those lanes and restored if none produces a
+Lean-verified candidate.
 Provider-eligible
 atomic/refused goals skip the baseline and go
 directly to those stages. In a combined invocation, fresh candidate groups are
@@ -605,9 +609,12 @@ Design rules, all inherited from Djex:
   goal it first runs the ordinary structural projection with no providers,
   renders the bounded candidate prefix, and asks Lean to elaborate every tried
   variant against the exact goal. Provider discovery and enriched search happen
-  only when that baseline completes with a nonterminal miss. Atomic or
+  whenever that baseline produces no verified term. Atomic or
   provider-open refused goals have no useful structural baseline and keep the
-  direct provider path. A complete Djinn refutation remains terminal.
+  direct provider path. A complete Djinn refutation is preserved as fallback
+  while the constructive provider lanes run; a verified candidate overrides
+  it, and an empty, unavailable, timed-out, or unsuccessful provider search
+  restores it before any classical retry.
   Exference searches the ranked inventory directly; Djinn-backed modes try the
   top provider, then prefixes of 4 and 16, and finally the full inventory after
   verified misses. Milestones at or beyond the actual inventory size are
@@ -743,8 +750,11 @@ Design rules, all inherited from Djex:
   "no closed term of this polymorphic type exists", never "this is
   false"; in `Prop` the verdict must further note it is about
   *constructive* provability (Peirce's law is classically fine). In Leant this
-  proof is scoped to the complete provider-free structural calculus, not to an
+  proof is complete for the provider-free structural calculus, not an
   exhaustive scan of the bounded, best-effort live environment inventory.
+  Leant therefore retains it as fallback while trying constructive live
+  providers; the first Lean-verified provider term wins, while provider
+  failure or exhaustion restores the refutation.
 - **Performance**: LJT on interactive-size goals is microseconds; the
   cost center is the backend verification round-trip (~100–300 ms per
   candidate on this machine), so batches should verify lazily, top
@@ -820,9 +830,12 @@ shares `goalTarget`.
 
 §2.1 promised: "`((A → B) → A) → A` has no constructive inhabitant,
 and here is the closest classical variant". Phase 1 delivered the
-first half; deliver the second. When the engine soundly refutes a
-`Prop` goal whose fragment is purely propositional (no quantifiers),
-re-run it once on `¬¬goal`. By Glivenko's theorem this succeeds
+first half; deliver the second. When the provider-free engine soundly
+refutes a `Prop` goal, Leant retains that proof-backed result while its
+constructive live-provider lanes run. Only if no provider candidate survives
+Lean verification does classical search begin. For a purely propositional
+fragment (no quantifiers), re-run the engine once on `¬¬goal`. By Glivenko's
+theorem this succeeds
 *exactly* when the goal is classically provable, so the search is
 complete for the fragment; a found term `t : ¬goal → False` renders as
 `Classical.byContradiction t` and is backend-verified like any other
@@ -928,9 +941,12 @@ the cached synthesis environment.
 
 That inventory is a fallback rather than the default input for any accepted
 structural goal. Leant first runs a provider-free baseline and verifies its
-candidates in Lean. It discovers and searches providers only after a
-nonterminal baseline miss; provider-eligible atomic/refused goals still go
-straight to providers, while a complete Djinn refutation remains terminal.
+candidates in Lean. It discovers and searches providers whenever no baseline
+term verifies; provider-eligible atomic/refused goals still go straight to
+providers. A complete Djinn refutation is retained as a sound fallback during
+provider search: a verified provider candidate wins, while empty, unavailable,
+timed-out, or unsuccessful search restores the refutation before classical
+fallback is considered.
 Exference searches the ranked inventory as one enriched lane.
 Djinn, including the Djinn half of `both`, can reuse the same declarations and
 Djex now specializes context-free loaded schemes at closed monotypes or guarded
@@ -1051,6 +1067,12 @@ a rank-N function type, plus atomic direct-provider admission, provider-free
 ordering, widening to a two-provider composition, combined-mode reuse, and a
 constrained vacuous provider whose closed type choice is visible through both
 engines without exposing its instance argument.
+A provider-refutation-fallback transcript separately checks that a live exact
+rank-N provider overrides provider-free refutation under Djinn, Exference, and
+combined mode, that an exact constructive provider wins before enabled
+classical fallback, and that a no-provider control retains the original sound
+verdict. Pure engine tests pin direct and exact rank-N overrides plus retention
+of a sound refutation when the available provider cannot inhabit the goal.
 A quantified-provider transcript additionally checks a local
 `{a : Type 1} → Demo.Token` value under Djinn, Exference, and combined mode.
 Each engine preserves the query-supplied `∀ x : Type, x → x` choice, and the

@@ -1014,8 +1014,9 @@ in sight:
 
 Peirce's law is different: it has no constructive inhabitant, and
 \code{:synth} can prove that. But rather than stopping at the
-refutation, it then asks the classical question, and answers with a
-term whose spelling shows what was used:
+refutation, it first gives constructive live providers a chance to supply a
+Lean-verified term. Only if those lanes fail does it ask the classical
+question, and answer with a term whose spelling shows what was used:
 
 \begin{session}
 λ> :synth (∀ p q : Prop, ((p → q) → p) → p)
@@ -1219,9 +1220,19 @@ note: exference: search truncated: step limit reached, queue limit pruned 31990
 \end{session}
 
 Every engine mode first gives a structurally accepted goal a
-provider-free lane and asks Lean to verify its candidates. After a
-nonterminal miss, Lean discovers at most 80 live term providers under
-the namespaces used by the target (plus exact session declarations).
+provider-free lane and asks Lean to verify its candidates. When no
+provider-free term verifies, Lean discovers at most 80 live term providers
+under the namespaces used by the target (plus exact session declarations).
+A complete Djinn refutation is retained as a sound fallback while those
+constructive provider lanes run: the first candidate accepted by Lean wins;
+an empty, unavailable, timed-out, or unsuccessful provider search restores
+the refutation before any classical retry.
+The focused \code{synth-provider-refutation-fallback} transcript checks exact
+rank-N overrides under Djinn, Exference, and combined mode. It also enables
+classical search for a Peirce-shaped goal and confirms that an exact
+constructive provider wins first, while a no-provider control retains the
+original sound refutation. Pure tests pin the same direct, rank-N, and
+unusable-provider boundaries below the REPL layer.
 Type constructors and type families, whose fully peeled result is a
 sort, are excluded before search. Exact-result session and public
 declarations lead the ranking;
@@ -1303,11 +1314,13 @@ control \code{Gap.Contextual := \{a : Type\} → [Inhabited a] → a} is therefo
 excluded even when an active class instance names it. This provider-local
 channel can expose a polytype absent from the query, but it is bounded checked
 evidence rather than general impredicative inference. The fragment is bounded
-on purpose: inside it, answers are fast and verified. Refutations are final for
-the complete provider-free structural calculus; the bounded, best-effort live-provider
-inventory is
-not an exhaustive theorem about every declaration or axiom in the Lean
-environment.
+on purpose: inside it, answers are fast and verified. Refutations are complete
+for the provider-free structural calculus but provisional with respect to the
+live environment. Leant searches the bounded, best-effort provider inventory
+before reporting one: a verified provider candidate overrides it, while an
+empty or unsuccessful provider search preserves it as the original sound
+fallback. The resulting verdict is not an exhaustive theorem about every
+declaration or axiom in the Lean environment.
 
 %==============================================================================
 \section{How it works, briefly}\label{sec:how}

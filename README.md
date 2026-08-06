@@ -416,8 +416,8 @@ that baseline before it discovers an environment inventory. Djinn and `both`
 now use the same provider-free ordering rule. The live golden
 therefore exercises real `Option` through Exference as well as Djinn; separate
 atomic and structural-miss controls confirm that a needed provider still wins
-when the baseline is inapplicable or ends without a verified term or complete
-Djinn refutation:
+when the baseline is inapplicable, ends without a verified term, or soundly
+refutes only the provider-free calculus:
 
 ```text
 λ> inductive Demo.Phantom2 (a b : Type 1) : Type 1 where
@@ -439,8 +439,9 @@ synth engine: djinn
 
 Live polymorphic definitions now participate in Djinn's bounded
 instantiation too. This ordinary Lean definition is discovered only after the
-provider-free lane ends with a nonterminal miss, then specialized independently
-at a closed built-in type, an opaque session type, and a rank-N type:
+provider-free lane ends without a verified term (a bounded miss in this
+example), then specialized independently at a closed built-in type, an opaque
+session type, and a rank-N type:
 
 ```text
 λ> def Demo.sealedBox {a : Type u} (value : a) : Demo.SealedBox a :=
@@ -636,14 +637,28 @@ The wording is careful: the verdict is about *closed terms of the
 polymorphic type* (instantiate `b := Option a` and `id` inhabits it),
 and in `Prop` it is about *constructive* provability. When the
 translation had to hide structure behind an opaque atom, the verdict
-backs off to "no term found within bounds". The proof is scoped to the
-complete provider-free structural calculus, not an exhaustive claim about
-every axiom or declaration in the live Lean environment: provider discovery is
-intentionally bounded and best-effort.
+backs off to "no term found within bounds". The proof is complete for the
+provider-free structural calculus, but it is only a fallback with respect to
+the live Lean environment. Leant still runs its bounded constructive provider
+lanes, and the first candidate that Lean verifies wins. If provider discovery
+is empty or unavailable, times out, or yields no verified candidate, Leant
+restores the original proof-backed refutation. Provider discovery is
+intentionally bounded and best-effort, so that verdict is not an exhaustive
+claim about every axiom or declaration in the environment.
+
+The focused
+[`synth-provider-refutation-fallback`](test/synth-provider-refutation-fallback.txt)
+transcript makes that ordering observable. Exact live rank-N providers override
+the provider-free refutation under Djinn, Exference, and `both`; an exact
+constructive proof of a Peirce-shaped goal wins while classical fallback is
+enabled; and a no-provider control preserves the original sound verdict. Pure
+engine tests separately pin a direct provider override, an empty-family
+rank-N assignment, and retention of refutation for an unusable provider.
 
 ### Classical candidates
 
-Constructively refuted `Prop` goals get a second, classical attempt
+After those constructive provider lanes fail, refuted `Prop` goals get a
+classical attempt
 (disable with `:set synth-classical off`): first with an
 excluded-middle case split per atomic subformula, then via the Glivenko
 double-negation translation wrapped in `Classical.byContradiction`.
@@ -924,8 +939,11 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   complete, terminating LJT search.
 - Every engine mode gives a structurally accepted goal a provider-free
   baseline lane. Its rendered candidates are checked by Lean first, and live
-  providers are discovered only after a nonterminal miss. A complete Djinn
-  refutation remains terminal and retains the explicit classical fallback.
+  providers are discovered whenever no baseline term verifies. A complete
+  Djinn refutation is retained provisionally while the constructive provider
+  lanes run: the first Lean-verified provider candidate wins, while empty,
+  unavailable, timed-out, or unsuccessful provider search restores the
+  proof-backed refutation. Only then does the explicit classical fallback run.
   Provider-eligible atomic/refused goals go directly to provider search.
   Djinn first isolates the highest-ranked provider, then widens through the
   first 4 and 16 providers before the full bounded inventory after verified
@@ -1070,9 +1088,12 @@ serializes it into the engine's fragment; the fragment translator
 accepts it or refuses with a reason. For every engine mode and an accepted
 structural fragment, the engine first searches without providers and the
 backend re-elaborates its rendered candidates against the original goal. After
-a nonterminal miss, a second metaprogram builds the bounded live-provider
-inventory and runs the fallback search; a complete Djinn refutation instead
-keeps its proof-backed verdict and explicit classical policy.
+no provider-free term verifies, a second metaprogram builds the bounded
+live-provider inventory and runs the fallback search. A complete Djinn
+refutation is kept as a sound fallback during those constructive lanes: a
+verified provider candidate overrides it, while provider discovery/search
+failure or exhaustion restores it before the explicit classical policy is
+considered.
 Atomic/provider-open refusals use that provider path directly. Djinn-backed
 fallback tries discovery-order prefixes of 1, 4, and 16 providers before the
 full inventory, omitting milestones at or beyond the actual inventory size.
