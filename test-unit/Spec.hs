@@ -1294,6 +1294,36 @@ typeApplicationTests = testGroup "retained type applications"
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
             Left err -> assertFailure err
       mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "retain distinct same-provider assignment vectors" $ do
+      let natural = FAtom False "Nat"
+          token = FAtom False "Higher.AlternativeToken"
+          provider = ProviderFragWithEvidence "Higher.alternative"
+            (FAll False "F" token) ["F"]
+            [ [ProviderInstantiationNominalArgument 1 "Higher.Wrap" []]
+            , [ ProviderInstantiationNominalArgument 1 "Higher.Pair"
+                  [natural]
+              ]
+            , [ProviderInstantiationNominalArgument 1 "Higher.Wrap" []]
+            ]
+          expected =
+            [ "Higher.alternative («F» := Higher.Wrap)"
+            , "Higher.alternative («F» := (@Higher.Pair (Nat)))"
+            ]
+          check engine = case
+              synthesizeWithProviders engine 1024 [provider] token of
+            Right (SynthCandidates groups _) ->
+              let terms = concat groups
+              in mapM_ (\term ->
+                  assertBool
+                    ("a distinct same-provider vector was lost or duplicated "
+                      ++ "in " ++ synthEngineName engine ++ ": " ++ show terms)
+                    (length (filter (== term) terms) == 1))
+                  expected
+            Right other -> assertFailure $
+              "unexpected same-provider assignment outcome from "
+                ++ synthEngineName engine ++ ": " ++ outcomeTag other
+            Left err -> assertFailure err
+      mapM_ check [EngineDjinn, EngineExference, EngineBoth]
   , testCase "retain four ordered quantified provider arguments" $ do
       let token = FAtom False "Gap.Token"
           quantified binder arity =

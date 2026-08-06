@@ -20,6 +20,12 @@ instance : MultiVacuousChoice Wrap (Triple Nat) := ⟨True.intro⟩
 axiom MultiVacuousToken : Type
 axiom multiVacuous {F : Type → Type} {G : Type → Type → Type}
     [MultiVacuousChoice F G] : MultiVacuousToken
+class AlternativeChoice (F : Type → Type) : Prop where
+  witness : True
+instance : AlternativeChoice Wrap := ⟨True.intro⟩
+instance : AlternativeChoice (Pair Nat) := ⟨True.intro⟩
+axiom AlternativeToken : Type
+axiom alternative {F : Type → Type} [AlternativeChoice F] : AlternativeToken
 end Higher
 
 :set synth-steps 2048
@@ -27,12 +33,15 @@ end Higher
 :synth (Higher.Wrap Bool → Higher.Pair Nat Bool → Higher.Token)
 :synth Higher.VacuousToken
 :synth Higher.MultiVacuousToken
+:synth Higher.AlternativeToken
 :set synth-engine exference
 :synth (Higher.Wrap Bool → Higher.Pair Nat Bool → Higher.Token)
 :synth Higher.VacuousToken
 :synth Higher.MultiVacuousToken
+:synth Higher.AlternativeToken
 :set synth-engine both
 :synth (Higher.Wrap Bool → Higher.Pair Nat Bool → Higher.Token)
 :synth Higher.VacuousToken
 :synth Higher.MultiVacuousToken
+:synth Higher.AlternativeToken
 :quit
