@@ -69,11 +69,12 @@ import Language.Haskell.Djex
   , ExferenceOptions (..)
   , ExferenceSessionPolicy (..)
   , Expression
+  , GroundKind
   , Name
   , Kind (FunctionKind, ProperTypeKind)
   , Penalty (..)
   , Progress (..)
-  , ProviderInstantiationAssignment (..)
+  , KindedProviderInstantiationAssignment (..)
   , Selection (..)
   , SelectionMode (SelectAll)
   , TruncationReason (..)
@@ -107,8 +108,8 @@ import Language.Haskell.Djex
   , renderDiagnostic
   , resultEvidence
   , resultSearch
-  , runDjinnQueryWithInstantiationAssignments
-  , runExferenceQueryWithInstantiationAssignments
+  , runDjinnQueryWithKindedInstantiationAssignments
+  , runExferenceQueryWithKindedInstantiationAssignments
   , selectQueryResults
   , standardDjinnSession
   , tupleName
@@ -361,7 +362,7 @@ djinnRun
   -> (Expression String -> Either String [String])
   -> Type String
   -> [DjinnDecl]
-  -> [ProviderInstantiationAssignment String]
+  -> [KindedProviderInstantiationAssignment String]
   -> Either String SynthOutcome
 djinnRun (cutoff, budget) frag projection render goal decls instantiations = do
   standard <- viaDiagnostic standardDjinnSession
@@ -387,7 +388,8 @@ djinnRun (cutoff, budget) frag projection render goal decls instantiations = do
         }
   request <- viaDiagnostic (mkDjinnRequest query)
   result <- viaDiagnostic
-    (runDjinnQueryWithInstantiationAssignments session instantiations request)
+    (runDjinnQueryWithKindedInstantiationAssignments
+      session instantiations request)
   let batch = resultSearch result
       notes = progressNotes (batchProgress batch)
       -- Djinn ranks by unused-binder fraction, which happily puts a
@@ -426,7 +428,7 @@ exferenceRun
   -> (Expression String -> Either String [String])
   -> Type String
   -> [DjinnDecl]
-  -> [ProviderInstantiationAssignment String]
+  -> [KindedProviderInstantiationAssignment String]
   -> Either String SynthOutcome
 exferenceRun steps render goal decls instantiations = do
   standard <- viaDiagnostic standardDjinnSession
@@ -437,21 +439,24 @@ exferenceRun steps render goal decls instantiations = do
         ( concatMap declarationTypeVariables allDecls
           ++ toList goal
           ++ concatMap
-            (concatMap toList . providerInstantiationAssignmentArguments)
+            (concatMap (toList . snd)
+              . kindedProviderInstantiationAssignmentArguments)
             instantiations
         )
       table = Map.fromList (zip names [0 :: Int ..])
       convert v = FlexibleVariable (table Map.! v)
   let convertedDecls = map (mapDeclarationTypeVariables convert) allDecls
       convertedInstantiations =
-        [ ProviderInstantiationAssignment
-            { providerInstantiationAssignmentProvider = provider
-            , providerInstantiationAssignmentArguments =
-                map (fmap convert) arguments
+        [ KindedProviderInstantiationAssignment
+            { kindedProviderInstantiationAssignmentProvider = provider
+            , kindedProviderInstantiationAssignmentArguments =
+                [ (kind, fmap convert argument)
+                | (kind, argument) <- arguments
+                ]
             }
-        | ProviderInstantiationAssignment
-            { providerInstantiationAssignmentProvider = provider
-            , providerInstantiationAssignmentArguments = arguments
+        | KindedProviderInstantiationAssignment
+            { kindedProviderInstantiationAssignmentProvider = provider
+            , kindedProviderInstantiationAssignmentArguments = arguments
             } <- instantiations
         ]
       providerNames =
@@ -490,7 +495,7 @@ exferenceRun steps render goal decls instantiations = do
               }
         request <- viaDiagnostic (mkExferenceRequest query)
         results <- viaDiagnostic
-          (runExferenceQueryWithInstantiationAssignments session
+          (runExferenceQueryWithKindedInstantiationAssignments session
             convertedInstantiations request)
         let selection =
               selectQueryResults SelectAll (const (0 :: Int))
@@ -863,7 +868,7 @@ fragToDjinn
       ( Type String
       , [DjinnDecl]
       , [DjinnDecl]
-      , [ProviderInstantiationAssignment String]
+      , [KindedProviderInstantiationAssignment String]
       , CtorMap
       , Map.Map String (String, Maybe [String])
       , TypeMap
@@ -1387,10 +1392,15 @@ fragToDjinn recursiveProjection providers extras frag0 = do
             providerType <- go False providerFrag
             instantiations <- mapM
               (\arguments -> do
-                argumentTypes <- mapM providerArgumentType arguments
-                pure ProviderInstantiationAssignment
-                  { providerInstantiationAssignmentProvider = privateName
-                  , providerInstantiationAssignmentArguments = argumentTypes
+                kindedArguments <- mapM
+                  (\argument -> do
+                    argumentType <- providerArgumentType argument
+                    pure (providerArgumentKind argument, argumentType))
+                  arguments
+                pure KindedProviderInstantiationAssignment
+                  { kindedProviderInstantiationAssignmentProvider = privateName
+                  , kindedProviderInstantiationAssignmentArguments =
+                      kindedArguments
                   })
               [ assignment
               | (providerIndex, assignment) <- boundedProviderAssignments
@@ -1452,9 +1462,7 @@ fragToDjinn recursiveProjection providers extras frag0 = do
           not (null assignment)
             && length assignment == arity
             && length assignment <= maximumProviderInstantiationArguments
-            && all usableProviderArgument assignment
-            && providerAssignmentKindsMatch
-              (providerTypeFrag provider) assignment)
+            && all usableProviderArgument assignment)
         assignments
     _ -> []
 
@@ -1466,6 +1474,13 @@ fragToDjinn recursiveProjection providers extras frag0 = do
       && all
         (\frag -> not (fragHasDepth frag || fragHasInstanceBinder frag))
         (providerArgumentFragments argument)
+
+  providerArgumentKind :: ProviderInstantiationArgument -> GroundKind
+  providerArgumentKind argument =
+    foldr FunctionKind ProperTypeKind
+      (replicate
+        (providerInstantiationArgumentKindArity argument)
+        ProperTypeKind)
 
   -- Saturated logical products, sums, Iff, and Not have dedicated structural
   -- fragment encodings. Until their unsaturated renderer identity is modeled,
@@ -1514,63 +1529,6 @@ fragToDjinn recursiveProjection providers extras frag0 = do
       append (Just previous)
         | evidence `elem` previous = Just previous
         | otherwise = Just (previous ++ [evidence])
-
-  -- Djex infers provider forall kinds from use sites and defaults a vacuous
-  -- binder to Type. Drop a vector whose Lean-side kind fact cannot be expressed
-  -- by that existing boundary, rather than allowing one unsupported assignment
-  -- to reject the whole engine request. A future kind-aware Djex API can remove
-  -- this conservative filter for constraint-only higher-kinded binders.
-  providerAssignmentKindsMatch provider assignment =
-    case providerBinderKindArities provider of
-      expected
-        | length expected == length assignment -> and
-            (zipWith
-              (\argument kindArity ->
-                Just (providerInstantiationArgumentKindArity argument)
-                  == kindArity)
-              assignment expected)
-      _ -> False
-
-  providerBinderKindArities provider = case provider of
-    FAll _ binder body ->
-      inferredBinderKindArity binder body : providerBinderKindArities body
-    FInst _ body -> providerBinderKindArities body
-    _ -> []
-
-  inferredBinderKindArity binder body =
-    case Set.toList (binderKindConstraints binder body) of
-      [] -> Just 0
-      [arity] -> Just arity
-      _ -> Nothing
-
-  binderKindConstraints binder = collect
-   where
-    collect frag = case frag of
-      FArr parameter result -> descend [parameter, result]
-      FProd left right -> descend [left, right]
-      FSum left right -> descend [left, right]
-      FAll _ shadow body
-        | shadow == binder -> Set.empty
-        | otherwise -> collect body
-      FInst _ body -> collect body
-      FVar spelling
-        | spelling == binder -> Set.singleton 0
-        | otherwise -> Set.empty
-      FApp _ _ head' arguments ->
-        let headConstraint = case head' of
-              AppVariable spelling
-                | spelling == binder -> Set.singleton (length arguments)
-              _ -> Set.empty
-        in headConstraint `Set.union` descend arguments
-      FParamInd _ _ parameters constructors ->
-        descend (parameters ++ concatMap snd constructors)
-      FInd _ constructors -> descend (concatMap snd constructors)
-      FParamRec _ _ _ parameters constructors ->
-        descend (parameters ++ concatMap snd constructors)
-      FRec _ _ parameters constructors ->
-        descend (parameters ++ concatMap snd constructors)
-      _ -> Set.empty
-    descend = Set.unions . map collect
 
   providerInstantiationArity provider = case provider of
     FAll _ _ body -> 1 + providerInstantiationArity body

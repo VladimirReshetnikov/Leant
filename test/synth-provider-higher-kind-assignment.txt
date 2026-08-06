@@ -8,13 +8,21 @@ instance : Choice Wrap (Pair Nat) Bool (∀ x : Type, x → x) :=
   ⟨True.intro⟩
 axiom global {F G : Type → Type} {a : Type} {hidden : Type 1}
     [Choice F G a hidden] : F a → G a → Token
+class VacuousChoice (F : Type → Type) : Prop where
+  witness : True
+instance : VacuousChoice Wrap := ⟨True.intro⟩
+axiom VacuousToken : Type
+axiom vacuous {F : Type → Type} [VacuousChoice F] : VacuousToken
 end Higher
 
 :set synth-steps 2048
 :set synth-engine djinn
 :synth (Higher.Wrap Bool → Higher.Pair Nat Bool → Higher.Token)
+:synth Higher.VacuousToken
 :set synth-engine exference
 :synth (Higher.Wrap Bool → Higher.Pair Nat Bool → Higher.Token)
+:synth Higher.VacuousToken
 :set synth-engine both
 :synth (Higher.Wrap Bool → Higher.Pair Nat Bool → Higher.Token)
+:synth Higher.VacuousToken
 :quit

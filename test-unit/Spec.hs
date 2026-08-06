@@ -1235,22 +1235,23 @@ typeApplicationTests = testGroup "retained type applications"
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
             Left err -> assertFailure err
       mapM_ check [EngineDjinn, EngineExference, EngineBoth]
-  , testCase "skip unsupported vacuous higher-kinded assignments" $ do
+  , testCase "retain a vacuous higher-kinded provider assignment" $ do
       let token = FAtom False "Higher.Token"
           provider = ProviderFragWithEvidence "Higher.vacuous"
             (FAll False "F" token) ["F"]
             [[ProviderInstantiationNominalArgument 1 "Higher.Wrap" []]]
+          expected = "Higher.vacuous («F» := Higher.Wrap)"
           check engine = case
               synthesizeWithProviders engine 512 [provider] token of
             Right (SynthCandidates groups _) ->
               assertBool
-                ("vacuous higher-kinded evidence leaked into "
+                ("vacuous higher-kinded assignment was lost in "
                   ++ synthEngineName engine ++ ": " ++ show groups)
-                (all (not . isInfixOf "Higher.Wrap") (concat groups))
-            Right _ -> pure ()
-            Left err -> assertFailure $
-              "unsupported vacuous evidence aborted "
-                ++ synthEngineName engine ++ ": " ++ err
+                (any (== expected) (concat groups))
+            Right other -> assertFailure $
+              "unexpected vacuous higher-kinded assignment outcome from "
+                ++ synthEngineName engine ++ ": " ++ outcomeTag other
+            Left err -> assertFailure err
       mapM_ check [EngineDjinn, EngineExference, EngineBoth]
   , testCase "retain four ordered quantified provider arguments" $ do
       let token = FAtom False "Gap.Token"

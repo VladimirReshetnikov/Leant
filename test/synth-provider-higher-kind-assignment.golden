@@ -14,6 +14,11 @@ Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to e
 …>   ⟨True.intro⟩
 …> axiom global {F G : Type → Type} {a : Type} {hidden : Type 1}
 …>     [Choice F G a hidden] : F a → G a → Token
+…> class VacuousChoice (F : Type → Type) : Prop where
+…>   witness : True
+…> instance : VacuousChoice Wrap := ⟨True.intro⟩
+…> axiom VacuousToken : Type
+…> axiom vacuous {F : Type → Type} [VacuousChoice F] : VacuousToken
 …> end Higher
 …>
 λ> :set synth-steps 2048
@@ -24,15 +29,23 @@ synth engine: djinn
 preparing synthesis environment (session imports + Lean)...
   it1  Higher.global («F» := Higher.Wrap) («G» := (@Higher.Pair Nat)) («a» := Bool) («hidden» := (∀ (a0_0 : _), a0_0 → a0_0))
 note: search truncated: candidate limit reached (60)
+λ> :synth Higher.VacuousToken
+  it1  Higher.vacuous («F» := Higher.Wrap)
 λ> :set synth-engine exference
 synth engine: exference
 λ> :synth (Higher.Wrap Bool → Higher.Pair Nat Bool → Higher.Token)
   it1  Higher.global («F» := Higher.Wrap) («G» := (@Higher.Pair Nat)) («a» := Bool) («hidden» := (∀ (a0_0 : _), a0_0 → a0_0))
 note: search truncated: step limit reached, queue limit pruned 116000
+λ> :synth Higher.VacuousToken
+  it1  Higher.vacuous («F» := Higher.Wrap)
+note: search truncated: step limit reached, queue limit pruned 36058
 λ> :set synth-engine both
 synth engine: both
 λ> :synth (Higher.Wrap Bool → Higher.Pair Nat Bool → Higher.Token)
   it1  Higher.global («F» := Higher.Wrap) («G» := (@Higher.Pair Nat)) («a» := Bool) («hidden» := (∀ (a0_0 : _), a0_0 → a0_0))
 note: search truncated: candidate limit reached (60)
 note: exference: search truncated: step limit reached, queue limit pruned 16431
+λ> :synth Higher.VacuousToken
+  it1  Higher.vacuous («F» := Higher.Wrap)
+note: exference: search truncated: step limit reached, queue limit pruned 12254
 λ> :quit
