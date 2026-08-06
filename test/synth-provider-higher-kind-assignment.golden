@@ -8,6 +8,7 @@ Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to e
 λ> axiom Token : Type
 λ> axiom Wrap : Type → Type
 λ> axiom Pair : Type → Type → Type
+λ> axiom Triple : Type → Type → Type → Type
 λ> class Choice (F G : Type → Type) (a : Type) (hidden : Type 1) : Prop where
 …>   witness : True
 …> instance : Choice Wrap (Pair Nat) Bool (∀ x : Type, x → x) :=
@@ -19,6 +20,12 @@ Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to e
 …> instance : VacuousChoice Wrap := ⟨True.intro⟩
 …> axiom VacuousToken : Type
 …> axiom vacuous {F : Type → Type} [VacuousChoice F] : VacuousToken
+…> class MultiVacuousChoice (F : Type → Type) (G : Type → Type → Type) : Prop where
+…>   witness : True
+…> instance : MultiVacuousChoice Wrap (Triple Nat) := ⟨True.intro⟩
+…> axiom MultiVacuousToken : Type
+…> axiom multiVacuous {F : Type → Type} {G : Type → Type → Type}
+…>     [MultiVacuousChoice F G] : MultiVacuousToken
 …> end Higher
 …>
 λ> :set synth-steps 2048
@@ -31,6 +38,8 @@ preparing synthesis environment (session imports + Lean)...
 note: search truncated: candidate limit reached (60)
 λ> :synth Higher.VacuousToken
   it1  Higher.vacuous («F» := Higher.Wrap)
+λ> :synth Higher.MultiVacuousToken
+  it1  Higher.multiVacuous («F» := Higher.Wrap) («G» := (@Higher.Triple Nat))
 λ> :set synth-engine exference
 synth engine: exference
 λ> :synth (Higher.Wrap Bool → Higher.Pair Nat Bool → Higher.Token)
@@ -38,7 +47,10 @@ synth engine: exference
 note: search truncated: step limit reached, queue limit pruned 116000
 λ> :synth Higher.VacuousToken
   it1  Higher.vacuous («F» := Higher.Wrap)
-note: search truncated: step limit reached, queue limit pruned 36058
+note: search truncated: step limit reached, queue limit pruned 43794
+λ> :synth Higher.MultiVacuousToken
+  it1  Higher.multiVacuous («F» := Higher.Wrap) («G» := (@Higher.Triple Nat))
+note: search truncated: step limit reached, queue limit pruned 43794
 λ> :set synth-engine both
 synth engine: both
 λ> :synth (Higher.Wrap Bool → Higher.Pair Nat Bool → Higher.Token)
@@ -48,4 +60,7 @@ note: exference: search truncated: step limit reached, queue limit pruned 16431
 λ> :synth Higher.VacuousToken
   it1  Higher.vacuous («F» := Higher.Wrap)
 note: exference: search truncated: step limit reached, queue limit pruned 12254
+λ> :synth Higher.MultiVacuousToken
+  it1  Higher.multiVacuous («F» := Higher.Wrap) («G» := (@Higher.Triple Nat))
+note: exference: search truncated: step limit reached, queue limit pruned 14002
 λ> :quit

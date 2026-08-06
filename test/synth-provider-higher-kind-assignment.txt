@@ -2,6 +2,7 @@ namespace Higher
 axiom Token : Type
 axiom Wrap : Type → Type
 axiom Pair : Type → Type → Type
+axiom Triple : Type → Type → Type → Type
 class Choice (F G : Type → Type) (a : Type) (hidden : Type 1) : Prop where
   witness : True
 instance : Choice Wrap (Pair Nat) Bool (∀ x : Type, x → x) :=
@@ -13,16 +14,25 @@ class VacuousChoice (F : Type → Type) : Prop where
 instance : VacuousChoice Wrap := ⟨True.intro⟩
 axiom VacuousToken : Type
 axiom vacuous {F : Type → Type} [VacuousChoice F] : VacuousToken
+class MultiVacuousChoice (F : Type → Type) (G : Type → Type → Type) : Prop where
+  witness : True
+instance : MultiVacuousChoice Wrap (Triple Nat) := ⟨True.intro⟩
+axiom MultiVacuousToken : Type
+axiom multiVacuous {F : Type → Type} {G : Type → Type → Type}
+    [MultiVacuousChoice F G] : MultiVacuousToken
 end Higher
 
 :set synth-steps 2048
 :set synth-engine djinn
 :synth (Higher.Wrap Bool → Higher.Pair Nat Bool → Higher.Token)
 :synth Higher.VacuousToken
+:synth Higher.MultiVacuousToken
 :set synth-engine exference
 :synth (Higher.Wrap Bool → Higher.Pair Nat Bool → Higher.Token)
 :synth Higher.VacuousToken
+:synth Higher.MultiVacuousToken
 :set synth-engine both
 :synth (Higher.Wrap Bool → Higher.Pair Nat Bool → Higher.Token)
 :synth Higher.VacuousToken
+:synth Higher.MultiVacuousToken
 :quit

@@ -629,6 +629,22 @@ providerParserTests = testGroup "provider inventory parser"
                 ]
               ]
           ]
+  , testCase "retain residual binary provider argument kinds" $
+      parseProviderSexp
+          "(providers (provider \"Gap.vacuous\" (binders \"F\") \
+          \(instantiations (args \
+          \(kinded 2 (nominal \"Gap.Triple\" \
+          \(atom unsafe \"Nat\"))))) \
+          \(alli \"F\" (atom unsafe \"Gap.Token\"))))"
+        @?= Right
+          [ ProviderFragWithEvidence "Gap.vacuous"
+              (FAll False "F" (FAtom False "Gap.Token"))
+              ["F"]
+              [ [ ProviderInstantiationNominalArgument 2 "Gap.Triple"
+                    [FAtom False "Nat"]
+                ]
+              ]
+          ]
   , testCase "reject invalid provider argument kinds" $ do
       let inventory arity =
             "(providers (provider \"Gap.global\" (binders \"F\") "
@@ -1250,6 +1266,31 @@ typeApplicationTests = testGroup "retained type applications"
                 (any (== expected) (concat groups))
             Right other -> assertFailure $
               "unexpected vacuous higher-kinded assignment outcome from "
+                ++ synthEngineName engine ++ ": " ++ outcomeTag other
+            Left err -> assertFailure err
+      mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "retain heterogeneous multi-vacuous provider kinds" $ do
+      let natural = FAtom False "Nat"
+          token = FAtom False "Higher.MultiVacuousToken"
+          provider = ProviderFragWithEvidence "Higher.multiVacuous"
+            (FAll False "F" (FAll False "G" token)) ["F", "G"]
+            [ [ ProviderInstantiationNominalArgument 1 "Higher.Wrap" []
+              , ProviderInstantiationNominalArgument 2 "Higher.Triple"
+                  [natural]
+              ]
+            ]
+          expected =
+            "Higher.multiVacuous («F» := Higher.Wrap) "
+              ++ "(«G» := (@Higher.Triple (Nat)))"
+          check engine = case
+              synthesizeWithProviders engine 1024 [provider] token of
+            Right (SynthCandidates groups _) ->
+              assertBool
+                ("multi-vacuous heterogeneous assignment was lost in "
+                  ++ synthEngineName engine ++ ": " ++ show groups)
+                (any (== expected) (concat groups))
+            Right other -> assertFailure $
+              "unexpected multi-vacuous assignment outcome from "
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
             Left err -> assertFailure err
       mapM_ check [EngineDjinn, EngineExference, EngineBoth]
