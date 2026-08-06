@@ -13,11 +13,11 @@ refutations retain their proof-backed verdict. Djinn-backed fallback can
 specialize loaded schemes at closed monotypes and guarded rank-N polytypes.
 Both engines can also retain a query-supplied closed polytype at a vacuous
 local provider whose result mentions fixed ambient query variables. Live
-provider discovery can now attach bounded, provider-local proper-type choices
-established by Lean's active instance heads, allowing both engines to select a
-rank-N provider argument which is absent from the query without importing Lean
-dictionaries into Djex. The translator additionally retains first-order
-proper-type applications for bound
+provider discovery can now attach bounded, provider-local, ordered proper-type
+assignments established by Lean's active instance heads, allowing both engines
+to select correlated rank-N provider arguments which are absent from the query
+without importing Lean dictionaries into Djex. The translator additionally
+retains first-order proper-type applications for bound
 constructor variables and opaque Lean families, and shares compatible
 proper-type applications of non-recursive and recursive inductive families
 across the complete query. Finite data retains constructor introduction and
@@ -141,40 +141,49 @@ best-first search. From the commit history and the reports
   a Lean instance binder. Unused
   implicit term binders are not misclassified as type quantifiers, and goal
   serialization keeps its established behavior.
-- **Provider-local active-instance evidence (Leant bridge).** For each exact
+- **Correlated active-instance assignments (Leant bridge).** For each exact
   live provider independently, the generated Lean metaprogram opens at most
   four leading proper-type binders while retaining the erased instance
   constraints which can determine them. It inspects at most 32 active instance
-  heads per provider in Lean resolver order. Every head is tried under
-  `Lean.withoutModifyingState`, so a failed or successful choice cannot leave
-  metavariable assignments for the next one; at most 16 distinct serialized
-  proper types survive per provider. Candidates must be closed and
-  universe-kinded. Serialization runs in goal mode so contextual binders remain
-  visible as `FInst`; the Haskell bridge then rejects any candidate containing
-  `FDepth` or `FInst`, including an instance binder exposed only after reducing
-  an alias.
+  heads per provider in Lean resolver order. Every selected head and its full
+  constraint closure run under `Lean.withoutModifyingState`, so no attempt can
+  constrain the next one. The selected head stays fixed while its returned
+  instance subgoals and every other provider constraint are synthesized under
+  the same metavariable context. A failure or unresolved binder rejects that
+  head as a whole.
 
-  The provider inventory grammar gains an optional `(candidates ...)` block
-  after binder metadata. Historical metadata-free entries, binder-only entries,
-  and an explicit empty block all continue to parse. Evidence stays inside the
-  same `ProviderFrag` as its source declaration, so the 1/4/16/full provider
-  prefix schedule cannot expose a later provider's choice in an earlier lane.
-  Leant translates candidates in the query's same rigid-type universe, flattens
-  them in provider/discovery order, and caps the command-wide association list
-  at Djex's shared limit of 32 before any candidate participates in family
-  planning, rigidity, or translation.
+  One success yields one complete ordered argument vector. At most 16
+  alpha-distinct vectors survive per provider; Leant never flattens them into a
+  scalar pool or reconstructs cross-head Cartesian products. Every argument
+  must be closed and universe-kinded. Serialization runs in goal mode so a
+  contextual binder remains visible as `FInst`; the Haskell bridge rejects a
+  whole vector containing `FDepth` or `FInst`, including an instance binder
+  exposed only after reducing an alias.
+
+  The provider inventory grammar uses an optional
+  `(instantiations (args ...))` block after binder metadata. Historical
+  metadata-free entries, binder-only entries, and explicit empty blocks still
+  parse. The legacy `(candidates ...)` form is read as unary vectors only; it
+  does not recreate a multi-binder product. Assignments stay inside the same
+  `ProviderFrag` as their declaration, so the 1/4/16/full provider-prefix
+  schedule cannot expose a later provider's vector in an earlier lane. Leant
+  caps the command-wide association list at 32 complete vectors before any
+  argument participates in family planning, rigidity, or translation.
 
   The pinned Djex API exposes checked
-  `runDjinnQueryWithInstantiationCandidates` and
-  `runExferenceQueryWithInstantiationCandidates` runners. Each resolves an
-  association against the exact sealed-session provider, validates its kind,
-  closure, and context-free shape, and alpha-deduplicates only within that
-  provider. Djinn compiles a proof-producing direct specialization; Exference
-  appends an exact-global visible-application tail. Neither path donates a
-  choice to an alpha-identically typed sibling provider, and an empty evidence
-  list is exactly the historical runner. This is bounded caller-supplied
-  evidence, not general rank-N subsumption or impredicative inference; see the
-  [implementation report](reports/2026-08-05-provider-local-instance-head-evidence.md).
+  `runDjinnQueryWithInstantiationAssignments` and
+  `runExferenceQueryWithInstantiationAssignments` runners. Each resolves the
+  exact sealed-session provider, validates vector width and exact arity,
+  synonym/kind correctness of the complete positional specialization, closure,
+  and context freedom, and alpha-deduplicates whole vectors only within that
+  provider. Djinn compiles each vector into one proof-producing direct premise;
+  Exference tries it once at exact global lookup, including when a provider
+  binder is non-vacuous. Neither path donates a choice to an alpha-identically
+  typed sibling or rebuilds a Cartesian product. Empty assignment input is
+  exactly the historical runner. The earlier scalar candidate API remains a
+  compatibility path. This is bounded caller-supplied evidence, not general
+  rank-N subsumption or impredicative inference; see the
+  [correlated assignment report](reports/2026-08-05-correlated-instance-head-assignments.md).
 - **Instance-implicit goal alignment (Leant bridge).** A non-dependent
   instance binder is neither a type quantifier nor an ordinary engine premise.
   The fragment retains it as a render-only slot, erases its dictionary before
@@ -582,8 +591,8 @@ Design rules, all inherited from Djex:
   instantiations render as named Lean arguments without exposing intervening
   instance binders. For a provider whose erased instance constraint can
   determine those binders, discovery also records the bounded active-head
-  choices described in §1.5. The metadata is provider-local and optional, and
-  both engine adapters receive it only through Djex's checked candidate
+  assignments described in §1.5. The metadata is provider-local and optional,
+  and both engine adapters receive it only through Djex's checked exact-vector
   runners. Exference assigns
   increasing positive rating penalties in discovery order so fallback
   constants do not drown the best match; Djinn instead uses the sparse-prefix
@@ -685,9 +694,11 @@ Design rules, all inherited from Djex:
   monotype-only. Separately, Leant can supply a quantified choice which an
   active Lean instance head established for that exact provider: at most four
   leading type binders are opened, 32 heads are inspected and 16 distinct
-  candidates retained per provider, and no more than 32 provider/type
-  associations reach a checked Djex runner. Any open, depth-truncated, or
-  contextual candidate fails closed. A vacuous provider may
+  complete vectors retained per provider, and no more than 32 provider/vector
+  associations reach a checked Djex runner. The selected head's subgoals and
+  all remaining provider constraints must close under one isolated
+  metavariable context. Any open, wrong-arity, depth-truncated, or contextual
+  vector fails closed as a whole. A vacuous provider may
   mention ambient rigids opened from the query, but a free flexible variable
   still disables this route. Leant rejects a constrained quantified visible
   argument rather than guessing how a Haskell class context should become Lean

@@ -1,5 +1,12 @@
 # Provider-local instance-head evidence
 
+> **Historical scalar snapshot.** This report records the original unary
+> provider/type association channel. Leant now preserves complete ordered
+> multi-binder vectors; see the
+> [correlated instance-head assignment report](2026-08-05-correlated-instance-head-assignments.md).
+> The legacy `(candidates ...)` wire form and Djex candidate runners remain
+> supported compatibility paths, but live extraction uses exact assignments.
+
 **Date:** 2026-08-05
 
 **Scope:** bounded Lean-to-Djex evidence for a live provider's visible

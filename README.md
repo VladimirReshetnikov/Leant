@@ -235,6 +235,8 @@ with the scoped quantified-provider boundary documented in the
 [local-provider report](docs/reports/2026-08-01-scoped-quantified-local-providers.md)
 and the active-instance extension in the
 [provider-local instance-head report](docs/reports/2026-08-05-provider-local-instance-head-evidence.md).
+Its complete multi-binder correlation follow-up is recorded in the
+[correlated instance-head assignment report](docs/reports/2026-08-05-correlated-instance-head-assignments.md).
 
 The engine is the vendored [Djex](lib/Djex) library, linked in-process.
 Djex began as a merger of two classic Haskell synthesizers — **Djinn**
@@ -507,17 +509,25 @@ synth engine: both
 Extraction is deliberately finite and local. It opens at most four leading
 proper-type binders on one provider, retains the erased instance constraints,
 and inspects at most 32 active heads in Lean's resolver order. Each attempt is
-state-isolated; at most 16 distinct closed, context-free proper types survive
-per provider, and Leant passes at most 32 provider/type associations in total.
-That aggregate prefix is taken before a candidate can affect family planning,
-rigidity, or type translation, so evidence beyond the boundary is not entered.
-The optional `(candidates ...)` provider metadata preserves historical
-metadata-free and binder-only inventories. Parsed candidates containing depth
-truncation (`FDepth`) or any instance binder (`FInst`) fail closed, including a
-constraint hidden behind a reducible alias. Provider-prefix lanes slice the
-metadata together with its declaration, and Djex resolves every association by
-the exact private provider name, so a later or alpha-identically typed provider
-cannot donate its evidence to an earlier one.
+state-isolated. The selected head remains fixed while its instance subgoals and
+every other provider constraint are solved under the same metavariable context;
+if any obligation or opened binder remains unresolved, that head contributes
+nothing. A success contributes one complete vector in leading-binder order,
+not a flat pool whose Cartesian product would lose the head's correlation.
+
+At most 16 alpha-distinct vectors survive per provider, and Leant passes at
+most 32 provider/vector associations in total. Every vector has exact provider
+arity and at most four arguments. That aggregate prefix is taken before an
+argument can affect family planning, rigidity, or type translation, so
+evidence beyond the boundary is not entered. Live metadata uses
+`(instantiations (args ...))`; the historical `(candidates ...)` form remains
+readable as unary vectors only, alongside metadata-free and binder-only
+inventories. A complete vector fails closed if any argument contains depth
+truncation (`FDepth`) or an instance binder (`FInst`), including a constraint
+hidden behind a reducible alias. Provider-prefix lanes slice the metadata with
+its declaration, and Djex resolves every vector by the exact private provider
+name, so a later or alpha-identically typed provider cannot donate evidence to
+an earlier one.
 
 The dedicated
 [`synth-quantified-provider`](test/synth-quantified-provider.txt) transcript
@@ -527,7 +537,10 @@ standalone Exference, and combined search. Its reducible
 instance but is excluded because it is contextual. This is bounded,
 evidence-directed rank-N/impredicative support, not general impredicative
 inference; open or context-bearing quantified arguments are rejected rather
-than guessed into Lean syntax. The exact contract is recorded in the
+than guessed into Lean syntax. The current exact-vector contract is recorded
+in the
+[correlated instance-head assignment report](docs/reports/2026-08-05-correlated-instance-head-assignments.md);
+the earlier scalar API remains documented in the
 [provider-local instance-head report](docs/reports/2026-08-05-provider-local-instance-head-evidence.md).
 
 Djinn first searches with only the highest-ranked provider, which prevents a
@@ -960,16 +973,19 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   without binder metadata retain the positional `@` fallback. Inventory
   extraction is deliberately best-effort: if it cannot be produced, each
   engine still runs with the structural declarations it already has.
-- For an exact polymorphic provider whose erased constraints can determine a
-  visible type argument, discovery may also attach active-instance-head
-  evidence. It opens at most four proper-type binders, inspects at most 32
-  heads in resolver order under isolated metavariable state, and retains at
-  most 16 distinct context-free choices per provider. `FDepth` and `FInst`
-  fragments are rejected after parsing, the command-wide association list is
-  capped at 32 before planning or translation, and provider-prefix fallback
-  carries each choice only with its source declaration. The checked Djinn and
-  Exference entry points validate the same exact-provider boundary before
-  search.
+- For an exact polymorphic provider whose erased constraints can determine its
+  visible type arguments, discovery may attach active-instance-head evidence.
+  It opens at most four proper-type binders and inspects at most 32 heads in
+  resolver order under isolated metavariable state. A selected head is retained
+  only after its own subgoals and every remaining provider constraint close;
+  one success yields one ordered vector, and incomplete heads yield nothing.
+  At most 16 distinct vectors survive per provider. `FDepth` and `FInst`
+  fragments reject their complete vector after parsing, the command-wide
+  vector list is capped at 32 before planning or translation, and
+  provider-prefix fallback carries each vector only with its source
+  declaration. The checked Djinn and Exference assignment entry points verify
+  exact provider identity, arity, positional kind correctness, closure, and
+  context before consuming a vector once without Cartesian reconstruction.
 - Non-dependent instance-implicit binders in a goal are serialized as
   render-only slots. They are erased before either engine searches, reserve a
   wildcard in an introduced Lean lambda, stay implicit at hypothesis and

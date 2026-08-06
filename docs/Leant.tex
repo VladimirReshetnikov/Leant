@@ -786,19 +786,28 @@ synth engine: both
 
 Discovery opens no more than four leading proper-type binders on one exact
 provider while retaining its erased instance constraints. It inspects at most
-32 active heads per provider in Lean resolver order, trying each under restored
-metavariable state, and retains at most 16 distinct closed, context-free proper
-types. The whole command passes no more than 32 provider/type associations to
-Djex, and takes that aggregate prefix before a candidate affects family
-planning, rigidity, or translation. Candidate metadata is optional in the
-provider protocol, so historical
-metadata-free and binder-only inventories still parse. A serialized candidate
-containing depth truncation (\code{FDepth}) or an instance binder
-(\code{FInst}) is discarded, including an instance binder revealed by reducing
-an alias. Provider-prefix fallback keeps this metadata attached to its exact
-declaration, and the checked Djinn and Exference runners validate the same
-exact-provider association. Thus a later or alpha-identically typed provider
-cannot donate its choice to an earlier one.
+32 active heads per provider in Lean resolver order. Each selected head and its
+complete constraint closure run under restored metavariable state. The seed
+head stays fixed while its returned instance subgoals and every other provider
+constraint are solved in that same context; a failure or unresolved binder
+rejects the head as a whole. One success contributes one complete vector in
+leading-binder order, never an uncorrelated scalar pool.
+
+Leant retains at most 16 alpha-distinct vectors per provider and passes no more
+than 32 provider/vector associations to Djex. Each vector has exact provider
+arity and at most four arguments. The command takes that aggregate prefix
+before an argument affects family planning, rigidity, or translation. Live
+provider metadata uses
+\code{(instantiations (args ...))}; metadata-free and binder-only inventories
+remain valid, while the historical \code{(candidates ...)} form parses as
+unary vectors only. A vector containing depth truncation (\code{FDepth}) or an
+instance binder (\code{FInst}) is discarded in full, including an instance
+binder revealed by reducing an alias. Provider-prefix fallback keeps metadata
+attached to its exact declaration. The checked Djinn and Exference assignment
+runners validate provider identity, arity, positional kind correctness,
+closure, and context before consuming each vector once without Cartesian
+reconstruction. Thus a later or alpha-identically typed provider cannot donate
+its assignment to an earlier one.
 
 Leant also retains applications whose arguments are proper types. A bound
 first-order constructor remains a higher-kinded variable in Djex; an opaque
@@ -822,20 +831,23 @@ as \code{P 3} remain opaque. A retained nominal application can support a
 positive, Lean-verified candidate but always poisons a negative verdict because
 its constant hides structure. Query-derived candidate types come only from
 proven proper-type positions below arrows and tuples in the sequent, including
-quantified subtrees already present there; provider-local candidates may also
-come from the bounded active-instance channel above. This is guarded,
+quantified subtrees already present there; provider-local assignment arguments
+may also come from the bounded active-instance channel above. This is guarded,
 evidence-directed impredicativity, not general second-order search. The
 query-derived visible-provider route is capped at four binders and 32 argument
 combinations; Djex's internal Haskell-instance route remains monotype-only. The
 external Lean evidence route has the separate four-binder, 32-head,
-16-candidate-per-provider, and 32-association limits. Open or context-bearing
-specified arguments fail closed, and chains with five or more leading binders
-remain a deliberate incomplete boundary. The original local-provider contract
-and the active-instance extension are recorded in the
+16-vector-per-provider, and 32-vector limits. Open, incomplete,
+wrong-arity, or context-bearing vectors fail closed, and chains with five or
+more leading binders remain a deliberate incomplete boundary. The original
+local-provider contract, scalar active-instance extension, and correlated
+follow-up are recorded in the
 \href{reports/2026-08-01-scoped-quantified-local-providers.md}{scoped
 local-provider report} and the
 \href{reports/2026-08-05-provider-local-instance-head-evidence.md}{provider-local
-instance-head report}.
+instance-head report}, followed by the
+\href{reports/2026-08-05-correlated-instance-head-assignments.md}{correlated
+assignment report}.
 
 \subsection{Impossibility, proved}\label{sec:negative}
 
@@ -1228,13 +1240,15 @@ generation; generated \code{it1}, \code{it2}, \dots\ bindings cannot be
 providers and preserve it.
 
 For an exact provider with erased instance constraints, the same discovery
-pass can attach bounded active-instance-head choices. Resolution follows Lean's
-own instance order but isolates each attempted head's metavariable state.
-Provider slicing retains the association only with its source declaration;
-after context/depth filtering Leant takes the command-wide prefix before
-planning or translation, then calls the checked Djinn or Exference evidence
-runner. Lean still reconstructs every dictionary during final
-elaboration---only the closed proper-type choice crosses the bridge.
+pass can attach bounded active-instance-head assignments. Resolution follows
+Lean's own instance order and isolates the selected head plus its complete
+constraint closure. One successful head yields one ordered vector; an
+incomplete or unusable head yields nothing. Provider slicing retains the
+vector only with its source declaration; after whole-vector context/depth and
+arity filtering Leant takes the command-wide prefix before planning or
+translation, then calls the checked Djinn or Exference assignment runner. Lean
+still reconstructs every dictionary during final elaboration---only the closed
+proper-type vector crosses the bridge.
 
 Exact rendered spellings keep their first scheduled occurrence. Before a
 later provider lane is forced or capped, spellings already rejected by Lean
@@ -1277,11 +1291,14 @@ Leant inserts its wildcard before later lambda arguments and withholds complete
 negative evidence across the erased boundary. Constrained rank-N hypotheses
 therefore keep their instance applications implicit without shifting the
 candidate's term binders. Provider discovery now consults active Lean instance
-heads only to obtain bounded proper-type choices for the exact provider whose
-erased constraint they solve. It never serializes dictionaries or general
-instance resolution into Djex. Up to 32 heads are inspected and 16 distinct
-choices retained per provider, with at most 32 associations passed in total;
-open, depth-truncated, and contextual choices fail closed. The reducible
+heads only to obtain bounded proper-type assignments for the exact provider
+whose erased constraints they collectively solve. It never serializes
+dictionaries or general instance resolution into Djex. A selected head is
+accepted only after its own subgoals and every remaining provider constraint
+close in one isolated metavariable context. Up to 32 heads are inspected and
+16 distinct complete vectors retained per provider, with at most 32 vectors
+passed in total; open, incomplete, wrong-arity, depth-truncated, and contextual
+vectors fail closed. The reducible
 control \code{Gap.Contextual := \{a : Type\} → [Inhabited a] → a} is therefore
 excluded even when an active class instance names it. This provider-local
 channel can expose a polytype absent from the query, but it is bounded checked
