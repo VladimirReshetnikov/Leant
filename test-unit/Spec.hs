@@ -2512,6 +2512,74 @@ rankNFrontierTests = testGroup "Djinn rank-N frontiers"
               ("quartic synthesis failed in " ++ synthEngineName engine
                 ++ ": " ++ err)
       mapM_ checkEngine [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "coalesce five-binder schemes for quintic Djinn planning" $ do
+      let variable = FVar
+          product5 names = foldr1 FProd $ map variable names
+          wide names = foldr (FAll True) (product5 names) names
+          identity name = FAll True name
+            (FArr (variable name) (variable name))
+          input = wide ["a", "b", "c", "d", "e"]
+          result = foldr1 FProd
+            [ wide ["f", "g", "h", "i", "j"]
+            , wide ["k", "l", "m", "n", "o"]
+            , wide ["p", "q", "r", "s", "t"]
+            , wide ["u", "v", "w", "x", "y"]
+            , identity "i0"
+            , identity "i1"
+            , identity "i2"
+            , identity "i3"
+            , identity "i4"
+            , wide ["z0", "z1", "z2", "z3", "z4"]
+            ]
+          goal = FArr input result
+          direct =
+            "fun x => ⟨x, ⟨x, ⟨x, ⟨x, ⟨fun _ y => y, "
+              ++ "⟨fun _ z => z, ⟨fun _ w => w, "
+              ++ "⟨fun _ x1 => x1, ⟨fun _ x2 => x2, x⟩⟩⟩⟩⟩⟩⟩⟩⟩"
+      case synthesizeWithProviders EngineDjinn 0 [] goal of
+        Right (SynthCandidates groups _) -> assertBool
+          ("expected the direct quintic rank-N candidate, got: "
+            ++ show groups)
+          (direct `elem` concat groups)
+        Right other -> assertFailure $
+          "unexpected quintic synthesis outcome: " ++ outcomeTag other
+        Left err -> assertFailure $
+          "quintic synthesis failed after forall coalescing: " ++ err
+  , testCase "render the eleven-site dual quintic plan for Lean" $ do
+      let variable = FVar
+          product5 names = foldr1 FProd $ map variable names
+          wide names = foldr (FAll True) (product5 names) names
+          identity name = FAll True name
+            (FArr (variable name) (variable name))
+          input = wide ["source0", "source1", "source2", "source3", "source4"]
+          result = foldr1 FProd
+            [ identity "i0"
+            , identity "i1"
+            , identity "i2"
+            , identity "i3"
+            , wide ["a", "b", "c", "d", "e"]
+            , wide ["f", "g", "h", "i", "j"]
+            , wide ["k", "l", "m", "n", "o"]
+            , wide ["p", "q", "r", "s", "t"]
+            , wide ["u", "v", "w", "x", "y"]
+            , wide ["z0", "z1", "z2", "z3", "z4"]
+            , identity "i4"
+            ]
+          goal = FArr input result
+          direct =
+            "fun x => ⟨fun _ y => y, ⟨fun _ z => z, "
+              ++ "⟨fun _ w => w, ⟨fun _ x1 => x1, "
+              ++ "⟨x, ⟨x, ⟨x, ⟨x, ⟨x, ⟨x, "
+              ++ "fun _ x2 => x2⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩"
+      case synthesizeWithProviders EngineDjinn 0 [] goal of
+        Right (SynthCandidates groups _) -> assertBool
+          ("expected the direct dual-quintic rank-N candidate, got: "
+            ++ show groups)
+          (direct `elem` concat groups)
+        Right other -> assertFailure $
+          "unexpected dual-quintic synthesis outcome: " ++ outcomeTag other
+        Left err -> assertFailure $
+          "dual-quintic synthesis failed after forall coalescing: " ++ err
   ]
 
 visibleTypeApplicationTests :: TestTree

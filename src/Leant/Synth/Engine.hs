@@ -1002,10 +1002,11 @@ fragToDjinn recursiveProjection providers extras frag0 = do
                 else TypeVariable <$> variable ("a:" ++ key)
         FApp _ _ head' arguments ->
           appOccurrence premisesEnabled head' arguments
-        FAll _ binder body -> do
-          v <- variable ("v:" ++ binder)
+        FAll{} -> do
+          let (binders, body) = adjacentForallSpine frag
+          variables <- mapM (variable . ("v:" ++)) binders
           body' <- go premisesEnabled body
-          pure (ForallType [v] [] body')
+          pure (ForallType variables [] body')
         -- Lean reconstructs instance evidence at applications.  Keep it out
         -- of both engine type systems; Render retains the introduction slot.
         FInst _ body -> go premisesEnabled body
@@ -1027,6 +1028,17 @@ fragToDjinn recursiveProjection providers extras frag0 = do
               recDataOccurrence key parameterKeys ctors
           | otherwise -> recOccurrence premisesEnabled key ctors
         FDepth -> failT "internal: depth marker survived refusal check"
+
+      -- One Lean binder group is serialized as adjacent FAll nodes because
+      -- rendering retains each explicitness slot independently. Djex instead
+      -- models one source scheme with a binder list. Coalescing only the
+      -- uninterrupted spine preserves scope and rendering while preventing a
+      -- five-binder scheme from becoming five independent occurrence sites.
+      adjacentForallSpine = collect []
+        where
+          collect binders (FAll _ binder body) =
+            collect (binder : binders) body
+          collect binders body = (reverse binders, body)
 
       -- Retained type applications are the bridge to Djex's guarded
       -- impredicative instantiation.  A bound higher-kinded head shares the
