@@ -237,6 +237,9 @@ and the active-instance extension in the
 [provider-local instance-head report](docs/reports/2026-08-05-provider-local-instance-head-evidence.md).
 Its complete multi-binder correlation follow-up is recorded in the
 [correlated instance-head assignment report](docs/reports/2026-08-05-correlated-instance-head-assignments.md).
+Djinn's next occurrence-plan layer and Leant's checked integration are recorded
+in the
+[quartic rank-N frontier report](docs/reports/2026-08-06-quartic-rank-n-frontiers.md).
 
 The engine is the vendored [Djex](lib/Djex) library, linked in-process.
 Djex began as a merger of two classic Haskell synthesizers — **Djinn**
@@ -663,11 +666,19 @@ hypotheses get placeholder type arguments wherever Lean needs them
 (`f _ x`), so bounded rank-N candidates verify. Chains with five or more
 leading binders remain outside Djinn's fixed instantiation bound. Full
 impredicative inhabitation is undecidable, so Djinn uses a deterministic
-cubic plan family rather than a power set. Its singleton, pairwise, and triple
-open/opaque frontiers cover every choice across seven independent
-quantified sites; an eight-site goal needing exactly four open and four
-opaque sites remains a deliberate bounded gap. Beyond the guard the
+quartic plan family rather than a power set. Its singleton, pairwise, triple,
+and quadruple open/opaque frontiers cover every choice across nine independent
+quantified sites; a ten-site goal needing exactly five open and five opaque
+sites remains a deliberate bounded gap. Beyond the guard the
 answer is "no term found within bounds" and nothing stronger.
+
+The live
+[`synth-quartic-rankn`](test/synth-quartic-rankn.txt) transcript makes the new
+central layer observable: four five-binder schemes must remain exact while
+four sibling identities open structurally. Standalone Djinn and combined mode
+both return terms which Lean checks against the original type; combined mode
+also reports Exference's independent bounded truncation without weakening the
+verified Djinn result.
 
 Instance-implicit goal binders keep a separate render-only position. The
 engines remain dictionary-independent, while Leant inserts the wildcard that
