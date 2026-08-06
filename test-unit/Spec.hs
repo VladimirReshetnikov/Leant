@@ -2466,48 +2466,47 @@ rankNFrontierTests = testGroup "Djinn rank-N frontiers"
             ++ show candidates
   , testCase "render a balanced eight-site quartic plan for Lean" $ do
       let variable = FVar
-          forall5 a b c d e body =
-            FAll True a
-              (FAll True b
-                (FAll True c (FAll True d (FAll True e body))))
-          scheme codomain a b c d e = forall5 a b c d e codomain
-          identity a = FAll True a (FArr (variable a) (variable a))
-          q = variable "q"
-          r = variable "r"
-          z = variable "z"
-          m = variable "m"
-          goal = FArr
-            (scheme q "a" "b" "c" "d" "e")
-            (FArr
-              (scheme r "f" "g" "h" "i" "j")
-              (FArr
-                (scheme z "k" "l" "m1" "n" "o")
-                (FArr
-                  (scheme m "p" "s" "t" "u" "v")
-                  (FProd
-                    (scheme q "w" "x" "y" "a1" "b1")
-                    (FProd
-                      (scheme r "c1" "d1" "e1" "f1" "g1")
-                      (FProd
-                        (scheme z "h1" "i1" "j1" "k1" "l1")
-                        (FProd
-                          (scheme m "m2" "n1" "o1" "p1" "q1")
-                          (FProd
-                            (identity "r1")
-                            (FProd
-                              (identity "s1")
-                              (FProd (identity "t1")
-                                (identity "u1")))))))))))
-          candidates = firstGroup
-            (synthesizeWithProviders EngineDjinn 0 [] goal)
-      if any (\candidate ->
-          "fun " `isInfixOf` candidate
-            && "\10216" `isInfixOf` candidate
-            && "fun _" `isInfixOf` candidate) candidates
-        then pure ()
-        else assertFailure $
-          "expected a rendered quartic rank-N candidate, got: "
-            ++ show candidates
+          -- Match the serializer exactly. The four result variables occur in
+          -- the body and therefore cross as explicit FAlls. Each vacuous
+          -- @forall A B C D E : Type, Q@ instead crosses as five ordinary
+          -- arrows from the same opaque @Type@ atom. Sibling dependent
+          -- identities reuse the serializer's depth-local @s4@ spelling.
+          universe = FAtom False "Type"
+          scheme codomain = foldr FArr codomain (replicate 5 universe)
+          identity = FAll True "s4"
+            (FArr (variable "s4") (variable "s4"))
+          q = variable "s0"
+          r = variable "s1"
+          z = variable "s2"
+          m = variable "s3"
+          result = foldr1 FProd
+            [ scheme q, scheme r, scheme z, scheme m
+            , identity, identity, identity, identity
+            ]
+          body = foldr FArr result [scheme q, scheme r, scheme z, scheme m]
+          goal = FAll True "s0"
+            (FAll True "s1" (FAll True "s2" (FAll True "s3" body)))
+          direct =
+            "fun _ _ _ _ f g h f1 => "
+              ++ "⟨f, ⟨g, ⟨h, ⟨f1, ⟨fun _ x => x, "
+              ++ "⟨fun _ y => y, ⟨fun _ z => z, "
+              ++ "fun _ w => w⟩⟩⟩⟩⟩⟩⟩"
+          checkEngine engine = case
+              synthesizeWithProviders engine 4096 [] goal of
+            Right (SynthCandidates groups _) -> do
+              let candidates = concat
+                    $ take (synthVerificationWindow engine) groups
+              assertBool
+                ("expected direct quartic rank-N candidate from "
+                  ++ synthEngineName engine ++ ", got: " ++ show candidates)
+                (direct `elem` candidates)
+            Right other -> assertFailure
+              ("unexpected quartic outcome from " ++ synthEngineName engine
+                ++ ": " ++ outcomeTag other)
+            Left err -> assertFailure
+              ("quartic synthesis failed in " ++ synthEngineName engine
+                ++ ": " ++ err)
+      mapM_ checkEngine [EngineDjinn, EngineExference, EngineBoth]
   ]
 
 visibleTypeApplicationTests :: TestTree

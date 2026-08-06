@@ -1,5 +1,7 @@
 :set synth-engine djinn
 :synth (∀ Q R Z M : Type, (∀ A B C D E : Type, Q) → (∀ A B C D E : Type, R) → (∀ A B C D E : Type, Z) → (∀ A B C D E : Type, M) → (∀ V W X Y U : Type, Q) × (∀ V W X Y U : Type, R) × (∀ V W X Y U : Type, Z) × (∀ V W X Y U : Type, M) × (∀ E : Type, E → E) × (∀ F : Type, F → F) × (∀ G : Type, G → G) × (∀ H : Type, H → H))
+:set synth-engine exference
+:synth (∀ Q R Z M : Type, (∀ A B C D E : Type, Q) → (∀ A B C D E : Type, R) → (∀ A B C D E : Type, Z) → (∀ A B C D E : Type, M) → (∀ V W X Y U : Type, Q) × (∀ V W X Y U : Type, R) × (∀ V W X Y U : Type, Z) × (∀ V W X Y U : Type, M) × (∀ E : Type, E → E) × (∀ F : Type, F → F) × (∀ G : Type, G → G) × (∀ H : Type, H → H))
 :set synth-engine both
 :synth (∀ Q R Z M : Type, (∀ A B C D E : Type, Q) → (∀ A B C D E : Type, R) → (∀ A B C D E : Type, Z) → (∀ A B C D E : Type, M) → (∀ V W X Y U : Type, Q) × (∀ V W X Y U : Type, R) × (∀ V W X Y U : Type, Z) × (∀ V W X Y U : Type, M) × (∀ E : Type, E → E) × (∀ F : Type, F → F) × (∀ G : Type, G → G) × (∀ H : Type, H → H))
 :quit
