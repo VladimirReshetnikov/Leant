@@ -674,11 +674,25 @@ answer is "no term found within bounds" and nothing stronger.
 
 The live
 [`synth-quartic-rankn`](test/synth-quartic-rankn.txt) transcript makes the new
-central layer observable: four five-binder schemes must remain exact while
-four sibling identities open structurally. Standalone Djinn and combined mode
-both return terms which Lean checks against the original type; combined mode
-also reports Exference's independent bounded truncation without weakening the
-verified Djinn result.
+engine boundary observable, but its Lean surface binder count is not its Djex
+quantifier count. After the four outer `FAll` binders for `Q`, `R`, `Z`, and
+`M`, each vacuous `forall A B C D E : Type, Q`-shaped component crosses the
+serializer as five ordinary arrows from the shared opaque `Type` atom to its
+codomain, not as another `FAll`; those four schemes therefore do not exercise
+the greater-than-four hypothesis-instantiation guard. Among the eight result
+leaves, only the four identity leaves stay quantified. Djex `f3dd2495`
+introduced the two cooperating Exference paths; the current submodule pin,
+`c0c1a461`, follows it with tuple-goal provenance that permits the eager
+whole-tree shortcut once per independently scheduled structural route. Nested
+fields emitted by the shallow alternative stay on that lane, preventing
+recursive rediscovery of equivalent structural trees while preserving scoped
+or environment product reuse at arbitrary depth. Standalone Djinn, standalone
+Exference, and combined mode all return the direct nested-product term.
+Exference does so at the unchanged 4096-step/1024-queue bounds, and its
+independently checked candidate is admitted at search step 30. The live run
+nevertheless continues along its bounded ranked tail and reports
+`queue limit pruned 36491` when the step limit is reached; that note records an
+incomplete tail, not a failure to find or check the displayed candidate.
 
 Instance-implicit goal binders keep a separate render-only position. The
 engines remain dictionary-independent, while Leant inserts the wildcard that
@@ -834,11 +848,12 @@ rather than abstracted or conflated.
 Recursive proper-type applications now receive the same query-wide exact-head
 identity discipline, with a recursive-specific schema check. This lets both
 engines transport a quantified family value directly to a supplied
-impredicative parameter—for example, the verified answer to a base-less
-`RecBox` query is `fun x => x _`. Recursive self fields are normalized to the
-generic applied family before schemas are compared, so `List a` and `List b`
-can validate one recursive knot even though Lean serialized different display
-keys.
+impredicative parameter—for example, the verified answers to a base-less
+`RecBox` query include `fun x => x _`; standalone Exference now also verifies
+the constructor-shaped `fun x => ⟨fun _ y => y, x _⟩`. Recursive self fields
+are normalized to the generic applied family before schemas are compared, so
+`List a` and `List b` can validate one recursive knot even though Lean
+serialized different display keys.
 
 The available structure remains intentionally asymmetric. When every reachable
 occurrence has a complete, compatible schema and a pairwise-distinct parameter
@@ -1008,6 +1023,11 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   groups to Lean; a combined lane gets 24 and preserves both standalone
   frontiers. Writing `D` and `E` for fresh Djinn and Exference groups, its
   order is `D1–D4, E1–E12, D5–D12`, followed by alternating tails.
+  Within each Exference invocation, Leant stable-deduplicates rendered groups
+  before applying the internal 60-candidate collection window. The first
+  spelling remains authoritative, while repeated backend derivations cannot
+  consume slots ahead of later distinct terms; the outer 12/24-group
+  verification frontiers then apply as above.
   Refutations still come only from Djinn. The default `djinn` remains the
   complete, terminating LJT search.
 - Every engine mode gives a structurally accepted goal a provider-free

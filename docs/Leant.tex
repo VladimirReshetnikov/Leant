@@ -736,6 +736,26 @@ Lean to verify every rendered candidate against the original type:
   it5  fun _ _ _ _ _ f x y z w => f _ _ _ _ x y z w
 \end{session}
 
+The similarly named live \code{synth-quartic-rankn} regression has a subtler
+bridge shape than its Lean surface syntax suggests. After the four outer
+\code{FAll} binders for \code{Q}, \code{R}, \code{Z}, and \code{M}, each
+vacuous \code{forall A B C D E : Type, Q}-shaped component is serialized as
+five ordinary arrows from the shared opaque \code{Type} atom to its codomain,
+not as another \code{FAll}. Among the eight result leaves, only the four
+polymorphic identity leaves remain quantified. The regression
+therefore does not exercise the greater-than-four hypothesis-instantiation
+guard. Djex \code{f3dd2495} lets standalone Exference forward those complete
+scoped arrow schemes through a structurally materialized nested product. The
+current submodule pin, \code{c0c1a461}, follows it with tuple-goal provenance:
+an independently scheduled structural route may use the eager whole-tree
+shortcut once, while fields emitted by the shallow alternative remain
+shallow. Equivalent recursive structural histories are suppressed without
+losing scoped or environment product reuse at depth. Exference admits the
+direct, independently checked candidate at search step 30. The unchanged
+4096-step/1024-queue live run still ends with a bounded-tail note recording
+36{,}491 queue prunes: search continued after the successful candidate and did
+not exhaust its ranked tail.
+
 Vacuous local providers can retain the same query-supplied choice even when
 their result is an opaque Lean type. Here \code{Demo.Token} becomes a fixed
 ambient query rigid, not an unresolved inference variable:
@@ -1271,7 +1291,12 @@ negative verdicts still come only from Djinn. Standalone lanes send at
 most 12 fresh candidate groups to Lean. A combined lane gets 24 and
 retains both standalone frontiers: writing D and E for fresh Djinn and
 Exference groups, its order is \code{D1–D4, E1–E12, D5–D12}, then
-alternating tails. Exference runs under explicit budgets
+alternating tails. Within each Exference invocation, Leant
+stable-deduplicates rendered groups before applying the internal 60-candidate
+collection window. The first spelling remains authoritative, while repeated
+backend histories cannot hide later distinct terms behind the bound; the
+outer 12- and 24-group verification frontiers then apply. Exference runs under
+explicit budgets
 (\code{:set synth-steps}, default 4096), and truncation is always
 reported:
 

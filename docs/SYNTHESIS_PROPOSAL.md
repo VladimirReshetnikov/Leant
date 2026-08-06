@@ -85,6 +85,29 @@ best-first search. From the commit history and the reports
   nine independent quantified sites without enumerating a power set;
   the central five-open/five-opaque layer at ten sites is the next
   deliberate, documented gap.
+- **Concrete boxed products and scoped-arrow forwarding (Exference).** A
+  known nonempty boxed-product goal can be materialized as one structural tree
+  before its leaves are scheduled, while the historical one-layer alternative
+  remains available for reuse of an existing inner product. A split scoped
+  binding also retains its complete arrow scheme, so Exference tries exact
+  whole-value forwarding before eta expansion. Djex `f3dd2495` pins that
+  combination. The current Leant submodule revision, `c0c1a461`, follows it by
+  carrying tuple-goal provenance: an independently scheduled structural route
+  may take the eager whole-tree shortcut once, while fields emitted by the
+  shallow sibling stay shallow through later engine steps. This suppresses
+  recursive shortcut duplication without losing scoped or environment product
+  reuse deep in the tree. In Leant's live `synth-quartic-rankn` regression,
+  each vacuous surface
+  scheme `forall A B C D E : Type, Q` is serialized, after the outer `FAll`
+  binders for `Q`, `R`, `Z`, and `M`, as five ordinary arrows from the shared
+  opaque `Type` atom to its codomain. It is not another `FAll`; among the eight
+  result leaves, only the four identity leaves stay quantified. Thus this
+  bridge regression does not exercise the greater-than-four
+  hypothesis-instantiation guard. Standalone Exference admits the direct,
+  independently checked candidate at step 30 under the unchanged
+  4096-step/1024-queue bounds. Its live transcript still reports a step-limited
+  tail with 36,491 queue prunes because search continues after that candidate;
+  the note is not a claim of exhaustive completion.
 - **Bounded hypothesis-side instantiation (Djinn).** A quantified
   hypothesis generates bounded premise axioms
   `Opaque(∀ as. t) → t[as := ss]` whose instantiation candidates are
@@ -993,6 +1016,11 @@ provider search: a verified provider candidate wins, while empty, unavailable,
 timed-out, or unsuccessful search restores the refutation before classical
 fallback is considered.
 Exference searches the ranked inventory as one enriched lane.
+Before its internal 60-candidate collection bound is applied, Leant
+stable-deduplicates rendered Exference groups. The first spelling wins, but
+equivalent backend histories no longer spend slots which belong to later
+distinct terms; subsequent standalone and combined verification frontiers
+remain 12 and 24 fresh groups respectively.
 Djinn, including the Djinn half of `both`, can reuse the same declarations and
 Djex now specializes context-free loaded schemes at closed monotypes or guarded
 rank-N polytypes. Because a lossy or irrelevant declaration can crowd Djinn's
@@ -1205,9 +1233,11 @@ self-knot normalization, occurrence-specific rank-N field fitting, native Djinn
 constructor rendering, independent-SCC composition, recursive evidence
 withholding, abstract fallbacks, exact-head and arity separation, and the legacy
 `Nat`, `List.map`, and `Std.Format` behavior. Lean goldens verify base-less
-identity transport under standalone Exference and Djinn, plus native Djinn
-construction of an impredicative payload through two independent recursive
-SCCs. The implementation contract is recorded in the
+identity transport under standalone Exference and Djinn; the Exference
+transcript also displays and Lean verifies the constructor-shaped candidate
+`fun x => ⟨fun _ y => y, x _⟩`. Native Djinn construction of an impredicative
+payload through two independent recursive SCCs remains covered as well. The
+implementation contract is recorded in the
 [2026-08-01 recursive-family report](reports/2026-08-01-query-wide-recursive-family-identity.md).
 
 ### J. Library premises for recursive inductives — M, phase-3 in miniature (implemented)
