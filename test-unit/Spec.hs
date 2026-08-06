@@ -2464,6 +2464,50 @@ rankNFrontierTests = testGroup "Djinn rank-N frontiers"
         else assertFailure $
           "expected a rendered triple rank-N candidate, got: "
             ++ show candidates
+  , testCase "render a balanced eight-site quartic plan for Lean" $ do
+      let variable = FVar
+          forall5 a b c d e body =
+            FAll True a
+              (FAll True b
+                (FAll True c (FAll True d (FAll True e body))))
+          scheme codomain a b c d e = forall5 a b c d e codomain
+          identity a = FAll True a (FArr (variable a) (variable a))
+          q = variable "q"
+          r = variable "r"
+          z = variable "z"
+          m = variable "m"
+          goal = FArr
+            (scheme q "a" "b" "c" "d" "e")
+            (FArr
+              (scheme r "f" "g" "h" "i" "j")
+              (FArr
+                (scheme z "k" "l" "m1" "n" "o")
+                (FArr
+                  (scheme m "p" "s" "t" "u" "v")
+                  (FProd
+                    (scheme q "w" "x" "y" "a1" "b1")
+                    (FProd
+                      (scheme r "c1" "d1" "e1" "f1" "g1")
+                      (FProd
+                        (scheme z "h1" "i1" "j1" "k1" "l1")
+                        (FProd
+                          (scheme m "m2" "n1" "o1" "p1" "q1")
+                          (FProd
+                            (identity "r1")
+                            (FProd
+                              (identity "s1")
+                              (FProd (identity "t1")
+                                (identity "u1")))))))))))
+          candidates = firstGroup
+            (synthesizeWithProviders EngineDjinn 0 [] goal)
+      if any (\candidate ->
+          "fun " `isInfixOf` candidate
+            && "\10216" `isInfixOf` candidate
+            && "fun _" `isInfixOf` candidate) candidates
+        then pure ()
+        else assertFailure $
+          "expected a rendered quartic rank-N candidate, got: "
+            ++ show candidates
   ]
 
 visibleTypeApplicationTests :: TestTree
