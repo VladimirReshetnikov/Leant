@@ -1,0 +1,17 @@
+
+   __                  __
+  / /  ___ ___ ____   / /_
+ / /__/ -_) _ `/ _ \_/ __/
+/____/\__/\_,_/_//_/ \__/
+Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to exit.
+λ> :set synth-library off
+synth library: off
+λ> :set synth-engine djinn
+synth engine: djinn
+λ> abbrev QuinticRankN.Wide := ∀ A B C D E : Type, A × B × C × D × E
+λ> :synth (QuinticRankN.Wide → QuinticRankN.Wide × QuinticRankN.Wide × QuinticRankN.Wide × QuinticRankN.Wide × (∀ I : Type, I → I) × (∀ J : Type, J → J) × (∀ K : Type, K → K) × (∀ L : Type, L → L) × (∀ N : Type, N → N) × QuinticRankN.Wide)
+preparing synthesis environment (session imports + Lean)...
+  it1  fun x => ⟨x, ⟨x, ⟨x, ⟨x, ⟨fun _ y => y, ⟨fun _ z => z, ⟨fun _ w => w, ⟨fun _ x1 => x1, ⟨fun _ x2 => x2, x⟩⟩⟩⟩⟩⟩⟩⟩⟩
+λ> :synth (QuinticRankN.Wide → (∀ I : Type, I → I) × (∀ J : Type, J → J) × (∀ K : Type, K → K) × (∀ L : Type, L → L) × QuinticRankN.Wide × QuinticRankN.Wide × QuinticRankN.Wide × QuinticRankN.Wide × QuinticRankN.Wide × QuinticRankN.Wide × (∀ N : Type, N → N))
+  it1  fun x => ⟨fun _ y => y, ⟨fun _ z => z, ⟨fun _ w => w, ⟨fun _ x1 => x1, ⟨x, ⟨x, ⟨x, ⟨x, ⟨x, ⟨x, fun _ x2 => x2⟩⟩⟩⟩⟩⟩⟩⟩⟩⟩
+λ> :quit
