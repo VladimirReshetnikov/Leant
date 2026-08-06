@@ -1,0 +1,49 @@
+:set synth-classical off
+inductive RefutationDjinn.Void : Type
+class RefutationDjinn.Choice (a : Type 1) : Prop where witness : True
+instance : RefutationDjinn.Choice (∀ x : Type, x → x) := ⟨True.intro⟩
+axiom RefutationDjinn.impossible {a : Type 1} [RefutationDjinn.Choice a] :
+  RefutationDjinn.Void
+
+:set synth-engine djinn
+:synth RefutationDjinn.Void
+:reset
+
+:set synth-classical off
+inductive RefutationExference.Void : Type
+class RefutationExference.Choice (a : Type 1) : Prop where witness : True
+instance : RefutationExference.Choice (∀ x : Type, x → x) := ⟨True.intro⟩
+axiom RefutationExference.impossible {a : Type 1}
+    [RefutationExference.Choice a] : RefutationExference.Void
+
+:set synth-engine exference
+:synth RefutationExference.Void
+:reset
+
+:set synth-classical off
+inductive RefutationBoth.Void : Type
+class RefutationBoth.Choice (a : Type 1) : Prop where witness : True
+instance : RefutationBoth.Choice (∀ x : Type, x → x) := ⟨True.intro⟩
+axiom RefutationBoth.impossible {a : Type 1} [RefutationBoth.Choice a] :
+  RefutationBoth.Void
+
+:set synth-engine both
+:synth RefutationBoth.Void
+:reset
+
+:set synth-classical on
+axiom RefutationClassical.P : Prop
+axiom RefutationClassical.Q : Prop
+axiom RefutationClassical.peirce :
+  ((RefutationClassical.P → RefutationClassical.Q) →
+    RefutationClassical.P) → RefutationClassical.P
+
+:set synth-engine djinn
+:synth (((RefutationClassical.P → RefutationClassical.Q) → RefutationClassical.P) → RefutationClassical.P)
+:reset
+
+:set synth-classical off
+inductive RefutationControl.Void : Type
+:set synth-engine djinn
+:synth RefutationControl.Void
+:quit

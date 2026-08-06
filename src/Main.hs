@@ -1997,8 +1997,11 @@ synthGo' st args retriedVars goal parsed = do
       -- search.  Preserve the ordinary structural search as an isolated first
       -- lane: if one of its candidates survives Lean verification, discovering
       -- providers cannot improve whether the goal is solved and must not crowd
-      -- that term out.  Atomic/provider-open refusals go straight to the
-      -- provider lane because the baseline has no usable structure.
+      -- that term out.  A provider-free Djinn refutation is retained as a
+      -- fallback, but is not a verdict about the larger live environment: a
+      -- verified provider candidate must still get a chance to win.  Atomic/
+      -- provider-open refusals go straight to the provider lane because the
+      -- baseline has no usable structure.
       structuralFirst = refusal == Nothing
   debug <- lookupEnv "LEANT_SYNTH_DEBUG"
   when (structuralFirst && isJust debug) $
@@ -2041,13 +2044,21 @@ synthGo' st args retriedVars goal parsed = do
         -- it with a less informative fallback result.
         Nothing -> report baselineLimit False baseline
         Just (Left _) -> report baselineLimit False baseline
-        -- A complete Djinn refutation is a terminal logical verdict under the
-        -- REPL's provider-free proof-search contract, not a bounded search
-        -- miss.  Reporting it here also preserves the explicit
-        -- constructive-to-classical fallback policy.  An approximate
-        -- refutation remains eligible for provider search.
-        Just (Right (SynthRefuted True)) ->
-          report baselineLimit False baseline
+        -- A complete Djinn refutation proves the provider-free structural
+        -- environment impossible, but a live declaration may still inhabit
+        -- the goal.  Keep the proof-backed result as the fallback for empty,
+        -- unavailable, timed-out, or unsuccessful provider search.  Reporting
+        -- it (and therefore any classical retry) is delayed until those
+        -- constructive lanes have failed.
+        Just (Right (SynthRefuted True)) -> do
+          providers <-
+            if discoverProviders
+              then loadSynthProviders st (pgProviderQuery parsed)
+              else pure []
+          if null providers
+            then report baselineLimit False baseline
+            else runProviderLanes (Just (baselineLimit, baseline))
+              (runSynthesis False) Set.empty (providerStages engine providers)
         _ -> do
           (checkedVariants, shown) <- tryCandidates baselineLimit baseline
           if shown
@@ -2059,7 +2070,7 @@ synthGo' st args retriedVars goal parsed = do
                   else pure []
               if null providers
                 then report baselineLimit (isJust checkedVariants) baseline
-                else runProviderLanes (runSynthesis False)
+                else runProviderLanes Nothing (runSynthesis False)
                   (Set.fromList (maybe [] id checkedVariants))
                   (providerStages engine providers)
     else do
@@ -2071,28 +2082,37 @@ synthGo' st args retriedVars goal parsed = do
         Just reason
           | not (fragProviderMayOpen fragment && not (null providers)) ->
               emitLn st =<< cRed st ("out of fragment: " ++ reason)
-        _ -> runProviderLanes (runSynthesis False) Set.empty
+        _ -> runProviderLanes Nothing (runSynthesis False) Set.empty
           (providerStages engine providers)
  where
-  runProviderLanes runLane checked lanes = case lanes of
-    [] -> report synthMaxTried False (Just (Right (SynthNoTerm [])))
-    [(laneEngine, providers)] -> do
-      let groupLimit = synthVerificationWindow laneEngine
-      bounded <- runLane checked laneEngine providers
-      report groupLimit False bounded
+  runProviderLanes fallback runLane checked lanes = case lanes of
+    [] -> finish synthMaxTried False (Just (Right (SynthNoTerm [])))
     (laneEngine, providers) : remaining -> do
       let groupLimit = synthVerificationWindow laneEngine
       fresh <- runLane checked laneEngine providers
       case fresh of
-        Nothing -> report groupLimit False fresh
-        Just (Left _) -> report groupLimit False fresh
+        Nothing -> finish groupLimit False fresh
+        Just (Left _) -> finish groupLimit False fresh
         _ -> do
           (attempted, shown) <- tryCandidates groupLimit fresh
           if shown
             then pure ()
-            else runProviderLanes runLane
-              (Set.union checked (Set.fromList (maybe [] id attempted)))
-              remaining
+            else if null remaining
+              then finish groupLimit (isJust attempted) fresh
+              else runProviderLanes fallback runLane
+                (Set.union checked (Set.fromList (maybe [] id attempted)))
+                remaining
+   where
+    -- Once the provider-free lane has proved a sound refutation, every
+    -- provider-side miss is weaker evidence.  Restore the original result
+    -- instead of allowing discovery/search failure (or rejected generated
+    -- terms) to replace it.  'report' is also the sole classical entry point,
+    -- so this ordering keeps classical search strictly after constructive
+    -- provider search.
+    finish groupLimit candidatesChecked bounded = case fallback of
+      Just (fallbackLimit, fallbackOutcome) ->
+        report fallbackLimit False fallbackOutcome
+      Nothing -> report groupLimit candidatesChecked bounded
 
   tryCandidates groupLimit bounded = case bounded of
     Just (Right (SynthCandidates groups notes)) -> do

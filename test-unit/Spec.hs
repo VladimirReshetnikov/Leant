@@ -837,7 +837,49 @@ combinedEngineMergeTests = testGroup "combined-engine verification frontier"
 
 providerEngineTests :: TestTree
 providerEngineTests = testGroup "foreign providers"
-  [ testCase "render an exact qualified provider through Exference" $ do
+  [ testCase "override a provider-free refutation with a real provider" $ do
+      let provider = ProviderFrag "Demo.falseProof" FBot
+          check engine = case
+              synthesizeWithProviders engine 128 [provider] FBot of
+            Right (SynthCandidates groups _) ->
+              assertBool
+                ("the provider did not override the provider-free refutation \
+                 \in " ++ synthEngineName engine ++ ": " ++ show groups)
+                (any (== "Demo.falseProof") (concat groups))
+            Right other -> assertFailure $
+              "unexpected provider-refutation outcome from "
+                ++ synthEngineName engine ++ ": " ++ outcomeTag other
+            Left err -> assertFailure err
+      mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "override an empty-family refutation with exact rank-N evidence" $ do
+      let void = FParamInd "Demo.Void" "Demo.Void" [] []
+          polytype = FAll True "p" (FArr (FVar "p") (FVar "p"))
+          provider = ProviderFragWithEvidence "Demo.impossible"
+            (FAll False "a" void) ["a"] [[polytype]]
+          exact = (==
+            "Demo.impossible («a» := (∀ (a0_0 : _), a0_0 → a0_0))")
+          check engine = case
+              synthesizeWithProviders engine 128 [provider] void of
+            Right (SynthCandidates groups _) ->
+              assertBool
+                ("the exact provider did not override the empty-family \
+                 \refutation in " ++ synthEngineName engine ++ ": "
+                   ++ show groups)
+                (any exact (concat groups))
+            Right other -> assertFailure $
+              "unexpected exact provider-refutation outcome from "
+                ++ synthEngineName engine ++ ": " ++ outcomeTag other
+            Left err -> assertFailure err
+      mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "retain a refutation when providers cannot inhabit the goal" $ do
+      let provider = ProviderFrag "Demo.falseEndomorphism" (FArr FBot FBot)
+      case synthesizeWithProviders EngineDjinn 128 [provider] FBot of
+        Right (SynthRefuted True) -> pure ()
+        Right other -> assertFailure $
+          "an unusable provider replaced the sound refutation: "
+            ++ outcomeTag other
+        Left err -> assertFailure err
+  , testCase "render an exact qualified provider through Exference" $ do
       let natural = FAtom False "Nat"
           boolean = FAtom False "Bool"
           provider = ProviderFrag "Demo.toBool" (FArr natural boolean)
