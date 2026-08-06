@@ -760,6 +760,46 @@ domain lane retains at most twelve site-and-style spellings, for a hard
 36-variant bound only when the local quantified argument is domain-sensitive;
 ordinary duplicate spellings collapse to the historical smaller group.
 
+An active Lean instance head can establish a provider-local choice even when
+the polytype does not occur in the query. In this session the goal contains
+only \code{Gap.Token}; the instance for \code{Gap.C} determines the quantified
+argument of the exact provider:
+
+\begin{session}
+λ> axiom Gap.Token : Type
+λ> class Gap.C (a : Type 1) : Prop where witness : True
+λ> instance : Gap.C (∀ x : Type, x → x) := ⟨True.intro⟩
+λ> axiom Gap.polyGlobal {a : Type 1} [Gap.C a] : Gap.Token
+λ> :set synth-engine djinn
+synth engine: djinn
+λ> :synth Gap.Token
+  it1  Gap.polyGlobal («a» := (∀ (a0_0 : _), a0_0 → a0_0))
+λ> :set synth-engine exference
+synth engine: exference
+λ> :synth Gap.Token
+  it1  Gap.polyGlobal («a» := (∀ (a0_0 : _), a0_0 → a0_0))
+λ> :set synth-engine both
+synth engine: both
+λ> :synth Gap.Token
+  it1  Gap.polyGlobal («a» := (∀ (a0_0 : _), a0_0 → a0_0))
+\end{session}
+
+Discovery opens no more than four leading proper-type binders on one exact
+provider while retaining its erased instance constraints. It inspects at most
+32 active heads per provider in Lean resolver order, trying each under restored
+metavariable state, and retains at most 16 distinct closed, context-free proper
+types. The whole command passes no more than 32 provider/type associations to
+Djex, and takes that aggregate prefix before a candidate affects family
+planning, rigidity, or translation. Candidate metadata is optional in the
+provider protocol, so historical
+metadata-free and binder-only inventories still parse. A serialized candidate
+containing depth truncation (\code{FDepth}) or an instance binder
+(\code{FInst}) is discarded, including an instance binder revealed by reducing
+an alias. Provider-prefix fallback keeps this metadata attached to its exact
+declaration, and the checked Djinn and Exference runners validate the same
+exact-provider association. Thus a later or alpha-identically typed provider
+cannot donate its choice to an earlier one.
+
 Leant also retains applications whose arguments are proper types. A bound
 first-order constructor remains a higher-kinded variable in Djex; an opaque
 Lean family receives one rigid nominal head across its occurrences. Both
@@ -780,16 +820,22 @@ The serializer admits only first-order kind arrows between universes and only
 application arguments whose own type is a universe. Term-indexed families such
 as \code{P 3} remain opaque. A retained nominal application can support a
 positive, Lean-verified candidate but always poisons a negative verdict because
-its constant hides structure. Candidate types come only from proven proper-type
-positions below arrows and tuples in the sequent, including quantified subtrees
-already present there: this is guarded impredicativity, not general
-second-order search. A visible provider chain is capped at four binders and 32
-argument combinations. The separate explicit-instance-head route remains
-monotype-only; open or context-bearing specified arguments fail closed, and
-chains with five or more leading binders remain a deliberate incomplete
-boundary. The implementation contract and Lean~4.31 transcript are recorded in
-the \href{reports/2026-08-01-scoped-quantified-local-providers.md}{scoped
-local-provider report}.
+its constant hides structure. Query-derived candidate types come only from
+proven proper-type positions below arrows and tuples in the sequent, including
+quantified subtrees already present there; provider-local candidates may also
+come from the bounded active-instance channel above. This is guarded,
+evidence-directed impredicativity, not general second-order search. The
+query-derived visible-provider route is capped at four binders and 32 argument
+combinations; Djex's internal Haskell-instance route remains monotype-only. The
+external Lean evidence route has the separate four-binder, 32-head,
+16-candidate-per-provider, and 32-association limits. Open or context-bearing
+specified arguments fail closed, and chains with five or more leading binders
+remain a deliberate incomplete boundary. The original local-provider contract
+and the active-instance extension are recorded in the
+\href{reports/2026-08-01-scoped-quantified-local-providers.md}{scoped
+local-provider report} and the
+\href{reports/2026-08-05-provider-local-instance-head-evidence.md}{provider-local
+instance-head report}.
 
 \subsection{Impossibility, proved}\label{sec:negative}
 
@@ -1181,6 +1227,15 @@ ordinary declarations, and session-restoring operations invalidate that
 generation; generated \code{it1}, \code{it2}, \dots\ bindings cannot be
 providers and preserve it.
 
+For an exact provider with erased instance constraints, the same discovery
+pass can attach bounded active-instance-head choices. Resolution follows Lean's
+own instance order but isolates each attempted head's metavariable state.
+Provider slicing retains the association only with its source declaration;
+after context/depth filtering Leant takes the command-wide prefix before
+planning or translation, then calls the checked Djinn or Exference evidence
+runner. Lean still reconstructs every dictionary during final
+elaboration---only the closed proper-type choice crosses the bridge.
+
 Exact rendered spellings keep their first scheduled occurrence. Before a
 later provider lane is forced or capped, spellings already rejected by Lean
 are removed from each engine's source stream and newly empty groups are
@@ -1221,12 +1276,17 @@ render-only slot: it contributes no dictionary premise to either engine, but
 Leant inserts its wildcard before later lambda arguments and withholds complete
 negative evidence across the erased boundary. Constrained rank-N hypotheses
 therefore keep their instance applications implicit without shifting the
-candidate's term binders. Provider projection does not serialize Lean's
-instance registry into Djex, so a polytype visible only inside an instance
-head is not a candidate: it must already occur in the checked query. Extending
-that boundary would require bounded, checked caller-supplied evidence rather
-than an approximation through Haskell classes. The fragment is bounded on
-purpose: inside it, answers are fast and verified. Refutations are final for
+candidate's term binders. Provider discovery now consults active Lean instance
+heads only to obtain bounded proper-type choices for the exact provider whose
+erased constraint they solve. It never serializes dictionaries or general
+instance resolution into Djex. Up to 32 heads are inspected and 16 distinct
+choices retained per provider, with at most 32 associations passed in total;
+open, depth-truncated, and contextual choices fail closed. The reducible
+control \code{Gap.Contextual := \{a : Type\} → [Inhabited a] → a} is therefore
+excluded even when an active class instance names it. This provider-local
+channel can expose a polytype absent from the query, but it is bounded checked
+evidence rather than general impredicative inference. The fragment is bounded
+on purpose: inside it, answers are fast and verified. Refutations are final for
 the complete provider-free structural calculus; the bounded, best-effort live-provider
 inventory is
 not an exhaustive theorem about every declaration or axiom in the Lean

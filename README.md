@@ -232,7 +232,9 @@ invariants are recorded in the dated reports for
 and
 [recursive families](docs/reports/2026-08-01-query-wide-recursive-family-identity.md),
 with the scoped quantified-provider boundary documented in the
-[local-provider report](docs/reports/2026-08-01-scoped-quantified-local-providers.md).
+[local-provider report](docs/reports/2026-08-01-scoped-quantified-local-providers.md)
+and the active-instance extension in the
+[provider-local instance-head report](docs/reports/2026-08-05-provider-local-instance-head-evidence.md).
 
 The engine is the vendored [Djex](lib/Djex) library, linked in-process.
 Djex began as a merger of two classic Haskell synthesizers — **Djinn**
@@ -478,11 +480,55 @@ universe remains authoritative:
   it1  fun _ => Demo.polyGlobal («a» := (∀ (a0_0 : _), a0_0 → a0_0))
 ```
 
+The choice need not occur in the query when Lean's active instance heads prove
+it for that exact provider. Here the goal is only `Gap.Token`; discovery learns
+the quantified argument by resolving `Gap.C ?a` against the active instance,
+then both checked Djex runners retain the same explicit application:
+
+```text
+λ> axiom Gap.Token : Type
+λ> class Gap.C (a : Type 1) : Prop where witness : True
+λ> instance : Gap.C (∀ x : Type, x → x) := ⟨True.intro⟩
+λ> axiom Gap.polyGlobal {a : Type 1} [Gap.C a] : Gap.Token
+λ> :set synth-engine djinn
+synth engine: djinn
+λ> :synth Gap.Token
+  it1  Gap.polyGlobal («a» := (∀ (a0_0 : _), a0_0 → a0_0))
+λ> :set synth-engine exference
+synth engine: exference
+λ> :synth Gap.Token
+  it1  Gap.polyGlobal («a» := (∀ (a0_0 : _), a0_0 → a0_0))
+λ> :set synth-engine both
+synth engine: both
+λ> :synth Gap.Token
+  it1  Gap.polyGlobal («a» := (∀ (a0_0 : _), a0_0 → a0_0))
+```
+
+Extraction is deliberately finite and local. It opens at most four leading
+proper-type binders on one provider, retains the erased instance constraints,
+and inspects at most 32 active heads in Lean's resolver order. Each attempt is
+state-isolated; at most 16 distinct closed, context-free proper types survive
+per provider, and Leant passes at most 32 provider/type associations in total.
+That aggregate prefix is taken before a candidate can affect family planning,
+rigidity, or type translation, so evidence beyond the boundary is not entered.
+The optional `(candidates ...)` provider metadata preserves historical
+metadata-free and binder-only inventories. Parsed candidates containing depth
+truncation (`FDepth`) or any instance binder (`FInst`) fail closed, including a
+constraint hidden behind a reducible alias. Provider-prefix lanes slice the
+metadata together with its declaration, and Djex resolves every association by
+the exact private provider name, so a later or alpha-identically typed provider
+cannot donate its evidence to an earlier one.
+
 The dedicated
 [`synth-quantified-provider`](test/synth-quantified-provider.txt) transcript
-checks that explicit impredicative evidence survives under standalone Djinn,
-standalone Exference, and combined search. Open or context-bearing quantified
-arguments are rejected at this bridge rather than guessed into Lean syntax.
+checks both the query-supplied and provider-only paths under standalone Djinn,
+standalone Exference, and combined search. Its reducible
+`Gap.Contextual := {a : Type} → [Inhabited a] → a` control has an active class
+instance but is excluded because it is contextual. This is bounded,
+evidence-directed rank-N/impredicative support, not general impredicative
+inference; open or context-bearing quantified arguments are rejected rather
+than guessed into Lean syntax. The exact contract is recorded in the
+[provider-local instance-head report](docs/reports/2026-08-05-provider-local-instance-head-evidence.md).
 
 Djinn first searches with only the highest-ranked provider, which prevents a
 lossily projected or irrelevant declaration from crowding the fixed candidate
@@ -914,6 +960,16 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   without binder metadata retain the positional `@` fallback. Inventory
   extraction is deliberately best-effort: if it cannot be produced, each
   engine still runs with the structural declarations it already has.
+- For an exact polymorphic provider whose erased constraints can determine a
+  visible type argument, discovery may also attach active-instance-head
+  evidence. It opens at most four proper-type binders, inspects at most 32
+  heads in resolver order under isolated metavariable state, and retains at
+  most 16 distinct context-free choices per provider. `FDepth` and `FInst`
+  fragments are rejected after parsing, the command-wide association list is
+  capped at 32 before planning or translation, and provider-prefix fallback
+  carries each choice only with its source declaration. The checked Djinn and
+  Exference entry points validate the same exact-provider boundary before
+  search.
 - Non-dependent instance-implicit binders in a goal are serialized as
   render-only slots. They are erased before either engine searches, reserve a
   wildcard in an introduced Lean lambda, stay implicit at hypothesis and
