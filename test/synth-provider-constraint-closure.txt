@@ -1,0 +1,69 @@
+namespace ClosureGood
+axiom Token : Type
+private class LeftChoice (a : Type 1) : Prop where witness : True
+private class RightChoice (b : Type 1) : Prop where witness : True
+private instance : LeftChoice (∀ x : Type, x → x) := ⟨True.intro⟩
+private instance : RightChoice (∀ x : Type, x → x → x) := ⟨True.intro⟩
+axiom global {a b : Type 1} [LeftChoice a] [RightChoice b] : Token
+end ClosureGood
+
+:set synth-steps 1024
+:set synth-engine djinn
+:synth ClosureGood.Token
+:set synth-engine exference
+:synth ClosureGood.Token
+:reset
+
+namespace ClosureSubgoal
+axiom Token : Type
+private class Need (a : Type 1) : Prop where witness : True
+private class Seed (a : Type 1) : Prop where witness : True
+private instance : Need (∀ x : Type, x → x) := ⟨True.intro⟩
+private instance [Need a] : Seed a := ⟨True.intro⟩
+axiom global {a : Type 1} [Seed a] : Token
+end ClosureSubgoal
+
+:set synth-steps 1024
+:set synth-engine djinn
+:synth ClosureSubgoal.Token
+:set synth-engine exference
+:synth ClosureSubgoal.Token
+:reset
+
+namespace ClosureControl
+axiom Token : Type
+private abbrev P1 := ∀ x : Type, x → x
+private abbrev P2 := ∀ x : Type, x → x → x
+private abbrev P3 := ∀ x : Type, x → x → x → x
+private abbrev P4 := ∀ x : Type, x → x → x → x → x
+private abbrev GoodA := ∀ x : Type, (x → x) → x → x
+private abbrev GoodB := ∀ x : Type, (x → x → x) → x → x
+private class PairChoice (a b : Type 1) : Prop where witness : True
+private class RequiredChoice (a b : Type 1) : Prop where witness : True
+private instance (priority := 1) : PairChoice GoodA GoodB := ⟨True.intro⟩
+private instance : PairChoice P1 P1 := ⟨True.intro⟩
+private instance : PairChoice P1 P2 := ⟨True.intro⟩
+private instance : PairChoice P1 P3 := ⟨True.intro⟩
+private instance : PairChoice P1 P4 := ⟨True.intro⟩
+private instance : PairChoice P2 P1 := ⟨True.intro⟩
+private instance : PairChoice P2 P2 := ⟨True.intro⟩
+private instance : PairChoice P2 P3 := ⟨True.intro⟩
+private instance : PairChoice P2 P4 := ⟨True.intro⟩
+private instance : PairChoice P3 P1 := ⟨True.intro⟩
+private instance : PairChoice P3 P2 := ⟨True.intro⟩
+private instance : PairChoice P3 P3 := ⟨True.intro⟩
+private instance : PairChoice P3 P4 := ⟨True.intro⟩
+private instance : PairChoice P4 P1 := ⟨True.intro⟩
+private instance : PairChoice P4 P2 := ⟨True.intro⟩
+private instance : PairChoice P4 P3 := ⟨True.intro⟩
+private instance : PairChoice P4 P4 := ⟨True.intro⟩
+private instance : RequiredChoice GoodA GoodB := ⟨True.intro⟩
+axiom global {a b : Type 1} [PairChoice a b] [RequiredChoice a b] : Token
+end ClosureControl
+
+:set synth-steps 1024
+:set synth-engine djinn
+:synth ClosureControl.Token
+:set synth-engine exference
+:synth ClosureControl.Token
+:quit

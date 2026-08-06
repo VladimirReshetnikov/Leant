@@ -354,23 +354,36 @@ providerProgramTests = testGroup "provider discovery program"
       "let binders \8592 LeantSynth.leadingTypeBinderNames 80 info.type"
         `isInfixOf` providerProgram []
           (ProviderQuery ["Demo"] (Just "Demo.Token")) @?= True
-  , testCase "bound active instance-head evidence per provider" $ do
+  , testCase "bound complete active instance-head assignments per provider" $ do
       let prelude = synthPrelude []
           program = providerProgram []
             (ProviderQuery ["Gap"] (Just "Gap.Token"))
       "providerEvidenceSpine fuel 4 source" `isInfixOf` prelude @?= True
-      "if inspected < 32 && candidates.size < 16"
+      "if inspected < 32 && assignments.size < 16"
         `isInfixOf` prelude @?= True
       "for inst in instances.toList.reverse do"
         `isInfixOf` prelude @?= True
       "Lean.withoutModifyingState do" `isInfixOf` prelude @?= True
+      "partial def closeProviderConstraints (fuel : Nat) (pending : List Expr)"
+        `isInfixOf` prelude @?= True
+      "closeProviderConstraints fuel (subgoals ++ rest)"
+        `isInfixOf` prelude @?= True
+      "let mut pending := subgoals" `isInfixOf` prelude @?= True
+      "let otherGoal ← mkFreshExprMVar otherConstraint"
+        `isInfixOf` prelude @?= True
+      "pending := pending ++ [otherGoal]"
+        `isInfixOf` prelude @?= True
+      "| some closedMCtx => withMCtx closedMCtx do"
+        `isInfixOf` prelude @?= True
+      "if complete && arguments.size == typeArgs.size then"
+        `isInfixOf` prelude @?= True
       "|| hasInstanceBinder candidate then"
         `isInfixOf` prelude @?= True
       "pure (some (← go false fuel 0 [] candidate))"
         `isInfixOf` prelude @?= True
-      "LeantSynth.providerInstantiationCandidates 80 info.type"
+      "LeantSynth.providerInstantiationAssignments 80 info.type"
         `isInfixOf` program @?= True
-      "\" (candidates\" ++ candidateText ++ \")\""
+      "\" (instantiations\" ++ assignmentText ++ \")\""
         `isInfixOf` program @?= True
   ]
 
@@ -519,7 +532,7 @@ providerParserTests = testGroup "provider inventory parser"
           [ ProviderFragWithBinders "Demo.token"
               (FAtom False "Demo.Token") []
           ]
-  , testCase "retain provider-local instance-head instantiations" $
+  , testCase "read legacy provider candidates as unary assignments" $
       parseProviderSexp
           "(providers (provider \"Gap.global\" (binders \"a\") \
           \(candidates \
@@ -530,8 +543,30 @@ providerParserTests = testGroup "provider inventory parser"
           [ ProviderFragWithEvidence "Gap.global"
               (FAll False "i0" (FAtom False "Gap.Token"))
               ["a"]
-              [ FAll True "s0" (FArr (FVar "s0") (FVar "s0"))
-              , FAtom False "Nat"
+              [ [FAll True "s0" (FArr (FVar "s0") (FVar "s0"))]
+              , [FAtom False "Nat"]
+              ]
+          ]
+  , testCase "retain exact ordered provider instantiations" $
+      parseProviderSexp
+          "(providers (provider \"Gap.global\" (binders \"a\" \"b\") \
+          \(instantiations \
+          \(args (all \"s0\" (-> (var \"s0\") (var \"s0\"))) \
+          \(all \"s1\" (-> (var \"s1\") \
+          \(-> (var \"s1\") (var \"s1\"))))) \
+          \(args (atom unsafe \"Nat\") (atom unsafe \"Bool\"))) \
+          \(alli \"a\" (alli \"b\" (atom unsafe \"Gap.Token\")))))"
+        @?= Right
+          [ ProviderFragWithEvidence "Gap.global"
+              (FAll False "a"
+                (FAll False "b" (FAtom False "Gap.Token")))
+              ["a", "b"]
+              [ [ FAll True "s0" (FArr (FVar "s0") (FVar "s0"))
+                , FAll True "s1"
+                    (FArr (FVar "s1")
+                      (FArr (FVar "s1") (FVar "s1")))
+                ]
+              , [FAtom False "Nat", FAtom False "Bool"]
               ]
           ]
   , testCase "distinguish an explicit empty evidence block" $
@@ -542,6 +577,20 @@ providerParserTests = testGroup "provider inventory parser"
           [ ProviderFragWithEvidence "Gap.token"
               (FAtom False "Gap.Token") [] []
           ]
+  , testCase "accept an explicit empty exact-instantiation block" $
+      parseProviderSexp
+          "(providers (provider \"Gap.token\" (binders) (instantiations) \
+          \(atom unsafe \"Gap.Token\")))"
+        @?= Right
+          [ ProviderFragWithEvidence "Gap.token"
+              (FAtom False "Gap.Token") [] []
+          ]
+  , testCase "reject an empty exact argument vector" $
+      parseProviderSexp
+          "(providers (provider \"Gap.bad\" (binders \"a\") \
+          \(instantiations (args)) \
+          \(alli \"a\" (atom unsafe \"Gap.Token\"))))"
+        @?= Left "provider instantiation assignment has no arguments"
   , testCase "retain contextual evidence for fail-closed filtering" $
       let contextual = FAll False "a"
             (FInst "Inhabited a" (FVar "a"))
@@ -554,7 +603,7 @@ providerParserTests = testGroup "provider inventory parser"
           @?= Right
             [ ProviderFragWithEvidence "Gap.global"
                 (FAll False "a" (FAtom False "Gap.Token"))
-                ["a"] [contextual]
+                ["a"] [[contextual]]
             ]
         fragHasInstanceBinder contextual @?= True
         fragHasInstanceBinder
@@ -1008,20 +1057,56 @@ typeApplicationTests = testGroup "retained type applications"
   , testCase "instantiate a provider-only constrained rank-N choice" $
       let token = FAtom False "Gap.Token"
           provider = ProviderFragWithEvidence "Gap.global"
-            (FAll False "a" token) ["a"] [polytype]
+            (FAll False "a" token) ["a"] [[polytype]]
           check engine = expectTerm "Gap.global («a» := (∀"
             (synthesizeWithProviders engine 1024 [provider] token)
       in mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "retain four ordered quantified provider arguments" $ do
+      let token = FAtom False "Gap.Token"
+          quantified binder arity =
+            let variable = FVar binder
+            in FAll True binder
+                (foldr FArr variable (replicate arity variable))
+          assignment =
+            [ quantified "p1" 1
+            , quantified "p2" 2
+            , quantified "p3" 3
+            , quantified "p4" 4
+            ]
+          provider = ProviderFragWithEvidence "Gap.four"
+            (FAll False "a" (FAll False "b"
+              (FAll False "c" (FAll False "d" token))))
+            ["a", "b", "c", "d"] [assignment]
+          expected =
+            [ "Gap.four"
+            , "«a» := (∀ (a0_0 : _), a0_0 → a0_0)"
+            , "«b» := (∀ (a0_0 : _), a0_0 → a0_0 → a0_0)"
+            , "«c» := (∀ (a0_0 : _), a0_0 → a0_0 → a0_0 → a0_0)"
+            , "«d» := (∀ (a0_0 : _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0)"
+            ]
+          exact term = all (\needle -> needle `isInfixOf` term) expected
+          check engine = case
+              synthesizeWithProviders engine 2048 [provider] token of
+            Right (SynthCandidates groups _) ->
+              assertBool
+                ("ordered four-argument assignment was lost in "
+                  ++ synthEngineName engine ++ ": " ++ show groups)
+                (any exact (concat groups))
+            Right other -> assertFailure $
+              "unexpected ordered-assignment outcome from "
+                ++ synthEngineName engine ++ ": " ++ outcomeTag other
+            Left err -> assertFailure err
+      mapM_ check [EngineDjinn, EngineExference, EngineBoth]
   , testCase "do not enter provider evidence beyond the aggregate bound" $
       let token = FAtom False "Gap.Token"
-          provider name result evidence = ProviderFragWithEvidence name
-            (FAll False "a" result) ["a"] evidence
+          provider name result assignments = ProviderFragWithEvidence name
+            (FAll False "a" result) ["a"] assignments
           providers =
-            [ provider "Gap.first" token (replicate 16 polytype)
+            [ provider "Gap.first" token (replicate 16 [polytype])
             , provider "Gap.second" (FAtom False "Gap.Other")
-                (replicate 16 polytype)
+                (replicate 16 [polytype])
             , provider "Gap.third" (FAtom False "Gap.Last")
-                [error "entered the 33rd provider evidence fragment"]
+                [error "entered the 33rd provider instantiation assignment"]
             ]
       in expectTerm "Gap.first («a» := (∀"
           (synthesizeWithProviders EngineDjinn 1024 providers token)
@@ -1032,7 +1117,7 @@ typeApplicationTests = testGroup "retained type applications"
                 (FAll False "a" token) ["a"]
             , ProviderFragWithEvidence "Gap.unrelated"
                 (FAll False "a" (FAtom False "Gap.Other")) ["a"]
-                [polytype]
+                [[polytype]]
             ]
           donated = isInfixOf "Gap.first («a» := (∀"
           check engine = case

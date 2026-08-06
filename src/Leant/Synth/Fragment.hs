@@ -168,11 +168,12 @@ data ProviderFrag
       { providerLeanName :: String
       , providerTypeFrag :: Frag
       , providerTypeBinderNames :: [String]
-      , providerInstantiationEvidence :: [Frag]
-        -- ^ Proper-type assignments learned from active instance heads for
-        -- this provider's erased instance binders. Evidence remains attached
-        -- to the provider so staged inventories cannot donate an
-        -- instantiation discovered for a later declaration to an earlier one.
+      , providerInstantiationAssignments :: [[Frag]]
+        -- ^ Exact ordered proper-type assignments learned from active instance
+        -- heads for this provider's erased instance binders.  Each inner list
+        -- follows the provider's leading FAll order. Evidence remains attached
+        -- to the provider so staged inventories cannot donate an instantiation
+        -- discovered for a later declaration to an earlier one.
       }
   deriving (Eq, Show)
 
@@ -579,41 +580,93 @@ synthPrelude inventory = unlines
   , "      pure (some (← go false fuel 0 [] candidate))"
   , "    else pure none"
   , ""
+  , "-- Resolve a fixed ordered obligation list by applying active instance"
+  , "-- heads in the same order as Lean's resolver.  Return the successful"
+  , "-- metavariable context as data: every branch itself is backtracked, so a"
+  , "-- failed closure cannot constrain its sibling and the caller can install"
+  , "-- only the one complete context it selected.  Fuel bounds recursive"
+  , "-- instance-premise chains independently of the outer inspected-head cap."
+  , "partial def closeProviderConstraints (fuel : Nat) (pending : List Expr)"
+  , "    : MetaM (Option MetavarContext) := do"
+  , "  match fuel, pending with"
+  , "  | 0, _ => pure none"
+  , "  | _, [] => pure (some (← getMCtx))"
+  , "  | Nat.succ fuel, goal :: rest => do"
+  , "    let constraint ← instantiateMVars (← inferType goal)"
+  , "    let instances ← try"
+  , "      Lean.Meta.SynthInstance.getInstances constraint"
+  , "    catch _ =>"
+  , "      pure #[]"
+  , "    for inst in instances.toList.reverse do"
+  , "      let closed? ← Lean.withoutModifyingState do"
+  , "        match ← Lean.Meta.SynthInstance.tryResolve goal inst with"
+  , "        | none => pure none"
+  , "        | some (mctx, subgoals) => withMCtx mctx do"
+  , "          closeProviderConstraints fuel (subgoals ++ rest)"
+  , "      match closed? with"
+  , "      | some mctx => return some mctx"
+  , "      | none => pure ()"
+  , "    pure none"
+  , ""
   , "-- Match active instance heads independently, in Lean's resolver order,"
-  , "-- and record every closed proper-type assignment they induce.  Each"
-  , "-- attempted head runs under a restored metavariable state so one choice"
-  , "-- cannot constrain a later choice.  The inventory is intentionally"
-  , "-- provider-local and bounded: 32 heads inspected, 16 distinct types."
-  , "partial def providerInstantiationCandidates (fuel : Nat) (source : Expr)"
-  , "    : MetaM (Array String) := do"
+  , "-- and record each complete ordered proper-type assignment they induce."
+  , "-- Each attempted head and its complete constraint closure run under a"
+  , "-- restored metavariable state so one choice cannot constrain a later"
+  , "-- choice.  The selected head stays fixed while its instance subgoals and"
+  , "-- every other erased provider constraint are resolved in that same mctx."
+  , "-- A head whose closure fails or leaves one opened type argument unresolved"
+  , "-- contributes no partial candidate pool."
+  , "-- The inventory is provider-local and bounded: 32 heads inspected, 16"
+  , "-- distinct complete assignments."
+  , "partial def providerInstantiationAssignments (fuel : Nat) (source : Expr)"
+  , "    : MetaM (Array (Array String)) := do"
   , "  let (typeArgs, constraints) ← providerEvidenceSpine fuel 4 source"
   , "  if typeArgs.isEmpty || constraints.isEmpty then return #[]"
   , "  let mut inspected := 0"
-  , "  let mut candidates : Array String := #[]"
-  , "  for constraint in constraints do"
-  , "    if inspected < 32 && candidates.size < 16 then"
+  , "  let mut assignments : Array (Array String) := #[]"
+  , "  for constraint in constraints, constraintIndex in [:constraints.size] do"
+  , "    if inspected < 32 && assignments.size < 16 then"
   , "      let instances ← try"
   , "        Lean.Meta.SynthInstance.getInstances constraint"
   , "      catch _ =>"
   , "        pure #[]"
   , "      for inst in instances.toList.reverse do"
-  , "        if inspected < 32 && candidates.size < 16 then"
+  , "        if inspected < 32 && assignments.size < 16 then"
   , "          inspected := inspected + 1"
-  , "          let fragments ← Lean.withoutModifyingState do"
+  , "          let assignment? ← Lean.withoutModifyingState do"
   , "            let goal ← mkFreshExprMVar constraint MetavarKind.synthetic"
   , "            match ← Lean.Meta.SynthInstance.tryResolve goal inst with"
-  , "            | none => pure #[]"
-  , "            | some (mctx, _) => withMCtx mctx do"
-  , "              let mut fragments : Array String := #[]"
-  , "              for candidate in typeArgs do"
-  , "                match ← providerCandidateFragment? fuel candidate with"
-  , "                | none => pure ()"
-  , "                | some fragment => fragments := fragments.push fragment"
-  , "              pure fragments"
-  , "          for fragment in fragments do"
-  , "            if candidates.size < 16 && !candidates.contains fragment then"
-  , "              candidates := candidates.push fragment"
-  , "  pure candidates"
+  , "            | none => pure none"
+  , "            | some (mctx, subgoals) => withMCtx mctx do"
+  , "              -- `tryResolve` fixes the seeded head.  Its own subgoals stay"
+  , "              -- first; every other erased provider constraint follows in"
+  , "              -- source order under that same assignment context."
+  , "              let mut pending := subgoals"
+  , "              for otherConstraint in constraints,"
+  , "                  otherIndex in [:constraints.size] do"
+  , "                if otherIndex != constraintIndex then"
+  , "                  let otherGoal ← mkFreshExprMVar otherConstraint"
+  , "                    MetavarKind.synthetic"
+  , "                  pending := pending ++ [otherGoal]"
+  , "              match ← closeProviderConstraints fuel pending with"
+  , "              | none => pure none"
+  , "              | some closedMCtx => withMCtx closedMCtx do"
+  , "                let mut arguments : Array String := #[]"
+  , "                let mut complete := true"
+  , "                for candidate in typeArgs do"
+  , "                  match ← providerCandidateFragment? fuel candidate with"
+  , "                  | none => complete := false"
+  , "                  | some fragment => arguments := arguments.push fragment"
+  , "                if complete && arguments.size == typeArgs.size then"
+  , "                  pure (some arguments)"
+  , "                else pure none"
+  , "          match assignment? with"
+  , "          | some assignment =>"
+  , "            if assignments.size < 16"
+  , "                && !assignments.contains assignment then"
+  , "              assignments := assignments.push assignment"
+  , "          | none => pure ()"
+  , "  pure assignments"
   , ""
   , "-- Phase-3 vanguard: library premises.  A goal that mentions a"
   , "-- recursive inductive brings rated library functions with it,"
@@ -894,15 +947,18 @@ providerProgram sessionNames query = unlines
   , "      | some info =>"
   , "        let frag \8592 LeantSynth.go true 80 0 [] info.type"
   , "        let binders \8592 LeantSynth.leadingTypeBinderNames 80 info.type"
-  , "        let candidates \8592"
-  , "          LeantSynth.providerInstantiationCandidates 80 info.type"
+  , "        let assignments \8592"
+  , "          LeantSynth.providerInstantiationAssignments 80 info.type"
   , "        let binderText := String.join"
   , "          (binders.toList.map fun binder =>"
   , "            \" \" ++ LeantSynth.esc binder)"
-  , "        let candidateText := String.join"
-  , "          (candidates.toList.map fun candidate => \" \" ++ candidate)"
-  , "        let evidenceText := if candidates.isEmpty then \"\" else"
-  , "          \" (candidates\" ++ candidateText ++ \")\""
+  , "        let assignmentText := String.join"
+  , "          (assignments.toList.map fun assignment =>"
+  , "            \" (args\" ++ String.join"
+  , "              (assignment.toList.map fun argument => \" \" ++ argument)"
+  , "              ++ \")\")"
+  , "        let evidenceText := if assignments.isEmpty then \"\" else"
+  , "          \" (instantiations\" ++ assignmentText ++ \")\""
   , "        body := body ++ \" (provider \" ++ LeantSynth.esc n.toString"
   , "          ++ \" (binders\" ++ binderText ++ \")\" ++ evidenceText"
   , "          ++ \" \" ++ frag ++ \")\""
@@ -1041,10 +1097,27 @@ parseProviderSexp text = do
     Right (name : names, remaining)
   binderNames _ = Left "malformed provider binder metadata"
 
+  -- The exact protocol retains each active instance head's ordered argument
+  -- vector.  Historical snapshots carried a flat candidate pool; interpret
+  -- every old scalar as one unary assignment so they remain readable without
+  -- recreating cross-binder combinations.
+  providerEvidence (TL : TSym "instantiations" : rest) = do
+    (assignments, remaining) <- assignmentFrags rest
+    Right (Just assignments, remaining)
   providerEvidence (TL : TSym "candidates" : rest) = do
-    (evidence, remaining) <- evidenceFrags rest
-    Right (Just evidence, remaining)
+    (candidates, remaining) <- evidenceFrags rest
+    Right (Just (map (: []) candidates), remaining)
   providerEvidence rest = Right (Nothing, rest)
+
+  assignmentFrags (TR : rest) = Right ([], rest)
+  assignmentFrags (TL : TSym "args" : rest) = do
+    (arguments, remaining) <- evidenceFrags rest
+    if null arguments
+      then Left "provider instantiation assignment has no arguments"
+      else do
+        (assignments, final) <- assignmentFrags remaining
+        Right (arguments : assignments, final)
+  assignmentFrags _ = Left "malformed provider instantiation assignments"
 
   evidenceFrags (TR : rest) = Right ([], rest)
   evidenceFrags tokens = do

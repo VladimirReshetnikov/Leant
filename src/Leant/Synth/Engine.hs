@@ -73,7 +73,7 @@ import Language.Haskell.Djex
   , Kind (FunctionKind, ProperTypeKind)
   , Penalty (..)
   , Progress (..)
-  , ProviderInstantiationCandidate (..)
+  , ProviderInstantiationAssignment (..)
   , Selection (..)
   , SelectionMode (SelectAll)
   , TruncationReason (..)
@@ -94,7 +94,8 @@ import Language.Haskell.Djex
   , expressionSize
   , functionClauseExpression
   , mapDeclarationTypeVariables
-  , maximumProviderInstantiationCandidates
+  , maximumProviderInstantiationAssignments
+  , maximumProviderInstantiationArguments
   , mkDefinitionName
   , mkDjinnRequest
   , mkDjinnSession
@@ -106,8 +107,8 @@ import Language.Haskell.Djex
   , renderDiagnostic
   , resultEvidence
   , resultSearch
-  , runDjinnQueryWithInstantiationCandidates
-  , runExferenceQueryWithInstantiationCandidates
+  , runDjinnQueryWithInstantiationAssignments
+  , runExferenceQueryWithInstantiationAssignments
   , selectQueryResults
   , standardDjinnSession
   , tupleName
@@ -358,7 +359,7 @@ djinnRun
   -> (Expression String -> Either String [String])
   -> Type String
   -> [DjinnDecl]
-  -> [ProviderInstantiationCandidate String]
+  -> [ProviderInstantiationAssignment String]
   -> Either String SynthOutcome
 djinnRun (cutoff, budget) frag projection render goal decls instantiations = do
   standard <- viaDiagnostic standardDjinnSession
@@ -384,7 +385,7 @@ djinnRun (cutoff, budget) frag projection render goal decls instantiations = do
         }
   request <- viaDiagnostic (mkDjinnRequest query)
   result <- viaDiagnostic
-    (runDjinnQueryWithInstantiationCandidates session instantiations request)
+    (runDjinnQueryWithInstantiationAssignments session instantiations request)
   let batch = resultSearch result
       notes = progressNotes (batchProgress batch)
       -- Djinn ranks by unused-binder fraction, which happily puts a
@@ -423,7 +424,7 @@ exferenceRun
   -> (Expression String -> Either String [String])
   -> Type String
   -> [DjinnDecl]
-  -> [ProviderInstantiationCandidate String]
+  -> [ProviderInstantiationAssignment String]
   -> Either String SynthOutcome
 exferenceRun steps render goal decls instantiations = do
   standard <- viaDiagnostic standardDjinnSession
@@ -434,19 +435,21 @@ exferenceRun steps render goal decls instantiations = do
         ( concatMap declarationTypeVariables allDecls
           ++ toList goal
           ++ concatMap
-            (toList . providerInstantiationCandidateType) instantiations
+            (concatMap toList . providerInstantiationAssignmentArguments)
+            instantiations
         )
       table = Map.fromList (zip names [0 :: Int ..])
       convert v = FlexibleVariable (table Map.! v)
   let convertedDecls = map (mapDeclarationTypeVariables convert) allDecls
       convertedInstantiations =
-        [ ProviderInstantiationCandidate
-            { providerInstantiationCandidateProvider = provider
-            , providerInstantiationCandidateType = fmap convert candidateType
+        [ ProviderInstantiationAssignment
+            { providerInstantiationAssignmentProvider = provider
+            , providerInstantiationAssignmentArguments =
+                map (fmap convert) arguments
             }
-        | ProviderInstantiationCandidate
-            { providerInstantiationCandidateProvider = provider
-            , providerInstantiationCandidateType = candidateType
+        | ProviderInstantiationAssignment
+            { providerInstantiationAssignmentProvider = provider
+            , providerInstantiationAssignmentArguments = arguments
             } <- instantiations
         ]
       providerNames =
@@ -485,7 +488,7 @@ exferenceRun steps render goal decls instantiations = do
               }
         request <- viaDiagnostic (mkExferenceRequest query)
         results <- viaDiagnostic
-          (runExferenceQueryWithInstantiationCandidates session
+          (runExferenceQueryWithInstantiationAssignments session
             convertedInstantiations request)
         let selection =
               selectQueryResults SelectAll (const (0 :: Int))
@@ -855,7 +858,7 @@ fragToDjinn
       ( Type String
       , [DjinnDecl]
       , [DjinnDecl]
-      , [ProviderInstantiationCandidate String]
+      , [ProviderInstantiationAssignment String]
       , CtorMap
       , Map.Map String (String, Maybe [String])
       , TypeMap
@@ -868,27 +871,28 @@ fragToDjinn recursiveProjection providers extras frag0 = do
   voidC <- viaShow (mkIdentifier "Void")
   unitC <- viaShow (tupleName Boxed 0)
   let usableProviders = filter usableProvider providers
-      -- Bound the provider-indexed association list before any evidence
+      -- Bound the provider-indexed assignment list before any argument
       -- fragment participates in family planning, rigidity, or translation.
-      -- Keeping the index beside each fragment preserves exact provider
-      -- locality while leaving later providers and their declarations intact.
-      boundedProviderEvidence =
-        take maximumProviderInstantiationCandidates
-          [ (index, candidate)
+      -- Keeping the index beside each complete vector preserves exact provider
+      -- locality and source argument order while leaving later providers and
+      -- their declarations intact.
+      boundedProviderAssignments =
+        take maximumProviderInstantiationAssignments
+          [ (index, assignment)
           | (index, provider) <- zip [0 :: Int ..] usableProviders
-          , candidate <- usableProviderEvidence provider
+          , assignment <- usableProviderAssignments provider
           ]
-      providerEvidenceFragments =
-        map snd boundedProviderEvidence
+      providerAssignmentFragments =
+        concatMap snd boundedProviderAssignments
       queryFragments =
         map snd extras ++ [frag0] ++ map providerTypeFrag usableProviders
-          ++ providerEvidenceFragments
+          ++ providerAssignmentFragments
       planningRoots =
         [ (True, frag) | frag <- map snd extras ++ [frag0] ]
           ++ [ (False, providerTypeFrag provider)
              | provider <- usableProviders
              ]
-          ++ [ (False, evidence) | evidence <- providerEvidenceFragments ]
+          ++ [ (False, argument) | argument <- providerAssignmentFragments ]
       plans = exactFamilyPlans recursiveProjection planningRoots
       structuralTemplateFragments =
         [ field
@@ -909,7 +913,7 @@ fragToDjinn recursiveProjection providers extras frag0 = do
             providerTypeFrag provider)
         Set.empty usableProviders
       providerAndEvidenceAtoms = foldl collectProviderSurfaceAtoms
-        providerAtoms providerEvidenceFragments
+        providerAtoms providerAssignmentFragments
       rigidAtoms = Set.difference
         (Set.unions
           [ structuralAtomKeys recursiveProjection plans
@@ -1345,14 +1349,14 @@ fragToDjinn recursiveProjection providers extras frag0 = do
             privateName <- nameT ("leantProvider" ++ show index)
             providerType <- go False providerFrag
             instantiations <- mapM
-              (\candidate -> do
-                candidateType <- go False candidate
-                pure ProviderInstantiationCandidate
-                  { providerInstantiationCandidateProvider = privateName
-                  , providerInstantiationCandidateType = candidateType
+              (\arguments -> do
+                argumentTypes <- mapM (go False) arguments
+                pure ProviderInstantiationAssignment
+                  { providerInstantiationAssignmentProvider = privateName
+                  , providerInstantiationAssignmentArguments = argumentTypes
                   })
-              [ candidate
-              | (providerIndex, candidate) <- boundedProviderEvidence
+              [ assignment
+              | (providerIndex, assignment) <- boundedProviderAssignments
               , providerIndex == index
               ]
             pure
@@ -1401,14 +1405,27 @@ fragToDjinn recursiveProjection providers extras frag0 = do
  where
   usableProvider = not . fragHasDepth . providerTypeFrag
 
-  usableProviderEvidence provider = case provider of
+  usableProviderAssignments provider = case provider of
     ProviderFragWithEvidence
-        { providerInstantiationEvidence = evidence } ->
+        { providerInstantiationAssignments = assignments } ->
+      let arity = providerInstantiationArity (providerTypeFrag provider)
+      in
       filter
-        (\candidate ->
-          not (fragHasDepth candidate || fragHasInstanceBinder candidate))
-        evidence
+        (\assignment ->
+          not (null assignment)
+            && length assignment == arity
+            && length assignment <= maximumProviderInstantiationArguments
+            && all
+              (\argument ->
+                not (fragHasDepth argument || fragHasInstanceBinder argument))
+              assignment)
+        assignments
     _ -> []
+
+  providerInstantiationArity provider = case provider of
+    FAll _ _ body -> 1 + providerInstantiationArity body
+    FInst _ body -> providerInstantiationArity body
+    _ -> 0
 
   recursiveFamily key ctors = case ctors of
     (leanName, _) : _ ->
