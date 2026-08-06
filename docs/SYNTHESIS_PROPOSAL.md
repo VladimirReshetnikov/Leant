@@ -1179,17 +1179,18 @@ Together: `fun f x => List.map f x`, `fun x => List.flatten x`,
 `fun x => List.length x`, `fun x y => List.replicate x y` are now the
 *first* candidates of their queries, with the constructor-junk
 candidates ranked behind or out of the window entirely. The former
-same-typed-argument residual is now closed as well. At an atomic binary
-endomorphism suffix, Djinn round-robins the three oldest sibling proofs
-and tries unused siblings before reusing one; every remaining proof stays
-on the historical depth-first tail. With two unary distractors this moves
-the direct mixed application from proof 112 to proof 12 while retaining
-the repeated application at proof 15. The bounded cohort matters: it keeps
-the established four-site rank-N stress case at 0.52 seconds instead of
-turning its independent plans into a wide Cartesian frontier. Leant pins
-the rendered mixed term inside its twelve-group verification frontier, and
-the live Lean transcript now displays both `List.append x y` and
-`List.append y x` for `List a → List a → List a`.
+`List.append` same-typed-argument residual is now closed as well. At an
+atomic binary endomorphism suffix, Djinn round-robins the three oldest
+sibling proofs and tries unused siblings before reusing one; every
+remaining proof stays on the historical depth-first tail. With two unary
+distractors this moves the direct mixed application from proof 112 to proof
+12 while retaining the repeated application at proof 15. In the recorded
+final run, the bounded cohort kept the established four-site rank-N stress
+case at 0.52 seconds; unrestricted fairness had instead widened its
+independent plans beyond a three-minute run. Leant pins the rendered mixed
+term inside its twelve-group verification frontier, and the live Lean
+transcript now displays both `List.append x y` and `List.append y x` for
+`List a → List a → List a`.
 
 ### Explicitly not proposed
 
