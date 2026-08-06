@@ -14,6 +14,7 @@ synth engine: exference
 λ> :synth ((∀ a : Type 1, Demo.RecBox a) → Demo.RecBox (∀ b : Type, b → b))
 preparing synthesis environment (session imports + Lean)...
   it1  fun x => x _
+  it2  fun x => ⟨fun _ y => y, x _⟩
 note: search truncated: step limit reached, queue limit pruned 2183
 λ> :set synth-engine djinn
 synth engine: djinn

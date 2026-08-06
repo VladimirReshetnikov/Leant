@@ -45,6 +45,7 @@ import Leant.Synth.Engine
   , synthVerificationWindow
   , synthesizeWith
   , synthesizeWithProviders
+  , takeDistinct
   , withoutCheckedCandidates
   )
 import Leant.Synth.Fragment
@@ -802,7 +803,11 @@ providerScheduleTests = testGroup "live provider widening"
 
 combinedEngineMergeTests :: TestTree
 combinedEngineMergeTests = testGroup "combined-engine verification frontier"
-  [ testCase "reserve a bounded frontier for fresh Exference groups" $ do
+  [ testCase "deduplicate before spending the candidate window" $
+      takeDistinct 3
+          (replicate 60 "same" ++ ["later", "last", "outside"])
+        @?= ["same", "later", "last"]
+  , testCase "reserve a bounded frontier for fresh Exference groups" $ do
       let groups prefix = [[prefix ++ show i] | i <- [1 :: Int .. 20]]
           merged = mergeCandidateGroups (groups "d") (groups "e")
       synthVerificationWindow EngineDjinn @?= synthMaxTried

@@ -45,6 +45,7 @@ module Leant.Synth.Engine
   , synthMaxTried
   , synthVerificationWindow
   , candidateWindow
+  , takeDistinct
   ) where
 
 import Data.Foldable (toList)
@@ -175,6 +176,12 @@ synthVerificationWindow engine = case engine of
 -- sound.
 candidateWindow :: Int
 candidateWindow = 60
+
+-- | Retain the first bounded set of distinct values. Deduplication deliberately
+-- precedes the bound so repeated backend derivations cannot consume slots that
+-- belong to later semantic candidates.
+takeDistinct :: Eq value => Int -> [value] -> [value]
+takeDistinct limit = take limit . nub
 
 -- | Drive an outcome's evaluation far enough that the whole search has
 -- run: the verdict itself, plus the first @n@ candidate groups.  The
@@ -500,10 +507,13 @@ exferenceRun steps render goal decls instantiations = do
         let selection =
               selectQueryResults SelectAll (const (0 :: Int))
                 (const True) results
-            groups = nub
+            -- Deduplicate before applying the public result window. Backend
+            -- search histories may converge on the same rendered term, and
+            -- repetitions must not crowd later distinct candidates out of a
+            -- bounded interactive response.
+            groups = takeDistinct candidateWindow
               [ group
-              | candidate <- take candidateWindow
-                  (selectionCandidates selection)
+              | candidate <- selectionCandidates selection
               , let expr = fmap (("x" ++) . show)
                       (functionClauseExpression (candidateOutput candidate))
               , Right group <- [render expr]
