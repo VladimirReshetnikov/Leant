@@ -1257,6 +1257,4 @@ installed. Ideas under consideration are tracked in
 
 ## License
 
-Dedicated to the public domain where that is legally effective, and
-otherwise available under MIT-0 — both texts are in
-[LICENSE](LICENSE).
+Available under [MIT-0](LICENSE).
