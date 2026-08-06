@@ -535,9 +535,11 @@ types, and impredicative instantiation is admitted under a guard that
 never invents a polytype the query did not supply. Djinn's current
 context-free hypothesis rule reaches four leading binders without
 raising its fixed search caps; chains with five or more stay opaque.
-Its singleton, pairwise, triple, and quadruple open/opaque frontiers grow
-quartically and cover every choice through nine independent quantified
-sites without enumerating a power set. That scope is still being
+Its singleton, pairwise, triple, quadruple, and bounded quintuple open/opaque
+frontiers cover every choice through eleven independent quantified sites
+without enumerating a power set. The quintic categories retain at most 512
+plans per orientation; a twelve-site six-open/six-opaque choice is the next
+deliberate occurrence gap. That scope is still being
 improved, and Leant keeps the boundary to the engines narrow on
 purpose, so each improvement arrives by version bump. The engines speak Haskell types;
 Leant translates Lean goals into their fragment and their answers back
@@ -746,15 +748,31 @@ polymorphic identity leaves remain quantified. The regression
 therefore does not exercise the greater-than-four hypothesis-instantiation
 guard. Djex \code{f3dd2495} lets standalone Exference forward those complete
 scoped arrow schemes through a structurally materialized nested product. The
-current submodule pin, \code{c0c1a461}, follows it with tuple-goal provenance:
+quartic submodule revision, \code{c0c1a461}, follows it with tuple-goal provenance:
 an independently scheduled structural route may use the eager whole-tree
 shortcut once, while fields emitted by the shallow alternative remain
 shallow. Equivalent recursive structural histories are suppressed without
 losing scoped or environment product reuse at depth. Exference admits the
 direct, independently checked candidate at search step 30. The unchanged
 4096-step/1024-queue live run still ends with a bounded-tail note recording
-36{,}491 queue prunes: search continued after the successful candidate and did
+36{,}475 queue prunes: search continued after the successful candidate and did
 not exhaust its ranked tail.
+
+The live \code{synth-quintic-rankn} regression supplies the missing exact
+bridge case. It defines
+\code{Wide = forall A B C D E : Type, A × B × C × D × E}, so every binder is
+non-vacuous and remains an adjacent \code{FAll}. Leant \code{378f866} coalesces
+each uninterrupted \code{FAll} spine to one Djex \code{ForallType} binder list
+without crossing an \code{FInst}; the original fragment still supplies every
+explicitness slot to the renderer. One \code{Wide} therefore contributes one
+Djinn occurrence site rather than five nested sites. With Djex
+\code{d728719f}, the first goal selects five non-contiguous opaque
+\code{Wide} results beside five opened identities at ten sites. The second
+selects five separated open identities beside six opaque \code{Wide} results at
+eleven sites, exercising the distinct dual plan. Leant \code{80f123a} records
+both direct candidates after Lean 4.31 accepts them; neither live search is
+truncated. This changes occurrence coverage only: hypothesis instantiation
+still stops at four leading binders.
 
 Vacuous local providers can retain the same query-supplied choice even when
 their result is an opaque Lean type. Here \code{Demo.Token} becomes a fixed
@@ -1382,8 +1400,8 @@ ambiguous, or incompatible families keep their conservative fallback.
 Quantifier handling beyond the propositional fragment follows
 Djex's bounded rank-N and guarded impredicativity rules, which are
 sound and terminating over an undecidable space and widen as Djex
-improves. The current plan family is exhaustive through nine
-independent quantified sites; a ten-site five-open/five-opaque goal
+improves. The current plan family is exhaustive through eleven
+independent quantified sites; a twelve-site six-open/six-opaque goal
 is the next deliberate occurrence-plan gap, while hypothesis
 instantiation chains with five or more binders remain opaque. Such
 higher-rank goals answer ``no term

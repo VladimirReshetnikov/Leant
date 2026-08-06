@@ -69,7 +69,8 @@ best-first search. From the commit history and the reports
 `2026-07-29-hypothesis-instantiation.md`,
 `2026-08-01-triple-rank-n-frontiers.md`,
 `2026-08-01-four-binder-instantiation.md`, and
-`2026-08-06-quartic-rank-n-frontiers.md`:
+`2026-08-06-quartic-rank-n-frontiers.md`, with the Leant integration recorded
+in `2026-08-06-quintic-rank-n-frontiers.md`:
 
 - **Alpha-aware opaque atoms as the default boundary.** Quantified
   subterms are carried as alpha-normalized `TypeAtom`s with lexical
@@ -79,19 +80,30 @@ best-first search. From the commit history and the reports
   occurrence-scoped skolems via a polarized translation (arrow domains
   reverse polarity; products/sums preserve it). Search runs a *plan
   family*: the fully-opened and fully-opaque plans, the historical two
-  singleton occurrence frontiers, followed by deterministic pair, triple, and
-  quadruple opaque/open tails. Nested selections open the union of their
-  required ancestor chains. The family grows quartically and is exhaustive for
-  nine independent quantified sites without enumerating a power set;
-  the central five-open/five-opaque layer at ten sites is the next
+  singleton occurrence frontiers, followed by deterministic pair, triple,
+  quadruple, and quintuple opaque/open tails. Nested selections open the union
+  of their required ancestor chains. Quintuple selections alternate from both
+  source edges and stop at 512 compiled plans per orientation. That fixed cap
+  retains every one of the 252 ten-site and 462 eleven-site choices, making the
+  family exhaustive through eleven independent sites without enumerating a
+  power set. A central six-open/six-opaque choice at twelve sites is the next
   deliberate, documented gap.
+- **Lean forall-spine parity.** Lean serializes one written multi-binder Pi as
+  adjacent `FAll` nodes because rendering must retain every explicitness slot.
+  Leant `378f866` coalesces each uninterrupted spine to one Djex `ForallType`
+  binder list, but never crosses an `FInst`. This preserves scope and Lean
+  rendering while making a non-vacuous five-binder source scheme one Djinn
+  occurrence site, matching Djex's native Haskell representation. The live
+  `synth-quintic-rankn` regression consequently exercises a genuine ten-site
+  non-prefix five-opaque/five-open plan and the separate eleven-site
+  five-open/six-opaque dual. Both direct candidates are checked by Lean.
 - **Concrete boxed products and scoped-arrow forwarding (Exference).** A
   known nonempty boxed-product goal can be materialized as one structural tree
   before its leaves are scheduled, while the historical one-layer alternative
   remains available for reuse of an existing inner product. A split scoped
   binding also retains its complete arrow scheme, so Exference tries exact
   whole-value forwarding before eta expansion. Djex `f3dd2495` pins that
-  combination. The current Leant submodule revision, `c0c1a461`, follows it by
+  combination. The quartic Leant submodule revision, `c0c1a461`, follows it by
   carrying tuple-goal provenance: an independently scheduled structural route
   may take the eager whole-tree shortcut once, while fields emitted by the
   shallow sibling stay shallow through later engine steps. This suppresses
@@ -106,7 +118,7 @@ best-first search. From the commit history and the reports
   hypothesis-instantiation guard. Standalone Exference admits the direct,
   independently checked candidate at step 30 under the unchanged
   4096-step/1024-queue bounds. Its live transcript still reports a step-limited
-  tail with 36,491 queue prunes because search continues after that candidate;
+  tail with 36,475 queue prunes because search continues after that candidate;
   the note is not a claim of exhaustive completion.
 - **Bounded hypothesis-side instantiation (Djinn).** A quantified
   hypothesis generates bounded premise axioms
@@ -370,9 +382,10 @@ opposite directions.
   transfers is not the workaround but the *logic*: positive ∀ =
   introduce a fresh opaque atom (Lean: a local constant), negative ∀ =
   bounded instantiation rule. Djex's deterministic singleton, pairwise,
-  triple, and quadruple frontiers transfer as a quartic search-space cap that
-  is exhaustive through nine independent sites without becoming a power
-  set.
+  triple, quadruple, and bounded quintuple frontiers transfer as a deterministic
+  search-space cap. The quintic tail keeps at most 512 plans in each
+  orientation, which is still exhaustive through eleven independent sites
+  without becoming a power set.
 - **Instantiation evidence is trivial.** Djex manufactures reserved
   `$`-namespace axiom symbols and erases them before code generation
   because GHC re-instantiates value occurrences implicitly. In Lean the
@@ -754,7 +767,7 @@ Design rules, all inherited from Djex:
 - **Quantifier verdicts are bounded, not complete**: second-order
   instantiation follows Djex's guarded, sequent-supplied discipline;
   beyond it (including instantiation chains longer than four binders
-  and the ten-site five-open/five-opaque plan gap) the answer is "no term
+  and the twelve-site six-open/six-opaque plan gap) the answer is "no term
   found within bounds" — full impredicative inhabitation is undecidable,
   so this boundary is permanent, and the display must never upgrade it
   to a refutation. Exference's query-derived provider route admits only

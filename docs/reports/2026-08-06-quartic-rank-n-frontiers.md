@@ -2,6 +2,11 @@
 
 Date: 2026-08-06
 
+> **Follow-up.** The
+> [quintic successor](2026-08-06-quintic-rank-n-frontiers.md) closes the
+> ten-site five-open/five-opaque gap, adds the eleven-site dual, and gives
+> Leant a genuinely non-vacuous live serializer regression.
+
 ## Outcome
 
 Leant consumes Djinn's quartic positive-forall plan family, introduced in
@@ -89,11 +94,11 @@ verified candidate, standalone Exference continues searching and eventually
 reports:
 
 ```text
-note: search truncated: step limit reached, queue limit pruned 36491
+note: search truncated: step limit reached, queue limit pruned 36475
 ```
 
 Combined mode retains the same Exference tail note alongside its merged
-candidates. The 36,491 prunes describe work discarded from the unfinished
+candidates. The 36,475 prunes describe work discarded from the unfinished
 tail; they do not weaken the already checker-admitted and Lean-verified direct
 candidate.
 
@@ -122,7 +127,7 @@ serialize as ordinary arrows.
   Exference, and combined mode at 4096 steps and queue size 1024.
 - The live transcript succeeds in all three modes, with every displayed
   candidate accepted by Lean 4.31; the Exference and combined runs retain the
-  honest bounded-tail note with 36,491 queue prunes.
+  honest bounded-tail note with 36,475 queue prunes.
 - All 177 Leant synthesis-boundary tests pass at the current submodule pin.
 
 The quartic Djinn plan family grows as `O(n^4)`, so it trades bounded runtime

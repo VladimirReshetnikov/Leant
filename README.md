@@ -237,9 +237,11 @@ and the active-instance extension in the
 [provider-local instance-head report](docs/reports/2026-08-05-provider-local-instance-head-evidence.md).
 Its complete multi-binder correlation follow-up is recorded in the
 [correlated instance-head assignment report](docs/reports/2026-08-05-correlated-instance-head-assignments.md).
-Djinn's next occurrence-plan layer and Leant's checked integration are recorded
-in the
-[quartic rank-N frontier report](docs/reports/2026-08-06-quartic-rank-n-frontiers.md).
+Djinn's expanding occurrence-plan family and Leant's checked integrations are
+recorded in the
+[quartic rank-N frontier report](docs/reports/2026-08-06-quartic-rank-n-frontiers.md)
+and its
+[quintic successor](docs/reports/2026-08-06-quintic-rank-n-frontiers.md).
 
 The engine is the vendored [Djex](lib/Djex) library, linked in-process.
 Djex began as a merger of two classic Haskell synthesizers — **Djinn**
@@ -666,11 +668,15 @@ hypotheses get placeholder type arguments wherever Lean needs them
 (`f _ x`), so bounded rank-N candidates verify. Chains with five or more
 leading binders remain outside Djinn's fixed instantiation bound. Full
 impredicative inhabitation is undecidable, so Djinn uses a deterministic
-quartic plan family rather than a power set. Its singleton, pairwise, triple,
-and quadruple open/opaque frontiers cover every choice across nine independent
-quantified sites; a ten-site goal needing exactly five open and five opaque
-sites remains a deliberate bounded gap. Beyond the guard the
-answer is "no term found within bounds" and nothing stronger.
+bounded plan family rather than a power set. Its singleton, pairwise, triple,
+quadruple, and quintuple open/opaque frontiers cover every choice across eleven
+independent quantified sites. Quintuple selections are edge-balanced and
+capped at 512 plans per orientation; this retains all 252 ten-site and 462
+eleven-site choices while bounding larger queries. A twelve-site goal needing
+exactly six open and six opaque sites is the next deliberate occurrence-plan
+gap. Beyond either that occurrence bound or the separate four-binder
+instantiation guard, the answer is "no term found within bounds" and nothing
+stronger.
 
 The live
 [`synth-quartic-rankn`](test/synth-quartic-rankn.txt) transcript makes the new
@@ -681,8 +687,8 @@ serializer as five ordinary arrows from the shared opaque `Type` atom to its
 codomain, not as another `FAll`; those four schemes therefore do not exercise
 the greater-than-four hypothesis-instantiation guard. Among the eight result
 leaves, only the four identity leaves stay quantified. Djex `f3dd2495`
-introduced the two cooperating Exference paths; the current submodule pin,
-`c0c1a461`, follows it with tuple-goal provenance that permits the eager
+introduced the two cooperating Exference paths; its quartic follow-up,
+`c0c1a461`, adds tuple-goal provenance that permits the eager
 whole-tree shortcut once per independently scheduled structural route. Nested
 fields emitted by the shallow alternative stay on that lane, preventing
 recursive rediscovery of equivalent structural trees while preserving scoped
@@ -691,8 +697,23 @@ Exference, and combined mode all return the direct nested-product term.
 Exference does so at the unchanged 4096-step/1024-queue bounds, and its
 independently checked candidate is admitted at search step 30. The live run
 nevertheless continues along its bounded ranked tail and reports
-`queue limit pruned 36491` when the step limit is reached; that note records an
+`queue limit pruned 36475` when the step limit is reached; that note records an
 incomplete tail, not a failure to find or check the displayed candidate.
+
+The live
+[`synth-quintic-rankn`](test/synth-quintic-rankn.txt) transcript is the exact
+non-vacuous successor. Its `QuinticRankN.Wide` abbreviation is
+`forall A B C D E : Type, A × B × C × D × E`, so all five binders survive as
+adjacent `FAll` nodes. Leant `378f866` projects each uninterrupted `FAll` spine
+to one Djex `ForallType` binder list, without crossing an `FInst`; the original
+fragment still owns every explicitness slot used for Lean rendering. Thus one
+`Wide` is one positive-forall occurrence site rather than five nested sites.
+With Djex `d728719f`, the first live goal requires a non-prefix five-opaque /
+five-open selection across ten sites, and the second requires the separate
+five-open / six-opaque dual across eleven. Leant `80f123a` records the direct
+Djinn terms accepted by Lean 4.31 for both goals. Neither run is truncated.
+This widens occurrence planning only: five-binder hypothesis instantiation
+remains outside Djinn's independent four-binder cap.
 
 Instance-implicit goal binders keep a separate render-only position. The
 engines remain dictionary-independent, while Leant inserts the wildcard that
