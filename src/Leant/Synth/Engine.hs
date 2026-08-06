@@ -868,8 +868,18 @@ fragToDjinn recursiveProjection providers extras frag0 = do
   voidC <- viaShow (mkIdentifier "Void")
   unitC <- viaShow (tupleName Boxed 0)
   let usableProviders = filter usableProvider providers
+      -- Bound the provider-indexed association list before any evidence
+      -- fragment participates in family planning, rigidity, or translation.
+      -- Keeping the index beside each fragment preserves exact provider
+      -- locality while leaving later providers and their declarations intact.
+      boundedProviderEvidence =
+        take maximumProviderInstantiationCandidates
+          [ (index, candidate)
+          | (index, provider) <- zip [0 :: Int ..] usableProviders
+          , candidate <- usableProviderEvidence provider
+          ]
       providerEvidenceFragments =
-        concatMap usableProviderEvidence usableProviders
+        map snd boundedProviderEvidence
       queryFragments =
         map snd extras ++ [frag0] ++ map providerTypeFrag usableProviders
           ++ providerEvidenceFragments
@@ -1341,7 +1351,10 @@ fragToDjinn recursiveProjection providers extras frag0 = do
                   { providerInstantiationCandidateProvider = privateName
                   , providerInstantiationCandidateType = candidateType
                   })
-              (usableProviderEvidence provider)
+              [ candidate
+              | (providerIndex, candidate) <- boundedProviderEvidence
+              , providerIndex == index
+              ]
             pure
               ( ValueDeclaration
                   (ValueSignature () privateName providerType)
@@ -1371,10 +1384,7 @@ fragToDjinn recursiveProjection providers extras frag0 = do
     }
   let providerDecls = [declaration | (declaration, _, _) <- translatedProviders]
       providerNames = [mapping | (_, mapping, _) <- translatedProviders]
-      -- The checked runner owns the same aggregate bound. Truncate here in
-      -- provider-discovery/evidence order so a large valid environment cannot
-      -- turn an otherwise usable synthesis lane into a boundary diagnostic.
-      instantiations = take maximumProviderInstantiationCandidates $ concat
+      instantiations = concat
         [ candidates | (_, _, candidates) <- translatedProviders ]
   Right
     ( goal

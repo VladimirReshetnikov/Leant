@@ -1012,6 +1012,19 @@ typeApplicationTests = testGroup "retained type applications"
           check engine = expectTerm "Gap.global («a» := (∀"
             (synthesizeWithProviders engine 1024 [provider] token)
       in mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "do not enter provider evidence beyond the aggregate bound" $
+      let token = FAtom False "Gap.Token"
+          provider name result evidence = ProviderFragWithEvidence name
+            (FAll False "a" result) ["a"] evidence
+          providers =
+            [ provider "Gap.first" token (replicate 16 polytype)
+            , provider "Gap.second" (FAtom False "Gap.Other")
+                (replicate 16 polytype)
+            , provider "Gap.third" (FAtom False "Gap.Last")
+                [error "entered the 33rd provider evidence fragment"]
+            ]
+      in expectTerm "Gap.first («a» := (∀"
+          (synthesizeWithProviders EngineDjinn 1024 providers token)
   , testCase "do not donate evidence between provider lanes" $ do
       let token = FAtom False "Gap.Token"
           providers =
