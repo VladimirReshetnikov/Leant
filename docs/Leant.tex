@@ -220,14 +220,9 @@ the title page and may not match the tool you build tomorrow. When
 this document and \code{:help} disagree, believe \code{:help}.
 \end{notice}
 
-Two implementations live side by side in the repository: the Haskell
-implementation at the repository root — the primary one, where
-development happens, speaking the backend protocol directly — and
-\code{LeantPy/}, a lighter Python edition built on LeanInteract that
-is kept up to date with it. They share the command set and the same session semantics;
-term synthesis (\S\ref{sec:synth}) is Haskell-only, because it embeds
-the Djex synthesis library in-process. Everything below describes the
-Haskell implementation.
+Leant is implemented in Haskell and speaks the backend protocol
+directly; term synthesis (\S\ref{sec:synth}) embeds the Djex synthesis
+library in-process.
 
 Under the hood, Leant drives the community
 \code{leanprover-community/repl} binary over a JSON protocol: every
@@ -314,6 +309,9 @@ header and just keep going), and an empty line submits it.
 \cmdrow{:set synth-steps N}{Exference's step budget (default 4096)}
 \cmdrow{:set synth-classical B}{offer classical candidates for
   constructively refuted goals (\code{on}$\mid$\code{off}, default on)}
+\cmdrow{:set synth-library B}{library premises for recursive
+  inductives (\code{on}$\mid$\code{off}, default on;
+  \S\ref{sec:synth-library})}
 \end{cmdtable}
 
 \subsection{Persistence and utility}
@@ -334,22 +332,173 @@ header and just keep going), and an empty line submits it.
 backend's proof-state protocol. Every line is a tactic; \code{:undo}
 pops one step; \code{:qed NAME} assembles the accumulated script into
 a theorem and replays it into the session, so the result is usable
-afterwards. Proof-state identifiers are local to one backend process; if
-it stops, Leant leaves prove mode and prints the accumulated script rather
-than submitting a stale identifier after session reconstruction.
+afterwards.  Each displayed proof state is followed by an automatically
+discovered tactic suggestion that Lean has already checked.  The
+candidate probes are shaped by the goal and its hypotheses: an
+\code{intro} suggestion names the binders it would introduce, a
+disjunction goal is probed with \code{left}/\code{right}, a
+hypothesis whose type a single step can take apart is probed with
+\code{cases} or \code{obtain}, and a data-typed variable the goal
+mentions is probed with \code{induction}.  The search prefers a
+candidate that closes the goal outright and annotates the suggestion
+accordingly (\code{closes the goal}, \code{splits into 2 goals}); when
+no single tactic closes it, a second phase chains quick finishers onto
+the best progressing candidates (\code{constructor <;> omega}, or an
+\code{obtain} step chained with the \code{exact} it enables), so even
+the opening suggestion is often a complete checked proof.  The chains
+also try \code{simp\_all}, unfolding the definitions the goal mentions
+and calling in \code{omega} on whatever arithmetic remains, which is
+how an induction suggestion can arrive as a finished proof:
+\code{induction l <;> simp\_all [myLen]}, or
+\code{induction n <;> simp\_all [double] <;> omega}.
+The suggestion is advisory---it does not advance the state or enter the
+script---and \code{:suggest} reprints it without rerunning the search.
+Below, the very first suggestion is already a complete proof; the session
+ignores it and proceeds step by step instead.
+Proof-state identifiers are local to one backend process; if it stops,
+Leant leaves prove mode and prints the accumulated script rather than
+submitting a stale identifier after session reconstruction.
 
 \begin{session}
 λ> :prove ∀ p q : Prop, (p → q) → p → q ∧ p
+entering prove mode — type tactics; :help for commands
 ⊢ ∀ (p q : Prop), (p → q) → p → q ∧ p
+suggestion: exact fun p q a a_1 => ⟨a a_1, a_1⟩  (closes the goal)
 ⊢> intro p q h hp
 p q : Prop
 h : p → q
 hp : p
 ⊢ q ∧ p
+suggestion: exact ⟨h hp, hp⟩  (closes the goal)
 ⊢> exact ⟨h hp, hp⟩
 All goals accomplished
+finish with :qed [NAME], inspect with :script
 ⊢> :qed mp_and
 saved: theorem mp_and : ∀ p q : Prop, (p → q) → p → q ∧ p
+\end{session}
+
+Accepting a suggestion is just typing it.  On a conjunction of two
+arithmetic facts, the opening suggestion is already the whole chained
+proof, and the session is two lines long:
+
+\begin{session}
+λ> :prove (∀ a b : Nat, a + b = b + a) ∧ (∀ a b : Nat, a + 2 * b = b + b + a)
+entering prove mode — type tactics; :help for commands
+⊢ (∀ (a b : Nat), a + b = b + a) ∧ ∀ (a b : Nat), a + 2 * b = b + b + a
+suggestion: constructor <;> omega  (closes the goal)
+⊢> constructor <;> omega
+All goals accomplished
+finish with :qed [NAME], inspect with :script
+⊢> :qed two_omegas
+saved: theorem two_omegas : (∀ a b : Nat, a + b = b + a) ∧ (∀ a b : Nat, a + 2 * b = b + b + a)
+\end{session}
+
+That chain was suggested because \emph{both} halves fall to
+\code{omega}.  When they need different tools, the suggestion adapts
+to whichever goal is in focus --- arithmetic for the first half, a
+found library lemma for the second:
+
+\begin{session}
+λ> :prove (∀ a b : Nat, a + b = b + a) ∧ (∀ a b : Nat, a * b = b * a)
+entering prove mode — type tactics; :help for commands
+⊢ (∀ (a b : Nat), a + b = b + a) ∧ ∀ (a b : Nat), a * b = b * a
+suggestion: constructor  (splits into 2 goals)
+⊢> constructor
+— goal 1 of 2 —
+case left
+⊢ ∀ (a b : Nat), a + b = b + a
+— goal 2 of 2 —
+case right
+⊢ ∀ (a b : Nat), a * b = b * a
+suggestion: omega  (closes the goal)
+⊢2> omega
+case right
+⊢ ∀ (a b : Nat), a * b = b * a
+suggestion: exact fun a b => Nat.mul_comm a b  (closes the goal)
+⊢> exact fun a b => Nat.mul_comm a b
+All goals accomplished
+finish with :qed [NAME], inspect with :script
+⊢> :qed add_mul_comm
+saved: theorem add_mul_comm : (∀ a b : Nat, a + b = b + a) ∧ (∀ a b : Nat, a * b = b * a)
+\end{session}
+
+The probes are shaped by the hypotheses as much as by the goal.  An
+existential hypothesis draws an \code{obtain} suggestion that names
+its witness; once the conjunction inside is the thing in the way, the
+suggested step is the \code{obtain} that splits it, chained with the
+\code{exact} it enables:
+
+\begin{session}
+λ> :prove (∃ x : Nat, 2 < x ∧ x < 4) → ∃ y : Nat, 2 < y
+entering prove mode — type tactics; :help for commands
+⊢ (∃ x, 2 < x ∧ x < 4) → ∃ y, 2 < y
+suggestion: intro h
+⊢> intro h
+h : ∃ x, 2 < x ∧ x < 4
+⊢ ∃ y, 2 < y
+suggestion: obtain ⟨x, h1⟩ := h
+⊢> obtain ⟨x, h1⟩ := h
+x : Nat
+h1 : 2 < x ∧ x < 4
+⊢ ∃ y, 2 < y
+suggestion: obtain ⟨h, h2⟩ := h1 <;> exact Exists.intro x h  (closes the goal)
+⊢> obtain ⟨h, h2⟩ := h1 <;> exact Exists.intro x h
+All goals accomplished
+finish with :qed [NAME], inspect with :script
+⊢> :qed ex_two_lt
+saved: theorem ex_two_lt : (∃ x : Nat, 2 < x ∧ x < 4) → ∃ y : Nat, 2 < y
+\end{session}
+
+A suggestion is not limited to one step.  Here the goal needs
+structural induction on a user-defined function; once \code{intro}
+brings the variable into the context, the suggested chain arrives as a
+complete verified proof:
+
+\begin{session}
+λ> def myLen : List Nat → Nat
+…>   | [] => 0
+…>   | _ :: t => myLen t + 1
+…>
+λ> :prove ∀ l : List Nat, myLen l = l.length
+entering prove mode — type tactics; :help for commands
+⊢ ∀ (l : List Nat), myLen l = l.length
+suggestion: intro l
+⊢> intro l
+l : List Nat
+⊢ myLen l = l.length
+suggestion: induction l <;> simp_all [myLen]  (closes the goal)
+⊢> induction l <;> simp_all [myLen]
+All goals accomplished
+finish with :qed [NAME], inspect with :script
+⊢> :qed myLen_length
+saved: theorem myLen_length : ∀ l : List Nat, myLen l = l.length
+\end{session}
+
+The same pattern scales to arithmetic recursion.  The chain below was
+assembled from three of the probes at once: \code{induction} because
+the goal mentions a data-typed variable, \code{simp\_all} unfolding
+the definition the goal is about, and \code{omega} for the arithmetic
+the simplifier leaves behind --- a finished proof of a small theorem
+about a function defined moments earlier:
+
+\begin{session}
+λ> def double : Nat → Nat
+…>   | 0 => 0
+…>   | n + 1 => double n + 2
+…>
+λ> :prove ∀ n : Nat, double n = 2 * n
+entering prove mode — type tactics; :help for commands
+⊢ ∀ (n : Nat), double n = 2 * n
+suggestion: intro n
+⊢> intro n
+n : Nat
+⊢ double n = 2 * n
+suggestion: induction n <;> simp_all [double] <;> omega  (closes the goal)
+⊢> induction n <;> simp_all [double] <;> omega
+All goals accomplished
+finish with :qed [NAME], inspect with :script
+⊢> :qed double_two_mul
+saved: theorem double_two_mul : ∀ n : Nat, double n = 2 * n
 \end{session}
 
 A \code{sorry} in an ordinary declaration prints its goal and offers
@@ -408,6 +557,10 @@ Three rules run through the design:
   found within bounds,'' which claims nothing.
 \end{itemize}
 
+Transcripts in this section are lightly abridged: trailing candidates
+beyond the ones shown, and trailing truncation notes, are elided.
+Every line that does appear is a verbatim record of a live session.
+
 \subsection{Higher-order plumbing}\label{sec:plumbing}
 
 The sweet spot is the structural fragment: arrows, products, sums,
@@ -430,6 +583,24 @@ backward implication projected out by the pattern
 \code{⟨\_, f⟩}. Binders are named by role (functions \code{f g h},
 values \code{x y z}, negations and continuations \code{k}), a small
 thing that makes large candidates much easier to read.
+
+The everyday combinators all come out on the first try, and each
+first candidate is the term you would have written yourself ---
+\code{flip}, composition, \code{curry}, \code{uncurry}, and product
+associativity:
+
+\begin{session}
+λ> :synth ((a → b → c) → b → a → c)
+  it1  fun f x y => f y x
+λ> :synth ((b → c) → (a → b) → a → c)
+  it1  fun f g x => f (g x)
+λ> :synth ((A × B → C) → A → B → C)
+  it1  fun f x y => f ⟨x, y⟩
+λ> :synth ((A → B → C) → A × B → C)
+  it1  fun f ⟨x, y⟩ => f x y
+λ> :synth (((A × B) × C) → A × (B × C))
+  it1  fun ⟨⟨x, y⟩, z⟩ => ⟨x, ⟨y, z⟩⟩
+\end{session}
 
 Candidates are ranked smallest-first and \emph{bound into the session}
 as \code{it1}, \code{it2}, \dots, with bare \code{it} the best one.
@@ -458,13 +629,37 @@ De Morgan and the absorption law:
   it1  fun _ _ => ⟨fun ⟨x, _⟩ => x, fun y => ⟨y, .inl y⟩⟩
 \end{session}
 
+Under propositions-as-types, the proof terms \emph{are} plumbing, and
+the synthesized spellings make that visible: \code{Iff} symmetry is a
+swap, and \code{¬(p ∧ q) ↔ (p → ¬q)} is nothing but currying:
+
+\begin{session}
+λ> :synth (∀ p q : Prop, (p ↔ q) → (q ↔ p))
+  it1  fun _ _ ⟨f, g⟩ => ⟨g, f⟩
+λ> :synth (∀ p q : Prop, ¬(p ∧ q) ↔ (p → ¬q))
+  it1  fun _ _ => ⟨fun k x y => k ⟨x, y⟩, fun k1 ⟨z, w⟩ => k1 z w⟩
+\end{session}
+
+The textbook curiosities are in range too. No proposition is
+equivalent to its own negation, and the synthesized proof is the
+classic self-application trick --- the term below applies \code{k} to
+itself through \code{f} twice, the propositional shadow of
+$\omega\,\omega$:
+
+\begin{session}
+λ> :synth (∀ p : Prop, (p ↔ ¬p) → False)
+  it1  fun _ ⟨k, f⟩ => k (f (fun x => k x x)) (f (fun y => k y y))
+\end{session}
+
 \subsection{Programs you already know}\label{sec:monads}
 
 Some types have one sensible inhabitant, and asking for it by type is
-quicker than remembering which library corner it lives in. Take the
-bind of the state monad:
+quicker than remembering which library corner it lives in. The bind
+of the reader monad, then the bind of the state monad:
 
 \begin{session}
+λ> :synth ((S → A) → (A → S → B) → S → B)
+  it1  fun f g x => g (f x) x
 λ> :synth ((S → A × S) → (A → S → B × S) → S → B × S)
   it1  fun f g x => match f x with | ⟨a, b⟩ => g a b
   it2  fun f g x => match f x with | ⟨a, _⟩ => g a x
@@ -497,10 +692,40 @@ doubt, run one:
 
 \subsection{Rank-N and impredicative goals}\label{sec:rankn}
 
-A polymorphic hypothesis can be instantiated at types the goal itself
-supplies. Context-free chains now reach four leading binders, and Leant
-inserts the inferred type arguments which Djinn leaves implicit. Lean
-then verifies each rendered candidate against the original type:
+A polymorphic hypothesis is not just cargo: Djex instantiates it at
+types the goal itself supplies --- including, under a guard, at
+\emph{polymorphic} ones. Here the first candidate applies the
+identity hypothesis to the whole goal \code{Q → Q}, an impredicative
+instantiation:
+
+\begin{session}
+λ> :synth ((∀ p : Prop, p → p) → Q → Q)
+  it1  fun f => f _
+  it2  fun _ x => x
+  it3  fun f x => f _ x
+\end{session}
+
+And a Church-encoded pair converts into a real conjunction --- the
+quantified hypothesis is instantiated once at \code{p} and once at
+\code{q}, fed the matching projection each time:
+
+\begin{session}
+λ> :synth (∀ p q : Prop, (∀ r : Prop, (p → q → r) → r) → p ∧ q)
+  it1  fun _ _ f => ⟨f _ (fun x _ => x), f _ (fun _ y => y)⟩
+\end{session}
+
+(Trailing candidates are elided.) Explicit \code{∀} binders ---
+leading, nested, trailing, or
+interleaved --- are woven into the candidate's lambda automatically,
+and uses of quantified hypotheses get placeholder type arguments
+wherever Lean needs them (\code{f \_ x}), so bounded rank-N
+candidates verify. Full impredicative inhabitation is undecidable;
+beyond the guard the answer is ``no term found within bounds'' and
+nothing stronger.
+
+Context-free instantiation chains extend to four leading binders. Leant
+inserts the inferred type arguments which Djinn leaves implicit, then asks
+Lean to verify every rendered candidate against the original type:
 
 \begin{session}
 λ> :synth (∀ A B C D R : Type, (∀ a b c d : Type, a → b → c → d → R) → A → B → C → D → R)
@@ -509,9 +734,9 @@ then verifies each rendered candidate against the original type:
   it5  fun _ _ _ _ _ f x y z w => f _ _ _ _ x y z w
 \end{session}
 
-Vacuous local providers can retain the same query-supplied choice even
-when their result is an opaque Lean type. Here \code{Demo.Token} becomes
-a fixed ambient query rigid, not an unresolved inference variable:
+Vacuous local providers can retain the same query-supplied choice even when
+their result is an opaque Lean type. Here \code{Demo.Token} becomes a fixed
+ambient query rigid, not an unresolved inference variable:
 
 \begin{session}
 λ> axiom Demo.Token : Type
@@ -524,23 +749,22 @@ synth engine: exference
 \end{session}
 
 This visible specialization is available only for a fully vacuous,
-context-free leading provider chain, and only selects a closed proper type
+context-free leading provider chain, and it selects only a closed proper type
 already present in the checked query. Fixed ambient rigids may occur in the
-provider result; a free flexible variable still rejects the route. A local
-value has no global binder name, so Leant renders a positional \code{@}
-application. For a quantified argument it tries binder domains \code{\_},
-\code{Type \_}, and \code{Prop}, in that order, and backend verification keeps
-the first spelling which elaborates. Named globals retain their
-source-directed applications. Each domain lane retains at most twelve
-site-and-style spellings, for a hard 36-variant bound only when the local
-quantified argument is domain-sensitive; ordinary duplicate spellings collapse
-to the historical smaller group.
+provider result; a free flexible variable rejects the route. A local value has
+no global binder name, so Leant renders a positional \code{@} application. For
+a quantified argument it tries binder domains \code{\_}, \code{Type \_}, and
+\code{Prop}, in that order, and backend verification keeps the first spelling
+which elaborates. Named globals retain source-directed applications. Each
+domain lane retains at most twelve site-and-style spellings, for a hard
+36-variant bound only when the local quantified argument is domain-sensitive;
+ordinary duplicate spellings collapse to the historical smaller group.
 
-Leant also retains applications whose arguments are proper types. A
-bound first-order constructor remains a higher-kinded variable in Djex;
-an opaque Lean family receives one rigid nominal head across its
-occurrences. Both engines can therefore see the query-supplied
-polytype without learning any hidden implementation:
+Leant also retains applications whose arguments are proper types. A bound
+first-order constructor remains a higher-kinded variable in Djex; an opaque
+Lean family receives one rigid nominal head across its occurrences. Both
+engines can therefore see a query-supplied polytype without learning any hidden
+implementation:
 
 \begin{session}
 λ> axiom Wrap : Type 1 → Type
@@ -552,20 +776,20 @@ synth engine: exference
   it1  fun _ x => x _
 \end{session}
 
-The serializer admits only first-order kind arrows between universes and
-only application arguments whose own type is a universe. Term-indexed
-families such as \code{P 3} remain opaque. A retained nominal application
-can support a positive, Lean-verified candidate but always poisons a
-negative verdict because its constant hides structure.
-
-The candidate vocabulary comes only from proven proper-type positions below
-arrows and tuples in the sequent, including quantified subtrees already
-present there; this is guarded impredicativity, not general second-order
-search. A visible provider chain is capped at four binders and 32 argument
-combinations. The separate explicit-instance-head route remains
-monotype-only, and open or context-bearing specified arguments fail closed.
-Chains with five or more leading binders remain a deliberate incomplete
-boundary.
+The serializer admits only first-order kind arrows between universes and only
+application arguments whose own type is a universe. Term-indexed families such
+as \code{P 3} remain opaque. A retained nominal application can support a
+positive, Lean-verified candidate but always poisons a negative verdict because
+its constant hides structure. Candidate types come only from proven proper-type
+positions below arrows and tuples in the sequent, including quantified subtrees
+already present there: this is guarded impredicativity, not general
+second-order search. A visible provider chain is capped at four binders and 32
+argument combinations. The separate explicit-instance-head route remains
+monotype-only; open or context-bearing specified arguments fail closed, and
+chains with five or more leading binders remain a deliberate incomplete
+boundary. The implementation contract and Lean~4.31 transcript are recorded in
+the \href{reports/2026-08-01-scoped-quantified-local-providers.md}{scoped
+local-provider report}.
 
 \subsection{Impossibility, proved}\label{sec:negative}
 
@@ -655,7 +879,59 @@ analysis is not:
   it2  Nat.succ Nat.zero
 λ> :synth (∀ a : Type, a → List a)
   it1  fun _ _ => List.nil
+  it2  fun _ x => List.cons x List.nil
 \end{session}
+
+\subsection{Recursion from the library}\label{sec:synth-library}
+
+\code{:synth} will never invent a \code{Nat.rec}-based program, but
+for the everyday recursive types it does not have to: the library
+already wrote the recursion. A goal that mentions \code{List} or
+\code{Nat} brings a rated inventory of library functions with it ---
+\code{List.map}, \code{List.foldr}, \code{List.append},
+\code{List.flatten}, \code{List.length}, \code{List.replicate},
+\code{Nat.add}, \dots{} --- instantiated at the goal's own types and
+offered to the engine as extra premises. The enumeration prefers
+proofs that use the goal's own arguments, so asking for a function
+\emph{by its type} puts the library answer first:
+
+\begin{session}
+λ> :synth ((a → b) → List a → List b)
+  it1  fun f x => List.map f x
+  it2  fun f x => List.reverse (List.map f x)
+λ> :synth (List (List a) → List a)
+  it1  fun x => List.flatten x
+  it2  fun x => List.reverse (List.flatten x)
+λ> :synth (Nat → a → List a)
+  it1  fun x y => List.replicate x y
+  it2  fun x y => List.reverse (List.replicate x y)
+λ> :synth (List a → List b → List (a × b))
+  it1  fun x y => List.zip x y
+  it2  fun _ _ => List.nil
+λ> :synth ((a → b → c) → List a → List b → List c)
+  it1  fun f x y => List.zipWith f x y
+  it2  fun _ _ _ => List.nil
+\end{session}
+
+(Trailing candidates and the truncation notes are elided here.) The
+inventory is a ratings list in Djex's \code{*.ratings} format ---
+lower is better, 100 or more disables --- and a project file
+\code{leant.ratings} (lines of \code{Name Rating}, \code{\#}
+comments) merges over the defaults at startup, so re-ranking,
+disabling, or growing the inventory is editing a list, not writing
+code.
+
+The library search runs beside the constructor search of the previous
+section, in a mode where the recursive occurrences are sealed atoms:
+without \code{nil}/\code{cons} in play, every candidate must route
+through the goal's own arguments and the offered functions, which is
+what keeps \code{List.map} ahead of the endless supply of closed
+terms that ignore the input. Both searches' survivors are shown
+together, library candidates first; \code{:set synth-library off}
+restores the constructors-only behavior. As always, the premises are
+only \emph{offers}: every candidate is re-elaborated by the backend,
+so a useless premise costs search time, never a wrong answer, and
+negative verdicts never come from the library run at all.
 
 \subsection{Classical candidates}\label{sec:classical}
 
@@ -684,15 +960,23 @@ term whose spelling shows what was used:
 \end{session}
 
 These are the proofs a human would write: one case split on excluded
-middle, one \code{absurd} where the contradiction lands. Less famous
-gaps between the two logics come out the same way. Weak excluded
-middle, and the G\"odel--Dummett formula:
+middle, one \code{absurd} where the contradiction lands. The hard
+direction of De Morgan needs excluded middle twice, once per
+disjunct, and the candidate reads as exactly that case analysis:
+
+\begin{session}
+λ> :synth (∀ p q : Prop, ¬(¬p ∧ ¬q) → p ∨ q)
+  it1  fun _ _ k => match Classical.em _ with | .inl x => .inl x | .inr k1 => (match Classical.em _ with | .inl y => .inr y | .inr k2 => absurd ⟨k1, k2⟩ k)
+\end{session}
+
+Less famous gaps between the two logics come out the same way. Weak
+excluded middle, and the G\"odel--Dummett formula:
 
 \begin{session}
 λ> :synth (∀ p : Prop, ¬p ∨ ¬¬p)
   it1  fun _ => match Classical.em _ with | .inl x => .inr (fun k => k x) | .inr k1 => .inl k1
 λ> :synth (∀ p q : Prop, (p → q) ∨ (q → p))
-  it1  fun _ _ => match Classical.em _ with | .inl x => (match Classical.em _ with | .inl _ => .inr (fun _ => x) | .inr k => .inr (fun y => absurd y k)) | .inr k1 => .inl (fun z => absurd z k1)
+  it1  fun _ _ => match Classical.em _ with | .inl _ => (match Classical.em _ with | .inl x => .inl (fun _ => x) | .inr k => .inr (fun y => absurd y k)) | .inr k1 => .inl (fun z => absurd z k1)
 \end{session}
 
 Two searches stand behind this. First, one excluded-middle assumption
@@ -745,21 +1029,30 @@ comes from \code{hd}:
 
 \begin{session}
 λ> :prove ∀ p q : Prop, Decidable p → (p → q) → (¬p → q) → q
-⊢ ∀ (p q : Prop), Decidable p → (p → q) → (¬p → q) → q
+entering prove mode — type tactics; :help for commands
+⊢ ∀ (p q : Prop) (a : Decidable p), (p → q) → (¬p → q) → q
+suggestion: exact fun p q a a_1 a_2 => dite p a_1 a_2  (closes the goal)
 ⊢> intro p q hd hpq hnq
 p q : Prop
 hd : Decidable p
 hpq : p → q
 hnq : ¬p → q
 ⊢ q
+suggestion: exact dite p hpq hnq  (closes the goal)
 ⊢> :synth
 (synthesizing with hypotheses p q hd hpq hnq as premises)
   it1  fun _ _ x f g => match x with | .isFalse k => g k | .isTrue y => f y
 ⊢> exact it1
 All goals accomplished
+finish with :qed [NAME], inspect with :script
 ⊢> :qed byCases
 saved: theorem byCases : ∀ p q : Prop, Decidable p → (p → q) → (¬p → q) → q
 \end{session}
+
+Note the contrast with the tactic suggestion above it: the suggestion
+\emph{found} the library's \code{dite}, while \code{:synth}
+\emph{composed} the case split from the goal's own material. Both are
+verified; they simply answer different questions.
 
 It also slots into an ordinary multi-goal proof. Split a conjunction
 with \code{constructor} and let \code{:synth} deal with each half in
@@ -768,12 +1061,15 @@ projections from \code{h} showing up without being asked for:
 
 \begin{session}
 λ> :prove ∀ p q r : Prop, (p → q) ∧ (q → r) → p → r ∧ (p → q)
+entering prove mode — type tactics; :help for commands
 ⊢ ∀ (p q r : Prop), (p → q) ∧ (q → r) → p → r ∧ (p → q)
+suggestion: intro p q r h h1 <;> simp_all  (closes the goal)
 ⊢> intro p q r h hp
 p q r : Prop
 h : (p → q) ∧ (q → r)
 hp : p
 ⊢ r ∧ (p → q)
+suggestion: simp_all only [forall_const, imp_self, and_self]  (closes the goal)
 ⊢> constructor
 — goal 1 of 2 —
 case left
@@ -787,6 +1083,7 @@ p q r : Prop
 h : (p → q) ∧ (q → r)
 hp : p
 ⊢ p → q
+suggestion: simp_all only [forall_const]  (closes the goal)
 ⊢2> :synth
 (synthesizing with hypotheses p q r h hp as premises)
   it1  fun _ _ _ ⟨f, g⟩ x => g (f x)
@@ -796,11 +1093,13 @@ p q r : Prop
 h : (p → q) ∧ (q → r)
 hp : p
 ⊢ p → q
+suggestion: simp_all only [forall_const, imp_self]  (closes the goal)
 ⊢> :synth
 (synthesizing with hypotheses p q r h hp as premises)
   it1  fun _ _ _ ⟨f, _⟩ x _ => f x
 ⊢> exact it1
 All goals accomplished
+finish with :qed [NAME], inspect with :script
 ⊢> :qed chain
 saved: theorem chain : ∀ p q r : Prop, (p → q) ∧ (q → r) → p → r ∧ (p → q)
 \end{session}
@@ -812,6 +1111,26 @@ no imports. The division of labor that
 emerges is pleasant: the genuinely dependent moves (quantifiers,
 induction, rewriting) stay yours, and the propositional bookkeeping
 between them does not.
+
+The classical fallback of \S\ref{sec:classical} follows \code{:synth}
+into prove mode. Double-negation elimination has no constructive
+proof, so the candidate arrives as an excluded-middle case split, and
+\code{:qed} turns it into a named theorem --- no tactic beyond
+\code{exact} was typed:
+
+\begin{session}
+λ> :prove ∀ p : Prop, ¬¬p → p
+entering prove mode — type tactics; :help for commands
+⊢ ∀ (p : Prop), ¬¬p → p
+suggestion: exact fun p a => Classical.byContradiction a  (closes the goal)
+⊢> :synth
+  it1  fun _ k => match Classical.em _ with | .inl x => x | .inr k1 => absurd k1 k
+⊢> exact it1
+All goals accomplished
+finish with :qed [NAME], inspect with :script
+⊢> :qed not_not_elim
+saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
+\end{session}
 
 \subsection{Engines and budgets}\label{sec:engines}
 
@@ -944,10 +1263,7 @@ API, Leant compiles current synthesis tooling directly over it.
 %==============================================================================
 \section{Status}\label{sec:status}
 
-Leant is a working prototype under active development. The Haskell
-implementation at the repository root is primary; the Python edition
-(\code{LeantPy/}) is kept up to date with it as a lighter alternative
-without synthesis.
+Leant is a working prototype under active development.
 The synthesis design and its phased history are documented in
 \code{docs/SYNTHESIS\_PROPOSAL.md}; transcript-level golden tests live in
 \code{test/}. The project began inside the \emph{ProveIt} repository

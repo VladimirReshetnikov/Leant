@@ -1,0 +1,47 @@
+:prove ∀ p q : Prop, p ∧ q → q ∧ p
+:goals
+intro p q h
+:suggest
+exact And.comm.mp h
+:qed and_swap
+:prove ∀ n : Nat, n = n
+intro n
+:undo
+:suggest
+intro n
+rfl
+:qed nat_refl
+:prove (∀ a b : Nat, a + b = b + a) ∧ (∀ a b : Nat, a * b = b * a)
+constructor
+omega
+exact fun a b => Nat.mul_comm a b
+:qed add_mul_comm
+:prove (∀ a b : Nat, a + b = b + a) ∧ (∀ a b : Nat, a + 2 * b = b + b + a)
+constructor <;> omega
+:qed two_omegas
+:prove ∀ p : Prop, p → ¬p → False
+intro p h h1
+contradiction
+:qed no_contra
+:prove (∃ x : Nat, 2 < x ∧ x < 4) → ∃ y : Nat, 2 < y
+intro h
+obtain ⟨x, h1⟩ := h
+obtain ⟨h, h2⟩ := h1 <;> exact Exists.intro x h
+:qed ex_two_lt
+def myLen : List Nat → Nat
+  | [] => 0
+  | _ :: t => myLen t + 1
+
+:prove ∀ l : List Nat, myLen l = l.length
+intro l
+induction l <;> simp_all [myLen]
+:qed myLen_length
+def double : Nat → Nat
+  | 0 => 0
+  | n + 1 => double n + 2
+
+:prove ∀ n : Nat, double n = 2 * n
+intro n
+induction n <;> simp_all [double] <;> omega
+:qed double_two_mul
+:quit

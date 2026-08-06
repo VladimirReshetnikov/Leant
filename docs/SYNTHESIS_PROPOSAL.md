@@ -4,31 +4,30 @@
 in-process Djex Djinn/LJT and Exference; see
 [README.md](../README.md#synth--automatic-term-synthesis)). A bounded
 first slice of phase 3 is also implemented: live goal-relevant Lean
-providers, exact global rendering, relevance-preserving ratings, and
-one-layer recursive elimination, backed by a bounded semantic provider
-cache. Every engine mode protects structural synthesis with a Lean-verified
-provider-free baseline and consults that inventory only after a nonterminal
-baseline miss; complete Djinn refutations retain their proof-backed verdict;
-Djinn-backed fallback can now specialize loaded schemes at closed monotypes and
-guarded rank-N polytypes. Both engines can also retain a query-supplied closed
-polytype at a vacuous local provider whose result mentions fixed ambient query
-variables. The translator additionally retains first-order
-proper-type applications for bound constructor variables and opaque Lean families, and
-shares compatible proper-type applications of non-recursive and recursive
-inductive families across the complete query. Finite data retains constructor
-introduction and case elimination; recursive data retains direct rank-N
-transport in both engines and a validated one-layer eliminator in Exference.
-That eliminator preserves the established strict candidate prefix, retrying
-with intentionally unused inputs only after a strict search miss and rendering
-the omitted fields as Lean wildcards.
-Phase 4 and a persistent Mathlib-scale inventory remain future work. Companion
-to
+providers, exact global rendering, relevance-preserving ratings, curated rated
+`List`/`Nat` library premises, and one-layer recursive elimination, backed by a
+bounded semantic provider cache. Every engine mode protects structural
+synthesis with a Lean-verified provider-free baseline and consults provider or
+library inventory only after the applicable baseline policy; complete Djinn
+refutations retain their proof-backed verdict. Djinn-backed fallback can
+specialize loaded schemes at closed monotypes and guarded rank-N polytypes.
+Both engines can also retain a query-supplied closed polytype at a vacuous
+local provider whose result mentions fixed ambient query variables. The
+translator additionally retains first-order proper-type applications for bound
+constructor variables and opaque Lean families, and shares compatible
+proper-type applications of non-recursive and recursive inductive families
+across the complete query. Finite data retains constructor introduction and
+case elimination; recursive data retains direct rank-N transport in both
+engines and a validated one-layer eliminator in Exference. That eliminator
+preserves the established strict candidate prefix, retrying with intentionally
+unused inputs only after a strict search miss and rendering omitted fields as
+Lean wildcards. Phase 4 and a persistent Mathlib-scale inventory remain future
+work; the implemented post-phase-2 increments are detailed in §7. Companion to
 [PROPOSALS.md](PROPOSALS.md).*
 
 Djex — vendored read-only in this repository as the
 [`lib/Djex`](../lib/Djex) submodule (pinned by the repository gitlink) —
-merges two
-Haskell expression synthesizers — Djinn
+merges two Haskell expression synthesizers — Djinn
 (Dyckhoff's LJT calculus: complete, terminating intuitionistic proof
 search that emits programs) and Exference (ranked heuristic search with
 resource budgets and type-class evidence) — behind one
@@ -50,8 +49,8 @@ system.*
 | --- | --- | --- |
 | **LJT engine (Djinn)** | Complete, *terminating* proof search for intuitionistic propositional logic over `->`, tuples, `Either`, `Void`, opaque type variables; emits a lambda term, or a definitive "no term exists" | Curry–Howard transfers directly: the same calculus decides the Lean fragment `→ × ⊕ Empty Unit` in `Type` and `→ ∧ ∨ ⊥ ⊤ ¬ ↔` in `Prop`, emitting `fun`/`⟨,⟩`/`Sum.inl`/`.casesOn` terms |
 | **Non-inhabitation verdicts** | "Proof-backed non-inhabitation result... when formula translation is complete" (library-api.md) | For *opaque* type variables, LJT failure means **no closed term exists at that polymorphic type** — a trustworthy negative answer no Lean tactic currently gives (`exact?` failing proves nothing) |
-| **Exference engine and live inventory** | Best-first search over an *inventory* of typed constants with per-name ratings (`environment/*.ratings`), explicit step/queue/depth budgets, ranked candidate batches | The implemented phase-3 slice protects every structurally accepted mode with a Lean-verified provider-free baseline, then discovers a bounded live inventory only after a nonterminal miss. A complete Djinn refutation remains terminal. Exference applies relevance penalties; Djinn first isolates the highest-ranked provider and can instantiate retained polymorphic schemes. Exact-result ordering, worker demotion, and a generation-aware semantic cache serve both. A persistent Mathlib-scale index, transitive relevance, and user-maintained ratings remain future work |
-| **Shared synthesis foundation** | Parser-independent vocabulary (`Name`, `Type`, `Constraint`, `Environment → Inventory → PreparedInventory → QueryResult (SearchBatch Candidate) → Expression`), each arrow a checked boundary | The template for Leant's internal engine boundary: one fragment grammar, one candidate term grammar, one verification protocol, with the engine behind it swappable. **Scope decision: this feature is Haskell-only** — the Haskell implementation links Djex in-process; the Python edition does not grow a synthesis host |
+| **Exference engine and live inventory** | Best-first search over an *inventory* of typed constants with per-name ratings (`environment/*.ratings`), explicit step/queue/depth budgets, ranked candidate batches | The implemented phase-3 slice protects every structurally accepted mode with a Lean-verified provider-free baseline, then discovers a bounded live inventory only after a nonterminal miss. A complete Djinn refutation remains terminal. Exference applies relevance penalties; Djinn first isolates the highest-ranked provider and can instantiate retained polymorphic schemes. Exact-result ordering, worker demotion, and a generation-aware semantic cache serve both. A curated core `List`/`Nat` inventory and project `leant.ratings` overrides are implemented; a persistent Mathlib-scale index and transitive relevance remain future work |
+| **Shared synthesis foundation** | Parser-independent vocabulary (`Name`, `Type`, `Constraint`, `Environment → Inventory → PreparedInventory → QueryResult (SearchBatch Candidate) → Expression`), each arrow a checked boundary | The template for Leant's internal engine boundary: one fragment grammar, one candidate term grammar, one verification protocol, with the engine behind it swappable. Leant links Djex in-process |
 | **Verification posture** | Engines are explicit about semantics ("neither backend guesses the other's"); truncated batches are labeled; a finished heuristic batch with no candidates "is not a proof of non-inhabitation" | Leant goes one better: **every candidate is elaborated by the Lean backend before display** (`example : (T) := term`), so the synthesizer never needs to be trusted — the same outsource-soundness pattern `:search?` and prove mode already use |
 | **Embeddable library** | `build-depends: djex`, GHC 9.12.4, sealed session + checked request + result envelope; also three CLIs (`djex djinn --render expression "a -> a"`) | Leant is built with **the same GHC 9.12.4** — it links Djex directly as a library, in-process, with no subprocess or protocol overhead |
 | **Shared REPL conventions** | Explicit backend selection (`djinn`/`exference`/`both`), settable limits, environment files | `:synth` command options: engine choice, candidate count, budget — consistent with Leant's `:set`-style toggles |
@@ -447,9 +446,7 @@ Design rules, all inherited from Djex:
    engine through a small typed interface (goal in, candidate batch
    out), so the LJT engine, the ranked-search engine, or a
    different backend can be swapped without touching the REPL layer.
-   Haskell-only: the engine lives in the Haskell implementation as a
-   direct Djex library dependency; `leant.py` deliberately does not
-   implement this feature.
+   The engine lives in the REPL as a direct Djex library dependency.
 
 ### Translation notes (the genuinely new work)
 
@@ -487,9 +484,7 @@ Design rules, all inherited from Djex:
   the same phase for free**: nested ∀s as opaque atoms, positive
   opening, hypothesis instantiation at query-supplied types, guarded
   impredicativity — the Leant work is confined to the translator
-  (polarity- and atom-aware) and to verdict labeling (§2.0). The
-  Python REPL's `:synth` prints a pointer to the Haskell implementation
-  rather than growing its own host.
+  (polarity- and atom-aware) and to verdict labeling (§2.0).
 - **Phase 2 — local and query-wide non-recursive inductives (M/L,
   implemented).** Treat
   non-recursive, non-dependent inductives and structures as generalized
@@ -587,8 +582,9 @@ Design rules, all inherited from Djex:
   advance the provider world and clear its cache. Generated `it1`, `it2`,
   … declarations cannot become providers, so appending or undoing one
   deliberately preserves the current generation and its inventories. A
-  persistent Mathlib-scale index, transitive relevance across unrelated
-  namespaces, and user/core/Mathlib ratings are still future work.
+  persistent Mathlib-scale index and transitive relevance across unrelated
+  namespaces are still future work; curated core ratings and project-local
+  `leant.ratings` overrides are implemented.
 
   The separate synthesis environment uses the same history boundary but
   avoids replaying a growing session from scratch: an exact history match
@@ -707,9 +703,6 @@ Design rules, all inherited from Djex:
   package (and to its GHC version). Mitigation: the narrow engine
   boundary keeps Djex swappable for a small purpose-built LJT module
   later, without REPL-layer changes.
-- **Haskell-only**: Python Leant users must switch binaries for this
-  feature — an accepted asymmetry (see §2.3); the two implementations
-  now have distinct strengths instead of being mirrors.
 
 ## 6. Recommendation
 
@@ -730,8 +723,8 @@ ordered penalties keep an 80-provider query useful, and one-layer
 recursive elimination composes with library reuse. A bounded semantic
 LRU now removes repeated inventory round-trips without changing startup
 discipline, and synthesis-history appends replay only their suffix. The
-next phase-3 work should measure those latency gains, improve relevance
-beyond a single target root, and expose stable user ratings.
+next phase-3 work should measure those latency gains and improve relevance
+beyond a single target root; stable project-local ratings are already exposed.
 
 ## 7. Post-phase-2 proposals
 
@@ -1088,6 +1081,112 @@ identity transport under standalone Exference and Djinn, plus native Djinn
 construction of an impredicative payload through two independent recursive
 SCCs. The implementation contract is recorded in the
 [2026-08-01 recursive-family report](reports/2026-08-01-query-wide-recursive-family-identity.md).
+
+### J. Library premises for recursive inductives — M, phase-3 in miniature (implemented)
+
+Item D gave recursive inductives their introduction rules; this gives
+them their library. The serializer keeps a small curated table
+(`List.map`, `List.foldr`, `List.append`, `List.flatten`/`List.join`,
+`Nat.add`); when the goal mentions the matching inductive, each entry
+is instantiated at the goal's own types — the sort-typed locals plus
+the occurrences' element types — and offered as a premise
+(`(prem "List.map" TYPE)` entries after the goal S-expression). The
+instantiation is *syntactic* (fresh level metavariables, direct
+substitution, no unification): an auto-implicit goal variable lives at
+a rigid `Sort u` that a typechecked instantiation could never meet,
+yet the candidate that uses the premise re-elaborates against the
+pretty-printed goal, where auto-implicits are flexible again —
+verification is the arbiter, as always. The driver filters the offers
+(in-fragment; no recursive inductive the goal does not itself mention;
+type-level dedup so `flatten`/`join` cost one premise; capped at 8,
+exact goal match first).
+
+Two searches run and merge. The base search is untouched — same
+constructor premises, no budget, so verdicts and their soundness are
+exactly as before. The library search strips the recursive occurrences
+to plain atoms and adds the library premises under a choice-point
+budget: with nil/cons in play the engine floods any candidate window
+with closed junk terms (`List.nil` inhabits every `List` goal) before
+enumerating a proof that uses the goal's arguments, whereas over
+sealed atoms every candidate must route through a hypothesis or an
+offered function. Library candidates display first; negative verdicts
+come only from the base run. `:set synth-library on|off` toggles the
+whole mechanism.
+
+Landing this exposed a latent premise-scoping bug worth recording:
+premises used to be prepended *outside* the goal's leading quantifier
+prefix, so on an explicit-`∀` goal a premise mentioning a quantified
+variable never connected to the bound occurrences — which is why
+`:synth (∀ a : Type, a → List a)` produced only `List.nil` while the
+auto-implicit spelling also found `List.cons x List.nil`. Premise
+antecedents now sit under the prefix (capture by the goal's binders is
+precisely the intent), fixing item D's promise for explicit binders
+too.
+
+The curated table is deliberately the smallest thing that delivers
+the phase-3 flagship examples (`List.map` from its type, `List.foldr`
+as bounded elimination, `List.flatten`); growing it toward the
+browse-env inventory with a ratings file remains phase 3 proper, and
+the offer/filter/verify pipeline built here is the interface that
+growth will reuse.
+
+### K. Ratings inventory and argument-first enumeration — M (implemented)
+
+Item J's curated table grown toward the phase-3 design, in two halves.
+
+**The inventory.** The hardcoded `(inductive, function, arity)` table
+became a rated name list: `defaultRatings` ships ~17 core `List`/`Nat`
+functions in Djex's `*.ratings` format (lower is better; ≥ 100
+disables), a project `leant.ratings` (lines of `Name Rating`, `#`
+comments) merges over it at startup, and the merged names compile into
+the synthesis prelude. Arity (leading sort-typed binders) and
+subject relevance (used constants ∩ the goal's recursive inductives)
+are derived from each constant's type at premise time, so growing the
+inventory is editing a list, not writing code. Ratings order the
+offers: they decide which instantiations survive the cap and — because
+the engine now consults antecedents oldest-first — which the search
+reaches for first. `List.head?` was tried and rated out: an
+Option-valued codomain expands into case analysis and floods the batch
+with match junk.
+
+**The enumeration.** Measured on modeled List goals, the previous
+enumeration never produced an argument-using proof within the first
+300 candidates once introduction premises were present — nil-composite
+junk saturated any window, so no ranking downstream could save the
+`List.flatten x` sitting beyond it. Two measured non-fixes are worth
+recording: the `Interleave` fair strategy still drowned (the junk tree
+is bushy on both sides of every choice point), and deferring
+implication application (index-first `reduceAtomicImp`) just moved the
+cascade to atom arrival. The actual levers were arrival order, in both
+repositories:
+
+- *Djex* (`Consult LJT antecedent evidence oldest-first`): atom
+  proofs, atom-implication buckets, and nested implications were all
+  stored newest-first, so every choice point reached for the most
+  recently *derived* evidence — freshly composed junk before the
+  goal's own arguments and named premises. All three now store
+  oldest-first; search space and completeness are untouched, only
+  enumeration order moves. (One Djex test pinned a choice budget tuned
+  to the old order and was recalibrated.)
+- *Leant* (engine boundary): premises now enter the engine goal at the
+  innermost point of the binder spine — after the goal's own arrows,
+  not just under its quantifier prefix — so the goal's arguments are
+  the oldest atoms in scope when the premises arrive. The renderer
+  strips the premise binders from their new position behind the
+  goal-arrow lambdas.
+
+Together: `fun f x => List.map f x`, `fun x => List.flatten x`,
+`fun x => List.length x`, `fun x y => List.replicate x y` are now the
+*first* candidates of their queries, with the constructor-junk
+candidates ranked behind or out of the window entirely. Known residual:
+a premise's use of a *second* distinct argument of the same type
+(`List.append x y` on `List a → List a → List a`) still sits behind
+the first argument's exhaustive subtree and misses the candidate
+window; the displayed candidates remain honest (`fun x _ => x` is the
+smallest inhabitant, and `List.append x x` shows the function), but
+surfacing the mixed-argument application likely needs a
+distinct-arguments preference at the engine's atom choice points —
+future work.
 
 ### Explicitly not proposed
 

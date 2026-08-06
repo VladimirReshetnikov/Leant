@@ -3,15 +3,16 @@
 
 -- | leant - a GHCi-style interactive REPL for Lean 4.
 --
--- Haskell port of Tools/LeantPy/leant.py. The Haskeline loop follows the
--- structure of the Djex REPL driver (interrupt-safe step function, logical
--- multi-line input, command completion).
+-- The Haskeline loop follows the structure of the Djex REPL driver
+-- (interrupt-safe step function, logical multi-line input, command
+-- completion).
 module Main (main) where
 
 import Control.Exception (SomeException, evaluate, finally, try)
 import Control.Monad (forM_, unless, when)
 import Control.Monad.IO.Class (liftIO)
-import Data.Char (isAlpha, isAlphaNum, isAscii, isDigit, isSpace, toLower)
+import Data.Char
+  (isAlpha, isAlphaNum, isAscii, isDigit, isLower, isSpace, isUpper, toLower)
 import Data.IORef
 import Data.List
   ( intercalate
@@ -19,10 +20,12 @@ import Data.List
   , isPrefixOf
   , isSuffixOf
   , nub
+  , nubBy
+  , sortOn
   , stripPrefix
   , tails
   )
-import Data.Maybe (fromMaybe, isJust)
+import Data.Maybe (fromMaybe, isJust, listToMaybe)
 import qualified Data.Set as Set
 import Data.Time.Clock (UTCTime, addUTCTime, diffUTCTime, getCurrentTime)
 import Data.Time.Format (defaultTimeLocale, formatTime)
@@ -83,6 +86,7 @@ import Leant.Session.Snapshot
 import Leant.Synth.Engine
   ( SynthEngine (..)
   , SynthOutcome (..)
+  , candidateWindow
   , forceOutcome
   , parseSynthEngine
   , providerStages
@@ -101,6 +105,8 @@ import Leant.Synth.Fragment
   , ProviderQuery
   , candidateVerificationProgram
   , fragProviderMayOpen
+  , fragHasDepth
+  , fragRecKeys
   , fragRefusal
   , fragUnsafeAtoms
   , glivenkoSplit
@@ -109,6 +115,7 @@ import Leant.Synth.Fragment
   , propAtoms
   , providerProgram
   , serializerProgram
+  , stripRecCtors
   , synthPrelude
   )
 import Leant.Synth.ProviderCache
@@ -247,6 +254,14 @@ data ReplState = ReplState
   , rsSynthClassical :: Bool
     -- ^ :set synth-classical on|off - offer classical candidates for
     -- constructively refuted goals
+  , rsSynthLibrary :: Bool
+    -- ^ :set synth-library on|off - seed the search with curated
+    -- library functions over the goal's recursive inductives
+  , rsRatings :: [(String, Double)]
+    -- ^ the library inventory with ratings (lower is better), best
+    -- first: the defaults merged with the project's `leant.ratings`
+    -- at startup.  Compiled into the synthesis prelude, so a
+    -- mid-session edit of the file takes effect next session
   , rsTimeout :: Maybe Int
   , rsColor :: Bool
   , rsInteractive :: Bool
@@ -295,6 +310,9 @@ invalidateDerivedEnvironments state = state
 data ProveState = ProveState
   { pvStmt :: Maybe String  -- ^ Nothing when resumed from a `sorry`
   , pvStack :: [(Integer, [String], Maybe String)]
+  , pvSuggestions :: [(Integer, Maybe String)]
+    -- ^ automatic tactic suggestions, cached by proof-state id; caching
+    -- failures too keeps :goals/:undo from repeating potentially costly search
   }
 
 type St = IORef ReplState
@@ -970,6 +988,7 @@ helpText = unlines
   , "  :browse! NAMESPACE       ...including compiler-generated auxiliaries"
   , "  :prove [PROP]            interactively prove PROP tactic by tactic"
   , "                           (no argument: resume the last `sorry`)"
+  , "                           suggests a verified next tactic automatically"
   , "  :doc NAME                show the documentation string of NAME"
   , "  :search TEXT             search declaration names (case-insensitive)"
   , "  :search? TYPE            proof search: what proves TYPE? (via exact?)"
@@ -978,6 +997,8 @@ helpText = unlines
   , "  :set synth-engine E      djinn (default) | exference | both"
   , "  :set synth-steps N       Exference step budget (default 4096)"
   , "  :set synth-classical B   classical candidates for refuted goals"
+  , "                           (on|off, default on)"
+  , "  :set synth-library B     library premises for recursive inductives"
   , "                           (on|off, default on)"
   , "  :set OPT VAL             set_option OPT VAL (persists in the session)"
   , "  :undo                    revert the last state-changing command"
@@ -998,7 +1019,8 @@ commandNames =
   [ ":help", ":quit", ":type", ":info", ":load", ":reload", ":import"
   , ":imports", ":browse", ":browse!", ":doc", ":prove", ":search", ":search?"
   , ":set", ":synth", ":undo", ":reset", ":history", ":env", ":time"
-  , ":transcript", ":timestamps", ":pickle", ":unpickle"
+  , ":transcript", ":timestamps", ":pickle", ":unpickle", ":goals"
+  , ":script", ":suggest", ":auto", ":qed", ":abort"
   ]
 
 -- Returns False when the REPL should exit.
@@ -1073,6 +1095,19 @@ dispatchCommand st line = do
           enabled <- rsSynthClassical <$> readIORef st
           emitLn st =<< cDim st
             ("synth classical: " ++ if enabled then "on" else "off")
+        ["synth-library", value]
+          | value `elem` ["on", "true"] -> do
+              modifyIORef' st (\s -> s { rsSynthLibrary = True })
+              emitLn st =<< cDim st "synth library: on"
+          | value `elem` ["off", "false"] -> do
+              modifyIORef' st (\s -> s { rsSynthLibrary = False })
+              emitLn st =<< cDim st "synth library: off"
+          | otherwise -> emitLn st =<< cRed st
+              "usage: :set synth-library on|off"
+        ["synth-library"] -> do
+          enabled <- rsSynthLibrary <$> readIORef st
+          emitLn st =<< cDim st
+            ("synth library: " ++ if enabled then "on" else "off")
         _ | null arg ->
               emitLn st =<< cRed st "usage: :set OPTION VALUE"
           | otherwise -> do
@@ -1562,7 +1597,8 @@ ensureSynthBase st = do
     pure (Right env)
 
   compilePrelude imported externalSnapshot = do
-    prelude <- runCmd st (Just imported) synthPrelude
+    names <- map fst . rsRatings <$> readIORef st
+    prelude <- runCmd st (Just imported) (synthPrelude names)
     case prelude of
       Left err -> pure (Left err)
       Right response
@@ -1910,7 +1946,6 @@ autoShapedTokens text = nub (go Nothing text)
             && prevChar /= Just '.'
             && not (qualifier rest)
       in [t | keep] ++ go (Just (last t)) rest
-  identChar c = isAlphaNum c || c == '_' || c == '\''
   autoShape (c : rest) = plainLetter c && all suffixChar rest
   autoShape [] = False
   plainLetter c =
@@ -1949,6 +1984,10 @@ synthGo' st args retriedVars goal parsed = do
   let fragment = pgFrag parsed
       engine = rsSynthEngine state
       refusal = fragRefusal fragment
+      libraryPremises
+        | rsSynthLibrary state =
+            selectLibraryPremises (rsRatings state) parsed
+        | otherwise = []
       -- A live value can inhabit an otherwise opaque atomic goal, but it
       -- cannot repair a structural translation that stopped at FDepth.
       discoverProviders = case refusal of
@@ -1961,20 +2000,40 @@ synthGo' st args retriedVars goal parsed = do
       -- that term out.  Atomic/provider-open refusals go straight to the
       -- provider lane because the baseline has no usable structure.
       structuralFirst = refusal == Nothing
+  debug <- lookupEnv "LEANT_SYNTH_DEBUG"
+  when (structuralFirst && isJust debug) $
+    forM_ libraryPremises $ \(name, premise) ->
+      emitLn st =<< cDim st
+        ("debug premise: " ++ name ++ " : " ++ show premise)
   limit <- synthTimeoutSeconds
   started <- getCurrentTime
   let deadline
         | limit <= 0 = Nothing
         | otherwise = Just (addUTCTime (fromIntegral limit) started)
-      runSynthesis checked laneEngine providers =
+      runSynthesis includeLibrary checked laneEngine providers =
         let groupLimit = synthVerificationWindow laneEngine
-            outcome = synthesizeWithProvidersSkipping
+            base = synthesizeWithProvidersSkipping
               laneEngine (rsSynthSteps state) checked providers fragment
+            -- Library premises are an isolated, deliberately budgeted
+            -- extension of the structural lane.  Their candidates lead the
+            -- unchanged base candidates, while only the base may contribute a
+            -- negative verdict.  Provider lanes remain separate so discovery
+            -- cannot crowd out either ordinary or library synthesis.
+            outcome
+              | includeLibrary && not (null libraryPremises) =
+                  mergeLibraryOutcomes base
+                    (synthesizeTuned laneEngine (rsSynthSteps state)
+                      (candidateWindow, Just 100000)
+                      [ (name, stripRecCtors premise)
+                      | (name, premise) <- libraryPremises
+                      ]
+                      (stripRecCtors fragment) fragment)
+              | otherwise = base
         in runEngineBefore groupLimit deadline outcome
   if structuralFirst
     then do
       let baselineLimit = synthVerificationWindow engine
-      baseline <- runSynthesis Set.empty engine []
+      baseline <- runSynthesis True Set.empty engine []
       case baseline of
         -- A provider inventory cannot repair an engine failure, and the two
         -- lanes share one wall-clock deadline.  Preserve the baseline
@@ -2000,7 +2059,7 @@ synthGo' st args retriedVars goal parsed = do
                   else pure []
               if null providers
                 then report baselineLimit (isJust checkedVariants) baseline
-                else runProviderLanes runSynthesis
+                else runProviderLanes (runSynthesis False)
                   (Set.fromList (maybe [] id checkedVariants))
                   (providerStages engine providers)
     else do
@@ -2012,7 +2071,7 @@ synthGo' st args retriedVars goal parsed = do
         Just reason
           | not (fragProviderMayOpen fragment && not (null providers)) ->
               emitLn st =<< cRed st ("out of fragment: " ++ reason)
-        _ -> runProviderLanes runSynthesis Set.empty
+        _ -> runProviderLanes (runSynthesis False) Set.empty
           (providerStages engine providers)
  where
   runProviderLanes runLane checked lanes = case lanes of
@@ -2167,6 +2226,127 @@ loadSynthProviders st query = do
     when (isJust debug) $
       emitLn st =<< cDim st ("provider inventory unavailable: " ++ reason)
     pure []
+
+-- | The default library inventory with ratings, Djex @*.ratings@ style:
+-- lower is better, and a rating of 100 or more disables an entry.  A
+-- project file @leant.ratings@ (lines of @Name Rating@, @#@ comments)
+-- merges over these at startup - override an entry to re-rank or
+-- disable it, add new names to grow the inventory toward the
+-- browse-env scale of SYNTHESIS_PROPOSAL.md phase 3.
+defaultRatings :: [(String, Double)]
+defaultRatings =
+  [ ("List.map", 1.0)
+  , ("List.append", 1.5)
+  , ("List.flatten", 1.5)
+  , ("List.foldr", 2.0)
+  , ("List.reverse", 2.0)
+  , ("List.length", 2.0)
+  , ("Nat.add", 2.0)
+  , ("List.replicate", 2.2)
+  , ("List.foldl", 2.5)
+  , ("List.flatMap", 2.5)
+  , ("List.join", 3.0)
+  , ("List.zip", 3.0)
+  , ("Nat.mul", 3.0)
+  , ("List.take", 3.2)
+  , ("List.drop", 3.2)
+  , ("List.zipWith", 3.4)
+  , ("List.filterMap", 3.5)
+  -- List.head? earned its exclusion: its Option-valued codomain
+  -- expands into case analysis and floods the batch with match junk
+  ]
+
+-- | The merged inventory, best rating first: defaults overlaid with the
+-- working directory's @leant.ratings@, entries rated out (>= 100) and
+-- names that could not splice into a Lean name literal dropped.
+loadRatings :: IO [(String, Double)]
+loadRatings = do
+  exists <- doesFileExist "leant.ratings"
+  user <- if not exists then pure [] else do
+    contents <- readFile "leant.ratings"
+    pure
+      [ (name, rating)
+      | line <- lines contents
+      , let payload = takeWhile (/= '#') line
+      , [name, ratingText] <- [words payload]
+      , (rating, "") <- reads ratingText
+      ]
+  let merged = foldl override defaultRatings user
+      override table (name, rating) =
+        (name, rating) : [entry | entry@(n, _) <- table, n /= name]
+  pure $ sortOn snd
+    [ entry
+    | entry@(name, rating) <- merged
+    , rating < 100
+    , not (null name)
+    , all nameChar name
+    ]
+ where
+  nameChar c = isAlphaNum c || c `elem` "_.'!?"
+
+-- | The serializer's library premises, filtered to the ones this goal
+-- can honestly use: in-fragment (no depth marker), and mentioning no
+-- recursive inductive the goal does not itself mention (an unknown
+-- occurrence would drag a fresh opaque atom and its constructor
+-- premises into the search).  Two functions with the same type at the
+-- offered instantiation (List.flatten and List.join, say) would only
+-- double the engine's work, so the type dedups, keeping the
+-- better-rated name (offers arrive in rating order).  Every premise
+-- multiplies the junk-proof space, so the survivors are capped, keeping
+-- first a premise whose type is exactly the goal (the type-directed
+-- library lookup answer) and then preferring the better rating, with
+-- small types - which apply directly rather than through invented
+-- arguments - breaking ties.  The order matters beyond the cap: the
+-- engine tries antecedents oldest-first, so the front of this list is
+-- the front of the search.
+selectLibraryPremises :: [(String, Double)] -> ParsedGoal -> [(String, Frag)]
+selectLibraryPremises ratings parsed = take 8 (sortOn rank offered)
+ where
+  goalKeys = fragRecKeys (pgFrag parsed)
+  offered = nubBy (\x y -> snd x == snd y)
+    [ prem
+    | prem@(_, frag) <- pgPrems parsed
+    , not (fragHasDepth frag)
+    , all (`elem` goalKeys) (fragRecKeys frag)
+    ]
+  rank (name, frag) =
+    ( frag /= pgFrag parsed
+    , fromMaybe 99 (lookup name ratings)
+    , fragSize frag
+    )
+  fragSize :: Frag -> Int
+  fragSize f = 1 + case f of
+    FArr a b -> fragSize a + fragSize b
+    FProd a b -> fragSize a + fragSize b
+    FSum a b -> fragSize a + fragSize b
+    FAll _ _ b -> fragSize b
+    _ -> 0
+
+-- | Combine the base search with the library-premise search: library
+-- candidates first (they use the goal's arguments through real library
+-- functions - the feature), the base run's other candidates after,
+-- and negative verdicts only from the base run (the library run is
+-- budgeted, so its negatives claim nothing).
+mergeLibraryOutcomes
+  :: Either String SynthOutcome -> Either String SynthOutcome
+  -> Either String SynthOutcome
+mergeLibraryOutcomes base lib = case (base, lib) of
+  (Left err, _) -> Left err
+  (_, Left err) -> Left err
+  (Right x, Right y) -> Right (merge x y)
+ where
+  merge x y = case (x, y) of
+    (SynthCandidates a na, SynthCandidates b nb) ->
+      SynthCandidates (b ++ filter (`notElem` b) a) (nub (na ++ nb))
+    (SynthCandidates a na, other) ->
+      SynthCandidates a (na ++ notesOf other)
+    (other, SynthCandidates b nb) ->
+      SynthCandidates b (notesOf other ++ nb)
+    (other, _) -> other
+  notesOf outcome = case outcome of
+    SynthCandidates _ notes -> notes
+    SynthNoTerm notes -> notes
+    SynthRefuted _ -> []
 
 -- | Run the pure engine under the wall-clock guard, forcing enough of
 -- the outcome that the whole search happens inside the guard (the
@@ -2635,7 +2815,11 @@ removeArtifactWithWarning st description path = do
 
 currentSynthesisCompanionABI :: String
 currentSynthesisCompanionABI =
-  synthesisToolingABI ("transport-environment-v1\n" ++ synthPrelude)
+  -- The companion is a clean Lean-equipped transport environment; the
+  -- current rated inventory is compiled after restore.  Hash the prelude's
+  -- inventory-independent shape so project-local rating changes do not make
+  -- an otherwise compatible snapshot stale.
+  synthesisToolingABI ("transport-environment-v1\n" ++ synthPrelude [])
 
 -- Read optional Leant metadata.  Invalid metadata never makes the main
 -- upstream snapshot unusable; it merely disables result-counter restoration
@@ -2749,7 +2933,8 @@ prepareSnapshotToolingEnvironment st = do
   case baseOr of
     Left err -> pure (Left err)
     Right base -> do
-      probeResult <- runCmd st (Just base) synthPrelude
+      let names = map fst (rsRatings state)
+      probeResult <- runCmd st (Just base) (synthPrelude names)
       case probeResult of
         Left err -> pure (Left err)
         Right response -> case checkedEnvironment
@@ -3019,6 +3204,7 @@ proveHelp = unlines
   , "  :goals             reprint the current goals"
   , "  :undo [N]          take back the last N tactics (default 1)"
   , "  :script            show the tactic script so far"
+  , "  :suggest           reprint Lean's suggested next tactic"
   , "  :auto              try common finishing tactics on the current goal"
   , "  :synth             synthesize terms for the goal, with the hypotheses"
   , "                     as premises (then `exact it1` records the step)"
@@ -3029,10 +3215,140 @@ proveHelp = unlines
   , ""
   , "Tip: `exact?`, `simp?`, `rw?` record the tactic they *found* in the"
   , "script, not the question mark form."
+  , "Automatic suggestions are advisory and never enter the script."
   ]
 
 autoTactics :: [String]
 autoTactics = ["rfl", "trivial", "decide", "simp", "omega", "exact?", "aesop"]
+
+-- Suggestion probes: quick certain finishers first, then structural progress
+-- steps shaped by the goal and its hypotheses, then broader searches. Each
+-- candidate is actually run against the current immutable proof state; a
+-- tactic is suggested only if Lean accepts it and returns a successor state.
+-- Unlike :auto, probing does not stop at the first accepted candidate: ones
+-- that merely advance the goal are remembered while the search keeps looking
+-- for one that closes it outright, and if no single tactic does, a second
+-- phase chains the finishers -- plus `simp_all`, with and without the
+-- definitions the goal mentions -- onto the remembered candidates
+-- (`t <;> finisher`) hunting for a complete proof.
+-- `apply?` is deliberately absent: its partial `refine ?_` suggestions are
+-- rarely actionable, and probing it over the proof-state protocol can panic
+-- the REPL backend (a UTF-8 slicing bug in repl v1.3.18), destroying every
+-- live proof state.
+-- `assumption` and `contradiction` sit before `trivial`, which subsumes
+-- both, so the more informative name is the one that gets shown.
+suggestionFinishers :: [String]
+suggestionFinishers =
+  ["rfl", "assumption", "contradiction", "trivial", "decide", "omega"]
+
+-- | Build the ordered candidate list for one pretty-printed goal. Shape
+-- analysis only picks which candidates are worth probing -- `left`/`right`
+-- instead of `constructor` on a disjunction goal, `cases`/`obtain` on a
+-- hypothesis whose type a single step can take apart, `induction` on a
+-- data-typed variable the target mentions, `simp_all?` only when there are
+-- hypotheses to use -- so a mis-parse costs a wasted probe, never a wrong
+-- suggestion.
+goalCandidates :: String -> [String]
+goalCandidates g = concat
+  [ suggestionFinishers
+  , ["exact?"]
+  , introCands
+  , destructCands  -- take hypotheses apart before building the goal
+  , splitCands
+  , inductionCands
+  , ["simp?"]
+  , ["simp_all?" | not (null hyps)]
+  , ["aesop?"]
+  ]
+ where
+  hyps = goalHypGroups g
+  used = concatMap fst hyps
+  targetIdents = maybe [] (identSplit . fst) (goalTarget g)
+  -- `intro` names the binders it would introduce when the goal's shape
+  -- allows it, keeping the bare form as a fallback should Lean reject them
+  introCands = case introNames g of
+    Just names -> ["intro " ++ unwords names, "intro"]
+    Nothing -> ["intro"]
+  splitCands
+    | (typeConnective . fst =<< goalTarget g) == Just '\8744' =
+        ["left", "right"]
+    | otherwise = ["constructor"]
+  destructCands = take 2
+    [ cand
+    | (name : _, ty) <- hyps
+    , Just cand <- [destructFor name ty]
+    ]
+  destructFor name ty = case typeConnective ty of
+    Just '\8744' -> Just ("cases " ++ name)                        -- h : a ∨ b
+    Just '\8707' -> Just (obtainWith (freshX : take 1 freshHs) name)
+    Just c | c `elem` "\8743\8596" ->                              -- ∧ and ↔
+      Just (obtainWith (take 2 freshHs) name)
+    Nothing | trim ty == "Bool" -> Just ("cases " ++ name)
+    _ -> Nothing
+  obtainWith fields name =
+    "obtain \10216" ++ intercalate ", " fields ++ "\10217 := " ++ name
+  -- A variable of a data type (`n : Nat`, `l : List Nat`, a user inductive)
+  -- that the target actually mentions is a candidate for induction. The
+  -- head-constant test only needs to rule out shapes induction cannot help
+  -- with -- sorts, `Bool` (destructFor's `cases` already covers it), and
+  -- anything with a logical connective on top; a data-looking hypothesis
+  -- whose type is not really inductive just wastes the probe.
+  inductionCands = take 1
+    [ "induction " ++ name
+    | (names, ty) <- hyps
+    , isInductionTy ty
+    , name <- names
+    , name `elem` targetIdents
+    ]
+  isInductionTy ty =
+    typeConnective ty == Nothing
+    && case words (trim ty) of
+         hd@(c0 : _) : _ ->
+           isUpper c0 && hd `notElem` ["Bool", "Prop", "Type", "Sort"]
+         _ -> False
+  freshHs = [n | n <- "h" : ["h" ++ show i | i <- [1 :: Int ..]]
+               , n `notElem` used]
+  freshX = fromMaybe "x" $ listToMaybe
+    [n | n <- ["x", "y", "z"] ++ ["x" ++ show i | i <- [1 :: Int ..]]
+       , n `notElem` used]
+
+-- | Hypothesis groups of a pretty-printed goal as (names, type) pairs, with
+-- wrapped continuation lines rejoined. Groups with inaccessible (\10013) or
+-- otherwise unusable names are dropped.
+goalHypGroups :: String -> [([String], String)]
+goalHypGroups g =
+  [ (names, trim (intercalate ":" tyParts))
+  | grp <- joinWrapped hypLines
+  , not ("case " `isPrefixOf` grp)
+  , namesPart : tyParts@(_ : _) <- [splitDepth0 ':' grp]
+  , names@(_ : _) <- [words namesPart]
+  , all usable names
+  ]
+ where
+  (hypLines, _) = break ("\8866" `isPrefixOf`) (lines g)
+  joinWrapped [] = []
+  joinWrapped (l : ls) =
+    let (conts, rest) = span indented ls
+    in unwords (concatMap words (l : conts)) : joinWrapped rest
+  indented (c : _) = isSpace c
+  indented [] = True
+  usable n = not (any (`elem` "()[]{},:\10013\8866\10216\10217") n)
+
+-- | The top-level connective of a pretty-printed type, approximated by
+-- Lean's precedence order: a leading binder, else the loosest depth-0
+-- connective (\8594, then \8596, \8744, \8743). Only an approximation --
+-- callers verify every derived candidate against the live proof state.
+typeConnective :: String -> Maybe Char
+typeConnective t0 = case dropWhile isSpace t0 of
+  "" -> Nothing
+  t@(c : _)
+    | c `elem` "\8704\8707" -> Just c
+    | otherwise -> listToMaybe [op | op <- "\8594\8596\8744\8743", depth0 op t]
+ where
+  depth0 op s = length (splitDepth0 op s) > 1
+
+suggestionHeartbeatLimit :: Int
+suggestionHeartbeatLimit = 20000
 
 respGoals :: JValue -> [String]
 respGoals v = fromMaybe [] $ do
@@ -3081,6 +3397,310 @@ parseTryThis messages = listToMaybe'
 proveScript :: ProveState -> [String]
 proveScript pv = reverse [e | (_, _, Just e) <- pvStack pv]
 
+-- Depth-aware scanning of pretty-printed goal text ---------------------------
+
+bracketDepthStep :: Int -> Char -> Int
+bracketDepthStep d c
+  | c `elem` "([{\10216\10627" = d + 1          -- ( [ { \10216 \10627
+  | c `elem` ")]}\10217\10628" = max 0 (d - 1)
+  | otherwise = d
+
+-- Split at occurrences of a character that sit outside every bracket pair.
+splitDepth0 :: Char -> String -> [String]
+splitDepth0 sep = go 0 ""
+ where
+  go _ acc [] = [reverse acc]
+  go d acc (c : rest)
+    | d == 0 && c == sep = reverse acc : go 0 "" rest
+    | otherwise = go (bracketDepthStep d c) (c : acc) rest
+
+-- | Maximal identifier-character runs of pretty-printed Lean text. The
+-- namespace/projection dot is a separator, so @l.length@ yields both @l@
+-- and @length@ -- the right reading for "does the target mention this
+-- variable" checks.
+identSplit :: String -> [String]
+identSplit s = case dropWhile (not . identChar) s of
+  "" -> []
+  s' -> let (tok, rest) = span identChar s' in tok : identSplit rest
+
+identChar :: Char -> Bool
+identChar c = isAlphaNum c || c `elem` "_'"
+
+-- | Tokens of the goal target that plausibly name definitions the goal is
+-- about, for `simp_all [f]` chain candidates that unfold them: lowercase-
+-- initial, not qualified or projected (no dot keeps @l.length@ and
+-- @List.length@ out), and bound neither by a hypothesis nor by a binder
+-- inside the target itself. A false positive costs one rejected probe.
+goalDefNames :: String -> [String]
+goalDefNames g = case goalTarget g of
+  Nothing -> []
+  Just (target, _) ->
+    take 2 $ nub
+      [ tok
+      | tok@(c0 : _) <- dotted target
+      , isLower c0
+      , tok `notElem` concatMap fst (goalHypGroups g)
+      , tok `notElem` binderBound target
+      , tok `notElem` ["fun", "if", "then", "else", "match", "with", "let",
+                       "do", "by", "at", "in", "have", "show", "this"]
+      ]
+ where
+  dotted = filter (all (/= '.')) . tokens
+  tokens s = case dropWhile (not . dottedChar) s of
+    "" -> []
+    s' -> let (tok, rest) = span dottedChar s' in tok : tokens rest
+  dottedChar c = identChar c || c == '.'
+  -- names bound by a \8704/\8707/\955/`fun` binder: everything between the
+  -- binder head and its depth-0 `,` or `=>` (types in the group included --
+  -- they are capitalized or rebound elsewhere, so over-excluding is safe)
+  binderBound = goB '\0'
+   where
+    goB _ [] = []
+    goB prev s@(c : rest)
+      | c `elem` "\8704\8707\955" = takeGroup rest
+      | not (identChar prev)
+      , Just r <- stripPrefix "fun" s
+      , maybe True (not . identChar) (listToMaybe r) = takeGroup r
+      | otherwise = goB c rest
+    takeGroup s =
+      let (grp, rest) = breakGroupEnd 0 s
+      in identSplit grp ++ goB '\0' rest
+    breakGroupEnd d s = case s of
+      [] -> ("", "")
+      ',' : rest | d == 0 -> ("", rest)
+      '=' : '>' : rest | d == 0 -> ("", rest)
+      '\8614' : rest | d == 0 -> ("", rest)
+      c : rest ->
+        let (grp, rest') = breakGroupEnd (bracketDepthStep d c) rest
+        in (c : grp, rest')
+
+-- | Name the binders a bare `intro` would introduce, from the pretty-printed
+-- goal: leading \8704 binder groups contribute their own names, then each
+-- depth-0 arrow of the body -- and a bare \172 conclusion, which intro also
+-- unfolds -- contributes a fresh hypothesis name. The result is only shown
+-- after Lean accepts it against the live proof state, so a mis-parse costs
+-- one wasted probe, never a wrong suggestion.
+introNames :: String -> Maybe [String]
+introNames goal = do
+  target <- case targetLines of
+    [] -> Nothing
+    t : more -> Just (unwords (concatMap words (drop 1 t : more)))
+  (binders, body) <- case target of
+    '\8704' : rest -> parseBinders (dropWhile isSpace rest) []
+    _ -> Just ([], target)
+  -- count arrows only up to the first depth-0 \8704 of the body; anything
+  -- beyond it belongs to a nested quantifier with its own binder names
+  let (cutSegments, wasCut) = case splitDepth0 '\8704' body of
+        prefix : _ : _ -> (splitDepth0 '\8594' prefix, True)
+        _ -> (splitDepth0 '\8594' body, False)
+      arrows = length cutSegments - 1
+      negBonus = if not wasCut && bareNegation (last cutSegments) then 1 else 0
+      used = hypNames ++ binders
+      fresh = take (arrows + negBonus)
+        [n | n <- "h" : ["h" ++ show i | i <- [1 :: Int ..]], n `notElem` used]
+      names = binders ++ fresh
+  if null names then Nothing else Just names
+ where
+  (hypLines, targetLines) = break ("\8866" `isPrefixOf`) (lines goal)
+  -- wrapped hypothesis and target lines are indented continuations
+  hypNames = concat
+    [ words namesPart
+    | l@(c0 : _) <- hypLines
+    , not ("case " `isPrefixOf` l), not (isSpace c0)
+    , namesPart : _ : _ <- [splitDepth0 ':' l]
+    ]
+  parseBinders s acc = case dropWhile isSpace s of
+    ',' : rest -> Just (reverse acc, dropWhile isSpace rest)
+    '(' : rest -> do
+      (content, rest') <- balancedParen (1 :: Int) "" rest
+      namesPart <- case splitDepth0 ':' content of
+        np : _ : _ -> Just np
+        _ -> Nothing
+      names <- traverse checkName (words namesPart)
+      if null names then Nothing else parseBinders rest' (reverse names ++ acc)
+    "" -> Nothing
+    s'@(c0 : _)
+      -- implicit/instance groups: bare `intro` still introduces them, but
+      -- suggesting explicit names for them is more confusing than helpful
+      | c0 `elem` "{[\10627" -> Nothing
+      | otherwise -> do
+          let (tok, rest') = break (\c -> isSpace c || c == ',') s'
+          name <- checkName tok
+          parseBinders rest' (name : acc)
+  balancedParen depth acc str = case str of
+    [] -> Nothing
+    ')' : rest
+      | depth == 1 -> Just (reverse acc, rest)
+      | otherwise -> balancedParen (depth - 1) (')' : acc) rest
+    '(' : rest -> balancedParen (depth + 1) ('(' : acc) rest
+    c : rest -> balancedParen depth (c : acc) rest
+  checkName tok
+    | null tok = Nothing
+    | any (`elem` "()[]{},:\10013\8866\10216\10217") tok = Nothing
+    | otherwise = Just tok
+  bareNegation seg =
+    case filter (not . null) (splitDepth0 ' ' (trim seg)) of
+      [tok] -> "\172" `isPrefixOf` tok
+      _ -> False
+
+annotateSuggestion :: String -> String -> String
+annotateSuggestion note text = case lines text of
+  [] -> text
+  first : rest -> intercalate "\n" ((first ++ "  (" ++ note ++ ")") : rest)
+
+emitSuggestion :: St -> String -> IO ()
+emitSuggestion st suggestion = case lines suggestion of
+  [] -> pure ()
+  first : rest -> do
+    emitLn st =<< cDim st ("suggestion: " ++ first)
+    forM_ rest $ \line -> emitLn st =<< cDim st ("            " ++ line)
+
+-- | Find and display a useful next tactic without changing the user's proof
+-- stack. The backend proof-state protocol is persistent, so speculative
+-- children do not affect the state to which the next user tactic is applied.
+-- Candidates that merely make progress are remembered (up to three) while
+-- the search keeps looking for one that closes the goal; if none does, a
+-- second phase chains the quick finishers onto each remembered candidate
+-- (`t <;> finisher`) so the suggestion can still be a complete verified
+-- proof. The annotation on the shown suggestion says which kind it is.
+suggestTactic :: St -> IO ()
+suggestTactic st = do
+  state <- readIORef st
+  case rsProve state of
+    Just pv | (ps, goals@(g : _), _) : _ <- pvStack pv ->
+      case lookup ps (pvSuggestions pv) of
+        Just cached -> forM_ cached (emitSuggestion st)
+        Nothing ->
+          probe ps (length goals) (chainExtras g) (goalCandidates g) []
+    _ -> pure ()
+ where
+  -- Chain finishers beyond the quick certain ones: `simp_all` can use the
+  -- case hypotheses an `induction` or `cases` step introduces, and when
+  -- the target mentions definitions, `simp_all [f]` unfolds them -- the
+  -- move that closes `induction l <;> simp_all [myLen]` proofs. Probed
+  -- after `exact?` so an informative found term still wins over a
+  -- sledgehammer when both close the goal.
+  chainExtras g =
+    "simp_all" : ["simp_all [" ++ d ++ "]" | d <- goalDefNames g]
+  -- Run one heartbeat-bounded candidate against the immutable proof state.
+  -- The bound keeps proactive help responsive even when a project has a very
+  -- large premise database. A heartbeat exhaustion is an ordinary tactic
+  -- error, unlike the REPL's wall-clock timeout, so it does not kill the
+  -- backend or invalidate the user's proof state. Returns Nothing when the
+  -- backend died (the emergency exit has already run), Just Nothing when
+  -- Lean rejected the candidate.
+  probeOnce :: Integer -> String -> IO (Maybe (Maybe JValue))
+  probeOnce ps tactic = do
+    let bounded = "set_option maxHeartbeats "
+          ++ show suggestionHeartbeatLimit ++ " in " ++ tactic
+    result <- runTactic st ps bounded
+    case result of
+      Left err -> Nothing <$ proveEmergencyExit st
+        ("the backend failed while suggesting a tactic: " ++ err)
+      Right v
+        | Nothing <- respFatal v
+        , null [() | (severity, _) <- respMessages v, severity == "error"]
+        , Just _ <- respProofState v -> pure (Just (Just v))
+        | otherwise -> pure (Just Nothing)
+
+  probe ps nGoals extras [] helds = chainPhase ps nGoals extras helds
+  probe ps nGoals extras ("intro" : rest) helds
+    | any (("intro " `isPrefixOf`) . fst) helds =
+        probe ps nGoals extras rest helds  -- the named intro variant held
+  probe ps nGoals extras (tactic : rest) helds = do
+    outcome <- probeOnce ps tactic
+    case outcome of
+      Nothing -> pure ()
+      Just Nothing -> probe ps nGoals extras rest helds
+      Just (Just v) -> do
+        let text = fromMaybe tactic (parseTryThis (respMessages v))
+            remaining = length (respGoals v)
+            -- library-search tactics can "close" the probe state with
+            -- metavariables and say so in a Remaining-subgoals comment;
+            -- never present those as closing the goal
+            partial = any (("-- Remaining subgoals:" `isPrefixOf`) . trim)
+              (lines text)
+        if remaining < nGoals && not partial
+          then conclude ps (Just (annotateSuggestion "closes the goal" text))
+          else probe ps nGoals extras rest $ if length helds >= 3 then helds
+            else helds ++ [(text, if remaining > nGoals
+                   then Just ("splits into "
+                     ++ show (remaining - nGoals + 1) ++ " goals")
+                   else Nothing)]
+
+  -- No single candidate closed the goal: try to discharge each remembered
+  -- candidate's residual subgoals in one more step. `<;>` (rather than `;`)
+  -- makes the finisher run on every subgoal the candidate produces, so
+  -- acceptance means the chain is a complete proof of the current goal.
+  -- `exact?` is only chained onto the first candidate to bound the cost of
+  -- the expensive library searches; the `simp_all` extras come after it so
+  -- an informative found term beats a sledgehammer. A candidate whose text
+  -- spans lines is never chained, since composing it would not yield a
+  -- tactic the user could type back. If no chain closes either, the first
+  -- remembered candidate is shown with its own annotation.
+  chainPhase ps _ _ [] = conclude ps Nothing
+  chainPhase ps nGoals extras helds@(first : _) =
+    goHeld (zip (True : repeat False) helds)
+   where
+    fallback = conclude ps (Just (annotateHeld first))
+    goHeld [] = fallback
+    goHeld ((isFirst, (text, _)) : more)
+      | '\n' `elem` text = goHeld more
+      | otherwise = goChain text
+          (suggestionFinishers ++ ["exact?" | isFirst] ++ extras) more
+    goChain _ [] more = goHeld more
+    goChain text (fin : rest) more = do
+      outcome <- probeOnce ps (text ++ " <;> " ++ fin)
+      case outcome of
+        Nothing -> pure ()
+        Just (Just v)
+          | length (respGoals v) < nGoals
+          , Just chained <- renderChain text fin v ->
+              conclude ps (Just (annotateSuggestion "closes the goal" chained))
+          -- a simp_all link that was accepted without closing may have
+          -- rewritten the residual goals into omega's arithmetic reach
+          -- (`induction n <;> simp_all [f] <;> omega`); one extension probe
+          | "simp_all" `isPrefixOf` fin -> do
+              let fin' = fin ++ " <;> omega"
+              outcome' <- probeOnce ps (text ++ " <;> " ++ fin')
+              case outcome' of
+                Nothing -> pure ()
+                Just (Just v') | length (respGoals v') < nGoals ->
+                  conclude ps $ Just $ annotateSuggestion "closes the goal"
+                    (text ++ " <;> " ++ fin')
+                Just _ -> goChain text rest more
+        Just _ -> goChain text rest more
+    -- The chained text must be something the user can type back verbatim.
+    -- A literal finisher composes trivially; `exact?` has to splice in the
+    -- term it found, which is only sound when the chain ran it against
+    -- exactly one subgoal (one Try-this message) and the found tactic fits
+    -- on one line (a Remaining-subgoals comment never does).
+    renderChain text "exact?" v = case
+      [ d | (sev, d) <- respMessages v, sev == "info"
+          , "Try this:" `isPrefixOf` dropWhile isSpace d ] of
+      [only] | Just found <- parseTryThis [("info", only)]
+             , '\n' `notElem` found ->
+        Just (text ++ " <;> " ++ found)
+      _ -> Nothing
+    renderChain text fin _ = Just (text ++ " <;> " ++ fin)
+
+  annotateHeld (text, note) = maybe text (`annotateSuggestion` text) note
+
+  conclude ps suggestion = do
+    cache ps suggestion
+    forM_ suggestion (emitSuggestion st)
+
+  cache ps suggestion = modifyIORef' st $ \s -> s
+    { rsProve = case rsProve s of
+        Just pv
+          | (currentPs, _, _) : _ <- pvStack pv
+          , currentPs == ps -> Just pv
+              { pvSuggestions = (ps, suggestion) : pvSuggestions pv }
+        -- The proof state can only change here through an emergency exit, but
+        -- preserve a newer state defensively rather than restoring old data.
+        newer -> newer
+    }
+
 proveEmergencyExit :: St -> String -> IO ()
 proveEmergencyExit st why = do
   state <- readIORef st
@@ -3112,7 +3732,7 @@ cmdProve st rawArg = do
               case respSorries v of
                 ((Just ps, goal) : _) | null errs -> do
                   modifyIORef' st (\s -> s { rsProve = Just (ProveState
-                    (Just arg) [(ps, [goal], Nothing)]) })
+                    (Just arg) [(ps, [goal], Nothing)] []) })
                   pure True
                 _ -> do
                   forM_ errs $ \e ->
@@ -3123,7 +3743,7 @@ cmdProve st rawArg = do
         else case rsLastSorry state of
           Just (ps, goal) -> do
             modifyIORef' st (\s -> s { rsProve = Just (ProveState
-              Nothing [(ps, [goal], Nothing)]) })
+              Nothing [(ps, [goal], Nothing)] []) })
             emitLn st =<< cDim st
               ("resuming from the last `sorry` \8212 on :qed the script is "
                ++ "printed for you to paste")
@@ -3138,6 +3758,7 @@ cmdProve st rawArg = do
           case pvStack pv of
             (_, goals, _) : _ -> formatGoals st goals
             [] -> pure ()
+        suggestTactic st
 
 -- Apply one tactic; returns True if the proof state advanced.
 applyTactic :: St -> Bool -> String -> IO Bool
@@ -3204,14 +3825,19 @@ proveInput st text = do
       case word of
         w | w `elem` ["q", "quit", "exit"] -> pure False
         w | w `elem` ["h", "help", "?"] -> True <$ emit st proveHelp
-        "goals" -> True <$ (formatGoals st =<< currentGoals st)
+        "goals" -> do
+          formatGoals st =<< currentGoals st
+          suggestTactic st
+          pure True
         "undo" -> do
           let n = if all (`elem` "0123456789") arg && not (null arg)
                 then read arg else 1 :: Int
           popped <- popTactics n
           if popped == 0
             then emitLn st =<< cRed st "nothing to undo"
-            else formatGoals st =<< currentGoals st
+            else do
+              formatGoals st =<< currentGoals st
+              suggestTactic st
           pure True
         "script" -> do
           state <- readIORef st
@@ -3220,6 +3846,7 @@ proveInput st text = do
               mapM_ (emitLn st) script
             _ -> emitLn st =<< cDim st "(no tactics yet)"
           pure True
+        "suggest" -> True <$ suggestTactic st
         "auto" -> True <$ cmdAuto st
         "synth" -> True <$ cmdSynth st arg
         "qed" -> True <$ cmdQed st arg
@@ -3237,7 +3864,7 @@ proveInput st text = do
         _ -> do
           emitLn st =<< cRed st ("no :" ++ word ++ " inside prove mode \8212 "
             ++ "tactics, :goals, :undo, :script, :auto, :synth, :qed, "
-            ++ ":abort, :quit")
+            ++ ":suggest, :abort, :quit")
           pure True
     else do
       state <- readIORef st
@@ -3246,8 +3873,9 @@ proveInput st text = do
       when advanced $ do
         goals <- currentGoals st
         formatGoals st goals
-        when (null goals) $
-          emitLn st =<< cDim st "finish with :qed [NAME], inspect with :script"
+        if null goals
+          then emitLn st =<< cDim st "finish with :qed [NAME], inspect with :script"
+          else suggestTactic st
       pure True
  where
   popTactics :: Int -> IO Int
@@ -3289,8 +3917,9 @@ cmdAuto st = do
                 ++ intercalate ", " (tried ++ [tac]) ++ ")")
               emitLn st (closed ++ note)
               formatGoals st goals
-              when (null goals) $
-                emitLn st =<< cDim st "finish with :qed [NAME]"
+              if null goals
+                then emitLn st =<< cDim st "finish with :qed [NAME]"
+                else suggestTactic st
             else do
               -- advanced without closing a goal: take it back
               modifyIORef' st $ \s -> s { rsProve = case rsProve s of
@@ -3585,8 +4214,7 @@ run opts = do
   case replExe of
     Nothing -> do
       putStrLn "error: could not find the Lean REPL backend executable."
-      putStrLn "Build it once via the Python sibling (Tools/LeantPy), or pass"
-      putStrLn "--repl-exe / set LEANT_BACKEND to a repl.exe built from"
+      putStrLn "Pass --repl-exe / set LEANT_BACKEND to a repl.exe built from"
       putStrLn "https://github.com/leanprover-community/repl for your toolchain."
       exitWith (ExitFailure 1)
     Just exe0 -> do
@@ -3615,6 +4243,7 @@ run opts = do
             , bcReplExe = exe
             , bcWorkingDir = workingDir
             }
+      ratings <- loadRatings
       st <- newIORef ReplState
         { rsBackend = Nothing
         , rsConfig = config
@@ -3644,6 +4273,8 @@ run opts = do
         , rsSynthEngine = EngineDjinn
         , rsSynthSteps = 4096
         , rsSynthClassical = True
+        , rsSynthLibrary = True
+        , rsRatings = ratings
         , rsTimeout = if optTimeout opts <= 0 then Nothing
             else Just (optTimeout opts)
         , rsColor = useColor

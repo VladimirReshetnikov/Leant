@@ -81,8 +81,8 @@ data RequestError
 
 -- Discovery -----------------------------------------------------------------
 
--- | Locate the repl executable built by LeanInteract (the Python sibling of
--- this tool), or honor the LEANT_BACKEND environment variable.
+-- | Locate a repl executable from a LeanInteract cache on this machine, or
+-- honor the LEANT_BACKEND environment variable.
 --
 -- The cache layout is
 --   <site-packages>/lean_interact/cache/<owner>/repl/<rev>/.lake/build/bin/repl.exe
@@ -143,7 +143,7 @@ findBackendProject executable = do
     (ancestorDirectories $ takeDirectory resolved)
 
 -- | Nearest enclosing Lake project that has been built, falling back to the
--- nearest project of any kind (port of the Python find_project).
+-- nearest project of any kind.
 findProject :: IO (Maybe FilePath)
 findProject = do
   currentDirectory <- getCurrentDirectory

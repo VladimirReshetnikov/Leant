@@ -307,20 +307,20 @@ providerProgramTests = testGroup "provider discovery program"
       let program = providerProgram []
             (ProviderQuery ["Widget"] (Just "Widget"))
       "partial def resultIsSort (e : Expr) : MetaM Bool := do"
-        `isInfixOf` synthPrelude @?= True
+        `isInfixOf` synthPrelude [] @?= True
       "        let typeLevel \8592 LeantSynth.resultIsSort info.type\n        if typeLevel then pure () else"
         `isInfixOf` program @?= True
   , testCase "retain only proper-type applications and constructor kinds" $ do
       "partial def isTypeKind (e : Expr) : MetaM Bool := do"
-        `isInfixOf` synthPrelude @?= True
+        `isInfixOf` synthPrelude [] @?= True
       "        if \8592 isTypeKind t then"
-        `isInfixOf` synthPrelude @?= True
+        `isInfixOf` synthPrelude [] @?= True
       "        if !argType.isSort then return none"
-        `isInfixOf` synthPrelude @?= True
+        `isInfixOf` synthPrelude [] @?= True
       "  if !resultType.isSort || args.isEmpty then pure none"
-        `isInfixOf` synthPrelude @?= True
+        `isInfixOf` synthPrelude [] @?= True
       "              match \8592 appOf providerMode fuel depth blocked e with"
-        `isInfixOf` synthPrelude @?= True
+        `isInfixOf` synthPrelude [] @?= True
   , testCase "erase provider instances but mark goal binders" $ do
       let instanceHandling = unlines
             [ "      else if bi.isInstImplicit then"
@@ -341,15 +341,15 @@ providerProgramTests = testGroup "provider discovery program"
             , "          -- An unused ordinary implicit type parameter still needs a"
             , "          -- scheme binder so Djex can choose a visible instantiation."
             ]
-      instanceHandling `isInfixOf` synthPrelude @?= True
-      implicitScheme `isInfixOf` synthPrelude @?= True
+      instanceHandling `isInfixOf` synthPrelude [] @?= True
+      implicitScheme `isInfixOf` synthPrelude [] @?= True
       "let s \8592 LeantSynth.go false 100 0 [] tgt"
         `isInfixOf` serializerProgram "Demo.Token" @?= True
       "let frag \8592 LeantSynth.go true 80 0 [] info.type"
         `isInfixOf` providerProgram []
           (ProviderQuery ["Demo"] (Just "Demo.Token")) @?= True
       "partial def leadingTypeBinderNames (fuel : Nat) (e : Expr)"
-        `isInfixOf` synthPrelude @?= True
+        `isInfixOf` synthPrelude [] @?= True
       "let binders \8592 LeantSynth.leadingTypeBinderNames 80 info.type"
         `isInfixOf` providerProgram []
           (ProviderQuery ["Demo"] (Just "Demo.Token")) @?= True
@@ -401,12 +401,12 @@ providerCacheTests = testGroup "semantic provider cache"
           \(head \"List\")) (-> (var \"a\") (var \"a\")))"
         @?= Right (ParsedGoal GoalType
           (ProviderQuery ["List", "Prod"] (Just "List"))
-          (FArr (FVar "a") (FVar "a")))
+          (FArr (FVar "a") (FVar "a")) [])
   , testCase "retain an explicitly headless provider query" $
       parseGoalSexp
           "(goal prop (query (roots) (head)) (var \"p\"))"
         @?= Right (ParsedGoal GoalProp
-          (ProviderQuery [] Nothing) (FVar "p"))
+          (ProviderQuery [] Nothing) (FVar "p") [])
   , testCase "refresh hits and evict the least-recently used entry" $ do
       let world = initialProviderWorld
           query n = ProviderQuery [n] (Just n)
@@ -514,7 +514,7 @@ instanceImplicitTests = testGroup "instance-implicit synthesis"
           "(goal type (query (roots \"Gap\") (head)) \
           \(all \"A\" (inst \"Gap.C A\" (-> (var \"A\") (var \"A\")))))"
         @?= Right (ParsedGoal GoalType
-          (ProviderQuery ["Gap"] Nothing) body)
+          (ProviderQuery ["Gap"] Nothing) body [])
       fragUnsafeAtoms body @?= ["Gap.C A"]
   , testCase "bind an erased instance before ordinary term arguments" $ do
       let goal = FAll True "A"
@@ -610,7 +610,7 @@ combinedEngineMergeTests = testGroup "combined-engine verification frontier"
       merged !! (synthMaxTried - 1) @?= ["e8"]
       take 4 (drop (synthVerificationWindow EngineBoth) merged) @?=
         [["e13"], ["d13"], ["e14"], ["d14"]]
-  , testCase "reach a constrained Exference choice beyond twelve groups" $ do
+  , testCase "surface an oldest-first constrained choice in the shown frontier" $ do
       let token = FAtom False "Demo.Token"
           finite name = FParamInd name name [] [(name ++ ".mk", [])]
           inputs =
@@ -622,10 +622,8 @@ combinedEngineMergeTests = testGroup "combined-engine verification frontier"
           isGood = any (isInfixOf "Demo.global (\171a\187 := Demo.Good)")
       case synthesizeWithProviders EngineBoth 1 [provider] goal of
         Right (SynthCandidates groups _) -> do
-          any isGood (take synthMaxTried groups) @?= False
-          any isGood
-              (take (synthVerificationWindow EngineBoth) groups)
-            @?= True
+          any isGood (take (synthMaxShown - 1) groups) @?= False
+          any isGood (take synthMaxShown groups) @?= True
         Right other -> assertFailure $
           "expected combined candidates, got: " ++ outcomeTag other
         Left err -> assertFailure err
@@ -890,7 +888,8 @@ typeApplicationTests = testGroup "retained type applications"
               (FApp True "F a" (AppVariable "F") [FVar "a"]))
             (FApp False "Demo.Wrap ((b : Type) \8594 b \8594 b)"
               (AppNominal "Demo.Wrap")
-              [FAll True "b" (FArr (FVar "b") (FVar "b"))])))
+              [FAll True "b" (FArr (FVar "b") (FVar "b"))]))
+          [])
   , testCase "reject an application without proper-type arguments" $
       parseProviderSexp
           "(providers (provider \"Demo.bad\" \
@@ -1070,7 +1069,7 @@ parametricFamilyFragmentTests = testGroup "parametric family fragments"
       let family = FParamInd "Demo.Box" "Demo.Box a" [FVar "a"]
             [("Demo.Box.mk", [FVar "a"])]
           parsed = ParsedGoal GoalType
-            (ProviderQuery ["Demo"] (Just "Demo.Box")) family
+            (ProviderQuery ["Demo"] (Just "Demo.Box")) family []
       parseGoalSexp
           "(goal type (query (roots \"Demo\") (head \"Demo.Box\")) \
           \(param-ind \"Demo.Box\" \"Demo.Box a\" (params (var \"a\")) \
@@ -1104,7 +1103,8 @@ parametricFamilyFragmentTests = testGroup "parametric family fragments"
           (FRec True "Demo.R (Demo.termByType Unit)"
             [FAtom False "Demo.termByType Unit"]
             [("Demo.R.next",
-              [FAtom False "Demo.R (Demo.termByType Unit)"])]))
+              [FAtom False "Demo.R (Demo.termByType Unit)"])])
+          [])
   , testCase "retain occurrence-local finite data for a term parameter" $
       parseGoalSexp
           "(goal type (query (roots \"Demo\") (head \"Demo.Tag\")) \
@@ -1113,21 +1113,22 @@ parametricFamilyFragmentTests = testGroup "parametric family fragments"
         @?= Right (ParsedGoal GoalType
           (ProviderQuery ["Demo"] (Just "Demo.Tag"))
           (FInd "Demo.Tag (Demo.termByType Unit)"
-            [("Demo.Tag.mk", [])]))
+            [("Demo.Tag.mk", [])])
+          [])
   , testCase "gate family sharing on universe-inhabiting parameters" $ do
       "def allProperTypeParams (args : Array Expr) : MetaM Bool := do"
-        `isInfixOf` synthPrelude @?= True
+        `isInfixOf` synthPrelude [] @?= True
       unlines
           [ "    let argType \8592 whnfR (\8592 inferType arg)"
           , "    if !argType.isSort then return false"
           ]
-        `isInfixOf` synthPrelude @?= True
+        `isInfixOf` synthPrelude [] @?= True
       "        if \8592 allProperTypeParams args then do"
-        `isInfixOf` synthPrelude @?= True
+        `isInfixOf` synthPrelude [] @?= True
       "          let properParams \8592 allProperTypeParams args"
-        `isInfixOf` synthPrelude @?= True
+        `isInfixOf` synthPrelude [] @?= True
       "          else if properParams then"
-        `isInfixOf` synthPrelude @?= True
+        `isInfixOf` synthPrelude [] @?= True
   , testCase "reject depth hidden in a family parameter" $ do
       let truncated = FParamInd "Demo.Phantom" "Demo.Phantom ?"
             [FDepth] [("Demo.Phantom.base", [])]
@@ -1952,7 +1953,7 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
       let expression = VisibleTypeApplication (Global providerName) argument
       renderLeanTerm Map.empty
           (Map.singleton "leantProvider0" ("Demo.identity", Nothing)) Map.empty
-          [] (FAtom False "Nat") expression
+          ([], 0, []) (FAtom False "Nat") expression
         @?= Right ["@Demo.identity Int"]
   , testCase "keep provider dictionaries implicit with a named type argument" $ do
       providerName <- expectRight $ mkIdentifier "leantProvider0"
@@ -1962,7 +1963,7 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
       let expression = VisibleTypeApplication (Global providerName) argument
       renderLeanTerm Map.empty
           (Map.singleton "leantProvider0" ("Demo.global", Just ["a"])) Map.empty
-          [] (FAtom False "Demo.Token") expression
+          ([], 0, []) (FAtom False "Demo.Token") expression
         @?= Right ["Demo.global («a» := Nat)"]
   , testCase "preserve named provider type-argument order" $ do
       providerName <- expectRight $ mkIdentifier "leantProvider0"
@@ -1976,7 +1977,7 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
             (VisibleTypeApplication (Global providerName) natural) boolean
       renderLeanTerm Map.empty
           (Map.singleton "leantProvider0" ("Demo.global", Just ["a", "b"]))
-          Map.empty [] (FAtom False "Demo.Token") expression
+          Map.empty ([], 0, []) (FAtom False "Demo.Token") expression
         @?= Right ["Demo.global («a» := Nat) («b» := Bool)"]
   , testCase "quote keyword and exotic provider binder names" $ do
       providerName <- expectRight $ mkIdentifier "leantProvider0"
@@ -1991,7 +1992,7 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
       renderLeanTerm Map.empty
           (Map.singleton "leantProvider0"
             ("Demo.global", Just ["match", "«x-y»"]))
-          Map.empty [] (FAtom False "Demo.Token") expression
+          Map.empty ([], 0, []) (FAtom False "Demo.Token") expression
         @?= Right ["Demo.global («match» := Nat) («x-y» := Bool)"]
   , testCase "reject misaligned live provider binder metadata" $ do
       providerName <- expectRight $ mkIdentifier "leantProvider0"
@@ -2005,7 +2006,7 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
             (VisibleTypeApplication (Global providerName) natural) boolean
       renderLeanTerm Map.empty
           (Map.singleton "leantProvider0" ("Demo.global", Just ["a"]))
-          Map.empty [] (FAtom False "Demo.Token") expression
+          Map.empty ([], 0, []) (FAtom False "Demo.Token") expression
         @?= Left "cannot align visible type arguments for Lean provider Demo.global"
   , testCase "render compound closed type arguments in Lean syntax" $ do
       providerName <- expectRight $ mkIdentifier "leantProvider0"
@@ -2020,7 +2021,7 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
       let expression = VisibleTypeApplication (Global providerName) argument
       renderLeanTerm Map.empty
           (Map.singleton "leantProvider0" ("Demo.identity", Nothing)) Map.empty
-          [] (FAtom False "Nat") expression
+          ([], 0, []) (FAtom False "Nat") expression
         @?= Right ["@Demo.identity (Option (Int → Bool))"]
   , testCase "restore every nominal argument with explicit Lean syntax" $ do
       providerName <- expectRight $ mkIdentifier "leantProvider0"
@@ -2034,7 +2035,7 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
       renderLeanTerm Map.empty
           (Map.singleton "leantProvider0" ("Demo.identity", Nothing))
           (Map.singleton "LeantType0" "Demo.Wrap")
-        [] (FAtom False "Nat") expression
+        ([], 0, []) (FAtom False "Nat") expression
         @?= Right ["@Demo.identity (@Demo.Wrap Int)"]
   , testCase "restore a rigid opaque field as one parenthesized type" $ do
       providerName <- expectRight $ mkIdentifier "leantProvider0"
@@ -2045,7 +2046,7 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
       renderLeanTerm Map.empty
           (Map.singleton "leantProvider0" ("Demo.identity", Nothing))
           (Map.singleton "LeantAtom0" "(Nat × Nat)")
-          [] (FAtom False "Nat") expression
+          ([], 0, []) (FAtom False "Nat") expression
         @?= Right ["@Demo.identity @(Nat × Nat)"]
   , testCase "keep inferred visible type arguments distinct from foralls" $ do
       providerName <- expectRight $ mkIdentifier "leantProvider0"
@@ -2053,7 +2054,7 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
             (Global providerName) inferredVisibleTypeArgument
       renderLeanTerm Map.empty
           (Map.singleton "leantProvider0" ("Demo.identity", Nothing)) Map.empty
-          [] (FAtom False "Nat") expression
+          ([], 0, []) (FAtom False "Nat") expression
         @?= Right ["@Demo.identity _"]
   , testCase "render a closed quantified named provider argument" $ do
       providerName <- expectRight $ mkIdentifier "leantProvider0"
@@ -2063,7 +2064,7 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
       let expression = VisibleTypeApplication (Global providerName) argument
       renderLeanTerm Map.empty
           (Map.singleton "leantProvider0" ("Demo.global", Just ["a"])) Map.empty
-          [] (FAtom False "Demo.Token") expression
+          ([], 0, []) (FAtom False "Demo.Token") expression
         @?= Right
           ["Demo.global («a» := (∀ (a0_0 : _), a0_0 → a0_0))"]
   , testCase "parenthesize a positional quantified type argument" $ do
@@ -2074,7 +2075,7 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
       let expression = VisibleTypeApplication (Global providerName) argument
       renderLeanTerm Map.empty
           (Map.singleton "leantProvider0" ("Demo.identity", Nothing)) Map.empty
-          [] (FAtom False "Nat") expression
+          ([], 0, []) (FAtom False "Nat") expression
         @?= Right ["@Demo.identity (∀ (a0_0 : _), a0_0 → a0_0)"]
   , testCase "offer kind-directed local quantified arguments" $ do
       argument <- expectRight $ specifiedVisibleTypeArgument
@@ -2083,7 +2084,7 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
       let token = FAtom False "Demo.Token"
           expression = Lambda [Bind "provider"] $
             VisibleTypeApplication (Local "provider") argument
-          rendered = renderLeanTerm Map.empty Map.empty Map.empty []
+          rendered = renderLeanTerm Map.empty Map.empty Map.empty ([], 0, [])
             (FArr (FAll False "hidden" token) token) expression
       case rendered of
         Left err -> assertFailure err
@@ -2117,7 +2118,7 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
             "fun x f g h => \10216@x "
               ++ "(\8704 (a0_0 : " ++ binderDomain ++ "), a0_0 \8594 a0_0), "
               ++ "\10216f, \10216g, h _\10217\10217\10217"
-          rendered = renderLeanTerm Map.empty Map.empty Map.empty []
+          rendered = renderLeanTerm Map.empty Map.empty Map.empty ([], 0, [])
             goal expression
       case rendered of
         Left err -> assertFailure err
@@ -2140,7 +2141,7 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
       rightArgument <- expectRight $ specifiedVisibleTypeArgument (source "renamed")
       let renderArgument argument = renderLeanTerm Map.empty
             (Map.singleton "leantProvider0" ("Demo.global", Just ["a"]))
-            Map.empty [] (FAtom False "Demo.Token")
+            Map.empty ([], 0, []) (FAtom False "Demo.Token")
             (VisibleTypeApplication (Global providerName) argument)
       renderArgument leftArgument @?= renderArgument rightArgument
   , testCase "preserve nested quantified shadowing with distinct names" $ do
@@ -2154,7 +2155,7 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
       let expression = VisibleTypeApplication (Global providerName) argument
       renderLeanTerm Map.empty
           (Map.singleton "leantProvider0" ("Demo.global", Just ["a"])) Map.empty
-          [] (FAtom False "Demo.Token") expression
+          ([], 0, []) (FAtom False "Demo.Token") expression
         @?= Right
           [ "Demo.global («a» := (∀ (a0_0 : _), a0_0 → "
               ++ "∀ (a1_0 : _), a1_0 → a1_0))"
@@ -2169,7 +2170,7 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
       let expression = VisibleTypeApplication (Global providerName) argument
       renderLeanTerm Map.empty
           (Map.singleton "leantProvider0" ("Demo.global", Just ["a"])) Map.empty
-          [] (FAtom False "Demo.Token") expression
+          ([], 0, []) (FAtom False "Demo.Token") expression
         @?= Left
           "cannot render a constrained quantified visible Lean type argument"
   ]

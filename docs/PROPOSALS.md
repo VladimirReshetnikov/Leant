@@ -1,9 +1,7 @@
 # Leant — proposed improvements and new features
 
-Applies to both implementations (the primary Haskell one at the
-repository root, and Python `LeantPy/`) unless marked otherwise. Ordered by expected
-value-for-effort within each tier. Effort: S (< half a day), M (a day or
-two), L (several days).
+Ordered by expected value-for-effort within each tier. Effort: S
+(< half a day), M (a day or two), L (several days).
 
 Term-synthesis (`:synth`) proposals live in
 [SYNTHESIS_PROPOSAL.md §7](SYNTHESIS_PROPOSAL.md#7-post-phase-2-proposals):
@@ -102,7 +100,7 @@ already exists; this is bookkeeping.
 `set_option` history and display it), `:show imports`, `:show env`,
 `:show paths` (project, backend, toolchain). GHCi users expect `:show`.
 
-### 11. Background Mathlib warm-up — M (Python), M/L (Haskell)
+### 11. Background Mathlib warm-up — M/L
 `--warm Mathlib` (or config default): start importing in a second
 backend process at launch; swap it in when ready. Hides the ~1-3 min
 Mathlib import behind the user's first few plain-stdlib interactions.
@@ -113,29 +111,22 @@ Colorize goal displays: hypothesis names dim, `⊢` bold, error underlines
 under the caret span (positions are already in every message). Applies
 to `sorry` output today and `:prove` tomorrow.
 
-## Tier 3 — architectural / parity
+## Tier 3 — architectural
 
-### 13. Backport Haskell's `:browse` to Python — S
-The Python `:browse` still requires `:import Lean` and lists unfiltered
-constants. Port back the side-environment cache, `isInternalDetail`
-filtering, `:browse!`, `@`-stripping, and session-declaration section.
+### 13. Self-managing backend — M
+`leant` currently reuses a repl binary found in a LeanInteract cache.
+Teach it to clone and `lake build` the matching REPL revision itself
+(toolchain read from `lean-toolchain`), making Leant fully standalone.
 
-### 14. Self-managing backend in Haskell — M
-`leant` (the Haskell implementation) currently reuses the binary LeanInteract built. Teach it to
-clone and `lake build` the matching REPL revision itself (toolchain read
-from `lean-toolchain`), making the Haskell implementation fully
-standalone.
-
-### 15. `:load` incremental reload — L
+### 14. `:load` incremental reload — L
 `:reload` currently re-elaborates the whole file. The backend supports
 incremental elaboration (`incrementality` flag in the fork); wiring it in
 would make the edit-reload loop close to instant for small changes.
 
-### 16. Structured JSON output mode (`--json`) — M
+### 15. Structured JSON output mode (`--json`) — M
 Mirror every response (messages, sorries, env ids, timing) as JSON lines
 on stdout. Turns the REPL into a backend for editor plugins and agents
-while keeping the human UI as-is. (The Python version could expose the
-LeanInteract objects almost directly.)
+while keeping the human UI as-is.
 
 ## Explicitly not proposed
 

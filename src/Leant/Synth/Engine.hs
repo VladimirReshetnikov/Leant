@@ -19,6 +19,12 @@
 -- legacy 'FInd' occurrences remain keyed by their alpha-normalized display
 -- spelling.  Engine-side type and constructor names are fresh, and mappings
 -- back to their exact Lean spellings ride along to the renderer.
+--
+-- Caller-supplied premises (library functions over the goal's recursive
+-- inductives, excluded-middle instances of the classical fallback)
+-- enter through 'synthesizeWith'\/'synthesizeTuned' and become goal
+-- antecedents under the leading quantifier prefix, so premise types may
+-- mention the goal's bound variables.
 module Leant.Synth.Engine
   ( SynthEngine (..)
   , SynthOutcome (..)
@@ -110,7 +116,9 @@ import Leant.Synth.Fragment
   ( AppHead (..)
   , Frag (..)
   , ProviderFrag (..)
+  , Slot (..)
   , fragHasDepth
+  , fragSpine
   , fragUnsafeAtoms
   )
 import Leant.Synth.Render
@@ -303,18 +311,36 @@ synthesizeTunedWithProviders engine steps limits checked providers extras
     pure (mergeOutcomesSkipping checked djinn exference)
  where
   prepare recursiveProjection activeProviders = do
-    ( goal0, decls, providerDecls, ctorMap, providerMap, typeMap, premises
-      , complete) <- fragToDjinn recursiveProjection activeProviders extras
-        engineFrag
-    -- Caller-supplied assumptions and constructor premises for conservative
-    -- recursive fallbacks enter as goal antecedents.  Validated exact
-    -- recursive families are native declarations for both engines: Djinn
-    -- grants one positive constructor layer, while Exference additionally
-    -- uses its bounded one-layer eliminator.
-    let goal = foldr (\(_, _, t) acc -> FunctionType t acc) goal0 premises
-        premisePairs = [(name, prem) | (name, prem, _) <- premises]
+    ( goal0, decls, providerDecls, ctorMap, providerMap, typeMap
+      , extrasPrems, ctorPrems, complete) <-
+        fragToDjinn recursiveProjection activeProviders extras engineFrag
+    -- Premises enter under the quantifier prefix, where their occurrences of
+    -- the goal's bound variables remain connected.  The two premise kinds sit
+    -- on opposite sides of the goal's own arrows.  Caller-supplied premises
+    -- (library functions and excluded-middle instances) go innermost, after
+    -- the goal arguments have entered Djinn's oldest-first atom inventory, so
+    -- short argument-using compositions stay inside the candidate window.
+    -- Conservative recursive constructor premises remain outside the goal
+    -- arrows, preserving alternatives that construct a richer argument before
+    -- applying a hypothesis.  Native exact recursive families produce no such
+    -- fallback premises.  The renderer strips both blocks around the kept
+    -- goal-arrow binders.
+    let antecedents prems body =
+          foldr (\(_, _, t) acc -> FunctionType t acc) body prems
+        insertInner ty = case ty of
+          FunctionType domain body -> FunctionType domain (insertInner body)
+          body -> antecedents extrasPrems body
+        insertOuter ty = case ty of
+          ForallType variables constraints body ->
+            ForallType variables constraints (insertOuter body)
+          body -> antecedents ctorPrems (insertInner body)
+        goal = insertOuter goal0
+        pairsOf prems = [(name, prem) | (name, prem, _) <- prems]
+        spineArrows = length [() | SlotArrow _ <- fragSpine engineFrag]
         render expr =
-          renderLeanTerm ctorMap providerMap typeMap premisePairs fitFrag expr
+          renderLeanTerm ctorMap providerMap typeMap
+            (pairsOf ctorPrems, spineArrows, pairsOf extrasPrems)
+            fitFrag expr
     pure (goal, decls, providerDecls, render, complete)
 
 -- | The complete LJT search: candidates, or a refutation whose
@@ -807,7 +833,8 @@ fragToDjinn
       , CtorMap
       , Map.Map String (String, Maybe [String])
       , TypeMap
-      , [(String, Frag, Type String)]
+      , [(String, Frag, Type String)] -- caller-supplied premises
+      , [(String, Frag, Type String)] -- constructor fallback premises
       , ProjectionCompleteness
       )
 fragToDjinn recursiveProjection providers extras frag0 = do
@@ -1307,7 +1334,8 @@ fragToDjinn recursiveProjection providers extras frag0 = do
     , tsCtorMap finalState
     , Map.fromList providerNames
     , tsTypeMap finalState
-    , extrasT ++ tsPrems finalState
+    , extrasT
+    , tsPrems finalState
     , projection
     )
  where

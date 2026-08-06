@@ -1,0 +1,146 @@
+
+   __                  __
+  / /  ___ ___ ____   / /_
+ / /__/ -_) _ `/ _ \_/ __/
+/____/\__/\_,_/_//_/ \__/
+Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to exit.
+λ> :prove ∀ p q : Prop, p ∧ q → q ∧ p
+entering prove mode — type tactics; :help for commands
+⊢ ∀ (p q : Prop), p ∧ q → q ∧ p
+suggestion: intro p q h <;> exact And.comm.mp h  (closes the goal)
+⊢> :goals
+⊢ ∀ (p q : Prop), p ∧ q → q ∧ p
+suggestion: intro p q h <;> exact And.comm.mp h  (closes the goal)
+⊢> intro p q h
+p q : Prop
+h : p ∧ q
+⊢ q ∧ p
+suggestion: exact And.comm.mp h  (closes the goal)
+⊢> :suggest
+suggestion: exact And.comm.mp h  (closes the goal)
+⊢> exact And.comm.mp h
+All goals accomplished 🎉
+finish with :qed [NAME], inspect with :script
+⊢> :qed and_swap
+saved: theorem and_swap : ∀ p q : Prop, p ∧ q → q ∧ p
+λ> :prove ∀ n : Nat, n = n
+entering prove mode — type tactics; :help for commands
+⊢ ∀ (n : Nat), n = n
+suggestion: omega  (closes the goal)
+⊢> intro n
+n : Nat
+⊢ n = n
+suggestion: rfl  (closes the goal)
+⊢> :undo
+undid: intro n
+⊢ ∀ (n : Nat), n = n
+suggestion: omega  (closes the goal)
+⊢> :suggest
+suggestion: omega  (closes the goal)
+⊢> intro n
+n : Nat
+⊢ n = n
+suggestion: rfl  (closes the goal)
+⊢> rfl
+All goals accomplished 🎉
+finish with :qed [NAME], inspect with :script
+⊢> :qed nat_refl
+saved: theorem nat_refl : ∀ n : Nat, n = n
+λ> :prove (∀ a b : Nat, a + b = b + a) ∧ (∀ a b : Nat, a * b = b * a)
+entering prove mode — type tactics; :help for commands
+⊢ (∀ (a b : Nat), a + b = b + a) ∧ ∀ (a b : Nat), a * b = b * a
+suggestion: constructor  (splits into 2 goals)
+⊢> constructor
+— goal 1 of 2 —
+case left
+⊢ ∀ (a b : Nat), a + b = b + a
+— goal 2 of 2 —
+case right
+⊢ ∀ (a b : Nat), a * b = b * a
+suggestion: omega  (closes the goal)
+⊢2> omega
+case right
+⊢ ∀ (a b : Nat), a * b = b * a
+suggestion: exact fun a b => Nat.mul_comm a b  (closes the goal)
+⊢> exact fun a b => Nat.mul_comm a b
+All goals accomplished 🎉
+finish with :qed [NAME], inspect with :script
+⊢> :qed add_mul_comm
+saved: theorem add_mul_comm : (∀ a b : Nat, a + b = b + a) ∧ (∀ a b : Nat, a * b = b * a)
+λ> :prove (∀ a b : Nat, a + b = b + a) ∧ (∀ a b : Nat, a + 2 * b = b + b + a)
+entering prove mode — type tactics; :help for commands
+⊢ (∀ (a b : Nat), a + b = b + a) ∧ ∀ (a b : Nat), a + 2 * b = b + b + a
+suggestion: constructor <;> omega  (closes the goal)
+⊢> constructor <;> omega
+All goals accomplished 🎉
+finish with :qed [NAME], inspect with :script
+⊢> :qed two_omegas
+saved: theorem two_omegas : (∀ a b : Nat, a + b = b + a) ∧ (∀ a b : Nat, a + 2 * b = b + b + a)
+λ> :prove ∀ p : Prop, p → ¬p → False
+entering prove mode — type tactics; :help for commands
+⊢ ∀ (p : Prop), p → ¬p → False
+suggestion: simp only [imp_false, Classical.not_not, imp_self, implies_true]  (closes the goal)
+⊢> intro p h h1
+p : Prop
+h : p
+h1 : ¬p
+⊢ False
+suggestion: contradiction  (closes the goal)
+⊢> contradiction
+All goals accomplished 🎉
+finish with :qed [NAME], inspect with :script
+⊢> :qed no_contra
+saved: theorem no_contra : ∀ p : Prop, p → ¬p → False
+λ> :prove (∃ x : Nat, 2 < x ∧ x < 4) → ∃ y : Nat, 2 < y
+entering prove mode — type tactics; :help for commands
+⊢ (∃ x, 2 < x ∧ x < 4) → ∃ y, 2 < y
+suggestion: intro h
+⊢> intro h
+h : ∃ x, 2 < x ∧ x < 4
+⊢ ∃ y, 2 < y
+suggestion: obtain ⟨x, h1⟩ := h
+⊢> obtain ⟨x, h1⟩ := h
+x : Nat
+h1 : 2 < x ∧ x < 4
+⊢ ∃ y, 2 < y
+suggestion: obtain ⟨h, h2⟩ := h1 <;> exact Exists.intro x h  (closes the goal)
+⊢> obtain ⟨h, h2⟩ := h1 <;> exact Exists.intro x h
+All goals accomplished 🎉
+finish with :qed [NAME], inspect with :script
+⊢> :qed ex_two_lt
+saved: theorem ex_two_lt : (∃ x : Nat, 2 < x ∧ x < 4) → ∃ y : Nat, 2 < y
+λ> def myLen : List Nat → Nat
+…>   | [] => 0
+…>   | _ :: t => myLen t + 1
+…>
+λ> :prove ∀ l : List Nat, myLen l = l.length
+entering prove mode — type tactics; :help for commands
+⊢ ∀ (l : List Nat), myLen l = l.length
+suggestion: intro l
+⊢> intro l
+l : List Nat
+⊢ myLen l = l.length
+suggestion: induction l <;> simp_all [myLen]  (closes the goal)
+⊢> induction l <;> simp_all [myLen]
+All goals accomplished 🎉
+finish with :qed [NAME], inspect with :script
+⊢> :qed myLen_length
+saved: theorem myLen_length : ∀ l : List Nat, myLen l = l.length
+λ> def double : Nat → Nat
+…>   | 0 => 0
+…>   | n + 1 => double n + 2
+…>
+λ> :prove ∀ n : Nat, double n = 2 * n
+entering prove mode — type tactics; :help for commands
+⊢ ∀ (n : Nat), double n = 2 * n
+suggestion: intro n
+⊢> intro n
+n : Nat
+⊢ double n = 2 * n
+suggestion: induction n <;> simp_all [double] <;> omega  (closes the goal)
+⊢> induction n <;> simp_all [double] <;> omega
+All goals accomplished 🎉
+finish with :qed [NAME], inspect with :script
+⊢> :qed double_two_mul
+saved: theorem double_two_mul : ∀ n : Nat, double n = 2 * n
+λ> :quit

@@ -137,28 +137,74 @@ Built-ins and keywords that are not constants in the environment
 
 `:prove PROP` opens a tactic loop against the backend's proof-state
 protocol (bare `:prove` resumes the most recent `sorry`). Every line is
-a tactic; goals reprint after each one; `:undo` takes back steps without
-limit; `:script` shows the accumulated proof; `:auto` tries common
-finishers; `:qed [NAME]` turns the script into a real theorem in the
-session. `?`-tactics (`exact?`, `simp?`, `rw?`) record the tactic they
-*found* rather than the question-mark form. Proof-state identifiers belong
-to one backend process: if that process stops, Leant leaves prove mode and
-prints the accumulated script instead of submitting a stale identifier after
-the session restarts.
+a tactic; goals reprint after each one, followed by a Lean-verified
+suggestion for the next tactic. The candidate probes are shaped by the
+goal and its hypotheses: an `intro` suggestion names the binders it
+would introduce, a disjunction goal is probed with `left`/`right`, a
+hypothesis whose type a single step can take apart is probed with
+`cases h` or `obtain ⟨x, h1⟩ := h`, and a data-typed variable the goal
+mentions is probed with `induction`. The search prefers a candidate that
+closes the goal outright and annotates the suggestion accordingly
+(`closes the goal`, `splits into 2 goals`); when no single tactic
+closes it, a second phase chains quick finishers onto the best
+progressing candidates (`constructor <;> omega`, `obtain ⟨h, h2⟩ := h1
+<;> exact Exists.intro x h`), so even the opening suggestion is often a
+complete checked proof. The chains also try `simp_all`, unfolding the
+definitions the goal mentions and calling in `omega` on whatever
+arithmetic remains, which is how an induction suggestion can arrive as
+a finished proof: `induction l <;> simp_all [myLen]`, or `induction n
+<;> simp_all [double] <;> omega`. Suggestions are advisory: they never advance
+the proof or enter the script, and `:suggest` reprints the cached
+suggestion.
+`:undo` takes back steps without limit; `:script` shows the accumulated proof;
+`:auto` tries common finishers; `:qed [NAME]` turns the script into a real
+theorem in the session. `?`-tactics (`exact?`, `simp?`, `rw?`) record the
+tactic they *found* rather than the question-mark form. Proof-state identifiers
+belong to one backend process: if that process stops, Leant leaves prove mode
+and prints the accumulated script instead of submitting a stale identifier
+after the session restarts.
 
 ```text
 λ> :prove ∀ p q : Prop, p ∧ q → q ∧ p
 entering prove mode — type tactics; :help for commands
 ⊢ ∀ (p q : Prop), p ∧ q → q ∧ p
+suggestion: intro p q h <;> exact And.comm.mp h  (closes the goal)
 ⊢> intro p q h
 p q : Prop
 h : p ∧ q
 ⊢ q ∧ p
-⊢> exact ⟨h.2, h.1⟩
+suggestion: exact And.comm.mp h  (closes the goal)
+⊢> exact And.comm.mp h
 All goals accomplished 🎉
 finish with :qed [NAME], inspect with :script
 ⊢> :qed and_swap
 saved: theorem and_swap : ∀ p q : Prop, p ∧ q → q ∧ p
+```
+
+At its best the suggestion machinery hands you a finished induction:
+here it combines `induction` (the goal mentions a data-typed
+variable), `simp_all` unfolding the function the goal is about, and
+`omega` for the leftover arithmetic — a complete verified proof of a
+theorem about a function defined two lines earlier:
+
+```text
+λ> def double : Nat → Nat
+…>   | 0 => 0
+…>   | n + 1 => double n + 2
+…>
+λ> :prove ∀ n : Nat, double n = 2 * n
+entering prove mode — type tactics; :help for commands
+⊢ ∀ (n : Nat), double n = 2 * n
+suggestion: intro n
+⊢> intro n
+n : Nat
+⊢ double n = 2 * n
+suggestion: induction n <;> simp_all [double] <;> omega  (closes the goal)
+⊢> induction n <;> simp_all [double] <;> omega
+All goals accomplished 🎉
+finish with :qed [NAME], inspect with :script
+⊢> :qed double_two_mul
+saved: theorem double_two_mul : ∀ n : Nat, double n = 2 * n
 ```
 
 ## `:synth` — automatic term synthesis
@@ -177,12 +223,16 @@ retain bounded one-layer elimination in Exference. If its usual all-inputs-used
 search has no candidate, Leant retries that same Exference query with omissions
 allowed; this can project an impredicative payload while rendering the unopened
 recursive tail as `_`. Both engines can also reuse a small, goal-relevant slice
-of the live Lean environment. Design and phasing:
+of the live Lean environment, and `List` and `Nat` goals can compose rated
+library functions such as `List.map` and `List.foldr` into candidates. Design
+and phasing:
 [docs/SYNTHESIS_PROPOSAL.md](docs/SYNTHESIS_PROPOSAL.md). The implementation
 invariants are recorded in the dated reports for
 [finite families](docs/reports/2026-08-01-query-wide-parametric-inductive-families.md)
 and
-[recursive families](docs/reports/2026-08-01-query-wide-recursive-family-identity.md).
+[recursive families](docs/reports/2026-08-01-query-wide-recursive-family-identity.md),
+with the scoped quantified-provider boundary documented in the
+[local-provider report](docs/reports/2026-08-01-scoped-quantified-local-providers.md).
 
 The engine is the vendored [Djex](lib/Djex) library, linked in-process.
 Djex began as a merger of two classic Haskell synthesizers — **Djinn**
@@ -220,7 +270,21 @@ candidates (and, where applicable, a truncation note).
 ### Higher-order plumbing
 
 The sweet spot is the "plumbing" terms one writes constantly. Free
-capital identifiers are auto-bound, so quick queries stay quick.
+capital identifiers are auto-bound, so quick queries stay quick, and
+the first candidate is reliably the term you would have written —
+here `flip`, composition, `uncurry`, and product associativity:
+
+```text
+λ> :synth ((a → b → c) → b → a → c)
+  it1  fun f x y => f y x
+λ> :synth ((b → c) → (a → b) → a → c)
+  it1  fun f g x => f (g x)
+λ> :synth ((A → B → C) → A × B → C)
+  it1  fun f ⟨x, y⟩ => f x y
+λ> :synth (((A × B) × C) → A × (B × C))
+  it1  fun ⟨⟨x, y⟩, z⟩ => ⟨x, ⟨y, z⟩⟩
+```
+
 Candidates are ranked smallest-first and *bound into the session* as
 `it1`, `it2`, …, with bare `it` the best one — they are ordinary
 definitions, so you can evaluate them immediately:
@@ -231,12 +295,30 @@ definitions, so you can evaluate them immediately:
   it2  fun x _ => x
 λ> #eval it2 "left" "right"
 "left"
+```
+
+Read through propositions-as-types, the same plumbing proves logical
+identities, and the proof terms *are* the plumbing: `Iff` symmetry is
+a swap, `¬(p ∧ q) ↔ (p → ¬q)` is currying, and De Morgan's law packs
+one direction each into an anonymous constructor:
+
+```text
+λ> :synth (∀ p q : Prop, (p ↔ q) → (q ↔ p))
+  it1  fun _ _ ⟨f, g⟩ => ⟨g, f⟩
+λ> :synth (∀ p q : Prop, ¬(p ∧ q) ↔ (p → ¬q))
+  it1  fun _ _ => ⟨fun k x y => k ⟨x, y⟩, fun k1 ⟨z, w⟩ => k1 z w⟩
 λ> :synth (∀ p q : Prop, ¬(p ∨ q) ↔ ¬p ∧ ¬q)
   it1  fun _ _ => ⟨fun k => ⟨fun x => k (.inl x), fun y => k (.inr y)⟩, fun ⟨k1, k2⟩ z => match z with | .inl w => k1 w | .inr x1 => k2 x1⟩
 ```
 
-Both inhabitants of `a → a → a` that matter, and one direction each of
-De Morgan's law, packed into an `Iff` by the anonymous constructor.
+It reaches the textbook curiosities too — `(p ↔ ¬p) → False` comes
+out by the classic self-application trick:
+
+```text
+λ> :synth (∀ p : Prop, (p ↔ ¬p) → False)
+  it1  fun _ ⟨k, f⟩ => k (f (fun x => k x x)) (f (fun y => k y y))
+```
+
 Binders are named by role — functions `f g h`, values `x y z`,
 negations and continuations `k` — which keeps large candidates
 readable.
@@ -244,18 +326,20 @@ readable.
 ### Programs you already know
 
 Some types have one sensible inhabitant, and asking for it by type is
-quicker than remembering which library corner it lives in. The bind of
-the state monad:
+quicker than remembering which library corner it lives in. The binds
+of the reader and state monads:
 
 ```text
+λ> :synth ((S → A) → (A → S → B) → S → B)
+  it1  fun f g x => g (f x) x
 λ> :synth ((S → A × S) → (A → S → B × S) → S → B × S)
   it1  fun f g x => match f x with | ⟨a, b⟩ => g a b
   it2  fun f g x => match f x with | ⟨a, _⟩ => g a x
   ⋯
 ```
 
-The first candidate threads the state correctly. The second is
-type-correct and runs `g` on the *initial* state — the classic
+For the state monad, `it1` threads the state correctly, while `it2`
+is type-correct and runs `g` on the *initial* state — the classic
 state-threading bug, which the type admits just as happily. Types alone
 cannot tell these apart, which is why all candidates are shown and each
 is one keystroke from a test run. With inductive expansion (below) the
@@ -519,6 +603,16 @@ provably uninhabited — no closed term of this polymorphic type exists
 (constructively — a classical proof may still exist; this is not a disproof of the proposition)
 ```
 
+The hard direction of De Morgan needs excluded middle twice, once per
+disjunct, and the candidate reads as exactly that case analysis:
+
+```text
+λ> :set synth-classical on
+synth classical: on
+λ> :synth (∀ p q : Prop, ¬(¬p ∧ ¬q) → p ∨ q)
+  it1  fun _ _ k => match Classical.em _ with | .inl x => .inl x | .inr k1 => (match Classical.em _ with | .inl y => .inr y | .inr k2 => absurd ⟨k1, k2⟩ k)
+```
+
 ### Inductive types
 
 A non-recursive, non-indexed inductive or structure — built-in
@@ -621,6 +715,62 @@ exposed, and Djinn search exhaustion is not promoted to a refutation. Indexed
 types remain opaque. The main impredicative gain is direct family transport,
 not recursion or induction.
 
+### Recursion from the library
+
+`:synth` will never invent a `Nat.rec`-based program, but it does not
+have to: for the everyday recursive types, the library already wrote
+the recursion. A goal that mentions `List` or `Nat` brings a rated
+inventory of library functions with it (`List.map`, `List.foldr`,
+`List.append`, `List.flatten`, `List.length`, `List.replicate`,
+`Nat.add`, …), instantiated at the goal's own types and handed to the
+engine as extra premises — the phase-3 promise of *recursion via
+library reuse*, in miniature. The enumeration prefers proofs that use
+the goal's own arguments, so the library answer is the *first*
+candidate:
+
+```text
+λ> :synth ((a → b) → List a → List b)
+  it1  fun f x => List.map f x
+  it2  fun f x => List.reverse (List.map f x)
+  ⋯
+λ> :synth (List (List a) → List a)
+  it1  fun x => List.flatten x
+  it2  fun x => List.reverse (List.flatten x)
+  ⋯
+λ> :synth (List a → Nat)
+  it1  fun x => List.length x
+  it2  fun x => Nat.add (List.length x) (List.length x)
+  ⋯
+λ> :synth (Nat → a → List a)
+  it1  fun x y => List.replicate x y
+  ⋯
+λ> :synth (List a → List b → List (a × b))
+  it1  fun x y => List.zip x y
+  ⋯
+λ> :synth ((a → b → c) → List a → List b → List c)
+  it1  fun f x y => List.zipWith f x y
+  ⋯
+```
+
+The inventory is a ratings list in Djex's `*.ratings` format — lower
+is better, 100 or more disables — and a project file `leant.ratings`
+(lines of `Name Rating`, `#` comments) merges over the defaults at
+startup, so re-ranking, disabling, or growing the inventory is
+editing a list, not writing code.
+
+The library search runs beside the plain constructor search, and its
+candidates come first — they are found in a mode where the recursive
+occurrences are sealed atoms, so every candidate must route through
+the goal's own arguments and the offered functions rather than
+through constructor junk (`List.nil` inhabits every `List` goal; a
+search that may use it drowns in closed terms that ignore the
+input). Both searches' candidates are verified and shown together,
+and `:set synth-library off` restores the constructors-only
+behavior. Negative verdicts are unaffected: goals that mention a
+recursive inductive already report "no term found within bounds"
+rather than a refutation, and the library run never contributes a
+negative verdict at all.
+
 ### Dependent formulas as cargo
 
 Dependent subformulas (`∀ n : Nat, P n`) are carried as opaque atoms,
@@ -648,11 +798,13 @@ those hypotheses, so `exact it1` closes the goal:
 λ> :prove ∀ p q : Prop, (p → q) → p → q ∧ p
 entering prove mode — type tactics; :help for commands
 ⊢ ∀ (p q : Prop), (p → q) → p → q ∧ p
+suggestion: exact fun p q a a_1 => ⟨a a_1, a_1⟩  (closes the goal)
 ⊢> intro p q h hp
 p q : Prop
 h : p → q
 hp : p
 ⊢ q ∧ p
+suggestion: exact ⟨h hp, hp⟩  (closes the goal)
 ⊢> :synth
 (synthesizing with hypotheses p q h hp as premises)
   it1  fun _ _ f x => ⟨f x, x⟩
@@ -668,8 +820,34 @@ term from the goal's own material — a constructive complement to the
 finisher tactics, needing no premise database and no imports. Bare
 `:synth` outside prove mode targets the last `sorry`.
 
+The classical fallback follows you into prove mode: double-negation
+elimination has no constructive proof, so `:synth` offers the
+excluded-middle case split, and `:qed` turns it into a theorem —
+proved, verified, and named without writing a single tactic beyond
+`exact`:
+
+```text
+λ> :prove ∀ p : Prop, ¬¬p → p
+entering prove mode — type tactics; :help for commands
+⊢ ∀ (p : Prop), ¬¬p → p
+suggestion: exact fun p a => Classical.byContradiction a  (closes the goal)
+⊢> :synth
+  it1  fun _ k => match Classical.em _ with | .inl x => x | .inr k1 => absurd k1 k
+⊢> exact it1
+All goals accomplished 🎉
+finish with :qed [NAME], inspect with :script
+⊢> :qed not_not_elim
+saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
+```
+
 ### Engines, budgets, and the fine print
 
+- Library premises are on by default (`:set synth-library on|off`);
+  the rated inventory (defaults merged with `leant.ratings`) only ever
+  *offers* premises — the driver filters them against the goal's own
+  types and the backend verifies every candidate, so a useless entry
+  costs search time, never soundness. The ratings file is read at
+  startup; edits take effect next session.
 - A second engine is available: `:set synth-engine exference` switches
   to Djex's ranked heuristic search (explicit budgets, no negative
   verdicts; `:set synth-steps N` bounds it, default 4096), and `both`
@@ -838,16 +1016,6 @@ that replay history so later goals can mention them, but because they
 cannot be providers they do not invalidate a reusable provider
 inventory.
 
-## The Python edition
-
-[LeantPy/](LeantPy/README.md) contains the Python edition of Leant: a
-single-file GHCi-style shell over
-[LeanInteract](https://github.com/augustepoiroux/LeanInteract) with the
-same command set and session semantics. The Haskell implementation is
-the primary one, where new development happens; we keep the Python
-edition up to date with it (minus `:synth`, which needs the in-process
-synthesis engine).
-
 ## Development
 
 The focused Haskell suite covers fragment/provider parsing, engine
@@ -858,7 +1026,7 @@ cabal test leant-synth-tests --test-show-details=direct
 ```
 
 Golden transcript tests live in [test/](test/): `bash test/run-tests.sh`
-pipes each `synth-*.txt` through `leant --plain` and diffs the filtered
+passes each `*.txt` through `leant --plain` and diffs the filtered
 output against the checked-in `*.golden`; `-u` regenerates the goldens
 after an intentional behavior change. These end-to-end goldens require
 the Lake project to provide the backend executable (`repl` or
