@@ -1178,15 +1178,18 @@ repositories:
 Together: `fun f x => List.map f x`, `fun x => List.flatten x`,
 `fun x => List.length x`, `fun x y => List.replicate x y` are now the
 *first* candidates of their queries, with the constructor-junk
-candidates ranked behind or out of the window entirely. Known residual:
-a premise's use of a *second* distinct argument of the same type
-(`List.append x y` on `List a → List a → List a`) still sits behind
-the first argument's exhaustive subtree and misses the candidate
-window; the displayed candidates remain honest (`fun x _ => x` is the
-smallest inhabitant, and `List.append x x` shows the function), but
-surfacing the mixed-argument application likely needs a
-distinct-arguments preference at the engine's atom choice points —
-future work.
+candidates ranked behind or out of the window entirely. The former
+same-typed-argument residual is now closed as well. At an atomic binary
+endomorphism suffix, Djinn round-robins the three oldest sibling proofs
+and tries unused siblings before reusing one; every remaining proof stays
+on the historical depth-first tail. With two unary distractors this moves
+the direct mixed application from proof 112 to proof 12 while retaining
+the repeated application at proof 15. The bounded cohort matters: it keeps
+the established four-site rank-N stress case at 0.52 seconds instead of
+turning its independent plans into a wide Cartesian frontier. Leant pins
+the rendered mixed term inside its twelve-group verification frontier, and
+the live Lean transcript now displays both `List.append x y` and
+`List.append y x` for `List a → List a → List a`.
 
 ### Explicitly not proposed
 

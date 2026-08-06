@@ -760,6 +760,24 @@ providerEngineTests = testGroup "foreign providers"
           (synthesizeWithProviders EngineDjinn 256 [provider]
             (FArr natural boolean))
         @?= ["Demo.toBool"]
+  , testCase "keep distinct same-typed arguments in the Djinn frontier" $ do
+      let value = FAtom False "Demo.Value"
+          combine = FArr value (FArr value value)
+          distractor = FArr value value
+          goal = FArr value (FArr value value)
+          extras =
+            [ ("Demo.combine", combine)
+            , ("Demo.first", distractor)
+            , ("Demo.second", distractor)
+            ]
+      case synthesizeWith EngineDjinn 0 extras goal goal of
+        Right (SynthCandidates groups _) ->
+          assertBool "the verification frontier omitted Demo.combine x y" $
+            any (elem "fun x y => Demo.combine x y")
+              (take synthMaxTried groups)
+        Right other -> assertFailure $
+          "unexpected repeated-domain synthesis outcome: " ++ outcomeTag other
+        Left err -> assertFailure err
   , testCase "reuse a provider through both engines" $ do
       let natural = FAtom False "Nat"
           provider = ProviderFrag "Demo.zero" natural

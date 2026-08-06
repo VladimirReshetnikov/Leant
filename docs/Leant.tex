@@ -892,8 +892,9 @@ already wrote the recursion. A goal that mentions \code{List} or
 \code{List.flatten}, \code{List.length}, \code{List.replicate},
 \code{Nat.add}, \dots{} --- instantiated at the goal's own types and
 offered to the engine as extra premises. The enumeration prefers
-proofs that use the goal's own arguments, so asking for a function
-\emph{by its type} puts the library answer first:
+proofs that use the goal's own arguments, generally putting a direct
+library answer first while retaining distinct choices between
+same-typed arguments:
 
 \begin{session}
 λ> :synth ((a → b) → List a → List b)
@@ -911,6 +912,12 @@ proofs that use the goal's own arguments, so asking for a function
 λ> :synth ((a → b → c) → List a → List b → List c)
   it1  fun f x y => List.zipWith f x y
   it2  fun _ _ _ => List.nil
+λ> :synth (List a → List a → List a)
+  it1  fun x _ => x
+  it2  fun _ x => x
+  it3  fun x _ => List.reverse x
+  it4  fun x y => List.append x y
+  it5  fun x y => List.append y x
 \end{session}
 
 (Trailing candidates and the truncation notes are elided here.) The

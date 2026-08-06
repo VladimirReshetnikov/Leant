@@ -725,8 +725,8 @@ inventory of library functions with it (`List.map`, `List.foldr`,
 `Nat.add`, …), instantiated at the goal's own types and handed to the
 engine as extra premises — the phase-3 promise of *recursion via
 library reuse*, in miniature. The enumeration prefers proofs that use
-the goal's own arguments, so the library answer is the *first*
-candidate:
+the goal's own arguments, generally putting the direct library answer
+first while retaining distinct choices between same-typed arguments:
 
 ```text
 λ> :synth ((a → b) → List a → List b)
@@ -750,6 +750,12 @@ candidate:
 λ> :synth ((a → b → c) → List a → List b → List c)
   it1  fun f x y => List.zipWith f x y
   ⋯
+λ> :synth (List a → List a → List a)
+  it1  fun x _ => x
+  it2  fun _ x => x
+  it3  fun x _ => List.reverse x
+  it4  fun x y => List.append x y
+  it5  fun x y => List.append y x
 ```
 
 The inventory is a ratings list in Djex's `*.ratings` format — lower
