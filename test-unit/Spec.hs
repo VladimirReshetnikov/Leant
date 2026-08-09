@@ -22,7 +22,10 @@ import Test.Tasty.HUnit ((@?=), assertBool, assertFailure, testCase)
 
 import Language.Haskell.Djex
   ( Constraint (..)
-  , Expression (Global, Lambda, Local, Tuple, VisibleTypeApplication)
+  , Expression
+      ( Apply, Case, Global, Lambda, Let, Local, Tuple
+      , VisibleTypeApplication
+      )
   , Pattern (Bind)
   , Type (..)
   , inferredVisibleTypeArgument
@@ -1238,6 +1241,46 @@ typeApplicationTests = testGroup "retained type applications"
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
             Left err -> assertFailure err
       mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "fit explicit forall provider arguments in case scrutinees" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      let token = FAtom False "Demo.Token"
+          providerFrag = FArr polytype token
+          providers = Map.singleton "leantProvider0"
+            ("Demo.consumeExplicit", Nothing, providerFrag)
+          providerApplication = Apply (Global providerName)
+            (Lambda [Bind "identity"] (Local "identity"))
+          expression = Case providerApplication
+            [(Bind "result", Local "result")]
+      case renderLeanTerm Map.empty providers Map.empty ([], 0, [])
+          token expression of
+        Left err -> assertFailure err
+        Right candidates -> assertBool
+          ("case scrutinee lost its explicit forall binder: "
+            ++ show candidates)
+          (not (null candidates)
+            && all
+              ("Demo.consumeExplicit (fun _" `isInfixOf`)
+              candidates)
+  , testCase "fit explicit forall provider arguments in let right-hand sides" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      let token = FAtom False "Demo.Token"
+          providerFrag = FArr polytype token
+          providers = Map.singleton "leantProvider0"
+            ("Demo.consumeExplicit", Nothing, providerFrag)
+          providerApplication = Apply (Global providerName)
+            (Lambda [Bind "identity"] (Local "identity"))
+          expression = Let (Bind "result") providerApplication
+            (Local "result")
+      case renderLeanTerm Map.empty providers Map.empty ([], 0, [])
+          token expression of
+        Left err -> assertFailure err
+        Right candidates -> assertBool
+          ("let right-hand side lost its explicit forall binder: "
+            ++ show candidates)
+          (not (null candidates)
+            && all
+              ("Demo.consumeExplicit (fun _" `isInfixOf`)
+              candidates)
   , testCase "make a constrained vacuous provider choice visible" $
       let natural = FParamRec True "Nat" "Nat" []
             [ ("Nat.zero", [])

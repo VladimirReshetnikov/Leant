@@ -607,11 +607,12 @@ fit cm providers force frag expr n doms =
     _ -> ([], core, f, k)
 
 -- | Recurse through introduction forms whose component types the goal
--- fragment determines, and through match alternatives (branches produce
--- the scrutinized position's type; sum\/product eliminations also reveal
--- the branch binders' domains when the scrutinee is a known binder,
--- whose quantifiers - instantiated silently by the engine before the
--- case split - are peeled first).
+-- fragment determines, through elimination inputs far enough to fit
+-- applications whose heads have known source fragments, and through match
+-- alternatives (branches produce the scrutinized position's type;
+-- sum\/product eliminations also reveal the branch binders' domains when the
+-- scrutinee is a known binder, whose quantifiers - instantiated silently by
+-- the engine before the case split - are peeled first).
 fitCore :: CtorMap -> ProviderMap -> Bool -> Frag -> Expression String -> Int
         -> [(String, Frag)] -> (Expression String, Int, [(String, Frag)])
 fitCore cm providers force cf ce n ds = case (cf, ce) of
@@ -666,8 +667,9 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
           fitCore cm providers force cf function n ds
     in (VisibleTypeApplication function' argument, n1, ds1)
   (_, Case scrut alts) ->
-    let scrutFrag = case scrut of
-          Local s -> peelAlls <$> lookup s ds
+    let (scrut', n0, ds0) = fitEliminationInput scrut n ds
+        scrutFrag = case scrut' of
+          Local s -> peelAlls <$> lookup s ds0
           _ -> Nothing
         goAlt (done, k, dss) (pat, body) =
           let branchDoms = case (scrutFrag, pat) of
@@ -687,17 +689,18 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
               (body', k', dss') =
                 fit cm providers force cf body k (branchDoms ++ dss)
           in (done ++ [(pat, body')], k', dss')
-        (alts', n1, ds1) = foldl goAlt ([], n, ds) alts
-    in (Case scrut alts', n1, ds1)
+        (alts', n1, ds1) = foldl goAlt ([], n0, ds0) alts
+    in (Case scrut' alts', n1, ds1)
   (_, Let pat rhs body) ->
-    let aliasDoms = case rhs of
-          Local source -> case lookup source ds of
+    let (rhs', n0, ds0) = fitEliminationInput rhs n ds
+        aliasDoms = case rhs' of
+          Local source -> case lookup source ds0 of
             Just sourceFrag -> bindDomainPairs pat sourceFrag
             Nothing -> []
           _ -> []
         (body', n1, ds1) =
-          fit cm providers force cf body n (aliasDoms ++ ds)
-    in (Let pat rhs body', n1, ds1)
+          fit cm providers force cf body n0 (aliasDoms ++ ds0)
+    in (Let pat rhs' body', n1, ds1)
   _ -> (ce, n, ds)
  where
   isKind k g = case (globalKind cm g, k) of
@@ -727,6 +730,15 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
       Nothing -> Nothing
     VisibleTypeApplication function _ -> applicationHeadFrag function
     _ -> Nothing
+  -- A case scrutinee or let RHS has its own result type, which the enclosing
+  -- goal fragment does not describe.  Use an opaque internal atom so only
+  -- expected-result-independent paths fire: known-head application fitting,
+  -- visible type applications, and nested eliminations.  In particular this
+  -- cannot mistake a tuple or declared constructor in the input for an
+  -- introduction of the enclosing result.
+  fitEliminationInput expression k dss =
+    fitCore cm providers force eliminationInputFrag expression k dss
+  eliminationInputFrag = FAtom False "Leant.Internal.EliminationInput"
   -- the domain of the hypothesis type's n-th term argument (its
   -- quantifier slots consume no term arguments)
   argDoms frag = case frag of
