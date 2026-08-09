@@ -607,11 +607,12 @@ fit cm providers force frag expr n doms =
     _ -> ([], core, f, k)
 
 -- | Recurse through introduction forms whose component types the goal
--- fragment determines, and through match alternatives (branches produce
--- the scrutinized position's type; sum\/product eliminations also reveal
--- the branch binders' domains when the scrutinee is a known binder,
--- whose quantifiers - instantiated silently by the engine before the
--- case split - are peeled first).
+-- fragment determines, through elimination inputs far enough to fit
+-- applications whose heads have known source fragments, and through match
+-- alternatives (branches produce the scrutinized position's type;
+-- sum\/product eliminations also reveal the branch binders' domains when the
+-- scrutinee is a known binder, whose quantifiers - instantiated silently by
+-- the engine before the case split - are peeled first).
 fitCore :: CtorMap -> ProviderMap -> Bool -> Frag -> Expression String -> Int
         -> [(String, Frag)] -> (Expression String, Int, [(String, Frag)])
 fitCore cm providers force cf ce n ds = case (cf, ce) of
@@ -650,24 +651,15 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
   -- it a constructed @forall@ argument would lose Lean's explicit type-binder
   -- wildcard and be rejected only at backend verification.
   (_, _)
-    | (headExpr, args@(_ : _)) <- appSpine ce
-    , Just hFrag <- applicationHeadFrag headExpr ->
-        let step (done, k, dss) (mdom, arg) = case mdom of
-              Just dom ->
-                let (arg', k', dss') =
-                      fit cm providers force dom arg k dss
-                in (done ++ [arg'], k', dss')
-              Nothing -> (done ++ [arg], k, dss)
-            (args', n1, ds1) =
-              foldl step ([], n, ds) (zip (argDoms hFrag) args)
-        in (foldl Apply headExpr args', n1, ds1)
+    | Just fitted <- fitKnownApplication ce n ds -> fitted
   (_, VisibleTypeApplication function argument) ->
     let (function', n1, ds1) =
           fitCore cm providers force cf function n ds
     in (VisibleTypeApplication function' argument, n1, ds1)
   (_, Case scrut alts) ->
-    let scrutFrag = case scrut of
-          Local s -> peelAlls <$> lookup s ds
+    let (scrut', n0, ds0) = fitEliminationInput scrut n ds
+        scrutFrag = case scrut' of
+          Local s -> peelAlls <$> lookup s ds0
           _ -> Nothing
         goAlt (done, k, dss) (pat, body) =
           let branchDoms = case (scrutFrag, pat) of
@@ -687,17 +679,18 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
               (body', k', dss') =
                 fit cm providers force cf body k (branchDoms ++ dss)
           in (done ++ [(pat, body')], k', dss')
-        (alts', n1, ds1) = foldl goAlt ([], n, ds) alts
-    in (Case scrut alts', n1, ds1)
+        (alts', n1, ds1) = foldl goAlt ([], n0, ds0) alts
+    in (Case scrut' alts', n1, ds1)
   (_, Let pat rhs body) ->
-    let aliasDoms = case rhs of
-          Local source -> case lookup source ds of
+    let (rhs', n0, ds0) = fitEliminationInput rhs n ds
+        aliasDoms = case rhs' of
+          Local source -> case lookup source ds0 of
             Just sourceFrag -> bindDomainPairs pat sourceFrag
             Nothing -> []
           _ -> []
         (body', n1, ds1) =
-          fit cm providers force cf body n (aliasDoms ++ ds)
-    in (Let pat rhs body', n1, ds1)
+          fit cm providers force cf body n0 (aliasDoms ++ ds0)
+    in (Let pat rhs' body', n1, ds1)
   _ -> (ce, n, ds)
  where
   isKind k g = case (globalKind cm g, k) of
@@ -720,13 +713,72 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
   appSpine expr = spineAcc expr []
   spineAcc (Apply f a) acc = spineAcc f (a : acc)
   spineAcc f acc = (f, acc)
-  applicationHeadFrag headExpr = case headExpr of
-    Local local -> lookup local ds
+  applicationHeadFrag dss headExpr = case headExpr of
+    Local local -> lookup local dss
     Global global -> case declaredProvider providers global of
       Just (_, _, providerFrag) -> Just providerFrag
       Nothing -> Nothing
-    VisibleTypeApplication function _ -> applicationHeadFrag function
+    VisibleTypeApplication function _ -> applicationHeadFrag dss function
     _ -> Nothing
+  fitKnownApplication expression k dss = case appSpine expression of
+    (headExpr, args@(_ : _)) -> case applicationHeadFrag dss headExpr of
+      Nothing -> Nothing
+      Just hFrag ->
+        let step (done, j, env) (mdom, arg) = case mdom of
+              Just dom ->
+                let (arg', j', env') =
+                      fit cm providers force dom arg j env
+                in (done ++ [arg'], j', env')
+              Nothing -> (done ++ [arg], j, env)
+            (args', k', dss') =
+              foldl step ([], k, dss) (zip (argDoms hFrag) args)
+        in Just (foldl Apply headExpr args', k', dss')
+    _ -> Nothing
+  -- A case scrutinee or let RHS has its own result type, which the enclosing
+  -- goal fragment does not describe.  Traverse that input structurally and
+  -- invoke fragment-directed fitting only at an application whose local or
+  -- provider head has an exact source fragment.  This preserves every
+  -- unrelated node and reaches known applications beneath lambdas, tuples,
+  -- unknown applications, and nested eliminations without guessing the
+  -- input's result fragment.
+  fitEliminationInput expression k dss =
+    case fitKnownApplication expression k dss of
+      Just fitted -> fitted
+      Nothing -> case expression of
+        Apply function argument ->
+          let (function', k1, dss1) =
+                fitEliminationInput function k dss
+              (argument', k2, dss2) =
+                fitEliminationInput argument k1 dss1
+          in (Apply function' argument', k2, dss2)
+        VisibleTypeApplication function argument ->
+          let (function', k1, dss1) =
+                fitEliminationInput function k dss
+          in (VisibleTypeApplication function' argument, k1, dss1)
+        Lambda patterns body ->
+          let (body', k1, dss1) = fitEliminationInput body k dss
+          in (Lambda patterns body', k1, dss1)
+        Tuple elements ->
+          let step (done, j, env) element =
+                let (element', j', env') =
+                      fitEliminationInput element j env
+                in (done ++ [element'], j', env')
+              (elements', k1, dss1) = foldl step ([], k, dss) elements
+          in (Tuple elements', k1, dss1)
+        Let pat rhs body ->
+          let (rhs', k1, dss1) = fitEliminationInput rhs k dss
+              (body', k2, dss2) = fitEliminationInput body k1 dss1
+          in (Let pat rhs' body', k2, dss2)
+        Case scrut alts ->
+          let (scrut', k1, dss1) = fitEliminationInput scrut k dss
+              step (done, j, env) (pat, body) =
+                let (body', j', env') = fitEliminationInput body j env
+                in (done ++ [(pat, body')], j', env')
+              (alts', k2, dss2) = foldl step ([], k1, dss1) alts
+          in (Case scrut' alts', k2, dss2)
+        Local _ -> (expression, k, dss)
+        Global _ -> (expression, k, dss)
+        Hole _ -> (expression, k, dss)
   -- the domain of the hypothesis type's n-th term argument (its
   -- quantifier slots consume no term arguments)
   argDoms frag = case frag of
@@ -1099,6 +1151,11 @@ render cm providers typeNames style visibleBinderDomain doms = go
         Local x -> do
           argTxts <- mapM (go 2) args
           renderUse req x argTxts
+        Global g
+          | Just (leanName, _, providerFrag) <- declaredProvider providers g -> do
+              argTxts <- mapM (go 2) args
+              Right (at req 1
+                (unwords (leanName : weaveArgs providerFrag argTxts)))
         Global g
           | Right (GCtor info) <- globalKind cm g
           , style == Idiomatic

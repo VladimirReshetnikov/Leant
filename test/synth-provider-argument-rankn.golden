@@ -1,0 +1,24 @@
+
+   __                  __
+  / /  ___ ___ ____   / /_
+ / /__/ -_) _ `/ _ \_/ __/
+/____/\__/\_,_/_//_/ \__/
+Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to exit.
+λ> :set synth-library off
+synth library: off
+λ> axiom ProviderLambda.Result : Type
+λ> axiom ProviderLambda.consume : (∀ A : Type, A → A) → ProviderLambda.Result
+λ> :set synth-steps 128
+synth steps: 128
+λ> :set synth-engine exference
+synth engine: exference
+λ> :synth ProviderLambda.Result
+preparing synthesis environment (session imports + Lean)...
+  it1  ProviderLambda.consume (fun _ x => x)
+note: search truncated: step limit reached
+λ> :set synth-engine both
+synth engine: both
+λ> :synth ProviderLambda.Result
+  it1  ProviderLambda.consume (fun _ x => x)
+note: exference: search truncated: step limit reached
+λ> :quit

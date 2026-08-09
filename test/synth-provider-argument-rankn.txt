@@ -1,0 +1,9 @@
+:set synth-library off
+axiom ProviderLambda.Result : Type
+axiom ProviderLambda.consume : (∀ A : Type, A → A) → ProviderLambda.Result
+:set synth-steps 128
+:set synth-engine exference
+:synth ProviderLambda.Result
+:set synth-engine both
+:synth ProviderLambda.Result
+:quit
