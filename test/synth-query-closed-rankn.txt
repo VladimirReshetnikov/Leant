@@ -1,0 +1,15 @@
+namespace QueryClosed
+axiom Mono : Type
+axiom Token : Type
+axiom Indexed : Type → Type
+end QueryClosed
+
+:set synth-library off
+:set synth-steps 128
+:set synth-engine djinn
+:synth ((∀ a : Type, (a → QueryClosed.Token) → a → QueryClosed.Indexed a) → (QueryClosed.Mono → QueryClosed.Token) → QueryClosed.Mono → QueryClosed.Indexed QueryClosed.Mono)
+:set synth-engine exference
+:synth ((∀ a : Type, (a → QueryClosed.Token) → a → QueryClosed.Indexed a) → (QueryClosed.Mono → QueryClosed.Token) → QueryClosed.Mono → QueryClosed.Indexed QueryClosed.Mono)
+:set synth-engine both
+:synth ((∀ a : Type, (a → QueryClosed.Token) → a → QueryClosed.Indexed a) → (QueryClosed.Mono → QueryClosed.Token) → QueryClosed.Mono → QueryClosed.Indexed QueryClosed.Mono)
+:quit
