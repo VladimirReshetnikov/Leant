@@ -26,6 +26,7 @@ import Language.Haskell.Djex
   , Pattern (Bind)
   , Type (..)
   , inferredVisibleTypeArgument
+  , maximumProviderInstantiationArguments
   , maximumProviderInstantiationKindNodes
   , mkIdentifier
   , specifiedVisibleTypeArgument
@@ -364,7 +365,9 @@ providerProgramTests = testGroup "provider discovery program"
       let prelude = synthPrelude []
           program = providerProgram []
             (ProviderQuery ["Gap"] (Just "Gap.Token"))
-      "providerEvidenceSpine fuel 4 source" `isInfixOf` prelude @?= True
+      ("providerEvidenceSpine fuel "
+          ++ show maximumProviderInstantiationArguments ++ " source")
+        `isInfixOf` prelude @?= True
       "if inspected < 32 && assignments.size < 16"
         `isInfixOf` prelude @?= True
       "for inst in instances.toList.reverse do"
@@ -1399,6 +1402,45 @@ typeApplicationTests = testGroup "retained type applications"
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
             Left err -> assertFailure err
       mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "retain five ordered quantified provider arguments" $ do
+      let token = FAtom False "Gap.FiveToken"
+          quantified binder arity =
+            let variable = FVar binder
+            in FAll True binder
+                (foldr FArr variable (replicate arity variable))
+          assignment = map properArgument
+            [ quantified "p1" 1
+            , quantified "p2" 2
+            , quantified "p3" 3
+            , quantified "p4" 4
+            , quantified "p5" 5
+            ]
+          provider = ProviderFragWithEvidence "Gap.five"
+            (FAll False "a" (FAll False "b"
+              (FAll False "c" (FAll False "d"
+                (FAll False "e" token)))))
+            ["a", "b", "c", "d", "e"] [assignment]
+          expected =
+            [ "Gap.five"
+            , "«a» := (∀ (a0_0 : _), a0_0 → a0_0)"
+            , "«b» := (∀ (a0_0 : _), a0_0 → a0_0 → a0_0)"
+            , "«c» := (∀ (a0_0 : _), a0_0 → a0_0 → a0_0 → a0_0)"
+            , "«d» := (∀ (a0_0 : _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0)"
+            , "«e» := (∀ (a0_0 : _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)"
+            ]
+          exact term = all (\needle -> needle `isInfixOf` term) expected
+          check engine = case
+              synthesizeWithProviders engine 2048 [provider] token of
+            Right (SynthCandidates groups _) ->
+              assertBool
+                ("ordered five-argument assignment was lost in "
+                  ++ synthEngineName engine ++ ": " ++ show groups)
+                (any exact (concat groups))
+            Right other -> assertFailure $
+              "unexpected five-argument assignment outcome from "
+                ++ synthEngineName engine ++ ": " ++ outcomeTag other
+            Left err -> assertFailure err
+      mapM_ check [EngineDjinn, EngineExference, EngineBoth]
   , testCase "do not enter provider evidence beyond the aggregate bound" $
       let token = FAtom False "Gap.Token"
           provider name result assignments = ProviderFragWithEvidence name
@@ -2399,6 +2441,43 @@ rankNFrontierTests = testGroup "Djinn rank-N frontiers"
         Right other -> assertFailure $
           "unexpected four-binder synthesis outcome: " ++ outcomeTag other
         Left err -> assertFailure err
+  , testCase "render five-binder hypothesis instantiation for Lean" $ do
+      let variable = FVar
+          forall5 a b c d e resultFrag =
+            FAll True a
+              (FAll True b
+                (FAll True c (FAll True d (FAll True e resultFrag))))
+          hypothesis = forall5 "a" "b" "c" "d" "e"
+            (FArr (variable "a")
+              (FArr (variable "b")
+                (FArr (variable "c")
+                  (FArr (variable "d")
+                    (FArr (variable "e") (variable "R"))))))
+          body = FArr hypothesis
+            (FArr (variable "A")
+              (FArr (variable "B")
+                (FArr (variable "C")
+                  (FArr (variable "D")
+                    (FArr (variable "E") (variable "R"))))))
+          goal = FAll True "A" (FAll True "B" (FAll True "C"
+            (FAll True "D" (FAll True "E" (FAll True "R" body)))))
+      case synthesizeWithProviders EngineDjinn 0 [] goal of
+        Right (SynthCandidates groups _) ->
+          let candidates = concat groups
+              -- As above, eta-equivalent candidates can keep either the
+              -- compact or expanded spelling.  Both spellings expose the
+              -- five retained type applications that this boundary tests.
+              instantiated candidate =
+                "f _ _ _ _ _ " `isInfixOf` candidate
+                  || "=> f _ _ _ _ _" `isInfixOf` candidate
+          in if any instantiated candidates
+              then pure ()
+              else assertFailure $
+                "expected a five-binder instantiation candidate, got: "
+                  ++ show candidates
+        Right other -> assertFailure $
+          "unexpected five-binder synthesis outcome: " ++ outcomeTag other
+        Left err -> assertFailure err
   , testCase "render a balanced four-site pairwise plan for Lean" $ do
       let variable = FVar
           product4 a b c d = FProd a (FProd b (FProd c d))
@@ -2512,24 +2591,24 @@ rankNFrontierTests = testGroup "Djinn rank-N frontiers"
               ("quartic synthesis failed in " ++ synthEngineName engine
                 ++ ": " ++ err)
       mapM_ checkEngine [EngineDjinn, EngineExference, EngineBoth]
-  , testCase "coalesce five-binder schemes for quintic Djinn planning" $ do
+  , testCase "coalesce six-binder sentinels for quintic Djinn planning" $ do
       let variable = FVar
-          product5 names = foldr1 FProd $ map variable names
-          wide names = foldr (FAll True) (product5 names) names
+          product6 names = foldr1 FProd $ map variable names
+          wide names = foldr (FAll True) (product6 names) names
           identity name = FAll True name
             (FArr (variable name) (variable name))
-          input = wide ["a", "b", "c", "d", "e"]
+          input = wide ["a", "b", "c", "d", "e", "f"]
           result = foldr1 FProd
-            [ wide ["f", "g", "h", "i", "j"]
-            , wide ["k", "l", "m", "n", "o"]
-            , wide ["p", "q", "r", "s", "t"]
-            , wide ["u", "v", "w", "x", "y"]
+            [ wide ["g", "h", "i", "j", "k", "l"]
+            , wide ["m", "n", "o", "p", "q", "r"]
+            , wide ["s", "t", "u", "v", "w", "x"]
+            , wide ["y", "z", "a0", "b0", "c0", "d0"]
             , identity "i0"
             , identity "i1"
             , identity "i2"
             , identity "i3"
             , identity "i4"
-            , wide ["z0", "z1", "z2", "z3", "z4"]
+            , wide ["z0", "z1", "z2", "z3", "z4", "z5"]
             ]
           goal = FArr input result
           direct =
@@ -2547,22 +2626,23 @@ rankNFrontierTests = testGroup "Djinn rank-N frontiers"
           "quintic synthesis failed after forall coalescing: " ++ err
   , testCase "render the eleven-site dual quintic plan for Lean" $ do
       let variable = FVar
-          product5 names = foldr1 FProd $ map variable names
-          wide names = foldr (FAll True) (product5 names) names
+          product6 names = foldr1 FProd $ map variable names
+          wide names = foldr (FAll True) (product6 names) names
           identity name = FAll True name
             (FArr (variable name) (variable name))
-          input = wide ["source0", "source1", "source2", "source3", "source4"]
+          input = wide
+            ["source0", "source1", "source2", "source3", "source4", "source5"]
           result = foldr1 FProd
             [ identity "i0"
             , identity "i1"
             , identity "i2"
             , identity "i3"
-            , wide ["a", "b", "c", "d", "e"]
-            , wide ["f", "g", "h", "i", "j"]
-            , wide ["k", "l", "m", "n", "o"]
-            , wide ["p", "q", "r", "s", "t"]
-            , wide ["u", "v", "w", "x", "y"]
-            , wide ["z0", "z1", "z2", "z3", "z4"]
+            , wide ["a", "b", "c", "d", "e", "f"]
+            , wide ["g", "h", "i", "j", "k", "l"]
+            , wide ["m", "n", "o", "p", "q", "r"]
+            , wide ["s", "t", "u", "v", "w", "x"]
+            , wide ["y", "z", "a0", "b0", "c0", "d0"]
+            , wide ["z0", "z1", "z2", "z3", "z4", "z5"]
             , identity "i4"
             ]
           goal = FArr input result

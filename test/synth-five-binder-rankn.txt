@@ -1,0 +1,13 @@
+namespace FiveBinder
+axiom Five : Type → Type → Type → Type → Type → Type
+axiom Token : Type
+class Choice (one two three four five : Type 1) : Prop where witness : True
+instance : Choice (∀ A : Type, A → A) (∀ B : Type, B → B → B) (∀ C : Type, C → C → C → C) (∀ D : Type, D → D → D → D → D) (∀ E : Type, E → E → E → E → E → E) := ⟨True.intro⟩
+axiom chosen {one two three four five : Type 1} [Choice one two three four five] : Token
+end FiveBinder
+
+:set synth-library off
+:set synth-engine djinn
+:synth FiveBinder.Token
+:synth (∀ A B C D E : Type, (∀ a b c d e : Type, FiveBinder.Five a b c d e) → FiveBinder.Five E D C B A)
+:quit
