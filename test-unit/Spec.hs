@@ -1281,6 +1281,26 @@ typeApplicationTests = testGroup "retained type applications"
             && all
               ("Demo.consumeExplicit (fun _" `isInfixOf`)
               candidates)
+  , testCase "fit provider arguments recursively below elimination inputs" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      let token = FAtom False "Demo.Token"
+          providerFrag = FArr polytype token
+          providers = Map.singleton "leantProvider0"
+            ("Demo.consumeExplicit", Nothing, providerFrag)
+          providerApplication = Apply (Global providerName)
+            (Lambda [Bind "identity"] (Local "identity"))
+          nestedRhs = Lambda [Bind "ignored"] providerApplication
+          expression = Let (Bind "result") nestedRhs (Local "result")
+      case renderLeanTerm Map.empty providers Map.empty ([], 0, [])
+          (FArr token token) expression of
+        Left err -> assertFailure err
+        Right candidates -> assertBool
+          ("nested elimination input lost its explicit forall binder: "
+            ++ show candidates)
+          (not (null candidates)
+            && all
+              ("Demo.consumeExplicit (fun _" `isInfixOf`)
+              candidates)
   , testCase "make a constrained vacuous provider choice visible" $
       let natural = FParamRec True "Nat" "Nat" []
             [ ("Nat.zero", [])

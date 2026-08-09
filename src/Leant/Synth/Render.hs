@@ -651,17 +651,7 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
   -- it a constructed @forall@ argument would lose Lean's explicit type-binder
   -- wildcard and be rejected only at backend verification.
   (_, _)
-    | (headExpr, args@(_ : _)) <- appSpine ce
-    , Just hFrag <- applicationHeadFrag headExpr ->
-        let step (done, k, dss) (mdom, arg) = case mdom of
-              Just dom ->
-                let (arg', k', dss') =
-                      fit cm providers force dom arg k dss
-                in (done ++ [arg'], k', dss')
-              Nothing -> (done ++ [arg], k, dss)
-            (args', n1, ds1) =
-              foldl step ([], n, ds) (zip (argDoms hFrag) args)
-        in (foldl Apply headExpr args', n1, ds1)
+    | Just fitted <- fitKnownApplication ce n ds -> fitted
   (_, VisibleTypeApplication function argument) ->
     let (function', n1, ds1) =
           fitCore cm providers force cf function n ds
@@ -723,22 +713,72 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
   appSpine expr = spineAcc expr []
   spineAcc (Apply f a) acc = spineAcc f (a : acc)
   spineAcc f acc = (f, acc)
-  applicationHeadFrag headExpr = case headExpr of
-    Local local -> lookup local ds
+  applicationHeadFrag dss headExpr = case headExpr of
+    Local local -> lookup local dss
     Global global -> case declaredProvider providers global of
       Just (_, _, providerFrag) -> Just providerFrag
       Nothing -> Nothing
-    VisibleTypeApplication function _ -> applicationHeadFrag function
+    VisibleTypeApplication function _ -> applicationHeadFrag dss function
+    _ -> Nothing
+  fitKnownApplication expression k dss = case appSpine expression of
+    (headExpr, args@(_ : _)) -> case applicationHeadFrag dss headExpr of
+      Nothing -> Nothing
+      Just hFrag ->
+        let step (done, j, env) (mdom, arg) = case mdom of
+              Just dom ->
+                let (arg', j', env') =
+                      fit cm providers force dom arg j env
+                in (done ++ [arg'], j', env')
+              Nothing -> (done ++ [arg], j, env)
+            (args', k', dss') =
+              foldl step ([], k, dss) (zip (argDoms hFrag) args)
+        in Just (foldl Apply headExpr args', k', dss')
     _ -> Nothing
   -- A case scrutinee or let RHS has its own result type, which the enclosing
-  -- goal fragment does not describe.  Use an opaque internal atom so only
-  -- expected-result-independent paths fire: known-head application fitting,
-  -- visible type applications, and nested eliminations.  In particular this
-  -- cannot mistake a tuple or declared constructor in the input for an
-  -- introduction of the enclosing result.
+  -- goal fragment does not describe.  Traverse that input structurally and
+  -- invoke fragment-directed fitting only at an application whose local or
+  -- provider head has an exact source fragment.  This preserves every
+  -- unrelated node and reaches known applications beneath lambdas, tuples,
+  -- unknown applications, and nested eliminations without guessing the
+  -- input's result fragment.
   fitEliminationInput expression k dss =
-    fitCore cm providers force eliminationInputFrag expression k dss
-  eliminationInputFrag = FAtom False "Leant.Internal.EliminationInput"
+    case fitKnownApplication expression k dss of
+      Just fitted -> fitted
+      Nothing -> case expression of
+        Apply function argument ->
+          let (function', k1, dss1) =
+                fitEliminationInput function k dss
+              (argument', k2, dss2) =
+                fitEliminationInput argument k1 dss1
+          in (Apply function' argument', k2, dss2)
+        VisibleTypeApplication function argument ->
+          let (function', k1, dss1) =
+                fitEliminationInput function k dss
+          in (VisibleTypeApplication function' argument, k1, dss1)
+        Lambda patterns body ->
+          let (body', k1, dss1) = fitEliminationInput body k dss
+          in (Lambda patterns body', k1, dss1)
+        Tuple elements ->
+          let step (done, j, env) element =
+                let (element', j', env') =
+                      fitEliminationInput element j env
+                in (done ++ [element'], j', env')
+              (elements', k1, dss1) = foldl step ([], k, dss) elements
+          in (Tuple elements', k1, dss1)
+        Let pat rhs body ->
+          let (rhs', k1, dss1) = fitEliminationInput rhs k dss
+              (body', k2, dss2) = fitEliminationInput body k1 dss1
+          in (Let pat rhs' body', k2, dss2)
+        Case scrut alts ->
+          let (scrut', k1, dss1) = fitEliminationInput scrut k dss
+              step (done, j, env) (pat, body) =
+                let (body', j', env') = fitEliminationInput body j env
+                in (done ++ [(pat, body')], j', env')
+              (alts', k2, dss2) = foldl step ([], k1, dss1) alts
+          in (Case scrut' alts', k2, dss2)
+        Local _ -> (expression, k, dss)
+        Global _ -> (expression, k, dss)
+        Hole _ -> (expression, k, dss)
   -- the domain of the hypothesis type's n-th term argument (its
   -- quantifier slots consume no term arguments)
   argDoms frag = case frag of
