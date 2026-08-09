@@ -1152,6 +1152,11 @@ render cm providers typeNames style visibleBinderDomain doms = go
           argTxts <- mapM (go 2) args
           renderUse req x argTxts
         Global g
+          | Just (leanName, _, providerFrag) <- declaredProvider providers g -> do
+              argTxts <- mapM (go 2) args
+              Right (at req 1
+                (unwords (leanName : weaveArgs providerFrag argTxts)))
+        Global g
           | Right (GCtor info) <- globalKind cm g
           , style == Idiomatic
           , ciSole info

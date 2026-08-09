@@ -1241,6 +1241,32 @@ typeApplicationTests = testGroup "retained type applications"
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
             Left err -> assertFailure err
       mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "weave explicit forall slots into applied foreign providers" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      let source = FAtom False "Demo.Source"
+          result = FAtom False "Demo.Result"
+          providerFrag = FAll True "A"
+            (FArr (FVar "A") result)
+          providers = Map.singleton "leantProvider0"
+            ("Demo.source", Nothing, providerFrag)
+          expression = Lambda [Bind "value"] $
+            Apply (Global providerName) (Local "value")
+      renderLeanTerm Map.empty providers Map.empty ([], 0, [])
+          (FArr source result) expression
+        @?= Right ["fun x => Demo.source _ x"]
+  , testCase "leave implicit forall slots hidden on applied providers" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      let source = FAtom False "Demo.Source"
+          result = FAtom False "Demo.Result"
+          providerFrag = FAll False "A"
+            (FArr (FVar "A") result)
+          providers = Map.singleton "leantProvider0"
+            ("Demo.source", Nothing, providerFrag)
+          expression = Lambda [Bind "value"] $
+            Apply (Global providerName) (Local "value")
+      renderLeanTerm Map.empty providers Map.empty ([], 0, [])
+          (FArr source result) expression
+        @?= Right ["fun x => Demo.source x"]
   , testCase "fit explicit forall provider arguments in case scrutinees" $ do
       providerName <- expectRight $ mkIdentifier "leantProvider0"
       let token = FAtom False "Demo.Token"
