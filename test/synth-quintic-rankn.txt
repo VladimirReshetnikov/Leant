@@ -1,6 +1,6 @@
 :set synth-library off
 :set synth-engine djinn
-abbrev QuinticRankN.Wide := ∀ A B C D E : Type, A × B × C × D × E
+abbrev QuinticRankN.Wide := ∀ A B C D E F : Type, A × B × C × D × E × F
 :synth (QuinticRankN.Wide → QuinticRankN.Wide × QuinticRankN.Wide × QuinticRankN.Wide × QuinticRankN.Wide × (∀ I : Type, I → I) × (∀ J : Type, J → J) × (∀ K : Type, K → K) × (∀ L : Type, L → L) × (∀ N : Type, N → N) × QuinticRankN.Wide)
 :synth (QuinticRankN.Wide → (∀ I : Type, I → I) × (∀ J : Type, J → J) × (∀ K : Type, K → K) × (∀ L : Type, L → L) × QuinticRankN.Wide × QuinticRankN.Wide × QuinticRankN.Wide × QuinticRankN.Wide × QuinticRankN.Wide × QuinticRankN.Wide × (∀ N : Type, N → N))
 :quit

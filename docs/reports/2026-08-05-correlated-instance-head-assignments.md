@@ -1,5 +1,10 @@
 # Correlated instance-head assignments
 
+> **Follow-up.** The
+> [five-binder integration](2026-08-09-five-binder-instantiation.md) raises the
+> shared vector and live-discovery boundary from four to five. The examples and
+> numeric limit below describe this report's historical tree.
+
 **Date:** 2026-08-05
 
 **Scope:** complete, ordered Lean-to-Djex provider instantiations

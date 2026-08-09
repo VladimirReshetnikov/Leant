@@ -6,6 +6,9 @@
 > [correlated instance-head assignment report](2026-08-05-correlated-instance-head-assignments.md).
 > The legacy `(candidates ...)` wire form and Djex candidate runners remain
 > supported compatibility paths, but live extraction uses exact assignments.
+> The later
+> [five-binder integration](2026-08-09-five-binder-instantiation.md) widens
+> that exact live channel while leaving this scalar snapshot historical.
 
 **Date:** 2026-08-05
 

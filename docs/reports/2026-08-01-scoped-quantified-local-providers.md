@@ -1,5 +1,10 @@
 # Scoped quantified local providers
 
+> **Follow-up.** The
+> [five-binder integration](2026-08-09-five-binder-instantiation.md) raises the
+> query-derived and exact-assignment eligibility boundary from four to five.
+> The local-provider result below remains the historical starting point.
+
 **Date:** 2026-08-01
 
 **Scope:** Djex-to-Lean synthesis of visible, query-supplied polytype choices

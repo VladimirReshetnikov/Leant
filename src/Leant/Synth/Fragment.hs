@@ -25,9 +25,11 @@
 -- while an atom mentioning any constant (e.g. @Nat@, @P 3@) downgrades
 -- \"provably uninhabited\" to \"no term found within bounds\".
 --
--- This module is deliberately Djex-free: it parses the S-expression into
--- 'Frag' and answers refusal/safety questions.  'Leant.Synth.Engine'
--- owns the narrow boundary to the synthesis engine.
+-- This module keeps Djex syntax out of the fragment representation: it parses
+-- the S-expression into 'Frag' and answers refusal/safety questions.
+-- 'Leant.Synth.Engine' owns the narrow type-and-search boundary.  The generated
+-- Lean provider worker imports only Djex's public finite argument limit so the
+-- producer and checked consumer cannot drift onto different arities.
 module Leant.Synth.Fragment
   ( AppHead (..)
   , Frag (..)
@@ -60,6 +62,8 @@ module Leant.Synth.Fragment
 import Data.Char (isSpace)
 import Data.List (intercalate, nub)
 import Text.Read (readMaybe)
+
+import Language.Haskell.Djex (maximumProviderInstantiationArguments)
 
 import Leant.Synth.ProviderCache
   ( ProviderQuery (..)
@@ -582,7 +586,7 @@ synthPrelude inventory = unlines
   , ""
   , "-- Open only the provider prefix represented by its serialized FAlls,"
   , "-- retaining erased instance constraints next to the fresh type metas"
-  , "-- they can determine.  Four type binders bound the candidate product;"
+  , "-- they can determine.  Five type binders bound the candidate product;"
   , "-- the ordinary serializer fuel bounds intervening instance binders."
   , "partial def providerEvidenceSpine (fuel remainingTypes : Nat)"
   , "    (e : Expr) : MetaM (Array Expr × Array Expr) := do"
@@ -704,7 +708,8 @@ synthPrelude inventory = unlines
   , "-- distinct complete assignments."
   , "partial def providerInstantiationAssignments (fuel : Nat) (source : Expr)"
   , "    : MetaM (Array (Array (Nat \215 String))) := do"
-  , "  let (typeArgs, constraints) ← providerEvidenceSpine fuel 4 source"
+  , "  let (typeArgs, constraints) ← providerEvidenceSpine fuel "
+      ++ show maximumProviderInstantiationArguments ++ " source"
   , "  if typeArgs.isEmpty || constraints.isEmpty then return #[]"
   , "  let mut inspected := 0"
   , "  let mut assignments : Array (Array (Nat \215 String)) := #[]"
