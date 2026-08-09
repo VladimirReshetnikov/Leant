@@ -87,9 +87,13 @@ data CtorInfo = CtorInfo
 -- | Engine-side constructor spellings of the declared datatypes.
 type CtorMap = Map.Map String CtorInfo
 
--- | Collision-free engine provider spelling to the exact Lean global name
--- and the original names of its engine-visible leading type binders.
-type ProviderMap = Map.Map String (String, Maybe [String])
+-- | Collision-free engine provider spelling to the exact Lean global name,
+-- the original names of its engine-visible leading type binders, and its
+-- source fragment.  The renderer needs the fragment as an expected type when
+-- an engine constructs a higher-rank argument directly under the provider's
+-- global application; unlike stripped premise lambdas, such a global has no
+-- local-domain entry from which fitting could otherwise recover it.
+type ProviderMap = Map.Map String (String, Maybe [String], Frag)
 
 -- | Collision-free engine type spelling to its exact Lean type or type-family
 -- spelling.  Family heads are restored with their full explicit argument
@@ -123,7 +127,7 @@ renderLeanTerm cm providers typeNames (outerPrems, skip, innerPrems)
   let premises = outerPrems ++ innerPrems
       seed = [(premiseMark ++ name, frag) | (name, frag) <- premises]
       fitted = nub
-        [fit cm force goalFrag base 0 seed | force <- [False, True]]
+        [fit cm providers force goalFrag base 0 seed | force <- [False, True]]
   -- Twelve was the complete historical budget for site/style variants. Keep
   -- that budget independently in each universe-domain lane: with three sites
   -- there are already eight selective subsets, so one shared budget cannot
@@ -363,7 +367,8 @@ declaredCtor cm name = nameSpelling name >>= (`Map.lookup` cm)
 -- spelling.  The mapped text and binder metadata come directly from Lean
 -- environment introspection, so no Haskell-name rendering or qualification
 -- heuristic is applied to them.
-declaredProvider :: ProviderMap -> Name -> Maybe (String, Maybe [String])
+declaredProvider
+  :: ProviderMap -> Name -> Maybe (String, Maybe [String], Frag)
 declaredProvider providers name =
   nameSpelling name >>= (`Map.lookup` providers)
 
@@ -540,9 +545,9 @@ uniquify expr0 = fst <$> go Map.empty 0 expr0
 -- even when they are elimination forms (the non-forced fit transports
 -- those whole; both variants are offered to verification).
 
-fit :: CtorMap -> Bool -> Frag -> Expression String -> Int
+fit :: CtorMap -> ProviderMap -> Bool -> Frag -> Expression String -> Int
     -> [(String, Frag)] -> (Expression String, Int, [(String, Frag)])
-fit cm force frag expr n doms =
+fit cm providers force frag expr n doms =
   let (pats, core) = lambdaSpine expr
       (pats', remaining, doms1, exhausted) = walk frag pats doms
       (etaPats, core1, coreFrag, n1)
@@ -550,7 +555,8 @@ fit cm force frag expr n doms =
             && spineNeedsBinder remaining =
             etaExpand remaining core n
         | otherwise = ([], core, remaining, n)
-      (core2, n2, doms2) = fitCore cm force coreFrag core1 n1 doms1
+      (core2, n2, doms2) =
+        fitCore cm providers force coreFrag core1 n1 doms1
       allPats = pats' ++ etaPats
   in (if null allPats then core2 else Lambda allPats core2, n2, doms2)
  where
@@ -606,17 +612,19 @@ fit cm force frag expr n doms =
 -- the branch binders' domains when the scrutinee is a known binder,
 -- whose quantifiers - instantiated silently by the engine before the
 -- case split - are peeled first).
-fitCore :: CtorMap -> Bool -> Frag -> Expression String -> Int
+fitCore :: CtorMap -> ProviderMap -> Bool -> Frag -> Expression String -> Int
         -> [(String, Frag)] -> (Expression String, Int, [(String, Frag)])
-fitCore cm force cf ce n ds = case (cf, ce) of
+fitCore cm providers force cf ce n ds = case (cf, ce) of
   (FProd a b, Tuple [x, y]) ->
-    let (x', n1, ds1) = fit cm force a x n ds
-        (y', n2, ds2) = fit cm force b y n1 ds1
+    let (x', n1, ds1) = fit cm providers force a x n ds
+        (y', n2, ds2) = fit cm providers force b y n1 ds1
     in (Tuple [x', y'], n2, ds2)
   (FSum a _, Apply h@(Global g) x) | isKind GInl g ->
-    let (x', n1, ds1) = fit cm force a x n ds in (Apply h x', n1, ds1)
+    let (x', n1, ds1) = fit cm providers force a x n ds
+    in (Apply h x', n1, ds1)
   (FSum _ b, Apply h@(Global g) x) | isKind GInr g ->
-    let (x', n1, ds1) = fit cm force b x n ds in (Apply h x', n1, ds1)
+    let (x', n1, ds1) = fit cm providers force b x n ds
+    in (Apply h x', n1, ds1)
   -- a fully applied declared constructor: fit each argument against
   -- the corresponding field fragment
   (resultFrag, _)
@@ -626,30 +634,36 @@ fitCore cm force cf ce n ds = case (cf, ce) of
     , Just fields <- constructorFieldsAt resultFrag info
     , length args == length fields ->
         let step (done, k, dss) (field, arg) =
-              let (arg', k', dss') = fit cm force field arg k dss
+              let (arg', k', dss') =
+                    fit cm providers force field arg k dss
               in (done ++ [arg'], k', dss')
             (args', n1, ds1) = foldl step ([], n, ds) (zip fields args)
         in (foldl Apply (Global g) args', n1, ds1)
   -- an eliminated absurdity whose expected type is itself ⊥ needs no
   -- elimination at all
-  (FBot, Case scrut []) -> fitCore cm force FBot scrut n ds
-  -- an application of a known hypothesis: fit each term argument
-  -- against the successive explicit-arrow domains of its type, so
-  -- binders inside those arguments are named and fitted too
+  (FBot, Case scrut []) ->
+    fitCore cm providers force FBot scrut n ds
+  -- An application of a known local hypothesis or discovered global provider:
+  -- fit each term argument against the successive explicit-arrow domains of
+  -- its type, so binders inside those arguments are named and fitted too.
+  -- Provider globals retain their source fragment in 'ProviderMap'; without
+  -- it a constructed @forall@ argument would lose Lean's explicit type-binder
+  -- wildcard and be rejected only at backend verification.
   (_, _)
     | (headExpr, args@(_ : _)) <- appSpine ce
-    , Just h <- localHead headExpr
-    , Just hFrag <- lookup h ds ->
+    , Just hFrag <- applicationHeadFrag headExpr ->
         let step (done, k, dss) (mdom, arg) = case mdom of
               Just dom ->
-                let (arg', k', dss') = fit cm force dom arg k dss
+                let (arg', k', dss') =
+                      fit cm providers force dom arg k dss
                 in (done ++ [arg'], k', dss')
               Nothing -> (done ++ [arg], k, dss)
             (args', n1, ds1) =
               foldl step ([], n, ds) (zip (argDoms hFrag) args)
         in (foldl Apply headExpr args', n1, ds1)
   (_, VisibleTypeApplication function argument) ->
-    let (function', n1, ds1) = fitCore cm force cf function n ds
+    let (function', n1, ds1) =
+          fitCore cm providers force cf function n ds
     in (VisibleTypeApplication function' argument, n1, ds1)
   (_, Case scrut alts) ->
     let scrutFrag = case scrut of
@@ -670,7 +684,8 @@ fitCore cm force cf ce n ds = case (cf, ce) of
                 (Just f, TuplePattern _) -> bindDomainPairs pat f
                 (Just f, Bind x) -> [(x, f)]
                 _ -> []
-              (body', k', dss') = fit cm force cf body k (branchDoms ++ dss)
+              (body', k', dss') =
+                fit cm providers force cf body k (branchDoms ++ dss)
           in (done ++ [(pat, body')], k', dss')
         (alts', n1, ds1) = foldl goAlt ([], n, ds) alts
     in (Case scrut alts', n1, ds1)
@@ -680,7 +695,8 @@ fitCore cm force cf ce n ds = case (cf, ce) of
             Just sourceFrag -> bindDomainPairs pat sourceFrag
             Nothing -> []
           _ -> []
-        (body', n1, ds1) = fit cm force cf body n (aliasDoms ++ ds)
+        (body', n1, ds1) =
+          fit cm providers force cf body n (aliasDoms ++ ds)
     in (Let pat rhs body', n1, ds1)
   _ -> (ce, n, ds)
  where
@@ -704,9 +720,13 @@ fitCore cm force cf ce n ds = case (cf, ce) of
   appSpine expr = spineAcc expr []
   spineAcc (Apply f a) acc = spineAcc f (a : acc)
   spineAcc f acc = (f, acc)
-  localHead (Local h) = Just h
-  localHead (VisibleTypeApplication function _) = localHead function
-  localHead _ = Nothing
+  applicationHeadFrag headExpr = case headExpr of
+    Local local -> lookup local ds
+    Global global -> case declaredProvider providers global of
+      Just (_, _, providerFrag) -> Just providerFrag
+      Nothing -> Nothing
+    VisibleTypeApplication function _ -> applicationHeadFrag function
+    _ -> Nothing
   -- the domain of the hypothesis type's n-th term argument (its
   -- quantifier slots consume no term arguments)
   argDoms frag = case frag of
@@ -1060,7 +1080,7 @@ render cm providers typeNames style visibleBinderDomain doms = go
   go req expr = case expr of
     Local x -> renderUse req x []
     Global name -> case declaredProvider providers name of
-      Just (leanName, _) -> Right (at req 2 leanName)
+      Just (leanName, _, _) -> Right (at req 2 leanName)
       Nothing -> do
         kind <- globalKind cm name
         case kind of
@@ -1187,7 +1207,7 @@ render cm providers typeNames style visibleBinderDomain doms = go
   spine f args = (f, args)
 
   renderHead (Global name) = case declaredProvider providers name of
-    Just (leanName, _) -> Right leanName
+    Just (leanName, _, _) -> Right leanName
     Nothing -> do
       kind <- globalKind cm name
       case kind of
@@ -1209,7 +1229,7 @@ render cm providers typeNames style visibleBinderDomain doms = go
     VisibleTypeApplication{} -> go 1 function
     Local{} -> ("@" ++) <$> go 2 function
     Global name -> case declaredProvider providers name of
-      Just (leanName, _) -> Right ("@" ++ leanName)
+      Just (leanName, _, _) -> Right ("@" ++ leanName)
       Nothing -> do
         kind <- globalKind cm name
         Right $ "@" ++ case kind of
@@ -1233,7 +1253,7 @@ render cm providers typeNames style visibleBinderDomain doms = go
       Nothing -> Right Nothing
       Just (providerName, arguments) ->
         case declaredProvider providers providerName of
-          Just (leanName, Just binderNames) ->
+          Just (leanName, Just binderNames, _) ->
             let selected = take (length arguments) binderNames
             in if length selected /= length arguments
               then Left $ "cannot align visible type arguments for Lean provider "
