@@ -1208,6 +1208,36 @@ typeApplicationTests = testGroup "retained type applications"
           check engine = expectTerm "Demo.sealedBox"
             (synthesizeWithProviders engine 1024 [provider] goal)
       in mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "fit explicit forall arguments of foreign providers" $ do
+      let token = FAtom False "Demo.Token"
+          provider = ProviderFrag "Demo.consumeExplicit"
+            (FArr polytype token)
+          check engine = expectTerm "Demo.consumeExplicit (fun _"
+            (synthesizeWithProviders engine 4096 [provider] token)
+      mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "keep implicit forall provider arguments binder-free" $ do
+      let token = FAtom False "Demo.Token"
+          implicitIdentity = FAll False "a"
+            (FArr (FVar "a") (FVar "a"))
+          provider = ProviderFrag "Demo.consumeImplicit"
+            (FArr implicitIdentity token)
+          check engine = case
+              synthesizeWithProviders engine 4096 [provider] token of
+            Right (SynthCandidates groups _) ->
+              let candidates = concat groups
+                  fitted candidate =
+                    "Demo.consumeImplicit (fun " `isInfixOf` candidate
+                      && not
+                        ("Demo.consumeImplicit (fun _" `isInfixOf` candidate)
+              in assertBool
+                ("implicit provider argument gained a type binder in "
+                  ++ synthEngineName engine ++ ": " ++ show candidates)
+                (any fitted candidates)
+            Right other -> assertFailure $
+              "unexpected implicit-provider outcome from "
+                ++ synthEngineName engine ++ ": " ++ outcomeTag other
+            Left err -> assertFailure err
+      mapM_ check [EngineDjinn, EngineExference, EngineBoth]
   , testCase "make a constrained vacuous provider choice visible" $
       let natural = FParamRec True "Nat" "Nat" []
             [ ("Nat.zero", [])
@@ -2684,6 +2714,11 @@ rankNFrontierTests = testGroup "Djinn rank-N frontiers"
           "dual-quintic synthesis failed after forall coalescing: " ++ err
   ]
 
+testProviderInfo :: String -> Maybe [String]
+  -> (String, Maybe [String], Frag)
+testProviderInfo leanName binders =
+  (leanName, binders, FAtom False "test provider")
+
 visibleTypeApplicationTests :: TestTree
 visibleTypeApplicationTests = testGroup "Lean visible type applications"
   [ testCase "activate implicit provider arguments with Lean @ syntax" $ do
@@ -2693,7 +2728,8 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
         (TypeConstructor integerName :: Type String)
       let expression = VisibleTypeApplication (Global providerName) argument
       renderLeanTerm Map.empty
-          (Map.singleton "leantProvider0" ("Demo.identity", Nothing)) Map.empty
+          (Map.singleton "leantProvider0"
+            (testProviderInfo "Demo.identity" Nothing)) Map.empty
           ([], 0, []) (FAtom False "Nat") expression
         @?= Right ["@Demo.identity Int"]
   , testCase "keep provider dictionaries implicit with a named type argument" $ do
@@ -2703,7 +2739,8 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
         (TypeConstructor naturalName :: Type String)
       let expression = VisibleTypeApplication (Global providerName) argument
       renderLeanTerm Map.empty
-          (Map.singleton "leantProvider0" ("Demo.global", Just ["a"])) Map.empty
+          (Map.singleton "leantProvider0"
+            (testProviderInfo "Demo.global" $ Just ["a"])) Map.empty
           ([], 0, []) (FAtom False "Demo.Token") expression
         @?= Right ["Demo.global («a» := Nat)"]
   , testCase "preserve named provider type-argument order" $ do
@@ -2717,7 +2754,8 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
       let expression = VisibleTypeApplication
             (VisibleTypeApplication (Global providerName) natural) boolean
       renderLeanTerm Map.empty
-          (Map.singleton "leantProvider0" ("Demo.global", Just ["a", "b"]))
+          (Map.singleton "leantProvider0"
+            (testProviderInfo "Demo.global" $ Just ["a", "b"]))
           Map.empty ([], 0, []) (FAtom False "Demo.Token") expression
         @?= Right ["Demo.global («a» := Nat) («b» := Bool)"]
   , testCase "quote keyword and exotic provider binder names" $ do
@@ -2732,7 +2770,7 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
             (VisibleTypeApplication (Global providerName) natural) boolean
       renderLeanTerm Map.empty
           (Map.singleton "leantProvider0"
-            ("Demo.global", Just ["match", "«x-y»"]))
+            (testProviderInfo "Demo.global" $ Just ["match", "«x-y»"]))
           Map.empty ([], 0, []) (FAtom False "Demo.Token") expression
         @?= Right ["Demo.global («match» := Nat) («x-y» := Bool)"]
   , testCase "reject misaligned live provider binder metadata" $ do
@@ -2746,7 +2784,8 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
       let expression = VisibleTypeApplication
             (VisibleTypeApplication (Global providerName) natural) boolean
       renderLeanTerm Map.empty
-          (Map.singleton "leantProvider0" ("Demo.global", Just ["a"]))
+          (Map.singleton "leantProvider0"
+            (testProviderInfo "Demo.global" $ Just ["a"]))
           Map.empty ([], 0, []) (FAtom False "Demo.Token") expression
         @?= Left "cannot align visible type arguments for Lean provider Demo.global"
   , testCase "render compound closed type arguments in Lean syntax" $ do
@@ -2761,7 +2800,8 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
       argument <- expectRight $ specifiedVisibleTypeArgument compound
       let expression = VisibleTypeApplication (Global providerName) argument
       renderLeanTerm Map.empty
-          (Map.singleton "leantProvider0" ("Demo.identity", Nothing)) Map.empty
+          (Map.singleton "leantProvider0"
+            (testProviderInfo "Demo.identity" Nothing)) Map.empty
           ([], 0, []) (FAtom False "Nat") expression
         @?= Right ["@Demo.identity (Option (Int → Bool))"]
   , testCase "restore every nominal argument with explicit Lean syntax" $ do
@@ -2774,7 +2814,8 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
       argument <- expectRight $ specifiedVisibleTypeArgument wrapped
       let expression = VisibleTypeApplication (Global providerName) argument
       renderLeanTerm Map.empty
-          (Map.singleton "leantProvider0" ("Demo.identity", Nothing))
+          (Map.singleton "leantProvider0"
+            (testProviderInfo "Demo.identity" Nothing))
           (Map.singleton "LeantType0" "Demo.Wrap")
         ([], 0, []) (FAtom False "Nat") expression
         @?= Right ["@Demo.identity (@Demo.Wrap Int)"]
@@ -2785,7 +2826,8 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
         (TypeConstructor privateName :: Type String)
       let expression = VisibleTypeApplication (Global providerName) argument
       renderLeanTerm Map.empty
-          (Map.singleton "leantProvider0" ("Demo.identity", Nothing))
+          (Map.singleton "leantProvider0"
+            (testProviderInfo "Demo.identity" Nothing))
           (Map.singleton "LeantAtom0" "(Nat × Nat)")
           ([], 0, []) (FAtom False "Nat") expression
         @?= Right ["@Demo.identity @(Nat × Nat)"]
@@ -2794,7 +2836,8 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
       let expression = VisibleTypeApplication
             (Global providerName) inferredVisibleTypeArgument
       renderLeanTerm Map.empty
-          (Map.singleton "leantProvider0" ("Demo.identity", Nothing)) Map.empty
+          (Map.singleton "leantProvider0"
+            (testProviderInfo "Demo.identity" Nothing)) Map.empty
           ([], 0, []) (FAtom False "Nat") expression
         @?= Right ["@Demo.identity _"]
   , testCase "render a closed quantified named provider argument" $ do
@@ -2804,7 +2847,8 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
           (FunctionType (TypeVariable "source") (TypeVariable "source")))
       let expression = VisibleTypeApplication (Global providerName) argument
       renderLeanTerm Map.empty
-          (Map.singleton "leantProvider0" ("Demo.global", Just ["a"])) Map.empty
+          (Map.singleton "leantProvider0"
+            (testProviderInfo "Demo.global" $ Just ["a"])) Map.empty
           ([], 0, []) (FAtom False "Demo.Token") expression
         @?= Right
           ["Demo.global («a» := (∀ (a0_0 : _), a0_0 → a0_0))"]
@@ -2815,7 +2859,8 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
           (FunctionType (TypeVariable "a") (TypeVariable "a")))
       let expression = VisibleTypeApplication (Global providerName) argument
       renderLeanTerm Map.empty
-          (Map.singleton "leantProvider0" ("Demo.identity", Nothing)) Map.empty
+          (Map.singleton "leantProvider0"
+            (testProviderInfo "Demo.identity" Nothing)) Map.empty
           ([], 0, []) (FAtom False "Nat") expression
         @?= Right ["@Demo.identity (∀ (a0_0 : _), a0_0 → a0_0)"]
   , testCase "offer kind-directed local quantified arguments" $ do
@@ -2881,7 +2926,8 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
       leftArgument <- expectRight $ specifiedVisibleTypeArgument (source "a")
       rightArgument <- expectRight $ specifiedVisibleTypeArgument (source "renamed")
       let renderArgument argument = renderLeanTerm Map.empty
-            (Map.singleton "leantProvider0" ("Demo.global", Just ["a"]))
+            (Map.singleton "leantProvider0"
+              (testProviderInfo "Demo.global" $ Just ["a"]))
             Map.empty ([], 0, []) (FAtom False "Demo.Token")
             (VisibleTypeApplication (Global providerName) argument)
       renderArgument leftArgument @?= renderArgument rightArgument
@@ -2895,7 +2941,8 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
       argument <- expectRight $ specifiedVisibleTypeArgument quantified
       let expression = VisibleTypeApplication (Global providerName) argument
       renderLeanTerm Map.empty
-          (Map.singleton "leantProvider0" ("Demo.global", Just ["a"])) Map.empty
+          (Map.singleton "leantProvider0"
+            (testProviderInfo "Demo.global" $ Just ["a"])) Map.empty
           ([], 0, []) (FAtom False "Demo.Token") expression
         @?= Right
           [ "Demo.global («a» := (∀ (a0_0 : _), a0_0 → "
@@ -2910,7 +2957,8 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
       argument <- expectRight $ specifiedVisibleTypeArgument constrained
       let expression = VisibleTypeApplication (Global providerName) argument
       renderLeanTerm Map.empty
-          (Map.singleton "leantProvider0" ("Demo.global", Just ["a"])) Map.empty
+          (Map.singleton "leantProvider0"
+            (testProviderInfo "Demo.global" $ Just ["a"])) Map.empty
           ([], 0, []) (FAtom False "Demo.Token") expression
         @?= Left
           "cannot render a constrained quantified visible Lean type argument"

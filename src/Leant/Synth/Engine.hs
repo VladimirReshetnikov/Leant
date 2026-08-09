@@ -880,7 +880,7 @@ fragToDjinn
       , [DjinnDecl]
       , [KindedProviderInstantiationAssignment String]
       , CtorMap
-      , Map.Map String (String, Maybe [String])
+      , Map.Map String (String, Maybe [String], Frag)
       , TypeMap
       , [(String, Frag, Type String)] -- caller-supplied premises
       , [(String, Frag, Type String)] -- constructor fallback premises
@@ -1431,7 +1431,9 @@ fragToDjinn recursiveProjection providers extras frag0 = do
             pure
               ( ValueDeclaration
                   (ValueSignature () privateName providerType)
-              , ("leantProvider" ++ show index, (leanName, binderNames))
+              , ( "leantProvider" ++ show index
+                , (leanName, binderNames, providerFrag)
+                )
               , instantiations
               ))
           (zip [0 :: Int ..] usableProviders)
