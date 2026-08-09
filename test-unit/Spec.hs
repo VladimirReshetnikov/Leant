@@ -2461,23 +2461,29 @@ rankNFrontierTests = testGroup "Djinn rank-N frontiers"
                     (FArr (variable "E") (variable "R"))))))
           goal = FAll True "A" (FAll True "B" (FAll True "C"
             (FAll True "D" (FAll True "E" (FAll True "R" body)))))
-      case synthesizeWithProviders EngineDjinn 0 [] goal of
-        Right (SynthCandidates groups _) ->
-          let candidates = concat groups
-              -- As above, eta-equivalent candidates can keep either the
-              -- compact or expanded spelling.  Both spellings expose the
-              -- five retained type applications that this boundary tests.
-              instantiated candidate =
-                "f _ _ _ _ _ " `isInfixOf` candidate
-                  || "=> f _ _ _ _ _" `isInfixOf` candidate
-          in if any instantiated candidates
-              then pure ()
-              else assertFailure $
-                "expected a five-binder instantiation candidate, got: "
-                  ++ show candidates
-        Right other -> assertFailure $
-          "unexpected five-binder synthesis outcome: " ++ outcomeTag other
-        Left err -> assertFailure err
+          check engine =
+            case synthesizeWithProviders engine 128 [] goal of
+              Right (SynthCandidates groups _) ->
+                let candidates = concat groups
+                    -- Eta-equivalent candidates can keep either the compact
+                    -- or expanded spelling. Both spellings expose the five
+                    -- retained type applications that this boundary tests.
+                    instantiated candidate =
+                      "f _ _ _ _ _ " `isInfixOf` candidate
+                        || "=> f _ _ _ _ _" `isInfixOf` candidate
+                in if any instantiated candidates
+                    then pure ()
+                    else assertFailure $
+                      "expected a five-binder instantiation candidate from "
+                        ++ synthEngineName engine ++ ", got: "
+                        ++ show candidates
+              Right other -> assertFailure $
+                "unexpected five-binder synthesis outcome from "
+                  ++ synthEngineName engine ++ ": " ++ outcomeTag other
+              Left err -> assertFailure $
+                "five-binder synthesis failed in "
+                  ++ synthEngineName engine ++ ": " ++ err
+      mapM_ check [EngineDjinn, EngineExference, EngineBoth]
   , testCase "render a balanced four-site pairwise plan for Lean" $ do
       let variable = FVar
           product4 a b c d = FProd a (FProd b (FProd c d))
