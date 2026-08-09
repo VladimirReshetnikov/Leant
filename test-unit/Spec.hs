@@ -1176,6 +1176,22 @@ typeApplicationTests = testGroup "retained type applications"
   , testCase "instantiate through a rigid nominal family with Exference" $
       expectTerm "x _"
         (synthesizeWithProviders EngineExference 1024 [] nominalGoal)
+  , testCase "instantiate a local scheme at a closed query type" $ do
+      let mono = FAtom False "QueryClosed.Mono"
+          token = FAtom False "QueryClosed.Token"
+          indexed key argument = FApp False key
+            (AppNominal "QueryClosed.Indexed") [argument]
+          variable = FVar "a"
+          hypothesis = FAll True "a"
+            (FArr (FArr variable token)
+              (FArr variable (indexed "QueryClosed.Indexed a" variable)))
+          goal = FArr hypothesis
+            (FArr (FArr mono token)
+              (FArr mono
+                (indexed "QueryClosed.Indexed QueryClosed.Mono" mono)))
+          check engine = expectTerm "f _"
+            (synthesizeWithProviders engine 128 [] goal)
+      mapM_ check [EngineDjinn, EngineExference, EngineBoth]
   , testCase "instantiate a foreign polymorphic family provider" $
       let provider = ProviderFrag "Demo.polyWrap" nominalHypothesis
           goal = wrap "Demo.Wrap ((b : Type) \8594 b \8594 b)" polytype
@@ -2461,23 +2477,29 @@ rankNFrontierTests = testGroup "Djinn rank-N frontiers"
                     (FArr (variable "E") (variable "R"))))))
           goal = FAll True "A" (FAll True "B" (FAll True "C"
             (FAll True "D" (FAll True "E" (FAll True "R" body)))))
-      case synthesizeWithProviders EngineDjinn 0 [] goal of
-        Right (SynthCandidates groups _) ->
-          let candidates = concat groups
-              -- As above, eta-equivalent candidates can keep either the
-              -- compact or expanded spelling.  Both spellings expose the
-              -- five retained type applications that this boundary tests.
-              instantiated candidate =
-                "f _ _ _ _ _ " `isInfixOf` candidate
-                  || "=> f _ _ _ _ _" `isInfixOf` candidate
-          in if any instantiated candidates
-              then pure ()
-              else assertFailure $
-                "expected a five-binder instantiation candidate, got: "
-                  ++ show candidates
-        Right other -> assertFailure $
-          "unexpected five-binder synthesis outcome: " ++ outcomeTag other
-        Left err -> assertFailure err
+          check engine =
+            case synthesizeWithProviders engine 128 [] goal of
+              Right (SynthCandidates groups _) ->
+                let candidates = concat groups
+                    -- Eta-equivalent candidates can keep either the compact
+                    -- or expanded spelling. Both spellings expose the five
+                    -- retained type applications that this boundary tests.
+                    instantiated candidate =
+                      "f _ _ _ _ _ " `isInfixOf` candidate
+                        || "=> f _ _ _ _ _" `isInfixOf` candidate
+                in if any instantiated candidates
+                    then pure ()
+                    else assertFailure $
+                      "expected a five-binder instantiation candidate from "
+                        ++ synthEngineName engine ++ ", got: "
+                        ++ show candidates
+              Right other -> assertFailure $
+                "unexpected five-binder synthesis outcome from "
+                  ++ synthEngineName engine ++ ": " ++ outcomeTag other
+              Left err -> assertFailure $
+                "five-binder synthesis failed in "
+                  ++ synthEngineName engine ++ ": " ++ err
+      mapM_ check [EngineDjinn, EngineExference, EngineBoth]
   , testCase "render a balanced four-site pairwise plan for Lean" $ do
       let variable = FVar
           product4 a b c d = FProd a (FProd b (FProd c d))

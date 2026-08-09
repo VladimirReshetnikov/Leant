@@ -10,4 +10,11 @@ end FiveBinder
 :set synth-engine djinn
 :synth FiveBinder.Token
 :synth (∀ A B C D E : Type, (∀ a b c d e : Type, FiveBinder.Five a b c d e) → FiveBinder.Five E D C B A)
+:set synth-steps 128
+:set synth-engine exference
+:synth FiveBinder.Token
+:synth (∀ A B C D E : Type, (∀ a b c d e : Type, FiveBinder.Five a b c d e) → FiveBinder.Five E D C B A)
+:set synth-engine both
+:synth FiveBinder.Token
+:synth (∀ A B C D E : Type, (∀ a b c d e : Type, FiveBinder.Five a b c d e) → FiveBinder.Five E D C B A)
 :quit

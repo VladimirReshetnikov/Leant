@@ -4,6 +4,11 @@
 > [five-binder integration](2026-08-09-five-binder-instantiation.md) raises the
 > query-derived and exact-assignment eligibility boundary from four to five.
 > The local-provider result below remains the historical starting point.
+>
+> A later, separate Djinn family lets non-vacuous query-local hypotheses use
+> closed forall-free monotypes already present in the checked goal; see the
+> [query-local closed-monotype report](2026-08-09-query-local-closed-monotype-instantiation.md).
+> It does not replace the visible vacuous-provider path recorded here.
 
 **Date:** 2026-08-01
 

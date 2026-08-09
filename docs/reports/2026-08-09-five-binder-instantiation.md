@@ -1,5 +1,10 @@
 # Five-binder Djex integration in Leant
 
+> **Follow-up.** The
+> [query-local closed-monotype extension](2026-08-09-query-local-closed-monotype-instantiation.md)
+> adds a positive-only final Djinn family without changing this report's
+> five-binder eligibility, tuple allowances, or six-binder boundary.
+
 **Date:** 2026-08-09
 
 ## Outcome

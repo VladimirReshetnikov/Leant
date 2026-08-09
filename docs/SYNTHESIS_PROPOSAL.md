@@ -13,6 +13,9 @@ refutations are retained as proof-backed fallbacks while constructive provider
 lanes run; a verified provider candidate wins, and otherwise the refutation is
 restored before any classical retry. Djinn-backed fallback can
 specialize loaded schemes at closed monotypes and guarded rank-N polytypes.
+An independently scheduled positive-only Djinn tail can now specialize
+query-local hypotheses at closed forall-free monotypes already present in the
+checked goal, without changing historical local or loaded-scheme prefixes.
 Both engines can also retain a query-supplied closed polytype at a vacuous
 local provider whose result mentions fixed ambient query variables. Live
 provider discovery can now attach bounded, provider-local, ordered proper-type
@@ -135,6 +138,19 @@ successor in `2026-08-09-five-binder-instantiation.md`:
   goals like
   `(forall a. a -> a) -> b -> b` and polymorphic transport through a
   container while remaining terminating.
+- **Query-local closed-monotype instantiation (Djinn).** The historical local
+  family above keeps its exact candidates and plan position. A separate final
+  structural/nominal tail revisits only context-free schemes embedded in the
+  requested goal and admits closed, forall-free subtrees collected from that
+  checked query. Every retained tuple contains at least one such closed
+  candidate, so the tail adds only the missing cases rather than duplicating
+  historical axioms. It carries established local, loaded-scheme, and checked
+  provider premises so those proof sources can compose. The family remains
+  positive-only and independently capped at five binders, 16 axioms per
+  scheme, 64 per family, and 512 attempts. The Leant
+  [query-local closed-monotype report](reports/2026-08-09-query-local-closed-monotype-instantiation.md)
+  records all-engine pure and Lean 4.31 coverage; the complete boundary suite
+  now passes 182 tests.
 - **Bounded loaded-scheme instantiation (Djinn).** Context-free polymorphic
   environment values retain an exact scheme alongside the historical
   implicitized premise projection. A deterministic, kind-checked tail
@@ -350,9 +366,10 @@ successor in `2026-08-09-five-binder-instantiation.md`:
   drift.
 
 Djex continues expanding in this direction. Goal-side forall introduction,
-bounded hypothesis instantiation, and loaded-scheme specialization are all
-implemented behind the same narrow library boundary, so later improvements
-continue to arrive in Leant by version bump.
+historical bounded hypothesis instantiation, the additive query-local
+closed-monotype tail, and loaded-scheme specialization are all implemented
+behind the same narrow library boundary, so later improvements continue to
+arrive in Leant by version bump.
 
 Two Djex components deliberately do *not* map:
 
@@ -771,7 +788,9 @@ Design rules, all inherited from Djex:
   and the twelve-site six-open/six-opaque plan gap) the answer is "no term
   found within bounds" — full impredicative inhabitation is undecidable,
   so this boundary is permanent, and the display must never upgrade it
-  to a refutation. Exference's query-derived provider route admits only
+  to a refutation. Djinn's query-local closed-monotype extension is likewise a
+  final positive-only family: a miss is always NoEvidence, never a new negative
+  theorem. Exference's query-derived provider route admits only
   complete closed, context-free `forall` roots observed in proven arrow or
   tuple proper-type positions; it excludes the query root and children of
   opaque type applications, and retains the five-binder and 32-combination
@@ -1037,8 +1056,12 @@ distinct terms; subsequent standalone and combined verification frontiers
 remain 12 and 24 fresh groups respectively.
 Djinn, including the Djinn half of `both`, can reuse the same declarations and
 Djex now specializes context-free loaded schemes at closed monotypes or guarded
-rank-N polytypes. Because a lossy or irrelevant declaration can crowd Djinn's
-fixed candidate window, Leant tries discovery-order prefixes of 1, 4, and 16
+rank-N polytypes. Separately, its final query-closed family specializes only
+local schemes embedded in the checked goal, at closed forall-free subtrees from
+that goal; the family carries loaded and provider premises for composition but
+does not treat their declarations as local schemes. Because a lossy or
+irrelevant declaration can crowd Djinn's fixed candidate window, Leant tries
+discovery-order prefixes of 1, 4, and 16
 providers before the full bounded inventory. In `both` mode, the singleton and
 terminal lanes run both engines while intermediate prefixes run Djinn only, so
 Exference's step budget is not spent at every width. One command deadline

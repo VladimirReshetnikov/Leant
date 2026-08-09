@@ -245,6 +245,9 @@ and its
 The shared five-binder Djex boundary and Leant's matching live bridge are
 recorded in the
 [five-binder integration report](docs/reports/2026-08-09-five-binder-instantiation.md).
+Djinn's additive specialization of query-local schemes at closed monotypes is
+recorded separately in the
+[query-local closed-monotype report](docs/reports/2026-08-09-query-local-closed-monotype-instantiation.md).
 
 The engine is the vendored [Djex](lib/Djex) library, linked in-process.
 Djex began as a merger of two classic Haskell synthesizers — **Djinn**
@@ -653,6 +656,46 @@ the matching projection each time:
   it1  fun _ _ f => ⟨f _ (fun x _ => x), f _ (fun _ y => y)⟩
   ⋯
 ```
+
+Djinn now keeps three instantiation families distinct. The historical local
+family specializes context-free hypotheses at query variables, opened
+skolems, premise scopes, and guarded quantified shapes. A new final
+query-closed tail additionally admits closed, forall-free subtrees already
+present in the checked goal, but only for schemes embedded in that goal.
+Loaded environment schemes remain a third family: they retain exact source
+identity and may also use closed subtrees from loaded signatures.
+
+That distinction makes the following provider-free Lean goal reachable without
+pretending that <code>Mono</code> is a type variable:
+
+~~~text
+λ> axiom QueryClosed.Mono : Type
+λ> axiom QueryClosed.Token : Type
+λ> axiom QueryClosed.Indexed : Type → Type
+λ> :synth ((∀ a : Type, (a → QueryClosed.Token) → a →
+…>     QueryClosed.Indexed a) → (QueryClosed.Mono → QueryClosed.Token) →
+…>     QueryClosed.Mono → QueryClosed.Indexed QueryClosed.Mono)
+  it1  fun f => f _
+  it2  fun f g x => f _ (fun _ => g x) x
+~~~
+
+Both Djinn terms instantiate <code>f</code> at the exact closed query type
+<code>QueryClosed.Mono</code>; the second merely chooses a different valid
+callback. Standalone Exference returns the compact
+<code>fun f =&gt; f _</code>, and combined mode retains both Djinn
+spellings. The
+[<code>synth-query-closed-rankn</code>](test/synth-query-closed-rankn.txt)
+transcript turns live-library premises off and checks all three modes through
+final Lean 4.31 elaboration with Exference bounded to 128 steps. The pure
+boundary test does the same below the REPL layer.
+
+The new Djinn family is appended after every established structural, provider,
+and loaded-scheme family, so historical candidate prefixes do not move. Its
+plan carries the established local, loaded, and caller-supplied provider
+premises, allowing those capabilities to compose in one proof. It retains the
+same five-binder eligibility, 16 axioms per scheme, 64 axioms per family, and
+512 tuple attempts. It is positive-only: exhausting this incomplete tail is
+<code>NoEvidence</code>, never a proof of uninhabitability.
 
 Context-free hypothesis chains now reach five leading binders. Leant inserts
 all five inferred type arguments, and Lean 4.31 verifies a non-lexical
