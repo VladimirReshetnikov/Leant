@@ -1,5 +1,11 @@
 # Quintic rank-N frontiers in Leant
 
+> **Follow-up.** The
+> [five-binder integration](2026-08-09-five-binder-instantiation.md) raises the
+> separate instantiation cap from four to five. The live `Wide` sentinel now
+> has six adjacent binders, preserving the occurrence-frontier witness recorded
+> below without allowing instantiation to rescue it.
+
 Date: 2026-08-06
 
 ## Outcome

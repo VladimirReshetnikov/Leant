@@ -533,8 +533,8 @@ quantifiers open through polarity-aware plan families, quantified
 hypotheses are instantiated at a bounded set of sequent-supplied
 types, and impredicative instantiation is admitted under a guard that
 never invents a polytype the query did not supply. Djinn's current
-context-free hypothesis rule reaches four leading binders without
-raising its fixed search caps; chains with five or more stay opaque.
+context-free hypothesis rule reaches five leading binders without
+raising its fixed search caps; chains with six or more stay opaque.
 Its singleton, pairwise, triple, quadruple, and bounded quintuple open/opaque
 frontiers cover every choice through eleven independent quantified sites
 without enumerating a power set. The quintic categories retain at most 512
@@ -727,16 +727,22 @@ candidates verify. Full impredicative inhabitation is undecidable;
 beyond the guard the answer is ``no term found within bounds'' and
 nothing stronger.
 
-Context-free instantiation chains extend to four leading binders. Leant
+Context-free instantiation chains extend to five leading binders. Leant
 inserts the inferred type arguments which Djinn leaves implicit, then asks
 Lean to verify every rendered candidate against the original type:
 
 \begin{session}
-λ> :synth (∀ A B C D R : Type, (∀ a b c d : Type, a → b → c → d → R) → A → B → C → D → R)
-  it1  fun _ _ _ _ _ f => f _ _ _ _
-  ⋯
-  it5  fun _ _ _ _ _ f x y z w => f _ _ _ _ x y z w
+λ> axiom FiveBinder.Five : Type → Type → Type → Type → Type → Type
+λ> :synth (∀ A B C D E : Type, (∀ a b c d e : Type, FiveBinder.Five a b c d e) → FiveBinder.Five E D C B A)
+  it1  fun _ _ _ _ _ x => x _ _ _ _ _
 \end{session}
+
+The focused \code{synth-five-binder-rankn} transcript disables live-library
+premises and pins that non-lexical source-order candidate through Lean 4.31
+elaboration without truncation. Its first query also discovers an active Lean
+instance and retains all five named quantified provider applications. Pure
+boundary tests separately retain the five-argument function-elimination shape
+and exact provider evidence in Djinn, Exference, and combined mode.
 
 The similarly named live \code{synth-quartic-rankn} regression has a subtler
 bridge shape than its Lean surface syntax suggests. After the four outer
@@ -745,7 +751,7 @@ vacuous \code{forall A B C D E : Type, Q}-shaped component is serialized as
 five ordinary arrows from the shared opaque \code{Type} atom to its codomain,
 not as another \code{FAll}. Among the eight result leaves, only the four
 polymorphic identity leaves remain quantified. The regression
-therefore does not exercise the greater-than-four hypothesis-instantiation
+therefore does not exercise the hypothesis-instantiation
 guard. Djex \code{f3dd2495} lets standalone Exference forward those complete
 scoped arrow schemes through a structurally materialized nested product. The
 quartic submodule revision, \code{c0c1a461}, follows it with tuple-goal provenance:
@@ -760,19 +766,19 @@ not exhaust its ranked tail.
 
 The live \code{synth-quintic-rankn} regression supplies the missing exact
 bridge case. It defines
-\code{Wide = forall A B C D E : Type, A × B × C × D × E}, so every binder is
+\code{Wide = forall A B C D E F : Type, A × B × C × D × E × F}, so every binder is
 non-vacuous and remains an adjacent \code{FAll}. Leant \code{378f866} coalesces
 each uninterrupted \code{FAll} spine to one Djex \code{ForallType} binder list
 without crossing an \code{FInst}; the original fragment still supplies every
 explicitness slot to the renderer. One \code{Wide} therefore contributes one
-Djinn occurrence site rather than five nested sites. With Djex
+Djinn occurrence site rather than six nested sites. With Djex
 \code{d728719f}, the first goal selects five non-contiguous opaque
 \code{Wide} results beside five opened identities at ten sites. The second
 selects five separated open identities beside six opaque \code{Wide} results at
 eleven sites, exercising the distinct dual plan. Leant \code{80f123a} records
 both direct candidates after Lean 4.31 accepts them; neither live search is
-truncated. This changes occurrence coverage only: hypothesis instantiation
-still stops at four leading binders.
+truncated. The sentinel now has six binders, preserving the same occurrence
+coverage witness beyond the independent five-binder instantiation cap.
 
 Vacuous local providers can retain the same query-supplied choice even when
 their result is an opaque Lean type. Here \code{Demo.Token} becomes a fixed
@@ -860,7 +866,7 @@ vector whose positional kind arities are one and two, and requires
 \code{Higher.multiVacuous («F» := Higher.Wrap) («G» := (@Higher.Triple Nat))}
 in all three modes.
 
-Discovery opens no more than four leading type binders on one exact
+Discovery opens no more than five leading type binders on one exact
 provider while retaining its erased instance constraints. It inspects at most
 32 active heads per provider in Lean resolver order. Each selected head and its
 complete constraint closure run under restored metavariable state. The seed
@@ -874,7 +880,7 @@ positive counts preserve bare and partially applied constructors.
 
 Leant retains at most 16 alpha-distinct vectors per provider and passes no more
 than 32 provider/vector associations to Djex. Each vector has exact provider
-arity and at most four arguments. The command takes that aggregate prefix
+arity and at most five arguments. The command takes that aggregate prefix
 before an argument affects family planning, rigidity, or translation. Live
 provider metadata uses
 \code{(instantiations (args (kinded N ...) ...))}. Leant folds each bounded
@@ -928,11 +934,11 @@ proven proper-type positions below arrows and tuples in the sequent, including
 quantified subtrees already present there; provider-local assignment arguments
 may also come from the bounded active-instance channel above. This is guarded,
 evidence-directed impredicativity, not general second-order search. The
-query-derived visible-provider route is capped at four binders and 32 argument
+query-derived visible-provider route is capped at five binders and 32 argument
 combinations; Djex's internal Haskell-instance route remains monotype-only. The
-external Lean evidence route has the separate four-binder, 32-head,
+external Lean evidence route has the separate five-binder, 32-head,
 16-vector-per-provider, and 32-vector limits. Open, incomplete,
-wrong-arity, or context-bearing vectors fail closed, and chains with five or
+wrong-arity, or context-bearing vectors fail closed, and chains with six or
 more leading binders remain a deliberate incomplete boundary. The original
 local-provider contract, scalar active-instance extension, and correlated
 follow-up are recorded in the
@@ -941,7 +947,9 @@ local-provider report} and the
 \href{reports/2026-08-05-provider-local-instance-head-evidence.md}{provider-local
 instance-head report}, followed by the
 \href{reports/2026-08-05-correlated-instance-head-assignments.md}{correlated
-assignment report}.
+assignment report}, with the shared successor recorded in the
+\href{reports/2026-08-09-five-binder-instantiation.md}{five-binder integration
+report}.
 
 Unit regressions pin the kinded wire format, kind and argument order, finite
 bounds, whole-vector deduplication, and the exact vacuous applications under
@@ -1403,7 +1411,7 @@ sound and terminating over an undecidable space and widen as Djex
 improves. The current plan family is exhaustive through eleven
 independent quantified sites; a twelve-site six-open/six-opaque goal
 is the next deliberate occurrence-plan gap, while hypothesis
-instantiation chains with five or more binders remain opaque. Such
+instantiation chains with six or more binders remain opaque. Such
 higher-rank goals answer ``no term
 found within bounds'' and nothing stronger. And although Djex can resolve
 type-class evidence itself, Leant leaves instance arguments to Lean's

@@ -586,7 +586,7 @@ synthPrelude inventory = unlines
   , ""
   , "-- Open only the provider prefix represented by its serialized FAlls,"
   , "-- retaining erased instance constraints next to the fresh type metas"
-  , "-- they can determine.  Four type binders bound the candidate product;"
+  , "-- they can determine.  Five type binders bound the candidate product;"
   , "-- the ordinary serializer fuel bounds intervening instance binders."
   , "partial def providerEvidenceSpine (fuel remainingTypes : Nat)"
   , "    (e : Expr) : MetaM (Array Expr × Array Expr) := do"
