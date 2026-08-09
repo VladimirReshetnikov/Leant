@@ -1,5 +1,12 @@
 # Provider-isolated baseline and staged Djinn fallback
 
+> **Follow-up.** Djinn now has a separate final tail for specializing
+> query-local hypotheses at closed forall-free types from the checked query;
+> see the
+> [query-local closed-monotype report](2026-08-09-query-local-closed-monotype-instantiation.md).
+> The loaded-scheme behavior below remains a distinct retained-environment
+> family.
+
 **Date:** 2026-08-01
 
 **Scope:** Leant's REPL orchestration around Djex provider search

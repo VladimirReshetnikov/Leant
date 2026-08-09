@@ -531,8 +531,10 @@ contexts and synthesizes dictionary-independent terms. And it adds a
 growing level of support for rank-N and impredicative types: goal-side
 quantifiers open through polarity-aware plan families, quantified
 hypotheses are instantiated at a bounded set of sequent-supplied
-types, and impredicative instantiation is admitted under a guard that
-never invents a polytype the query did not supply. Djinn's current
+types, a separate final tail admits closed forall-free monotypes from
+the checked query, and retained loaded schemes keep their own
+environment-backed family. Impredicative instantiation is admitted under a
+guard that never invents a polytype the query did not supply. Djinn's current
 context-free hypothesis rule reaches five leading binders without
 raising its fixed search caps; chains with six or more stay opaque.
 Its singleton, pairwise, triple, quadruple, and bounded quintuple open/opaque
@@ -726,6 +728,47 @@ wherever Lean needs them (\code{f \_ x}), so bounded rank-N
 candidates verify. Full impredicative inhabitation is undecidable;
 beyond the guard the answer is ``no term found within bounds'' and
 nothing stronger.
+
+Djinn deliberately keeps three specialization families separate. The
+historical local family uses goal variables, opened skolems, premise scopes,
+and guarded quantified shapes. A final query-closed tail revisits only
+context-free schemes embedded in the requested goal and additionally admits
+closed, forall-free subtrees from that checked query. Loaded environment
+schemes remain a distinct family with retained source identity and may also use
+closed subtrees from loaded signatures.
+
+The separation makes this provider-free goal reachable without treating the
+abstract \code{Mono} constant as a type variable:
+
+\begin{session}
+λ> axiom QueryClosed.Mono : Type
+λ> axiom QueryClosed.Token : Type
+λ> axiom QueryClosed.Indexed : Type → Type
+λ> :synth ((∀ a : Type, (a → QueryClosed.Token) → a →
+…>     QueryClosed.Indexed a) → (QueryClosed.Mono → QueryClosed.Token) →
+…>     QueryClosed.Mono → QueryClosed.Indexed QueryClosed.Mono)
+  it1  fun f => f _
+  it2  fun f g x => f _ (fun _ => g x) x
+\end{session}
+
+Both Djinn candidates instantiate \code{f} at
+\code{QueryClosed.Mono}; the second supplies a different valid constant
+callback. Standalone Exference returns the compact
+\code{fun f => f \_}, and combined mode retains both Djinn spellings.
+The \code{synth-query-closed-rankn} transcript disables live-library premises,
+bounds Exference at 128 steps, and checks all three modes through final Lean
+4.31 elaboration. A pure all-engine boundary regression covers the same
+projection. The complete synthesis-boundary suite now passes 182 tests.
+
+The new structural and nominal plans come after every established family, so
+historical result prefixes do not move. They carry historical local,
+loaded-scheme, and checked provider premises for composition, but do not
+reclassify loaded declarations as local schemes. The tail independently
+retains the five-binder, 16-per-scheme, 64-per-family, and 512-attempt caps.
+It is positive-only: exhaustion is \code{NoEvidence}, never a refutation. The
+detailed boundary is recorded in the
+\href{reports/2026-08-09-query-local-closed-monotype-instantiation.md}{query-local
+closed-monotype report}.
 
 Context-free instantiation chains extend to five leading binders. Leant
 inserts the inferred type arguments which Djinn leaves implicit, then asks
@@ -949,7 +992,9 @@ instance-head report}, followed by the
 \href{reports/2026-08-05-correlated-instance-head-assignments.md}{correlated
 assignment report}, with the shared successor recorded in the
 \href{reports/2026-08-09-five-binder-instantiation.md}{five-binder integration
-report}.
+report} and the additive local tail in the
+\href{reports/2026-08-09-query-local-closed-monotype-instantiation.md}{query-local
+closed-monotype report}.
 
 Unit regressions pin the kinded wire format, kind and argument order, finite
 bounds, whole-vector deduplication, and the exact vacuous applications under
