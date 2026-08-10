@@ -242,9 +242,11 @@ recorded in the
 [quartic rank-N frontier report](docs/reports/2026-08-06-quartic-rank-n-frontiers.md)
 and its
 [quintic successor](docs/reports/2026-08-06-quintic-rank-n-frontiers.md).
-The shared five-binder Djex boundary and Leant's matching live bridge are
+The historical five-binder Djex boundary and Leant's matching live bridge are
 recorded in the
 [five-binder integration report](docs/reports/2026-08-09-five-binder-instantiation.md).
+Its one-through-six successor is recorded in the
+[six-binder integration report](docs/reports/2026-08-10-six-binder-instantiation.md).
 Djinn's additive specialization of query-local schemes at closed monotypes is
 recorded separately in the
 [query-local closed-monotype report](docs/reports/2026-08-09-query-local-closed-monotype-instantiation.md).
@@ -557,7 +559,7 @@ vector with kind arities one and two, respectively, and requires
 `Higher.multiVacuous («F» := Higher.Wrap) («G» := (@Higher.Triple Nat))` in
 all three modes.
 
-Extraction is deliberately finite and local. It opens at most five leading
+Extraction is deliberately finite and local. It opens at most six leading
 type binders on one provider, retains the erased instance constraints,
 and inspects at most 32 active heads in Lean's resolver order. Each attempt is
 state-isolated. The selected head remains fixed while its instance subgoals and
@@ -571,7 +573,7 @@ proper type; positive counts preserve bare and partially applied constructors.
 
 At most 16 alpha-distinct vectors survive per provider, and Leant passes at
 most 32 provider/vector associations in total. Every vector has exact provider
-arity and at most five arguments. That aggregate prefix is taken before an
+arity and at most six arguments. That aggregate prefix is taken before an
 argument can affect family planning, rigidity, or type translation, so
 evidence beyond the boundary is not entered. Live metadata uses
 `(instantiations (args (kinded N ...) ...))`. A proper-kind live argument also
@@ -762,24 +764,24 @@ The new Djinn family is appended after every established structural, provider,
 and loaded-scheme family, so historical candidate prefixes do not move. Its
 plan carries the established local, loaded, and caller-supplied provider
 premises, allowing those capabilities to compose in one proof. It retains the
-same five-binder eligibility, 16 axioms per scheme, 64 axioms per family, and
+same six-binder eligibility, 16 axioms per scheme, 64 axioms per family, and
 512 tuple attempts. It is positive-only: exhausting this incomplete tail is
 <code>NoEvidence</code>, never a proof of uninhabitability.
 
-Context-free hypothesis chains now reach five leading binders. Leant inserts
-all five inferred type arguments, and Lean 4.31 verifies a non-lexical
-source-order application of an abstract five-argument constructor:
+Context-free hypothesis chains now reach six leading binders. Leant inserts
+all six inferred type arguments, and Lean 4.31 verifies a non-lexical
+source-order application of an abstract six-argument constructor:
 
 ```text
-λ> axiom FiveBinder.Five : Type → Type → Type → Type → Type → Type
-λ> :synth (∀ A B C D E : Type, (∀ a b c d e : Type, FiveBinder.Five a b c d e) → FiveBinder.Five E D C B A)
-  it1  fun _ _ _ _ _ x => x _ _ _ _ _
+λ> axiom SixBinder.Six : Type → Type → Type → Type → Type → Type → Type
+λ> :synth (∀ A B C D E F : Type, (∀ a b c d e f : Type, SixBinder.Six a b c d e f) → SixBinder.Six F E D C B A)
+  it1  fun _ _ _ _ _ _ x => x _ _ _ _ _ _
 ```
 
 Explicit `∀` binders — leading, nested, trailing, or interleaved — are
 woven into the candidate's lambda automatically, and uses of quantified
 hypotheses get placeholder type arguments wherever Lean needs them
-(`f _ x`), so bounded rank-N candidates verify. Chains with six or more
+(`f _ x`), so bounded rank-N candidates verify. Chains with seven or more
 leading binders remain outside Djinn's fixed instantiation bound. Full
 impredicative inhabitation is undecidable, so Djinn uses a deterministic
 bounded plan family rather than a power set. Its singleton, pairwise, triple,
@@ -788,18 +790,20 @@ independent quantified sites. Quintuple selections are edge-balanced and
 capped at 512 plans per orientation; this retains all 252 ten-site and 462
 eleven-site choices while bounding larger queries. A twelve-site goal needing
 exactly six open and six opaque sites is the next deliberate occurrence-plan
-gap. Beyond either that occurrence bound or the separate five-binder
+gap. Beyond either that occurrence bound or the separate six-binder
 instantiation guard, the answer is "no term found within bounds" and nothing
 stronger.
 
 The dedicated
-[`synth-five-binder-rankn`](test/synth-five-binder-rankn.txt) transcript
-disables live-library premises, runs standalone Djinn, and pins that exact
-candidate without search truncation through final Lean elaboration. The same
-golden first discovers a five-binder active-instance assignment and retains all
-five named quantified applications. Unit coverage separately retains the
-five-argument function-elimination shape and exact provider evidence in Djinn,
-Exference, and combined mode.
+[`synth-six-binder-rankn`](test/synth-six-binder-rankn.txt) transcript
+disables live-library premises and pins that exact candidate through final
+Lean elaboration under standalone Djinn, standalone Exference, and combined
+mode. The same golden first discovers a six-binder active-instance assignment
+and retains all six named quantified applications in every mode. Unit coverage
+separately retains the six-argument function-elimination shape and exact
+provider evidence across the same three engines. The earlier
+[`synth-five-binder-rankn`](test/synth-five-binder-rankn.txt) transcript remains
+as the historical predecessor.
 
 The live
 [`synth-quartic-rankn`](test/synth-quartic-rankn.txt) transcript makes the new
@@ -826,17 +830,18 @@ incomplete tail, not a failure to find or check the displayed candidate.
 The live
 [`synth-quintic-rankn`](test/synth-quintic-rankn.txt) transcript is the exact
 non-vacuous successor. Its `QuinticRankN.Wide` abbreviation is
-`forall A B C D E F : Type, A × B × C × D × E × F`, so all six binders survive as
-adjacent `FAll` nodes. Leant `378f866` projects each uninterrupted `FAll` spine
-to one Djex `ForallType` binder list, without crossing an `FInst`; the original
+`forall A B C D E F G : Type, A × B × C × D × E × F × G`, so all seven
+binders survive as adjacent `FAll` nodes. Leant `378f866` projects each
+uninterrupted `FAll` spine to one Djex `ForallType` binder list, without
+crossing an `FInst`; the original
 fragment still owns every explicitness slot used for Lean rendering. Thus one
-`Wide` is one positive-forall occurrence site rather than six nested sites.
+`Wide` is one positive-forall occurrence site rather than seven nested sites.
 With Djex `d728719f`, the first live goal requires a non-prefix five-opaque /
 five-open selection across ten sites, and the second requires the separate
 five-open / six-opaque dual across eleven. Leant `80f123a` records the direct
 Djinn terms accepted by Lean 4.31 for both goals. Neither run is truncated.
-The sentinel is now six-binder so the same occurrence-planning witnesses remain
-outside Djinn's independent five-binder instantiation cap.
+The sentinel is now seven-binder so the same occurrence-planning witnesses
+remain outside Djinn's independent six-binder instantiation cap.
 
 Instance-implicit goal binders keep a separate render-only position. The
 engines remain dictionary-independent, while Leant inserts the wildcard that
@@ -1230,7 +1235,7 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   engine still runs with the structural declarations it already has.
 - For an exact polymorphic provider whose erased constraints can determine its
   visible type arguments, discovery may attach active-instance-head evidence.
-  It opens at most five type binders and inspects at most 32 heads in
+  It opens at most six type binders and inspects at most 32 heads in
   resolver order under isolated metavariable state. A selected head is retained
   only after its own subgoals and every remaining provider constraint close;
   one success yields one ordered vector of kind/type pairs, and incomplete

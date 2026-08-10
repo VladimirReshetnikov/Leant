@@ -5,6 +5,13 @@
 > separate instantiation cap from four to five. The live `Wide` sentinel now
 > has six adjacent binders, preserving the occurrence-frontier witness recorded
 > below without allowing instantiation to rescue it.
+>
+> The later
+> [six-binder integration](2026-08-10-six-binder-instantiation.md) raises that
+> separate cap once more. `Wide` now has seven adjacent binders and a
+> seven-component product, so the same quintic occurrence witnesses remain
+> isolated from hypothesis instantiation. The body below preserves the
+> historical five-binder/six-sentinel state.
 
 Date: 2026-08-06
 

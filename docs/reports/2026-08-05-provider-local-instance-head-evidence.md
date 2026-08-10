@@ -8,7 +8,9 @@
 > supported compatibility paths, but live extraction uses exact assignments.
 > The later
 > [five-binder integration](2026-08-09-five-binder-instantiation.md) widens
-> that exact live channel while leaving this scalar snapshot historical.
+> that exact live channel, and its
+> [six-binder successor](2026-08-10-six-binder-instantiation.md) widens it once
+> more while leaving this scalar snapshot historical.
 
 **Date:** 2026-08-05
 

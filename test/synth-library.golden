@@ -15,7 +15,7 @@ note: search truncated: candidate limit reached (60)
 λ> :synth ((a → b → b) → b → List a → b)
   it1  fun _ x _ => x
   it2  fun f x y => List.foldr f x y
-  it3  fun f x y => List.foldl (fun _ z => f z x) x y
+  it3  fun f x y => List.foldl (fun _ a => f a x) x y
 note: search truncated: candidate limit reached (60)
 λ> :synth (List (List a) → List a)
   it1  fun x => List.flatten x

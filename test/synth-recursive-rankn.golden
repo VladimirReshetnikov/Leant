@@ -15,7 +15,7 @@ synth engine: exference
 preparing synthesis environment (session imports + Lean)...
   it1  fun x => x _
   it2  fun x => ⟨fun _ y => y, x _⟩
-note: search truncated: step limit reached, queue limit pruned 2183
+note: search truncated: step limit reached, queue limit pruned 2569
 λ> :set synth-engine djinn
 synth engine: djinn
 λ> :synth ((∀ a : Type 1, Demo.RecBox a) → Demo.RecBox (∀ b : Type, b → b))
@@ -47,5 +47,5 @@ synth engine: exference
   it3  fun x => let y := x; match y with | ⟨f, _⟩ => (fun _ z => f _ (f _ z))
   it4  fun x => let y := x; match y with | ⟨f, _⟩ => (fun _ z => f _ (f _ (f _ z)))
   it5  fun x => let y := x; match y with | ⟨f, _⟩ => (fun _ z => f _ (f _ (f _ (f _ z))))
-note: search truncated: step limit reached
+note: search truncated: step limit reached, queue limit pruned 33
 λ> :quit

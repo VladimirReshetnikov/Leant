@@ -1,0 +1,42 @@
+
+   __                  __
+  / /  ___ ___ ____   / /_
+ / /__/ -_) _ `/ _ \_/ __/
+/____/\__/\_,_/_//_/ \__/
+Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to exit.
+λ> namespace SixBinder
+λ> axiom Six : Type → Type → Type → Type → Type → Type → Type
+λ> axiom Token : Type
+λ> class Choice (one two three four five six : Type 1) : Prop where witness : True
+λ> instance : Choice (∀ A : Type, A → A) (∀ B : Type, B → B → B) (∀ C : Type, C → C → C → C) (∀ D : Type, D → D → D → D → D) (∀ E : Type, E → E → E → E → E → E) (∀ F : Type, F → F → F → F → F → F → F) := ⟨True.intro⟩
+λ> axiom chosen {one two three four five six : Type 1} [Choice one two three four five six] : Token
+λ> end SixBinder
+λ>
+λ> :set synth-library off
+synth library: off
+λ> :set synth-engine djinn
+synth engine: djinn
+λ> :synth SixBinder.Token
+preparing synthesis environment (session imports + Lean)...
+  it1  SixBinder.chosen («one» := (∀ (a0_0 : Type _), a0_0 → a0_0)) («two» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0)) («three» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0)) («four» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («five» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («six» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0))
+λ> :synth (∀ A B C D E F : Type, (∀ a b c d e f : Type, SixBinder.Six a b c d e f) → SixBinder.Six F E D C B A)
+  it1  fun _ _ _ _ _ _ x => x _ _ _ _ _ _
+λ> :set synth-steps 256
+synth steps: 256
+λ> :set synth-engine exference
+synth engine: exference
+λ> :synth SixBinder.Token
+  it1  SixBinder.chosen («one» := (∀ (a0_0 : Type _), a0_0 → a0_0)) («two» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0)) («three» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0)) («four» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («five» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («six» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0))
+note: search truncated: step limit reached, queue limit pruned 2147
+λ> :synth (∀ A B C D E F : Type, (∀ a b c d e f : Type, SixBinder.Six a b c d e f) → SixBinder.Six F E D C B A)
+  it1  fun _ _ _ _ _ _ x => x _ _ _ _ _ _
+note: search truncated: step limit reached, queue limit pruned 513
+λ> :set synth-engine both
+synth engine: both
+λ> :synth SixBinder.Token
+  it1  SixBinder.chosen («one» := (∀ (a0_0 : Type _), a0_0 → a0_0)) («two» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0)) («three» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0)) («four» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («five» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («six» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0))
+note: exference: search truncated: step limit reached, queue limit pruned 857
+λ> :synth (∀ A B C D E F : Type, (∀ a b c d e f : Type, SixBinder.Six a b c d e f) → SixBinder.Six F E D C B A)
+  it1  fun _ _ _ _ _ _ x => x _ _ _ _ _ _
+note: exference: search truncated: step limit reached, queue limit pruned 513
+λ> :quit

@@ -1,0 +1,20 @@
+namespace SixBinder
+axiom Six : Type → Type → Type → Type → Type → Type → Type
+axiom Token : Type
+class Choice (one two three four five six : Type 1) : Prop where witness : True
+instance : Choice (∀ A : Type, A → A) (∀ B : Type, B → B → B) (∀ C : Type, C → C → C → C) (∀ D : Type, D → D → D → D → D) (∀ E : Type, E → E → E → E → E → E) (∀ F : Type, F → F → F → F → F → F → F) := ⟨True.intro⟩
+axiom chosen {one two three four five six : Type 1} [Choice one two three four five six] : Token
+end SixBinder
+
+:set synth-library off
+:set synth-engine djinn
+:synth SixBinder.Token
+:synth (∀ A B C D E F : Type, (∀ a b c d e f : Type, SixBinder.Six a b c d e f) → SixBinder.Six F E D C B A)
+:set synth-steps 256
+:set synth-engine exference
+:synth SixBinder.Token
+:synth (∀ A B C D E F : Type, (∀ a b c d e f : Type, SixBinder.Six a b c d e f) → SixBinder.Six F E D C B A)
+:set synth-engine both
+:synth SixBinder.Token
+:synth (∀ A B C D E F : Type, (∀ a b c d e f : Type, SixBinder.Six a b c d e f) → SixBinder.Six F E D C B A)
+:quit
