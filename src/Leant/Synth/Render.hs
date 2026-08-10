@@ -49,6 +49,9 @@ import Data.List (intercalate, nub, sortOn, subsequences)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
+import Language.Haskell.Djex
+  ( maximumProviderInstantiationAssignments
+  )
 import Language.Haskell.Synthesis.Generated
   ( ApplicationArgument (..)
   , ClosedVisibleTypeVariable
@@ -75,10 +78,13 @@ import qualified Language.Haskell.Synthesis.Type as SharedType
 import Leant.Synth.Fragment
   ( AppHead (..)
   , Frag (..)
+  , ProviderForallDomain (..)
   , ProviderInstantiationArgument (..)
   , Slot (..)
+  , fragVisibleForallVisibilities
   , fragSpine
   , leadingTypeArgs
+  , maximumProviderExactForallDomains
   )
 
 -- | One constructor of a datatype 'Leant.Synth.Engine' declared to
@@ -166,13 +172,11 @@ renderLeanTerm cm providers typeNames (outerPrems, skip, innerPrems)
       seed = [(premiseMark ++ name, frag) | (name, frag) <- premises]
       fitted = nub
         [fit cm providers force goalFrag base 0 seed | force <- [False, True]]
-  -- Twelve was the complete historical budget for site/style variants. Keep
-  -- that budget independently in each universe-domain lane: with three sites
-  -- there are already eight selective subsets, so one shared budget cannot
-  -- retain those spellings across even two domains. The final group therefore
-  -- remains bounded at 36 variants. Named, monomorphic, and otherwise
-  -- domain-insensitive spellings collapse back to the old size in the final
-  -- 'nub'; only a local quantified application pays the larger backend bound.
+  -- Keep the aggregate provider-assignment budget independently in each
+  -- universe-domain lane. This preserves every bounded exact-metadata choice
+  -- before the verifier while keeping the final group bounded at three times
+  -- that limit. Named, monomorphic, and otherwise domain-insensitive spellings
+  -- collapse back to the old size in the final 'nub'.
   lanes <- mapM
     (\visibleBinderDomain -> do
       texts <- concat <$> mapM (variantsFor visibleBinderDomain) fitted
@@ -196,13 +200,81 @@ renderLeanTerm cm providers typeNames (outerPrems, skip, innerPrems)
         -- qualified fallback; verification keeps the first that
         -- elaborates
         styles = [Idiomatic, Explicit]
+        providerVariants = providerRenderingAlternatives providers
     concat <$> mapM
-      (\set -> mapM
-        (\style ->
-          render cm providers typeNames style visibleBinderDomain doms 0
-            (markSites doms set expr))
+      (\set -> concat <$> mapM
+        (\style -> mapM
+          (\providerVariant ->
+            render cm providerVariant typeNames style visibleBinderDomain
+              doms 0 (markSites doms set expr))
+          providerVariants)
         styles)
       sets
+
+-- Exact domain vectors which collapse to one Djex visible type must remain
+-- render alternatives: Lean verification can reject the first (for example a
+-- Prop-domain spelling) and accept the next Type-domain spelling. Build a
+-- bounded Cartesian product keyed by provider and canonical visible vector.
+-- The prefix keeps the base plus each individual retained alternative. With
+-- the engine's aggregate assignment bound, that entire prefix fits before the
+-- remaining Cartesian combinations, including for staged callers which may
+-- supply more alternatives than the live producer's per-provider limit.
+providerRenderingAlternatives :: ProviderMap -> [ProviderMap]
+providerRenderingAlternatives providers =
+  map applySelections $
+    take maximumProviderInstantiationAssignments $ nub (prefix ++ cartesian)
+ where
+  groups =
+    [ ( providerKey
+      , visibleArguments
+      , min maximumProviderInstantiationAssignments count
+      )
+    | (providerKey, info) <- Map.toAscList providers
+    , visibleArguments <- nub (map paiVisibleArguments (piAssignments info))
+    , let count = length
+            [ ()
+            | candidate <- piAssignments info
+            , paiVisibleArguments candidate == visibleArguments
+            ]
+    , count > 1
+    ]
+  prefix = [] :
+    [ [(providerKey, visibleArguments, alternative)]
+    | (providerKey, visibleArguments, count) <- groups
+    , alternative <- [1 .. count - 1]
+    ]
+  cartesian =
+    [ [ (providerKey, visibleArguments, alternative)
+      | ((providerKey, visibleArguments, _), alternative) <- zip groups choices
+      , alternative /= 0
+      ]
+    | choices <- sequence
+        [ [0 .. count - 1] | (_, _, count) <- groups ]
+    ]
+
+  applySelections = foldl applySelection providers
+
+  applySelection selectedProviders
+      (providerKey, visibleArguments, alternative) =
+    Map.adjust
+      (\info -> info
+        { piAssignments = moveMatchingAssignment alternative visibleArguments
+            (piAssignments info)
+        })
+      providerKey selectedProviders
+
+  moveMatchingAssignment selected visibleArguments assignments =
+    case pick selected 0 [] assignments of
+      Nothing -> assignments
+      Just (chosen, remaining) -> chosen : remaining
+   where
+    pick _ _ _ [] = Nothing
+    pick target seen previous (assignment : rest)
+      | paiVisibleArguments assignment == visibleArguments =
+          if seen == target
+            then Just (assignment, reverse previous ++ rest)
+            else pick target (seen + 1) (assignment : previous) rest
+      | otherwise = pick target seen (assignment : previous) rest
 
 -- | Instantiation subsets, transport-first: no site instantiated, all
 -- sites, then the mixed subsets by size.
@@ -423,10 +495,14 @@ providerAssignmentAt info arguments = do
   let visiblePrefix = takeVisiblePrefix arguments
   if null visiblePrefix || any isInferredVisibleTypeArgument visiblePrefix
     then Nothing
-    else lookup visiblePrefix
-      [ (paiVisibleArguments assignment, paiSourceArguments assignment)
-      | assignment <- piAssignments info
-      ]
+    else do
+      sourceArguments <- lookup visiblePrefix
+        [ (paiVisibleArguments assignment, paiSourceArguments assignment)
+        | assignment <- piAssignments info
+        ]
+      if length sourceArguments == length visiblePrefix
+        then Just sourceArguments
+        else Nothing
  where
   takeVisiblePrefix applicationArguments = case applicationArguments of
     VisibleTypeArgumentArgument argument : remaining ->
@@ -440,35 +516,35 @@ providerAssignmentAt info arguments = do
 properProviderArgument :: ProviderInstantiationArgument -> Maybe Frag
 properProviderArgument argument = case argument of
   ProviderInstantiationArgument 0 frag
-    | visibleArgumentPreservesExplicitness frag -> Just frag
+    | Just _ <- providerArgumentForallVisibilities argument -> Just frag
+  ProviderInstantiationExactArgument 0 frag domains
+    | length domains <= maximumProviderExactForallDomains
+    , Just visibilities <- providerArgumentForallVisibilities argument
+    , length domains == length visibilities -> Just frag
   _ -> Nothing
 
--- Djex's neutral visible-type syntax renders every retained forall binder as
--- explicit.  A source fragment containing an implicit forall therefore does
--- not describe the Lean type which the candidate will actually pass to the
--- provider.  Keep such evidence for correlation and rendering, but decline
--- result substitution until an exact fragment-directed VTA renderer exists.
--- Constructor inventories are metadata of nominal occurrences rather than
--- part of the visible type expression, so only occurrence parameters recurse.
-visibleArgumentPreservesExplicitness :: Frag -> Bool
-visibleArgumentPreservesExplicitness frag = case frag of
-  FArr parameter result -> recur parameter && recur result
-  FProd left right -> recur left && recur right
-  FSum left right -> recur left && recur right
-  FAll explicit _ body -> explicit && recur body
-  FInst{} -> False
-  FApp _ _ _ arguments -> all recur arguments
-  FParamInd _ _ parameters _ -> all recur parameters
-  FParamRec _ _ _ parameters _ -> all recur parameters
-  FRec _ _ parameters _ -> all recur parameters
-  _ -> True
- where
-  recur = visibleArgumentPreservesExplicitness
+-- Djex intentionally erases Lean's explicit/implicit forall distinction from
+-- its neutral visible-type syntax.  Exact provider evidence retains the source
+-- fragment beside that canonical syntax, so collect its forall visibility in
+-- the same preorder used by the shared type translation.  Free variables,
+-- instance binders, and depth markers cannot be reconstructed exactly and
+-- therefore fail closed.  Constructor inventories are metadata of nominal
+-- occurrences rather than part of the visible type expression, so only
+-- occurrence parameters recurse.
+providerArgumentForallVisibilities
+  :: ProviderInstantiationArgument -> Maybe [Bool]
+providerArgumentForallVisibilities argument = case argument of
+  ProviderInstantiationArgument _ frag -> fragVisibleForallVisibilities frag
+  ProviderInstantiationExactArgument _ frag _ ->
+    fragVisibleForallVisibilities frag
+  ProviderInstantiationNominalArgument _ _ supplied ->
+    concat <$> mapM fragVisibleForallVisibilities supplied
 
 providerArgumentVariableNames
   :: ProviderInstantiationArgument -> Set.Set String
 providerArgumentVariableNames argument = case argument of
   ProviderInstantiationArgument _ frag -> fragVariableNames frag
+  ProviderInstantiationExactArgument _ frag _ -> fragVariableNames frag
   ProviderInstantiationNominalArgument _ _ supplied ->
     Set.unions (map fragVariableNames supplied)
 
@@ -1440,6 +1516,7 @@ data VisibleBinderDomain
   = InferredVisibleBinderDomain
   | TypeVisibleBinderDomain
   | PropVisibleBinderDomain
+  | SortVisibleBinderDomain
   deriving (Eq)
 
 visibleBinderDomains :: [VisibleBinderDomain]
@@ -1450,8 +1527,10 @@ visibleBinderDomains =
   ]
 
 -- Applied separately to the three bounded domain lanes in 'renderLeanTerm'.
+-- Thirty-two preserves the complete source-selection prefix above before
+-- style/site fallbacks; the final candidate group remains bounded at 96.
 visibleBinderDomainVariantLimit :: Int
-visibleBinderDomainVariantLimit = 12
+visibleBinderDomainVariantLimit = maximumProviderInstantiationAssignments
 
 render
   :: CtorMap -> ProviderMap -> TypeMap -> Style -> VisibleBinderDomain
@@ -1504,8 +1583,11 @@ render cm providers typeNames style visibleBinderDomain doms = go
         Left failure -> Left failure
         Right (Just (leanName, assignments)) -> do
           rendered <- mapM
-            (\(binder, value) -> do
-              valueTxt <- renderNamedVisibleTypeArgument typeNames value
+            (\(binder, value, source) -> do
+              valueTxt <- case source of
+                Nothing -> renderNamedVisibleTypeArgument typeNames value
+                Just exact -> renderExactNamedVisibleTypeArgument
+                  visibleBinderDomain typeNames exact value
               pure (" (" ++ binder ++ " := " ++ valueTxt ++ ")"))
             assignments
           Right (at req 1 (leanName ++ concat rendered))
@@ -1655,8 +1737,25 @@ render cm providers typeNames style visibleBinderDomain doms = go
                   | nub renderedNames /= renderedNames ->
                       Left $ "cannot align duplicate type binders for Lean provider "
                         ++ leanName
-                  | otherwise -> Right $ Just
-                      (leanName, zip renderedNames arguments)
+                  | otherwise -> do
+                      let exactSources = lookup arguments
+                            [ ( paiVisibleArguments assignment
+                              , paiSourceArguments assignment
+                              )
+                            | assignment <- piAssignments info
+                            ]
+                      sources <- case exactSources of
+                        Just retained
+                          | length retained == length arguments ->
+                              Right (map Just retained)
+                          | otherwise -> Left $
+                              "cannot align exact provider type-argument "
+                                ++ "source vector for Lean provider "
+                                ++ leanName
+                        Nothing -> Right $
+                          replicate (length arguments) Nothing
+                      Right $ Just
+                        (leanName, zip3 renderedNames arguments sources)
           _ -> Right Nothing
 
   providerVisibleSpine expression arguments = case expression of
@@ -1713,15 +1812,66 @@ renderNamedVisibleTypeArgument
 renderNamedVisibleTypeArgument =
   renderVisibleTypeArgumentWith InferredVisibleBinderDomain False
 
+-- | Render a matched provider assignment with the canonical Djex type as the
+-- structural and nominal authority. Exact live evidence contributes only a
+-- bounded vector of semantic forall-domain classes. The source fragment
+-- supplies explicitness, and both metadata vectors must align exactly with
+-- the canonical visible type before any Lean text is emitted.
+renderExactNamedVisibleTypeArgument
+  :: VisibleBinderDomain -> TypeMap -> ProviderInstantiationArgument
+  -> VisibleTypeArgument
+  -> Either String String
+renderExactNamedVisibleTypeArgument visibleBinderDomain typeNames source
+    argument = do
+  visibilities <- maybe
+    (Left "cannot render exact Lean provider type-argument evidence")
+    Right
+    (providerArgumentForallVisibilities source)
+  binderMetadata <- case source of
+    ProviderInstantiationExactArgument 0 _ domains
+      | length domains > maximumProviderExactForallDomains -> Left
+          "exact Lean provider forall-domain vector is too long"
+      | length domains /= length visibilities -> Left
+          "exact Lean provider forall-domain vector does not align with its source fragment"
+      | otherwise -> Right
+          (zip visibilities (map exactVisibleBinderDomain domains))
+    ProviderInstantiationExactArgument _ _ _ -> Left
+      "exact Lean provider forall-domain vector is not proper-kinded"
+    _ -> Right
+      (zip visibilities (repeat visibleBinderDomain))
+  renderVisibleTypeArgumentWithForallMetadata
+    visibleBinderDomain False typeNames (Just binderMetadata) argument
+ where
+  exactVisibleBinderDomain domain = case domain of
+    ProviderForallDomainProp -> PropVisibleBinderDomain
+    ProviderForallDomainType -> TypeVisibleBinderDomain
+    ProviderForallDomainSort -> SortVisibleBinderDomain
+
 renderVisibleTypeArgumentWith
   :: VisibleBinderDomain -> Bool -> TypeMap -> VisibleTypeArgument
   -> Either String String
-renderVisibleTypeArgumentWith visibleBinderDomain explicitStandalone typeNames
-    argument =
+renderVisibleTypeArgumentWith visibleBinderDomain explicitStandalone typeNames =
+  renderVisibleTypeArgumentWithForallMetadata
+    visibleBinderDomain explicitStandalone typeNames Nothing
+
+renderVisibleTypeArgumentWithForallMetadata
+  :: VisibleBinderDomain -> Bool -> TypeMap
+  -> Maybe [(Bool, VisibleBinderDomain)]
+  -> VisibleTypeArgument -> Either String String
+renderVisibleTypeArgumentWithForallMetadata visibleBinderDomain
+    explicitStandalone typeNames exactBinders argument =
   case ( isInferredVisibleTypeArgument argument
        , visibleTypeArgumentClosedType argument) of
     (True, Nothing) -> Right "_"
-    (False, Just typeExpression) -> renderType False 2 typeExpression
+    (False, Just typeExpression) -> do
+      (rendered, remaining) <- renderType False 2
+        (maybe (repeat (True, visibleBinderDomain)) id exactBinders)
+        typeExpression
+      case exactBinders of
+        Just _
+          | not (null remaining) -> Left
+              "exact Lean provider type-argument visibility exceeds its canonical type"
+        _ -> Right rendered
     (True, Just _) -> Left
       "internal: inferred visible type argument has a closed representation"
     (False, Nothing) -> Left
@@ -1731,44 +1881,72 @@ renderVisibleTypeArgumentWith visibleBinderDomain explicitStandalone typeNames
   renderType
     :: Bool
     -> Int
+    -> [(Bool, VisibleBinderDomain)]
     -> SharedType.Type ClosedVisibleTypeVariable
-    -> Either String String
-  renderType applicationHead req typeExpression = case typeExpression of
-    SharedType.TypeVariable variable -> Right $ at req 2
-      $ closedVisibleTypeVariableSpelling variable
-    SharedType.TypeConstructor name ->
-      at req 2 <$> renderTypeName
-        (explicitStandalone || applicationHead) name
+    -> Either String (String, [(Bool, VisibleBinderDomain)])
+  renderType applicationHead req visibilities typeExpression = case typeExpression of
+    SharedType.TypeVariable variable -> Right
+      ( at req 2 $ closedVisibleTypeVariableSpelling variable
+      , visibilities
+      )
+    SharedType.TypeConstructor name -> do
+      rendered <- renderTypeName (explicitStandalone || applicationHead) name
+      Right (at req 2 rendered, visibilities)
     SharedType.TypeApplication function argumentType -> do
-      functionTxt <- renderType True 1 function
-      argumentTxt <- renderType False 2 argumentType
-      Right (at req 1 (functionTxt ++ " " ++ argumentTxt))
+      (functionTxt, afterFunction) <-
+        renderType True 1 visibilities function
+      (argumentTxt, remaining) <-
+        renderType False 2 afterFunction argumentType
+      Right (at req 1 (functionTxt ++ " " ++ argumentTxt), remaining)
     SharedType.FunctionType parameter result -> do
-      parameterTxt <- renderType False 1 parameter
-      resultTxt <- renderType False 0 result
-      Right (at req 0 (parameterTxt ++ " → " ++ resultTxt))
-    SharedType.TupleType Boxed [] -> Right (at req 2 "Unit")
+      (parameterTxt, afterParameter) <-
+        renderType False 1 visibilities parameter
+      (resultTxt, remaining) <- renderType False 0 afterParameter result
+      Right (at req 0 (parameterTxt ++ " → " ++ resultTxt), remaining)
+    SharedType.TupleType Boxed [] -> Right (at req 2 "Unit", visibilities)
     SharedType.TupleType Boxed elements -> do
-      elementTxts <- mapM (renderType False 1) elements
-      Right (at req 0 (intercalate " × " elementTxts))
+      (elementTxts, remaining) <- renderTypes visibilities elements
+      Right (at req 0 (intercalate " × " elementTxts), remaining)
     SharedType.TupleType Unboxed _ ->
       Left "cannot render an unboxed tuple as a Lean type argument"
     SharedType.ForallType variables constraints body
       | not (null constraints) ->
           Left "cannot render a constrained quantified visible Lean type argument"
-      | null variables -> renderType applicationHead req body
+      | null variables -> renderType applicationHead req visibilities body
       | otherwise -> do
-          bodyTxt <- renderType False 0 body
-          let binderTxt variable =
-                "(" ++ closedVisibleTypeVariableSpelling variable ++ " : "
-                  ++ visibleBinderDomainText ++ ")"
-          Right $ at req 0
-            ("\8704 " ++ unwords (map binderTxt variables) ++ ", " ++ bodyTxt)
+          let (binderMetadata, afterBinders) =
+                splitAt (length variables) visibilities
+          if length binderMetadata /= length variables
+            then Left
+              "exact Lean provider forall metadata is shorter than its canonical type"
+            else do
+              (bodyTxt, remaining) <- renderType False 0 afterBinders body
+              let binderTxt (variable, (explicit, domain)) =
+                    (if explicit then "(" else "{")
+                      ++ closedVisibleTypeVariableSpelling variable ++ " : "
+                      ++ visibleBinderDomainText domain
+                      ++ (if explicit then ")" else "}")
+              Right
+                ( at req 0
+                    ("\8704 " ++ unwords
+                      (map binderTxt (zip variables binderMetadata))
+                      ++ ", " ++ bodyTxt)
+                , remaining
+                )
 
-  visibleBinderDomainText = case visibleBinderDomain of
+  renderTypes visibilities types = case types of
+    [] -> Right ([], visibilities)
+    typeExpression : remainingTypes -> do
+      (rendered, afterType) <-
+        renderType False 1 visibilities typeExpression
+      (rest, remaining) <- renderTypes afterType remainingTypes
+      Right (rendered : rest, remaining)
+
+  visibleBinderDomainText domain = case domain of
     InferredVisibleBinderDomain -> "_"
     TypeVisibleBinderDomain -> "Type _"
     PropVisibleBinderDomain -> "Prop"
+    SortVisibleBinderDomain -> "Sort _"
 
   -- The engine's structural encodings use their Haskell names.  Lean's
   -- corresponding nominal constructors differ only in these cases; all other
