@@ -13,6 +13,24 @@ axiom chosen {a : Type 1} [Pick a] : Token
 
 end ContextualOnly
 
+namespace HigherContext
+
+axiom Token : Type
+
+class Mark (f : Type → Type) : Prop where
+  witness : True
+
+abbrev Choice := {a : Type} → [Mark List] → a → a
+
+class Pick (a : Type 1) : Prop where
+  witness : True
+
+instance : Pick Choice := ⟨True.intro⟩
+
+axiom chosen {a : Type 1} [Pick a] : Token
+
+end HigherContext
+
 namespace DependentContext
 
 class Dep where
@@ -39,6 +57,14 @@ end DependentContext
 :synth ContextualOnly.Token
 :set synth-engine both
 :synth ContextualOnly.Token
+:set synth-steps 512
+:set synth-engine djinn
+:synth HigherContext.Token
+:set synth-engine exference
+:synth HigherContext.Token
+:set synth-engine both
+:synth HigherContext.Token
+:set synth-steps 256
 :set synth-engine djinn
 :synth DependentContext.Token
 :set synth-engine exference

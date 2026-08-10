@@ -787,6 +787,177 @@ data ExactFamilyUse
     -- saturated nominal occurrence, this does not hide a constructor schema.
   deriving (Eq, Show)
 
+-- | Decompose a supported higher-kinded exact-context argument into its
+-- canonical nominal head, total constructor arity, and already supplied
+-- proper-type arguments.  The residual kind arity is metadata on the context
+-- edge rather than part of the ordinary fragment, so every query-wide family
+-- scan must use this view instead of treating the fragment as saturated.
+exactContextNominalUse :: (Int, Frag) -> Maybe (String, Int, [Frag])
+exactContextNominalUse (remaining, argument)
+  | remaining <= 0 = Nothing
+  | otherwise = case argument of
+      FAtom _ spelling -> Just (spelling, remaining, [])
+      FApp _ _ (AppNominal spelling) supplied ->
+        Just (spelling, length supplied + remaining, supplied)
+      _ -> Nothing
+
+-- | Fragments below a higher-kinded exact nominal head that remain ordinary
+-- proper-type planning/rigidity roots.  The head itself is represented by an
+-- 'EvidenceUse' and must never be closed as a proper rigid atom.
+exactContextArgumentFragments :: (Int, Frag) -> [Frag]
+exactContextArgumentFragments source@(_, argument) =
+  case exactContextNominalUse source of
+    Just (_, _, supplied) -> supplied
+    Nothing -> [argument]
+
+-- | Exact family and class-kind identities claimed by one untrusted provider
+-- assignment.  These claims are inspected before any fragment reaches the
+-- query-wide family planner or translator, so a malformed assignment remains
+-- local to its source instead of aborting an otherwise usable provider lane.
+data ExactEvidenceClaims = ExactEvidenceClaims
+  { claimedContextKinds :: Map.Map String (Set.Set [Int])
+  , claimedFamilyArities :: Map.Map String (Set.Set Int)
+  , claimsMalformed :: Bool
+  }
+
+emptyExactEvidenceClaims :: ExactEvidenceClaims
+emptyExactEvidenceClaims = ExactEvidenceClaims Map.empty Map.empty False
+
+mergeExactEvidenceClaims
+  :: ExactEvidenceClaims
+  -> ExactEvidenceClaims
+  -> ExactEvidenceClaims
+mergeExactEvidenceClaims left right = ExactEvidenceClaims
+  { claimedContextKinds = Map.unionWith Set.union
+      (claimedContextKinds left) (claimedContextKinds right)
+  , claimedFamilyArities = Map.unionWith Set.union
+      (claimedFamilyArities left) (claimedFamilyArities right)
+  , claimsMalformed = claimsMalformed left || claimsMalformed right
+  }
+
+malformedExactEvidenceClaims :: ExactEvidenceClaims
+malformedExactEvidenceClaims =
+  emptyExactEvidenceClaims { claimsMalformed = True }
+
+claimContextKinds :: String -> [Int] -> ExactEvidenceClaims
+claimContextKinds spelling kinds
+  | null spelling = malformedExactEvidenceClaims
+  | otherwise = emptyExactEvidenceClaims
+      { claimedContextKinds = Map.singleton spelling (Set.singleton kinds) }
+
+claimFamilyArity :: String -> Int -> ExactEvidenceClaims
+claimFamilyArity spelling arity
+  | null spelling || arity < 0 = malformedExactEvidenceClaims
+  | otherwise = emptyExactEvidenceClaims
+      { claimedFamilyArities = Map.singleton spelling (Set.singleton arity) }
+
+-- | Conservatively collect every exact identity stored in a fragment.  Live
+-- serializer output is globally consistent; traversing constructor metadata as
+-- well as the occurrence surface therefore makes hand-written snapshots fail
+-- closed without changing valid discovery output.
+fragExactEvidenceClaims :: Frag -> ExactEvidenceClaims
+fragExactEvidenceClaims frag = case frag of
+  FArr parameter result -> descend [parameter, result]
+  FProd left right -> descend [left, right]
+  FSum left right -> descend [left, right]
+  FAll _ _ body -> fragExactEvidenceClaims body
+  FInst _ body -> fragExactEvidenceClaims body
+  FExactContext className arguments body ->
+    foldl mergeExactEvidenceClaims
+      (mergeExactEvidenceClaims
+        (claimContextKinds className (map fst arguments))
+        (fragExactEvidenceClaims body))
+      (map exactContextClaim arguments)
+  FApp _ _ head' arguments ->
+    mergeExactEvidenceClaims
+      (case head' of
+        AppVariable _ -> emptyExactEvidenceClaims
+        AppNominal spelling -> claimFamilyArity spelling (length arguments))
+      (descend arguments)
+  FParamInd spelling _ parameters constructors ->
+    mergeExactEvidenceClaims
+      (claimFamilyArity spelling (length parameters))
+      (descend (parameters ++ concatMap snd constructors))
+  FInd _ constructors -> descend (concatMap snd constructors)
+  FParamRec _ spelling _ parameters constructors ->
+    mergeExactEvidenceClaims
+      (claimFamilyArity spelling (length parameters))
+      (descend (parameters ++ concatMap snd constructors))
+  FRec _ _ parameters constructors ->
+    descend (parameters ++ concatMap snd constructors)
+  FDepth -> malformedExactEvidenceClaims
+  _ -> emptyExactEvidenceClaims
+ where
+  descend = foldl
+    (\claims child -> mergeExactEvidenceClaims claims
+      (fragExactEvidenceClaims child))
+    emptyExactEvidenceClaims
+
+  exactContextClaim source@(remaining, argument)
+    | remaining < 0 = malformedExactEvidenceClaims
+    | remaining == 0 = fragExactEvidenceClaims argument
+    | otherwise = case exactContextNominalUse source of
+        Just (spelling, totalArity, supplied) ->
+          mergeExactEvidenceClaims
+            (claimFamilyArity spelling totalArity)
+            (descend supplied)
+        Nothing -> malformedExactEvidenceClaims
+
+providerArgumentExactEvidenceClaims
+  :: ProviderInstantiationArgument
+  -> ExactEvidenceClaims
+providerArgumentExactEvidenceClaims argument = case argument of
+  ProviderInstantiationNominalArgument remaining spelling supplied
+    | remaining < 0 -> malformedExactEvidenceClaims
+    | otherwise -> mergeExactEvidenceClaims
+        (claimFamilyArity spelling (length supplied + remaining))
+        (descend supplied)
+  ProviderInstantiationExactArgument remaining frag _
+    | remaining == 0 -> fragExactEvidenceClaims frag
+    | otherwise -> malformedExactEvidenceClaims
+  ProviderInstantiationArgument remaining frag
+    | remaining < 0 -> malformedExactEvidenceClaims
+    | remaining == 0 -> fragExactEvidenceClaims frag
+    | otherwise -> case exactContextNominalUse (remaining, frag) of
+        Just (spelling, totalArity, supplied) ->
+          mergeExactEvidenceClaims
+            (claimFamilyArity spelling totalArity)
+            (descend supplied)
+        Nothing -> malformedExactEvidenceClaims
+ where
+  descend = foldl
+    (\claims child -> mergeExactEvidenceClaims claims
+      (fragExactEvidenceClaims child))
+    emptyExactEvidenceClaims
+
+providerAssignmentExactEvidenceClaims
+  :: [ProviderInstantiationArgument]
+  -> ExactEvidenceClaims
+providerAssignmentExactEvidenceClaims = foldl
+  (\claims argument -> mergeExactEvidenceClaims claims
+    (providerArgumentExactEvidenceClaims argument))
+  emptyExactEvidenceClaims
+
+exactEvidenceClaimsConsistent :: ExactEvidenceClaims -> Bool
+exactEvidenceClaimsConsistent claims =
+  not (claimsMalformed claims)
+    && all ((<= 1) . Set.size) (Map.elems (claimedContextKinds claims))
+    && all ((<= 1) . Set.size) (Map.elems (claimedFamilyArities claims))
+
+conflictingClaimNames :: Map.Map String (Set.Set a) -> Set.Set String
+conflictingClaimNames = Map.keysSet . Map.filter ((> 1) . Set.size)
+
+claimsTouchConflicts
+  :: Set.Set String
+  -> Set.Set String
+  -> ExactEvidenceClaims
+  -> Bool
+claimsTouchConflicts contextConflicts familyConflicts claims =
+  not (Set.null (Set.intersection contextConflicts
+    (Map.keysSet (claimedContextKinds claims))))
+  || not (Set.null (Set.intersection familyConflicts
+    (Map.keysSet (claimedFamilyArities claims))))
+
 data ParametricTemplate = ParametricTemplate
   { templateArity :: Int
   , templateFormals :: [String]
@@ -909,12 +1080,41 @@ fragToDjinn recursiveProjection providers extras frag0 = do
       -- Keeping the index beside each complete vector preserves exact provider
       -- locality and source argument order while leaving later providers and
       -- their declarations intact.
-      boundedProviderAssignments =
+      rawBoundedProviderAssignments =
         take maximumProviderInstantiationAssignments
           [ (index, assignment)
           | (index, provider) <- zip [0 :: Int ..] usableProviders
           , assignment <- usableProviderAssignments provider
           ]
+      baselineEvidenceClaims = foldl
+        (\claims source -> mergeExactEvidenceClaims claims
+          (fragExactEvidenceClaims source))
+        emptyExactEvidenceClaims
+        (map snd extras ++ [frag0] ++ map providerTypeFrag usableProviders)
+      internallyConsistentProviderAssignments =
+        [ (index, assignment, claims)
+        | (index, assignment) <- rawBoundedProviderAssignments
+        , let claims = providerAssignmentExactEvidenceClaims assignment
+        , exactEvidenceClaimsConsistent claims
+        ]
+      combinedEvidenceClaims = foldl
+        (\claims (_, _, assignmentClaims) ->
+          mergeExactEvidenceClaims claims assignmentClaims)
+        baselineEvidenceClaims internallyConsistentProviderAssignments
+      conflictingContextNames =
+        conflictingClaimNames (claimedContextKinds combinedEvidenceClaims)
+      conflictingFamilyNames =
+        conflictingClaimNames (claimedFamilyArities combinedEvidenceClaims)
+      -- A conflict may span two individually well-formed assignment vectors or
+      -- one vector and the query baseline. Drop every vector that touches that
+      -- identity; unrelated vectors from the same provider remain eligible.
+      boundedProviderAssignments =
+        [ (index, assignment)
+        | (index, assignment, claims) <-
+            internallyConsistentProviderAssignments
+        , not (claimsTouchConflicts conflictingContextNames
+            conflictingFamilyNames claims)
+        ]
       providerArguments = concatMap snd boundedProviderAssignments
       providerAssignmentFragments =
         concatMap providerArgumentFragments providerArguments
@@ -1077,10 +1277,6 @@ fragToDjinn recursiveProjection providers extras frag0 = do
           collect contexts body = (reverse contexts, body)
 
       exactContextConstraint (leanClassName, arguments) = do
-        if any ((/= 0) . fst) arguments
-          then failT
-            "exact Lean context class has a non-proper parameter"
-          else pure ()
         translatedArguments <- mapM exactContextArgument arguments
         classes <- getsT tsContextClasses
         className <- case Map.lookup leanClassName classes of
@@ -1096,8 +1292,9 @@ fragToDjinn recursiveProjection providers extras frag0 = do
                 parameters =
                   [ TypeParameter
                       ("leantContextParameter" ++ show index ++ "_" ++ show j)
-                      Nothing
-                  | (j, _) <- zip [0 :: Int ..] parameterKinds
+                      (Just $ foldr FunctionKind ProperTypeKind
+                        (replicate arity ProperTypeKind))
+                  | (j, arity) <- zip [0 :: Int ..] parameterKinds
                   ]
             privateName <- nameT privateSpelling
             modifyT (\s -> s
@@ -1725,7 +1922,8 @@ fragToDjinn recursiveProjection providers extras frag0 = do
       FAll _ _ body -> collect accum body
       FInst _ body -> collect accum body
       FExactContext _ arguments body ->
-        descend accum (map snd arguments ++ [body])
+        descend accum
+          (concatMap exactContextArgumentFragments arguments ++ [body])
       FApp _ _ _ arguments -> descend accum arguments
       -- Translating an exact nonrecursive occurrence consumes only its
       -- parameter vector.  Its query-wide structural template fields are
@@ -1859,7 +2057,8 @@ collectFragAtoms atoms frag = case frag of
   FAll _ _ body -> collectFragAtoms atoms body
   FInst _ body -> collectFragAtoms atoms body
   FExactContext _ arguments body ->
-    descend atoms (map snd arguments ++ [body])
+    descend atoms
+      (concatMap exactContextArgumentFragments arguments ++ [body])
   FAtom _ key -> Set.insert key atoms
   FApp _ _ _ arguments -> descend atoms arguments
   -- An exact nested family's inventory belongs to its independent query-wide
@@ -1893,7 +2092,8 @@ collectProviderSurfaceAtoms atoms frag = case frag of
   FAll _ _ body -> collectProviderSurfaceAtoms atoms body
   FInst _ body -> collectProviderSurfaceAtoms atoms body
   FExactContext _ arguments body ->
-    descend atoms (map snd arguments ++ [body])
+    descend atoms
+      (concatMap exactContextArgumentFragments arguments ++ [body])
   FAtom _ key -> Set.insert key atoms
   FApp _ _ _ arguments -> descend atoms arguments
   FParamInd _ _ parameters _ -> descend atoms parameters
@@ -1917,7 +2117,7 @@ collectExactFamilyUses recursiveProjection premisesEnabled uses frag =
   FAll _ _ body -> collect uses body
   FInst _ body -> collect uses body
   FExactContext _ arguments body ->
-    descend uses (map snd arguments ++ [body])
+    collect (foldl collectContextArgument uses arguments) body
   FApp _ key head' arguments ->
     let withUse = case head' of
           AppVariable _ -> uses
@@ -1948,6 +2148,13 @@ collectExactFamilyUses recursiveProjection premisesEnabled uses frag =
  where
   collect = collectExactFamilyUses recursiveProjection premisesEnabled
   descend = foldl collect
+  collectContextArgument current source@(_, argument) =
+    case exactContextNominalUse source of
+      Just (spelling, totalArity, supplied) ->
+        descend
+          (insertUse spelling (EvidenceUse totalArity) current)
+          supplied
+      Nothing -> collect current argument
   insertUse spelling use = Map.alter append spelling
    where
     append Nothing = Just [use]

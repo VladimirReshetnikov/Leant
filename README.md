@@ -615,13 +615,22 @@ finitely. The historical `(candidates ...)` form and structural
 `(kinded N ...)` payload remain readable, alongside metadata-free and
 binder-only inventories. Exact-assignment serialization may additionally
 retain a bounded contextual binder as `FExactContext`: the node records the
-exact nominal Lean class head, its ordered proper-type arguments, and its
-body, so Djex checks the context structurally and rendering restores the same
-Lean class application. This representation exists only inside one exact
-provider assignment. A complete vector still fails closed if any argument
-contains depth truncation (`FDepth`), a legacy raw instance marker (`FInst`),
-or a malformed, open, dictionary-dependent, term-indexed, or otherwise
-unsupported context.
+exact nominal Lean class head, each ordered argument's bounded ground-kind
+arity, and its body, so Djex checks the context structurally and rendering
+restores the same Lean class application. Proper arguments retain their full
+fragment. A higher-kinded argument must retain a canonical bare or partially
+applied nominal head with only proper-type supplied arguments; family planning
+uses its supplied-plus-residual total arity, and the head is never mistaken for
+a proper rigid atom. This representation exists only inside one exact provider
+assignment. A complete vector still fails closed if any argument contains
+depth truncation (`FDepth`), a legacy raw instance marker (`FInst`), or a
+malformed, open, dictionary-dependent, term-indexed, structural-builtin, or
+otherwise unsupported context. The implementation and live evidence are
+recorded in the
+[higher-kinded contextual assignment report](docs/reports/2026-08-10-higher-kinded-contextual-assignments.md).
+Before planning, conflicting class-kind or nominal-family arity claims discard
+only the assignment vectors that touch that identity; unrelated sibling vectors
+remain usable.
 Provider-prefix lanes slice the metadata with its declaration, and Djex
 resolves every vector by the exact private provider name, so a later or
 alpha-identically typed provider cannot donate evidence to an earlier one.
@@ -1234,9 +1243,10 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   16 distinct vectors survive per provider. `FDepth` and legacy raw `FInst`
   fragments reject their complete vector after parsing. Exact-assignment-local
   `FExactContext` nodes are admitted only for bounded, closed nominal class
-  applications with supported proper-type arguments; malformed, free,
-  dictionary-dependent, term-indexed, and otherwise unsupported forms remain
-  fail-closed. The
+  applications. Class arguments may have a bounded first-order ground kind;
+  positive arities require a canonical nominal head and proper-type supplied
+  arguments. Malformed, free, dictionary-dependent, term-indexed,
+  structural-builtin, and otherwise unsupported forms remain fail-closed. The
   command-wide vector list is capped at 32 before planning or translation, and
   provider-prefix fallback carries each vector only with its source
   declaration. The checked runners

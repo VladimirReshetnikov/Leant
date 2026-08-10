@@ -943,9 +943,13 @@ original vectors and default each position to proper kind; the
 containing depth truncation (\code{FDepth}) or a legacy raw instance marker
 (\code{FInst}) is discarded in full. Dedicated exact-assignment serialization
 may instead retain a bounded \code{FExactContext}: the exact nominal Lean class
-head, its ordered proper-type arguments, and the contextual body. Malformed,
-open, dictionary-dependent, term-indexed, and otherwise unsupported contexts
-still discard their complete vector. Provider-prefix fallback keeps metadata
+head, every ordered argument's bounded ground-kind arity, and the contextual
+body. Positive-arity arguments retain only a canonical bare or partially
+applied nominal head with proper-type supplied arguments. Malformed, open,
+dictionary-dependent, term-indexed, structural-builtin, and otherwise
+unsupported contexts still discard their complete vector. A bounded pre-scan
+also discards only assignment vectors that touch inconsistent class-kind or
+nominal-family arity claims. Provider-prefix fallback keeps metadata
 attached to its exact declaration. The checked runners validate provider identity, arity,
 supplied positional kinds, closure, and context before consuming each vector
 once without Cartesian reconstruction. Thus a later or alpha-identically typed
@@ -1487,8 +1491,10 @@ close in one isolated metavariable context. Up to 32 heads are inspected and
 passed in total. A closed contextual argument such as
 \code{\{a : Type\} → [Inhabited a] → a → a} may cross this exact-provider lane
 only when serialization records the nominal class application and its ordered
-proper-type arguments as \code{FExactContext}. Djex checks that semantic
-constraint and rendering restores the exact Lean class head. Open, incomplete,
+ground-kinded arguments as \code{FExactContext}. Higher-kinded arguments such
+as \code{List} retain their canonical nominal head and residual kind arity;
+Djex checks the reconstructed class-parameter kind and rendering restores the
+exact Lean class head. Open, incomplete,
 wrong-arity, depth-truncated, malformed, free, dictionary-dependent,
 term-indexed, and legacy raw \code{FInst} vectors fail closed. Ordinary goals retain render-only
 \code{FInst} slots and provider schemes continue to erase instance evidence;

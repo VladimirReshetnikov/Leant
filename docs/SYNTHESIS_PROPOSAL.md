@@ -220,11 +220,16 @@ successor in `2026-08-09-five-binder-instantiation.md`:
   a bare or partially applied constructor. Serialization runs in a dedicated
   exact-assignment mode. A genuine nominal class binder becomes
   `FExactContext`, which carries its exact Lean class name, bounded ordered
-  proper-type arguments, and body instead of pretty-printed binder text. The
-  Haskell bridge translates that structure to a private checked class and maps
-  it back to the same Lean head during rendering. A whole vector containing
-  `FDepth` or legacy raw `FInst` still fails closed, as do malformed, open,
-  dictionary-dependent, term-indexed, and otherwise unsupported contexts.
+  ground-kinded arguments, and body instead of pretty-printed binder text.
+  Arity-zero arguments retain their full fragment; positive arities require a
+  canonical nominal constant head with proper-type supplied arguments. The
+  Haskell bridge reconstructs every private class parameter kind, translates
+  the structure to that checked class, and maps it back to the same Lean head
+  during rendering. A whole vector containing `FDepth` or legacy raw `FInst`
+  still fails closed, as do malformed, open, dictionary-dependent,
+  term-indexed, structural-builtin, and otherwise unsupported contexts. A
+  bounded pre-scan drops assignment vectors carrying inconsistent class-kind or
+  nominal-family arity claims without poisoning unrelated sibling vectors.
   Ordinary goal mode keeps its render-only `FInst`, and provider schemes keep
   erasing instance evidence.
   The boundary is recorded in the

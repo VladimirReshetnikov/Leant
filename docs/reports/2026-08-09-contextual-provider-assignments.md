@@ -28,9 +28,12 @@ candidate.
 
 The generated serializer has a dedicated exact-assignment mode. After reducing
 an instance binder, it accepts only a genuine nominal Lean class application
-whose ordered arguments are proper types. It emits `FExactContext`
-with the exact class name, bounded kind/fragment arguments, and contextual
-body. No pretty-printed binder syntax becomes executable metadata.
+whose ordered arguments have bounded first-order ground kinds. It emits
+`FExactContext` with the exact class name, kind/fragment arguments, and
+contextual body. Arity-zero arguments keep their complete fragment. Since the
+2026-08-10 extension, a positive-arity argument keeps a canonical bare or
+partially applied nominal head and only proper-type supplied arguments. No
+pretty-printed binder syntax becomes executable metadata.
 
 Leant translates each exact class head to a collision-free private Djex class,
 retains its constraints in the corresponding `ForallType`, and maps the
@@ -61,6 +64,10 @@ The existing provider identity, arity, positional-kind, vector, and search
 bounds remain in force. Structured context support changes neither ordinary
 goal/provider schemes nor negative-evidence policy.
 
+Higher-kinded context arguments, total-arity family planning, and the matching
+Djinn shared-class-kind boundary are detailed in the
+[follow-up report](2026-08-10-higher-kinded-contextual-assignments.md).
+
 ## Regression evidence
 
 Pure regressions cover structured wire parsing, legacy `FInst` rejection,
@@ -68,6 +75,7 @@ context-preserving translation and rendering, and exact provider selection in
 Djinn, Exference, and combined mode. The live
 [`synth-provider-contextual-assignment`](../../test/synth-provider-contextual-assignment.txt)
 transcript makes the contextual `Choice` the only active assignment and
-requires every engine mode to produce a Lean-verified specialization. Its
-`DependentContext` control also gives every mode an active dictionary-dependent
+requires every engine mode to produce a Lean-verified specialization. The same
+transcript now includes `HigherContext.Choice` with `[Mark List]`, while its
+`DependentContext` control gives every mode an active dictionary-dependent
 choice and requires that no proposed spelling survive Lean verification.
