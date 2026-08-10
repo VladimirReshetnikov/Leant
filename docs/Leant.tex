@@ -535,8 +535,8 @@ types, a separate final tail admits closed forall-free monotypes from
 the checked query, and retained loaded schemes keep their own
 environment-backed family. Impredicative instantiation is admitted under a
 guard that never invents a polytype the query did not supply. Djinn's current
-context-free hypothesis rule reaches five leading binders without
-raising its fixed search caps; chains with six or more stay opaque.
+context-free hypothesis rule reaches six leading binders without
+raising its fixed search caps; chains with seven or more stay opaque.
 Its singleton, pairwise, triple, quadruple, and bounded quintuple open/opaque
 frontiers cover every choice through eleven independent quantified sites
 without enumerating a power set. The quintic categories retain at most 512
@@ -758,34 +758,39 @@ callback. Standalone Exference returns the compact
 The \code{synth-query-closed-rankn} transcript disables live-library premises,
 bounds Exference at 128 steps, and checks all three modes through final Lean
 4.31 elaboration. A pure all-engine boundary regression covers the same
-projection. The complete synthesis-boundary suite now passes 182 tests.
+projection, and remains in the suite alongside the later widening.
 
 The new structural and nominal plans come after every established family, so
 historical result prefixes do not move. They carry historical local,
 loaded-scheme, and checked provider premises for composition, but do not
 reclassify loaded declarations as local schemes. The tail independently
-retains the five-binder, 16-per-scheme, 64-per-family, and 512-attempt caps.
+retains the six-binder, 16-per-scheme, 64-per-family, and 512-attempt caps.
 It is positive-only: exhaustion is \code{NoEvidence}, never a refutation. The
 detailed boundary is recorded in the
 \href{reports/2026-08-09-query-local-closed-monotype-instantiation.md}{query-local
 closed-monotype report}.
 
-Context-free instantiation chains extend to five leading binders. Leant
+Context-free instantiation chains extend to six leading binders. Leant
 inserts the inferred type arguments which Djinn leaves implicit, then asks
 Lean to verify every rendered candidate against the original type:
 
 \begin{session}
-λ> axiom FiveBinder.Five : Type → Type → Type → Type → Type → Type
-λ> :synth (∀ A B C D E : Type, (∀ a b c d e : Type, FiveBinder.Five a b c d e) → FiveBinder.Five E D C B A)
-  it1  fun _ _ _ _ _ x => x _ _ _ _ _
+λ> axiom SixBinder.Six : Type → Type → Type → Type → Type → Type → Type
+λ> :synth (∀ A B C D E F : Type, (∀ a b c d e f : Type, SixBinder.Six a b c d e f) → SixBinder.Six F E D C B A)
+  it1  fun _ _ _ _ _ _ x => x _ _ _ _ _ _
 \end{session}
 
-The focused \code{synth-five-binder-rankn} transcript disables live-library
+The focused \code{synth-six-binder-rankn} transcript disables live-library
 premises and pins that non-lexical source-order candidate through Lean 4.31
-elaboration without truncation. Its first query also discovers an active Lean
-instance and retains all five named quantified provider applications. Pure
-boundary tests separately retain the five-argument function-elimination shape
-and exact provider evidence in Djinn, Exference, and combined mode.
+elaboration in standalone Djinn, standalone Exference, and combined mode. Its
+first query also discovers an active Lean instance and retains all six named
+quantified provider applications in every mode. Pure boundary tests separately
+retain the six-argument function-elimination shape and exact provider evidence
+across the same three engines. The five-binder transcript remains the
+historical predecessor. The shared widening and its seven-binder controls are
+recorded in the
+\href{reports/2026-08-10-six-binder-instantiation.md}{six-binder integration
+report}.
 
 The similarly named live \code{synth-quartic-rankn} regression has a subtler
 bridge shape than its Lean surface syntax suggests. After the four outer
@@ -809,19 +814,20 @@ not exhaust its ranked tail.
 
 The live \code{synth-quintic-rankn} regression supplies the missing exact
 bridge case. It defines
-\code{Wide = forall A B C D E F : Type, A × B × C × D × E × F}, so every binder is
-non-vacuous and remains an adjacent \code{FAll}. Leant \code{378f866} coalesces
+\code{Wide = forall A B C D E F G : Type, A × B × C × D × E × F × G}, so
+every binder is non-vacuous and remains an adjacent \code{FAll}. Leant
+\code{378f866} coalesces
 each uninterrupted \code{FAll} spine to one Djex \code{ForallType} binder list
 without crossing an \code{FInst}; the original fragment still supplies every
 explicitness slot to the renderer. One \code{Wide} therefore contributes one
-Djinn occurrence site rather than six nested sites. With Djex
+Djinn occurrence site rather than seven nested sites. With Djex
 \code{d728719f}, the first goal selects five non-contiguous opaque
 \code{Wide} results beside five opened identities at ten sites. The second
 selects five separated open identities beside six opaque \code{Wide} results at
 eleven sites, exercising the distinct dual plan. Leant \code{80f123a} records
 both direct candidates after Lean 4.31 accepts them; neither live search is
-truncated. The sentinel now has six binders, preserving the same occurrence
-coverage witness beyond the independent five-binder instantiation cap.
+truncated. The sentinel now has seven binders, preserving the same occurrence
+coverage witness beyond the independent six-binder instantiation cap.
 
 Vacuous local providers can retain the same query-supplied choice even when
 their result is an opaque Lean type. Here \code{Demo.Token} becomes a fixed
@@ -909,7 +915,7 @@ vector whose positional kind arities are one and two, and requires
 \code{Higher.multiVacuous («F» := Higher.Wrap) («G» := (@Higher.Triple Nat))}
 in all three modes.
 
-Discovery opens no more than five leading type binders on one exact
+Discovery opens no more than six leading type binders on one exact
 provider while retaining its erased instance constraints. It inspects at most
 32 active heads per provider in Lean resolver order. Each selected head and its
 complete constraint closure run under restored metavariable state. The seed
@@ -923,7 +929,7 @@ positive counts preserve bare and partially applied constructors.
 
 Leant retains at most 16 alpha-distinct vectors per provider and passes no more
 than 32 provider/vector associations to Djex. Each vector has exact provider
-arity and at most five arguments. The command takes that aggregate prefix
+arity and at most six arguments. The command takes that aggregate prefix
 before an argument affects family planning, rigidity, or translation. Live
 provider metadata uses
 \code{(instantiations (args (kinded N ...) ...))}. Leant folds each bounded
@@ -984,14 +990,14 @@ proven proper-type positions below arrows and tuples in the sequent, including
 quantified subtrees already present there; provider-local assignment arguments
 may also come from the bounded active-instance channel above. This is guarded,
 evidence-directed impredicativity, not general second-order search. The
-query-derived visible-provider route is capped at five binders and 32 argument
+query-derived visible-provider route is capped at six binders and 32 argument
 combinations; Djex's internal Haskell-instance route remains monotype-only. The
-external Lean evidence route has the separate five-binder, 32-head,
+external Lean evidence route has the separate six-binder, 32-head,
 16-vector-per-provider, and 32-vector limits. Open, incomplete, wrong-arity,
 depth-truncated, malformed, and unsupported vectors fail closed. Closed
 quantified arguments may contain a structured exact-assignment-local nominal
 class context; raw \code{FInst}, free or term-indexed contexts,
-dictionary-dependent result bodies, and chains with six or more leading
+dictionary-dependent result bodies, and chains with seven or more leading
 binders remain deliberate incomplete boundaries. The
 original local-provider contract, scalar active-instance extension, and correlated
 follow-up are recorded in the
@@ -1002,7 +1008,9 @@ instance-head report}, followed by the
 \href{reports/2026-08-05-correlated-instance-head-assignments.md}{correlated
 assignment report}, with the shared successor recorded in the
 \href{reports/2026-08-09-five-binder-instantiation.md}{five-binder integration
-report} and the additive local tail in the
+report}, the current boundary in the
+\href{reports/2026-08-10-six-binder-instantiation.md}{six-binder integration
+report}, and the additive local tail in the
 \href{reports/2026-08-09-query-local-closed-monotype-instantiation.md}{query-local
 closed-monotype report}, and the structured context boundary in the
 \href{reports/2026-08-09-contextual-provider-assignments.md}{contextual
@@ -1468,7 +1476,7 @@ sound and terminating over an undecidable space and widen as Djex
 improves. The current plan family is exhaustive through eleven
 independent quantified sites; a twelve-site six-open/six-opaque goal
 is the next deliberate occurrence-plan gap, while hypothesis
-instantiation chains with six or more binders remain opaque. Such
+instantiation chains with seven or more binders remain opaque. Such
 higher-rank goals answer ``no term
 found within bounds'' and nothing stronger. And although Djex can resolve
 type-class evidence itself, Leant leaves instance arguments to Lean's

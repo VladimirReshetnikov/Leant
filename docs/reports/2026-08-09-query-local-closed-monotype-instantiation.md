@@ -1,5 +1,11 @@
 # Query-local closed-monotype instantiation in Leant
 
+> **Successor.** The
+> [six-binder integration](2026-08-10-six-binder-instantiation.md) raises this
+> additive family's leading-binder eligibility from five to six without
+> changing its 16-per-scheme, 64-per-family, or 512-attempt bounds. The body
+> below records the boundary when this family was introduced.
+
 **Date:** 2026-08-09
 
 ## Outcome

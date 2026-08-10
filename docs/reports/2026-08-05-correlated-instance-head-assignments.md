@@ -4,6 +4,10 @@
 > [five-binder integration](2026-08-09-five-binder-instantiation.md) raises the
 > shared vector and live-discovery boundary from four to five. The examples and
 > numeric limit below describe this report's historical tree.
+> The
+> [six-binder successor](2026-08-10-six-binder-instantiation.md) raises the
+> current boundary from five to six while preserving the complete-vector
+> contract.
 
 **Date:** 2026-08-05
 

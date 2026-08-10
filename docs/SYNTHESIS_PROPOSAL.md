@@ -73,8 +73,9 @@ best-first search. From the commit history and the reports
 `2026-08-01-triple-rank-n-frontiers.md`,
 `2026-08-01-four-binder-instantiation.md`, and
 `2026-08-06-quartic-rank-n-frontiers.md`, with the Leant integration recorded
-in `2026-08-06-quintic-rank-n-frontiers.md` and the shared five-binder
-successor in `2026-08-09-five-binder-instantiation.md`:
+in `2026-08-06-quintic-rank-n-frontiers.md`, the historical five-binder
+boundary in `2026-08-09-five-binder-instantiation.md`, and its shared
+six-binder successor in `2026-08-10-six-binder-instantiation.md`:
 
 - **Alpha-aware opaque atoms as the default boundary.** Quantified
   subterms are carried as alpha-normalized `TypeAtom`s with lexical
@@ -96,7 +97,7 @@ successor in `2026-08-09-five-binder-instantiation.md`:
   adjacent `FAll` nodes because rendering must retain every explicitness slot.
   Leant `378f866` coalesces each uninterrupted spine to one Djex `ForallType`
   binder list, but never crosses an `FInst`. This preserves scope and Lean
-  rendering while making a non-vacuous six-binder source scheme one Djinn
+  rendering while making a non-vacuous seven-binder source scheme one Djinn
   occurrence site, matching Djex's native Haskell representation. The live
   `synth-quintic-rankn` regression consequently exercises a genuine ten-site
   non-prefix five-opaque/five-open plan and the separate eleven-site
@@ -132,9 +133,10 @@ successor in `2026-08-09-five-binder-instantiation.md`:
   last class is **guarded impredicativity** — a binder may be solved
   with a polytype, but only one the query supplied. A worklist follows
   strictly shallower exposed foralls under per-scheme and global caps;
-  chains beyond five binders stay opaque. One- through three-binder tuple
-  order remains historical; four- and five-binder search fairly mix source-order,
-  repeated, sparse, and Cartesian candidates under the same caps. This closes
+  chains beyond six binders stay opaque. One- through three-binder tuple
+  order remains historical; four-, five-, and six-binder search fairly mixes
+  source-order, repeated, sparse, and Cartesian candidates under the same
+  caps. This closes
   goals like
   `(forall a. a -> a) -> b -> b` and polymorphic transport through a
   container while remaining terminating.
@@ -146,19 +148,26 @@ successor in `2026-08-09-five-binder-instantiation.md`:
   candidate, so the tail adds only the missing cases rather than duplicating
   historical axioms. It carries established local, loaded-scheme, and checked
   provider premises so those proof sources can compose. The family remains
-  positive-only and independently capped at five binders, 16 axioms per
+  positive-only and independently capped at six binders, 16 axioms per
   scheme, 64 per family, and 512 attempts. The Leant
   [query-local closed-monotype report](reports/2026-08-09-query-local-closed-monotype-instantiation.md)
   records all-engine pure and Lean 4.31 coverage; the complete boundary suite
-  now passes 182 tests.
+  retains that regression alongside the later widening.
 - **Bounded loaded-scheme instantiation (Djinn).** Context-free polymorphic
   environment values retain an exact scheme alongside the historical
   implicitized premise projection. A deterministic, kind-checked tail
-  specializes up to five leading binders from sequent variables, guarded
+  specializes up to six leading binders from sequent variables, guarded
   quantified subtrees, and closed forall-free subtrees supplied by the checked
   query or loaded signatures. Work is capped and scheduled fairly across
   schemes; target-derived axioms remain diagnostic-only, so bounded positive
   search cannot manufacture recursion or an unsound negative verdict.
+  The
+  [`synth-six-binder-rankn`](../test/synth-six-binder-rankn.txt) transcript and
+  pure boundary regressions exercise both a non-lexical six-binder hypothesis
+  and a six-element active-instance provider assignment under Djinn,
+  Exference, and combined mode. The
+  [six-binder report](reports/2026-08-10-six-binder-instantiation.md) records
+  the shared boundary and the seven-binder successor controls.
 - **Guarded impredicative provider subsumption (Exference).** A
   provider such as `forall a. a -> a` forwards to an impredicative
   requested scheme; the Quick-Look-style guard admits a quantified
@@ -202,7 +211,7 @@ successor in `2026-08-09-five-binder-instantiation.md`:
   serialization keeps its established behavior.
 - **Correlated active-instance assignments (Leant bridge).** For each exact
   live provider independently, the generated Lean metaprogram opens at most
-  five leading type binders while retaining the erased instance
+  six leading type binders while retaining the erased instance
   constraints which can determine them. It inspects at most 32 active instance
   heads per provider in Lean resolver order. Every selected head and its full
   constraint closure run under `Lean.withoutModifyingState`, so no attempt can
@@ -248,7 +257,7 @@ successor in `2026-08-09-five-binder-instantiation.md`:
   The provider inventory grammar uses an optional
   `(instantiations (args (kinded N ...) ...))` block after binder metadata.
   `N` is the remaining `Type`-arrow arity and is bounded independently of the
-  five provider-binder positions. Historical metadata-free entries,
+  six provider-binder positions. Historical metadata-free entries,
   binder-only entries, and explicit empty blocks still parse. Historical exact
   arguments without the wrapper remain in their original vectors and default
   each position to proper kind. The legacy `(candidates ...)` form is read as
@@ -801,7 +810,7 @@ Design rules, all inherited from Djex:
   reason.
 - **Quantifier verdicts are bounded, not complete**: second-order
   instantiation follows Djex's guarded, sequent-supplied discipline;
-  beyond it (including instantiation chains longer than five binders
+  beyond it (including instantiation chains longer than six binders
   and the twelve-site six-open/six-opaque plan gap) the answer is "no term
   found within bounds" — full impredicative inhabitation is undecidable,
   so this boundary is permanent, and the display must never upgrade it
@@ -810,10 +819,10 @@ Design rules, all inherited from Djex:
   theorem. Exference's query-derived provider route admits only
   complete closed, context-free `forall` roots observed in proven arrow or
   tuple proper-type positions; it excludes the query root and children of
-  opaque type applications, and retains the five-binder and 32-combination
+  opaque type applications, and retains the six-binder and 32-combination
   caps. Its internal Haskell instance-head specialization remains
   monotype-only. Separately, Leant can supply a quantified choice which an
-  active Lean instance head established for that exact provider: at most five
+  active Lean instance head established for that exact provider: at most six
   leading type binders are opened, 32 heads are inspected and 16 distinct
   complete vectors retained per provider, and no more than 32 provider/vector
   associations reach a checked Djex runner. The selected head's subgoals and

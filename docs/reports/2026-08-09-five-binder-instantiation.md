@@ -1,5 +1,11 @@
 # Five-binder Djex integration in Leant
 
+> **Successor.** The
+> [six-binder integration](2026-08-10-six-binder-instantiation.md) raises the
+> shared hypothesis, loaded-scheme, query-derived provider, and exact-assignment
+> boundary from five to six. Seven binders are now the conservative incomplete
+> boundary. The body below remains the historical five-binder record.
+>
 > **Follow-up.** The
 > [query-local closed-monotype extension](2026-08-09-query-local-closed-monotype-instantiation.md)
 > adds a positive-only final Djinn family without changing this report's
