@@ -26,7 +26,7 @@ import Language.Haskell.Djex
       ( Apply, Case, Global, Lambda, Let, Local, Tuple
       , VisibleTypeApplication
       )
-  , Pattern (Bind)
+  , Pattern (Bind, TuplePattern, Wildcard)
   , Type (..)
   , inferredVisibleTypeArgument
   , maximumProviderInstantiationArguments
@@ -1211,6 +1211,16 @@ typeApplicationTests = testGroup "retained type applications"
           check engine = expectTerm "Demo.sealedBox"
             (synthesizeWithProviders engine 1024 [provider] goal)
       in mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "retain structured rank-N provider elimination in Djinn" $ do
+      let source = FAtom False "Demo.Source"
+          result = FAtom False "Demo.Result"
+          provider = ProviderFrag "Demo.source" $
+            FProd
+              (FAll True "A" (FArr (FVar "A") result))
+              FTop
+          goal = FArr source result
+      expectTerm "match Demo.source with"
+        (synthesizeWithProviders EngineDjinn 1024 [provider] goal)
   , testCase "fit explicit forall arguments of foreign providers" $ do
       let token = FAtom False "Demo.Token"
           provider = ProviderFrag "Demo.consumeExplicit"
@@ -1267,6 +1277,106 @@ typeApplicationTests = testGroup "retained type applications"
       renderLeanTerm Map.empty providers Map.empty ([], 0, [])
           (FArr source result) expression
         @?= Right ["fun x => Demo.source x"]
+  , testCase "fit rank-N fields eliminated from structured providers" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      let source = FAtom False "Demo.Source"
+          result = FAtom False "Demo.Result"
+          providerFrag = FProd
+            (FAll True "A" (FArr (FVar "A") result))
+            FTop
+          providers = Map.singleton "leantProvider0"
+            ("Demo.source", Nothing, providerFrag)
+          expression = Lambda [Bind "value"] $
+            Case (Global providerName)
+              [ ( TuplePattern [Bind "function", Wildcard]
+                , Apply (Local "function") (Local "value")
+                )
+              ]
+      renderLeanTerm Map.empty providers Map.empty ([], 0, [])
+          (FArr source result) expression
+        @?= Right
+          ["fun x => match Demo.source with | ⟨f, _⟩ => f _ x"]
+  , testCase "fit rank-N fields from applied structured providers" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      let token = FAtom False "Demo.Token"
+          source = FAtom False "Demo.Source"
+          result = FAtom False "Demo.Result"
+          providerFrag = FArr token $
+            FProd
+              (FAll True "A" (FArr (FVar "A") result))
+              FTop
+          providers = Map.singleton "leantProvider0"
+            ("Demo.makeSource", Nothing, providerFrag)
+          expression = Lambda [Bind "token", Bind "value"] $
+            Case
+              (Apply (Global providerName) (Local "token"))
+              [ ( TuplePattern [Bind "function", Wildcard]
+                , Apply (Local "function") (Local "value")
+                )
+              ]
+      renderLeanTerm Map.empty providers Map.empty ([], 0, [])
+          (FArr token (FArr source result)) expression
+        @?= Right
+          ["fun x y => match Demo.makeSource x with | ⟨f, _⟩ => f _ y"]
+  , testCase "fit rank-N fields let-bound from structured providers" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      let source = FAtom False "Demo.Source"
+          result = FAtom False "Demo.Result"
+          providerFrag = FProd
+            (FAll True "A" (FArr (FVar "A") result))
+            FTop
+          providers = Map.singleton "leantProvider0"
+            ("Demo.source", Nothing, providerFrag)
+          expression = Lambda [Bind "value"] $
+            Let (TuplePattern [Bind "function", Wildcard])
+              (Global providerName)
+              (Apply (Local "function") (Local "value"))
+      renderLeanTerm Map.empty providers Map.empty ([], 0, [])
+          (FArr source result) expression
+        @?= Right
+          ["fun x => let ⟨f, _⟩ := Demo.source; f _ x"]
+  , testCase "leave implicit rank-N fields hidden after elimination" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      let source = FAtom False "Demo.Source"
+          result = FAtom False "Demo.Result"
+          providerFrag = FProd
+            (FAll False "A" (FArr (FVar "A") result))
+            FTop
+          providers = Map.singleton "leantProvider0"
+            ("Demo.source", Nothing, providerFrag)
+          expression = Lambda [Bind "value"] $
+            Case (Global providerName)
+              [ ( TuplePattern [Bind "function", Wildcard]
+                , Apply (Local "function") (Local "value")
+                )
+              ]
+      renderLeanTerm Map.empty providers Map.empty ([], 0, [])
+          (FArr source result) expression
+        @?= Right
+          ["fun x => match Demo.source with | ⟨f, _⟩ => f x"]
+  , testCase "fit rank-N fields inside nested elimination inputs" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      let source = FAtom False "Demo.Source"
+          result = FAtom False "Demo.Result"
+          providerFrag = FProd
+            (FAll True "A" (FArr (FVar "A") result))
+            FTop
+          providers = Map.singleton "leantProvider0"
+            ("Demo.source", Nothing, providerFrag)
+          expression = Lambda [Bind "value"] $
+            Let (Bind "answer")
+              (Case (Global providerName)
+                [ ( TuplePattern [Bind "function", Wildcard]
+                  , Apply (Local "function") (Local "value")
+                  )
+                ])
+              (Local "answer")
+      renderLeanTerm Map.empty providers Map.empty ([], 0, [])
+          (FArr source result) expression
+        @?= Right
+          [ "fun x => let a := match Demo.source with | "
+              ++ "⟨f, _⟩ => f _ x; a"
+          ]
   , testCase "fit explicit forall provider arguments in case scrutinees" $ do
       providerName <- expectRight $ mkIdentifier "leantProvider0"
       let token = FAtom False "Demo.Token"
