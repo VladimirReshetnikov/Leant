@@ -1,0 +1,48 @@
+namespace ContextualOnly
+
+axiom Token : Type
+
+class Pick (a : Type 1) : Prop where
+  witness : True
+
+abbrev Choice := {a : Type} → [Inhabited a] → a → a
+
+instance : Pick Choice := ⟨True.intro⟩
+
+axiom chosen {a : Type 1} [Pick a] : Token
+
+end ContextualOnly
+
+namespace DependentContext
+
+class Dep where
+  T : Type
+
+abbrev Choice := [d : Dep] → d.T
+
+class Pick (a : Type 1) : Prop where
+  witness : True
+
+instance : Pick Choice := ⟨True.intro⟩
+
+axiom Token : Type
+
+axiom chosen {a : Type 1} [Pick a] : Token
+
+end DependentContext
+
+:set synth-library off
+:set synth-steps 256
+:set synth-engine djinn
+:synth ContextualOnly.Token
+:set synth-engine exference
+:synth ContextualOnly.Token
+:set synth-engine both
+:synth ContextualOnly.Token
+:set synth-engine djinn
+:synth DependentContext.Token
+:set synth-engine exference
+:synth DependentContext.Token
+:set synth-engine both
+:synth DependentContext.Token
+:quit

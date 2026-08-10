@@ -65,6 +65,7 @@ import Language.Haskell.Synthesis.Generated
   , isInferredVisibleTypeArgument
   , visibleTypeArgumentClosedType
   )
+import Language.Haskell.Synthesis.Constraint (Constraint (..))
 import Language.Haskell.Synthesis.Name
   ( Boxity (..)
   , Name
@@ -562,6 +563,7 @@ roleRename (expr, _, domPairs) =
       _ -> False
   peel (FAll _ _ b) = peel b
   peel (FInst _ b) = peel b
+  peel (FExactContext _ _ b) = peel b
   peel f = f
 
 -- | Bound placeholder names in binding order.
@@ -909,6 +911,9 @@ fit cm providers force frag expr n doms =
   walk (FInst _ rest) ps ds =
     let (ps', f', ds', ex) = walk rest ps ds
     in (Wildcard : ps', f', ds', ex)
+  walk (FExactContext _ _ rest) ps ds =
+    let (ps', f', ds', ex) = walk rest ps ds
+    in (Wildcard : ps', f', ds', ex)
   walk f ps ds = (ps, f, ds, False)
 
   introCore e = case e of
@@ -932,6 +937,9 @@ fit cm providers force frag expr n doms =
       in (Wildcard : ps, core', f', k')
     FAll False _ rest -> etaExpand rest core k
     FInst _ rest ->
+      let (ps, core', f', k') = etaExpand rest core k
+      in (Wildcard : ps, core', f', k')
+    FExactContext _ _ rest ->
       let (ps, core', f', k') = etaExpand rest core k
       in (Wildcard : ps, core', f', k')
     _ -> ([], core, f, k)
@@ -1117,6 +1125,11 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
               in go (Set.insert fresh consumed) replacements'
                 termDomains remainingExact remaining opened
         FInst _ rest
+          | preserveTrailing && null arguments ->
+              finish replacements termDomains arguments frag
+          | otherwise ->
+              go consumed replacements termDomains exactArguments arguments rest
+        FExactContext _ _ rest
           | preserveTrailing && null arguments ->
               finish replacements termDomains arguments frag
           | otherwise ->
@@ -1321,6 +1334,15 @@ inferFragReplacements targets = go Set.empty
         in go (Set.insert fresh bound) replacements expected' actual'
   go bound replacements (FInst key body) (FInst key' body')
     | key == key' = go bound replacements body body'
+  go bound replacements
+      (FExactContext className arguments body)
+      (FExactContext className' arguments' body')
+    | className == className'
+    , map fst arguments == map fst arguments'
+    , length arguments == length arguments' = do
+        replacements' <- matchMany bound replacements
+          (zip (map snd arguments) (map snd arguments'))
+        go bound replacements' body body'
   go bound replacements (FApp _ _ head' arguments)
       (FApp _ _ head'' arguments')
     | head' == head''
@@ -1405,6 +1427,10 @@ specializeFrag replacements = go Set.empty
       | otherwise ->
           FAll explicit binder (go (Set.insert binder bound) body)
     FInst key body -> FInst key (recur body)
+    FExactContext className arguments body ->
+      FExactContext className
+        [(arity, recur argument) | (arity, argument) <- arguments]
+        (recur body)
     FApp safe key head' arguments ->
       FApp safe key head' (map recur arguments)
     FParamInd headName key parameters constructors ->
@@ -1431,6 +1457,8 @@ freeFragVariables bound frag = case frag of
   FSum left right -> descend [left, right]
   FAll _ binder body -> freeFragVariables (Set.insert binder bound) body
   FInst _ body -> freeFragVariables bound body
+  FExactContext _ arguments body ->
+    descend (map snd arguments ++ [body])
   FVar variable
     | variable `Set.member` bound -> Set.empty
     | otherwise -> Set.singleton variable
@@ -1458,6 +1486,8 @@ fragVariableNames frag = case frag of
   FSum left right -> descend [left, right]
   FAll _ binder body -> Set.insert binder (fragVariableNames body)
   FInst _ body -> fragVariableNames body
+  FExactContext _ arguments body ->
+    descend (map snd arguments ++ [body])
   FVar variable -> Set.singleton variable
   FApp _ _ head' arguments ->
     let headNames = case head' of
@@ -1493,6 +1523,10 @@ renameFragBinder old new frag = case frag of
     | binder == old -> frag
     | otherwise -> FAll explicit binder (go body)
   FInst key body -> FInst key (go body)
+  FExactContext className arguments body ->
+    FExactContext className
+      [(arity, go argument) | (arity, argument) <- arguments]
+      (go body)
   FVar variable
     | variable == old -> FVar new
     | otherwise -> frag
@@ -1550,6 +1584,7 @@ trailingAlls :: Frag -> Int -> Int
 trailingAlls frag 0 = leadingTypeArgs frag
 trailingAlls (FAll _ _ rest) k = trailingAlls rest k
 trailingAlls (FInst _ rest) k = trailingAlls rest k
+trailingAlls (FExactContext _ _ rest) k = trailingAlls rest k
 trailingAlls (FArr _ rest) k = trailingAlls rest (k - 1)
 trailingAlls _ _ = 0
 
@@ -1805,6 +1840,7 @@ render cm providers typeNames style visibleBinderDomain doms = go
   weaveArgs (FAll True _ rest) as = "_" : weaveArgs rest as
   weaveArgs (FAll False _ rest) as = weaveArgs rest as
   weaveArgs (FInst _ rest) as = weaveArgs rest as
+  weaveArgs (FExactContext _ _ rest) as = weaveArgs rest as
   weaveArgs (FArr _ rest) (a : as) = a : weaveArgs rest as
   weaveArgs _ as = as
 
@@ -1815,6 +1851,7 @@ render cm providers typeNames style visibleBinderDomain doms = go
     _ -> False
   peelA (FAll _ _ b) = peelA b
   peelA (FInst _ b) = peelA b
+  peelA (FExactContext _ _ b) = peelA b
   peelA f = f
 
   at req level text = if level >= req then text else "(" ++ text ++ ")"
@@ -2049,30 +2086,30 @@ renderVisibleTypeArgumentWithForallMetadata visibleBinderDomain
       Right (at req 0 (intercalate " × " elementTxts), remaining)
     SharedType.TupleType Unboxed _ ->
       Left "cannot render an unboxed tuple as a Lean type argument"
-    SharedType.ForallType variables constraints body
-      | not (null constraints) ->
-          Left "cannot render a constrained quantified visible Lean type argument"
-      | null variables -> renderType applicationHead req visibilities body
-      | otherwise -> do
-          let (binderMetadata, afterBinders) =
-                splitAt (length variables) visibilities
-          if length binderMetadata /= length variables
-            then Left
-              "exact Lean provider forall metadata is shorter than its canonical type"
-            else do
-              (bodyTxt, remaining) <- renderType False 0 afterBinders body
-              let binderTxt (variable, (explicit, domain)) =
-                    (if explicit then "(" else "{")
-                      ++ closedVisibleTypeVariableSpelling variable ++ " : "
-                      ++ visibleBinderDomainText domain
-                      ++ (if explicit then ")" else "}")
-              Right
-                ( at req 0
-                    ("\8704 " ++ unwords
+    SharedType.ForallType variables constraints body -> do
+      let (binderMetadata, afterBinders) =
+            splitAt (length variables) visibilities
+      if length binderMetadata /= length variables
+        then Left
+          "exact Lean provider forall metadata is shorter than its canonical type"
+        else do
+          (constraintTxts, afterConstraints) <-
+            renderConstraints afterBinders constraints
+          (bodyTxt, remaining) <- renderType False 0 afterConstraints body
+          let binderTxt (variable, (explicit, domain)) =
+                (if explicit then "(" else "{")
+                  ++ closedVisibleTypeVariableSpelling variable ++ " : "
+                  ++ visibleBinderDomainText domain
+                  ++ (if explicit then ")" else "}")
+              contextualBody = intercalate " \8594 "
+                (constraintTxts ++ [bodyTxt])
+              rendered
+                | null variables = contextualBody
+                | otherwise =
+                    "\8704 " ++ unwords
                       (map binderTxt (zip variables binderMetadata))
-                      ++ ", " ++ bodyTxt)
-                , remaining
-                )
+                      ++ ", " ++ contextualBody
+          Right (at req 0 rendered, remaining)
 
   renderTypes visibilities types = case types of
     [] -> Right ([], visibilities)
@@ -2080,6 +2117,25 @@ renderVisibleTypeArgumentWithForallMetadata visibleBinderDomain
       (rendered, afterType) <-
         renderType False 1 visibilities typeExpression
       (rest, remaining) <- renderTypes afterType remainingTypes
+      Right (rendered : rest, remaining)
+
+  renderConstraints visibilities constraints = case constraints of
+    [] -> Right ([], visibilities)
+    Constraint className arguments : remainingConstraints -> do
+      classTxt <- renderTypeName (not $ null arguments) className
+      (argumentTxts, afterArguments) <-
+        renderConstraintArguments visibilities arguments
+      let rendered = "[" ++ unwords (classTxt : argumentTxts) ++ "]"
+      (rest, remaining) <-
+        renderConstraints afterArguments remainingConstraints
+      Right (rendered : rest, remaining)
+
+  renderConstraintArguments visibilities arguments = case arguments of
+    [] -> Right ([], visibilities)
+    argument : remainingArguments -> do
+      (rendered, afterArgument) <- renderType False 2 visibilities argument
+      (rest, remaining) <-
+        renderConstraintArguments afterArgument remainingArguments
       Right (rendered : rest, remaining)
 
   visibleBinderDomainText domain = case domain of

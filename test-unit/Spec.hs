@@ -66,6 +66,7 @@ import Leant.Synth.Fragment
   , candidateVerificationProgram
   , fragHasDepth
   , fragHasInstanceBinder
+  , fragHasUnsupportedInstanceBinder
   , fragProviderMayOpen
   , fragRefusal
   , fragUnsafeAtoms
@@ -340,19 +341,26 @@ providerProgramTests = testGroup "provider discovery program"
         `isInfixOf` synthPrelude [] @?= True
       "  if !resultType.isSort || args.isEmpty then pure none"
         `isInfixOf` synthPrelude [] @?= True
-      "              match \8592 appOf providerMode fuel depth blocked e with"
+      "              match \8592 appOf providerMode exactAssignmentMode fuel depth blocked e with"
         `isInfixOf` synthPrelude [] @?= True
-  , testCase "erase provider instances but mark goal binders" $ do
+  , testCase "separate ordinary and exact-assignment instance serialization" $ do
       let instanceHandling = unlines
             [ "      else if bi.isInstImplicit then"
             , "        -- Typeclass evidence is reconstructed by Lean when a value is"
             , "        -- applied, so Djex never consumes it as a term premise. Providers"
-            , "        -- erase the binder completely. Goal mode retains a render-only"
-            , "        -- marker because Lean lambdas must still bind instance arguments."
+            , "        -- erase the binder completely. Exact assignment mode preserves a"
+            , "        -- bounded, semantic class application; ordinary goal mode retains"
+            , "        -- only the legacy render marker for backward compatibility."
             , "        if providerMode then"
-            , "          go providerMode fuel depth blocked b"
-            , "        else do"
-            , "          let instanceType \8592 Meta.ppExpr t"
+            , "          go providerMode exactAssignmentMode fuel depth blocked b"
+            , "        else if exactAssignmentMode then do"
+            , "          let legacy : MetaM String := do"
+            ]
+          exactContextHandling = unlines
+            [ "          match \8592 Meta.isClass? classType with"
+            , "          | none => legacy"
+            , "          | some className => do"
+            , "            let arguments := classType.getAppArgs"
             ]
           implicitScheme = unlines
             [ "      else do"
@@ -363,10 +371,17 @@ providerProgramTests = testGroup "provider discovery program"
             , "          -- scheme binder so Djex can choose a visible instantiation."
             ]
       instanceHandling `isInfixOf` synthPrelude [] @?= True
+      exactContextHandling `isInfixOf` synthPrelude [] @?= True
+      "pure (\"(exact-context \" ++ esc className.toString"
+        `isInfixOf` synthPrelude [] @?= True
+      "if exactAssignmentMode && bi.isInstImplicit then pure \"(depth)\""
+        `isInfixOf` synthPrelude [] @?= True
+      "let r \8592 go providerMode false fuel depth blocked b"
+        `isInfixOf` synthPrelude [] @?= True
       implicitScheme `isInfixOf` synthPrelude [] @?= True
-      "let s \8592 LeantSynth.go false 100 0 [] tgt"
+      "let s \8592 LeantSynth.go false false 100 0 [] tgt"
         `isInfixOf` serializerProgram "Demo.Token" @?= True
-      "let frag \8592 LeantSynth.go true 80 0 [] info.type"
+      "let frag \8592 LeantSynth.go true false 80 0 [] info.type"
         `isInfixOf` providerProgram []
           (ProviderQuery ["Demo"] (Just "Demo.Token")) @?= True
       "partial def leadingTypeBinderNames (fuel : Nat) (e : Expr)"
@@ -395,19 +410,23 @@ providerProgramTests = testGroup "provider discovery program"
         `isInfixOf` prelude @?= True
       "pending := pending ++ [otherGoal]"
         `isInfixOf` prelude @?= True
+      "if binderInfo.isInstImplicit then do"
+        `isInfixOf` prelude @?= True
       unlines
-          [ "      else if binderInfo.isInstImplicit then"
-          , "        -- Exact provider arguments are context-free. Reject a contextual"
-          , "        -- binder wherever WHNF exposes it, including beneath an alias,"
-          , "        -- before 'go false' could emit an unparsable FInst payload."
-          , "        pure none"
+          [ "      if binderInfo.isInstImplicit then do"
+          , "        -- A dictionary-dependent result is not an ordinary Haskell class"
+          , "        -- context and must not fall back to one opaque pretty-printed atom."
+          , "        if body.hasLooseBVars then pure none"
           ]
+        `isInfixOf` prelude @?= True
+      ("if arguments.size > "
+          ++ show maximumProviderInstantiationArguments ++ " then return none")
+        `isInfixOf` prelude @?= True
+      "match \8592 Meta.isClass? classType with"
         `isInfixOf` prelude @?= True
       "| some closedMCtx => withMCtx closedMCtx do"
         `isInfixOf` prelude @?= True
       "if complete && arguments.size == typeArgs.size then"
-        `isInfixOf` prelude @?= True
-      "|| hasInstanceBinder candidate then"
         `isInfixOf` prelude @?= True
       "match ← typeKindArity? fuel kind with"
         `isInfixOf` prelude @?= True
@@ -421,6 +440,8 @@ providerProgramTests = testGroup "provider discovery program"
       "domains : Array String"
         `isInfixOf` prelude @?= True
       "providerForallDomains? fuel 0 candidate"
+        `isInfixOf` prelude @?= True
+      "let fragment \8592 go false true fuel 0 [] candidate"
         `isInfixOf` prelude @?= True
       "payload := \"(exact (domains\""
         `isInfixOf` prelude @?= True
@@ -669,6 +690,55 @@ providerParserTests = testGroup "provider inventory parser"
                 ]
               ]
           ]
+  , testCase "retain structured contextual exact provider assignments" $
+      let contextual = FAll False "A" $
+            FExactContext "Inhabited" [(0, FVar "A")] $
+              FArr (FVar "A") (FVar "A")
+      in do
+        parseProviderSexp
+            ("(providers (provider \"ContextualOnly.chosen\" "
+              ++ "(binders \"a\") (instantiations (args (kinded 0 "
+              ++ "(exact (domains type) (alli \"A\" "
+              ++ "(exact-context \"Inhabited\" (arguments "
+              ++ "(kinded 0 (var \"A\"))) "
+              ++ "(-> (var \"A\") (var \"A\")))))))) "
+              ++ "(alli \"a\" "
+              ++ "(atom unsafe \"ContextualOnly.Token\"))))")
+          @?= Right
+            [ ProviderFragWithEvidence "ContextualOnly.chosen"
+                (FAll False "a" (FAtom False "ContextualOnly.Token"))
+                ["a"]
+                [ [ ProviderInstantiationExactArgument 0 contextual
+                      [ProviderForallDomainType]
+                  ]
+                ]
+            ]
+        fragHasInstanceBinder contextual @?= True
+        fragHasUnsupportedInstanceBinder contextual @?= False
+  , testCase "reject structured contexts outside exact assignments" $ do
+      let contextual =
+            "(exact-context \"Gap.C\" (arguments) "
+              ++ "(atom unsafe \"Gap.Token\"))"
+          expected = Left
+            "exact-context is only valid in an exact provider argument"
+      parseGoalSexp
+          ("(goal type (query (roots \"Gap\") (head)) "
+            ++ contextual ++ ")")
+        @?= expected
+      parseProviderSexp
+          ("(providers (provider \"Gap.bad\" " ++ contextual ++ "))")
+        @?= expected
+      parseProviderSexp
+          ("(providers (provider \"Gap.global\" (binders \"a\") "
+            ++ "(instantiations (args (kinded 0 " ++ contextual ++ "))) "
+            ++ "(alli \"a\" (atom unsafe \"Gap.Token\"))))")
+        @?= expected
+      parseProviderSexp
+          ("(providers (provider \"Gap.global\" (binders \"a\") "
+            ++ "(instantiations (args (kinded 0 (nominal \"Gap.Wrap\" "
+            ++ contextual ++ ")))) "
+            ++ "(alli \"a\" (atom unsafe \"Gap.Token\"))))")
+        @?= expected
   , testCase "retain a general Sort provider forall domain" $
       parseProviderSexp
           ("(providers (provider \"Gap.sort\" (binders \"a\") "
@@ -706,6 +776,20 @@ providerParserTests = testGroup "provider inventory parser"
           (inventory $ unwords $
             replicate (maximumProviderExactForallDomains + 1) "prop")
         @?= Left "exact Lean provider forall-domain vector is too long"
+  , testCase "bound structured exact-context class arguments" $ do
+      let inventory arguments =
+            "(providers (provider \"Gap.global\" (binders \"a\") "
+              ++ "(instantiations (args (kinded 0 (exact (domains) "
+              ++ "(exact-context \"Gap.C\" (arguments " ++ arguments
+              ++ ") (atom unsafe \"Nat\")))))) "
+              ++ "(alli \"a\" (atom unsafe \"Gap.Token\"))))"
+          proper = "(kinded 0 (atom unsafe \"Nat\"))"
+      parseProviderSexp (inventory
+          "(kinded 65 (atom unsafe \"Nat\"))")
+        @?= Left "invalid exact-context class argument kind arity"
+      parseProviderSexp (inventory $ unwords $
+          replicate (maximumProviderInstantiationArguments + 1) proper)
+        @?= Left "too many exact-context class arguments"
   , testCase "retain canonical nominal provider arguments" $
       parseProviderSexp
           "(providers (provider \"Gap.partial\" (binders \"F\") \
@@ -787,7 +871,7 @@ providerParserTests = testGroup "provider inventory parser"
           \(instantiations (args)) \
           \(alli \"a\" (atom unsafe \"Gap.Token\"))))"
         @?= Left "provider instantiation assignment has no arguments"
-  , testCase "retain contextual evidence for fail-closed filtering" $
+  , testCase "retain legacy contextual evidence for fail-closed filtering" $
       let contextual = FAll False "a"
             (FInst "Inhabited a" (FVar "a"))
       in do
@@ -802,6 +886,7 @@ providerParserTests = testGroup "provider inventory parser"
                 ["a"] [[ProviderInstantiationArgument 0 contextual]]
             ]
         fragHasInstanceBinder contextual @?= True
+        fragHasUnsupportedInstanceBinder contextual @?= True
         fragHasInstanceBinder
           (FAll True "a" (FArr (FVar "a") (FVar "a"))) @?= False
   , testCase "rejects trailing inventory data" $
@@ -2247,6 +2332,50 @@ typeApplicationTests = testGroup "retained type applications"
           check engine = expectTerm "Gap.global («a» := (∀"
             (synthesizeWithProviders engine 1024 [provider] token)
       in mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "instantiate a structured contextual rank-N provider choice" $
+      let token = FAtom False "ContextualOnly.Token"
+          contextual = FAll False "A" $
+            FExactContext "Inhabited" [(0, FVar "A")] $
+              FArr (FVar "A") (FVar "A")
+          provider = ProviderFragWithEvidence "ContextualOnly.chosen"
+            (FAll False "a" token) ["a"]
+            [ [ ProviderInstantiationExactArgument 0 contextual
+                  [ProviderForallDomainType]
+              ]
+            ]
+          expected =
+            "ContextualOnly.chosen («a» := (∀ {a0_0 : Type _}, "
+              ++ "[@Inhabited a0_0] → a0_0 → a0_0))"
+          check engine = expectTerm expected
+            (synthesizeWithProviders engine 2048 [provider] token)
+      in mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "keep structured contexts exact-only and proper-kinded" $
+      let token = FAtom False "ContextualOnly.Token"
+          contextual arity = FAll False "A" $
+            FExactContext "Inhabited" [(arity, FVar "A")] $
+              FArr (FVar "A") (FVar "A")
+          provider argument = ProviderFragWithEvidence
+            "ContextualOnly.chosen" (FAll False "a" token) ["a"]
+            [[argument]]
+          structural = provider $
+            ProviderInstantiationArgument 0 (contextual 0)
+          wrongKind = provider $
+            ProviderInstantiationExactArgument 0 (contextual 1)
+              [ProviderForallDomainType]
+          check provider' engine = case
+              synthesizeWithProviders engine 512 [provider'] token of
+            Right (SynthCandidates groups _)
+              | any ("[@Inhabited" `isInfixOf`) (concat groups) ->
+                  assertFailure $ "unsupported contextual assignment reached "
+                    ++ show engine ++ ": " ++ show groups
+            Right _ -> pure ()
+            Left err -> assertFailure $ "unsupported contextual assignment "
+              ++ "failed the whole " ++ show engine ++ " query: " ++ err
+      in do
+        fragHasUnsupportedInstanceBinder (contextual 0) @?= False
+        fragHasUnsupportedInstanceBinder (contextual 1) @?= True
+        mapM_ (check structural) [EngineDjinn, EngineExference, EngineBoth]
+        mapM_ (check wrongKind) [EngineDjinn, EngineExference, EngineBoth]
   , testCase "search one canonical assignment but retain domain alternatives" $ do
       let mixed = FAll False "P" $ FAll True "A" $
             FArr (FVar "P") $ FArr (FVar "A") (FVar "A")
@@ -3986,7 +4115,7 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
           [ "Demo.global («a» := (∀ (a0_0 : _), a0_0 → "
               ++ "∀ (a1_0 : _), a1_0 → a1_0))"
           ]
-  , testCase "reject constrained quantified Lean type arguments" $ do
+  , testCase "render constrained quantified Lean type arguments" $ do
       providerName <- expectRight $ mkIdentifier "leantProvider0"
       className <- expectRight $ mkIdentifier "C"
       let constrained = ForallType ["a"]
@@ -3998,8 +4127,10 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
           (Map.singleton "leantProvider0"
             (testProviderInfo "Demo.global" $ Just ["a"])) Map.empty
           ([], 0, []) (FAtom False "Demo.Token") expression
-        @?= Left
-          "cannot render a constrained quantified visible Lean type argument"
+        @?= Right
+          [ "Demo.global («a» := (∀ (a0_0 : _), "
+              ++ "[C a0_0] → a0_0))"
+          ]
   ]
 
 firstGroup :: Either String SynthOutcome -> AssertionResult

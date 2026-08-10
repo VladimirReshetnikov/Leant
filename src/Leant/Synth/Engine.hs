@@ -55,7 +55,8 @@ import qualified Data.Set as Set
 import Data.Void (Void)
 
 import Language.Haskell.Djex
-  ( QueryEvidence (..)
+  ( Constraint (..)
+  , QueryEvidence (..)
   , QueryOptions (..)
   , QueryRequest (..)
   , Boxity (Boxed)
@@ -63,6 +64,7 @@ import Language.Haskell.Djex
   , DataConstructor (..)
   , Declaration
       ( AbstractTypeDeclaration
+      , ClassDeclaration
       , DataTypeDeclaration
       , ValueDeclaration
       )
@@ -126,6 +128,7 @@ import Leant.Synth.Fragment
   , Slot (..)
   , fragHasDepth
   , fragHasInstanceBinder
+  , fragHasUnsupportedInstanceBinder
   , fragSpine
   , fragUnsafeAtoms
   , fragVisibleForallVisibilities
@@ -751,6 +754,9 @@ data TransState = TransState
     -- these must be rigid constructors, not undeclared datatype variables
   , tsAtomFamilies :: Map.Map String Name
   , tsAtomNext :: Int
+  , tsContextClasses :: Map.Map String (Name, [Int])
+    -- ^ exact Lean class head -> private checked class and parameter kinds
+  , tsContextNext :: Int
   , tsTypeMap :: TypeMap
     -- ^ private engine type spelling -> exact Lean type or family head
   }
@@ -1013,13 +1019,23 @@ fragToDjinn recursiveProjection providers extras frag0 = do
         FApp _ _ head' arguments ->
           appOccurrence premisesEnabled head' arguments
         FAll{} -> do
-          let (binders, body) = adjacentForallSpine frag
+          let (binders, afterBinders) = adjacentForallSpine frag
+              (contextSources, body) = adjacentExactContextSpine afterBinders
           variables <- mapM (variable . ("v:" ++)) binders
+          contexts <- mapM exactContextConstraint contextSources
           body' <- go premisesEnabled body
-          pure (ForallType variables [] body')
+          pure (ForallType variables contexts body')
         -- Lean reconstructs instance evidence at applications.  Keep it out
         -- of both engine type systems; Render retains the introduction slot.
         FInst _ body -> go premisesEnabled body
+        -- Exact provider-assignment contexts carry semantic class identity and
+        -- structured arguments. They occur only in the exact evidence wire;
+        -- unlike legacy render-only FInst markers, retain them for Djex's
+        -- closed contextual assignment checker.
+        FExactContext className arguments body -> do
+          context <- exactContextConstraint (className, arguments)
+          body' <- go premisesEnabled body
+          pure (ForallType [] [context] body')
         FParamInd headName _ parameters _ ->
           parametricIndOccurrence premisesEnabled headName parameters
         FInd key ctors -> indOccurrence premisesEnabled key ctors
@@ -1049,6 +1065,66 @@ fragToDjinn recursiveProjection providers extras frag0 = do
           collect binders (FAll _ binder body) =
             collect (binder : binders) body
           collect binders body = (reverse binders, body)
+
+      -- Preserve an exact instance telescope at its source position. A later
+      -- FAll starts a nested scheme rather than being floated ahead of the
+      -- context, so rendering consumes forall-domain metadata in the same
+      -- preorder that the Lean serializer recorded.
+      adjacentExactContextSpine = collect []
+        where
+          collect contexts (FExactContext className arguments body) =
+            collect ((className, arguments) : contexts) body
+          collect contexts body = (reverse contexts, body)
+
+      exactContextConstraint (leanClassName, arguments) = do
+        if any ((/= 0) . fst) arguments
+          then failT
+            "exact Lean context class has a non-proper parameter"
+          else pure ()
+        translatedArguments <- mapM exactContextArgument arguments
+        classes <- getsT tsContextClasses
+        className <- case Map.lookup leanClassName classes of
+          Just (known, knownKinds)
+            | knownKinds == map fst arguments -> pure known
+            | otherwise -> failT $
+                "exact Lean context class " ++ show leanClassName
+                  ++ " has inconsistent parameter kinds"
+          Nothing -> do
+            index <- getsT tsContextNext
+            let privateSpelling = "LeantContext" ++ show index
+                parameterKinds = map fst arguments
+                parameters =
+                  [ TypeParameter
+                      ("leantContextParameter" ++ show index ++ "_" ++ show j)
+                      Nothing
+                  | (j, _) <- zip [0 :: Int ..] parameterKinds
+                  ]
+            privateName <- nameT privateSpelling
+            modifyT (\s -> s
+              { tsContextClasses = Map.insert leanClassName
+                  (privateName, parameterKinds) (tsContextClasses s)
+              , tsContextNext = index + 1
+              , tsTypeMap = Map.insert privateSpelling leanClassName
+                  (tsTypeMap s)
+              , tsDecls = tsDecls s ++
+                  [ClassDeclaration () privateName parameters [] []]
+              })
+            pure privateName
+        pure (Constraint className translatedArguments)
+
+      exactContextArgument (remaining, argument)
+        | remaining < 0 || remaining > maximumProviderArgumentKindArity =
+            failT "exact Lean context argument has an unsupported kind"
+        | remaining == 0 = go False argument
+        | otherwise = case argument of
+            FAtom _ spelling -> exactFamilyHead spelling remaining
+            FApp _ _ (AppNominal spelling) supplied -> do
+              translated <- mapM (go False) supplied
+              headType <- exactFamilyHead spelling
+                (length supplied + remaining)
+              pure (applyTypeArguments headType translated)
+            _ -> failT
+              "higher-kinded exact Lean context argument did not retain a nominal head"
 
       -- Retained type applications are the bridge to Djex's guarded
       -- impredicative instantiation.  A bound higher-kinded head shares the
@@ -1486,6 +1562,8 @@ fragToDjinn recursiveProjection providers extras frag0 = do
     , tsRigidAtoms = rigidAtoms
     , tsAtomFamilies = Map.empty
     , tsAtomNext = 0
+    , tsContextClasses = Map.empty
+    , tsContextNext = 0
     , tsTypeMap = Map.empty
     }
   let providerDecls = [declaration | (declaration, _, _) <- translatedProviders]
@@ -1527,9 +1605,19 @@ fragToDjinn recursiveProjection providers extras frag0 = do
         <= maximumProviderArgumentKindArity
       && supportedProviderArgumentHead argument
       && usableExactDomains argument
+      && contextualEvidenceIsExact argument
       && all
-        (\frag -> not (fragHasDepth frag || fragHasInstanceBinder frag))
+        (\frag -> not
+          (fragHasDepth frag || fragHasUnsupportedInstanceBinder frag))
         (providerArgumentFragments argument)
+
+  -- The structured contextual node is semantic metadata owned by the exact
+  -- argument wire. Historical structural and nominal payloads must not gain a
+  -- second, metadata-free route merely because they share the Frag parser.
+  contextualEvidenceIsExact argument = case argument of
+    ProviderInstantiationExactArgument{} -> True
+    _ -> all (not . fragHasInstanceBinder)
+      (providerArgumentFragments argument)
 
   usableExactDomains argument = case argument of
     ProviderInstantiationExactArgument remaining frag domains ->
@@ -1601,6 +1689,7 @@ fragToDjinn recursiveProjection providers extras frag0 = do
   providerInstantiationArity provider = case provider of
     FAll _ _ body -> 1 + providerInstantiationArity body
     FInst _ body -> providerInstantiationArity body
+    FExactContext _ _ body -> providerInstantiationArity body
     _ -> 0
 
   recursiveFamily key ctors = case ctors of
@@ -1635,6 +1724,8 @@ fragToDjinn recursiveProjection providers extras frag0 = do
       FSum left right -> descend accum [left, right]
       FAll _ _ body -> collect accum body
       FInst _ body -> collect accum body
+      FExactContext _ arguments body ->
+        descend accum (map snd arguments ++ [body])
       FApp _ _ _ arguments -> descend accum arguments
       -- Translating an exact nonrecursive occurrence consumes only its
       -- parameter vector.  Its query-wide structural template fields are
@@ -1767,6 +1858,8 @@ collectFragAtoms atoms frag = case frag of
   FSum left right -> descend atoms [left, right]
   FAll _ _ body -> collectFragAtoms atoms body
   FInst _ body -> collectFragAtoms atoms body
+  FExactContext _ arguments body ->
+    descend atoms (map snd arguments ++ [body])
   FAtom _ key -> Set.insert key atoms
   FApp _ _ _ arguments -> descend atoms arguments
   -- An exact nested family's inventory belongs to its independent query-wide
@@ -1799,6 +1892,8 @@ collectProviderSurfaceAtoms atoms frag = case frag of
   FSum left right -> descend atoms [left, right]
   FAll _ _ body -> collectProviderSurfaceAtoms atoms body
   FInst _ body -> collectProviderSurfaceAtoms atoms body
+  FExactContext _ arguments body ->
+    descend atoms (map snd arguments ++ [body])
   FAtom _ key -> Set.insert key atoms
   FApp _ _ _ arguments -> descend atoms arguments
   FParamInd _ _ parameters _ -> descend atoms parameters
@@ -1821,6 +1916,8 @@ collectExactFamilyUses recursiveProjection premisesEnabled uses frag =
   FSum left right -> descend uses [left, right]
   FAll _ _ body -> collect uses body
   FInst _ body -> collect uses body
+  FExactContext _ arguments body ->
+    descend uses (map snd arguments ++ [body])
   FApp _ key head' arguments ->
     let withUse = case head' of
           AppVariable _ -> uses
@@ -2028,6 +2125,8 @@ freeSchemaVariables bound frag = case frag of
   FSum left right -> descend [left, right]
   FAll _ binder body -> freeSchemaVariables (Set.insert binder bound) body
   FInst _ body -> freeSchemaVariables bound body
+  FExactContext _ arguments body ->
+    descend (map snd arguments ++ [body])
   FVar variableName
     | variableName `Set.member` bound -> Set.empty
     | otherwise -> Set.singleton variableName
@@ -2105,6 +2204,13 @@ schemaEquivalent = go []
     -- templates whose enclosing binder spellings differ.
     (FInst _ leftBody, FInst _ rightBody) ->
       go binders leftBody rightBody
+    (FExactContext leftClass leftArguments leftBody,
+        FExactContext rightClass rightArguments rightBody) ->
+      leftClass == rightClass
+        && map fst leftArguments == map fst rightArguments
+        && equivalentLists binders
+          (map snd leftArguments) (map snd rightArguments)
+        && go binders leftBody rightBody
     (FVar a, FVar b) -> equivalentName binders a b
     (FAtom _ a, FAtom _ b) -> a == b
     (FApp _ _ leftHead leftArguments,
@@ -2194,6 +2300,10 @@ replaceFrag replacements = go Set.empty
         | otherwise ->
             FAll explicit binder (go (Set.insert binder shadowed) body)
       FInst key body -> FInst key (recur body)
+      FExactContext className arguments body ->
+        FExactContext className
+          [(arity, recur argument) | (arity, argument) <- arguments]
+          (recur body)
       FApp safe key head' arguments ->
         FApp safe key head' (map recur arguments)
       FParamInd headName key parameters constructors ->
@@ -2232,6 +2342,8 @@ schemaNames frag = case frag of
   FSum left right -> descend [left, right]
   FAll _ binder body -> Set.insert binder (schemaNames body)
   FInst _ body -> schemaNames body
+  FExactContext _ arguments body ->
+    descend (map snd arguments ++ [body])
   FVar variableName -> Set.singleton variableName
   FApp _ _ head' arguments ->
     let headNames = case head' of
@@ -2260,6 +2372,10 @@ renameBoundVariable old new frag = case frag of
     | binder == old -> frag
     | otherwise -> FAll explicit binder (go body)
   FInst key body -> FInst key (go body)
+  FExactContext className arguments body ->
+    FExactContext className
+      [(arity, go argument) | (arity, argument) <- arguments]
+      (go body)
   FVar variableName
     | variableName == old -> FVar new
     | otherwise -> frag
