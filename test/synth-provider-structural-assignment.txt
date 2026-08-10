@@ -1,0 +1,54 @@
+namespace StructuralDirect
+
+axiom Token : Type
+axiom LeftType : Type
+axiom RightType : Type
+
+class Choice (F : Type → Type → Type) (G : Type → Type) : Prop where
+  witness : True
+
+instance : Choice Prod (Sum LeftType) := ⟨True.intro⟩
+
+axiom consume {F : Type → Type → Type} {G : Type → Type}
+    [Choice F G] : F LeftType RightType → G RightType → Token
+
+abbrev Goal :=
+  Prod LeftType RightType → Sum LeftType RightType → Token
+
+end StructuralDirect
+
+namespace StructuralContext
+
+axiom Token : Type
+axiom Fixed : Type
+
+class Binary (F : Type → Type → Type) : Prop where
+  witness : True
+
+class Unary (G : Type → Type) : Prop where
+  witness : True
+
+abbrev Selected :=
+  {a : Type} → [Binary Prod] → [Unary (Sum Fixed)] → a → a
+
+class Pick (selected : Type 1) : Prop where
+  witness : True
+
+instance : Pick Selected := ⟨True.intro⟩
+
+axiom choose {selected : Type 1} [Pick selected] : Token
+
+end StructuralContext
+
+:set synth-library off
+:set synth-steps 1024
+:set synth-engine djinn
+:synth StructuralDirect.Goal
+:synth StructuralContext.Token
+:set synth-engine exference
+:synth StructuralDirect.Goal
+:synth StructuralContext.Token
+:set synth-engine both
+:synth StructuralDirect.Goal
+:synth StructuralContext.Token
+:quit

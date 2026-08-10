@@ -79,10 +79,13 @@ import qualified Language.Haskell.Synthesis.Type as SharedType
 
 import Leant.Synth.Fragment
   ( AppHead (..)
+  , ExactContextArgument (..)
   , Frag (..)
   , ProviderForallDomain (..)
   , ProviderInstantiationArgument (..)
   , Slot (..)
+  , exactContextArgumentPayloadFragments
+  , mapExactContextArgumentFragments
   , fragVisibleForallVisibilities
   , fragSpine
   , leadingTypeArgs
@@ -1338,10 +1341,9 @@ inferFragReplacements targets = go Set.empty
       (FExactContext className arguments body)
       (FExactContext className' arguments' body')
     | className == className'
-    , map fst arguments == map fst arguments'
     , length arguments == length arguments' = do
-        replacements' <- matchMany bound replacements
-          (zip (map snd arguments) (map snd arguments'))
+        replacements' <- foldM (matchContextArgument bound)
+          replacements (zip arguments arguments')
         go bound replacements' body body'
   go bound replacements (FApp _ _ head' arguments)
       (FApp _ _ head'' arguments')
@@ -1379,6 +1381,51 @@ inferFragReplacements targets = go Set.empty
   matchMany bound = foldM
     (\replacements (expected, actual) ->
       go bound replacements expected actual)
+
+  matchContextArgument bound replacements (expected, actual) =
+    case (contextNominalUse expected, contextNominalUse actual) of
+      ( Just (expectedArity, expectedHead, expectedSupplied)
+        , Just (actualArity, actualHead, actualSupplied)
+        )
+        | expectedArity == actualArity
+        , expectedHead == actualHead
+        , length expectedSupplied == length actualSupplied ->
+            matchMany bound replacements
+              (zip expectedSupplied actualSupplied)
+      (Nothing, Nothing) -> case (expected, actual) of
+        ( ExactContextFragmentArgument expectedArity expectedFrag
+          , ExactContextFragmentArgument actualArity actualFrag
+          )
+          | expectedArity == 0
+          , actualArity == 0 ->
+              go bound replacements expectedFrag actualFrag
+        _ -> Nothing
+      _ -> Nothing
+
+  contextNominalUse argument = case argument of
+    ExactContextNominalArgument remaining spelling supplied
+      | remaining > 0
+      , not (null spelling)
+      , canonicalHeadSupported spelling (length supplied + remaining) ->
+          Just (length supplied + remaining, spelling, supplied)
+    ExactContextFragmentArgument remaining child
+      | remaining > 0 -> case child of
+          FAtom _ spelling
+            | legacyHeadSupported spelling ->
+                Just (remaining, spelling, [])
+          FApp _ _ (AppNominal spelling) supplied
+            | legacyHeadSupported spelling ->
+                Just (length supplied + remaining, spelling, supplied)
+          _ -> Nothing
+    _ -> Nothing
+
+  canonicalHeadSupported spelling totalArity
+    | elem spelling ["Prod", "Sum"] = totalArity == 2
+    | otherwise = legacyHeadSupported spelling
+  legacyHeadSupported spelling =
+    not (null spelling)
+      && not (elem spelling
+        ["And", "Prod", "PProd", "Or", "Sum", "PSum", "Iff", "Not"])
 
   targetApplicationHead head' = case head' of
     AppVariable variable -> variable `Set.member` targets
@@ -1429,7 +1476,7 @@ specializeFrag replacements = go Set.empty
     FInst key body -> FInst key (recur body)
     FExactContext className arguments body ->
       FExactContext className
-        [(arity, recur argument) | (arity, argument) <- arguments]
+        (map (mapExactContextArgumentFragments recur) arguments)
         (recur body)
     FApp safe key head' arguments ->
       FApp safe key head' (map recur arguments)
@@ -1458,7 +1505,8 @@ freeFragVariables bound frag = case frag of
   FAll _ binder body -> freeFragVariables (Set.insert binder bound) body
   FInst _ body -> freeFragVariables bound body
   FExactContext _ arguments body ->
-    descend (map snd arguments ++ [body])
+    descend
+      (concatMap exactContextArgumentPayloadFragments arguments ++ [body])
   FVar variable
     | variable `Set.member` bound -> Set.empty
     | otherwise -> Set.singleton variable
@@ -1487,7 +1535,8 @@ fragVariableNames frag = case frag of
   FAll _ binder body -> Set.insert binder (fragVariableNames body)
   FInst _ body -> fragVariableNames body
   FExactContext _ arguments body ->
-    descend (map snd arguments ++ [body])
+    descend
+      (concatMap exactContextArgumentPayloadFragments arguments ++ [body])
   FVar variable -> Set.singleton variable
   FApp _ _ head' arguments ->
     let headNames = case head' of
@@ -1525,7 +1574,7 @@ renameFragBinder old new frag = case frag of
   FInst key body -> FInst key (go body)
   FExactContext className arguments body ->
     FExactContext className
-      [(arity, go argument) | (arity, argument) <- arguments]
+      (map (mapExactContextArgumentFragments go) arguments)
       (go body)
   FVar variable
     | variable == old -> FVar new
@@ -2160,6 +2209,8 @@ renderVisibleTypeArgumentWithForallMetadata visibleBinderDomain
         Just FunctionConstructor ->
           Left "cannot render an unsaturated function type constructor in Lean"
         Just (TupleConstructor Boxed 0) -> Right "Unit"
+        Just (TupleConstructor Boxed 2) ->
+          Right ((if explicit then "@" else "") ++ "Prod")
         Just (TupleConstructor Boxed _) ->
           Left "cannot render an unsaturated tuple type constructor in Lean"
         Just (TupleConstructor Unboxed _) ->
