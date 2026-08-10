@@ -248,6 +248,9 @@ recorded in the
 Djinn's additive specialization of query-local schemes at closed monotypes is
 recorded separately in the
 [query-local closed-monotype report](docs/reports/2026-08-09-query-local-closed-monotype-instantiation.md).
+Exact render-only retention of implicit forall visibility and mixed sort
+domains is recorded in the
+[implicit provider visible-result report](docs/reports/2026-08-09-exact-implicit-provider-visible-results.md).
 
 The engine is the vendored [Djex](lib/Djex) library, linked in-process.
 Djex began as a merger of two classic Haskell synthesizers — **Djinn**
@@ -571,7 +574,20 @@ most 32 provider/vector associations in total. Every vector has exact provider
 arity and at most five arguments. That aggregate prefix is taken before an
 argument can affect family planning, rigidity, or type translation, so
 evidence beyond the boundary is not entered. Live metadata uses
-`(instantiations (args (kinded N ...) ...))`. Leant reconstructs each Djex
+`(instantiations (args (kinded N ...) ...))`. A proper-kind live argument also
+retains bounded structural rendering metadata as
+`(kinded 0 (exact (domains prop type ...) FRAG))`. `FRAG` records source forall
+visibility while the domain tags distinguish `Prop`, `Type`, and general
+`Sort`, including mixed-domain rank-N types that cannot be reconstructed from
+Djex's deliberately kind-erased syntax. The canonical translated type remains
+authoritative for alpha-deduplication, kind/context checking, vector lookup,
+and engine search. No executable Lean source crosses this boundary: the parser
+accepts only the fixed domain vocabulary, requires one tag for every visible
+forall in the fragment, and caps a vector at 128 tags. The metadata is used
+only after the complete specified vector matches, and the backend still
+elaborates and kernel-checks every resulting candidate.
+
+Leant reconstructs each Djex
 `GroundKind` by folding that bounded arrow count into `FunctionKind` over
 `ProperTypeKind`, pairs it with the translated type, and calls
 `runDjinnQueryWithKindedInstantiationAssignments` or
@@ -582,9 +598,9 @@ assignment passes Djex's provider, scheme, context, and exact-arity checks, the
 pinned adapters productively preflight all of that assignment's supplied kinds
 before recursive kind inference, same-provider comparison, kind conversion, or
 paired type elaboration. Oversized and cyclic caller-built kinds therefore fail
-finitely. The historical
-`(candidates ...)` form remains readable as unary, proper-kind vectors only,
-alongside metadata-free and binder-only inventories. A complete vector fails
+finitely. The historical `(candidates ...)` form and structural
+`(kinded N ...)` payload remain readable, alongside metadata-free and
+binder-only inventories. A complete vector fails
 closed if any argument contains depth truncation (`FDepth`) or an instance
 binder (`FInst`), including a constraint hidden behind a reducible alias.
 Provider-prefix lanes slice the metadata with its declaration, and Djex
@@ -605,6 +621,17 @@ instance but is excluded because it is contextual. This is bounded,
 evidence-directed rank-N/impredicative support, not general impredicative
 inference; open or context-bearing quantified arguments are rejected rather
 than guessed into Lean syntax. The
+[`synth-provider-implicit-visible-result`](test/synth-provider-implicit-visible-result.txt)
+transcript covers the complementary exact-metadata path. It requires standalone
+Djinn, standalone Exference, and combined mode to select a provider at the
+mixed type `∀ {P : Prop} (A : Type), P → A → Result`, preserving the
+implicit `Prop` binder and explicit `Type` binder. Exference and combined mode
+also project that assigned type from a provider result and apply it under a
+quantified goal; Lean verification checks the rendered specialization rather
+than a string-only fixture. Its second namespace supplies two instance-selected
+types with one canonical Djex fragment but swapped `Prop`/`Type` domains, puts
+the wrong rendering first, and requires all three modes to fall through to the
+kernel-valid alternative. The
 [`synth-provider-higher-kind-assignment`](test/synth-provider-higher-kind-assignment.txt)
 transcript separately requires the mixed kinded/rank-N vector and the exact
 vacuous and heterogeneous multi-vacuous applications under Djinn, Exference,
@@ -1177,6 +1204,11 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   carries each vector only with its source declaration. The checked runners
   verify exact provider identity, arity, supplied positional kinds, closure,
   and context before consuming a vector once without Cartesian reconstruction.
+  Proper-kind live arguments additionally retain a bounded structural fragment
+  plus semantic forall-domain tags. This metadata is render-only, selected only
+  by a complete canonical vector, and preserves implicit/explicit binders plus
+  mixed `Prop`/`Type`/`Sort` domains without transporting executable Lean text;
+  the mandatory Lean verifier remains the acceptance boundary.
   This includes constraint-only or otherwise vacuous higher-kinded binders;
   unsaturated structural built-in heads remain conservatively excluded.
 - Non-dependent instance-implicit binders in a goal are serialized as
