@@ -230,15 +230,21 @@ six-binder successor in `2026-08-10-six-binder-instantiation.md`:
   exact-assignment mode. A genuine nominal class binder becomes
   `FExactContext`, which carries its exact Lean class name, bounded ordered
   ground-kinded arguments, and body instead of pretty-printed binder text.
-  Arity-zero arguments retain their full fragment; positive arities require a
-  canonical nominal constant head with proper-type supplied arguments. The
-  Haskell bridge reconstructs every private class parameter kind, translates
-  the structure to that checked class, and maps it back to the same Lean head
-  during rendering. A whole vector containing `FDepth` or legacy raw `FInst`
-  still fails closed, as do malformed, open, dictionary-dependent,
-  term-indexed, structural-builtin, and otherwise unsupported contexts. A
-  bounded pre-scan drops assignment vectors carrying inconsistent class-kind or
-  nominal-family arity claims without poisoning unrelated sibling vectors.
+  Arity-zero arguments retain their full fragment. Live positive-arity
+  arguments use `(kinded N (nominal "Head" ...))`, carrying an exact constant
+  head and only proper-type supplied arguments. Historical fragment payloads
+  remain readable for compatible nonstructural heads, but their opaque spelling
+  has no structural authority. The Haskell bridge reconstructs every private
+  class parameter kind, translates the structure to that checked class, and
+  maps it back to the same Lean head during rendering. Canonical `Prod` and
+  `Sum` are admitted only at supplied-plus-residual total arity two and use
+  Djex's boxed-pair and `Either` identities directly. Legacy structural
+  payloads and canonical `And`, `PProd`, `Or`, `PSum`, `Iff`, and `Not` remain
+  fail-closed. A whole vector containing `FDepth` or legacy raw `FInst` still
+  fails closed, as do malformed, open, dictionary-dependent, term-indexed, and
+  otherwise unsupported contexts. A bounded pre-scan drops assignment vectors
+  carrying inconsistent class-kind or nominal-family arity claims without
+  poisoning unrelated sibling vectors.
   Ordinary goal mode keeps its render-only `FInst`, and provider schemes keep
   erasing instance evidence.
   The boundary is recorded in the
@@ -294,16 +300,22 @@ six-binder successor in `2026-08-10-six-binder-instantiation.md`:
   impredicative inference; see the
   [correlated assignment report](reports/2026-08-05-correlated-instance-head-assignments.md).
 
-  Unsaturated structural built-ins `And`, `Prod`, `PProd`, `Or`, `Sum`, `PSum`,
-  `Iff`, and `Not` remain excluded as higher-kinded assignment heads until
-  their renderer identities are modeled; saturated uses keep their structural
-  translation. Unit regressions cover the kinded wire, kind/order retention,
+  Canonical nominal `Prod` and `Sum` are supported bare or partially applied at
+  total arity two. They share the direct structural identities used by
+  saturated products and sums. Unsaturated `And`, `PProd`, `Or`, `PSum`, `Iff`,
+  and `Not`, together with every legacy structural payload, remain excluded;
+  saturated uses keep their structural translation. Unit regressions cover the
+  kinded wire, kind/order retention,
   bounds, whole-vector deduplication, and exact vacuous success in Djinn,
   Exference, and combined mode. The live
   `synth-provider-higher-kind-assignment` transcript requires its mixed
   kinded/rank-N vector, the heterogeneous arity-1/arity-2 multi-vacuous vector,
   and both exact `Wrap` and `Pair Nat` alternatives for one provider in all
-  three modes while leaving their order to engine ranking.
+  three modes while leaving their order to engine ranking. The focused
+  `synth-provider-structural-assignment` transcript additionally requires a
+  provider to consume bare `Prod` and partial `Sum`, and retains both inside a
+  closed contextual rank-N argument, under all three engine modes. See the
+  [higher-kinded contextual assignment report](reports/2026-08-10-higher-kinded-contextual-assignments.md).
 - **Instance-implicit goal alignment (Leant bridge).** A non-dependent
   instance binder is neither a type quantifier nor an ordinary engine premise.
   The fragment retains it as a render-only slot, erases its dictionary before
@@ -833,13 +845,14 @@ Design rules, all inherited from Djex:
   is checked against the exact provider binder. This admits constraint-only or
   otherwise vacuous higher-kinded binders and closed quantified arguments with
   structured exact-assignment-local nominal class contexts. It does not admit
-  legacy raw `FInst`, free, dictionary-dependent, or term-indexed contexts, or
-  unsaturated structural built-ins whose renderer identity is still absent
-  (`And`, `Prod`, `PProd`,
-  `Or`, `Sum`, `PSum`, `Iff`, and `Not`). A vacuous provider may mention ambient
-  rigids opened from the query, but a free flexible variable still disables
-  this route. No ordinary goal or provider scheme gains contextual search from
-  this assignment-only representation.
+  legacy raw `FInst`, free, dictionary-dependent, or term-indexed contexts.
+  Canonical `Prod` and `Sum` are admitted at total arity two, both as direct
+  provider arguments and inside structured exact-assignment-local contexts.
+  Unsaturated `And`, `PProd`, `Or`, `PSum`, `Iff`, and `Not`, together with
+  legacy structural payloads, remain excluded. A vacuous provider may mention
+  ambient rigids opened from the query, but a free flexible variable still
+  disables this route. No ordinary goal or provider scheme gains contextual
+  search from this assignment-only representation.
 - **Recursive elimination is bounded to one layer in Exference.** A
   recursive field exposed by a constructor match is available as a
   normal branch-local value, but is not eagerly decomposed again. The

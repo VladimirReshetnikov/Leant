@@ -621,14 +621,20 @@ exact nominal Lean class head, each ordered argument's bounded ground-kind
 arity, and its body, so Djex checks the context structurally and rendering
 restores the same Lean class application. Proper arguments retain their full
 fragment. A higher-kinded argument must retain a canonical bare or partially
-applied nominal head with only proper-type supplied arguments; family planning
-uses its supplied-plus-residual total arity, and the head is never mistaken for
-a proper rigid atom. This representation exists only inside one exact provider
-assignment. A complete vector still fails closed if any argument contains
-depth truncation (`FDepth`), a legacy raw instance marker (`FInst`), or a
-malformed, open, dictionary-dependent, term-indexed, structural-builtin, or
-otherwise unsupported context. The implementation and live evidence are
-recorded in the
+applied nominal head with only proper-type supplied arguments; live discovery
+uses `(kinded N (nominal "Head" ...))`. Historical fragment payloads remain
+readable for compatible nonstructural heads, but their atom or application text
+does not confer structural identity. Family planning uses supplied-plus-residual
+total arity, and never mistakes the head for a proper rigid atom. This
+representation exists only inside one exact provider assignment. A complete
+vector still fails closed if any argument contains depth truncation (`FDepth`),
+a legacy raw instance marker (`FInst`), or a malformed, open,
+dictionary-dependent, term-indexed, or otherwise unsupported context. Canonical
+nominal `Prod` and `Sum` are the structural exception: at total arity two they
+map directly to Djex's boxed-pair and `Either` identities, so bare and partially
+applied forms can be consumed in provider bodies or retained in contextual
+rank-N arguments. Legacy structural payloads do not gain that authority. The
+implementation and live evidence are recorded in the
 [higher-kinded contextual assignment report](docs/reports/2026-08-10-higher-kinded-contextual-assignments.md).
 Before planning, conflicting class-kind or nominal-family arity claims discard
 only the assignment vectors that touch that identity; unrelated sibling vectors
@@ -637,10 +643,12 @@ Provider-prefix lanes slice the metadata with its declaration, and Djex
 resolves every vector by the exact private provider name, so a later or
 alpha-identically typed provider cannot donate evidence to an earlier one.
 
-Unsaturated structural built-ins `And`, `Prod`, `PProd`, `Or`, `Sum`, `PSum`,
-`Iff`, and `Not` remain excluded as higher-kinded assignment heads until their
-unsaturated renderer identity is represented. Saturated uses retain their
-ordinary structural translation.
+Canonical `Prod` and `Sum` assignments are supported at total arity two,
+including bare `Prod`/`Sum` and partial `Prod A`/`Sum A`. Unsaturated `And`,
+`PProd`, `Or`, `PSum`, `Iff`, and `Not` remain excluded because the ground-kind
+wire does not retain their Prop/sort distinctions. Saturated uses retain their
+ordinary structural translation, and legacy structural payloads remain
+fail-closed.
 
 The dedicated
 [`synth-quantified-provider`](test/synth-quantified-provider.txt) transcript
@@ -687,6 +695,12 @@ all three engine modes. The current exact-vector contract is recorded in the
 [correlated instance-head assignment report](docs/reports/2026-08-05-correlated-instance-head-assignments.md);
 the earlier scalar API remains documented in the
 [provider-local instance-head report](docs/reports/2026-08-05-provider-local-instance-head-evidence.md).
+The focused
+[`synth-provider-structural-assignment`](test/synth-provider-structural-assignment.txt)
+transcript discovers `Prod` and partial `Sum` assignments from real Lean
+instances. It makes a provider consume their saturated forms and separately
+retains both heads inside a closed contextual rank-N argument under Djinn,
+Exference, and combined mode; every displayed result is checked by Lean 4.31.
 
 Djinn first searches with only the highest-ranked provider, which prevents a
 lossily projected or irrelevant declaration from crowding the fixed candidate
@@ -1250,8 +1264,8 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   `FExactContext` nodes are admitted only for bounded, closed nominal class
   applications. Class arguments may have a bounded first-order ground kind;
   positive arities require a canonical nominal head and proper-type supplied
-  arguments. Malformed, free, dictionary-dependent, term-indexed,
-  structural-builtin, and otherwise unsupported forms remain fail-closed. The
+  arguments. Malformed, free, dictionary-dependent, term-indexed, unsupported
+  structural forms, and other unsupported forms remain fail-closed. The
   command-wide vector list is capped at 32 before planning or translation, and
   provider-prefix fallback carries each vector only with its source
   declaration. The checked runners
@@ -1262,8 +1276,10 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   by a complete canonical vector, and preserves implicit/explicit binders plus
   mixed `Prop`/`Type`/`Sort` domains without transporting executable Lean text;
   the mandatory Lean verifier remains the acceptance boundary.
-  This includes constraint-only or otherwise vacuous higher-kinded binders;
-  unsaturated structural built-in heads remain conservatively excluded.
+  This includes constraint-only or otherwise vacuous higher-kinded binders.
+  Canonical `Prod` and `Sum` are accepted at total arity two and translated to
+  their structural Djex identities; the other unsaturated structural heads and
+  every legacy structural payload remain conservatively excluded.
 - Non-dependent instance-implicit binders in a goal are serialized as
   render-only slots. They are erased before either engine searches, reserve a
   wildcard in an introduced Lean lambda, stay implicit at hypothesis and

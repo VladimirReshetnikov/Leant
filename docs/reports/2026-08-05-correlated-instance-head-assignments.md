@@ -248,12 +248,12 @@ polytypes, inspect local term scopes, mix components from separately accepted
 assignment vectors, remove engine search bounds, or turn a bounded miss into a
 refutation. Closing one selected seed may use other heads for that seed's
 instance subgoals and the provider's remaining constraints; all of them must
-agree in one metavariable context. Open, contextual, depth-truncated,
-wrong-kind, wrong-arity, incomplete, or unsatisfied assignments fail closed.
-Unsaturated structural built-ins `And`, `Prod`, `PProd`, `Or`, `Sum`, `PSum`,
-`Iff`, and `Not` also remain unsupported as higher-kinded assignment heads
-until their unsaturated renderer identities are modeled. Saturated occurrences
-keep their existing structural translations.
+agree in one metavariable context. At this slice's original boundary, open,
+contextual, depth-truncated, wrong-kind, wrong-arity, incomplete, or unsatisfied
+assignments failed closed. Unsaturated structural built-ins `And`, `Prod`,
+`PProd`, `Or`, `Sum`, `PSum`, `Iff`, and `Not` were also unsupported until
+canonical unsaturated identity was modeled. Saturated occurrences retained
+their existing structural translations.
 
 Pure regressions cover exact parsing, legacy unary parsing, finite outer,
 inner, and 129-node kind bounds, four ordered quantified arguments in all
@@ -277,6 +277,27 @@ two alternatives differently, while combined mode retains Djinn's order; all
 three still contain exactly the same required applications. The transcript
 also retains the earlier mixed higher-kinded/rank-N vector, so these vacuous
 paths do not weaken positional kind or argument-order preservation.
+
+## Successor: contextual and structural nominal assignments
+
+The
+[contextual-assignment successor](2026-08-09-contextual-provider-assignments.md)
+first extended exact evidence into assignment-local class contexts. The
+subsequent
+[higher-kinded contextual extension](2026-08-10-higher-kinded-contextual-assignments.md)
+now distinguishes canonical nominal arguments from legacy fragments. Canonical
+`Prod` and `Sum` are accepted at total arity two, both as direct provider
+assignments and inside contextual rank-N arguments. They reuse Djex's boxed-pair
+and `Either` identities, so their saturation in a provider body agrees with the
+ordinary structural representation.
+
+This is a deliberately narrow successor to the historical boundary above.
+Legacy structural payloads remain fail-closed, as do unsaturated `And`,
+`PProd`, `Or`, `PSum`, `Iff`, and `Not`, whose `Prop` and sort distinctions are
+not carried by the ground-kind wire. The live
+[`synth-provider-structural-assignment`](../../test/synth-provider-structural-assignment.txt)
+fixture verifies bare and partially applied `Prod`/`Sum` evidence under Djinn,
+Exference, and combined search.
 
 On 2026-08-06, `cabal build all -j1` and
 `cabal test leant-synth-tests -j1 --test-show-details=direct` passed, including
