@@ -1,0 +1,37 @@
+
+   __                  __
+  / /  ___ ___ ____   / /_
+ / /__/ -_) _ `/ _ \_/ __/
+/____/\__/\_,_/_//_/ \__/
+Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to exit.
+λ> namespace MetadataFitting
+λ>
+λ> axiom Marker (a : Type 1) : Type
+λ>
+λ> class Choice (a : Type 1) : Prop where
+…>   witness : True
+…>
+λ> instance implicitChoice : Choice (∀ {A : Type}, A → A) :=
+…>   ⟨True.intro⟩
+…>
+λ> instance explicitChoice : Choice (∀ (A : Type), A → A) :=
+…>   ⟨True.intro⟩
+…>
+λ> axiom make {a : Type 1} [Choice a] : a → Marker a
+λ>
+λ> end MetadataFitting
+λ>
+λ> :set synth-steps 64
+synth steps: 64
+λ> :set synth-engine exference
+synth engine: exference
+λ> :synth MetadataFitting.Marker (∀ (A : Type), A → A)
+preparing synthesis environment (session imports + Lean)...
+  it1  MetadataFitting.make («a» := (∀ (a0_0 : Type _), a0_0 → a0_0)) (fun _ x => x)
+note: search truncated: step limit reached
+λ> :set synth-engine both
+synth engine: both
+λ> :synth MetadataFitting.Marker (∀ (A : Type), A → A)
+  it1  MetadataFitting.make («a» := (∀ (a0_0 : Type _), a0_0 → a0_0)) (fun _ x => x)
+note: exference: search truncated: step limit reached
+λ> :quit

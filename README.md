@@ -587,6 +587,19 @@ forall in the fragment, and caps a vector at 128 tags. The metadata is used
 only after the complete specified vector matches, and the backend still
 elaborates and kernel-checks every resulting candidate.
 
+Each provider occurrence whose complete visible vector matches retained exact
+evidence receives a private render-time identity. One bounded metadata
+alternative is then used consistently for both provider-result fitting and
+final type-argument spelling;
+two uses of the same canonical vector may choose different implicit\/explicit
+source binders without pairing one choice's rendered type with another
+choice's inserted placeholders. The established 32-selection prefix and
+Cartesian cap still bound each rendering lane; if repeated occurrences expose
+more individual alternatives than fit, source-earlier occurrences retain
+priority and later occurrences keep their base selection. This occurrence-local
+coupling is recorded in the
+[provider metadata fitting report](docs/reports/2026-08-09-occurrence-local-provider-metadata-fitting.md).
+
 Leant reconstructs each Djex
 `GroundKind` by folding that bounded arrow count into `FunctionKind` over
 `ProperTypeKind`, pairs it with the translated type, and calls
@@ -632,6 +645,14 @@ than a string-only fixture. Its second namespace supplies two instance-selected
 types with one canonical Djex fragment but swapped `Prop`/`Type` domains, puts
 the wrong rendering first, and requires all three modes to fall through to the
 kernel-valid alternative. The
+[`synth-provider-metadata-fitting`](test/synth-provider-metadata-fitting.txt)
+transcript additionally makes rendering and result fitting inseparable. Its
+first instance contributes the canonical type with an implicit forall, while a
+second instance contributes the same Djex type with an explicit forall. The
+goal forces the explicit selection, and the provider consumes a value at that
+selected type; Exference and combined mode must therefore render both the
+explicit provider argument and `fun _ x => x`. Lean verifies that result at a
+64-step search bound. The
 [`synth-provider-higher-kind-assignment`](test/synth-provider-higher-kind-assignment.txt)
 transcript separately requires the mixed kinded/rank-N vector and the exact
 vacuous and heterogeneous multi-vacuous applications under Djinn, Exference,

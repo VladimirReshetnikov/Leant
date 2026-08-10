@@ -91,7 +91,8 @@ import Leant.Synth.ProviderCache
   )
 import Leant.Synth.Replay (ReplayPlan (..), planReplay)
 import Leant.Synth.Render
-  ( ProviderAssignmentInfo (..)
+  ( CtorInfo (..)
+  , ProviderAssignmentInfo (..)
   , ProviderInfo (..)
   , providerInfo
   , renderLeanTerm
@@ -1388,15 +1389,15 @@ typeApplicationTests = testGroup "retained type applications"
           [ "fun x => let ⟨f, _⟩ := Demo.box "
               ++ "(«A» := (∀ (a0_0 : _), a0_0 → a0_0)); f _ x"
           , "fun x => let ⟨f, _⟩ := Demo.box "
-              ++ "(«A» := (∀ {a0_0 : _}, a0_0 → a0_0)); f _ x"
+              ++ "(«A» := (∀ {a0_0 : _}, a0_0 → a0_0)); f x"
           , "fun x => let ⟨f, _⟩ := Demo.box "
               ++ "(«A» := (∀ (a0_0 : Type _), a0_0 → a0_0)); f _ x"
           , "fun x => let ⟨f, _⟩ := Demo.box "
-              ++ "(«A» := (∀ {a0_0 : Type _}, a0_0 → a0_0)); f _ x"
+              ++ "(«A» := (∀ {a0_0 : Type _}, a0_0 → a0_0)); f x"
           , "fun x => let ⟨f, _⟩ := Demo.box "
               ++ "(«A» := (∀ (a0_0 : Prop), a0_0 → a0_0)); f _ x"
           , "fun x => let ⟨f, _⟩ := Demo.box "
-              ++ "(«A» := (∀ {a0_0 : Prop}, a0_0 → a0_0)); f _ x"
+              ++ "(«A» := (∀ {a0_0 : Prop}, a0_0 → a0_0)); f x"
           ]
   , testCase "restore implicit specified arguments exactly" $ do
       providerName <- expectRight $ mkIdentifier "leantProvider0"
@@ -1515,6 +1516,96 @@ typeApplicationTests = testGroup "retained type applications"
           , "Demo.value («X» := (∀ {a0_0 : Type _} (a0_1 : Prop), "
               ++ "a0_0 → a0_1 → Result))"
           ]
+  , testCase "couple exact metadata to occurrence-local result fitting" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      visibleIdentity <- expectRight $ specifiedVisibleTypeArgument
+        (ForallType ["A"] []
+          (FunctionType (TypeVariable "A") (TypeVariable "A"))
+          :: Type String)
+      let natural = FAtom False "Nat"
+          implicitIdentity = FAll False "A" $
+            FArr (FVar "A") (FVar "A")
+          explicitIdentity = FAll True "A" $
+            FArr (FVar "A") (FVar "A")
+          assignment source = ProviderAssignmentInfo
+            { paiVisibleArguments = [visibleIdentity]
+            , paiSourceArguments =
+                [ ProviderInstantiationExactArgument 0 source
+                    [ProviderForallDomainType]
+                ]
+            }
+          providerFrag = FAll False "F" (FProd (FVar "F") FTop)
+          providers = Map.singleton "leantProvider0" $
+            (providerInfo "Demo.box" (Just ["F"]) providerFrag)
+              { piAssignments =
+                  [ assignment implicitIdentity
+                  , assignment explicitIdentity
+                  ]
+              }
+          providerApplication = VisibleTypeApplication
+            (Global providerName) visibleIdentity
+          expression = Lambda [Bind "value"] $
+            Let (TuplePattern [Bind "implicitFunction", Wildcard])
+              providerApplication $
+              Let (TuplePattern [Bind "explicitFunction", Wildcard])
+                providerApplication $
+                Tuple
+                  [ Apply (Local "implicitFunction") (Local "value")
+                  , Apply (Local "explicitFunction") (Local "value")
+                  ]
+          goal = FArr natural (FProd natural natural)
+          occurrenceLocalChoice =
+            "fun x => let ⟨f, _⟩ := Demo.box "
+              ++ "(«F» := (∀ {a0_0 : Type _}, a0_0 → a0_0)); "
+              ++ "let ⟨g, _⟩ := Demo.box "
+              ++ "(«F» := (∀ (a0_0 : Type _), a0_0 → a0_0)); "
+              ++ "⟨f x, g _ x⟩"
+      rendered <- expectRight $
+        renderLeanTerm Map.empty providers Map.empty ([], 0, []) goal expression
+      assertBool
+        ("no rendering kept each occurrence's metadata coupled to fitting: "
+          ++ show rendered)
+        (occurrenceLocalChoice `elem` rendered)
+  , testCase "reserve occurrence identities against candidate globals" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      collisionName <- expectRight $ mkIdentifier
+        "leantMetadataProviderOccurrence00000000000000000000"
+      naturalName <- expectRight $ mkIdentifier "Nat"
+      visibleNatural <- expectRight $ specifiedVisibleTypeArgument
+        (TypeConstructor naturalName :: Type String)
+      let natural = FAtom False "Nat"
+          token = FAtom False "Demo.Token"
+          collision = FAtom False "Demo.Collision"
+          providers = Map.singleton "leantProvider0" $
+            (providerInfo "Demo.value" (Just ["A"])
+              (FAll False "A" token))
+                { piAssignments =
+                    [ ProviderAssignmentInfo
+                        { paiVisibleArguments = [visibleNatural]
+                        , paiSourceArguments =
+                            [ProviderInstantiationArgument 0 natural]
+                        }
+                    ]
+                }
+          constructors = Map.singleton
+            "leantMetadataProviderOccurrence00000000000000000000"
+            CtorInfo
+              { ciLean = "Demo.Collision.mk"
+              , ciFields = []
+              , ciSole = False
+              , ciParametric = Nothing
+              }
+          expression = Tuple
+            [ VisibleTypeApplication (Global providerName) visibleNatural
+            , Global collisionName
+            ]
+      rendered <- expectRight $
+        renderLeanTerm constructors providers Map.empty ([], 0, [])
+          (FProd token collision) expression
+      assertBool
+        ("an occurrence identity shadowed an existing candidate global: "
+          ++ show rendered)
+        (any (isInfixOf "Demo.Collision.mk") rendered)
   , testCase "retain staged exact-domain alternatives beyond the live cap" $ do
       providerName <- expectRight $ mkIdentifier "leantProvider0"
       resultName <- expectRight $ mkIdentifier "Result"
