@@ -112,6 +112,7 @@ import Language.Haskell.Djex
   , runDjinnQueryWithKindedInstantiationAssignments
   , runExferenceQueryWithKindedInstantiationAssignments
   , selectQueryResults
+  , specifiedVisibleTypeArgument
   , standardDjinnSession
   , tupleName
   , valueName
@@ -132,7 +133,11 @@ import Leant.Synth.Fragment
 import Leant.Synth.Render
   ( CtorInfo (..)
   , CtorMap
+  , ProviderAssignmentInfo (..)
+  , ProviderInfo (..)
+  , ProviderMap
   , TypeMap
+  , providerInfo
   , renderLeanTerm
   )
 
@@ -880,7 +885,7 @@ fragToDjinn
       , [DjinnDecl]
       , [KindedProviderInstantiationAssignment String]
       , CtorMap
-      , Map.Map String (String, Maybe [String], Frag)
+      , ProviderMap
       , TypeMap
       , [(String, Frag, Type String)] -- caller-supplied premises
       , [(String, Frag, Type String)] -- constructor fallback premises
@@ -1412,27 +1417,44 @@ fragToDjinn recursiveProjection providers extras frag0 = do
                       { providerTypeBinderNames = names } -> Just names
             privateName <- nameT ("leantProvider" ++ show index)
             providerType <- go False providerFrag
-            instantiations <- mapM
+            translatedAssignments <- mapM
               (\arguments -> do
-                kindedArguments <- mapM
+                translatedArguments <- mapM
                   (\argument -> do
                     argumentType <- providerArgumentType argument
-                    pure (providerArgumentKind argument, argumentType))
+                    visibleArgument <- case
+                        specifiedVisibleTypeArgument argumentType of
+                      Left failure -> failT $ show failure
+                      Right visible -> pure visible
+                    pure
+                      ( (providerArgumentKind argument, argumentType)
+                      , visibleArgument
+                      ))
                   arguments
-                pure KindedProviderInstantiationAssignment
-                  { kindedProviderInstantiationAssignmentProvider = privateName
-                  , kindedProviderInstantiationAssignmentArguments =
-                      kindedArguments
-                  })
+                pure
+                  ( KindedProviderInstantiationAssignment
+                      { kindedProviderInstantiationAssignmentProvider =
+                          privateName
+                      , kindedProviderInstantiationAssignmentArguments =
+                          map fst translatedArguments
+                      }
+                  , ProviderAssignmentInfo
+                      { paiVisibleArguments = map snd translatedArguments
+                      , paiSourceArguments = arguments
+                      }
+                  ))
               [ assignment
               | (providerIndex, assignment) <- boundedProviderAssignments
               , providerIndex == index
               ]
+            let instantiations = map fst translatedAssignments
+                info = (providerInfo leanName binderNames providerFrag)
+                  { piAssignments = map snd translatedAssignments }
             pure
               ( ValueDeclaration
                   (ValueSignature () privateName providerType)
               , ( "leantProvider" ++ show index
-                , (leanName, binderNames, providerFrag)
+                , info
                 )
               , instantiations
               ))

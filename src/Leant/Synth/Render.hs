@@ -35,7 +35,11 @@
 module Leant.Synth.Render
   ( CtorInfo (..)
   , CtorMap
+  , ProviderAssignmentInfo (..)
+  , ProviderInfo (..)
+  , ProviderMap
   , TypeMap
+  , providerInfo
   , renderLeanTerm
   ) where
 
@@ -70,6 +74,7 @@ import qualified Language.Haskell.Synthesis.Type as SharedType
 import Leant.Synth.Fragment
   ( AppHead (..)
   , Frag (..)
+  , ProviderInstantiationArgument (..)
   , Slot (..)
   , fragSpine
   , leadingTypeArgs
@@ -89,13 +94,43 @@ data CtorInfo = CtorInfo
 -- | Engine-side constructor spellings of the declared datatypes.
 type CtorMap = Map.Map String CtorInfo
 
--- | Collision-free engine provider spelling to the exact Lean global name,
--- the original names of its engine-visible leading type binders, and its
--- source fragment.  The renderer needs the fragment as an expected type when
--- an engine constructs a higher-rank argument directly under the provider's
--- global application; unlike stripped premise lambdas, such a global has no
--- local-domain entry from which fitting could otherwise recover it.
-type ProviderMap = Map.Map String (String, Maybe [String], Frag)
+-- | One retained provider-instantiation vector.  The visible arguments are
+-- the canonical syntax emitted by Djex, while the source arguments preserve
+-- Lean's exact fragment explicitness and higher-kinded payload.  Keeping both
+-- sides lets result fitting recover information which Djex's intentionally
+-- language-neutral type representation cannot express.
+data ProviderAssignmentInfo = ProviderAssignmentInfo
+  { paiVisibleArguments :: [VisibleTypeArgument]
+  , paiSourceArguments :: [ProviderInstantiationArgument]
+  }
+  deriving (Eq, Show)
+
+-- | Exact rendering metadata for one collision-free engine provider.
+data ProviderInfo = ProviderInfo
+  { piLeanName :: String
+  , piBinderNames :: Maybe [String]
+  , piFrag :: Frag
+  , piAssignments :: [ProviderAssignmentInfo]
+  }
+  deriving (Eq, Show)
+
+-- | Collision-free engine provider spelling to its exact Lean metadata.
+-- Besides restoring names, the renderer needs the source fragment as an
+-- expected type when an engine constructs a higher-rank argument directly
+-- under a provider application; unlike stripped premise lambdas, such a
+-- global has no local-domain entry from which fitting could recover it.
+type ProviderMap = Map.Map String ProviderInfo
+
+-- | Provider metadata without retained instantiation evidence.  This is the
+-- normal shape for providers which were not discovered with exact assignment
+-- vectors and keeps direct renderer fixtures concise.
+providerInfo :: String -> Maybe [String] -> Frag -> ProviderInfo
+providerInfo leanName binderNames frag = ProviderInfo
+  { piLeanName = leanName
+  , piBinderNames = binderNames
+  , piFrag = frag
+  , piAssignments = []
+  }
 
 -- | Collision-free engine type spelling to its exact Lean type or type-family
 -- spelling.  Family heads are restored with their full explicit argument
@@ -370,9 +405,71 @@ declaredCtor cm name = nameSpelling name >>= (`Map.lookup` cm)
 -- environment introspection, so no Haskell-name rendering or qualification
 -- heuristic is applied to them.
 declaredProvider
-  :: ProviderMap -> Name -> Maybe (String, Maybe [String], Frag)
+  :: ProviderMap -> Name -> Maybe ProviderInfo
 declaredProvider providers name =
   nameSpelling name >>= (`Map.lookup` providers)
+
+-- | Recover the source assignment corresponding to the complete leading
+-- specified visible-argument vector of this provider application.  Djinn and
+-- Exference both retain the first canonical vector, so source order here is
+-- semantically significant.  Inferred, partial, and term-first spines carry no
+-- exact recoverable source assignment and deliberately fail closed.
+providerAssignmentAt
+  :: ProviderInfo
+  -> [ApplicationArgument local]
+  -> Maybe [ProviderInstantiationArgument]
+providerAssignmentAt info arguments = do
+  let visiblePrefix = takeVisiblePrefix arguments
+  if null visiblePrefix || any isInferredVisibleTypeArgument visiblePrefix
+    then Nothing
+    else lookup visiblePrefix
+      [ (paiVisibleArguments assignment, paiSourceArguments assignment)
+      | assignment <- piAssignments info
+      ]
+ where
+  takeVisiblePrefix applicationArguments = case applicationArguments of
+    VisibleTypeArgumentArgument argument : remaining ->
+      argument : takeVisiblePrefix remaining
+    _ -> []
+
+-- | A proper-kinded direct fragment can participate in the renderer's
+-- existing first-order substitution.  Higher-kinded and nominal arguments
+-- retain their evidence for future support but cannot safely masquerade as a
+-- plain fragment today.
+properProviderArgument :: ProviderInstantiationArgument -> Maybe Frag
+properProviderArgument argument = case argument of
+  ProviderInstantiationArgument 0 frag
+    | visibleArgumentPreservesExplicitness frag -> Just frag
+  _ -> Nothing
+
+-- Djex's neutral visible-type syntax renders every retained forall binder as
+-- explicit.  A source fragment containing an implicit forall therefore does
+-- not describe the Lean type which the candidate will actually pass to the
+-- provider.  Keep such evidence for correlation and rendering, but decline
+-- result substitution until an exact fragment-directed VTA renderer exists.
+-- Constructor inventories are metadata of nominal occurrences rather than
+-- part of the visible type expression, so only occurrence parameters recurse.
+visibleArgumentPreservesExplicitness :: Frag -> Bool
+visibleArgumentPreservesExplicitness frag = case frag of
+  FArr parameter result -> recur parameter && recur result
+  FProd left right -> recur left && recur right
+  FSum left right -> recur left && recur right
+  FAll explicit _ body -> explicit && recur body
+  FInst{} -> False
+  FApp _ _ _ arguments -> all recur arguments
+  FParamInd _ _ parameters _ -> all recur parameters
+  FParamRec _ _ _ parameters _ -> all recur parameters
+  FRec _ _ parameters _ -> all recur parameters
+  _ -> True
+ where
+  recur = visibleArgumentPreservesExplicitness
+
+providerArgumentVariableNames
+  :: ProviderInstantiationArgument -> Set.Set String
+providerArgumentVariableNames argument = case argument of
+  ProviderInstantiationArgument _ frag -> fragVariableNames frag
+  ProviderInstantiationNominalArgument _ _ supplied ->
+    Set.unions (map fragVariableNames supplied)
 
 -- Pattern normalization ------------------------------------------------------
 --
@@ -706,7 +803,7 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
   applicationHeadFrag dss headExpr = case headExpr of
     Local local -> lookup local dss
     Global global -> case declaredProvider providers global of
-      Just (_, _, providerFrag) -> Just providerFrag
+      Just info -> Just (piFrag info)
       Nothing -> Nothing
     VisibleTypeApplication function _ -> applicationHeadFrag dss function
     _ -> Nothing
@@ -729,7 +826,7 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
     case expressionFullApplicationSpine expression of
       (Local local, []) -> lookup local dss
       (Global global, []) ->
-        (\(_, _, providerFrag) -> providerFrag)
+        piFrag
           <$> declaredProvider providers global
       _ -> do
         (_, _, _, resultFrag) <-
@@ -743,17 +840,24 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
   analyzeApplication preserveTrailing avoiding dss expression = do
     let (headExpr, arguments) = expressionFullApplicationSpine expression
     headFrag <- applicationHeadFrag dss headExpr
-    let reserved = Set.unions
-          ( avoiding
-          : fragVariableNames headFrag
-          : map (fragVariableNames . snd) dss
-          )
+    let exactArguments = case headExpr of
+          Global global ->
+            declaredProvider providers global >>= (`providerAssignmentAt` arguments)
+          _ -> Nothing
+        retainedArguments = maybe [] id exactArguments
+        reserved = Set.unions $
+          [ avoiding
+          , fragVariableNames headFrag
+          ]
+          ++ map providerArgumentVariableNames retainedArguments
+          ++ map (fragVariableNames . snd) dss
     (termDomains, resultFrag) <-
-      consumeApplication preserveTrailing dss reserved arguments headFrag
+      consumeApplication preserveTrailing dss reserved retainedArguments
+        arguments headFrag
     pure (headExpr, arguments, termDomains, resultFrag)
   consumeApplication preserveTrailing dss reserved = go Set.empty [] []
    where
-    go consumed replacements termDomains arguments sourceFrag =
+    go consumed replacements termDomains exactArguments arguments sourceFrag =
       let frag = specializeFrag replacements sourceFrag
       in case frag of
         FAll _ binder rest
@@ -774,17 +878,26 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
                     , fragVariableNames rest
                     ]
                   opened = renameFragBinder binder fresh rest
-                  remaining = case arguments of
+                  (replacements', remainingExact, remaining) = case arguments of
                     VisibleTypeArgumentArgument _ : tailArguments ->
-                      tailArguments
-                    _ -> arguments
-              in go (Set.insert fresh consumed) replacements
-                termDomains remaining opened
+                      case exactArguments of
+                        exact : tailExact ->
+                          ( maybe replacements
+                              (\replacement ->
+                                replacements ++ [(fresh, replacement)])
+                              (properProviderArgument exact)
+                          , tailExact
+                          , tailArguments
+                          )
+                        [] -> (replacements, [], tailArguments)
+                    _ -> (replacements, exactArguments, arguments)
+              in go (Set.insert fresh consumed) replacements'
+                termDomains remainingExact remaining opened
         FInst _ rest
           | preserveTrailing && null arguments ->
               finish replacements termDomains arguments frag
           | otherwise ->
-              go consumed replacements termDomains arguments rest
+              go consumed replacements termDomains exactArguments arguments rest
         FArr domain rest -> case arguments of
           TermArgument argument : remaining -> do
             let replacementNames = Set.unions
@@ -800,7 +913,7 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
                 inferFragReplacements consumed replacements domain actual
             let fittedDomain = specializeFrag replacements' domain
             go consumed replacements' (fittedDomain : termDomains)
-              remaining rest
+              exactArguments remaining rest
           _ -> finish replacements termDomains arguments frag
         _ -> finish replacements termDomains arguments frag
 
@@ -1343,7 +1456,7 @@ render cm providers typeNames style visibleBinderDomain doms = go
   go req expr = case expr of
     Local x -> renderUse req x []
     Global name -> case declaredProvider providers name of
-      Just (leanName, _, _) -> Right (at req 2 leanName)
+      Just info -> Right (at req 2 (piLeanName info))
       Nothing -> do
         kind <- globalKind cm name
         case kind of
@@ -1363,10 +1476,10 @@ render cm providers typeNames style visibleBinderDomain doms = go
           argTxts <- mapM (go 2) args
           renderUse req x argTxts
         Global g
-          | Just (leanName, _, providerFrag) <- declaredProvider providers g -> do
+          | Just info <- declaredProvider providers g -> do
               argTxts <- mapM (go 2) args
               Right (at req 1
-                (unwords (leanName : weaveArgs providerFrag argTxts)))
+                (unwords (piLeanName info : weaveArgs (piFrag info) argTxts)))
         Global g
           | Right (GCtor info) <- globalKind cm g
           , style == Idiomatic
@@ -1475,7 +1588,7 @@ render cm providers typeNames style visibleBinderDomain doms = go
   spine f args = (f, args)
 
   renderHead (Global name) = case declaredProvider providers name of
-    Just (leanName, _, _) -> Right leanName
+    Just info -> Right (piLeanName info)
     Nothing -> do
       kind <- globalKind cm name
       case kind of
@@ -1497,7 +1610,7 @@ render cm providers typeNames style visibleBinderDomain doms = go
     VisibleTypeApplication{} -> go 1 function
     Local{} -> ("@" ++) <$> go 2 function
     Global name -> case declaredProvider providers name of
-      Just (leanName, _, _) -> Right ("@" ++ leanName)
+      Just info -> Right ("@" ++ piLeanName info)
       Nothing -> do
         kind <- globalKind cm name
         Right $ "@" ++ case kind of
@@ -1521,8 +1634,10 @@ render cm providers typeNames style visibleBinderDomain doms = go
       Nothing -> Right Nothing
       Just (providerName, arguments) ->
         case declaredProvider providers providerName of
-          Just (leanName, Just binderNames, _) ->
-            let selected = take (length arguments) binderNames
+          Just info
+            | Just binderNames <- piBinderNames info ->
+            let leanName = piLeanName info
+                selected = take (length arguments) binderNames
             in if length selected /= length arguments
               then Left $ "cannot align visible type arguments for Lean provider "
                 ++ leanName
