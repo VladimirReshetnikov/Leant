@@ -613,9 +613,15 @@ before recursive kind inference, same-provider comparison, kind conversion, or
 paired type elaboration. Oversized and cyclic caller-built kinds therefore fail
 finitely. The historical `(candidates ...)` form and structural
 `(kinded N ...)` payload remain readable, alongside metadata-free and
-binder-only inventories. A complete vector fails
-closed if any argument contains depth truncation (`FDepth`) or an instance
-binder (`FInst`), including a constraint hidden behind a reducible alias.
+binder-only inventories. Exact-assignment serialization may additionally
+retain a bounded contextual binder as `FExactContext`: the node records the
+exact nominal Lean class head, its ordered proper-type arguments, and its
+body, so Djex checks the context structurally and rendering restores the same
+Lean class application. This representation exists only inside one exact
+provider assignment. A complete vector still fails closed if any argument
+contains depth truncation (`FDepth`), a legacy raw instance marker (`FInst`),
+or a malformed, open, dictionary-dependent, term-indexed, or otherwise
+unsupported context.
 Provider-prefix lanes slice the metadata with its declaration, and Djex
 resolves every vector by the exact private provider name, so a later or
 alpha-identically typed provider cannot donate evidence to an earlier one.
@@ -628,12 +634,18 @@ ordinary structural translation.
 The dedicated
 [`synth-quantified-provider`](test/synth-quantified-provider.txt) transcript
 checks both the query-supplied and provider-only paths under standalone Djinn,
-standalone Exference, and combined search. Its reducible
-`Gap.Contextual := {a : Type} → [Inhabited a] → a` control has an active class
-instance but is excluded because it is contextual. This is bounded,
+standalone Exference, and combined search. The dedicated
+[`synth-provider-contextual-assignment`](test/synth-provider-contextual-assignment.txt)
+transcript isolates the structured-context extension: its only active head
+selects `∀ {a : Type}, [Inhabited a] → a → a`, and all three modes must render
+and verify that exact contextual named argument. This remains bounded,
 evidence-directed rank-N/impredicative support, not general impredicative
-inference; open or context-bearing quantified arguments are rejected rather
-than guessed into Lean syntax. The
+inference. Only closed, structured nominal class contexts from exact assignment
+discovery cross the bridge; open or unsupported contexts and legacy `FInst`
+payloads fail closed rather than being guessed into Lean syntax. Ordinary goal
+and provider-scheme serialization is unchanged. See the
+[contextual provider-assignment report](docs/reports/2026-08-09-contextual-provider-assignments.md).
+The
 [`synth-provider-implicit-visible-result`](test/synth-provider-implicit-visible-result.txt)
 transcript covers the complementary exact-metadata path. It requires standalone
 Djinn, standalone Exference, and combined mode to select a provider at the
@@ -1219,10 +1231,15 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   rejects residual kind arities above 64 before that bridge, and pinned Djex
   independently rejects a supplied `GroundKind` above 129 constructor nodes
   before recursive operations on that assignment. At most
-  16 distinct vectors survive per provider. `FDepth` and `FInst` fragments
-  reject their complete vector after parsing, the command-wide vector list is
-  capped at 32 before planning or translation, and provider-prefix fallback
-  carries each vector only with its source declaration. The checked runners
+  16 distinct vectors survive per provider. `FDepth` and legacy raw `FInst`
+  fragments reject their complete vector after parsing. Exact-assignment-local
+  `FExactContext` nodes are admitted only for bounded, closed nominal class
+  applications with supported proper-type arguments; malformed, free,
+  dictionary-dependent, term-indexed, and otherwise unsupported forms remain
+  fail-closed. The
+  command-wide vector list is capped at 32 before planning or translation, and
+  provider-prefix fallback carries each vector only with its source
+  declaration. The checked runners
   verify exact provider identity, arity, supplied positional kinds, closure,
   and context before consuming a vector once without Cartesian reconstruction.
   Proper-kind live arguments additionally retain a bounded structural fragment

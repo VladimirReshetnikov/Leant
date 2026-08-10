@@ -191,10 +191,14 @@ successor in `2026-08-09-five-binder-instantiation.md`:
   rendering. Each of the inferred, `Type _`, and `Prop` lanes retains its own
   12 site-and-style variants, so selective local instantiation sites remain
   reachable under a hard 36-spelling bound; domain-insensitive duplicates
-  collapse back to the historical group size. Context-bearing quantified
-  arguments fail closed rather than guessing that a Haskell constraint denotes
-  a Lean instance binder. Unused
-  implicit term binders are not misclassified as type quantifiers, and goal
+  collapse back to the historical group size. An exact-assignment-local
+  contextual argument may now retain a structured nominal Lean class head,
+  ordered proper-type arguments, and body. Djex therefore checks a semantic
+  class constraint and Leant renders the same Lean class application; it never
+  guesses source syntax from a Haskell constraint. Legacy raw `FInst`,
+  malformed, free, dictionary-dependent, term-indexed, and otherwise
+  unsupported contexts fail closed. Unused implicit term binders are not
+  misclassified as type quantifiers, and ordinary goal and provider-scheme
   serialization keeps its established behavior.
 - **Correlated active-instance assignments (Leant bridge).** For each exact
   live provider independently, the generated Lean metaprogram opens at most
@@ -213,10 +217,18 @@ successor in `2026-08-09-five-binder-instantiation.md`:
   must be closed, and its inferred type must reduce to the bounded first-order
   kind language `Type -> ... -> Type`. Discovery retains the arrow count next
   to that exact argument; zero is proper type, while a positive count preserves
-  a bare or partially applied constructor. Serialization runs in goal mode so
-  a contextual binder remains visible as `FInst`; the Haskell bridge rejects a
-  whole vector containing `FDepth` or `FInst`, including an instance binder
-  exposed only after reducing an alias.
+  a bare or partially applied constructor. Serialization runs in a dedicated
+  exact-assignment mode. A genuine nominal class binder becomes
+  `FExactContext`, which carries its exact Lean class name, bounded ordered
+  proper-type arguments, and body instead of pretty-printed binder text. The
+  Haskell bridge translates that structure to a private checked class and maps
+  it back to the same Lean head during rendering. A whole vector containing
+  `FDepth` or legacy raw `FInst` still fails closed, as do malformed, open,
+  dictionary-dependent, term-indexed, and otherwise unsupported contexts.
+  Ordinary goal mode keeps its render-only `FInst`, and provider schemes keep
+  erasing instance evidence.
+  The boundary is recorded in the
+  [contextual provider-assignment report](reports/2026-08-09-contextual-provider-assignments.md).
 
   Distinct successful heads for one provider remain distinct complete vectors.
   The live higher-kind regression retains unary kind-1 alternatives
@@ -801,16 +813,19 @@ Design rules, all inherited from Djex:
   complete vectors retained per provider, and no more than 32 provider/vector
   associations reach a checked Djex runner. The selected head's subgoals and
   all remaining provider constraints must close under one isolated
-  metavariable context. Any open, wrong-arity, depth-truncated, or contextual
-  vector fails closed as a whole. Each argument's kind must be a bounded
-  `Type -> ... -> Type` chain; its arrow count crosses the bridge and is checked
-  against the exact provider binder. This admits constraint-only or otherwise
-  vacuous higher-kinded binders, but not unsaturated structural built-ins whose
-  renderer identity is still absent (`And`, `Prod`, `PProd`, `Or`, `Sum`,
-  `PSum`, `Iff`, and `Not`). A vacuous provider may mention ambient rigids
-  opened from the query, but a free flexible variable still disables this
-  route. Leant rejects a constrained quantified visible argument rather than
-  guessing how a Haskell class context should become Lean binders.
+  metavariable context. Any open, wrong-arity, depth-truncated, malformed, or
+  unsupported vector fails closed as a whole. Each argument's kind must be a
+  bounded `Type -> ... -> Type` chain; its arrow count crosses the bridge and
+  is checked against the exact provider binder. This admits constraint-only or
+  otherwise vacuous higher-kinded binders and closed quantified arguments with
+  structured exact-assignment-local nominal class contexts. It does not admit
+  legacy raw `FInst`, free, dictionary-dependent, or term-indexed contexts, or
+  unsaturated structural built-ins whose renderer identity is still absent
+  (`And`, `Prod`, `PProd`,
+  `Or`, `Sum`, `PSum`, `Iff`, and `Not`). A vacuous provider may mention ambient
+  rigids opened from the query, but a free flexible variable still disables
+  this route. No ordinary goal or provider scheme gains contextual search from
+  this assignment-only representation.
 - **Recursive elimination is bounded to one layer in Exference.** A
   recursive field exposed by a constructor match is available as a
   normal branch-local value, but is not eagerly decomposed again. The

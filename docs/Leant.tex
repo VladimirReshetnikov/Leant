@@ -940,10 +940,13 @@ caller-built kinds therefore fail finitely. Metadata-free and
 binder-only inventories remain valid. Historical exact arguments stay in their
 original vectors and default each position to proper kind; the
 \code{(candidates ...)} form parses as proper-kind unary vectors only. A vector
-containing depth truncation (\code{FDepth}) or an instance binder
-(\code{FInst}) is discarded in full, including an instance binder revealed by
-reducing an alias. Provider-prefix fallback keeps metadata attached to its
-exact declaration. The checked runners validate provider identity, arity,
+containing depth truncation (\code{FDepth}) or a legacy raw instance marker
+(\code{FInst}) is discarded in full. Dedicated exact-assignment serialization
+may instead retain a bounded \code{FExactContext}: the exact nominal Lean class
+head, its ordered proper-type arguments, and the contextual body. Malformed,
+open, dictionary-dependent, term-indexed, and otherwise unsupported contexts
+still discard their complete vector. Provider-prefix fallback keeps metadata
+attached to its exact declaration. The checked runners validate provider identity, arity,
 supplied positional kinds, closure, and context before consuming each vector
 once without Cartesian reconstruction. Thus a later or alpha-identically typed
 provider cannot donate its assignment to an earlier one.
@@ -980,10 +983,13 @@ evidence-directed impredicativity, not general second-order search. The
 query-derived visible-provider route is capped at five binders and 32 argument
 combinations; Djex's internal Haskell-instance route remains monotype-only. The
 external Lean evidence route has the separate five-binder, 32-head,
-16-vector-per-provider, and 32-vector limits. Open, incomplete,
-wrong-arity, or context-bearing vectors fail closed, and chains with six or
-more leading binders remain a deliberate incomplete boundary. The original
-local-provider contract, scalar active-instance extension, and correlated
+16-vector-per-provider, and 32-vector limits. Open, incomplete, wrong-arity,
+depth-truncated, malformed, and unsupported vectors fail closed. Closed
+quantified arguments may contain a structured exact-assignment-local nominal
+class context; raw \code{FInst}, free or term-indexed contexts,
+dictionary-dependent result bodies, and chains with six or more leading
+binders remain deliberate incomplete boundaries. The
+original local-provider contract, scalar active-instance extension, and correlated
 follow-up are recorded in the
 \href{reports/2026-08-01-scoped-quantified-local-providers.md}{scoped
 local-provider report} and the
@@ -994,7 +1000,9 @@ assignment report}, with the shared successor recorded in the
 \href{reports/2026-08-09-five-binder-instantiation.md}{five-binder integration
 report} and the additive local tail in the
 \href{reports/2026-08-09-query-local-closed-monotype-instantiation.md}{query-local
-closed-monotype report}.
+closed-monotype report}, and the structured context boundary in the
+\href{reports/2026-08-09-contextual-provider-assignments.md}{contextual
+provider-assignment report}.
 
 Unit regressions pin the kinded wire format, kind and argument order, finite
 bounds, whole-vector deduplication, and the exact vacuous applications under
@@ -1476,12 +1484,17 @@ dictionaries or general instance resolution into Djex. A selected head is
 accepted only after its own subgoals and every remaining provider constraint
 close in one isolated metavariable context. Up to 32 heads are inspected and
 16 distinct complete vectors retained per provider, with at most 32 vectors
-passed in total; open, incomplete, wrong-arity, depth-truncated, and contextual
-vectors fail closed. The reducible
-control \code{Gap.Contextual := \{a : Type\} → [Inhabited a] → a} is therefore
-excluded even when an active class instance names it. This provider-local
-channel can expose a polytype absent from the query, but it is bounded checked
-evidence rather than general impredicative inference. The fragment is bounded
+passed in total. A closed contextual argument such as
+\code{\{a : Type\} → [Inhabited a] → a → a} may cross this exact-provider lane
+only when serialization records the nominal class application and its ordered
+proper-type arguments as \code{FExactContext}. Djex checks that semantic
+constraint and rendering restores the exact Lean class head. Open, incomplete,
+wrong-arity, depth-truncated, malformed, free, dictionary-dependent,
+term-indexed, and legacy raw \code{FInst} vectors fail closed. Ordinary goals retain render-only
+\code{FInst} slots and provider schemes continue to erase instance evidence;
+neither path gains contextual search. This provider-local channel can expose a
+polytype absent from the query, but it is bounded checked evidence rather than
+general impredicative inference. The fragment is bounded
 on purpose: inside it, answers are fast and verified. Refutations are complete
 for the provider-free structural calculus but provisional with respect to the
 live environment. Leant searches the bounded, best-effort provider inventory
