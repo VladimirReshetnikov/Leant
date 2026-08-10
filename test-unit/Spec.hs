@@ -2782,6 +2782,71 @@ typeApplicationTests = testGroup "retained type applications"
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
             Left err -> assertFailure err
       mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "retain six ordered quantified provider arguments" $ do
+      let token = FAtom False "Gap.SixToken"
+          quantified binder arity =
+            let variable = FVar binder
+            in FAll True binder
+                (foldr FArr variable (replicate arity variable))
+          assignment = map properArgument
+            [ quantified "p1" 1
+            , quantified "p2" 2
+            , quantified "p3" 3
+            , quantified "p4" 4
+            , quantified "p5" 5
+            , quantified "p6" 6
+            ]
+          provider = ProviderFragWithEvidence "Gap.six"
+            (FAll False "a" (FAll False "b"
+              (FAll False "c" (FAll False "d"
+                (FAll False "e" (FAll False "f" token))))))
+            ["a", "b", "c", "d", "e", "f"] [assignment]
+          expected =
+            [ "Gap.six"
+            , "«a» := (∀ (a0_0 : _), a0_0 → a0_0)"
+            , "«b» := (∀ (a0_0 : _), a0_0 → a0_0 → a0_0)"
+            , "«c» := (∀ (a0_0 : _), a0_0 → a0_0 → a0_0 → a0_0)"
+            , "«d» := (∀ (a0_0 : _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0)"
+            , "«e» := (∀ (a0_0 : _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)"
+            , "«f» := (∀ (a0_0 : _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)"
+            ]
+          exact term = all (\needle -> needle `isInfixOf` term) expected
+          check engine = case
+              synthesizeWithProviders engine 4096 [provider] token of
+            Right (SynthCandidates groups _) ->
+              assertBool
+                ("ordered six-argument assignment was lost in "
+                  ++ synthEngineName engine ++ ": " ++ show groups)
+                (any exact (concat groups))
+            Right other -> assertFailure $
+              "unexpected six-argument assignment outcome from "
+                ++ synthEngineName engine ++ ": " ++ outcomeTag other
+            Left err -> assertFailure err
+      mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "do not enter a seven-argument provider assignment" $ do
+      let token = FAtom False "Gap.SevenBoundaryToken"
+          binderNames =
+            ["p" ++ show index
+            | index <- [1 .. maximumProviderInstantiationArguments + 1]
+            ]
+          providerType = foldr (FAll False) token binderNames
+          inertArguments = replicate maximumProviderInstantiationArguments
+            (properArgument polytype)
+          assignment = inertArguments ++
+            [error "entered an over-wide provider assignment argument"]
+          provider = ProviderFragWithEvidence "Gap.sevenBoundary"
+            providerType binderNames [assignment]
+          check engine = case
+              synthesizeWithProviders engine 128 [provider] token of
+            Left err -> assertFailure $
+              "over-wide assignment failed the whole "
+                ++ synthEngineName engine ++ " query: " ++ err
+            Right (SynthCandidates groups _) -> assertBool
+              ("over-wide assignment became visible in "
+                ++ synthEngineName engine ++ ": " ++ show groups)
+              (all (not . isInfixOf "«p1» :=") (concat groups))
+            Right _ -> pure ()
+      mapM_ check [EngineDjinn, EngineExference, EngineBoth]
   , testCase "do not enter provider evidence beyond the aggregate bound" $
       let token = FAtom False "Gap.Token"
           provider name result assignments = ProviderFragWithEvidence name
@@ -3831,6 +3896,50 @@ rankNFrontierTests = testGroup "Djinn rank-N frontiers"
                 "five-binder synthesis failed in "
                   ++ synthEngineName engine ++ ": " ++ err
       mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "render six-binder hypothesis instantiation for Lean" $ do
+      let variable = FVar
+          forall6 a b c d e f resultFrag =
+            FAll True a
+              (FAll True b
+                (FAll True c
+                  (FAll True d (FAll True e (FAll True f resultFrag)))))
+          hypothesis = forall6 "a" "b" "c" "d" "e" "f"
+            (FArr (variable "a")
+              (FArr (variable "b")
+                (FArr (variable "c")
+                  (FArr (variable "d")
+                    (FArr (variable "e")
+                      (FArr (variable "f") (variable "R")))))))
+          body = FArr hypothesis
+            (FArr (variable "A")
+              (FArr (variable "B")
+                (FArr (variable "C")
+                  (FArr (variable "D")
+                    (FArr (variable "E")
+                      (FArr (variable "F") (variable "R")))))))
+          goal = FAll True "A" (FAll True "B" (FAll True "C"
+            (FAll True "D" (FAll True "E" (FAll True "F"
+              (FAll True "R" body))))))
+          check engine =
+            case synthesizeWithProviders engine 256 [] goal of
+              Right (SynthCandidates groups _) ->
+                let candidates = concat groups
+                    instantiated candidate =
+                      "f _ _ _ _ _ _ " `isInfixOf` candidate
+                        || "=> f _ _ _ _ _ _" `isInfixOf` candidate
+                in if any instantiated candidates
+                    then pure ()
+                    else assertFailure $
+                      "expected a six-binder instantiation candidate from "
+                        ++ synthEngineName engine ++ ", got: "
+                        ++ show candidates
+              Right other -> assertFailure $
+                "unexpected six-binder synthesis outcome from "
+                  ++ synthEngineName engine ++ ": " ++ outcomeTag other
+              Left err -> assertFailure $
+                "six-binder synthesis failed in "
+                  ++ synthEngineName engine ++ ": " ++ err
+      mapM_ check [EngineDjinn, EngineExference, EngineBoth]
   , testCase "render a balanced four-site pairwise plan for Lean" $ do
       let variable = FVar
           product4 a b c d = FProd a (FProd b (FProd c d))
@@ -3944,24 +4053,24 @@ rankNFrontierTests = testGroup "Djinn rank-N frontiers"
               ("quartic synthesis failed in " ++ synthEngineName engine
                 ++ ": " ++ err)
       mapM_ checkEngine [EngineDjinn, EngineExference, EngineBoth]
-  , testCase "coalesce six-binder sentinels for quintic Djinn planning" $ do
+  , testCase "coalesce seven-binder sentinels for quintic Djinn planning" $ do
       let variable = FVar
-          product6 names = foldr1 FProd $ map variable names
-          wide names = foldr (FAll True) (product6 names) names
+          product7 names = foldr1 FProd $ map variable names
+          wide names = foldr (FAll True) (product7 names) names
           identity name = FAll True name
             (FArr (variable name) (variable name))
-          input = wide ["a", "b", "c", "d", "e", "f"]
+          input = wide ["a", "b", "c", "d", "e", "f", "f0"]
           result = foldr1 FProd
-            [ wide ["g", "h", "i", "j", "k", "l"]
-            , wide ["m", "n", "o", "p", "q", "r"]
-            , wide ["s", "t", "u", "v", "w", "x"]
-            , wide ["y", "z", "a0", "b0", "c0", "d0"]
+            [ wide ["g", "h", "i", "j", "k", "l", "l0"]
+            , wide ["m", "n", "o", "p", "q", "r", "r0"]
+            , wide ["s", "t", "u", "v", "w", "x", "x0"]
+            , wide ["y", "z", "a0", "b0", "c0", "d0", "e0"]
             , identity "i0"
             , identity "i1"
             , identity "i2"
             , identity "i3"
             , identity "i4"
-            , wide ["z0", "z1", "z2", "z3", "z4", "z5"]
+            , wide ["z0", "z1", "z2", "z3", "z4", "z5", "z6"]
             ]
           goal = FArr input result
           direct =
@@ -3979,23 +4088,25 @@ rankNFrontierTests = testGroup "Djinn rank-N frontiers"
           "quintic synthesis failed after forall coalescing: " ++ err
   , testCase "render the eleven-site dual quintic plan for Lean" $ do
       let variable = FVar
-          product6 names = foldr1 FProd $ map variable names
-          wide names = foldr (FAll True) (product6 names) names
+          product7 names = foldr1 FProd $ map variable names
+          wide names = foldr (FAll True) (product7 names) names
           identity name = FAll True name
             (FArr (variable name) (variable name))
           input = wide
-            ["source0", "source1", "source2", "source3", "source4", "source5"]
+            [ "source0", "source1", "source2", "source3"
+            , "source4", "source5", "source6"
+            ]
           result = foldr1 FProd
             [ identity "i0"
             , identity "i1"
             , identity "i2"
             , identity "i3"
-            , wide ["a", "b", "c", "d", "e", "f"]
-            , wide ["g", "h", "i", "j", "k", "l"]
-            , wide ["m", "n", "o", "p", "q", "r"]
-            , wide ["s", "t", "u", "v", "w", "x"]
-            , wide ["y", "z", "a0", "b0", "c0", "d0"]
-            , wide ["z0", "z1", "z2", "z3", "z4", "z5"]
+            , wide ["a", "b", "c", "d", "e", "f", "f0"]
+            , wide ["g", "h", "i", "j", "k", "l", "l0"]
+            , wide ["m", "n", "o", "p", "q", "r", "r0"]
+            , wide ["s", "t", "u", "v", "w", "x", "x0"]
+            , wide ["y", "z", "a0", "b0", "c0", "d0", "e0"]
+            , wide ["z0", "z1", "z2", "z3", "z4", "z5", "z6"]
             , identity "i4"
             ]
           goal = FArr input result

@@ -10,7 +10,7 @@ preparing synthesis environment (session imports + Lean)...
 λ> :synth ((A → B → C) → (A → B) → A → C)
   it1  fun f g x => f x (g x)
 λ> :synth (((A → B) → A) → A)
-  it1  Classical.byContradiction (fun k => k (fun f => absurd (fun _ => f (fun a => absurd (fun _ => a) k)) k))
+  it1  Classical.byContradiction (fun k => k (fun f => absurd (fun _ => f (fun x => absurd (fun _ => x) k)) k))
 λ> :synth (∀ a b : Type, a → b)
 provably uninhabited — no closed term of this polymorphic type exists
 λ> :synth (a → a → a)

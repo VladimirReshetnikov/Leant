@@ -1259,7 +1259,7 @@ fragToDjinn recursiveProjection providers extras frag0 = do
       -- rendering retains each explicitness slot independently. Djex instead
       -- models one source scheme with a binder list. Coalescing only the
       -- uninterrupted spine preserves scope and rendering while preventing a
-      -- five-binder scheme from becoming five independent occurrence sites.
+      -- bounded multi-binder scheme from becoming independent occurrence sites.
       adjacentForallSpine = collect []
         where
           collect binders (FAll _ binder body) =

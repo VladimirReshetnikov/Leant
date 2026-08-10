@@ -8,7 +8,7 @@ Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to e
 synth library: off
 λ> :set synth-engine djinn
 synth engine: djinn
-λ> abbrev QuinticRankN.Wide := ∀ A B C D E F : Type, A × B × C × D × E × F
+λ> abbrev QuinticRankN.Wide := ∀ A B C D E F G : Type, A × B × C × D × E × F × G
 λ> :synth (QuinticRankN.Wide → QuinticRankN.Wide × QuinticRankN.Wide × QuinticRankN.Wide × QuinticRankN.Wide × (∀ I : Type, I → I) × (∀ J : Type, J → J) × (∀ K : Type, K → K) × (∀ L : Type, L → L) × (∀ N : Type, N → N) × QuinticRankN.Wide)
 preparing synthesis environment (session imports + Lean)...
   it1  fun x => ⟨x, ⟨x, ⟨x, ⟨x, ⟨fun _ y => y, ⟨fun _ z => z, ⟨fun _ w => w, ⟨fun _ x1 => x1, ⟨fun _ x2 => x2, x⟩⟩⟩⟩⟩⟩⟩⟩⟩
