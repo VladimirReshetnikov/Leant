@@ -1260,6 +1260,29 @@ typeApplicationTests = testGroup "retained type applications"
           [ "fun f x => let ⟨g, _⟩ := Demo.box f; g _ x"
           , "fun f x => let ⟨g, _⟩ := Demo.box (f _); g _ x"
           ]
+  , testCase "fit later provider arguments at an inferred rank-N type" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      let identity = FAll True "B"
+            (FArr (FVar "B") (FVar "B"))
+          token = FAtom False "Demo.Token"
+          holder key argument =
+            FApp False key (AppNominal "Demo.Holder") [argument]
+          providerFrag = FAll False "A" $
+            FArr
+              (holder "Demo.Holder A" (FVar "A"))
+              (FArr (FVar "A") token)
+          providers = Map.singleton "leantProvider0"
+            ("Demo.consume", Nothing, providerFrag)
+          expression = Lambda [Bind "wrapped"] $
+            Apply
+              (Apply (Global providerName) (Local "wrapped"))
+              (Lambda [Bind "identity"] (Local "identity"))
+          goal = FArr
+            (holder "Demo.Holder identity" identity)
+            token
+      renderLeanTerm Map.empty providers Map.empty ([], 0, []) goal expression
+        @?= Right
+          ["fun x => Demo.consume x (fun _ y => y)"]
   , testCase "retain inferred provider-result envelopes" $ do
       providerName <- expectRight $ mkIdentifier "leantProvider0"
       let natural = FAtom False "Nat"

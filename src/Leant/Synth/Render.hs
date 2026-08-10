@@ -721,22 +721,37 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
   -- provider result capture-avoidably. Opened binders receive collision-free
   -- private identities, so an unresolved binder can safely remain opaque in
   -- a known result envelope; conflicting evidence still fails closed.
-  knownExpressionFrag dss expression =
-    let (headExpr, arguments) = expressionFullApplicationSpine expression
-    in applicationHeadFrag dss headExpr >>= \headFrag ->
-      let reserved = Set.unions
-            (fragVariableNames headFrag : map (fragVariableNames . snd) dss)
-      in consumeApplication dss reserved arguments headFrag
-  knownArgumentFrag dss expression =
+  knownExpressionFrag dss expression = do
+    (_, _, _, resultFrag) <-
+      analyzeKnownApplication Set.empty dss expression
+    pure resultFrag
+  knownArgumentFrag avoiding dss expression =
     case expressionFullApplicationSpine expression of
       (Local local, []) -> lookup local dss
       (Global global, []) ->
         (\(_, _, providerFrag) -> providerFrag)
           <$> declaredProvider providers global
-      _ -> knownExpressionFrag dss expression
-  consumeApplication dss reserved = go Set.empty []
+      _ -> do
+        (_, _, _, resultFrag) <-
+          analyzeKnownApplication avoiding dss expression
+        pure resultFrag
+  -- Analyze once for both elimination-result recovery and argument fitting.
+  -- Each returned term domain includes every replacement learned at that
+  -- argument, while the complete mixed spine is retained for reconstruction.
+  analyzeKnownApplication avoiding dss expression = do
+    let (headExpr, arguments) = expressionFullApplicationSpine expression
+    headFrag <- applicationHeadFrag dss headExpr
+    let reserved = Set.unions
+          ( avoiding
+          : fragVariableNames headFrag
+          : map (fragVariableNames . snd) dss
+          )
+    (termDomains, resultFrag) <-
+      consumeApplication dss reserved arguments headFrag
+    pure (headExpr, arguments, termDomains, resultFrag)
+  consumeApplication dss reserved = go Set.empty [] []
    where
-    go consumed replacements arguments frag = case frag of
+    go consumed replacements termDomains arguments frag = case frag of
       FAll _ binder rest ->
         let replacementNames = Set.unions
               [ Set.insert formal (fragVariableNames replacement)
@@ -752,21 +767,33 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
             remaining = case arguments of
               VisibleTypeArgumentArgument _ : tailArguments -> tailArguments
               _ -> arguments
-        in go (Set.insert fresh consumed) replacements remaining opened
-      FInst _ rest -> go consumed replacements arguments rest
+        in go (Set.insert fresh consumed) replacements termDomains
+          remaining opened
+      FInst _ rest ->
+        go consumed replacements termDomains arguments rest
       FArr domain rest -> case arguments of
         TermArgument argument : remaining -> do
-          replacements' <- case knownArgumentFrag dss argument of
+          let replacementNames = Set.unions
+                [ Set.insert formal (fragVariableNames replacement)
+                | (formal, replacement) <- replacements
+                ]
+              argumentAvoiding = Set.unions
+                [reserved, consumed, replacementNames]
+          replacements' <- case
+              knownArgumentFrag argumentAvoiding dss argument of
             Nothing -> Just replacements
             Just actual ->
               inferFragReplacements consumed replacements domain actual
-          go consumed replacements' remaining rest
-        _ -> finish consumed replacements arguments frag
-      _ -> finish consumed replacements arguments frag
+          let fittedDomain = specializeFrag replacements' domain
+          go consumed replacements' (fittedDomain : termDomains)
+            remaining rest
+        _ -> finish replacements termDomains arguments frag
+      _ -> finish replacements termDomains arguments frag
 
-    finish _ replacements arguments frag
+    finish replacements termDomains arguments frag
       | not (null arguments) = Nothing
-      | otherwise = Just (specializeFrag replacements frag)
+      | otherwise = Just
+          (reverse termDomains, specializeFrag replacements frag)
   eliminationPatternDomains scrutineeFrag pat =
     case (scrutineeFrag, pat) of
       (Just (FSum a _), Constructor g [p])
@@ -782,20 +809,32 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
       (Just frag, TuplePattern _) -> bindDomainPairs pat frag
       (Just frag, Bind x) -> [(x, frag)]
       _ -> []
-  fitKnownApplication expression k dss = case appSpine expression of
-    (headExpr, args@(_ : _)) -> case applicationHeadFrag dss headExpr of
-      Nothing -> Nothing
-      Just hFrag ->
-        let step (done, j, env) (mdom, arg) = case mdom of
-              Just dom ->
-                let (arg', j', env') =
-                      fit cm providers force dom arg j env
-                in (done ++ [arg'], j', env')
-              Nothing -> (done ++ [arg], j, env)
-            (args', k', dss') =
-              foldl step ([], k, dss) (zip (argDoms hFrag) args)
-        in Just (foldl Apply headExpr args', k', dss')
-    _ -> Nothing
+  fitKnownApplication expression k dss = do
+    (headExpr, arguments, termDomains, _) <-
+      analyzeKnownApplication Set.empty dss expression
+    if null termDomains
+      then Nothing
+      else
+        let step (function, j, env, domains) applicationArgument =
+              case (applicationArgument, domains) of
+                (VisibleTypeArgumentArgument argument, _) ->
+                  (VisibleTypeApplication function argument, j, env, domains)
+                (TermArgument argument, domain : remaining) ->
+                  let exactArgument = knownArgumentFrag
+                        (fragVariableNames domain) env argument
+                      (argument', j', env') = case exactArgument of
+                        Just actual
+                          | equivalentFrag domain actual ->
+                              (argument, j, env)
+                        _ -> fit cm providers force domain argument j env
+                  in (Apply function argument', j', env', remaining)
+                -- 'analyzeKnownApplication' accepts a term argument only by
+                -- consuming one arrow, so this branch is defensive.
+                (TermArgument argument, []) ->
+                  (Apply function argument, j, env, [])
+            (fitted, k', dss', _) =
+              foldl step (headExpr, k, dss, termDomains) arguments
+        in Just (fitted, k', dss')
   -- A case scrutinee or let RHS has its own result type, which the enclosing
   -- goal fragment does not describe.  Traverse that input structurally and
   -- invoke fragment-directed fitting only at an application whose local or
@@ -847,14 +886,6 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
         Local _ -> (expression, k, dss)
         Global _ -> (expression, k, dss)
         Hole _ -> (expression, k, dss)
-  -- the domain of the hypothesis type's n-th term argument (its
-  -- quantifier slots consume no term arguments)
-  argDoms frag = case frag of
-    FAll _ _ rest -> argDoms rest
-    FInst _ rest -> argDoms rest
-    FArr dom rest -> Just dom : argDoms rest
-    _ -> repeat Nothing
-
 -- | Recover the constructor's field fragments at the exact result or
 -- scrutinee occurrence being fitted.  Legacy occurrence-local declarations
 -- already carry specialized fields.  Shared parametric declarations instead
@@ -902,7 +933,7 @@ inferFragReplacements targets = go Set.empty
     , variable `Set.notMember` bound = case lookup variable replacements of
         Nothing -> Just (replacements ++ [(variable, actual)])
         Just previous
-          | equivalent previous actual -> Just replacements
+          | equivalentFrag previous actual -> Just replacements
           | otherwise -> Nothing
   go _ replacements (FVar variable) (FVar variable')
     | variable == variable' = Just replacements
@@ -975,10 +1006,14 @@ inferFragReplacements targets = go Set.empty
     AppVariable variable -> variable `Set.member` targets
     AppNominal _ -> False
 
-  equivalent left right = case
-      inferFragReplacements Set.empty [] left right of
-    Just _ -> True
-    Nothing -> False
+
+-- | Alpha-aware equality for exact first-order fragments, deliberately using
+-- the same metadata-insensitive structural relation as replacement inference.
+equivalentFrag :: Frag -> Frag -> Bool
+equivalentFrag left right = case
+    inferFragReplacements Set.empty [] left right of
+  Just _ -> True
+  Nothing -> False
 
 -- | Capture-avoiding substitution shared by known-application result fitting
 -- and the defensive generic-field fallback. Family formals use private
