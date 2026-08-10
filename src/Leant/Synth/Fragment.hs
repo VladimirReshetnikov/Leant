@@ -101,11 +101,11 @@ data Frag
     -- exhaustion conservative because the hidden dictionary can carry data.
   | FExactContext String [(Int, Frag)] Frag
     -- ^ An exact-assignment-only contextual binder: exact Lean class name,
-    -- ordered @(ground kind arity, argument)@ vector, and body.  Unlike
-    -- 'FInst', this node is semantic evidence rather than pretty text.  Live
-    -- production currently admits only proper-kind class arguments, while the
-    -- bounded arity field keeps the wire forward-compatible with the same
-    -- first-order ground-kind language used by provider assignments.
+    -- ordered @(residual ground-kind arity, argument)@ vector, and body.
+    -- Unlike 'FInst', this node is semantic evidence rather than pretty text.
+    -- A proper-kind argument retains its complete fragment; a positive arity
+    -- retains only a canonical bare or partially applied nominal head together
+    -- with its already supplied proper-type arguments.
   | FVar String         -- ^ opaque type variable (auto-implicit or opened binder)
   | FAtom Bool String   -- ^ opaque atom: safe-for-refutation flag, display key
   | FApp Bool String AppHead [Frag]
@@ -376,6 +376,32 @@ synthPrelude inventory = unlines
   , "    if !argType.isSort then return false"
   , "  pure true"
   , ""
+  , "-- Higher-kinded exact context arguments must retain a canonical"
+  , "-- nominal head. Logical constructors have dedicated structural"
+  , "-- encodings only when saturated, so their unsaturated identities stay"
+  , "-- outside this bounded evidence path."
+  , "def unsupportedHigherKindNominalHead (name : Name) : Bool :="
+  , "  name == ``And || name == ``Prod || name == ``PProd"
+  , "    || name == ``Or || name == ``Sum || name == ``PSum"
+  , "    || name == ``Iff || name == ``Not"
+  , ""
+  , "def exactContextArgumentKindArity? (fuel : Nat) (argument : Expr)"
+  , "    : MetaM (Option Nat) := do"
+  , "  let kind \8592 whnfR (\8592 inferType argument)"
+  , "  match \8592 typeKindArity? fuel kind with"
+  , "  | none => pure none"
+  , "  | some arity =>"
+  , "    if arity > " ++ show maximumProviderArgumentKindArity
+      ++ " then pure none"
+  , "    else if arity == 0 then pure (some 0)"
+  , "    else match argument.getAppFn with"
+  , "      | Expr.const name _ =>"
+  , "        if unsupportedHigherKindNominalHead name then pure none"
+  , "        else if \8592 allProperTypeParams argument.getAppArgs then"
+  , "          pure (some arity)"
+  , "        else pure none"
+  , "      | _ => pure none"
+  , ""
   , "mutual"
   , ""
   , "partial def go (providerMode exactAssignmentMode : Bool)"
@@ -433,17 +459,16 @@ synthPrelude inventory = unlines
       ++ show maximumProviderExactContextArguments ++ " then legacy"
   , "            else do"
   , "              let mut supported := true"
+  , "              let mut rendered := \"\""
   , "              for argument in arguments do"
-  , "                let kind \8592 whnfR (\8592 inferType argument)"
-  , "                if !kind.isSort then supported := false"
+  , "                match \8592 exactContextArgumentFragment? fuel depth"
+  , "                    blocked argument with"
+  , "                | none => supported := false"
+  , "                | some (arity, fragment) =>"
+  , "                  rendered := rendered ++ \" (kinded \""
+  , "                    ++ toString arity ++ \" \" ++ fragment ++ \")\""
   , "              if !supported then legacy"
   , "              else do"
-  , "                let mut rendered := \"\""
-  , "                for argument in arguments do"
-  , "                  let fragment \8592"
-  , "                    go false true fuel depth blocked argument"
-  , "                  rendered := rendered ++ \" (kinded 0 \""
-  , "                    ++ fragment ++ \")\""
   , "                let r \8592 go false true fuel depth blocked b"
   , "                pure (\"(exact-context \" ++ esc className.toString"
   , "                  ++ \" (arguments\" ++ rendered ++ \") \" ++ r ++ \")\")"
@@ -509,6 +534,36 @@ synthPrelude inventory = unlines
   , "        match \8592 appOf providerMode exactAssignmentMode fuel depth blocked e with"
   , "        | some s => pure s"
   , "        | none => atomOf e"
+  , ""
+  , "-- Serialize one exact context argument together with the ground kind"
+  , "-- arity checked above. Proper arguments keep their full exact fragment;"
+  , "-- higher-kinded arguments spell the constant head canonically and carry"
+  , "-- only already supplied proper-type arguments."
+  , "partial def exactContextArgumentFragment? (fuel depth : Nat)"
+  , "    (blocked : List String) (argument : Expr)"
+  , "    : MetaM (Option (Nat \215 String)) := do"
+  , "  match \8592 exactContextArgumentKindArity? fuel argument with"
+  , "  | none => pure none"
+  , "  | some 0 => do"
+  , "    let fragment \8592 go false true fuel depth blocked argument"
+  , "    pure (some (0, fragment))"
+  , "  | some arity =>"
+  , "    match argument.getAppFn with"
+  , "    | Expr.const name _ => do"
+  , "      let supplied := argument.getAppArgs"
+  , "      if supplied.isEmpty then"
+  , "        pure (some (arity, \"(atom unsafe \" ++ esc name.toString ++ \")\"))"
+  , "      else do"
+  , "        let pp \8592 Meta.ppExpr argument"
+  , "        let mut rendered := \"\""
+  , "        for suppliedArgument in supplied do"
+  , "          let fragment \8592"
+  , "            go false true fuel depth blocked suppliedArgument"
+  , "          rendered := rendered ++ \" \" ++ fragment"
+  , "        pure (some (arity, \"(app unsafe \" ++ esc (toString pp)"
+  , "          ++ \" (app-nominal \" ++ esc name.toString ++ \")\""
+  , "          ++ rendered ++ \")\"))"
+  , "    | _ => pure none"
   , ""
   , "-- Preserve applications whose head is a bound type function or a rigid"
   , "-- Lean constant, whose result is a type, and whose arguments are all"
@@ -707,9 +762,7 @@ synthPrelude inventory = unlines
   , "    : MetaM (Option String) := do"
   , "  match candidate.getAppFn with"
   , "  | Expr.const n _ =>"
-  , "    if n == ``And || n == ``Prod || n == ``PProd"
-  , "        || n == ``Or || n == ``Sum || n == ``PSum"
-  , "        || n == ``Iff || n == ``Not then"
+  , "    if unsupportedHigherKindNominalHead n then"
   , "      pure none"
   , "    else do"
   , "      let mut rendered := \"\""
@@ -752,8 +805,9 @@ synthPrelude inventory = unlines
   , "        if body.hasLooseBVars then pure none"
   , "        else do"
   , "          -- Exact assignments retain only genuine class applications whose"
-  , "          -- ordered arguments are proper types. Their arguments and body"
-  , "          -- still contribute every visible forall-domain tag."
+  , "          -- ordered arguments have bounded ground kinds. Proper arguments"
+  , "          -- contribute their complete visible forall metadata; a nominal"
+  , "          -- higher-kinded head contributes only its supplied proper args."
   , "          let classType ← whnfR domain.consumeMData"
   , "          match ← Meta.isClass? classType with"
   , "          | none => pure none"
@@ -763,11 +817,16 @@ synthPrelude inventory = unlines
       ++ show maximumProviderExactContextArguments ++ " then return none"
   , "            let mut domains := #[]"
   , "            for argument in arguments do"
-  , "              let argumentKind ← whnfR (← inferType argument)"
-  , "              if !argumentKind.isSort then return none"
-  , "              match ← providerForallDomains? fuel depth argument with"
+  , "              match ← exactContextArgumentKindArity? fuel argument with"
   , "              | none => return none"
-  , "              | some nested => domains := domains ++ nested"
+  , "              | some arity =>"
+  , "                let nestedArguments :="
+  , "                  if arity == 0 then #[argument] else argument.getAppArgs"
+  , "                for nestedArgument in nestedArguments do"
+  , "                  match ← providerForallDomains? fuel depth"
+  , "                      nestedArgument with"
+  , "                  | none => return none"
+  , "                  | some nested => domains := domains ++ nested"
   , "            match ← providerForallDomains? fuel depth body with"
   , "            | none => pure none"
   , "            | some rest => pure (some (domains ++ rest))"
@@ -1780,8 +1839,9 @@ fragHasInstanceBinder frag = case frag of
 -- | Whether contextual evidence cannot be reconstructed from exact semantic
 -- data. Legacy 'FInst' stores only pretty text and therefore remains
 -- fail-closed. A structured exact context is supported only with the live
--- producer's nonempty class identity, bounded proper-type argument vector,
--- and no nested unsupported marker.
+-- producer's nonempty class identity, bounded ground-kinded argument vector,
+-- canonical nominal shape for every higher-kinded head, and no nested
+-- unsupported marker.
 fragHasUnsupportedInstanceBinder :: Frag -> Bool
 fragHasUnsupportedInstanceBinder frag = case frag of
   FArr a b ->
@@ -1795,7 +1855,7 @@ fragHasUnsupportedInstanceBinder frag = case frag of
   FExactContext className arguments body ->
     null className
       || length arguments > maximumProviderExactContextArguments
-      || any ((/= 0) . fst) arguments
+      || any unsupportedExactContextArgument arguments
       || any (fragHasUnsupportedInstanceBinder . snd) arguments
       || fragHasUnsupportedInstanceBinder body
   FApp _ _ _ arguments -> any fragHasUnsupportedInstanceBinder arguments
@@ -1811,6 +1871,19 @@ fragHasUnsupportedInstanceBinder frag = case frag of
     any fragHasUnsupportedInstanceBinder params
       || any (any fragHasUnsupportedInstanceBinder . snd) ctors
   _ -> False
+ where
+  unsupportedExactContextArgument (remaining, argument)
+    | remaining < 0 || remaining > maximumProviderArgumentKindArity = True
+    | remaining == 0 = False
+    | otherwise = case argument of
+        FAtom _ spelling ->
+          null spelling || reservedHigherKindHead spelling
+        FApp _ _ (AppNominal spelling) _ ->
+          null spelling || reservedHigherKindHead spelling
+        _ -> True
+
+  reservedHigherKindHead spelling = spelling `elem`
+    ["And", "Prod", "PProd", "Or", "Sum", "PSum", "Iff", "Not"]
 
 -- | Whether a foreign value may open an otherwise atomic goal.  Quantifier
 -- prefixes are transparent, but a depth-truncated fragment is never

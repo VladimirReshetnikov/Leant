@@ -374,6 +374,12 @@ providerProgramTests = testGroup "provider discovery program"
       exactContextHandling `isInfixOf` synthPrelude [] @?= True
       "pure (\"(exact-context \" ++ esc className.toString"
         `isInfixOf` synthPrelude [] @?= True
+      "def exactContextArgumentKindArity? (fuel : Nat) (argument : Expr)"
+        `isInfixOf` synthPrelude [] @?= True
+      "partial def exactContextArgumentFragment? (fuel depth : Nat)"
+        `isInfixOf` synthPrelude [] @?= True
+      "++ toString arity ++ \" \" ++ fragment ++ \")\""
+        `isInfixOf` synthPrelude [] @?= True
       "if exactAssignmentMode && bi.isInstImplicit then pure \"(depth)\""
         `isInfixOf` synthPrelude [] @?= True
       "let r \8592 go providerMode false fuel depth blocked b"
@@ -694,6 +700,9 @@ providerParserTests = testGroup "provider inventory parser"
       let contextual = FAll False "A" $
             FExactContext "Inhabited" [(0, FVar "A")] $
               FArr (FVar "A") (FVar "A")
+          higherContextual =
+            FExactContext "Functor" [(1, FAtom False "List")] $
+              FArr (FAtom False "Nat") (FAtom False "Nat")
       in do
         parseProviderSexp
             ("(providers (provider \"ContextualOnly.chosen\" "
@@ -715,6 +724,25 @@ providerParserTests = testGroup "provider inventory parser"
             ]
         fragHasInstanceBinder contextual @?= True
         fragHasUnsupportedInstanceBinder contextual @?= False
+        parseProviderSexp
+            ("(providers (provider \"HigherContext.chosen\" "
+              ++ "(binders \"a\") (instantiations (args (kinded 0 "
+              ++ "(exact (domains) "
+              ++ "(exact-context \"Functor\" (arguments "
+              ++ "(kinded 1 (atom unsafe \"List\"))) "
+              ++ "(-> (atom unsafe \"Nat\") "
+              ++ "(atom unsafe \"Nat\"))))))) "
+              ++ "(alli \"a\" "
+              ++ "(atom unsafe \"HigherContext.Token\"))))")
+          @?= Right
+            [ ProviderFragWithEvidence "HigherContext.chosen"
+                (FAll False "a" (FAtom False "HigherContext.Token"))
+                ["a"]
+                [ [ ProviderInstantiationExactArgument 0 higherContextual []
+                  ]
+                ]
+            ]
+        fragHasUnsupportedInstanceBinder higherContextual @?= False
   , testCase "reject structured contexts outside exact assignments" $ do
       let contextual =
             "(exact-context \"Gap.C\" (arguments) "
@@ -2349,11 +2377,51 @@ typeApplicationTests = testGroup "retained type applications"
           check engine = expectTerm expected
             (synthesizeWithProviders engine 2048 [provider] token)
       in mapM_ check [EngineDjinn, EngineExference, EngineBoth]
-  , testCase "keep structured contexts exact-only and proper-kinded" $
+  , testCase "instantiate a higher-kinded structured contextual choice" $
+      let token = FAtom False "HigherContext.Token"
+          contextual = FExactContext "Functor"
+            [(1, FAtom False "List")] $
+              FArr (FAtom False "Nat") (FAtom False "Nat")
+          provider = ProviderFragWithEvidence "HigherContext.chosen"
+            (FAll False "a" token) ["a"]
+            [ [ProviderInstantiationExactArgument 0 contextual []]
+            ]
+          expected =
+            "HigherContext.chosen («a» := "
+              ++ "([@Functor List] → (Nat) → (Nat)))"
+          check engine = expectTerm expected
+            (synthesizeWithProviders engine 2048 [provider] token)
+      in mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "plan a partial contextual family at its total arity" $
+      let token = FAtom False "HigherContext.Token"
+          partial = FApp False "Except String"
+            (AppNominal "Except") [FAtom False "String"]
+          contextual = FExactContext "Bifunctor" [(1, partial)] $
+            FArr (FAtom False "Nat") (FAtom False "Nat")
+          provider = ProviderFragWithEvidence "HigherContext.partial"
+            (FAll False "a" token) ["a"]
+            [ [ProviderInstantiationExactArgument 0 contextual []]
+            ]
+          check engine = expectTerm
+            "[@Bifunctor (@Except (String))]"
+            (synthesizeWithProviders engine 2048 [provider] token)
+      in mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "keep structured contexts exact-only and nominally kinded" $
       let token = FAtom False "ContextualOnly.Token"
           contextual arity = FAll False "A" $
             FExactContext "Inhabited" [(arity, FVar "A")] $
               FArr (FVar "A") (FVar "A")
+          nominal = FExactContext "Functor"
+            [(1, FAtom False "List")] token
+          partialNominal = FExactContext "Bifunctor"
+            [ (1, FApp False "Except String"
+                (AppNominal "Except") [FAtom False "String"])
+            ] token
+          reserved = FExactContext "Functor"
+            [(1, FAtom False "Prod")] token
+          overBound = FExactContext "Functor"
+            [(maximumProviderArgumentKindArity + 1, FAtom False "List")]
+            token
           provider argument = ProviderFragWithEvidence
             "ContextualOnly.chosen" (FAll False "a" token) ["a"]
             [[argument]]
@@ -2365,17 +2433,83 @@ typeApplicationTests = testGroup "retained type applications"
           check provider' engine = case
               synthesizeWithProviders engine 512 [provider'] token of
             Right (SynthCandidates groups _)
-              | any ("[@Inhabited" `isInfixOf`) (concat groups) ->
+              | any (anyContextMarker `isInfixOf`) (concat groups) ->
                   assertFailure $ "unsupported contextual assignment reached "
                     ++ show engine ++ ": " ++ show groups
             Right _ -> pure ()
             Left err -> assertFailure $ "unsupported contextual assignment "
               ++ "failed the whole " ++ show engine ++ " query: " ++ err
+          anyContextMarker = "[@Inhabited"
       in do
         fragHasUnsupportedInstanceBinder (contextual 0) @?= False
         fragHasUnsupportedInstanceBinder (contextual 1) @?= True
+        fragHasUnsupportedInstanceBinder nominal @?= False
+        fragHasUnsupportedInstanceBinder partialNominal @?= False
+        fragHasUnsupportedInstanceBinder reserved @?= True
+        fragHasUnsupportedInstanceBinder overBound @?= True
         mapM_ (check structural) [EngineDjinn, EngineExference, EngineBoth]
         mapM_ (check wrongKind) [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "discard inconsistent exact evidence without losing siblings" $
+      let token = FAtom False "ContextualOnly.Token"
+          natural = FAtom False "Nat"
+          good = natural
+          familyAtOne = FExactContext "Audit.C1"
+            [(1, FAtom False "Audit.H")] token
+          familyAtTwo = FExactContext "Audit.C2"
+            [ (1, FApp False "Audit.H Nat" (AppNominal "Audit.H")
+                [natural])
+            ] token
+          internallyInconsistentFamily = FExactContext "Audit.C1"
+            [(1, FAtom False "Audit.H")] $
+              FExactContext "Audit.C2"
+                [ (1, FApp False "Audit.H Nat" (AppNominal "Audit.H")
+                    [natural])
+                ] token
+          classAtProper = FExactContext "Audit.Class" [(0, natural)] token
+          classAtHigher = FExactContext "Audit.Class"
+            [(1, FAtom False "List")] token
+          emptyNominal = FExactContext "Audit.Empty"
+            [(1, FAtom False "")] token
+          provider assignments = ProviderFragWithEvidence
+            "ContextualOnly.chosen" (FAll False "a" token) ["a"]
+            [ [ProviderInstantiationExactArgument 0 assignment []]
+            | assignment <- assignments
+            ]
+          expected = "ContextualOnly.chosen («a» := (Nat))"
+          malformedBatches =
+            [ ("one internally inconsistent family",
+                [internallyInconsistentFamily, good])
+            , ("two conflicting family vectors",
+                [familyAtOne, familyAtTwo, good])
+            , ("two conflicting class-kind vectors",
+                [classAtProper, classAtHigher, good])
+            , ("an empty nominal head", [emptyNominal, good])
+            ]
+          check (label, assignments) engine = case
+              synthesizeWithProviders engine 1024
+                [provider assignments] token of
+            Right (SynthCandidates groups _) ->
+              assertBool
+                (label ++ " removed an unrelated valid assignment from "
+                  ++ synthEngineName engine ++ ": " ++ show groups)
+                (expected `elem` concat groups)
+            Right other -> assertFailure $
+              label ++ " produced an unexpected " ++ synthEngineName engine
+                ++ " outcome: " ++ outcomeTag other
+            Left err -> assertFailure $
+              label ++ " poisoned the whole " ++ synthEngineName engine
+                ++ " query: " ++ err
+      in do
+        fragHasUnsupportedInstanceBinder internallyInconsistentFamily @?= False
+        fragHasUnsupportedInstanceBinder familyAtOne @?= False
+        fragHasUnsupportedInstanceBinder familyAtTwo @?= False
+        fragHasUnsupportedInstanceBinder classAtProper @?= False
+        fragHasUnsupportedInstanceBinder classAtHigher @?= False
+        fragHasUnsupportedInstanceBinder emptyNominal @?= True
+        mapM_
+          (\batch -> mapM_ (check batch)
+            [EngineDjinn, EngineExference, EngineBoth])
+          malformedBatches
   , testCase "search one canonical assignment but retain domain alternatives" $ do
       let mixed = FAll False "P" $ FAll True "A" $
             FArr (FVar "P") $ FArr (FVar "A") (FVar "A")
