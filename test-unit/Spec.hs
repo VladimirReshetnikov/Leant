@@ -1332,14 +1332,12 @@ typeApplicationTests = testGroup "retained type applications"
               (Global providerName)
               (Let (Constructor unitName []) (Local "unit")
                 (Apply (Local "function") (Local "value")))
-      case renderLeanTerm Map.empty providers Map.empty ([], 0, [])
-          (FArr source result) expression of
-        Left err -> assertFailure err
-        Right candidates -> assertBool
-          ("intrinsic product pattern lost its rank-N field: "
-            ++ show candidates)
-          (any (\term -> "Demo.source" `isInfixOf` term
-              && "f _ x" `isInfixOf` term) candidates)
+      renderLeanTerm Map.empty providers Map.empty ([], 0, [])
+          (FArr source result) expression
+        @?= Right
+          [ "fun x => let ⟨f, y⟩ := Demo.source; let z := y; "
+              ++ "match z with | _ => f _ x"
+          ]
   , testCase "fit rank-N fields from applied structured providers" $ do
       providerName <- expectRight $ mkIdentifier "leantProvider0"
       let token = FAtom False "Demo.Token"
@@ -2526,7 +2524,7 @@ parametricFamilyEngineTests = testGroup "parametric family engine projection"
             let candidates = allFamilyCandidates
                   (synthesizeWithProviders engine 1024 []
                     (FArr partial (FArr parameter complete)))
-            in if any ("match x with" `isInfixOf`) candidates
+            in if any treeElimination candidates
                 then assertFailure $ "mixed completeness exposed elimination "
                   ++ "in " ++ show engine ++ ": " ++ show candidates
                 else if any ("Demo.Tree.leaf" `isInfixOf`) candidates
@@ -2534,19 +2532,25 @@ parametricFamilyEngineTests = testGroup "parametric family engine projection"
                   else assertFailure $ "abstract recursive fallback lost "
                     ++ "introduction in " ++ show engine ++ ": "
                     ++ show candidates
+          treeElimination term =
+            "| .leaf" `isInfixOf` term
+              || "| Demo.Tree.leaf" `isInfixOf` term
       mapM_ check [EngineDjinn, EngineExference]
   , testCase "share recursive and nominal uses through an abstract head" $ do
       let source = recursiveBox True "Demo.RecBox poly" polytype
           target = FApp False "Demo.RecBox poly"
             (AppNominal "Demo.RecBox") [polytype]
           goal = FArr source target
+          recBoxElimination term =
+            "| ⟨" `isInfixOf` term
+              || "| Demo.RecBox.step" `isInfixOf` term
       expectExactFamilyTerm "fun x => x"
         (synthesizeWithProviders EngineDjinn 0 [] goal)
       let candidates = allFamilyCandidates
             (synthesizeWithProviders EngineExference 1024 [] goal)
       if null candidates
         then assertFailure "recursive/nominal fallback lost all conversions"
-        else if any ("match x with" `isInfixOf`) candidates
+        else if any recBoxElimination candidates
           then assertFailure $ "recursive/nominal fallback exposed a match: "
             ++ show candidates
           else if any ("fun x =>" `isInfixOf`) candidates
