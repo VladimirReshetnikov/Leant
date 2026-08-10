@@ -21,18 +21,20 @@ import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.HUnit ((@?=), assertBool, assertFailure, testCase)
 
 import Language.Haskell.Djex
-  ( Constraint (..)
+  ( Boxity (Boxed)
+  , Constraint (..)
   , Expression
       ( Apply, Case, Global, Lambda, Let, Local, Tuple
       , VisibleTypeApplication
       )
-  , Pattern (Bind, TuplePattern, Wildcard)
+  , Pattern (Bind, Constructor, TuplePattern, Wildcard)
   , Type (..)
   , inferredVisibleTypeArgument
   , maximumProviderInstantiationArguments
   , maximumProviderInstantiationKindNodes
   , mkIdentifier
   , specifiedVisibleTypeArgument
+  , tupleName
   )
 
 import Leant.Backend (findBackendProject)
@@ -1211,7 +1213,7 @@ typeApplicationTests = testGroup "retained type applications"
           check engine = expectTerm "Demo.sealedBox"
             (synthesizeWithProviders engine 1024 [provider] goal)
       in mapM_ check [EngineDjinn, EngineExference, EngineBoth]
-  , testCase "retain structured rank-N provider elimination in Djinn" $ do
+  , testCase "retain structured rank-N provider elimination across engines" $ do
       let source = FAtom False "Demo.Source"
           result = FAtom False "Demo.Result"
           provider = ProviderFrag "Demo.source" $
@@ -1219,8 +1221,26 @@ typeApplicationTests = testGroup "retained type applications"
               (FAll True "A" (FArr (FVar "A") result))
               FTop
           goal = FArr source result
-      expectTerm "match Demo.source with"
-        (synthesizeWithProviders EngineDjinn 1024 [provider] goal)
+          check engine = case
+              synthesizeWithProviders engine 1024 [provider] goal of
+            Right (SynthCandidates groups _) ->
+              let candidates = concat groups
+                  fitted term =
+                    "Demo.source" `isInfixOf` term
+                      && case engine of
+                        EngineDjinn ->
+                          "match Demo.source with" `isInfixOf` term
+                        EngineExference -> "f _ x" `isInfixOf` term
+                        EngineBoth -> "f _ x" `isInfixOf` term
+              in assertBool
+                ("structured provider field was not instantiated in "
+                  ++ synthEngineName engine ++ ": " ++ show candidates)
+                (any fitted candidates)
+            Right other -> assertFailure $
+              "unexpected structured-provider outcome from "
+                ++ synthEngineName engine ++ ": " ++ outcomeTag other
+            Left err -> assertFailure err
+      mapM_ check [EngineDjinn, EngineExference, EngineBoth]
   , testCase "fit explicit forall arguments of foreign providers" $ do
       let token = FAtom False "Demo.Token"
           provider = ProviderFrag "Demo.consumeExplicit"
@@ -1296,6 +1316,30 @@ typeApplicationTests = testGroup "retained type applications"
           (FArr source result) expression
         @?= Right
           ["fun x => match Demo.source with | ⟨f, _⟩ => f _ x"]
+  , testCase "normalize Exference intrinsic product eliminations" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      pairName <- expectRight $ tupleName Boxed 2
+      unitName <- expectRight $ tupleName Boxed 0
+      let source = FAtom False "Demo.Source"
+          result = FAtom False "Demo.Result"
+          providerFrag = FProd
+            (FAll True "A" (FArr (FVar "A") result))
+            FTop
+          providers = Map.singleton "leantProvider0"
+            ("Demo.source", Nothing, providerFrag)
+          expression = Lambda [Bind "value"] $
+            Let (Constructor pairName [Bind "function", Bind "unit"])
+              (Global providerName)
+              (Let (Constructor unitName []) (Local "unit")
+                (Apply (Local "function") (Local "value")))
+      case renderLeanTerm Map.empty providers Map.empty ([], 0, [])
+          (FArr source result) expression of
+        Left err -> assertFailure err
+        Right candidates -> assertBool
+          ("intrinsic product pattern lost its rank-N field: "
+            ++ show candidates)
+          (any (\term -> "Demo.source" `isInfixOf` term
+              && "f _ x" `isInfixOf` term) candidates)
   , testCase "fit rank-N fields from applied structured providers" $ do
       providerName <- expectRight $ mkIdentifier "leantProvider0"
       let token = FAtom False "Demo.Token"
@@ -2482,7 +2526,7 @@ parametricFamilyEngineTests = testGroup "parametric family engine projection"
             let candidates = allFamilyCandidates
                   (synthesizeWithProviders engine 1024 []
                     (FArr partial (FArr parameter complete)))
-            in if any ("match" `isInfixOf`) candidates
+            in if any ("match x with" `isInfixOf`) candidates
                 then assertFailure $ "mixed completeness exposed elimination "
                   ++ "in " ++ show engine ++ ": " ++ show candidates
                 else if any ("Demo.Tree.leaf" `isInfixOf`) candidates
@@ -2502,7 +2546,7 @@ parametricFamilyEngineTests = testGroup "parametric family engine projection"
             (synthesizeWithProviders EngineExference 1024 [] goal)
       if null candidates
         then assertFailure "recursive/nominal fallback lost all conversions"
-        else if any ("match" `isInfixOf`) candidates
+        else if any ("match x with" `isInfixOf`) candidates
           then assertFailure $ "recursive/nominal fallback exposed a match: "
             ++ show candidates
           else if any ("fun x =>" `isInfixOf`) candidates

@@ -376,6 +376,9 @@ declaredProvider providers name =
 --
 -- Lean 4 has no as-patterns and its @fun@\/@let@ binder patterns must be
 -- irrefutable, so before rendering:
+--   * Exference's intrinsic boxed-pair constructor patterns become the shared
+--     'TuplePattern' form emitted by Djinn, retaining irrefutable @fun@\/@let@
+--     destructuring and one fragment-fitting path for both engines;
 --   * every @As x p@ becomes a plain binding of @x@ plus an inner
 --     @match x with | p => ...@ around the body;
 --   * a constructor pattern in @fun@\/@let@ position becomes a fresh
@@ -386,6 +389,11 @@ declaredProvider providers name =
 splitAs :: Pattern String -> (Pattern String, [(String, Pattern String)])
 splitAs pat = case pat of
   As x p -> (Bind x, [(x, p)])
+  Constructor n ps
+    | nameSpecial n == Just (TupleConstructor Boxed 2)
+    , length ps == 2 ->
+        let (ps', obs) = unzip (map splitAs ps)
+        in (TuplePattern ps', concat obs)
   Constructor n ps ->
     let (ps', obs) = unzip (map splitAs ps)
     in (Constructor n ps', concat obs)
