@@ -88,7 +88,12 @@ import Leant.Synth.ProviderCache
   , providerCacheSize
   )
 import Leant.Synth.Replay (ReplayPlan (..), planReplay)
-import Leant.Synth.Render (renderLeanTerm)
+import Leant.Synth.Render
+  ( ProviderAssignmentInfo (..)
+  , ProviderInfo (..)
+  , providerInfo
+  , renderLeanTerm
+  )
 import Leant.Session.Replay (itCounterAfterHistory, replayHistoryWith)
 import Leant.Session.Snapshot
   ( SnapshotCompanion (..)
@@ -1249,7 +1254,7 @@ typeApplicationTests = testGroup "retained type applications"
           providerFrag = FAll False "A" $
             FArr (FVar "A") (FProd (FVar "A") FTop)
           providers = Map.singleton "leantProvider0"
-            ("Demo.box", Nothing, providerFrag)
+            (providerInfo "Demo.box" Nothing providerFrag)
           expression = Lambda [Bind "polymorphic", Bind "value"] $
             Let (TuplePattern [Bind "function", Wildcard])
               (Apply (Global providerName) (Local "polymorphic"))
@@ -1260,6 +1265,123 @@ typeApplicationTests = testGroup "retained type applications"
           [ "fun f x => let ⟨g, _⟩ := Demo.box f; g _ x"
           , "fun f x => let ⟨g, _⟩ := Demo.box (f _); g _ x"
           ]
+  , testCase "specialize provider results from specified type arguments" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      visibleIdentity <- expectRight $ specifiedVisibleTypeArgument
+        (ForallType ["B"] []
+          (FunctionType (TypeVariable "B") (TypeVariable "B"))
+          :: Type String)
+      let -- Deliberately collide with the renderer's private fresh prefix;
+          -- retained source evidence must be reserved before opening A.
+          identity = FAll True "\0leant-render-bound:0"
+            (FArr
+              (FVar "\0leant-render-bound:0")
+              (FVar "\0leant-render-bound:0"))
+          implicitIdentity = FAll False "C"
+            (FArr (FVar "C") (FVar "C"))
+          natural = FAtom False "Nat"
+          providerFrag = FAll False "A" (FProd (FVar "A") FTop)
+          providers = Map.singleton "leantProvider0" $
+            (providerInfo "Demo.box" (Just ["A"]) providerFrag)
+              { piAssignments =
+                  [ ProviderAssignmentInfo
+                      { paiVisibleArguments = [visibleIdentity]
+                      , paiSourceArguments =
+                          [ProviderInstantiationArgument 0 identity]
+                      }
+                  , ProviderAssignmentInfo
+                      { paiVisibleArguments = [visibleIdentity]
+                      , paiSourceArguments =
+                          [ProviderInstantiationArgument 0 implicitIdentity]
+                      }
+                  ]
+              }
+          expression = Lambda [Bind "value"] $
+            Let (TuplePattern [Bind "function", Wildcard])
+              (VisibleTypeApplication (Global providerName) visibleIdentity)
+              (Apply (Local "function") (Local "value"))
+      renderLeanTerm Map.empty providers Map.empty ([], 0, [])
+          (FArr natural natural) expression
+        @?= Right
+          [ "fun x => let ⟨f, _⟩ := Demo.box "
+              ++ "(«A» := (∀ (a0_0 : _), a0_0 → a0_0)); f _ x"
+          ]
+  , testCase "leave lossy implicit specified arguments opaque" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      visibleIdentity <- expectRight $ specifiedVisibleTypeArgument
+        (ForallType ["B"] []
+          (FunctionType (TypeVariable "B") (TypeVariable "B"))
+          :: Type String)
+      let implicitIdentity = FAll False "B"
+            (FArr (FVar "B") (FVar "B"))
+          natural = FAtom False "Nat"
+          providerFrag = FAll False "A" (FProd (FVar "A") FTop)
+          providers = Map.singleton "leantProvider0" $
+            (providerInfo "Demo.box" (Just ["A"]) providerFrag)
+              { piAssignments =
+                  [ ProviderAssignmentInfo
+                      { paiVisibleArguments = [visibleIdentity]
+                      , paiSourceArguments =
+                          [ProviderInstantiationArgument 0 implicitIdentity]
+                      }
+                  ]
+              }
+          expression = Lambda [Bind "value"] $
+            Let (TuplePattern [Bind "function", Wildcard])
+              (VisibleTypeApplication (Global providerName) visibleIdentity)
+              (Apply (Local "function") (Local "value"))
+      renderLeanTerm Map.empty providers Map.empty ([], 0, [])
+          (FArr natural natural) expression
+        @?= Right
+          [ "fun x => let ⟨y, _⟩ := Demo.box "
+              ++ "(«A» := (∀ (a0_0 : _), a0_0 → a0_0)); y x"
+          ]
+  , testCase "correlate complete type vectors across erased instances" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      naturalName <- expectRight $ mkIdentifier "Nat"
+      visibleNatural <- expectRight $ specifiedVisibleTypeArgument
+        (TypeConstructor naturalName :: Type String)
+      visibleIdentity <- expectRight $ specifiedVisibleTypeArgument
+        (ForallType ["B"] []
+          (FunctionType (TypeVariable "B") (TypeVariable "B"))
+          :: Type String)
+      let identity = FAll True "B"
+            (FArr (FVar "B") (FVar "B"))
+          natural = FAtom False "Nat"
+          providerFrag = FAll False "A" $ FInst "Demo.inst" $
+            FAll False "B" (FProd (FVar "B") FTop)
+          providers = Map.singleton "leantProvider0" $
+            (providerInfo "Demo.box" (Just ["A", "B"]) providerFrag)
+              { piAssignments =
+                  [ ProviderAssignmentInfo
+                      { paiVisibleArguments =
+                          [visibleNatural, visibleIdentity]
+                      , paiSourceArguments =
+                          [ ProviderInstantiationArgument 0 natural
+                          , ProviderInstantiationArgument 0 identity
+                          ]
+                      }
+                  ]
+              }
+          eliminate providerApplication = Lambda [Bind "value"] $
+            Let (TuplePattern [Bind "function", Wildcard])
+              providerApplication
+              (Apply (Local "function") (Local "value"))
+          completeApplication = VisibleTypeApplication
+            (VisibleTypeApplication (Global providerName) visibleNatural)
+            visibleIdentity
+          partialApplication =
+            VisibleTypeApplication (Global providerName) visibleNatural
+      renderLeanTerm Map.empty providers Map.empty ([], 0, [])
+          (FArr natural natural) (eliminate completeApplication)
+        @?= Right
+          [ "fun x => let ⟨f, _⟩ := Demo.box («A» := Nat) "
+              ++ "(«B» := (∀ (a0_0 : _), a0_0 → a0_0)); f _ x"
+          ]
+      renderLeanTerm Map.empty providers Map.empty ([], 0, [])
+          (FArr natural natural) (eliminate partialApplication)
+        @?= Right
+          ["fun x => let ⟨y, _⟩ := Demo.box («A» := Nat); y x"]
   , testCase "fit later provider arguments at an inferred rank-N type" $ do
       providerName <- expectRight $ mkIdentifier "leantProvider0"
       let identity = FAll True "B"
@@ -1272,7 +1394,7 @@ typeApplicationTests = testGroup "retained type applications"
               (holder "Demo.Holder A" (FVar "A"))
               (FArr (FVar "A") token)
           providers = Map.singleton "leantProvider0"
-            ("Demo.consume", Nothing, providerFrag)
+            (providerInfo "Demo.consume" Nothing providerFrag)
           expression = Lambda [Bind "wrapped"] $
             Apply
               (Apply (Global providerName) (Local "wrapped"))
@@ -1292,7 +1414,7 @@ typeApplicationTests = testGroup "retained type applications"
           providerFrag = FAll False "A"
             (FArr (FVar "A") (FVar "A"))
           providers = Map.singleton "leantProvider0"
-            ("Demo.choose", Nothing, providerFrag)
+            (providerInfo "Demo.choose" Nothing providerFrag)
           expression = Lambda [Bind "consumer"] $
             Apply
               (Apply (Global providerName) (Local "consumer"))
@@ -1309,10 +1431,10 @@ typeApplicationTests = testGroup "retained type applications"
           token = FAtom False "Demo.Token"
           providers = Map.fromList
             [ ( "leantProvider0"
-              , ("Demo.consume", Nothing, FArr identity token)
+              , providerInfo "Demo.consume" Nothing (FArr identity token)
               )
             , ( "leantProvider1"
-              , ("Demo.transport", Nothing, FArr identity identity)
+              , providerInfo "Demo.transport" Nothing (FArr identity identity)
               )
             ]
           expression = Apply (Global consumeName) $
@@ -1331,7 +1453,7 @@ typeApplicationTests = testGroup "retained type applications"
           providerFrag = FArr FTop $
             FAll False "A" (FProd identity FTop)
           providers = Map.singleton "leantProvider0"
-            ("Demo.make", Nothing, providerFrag)
+            (providerInfo "Demo.make" Nothing providerFrag)
           expression = Lambda [Bind "unit", Bind "value"] $
             Let (TuplePattern [Bind "function", Wildcard])
               (Apply (Global providerName) (Local "unit"))
@@ -1349,7 +1471,7 @@ typeApplicationTests = testGroup "retained type applications"
               (FAll True "B" (FArr (FVar "B") (FVar "A")))
               FTop
           providers = Map.singleton "leantProvider0"
-            ("Demo.unknown", Nothing, providerFrag)
+            (providerInfo "Demo.unknown" Nothing providerFrag)
           expression = Lambda [Bind "value"] $
             Let (TuplePattern [Bind "function", Wildcard])
               (VisibleTypeApplication
@@ -1369,7 +1491,7 @@ typeApplicationTests = testGroup "retained type applications"
               (FProd (FVar "A") (FVar "A"))
               (FProd (FVar "A") FTop)
           providers = Map.singleton "leantProvider0"
-            ("Demo.boxRepeated", Nothing, providerFrag)
+            (providerInfo "Demo.boxRepeated" Nothing providerFrag)
           expression = Lambda [Bind "pair", Bind "value"] $
             Let (TuplePattern [Bind "function", Wildcard])
               (Apply (Global providerName) (Local "pair"))
@@ -1390,7 +1512,7 @@ typeApplicationTests = testGroup "retained type applications"
               (FProd (FVar "A") (FVar "A"))
               (FProd (FVar "A") FTop)
           providers = Map.singleton "leantProvider0"
-            ("Demo.boxRepeated", Nothing, providerFrag)
+            (providerInfo "Demo.boxRepeated" Nothing providerFrag)
           expression = Lambda [Bind "pair", Bind "value"] $
             Let (TuplePattern [Bind "function", Wildcard])
               (Apply (Global providerName) (Local "pair"))
@@ -1431,6 +1553,35 @@ typeApplicationTests = testGroup "retained type applications"
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
             Left err -> assertFailure err
       mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "specialize evidence-selected provider results" $ do
+      let identity = FAll True "B"
+            (FArr (FVar "B") (FVar "B"))
+          natural = FAtom False "Nat"
+          providerFrag = FAll False "A" (FProd (FVar "A") FTop)
+          provider = ProviderFragWithEvidence
+            "Demo.box" providerFrag ["A"]
+            [[ProviderInstantiationArgument 0 identity]]
+          goal = FArr natural natural
+          check engine = case
+              synthesizeWithProviders engine 1024 [provider] goal of
+            Right (SynthCandidates groups _) ->
+              let candidates = concat groups
+                  fitted term =
+                    "Demo.box («A» := (∀" `isInfixOf` term
+                      && "f _ x" `isInfixOf` term
+              in assertBool
+                ("specified provider result was not specialized in "
+                  ++ synthEngineName engine ++ ": " ++ show candidates)
+                (any fitted candidates)
+            Right other -> assertFailure $
+              "unexpected specified-provider outcome from "
+                ++ synthEngineName engine ++ ": " ++ outcomeTag other
+            Left err -> assertFailure err
+      -- The direct renderer assertion above covers the engine-neutral fitting
+      -- path exactly. Exference supplies the stable evidence-selected
+      -- elimination candidate; combined mode verifies that merging preserves
+      -- it even when Djinn's direct identity candidates fill its own frontier.
+      mapM_ check [EngineExference, EngineBoth]
   , testCase "fit explicit forall arguments of foreign providers" $ do
       let token = FAtom False "Demo.Token"
           provider = ProviderFrag "Demo.consumeExplicit"
@@ -1468,7 +1619,7 @@ typeApplicationTests = testGroup "retained type applications"
           providerFrag = FAll True "A"
             (FArr (FVar "A") result)
           providers = Map.singleton "leantProvider0"
-            ("Demo.source", Nothing, providerFrag)
+            (providerInfo "Demo.source" Nothing providerFrag)
           expression = Lambda [Bind "value"] $
             Apply (Global providerName) (Local "value")
       renderLeanTerm Map.empty providers Map.empty ([], 0, [])
@@ -1481,7 +1632,7 @@ typeApplicationTests = testGroup "retained type applications"
           providerFrag = FAll False "A"
             (FArr (FVar "A") result)
           providers = Map.singleton "leantProvider0"
-            ("Demo.source", Nothing, providerFrag)
+            (providerInfo "Demo.source" Nothing providerFrag)
           expression = Lambda [Bind "value"] $
             Apply (Global providerName) (Local "value")
       renderLeanTerm Map.empty providers Map.empty ([], 0, [])
@@ -1495,7 +1646,7 @@ typeApplicationTests = testGroup "retained type applications"
             (FAll True "A" (FArr (FVar "A") result))
             FTop
           providers = Map.singleton "leantProvider0"
-            ("Demo.source", Nothing, providerFrag)
+            (providerInfo "Demo.source" Nothing providerFrag)
           expression = Lambda [Bind "value"] $
             Case (Global providerName)
               [ ( TuplePattern [Bind "function", Wildcard]
@@ -1516,7 +1667,7 @@ typeApplicationTests = testGroup "retained type applications"
             (FAll True "A" (FArr (FVar "A") result))
             FTop
           providers = Map.singleton "leantProvider0"
-            ("Demo.source", Nothing, providerFrag)
+            (providerInfo "Demo.source" Nothing providerFrag)
           expression = Lambda [Bind "value"] $
             Let (Constructor pairName [Bind "function", Bind "unit"])
               (Global providerName)
@@ -1538,7 +1689,7 @@ typeApplicationTests = testGroup "retained type applications"
               (FAll True "A" (FArr (FVar "A") result))
               FTop
           providers = Map.singleton "leantProvider0"
-            ("Demo.makeSource", Nothing, providerFrag)
+            (providerInfo "Demo.makeSource" Nothing providerFrag)
           expression = Lambda [Bind "token", Bind "value"] $
             Case
               (Apply (Global providerName) (Local "token"))
@@ -1558,7 +1709,7 @@ typeApplicationTests = testGroup "retained type applications"
             (FAll True "A" (FArr (FVar "A") result))
             FTop
           providers = Map.singleton "leantProvider0"
-            ("Demo.source", Nothing, providerFrag)
+            (providerInfo "Demo.source" Nothing providerFrag)
           expression = Lambda [Bind "value"] $
             Let (TuplePattern [Bind "function", Wildcard])
               (Global providerName)
@@ -1575,7 +1726,7 @@ typeApplicationTests = testGroup "retained type applications"
             (FAll False "A" (FArr (FVar "A") result))
             FTop
           providers = Map.singleton "leantProvider0"
-            ("Demo.source", Nothing, providerFrag)
+            (providerInfo "Demo.source" Nothing providerFrag)
           expression = Lambda [Bind "value"] $
             Case (Global providerName)
               [ ( TuplePattern [Bind "function", Wildcard]
@@ -1594,7 +1745,7 @@ typeApplicationTests = testGroup "retained type applications"
             (FAll True "A" (FArr (FVar "A") result))
             FTop
           providers = Map.singleton "leantProvider0"
-            ("Demo.source", Nothing, providerFrag)
+            (providerInfo "Demo.source" Nothing providerFrag)
           expression = Lambda [Bind "value"] $
             Let (Bind "answer")
               (Case (Global providerName)
@@ -1614,7 +1765,7 @@ typeApplicationTests = testGroup "retained type applications"
       let token = FAtom False "Demo.Token"
           providerFrag = FArr polytype token
           providers = Map.singleton "leantProvider0"
-            ("Demo.consumeExplicit", Nothing, providerFrag)
+            (providerInfo "Demo.consumeExplicit" Nothing providerFrag)
           providerApplication = Apply (Global providerName)
             (Lambda [Bind "identity"] (Local "identity"))
           expression = Case providerApplication
@@ -1634,7 +1785,7 @@ typeApplicationTests = testGroup "retained type applications"
       let token = FAtom False "Demo.Token"
           providerFrag = FArr polytype token
           providers = Map.singleton "leantProvider0"
-            ("Demo.consumeExplicit", Nothing, providerFrag)
+            (providerInfo "Demo.consumeExplicit" Nothing providerFrag)
           providerApplication = Apply (Global providerName)
             (Lambda [Bind "identity"] (Local "identity"))
           expression = Let (Bind "result") providerApplication
@@ -1654,7 +1805,7 @@ typeApplicationTests = testGroup "retained type applications"
       let token = FAtom False "Demo.Token"
           providerFrag = FArr polytype token
           providers = Map.singleton "leantProvider0"
-            ("Demo.consumeExplicit", Nothing, providerFrag)
+            (providerInfo "Demo.consumeExplicit" Nothing providerFrag)
           providerApplication = Apply (Global providerName)
             (Lambda [Bind "identity"] (Local "identity"))
           nestedRhs = Lambda [Bind "ignored"] providerApplication
@@ -3152,9 +3303,9 @@ rankNFrontierTests = testGroup "Djinn rank-N frontiers"
   ]
 
 testProviderInfo :: String -> Maybe [String]
-  -> (String, Maybe [String], Frag)
+  -> ProviderInfo
 testProviderInfo leanName binders =
-  (leanName, binders, FAtom False "test provider")
+  providerInfo leanName binders (FAtom False "test provider")
 
 visibleTypeApplicationTests :: TestTree
 visibleTypeApplicationTests = testGroup "Lean visible type applications"
