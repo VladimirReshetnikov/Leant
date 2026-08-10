@@ -1241,6 +1241,116 @@ typeApplicationTests = testGroup "retained type applications"
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
             Left err -> assertFailure err
       mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "specialize provider results from impredicative arguments" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      let identity = FAll True "B"
+            (FArr (FVar "B") (FVar "B"))
+          natural = FAtom False "Nat"
+          providerFrag = FAll False "A" $
+            FArr (FVar "A") (FProd (FVar "A") FTop)
+          providers = Map.singleton "leantProvider0"
+            ("Demo.box", Nothing, providerFrag)
+          expression = Lambda [Bind "polymorphic", Bind "value"] $
+            Let (TuplePattern [Bind "function", Wildcard])
+              (Apply (Global providerName) (Local "polymorphic"))
+              (Apply (Local "function") (Local "value"))
+      renderLeanTerm Map.empty providers Map.empty ([], 0, [])
+          (FArr identity (FArr natural natural)) expression
+        @?= Right
+          [ "fun f x => let ⟨g, _⟩ := Demo.box f; g _ x"
+          , "fun f x => let ⟨g, _⟩ := Demo.box (f _); g _ x"
+          ]
+  , testCase "retain inferred provider-result envelopes" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      let natural = FAtom False "Nat"
+          boolean = FAtom False "Bool"
+          providerFrag = FAll False "A" $
+            FProd
+              (FAll True "B" (FArr (FVar "B") (FVar "A")))
+              FTop
+          providers = Map.singleton "leantProvider0"
+            ("Demo.unknown", Nothing, providerFrag)
+          expression = Lambda [Bind "value"] $
+            Let (TuplePattern [Bind "function", Wildcard])
+              (VisibleTypeApplication
+                (Global providerName) inferredVisibleTypeArgument)
+              (Apply (Local "function") (Local "value"))
+      renderLeanTerm Map.empty providers Map.empty ([], 0, [])
+          (FArr natural boolean) expression
+        @?= Right
+          ["fun x => let ⟨f, _⟩ := @Demo.unknown _; f _ x"]
+  , testCase "match repeated impredicative arguments alpha-equivalently" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      let identity binder = FAll True binder
+            (FArr (FVar binder) (FVar binder))
+          natural = FAtom False "Nat"
+          providerFrag = FAll False "A" $
+            FArr
+              (FProd (FVar "A") (FVar "A"))
+              (FProd (FVar "A") FTop)
+          providers = Map.singleton "leantProvider0"
+            ("Demo.boxRepeated", Nothing, providerFrag)
+          expression = Lambda [Bind "pair", Bind "value"] $
+            Let (TuplePattern [Bind "function", Wildcard])
+              (Apply (Global providerName) (Local "pair"))
+              (Apply (Local "function") (Local "value"))
+          goal = FArr
+            (FProd (identity "B") (identity "C"))
+            (FArr natural natural)
+      renderLeanTerm Map.empty providers Map.empty ([], 0, []) goal expression
+        @?= Right
+          ["fun x y => let ⟨f, _⟩ := Demo.boxRepeated x; f _ y"]
+  , testCase "reject conflicting provider-result specializations" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      let identity = FAll True "B"
+            (FArr (FVar "B") (FVar "B"))
+          natural = FAtom False "Nat"
+          providerFrag = FAll False "A" $
+            FArr
+              (FProd (FVar "A") (FVar "A"))
+              (FProd (FVar "A") FTop)
+          providers = Map.singleton "leantProvider0"
+            ("Demo.boxRepeated", Nothing, providerFrag)
+          expression = Lambda [Bind "pair", Bind "value"] $
+            Let (TuplePattern [Bind "function", Wildcard])
+              (Apply (Global providerName) (Local "pair"))
+              (Apply (Local "function") (Local "value"))
+          goal = FArr
+            (FProd identity natural)
+            (FArr natural natural)
+      renderLeanTerm Map.empty providers Map.empty ([], 0, []) goal expression
+        @?= Right
+          ["fun x y => let ⟨a, _⟩ := Demo.boxRepeated x; a y"]
+  , testCase "specialize impredicative provider results across engines" $ do
+      let identity = FAll True "B"
+            (FArr (FVar "B") (FVar "B"))
+          natural = FAtom False "Nat"
+          holder key argument =
+            FApp False key (AppNominal "Demo.Holder") [argument]
+          provider = ProviderFrag "Demo.unpack" $
+            FAll False "A" $
+              FArr
+                (holder "Demo.Holder A" (FVar "A"))
+                (FProd (FVar "A") FTop)
+          goal = FArr
+            (holder "Demo.Holder identity" identity)
+            (FArr natural natural)
+          check engine = case
+              synthesizeWithProviders engine 1024 [provider] goal of
+            Right (SynthCandidates groups _) ->
+              let candidates = concat groups
+                  fitted term =
+                    "Demo.unpack" `isInfixOf` term
+                      && "f _ y" `isInfixOf` term
+              in assertBool
+                ("impredicative provider result was not specialized in "
+                  ++ synthEngineName engine ++ ": " ++ show candidates)
+                (any fitted candidates)
+            Right other -> assertFailure $
+              "unexpected impredicative-provider outcome from "
+                ++ synthEngineName engine ++ ": " ++ outcomeTag other
+            Left err -> assertFailure err
+      mapM_ check [EngineDjinn, EngineExference, EngineBoth]
   , testCase "fit explicit forall arguments of foreign providers" $ do
       let token = FAtom False "Demo.Token"
           provider = ProviderFrag "Demo.consumeExplicit"

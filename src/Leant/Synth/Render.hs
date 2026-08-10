@@ -46,12 +46,14 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
 import Language.Haskell.Synthesis.Generated
-  ( ClosedVisibleTypeVariable
+  ( ApplicationArgument (..)
+  , ClosedVisibleTypeVariable
   , Expression (..)
   , Pattern (..)
   , VisibleTypeArgument
   , closedVisibleTypeVariableSpelling
   , discardUnusedPatternBindingsBy
+  , expressionFullApplicationSpine
   , isInferredVisibleTypeArgument
   , visibleTypeArgumentClosedType
   )
@@ -708,27 +710,63 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
       Nothing -> Nothing
     VisibleTypeApplication function _ -> applicationHeadFrag dss function
     _ -> Nothing
-  -- Recover the result fragment of a local/provider expression after its
-  -- ordinary term arguments have been consumed.  This is deliberately shared
-  -- by case and let fitting: a provider can expose a structured value directly
-  -- or return one from an application, and either elimination must retain the
-  -- domains of the fields it binds.  A consumed type binder that remains free
-  -- in the result needs substitution information this pass does not have, so
-  -- reject that fragment instead of fitting against a stale variable.
+  -- Recover the result fragment of a local/provider expression after its full
+  -- application spine has been consumed.  This is deliberately shared by case
+  -- and let fitting: a provider can expose a structured value directly or
+  -- return one from an application, and either elimination must retain the
+  -- domains of the fields it binds.  Djex's generated tree intentionally does
+  -- not annotate ordinary inferred applications, but an argument which is a
+  -- known local or provider still has an exact Lean-side fragment here. Match
+  -- that fragment against the corresponding arrow domain and specialize the
+  -- provider result capture-avoidably. Opened binders receive collision-free
+  -- private identities, so an unresolved binder can safely remain opaque in
+  -- a known result envelope; conflicting evidence still fails closed.
   knownExpressionFrag dss expression =
-    let (headExpr, args) = appSpine expression
-    in applicationHeadFrag dss headExpr >>= consumeTermArgs (length args)
-  consumeTermArgs = go Set.empty
+    let (headExpr, arguments) = expressionFullApplicationSpine expression
+    in applicationHeadFrag dss headExpr >>= \headFrag ->
+      let reserved = Set.unions
+            (fragVariableNames headFrag : map (fragVariableNames . snd) dss)
+      in consumeApplication dss reserved arguments headFrag
+  knownArgumentFrag dss expression =
+    case expressionFullApplicationSpine expression of
+      (Local local, []) -> lookup local dss
+      (Global global, []) ->
+        (\(_, _, providerFrag) -> providerFrag)
+          <$> declaredProvider providers global
+      _ -> knownExpressionFrag dss expression
+  consumeApplication dss reserved = go Set.empty []
    where
-    go consumed remaining frag = case frag of
-      FAll _ binder rest -> go (Set.insert binder consumed) remaining rest
-      FInst _ rest -> go consumed remaining rest
-      FArr _ rest | remaining > 0 -> go consumed (remaining - 1) rest
-      _ | remaining == 0
-        , Set.null
-            (consumed `Set.intersection` freeFragVariables Set.empty frag) ->
-              Just frag
-      _ -> Nothing
+    go consumed replacements arguments frag = case frag of
+      FAll _ binder rest ->
+        let replacementNames = Set.unions
+              [ Set.insert formal (fragVariableNames replacement)
+              | (formal, replacement) <- replacements
+              ]
+            fresh = freshFragBinder $ Set.unions
+              [ reserved
+              , consumed
+              , replacementNames
+              , fragVariableNames rest
+              ]
+            opened = renameFragBinder binder fresh rest
+            remaining = case arguments of
+              VisibleTypeArgumentArgument _ : tailArguments -> tailArguments
+              _ -> arguments
+        in go (Set.insert fresh consumed) replacements remaining opened
+      FInst _ rest -> go consumed replacements arguments rest
+      FArr domain rest -> case arguments of
+        TermArgument argument : remaining -> do
+          replacements' <- case knownArgumentFrag dss argument of
+            Nothing -> Just replacements
+            Just actual ->
+              inferFragReplacements consumed replacements domain actual
+          go consumed replacements' remaining rest
+        _ -> finish consumed replacements arguments frag
+      _ -> finish consumed replacements arguments frag
+
+    finish _ replacements arguments frag
+      | not (null arguments) = Nothing
+      | otherwise = Just (specializeFrag replacements frag)
   eliminationPatternDomains scrutineeFrag pat =
     case (scrutineeFrag, pat) of
       (Just (FSum a _), Constructor g [p])
@@ -848,10 +886,104 @@ constructorFieldsAt occurrence info = case ciParametric info of
           (specializeFrag (zip formals parameters)) (ciFields info)
       else Nothing
 
--- | Capture-avoiding substitution for the defensive generic-field fallback.
--- Family formals use private spellings, but actual occurrence parameters may
--- reuse a constructor-local binder name, so conflicting binders are renamed
--- before an actual fragment is inserted.
+-- | Infer exact replacements for variables opened by the known expression's
+-- leading forall spine. Matching follows only structural positions which can
+-- contain those variables; unrelated display keys and refutation flags are
+-- deliberately ignored. A repeated variable must receive the identical exact
+-- fragment, while higher-kinded variables in application-head position remain
+-- unsupported and therefore fail closed.
+inferFragReplacements
+  :: Set.Set String -> [(String, Frag)] -> Frag -> Frag
+  -> Maybe [(String, Frag)]
+inferFragReplacements targets = go Set.empty
+ where
+  go bound replacements (FVar variable) actual
+    | variable `Set.member` targets
+    , variable `Set.notMember` bound = case lookup variable replacements of
+        Nothing -> Just (replacements ++ [(variable, actual)])
+        Just previous
+          | equivalent previous actual -> Just replacements
+          | otherwise -> Nothing
+  go _ replacements (FVar variable) (FVar variable')
+    | variable == variable' = Just replacements
+  go bound replacements (FArr left right) (FArr left' right') = do
+    replacements' <- go bound replacements left left'
+    go bound replacements' right right'
+  go bound replacements (FProd left right) (FProd left' right') = do
+    replacements' <- go bound replacements left left'
+    go bound replacements' right right'
+  go bound replacements (FSum left right) (FSum left' right') = do
+    replacements' <- go bound replacements left left'
+    go bound replacements' right right'
+  go bound replacements (FAll explicit binder body)
+      (FAll explicit' binder' body')
+    | explicit == explicit' =
+        let reserved = Set.unions
+              [ targets
+              , bound
+              , fragVariableNames body
+              , fragVariableNames body'
+              , Set.unions
+                  [ Set.insert formal (fragVariableNames replacement)
+                  | (formal, replacement) <- replacements
+                  ]
+              ]
+            fresh = freshFragBinder reserved
+            expected' = renameFragBinder binder fresh body
+            actual' = renameFragBinder binder' fresh body'
+        in go (Set.insert fresh bound) replacements expected' actual'
+  go bound replacements (FInst key body) (FInst key' body')
+    | key == key' = go bound replacements body body'
+  go bound replacements (FApp _ _ head' arguments)
+      (FApp _ _ head'' arguments')
+    | head' == head''
+    , not (targetApplicationHead head')
+    , length arguments == length arguments' =
+        matchMany bound replacements (zip arguments arguments')
+  go bound replacements
+      (FParamInd headName _ parameters _)
+      (FParamInd headName' _ parameters' _)
+    | headName == headName'
+    , length parameters == length parameters' =
+        matchMany bound replacements (zip parameters parameters')
+  go _ replacements (FInd key _) (FInd key' _)
+    | key == key' = Just replacements
+  go bound replacements
+      (FParamRec _ headName _ parameters _)
+      (FParamRec _ headName' _ parameters' _)
+    | headName == headName'
+    , length parameters == length parameters' =
+        matchMany bound replacements (zip parameters parameters')
+  go bound replacements (FRec complete key parameters _)
+      (FRec complete' key' parameters' _)
+    | complete == complete'
+    , key == key'
+    , length parameters == length parameters' =
+        matchMany bound replacements (zip parameters parameters')
+  go _ replacements (FAtom _ key) (FAtom _ key')
+    | key == key' = Just replacements
+  go _ replacements FTop FTop = Just replacements
+  go _ replacements FBot FBot = Just replacements
+  go _ replacements FDepth FDepth = Just replacements
+  go _ _ _ _ = Nothing
+
+  matchMany bound = foldM
+    (\replacements (expected, actual) ->
+      go bound replacements expected actual)
+
+  targetApplicationHead head' = case head' of
+    AppVariable variable -> variable `Set.member` targets
+    AppNominal _ -> False
+
+  equivalent left right = case
+      inferFragReplacements Set.empty [] left right of
+    Just _ -> True
+    Nothing -> False
+
+-- | Capture-avoiding substitution shared by known-application result fitting
+-- and the defensive generic-field fallback. Family formals use private
+-- spellings, but exact argument fragments may reuse a result-local binder
+-- name, so conflicting binders are renamed before an actual is inserted.
 specializeFrag :: [(String, Frag)] -> Frag -> Frag
 specializeFrag replacements = go Set.empty
  where
