@@ -1,0 +1,75 @@
+
+   __                  __
+  / /  ___ ___ ____   / /_
+ / /__/ -_) _ `/ _ \_/ __/
+/____/\__/\_,_/_//_/ \__/
+Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to exit.
+λ> namespace ContextualOnly
+λ>
+λ> axiom Token : Type
+λ>
+λ> class Pick (a : Type 1) : Prop where
+…>   witness : True
+…>
+λ> abbrev Choice := {a : Type} → [Inhabited a] → a → a
+λ>
+λ> instance : Pick Choice := ⟨True.intro⟩
+λ>
+λ> axiom chosen {a : Type 1} [Pick a] : Token
+λ>
+λ> end ContextualOnly
+λ>
+λ> namespace DependentContext
+λ>
+λ> class Dep where
+…>   T : Type
+…>
+λ> abbrev Choice := [d : Dep] → d.T
+λ>
+λ> class Pick (a : Type 1) : Prop where
+…>   witness : True
+…>
+λ> instance : Pick Choice := ⟨True.intro⟩
+λ>
+λ> axiom Token : Type
+λ>
+λ> axiom chosen {a : Type 1} [Pick a] : Token
+λ>
+λ> end DependentContext
+λ>
+λ> :set synth-library off
+synth library: off
+λ> :set synth-steps 256
+synth steps: 256
+λ> :set synth-engine djinn
+synth engine: djinn
+λ> :synth ContextualOnly.Token
+preparing synthesis environment (session imports + Lean)...
+  it1  ContextualOnly.chosen («a» := (∀ {a0_0 : Type _}, [@Inhabited a0_0] → a0_0 → a0_0))
+λ> :set synth-engine exference
+synth engine: exference
+λ> :synth ContextualOnly.Token
+  it1  ContextualOnly.chosen («a» := (∀ {a0_0 : Type _}, [@Inhabited a0_0] → a0_0 → a0_0))
+note: search truncated: step limit reached, queue limit pruned 2148
+λ> :set synth-engine both
+synth engine: both
+λ> :synth ContextualOnly.Token
+  it1  ContextualOnly.chosen («a» := (∀ {a0_0 : Type _}, [@Inhabited a0_0] → a0_0 → a0_0))
+note: exference: search truncated: step limit reached, queue limit pruned 857
+λ> :set synth-engine djinn
+synth engine: djinn
+λ> :synth DependentContext.Token
+the engine proposed 11 candidate(s) but none survived Lean verification
+note: search truncated: candidate limit reached (60)
+λ> :set synth-engine exference
+synth engine: exference
+λ> :synth DependentContext.Token
+the engine proposed 10 candidate(s) but none survived Lean verification
+note: search truncated: step limit reached, queue limit pruned 2424
+λ> :set synth-engine both
+synth engine: both
+λ> :synth DependentContext.Token
+the engine proposed 13 candidate(s) but none survived Lean verification
+note: search truncated: candidate limit reached (60)
+note: exference: search truncated: step limit reached, queue limit pruned 2424
+λ> :quit

@@ -1,0 +1,23 @@
+namespace MetadataFitting
+
+axiom Marker (a : Type 1) : Type
+
+class Choice (a : Type 1) : Prop where
+  witness : True
+
+instance implicitChoice : Choice (∀ {A : Type}, A → A) :=
+  ⟨True.intro⟩
+
+instance explicitChoice : Choice (∀ (A : Type), A → A) :=
+  ⟨True.intro⟩
+
+axiom make {a : Type 1} [Choice a] : a → Marker a
+
+end MetadataFitting
+
+:set synth-steps 64
+:set synth-engine exference
+:synth MetadataFitting.Marker (∀ (A : Type), A → A)
+:set synth-engine both
+:synth MetadataFitting.Marker (∀ (A : Type), A → A)
+:quit

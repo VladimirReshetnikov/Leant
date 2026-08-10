@@ -587,6 +587,19 @@ forall in the fragment, and caps a vector at 128 tags. The metadata is used
 only after the complete specified vector matches, and the backend still
 elaborates and kernel-checks every resulting candidate.
 
+Each provider occurrence whose complete visible vector matches retained exact
+evidence receives a private render-time identity. One bounded metadata
+alternative is then used consistently for both provider-result fitting and
+final type-argument spelling;
+two uses of the same canonical vector may choose different implicit\/explicit
+source binders without pairing one choice's rendered type with another
+choice's inserted placeholders. The established 32-selection prefix and
+Cartesian cap still bound each rendering lane; if repeated occurrences expose
+more individual alternatives than fit, source-earlier occurrences retain
+priority and later occurrences keep their base selection. This occurrence-local
+coupling is recorded in the
+[provider metadata fitting report](docs/reports/2026-08-09-occurrence-local-provider-metadata-fitting.md).
+
 Leant reconstructs each Djex
 `GroundKind` by folding that bounded arrow count into `FunctionKind` over
 `ProperTypeKind`, pairs it with the translated type, and calls
@@ -600,9 +613,15 @@ before recursive kind inference, same-provider comparison, kind conversion, or
 paired type elaboration. Oversized and cyclic caller-built kinds therefore fail
 finitely. The historical `(candidates ...)` form and structural
 `(kinded N ...)` payload remain readable, alongside metadata-free and
-binder-only inventories. A complete vector fails
-closed if any argument contains depth truncation (`FDepth`) or an instance
-binder (`FInst`), including a constraint hidden behind a reducible alias.
+binder-only inventories. Exact-assignment serialization may additionally
+retain a bounded contextual binder as `FExactContext`: the node records the
+exact nominal Lean class head, its ordered proper-type arguments, and its
+body, so Djex checks the context structurally and rendering restores the same
+Lean class application. This representation exists only inside one exact
+provider assignment. A complete vector still fails closed if any argument
+contains depth truncation (`FDepth`), a legacy raw instance marker (`FInst`),
+or a malformed, open, dictionary-dependent, term-indexed, or otherwise
+unsupported context.
 Provider-prefix lanes slice the metadata with its declaration, and Djex
 resolves every vector by the exact private provider name, so a later or
 alpha-identically typed provider cannot donate evidence to an earlier one.
@@ -615,12 +634,18 @@ ordinary structural translation.
 The dedicated
 [`synth-quantified-provider`](test/synth-quantified-provider.txt) transcript
 checks both the query-supplied and provider-only paths under standalone Djinn,
-standalone Exference, and combined search. Its reducible
-`Gap.Contextual := {a : Type} → [Inhabited a] → a` control has an active class
-instance but is excluded because it is contextual. This is bounded,
+standalone Exference, and combined search. The dedicated
+[`synth-provider-contextual-assignment`](test/synth-provider-contextual-assignment.txt)
+transcript isolates the structured-context extension: its only active head
+selects `∀ {a : Type}, [Inhabited a] → a → a`, and all three modes must render
+and verify that exact contextual named argument. This remains bounded,
 evidence-directed rank-N/impredicative support, not general impredicative
-inference; open or context-bearing quantified arguments are rejected rather
-than guessed into Lean syntax. The
+inference. Only closed, structured nominal class contexts from exact assignment
+discovery cross the bridge; open or unsupported contexts and legacy `FInst`
+payloads fail closed rather than being guessed into Lean syntax. Ordinary goal
+and provider-scheme serialization is unchanged. See the
+[contextual provider-assignment report](docs/reports/2026-08-09-contextual-provider-assignments.md).
+The
 [`synth-provider-implicit-visible-result`](test/synth-provider-implicit-visible-result.txt)
 transcript covers the complementary exact-metadata path. It requires standalone
 Djinn, standalone Exference, and combined mode to select a provider at the
@@ -632,6 +657,14 @@ than a string-only fixture. Its second namespace supplies two instance-selected
 types with one canonical Djex fragment but swapped `Prop`/`Type` domains, puts
 the wrong rendering first, and requires all three modes to fall through to the
 kernel-valid alternative. The
+[`synth-provider-metadata-fitting`](test/synth-provider-metadata-fitting.txt)
+transcript additionally makes rendering and result fitting inseparable. Its
+first instance contributes the canonical type with an implicit forall, while a
+second instance contributes the same Djex type with an explicit forall. The
+goal forces the explicit selection, and the provider consumes a value at that
+selected type; Exference and combined mode must therefore render both the
+explicit provider argument and `fun _ x => x`. Lean verifies that result at a
+64-step search bound. The
 [`synth-provider-higher-kind-assignment`](test/synth-provider-higher-kind-assignment.txt)
 transcript separately requires the mixed kinded/rank-N vector and the exact
 vacuous and heterogeneous multi-vacuous applications under Djinn, Exference,
@@ -1198,10 +1231,15 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   rejects residual kind arities above 64 before that bridge, and pinned Djex
   independently rejects a supplied `GroundKind` above 129 constructor nodes
   before recursive operations on that assignment. At most
-  16 distinct vectors survive per provider. `FDepth` and `FInst` fragments
-  reject their complete vector after parsing, the command-wide vector list is
-  capped at 32 before planning or translation, and provider-prefix fallback
-  carries each vector only with its source declaration. The checked runners
+  16 distinct vectors survive per provider. `FDepth` and legacy raw `FInst`
+  fragments reject their complete vector after parsing. Exact-assignment-local
+  `FExactContext` nodes are admitted only for bounded, closed nominal class
+  applications with supported proper-type arguments; malformed, free,
+  dictionary-dependent, term-indexed, and otherwise unsupported forms remain
+  fail-closed. The
+  command-wide vector list is capped at 32 before planning or translation, and
+  provider-prefix fallback carries each vector only with its source
+  declaration. The checked runners
   verify exact provider identity, arity, supplied positional kinds, closure,
   and context before consuming a vector once without Cartesian reconstruction.
   Proper-kind live arguments additionally retain a bounded structural fragment

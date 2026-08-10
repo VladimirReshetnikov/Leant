@@ -65,10 +65,12 @@ import Language.Haskell.Synthesis.Generated
   , isInferredVisibleTypeArgument
   , visibleTypeArgumentClosedType
   )
+import Language.Haskell.Synthesis.Constraint (Constraint (..))
 import Language.Haskell.Synthesis.Name
   ( Boxity (..)
   , Name
   , SpecialName (..)
+  , mkIdentifier
   , nameSpecial
   , nameSpelling
   , renderCanonical
@@ -170,8 +172,17 @@ renderLeanTerm cm providers typeNames (outerPrems, skip, innerPrems)
   -- so case splits on them reveal their branch binders' domains
   let premises = outerPrems ++ innerPrems
       seed = [(premiseMark ++ name, frag) | (name, frag) <- premises]
-      fitted = nub
-        [fit cm providers force goalFrag base 0 seed | force <- [False, True]]
+  (occurrenceProviders, occurrenceBase) <-
+    aliasProviderOccurrences cm providers base
+  let providerVariants = providerRenderingAlternatives occurrenceProviders
+      fittedCohorts =
+        [ nub
+            [ (providerVariant,
+                fit cm providerVariant force goalFrag occurrenceBase 0 seed)
+            | providerVariant <- providerVariants
+            ]
+        | force <- [False, True]
+        ]
   -- Keep the aggregate provider-assignment budget independently in each
   -- universe-domain lane. This preserves every bounded exact-metadata choice
   -- before the verifier while keeping the final group bounded at three times
@@ -179,14 +190,16 @@ renderLeanTerm cm providers typeNames (outerPrems, skip, innerPrems)
   -- collapse back to the old size in the final 'nub'.
   lanes <- mapM
     (\visibleBinderDomain -> do
-      texts <- concat <$> mapM (variantsFor visibleBinderDomain) fitted
-      pure $ take visibleBinderDomainVariantLimit $ nub texts)
+      cohorts <- mapM
+        (mapM (uncurry (variantsFor visibleBinderDomain))) fittedCohorts
+      pure $ take visibleBinderDomainVariantLimit $
+        nub (concatMap roundRobin cohorts))
     visibleBinderDomains
   case nub $ concat lanes of
     [] -> Left "no renderable variant"
     group -> Right group
  where
-  variantsFor visibleBinderDomain fitted = do
+  variantsFor visibleBinderDomain selectedProviders fitted = do
     let (expr, domPairs) = roleRename fitted
         doms = Map.fromList domPairs
         sites = countSites doms expr
@@ -200,25 +213,159 @@ renderLeanTerm cm providers typeNames (outerPrems, skip, innerPrems)
         -- qualified fallback; verification keeps the first that
         -- elaborates
         styles = [Idiomatic, Explicit]
-        providerVariants = providerRenderingAlternatives providers
     concat <$> mapM
-      (\set -> concat <$> mapM
-        (\style -> mapM
-          (\providerVariant ->
-            render cm providerVariant typeNames style visibleBinderDomain
-              doms 0 (markSites doms set expr))
-          providerVariants)
+      (\set -> mapM
+        (\style ->
+          render cm selectedProviders typeNames style visibleBinderDomain
+            doms 0 (markSites doms set expr))
         styles)
       sets
+
+  roundRobin rows = case [(item, rest) | item : rest <- rows] of
+    [] -> []
+    headsAndTails ->
+      map fst headsAndTails ++ roundRobin (map snd headsAndTails)
+
+-- Give each provider occurrence whose complete visible vector matches retained
+-- evidence a private renderer key. Djex intentionally merges Lean metadata
+-- which has one canonical visible type, but two uses of that canonical vector
+-- may need different source visibility/domain alternatives. Aliasing before
+-- fitting lets the existing bounded provider-map scheduler select those
+-- alternatives independently, while every alias still renders the exact
+-- original Lean global through its copied 'ProviderInfo'.
+aliasProviderOccurrences
+  :: CtorMap -> ProviderMap -> Expression local
+  -> Either String (ProviderMap, Expression local)
+aliasProviderOccurrences constructors providers expression = do
+  (expression', aliases, _) <- go (0 :: Int) expression
+  let originalsWithoutAssignments = Map.map
+        (\info -> info { piAssignments = [] }) providers
+  pure
+    ( Map.union (Map.fromList aliases) originalsWithoutAssignments
+    , expression'
+    )
+ where
+  occupiedGlobalSpellings = expressionGlobalSpellings expression
+
+  go next expression'
+    | Just (providerName, arguments) <- providerVisibleSpine expression' []
+    , Just info <- declaredProvider providers providerName
+    , let retained =
+            [ assignment
+            | assignment <- piAssignments info
+            , paiVisibleArguments assignment == arguments
+            ]
+    , not (null retained) = do
+        (aliasName, aliasKey, next') <- freshAlias next
+        let aliasedInfo = info { piAssignments = retained }
+            aliasedExpression = foldl VisibleTypeApplication
+              (Global aliasName) arguments
+        pure (aliasedExpression, [(aliasKey, aliasedInfo)], next')
+  go next expression' = case expression' of
+    Local{} -> pure (expression', [], next)
+    Global{} -> pure (expression', [], next)
+    Hole{} -> pure (expression', [], next)
+    Lambda patterns body -> do
+      (body', aliases, final) <- go next body
+      pure (Lambda patterns body', aliases, final)
+    Apply function argument -> do
+      (function', functionAliases, afterFunction) <- go next function
+      (argument', argumentAliases, final) <- go afterFunction argument
+      pure
+        ( Apply function' argument'
+        , functionAliases ++ argumentAliases
+        , final
+        )
+    VisibleTypeApplication function argument -> do
+      (function', aliases, final) <- go next function
+      pure (VisibleTypeApplication function' argument, aliases, final)
+    Tuple elements -> do
+      (elements', aliases, final) <- goMany next elements
+      pure (Tuple elements', aliases, final)
+    Let pattern rhs body -> do
+      (rhs', rhsAliases, afterRhs) <- go next rhs
+      (body', bodyAliases, final) <- go afterRhs body
+      pure (Let pattern rhs' body', rhsAliases ++ bodyAliases, final)
+    Case scrutinee alternatives -> do
+      (scrutinee', scrutineeAliases, afterScrutinee) <- go next scrutinee
+      (alternatives', alternativeAliases, final) <-
+        goAlternatives afterScrutinee alternatives
+      pure
+        ( Case scrutinee' alternatives'
+        , scrutineeAliases ++ alternativeAliases
+        , final
+        )
+
+  goMany next [] = pure ([], [], next)
+  goMany next (element : elements) = do
+    (element', elementAliases, afterElement) <- go next element
+    (elements', remainingAliases, final) <- goMany afterElement elements
+    pure
+      ( element' : elements'
+      , elementAliases ++ remainingAliases
+      , final
+      )
+
+  goAlternatives next [] = pure ([], [], next)
+  goAlternatives next ((pattern, body) : alternatives) = do
+    (body', bodyAliases, afterBody) <- go next body
+    (alternatives', remainingAliases, final) <-
+      goAlternatives afterBody alternatives
+    pure
+      ( (pattern, body') : alternatives'
+      , bodyAliases ++ remainingAliases
+      , final
+      )
+
+  freshAlias next =
+    let digits = show next
+        sourceOrdered = replicate (20 - length digits) '0' ++ digits
+        aliasKey = "leantMetadataProviderOccurrence" ++ sourceOrdered
+    in if Map.member aliasKey providers
+        || Map.member aliasKey constructors
+        || Set.member aliasKey occupiedGlobalSpellings
+      then freshAlias (next + 1)
+      else case mkIdentifier aliasKey of
+        Left _ -> Left "internal: invalid provider metadata occurrence name"
+        Right aliasName -> Right (aliasName, aliasKey, next + 1)
+
+  expressionGlobalSpellings expression' = case expression' of
+    Local{} -> Set.empty
+    Global name -> maybe Set.empty Set.singleton (nameSpelling name)
+    Hole{} -> Set.empty
+    Lambda _ body -> expressionGlobalSpellings body
+    Apply function argument -> Set.union
+      (expressionGlobalSpellings function)
+      (expressionGlobalSpellings argument)
+    VisibleTypeApplication function _ -> expressionGlobalSpellings function
+    Tuple elements -> Set.unions $ map expressionGlobalSpellings elements
+    Let _ rhs body -> Set.union
+      (expressionGlobalSpellings rhs)
+      (expressionGlobalSpellings body)
+    Case scrutinee alternatives -> Set.unions $
+      expressionGlobalSpellings scrutinee :
+        [ expressionGlobalSpellings body | (_, body) <- alternatives ]
+
+providerVisibleSpine
+  :: Expression local -> [VisibleTypeArgument]
+  -> Maybe (Name, [VisibleTypeArgument])
+providerVisibleSpine expression arguments = case expression of
+  VisibleTypeApplication function argument ->
+    providerVisibleSpine function (argument : arguments)
+  Global name -> Just (name, arguments)
+  _ -> Nothing
 
 -- Exact domain vectors which collapse to one Djex visible type must remain
 -- render alternatives: Lean verification can reject the first (for example a
 -- Prop-domain spelling) and accept the next Type-domain spelling. Build a
 -- bounded Cartesian product keyed by provider and canonical visible vector.
--- The prefix keeps the base plus each individual retained alternative. With
--- the engine's aggregate assignment bound, that entire prefix fits before the
--- remaining Cartesian combinations, including for staged callers which may
--- supply more alternatives than the live producer's per-provider limit.
+-- The prefix keeps the base plus individual retained alternatives in provider
+-- key order. A source provider contributes at most 32 assignments, but
+-- occurrence-local aliases can repeat those alternatives more than 32 times;
+-- the same global bound therefore retains the earliest source occurrences and
+-- leaves later ones at their base selection. Remaining capacity admits the
+-- Cartesian combinations, including for staged callers which may supply more
+-- alternatives than the live producer's per-provider limit.
 providerRenderingAlternatives :: ProviderMap -> [ProviderMap]
 providerRenderingAlternatives providers =
   map applySelections $
@@ -416,6 +563,7 @@ roleRename (expr, _, domPairs) =
       _ -> False
   peel (FAll _ _ b) = peel b
   peel (FInst _ b) = peel b
+  peel (FExactContext _ _ b) = peel b
   peel f = f
 
 -- | Bound placeholder names in binding order.
@@ -763,6 +911,9 @@ fit cm providers force frag expr n doms =
   walk (FInst _ rest) ps ds =
     let (ps', f', ds', ex) = walk rest ps ds
     in (Wildcard : ps', f', ds', ex)
+  walk (FExactContext _ _ rest) ps ds =
+    let (ps', f', ds', ex) = walk rest ps ds
+    in (Wildcard : ps', f', ds', ex)
   walk f ps ds = (ps, f, ds, False)
 
   introCore e = case e of
@@ -786,6 +937,9 @@ fit cm providers force frag expr n doms =
       in (Wildcard : ps, core', f', k')
     FAll False _ rest -> etaExpand rest core k
     FInst _ rest ->
+      let (ps, core', f', k') = etaExpand rest core k
+      in (Wildcard : ps, core', f', k')
+    FExactContext _ _ rest ->
       let (ps, core', f', k') = etaExpand rest core k
       in (Wildcard : ps, core', f', k')
     _ -> ([], core, f, k)
@@ -971,6 +1125,11 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
               in go (Set.insert fresh consumed) replacements'
                 termDomains remainingExact remaining opened
         FInst _ rest
+          | preserveTrailing && null arguments ->
+              finish replacements termDomains arguments frag
+          | otherwise ->
+              go consumed replacements termDomains exactArguments arguments rest
+        FExactContext _ _ rest
           | preserveTrailing && null arguments ->
               finish replacements termDomains arguments frag
           | otherwise ->
@@ -1175,6 +1334,15 @@ inferFragReplacements targets = go Set.empty
         in go (Set.insert fresh bound) replacements expected' actual'
   go bound replacements (FInst key body) (FInst key' body')
     | key == key' = go bound replacements body body'
+  go bound replacements
+      (FExactContext className arguments body)
+      (FExactContext className' arguments' body')
+    | className == className'
+    , map fst arguments == map fst arguments'
+    , length arguments == length arguments' = do
+        replacements' <- matchMany bound replacements
+          (zip (map snd arguments) (map snd arguments'))
+        go bound replacements' body body'
   go bound replacements (FApp _ _ head' arguments)
       (FApp _ _ head'' arguments')
     | head' == head''
@@ -1259,6 +1427,10 @@ specializeFrag replacements = go Set.empty
       | otherwise ->
           FAll explicit binder (go (Set.insert binder bound) body)
     FInst key body -> FInst key (recur body)
+    FExactContext className arguments body ->
+      FExactContext className
+        [(arity, recur argument) | (arity, argument) <- arguments]
+        (recur body)
     FApp safe key head' arguments ->
       FApp safe key head' (map recur arguments)
     FParamInd headName key parameters constructors ->
@@ -1285,6 +1457,8 @@ freeFragVariables bound frag = case frag of
   FSum left right -> descend [left, right]
   FAll _ binder body -> freeFragVariables (Set.insert binder bound) body
   FInst _ body -> freeFragVariables bound body
+  FExactContext _ arguments body ->
+    descend (map snd arguments ++ [body])
   FVar variable
     | variable `Set.member` bound -> Set.empty
     | otherwise -> Set.singleton variable
@@ -1312,6 +1486,8 @@ fragVariableNames frag = case frag of
   FSum left right -> descend [left, right]
   FAll _ binder body -> Set.insert binder (fragVariableNames body)
   FInst _ body -> fragVariableNames body
+  FExactContext _ arguments body ->
+    descend (map snd arguments ++ [body])
   FVar variable -> Set.singleton variable
   FApp _ _ head' arguments ->
     let headNames = case head' of
@@ -1347,6 +1523,10 @@ renameFragBinder old new frag = case frag of
     | binder == old -> frag
     | otherwise -> FAll explicit binder (go body)
   FInst key body -> FInst key (go body)
+  FExactContext className arguments body ->
+    FExactContext className
+      [(arity, go argument) | (arity, argument) <- arguments]
+      (go body)
   FVar variable
     | variable == old -> FVar new
     | otherwise -> frag
@@ -1404,6 +1584,7 @@ trailingAlls :: Frag -> Int -> Int
 trailingAlls frag 0 = leadingTypeArgs frag
 trailingAlls (FAll _ _ rest) k = trailingAlls rest k
 trailingAlls (FInst _ rest) k = trailingAlls rest k
+trailingAlls (FExactContext _ _ rest) k = trailingAlls rest k
 trailingAlls (FArr _ rest) k = trailingAlls rest (k - 1)
 trailingAlls _ _ = 0
 
@@ -1659,6 +1840,7 @@ render cm providers typeNames style visibleBinderDomain doms = go
   weaveArgs (FAll True _ rest) as = "_" : weaveArgs rest as
   weaveArgs (FAll False _ rest) as = weaveArgs rest as
   weaveArgs (FInst _ rest) as = weaveArgs rest as
+  weaveArgs (FExactContext _ _ rest) as = weaveArgs rest as
   weaveArgs (FArr _ rest) (a : as) = a : weaveArgs rest as
   weaveArgs _ as = as
 
@@ -1669,6 +1851,7 @@ render cm providers typeNames style visibleBinderDomain doms = go
     _ -> False
   peelA (FAll _ _ b) = peelA b
   peelA (FInst _ b) = peelA b
+  peelA (FExactContext _ _ b) = peelA b
   peelA f = f
 
   at req level text = if level >= req then text else "(" ++ text ++ ")"
@@ -1757,12 +1940,6 @@ render cm providers typeNames style visibleBinderDomain doms = go
                       Right $ Just
                         (leanName, zip3 renderedNames arguments sources)
           _ -> Right Nothing
-
-  providerVisibleSpine expression arguments = case expression of
-    VisibleTypeApplication function argument ->
-      providerVisibleSpine function (argument : arguments)
-    Global name -> Just (name, arguments)
-    _ -> Nothing
 
   -- Quoted identifiers remain valid even when the source binder is a Lean
   -- keyword. Name.toString already quotes some exotic spellings and leaves
@@ -1909,30 +2086,30 @@ renderVisibleTypeArgumentWithForallMetadata visibleBinderDomain
       Right (at req 0 (intercalate " × " elementTxts), remaining)
     SharedType.TupleType Unboxed _ ->
       Left "cannot render an unboxed tuple as a Lean type argument"
-    SharedType.ForallType variables constraints body
-      | not (null constraints) ->
-          Left "cannot render a constrained quantified visible Lean type argument"
-      | null variables -> renderType applicationHead req visibilities body
-      | otherwise -> do
-          let (binderMetadata, afterBinders) =
-                splitAt (length variables) visibilities
-          if length binderMetadata /= length variables
-            then Left
-              "exact Lean provider forall metadata is shorter than its canonical type"
-            else do
-              (bodyTxt, remaining) <- renderType False 0 afterBinders body
-              let binderTxt (variable, (explicit, domain)) =
-                    (if explicit then "(" else "{")
-                      ++ closedVisibleTypeVariableSpelling variable ++ " : "
-                      ++ visibleBinderDomainText domain
-                      ++ (if explicit then ")" else "}")
-              Right
-                ( at req 0
-                    ("\8704 " ++ unwords
+    SharedType.ForallType variables constraints body -> do
+      let (binderMetadata, afterBinders) =
+            splitAt (length variables) visibilities
+      if length binderMetadata /= length variables
+        then Left
+          "exact Lean provider forall metadata is shorter than its canonical type"
+        else do
+          (constraintTxts, afterConstraints) <-
+            renderConstraints afterBinders constraints
+          (bodyTxt, remaining) <- renderType False 0 afterConstraints body
+          let binderTxt (variable, (explicit, domain)) =
+                (if explicit then "(" else "{")
+                  ++ closedVisibleTypeVariableSpelling variable ++ " : "
+                  ++ visibleBinderDomainText domain
+                  ++ (if explicit then ")" else "}")
+              contextualBody = intercalate " \8594 "
+                (constraintTxts ++ [bodyTxt])
+              rendered
+                | null variables = contextualBody
+                | otherwise =
+                    "\8704 " ++ unwords
                       (map binderTxt (zip variables binderMetadata))
-                      ++ ", " ++ bodyTxt)
-                , remaining
-                )
+                      ++ ", " ++ contextualBody
+          Right (at req 0 rendered, remaining)
 
   renderTypes visibilities types = case types of
     [] -> Right ([], visibilities)
@@ -1940,6 +2117,25 @@ renderVisibleTypeArgumentWithForallMetadata visibleBinderDomain
       (rendered, afterType) <-
         renderType False 1 visibilities typeExpression
       (rest, remaining) <- renderTypes afterType remainingTypes
+      Right (rendered : rest, remaining)
+
+  renderConstraints visibilities constraints = case constraints of
+    [] -> Right ([], visibilities)
+    Constraint className arguments : remainingConstraints -> do
+      classTxt <- renderTypeName (not $ null arguments) className
+      (argumentTxts, afterArguments) <-
+        renderConstraintArguments visibilities arguments
+      let rendered = "[" ++ unwords (classTxt : argumentTxts) ++ "]"
+      (rest, remaining) <-
+        renderConstraints afterArguments remainingConstraints
+      Right (rendered : rest, remaining)
+
+  renderConstraintArguments visibilities arguments = case arguments of
+    [] -> Right ([], visibilities)
+    argument : remainingArguments -> do
+      (rendered, afterArgument) <- renderType False 2 visibilities argument
+      (rest, remaining) <-
+        renderConstraintArguments afterArgument remainingArguments
       Right (rendered : rest, remaining)
 
   visibleBinderDomainText domain = case domain of

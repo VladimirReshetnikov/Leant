@@ -51,6 +51,7 @@ module Leant.Synth.Fragment
   , fragVisibleForallVisibilities
   , fragHasDepth
   , fragHasInstanceBinder
+  , fragHasUnsupportedInstanceBinder
   , fragProviderMayOpen
   , fragRefusal
   , fragRecKeys
@@ -98,6 +99,13 @@ data Frag
     -- ignores dictionary evidence, while the Lean renderer must still bind a
     -- wildcard at an introduction site.  The display key keeps Djinn
     -- exhaustion conservative because the hidden dictionary can carry data.
+  | FExactContext String [(Int, Frag)] Frag
+    -- ^ An exact-assignment-only contextual binder: exact Lean class name,
+    -- ordered @(ground kind arity, argument)@ vector, and body.  Unlike
+    -- 'FInst', this node is semantic evidence rather than pretty text.  Live
+    -- production currently admits only proper-kind class arguments, while the
+    -- bounded arity field keeps the wire forward-compatible with the same
+    -- first-order ground-kind language used by provider assignments.
   | FVar String         -- ^ opaque type variable (auto-implicit or opened binder)
   | FAtom Bool String   -- ^ opaque atom: safe-for-refutation flag, display key
   | FApp Bool String AppHead [Frag]
@@ -207,6 +215,12 @@ maximumProviderArgumentKindArity = 64
 -- this independent parser-side cap keeps caller-authored snapshots bounded.
 maximumProviderExactForallDomains :: Int
 maximumProviderExactForallDomains = 128
+
+-- | A contextual class application is auxiliary evidence inside one provider
+-- argument, so keep its own positional width no larger than the public exact
+-- provider vector.  This bounds both generated and caller-authored wire data.
+maximumProviderExactContextArguments :: Int
+maximumProviderExactContextArguments = maximumProviderInstantiationArguments
 
 -- | One Lean environment value lowered to the synthesis fragment.  The
 -- provider name remains the exact fully-qualified Lean spelling; the engine
@@ -364,7 +378,8 @@ synthPrelude inventory = unlines
   , ""
   , "mutual"
   , ""
-  , "partial def go (providerMode : Bool) (fuel depth : Nat)"
+  , "partial def go (providerMode exactAssignmentMode : Bool)"
+  , "    (fuel depth : Nat)"
   , "    (blocked : List String) (e : Expr)"
   , "    : MetaM String := do"
   , "  match fuel with"
@@ -381,10 +396,15 @@ synthPrelude inventory = unlines
   , "      else atomOf e"
   , "    | Expr.forallE _ t b bi =>"
   , "      if b.hasLooseBVars then do"
-  , "        if \8592 isTypeKind t then"
+  , "        -- A dependent instance telescope cannot be represented by the"
+  , "        -- exact contextual wire. Mark only that assignment as truncated;"
+  , "        -- ordinary goal/provider behavior retains its established path."
+  , "        if exactAssignmentMode && bi.isInstImplicit then pure \"(depth)\""
+  , "        else if \8592 isTypeKind t then"
   , "          withLocalDeclD (Name.mkSimple (\"s\" ++ toString depth)) t"
   , "              fun fv => do"
-  , "            let inner \8592 go providerMode fuel (depth + 1) blocked"
+  , "            let inner \8592 go providerMode exactAssignmentMode fuel"
+  , "              (depth + 1) blocked"
   , "              (b.instantiate1 fv)"
   , "            let tag := if bi.isExplicit then \"(all \" else \"(alli \""
   , "            pure (tag ++ esc (\"s\" ++ toString depth) ++ \" \""
@@ -393,18 +413,48 @@ synthPrelude inventory = unlines
   , "      else if bi.isInstImplicit then"
   , "        -- Typeclass evidence is reconstructed by Lean when a value is"
   , "        -- applied, so Djex never consumes it as a term premise. Providers"
-  , "        -- erase the binder completely. Goal mode retains a render-only"
-  , "        -- marker because Lean lambdas must still bind instance arguments."
+  , "        -- erase the binder completely. Exact assignment mode preserves a"
+  , "        -- bounded, semantic class application; ordinary goal mode retains"
+  , "        -- only the legacy render marker for backward compatibility."
   , "        if providerMode then"
-  , "          go providerMode fuel depth blocked b"
+  , "          go providerMode exactAssignmentMode fuel depth blocked b"
+  , "        else if exactAssignmentMode then do"
+  , "          let legacy : MetaM String := do"
+  , "            let instanceType \8592 Meta.ppExpr t"
+  , "            let r \8592 go false false fuel depth blocked b"
+  , "            pure (\"(inst \" ++ esc (toString instanceType) ++ \" \""
+  , "              ++ r ++ \")\")"
+  , "          let classType \8592 whnfR t.consumeMData"
+  , "          match \8592 Meta.isClass? classType with"
+  , "          | none => legacy"
+  , "          | some className => do"
+  , "            let arguments := classType.getAppArgs"
+  , "            if arguments.size > "
+      ++ show maximumProviderExactContextArguments ++ " then legacy"
+  , "            else do"
+  , "              let mut supported := true"
+  , "              for argument in arguments do"
+  , "                let kind \8592 whnfR (\8592 inferType argument)"
+  , "                if !kind.isSort then supported := false"
+  , "              if !supported then legacy"
+  , "              else do"
+  , "                let mut rendered := \"\""
+  , "                for argument in arguments do"
+  , "                  let fragment \8592"
+  , "                    go false true fuel depth blocked argument"
+  , "                  rendered := rendered ++ \" (kinded 0 \""
+  , "                    ++ fragment ++ \")\""
+  , "                let r \8592 go false true fuel depth blocked b"
+  , "                pure (\"(exact-context \" ++ esc className.toString"
+  , "                  ++ \" (arguments\" ++ rendered ++ \") \" ++ r ++ \")\")"
   , "        else do"
   , "          let instanceType \8592 Meta.ppExpr t"
-  , "          let r \8592 go providerMode fuel depth blocked b"
+  , "          let r \8592 go providerMode false fuel depth blocked b"
   , "          pure (\"(inst \" ++ esc (toString instanceType) ++ \" \""
   , "            ++ r ++ \")\")"
   , "      else if bi.isExplicit then do"
-  , "        let d \8592 go providerMode fuel depth blocked t"
-  , "        let r \8592 go providerMode fuel depth blocked b"
+  , "        let d \8592 go providerMode exactAssignmentMode fuel depth blocked t"
+  , "        let r \8592 go providerMode exactAssignmentMode fuel depth blocked b"
   , "        pure (\"(-> \" ++ d ++ \" \" ++ r ++ \")\")"
   , "      else do"
   , "        let typeKind \8592 isTypeKind t"
@@ -414,7 +464,7 @@ synthPrelude inventory = unlines
   , "          -- scheme binder so Djex can choose a visible instantiation."
   , "          -- Goal mode retains the historical elaborator-binder model;"
   , "          -- provider mode admits only first-order type-kind binders."
-  , "          let r \8592 go providerMode fuel depth blocked b"
+  , "          let r \8592 go providerMode exactAssignmentMode fuel depth blocked b"
   , "          pure (\"(alli \" ++ esc (\"i\" ++ toString depth) ++ \" \""
   , "            ++ r ++ \")\")"
   , "    | _ =>"
@@ -422,8 +472,8 @@ synthPrelude inventory = unlines
   , "      | Expr.const n _ => do"
   , "        let args := e.getAppArgs"
   , "        let bin (tag : String) : MetaM String := do"
-  , "          let a \8592 go providerMode fuel depth blocked args[0]!"
-  , "          let b \8592 go providerMode fuel depth blocked args[1]!"
+  , "          let a \8592 go providerMode exactAssignmentMode fuel depth blocked args[0]!"
+  , "          let b \8592 go providerMode exactAssignmentMode fuel depth blocked args[1]!"
   , "          pure (\"(\" ++ tag ++ \" \" ++ a ++ \" \" ++ b ++ \")\")"
   , "        if args.size == 0 &&"
   , "            (n == ``False || n == ``Empty || n == ``PEmpty) then"
@@ -438,25 +488,25 @@ synthPrelude inventory = unlines
   , "            (n == ``Or || n == ``Sum || n == ``PSum) then"
   , "          bin \"sum\""
   , "        else if args.size == 2 && n == ``Iff then do"
-  , "          let a \8592 go providerMode fuel depth blocked args[0]!"
-  , "          let b \8592 go providerMode fuel depth blocked args[1]!"
+  , "          let a \8592 go providerMode exactAssignmentMode fuel depth blocked args[0]!"
+  , "          let b \8592 go providerMode exactAssignmentMode fuel depth blocked args[1]!"
   , "          pure (\"(prod (-> \" ++ a ++ \" \" ++ b ++ \") (-> \""
   , "            ++ b ++ \" \" ++ a ++ \"))\")"
   , "        else if args.size == 1 && n == ``Not then do"
-  , "          let a \8592 go providerMode fuel depth blocked args[0]!"
+  , "          let a \8592 go providerMode exactAssignmentMode fuel depth blocked args[0]!"
   , "          pure (\"(-> \" ++ a ++ \" (bot))\")"
   , "        else do"
-  , "          match \8592 indOf providerMode fuel depth blocked e with"
+  , "          match \8592 indOf providerMode exactAssignmentMode fuel depth blocked e with"
   , "          | some s => pure s"
   , "          | none =>"
-  , "            match \8592 recOf providerMode fuel depth blocked e with"
+  , "            match \8592 recOf providerMode exactAssignmentMode fuel depth blocked e with"
   , "            | some s => pure s"
   , "            | none =>"
-  , "              match \8592 appOf providerMode fuel depth blocked e with"
+  , "              match \8592 appOf providerMode exactAssignmentMode fuel depth blocked e with"
   , "              | some s => pure s"
   , "              | none => atomOf e"
   , "      | _ =>"
-  , "        match \8592 appOf providerMode fuel depth blocked e with"
+  , "        match \8592 appOf providerMode exactAssignmentMode fuel depth blocked e with"
   , "        | some s => pure s"
   , "        | none => atomOf e"
   , ""
@@ -466,7 +516,8 @@ synthPrelude inventory = unlines
   , "-- proof arguments, and other dependent applications remain one opaque"
   , "-- atom.  A blocked recursive occurrence also remains an atom so recOf's"
   , "-- constructor-premise knot keeps sharing the exact occurrence key."
-  , "partial def appOf (providerMode : Bool) (fuel depth : Nat)"
+  , "partial def appOf (providerMode exactAssignmentMode : Bool)"
+  , "    (fuel depth : Nat)"
   , "    (blocked : List String) (e : Expr)"
   , "    : MetaM (Option String) := do"
   , "  let args := e.getAppArgs"
@@ -493,7 +544,7 @@ synthPrelude inventory = unlines
   , "        let safe := e.getUsedConstants.isEmpty && !e.isSort"
   , "        let mut rendered := \"\""
   , "        for arg in args do"
-  , "          let argument \8592 go providerMode fuel depth blocked arg"
+  , "          let argument \8592 go providerMode exactAssignmentMode fuel depth blocked arg"
   , "          rendered := rendered ++ \" \" ++ argument"
   , "        pure (some (\"(app \""
   , "          ++ (if safe then \"safe\" else \"unsafe\") ++ \" \""
@@ -505,7 +556,8 @@ synthPrelude inventory = unlines
   , "-- explicit and non-dependent.  Proper-type parameter vectors retain"
   , "-- their exact family head for query-wide sharing; term/dependent"
   , "-- parameter vectors keep the occurrence-local ind representation."
-  , "partial def indOf (providerMode : Bool) (fuel depth : Nat)"
+  , "partial def indOf (providerMode exactAssignmentMode : Bool)"
+  , "    (fuel depth : Nat)"
   , "    (blocked : List String) (e : Expr)"
   , "    : MetaM (Option String) := do"
   , "  match e.getAppFn with"
@@ -521,7 +573,7 @@ synthPrelude inventory = unlines
   , "        let mut ctors := \"\""
   , "        for c in iv.ctors do"
   , "          let ct \8592 inferType (mkAppN (Expr.const c us) args)"
-  , "          match \8592 ctorFields providerMode fuel depth blocked ct with"
+  , "          match \8592 ctorFields providerMode exactAssignmentMode fuel depth blocked ct with"
   , "          | none => return none"
   , "          | some fs =>"
   , "            ctors := ctors ++ \" (ctor \" ++ esc c.toString ++ fs ++ \")\""
@@ -530,7 +582,7 @@ synthPrelude inventory = unlines
   , "        if \8592 allProperTypeParams args then do"
   , "          let mut params := \"\""
   , "          for arg in args do"
-  , "            let param \8592 go providerMode fuel depth blocked arg"
+  , "            let param \8592 go providerMode exactAssignmentMode fuel depth blocked arg"
   , "            params := params ++ \" \" ++ param"
   , "          pure (some (\"(param-ind \" ++ esc n.toString ++ \" \""
   , "            ++ esc key ++ \" (params\" ++ params ++ \")\""
@@ -546,7 +598,8 @@ synthPrelude inventory = unlines
   , "-- whose instantiated fields are explicit and"
   , "-- non-dependent, with this occurrence's own key blocked so field"
   , "-- occurrences of the type serialize as the matching atom."
-  , "partial def recOf (providerMode : Bool) (fuel depth : Nat)"
+  , "partial def recOf (providerMode exactAssignmentMode : Bool)"
+  , "    (fuel depth : Nat)"
   , "    (blocked : List String) (e : Expr)"
   , "    : MetaM (Option String) := do"
   , "  match e.getAppFn with"
@@ -566,7 +619,7 @@ synthPrelude inventory = unlines
   , "          let properParams \8592 allProperTypeParams args"
   , "          let mut params := \"\""
   , "          for arg in args do"
-  , "            let param \8592 go providerMode fuel depth blocked arg"
+  , "            let param \8592 go providerMode exactAssignmentMode fuel depth blocked arg"
   , "            params := params ++ \" \" ++ param"
   , "          let blocked := key :: blocked"
   , "          let mut ctors := \"\""
@@ -574,7 +627,7 @@ synthPrelude inventory = unlines
   , "          let mut complete := true"
   , "          for c in iv.ctors do"
   , "            let ct \8592 inferType (mkAppN (Expr.const c us) args)"
-  , "            match \8592 ctorFields providerMode fuel depth blocked ct with"
+  , "            match \8592 ctorFields providerMode exactAssignmentMode fuel depth blocked ct with"
   , "            | none => complete := false"
   , "            | some fs =>"
   , "              found := true"
@@ -593,7 +646,8 @@ synthPrelude inventory = unlines
   , "    | _ => pure none"
   , "  | _ => pure none"
   , ""
-  , "partial def ctorFields (providerMode : Bool) (fuel depth : Nat)"
+  , "partial def ctorFields (providerMode exactAssignmentMode : Bool)"
+  , "    (fuel depth : Nat)"
   , "    (blocked : List String) (t : Expr)"
   , "    : MetaM (Option String) := do"
   , "  let t \8592 whnfR t"
@@ -601,8 +655,8 @@ synthPrelude inventory = unlines
   , "  | Expr.forallE _ dom body bi =>"
   , "    if body.hasLooseBVars || !bi.isExplicit then pure none"
   , "    else do"
-  , "      let d \8592 go providerMode fuel depth blocked dom"
-  , "      match \8592 ctorFields providerMode fuel depth blocked body with"
+  , "      let d \8592 go providerMode exactAssignmentMode fuel depth blocked dom"
+  , "      match \8592 ctorFields providerMode exactAssignmentMode fuel depth blocked body with"
   , "      | none => pure none"
   , "      | some rest => pure (some (\" \" ++ d ++ rest))"
   , "  | _ => pure (some \"\")"
@@ -646,11 +700,6 @@ synthPrelude inventory = unlines
   , "      else pure (#[], #[])"
   , "    | _ => pure (#[], #[])"
   , ""
-  , "def hasInstanceBinder (e : Expr) : Bool :="
-  , "  (e.find? fun subterm => match subterm with"
-  , "    | Expr.forallE _ _ _ bi => bi.isInstImplicit"
-  , "    | _ => false).isSome"
-  , ""
   , "-- Preserve canonical identity for a bare or partially applied nominal"
   , "-- constructor. Structural logical heads use separate fragment nodes, so"
   , "-- omit them here until their unsaturated renderer identity is modeled."
@@ -667,7 +716,7 @@ synthPrelude inventory = unlines
   , "      for arg in candidate.getAppArgs do"
   , "        let argType \8592 whnfR (\8592 inferType arg)"
   , "        if !argType.isSort then return none"
-  , "        let argument \8592 go false fuel 0 [] arg"
+  , "        let argument \8592 go false true fuel 0 [] arg"
   , "        rendered := rendered ++ \" \" ++ argument"
   , "      pure (some (\"(nominal \" ++ esc n.toString ++ rendered ++ \")\"))"
   , "  | _ => pure none"
@@ -697,7 +746,32 @@ synthPrelude inventory = unlines
   , "    else match e with"
   , "    | Expr.fvar _ => pure (some #[])"
   , "    | Expr.forallE _ domain body binderInfo =>"
-  , "      if body.hasLooseBVars then do"
+  , "      if binderInfo.isInstImplicit then do"
+  , "        -- A dictionary-dependent result is not an ordinary Haskell class"
+  , "        -- context and must not fall back to one opaque pretty-printed atom."
+  , "        if body.hasLooseBVars then pure none"
+  , "        else do"
+  , "          -- Exact assignments retain only genuine class applications whose"
+  , "          -- ordered arguments are proper types. Their arguments and body"
+  , "          -- still contribute every visible forall-domain tag."
+  , "          let classType ← whnfR domain.consumeMData"
+  , "          match ← Meta.isClass? classType with"
+  , "          | none => pure none"
+  , "          | some _ => do"
+  , "            let arguments := classType.getAppArgs"
+  , "            if arguments.size > "
+      ++ show maximumProviderExactContextArguments ++ " then return none"
+  , "            let mut domains := #[]"
+  , "            for argument in arguments do"
+  , "              let argumentKind ← whnfR (← inferType argument)"
+  , "              if !argumentKind.isSort then return none"
+  , "              match ← providerForallDomains? fuel depth argument with"
+  , "              | none => return none"
+  , "              | some nested => domains := domains ++ nested"
+  , "            match ← providerForallDomains? fuel depth body with"
+  , "            | none => pure none"
+  , "            | some rest => pure (some (domains ++ rest))"
+  , "      else if body.hasLooseBVars then do"
   , "        if ← isTypeKind domain then"
   , "          match ← providerForallDomainTag? domain with"
   , "          | none => pure none"
@@ -709,11 +783,6 @@ synthPrelude inventory = unlines
   , "              | none => pure none"
   , "              | some rest => pure (some (#[tag] ++ rest))"
   , "        else pure (some #[])"
-  , "      else if binderInfo.isInstImplicit then"
-  , "        -- Exact provider arguments are context-free. Reject a contextual"
-  , "        -- binder wherever WHNF exposes it, including beneath an alias,"
-  , "        -- before 'go false' could emit an unparsable FInst payload."
-  , "        pure none"
   , "      else if binderInfo.isExplicit then do"
   , "        match ← providerForallDomains? fuel depth domain with"
   , "        | none => pure none"
@@ -785,8 +854,7 @@ synthPrelude inventory = unlines
   , "    : MetaM (Option ProviderCandidateFragment) := do"
   , "  let candidate ← instantiateMVars candidate"
   , "  if candidate.hasMVar || candidate.hasLevelMVar"
-  , "      || candidate.hasFVar || candidate.hasLooseBVars"
-  , "      || hasInstanceBinder candidate then"
+  , "      || candidate.hasFVar || candidate.hasLooseBVars then"
   , "    pure none"
   , "  else do"
   , "    let kind ← whnfR (← inferType candidate)"
@@ -799,7 +867,7 @@ synthPrelude inventory = unlines
   , "        if domains.size > "
       ++ show maximumProviderExactForallDomains ++ " then pure none"
   , "        else do"
-  , "          let fragment ← go false fuel 0 [] candidate"
+  , "          let fragment ← go false true fuel 0 [] candidate"
   , "          let domainText := String.join"
   , "            (domains.toList.map fun domain => \" \" ++ domain)"
   , "          pure (some"
@@ -1052,7 +1120,7 @@ synthPrelude inventory = unlines
   , "            let us \8592 Meta.mkFreshLevelMVars info.numLevelParams"
   , "            let ty0 := info.instantiateTypeLevelParams us"
   , "            if let some ty := instHead arity ty0 asg then"
-  , "              let s \8592 go false 100 0 [] ty"
+  , "              let s \8592 go false false 100 0 [] ty"
   , "              out := out ++ \" (prem \" ++ esc fn.toString"
   , "                ++ \" \" ++ s ++ \")\""
   , "          catch _ => pure ()"
@@ -1102,7 +1170,7 @@ serializerProgram goal = unlines
   , "  run_tac withMainContext do"
   , "    let tgt \8592 getMainTarget"
   , "    let isP \8592 Meta.isProp tgt"
-  , "    let s \8592 LeantSynth.go false 100 0 [] tgt"
+  , "    let s \8592 LeantSynth.go false false 100 0 [] tgt"
   , "    let prems \8592 LeantSynth.premSpine 100 0 #[] tgt"
   , "    let roots := tgt.getUsedConstants.toList.map Name.getRoot"
   , "    let rootText := String.intercalate \" \" (roots.map fun n =>"
@@ -1210,7 +1278,7 @@ providerProgram sessionNames query = unlines
   , "      match env.find? n with"
   , "      | none => pure ()"
   , "      | some info =>"
-  , "        let frag \8592 LeantSynth.go true 80 0 [] info.type"
+  , "        let frag \8592 LeantSynth.go true false 80 0 [] info.type"
   , "        let binders \8592 LeantSynth.leadingTypeBinderNames 80 info.type"
   , "        let assignments \8592"
   , "          LeantSynth.providerInstantiationAssignments 80 info.type"
@@ -1412,7 +1480,7 @@ parseProviderSexp text = do
             Left "exact Lean provider argument is not proper-kinded"
         | otherwise -> do
             (domains, exactTokens) <- providerForallDomains domainTokens
-            (frag, remaining) <- parseFrag exactTokens
+            (frag, remaining) <- parseExactFrag exactTokens
             case remaining of
               TR : TR : final -> case fragVisibleForallVisibilities frag of
                 Nothing -> Left
@@ -1466,7 +1534,18 @@ parseProviderSexp text = do
     Right (frag : frags, final)
 
 parseFrag :: [Tok] -> Either String (Frag, [Tok])
-parseFrag (TL : TSym tag : rest) = case tag of
+parseFrag = parseFragWith False
+
+-- Structured class contexts are semantic evidence owned by one exact
+-- provider-assignment payload. Keeping the permission in the recursive parser
+-- lets nested proper-type class arguments retain contexts without admitting
+-- the tag in ordinary goals, providers, premises, nominal arguments, or
+-- historical structural arguments.
+parseExactFrag :: [Tok] -> Either String (Frag, [Tok])
+parseExactFrag = parseFragWith True
+
+parseFragWith :: Bool -> [Tok] -> Either String (Frag, [Tok])
+parseFragWith allowExactContext (TL : TSym tag : rest) = case tag of
   "->" -> binary FArr rest
   "prod" -> binary FProd rest
   "sum" -> binary FSum rest
@@ -1494,9 +1573,19 @@ parseFrag (TL : TSym tag : rest) = case tag of
   "alli" -> allTag False rest
   "inst" -> case rest of
     TStr key : toks -> do
-      (body, toks') <- parseFrag toks
+      (body, toks') <- parseFragWith allowExactContext toks
       close (FInst key body) toks'
     _ -> Left "malformed (inst ...)"
+  "exact-context"
+    | not allowExactContext ->
+        Left "exact-context is only valid in an exact provider argument"
+    | otherwise -> case rest of
+        TStr className : TL : TSym "arguments" : toks
+          | not (null className) -> do
+              (arguments, toks') <- parseExactContextArguments 0 toks
+              (body, toks'') <- parseFragWith allowExactContext toks'
+              close (FExactContext className arguments body) toks''
+        _ -> Left "malformed (exact-context ...)"
   "param-ind" -> case rest of
     TStr headName : TStr key : TL : TSym "params" : rest' -> do
       (params, rest'') <- parseFrags rest'
@@ -1548,27 +1637,46 @@ parseFrag (TL : TSym tag : rest) = case tag of
   parseCtors _ = Left "malformed (ctor ...)"
   parseFields (TR : toks) = Right ([], toks)
   parseFields toks = do
-    (field, toks') <- parseFrag toks
+    (field, toks') <- parseFragWith allowExactContext toks
     (fields, toks'') <- parseFields toks'
     Right (field : fields, toks'')
+  parseExactContextArguments _ (TR : toks) = Right ([], toks)
+  parseExactContextArguments count
+      (TL : TSym "kinded" : TSym arityText : toks)
+    | count >= maximumProviderExactContextArguments =
+        Left "too many exact-context class arguments"
+    | otherwise = case readMaybe arityText of
+        Just arity
+          | arity >= 0
+          , arity <= maximumProviderArgumentKindArity -> do
+              (argument, toks') <- parseFragWith allowExactContext toks
+              case toks' of
+                TR : toks'' -> do
+                  (arguments, final) <-
+                    parseExactContextArguments (count + 1) toks''
+                  Right ((arity, argument) : arguments, final)
+                _ -> Left "expected ) in exact-context class argument"
+        _ -> Left "invalid exact-context class argument kind arity"
+  parseExactContextArguments _ _ =
+    Left "malformed exact-context class argument vector"
   parseFrags (TR : toks) = Right ([], toks)
   parseFrags toks = do
-    (frag, toks') <- parseFrag toks
+    (frag, toks') <- parseFragWith allowExactContext toks
     (frags, toks'') <- parseFrags toks'
     Right (frag : frags, toks'')
   binary ctor toks = do
-    (a, toks') <- parseFrag toks
-    (b, toks'') <- parseFrag toks'
+    (a, toks') <- parseFragWith allowExactContext toks
+    (b, toks'') <- parseFragWith allowExactContext toks'
     close (ctor a b) toks''
   nullary value toks = close value toks
   allTag explicit toks = case toks of
     TStr name : toks' -> do
-      (body, toks'') <- parseFrag toks'
+      (body, toks'') <- parseFragWith allowExactContext toks'
       close (FAll explicit name body) toks''
     _ -> Left "malformed (all ...)"
   close value (TR : toks) = Right (value, toks)
   close _ _ = Left "expected ) in goal translation"
-parseFrag _ = Left "expected ( in goal translation"
+parseFragWith _ _ = Left "expected ( in goal translation"
 
 -- | Parse the serializer's trailing @(prem "name" FRAG)@ entries (library
 -- premises); absent entries parse as the empty list, so the format stays
@@ -1588,7 +1696,9 @@ parsePrems toks = Right ([], toks)
 -- | Forall visibility in the exact preorder consumed by visible-type
 -- rendering. Constructor inventories describe nominal declarations rather
 -- than the occurrence's type syntax, so only occurrence parameters recurse.
--- Open variables, instance binders, and truncation make reconstruction unsafe.
+-- Open variables, legacy instance binders, and truncation make reconstruction
+-- unsafe. Structured exact contexts recurse through their semantic class
+-- arguments and body.
 fragVisibleForallVisibilities :: Frag -> Maybe [Bool]
 fragVisibleForallVisibilities = collect []
  where
@@ -1599,6 +1709,8 @@ fragVisibleForallVisibilities = collect []
     FAll explicit binder body ->
       (explicit :) <$> collect (binder : bound) body
     FInst{} -> Nothing
+    FExactContext _ arguments body ->
+      descend bound (map snd arguments ++ [body])
     FVar variable
       | variable `elem` bound -> Just []
       | otherwise -> Nothing
@@ -1628,6 +1740,8 @@ fragHasDepth frag = case frag of
   FSum a b -> fragHasDepth a || fragHasDepth b
   FAll _ _ b -> fragHasDepth b
   FInst _ b -> fragHasDepth b
+  FExactContext _ arguments body ->
+    any (fragHasDepth . snd) arguments || fragHasDepth body
   FApp _ _ _ arguments -> any fragHasDepth arguments
   FParamInd _ _ params ctors ->
     any fragHasDepth params || any (any fragHasDepth . snd) ctors
@@ -1639,12 +1753,9 @@ fragHasDepth frag = case frag of
   FDepth -> True
   _ -> False
 
--- | Whether a serialized type contains contextual typeclass evidence. Such a
--- type is not a context-free instantiation candidate: provider-mode
--- serialization would erase the dictionary binder and silently strengthen it.
--- Candidate extraction serializes in goal mode and applies this exact-tree
--- check after parsing, catching binders exposed by reducible aliases as well
--- as binders visible to the earlier Lean expression scan.
+-- | Whether a serialized type contains any contextual typeclass evidence.
+-- Both the legacy display-only marker and the semantic exact-assignment node
+-- count here.
 fragHasInstanceBinder :: Frag -> Bool
 fragHasInstanceBinder frag = case frag of
   FArr a b -> fragHasInstanceBinder a || fragHasInstanceBinder b
@@ -1652,6 +1763,7 @@ fragHasInstanceBinder frag = case frag of
   FSum a b -> fragHasInstanceBinder a || fragHasInstanceBinder b
   FAll _ _ b -> fragHasInstanceBinder b
   FInst{} -> True
+  FExactContext{} -> True
   FApp _ _ _ arguments -> any fragHasInstanceBinder arguments
   FParamInd _ _ params ctors ->
     any fragHasInstanceBinder params
@@ -1663,6 +1775,41 @@ fragHasInstanceBinder frag = case frag of
   FRec _ _ params ctors ->
     any fragHasInstanceBinder params
       || any (any fragHasInstanceBinder . snd) ctors
+  _ -> False
+
+-- | Whether contextual evidence cannot be reconstructed from exact semantic
+-- data. Legacy 'FInst' stores only pretty text and therefore remains
+-- fail-closed. A structured exact context is supported only with the live
+-- producer's nonempty class identity, bounded proper-type argument vector,
+-- and no nested unsupported marker.
+fragHasUnsupportedInstanceBinder :: Frag -> Bool
+fragHasUnsupportedInstanceBinder frag = case frag of
+  FArr a b ->
+    fragHasUnsupportedInstanceBinder a || fragHasUnsupportedInstanceBinder b
+  FProd a b ->
+    fragHasUnsupportedInstanceBinder a || fragHasUnsupportedInstanceBinder b
+  FSum a b ->
+    fragHasUnsupportedInstanceBinder a || fragHasUnsupportedInstanceBinder b
+  FAll _ _ b -> fragHasUnsupportedInstanceBinder b
+  FInst{} -> True
+  FExactContext className arguments body ->
+    null className
+      || length arguments > maximumProviderExactContextArguments
+      || any ((/= 0) . fst) arguments
+      || any (fragHasUnsupportedInstanceBinder . snd) arguments
+      || fragHasUnsupportedInstanceBinder body
+  FApp _ _ _ arguments -> any fragHasUnsupportedInstanceBinder arguments
+  FParamInd _ _ params ctors ->
+    any fragHasUnsupportedInstanceBinder params
+      || any (any fragHasUnsupportedInstanceBinder . snd) ctors
+  FInd _ ctors ->
+    any (any fragHasUnsupportedInstanceBinder . snd) ctors
+  FParamRec _ _ _ params ctors ->
+    any fragHasUnsupportedInstanceBinder params
+      || any (any fragHasUnsupportedInstanceBinder . snd) ctors
+  FRec _ _ params ctors ->
+    any fragHasUnsupportedInstanceBinder params
+      || any (any fragHasUnsupportedInstanceBinder . snd) ctors
   _ -> False
 
 -- | Whether a foreign value may open an otherwise atomic goal.  Quantifier
@@ -1678,6 +1825,7 @@ fragProviderMayOpen frag
  where
   peel (FAll _ _ body) = peel body
   peel (FInst _ body) = peel body
+  peel (FExactContext _ _ body) = peel body
   peel body = body
 
 -- | An honest refusal, when the goal offers the engine nothing structural
@@ -1699,6 +1847,7 @@ fragRefusal frag
  where
   peel (FAll _ _ b) = peel b
   peel (FInst _ b) = peel b
+  peel (FExactContext _ _ b) = peel b
   peel f = f
 
 -- | Display keys of the recursive-inductive occurrences.  Used to keep
@@ -1714,6 +1863,8 @@ fragRecKeys = nub . go
     FSum a b -> go a ++ go b
     FAll _ _ b -> go b
     FInst _ b -> go b
+    FExactContext _ arguments body ->
+      concatMap (go . snd) arguments ++ go body
     FApp _ _ _ arguments -> concatMap go arguments
     FParamInd _ _ parameters ctors ->
       concatMap go parameters ++ concatMap (concatMap go . snd) ctors
@@ -1733,6 +1884,7 @@ fragSpine :: Frag -> [Slot]
 fragSpine (FArr dom body) = SlotArrow dom : fragSpine body
 fragSpine (FAll explicit _ body) = SlotAll explicit : fragSpine body
 fragSpine (FInst _ body) = SlotInst : fragSpine body
+fragSpine (FExactContext _ _ body) = SlotInst : fragSpine body
 fragSpine _ = []
 
 -- | How many explicit type arguments a value of this type needs before
@@ -1744,6 +1896,7 @@ leadingTypeArgs :: Frag -> Int
 leadingTypeArgs (FAll True _ body) = 1 + leadingTypeArgs body
 leadingTypeArgs (FAll False _ body) = leadingTypeArgs body
 leadingTypeArgs (FInst _ body) = leadingTypeArgs body
+leadingTypeArgs (FExactContext _ _ body) = leadingTypeArgs body
 leadingTypeArgs _ = 0
 
 -- | Split a goal into its leading quantifier prefix and a
@@ -1777,6 +1930,7 @@ glivenkoSplit = go []
       all quantFree params && all (all quantFree . snd) ctors
     FAll{} -> False
     FInst{} -> False
+    FExactContext{} -> False
     _ -> True
 
 -- | The distinct atomic subformulas (opaque variables and atoms) of a
@@ -1795,6 +1949,7 @@ propAtoms = nub . go
     -- Recursive occurrences stay nominal in the classical projection, just
     -- like the established FRec representation.
     FParamRec{} -> []
+    FExactContext{} -> []
     FVar _ -> [f]
     FAtom _ _ -> [f]
     _ -> []
@@ -1814,6 +1969,10 @@ stripRecCtors f = case f of
   FSum a b -> FSum (stripRecCtors a) (stripRecCtors b)
   FAll e n b -> FAll e n (stripRecCtors b)
   FInst key b -> FInst key (stripRecCtors b)
+  FExactContext className arguments body ->
+    FExactContext className
+      [(arity, stripRecCtors argument) | (arity, argument) <- arguments]
+      (stripRecCtors body)
   FApp safe key head' arguments ->
     FApp safe key head' (map stripRecCtors arguments)
   FParamInd headName key parameters ctors ->
@@ -1836,6 +1995,8 @@ fragUnsafeAtoms = nub . go
     FSum a b -> go a ++ go b
     FAll _ _ b -> go b
     FInst key b -> key : go b
+    FExactContext className arguments body ->
+      className : concatMap (go . snd) arguments ++ go body
     FApp safe key _ arguments ->
       (if safe then [] else [key]) ++ concatMap go arguments
     FParamInd _ _ params ctors ->
