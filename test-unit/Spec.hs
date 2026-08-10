@@ -56,6 +56,7 @@ import Leant.Synth.Engine
   )
 import Leant.Synth.Fragment
   ( AppHead (..)
+  , ExactContextArgument (..)
   , Frag (..)
   , GoalSort (..)
   , ParsedGoal (..)
@@ -378,6 +379,8 @@ providerProgramTests = testGroup "provider discovery program"
         `isInfixOf` synthPrelude [] @?= True
       "partial def exactContextArgumentFragment? (fuel depth : Nat)"
         `isInfixOf` synthPrelude [] @?= True
+      isInfixOf "pure (some (arity, \"(nominal \" ++ esc name.toString"
+        (synthPrelude []) @?= True
       "++ toString arity ++ \" \" ++ fragment ++ \")\""
         `isInfixOf` synthPrelude [] @?= True
       "if exactAssignmentMode && bi.isInstImplicit then pure \"(depth)\""
@@ -698,10 +701,12 @@ providerParserTests = testGroup "provider inventory parser"
           ]
   , testCase "retain structured contextual exact provider assignments" $
       let contextual = FAll False "A" $
-            FExactContext "Inhabited" [(0, FVar "A")] $
+            FExactContext "Inhabited"
+              [ExactContextFragmentArgument 0 (FVar "A")] $
               FArr (FVar "A") (FVar "A")
           higherContextual =
-            FExactContext "Functor" [(1, FAtom False "List")] $
+            FExactContext "Functor"
+              [ExactContextFragmentArgument 1 (FAtom False "List")] $
               FArr (FAtom False "Nat") (FAtom False "Nat")
       in do
         parseProviderSexp
@@ -743,6 +748,36 @@ providerParserTests = testGroup "provider inventory parser"
                 ]
             ]
         fragHasUnsupportedInstanceBinder higherContextual @?= False
+  , testCase "retain canonical structural higher-kinded context arguments" $
+      let natural = FAtom False "Nat"
+          contextual = FExactContext "Structural.Context"
+            [ ExactContextNominalArgument 2 "Prod" []
+            , ExactContextNominalArgument 1 "Sum" [natural]
+            ]
+            (FArr natural natural)
+      in do
+        parseProviderSexp
+            ("(providers (provider \"Structural.chosen\" "
+              ++ "(binders \"selected\") "
+              ++ "(instantiations (args (kinded 0 "
+              ++ "(exact (domains) "
+              ++ "(exact-context \"Structural.Context\" (arguments "
+              ++ "(kinded 2 (nominal \"Prod\")) "
+              ++ "(kinded 1 (nominal \"Sum\" "
+              ++ "(atom unsafe \"Nat\")))) "
+              ++ "(-> (atom unsafe \"Nat\") "
+              ++ "(atom unsafe \"Nat\"))))))) "
+              ++ "(alli \"selected\" "
+              ++ "(atom unsafe \"Structural.Token\"))))")
+          @?= Right
+            [ ProviderFragWithEvidence "Structural.chosen"
+                (FAll False "selected" (FAtom False "Structural.Token"))
+                ["selected"]
+                [ [ ProviderInstantiationExactArgument 0 contextual []
+                  ]
+                ]
+            ]
+        fragHasUnsupportedInstanceBinder contextual @?= False
   , testCase "reject structured contexts outside exact assignments" $ do
       let contextual =
             "(exact-context \"Gap.C\" (arguments) "
@@ -2363,7 +2398,8 @@ typeApplicationTests = testGroup "retained type applications"
   , testCase "instantiate a structured contextual rank-N provider choice" $
       let token = FAtom False "ContextualOnly.Token"
           contextual = FAll False "A" $
-            FExactContext "Inhabited" [(0, FVar "A")] $
+            FExactContext "Inhabited"
+              [ExactContextFragmentArgument 0 (FVar "A")] $
               FArr (FVar "A") (FVar "A")
           provider = ProviderFragWithEvidence "ContextualOnly.chosen"
             (FAll False "a" token) ["a"]
@@ -2380,7 +2416,7 @@ typeApplicationTests = testGroup "retained type applications"
   , testCase "instantiate a higher-kinded structured contextual choice" $
       let token = FAtom False "HigherContext.Token"
           contextual = FExactContext "Functor"
-            [(1, FAtom False "List")] $
+            [ExactContextFragmentArgument 1 (FAtom False "List")] $
               FArr (FAtom False "Nat") (FAtom False "Nat")
           provider = ProviderFragWithEvidence "HigherContext.chosen"
             (FAll False "a" token) ["a"]
@@ -2396,8 +2432,9 @@ typeApplicationTests = testGroup "retained type applications"
       let token = FAtom False "HigherContext.Token"
           partial = FApp False "Except String"
             (AppNominal "Except") [FAtom False "String"]
-          contextual = FExactContext "Bifunctor" [(1, partial)] $
-            FArr (FAtom False "Nat") (FAtom False "Nat")
+          contextual = FExactContext "Bifunctor"
+            [ExactContextFragmentArgument 1 partial] $
+              FArr (FAtom False "Nat") (FAtom False "Nat")
           provider = ProviderFragWithEvidence "HigherContext.partial"
             (FAll False "a" token) ["a"]
             [ [ProviderInstantiationExactArgument 0 contextual []]
@@ -2406,21 +2443,124 @@ typeApplicationTests = testGroup "retained type applications"
             "[@Bifunctor (@Except (String))]"
             (synthesizeWithProviders engine 2048 [provider] token)
       in mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "consume canonical structural provider assignments" $
+      let natural = FAtom False "Nat"
+          boolean = FAtom False "Bool"
+          token = FAtom False "Structural.Token"
+          fApplied = FApp True "F Nat Bool"
+            (AppVariable "F") [natural, boolean]
+          gApplied = FApp True "G Bool"
+            (AppVariable "G") [boolean]
+          provider = ProviderFragWithEvidence "Structural.consume"
+            (FAll False "F" $ FAll False "G" $
+              FArr fApplied (FArr gApplied token))
+            ["F", "G"]
+            [ [ ProviderInstantiationNominalArgument 2 "Prod" []
+              , ProviderInstantiationNominalArgument 1 "Sum" [natural]
+              ]
+            , [ ProviderInstantiationNominalArgument 2 "Sum" []
+              , ProviderInstantiationNominalArgument 1 "Prod" [natural]
+              ]
+            ]
+          assignments =
+            [ ( "bare Prod and partial Sum"
+              , FArr (FProd natural boolean)
+                  (FArr (FSum natural boolean) token)
+              , "«F» := Prod"
+              , "«G» := (Sum (Nat))"
+              )
+            , ( "bare Sum and partial Prod"
+              , FArr (FSum natural boolean)
+                  (FArr (FProd natural boolean) token)
+              , "«F» := Sum"
+              , "«G» := (@Prod (Nat))"
+              )
+            ]
+          check (label, goal, expectedF, expectedG) engine = case
+              synthesizeWithProviders engine 4096 [provider] goal of
+            Right (SynthCandidates groups _) ->
+              let terms = concat groups
+              in assertBool
+                  (label ++ " assignment was lost in "
+                    ++ synthEngineName engine ++ ": " ++ show terms)
+                  (any (\term ->
+                    isInfixOf "Structural.consume" term
+                      && isInfixOf expectedF term
+                      && isInfixOf expectedG term)
+                    terms)
+            Right other -> assertFailure $
+              "unexpected " ++ label ++ " provider outcome from "
+                ++ synthEngineName engine ++ ": " ++ outcomeTag other
+            Left err -> assertFailure err
+      in mapM_ (\assignment ->
+          mapM_ (check assignment)
+            [EngineDjinn, EngineExference, EngineBoth])
+        assignments
+  , testCase "consume a structural contextual rank-N assignment" $
+      let natural = FAtom False "Nat"
+          token = FAtom False "Structural.ContextToken"
+          contextual = FAll False "A" $
+            FExactContext "Structural.Context"
+              [ ExactContextNominalArgument 2 "Prod" []
+              , ExactContextNominalArgument 1 "Sum" [natural]
+              ] $
+              FArr (FVar "A") (FVar "A")
+          provider = ProviderFragWithEvidence "Structural.choose"
+            (FAll False "selected" $
+              FArr (FVar "selected") token)
+            ["selected"]
+            [ [ ProviderInstantiationExactArgument 0 contextual
+                  [ProviderForallDomainType]
+              ]
+            ]
+          goal = FArr contextual token
+          check engine = case
+              synthesizeWithProviders engine 4096 [provider] goal of
+            Right (SynthCandidates groups _) ->
+              let terms = concat groups
+              in assertBool
+                  ("structural contextual rank-N assignment was lost in "
+                    ++ synthEngineName engine ++ ": " ++ show terms)
+                  (any (\term ->
+                    isInfixOf "Structural.choose" term
+                      && isInfixOf
+                        "[@Structural.Context Prod (Sum (Nat))]" term)
+                    terms)
+            Right other -> assertFailure $
+              "unexpected structural contextual outcome from "
+                ++ synthEngineName engine ++ ": " ++ outcomeTag other
+            Left err -> assertFailure err
+      in mapM_ check [EngineDjinn, EngineExference, EngineBoth]
   , testCase "keep structured contexts exact-only and nominally kinded" $
       let token = FAtom False "ContextualOnly.Token"
           contextual arity = FAll False "A" $
-            FExactContext "Inhabited" [(arity, FVar "A")] $
+            FExactContext "Inhabited"
+              [ExactContextFragmentArgument arity (FVar "A")] $
               FArr (FVar "A") (FVar "A")
           nominal = FExactContext "Functor"
-            [(1, FAtom False "List")] token
+            [ExactContextFragmentArgument 1 (FAtom False "List")] token
           partialNominal = FExactContext "Bifunctor"
-            [ (1, FApp False "Except String"
-                (AppNominal "Except") [FAtom False "String"])
+            [ ExactContextFragmentArgument 1
+                (FApp False "Except String"
+                  (AppNominal "Except") [FAtom False "String"])
             ] token
           reserved = FExactContext "Functor"
-            [(1, FAtom False "Prod")] token
+            [ExactContextFragmentArgument 1 (FAtom False "Prod")] token
+          canonicalProduct = FExactContext "Functor"
+            [ExactContextNominalArgument 2 "Prod" []] token
+          canonicalPartialSum = FExactContext "Functor"
+            [ ExactContextNominalArgument 1 "Sum"
+                [FAtom False "Nat"]
+            ] token
+          wrongStructuralArity = FExactContext "Functor"
+            [ExactContextNominalArgument 1 "Prod" []] token
+          unsupportedStructural = FExactContext "Functor"
+            [ExactContextNominalArgument 2 "PProd" []] token
           overBound = FExactContext "Functor"
-            [(maximumProviderArgumentKindArity + 1, FAtom False "List")]
+            [ ExactContextFragmentArgument
+                (maximumProviderArgumentKindArity + 1)
+                (FAtom False "List")
+            ]
             token
           provider argument = ProviderFragWithEvidence
             "ContextualOnly.chosen" (FAll False "a" token) ["a"]
@@ -2446,6 +2586,10 @@ typeApplicationTests = testGroup "retained type applications"
         fragHasUnsupportedInstanceBinder nominal @?= False
         fragHasUnsupportedInstanceBinder partialNominal @?= False
         fragHasUnsupportedInstanceBinder reserved @?= True
+        fragHasUnsupportedInstanceBinder canonicalProduct @?= False
+        fragHasUnsupportedInstanceBinder canonicalPartialSum @?= False
+        fragHasUnsupportedInstanceBinder wrongStructuralArity @?= True
+        fragHasUnsupportedInstanceBinder unsupportedStructural @?= True
         fragHasUnsupportedInstanceBinder overBound @?= True
         mapM_ (check structural) [EngineDjinn, EngineExference, EngineBoth]
         mapM_ (check wrongKind) [EngineDjinn, EngineExference, EngineBoth]
@@ -2454,22 +2598,25 @@ typeApplicationTests = testGroup "retained type applications"
           natural = FAtom False "Nat"
           good = natural
           familyAtOne = FExactContext "Audit.C1"
-            [(1, FAtom False "Audit.H")] token
+            [ExactContextFragmentArgument 1 (FAtom False "Audit.H")] token
           familyAtTwo = FExactContext "Audit.C2"
-            [ (1, FApp False "Audit.H Nat" (AppNominal "Audit.H")
-                [natural])
+            [ ExactContextFragmentArgument 1
+                (FApp False "Audit.H Nat" (AppNominal "Audit.H")
+                  [natural])
             ] token
           internallyInconsistentFamily = FExactContext "Audit.C1"
-            [(1, FAtom False "Audit.H")] $
+            [ExactContextFragmentArgument 1 (FAtom False "Audit.H")] $
               FExactContext "Audit.C2"
-                [ (1, FApp False "Audit.H Nat" (AppNominal "Audit.H")
-                    [natural])
+                [ ExactContextFragmentArgument 1
+                    (FApp False "Audit.H Nat" (AppNominal "Audit.H")
+                      [natural])
                 ] token
-          classAtProper = FExactContext "Audit.Class" [(0, natural)] token
+          classAtProper = FExactContext "Audit.Class"
+            [ExactContextFragmentArgument 0 natural] token
           classAtHigher = FExactContext "Audit.Class"
-            [(1, FAtom False "List")] token
+            [ExactContextFragmentArgument 1 (FAtom False "List")] token
           emptyNominal = FExactContext "Audit.Empty"
-            [(1, FAtom False "")] token
+            [ExactContextFragmentArgument 1 (FAtom False "")] token
           provider assignments = ProviderFragWithEvidence
             "ContextualOnly.chosen" (FAll False "a" token) ["a"]
             [ [ProviderInstantiationExactArgument 0 assignment []]

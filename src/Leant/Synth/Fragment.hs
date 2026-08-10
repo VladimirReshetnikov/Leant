@@ -32,6 +32,7 @@
 -- producer and checked consumer cannot drift onto different arities.
 module Leant.Synth.Fragment
   ( AppHead (..)
+  , ExactContextArgument (..)
   , Frag (..)
   , Slot (..)
   , GoalSort (..)
@@ -42,6 +43,9 @@ module Leant.Synth.Fragment
   , ProviderQuery (..)
   , maximumProviderArgumentKindArity
   , maximumProviderExactForallDomains
+  , exactContextArgumentKindArity
+  , exactContextArgumentPayloadFragments
+  , mapExactContextArgumentFragments
   , synthPrelude
   , serializerProgram
   , providerProgram
@@ -82,6 +86,39 @@ data AppHead
   | AppNominal String
   deriving (Eq, Show)
 
+-- | One ordered argument of a retained exact class constraint.  Proper-kind
+-- and historical payloads keep their complete fragment.  A canonical
+-- higher-kinded payload instead retains the exact Lean constant head and only
+-- its already supplied proper-type arguments.  Keeping these constructors
+-- distinct prevents legacy opaque atoms from acquiring nominal authority.
+data ExactContextArgument
+  = ExactContextFragmentArgument Int Frag
+  | ExactContextNominalArgument Int String [Frag]
+  deriving (Eq, Show)
+
+exactContextArgumentKindArity :: ExactContextArgument -> Int
+exactContextArgumentKindArity argument = case argument of
+  ExactContextFragmentArgument arity _ -> arity
+  ExactContextNominalArgument arity _ _ -> arity
+
+-- | Ordinary fragment children below an exact context argument.  A nominal
+-- head is kind metadata rather than a proper-type fragment, so only its
+-- supplied arguments participate in recursive fragment analyses.
+exactContextArgumentPayloadFragments :: ExactContextArgument -> [Frag]
+exactContextArgumentPayloadFragments argument = case argument of
+  ExactContextFragmentArgument _ frag -> [frag]
+  ExactContextNominalArgument _ _ supplied -> supplied
+
+mapExactContextArgumentFragments
+  :: (Frag -> Frag)
+  -> ExactContextArgument
+  -> ExactContextArgument
+mapExactContextArgumentFragments f argument = case argument of
+  ExactContextFragmentArgument arity frag ->
+    ExactContextFragmentArgument arity (f frag)
+  ExactContextNominalArgument arity spelling supplied ->
+    ExactContextNominalArgument arity spelling (map f supplied)
+
 -- | The LJT core fragment.  @Iff@ and @Not@ are already lowered by the
 -- serializer (to a pair of arrows and an arrow to 'FBot').
 data Frag
@@ -99,9 +136,9 @@ data Frag
     -- ignores dictionary evidence, while the Lean renderer must still bind a
     -- wildcard at an introduction site.  The display key keeps Djinn
     -- exhaustion conservative because the hidden dictionary can carry data.
-  | FExactContext String [(Int, Frag)] Frag
+  | FExactContext String [ExactContextArgument] Frag
     -- ^ An exact-assignment-only contextual binder: exact Lean class name,
-    -- ordered @(residual ground-kind arity, argument)@ vector, and body.
+    -- ordered ground-kinded argument vector, and body.
     -- Unlike 'FInst', this node is semantic evidence rather than pretty text.
     -- A proper-kind argument retains its complete fragment; a positive arity
     -- retains only a canonical bare or partially applied nominal head together
@@ -377,12 +414,11 @@ synthPrelude inventory = unlines
   , "  pure true"
   , ""
   , "-- Higher-kinded exact context arguments must retain a canonical"
-  , "-- nominal head. Logical constructors have dedicated structural"
-  , "-- encodings only when saturated, so their unsaturated identities stay"
-  , "-- outside this bounded evidence path."
+  , "-- nominal head. Prod and Sum have matching structural identities in"
+  , "-- Djex; the remaining logical or sort-polymorphic constructors do not."
   , "def unsupportedHigherKindNominalHead (name : Name) : Bool :="
-  , "  name == ``And || name == ``Prod || name == ``PProd"
-  , "    || name == ``Or || name == ``Sum || name == ``PSum"
+  , "  name == ``And || name == ``PProd"
+  , "    || name == ``Or || name == ``PSum"
   , "    || name == ``Iff || name == ``Not"
   , ""
   , "def exactContextArgumentKindArity? (fuel : Nat) (argument : Expr)"
@@ -551,18 +587,13 @@ synthPrelude inventory = unlines
   , "    match argument.getAppFn with"
   , "    | Expr.const name _ => do"
   , "      let supplied := argument.getAppArgs"
-  , "      if supplied.isEmpty then"
-  , "        pure (some (arity, \"(atom unsafe \" ++ esc name.toString ++ \")\"))"
-  , "      else do"
-  , "        let pp \8592 Meta.ppExpr argument"
-  , "        let mut rendered := \"\""
-  , "        for suppliedArgument in supplied do"
-  , "          let fragment \8592"
-  , "            go false true fuel depth blocked suppliedArgument"
-  , "          rendered := rendered ++ \" \" ++ fragment"
-  , "        pure (some (arity, \"(app unsafe \" ++ esc (toString pp)"
-  , "          ++ \" (app-nominal \" ++ esc name.toString ++ \")\""
-  , "          ++ rendered ++ \")\"))"
+  , "      let mut rendered := \"\""
+  , "      for suppliedArgument in supplied do"
+  , "        let fragment \8592"
+  , "          go false true fuel depth blocked suppliedArgument"
+  , "        rendered := rendered ++ \" \" ++ fragment"
+  , "      pure (some (arity, \"(nominal \" ++ esc name.toString"
+  , "        ++ rendered ++ \")\"))"
   , "    | _ => pure none"
   , ""
   , "-- Preserve applications whose head is a bound type function or a rigid"
@@ -756,8 +787,8 @@ synthPrelude inventory = unlines
   , "    | _ => pure (#[], #[])"
   , ""
   , "-- Preserve canonical identity for a bare or partially applied nominal"
-  , "-- constructor. Structural logical heads use separate fragment nodes, so"
-  , "-- omit them here until their unsaturated renderer identity is modeled."
+  , "-- constructor. Prod and Sum share Djex's structural pair/Either identity;"
+  , "-- Prop-valued and sort-polymorphic structural heads remain unsupported."
   , "def providerNominalCandidateFragment? (fuel : Nat) (candidate : Expr)"
   , "    : MetaM (Option String) := do"
   , "  match candidate.getAppFn with"
@@ -1708,13 +1739,30 @@ parseFragWith allowExactContext (TL : TSym tag : rest) = case tag of
         Just arity
           | arity >= 0
           , arity <= maximumProviderArgumentKindArity -> do
-              (argument, toks') <- parseFragWith allowExactContext toks
-              case toks' of
-                TR : toks'' -> do
-                  (arguments, final) <-
-                    parseExactContextArguments (count + 1) toks''
-                  Right ((arity, argument) : arguments, final)
-                _ -> Left "expected ) in exact-context class argument"
+              (argument, toks'') <- case toks of
+                TL : TSym "nominal" : TStr headName : nominalTokens
+                  | arity == 0 ->
+                      Left "proper-kinded exact-context argument is nominal"
+                  | otherwise -> do
+                      (supplied, afterNominal) <- parseFrags nominalTokens
+                      case afterNominal of
+                        TR : final -> Right
+                          ( ExactContextNominalArgument arity headName supplied
+                          , final
+                          )
+                        _ -> Left
+                          "expected ) in nominal exact-context class argument"
+                _ -> do
+                  (frag, afterFrag) <-
+                    parseFragWith allowExactContext toks
+                  case afterFrag of
+                    TR : final -> Right
+                      (ExactContextFragmentArgument arity frag, final)
+                    _ -> Left
+                      "expected ) in exact-context class argument"
+              (arguments, final) <-
+                parseExactContextArguments (count + 1) toks''
+              Right (argument : arguments, final)
         _ -> Left "invalid exact-context class argument kind arity"
   parseExactContextArguments _ _ =
     Left "malformed exact-context class argument vector"
@@ -1769,7 +1817,8 @@ fragVisibleForallVisibilities = collect []
       (explicit :) <$> collect (binder : bound) body
     FInst{} -> Nothing
     FExactContext _ arguments body ->
-      descend bound (map snd arguments ++ [body])
+      descend bound
+        (concatMap exactContextArgumentPayloadFragments arguments ++ [body])
     FVar variable
       | variable `elem` bound -> Just []
       | otherwise -> Nothing
@@ -1800,7 +1849,9 @@ fragHasDepth frag = case frag of
   FAll _ _ b -> fragHasDepth b
   FInst _ b -> fragHasDepth b
   FExactContext _ arguments body ->
-    any (fragHasDepth . snd) arguments || fragHasDepth body
+    any fragHasDepth
+      (concatMap exactContextArgumentPayloadFragments arguments)
+      || fragHasDepth body
   FApp _ _ _ arguments -> any fragHasDepth arguments
   FParamInd _ _ params ctors ->
     any fragHasDepth params || any (any fragHasDepth . snd) ctors
@@ -1856,7 +1907,8 @@ fragHasUnsupportedInstanceBinder frag = case frag of
     null className
       || length arguments > maximumProviderExactContextArguments
       || any unsupportedExactContextArgument arguments
-      || any (fragHasUnsupportedInstanceBinder . snd) arguments
+      || any fragHasUnsupportedInstanceBinder
+        (concatMap exactContextArgumentPayloadFragments arguments)
       || fragHasUnsupportedInstanceBinder body
   FApp _ _ _ arguments -> any fragHasUnsupportedInstanceBinder arguments
   FParamInd _ _ params ctors ->
@@ -1872,7 +1924,8 @@ fragHasUnsupportedInstanceBinder frag = case frag of
       || any (any fragHasUnsupportedInstanceBinder . snd) ctors
   _ -> False
  where
-  unsupportedExactContextArgument (remaining, argument)
+  unsupportedExactContextArgument
+      (ExactContextFragmentArgument remaining argument)
     | remaining < 0 || remaining > maximumProviderArgumentKindArity = True
     | remaining == 0 = False
     | otherwise = case argument of
@@ -1881,6 +1934,13 @@ fragHasUnsupportedInstanceBinder frag = case frag of
         FApp _ _ (AppNominal spelling) _ ->
           null spelling || reservedHigherKindHead spelling
         _ -> True
+  unsupportedExactContextArgument
+      (ExactContextNominalArgument remaining spelling supplied)
+    | remaining <= 0 || remaining > maximumProviderArgumentKindArity = True
+    | null spelling = True
+    | elem spelling ["Prod", "Sum"] =
+        length supplied + remaining /= 2
+    | otherwise = reservedHigherKindHead spelling
 
   reservedHigherKindHead spelling = spelling `elem`
     ["And", "Prod", "PProd", "Or", "Sum", "PSum", "Iff", "Not"]
@@ -1937,7 +1997,8 @@ fragRecKeys = nub . go
     FAll _ _ b -> go b
     FInst _ b -> go b
     FExactContext _ arguments body ->
-      concatMap (go . snd) arguments ++ go body
+      concatMap (concatMap go . exactContextArgumentPayloadFragments)
+        arguments ++ go body
     FApp _ _ _ arguments -> concatMap go arguments
     FParamInd _ _ parameters ctors ->
       concatMap go parameters ++ concatMap (concatMap go . snd) ctors
@@ -2044,7 +2105,7 @@ stripRecCtors f = case f of
   FInst key b -> FInst key (stripRecCtors b)
   FExactContext className arguments body ->
     FExactContext className
-      [(arity, stripRecCtors argument) | (arity, argument) <- arguments]
+      (map (mapExactContextArgumentFragments stripRecCtors) arguments)
       (stripRecCtors body)
   FApp safe key head' arguments ->
     FApp safe key head' (map stripRecCtors arguments)
@@ -2069,7 +2130,11 @@ fragUnsafeAtoms = nub . go
     FAll _ _ b -> go b
     FInst key b -> key : go b
     FExactContext className arguments body ->
-      className : concatMap (go . snd) arguments ++ go body
+      className
+        : concatMap
+            (concatMap go . exactContextArgumentPayloadFragments)
+            arguments
+          ++ go body
     FApp safe key _ arguments ->
       (if safe then [] else [key]) ++ concatMap go arguments
     FParamInd _ _ params ctors ->

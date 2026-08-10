@@ -122,6 +122,7 @@ import Language.Haskell.Djex
 
 import Leant.Synth.Fragment
   ( AppHead (..)
+  , ExactContextArgument (..)
   , Frag (..)
   , ProviderFrag (..)
   , ProviderInstantiationArgument (..)
@@ -132,6 +133,9 @@ import Leant.Synth.Fragment
   , fragSpine
   , fragUnsafeAtoms
   , fragVisibleForallVisibilities
+  , exactContextArgumentKindArity
+  , exactContextArgumentPayloadFragments
+  , mapExactContextArgumentFragments
   , maximumProviderArgumentKindArity
   , maximumProviderExactForallDomains
   )
@@ -787,28 +791,53 @@ data ExactFamilyUse
     -- saturated nominal occurrence, this does not hide a constructor schema.
   deriving (Eq, Show)
 
+structuralHigherKindHeads :: [String]
+structuralHigherKindHeads =
+  ["And", "Prod", "PProd", "Or", "Sum", "PSum", "Iff", "Not"]
+
 -- | Decompose a supported higher-kinded exact-context argument into its
 -- canonical nominal head, total constructor arity, and already supplied
 -- proper-type arguments.  The residual kind arity is metadata on the context
 -- edge rather than part of the ordinary fragment, so every query-wide family
 -- scan must use this view instead of treating the fragment as saturated.
-exactContextNominalUse :: (Int, Frag) -> Maybe (String, Int, [Frag])
-exactContextNominalUse (remaining, argument)
-  | remaining <= 0 = Nothing
-  | otherwise = case argument of
-      FAtom _ spelling -> Just (spelling, remaining, [])
-      FApp _ _ (AppNominal spelling) supplied ->
+exactContextNominalUse
+  :: ExactContextArgument
+  -> Maybe (String, Int, [Frag])
+exactContextNominalUse source = case source of
+  ExactContextNominalArgument remaining spelling supplied
+    | remaining > 0
+    , remaining <= maximumProviderArgumentKindArity
+    , not (null spelling)
+    , canonicalHeadSupported spelling (length supplied + remaining) ->
         Just (spelling, length supplied + remaining, supplied)
-      _ -> Nothing
+  ExactContextFragmentArgument remaining argument
+    | remaining > 0
+    , remaining <= maximumProviderArgumentKindArity -> case argument of
+        FAtom _ spelling
+          | legacyHeadSupported spelling ->
+              Just (spelling, remaining, [])
+        FApp _ _ (AppNominal spelling) supplied ->
+          if legacyHeadSupported spelling
+            then Just (spelling, length supplied + remaining, supplied)
+            else Nothing
+        _ -> Nothing
+  _ -> Nothing
+ where
+  canonicalHeadSupported spelling totalArity
+    | elem spelling ["Prod", "Sum"] = totalArity == 2
+    | otherwise = not (elem spelling structuralHigherKindHeads)
+  legacyHeadSupported spelling =
+    not (null spelling)
+      && not (elem spelling structuralHigherKindHeads)
 
 -- | Fragments below a higher-kinded exact nominal head that remain ordinary
 -- proper-type planning/rigidity roots.  The head itself is represented by an
 -- 'EvidenceUse' and must never be closed as a proper rigid atom.
-exactContextArgumentFragments :: (Int, Frag) -> [Frag]
-exactContextArgumentFragments source@(_, argument) =
+exactContextArgumentFragments :: ExactContextArgument -> [Frag]
+exactContextArgumentFragments source =
   case exactContextNominalUse source of
     Just (_, _, supplied) -> supplied
-    Nothing -> [argument]
+    Nothing -> exactContextArgumentPayloadFragments source
 
 -- | Exact family and class-kind identities claimed by one untrusted provider
 -- assignment.  These claims are inspected before any fragment reaches the
@@ -865,7 +894,8 @@ fragExactEvidenceClaims frag = case frag of
   FExactContext className arguments body ->
     foldl mergeExactEvidenceClaims
       (mergeExactEvidenceClaims
-        (claimContextKinds className (map fst arguments))
+        (claimContextKinds className
+          (map exactContextArgumentKindArity arguments))
         (fragExactEvidenceClaims body))
       (map exactContextClaim arguments)
   FApp _ _ head' arguments ->
@@ -893,15 +923,20 @@ fragExactEvidenceClaims frag = case frag of
       (fragExactEvidenceClaims child))
     emptyExactEvidenceClaims
 
-  exactContextClaim source@(remaining, argument)
+  exactContextClaim source
     | remaining < 0 = malformedExactEvidenceClaims
-    | remaining == 0 = fragExactEvidenceClaims argument
+    | remaining == 0 = case source of
+        ExactContextFragmentArgument _ argument ->
+          fragExactEvidenceClaims argument
+        ExactContextNominalArgument{} -> malformedExactEvidenceClaims
     | otherwise = case exactContextNominalUse source of
         Just (spelling, totalArity, supplied) ->
           mergeExactEvidenceClaims
             (claimFamilyArity spelling totalArity)
             (descend supplied)
         Nothing -> malformedExactEvidenceClaims
+   where
+    remaining = exactContextArgumentKindArity source
 
 providerArgumentExactEvidenceClaims
   :: ProviderInstantiationArgument
@@ -918,7 +953,8 @@ providerArgumentExactEvidenceClaims argument = case argument of
   ProviderInstantiationArgument remaining frag
     | remaining < 0 -> malformedExactEvidenceClaims
     | remaining == 0 -> fragExactEvidenceClaims frag
-    | otherwise -> case exactContextNominalUse (remaining, frag) of
+    | otherwise -> case exactContextNominalUse
+        (ExactContextFragmentArgument remaining frag) of
         Just (spelling, totalArity, supplied) ->
           mergeExactEvidenceClaims
             (claimFamilyArity spelling totalArity)
@@ -1074,6 +1110,7 @@ fragToDjinn recursiveProjection providers extras frag0 = do
   eitherC <- viaShow (mkIdentifier "Either")
   voidC <- viaShow (mkIdentifier "Void")
   unitC <- viaShow (tupleName Boxed 0)
+  pairC <- viaShow (tupleName Boxed 2)
   let usableProviders = filter usableProvider providers
       -- Bound the provider-indexed assignment list before any argument
       -- fragment participates in family planning, rigidity, or translation.
@@ -1192,7 +1229,8 @@ fragToDjinn recursiveProjection providers extras frag0 = do
 
       nominalArgumentType remaining spelling supplied = do
         translated <- mapM (go False) supplied
-        headType <- exactFamilyHead spelling (length supplied + remaining)
+        headType <- canonicalExactFamilyHead spelling
+          (length supplied + remaining)
         pure (applyTypeArguments headType translated)
 
       go premisesEnabled frag = case frag of
@@ -1281,14 +1319,16 @@ fragToDjinn recursiveProjection providers extras frag0 = do
         classes <- getsT tsContextClasses
         className <- case Map.lookup leanClassName classes of
           Just (known, knownKinds)
-            | knownKinds == map fst arguments -> pure known
+            | knownKinds
+                == map exactContextArgumentKindArity arguments -> pure known
             | otherwise -> failT $
                 "exact Lean context class " ++ show leanClassName
                   ++ " has inconsistent parameter kinds"
           Nothing -> do
             index <- getsT tsContextNext
             let privateSpelling = "LeantContext" ++ show index
-                parameterKinds = map fst arguments
+                parameterKinds =
+                  map exactContextArgumentKindArity arguments
                 parameters =
                   [ TypeParameter
                       ("leantContextParameter" ++ show index ++ "_" ++ show j)
@@ -1309,19 +1349,30 @@ fragToDjinn recursiveProjection providers extras frag0 = do
             pure privateName
         pure (Constraint className translatedArguments)
 
-      exactContextArgument (remaining, argument)
+      exactContextArgument source
         | remaining < 0 || remaining > maximumProviderArgumentKindArity =
             failT "exact Lean context argument has an unsupported kind"
-        | remaining == 0 = go False argument
-        | otherwise = case argument of
-            FAtom _ spelling -> exactFamilyHead spelling remaining
-            FApp _ _ (AppNominal spelling) supplied -> do
+        | remaining == 0 = case source of
+            ExactContextFragmentArgument _ argument -> go False argument
+            ExactContextNominalArgument{} -> failT
+              "proper-kinded exact Lean context argument was nominal"
+        | otherwise = case source of
+            ExactContextNominalArgument _ spelling supplied -> do
               translated <- mapM (go False) supplied
-              headType <- exactFamilyHead spelling
+              headType <- canonicalExactFamilyHead spelling
                 (length supplied + remaining)
               pure (applyTypeArguments headType translated)
-            _ -> failT
-              "higher-kinded exact Lean context argument did not retain a nominal head"
+            ExactContextFragmentArgument _ argument -> case argument of
+              FAtom _ spelling -> exactFamilyHead spelling remaining
+              FApp _ _ (AppNominal spelling) supplied -> do
+                translated <- mapM (go False) supplied
+                headType <- exactFamilyHead spelling
+                  (length supplied + remaining)
+                pure (applyTypeArguments headType translated)
+              _ -> failT
+                "higher-kinded exact Lean context argument did not retain a nominal head"
+       where
+        remaining = exactContextArgumentKindArity source
 
       -- Retained type applications are the bridge to Djex's guarded
       -- impredicative instantiation.  A bound higher-kinded head shares the
@@ -1388,6 +1439,21 @@ fragToDjinn recursiveProjection providers extras frag0 = do
                 -- generic constructor schema is translated.  It still gets a
                 -- single conservative nominal declaration.
                 declareAbstractFamily spelling arity
+
+      -- Canonical Prod and Sum evidence is the same structural identity used
+      -- for saturated fragment products and sums.  This matters when a
+      -- provider body applies its assigned constructor: substituting a fresh
+      -- abstract family would no longer match an ordinary FProd/FSum goal.
+      canonicalExactFamilyHead spelling arity
+        | spelling == "Prod" =
+            if arity == 2
+              then pure (TypeConstructor pairC)
+              else arityFailure spelling arity [2]
+        | spelling == "Sum" =
+            if arity == 2
+              then pure (TypeConstructor eitherC)
+              else arityFailure spelling arity [2]
+        | otherwise = exactFamilyHead spelling arity
 
       arityFailure spelling arity arities = failT
         ("internal: exact Lean family " ++ show spelling
@@ -1831,12 +1897,15 @@ fragToDjinn recursiveProjection providers extras frag0 = do
         (providerInstantiationArgumentKindArity argument)
         ProperTypeKind)
 
-  -- Saturated logical products, sums, Iff, and Not have dedicated structural
-  -- fragment encodings. Until their unsaturated renderer identity is modeled,
-  -- reject a caller-authored nominal payload just as live discovery does.
+  -- Canonical Prod/Sum payloads have exact structural engine identities.
+  -- Prop-valued and sort-polymorphic structural heads remain fail-closed
+  -- because the ground-kind wire does not retain enough sort information.
   supportedProviderArgumentHead argument = case argument of
-    ProviderInstantiationNominalArgument remaining spelling _ ->
-      remaining == 0 || spelling `notElem` structuralHigherKindHeads
+    ProviderInstantiationNominalArgument remaining spelling supplied
+      | elem spelling ["Prod", "Sum"] ->
+          length supplied + remaining == 2
+      | otherwise ->
+          remaining == 0 || not (elem spelling structuralHigherKindHeads)
     ProviderInstantiationExactArgument remaining _ _ -> remaining == 0
     ProviderInstantiationArgument remaining frag
       | remaining > 0 -> case frag of
@@ -1845,9 +1914,6 @@ fragToDjinn recursiveProjection providers extras frag0 = do
             spelling `notElem` structuralHigherKindHeads
           _ -> True
       | otherwise -> True
-  structuralHigherKindHeads =
-    ["And", "Prod", "PProd", "Or", "Sum", "PSum", "Iff", "Not"]
-
   providerArgumentFragments argument = case argument of
     ProviderInstantiationArgument _ frag -> [frag]
     ProviderInstantiationExactArgument _ frag _ -> [frag]
@@ -2148,13 +2214,14 @@ collectExactFamilyUses recursiveProjection premisesEnabled uses frag =
  where
   collect = collectExactFamilyUses recursiveProjection premisesEnabled
   descend = foldl collect
-  collectContextArgument current source@(_, argument) =
+  collectContextArgument current source =
     case exactContextNominalUse source of
       Just (spelling, totalArity, supplied) ->
         descend
           (insertUse spelling (EvidenceUse totalArity) current)
           supplied
-      Nothing -> collect current argument
+      Nothing -> descend current
+        (exactContextArgumentPayloadFragments source)
   insertUse spelling use = Map.alter append spelling
    where
     append Nothing = Just [use]
@@ -2333,7 +2400,8 @@ freeSchemaVariables bound frag = case frag of
   FAll _ binder body -> freeSchemaVariables (Set.insert binder bound) body
   FInst _ body -> freeSchemaVariables bound body
   FExactContext _ arguments body ->
-    descend (map snd arguments ++ [body])
+    descend
+      (concatMap exactContextArgumentPayloadFragments arguments ++ [body])
   FVar variableName
     | variableName `Set.member` bound -> Set.empty
     | otherwise -> Set.singleton variableName
@@ -2414,9 +2482,9 @@ schemaEquivalent = go []
     (FExactContext leftClass leftArguments leftBody,
         FExactContext rightClass rightArguments rightBody) ->
       leftClass == rightClass
-        && map fst leftArguments == map fst rightArguments
-        && equivalentLists binders
-          (map snd leftArguments) (map snd rightArguments)
+        && length leftArguments == length rightArguments
+        && and (zipWith (equivalentContextArgument binders)
+          leftArguments rightArguments)
         && go binders leftBody rightBody
     (FVar a, FVar b) -> equivalentName binders a b
     (FAtom _ a, FAtom _ b) -> a == b
@@ -2440,6 +2508,23 @@ schemaEquivalent = go []
   both binders a c b d = go binders a c && go binders b d
   equivalentLists binders xs ys = length xs == length ys
     && and (zipWith (go binders) xs ys)
+  equivalentContextArgument binders left right =
+    case (exactContextNominalUse left, exactContextNominalUse right) of
+      ( Just (leftHead, leftArity, leftSupplied)
+        , Just (rightHead, rightArity, rightSupplied)
+        ) ->
+          leftArity == rightArity
+            && leftHead == rightHead
+            && equivalentLists binders leftSupplied rightSupplied
+      (Nothing, Nothing) -> case (left, right) of
+        ( ExactContextFragmentArgument leftArity leftFrag
+          , ExactContextFragmentArgument rightArity rightFrag
+          ) ->
+            leftArity == 0
+              && rightArity == 0
+              && go binders leftFrag rightFrag
+        _ -> False
+      _ -> False
   equivalentHead binders leftHead rightHead = case (leftHead, rightHead) of
     (AppVariable leftName, AppVariable rightName) ->
       equivalentName binders leftName rightName
@@ -2509,7 +2594,7 @@ replaceFrag replacements = go Set.empty
       FInst key body -> FInst key (recur body)
       FExactContext className arguments body ->
         FExactContext className
-          [(arity, recur argument) | (arity, argument) <- arguments]
+          (map (mapExactContextArgumentFragments recur) arguments)
           (recur body)
       FApp safe key head' arguments ->
         FApp safe key head' (map recur arguments)
@@ -2550,7 +2635,8 @@ schemaNames frag = case frag of
   FAll _ binder body -> Set.insert binder (schemaNames body)
   FInst _ body -> schemaNames body
   FExactContext _ arguments body ->
-    descend (map snd arguments ++ [body])
+    descend
+      (concatMap exactContextArgumentPayloadFragments arguments ++ [body])
   FVar variableName -> Set.singleton variableName
   FApp _ _ head' arguments ->
     let headNames = case head' of
@@ -2581,7 +2667,7 @@ renameBoundVariable old new frag = case frag of
   FInst key body -> FInst key (go body)
   FExactContext className arguments body ->
     FExactContext className
-      [(arity, go argument) | (arity, argument) <- arguments]
+      (map (mapExactContextArgumentFragments go) arguments)
       (go body)
   FVar variableName
     | variableName == old -> FVar new
