@@ -1271,8 +1271,14 @@ typeApplicationTests = testGroup "retained type applications"
         (ForallType ["B"] []
           (FunctionType (TypeVariable "B") (TypeVariable "B"))
           :: Type String)
-      let identity = FAll True "B"
-            (FArr (FVar "B") (FVar "B"))
+      let -- Deliberately collide with the renderer's private fresh prefix;
+          -- retained source evidence must be reserved before opening A.
+          identity = FAll True "\0leant-render-bound:0"
+            (FArr
+              (FVar "\0leant-render-bound:0")
+              (FVar "\0leant-render-bound:0"))
+          implicitIdentity = FAll False "C"
+            (FArr (FVar "C") (FVar "C"))
           natural = FAtom False "Nat"
           providerFrag = FAll False "A" (FProd (FVar "A") FTop)
           providers = Map.singleton "leantProvider0" $
@@ -1282,6 +1288,11 @@ typeApplicationTests = testGroup "retained type applications"
                       { paiVisibleArguments = [visibleIdentity]
                       , paiSourceArguments =
                           [ProviderInstantiationArgument 0 identity]
+                      }
+                  , ProviderAssignmentInfo
+                      { paiVisibleArguments = [visibleIdentity]
+                      , paiSourceArguments =
+                          [ProviderInstantiationArgument 0 implicitIdentity]
                       }
                   ]
               }
@@ -1325,6 +1336,52 @@ typeApplicationTests = testGroup "retained type applications"
           [ "fun x => let ⟨y, _⟩ := Demo.box "
               ++ "(«A» := (∀ (a0_0 : _), a0_0 → a0_0)); y x"
           ]
+  , testCase "correlate complete type vectors across erased instances" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      naturalName <- expectRight $ mkIdentifier "Nat"
+      visibleNatural <- expectRight $ specifiedVisibleTypeArgument
+        (TypeConstructor naturalName :: Type String)
+      visibleIdentity <- expectRight $ specifiedVisibleTypeArgument
+        (ForallType ["B"] []
+          (FunctionType (TypeVariable "B") (TypeVariable "B"))
+          :: Type String)
+      let identity = FAll True "B"
+            (FArr (FVar "B") (FVar "B"))
+          natural = FAtom False "Nat"
+          providerFrag = FAll False "A" $ FInst "Demo.inst" $
+            FAll False "B" (FProd (FVar "B") FTop)
+          providers = Map.singleton "leantProvider0" $
+            (providerInfo "Demo.box" (Just ["A", "B"]) providerFrag)
+              { piAssignments =
+                  [ ProviderAssignmentInfo
+                      { paiVisibleArguments =
+                          [visibleNatural, visibleIdentity]
+                      , paiSourceArguments =
+                          [ ProviderInstantiationArgument 0 natural
+                          , ProviderInstantiationArgument 0 identity
+                          ]
+                      }
+                  ]
+              }
+          eliminate providerApplication = Lambda [Bind "value"] $
+            Let (TuplePattern [Bind "function", Wildcard])
+              providerApplication
+              (Apply (Local "function") (Local "value"))
+          completeApplication = VisibleTypeApplication
+            (VisibleTypeApplication (Global providerName) visibleNatural)
+            visibleIdentity
+          partialApplication =
+            VisibleTypeApplication (Global providerName) visibleNatural
+      renderLeanTerm Map.empty providers Map.empty ([], 0, [])
+          (FArr natural natural) (eliminate completeApplication)
+        @?= Right
+          [ "fun x => let ⟨f, _⟩ := Demo.box («A» := Nat) "
+              ++ "(«B» := (∀ (a0_0 : _), a0_0 → a0_0)); f _ x"
+          ]
+      renderLeanTerm Map.empty providers Map.empty ([], 0, [])
+          (FArr natural natural) (eliminate partialApplication)
+        @?= Right
+          ["fun x => let ⟨y, _⟩ := Demo.box («A» := Nat); y x"]
   , testCase "fit later provider arguments at an inferred rank-N type" $ do
       providerName <- expectRight $ mkIdentifier "leantProvider0"
       let identity = FAll True "B"

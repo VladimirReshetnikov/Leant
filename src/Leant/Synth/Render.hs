@@ -55,6 +55,7 @@ import Language.Haskell.Synthesis.Generated
   , Expression (..)
   , Pattern (..)
   , VisibleTypeArgument
+  , applyExpressionArguments
   , closedVisibleTypeVariableSpelling
   , discardUnusedPatternBindingsBy
   , expressionFullApplicationSpine
@@ -942,10 +943,14 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
     if null termDomains
       then Nothing
       else
-        let step (function, j, env, domains) applicationArgument =
+        let step (fittedArguments, j, env, domains) applicationArgument =
               case (applicationArgument, domains) of
                 (VisibleTypeArgumentArgument argument, _) ->
-                  (VisibleTypeApplication function argument, j, env, domains)
+                  ( VisibleTypeArgumentArgument argument : fittedArguments
+                  , j
+                  , env
+                  , domains
+                  )
                 (TermArgument argument, domain : remaining) ->
                   let exactArgument = knownArgumentFrag
                         (fragVariableNames domain) env argument
@@ -954,13 +959,15 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
                           | equivalentFrag domain actual ->
                               fitEliminationInput argument j env
                         _ -> fit cm providers force domain argument j env
-                  in (Apply function argument', j', env', remaining)
+                  in (TermArgument argument' : fittedArguments, j', env', remaining)
                 -- 'analyzeKnownApplication' accepts a term argument only by
                 -- consuming one arrow, so this branch is defensive.
                 (TermArgument argument, []) ->
-                  (Apply function argument, j, env, [])
-            (fitted, k', dss', _) =
-              foldl step (headExpr, k, dss, termDomains) arguments
+                  (TermArgument argument : fittedArguments, j, env, [])
+            (reversedArguments, k', dss', _) =
+              foldl step ([], k, dss, termDomains) arguments
+            fitted = applyExpressionArguments headExpr
+              (reverse reversedArguments)
         in Just (fitted, k', dss')
   -- A case scrutinee or let RHS has its own result type, which the enclosing
   -- goal fragment does not describe.  Traverse that input structurally and
