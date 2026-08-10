@@ -128,7 +128,9 @@ import Leant.Synth.Fragment
   , fragHasInstanceBinder
   , fragSpine
   , fragUnsafeAtoms
+  , fragVisibleForallVisibilities
   , maximumProviderArgumentKindArity
+  , maximumProviderExactForallDomains
   )
 import Leant.Synth.Render
   ( CtorInfo (..)
@@ -967,6 +969,9 @@ fragToDjinn recursiveProjection providers extras frag0 = do
       providerArgumentType argument = case argument of
         ProviderInstantiationNominalArgument remaining spelling supplied ->
           nominalArgumentType remaining spelling supplied
+        ProviderInstantiationExactArgument 0 frag _ -> go False frag
+        ProviderInstantiationExactArgument _ _ _ -> failT
+          "exact Lean provider argument is not proper-kinded"
         ProviderInstantiationArgument 0 frag -> go False frag
         ProviderInstantiationArgument remaining frag -> case frag of
           -- Compatibility for snapshots written by the first kinded wire
@@ -1447,7 +1452,11 @@ fragToDjinn recursiveProjection providers extras frag0 = do
               | (providerIndex, assignment) <- boundedProviderAssignments
               , providerIndex == index
               ]
-            let instantiations = map fst translatedAssignments
+            -- Domain metadata can distinguish two Lean renderings which Djex
+            -- intentionally collapses to the same canonical assignment. Keep
+            -- every bounded rendering below, but search each canonical vector
+            -- only once.
+            let instantiations = nub (map fst translatedAssignments)
                 info = (providerInfo leanName binderNames providerFrag)
                   { piAssignments = map snd translatedAssignments }
             pure
@@ -1517,9 +1526,18 @@ fragToDjinn recursiveProjection providers extras frag0 = do
       && providerInstantiationArgumentKindArity argument
         <= maximumProviderArgumentKindArity
       && supportedProviderArgumentHead argument
+      && usableExactDomains argument
       && all
         (\frag -> not (fragHasDepth frag || fragHasInstanceBinder frag))
         (providerArgumentFragments argument)
+
+  usableExactDomains argument = case argument of
+    ProviderInstantiationExactArgument remaining frag domains ->
+      remaining == 0
+        && length domains <= maximumProviderExactForallDomains
+        && maybe False ((length domains ==) . length)
+          (fragVisibleForallVisibilities frag)
+    _ -> True
 
   providerArgumentKind :: ProviderInstantiationArgument -> GroundKind
   providerArgumentKind argument =
@@ -1534,6 +1552,7 @@ fragToDjinn recursiveProjection providers extras frag0 = do
   supportedProviderArgumentHead argument = case argument of
     ProviderInstantiationNominalArgument remaining spelling _ ->
       remaining == 0 || spelling `notElem` structuralHigherKindHeads
+    ProviderInstantiationExactArgument remaining _ _ -> remaining == 0
     ProviderInstantiationArgument remaining frag
       | remaining > 0 -> case frag of
           FAtom _ spelling -> spelling `notElem` structuralHigherKindHeads
@@ -1546,10 +1565,12 @@ fragToDjinn recursiveProjection providers extras frag0 = do
 
   providerArgumentFragments argument = case argument of
     ProviderInstantiationArgument _ frag -> [frag]
+    ProviderInstantiationExactArgument _ frag _ -> [frag]
     ProviderInstantiationNominalArgument _ _ supplied -> supplied
 
   providerArgumentPlanningFragments argument = case argument of
     ProviderInstantiationNominalArgument _ _ supplied -> supplied
+    ProviderInstantiationExactArgument _ frag _ -> [frag]
     ProviderInstantiationArgument remaining frag
       | remaining > 0 -> case frag of
           FAtom{} -> []
@@ -1560,6 +1581,7 @@ fragToDjinn recursiveProjection providers extras frag0 = do
   collectProviderArgumentFamilyUse uses argument = case argument of
     ProviderInstantiationNominalArgument remaining spelling supplied ->
       insertEvidenceUse spelling (length supplied + remaining) uses
+    ProviderInstantiationExactArgument _ _ _ -> uses
     ProviderInstantiationArgument remaining frag
       | remaining > 0 -> case frag of
           FAtom _ spelling -> insertEvidenceUse spelling remaining uses

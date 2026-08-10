@@ -60,6 +60,7 @@ import Leant.Synth.Fragment
   , GoalSort (..)
   , ParsedGoal (..)
   , ProviderFrag (..)
+  , ProviderForallDomain (..)
   , ProviderInstantiationArgument (..)
   , ProviderQuery (..)
   , candidateVerificationProgram
@@ -70,6 +71,7 @@ import Leant.Synth.Fragment
   , fragUnsafeAtoms
   , glivenkoSplit
   , maximumProviderArgumentKindArity
+  , maximumProviderExactForallDomains
   , parseGoalSexp
   , parseProviderSexp
   , providerProgram
@@ -392,6 +394,14 @@ providerProgramTests = testGroup "provider discovery program"
         `isInfixOf` prelude @?= True
       "pending := pending ++ [otherGoal]"
         `isInfixOf` prelude @?= True
+      unlines
+          [ "      else if binderInfo.isInstImplicit then"
+          , "        -- Exact provider arguments are context-free. Reject a contextual"
+          , "        -- binder wherever WHNF exposes it, including beneath an alias,"
+          , "        -- before 'go false' could emit an unparsable FInst payload."
+          , "        pure none"
+          ]
+        `isInfixOf` prelude @?= True
       "| some closedMCtx => withMCtx closedMCtx do"
         `isInfixOf` prelude @?= True
       "if complete && arguments.size == typeArgs.size then"
@@ -403,11 +413,27 @@ providerProgramTests = testGroup "provider discovery program"
       "if arity > 64 then" `isInfixOf` prelude @?= True
       "providerNominalCandidateFragment? fuel candidate"
         `isInfixOf` prelude @?= True
-      "let mut assignments : Array (Array (Nat × String)) := #[]"
+      "let mut assignments : Array (Array ProviderCandidateFragment) := #[]"
+        `isInfixOf` prelude @?= True
+      "candidate : Expr"
+        `isInfixOf` prelude @?= True
+      "domains : Array String"
+        `isInfixOf` prelude @?= True
+      "providerForallDomains? fuel 0 candidate"
+        `isInfixOf` prelude @?= True
+      "payload := \"(exact (domains\""
+        `isInfixOf` prelude @?= True
+      "providerCandidateAssignmentsDefEq"
+        `isInfixOf` prelude @?= True
+      "firstLeft.domains != firstRight.domains"
+        `isInfixOf` prelude @?= True
+      "Lean.withoutModifyingState do"
+        `isInfixOf` prelude @?= True
+      "isDefEq firstLeft.candidate firstRight.candidate"
         `isInfixOf` prelude @?= True
       "LeantSynth.providerInstantiationAssignments 80 info.type"
         `isInfixOf` program @?= True
-      "\" (kinded \" ++ toString argument.1 ++ \" \""
+      "\" (kinded \" ++ toString argument.kindArity ++ \" \""
         `isInfixOf` program @?= True
       "\" (instantiations\" ++ assignmentText ++ \")\""
         `isInfixOf` program @?= True
@@ -623,6 +649,62 @@ providerParserTests = testGroup "provider inventory parser"
                 ]
               ]
           ]
+  , testCase "retain bounded exact Lean provider forall domains" $
+      parseProviderSexp
+          ("(providers (provider \"Gap.global\" (binders \"a\") "
+            ++ "(instantiations (args (kinded 0 (exact "
+            ++ "(domains prop type) "
+            ++ "(alli \"P\" (all \"A\" (-> (var \"P\") "
+            ++ "(var \"A\")))))))) (alli \"a\" "
+            ++ "(atom unsafe \"Gap.Token\"))))")
+        @?= Right
+          [ ProviderFragWithEvidence "Gap.global"
+              (FAll False "a" (FAtom False "Gap.Token"))
+              ["a"]
+              [ [ ProviderInstantiationExactArgument 0
+                    (FAll False "P" $ FAll True "A" $
+                      FArr (FVar "P") (FVar "A"))
+                    [ProviderForallDomainProp, ProviderForallDomainType]
+                ]
+              ]
+          ]
+  , testCase "retain a general Sort provider forall domain" $
+      parseProviderSexp
+          ("(providers (provider \"Gap.sort\" (binders \"a\") "
+            ++ "(instantiations (args (kinded 0 (exact (domains sort) "
+            ++ "(alli \"A\" (var \"A\")))))) "
+            ++ "(alli \"a\" (atom unsafe \"Gap.Token\"))))")
+        @?= Right
+          [ ProviderFragWithEvidence "Gap.sort"
+              (FAll False "a" (FAtom False "Gap.Token"))
+              ["a"]
+              [ [ ProviderInstantiationExactArgument 0
+                    (FAll False "A" (FVar "A"))
+                    [ProviderForallDomainSort]
+                ]
+              ]
+          ]
+  , testCase "reject invalid exact Lean provider forall domains" $ do
+      let inventory domains =
+            "(providers (provider \"Gap.global\" (binders \"a\") "
+              ++ "(instantiations (args (kinded 0 (exact (domains "
+              ++ domains
+              ++ ") (atom unsafe \"Nat\"))))) "
+              ++ "(alli \"a\" (atom unsafe \"Gap.Token\"))))"
+      parseProviderSexp (inventory "effect") @?=
+        Left "unknown exact Lean provider forall-domain tag"
+      parseProviderSexp (inventory "prop") @?=
+        Left "exact Lean provider forall-domain vector does not align with its fragment"
+      parseProviderSexp
+          ("(providers (provider \"Gap.global\" (binders \"a\") "
+            ++ "(instantiations (args (kinded 0 (exact (domains \"prop\") "
+            ++ "(atom unsafe \"Nat\"))))) "
+            ++ "(alli \"a\" (atom unsafe \"Gap.Token\"))))") @?=
+        Left "malformed exact Lean provider forall-domain vector"
+      parseProviderSexp
+          (inventory $ unwords $
+            replicate (maximumProviderExactForallDomains + 1) "prop")
+        @?= Left "exact Lean provider forall-domain vector is too long"
   , testCase "retain canonical nominal provider arguments" $
       parseProviderSexp
           "(providers (provider \"Gap.partial\" (binders \"F\") \
@@ -1305,8 +1387,18 @@ typeApplicationTests = testGroup "retained type applications"
         @?= Right
           [ "fun x => let ⟨f, _⟩ := Demo.box "
               ++ "(«A» := (∀ (a0_0 : _), a0_0 → a0_0)); f _ x"
+          , "fun x => let ⟨f, _⟩ := Demo.box "
+              ++ "(«A» := (∀ {a0_0 : _}, a0_0 → a0_0)); f _ x"
+          , "fun x => let ⟨f, _⟩ := Demo.box "
+              ++ "(«A» := (∀ (a0_0 : Type _), a0_0 → a0_0)); f _ x"
+          , "fun x => let ⟨f, _⟩ := Demo.box "
+              ++ "(«A» := (∀ {a0_0 : Type _}, a0_0 → a0_0)); f _ x"
+          , "fun x => let ⟨f, _⟩ := Demo.box "
+              ++ "(«A» := (∀ (a0_0 : Prop), a0_0 → a0_0)); f _ x"
+          , "fun x => let ⟨f, _⟩ := Demo.box "
+              ++ "(«A» := (∀ {a0_0 : Prop}, a0_0 → a0_0)); f _ x"
           ]
-  , testCase "leave lossy implicit specified arguments opaque" $ do
+  , testCase "restore implicit specified arguments exactly" $ do
       providerName <- expectRight $ mkIdentifier "leantProvider0"
       visibleIdentity <- expectRight $ specifiedVisibleTypeArgument
         (ForallType ["B"] []
@@ -1333,9 +1425,204 @@ typeApplicationTests = testGroup "retained type applications"
       renderLeanTerm Map.empty providers Map.empty ([], 0, [])
           (FArr natural natural) expression
         @?= Right
-          [ "fun x => let ⟨y, _⟩ := Demo.box "
-              ++ "(«A» := (∀ (a0_0 : _), a0_0 → a0_0)); y x"
+          [ "fun x => let ⟨f, _⟩ := Demo.box "
+              ++ "(«A» := (∀ {a0_0 : _}, a0_0 → a0_0)); f x"
+          , "fun x => let ⟨f, _⟩ := Demo.box "
+              ++ "(«A» := (∀ {a0_0 : Type _}, a0_0 → a0_0)); f x"
+          , "fun x => let ⟨f, _⟩ := Demo.box "
+              ++ "(«A» := (∀ {a0_0 : Prop}, a0_0 → a0_0)); f x"
           ]
+  , testCase "restore mixed forall visibility in specified results" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      visibleMixed <- expectRight $ specifiedVisibleTypeArgument
+        (ForallType ["B", "C"] []
+          (FunctionType (TypeVariable "C") (TypeVariable "C"))
+          :: Type String)
+      let mixed = FAll False "B" $ FAll True "C"
+            (FArr (FVar "C") (FVar "C"))
+          natural = FAtom False "Nat"
+          providerFrag = FAll False "A" (FProd (FVar "A") FTop)
+          providers = Map.singleton "leantProvider0" $
+            (providerInfo "Demo.box" (Just ["A"]) providerFrag)
+              { piAssignments =
+                  [ ProviderAssignmentInfo
+                      { paiVisibleArguments = [visibleMixed]
+                      , paiSourceArguments =
+                          [ProviderInstantiationArgument 0 mixed]
+                      }
+                  ]
+              }
+          expression = Lambda [Bind "value"] $
+            Let (TuplePattern [Bind "function", Wildcard])
+              (VisibleTypeApplication (Global providerName) visibleMixed)
+              (Apply (Local "function") (Local "value"))
+      renderLeanTerm Map.empty providers Map.empty ([], 0, [])
+          (FArr natural natural) expression
+        @?= Right
+          [ "fun x => let ⟨f, _⟩ := Demo.box "
+              ++ "(«A» := (∀ {a0_0 : _} (a0_1 : _), "
+              ++ "a0_1 → a0_1)); f _ x"
+          , "fun x => let ⟨f, _⟩ := Demo.box "
+              ++ "(«A» := (∀ {a0_0 : Type _} (a0_1 : Type _), "
+              ++ "a0_1 → a0_1)); f _ x"
+          , "fun x => let ⟨f, _⟩ := Demo.box "
+              ++ "(«A» := (∀ {a0_0 : Prop} (a0_1 : Prop), "
+              ++ "a0_1 → a0_1)); f _ x"
+          ]
+  , testCase "render exact mixed forall-domain alternatives" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      resultName <- expectRight $ mkIdentifier "Result"
+      visibleMixed <- expectRight $ specifiedVisibleTypeArgument
+        (ForallType ["P", "A"] []
+          (FunctionType (TypeVariable "P")
+            (FunctionType (TypeVariable "A") (TypeConstructor resultName)))
+          :: Type String)
+      let mixed = FAll False "P" $ FAll True "A" $
+            FArr (FVar "P") $
+              FArr (FVar "A") (FAtom False "Result")
+          token = FAtom False "Demo.Token"
+          providerFrag = FAll False "X" token
+          providers = Map.singleton "leantProvider0" $
+            (providerInfo "Demo.value" (Just ["X"]) providerFrag)
+              { piAssignments =
+                  [ ProviderAssignmentInfo
+                      { paiVisibleArguments = [visibleMixed]
+                      , paiSourceArguments =
+                          [ ProviderInstantiationExactArgument
+                              0 mixed
+                              [ ProviderForallDomainProp
+                              , ProviderForallDomainType
+                              ]
+                          ]
+                      }
+                  , ProviderAssignmentInfo
+                      { paiVisibleArguments = [visibleMixed]
+                      , paiSourceArguments =
+                          [ ProviderInstantiationExactArgument 0 mixed
+                              [ ProviderForallDomainType
+                              , ProviderForallDomainProp
+                              ]
+                          ]
+                      }
+                  ]
+              }
+          expression = VisibleTypeApplication
+            (Global providerName) visibleMixed
+      renderLeanTerm Map.empty providers Map.empty ([], 0, []) token expression
+        @?= Right
+          [ "Demo.value («X» := (∀ {a0_0 : Prop} (a0_1 : Type _), "
+              ++ "a0_0 → a0_1 → Result))"
+          , "Demo.value («X» := (∀ {a0_0 : Type _} (a0_1 : Prop), "
+              ++ "a0_0 → a0_1 → Result))"
+          ]
+  , testCase "retain staged exact-domain alternatives beyond the live cap" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      resultName <- expectRight $ mkIdentifier "Result"
+      visibleMixed <- expectRight $ specifiedVisibleTypeArgument
+        (ForallType ["A", "B", "C"] []
+          (FunctionType (TypeVariable "A") $
+            FunctionType (TypeVariable "B") $
+              FunctionType (TypeVariable "C") (TypeConstructor resultName))
+          :: Type String)
+      let mixed = FAll True "A" $ FAll True "B" $ FAll True "C" $
+            FArr (FVar "A") $ FArr (FVar "B") $
+              FArr (FVar "C") (FAtom False "Result")
+          domains = take 17 $ sequence $ replicate 3
+            [ ProviderForallDomainProp
+            , ProviderForallDomainType
+            , ProviderForallDomainSort
+            ]
+          token = FAtom False "Demo.Token"
+          providerFrag = FAll False "X" token
+          assignment exactDomains = ProviderAssignmentInfo
+            { paiVisibleArguments = [visibleMixed]
+            , paiSourceArguments =
+                [ProviderInstantiationExactArgument 0 mixed exactDomains]
+            }
+          providers = Map.singleton "leantProvider0" $
+            (providerInfo "Demo.value" (Just ["X"]) providerFrag)
+              { piAssignments = map assignment domains }
+          expression = VisibleTypeApplication
+            (Global providerName) visibleMixed
+          seventeenth =
+            "Demo.value («X» := (∀ (a0_0 : Type _) (a0_1 : Sort _) "
+              ++ "(a0_2 : Type _), a0_0 → a0_1 → a0_2 → Result))"
+      rendered <- expectRight $
+        renderLeanTerm Map.empty providers Map.empty ([], 0, []) token expression
+      length rendered @?= 17
+      assertBool "the seventeenth staged exact-domain rendering was dropped"
+        $ seventeenth `elem` rendered
+  , testCase "reject exact domains misaligned with the source fragment" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      naturalName <- expectRight $ mkIdentifier "Nat"
+      visibleNatural <- expectRight $ specifiedVisibleTypeArgument
+        (TypeConstructor naturalName :: Type String)
+      let natural = FAtom False "Nat"
+          providers = Map.singleton "leantProvider0" $
+            (providerInfo "Demo.value" (Just ["X"])
+              (FAll False "X" (FAtom False "Demo.Token")))
+                { piAssignments =
+                    [ ProviderAssignmentInfo
+                        { paiVisibleArguments = [visibleNatural]
+                        , paiSourceArguments =
+                            [ ProviderInstantiationExactArgument
+                                0 natural [ProviderForallDomainProp]
+                            ]
+                        }
+                    ]
+                }
+          expression = VisibleTypeApplication
+            (Global providerName) visibleNatural
+      renderLeanTerm Map.empty providers Map.empty ([], 0, [])
+          (FAtom False "Demo.Token") expression
+        @?= Left
+          "exact Lean provider forall-domain vector does not align with its source fragment"
+  , testCase "reject mismatched exact forall visibility" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      visibleIdentity <- expectRight $ specifiedVisibleTypeArgument
+        (ForallType ["B"] []
+          (FunctionType (TypeVariable "B") (TypeVariable "B"))
+          :: Type String)
+      let providerFrag = FAll False "A" (FVar "A")
+          mismatched = FAll False "B" $ FAll True "C"
+            (FArr (FVar "C") (FVar "C"))
+          providers = Map.singleton "leantProvider0" $
+            (providerInfo "Demo.value" (Just ["A"]) providerFrag)
+              { piAssignments =
+                  [ ProviderAssignmentInfo
+                      { paiVisibleArguments = [visibleIdentity]
+                      , paiSourceArguments =
+                          [ProviderInstantiationArgument 0 mismatched]
+                      }
+                  ]
+              }
+          expression = VisibleTypeApplication
+            (Global providerName) visibleIdentity
+      renderLeanTerm Map.empty providers Map.empty ([], 0, [])
+          (FAll True "B" (FArr (FVar "B") (FVar "B"))) expression
+        @?= Left
+          "exact Lean provider type-argument visibility exceeds its canonical type"
+  , testCase "reject mismatched exact provider assignment vectors" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      naturalName <- expectRight $ mkIdentifier "Nat"
+      visibleNatural <- expectRight $ specifiedVisibleTypeArgument
+        (TypeConstructor naturalName :: Type String)
+      let natural = FAtom False "Nat"
+          providerFrag = FAll False "A" (FVar "A")
+          providers = Map.singleton "leantProvider0" $
+            (providerInfo "Demo.value" (Just ["A"]) providerFrag)
+              { piAssignments =
+                  [ ProviderAssignmentInfo
+                      { paiVisibleArguments = [visibleNatural]
+                      , paiSourceArguments = []
+                      }
+                  ]
+              }
+          expression = VisibleTypeApplication
+            (Global providerName) visibleNatural
+      renderLeanTerm Map.empty providers Map.empty ([], 0, []) natural expression
+        @?= Left
+          "cannot align exact provider type-argument source vector for Lean provider Demo.value"
   , testCase "correlate complete type vectors across erased instances" $ do
       providerName <- expectRight $ mkIdentifier "leantProvider0"
       naturalName <- expectRight $ mkIdentifier "Nat"
@@ -1377,6 +1664,10 @@ typeApplicationTests = testGroup "retained type applications"
         @?= Right
           [ "fun x => let ⟨f, _⟩ := Demo.box («A» := Nat) "
               ++ "(«B» := (∀ (a0_0 : _), a0_0 → a0_0)); f _ x"
+          , "fun x => let ⟨f, _⟩ := Demo.box («A» := Nat) "
+              ++ "(«B» := (∀ (a0_0 : Type _), a0_0 → a0_0)); f _ x"
+          , "fun x => let ⟨f, _⟩ := Demo.box («A» := Nat) "
+              ++ "(«B» := (∀ (a0_0 : Prop), a0_0 → a0_0)); f _ x"
           ]
       renderLeanTerm Map.empty providers Map.empty ([], 0, [])
           (FArr natural natural) (eliminate partialApplication)
@@ -1581,6 +1872,32 @@ typeApplicationTests = testGroup "retained type applications"
       -- path exactly. Exference supplies the stable evidence-selected
       -- elimination candidate; combined mode verifies that merging preserves
       -- it even when Djinn's direct identity candidates fill its own frontier.
+      mapM_ check [EngineExference, EngineBoth]
+  , testCase "specialize implicit evidence-selected provider results" $ do
+      let mixed = FAll False "B" $ FAll True "C"
+            (FArr (FVar "C") (FVar "C"))
+          natural = FAtom False "Nat"
+          providerFrag = FAll False "A" (FProd (FVar "A") FTop)
+          provider = ProviderFragWithEvidence
+            "Demo.box" providerFrag ["A"]
+            [[ProviderInstantiationArgument 0 mixed]]
+          goal = FArr natural natural
+          check engine = case
+              synthesizeWithProviders engine 1024 [provider] goal of
+            Right (SynthCandidates groups _) ->
+              let candidates = concat groups
+                  fitted term =
+                    "Demo.box («A» := (∀ {" `isInfixOf` term
+                      && "} (a0_1 : _), a0_1 → a0_1)" `isInfixOf` term
+                      && "f _ x" `isInfixOf` term
+              in assertBool
+                ("implicit specified provider result was not specialized in "
+                  ++ synthEngineName engine ++ ": " ++ show candidates)
+                (any fitted candidates)
+            Right other -> assertFailure $
+              "unexpected implicit specified-provider outcome from "
+                ++ synthEngineName engine ++ ": " ++ outcomeTag other
+            Left err -> assertFailure err
       mapM_ check [EngineExference, EngineBoth]
   , testCase "fit explicit forall arguments of foreign providers" $ do
       let token = FAtom False "Demo.Token"
@@ -1839,6 +2156,48 @@ typeApplicationTests = testGroup "retained type applications"
           check engine = expectTerm "Gap.global («a» := (∀"
             (synthesizeWithProviders engine 1024 [provider] token)
       in mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "search one canonical assignment but retain domain alternatives" $ do
+      let mixed = FAll False "P" $ FAll True "A" $
+            FArr (FVar "P") $ FArr (FVar "A") (FVar "A")
+          token = FAtom False "Gap.Token"
+          provider = ProviderFragWithEvidence "Gap.global"
+            (FAll False "X" token) ["X"]
+            [ [ ProviderInstantiationExactArgument 0 mixed
+                  [ ProviderForallDomainProp
+                  , ProviderForallDomainType
+                  ]
+              ]
+            , [ ProviderInstantiationExactArgument 0 mixed
+                  [ ProviderForallDomainType
+                  , ProviderForallDomainProp
+                  ]
+              ]
+            ]
+          expected =
+            [ "Gap.global («X» := (∀ {a0_0 : Prop} (a0_1 : Type _), "
+                ++ "a0_0 → a0_1 → a0_1))"
+            , "Gap.global («X» := (∀ {a0_0 : Type _} (a0_1 : Prop), "
+                ++ "a0_0 → a0_1 → a0_1))"
+            ]
+      case synthesizeWithProviders EngineDjinn 1024 [provider] token of
+        Right (SynthCandidates groups _) -> do
+          let exactGroups =
+                [ variants
+                | variants <- groups
+                , any (`elem` variants) expected
+                ]
+          case exactGroups of
+            [variants] -> mapM_ (\term -> assertBool
+                ("domain alternative missing from the sole exact Djinn group: "
+                  ++ show variants)
+                (term `elem` variants))
+              expected
+            _ -> assertFailure $
+              "canonical domain collision did not coalesce into one exact "
+                ++ "Djinn group: " ++ show groups
+        Right other -> assertFailure $
+          "unexpected canonical-domain collision outcome: " ++ outcomeTag other
+        Left err -> assertFailure err
   , testCase "retain mixed higher-kinded and rank-N provider arguments" $ do
       let natural = FAtom False "Nat"
           token = FAtom False "Higher.Token"

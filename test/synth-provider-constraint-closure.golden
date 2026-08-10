@@ -19,12 +19,12 @@ synth steps: 1024
 synth engine: djinn
 λ> :synth ClosureGood.Token
 preparing synthesis environment (session imports + Lean)...
-  it1  ClosureGood.global («a» := (∀ (a0_0 : _), a0_0 → a0_0)) («b» := (∀ (a0_0 : _), a0_0 → a0_0 → a0_0))
+  it1  ClosureGood.global («a» := (∀ (a0_0 : Type _), a0_0 → a0_0)) («b» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0))
 λ> :set synth-engine exference
 synth engine: exference
 λ> :synth ClosureGood.Token
-  it1  ClosureGood.global («a» := (∀ (a0_0 : _), a0_0 → a0_0)) («b» := (∀ (a0_0 : _), a0_0 → a0_0 → a0_0))
-note: search truncated: step limit reached, queue limit pruned 5977
+  it1  ClosureGood.global («a» := (∀ (a0_0 : Type _), a0_0 → a0_0)) («b» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0))
+note: search truncated: step limit reached, queue limit pruned 6556
 λ> :reset
 session reset
 λ>
@@ -43,12 +43,12 @@ synth steps: 1024
 synth engine: djinn
 λ> :synth ClosureSubgoal.Token
 preparing synthesis environment (session imports + Lean)...
-  it1  ClosureSubgoal.global («a» := (∀ (a0_0 : _), a0_0 → a0_0))
+  it1  ClosureSubgoal.global («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
 λ> :set synth-engine exference
 synth engine: exference
 λ> :synth ClosureSubgoal.Token
-  it1  ClosureSubgoal.global («a» := (∀ (a0_0 : _), a0_0 → a0_0))
-note: search truncated: step limit reached, queue limit pruned 5977
+  it1  ClosureSubgoal.global («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
+note: search truncated: step limit reached, queue limit pruned 6556
 λ> :reset
 session reset
 λ>
@@ -89,10 +89,10 @@ synth steps: 1024
 synth engine: djinn
 λ> :synth ClosureControl.Token
 preparing synthesis environment (session imports + Lean)...
-  it1  ClosureControl.global («a» := (∀ (a0_0 : _), (a0_0 → a0_0) → a0_0 → a0_0)) («b» := (∀ (a0_0 : _), (a0_0 → a0_0 → a0_0) → a0_0 → a0_0))
+  it1  ClosureControl.global («a» := (∀ (a0_0 : Type _), (a0_0 → a0_0) → a0_0 → a0_0)) («b» := (∀ (a0_0 : Type _), (a0_0 → a0_0 → a0_0) → a0_0 → a0_0))
 λ> :set synth-engine exference
 synth engine: exference
 λ> :synth ClosureControl.Token
-  it1  ClosureControl.global («a» := (∀ (a0_0 : _), (a0_0 → a0_0) → a0_0 → a0_0)) («b» := (∀ (a0_0 : _), (a0_0 → a0_0 → a0_0) → a0_0 → a0_0))
-note: search truncated: step limit reached, queue limit pruned 5977
+  it1  ClosureControl.global («a» := (∀ (a0_0 : Type _), (a0_0 → a0_0) → a0_0 → a0_0)) («b» := (∀ (a0_0 : Type _), (a0_0 → a0_0 → a0_0) → a0_0 → a0_0))
+note: search truncated: step limit reached, queue limit pruned 6556
 λ> :quit

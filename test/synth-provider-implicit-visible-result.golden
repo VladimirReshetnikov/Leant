@@ -1,0 +1,85 @@
+
+   __                  __
+  / /  ___ ___ ____   / /_
+ / /__/ -_) _ `/ _ \_/ __/
+/____/\__/\_,_/_//_/ \__/
+Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to exit.
+λ> namespace ImplicitVisible
+λ>
+λ> axiom Source : Type
+λ> axiom Result : Type
+λ> axiom Token : Type
+λ>
+λ> class Choice (a : Type 1) : Prop where
+…>   witness : True
+…>
+λ> instance : Choice (∀ {P : Prop} (A : Type), P → A → Result) :=
+…>   ⟨True.intro⟩
+…>
+λ> axiom token {a : Type 1} [Choice a] : Token
+λ> axiom box {a : Type 1} [Choice a] : a × Unit
+λ>
+λ> end ImplicitVisible
+λ>
+λ> :set synth-steps 2048
+synth steps: 2048
+λ> :set synth-engine djinn
+synth engine: djinn
+λ> :synth ImplicitVisible.Token
+preparing synthesis environment (session imports + Lean)...
+  it1  ImplicitVisible.token («a» := (∀ {a0_0 : Prop} (a0_1 : Type _), a0_0 → a0_1 → (ImplicitVisible.Result)))
+λ> :set synth-engine exference
+synth engine: exference
+λ> :synth ImplicitVisible.Token
+  it1  ImplicitVisible.token («a» := (∀ {a0_0 : Prop} (a0_1 : Type _), a0_0 → a0_1 → (ImplicitVisible.Result)))
+note: search truncated: step limit reached, queue limit pruned 26211
+λ> :synth ∀ (P : Prop), P → ImplicitVisible.Source → ImplicitVisible.Result
+  it1  fun _ x y => let ⟨f, z⟩ := ImplicitVisible.box («a» := (∀ {a0_0 : Prop} (a0_1 : Type _), a0_0 → a0_1 → (ImplicitVisible.Result))); let w := z; match w with | _ => f _ x y
+note: search truncated: step limit reached, queue limit pruned 20672
+λ> :set synth-engine both
+synth engine: both
+λ> :synth ImplicitVisible.Token
+  it1  ImplicitVisible.token («a» := (∀ {a0_0 : Prop} (a0_1 : Type _), a0_0 → a0_1 → (ImplicitVisible.Result)))
+note: exference: search truncated: step limit reached, queue limit pruned 13547
+λ> :synth ∀ (P : Prop), P → ImplicitVisible.Source → ImplicitVisible.Result
+  it1  fun _ x y => let ⟨f, z⟩ := ImplicitVisible.box («a» := (∀ {a0_0 : Prop} (a0_1 : Type _), a0_0 → a0_1 → (ImplicitVisible.Result))); let w := z; match w with | _ => f _ x y
+note: exference: search truncated: step limit reached, queue limit pruned 14153
+λ>
+λ> namespace DomainCollision
+λ>
+λ> axiom Result : Type
+λ> axiom Box (a : Type 1) : Type
+λ>
+λ> class Choice (a : Type 1) : Prop where
+…>   witness : True
+…>
+λ> instance choicePropType :
+…>     Choice (∀ {P : Prop} (A : Type), (P → A) → Result) :=
+…>   ⟨True.intro⟩
+…>
+λ> instance choiceTypeProp :
+…>     Choice (∀ {A : Type} (P : Prop), (A → P) → Result) :=
+…>   ⟨True.intro⟩
+…>
+λ> axiom selected {a : Type 1} [Choice a] : Box a
+λ>
+λ> end DomainCollision
+λ>
+λ> :set synth-engine djinn
+synth engine: djinn
+λ> :synth DomainCollision.Box (∀ {P : Prop} (A : Type), (P → A) → DomainCollision.Result)
+  it1  DomainCollision.selected
+  it2  DomainCollision.selected («a» := (∀ {a0_0 : Prop} (a0_1 : Type _), (a0_0 → a0_1) → (DomainCollision.Result)))
+λ> :set synth-engine exference
+synth engine: exference
+λ> :synth DomainCollision.Box (∀ {P : Prop} (A : Type), (P → A) → DomainCollision.Result)
+  it1  DomainCollision.selected
+  it2  DomainCollision.selected («a» := (∀ {a0_0 : Prop} (a0_1 : Type _), (a0_0 → a0_1) → (DomainCollision.Result)))
+note: search truncated: step limit reached, queue limit pruned 22296
+λ> :set synth-engine both
+synth engine: both
+λ> :synth DomainCollision.Box (∀ {P : Prop} (A : Type), (P → A) → DomainCollision.Result)
+  it1  DomainCollision.selected
+  it2  DomainCollision.selected («a» := (∀ {a0_0 : Prop} (a0_1 : Type _), (a0_0 → a0_1) → (DomainCollision.Result)))
+note: exference: search truncated: step limit reached, queue limit pruned 12646
+λ> :quit

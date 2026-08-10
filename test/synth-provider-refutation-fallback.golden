@@ -16,7 +16,7 @@ synth classical: off
 synth engine: djinn
 λ> :synth RefutationDjinn.Void
 preparing synthesis environment (session imports + Lean)...
-  it1  RefutationDjinn.impossible («a» := (∀ (a0_0 : _), a0_0 → a0_0))
+  it1  RefutationDjinn.impossible («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
 λ> :reset
 session reset
 λ>
@@ -32,8 +32,8 @@ synth classical: off
 synth engine: exference
 λ> :synth RefutationExference.Void
 preparing synthesis environment (session imports + Lean)...
-  it1  RefutationExference.impossible («a» := (∀ (a0_0 : _), a0_0 → a0_0))
-note: search truncated: step limit reached, queue limit pruned 34384
+  it1  RefutationExference.impossible («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
+note: search truncated: step limit reached, queue limit pruned 49783
 λ> :reset
 session reset
 λ>
@@ -49,8 +49,8 @@ synth classical: off
 synth engine: both
 λ> :synth RefutationBoth.Void
 preparing synthesis environment (session imports + Lean)...
-  it1  RefutationBoth.impossible («a» := (∀ (a0_0 : _), a0_0 → a0_0))
-note: exference: search truncated: step limit reached, queue limit pruned 24536
+  it1  RefutationBoth.impossible («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
+note: exference: search truncated: step limit reached, queue limit pruned 29844
 λ> :reset
 session reset
 λ>
@@ -67,7 +67,7 @@ synth engine: djinn
 λ> :synth (((RefutationClassical.P → RefutationClassical.Q) → RefutationClassical.P) → RefutationClassical.P)
 preparing synthesis environment (session imports + Lean)...
   it1  RefutationClassical.peirce
-  it2  fun f => RefutationClassical.peirce (fun a => RefutationClassical.peirce (fun _ => f a))
+  it2  fun f => RefutationClassical.peirce (fun g => RefutationClassical.peirce (fun _ => f g))
 λ> :reset
 session reset
 λ>

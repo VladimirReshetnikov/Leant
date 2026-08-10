@@ -50,7 +50,7 @@ synth engine: both
 note: search truncated: candidate limit reached (60)
 λ> :synth (Demo.Seed → Demo.SealedBox Demo.Seed)
   it1  Demo.sealedBox
-note: exference: search truncated: step limit reached, queue limit pruned 25900
+note: exference: search truncated: step limit reached, queue limit pruned 28246
 λ>
 λ> :set synth-steps 1024
 synth steps: 1024
@@ -58,7 +58,7 @@ synth steps: 1024
 synth engine: exference
 λ> :synth (Nat → Demo.Token)
   it1  fun x => match x with | .zero => Demo.global («a» := Nat) | .succ _ => Demo.global («a» := Nat)
-note: search truncated: step limit reached, queue limit pruned 44665
+note: search truncated: step limit reached, queue limit pruned 45592
 λ> :set synth-engine djinn
 synth engine: djinn
 λ> :synth (Nat → Demo.Token)
@@ -68,5 +68,5 @@ synth engine: both
 λ> :synth (Nat → Demo.Token)
   it1  fun _ => Demo.global («a» := Nat)
   it2  fun x => match x with | .zero => Demo.global («a» := Nat) | .succ _ => Demo.global («a» := Nat)
-note: exference: search truncated: step limit reached, queue limit pruned 8061
+note: exference: search truncated: step limit reached, queue limit pruned 9019
 λ> :quit

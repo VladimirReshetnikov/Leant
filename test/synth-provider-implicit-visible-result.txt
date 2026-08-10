@@ -1,0 +1,54 @@
+namespace ImplicitVisible
+
+axiom Source : Type
+axiom Result : Type
+axiom Token : Type
+
+class Choice (a : Type 1) : Prop where
+  witness : True
+
+instance : Choice (∀ {P : Prop} (A : Type), P → A → Result) :=
+  ⟨True.intro⟩
+
+axiom token {a : Type 1} [Choice a] : Token
+axiom box {a : Type 1} [Choice a] : a × Unit
+
+end ImplicitVisible
+
+:set synth-steps 2048
+:set synth-engine djinn
+:synth ImplicitVisible.Token
+:set synth-engine exference
+:synth ImplicitVisible.Token
+:synth ∀ (P : Prop), P → ImplicitVisible.Source → ImplicitVisible.Result
+:set synth-engine both
+:synth ImplicitVisible.Token
+:synth ∀ (P : Prop), P → ImplicitVisible.Source → ImplicitVisible.Result
+
+namespace DomainCollision
+
+axiom Result : Type
+axiom Box (a : Type 1) : Type
+
+class Choice (a : Type 1) : Prop where
+  witness : True
+
+instance choicePropType :
+    Choice (∀ {P : Prop} (A : Type), (P → A) → Result) :=
+  ⟨True.intro⟩
+
+instance choiceTypeProp :
+    Choice (∀ {A : Type} (P : Prop), (A → P) → Result) :=
+  ⟨True.intro⟩
+
+axiom selected {a : Type 1} [Choice a] : Box a
+
+end DomainCollision
+
+:set synth-engine djinn
+:synth DomainCollision.Box (∀ {P : Prop} (A : Type), (P → A) → DomainCollision.Result)
+:set synth-engine exference
+:synth DomainCollision.Box (∀ {P : Prop} (A : Type), (P → A) → DomainCollision.Result)
+:set synth-engine both
+:synth DomainCollision.Box (∀ {P : Prop} (A : Type), (P → A) → DomainCollision.Result)
+:quit

@@ -37,15 +37,18 @@ module Leant.Synth.Fragment
   , GoalSort (..)
   , ParsedGoal (..)
   , ProviderFrag (..)
+  , ProviderForallDomain (..)
   , ProviderInstantiationArgument (..)
   , ProviderQuery (..)
   , maximumProviderArgumentKindArity
+  , maximumProviderExactForallDomains
   , synthPrelude
   , serializerProgram
   , providerProgram
   , candidateVerificationProgram
   , parseGoalSexp
   , parseProviderSexp
+  , fragVisibleForallVisibilities
   , fragHasDepth
   , fragHasInstanceBinder
   , fragProviderMayOpen
@@ -159,11 +162,27 @@ data ParsedGoal = ParsedGoal
 -- retains the historical proper-type argument representation; positive
 -- arities let a bare or partially applied Lean constructor cross the otherwise
 -- kind-erasing fragment boundary without pretending it is a proper type.
+data ProviderForallDomain
+  = ProviderForallDomainProp
+  | ProviderForallDomainType
+  | ProviderForallDomainSort
+  deriving (Eq, Show)
+
 data ProviderInstantiationArgument
   = ProviderInstantiationArgument
       { providerInstantiationArgumentKindArity :: Int
       , providerInstantiationArgumentFrag :: Frag
         -- ^ Legacy and proper-kind fragment payload.
+      }
+  | ProviderInstantiationExactArgument
+      { providerInstantiationArgumentKindArity :: Int
+      , providerInstantiationArgumentFrag :: Frag
+        -- ^ Canonical engine payload used for checking and specialization.
+      , providerInstantiationArgumentForallDomains :: [ProviderForallDomain]
+        -- ^ Bounded semantic domains for the 'FAll' nodes traversed by the
+        -- visible-type renderer, in preorder. The fragment retains binder
+        -- visibility; this vector distinguishes Prop, Type, and general Sort
+        -- domains without transporting executable Lean syntax.
       }
   | ProviderInstantiationNominalArgument
       { providerInstantiationArgumentKindArity :: Int
@@ -182,6 +201,12 @@ data ProviderInstantiationArgument
 -- snapshot that claims one, keeping every side of the protocol aligned.
 maximumProviderArgumentKindArity :: Int
 maximumProviderArgumentKindArity = 64
+
+-- | Maximum number of forall-domain tags retained for one exact proper-kind
+-- provider argument. The serializer itself has depth 80 in provider mode;
+-- this independent parser-side cap keeps caller-authored snapshots bounded.
+maximumProviderExactForallDomains :: Int
+maximumProviderExactForallDomains = 128
 
 -- | One Lean environment value lowered to the synthesis fragment.  The
 -- provider name remains the exact fully-qualified Lean spelling; the engine
@@ -647,8 +672,117 @@ synthPrelude inventory = unlines
   , "      pure (some (\"(nominal \" ++ esc n.toString ++ rendered ++ \")\"))"
   , "  | _ => pure none"
   , ""
+  , "-- Record only semantic forall-domain classes, never pretty-printed Lean"
+  , "-- syntax. This traversal mirrors the fragment shapes whose FAll nodes"
+  , "-- become visible type syntax on the Haskell side: logical arguments and"
+  , "-- proper-type application/inductive parameters recurse in source order;"
+  , "-- constructor inventories remain nominal metadata and opaque atoms stop."
+  , "def providerForallDomainTag? (domain : Expr)"
+  , "    : MetaM (Option String) := do"
+  , "  let domain ← whnfR domain.consumeMData"
+  , "  match domain with"
+  , "  | Expr.sort .zero => pure (some \"prop\")"
+  , "  | Expr.sort (.succ _) => pure (some \"type\")"
+  , "  | Expr.sort _ => pure (some \"sort\")"
+  , "  | _ => pure none"
+  , ""
+  , "partial def providerForallDomains? (fuel depth : Nat) (e : Expr)"
+  , "    : MetaM (Option (Array String)) := do"
+  , "  match fuel with"
+  , "  | 0 => pure none"
+  , "  | Nat.succ fuel => do"
+  , "    let e ← instantiateMVars e"
+  , "    let e ← whnfR e.consumeMData"
+  , "    if e.isSort then pure (some #[])"
+  , "    else match e with"
+  , "    | Expr.fvar _ => pure (some #[])"
+  , "    | Expr.forallE _ domain body binderInfo =>"
+  , "      if body.hasLooseBVars then do"
+  , "        if ← isTypeKind domain then"
+  , "          match ← providerForallDomainTag? domain with"
+  , "          | none => pure none"
+  , "          | some tag =>"
+  , "            withLocalDeclD (Name.mkSimple (\"s\" ++ toString depth))"
+  , "                domain fun fv => do"
+  , "              match ← providerForallDomains? fuel (depth + 1)"
+  , "                  (body.instantiate1 fv) with"
+  , "              | none => pure none"
+  , "              | some rest => pure (some (#[tag] ++ rest))"
+  , "        else pure (some #[])"
+  , "      else if binderInfo.isInstImplicit then"
+  , "        -- Exact provider arguments are context-free. Reject a contextual"
+  , "        -- binder wherever WHNF exposes it, including beneath an alias,"
+  , "        -- before 'go false' could emit an unparsable FInst payload."
+  , "        pure none"
+  , "      else if binderInfo.isExplicit then do"
+  , "        match ← providerForallDomains? fuel depth domain with"
+  , "        | none => pure none"
+  , "        | some left =>"
+  , "          match ← providerForallDomains? fuel depth body with"
+  , "          | none => pure none"
+  , "          | some right => pure (some (left ++ right))"
+  , "      else if ← isTypeKind domain then"
+  , "        match ← providerForallDomainTag? domain with"
+  , "        | none => pure none"
+  , "        | some tag =>"
+  , "          match ← providerForallDomains? fuel depth body with"
+  , "          | none => pure none"
+  , "          | some rest => pure (some (#[tag] ++ rest))"
+  , "      else pure none"
+  , "    | _ =>"
+  , "      match e.getAppFn with"
+  , "      | Expr.const name _ => do"
+  , "        let args := e.getAppArgs"
+  , "        let collectArguments : MetaM (Option (Array String)) := do"
+  , "          let resultType ← whnfR (← inferType e)"
+  , "          if !resultType.isSort || args.isEmpty then pure (some #[])"
+  , "          else do"
+  , "            let mut domains := #[]"
+  , "            for argument in args do"
+  , "              let argumentType ← whnfR (← inferType argument)"
+  , "              if !argumentType.isSort then return some #[]"
+  , "              match ← providerForallDomains? fuel depth argument with"
+  , "              | none => return none"
+  , "              | some nested => domains := domains ++ nested"
+  , "            pure (some domains)"
+  , "        if args.size == 2 &&"
+  , "            (name == ``And || name == ``Prod || name == ``PProd"
+  , "              || name == ``Or || name == ``Sum || name == ``PSum) then"
+  , "          collectArguments"
+  , "        else if args.size == 2 && name == ``Iff then do"
+  , "          match ← providerForallDomains? fuel depth args[0]! with"
+  , "          | none => pure none"
+  , "          | some left =>"
+  , "            match ← providerForallDomains? fuel depth args[1]! with"
+  , "            | none => pure none"
+  , "            | some right => pure (some (left ++ right ++ right ++ left))"
+  , "        else if args.size == 1 && name == ``Not then"
+  , "          providerForallDomains? fuel depth args[0]!"
+  , "        else collectArguments"
+  , "      | Expr.fvar _ => do"
+  , "        let args := e.getAppArgs"
+  , "        let resultType ← whnfR (← inferType e)"
+  , "        if !resultType.isSort || args.isEmpty then pure (some #[])"
+  , "        else do"
+  , "          let mut domains := #[]"
+  , "          for argument in args do"
+  , "            let argumentType ← whnfR (← inferType argument)"
+  , "            if !argumentType.isSort then return some #[]"
+  , "            match ← providerForallDomains? fuel depth argument with"
+  , "            | none => return none"
+  , "            | some nested => domains := domains ++ nested"
+  , "          pure (some domains)"
+  , "      | _ => pure (some #[])"
+  , ""
+  , "structure ProviderCandidateFragment where"
+  , "  kindArity : Nat"
+  , "  canonical : String"
+  , "  payload : String"
+  , "  domains : Array String"
+  , "  candidate : Expr"
+  , ""
   , "def providerCandidateFragment? (fuel : Nat) (candidate : Expr)"
-  , "    : MetaM (Option (Nat × String)) := do"
+  , "    : MetaM (Option ProviderCandidateFragment) := do"
   , "  let candidate ← instantiateMVars candidate"
   , "  if candidate.hasMVar || candidate.hasLevelMVar"
   , "      || candidate.hasFVar || candidate.hasLooseBVars"
@@ -658,15 +792,52 @@ synthPrelude inventory = unlines
   , "    let kind ← whnfR (← inferType candidate)"
   , "    match ← typeKindArity? fuel kind with"
   , "    | none => pure none"
-  , "    | some 0 =>"
-  , "      pure (some (0, ← go false fuel 0 [] candidate))"
+  , "    | some 0 => do"
+  , "      match ← providerForallDomains? fuel 0 candidate with"
+  , "      | none => pure none"
+  , "      | some domains =>"
+  , "        if domains.size > "
+      ++ show maximumProviderExactForallDomains ++ " then pure none"
+  , "        else do"
+  , "          let fragment ← go false fuel 0 [] candidate"
+  , "          let domainText := String.join"
+  , "            (domains.toList.map fun domain => \" \" ++ domain)"
+  , "          pure (some"
+  , "            { kindArity := 0"
+  , "            , canonical := fragment"
+  , "            , payload := \"(exact (domains\" ++ domainText ++ \") \""
+  , "                ++ fragment ++ \")\""
+  , "            , domains := domains"
+  , "            , candidate := candidate })"
   , "    | some arity =>"
   , "      if arity > " ++ show maximumProviderArgumentKindArity ++ " then"
   , "        pure none"
   , "      else"
   , "        match ← providerNominalCandidateFragment? fuel candidate with"
   , "        | none => pure none"
-  , "        | some fragment => pure (some (arity, fragment))"
+  , "        | some fragment => pure (some"
+  , "            { kindArity := arity"
+  , "            , canonical := fragment"
+  , "            , payload := fragment"
+  , "            , domains := #[]"
+  , "            , candidate := candidate })"
+  , ""
+  , "partial def providerCandidateAssignmentsDefEq"
+  , "    (left right : List ProviderCandidateFragment) : MetaM Bool := do"
+  , "  match left, right with"
+  , "  | [], [] => pure true"
+  , "  | firstLeft :: remainingLeft, firstRight :: remainingRight =>"
+  , "    if firstLeft.kindArity != firstRight.kindArity"
+  , "        || firstLeft.canonical != firstRight.canonical"
+  , "        || firstLeft.domains != firstRight.domains then"
+  , "      pure false"
+  , "    else do"
+  , "      let same ← Lean.withoutModifyingState do"
+  , "        isDefEq firstLeft.candidate firstRight.candidate"
+  , "      if same then"
+  , "        providerCandidateAssignmentsDefEq remainingLeft remainingRight"
+  , "      else pure false"
+  , "  | _, _ => pure false"
   , ""
   , "-- Resolve a fixed ordered obligation list by applying active instance"
   , "-- heads in the same order as Lean's resolver.  Return the successful"
@@ -707,12 +878,12 @@ synthPrelude inventory = unlines
   , "-- The inventory is provider-local and bounded: 32 heads inspected, 16"
   , "-- distinct complete assignments."
   , "partial def providerInstantiationAssignments (fuel : Nat) (source : Expr)"
-  , "    : MetaM (Array (Array (Nat \215 String))) := do"
+  , "    : MetaM (Array (Array ProviderCandidateFragment)) := do"
   , "  let (typeArgs, constraints) ← providerEvidenceSpine fuel "
       ++ show maximumProviderInstantiationArguments ++ " source"
   , "  if typeArgs.isEmpty || constraints.isEmpty then return #[]"
   , "  let mut inspected := 0"
-  , "  let mut assignments : Array (Array (Nat \215 String)) := #[]"
+  , "  let mut assignments : Array (Array ProviderCandidateFragment) := #[]"
   , "  for constraint in constraints, constraintIndex in [:constraints.size] do"
   , "    if inspected < 32 && assignments.size < 16 then"
   , "      let instances ← try"
@@ -740,7 +911,7 @@ synthPrelude inventory = unlines
   , "              match ← closeProviderConstraints fuel pending with"
   , "              | none => pure none"
   , "              | some closedMCtx => withMCtx closedMCtx do"
-  , "                let mut arguments : Array (Nat \215 String) := #[]"
+  , "                let mut arguments : Array ProviderCandidateFragment := #[]"
   , "                let mut complete := true"
   , "                for candidate in typeArgs do"
   , "                  match ← providerCandidateFragment? fuel candidate with"
@@ -750,9 +921,14 @@ synthPrelude inventory = unlines
   , "                  pure (some arguments)"
   , "                else pure none"
   , "          match assignment? with"
-  , "          | some assignment =>"
-  , "            if assignments.size < 16"
-  , "                && !assignments.contains assignment then"
+  , "          | some assignment => do"
+  , "            let mut duplicate := false"
+  , "            for previous in assignments do"
+  , "              if !duplicate then"
+  , "                let same ← providerCandidateAssignmentsDefEq"
+  , "                  previous.toList assignment.toList"
+  , "                if same then duplicate := true"
+  , "            if assignments.size < 16 && !duplicate then"
   , "              assignments := assignments.push assignment"
   , "          | none => pure ()"
   , "  pure assignments"
@@ -1045,8 +1221,8 @@ providerProgram sessionNames query = unlines
   , "          (assignments.toList.map fun assignment =>"
   , "            \" (args\" ++ String.join"
   , "              (assignment.toList.map fun argument =>"
-  , "                \" (kinded \" ++ toString argument.1 ++ \" \""
-  , "                  ++ argument.2 ++ \")\")"
+  , "                \" (kinded \" ++ toString argument.kindArity ++ \" \""
+  , "                  ++ argument.payload ++ \")\")"
   , "              ++ \")\")"
   , "        let evidenceText := if assignments.isEmpty then \"\" else"
   , "          \" (instantiations\" ++ assignmentText ++ \")\""
@@ -1061,11 +1237,9 @@ providerProgram sessionNames query = unlines
   escape '\\' = "\\\\"
   escape c = [c]
 
--- | Lean command used to verify one rendered synthesis candidate.
--- @noncomputable@ disables executable-code generation without weakening
--- elaboration, universe checking, safety checking, or the kernel type check.
--- It therefore admits opaque and axiom-backed inhabitants without requiring a
--- second backend round trip for every ordinary type-invalid candidate.
+-- | Verify a candidate in the user's actual session. @noncomputable@ disables
+-- executable-code generation without weakening elaboration, universe
+-- checking, safety checking, or the kernel type check.
 candidateVerificationProgram :: String -> String -> String
 candidateVerificationProgram goal term =
   "set_option autoImplicit true in noncomputable example : ("
@@ -1233,6 +1407,24 @@ parseProviderSexp text = do
             Right parsed
       _ -> Left "invalid provider instantiation argument kind arity"
     case rest of
+      TL : TSym "exact" : TL : TSym "domains" : domainTokens
+        | arity /= 0 ->
+            Left "exact Lean provider argument is not proper-kinded"
+        | otherwise -> do
+            (domains, exactTokens) <- providerForallDomains domainTokens
+            (frag, remaining) <- parseFrag exactTokens
+            case remaining of
+              TR : TR : final -> case fragVisibleForallVisibilities frag of
+                Nothing -> Left
+                  "exact Lean provider fragment has no reconstructable forall metadata"
+                Just visibilities
+                  | length visibilities /= length domains -> Left
+                      "exact Lean provider forall-domain vector does not align with its fragment"
+                  | otherwise -> Right
+                      ( ProviderInstantiationExactArgument arity frag domains
+                      , final
+                      )
+              _ -> Left "malformed exact Lean provider argument"
       TL : TSym "nominal" : TStr headName : nominalTokens -> do
         (arguments, remaining) <- evidenceFrags nominalTokens
         case remaining of
@@ -1250,6 +1442,22 @@ parseProviderSexp text = do
   providerArgument tokens = do
     (frag, remaining) <- parseFrag tokens
     Right (ProviderInstantiationArgument 0 frag, remaining)
+
+  providerForallDomains = go 0
+   where
+    go _ (TR : remaining) = Right ([], remaining)
+    go count (TSym tag : remaining)
+      | count >= maximumProviderExactForallDomains =
+          Left "exact Lean provider forall-domain vector is too long"
+      | otherwise = do
+          domain <- case tag of
+            "prop" -> Right ProviderForallDomainProp
+            "type" -> Right ProviderForallDomainType
+            "sort" -> Right ProviderForallDomainSort
+            _ -> Left "unknown exact Lean provider forall-domain tag"
+          (domains, final) <- go (count + 1) remaining
+          Right (domain : domains, final)
+    go _ _ = Left "malformed exact Lean provider forall-domain vector"
 
   evidenceFrags (TR : rest) = Right ([], rest)
   evidenceFrags tokens = do
@@ -1376,6 +1584,39 @@ parsePrems (TL : TSym "prem" : TStr name : toks) = do
 parsePrems toks = Right ([], toks)
 
 -- Fragment analysis ---------------------------------------------------------
+
+-- | Forall visibility in the exact preorder consumed by visible-type
+-- rendering. Constructor inventories describe nominal declarations rather
+-- than the occurrence's type syntax, so only occurrence parameters recurse.
+-- Open variables, instance binders, and truncation make reconstruction unsafe.
+fragVisibleForallVisibilities :: Frag -> Maybe [Bool]
+fragVisibleForallVisibilities = collect []
+ where
+  collect bound frag = case frag of
+    FArr parameter result -> descend bound [parameter, result]
+    FProd left right -> descend bound [left, right]
+    FSum left right -> descend bound [left, right]
+    FAll explicit binder body ->
+      (explicit :) <$> collect (binder : bound) body
+    FInst{} -> Nothing
+    FVar variable
+      | variable `elem` bound -> Just []
+      | otherwise -> Nothing
+    FAtom{} -> Just []
+    FApp _ _ head' arguments -> do
+      case head' of
+        AppVariable variable
+          | variable `notElem` bound -> Nothing
+        _ -> Just ()
+      descend bound arguments
+    FParamInd _ _ parameters _ -> descend bound parameters
+    FInd{} -> Just []
+    FParamRec _ _ _ parameters _ -> descend bound parameters
+    FRec _ _ parameters _ -> descend bound parameters
+    FDepth -> Nothing
+    _ -> Just []
+
+  descend bound = fmap concat . mapM (collect bound)
 
 -- | Whether translation exhausted its structural fuel anywhere in a
 -- fragment.  A live provider cannot repair missing type structure, so this
