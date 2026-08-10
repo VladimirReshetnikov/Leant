@@ -1283,6 +1283,63 @@ typeApplicationTests = testGroup "retained type applications"
       renderLeanTerm Map.empty providers Map.empty ([], 0, []) goal expression
         @?= Right
           ["fun x => Demo.consume x (fun _ y => y)"]
+  , testCase "continue through an inferred function-shaped result" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      let identity = FAll True "B"
+            (FArr (FVar "B") (FVar "B"))
+          token = FAtom False "Demo.Token"
+          consumer = FArr identity token
+          providerFrag = FAll False "A"
+            (FArr (FVar "A") (FVar "A"))
+          providers = Map.singleton "leantProvider0"
+            ("Demo.choose", Nothing, providerFrag)
+          expression = Lambda [Bind "consumer"] $
+            Apply
+              (Apply (Global providerName) (Local "consumer"))
+              (Lambda [Bind "identity"] (Local "identity"))
+      renderLeanTerm Map.empty providers Map.empty ([], 0, [])
+          (FArr consumer token) expression
+        @?= Right
+          ["fun f => Demo.choose f (fun _ x => x)"]
+  , testCase "fit nested exact provider applications recursively" $ do
+      consumeName <- expectRight $ mkIdentifier "leantProvider0"
+      transportName <- expectRight $ mkIdentifier "leantProvider1"
+      let identity = FAll True "B"
+            (FArr (FVar "B") (FVar "B"))
+          token = FAtom False "Demo.Token"
+          providers = Map.fromList
+            [ ( "leantProvider0"
+              , ("Demo.consume", Nothing, FArr identity token)
+              )
+            , ( "leantProvider1"
+              , ("Demo.transport", Nothing, FArr identity identity)
+              )
+            ]
+          expression = Apply (Global consumeName) $
+            Apply
+              (Global transportName)
+              (Lambda [Bind "identity"] (Local "identity"))
+      renderLeanTerm Map.empty providers Map.empty ([], 0, [])
+          token expression
+        @?= Right
+          ["Demo.consume (Demo.transport (fun _ x => x))"]
+  , testCase "open a trailing forall for structural elimination" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      let identity = FAll True "B"
+            (FArr (FVar "B") (FVar "B"))
+          natural = FAtom False "Nat"
+          providerFrag = FArr FTop $
+            FAll False "A" (FProd identity FTop)
+          providers = Map.singleton "leantProvider0"
+            ("Demo.make", Nothing, providerFrag)
+          expression = Lambda [Bind "unit", Bind "value"] $
+            Let (TuplePattern [Bind "function", Wildcard])
+              (Apply (Global providerName) (Local "unit"))
+              (Apply (Local "function") (Local "value"))
+      renderLeanTerm Map.empty providers Map.empty ([], 0, [])
+          (FArr FTop (FArr natural natural)) expression
+        @?= Right
+          ["fun x y => let ⟨f, _⟩ := Demo.make x; f _ y"]
   , testCase "retain inferred provider-result envelopes" $ do
       providerName <- expectRight $ mkIdentifier "leantProvider0"
       let natural = FAtom False "Nat"

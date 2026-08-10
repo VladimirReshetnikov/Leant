@@ -733,12 +733,14 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
           <$> declaredProvider providers global
       _ -> do
         (_, _, _, resultFrag) <-
-          analyzeKnownApplication avoiding dss expression
+          analyzeExactApplication avoiding dss expression
         pure resultFrag
   -- Analyze once for both elimination-result recovery and argument fitting.
   -- Each returned term domain includes every replacement learned at that
   -- argument, while the complete mixed spine is retained for reconstruction.
-  analyzeKnownApplication avoiding dss expression = do
+  analyzeKnownApplication = analyzeApplication False
+  analyzeExactApplication = analyzeApplication True
+  analyzeApplication preserveTrailing avoiding dss expression = do
     let (headExpr, arguments) = expressionFullApplicationSpine expression
     headFrag <- applicationHeadFrag dss headExpr
     let reserved = Set.unions
@@ -747,48 +749,60 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
           : map (fragVariableNames . snd) dss
           )
     (termDomains, resultFrag) <-
-      consumeApplication dss reserved arguments headFrag
+      consumeApplication preserveTrailing dss reserved arguments headFrag
     pure (headExpr, arguments, termDomains, resultFrag)
-  consumeApplication dss reserved = go Set.empty [] []
+  consumeApplication preserveTrailing dss reserved = go Set.empty [] []
    where
-    go consumed replacements termDomains arguments frag = case frag of
-      FAll _ binder rest ->
-        let replacementNames = Set.unions
-              [ Set.insert formal (fragVariableNames replacement)
-              | (formal, replacement) <- replacements
-              ]
-            fresh = freshFragBinder $ Set.unions
-              [ reserved
-              , consumed
-              , replacementNames
-              , fragVariableNames rest
-              ]
-            opened = renameFragBinder binder fresh rest
-            remaining = case arguments of
-              VisibleTypeArgumentArgument _ : tailArguments -> tailArguments
-              _ -> arguments
-        in go (Set.insert fresh consumed) replacements termDomains
-          remaining opened
-      FInst _ rest ->
-        go consumed replacements termDomains arguments rest
-      FArr domain rest -> case arguments of
-        TermArgument argument : remaining -> do
-          let replacementNames = Set.unions
-                [ Set.insert formal (fragVariableNames replacement)
-                | (formal, replacement) <- replacements
-                ]
-              argumentAvoiding = Set.unions
-                [reserved, consumed, replacementNames]
-          replacements' <- case
-              knownArgumentFrag argumentAvoiding dss argument of
-            Nothing -> Just replacements
-            Just actual ->
-              inferFragReplacements consumed replacements domain actual
-          let fittedDomain = specializeFrag replacements' domain
-          go consumed replacements' (fittedDomain : termDomains)
-            remaining rest
+    go consumed replacements termDomains arguments sourceFrag =
+      let frag = specializeFrag replacements sourceFrag
+      in case frag of
+        FAll _ binder rest
+          -- An exact term argument retains an unapplied trailing binder.
+          -- Elimination analysis instead keeps the historical silent opening
+          -- needed to expose a provider's structural result to case or let.
+          | preserveTrailing && null arguments ->
+              finish replacements termDomains arguments frag
+          | otherwise ->
+              let replacementNames = Set.unions
+                    [ Set.insert formal (fragVariableNames replacement)
+                    | (formal, replacement) <- replacements
+                    ]
+                  fresh = freshFragBinder $ Set.unions
+                    [ reserved
+                    , consumed
+                    , replacementNames
+                    , fragVariableNames rest
+                    ]
+                  opened = renameFragBinder binder fresh rest
+                  remaining = case arguments of
+                    VisibleTypeArgumentArgument _ : tailArguments ->
+                      tailArguments
+                    _ -> arguments
+              in go (Set.insert fresh consumed) replacements
+                termDomains remaining opened
+        FInst _ rest
+          | preserveTrailing && null arguments ->
+              finish replacements termDomains arguments frag
+          | otherwise ->
+              go consumed replacements termDomains arguments rest
+        FArr domain rest -> case arguments of
+          TermArgument argument : remaining -> do
+            let replacementNames = Set.unions
+                  [ Set.insert formal (fragVariableNames replacement)
+                  | (formal, replacement) <- replacements
+                  ]
+                argumentAvoiding = Set.unions
+                  [reserved, consumed, replacementNames]
+            replacements' <- case
+                knownArgumentFrag argumentAvoiding dss argument of
+              Nothing -> Just replacements
+              Just actual ->
+                inferFragReplacements consumed replacements domain actual
+            let fittedDomain = specializeFrag replacements' domain
+            go consumed replacements' (fittedDomain : termDomains)
+              remaining rest
+          _ -> finish replacements termDomains arguments frag
         _ -> finish replacements termDomains arguments frag
-      _ -> finish replacements termDomains arguments frag
 
     finish replacements termDomains arguments frag
       | not (null arguments) = Nothing
@@ -825,7 +839,7 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
                       (argument', j', env') = case exactArgument of
                         Just actual
                           | equivalentFrag domain actual ->
-                              (argument, j, env)
+                              fitEliminationInput argument j env
                         _ -> fit cm providers force domain argument j env
                   in (Apply function argument', j', env', remaining)
                 -- 'analyzeKnownApplication' accepts a term argument only by
