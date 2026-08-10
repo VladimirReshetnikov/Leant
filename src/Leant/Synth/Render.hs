@@ -376,6 +376,9 @@ declaredProvider providers name =
 --
 -- Lean 4 has no as-patterns and its @fun@\/@let@ binder patterns must be
 -- irrefutable, so before rendering:
+--   * Exference's intrinsic boxed-pair constructor patterns become the shared
+--     'TuplePattern' form emitted by Djinn, retaining irrefutable @fun@\/@let@
+--     destructuring and one fragment-fitting path for both engines;
 --   * every @As x p@ becomes a plain binding of @x@ plus an inner
 --     @match x with | p => ...@ around the body;
 --   * a constructor pattern in @fun@\/@let@ position becomes a fresh
@@ -386,6 +389,11 @@ declaredProvider providers name =
 splitAs :: Pattern String -> (Pattern String, [(String, Pattern String)])
 splitAs pat = case pat of
   As x p -> (Bind x, [(x, p)])
+  Constructor n ps
+    | nameSpecial n == Just (TupleConstructor Boxed 2)
+    , length ps == 2 ->
+        let (ps', obs) = unzip (map splitAs ps)
+        in (TuplePattern ps', concat obs)
   Constructor n ps ->
     let (ps', obs) = unzip (map splitAs ps)
     in (Constructor n ps', concat obs)
@@ -611,8 +619,9 @@ fit cm providers force frag expr n doms =
 -- applications whose heads have known source fragments, and through match
 -- alternatives (branches produce the scrutinized position's type;
 -- sum\/product eliminations also reveal the branch binders' domains when the
--- scrutinee is a known binder, whose quantifiers - instantiated silently by
--- the engine before the case split - are peeled first).
+-- scrutinee has a known local or provider fragment, whose quantifiers -
+-- instantiated silently by the engine before the case split - are peeled
+-- first).
 fitCore :: CtorMap -> ProviderMap -> Bool -> Frag -> Expression String -> Int
         -> [(String, Frag)] -> (Expression String, Int, [(String, Frag)])
 fitCore cm providers force cf ce n ds = case (cf, ce) of
@@ -658,24 +667,9 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
     in (VisibleTypeApplication function' argument, n1, ds1)
   (_, Case scrut alts) ->
     let (scrut', n0, ds0) = fitEliminationInput scrut n ds
-        scrutFrag = case scrut' of
-          Local s -> peelAlls <$> lookup s ds0
-          _ -> Nothing
+        scrutFrag = knownExpressionFrag ds0 scrut'
         goAlt (done, k, dss) (pat, body) =
-          let branchDoms = case (scrutFrag, pat) of
-                (Just (FSum a _), Constructor g [p])
-                  | Right GInl <- globalKind cm g -> bindDomainPairs p a
-                (Just (FSum _ b), Constructor g [p])
-                  | Right GInr <- globalKind cm g -> bindDomainPairs p b
-                (Just scrutineeFrag, Constructor g ps)
-                  | isDeclaredData scrutineeFrag
-                  , Just info <- declaredCtor cm g
-                  , Just fields <- constructorFieldsAt scrutineeFrag info
-                  , length ps == length fields ->
-                      concat (zipWith bindDomainPairs ps fields)
-                (Just f, TuplePattern _) -> bindDomainPairs pat f
-                (Just f, Bind x) -> [(x, f)]
-                _ -> []
+          let branchDoms = eliminationPatternDomains scrutFrag pat
               (body', k', dss') =
                 fit cm providers force cf body k (branchDoms ++ dss)
           in (done ++ [(pat, body')], k', dss')
@@ -683,11 +677,8 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
     in (Case scrut' alts', n1, ds1)
   (_, Let pat rhs body) ->
     let (rhs', n0, ds0) = fitEliminationInput rhs n ds
-        aliasDoms = case rhs' of
-          Local source -> case lookup source ds0 of
-            Just sourceFrag -> bindDomainPairs pat sourceFrag
-            Nothing -> []
-          _ -> []
+        aliasDoms = maybe [] (bindDomainPairs pat)
+          (knownExpressionFrag ds0 rhs')
         (body', n1, ds1) =
           fit cm providers force cf body n0 (aliasDoms ++ ds0)
     in (Let pat rhs' body', n1, ds1)
@@ -707,9 +698,6 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
   isDeclaredData FParamRec{} = True
   isDeclaredData FRec{} = True
   isDeclaredData _ = False
-  peelAlls (FAll _ _ b) = peelAlls b
-  peelAlls (FInst _ b) = peelAlls b
-  peelAlls f = f
   appSpine expr = spineAcc expr []
   spineAcc (Apply f a) acc = spineAcc f (a : acc)
   spineAcc f acc = (f, acc)
@@ -720,6 +708,42 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
       Nothing -> Nothing
     VisibleTypeApplication function _ -> applicationHeadFrag dss function
     _ -> Nothing
+  -- Recover the result fragment of a local/provider expression after its
+  -- ordinary term arguments have been consumed.  This is deliberately shared
+  -- by case and let fitting: a provider can expose a structured value directly
+  -- or return one from an application, and either elimination must retain the
+  -- domains of the fields it binds.  A consumed type binder that remains free
+  -- in the result needs substitution information this pass does not have, so
+  -- reject that fragment instead of fitting against a stale variable.
+  knownExpressionFrag dss expression =
+    let (headExpr, args) = appSpine expression
+    in applicationHeadFrag dss headExpr >>= consumeTermArgs (length args)
+  consumeTermArgs = go Set.empty
+   where
+    go consumed remaining frag = case frag of
+      FAll _ binder rest -> go (Set.insert binder consumed) remaining rest
+      FInst _ rest -> go consumed remaining rest
+      FArr _ rest | remaining > 0 -> go consumed (remaining - 1) rest
+      _ | remaining == 0
+        , Set.null
+            (consumed `Set.intersection` freeFragVariables Set.empty frag) ->
+              Just frag
+      _ -> Nothing
+  eliminationPatternDomains scrutineeFrag pat =
+    case (scrutineeFrag, pat) of
+      (Just (FSum a _), Constructor g [p])
+        | Right GInl <- globalKind cm g -> bindDomainPairs p a
+      (Just (FSum _ b), Constructor g [p])
+        | Right GInr <- globalKind cm g -> bindDomainPairs p b
+      (Just frag, Constructor g ps)
+        | isDeclaredData frag
+        , Just info <- declaredCtor cm g
+        , Just fields <- constructorFieldsAt frag info
+        , length ps == length fields ->
+            concat (zipWith bindDomainPairs ps fields)
+      (Just frag, TuplePattern _) -> bindDomainPairs pat frag
+      (Just frag, Bind x) -> [(x, frag)]
+      _ -> []
   fitKnownApplication expression k dss = case appSpine expression of
     (headExpr, args@(_ : _)) -> case applicationHeadFrag dss headExpr of
       Nothing -> Nothing
@@ -767,12 +791,18 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
           in (Tuple elements', k1, dss1)
         Let pat rhs body ->
           let (rhs', k1, dss1) = fitEliminationInput rhs k dss
-              (body', k2, dss2) = fitEliminationInput body k1 dss1
+              aliasDoms = maybe [] (bindDomainPairs pat)
+                (knownExpressionFrag dss1 rhs')
+              (body', k2, dss2) =
+                fitEliminationInput body k1 (aliasDoms ++ dss1)
           in (Let pat rhs' body', k2, dss2)
         Case scrut alts ->
           let (scrut', k1, dss1) = fitEliminationInput scrut k dss
+              scrutFrag = knownExpressionFrag dss1 scrut'
               step (done, j, env) (pat, body) =
-                let (body', j', env') = fitEliminationInput body j env
+                let branchDoms = eliminationPatternDomains scrutFrag pat
+                    (body', j', env') =
+                      fitEliminationInput body j (branchDoms ++ env)
                 in (done ++ [(pat, body')], j', env')
               (alts', k2, dss2) = foldl step ([], k1, dss1) alts
           in (Case scrut' alts', k2, dss2)
