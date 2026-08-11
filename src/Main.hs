@@ -118,6 +118,9 @@ import Leant.Synth.Fragment
   , stripRecCtors
   , synthPrelude
   )
+import Leant.Synth.Observability
+  ( VerificationFailureClass (..)
+  )
 import Leant.Synth.ProviderCache
   ( ProviderCache
   , ProviderWorld
@@ -130,6 +133,12 @@ import Leant.Synth.ProviderCache
   , lookupProviderCache
   )
 import Leant.Synth.Replay (ReplayPlan (..), planReplay)
+import Leant.Synth.Verification
+  ( VariantVerdict (..)
+  , VerificationBatch
+  , verifiedCandidates
+  , verifyCandidateGroups
+  )
 
 #ifdef mingw32_HOST_OS
 import Data.Bits ((.|.))
@@ -2507,8 +2516,8 @@ synthClassical st args goal parsed = case glivenkoSplit (pgFrag parsed) of
 verifyAndDisplay :: St -> [String] -> String -> [[String]] -> IO Bool
 verifyAndDisplay _ _ _ [] = pure False
 verifyAndDisplay st args goal groups = do
-  (verified, _) <- synthVerify st goal groups
-  let shown = take synthMaxShown verified
+  verification <- synthVerify st goal groups
+  let shown = take synthMaxShown (verifiedCandidates verification)
   if null shown
     then pure False
     else do
@@ -2575,28 +2584,22 @@ synthBind st goal term = do
 -- stop once enough verified candidates are collected (design rule: only
 -- backend-verified candidates are ever shown).  Within a group, textual
 -- variants of one engine candidate are tried in order and the first that
--- elaborates represents the group.  Returns the verified terms and how
--- many groups failed entirely.
-synthVerify :: St -> String -> [[String]] -> IO ([String], Int)
-synthVerify st goal = go synthMaxShown 0
+-- elaborates represents the group.  Failure classification is deliberately
+-- ordered: transport, fatal response, error diagnostic, then a `sorry`.
+synthVerify :: St -> String -> [[String]] -> IO (VerificationBatch String)
+synthVerify st goal = verifyCandidateGroups synthMaxShown verifyVariant
  where
-  go _ failed [] = pure ([], failed)
-  go 0 failed _ = pure ([], failed)
-  go n failed (group : rest) = do
-    ok <- tryGroup group
-    case ok of
-      Just term -> do
-        (rest', failed') <- go (n - 1) failed rest
-        pure (term : rest', failed')
-      Nothing -> go n (failed + 1) rest
-
-  tryGroup [] = pure Nothing
-  tryGroup (term : variants) = do
+  verifyVariant term = do
     result <- runCurrentCmd st (candidateVerificationProgram goal term)
-    case result of
-      Right v | not (hasErrors v), Nothing <- respFatal v
-              , null (respSorries v) -> pure (Just term)
-      _ -> tryGroup variants
+    pure $ case result of
+      Left _ -> VariantRejected BackendRequestFailure
+      Right response
+        | isJust (respFatal response) ->
+            VariantRejected BackendFatalResponse
+        | hasErrors response -> VariantRejected LeanErrorDiagnostic
+        | not (null (respSorries response)) ->
+            VariantRejected LeanContainsSorry
+        | otherwise -> VariantAccepted
 
 completionCandidates :: St -> String -> IO [String]
 completionCandidates st prefix = do

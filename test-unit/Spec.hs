@@ -2,6 +2,7 @@ module Main (main) where
 
 import Control.Exception (finally)
 import qualified Data.ByteString.Char8 as BS
+import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.List (isInfixOf)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -33,6 +34,8 @@ import Language.Haskell.Djex
   , maximumProviderInstantiationArguments
   , maximumProviderInstantiationKindNodes
   , mkIdentifier
+  , noObservations
+  , observationCount
   , specifiedVisibleTypeArgument
   , tupleName
   )
@@ -81,6 +84,12 @@ import Leant.Synth.Fragment
   , serializerProgram
   , synthPrelude
   )
+import Leant.Synth.Observability
+  ( LeantSynthesisMetric (..)
+  , VerificationFailureClass (..)
+  , leantObservationCodeEntries
+  , leantSynthesisMetricCode
+  )
 import Leant.Synth.ProviderCache
   ( advanceProviderWorld
   , canonicalProviderQuery
@@ -98,6 +107,13 @@ import Leant.Synth.Render
   , ProviderInfo (..)
   , providerInfo
   , renderLeanTerm
+  )
+import Leant.Synth.Verification
+  ( VariantVerdict (..)
+  , failedCandidateGroups
+  , verificationObservations
+  , verifiedCandidates
+  , verifyCandidateGroups
   )
 import Leant.Session.Replay (itCounterAfterHistory, replayHistoryWith)
 import Leant.Session.Snapshot
@@ -123,6 +139,7 @@ main = defaultMain $ testGroup "Leant synthesis boundary"
   , replayPlanTests
   , providerProgramTests
   , candidateVerificationTests
+  , verificationObservabilityTests
   , providerParserTests
   , instanceImplicitTests
   , providerEngineTests
@@ -475,6 +492,90 @@ candidateVerificationTests = testGroup "candidate verification programs"
   [ testCase "retry valid opaque inhabitants as noncomputable" $
       candidateVerificationProgram "Widget" "Widget.saved" @?=
         "set_option autoImplicit true in noncomputable example : (Widget) := (Widget.saved)"
+  ]
+
+verificationObservabilityTests :: TestTree
+verificationObservabilityTests = testGroup "verification observability"
+  [ testCase "assign unique stable codes to every metric" $ do
+      let failures = [minBound .. maxBound]
+          metrics =
+            [ LegacyCandidateFallback
+            , TypedCandidateRendered
+            , LeanVariantAttempted
+            ]
+            ++ map LeanVerificationFailure failures
+            ++ [LeanCandidateVerified]
+          codes = map leantSynthesisMetricCode metrics
+      codes @?=
+        [ "legacy-candidate-fallback"
+        , "typed-candidate-rendered"
+        , "lean-variant-attempted"
+        , "lean-verification-failure.backend-request"
+        , "lean-verification-failure.backend-fatal-response"
+        , "lean-verification-failure.error-diagnostic"
+        , "lean-verification-failure.contains-sorry"
+        , "lean-candidate-verified"
+        ]
+      Set.size (Set.fromList codes) @?= length codes
+  , testCase "classify rejections exactly once before a success" $ do
+      let verdict candidate = pure $ case candidate of
+            "request" -> VariantRejected BackendRequestFailure
+            "fatal" -> VariantRejected BackendFatalResponse
+            "diagnostic" -> VariantRejected LeanErrorDiagnostic
+            "sorry" -> VariantRejected LeanContainsSorry
+            _ -> VariantAccepted
+      batch <- verifyCandidateGroups 1 verdict
+        [["request", "fatal", "diagnostic", "sorry", "accepted"]]
+      verifiedCandidates batch @?= ["accepted"]
+      failedCandidateGroups batch @?= 0
+      let observations = verificationObservations batch
+          failures = sum
+            [ observationCount (LeanVerificationFailure failure) observations
+            | failure <- [minBound .. maxBound]
+            ]
+          attempts = observationCount LeanVariantAttempted observations
+          verified = observationCount LeanCandidateVerified observations
+      attempts @?= 5
+      failures @?= 4
+      verified @?= 1
+      attempts @?= failures + verified
+  , testCase "failed groups do not consume the success quota" $ do
+      attemptsRef <- newIORef ([] :: [String])
+      let verdict candidate = do
+            modifyIORef' attemptsRef (++ [candidate])
+            pure $ if candidate == "accepted"
+              then VariantAccepted
+              else VariantRejected LeanErrorDiagnostic
+      batch <- verifyCandidateGroups 1 verdict
+        [["rejected-1", "rejected-2"], ["accepted"], ["unreached"]]
+      attempted <- readIORef attemptsRef
+      attempted @?= ["rejected-1", "rejected-2", "accepted"]
+      verifiedCandidates batch @?= ["accepted"]
+      failedCandidateGroups batch @?= 1
+      observationCount LeanVariantAttempted
+        (verificationObservations batch) @?= 3
+  , testCase "empty groups fail without recording a variant attempt" $ do
+      batch <- verifyCandidateGroups 1 (const (pure VariantAccepted))
+        [[], ["accepted"]]
+      verifiedCandidates batch @?= ["accepted"]
+      failedCandidateGroups batch @?= 1
+      leantObservationCodeEntries (verificationObservations batch) @?=
+        [ ("lean-variant-attempted", 1)
+        , ("lean-candidate-verified", 1)
+        ]
+  , testCase "quota and acceptance leave partial tails untouched" $ do
+      zero <- verifyCandidateGroups 0
+        (const (assertFailure "zero quota attempted a variant"
+          >> pure VariantAccepted))
+        (error "zero quota forced the group list")
+      verifiedCandidates zero @?= ([] :: [String])
+      verificationObservations zero @?= noObservations
+      one <- verifyCandidateGroups 1 (const (pure VariantAccepted))
+        (("accepted" : error "accepted group forced its variant tail")
+          : error "success quota forced the group tail")
+      verifiedCandidates one @?= ["accepted"]
+      observationCount LeanVariantAttempted
+        (verificationObservations one) @?= 1
   ]
 
 replayPlanTests :: TestTree
