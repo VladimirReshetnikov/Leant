@@ -57,6 +57,17 @@ import Language.Haskell.Djex
   , specifiedVisibleTypeArgument
   , typedCandidateTermGraph
   , tupleName
+  , behavioralProblemFingerprint
+  , checkedLengthProblemBehavioralProblem
+  , defaultLengthEvaluationLimits
+  , fingerprintCanonicalBytes
+  , lengthSMTLibQueryBehavioralProblem
+  , lengthSMTLibQueryFingerprint
+  , lengthSMTLibQueryInputSymbols
+  , lengthSMTLibQueryInputValueRequestBytes
+  , lengthSMTLibQueryLogic
+  , lengthSMTLibQuerySchemaTag
+  , validateLengthSMTLibCounterexample
   )
 
 import Leant.Backend (findBackendProject)
@@ -140,6 +151,8 @@ import Leant.Synth.Fragment
   , serializerProgram
   , synthPrelude
   )
+import Leant.Synth.Length.Adapter
+  ( prepareLengthQueryFromHandoff )
 import Leant.Synth.Observability
   ( CandidateRenderingRoute (..)
   , LeantSynthesisMetric (..)
@@ -1586,6 +1599,30 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                         $ checkedLengthHandoffProblem handoff
                   checkedLengthCandidateResult candidate @?=
                     LengthLiteral 0
+                  query <- expectRight $
+                    prepareLengthQueryFromHandoff handoff
+                  lengthSMTLibQuerySchemaTag @?=
+                    map (fromIntegral . fromEnum)
+                      ("djex-length-z3-qf-lia-smtlib2/v1" :: String)
+                  lengthSMTLibQueryLogic @?=
+                    map (fromIntegral . fromEnum) ("QF_LIA" :: String)
+                  lengthSMTLibQueryInputSymbols query @?= []
+                  lengthSMTLibQueryInputValueRequestBytes query @?= Nothing
+                  assertBool "the checked query retained no identity" $
+                    not $ null $ fingerprintCanonicalBytes
+                      $ lengthSMTLibQueryFingerprint query
+                  behavioralProblemFingerprint
+                      (lengthSMTLibQueryBehavioralProblem query) @?=
+                    behavioralProblemFingerprint
+                      (checkedLengthProblemBehavioralProblem
+                        $ checkedLengthHandoffProblem handoff)
+                  case validateLengthSMTLibCounterexample
+                      defaultLengthEvaluationLimits query [] of
+                    Right Nothing -> pure ()
+                    Right Just{} -> assertFailure
+                      "a false zero-input bad state produced evidence"
+                    Left failure -> assertFailure $
+                      "zero-input query replay failed: " ++ show failure
                   case inspectedProviderBindings expected of
                     [binding] ->
                       checkedLengthCandidateUsedProviders candidate @?=

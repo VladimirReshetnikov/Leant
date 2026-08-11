@@ -1,8 +1,9 @@
 -- | The narrow engine boundary for @:synth@ (design rule 4 of
 -- SYNTHESIS_PROPOSAL.md): fragment goal in, candidate batch out.  This is
--- the only Leant module that imports Djex; the engine behind the boundary
--- (today: Djinn's LJT search, in-process) is swappable without touching
--- the REPL layer.
+-- the module that owns Djex translation and search; the engine behind the
+-- boundary (today: Djinn's LJT search, in-process) is swappable without
+-- touching the REPL layer.  "Leant.Synth.Length.Adapter" is the separate
+-- narrow consumer of the exact checked problem projected below.
 --
 -- Verdicts follow Djex's evidence\/progress split, extended by the
 -- two-axis honesty rule of the proposal: a refutation is reported as

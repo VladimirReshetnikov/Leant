@@ -39,6 +39,7 @@ Executable leant
     Leant.Session.Snapshot
     Leant.Synth.Engine
     Leant.Synth.Fragment
+    Leant.Synth.Length.Adapter
     Leant.Synth.Observability
     Leant.Synth.ProviderCache
     Leant.Synth.Replay
@@ -72,6 +73,7 @@ Test-Suite leant-synth-tests
     Leant.Backend
     Leant.Synth.Engine
     Leant.Synth.Fragment
+    Leant.Synth.Length.Adapter
     Leant.Synth.Observability
     Leant.Synth.ProviderCache
     Leant.Synth.Replay
