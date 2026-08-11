@@ -120,6 +120,7 @@ import Leant.Synth.Fragment
   )
 import Leant.Synth.Observability
   ( VerificationFailureClass (..)
+  , leantObservationCodeEntries
   )
 import Leant.Synth.ProviderCache
   ( ProviderCache
@@ -136,6 +137,7 @@ import Leant.Synth.Replay (ReplayPlan (..), planReplay)
 import Leant.Synth.Verification
   ( VariantVerdict (..)
   , VerificationBatch
+  , verificationObservations
   , verifiedCandidates
   , verifyCandidateGroups
   )
@@ -2517,6 +2519,12 @@ verifyAndDisplay :: St -> [String] -> String -> [[String]] -> IO Bool
 verifyAndDisplay _ _ _ [] = pure False
 verifyAndDisplay st args goal groups = do
   verification <- synthVerify st goal groups
+  debug <- lookupEnv "LEANT_SYNTH_DEBUG"
+  when (isJust debug) $
+    forM_ (leantObservationCodeEntries
+        $ verificationObservations verification) $ \(code, count) ->
+      emitLn st =<< cDim st
+        ("debug metric: " ++ code ++ "=" ++ show count)
   let shown = take synthMaxShown (verifiedCandidates verification)
   if null shown
     then pure False

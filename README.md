@@ -1327,7 +1327,9 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   rather than restarting for each lane; hitting it is reported as "no answer",
   never as a verdict.
 - `LEANT_SYNTH_DEBUG=1` prints the translated fragment, discovered providers,
-  and rendered variants — the fastest way to see why a candidate was dropped.
+  rendered variants, and stable `code=count` verification metrics — the
+  fastest way to see why a candidate was dropped and how much Lean work the
+  lane performed.
 
 ## How it works
 
