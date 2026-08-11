@@ -270,6 +270,17 @@ schemes are instantiated at a bounded set of query and environment types, and
 impredicative instantiation is admitted under a guard that never invents a
 polytype the checked input did not supply.
 
+Leant's detailed Exference route now retains an opaque checked candidate, the
+exact session inventory, and a lazy attempt at Djex's canonical typed-graph
+fingerprint beside the originating rendered group. Textual ordering and the
+compatibility result stay unchanged when that structural fingerprint is
+unavailable. Filtering preserves the sidecar only with its original candidate;
+deduplication never transfers it to an earlier textual duplicate, and wrappers
+such as `Classical.byContradiction` discard it because they denote a new term.
+This is deliberately a solver-neutral identity seam, not behavioral evidence:
+future contract interpreters must still bind the exact request, provider
+assumptions, and Lean verification result.
+
 Three rules run through the design:
 
 - **The engine is never trusted.** Every candidate is re-elaborated by

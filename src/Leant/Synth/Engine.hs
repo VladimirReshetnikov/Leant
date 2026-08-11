@@ -29,9 +29,15 @@ module Leant.Synth.Engine
   ( SynthEngine (..)
   , SynthOutcome (..)
   , DetailedCandidateGroup
+  , TypedCandidateSemanticSidecar
   , detailedCandidateGroup
   , detailedCandidateGroupRoute
   , detailedCandidateGroupVariants
+  , detailedCandidateGroupSemanticSidecar
+  , typedCandidateSemanticCandidate
+  , typedCandidateSemanticInventory
+  , typedCandidateSemanticFingerprint
+  , mapDetailedCandidateGroupVariantsDroppingSemanticSidecar
   , DetailedSynthOutcome (..)
   , projectDetailedSynthOutcome
   , parseSynthEngine
@@ -87,11 +93,14 @@ import Language.Haskell.Djex
       , ValueDeclaration
       )
   , Diagnostic
+  , ExferenceInventory
   , ExferenceLocal
   , ExferenceOptions (..)
   , ExferenceSessionPolicy (..)
+  , ExferenceTypedCandidate
   , ExferenceType
   , Expression
+  , Fingerprint
   , GroundKind
   , Name
   , Kind (FunctionKind, ProperTypeKind)
@@ -141,6 +150,12 @@ import Language.Haskell.Djex
   , typedCandidateCompatibility
   , typedCandidateTermGraph
   , TermGraph
+  , TermGraphFingerprintError
+  , TermGraphFingerprintSubject
+  , defaultTermGraphFingerprintByteLimit
+  , defaultTermGraphLimits
+  , exferenceSessionInventory
+  , fingerprintSharedTermGraph
   )
 
 import Leant.Synth.Observability
@@ -196,14 +211,78 @@ data SynthOutcome
     -- ^ no candidate and no logical claim, with notes
   deriving (Eq, Show)
 
+-- | Checked Exference identity retained with one originating rendered group.
+--
+-- The opaque typed candidate keeps its compatibility projection inseparable
+-- from the exact graph which produced the group.  The session inventory is the
+-- source authority against which that candidate was checked.  Fingerprinting
+-- remains deliberately lazy and fallible: inability to assign a structural
+-- key cannot remove, reorder, or reroute an otherwise valid rendered term.
+data TypedCandidateSemanticSidecar = TypedCandidateSemanticSidecar
+  ExferenceTypedCandidate
+  ExferenceInventory
+  (Either
+    (TermGraphFingerprintError ExferenceLocal ExferenceLocal)
+    (Fingerprint TermGraphFingerprintSubject))
+
+-- The fingerprint attempt is a pure, deterministic private projection of the
+-- exact candidate graph under fixed limits. Comparing its two authorities is
+-- therefore sufficient and keeps equality from forcing that lazy projection.
+instance Eq TypedCandidateSemanticSidecar where
+  TypedCandidateSemanticSidecar leftCandidate leftInventory _
+      == TypedCandidateSemanticSidecar rightCandidate rightInventory _ =
+    leftCandidate == rightCandidate && leftInventory == rightInventory
+
+-- | Recover the checked candidate without detaching its graph association.
+typedCandidateSemanticCandidate
+  :: TypedCandidateSemanticSidecar
+  -> ExferenceTypedCandidate
+typedCandidateSemanticCandidate
+    (TypedCandidateSemanticSidecar candidate _ _) = candidate
+
+-- | Recover the exact checked inventory from the candidate's Exference run.
+typedCandidateSemanticInventory
+  :: TypedCandidateSemanticSidecar
+  -> ExferenceInventory
+typedCandidateSemanticInventory
+    (TypedCandidateSemanticSidecar _ inventory _) = inventory
+
+-- | Lazily attempt the allocation-insensitive structural graph identity.
+-- Failure leaves ordinary synthesis and rendering unchanged.
+typedCandidateSemanticFingerprint
+  :: TypedCandidateSemanticSidecar
+  -> Either
+      (TermGraphFingerprintError ExferenceLocal ExferenceLocal)
+      (Fingerprint TermGraphFingerprintSubject)
+typedCandidateSemanticFingerprint
+    (TypedCandidateSemanticSidecar _ _ fingerprint) = fingerprint
+
 -- | One semantic candidate and the route that supplied the expression handed
 -- to Leant's renderer.  Every deduplication boundary names the textual-variant
--- key explicitly, so ordinary structural equality can still expose route
--- mistakes in tests.
+-- key explicitly.  A sidecar belongs to the originating engine candidate, not
+-- to an arbitrary spelling which happens to compare equal.
 data DetailedCandidateGroup = DetailedCandidateGroup
   CandidateRenderingRoute
   [String]
-  deriving (Eq, Show)
+  (Maybe TypedCandidateSemanticSidecar)
+
+-- Compare the observable sidecar authority without forcing its potentially
+-- expensive fingerprint thunk. The custom 'Show' instance likewise keeps
+-- routine diagnostics independent of that thunk.
+instance Eq DetailedCandidateGroup where
+  DetailedCandidateGroup leftRoute leftVariants leftSidecar
+      == DetailedCandidateGroup rightRoute rightVariants rightSidecar =
+    leftRoute == rightRoute
+      && leftVariants == rightVariants
+      && leftSidecar == rightSidecar
+
+instance Show DetailedCandidateGroup where
+  showsPrec precedence (DetailedCandidateGroup route variants _) =
+    showParen (precedence > 10) $
+      showString "DetailedCandidateGroup "
+        . showsPrec 11 route
+        . showChar ' '
+        . showsPrec 11 variants
 
 -- | Construct one internal semantic group.  This is exported only to the
 -- executable's focused boundary tests; Leant has no public library surface.
@@ -211,17 +290,51 @@ detailedCandidateGroup
   :: CandidateRenderingRoute
   -> [String]
   -> DetailedCandidateGroup
-detailedCandidateGroup = DetailedCandidateGroup
+detailedCandidateGroup route variants =
+  DetailedCandidateGroup route variants Nothing
 
 -- | Rendering-route sidecar for one semantic group.
 detailedCandidateGroupRoute
   :: DetailedCandidateGroup
   -> CandidateRenderingRoute
-detailedCandidateGroupRoute (DetailedCandidateGroup route _) = route
+detailedCandidateGroupRoute (DetailedCandidateGroup route _ _) = route
 
 -- | Ordered textual variants of one semantic group.
 detailedCandidateGroupVariants :: DetailedCandidateGroup -> [String]
-detailedCandidateGroupVariants (DetailedCandidateGroup _ variants) = variants
+detailedCandidateGroupVariants (DetailedCandidateGroup _ variants _) = variants
+
+-- | Exact candidate identity, when this group came from a retained checked
+-- Exference graph and has not subsequently been wrapped as another term.
+detailedCandidateGroupSemanticSidecar
+  :: DetailedCandidateGroup
+  -> Maybe TypedCandidateSemanticSidecar
+detailedCandidateGroupSemanticSidecar
+    (DetailedCandidateGroup _ _ sidecar) = sidecar
+
+-- | Apply an arbitrary textual wrapper. Such a wrapper denotes a new term and
+-- possibly a new target (notably @Classical.byContradiction@), so retaining the
+-- originating graph identity would associate semantics with the wrong term.
+mapDetailedCandidateGroupVariantsDroppingSemanticSidecar
+  :: (String -> String)
+  -> DetailedCandidateGroup
+  -> DetailedCandidateGroup
+mapDetailedCandidateGroupVariantsDroppingSemanticSidecar transform group =
+  DetailedCandidateGroup
+    (detailedCandidateGroupRoute group)
+    (map transform $ detailedCandidateGroupVariants group)
+    Nothing
+
+-- | Replace a group by a stable subset of its spellings without changing the
+-- originating engine candidate. Used only by filtering and scheduling paths
+-- which never synthesize a new textual term.
+retainDetailedCandidateGroupVariants
+  :: [String]
+  -> DetailedCandidateGroup
+  -> DetailedCandidateGroup
+retainDetailedCandidateGroupVariants variants group = DetailedCandidateGroup
+  (detailedCandidateGroupRoute group)
+  variants
+  (detailedCandidateGroupSemanticSidecar group)
 
 -- | Internal outcome retaining rendering provenance until the bounded group
 -- prefix is observed.  Compatibility APIs project this type immediately.
@@ -305,7 +418,7 @@ forceDetailedOutcome n outcome = case outcome of
   Right (DetailedSynthRefuted sound) -> if sound then 1 else 0
   Right (DetailedSynthNoTerm notes) -> noteSize notes
  where
-  groupSize (DetailedCandidateGroup route variants) =
+  groupSize (DetailedCandidateGroup route variants _) =
     route `seq` sum (map length variants)
   noteSize = sum . map length
 
@@ -720,9 +833,10 @@ exferenceRun steps render renderGraph goal decls instantiations = do
             -- search histories may converge on the same rendered term, and
             -- repetitions must not crowd later distinct candidates out of a
             -- bounded interactive response.
+            inventory = exferenceSessionInventory session
             groups = takeDistinctOn detailedCandidateGroupVariants
               candidateWindow
-              [ DetailedCandidateGroup route group
+              [ DetailedCandidateGroup route group sidecar
               | candidate <- selectionCandidates selection
               , let availability = typedCandidateTermGraph candidate
                     compatibility = typedCandidateCompatibility candidate
@@ -730,6 +844,14 @@ exferenceRun steps render renderGraph goal decls instantiations = do
                       . functionClauseExpression . candidateOutput
                     (route, rendered) = renderCandidateByAvailability
                       renderGraph render availability compatibility fallback
+                    sidecar = case availability of
+                      Right graph -> Just $ TypedCandidateSemanticSidecar
+                        candidate inventory
+                        (fingerprintSharedTermGraph
+                          defaultTermGraphLimits
+                          defaultTermGraphFingerprintByteLimit
+                          graph)
+                      Left _ -> Nothing
               , Right group <- [rendered]
               ]
             notes = maybe [] progressNotes (selectionProgress selection)
@@ -767,8 +889,8 @@ mergeCandidateGroups :: [[String]] -> [[String]] -> [[String]]
 mergeCandidateGroups left right =
   map detailedCandidateGroupVariants $
     mergeDetailedCandidateGroups
-      (map (DetailedCandidateGroup RouteUnobserved) left)
-      (map (DetailedCandidateGroup RouteUnobserved) right)
+      (map (detailedCandidateGroup RouteUnobserved) left)
+      (map (detailedCandidateGroup RouteUnobserved) right)
 
 -- | Route-preserving form of 'mergeCandidateGroups'.  Dedupe looks only at
 -- rendered spellings and keeps the route of the first group with a surviving
@@ -824,7 +946,7 @@ mergeDetailedCandidateGroups = djinnHead (synthMaxShown - 1) Set.empty
     in if null fresh
       then nextFresh seen' groups
       else Just
-        ( DetailedCandidateGroup (detailedCandidateGroupRoute group) fresh
+        ( retainDetailedCandidateGroupVariants fresh group
         , seen'
         , groups
         )
@@ -873,7 +995,7 @@ withoutCheckedCandidates checked =
 detailUnobservedOutcome :: SynthOutcome -> DetailedSynthOutcome
 detailUnobservedOutcome outcome = case outcome of
   SynthCandidates groups notes -> DetailedSynthCandidates
-    (map (DetailedCandidateGroup RouteUnobserved) groups) notes
+    (map (detailedCandidateGroup RouteUnobserved) groups) notes
   SynthRefuted sound -> DetailedSynthRefuted sound
   SynthNoTerm notes -> DetailedSynthNoTerm notes
 
@@ -933,10 +1055,10 @@ withoutCheckedDetailedCandidates checked outcome = case outcome of
  where
   freshGroups = filter (not . null . detailedCandidateGroupVariants)
     . map retainFresh
-  retainFresh group = DetailedCandidateGroup
-    (detailedCandidateGroupRoute group)
+  retainFresh group = retainDetailedCandidateGroupVariants
     (filter (`Set.notMember` checked)
       (detailedCandidateGroupVariants group))
+    group
 
 viaDiagnostic :: Either Diagnostic a -> Either String a
 viaDiagnostic = either (Left . renderDiagnostic) Right

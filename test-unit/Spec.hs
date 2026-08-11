@@ -4,6 +4,7 @@ import Control.Exception (finally)
 import qualified Data.ByteString.Char8 as BS
 import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.List (isInfixOf)
+import Data.Maybe (isNothing)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import System.Directory
@@ -38,6 +39,7 @@ import Language.Haskell.Djex
   , noObservations
   , observationCount
   , specifiedVisibleTypeArgument
+  , typedCandidateTermGraph
   , tupleName
   )
 
@@ -51,9 +53,11 @@ import Leant.Synth.Engine
   , TranslatedPremise (..)
   , detailedCandidateGroup
   , detailedCandidateGroupRoute
+  , detailedCandidateGroupSemanticSidecar
   , detailedCandidateGroupVariants
   , forceDetailedOutcome
   , inspectExferencePreparation
+  , mapDetailedCandidateGroupVariantsDroppingSemanticSidecar
   , mergeCandidateGroups
   , mergeDetailedCandidateGroups
   , mergeDetailedOutcomesSkipping
@@ -71,6 +75,9 @@ import Leant.Synth.Engine
   , renderCandidateByAvailability
   , takeDistinct
   , takeDistinctOn
+  , typedCandidateSemanticCandidate
+  , typedCandidateSemanticFingerprint
+  , typedCandidateSemanticInventory
   , withoutCheckedCandidates
   , withoutCheckedDetailedCandidates
   )
@@ -1390,8 +1397,21 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
             EngineExference 128 [] goal
       fmap projectDetailedSynthOutcome detailed @?= compatibility
       case detailed of
-        Right (DetailedSynthCandidates (group : _) _) ->
+        Right (DetailedSynthCandidates (group : _) _) -> do
           detailedCandidateGroupRoute group @?= RouteTypedCandidate
+          case detailedCandidateGroupSemanticSidecar group of
+            Nothing -> assertFailure
+              "typed graph rendering lost its semantic sidecar"
+            Just semantic -> do
+              case typedCandidateTermGraph
+                  (typedCandidateSemanticCandidate semantic) of
+                Left absence -> assertFailure $
+                  "typed semantic candidate lost its graph: " ++ show absence
+                Right _ -> pure ()
+              case typedCandidateSemanticFingerprint semantic of
+                Left fingerprintError -> assertFailure $
+                  "typed graph fingerprint failed: " ++ show fingerprintError
+                Right _ -> pure ()
         Right other -> assertFailure $
           "expected a typed Exference identity candidate, got: "
             ++ show other
@@ -1406,7 +1426,7 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
             EngineExference 256 [] goal
       fmap projectDetailedSynthOutcome detailed @?= compatibility
       case detailed of
-        Right (DetailedSynthCandidates groups _) ->
+        Right (DetailedSynthCandidates groups _) -> do
           assertBool
             ("expected an explicit nested-forall fallback, got: "
               ++ show groups)
@@ -1414,6 +1434,14 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
               ((== RouteLegacyCandidateFallback)
                 . detailedCandidateGroupRoute)
               groups)
+          assertBool
+            "a compatibility-only rendering retained typed graph semantics"
+            (all
+              (isNothing . detailedCandidateGroupSemanticSidecar)
+              (filter
+                ((== RouteLegacyCandidateFallback)
+                  . detailedCandidateGroupRoute)
+                groups))
         Right other -> assertFailure $
           "expected a fallback Exference candidate, got: " ++ show other
         Left err -> assertFailure err
@@ -1489,6 +1517,73 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
           , typed
           ]
         @?= [fallback, typed]
+  , testCase
+      "preserve only the originating typed sidecar through filtering and merge" $
+      do
+        let token = FAtom False "Demo.SemanticToken"
+            goal = FArr token token
+        case synthesizeWithProvidersSkippingDetailed
+            EngineExference 128 Set.empty [] goal of
+          Right (DetailedSynthCandidates (origin : _) _) ->
+            case detailedCandidateGroupSemanticSidecar origin of
+              Nothing -> assertFailure
+                "expected an originating typed semantic sidecar"
+              Just originalSemantic -> do
+                let filtered = withoutCheckedDetailedCandidates
+                      (Set.singleton "not-this-candidate")
+                      (DetailedSynthCandidates [origin] [])
+                case filtered of
+                  DetailedSynthCandidates [survivor] _ ->
+                    case detailedCandidateGroupSemanticSidecar survivor of
+                      Nothing -> assertFailure
+                        "filtering discarded the originating semantic sidecar"
+                      Just survivorSemantic -> do
+                        typedCandidateSemanticCandidate survivorSemantic
+                          @?= typedCandidateSemanticCandidate originalSemantic
+                        typedCandidateSemanticInventory survivorSemantic
+                          @?= typedCandidateSemanticInventory originalSemantic
+                        typedCandidateSemanticFingerprint survivorSemantic
+                          @?= typedCandidateSemanticFingerprint originalSemantic
+                  other -> assertFailure $
+                    "unexpected filtered typed outcome: " ++ show other
+                let earlier = detailedCandidateGroup RouteUnobserved
+                      (detailedCandidateGroupVariants origin)
+                    merged = mergeDetailedCandidateGroups [earlier] [origin]
+                assertBool
+                  "observable semantic ownership was absent from equality"
+                  (origin /= earlier)
+                merged @?= [earlier]
+                assertBool
+                  "a later duplicate transferred its sidecar to earlier text"
+                  (all
+                    (isNothing . detailedCandidateGroupSemanticSidecar)
+                    merged)
+          Right other -> assertFailure $
+            "expected a typed semantic candidate, got: " ++ show other
+          Left err -> assertFailure err
+  , testCase "drop typed semantics when wrapping a candidate as a new term" $ do
+      let token = FAtom False "Demo.WrappedToken"
+          goal = FArr token token
+      case synthesizeWithProvidersSkippingDetailed
+          EngineExference 128 Set.empty [] goal of
+        Right (DetailedSynthCandidates (origin : _) _) -> do
+          assertBool
+            "expected an originating typed semantic sidecar"
+            (not $ isNothing $ detailedCandidateGroupSemanticSidecar origin)
+          let wrap term = "Classical.byContradiction (" ++ term ++ ")"
+              wrapped =
+                mapDetailedCandidateGroupVariantsDroppingSemanticSidecar
+                  wrap origin
+          detailedCandidateGroupRoute wrapped
+            @?= detailedCandidateGroupRoute origin
+          detailedCandidateGroupVariants wrapped
+            @?= map wrap (detailedCandidateGroupVariants origin)
+          assertBool
+            "Classical.byContradiction retained stale typed semantics"
+            (isNothing $ detailedCandidateGroupSemanticSidecar wrapped)
+        Right other -> assertFailure $
+          "expected a typed candidate to wrap, got: " ++ show other
+        Left err -> assertFailure err
   , testCase "filter routes as sidecars and preserve old merge projection" $ do
       let checked = Set.singleton "old"
           typed = detailedCandidateGroup RouteTypedCandidate ["old", "fresh"]

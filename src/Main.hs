@@ -88,10 +88,10 @@ import Leant.Synth.Engine
   , DetailedSynthOutcome (..)
   , SynthEngine (..)
   , candidateWindow
-  , detailedCandidateGroup
   , detailedCandidateGroupRoute
   , detailedCandidateGroupVariants
   , forceDetailedOutcome
+  , mapDetailedCandidateGroupVariantsDroppingSemanticSidecar
   , parseSynthEngine
   , providerStages
   , synthMaxShown
@@ -2524,13 +2524,10 @@ synthClassical st args goal parsed = case glivenkoSplit (pgFrag parsed) of
         case bounded of
           Just (Right (DetailedSynthCandidates groups _)) ->
             verifyAndDisplay st args goal
-              (map (mapDetailedCandidateGroup wrap)
+              (map
+                (mapDetailedCandidateGroupVariantsDroppingSemanticSidecar wrap)
                 (take groupLimit groups))
           _ -> pure False
- where
-  mapDetailedCandidateGroup transform group = detailedCandidateGroup
-    (detailedCandidateGroupRoute group)
-    (map transform (detailedCandidateGroupVariants group))
 
 -- | Verify candidate groups, bind the survivors as `it1`, `it2`, ...,
 -- and display them.  In the session the candidates become real
