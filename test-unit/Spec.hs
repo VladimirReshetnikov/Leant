@@ -18,6 +18,7 @@ import System.Directory
   , createDirectory
   , createDirectoryIfMissing
   , createFileLink
+  , doesFileExist
   , findExecutable
   , getPermissions
   , getTemporaryDirectory
@@ -82,6 +83,7 @@ import Language.Haskell.Djex
   )
 
 import Leant.Backend (findBackendProject)
+import qualified Leant.Json as Json
 import Leant.Json.Bounded
   ( BoundedJsonError (..)
   , BoundedJsonErrorKind (..)
@@ -183,6 +185,24 @@ import Leant.Synth.Length.Configuration
   , LengthRankingConfigurationSource (..)
   , mkLengthRankingConfiguration
   , rankVerifiedLengthCandidatesConfigured
+  )
+import Leant.Synth.Length.Configuration.File
+  ( DisabledLengthRankingConfiguration
+  , LengthRankingConfigurationActivationError (..)
+  , LengthRankingConfigurationActivationPolicy (..)
+  , LengthRankingConfigurationFileError (..)
+  , LengthRankingConfigurationFileField (..)
+  , LengthRankingConfigurationFileObject (..)
+  , LengthRankingConfigurationFileTextMeasure (..)
+  , LengthRankingConfigurationFileValueType (..)
+  , LengthRankingConfigurationSyntaxError (..)
+  , LengthRankingConfigurationSyntaxLimit (..)
+  , LengthRankingConfigurationSyntaxPhase (..)
+  , activateLengthRankingConfiguration
+  , decodeLengthRankingConfigurationFile
+  , lengthRankingConfigurationFileFormat
+  , lengthRankingConfigurationFileJsonLimits
+  , lengthRankingConfigurationFileVersion
   )
 import Leant.Synth.Length.Ranking
   ( LengthRanking
@@ -1882,7 +1902,973 @@ lengthRankingConfigurationTests = testGroup "explicit ranking configuration"
       assertLengthRankingConfiguredAllIneligible
   , testCase "match the direct runner for healthy and failing live rankings"
       assertLengthRankingConfiguredLiveEquivalence
+  , lengthRankingConfigurationFileTests
   ]
+
+lengthRankingConfigurationFileTests :: TestTree
+lengthRankingConfigurationFileTests = testGroup
+  "versioned bounded ranking configuration file"
+  [ testCase "decode order-invariant pinned and unpinned v1 files explicitly"
+      assertLengthRankingConfigurationFileActivation
+  , testCase "apply format, version, schema, decimal, and digest precedence"
+      assertLengthRankingConfigurationFileSchemaPrecedence
+  , testCase "validate execution before evaluation before contract syntax"
+      assertLengthRankingConfigurationFileValidationPrecedence
+  , testCase "decode and activate without opening the configured executable"
+      assertLengthRankingConfigurationFileNoOpen
+  , testCase "reject unknown, missing, and mistyped fields at every object"
+      assertLengthRankingConfigurationFileObjectSchema
+  , testCase "admit operational caps exactly and reject maximum plus one"
+      assertLengthRankingConfigurationFileOperationalCaps
+  , testCase "decode every Length syntax constructor and reject bad shapes"
+      assertLengthRankingConfigurationFileSyntaxShapes
+  , testCase "enforce bounded contract syntax and provider associations"
+      assertLengthRankingConfigurationFileSyntaxBounds
+  , testCase "match the explicit configured live runner"
+      assertLengthRankingConfigurationFileLiveEquivalence
+  , testCase "keep paths, digests, fields, tags, and names out of Show errors"
+      assertLengthRankingConfigurationFileShowRedaction
+  ]
+
+assertLengthRankingConfigurationFileActivation :: IO ()
+assertLengthRankingConfigurationFileActivation =
+  withTemporaryDirectory "leant-length-file-activation" $ \root -> do
+    let executable = root </> "missing-z3"
+        unpinnedDocument = lengthRankingConfigurationFileFixture
+          executable Nothing
+        pinnedDocument = lengthRankingConfigurationFileFixture executable
+          $ Just $ replicate 64 '0'
+    lengthRankingConfigurationFileFormat @?=
+      Text.pack "leant-live-length-ranking-configuration"
+    lengthRankingConfigurationFileVersion @?= 1
+    lengthRankingConfigurationFileJsonLimits @?= BoundedJsonLimits
+      { boundedJsonMaximumTotalBytes = 262144
+      , boundedJsonMaximumNestingDepth = 133
+      , boundedJsonMaximumNodes = 32768
+      , boundedJsonMaximumObjectMembers = 32
+      , boundedJsonMaximumArrayElements = 257
+      , boundedJsonMaximumObjectKeyUtf8Bytes = 64
+      , boundedJsonMaximumStringUtf8Bytes = 16384
+      , boundedJsonMaximumStringUnicodeScalars = 4096
+      , boundedJsonMaximumNumberBytes = 80
+      }
+
+    unpinned <- expectLengthRankingConfigurationFile unpinnedDocument
+    case activateLengthRankingConfiguration
+        RequirePinnedExecutable unpinned of
+      Left failure -> failure @?=
+        LengthRankingConfigurationExecutablePinRequired
+      Right _ -> assertFailure
+        "an unpinned configuration passed require-pinned activation"
+    _ <- expectLengthRankingConfigurationActivation
+      PermitUnpinnedExecutable unpinned
+
+    pinned <- expectLengthRankingConfigurationFile pinnedDocument
+    _ <- expectLengthRankingConfigurationActivation
+      RequirePinnedExecutable pinned
+    _ <- expectLengthRankingConfigurationActivation
+      PermitUnpinnedExecutable pinned
+
+    reordered <- expectLengthRankingConfigurationFile
+      $ reverseJsonObjectFields pinnedDocument
+    _ <- expectLengthRankingConfigurationActivation
+      RequirePinnedExecutable reordered
+    pure ()
+
+assertLengthRankingConfigurationFileSchemaPrecedence :: IO ()
+assertLengthRankingConfigurationFileSchemaPrecedence =
+  withTemporaryDirectory "leant-length-file-schema" $ \root -> do
+    let executable = root </> "missing-z3"
+        base = lengthRankingConfigurationFileFixture executable Nothing
+        badEnvelope = addJsonField [] ("private-root-field", Json.JNull)
+          $ setJsonField ["version"] (Json.JInt 2)
+          $ setJsonField ["format"] (Json.JStr "private-format") base
+    assertLengthRankingConfigurationFileError
+      LengthRankingConfigurationUnsupportedFormat badEnvelope
+    assertLengthRankingConfigurationFileError
+      LengthRankingConfigurationUnsupportedVersion
+      $ setJsonField ["format"]
+          (Json.JStr $ Text.unpack lengthRankingConfigurationFileFormat)
+          badEnvelope
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationUnexpectedField
+        LengthRankingConfigurationRootObject)
+      $ deleteJsonField ["executionAdmission"]
+      $ addJsonField [] ("private-root-field", Json.JNull) base
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationMissingField
+        LengthRankingConfigurationRootObject
+        LengthRankingConfigurationExecutionField)
+      $ deleteJsonField ["contract"]
+      $ deleteJsonField ["execution"] base
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationFieldTypeMismatch
+        LengthRankingConfigurationVersionField
+        LengthRankingConfigurationIntegerValue)
+      $ setJsonField ["version"] (Json.JNum 1.0) base
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationFieldValueRejected
+        LengthRankingConfigurationExpectedExecutableSha256Field)
+      $ setJsonField ["execution", "expectedExecutableSha256"]
+          (Json.JStr $ replicate 64 'A') base
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationFieldValueRejected
+        LengthRankingConfigurationExpectedExecutableSha256Field)
+      $ setJsonField ["execution", "expectedExecutableSha256"]
+          (Json.JStr $ replicate 63 '0') base
+    _ <- expectLengthRankingConfigurationFile
+      $ setJsonField ["execution", "expectedExecutableSha256"]
+          (Json.JStr $ replicate 64 '0') base
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationFieldValueRejected
+        LengthRankingConfigurationExpectedExecutableSha256Field)
+      $ setJsonField ["execution", "expectedExecutableSha256"]
+          (Json.JStr $ replicate 65 '0') base
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationFieldTypeMismatch
+        LengthRankingConfigurationExpectedExecutableSha256Field
+        LengthRankingConfigurationNullOrStringValue)
+      $ setJsonField ["execution", "expectedExecutableSha256"]
+          (Json.JBool False) base
+    _ <- expectLengthRankingConfigurationFile
+      $ setJsonField ["execution", "artifactPolicy"]
+          (Json.JStr "input-values-after-satisfiable") base
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationFieldValueRejected
+        LengthRankingConfigurationArtifactPolicyField)
+      $ setJsonField ["execution", "artifactPolicy"]
+          (Json.JStr "private-artifact-policy") base
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationFieldTypeMismatch
+        LengthRankingConfigurationArtifactPolicyField
+        LengthRankingConfigurationStringValue)
+      $ setJsonField ["execution", "artifactPolicy"]
+          (Json.JBool False) base
+
+assertLengthRankingConfigurationFileValidationPrecedence :: IO ()
+assertLengthRankingConfigurationFileValidationPrecedence =
+  withTemporaryDirectory "leant-length-file-precedence" $ \root -> do
+    let base = lengthRankingConfigurationFileFixture
+          (root </> "missing-z3") Nothing
+        badEvaluation = setJsonField
+          ["evaluation", "assignmentValueBits"] (Json.JInt (-1))
+        badContract = setJsonField ["contract", "precondition"]
+          $ Json.JArr [Json.JStr "private-unknown-formula"]
+        allBad = setJsonField ["execution", "executablePath"]
+          (Json.JStr "djex-fake-z3") $ badEvaluation $ badContract base
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationExecutionRejected
+        Djex.LengthSMTLibExecutionExecutablePathNotAbsolute)
+      allBad
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationEvaluationRejected
+        $ Djex.NegativeLengthEvaluationLimit
+            Djex.LengthAssignmentValueBits (-1))
+      $ badEvaluation $ badContract base
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationSyntaxRejected
+        LengthRankingConfigurationPreconditionSyntax
+        LengthRankingConfigurationUnknownTag)
+      $ badContract base
+
+assertLengthRankingConfigurationFileNoOpen :: IO ()
+assertLengthRankingConfigurationFileNoOpen =
+  withFakeLengthSolver "healthy" $ \executable -> do
+    let sidecar = executable ++ ".events"
+    doesFileExist sidecar >>= (@?= False)
+    disabled <- expectLengthRankingConfigurationFile
+      $ lengthRankingConfigurationFileFixture executable Nothing
+    doesFileExist sidecar >>= (@?= False)
+    _ <- expectLengthRankingConfigurationActivation
+      PermitUnpinnedExecutable disabled
+    doesFileExist sidecar >>= (@?= False)
+
+assertLengthRankingConfigurationFileObjectSchema :: IO ()
+assertLengthRankingConfigurationFileObjectSchema =
+  withTemporaryDirectory "leant-length-file-objects" $ \root -> do
+    let base = lengthRankingConfigurationFileFixture
+          (root </> "missing-z3") Nothing
+        law = jsonLengthProviderLaw "Demo.provider" []
+          $ jsonLengthLiteral 0
+        withLaw = setJsonField ["contract", "providerLaws"]
+          (Json.JArr [law]) base
+        unexpected object path source =
+          ( LengthRankingConfigurationUnexpectedField object
+          , addJsonField path ("private-unexpected", Json.JNull) source
+          )
+        missing object field path source =
+          ( LengthRankingConfigurationMissingField object field
+          , deleteJsonField path source
+          )
+        unexpectedLaw = setJsonField ["contract", "providerLaws"]
+          (Json.JArr [prependJsonObjectField
+            ("private-unexpected", Json.JNull) law]) base
+        missingLaw = setJsonField ["contract", "providerLaws"]
+          (Json.JArr [deleteJsonObjectField "name" law]) base
+        cases =
+          [ unexpected LengthRankingConfigurationRootObject [] base
+          , unexpected LengthRankingConfigurationExecutionAdmissionObject
+              ["executionAdmission"] base
+          , unexpected LengthRankingConfigurationExecutionObject
+              ["execution"] base
+          , unexpected LengthRankingConfigurationResponseLimitsObject
+              ["execution", "responseLimits"] base
+          , unexpected LengthRankingConfigurationEvaluationObject
+              ["evaluation"] base
+          , unexpected LengthRankingConfigurationContractObject
+              ["contract"] base
+          , unexpected LengthRankingConfigurationSpineObject
+              ["contract", "spine"] base
+          , ( LengthRankingConfigurationUnexpectedField
+                $ LengthRankingConfigurationProviderLawObject 0
+            , unexpectedLaw
+            )
+          , missing LengthRankingConfigurationRootObject
+              LengthRankingConfigurationExecutionAdmissionField
+              ["executionAdmission"] base
+          , missing LengthRankingConfigurationExecutionAdmissionObject
+              LengthRankingConfigurationExecutablePathCharactersField
+              ["executionAdmission", "executablePathCharacters"] base
+          , missing LengthRankingConfigurationExecutionObject
+              LengthRankingConfigurationExecutablePathField
+              ["execution", "executablePath"] base
+          , missing LengthRankingConfigurationResponseLimitsObject
+              LengthRankingConfigurationResponseBytesField
+              ["execution", "responseLimits", "bytes"] base
+          , missing LengthRankingConfigurationEvaluationObject
+              LengthRankingConfigurationAssignmentValueBitsField
+              ["evaluation", "assignmentValueBits"] base
+          , missing LengthRankingConfigurationContractObject
+              LengthRankingConfigurationSpineField
+              ["contract", "spine"] base
+          , missing LengthRankingConfigurationSpineObject
+              LengthRankingConfigurationSpineFamilyField
+              ["contract", "spine", "family"] base
+          , ( LengthRankingConfigurationMissingField
+                (LengthRankingConfigurationProviderLawObject 0)
+                (LengthRankingConfigurationProviderLawNameField 0)
+            , missingLaw
+            )
+          ]
+    mapM_ (uncurry assertLengthRankingConfigurationFileError) cases
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationExpectedObject
+        LengthRankingConfigurationRootObject)
+      Json.JNull
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationExpectedObject
+        LengthRankingConfigurationExecutionAdmissionObject)
+      $ setJsonField ["executionAdmission"] Json.JNull base
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationFieldTypeMismatch
+        LengthRankingConfigurationExecutablePathField
+        LengthRankingConfigurationStringValue)
+      $ setJsonField ["execution", "executablePath"] (Json.JInt 0) base
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationFieldTypeMismatch
+        LengthRankingConfigurationProviderLawsField
+        LengthRankingConfigurationArrayValue)
+      $ setJsonField ["contract", "providerLaws"] (Json.JBool False) base
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationFieldTypeMismatch
+        (LengthRankingConfigurationProviderLawArgumentRolesField 0)
+        LengthRankingConfigurationArrayValue)
+      $ setJsonField ["contract", "providerLaws"]
+          (Json.JArr [setJsonField ["argumentRoles"]
+            (Json.JBool False) law]) withLaw
+
+assertLengthRankingConfigurationFileOperationalCaps :: IO ()
+assertLengthRankingConfigurationFileOperationalCaps =
+  withTemporaryDirectory "leant-length-file-caps" $ \root -> do
+    let base = lengthRankingConfigurationFileFixture
+          (root </> "missing-z3") Nothing
+        setInteger path value = setJsonField path $ Json.JInt value
+        direct path value = setInteger path value base
+        timeoutAt value = setInteger
+          ["execution", "solverTimeoutMilliseconds"] value
+          $ setInteger ["execution", "hostDeadlineMilliseconds"] 65000 base
+        cases =
+          [ ( LengthRankingConfigurationExecutablePathCharactersField
+            , 4096
+            , direct ["executionAdmission", "executablePathCharacters"]
+            )
+          , ( LengthRankingConfigurationPolicyFingerprintBytesField
+            , 262144
+            , direct ["executionAdmission", "policyFingerprintBytes"]
+            )
+          , ( LengthRankingConfigurationSolverTimeoutMillisecondsField
+            , 60000
+            , timeoutAt
+            )
+          , ( LengthRankingConfigurationSolverResourceLimitField
+            , 10000000
+            , direct ["execution", "solverResourceLimit"]
+            )
+          , ( LengthRankingConfigurationHostDeadlineMillisecondsField
+            , 65000
+            , direct ["execution", "hostDeadlineMilliseconds"]
+            )
+          , ( LengthRankingConfigurationResponseBytesField
+            , 65536
+            , direct ["execution", "responseLimits", "bytes"]
+            )
+          , ( LengthRankingConfigurationResponseNestingDepthField
+            , 64
+            , direct ["execution", "responseLimits", "nestingDepth"]
+            )
+          , ( LengthRankingConfigurationResponseNodesField
+            , 4096
+            , direct ["execution", "responseLimits", "nodes"]
+            )
+          , ( LengthRankingConfigurationResponseTokenBytesField
+            , 4096
+            , direct ["execution", "responseLimits", "tokenBytes"]
+            )
+          , ( LengthRankingConfigurationResponseIntegerBitsField
+            , 4096
+            , direct ["execution", "responseLimits", "integerBits"]
+            )
+          , ( LengthRankingConfigurationAssignmentValueBitsField
+            , 4096
+            , direct ["evaluation", "assignmentValueBits"]
+            )
+          , ( LengthRankingConfigurationIntermediateValueBitsField
+            , 4096
+            , direct ["evaluation", "intermediateValueBits"]
+            )
+          ]
+    mapM_ assertCap cases
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationFieldValueRejected
+        LengthRankingConfigurationExecutablePathCharactersField)
+      $ direct ["executionAdmission", "executablePathCharacters"] (-1)
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationResponseLimitsRejected
+        $ Djex.NegativeLengthSMTLibResponseLimit
+            Djex.LengthSMTLibResponseNestingDepth (-1))
+      $ direct ["execution", "responseLimits", "nestingDepth"] (-1)
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationExecutionRejected
+        $ Djex.ZeroLengthSMTLibExecutionConfigField
+            Djex.LengthSMTLibExecutionSolverTimeoutMilliseconds)
+      $ direct ["execution", "solverTimeoutMilliseconds"] 0
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationEvaluationRejected
+        $ Djex.NegativeLengthEvaluationLimit
+            Djex.LengthAssignmentValueBits (-1))
+      $ direct ["evaluation", "assignmentValueBits"] (-1)
+ where
+  assertCap (field, maximumValue, documentAt) = do
+    _ <- expectLengthRankingConfigurationFile $ documentAt maximumValue
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationPolicyLimitExceeded field
+        (fromInteger maximumValue) (fromInteger maximumValue + 1))
+      $ documentAt $ maximumValue + 1
+
+prependJsonObjectField
+  :: (String, Json.JValue)
+  -> Json.JValue
+  -> Json.JValue
+prependJsonObjectField field (Json.JObj fields) = Json.JObj $ field : fields
+prependJsonObjectField _ value = value
+
+deleteJsonObjectField :: String -> Json.JValue -> Json.JValue
+deleteJsonObjectField field (Json.JObj fields) = Json.JObj
+  [(name, value) | (name, value) <- fields, name /= field]
+deleteJsonObjectField _ value = value
+
+assertLengthRankingConfigurationFileSyntaxShapes :: IO ()
+assertLengthRankingConfigurationFileSyntaxShapes =
+  withTemporaryDirectory "leant-length-file-shapes" $ \root -> do
+    let base = lengthRankingConfigurationFileFixture
+          (root </> "missing-z3") Nothing
+        fullExpression = jsonLengthIf
+          (jsonLengthNot $ jsonLengthTruth False)
+          (jsonLengthMonus
+            (jsonLengthMaximum
+              (jsonLengthSum
+                [ jsonLengthInput 0
+                , jsonLengthScale 2 $ jsonLengthLiteral 3
+                ])
+              (jsonLengthLiteral 4))
+            (jsonLengthMinimum (jsonLengthLiteral 5)
+              $ jsonLengthLiteral 6))
+          (jsonLengthLiteral 7)
+        fullContract = jsonLengthContract
+          (jsonLengthAll
+            [ jsonLengthTruth True
+            , jsonLengthEqual fullExpression $ jsonLengthLiteral 0
+            , jsonLengthAtMost (jsonLengthLiteral 0) fullExpression
+            ])
+          (jsonLengthEqual jsonLengthResult $ jsonLengthLiteral 0)
+          [ jsonLengthProviderLaw "Demo.provider"
+              ["spine", "unobserved"]
+              (jsonLengthSum
+                [jsonLengthArgument 0, jsonLengthLiteral 1])
+          ]
+        withFullContract = setJsonField ["contract"] fullContract base
+        malformed value expected =
+          ( LengthRankingConfigurationSyntaxRejected
+              LengthRankingConfigurationPreconditionSyntax expected
+          , setJsonField ["contract", "precondition"] value base
+          )
+        malformedExpression value expected = malformed
+          (jsonLengthEqual value $ jsonLengthLiteral 0) expected
+        cases =
+          [ malformed (Json.JBool True)
+              LengthRankingConfigurationExpectedTaggedArray
+          , malformed (Json.JArr []) LengthRankingConfigurationExpectedTag
+          , malformed (Json.JArr [Json.JStr "private-tag"])
+              LengthRankingConfigurationUnknownTag
+          , malformedExpression
+              (Json.JArr [Json.JStr "result", Json.JInt 0])
+              (LengthRankingConfigurationTagArityMismatch 0 1)
+          , malformed (Json.JArr [Json.JStr "truth"])
+              (LengthRankingConfigurationTagArityMismatch 1 0)
+          , malformed
+              (Json.JArr [Json.JStr "equal", jsonLengthLiteral 0])
+              (LengthRankingConfigurationTagArityMismatch 2 1)
+          , malformedExpression
+              (Json.JArr
+                [ Json.JStr "if"
+                , jsonLengthTruth True
+                , jsonLengthLiteral 0
+                ])
+              (LengthRankingConfigurationTagArityMismatch 3 2)
+          , malformedExpression
+              (Json.JArr [Json.JStr "sum", Json.JBool False])
+              LengthRankingConfigurationExpectedSyntaxArray
+          , malformed
+              (Json.JArr [Json.JStr "truth", Json.JInt 1])
+              LengthRankingConfigurationExpectedSyntaxBoolean
+          , malformedExpression (jsonLengthLiteral (-1))
+              LengthRankingConfigurationExpectedSyntaxNatural
+          ]
+    _ <- expectLengthRankingConfigurationFile withFullContract
+    mapM_ (uncurry assertLengthRankingConfigurationFileError) cases
+
+assertLengthRankingConfigurationFileSyntaxBounds :: IO ()
+assertLengthRankingConfigurationFileSyntaxBounds =
+  withTemporaryDirectory "leant-length-file-syntax-bounds" $ \root -> do
+    let base = lengthRankingConfigurationFileFixture
+          (root </> "missing-z3") Nothing
+        withContract precondition postcondition laws =
+          setJsonField ["contract"]
+            (jsonLengthContract precondition postcondition laws) base
+        preconditionLimit limit maximumValue =
+          LengthRankingConfigurationSyntaxRejected
+            LengthRankingConfigurationPreconditionSyntax
+            $ LengthRankingConfigurationSyntaxLimitExceeded
+                limit maximumValue (maximumValue + 1)
+        providerLimit index limit maximumValue observed =
+          LengthRankingConfigurationSyntaxRejected
+            (LengthRankingConfigurationProviderTransferSyntax index)
+            $ LengthRankingConfigurationSyntaxLimitExceeded
+                limit maximumValue observed
+
+    _ <- expectLengthRankingConfigurationFile $ withContract
+      (nestedLengthNot 63 $ jsonLengthTruth True)
+      (jsonLengthTruth True) []
+    assertLengthRankingConfigurationFileError
+      (preconditionLimit LengthRankingConfigurationSemanticDepth 64)
+      $ withContract (nestedLengthNot 64 $ jsonLengthTruth True)
+          (jsonLengthTruth True) []
+
+    let exactDepthLaw = jsonLengthProviderLaw "Demo.depth" []
+          $ nestedProviderTransfer 64
+        excessiveDepthLaw = jsonLengthProviderLaw "Demo.depth" []
+          $ nestedProviderTransfer 65
+    _ <- expectLengthRankingConfigurationFile $ withContract
+      (jsonLengthTruth True) (jsonLengthTruth True) [exactDepthLaw]
+    assertLengthRankingConfigurationFileError
+      (providerLimit 0 LengthRankingConfigurationSemanticDepth 64 65)
+      $ withContract (jsonLengthTruth True) (jsonLengthTruth True)
+          [excessiveDepthLaw]
+
+    _ <- expectLengthRankingConfigurationFile $ withContract
+      (largeLengthFormula 12) (jsonLengthTruth True) []
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationSyntaxRejected
+        LengthRankingConfigurationPostconditionSyntax
+        $ LengthRankingConfigurationSyntaxLimitExceeded
+            LengthRankingConfigurationSyntaxNodes 1024 1025)
+      $ withContract (largeLengthFormula 13) (jsonLengthTruth True) []
+
+    _ <- expectLengthRankingConfigurationFile $ withContract
+      (jsonLengthAll $ replicate 31 $ jsonLengthTruth True)
+      (jsonLengthTruth True) []
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationSyntaxRejected
+        LengthRankingConfigurationPostconditionSyntax
+        $ LengthRankingConfigurationSyntaxLimitExceeded
+            LengthRankingConfigurationFormulaClauses 32 33)
+      $ withContract
+          (jsonLengthAll $ replicate 32 $ jsonLengthTruth True)
+          (jsonLengthTruth True) []
+
+    _ <- expectLengthRankingConfigurationFile $ withContract
+      (jsonLengthEqual
+        (jsonLengthSum $ replicate 64 $ jsonLengthLiteral 0)
+        $ jsonLengthLiteral 0)
+      (jsonLengthTruth True) []
+    assertLengthRankingConfigurationFileError
+      (preconditionLimit LengthRankingConfigurationSumTerms 64)
+      $ withContract
+          (jsonLengthEqual
+            (jsonLengthSum $ replicate 65 $ jsonLengthLiteral 0)
+            $ jsonLengthLiteral 0)
+          (jsonLengthTruth True) []
+
+    _ <- expectLengthRankingConfigurationFile $ withContract
+      (jsonLengthAll $ replicate 64 $ jsonLengthAll [])
+      (jsonLengthTruth True) []
+    assertLengthRankingConfigurationFileError
+      (preconditionLimit LengthRankingConfigurationAllClauses 64)
+      $ withContract (jsonLengthAll $ replicate 65 $ jsonLengthAll [])
+          (jsonLengthTruth True) []
+
+    let maximumLiteral = 2 ^ (256 :: Int) - 1
+        excessiveLiteral = maximumLiteral + 1
+    _ <- expectLengthRankingConfigurationFile $ withContract
+      (jsonLengthEqual (jsonLengthLiteral maximumLiteral)
+        $ jsonLengthLiteral 0)
+      (jsonLengthTruth True) []
+    assertLengthRankingConfigurationFileError
+      (preconditionLimit LengthRankingConfigurationLiteralBits 256)
+      $ withContract
+          (jsonLengthEqual (jsonLengthLiteral excessiveLiteral)
+            $ jsonLengthLiteral 0)
+          (jsonLengthTruth True) []
+
+    _ <- expectLengthRankingConfigurationFile $ withContract
+      (jsonLengthEqual (jsonLengthInput 7) $ jsonLengthLiteral 0)
+      (jsonLengthTruth True) []
+    assertLengthRankingConfigurationFileError
+      (preconditionLimit LengthRankingConfigurationInputIndex 7)
+      $ withContract
+          (jsonLengthEqual (jsonLengthInput 8) $ jsonLengthLiteral 0)
+          (jsonLengthTruth True) []
+
+    let roles16 = replicate 16 "spine"
+        exactArgumentLaw = jsonLengthProviderLaw
+          "Demo.arguments" roles16 $ jsonLengthArgument 15
+        excessiveArgumentLaw = jsonLengthProviderLaw
+          "Demo.arguments" roles16 $ jsonLengthArgument 16
+        missingRoleLaw = jsonLengthProviderLaw
+          "Demo.arguments" ["spine"] $ jsonLengthArgument 1
+    _ <- expectLengthRankingConfigurationFile $ withContract
+      (jsonLengthTruth True) (jsonLengthTruth True) [exactArgumentLaw]
+    assertLengthRankingConfigurationFileError
+      (providerLimit 0 LengthRankingConfigurationProviderArgumentIndex
+        15 16)
+      $ withContract (jsonLengthTruth True) (jsonLengthTruth True)
+          [excessiveArgumentLaw]
+    assertLengthRankingConfigurationFileError
+      (providerLimit 0 LengthRankingConfigurationProviderArgumentRoleCount
+        1 2)
+      $ withContract (jsonLengthTruth True) (jsonLengthTruth True)
+          [missingRoleLaw]
+
+    let lawWithRoles roles = jsonLengthProviderLaw
+          "Demo.roles" roles $ jsonLengthLiteral 0
+    _ <- expectLengthRankingConfigurationFile $ withContract
+      (jsonLengthTruth True) (jsonLengthTruth True)
+      [lawWithRoles roles16]
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationPolicyLimitExceeded
+        (LengthRankingConfigurationProviderLawArgumentRolesField 0) 16 17)
+      $ withContract (jsonLengthTruth True) (jsonLengthTruth True)
+          [lawWithRoles $ replicate 17 "spine"]
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationFieldValueRejected
+        $ LengthRankingConfigurationProviderLawArgumentRolesField 0)
+      $ withContract (jsonLengthTruth True) (jsonLengthTruth True)
+          [lawWithRoles ["private-role"]]
+
+    let laws count =
+          [ jsonLengthProviderLaw ("Demo.provider" ++ show index) []
+              $ jsonLengthLiteral 0
+          | index <- take count [0 :: Int ..]
+          ]
+    _ <- expectLengthRankingConfigurationFile $ withContract
+      (jsonLengthTruth True) (jsonLengthTruth True) $ laws 256
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationPolicyLimitExceeded
+        LengthRankingConfigurationProviderLawsField 256 257)
+      $ withContract (jsonLengthTruth True) (jsonLengthTruth True) $ laws 257
+
+    let setFamily name = setJsonField
+          ["contract", "spine", "family"] (Json.JStr name) base
+    _ <- expectLengthRankingConfigurationFile $ setFamily
+      $ replicate 256 '\x1f600'
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationTextLimitExceeded
+        LengthRankingConfigurationSpineFamilyField
+        LengthRankingConfigurationUnicodeScalars 256 257)
+      $ setFamily $ replicate 257 'a'
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationTextLimitExceeded
+        LengthRankingConfigurationSpineFamilyField
+        LengthRankingConfigurationUtf8Bytes 1024 1025)
+      $ setFamily $ replicate 257 '\x1f600'
+
+    let exactNodeLaws =
+          [ jsonLengthProviderLaw "Demo.large" []
+              $ largeLengthExpression 14
+          , jsonLengthProviderLaw "Demo.last" [] $ jsonLengthLiteral 0
+          ]
+        excessiveNodeLaws = exactNodeLaws ++
+          [jsonLengthProviderLaw "Demo.excessive" [] $ jsonLengthLiteral 0]
+    _ <- expectLengthRankingConfigurationFile $ withContract
+      (jsonLengthTruth True) (jsonLengthTruth True) exactNodeLaws
+    assertLengthRankingConfigurationFileError
+      (providerLimit 2 LengthRankingConfigurationSyntaxNodes 1024 1025)
+      $ withContract (jsonLengthTruth True) (jsonLengthTruth True)
+          excessiveNodeLaws
+
+    let clauseLaw :: Int -> Json.JValue
+        clauseLaw index = jsonLengthProviderLaw
+          ("Demo.clause" ++ show index) []
+          $ jsonLengthIf (jsonLengthTruth True)
+              (jsonLengthLiteral 0) (jsonLengthLiteral 0)
+        exactClauseLaws = map clauseLaw $ take 32 [0 :: Int ..]
+        excessiveClauseLaws = exactClauseLaws ++ [clauseLaw 32]
+    _ <- expectLengthRankingConfigurationFile $ withContract
+      (jsonLengthTruth True) (jsonLengthTruth True) exactClauseLaws
+    assertLengthRankingConfigurationFileError
+      (providerLimit 32 LengthRankingConfigurationFormulaClauses 32 33)
+      $ withContract (jsonLengthTruth True) (jsonLengthTruth True)
+          excessiveClauseLaws
+
+nestedLengthNot :: Int -> Json.JValue -> Json.JValue
+nestedLengthNot count value
+  | count <= 0 = value
+  | otherwise = jsonLengthNot $ nestedLengthNot (count - 1) value
+
+nestedProviderTransfer :: Int -> Json.JValue
+nestedProviderTransfer depth
+  | depth <= 1 = jsonLengthLiteral 0
+  | even depth = jsonLengthSum [nestedProviderTransfer $ depth - 1]
+  | otherwise = jsonLengthIf (jsonLengthAll [])
+      (nestedProviderTransfer $ depth - 1) (jsonLengthLiteral 0)
+
+largeLengthFormula :: Int -> Json.JValue
+largeLengthFormula finalTermNodes = jsonLengthEqual
+  (largeLengthExpression finalTermNodes)
+  $ jsonLengthLiteral 0
+
+largeLengthExpression :: Int -> Json.JValue
+largeLengthExpression finalTermNodes = jsonLengthSum
+  $ replicate 63 (scaleChain 16)
+    ++ [scaleChain finalTermNodes]
+ where
+  scaleChain :: Int -> Json.JValue
+  scaleChain nodes
+    | nodes <= 1 = jsonLengthLiteral 0
+    | otherwise = jsonLengthScale 1 $ scaleChain $ nodes - 1
+
+assertLengthRankingConfigurationFileLiveEquivalence :: IO ()
+assertLengthRankingConfigurationFileLiveEquivalence = do
+  fixture <- buildLengthRankingLiveFixture
+  neutral <- syntheticLengthRankingCandidate "file-configured-neutral"
+  withFakeLengthSolver "healthy" $ \executable -> do
+    let zero = lengthRankingFixtureZero fixture
+        one = lengthRankingFixtureOne fixture
+        candidates = [zero, neutral, one]
+        contract = lengthRankingContract 0
+        contractValue = jsonLengthContract
+          (jsonLengthTruth True)
+          (jsonLengthEqual jsonLengthResult $ jsonLengthLiteral 0)
+          [ jsonLengthProviderLaw "Demo.zeroList" []
+              $ jsonLengthLiteral 0
+          , jsonLengthProviderLaw "Demo.oneList" []
+              $ jsonLengthLiteral 1
+          ]
+        document = setJsonField ["contract"] contractValue
+          $ lengthRankingConfigurationFileFixture executable Nothing
+        executionSource = explicitLengthRankingExecutionSource
+          executable Nothing Djex.LengthSMTLibStatusOnly
+    disabled <- expectLengthRankingConfigurationFile document
+    configuration <- expectLengthRankingConfigurationActivation
+      PermitUnpinnedExecutable disabled
+    execution <- expectRight $ Djex.mkLengthSMTLibExecutionConfig
+      Djex.defaultLengthSMTLibExecutionLimits executionSource
+    evaluation <- expectRight $ Djex.mkLengthEvaluationLimits
+      Djex.defaultLengthEvaluationLimitSource
+    direct <- expectLengthRankingWithin "direct file configuration"
+      $ rankVerifiedLengthCandidates execution evaluation contract candidates
+    configured <- expectLengthRankingWithin "decoded file configuration"
+      $ rankVerifiedLengthCandidatesConfigured configuration candidates
+    assertLengthRankingsEquivalent direct configured
+    map rankedLengthCandidateAssessment
+        (lengthRankingCandidates configured) @?=
+      [ Heuristic Djex.SolverSatisfiable
+      , Unassessed
+      , Heuristic Djex.SolverSatisfiable
+      ]
+
+assertLengthRankingConfigurationFileShowRedaction :: IO ()
+assertLengthRankingConfigurationFileShowRedaction =
+  withTemporaryDirectory "leant-length-file-redaction" $ \root -> do
+    let base = lengthRankingConfigurationFileFixture
+          (root </> "missing-z3") Nothing
+        privatePath = "private-relative-executable-path"
+        privateDigest = take 64 $ cycle "abcdefPRIVATE"
+        privateField = "private-unexpected-field"
+        privateTag = "private-unknown-tag"
+        privateNameFragment = "private-name-fragment"
+        privateName = concat $ replicate 30 privateNameFragment
+        failures =
+          [ ( privatePath
+            , setJsonField ["execution", "executablePath"]
+                (Json.JStr privatePath) base
+            )
+          , ( privateDigest
+            , setJsonField ["execution", "expectedExecutableSha256"]
+                (Json.JStr privateDigest) base
+            )
+          , ( privateField
+            , addJsonField [] (privateField, Json.JNull) base
+            )
+          , ( privateTag
+            , setJsonField ["contract", "precondition"]
+                (Json.JArr [Json.JStr privateTag]) base
+            )
+          , ( privateNameFragment
+            , setJsonField ["contract", "spine", "family"]
+                (Json.JStr privateName) base
+            )
+          ]
+    mapM_ assertRedacted failures
+ where
+  assertRedacted (privateText, document) = case
+      decodeLengthRankingConfigurationFile
+        $ encodeLengthRankingConfigurationFile document of
+    Right _ -> assertFailure "redaction fixture unexpectedly decoded"
+    Left failure -> assertBool
+      ("configuration failure exposed private text: " ++ show failure)
+      $ not $ privateText `isInfixOf` show failure
+
+lengthRankingConfigurationFileFixture
+  :: FilePath
+  -> Maybe String
+  -> Json.JValue
+lengthRankingConfigurationFileFixture executable digest = Json.JObj
+  [ ( "format"
+    , Json.JStr $ Text.unpack lengthRankingConfigurationFileFormat
+    )
+  , ("version", Json.JInt $ toInteger lengthRankingConfigurationFileVersion)
+  , ("executionAdmission", Json.JObj
+      [ ("executablePathCharacters", Json.JInt 4096)
+      , ("policyFingerprintBytes", Json.JInt 262144)
+      ])
+  , ("execution", Json.JObj
+      [ ("executablePath", Json.JStr executable)
+      , ( "expectedExecutableSha256"
+        , maybe Json.JNull Json.JStr digest
+        )
+      , ("solverTimeoutMilliseconds", Json.JInt 100)
+      , ("solverResourceLimit", Json.JInt 4242)
+      , ("hostDeadlineMilliseconds", Json.JInt 1000)
+      , ("artifactPolicy", Json.JStr "status-only")
+      , ("responseLimits", Json.JObj
+          [ ("bytes", Json.JInt 65536)
+          , ("nestingDepth", Json.JInt 64)
+          , ("nodes", Json.JInt 4096)
+          , ("tokenBytes", Json.JInt 4096)
+          , ("integerBits", Json.JInt 4096)
+          ])
+      ])
+  , ("evaluation", Json.JObj
+      [ ("assignmentValueBits", Json.JInt 4096)
+      , ("intermediateValueBits", Json.JInt 4096)
+      ])
+  , ("contract", Json.JObj
+      [ ("spine", Json.JObj
+          [ ("family", Json.JStr "List")
+          , ("zero", Json.JStr "List.nil")
+          , ("step", Json.JStr "List.cons")
+          ])
+      , ("precondition", jsonLengthTruth True)
+      , ("postcondition", jsonLengthTruth True)
+      , ("providerLaws", Json.JArr [])
+      ])
+  ]
+
+jsonLengthTruth :: Bool -> Json.JValue
+jsonLengthTruth value = Json.JArr
+  [Json.JStr "truth", Json.JBool value]
+
+jsonLengthLiteral :: Integer -> Json.JValue
+jsonLengthLiteral value = Json.JArr
+  [Json.JStr "literal", Json.JInt value]
+
+jsonLengthInput :: Integer -> Json.JValue
+jsonLengthInput index = Json.JArr [Json.JStr "input", Json.JInt index]
+
+jsonLengthResult :: Json.JValue
+jsonLengthResult = Json.JArr [Json.JStr "result"]
+
+jsonLengthArgument :: Integer -> Json.JValue
+jsonLengthArgument index = Json.JArr
+  [Json.JStr "argument", Json.JInt index]
+
+jsonLengthSum :: [Json.JValue] -> Json.JValue
+jsonLengthSum terms = Json.JArr
+  [Json.JStr "sum", Json.JArr terms]
+
+jsonLengthScale :: Integer -> Json.JValue -> Json.JValue
+jsonLengthScale factor expression = Json.JArr
+  [Json.JStr "scale", Json.JInt factor, expression]
+
+jsonLengthMonus :: Json.JValue -> Json.JValue -> Json.JValue
+jsonLengthMonus left right = Json.JArr
+  [Json.JStr "monus", left, right]
+
+jsonLengthMinimum :: Json.JValue -> Json.JValue -> Json.JValue
+jsonLengthMinimum left right = Json.JArr
+  [Json.JStr "minimum", left, right]
+
+jsonLengthMaximum :: Json.JValue -> Json.JValue -> Json.JValue
+jsonLengthMaximum left right = Json.JArr
+  [Json.JStr "maximum", left, right]
+
+jsonLengthIf
+  :: Json.JValue
+  -> Json.JValue
+  -> Json.JValue
+  -> Json.JValue
+jsonLengthIf condition trueBranch falseBranch = Json.JArr
+  [Json.JStr "if", condition, trueBranch, falseBranch]
+
+jsonLengthEqual :: Json.JValue -> Json.JValue -> Json.JValue
+jsonLengthEqual left right = Json.JArr
+  [Json.JStr "equal", left, right]
+
+jsonLengthAtMost :: Json.JValue -> Json.JValue -> Json.JValue
+jsonLengthAtMost left right = Json.JArr
+  [Json.JStr "at-most", left, right]
+
+jsonLengthNot :: Json.JValue -> Json.JValue
+jsonLengthNot formula = Json.JArr [Json.JStr "not", formula]
+
+jsonLengthAll :: [Json.JValue] -> Json.JValue
+jsonLengthAll formulas = Json.JArr
+  [Json.JStr "all", Json.JArr formulas]
+
+jsonLengthProviderLaw
+  :: String
+  -> [String]
+  -> Json.JValue
+  -> Json.JValue
+jsonLengthProviderLaw name roles transfer = Json.JObj
+  [ ("name", Json.JStr name)
+  , ("argumentRoles", Json.JArr $ map Json.JStr roles)
+  , ("transfer", transfer)
+  ]
+
+jsonLengthContract
+  :: Json.JValue
+  -> Json.JValue
+  -> [Json.JValue]
+  -> Json.JValue
+jsonLengthContract precondition postcondition laws = Json.JObj
+  [ ("spine", Json.JObj
+      [ ("family", Json.JStr "List")
+      , ("zero", Json.JStr "List.nil")
+      , ("step", Json.JStr "List.cons")
+      ])
+  , ("precondition", precondition)
+  , ("postcondition", postcondition)
+  , ("providerLaws", Json.JArr laws)
+  ]
+
+encodeLengthRankingConfigurationFile
+  :: Json.JValue
+  -> ByteString.ByteString
+encodeLengthRankingConfigurationFile = TextEncoding.encodeUtf8
+  . Text.pack
+  . Json.encodeJson
+
+expectLengthRankingConfigurationFile
+  :: Json.JValue
+  -> IO DisabledLengthRankingConfiguration
+expectLengthRankingConfigurationFile document =
+  case decodeLengthRankingConfigurationFile
+      $ encodeLengthRankingConfigurationFile document of
+    Left failure -> assertFailure ("configuration file was rejected: " ++
+      show failure) >> error "unreachable"
+    Right disabled -> pure disabled
+
+expectLengthRankingConfigurationActivation
+  :: LengthRankingConfigurationActivationPolicy
+  -> DisabledLengthRankingConfiguration
+  -> IO LengthRankingConfiguration
+expectLengthRankingConfigurationActivation policy disabled =
+  case activateLengthRankingConfiguration policy disabled of
+    Left failure -> assertFailure ("configuration activation failed: " ++
+      show failure) >> error "unreachable"
+    Right configuration -> pure configuration
+
+assertLengthRankingConfigurationFileError
+  :: LengthRankingConfigurationFileError
+  -> Json.JValue
+  -> IO ()
+assertLengthRankingConfigurationFileError expected document =
+  case decodeLengthRankingConfigurationFile
+      $ encodeLengthRankingConfigurationFile document of
+    Left failure -> failure @?= expected
+    Right _ -> assertFailure $ "expected configuration-file failure: " ++
+      show expected
+
+setJsonField :: [String] -> Json.JValue -> Json.JValue -> Json.JValue
+setJsonField [] _ source = source
+setJsonField [field] replacement (Json.JObj fields) = Json.JObj
+  [ if name == field then (name, replacement) else (name, value)
+  | (name, value) <- fields
+  ]
+setJsonField (field : remaining) replacement (Json.JObj fields) = Json.JObj
+  [ if name == field
+      then (name, setJsonField remaining replacement value)
+      else (name, value)
+  | (name, value) <- fields
+  ]
+setJsonField _ _ source = source
+
+deleteJsonField :: [String] -> Json.JValue -> Json.JValue
+deleteJsonField [] source = source
+deleteJsonField [field] (Json.JObj fields) = Json.JObj
+  [(name, value) | (name, value) <- fields, name /= field]
+deleteJsonField (field : remaining) (Json.JObj fields) = Json.JObj
+  [ if name == field
+      then (name, deleteJsonField remaining value)
+      else (name, value)
+  | (name, value) <- fields
+  ]
+deleteJsonField _ source = source
+
+addJsonField
+  :: [String]
+  -> (String, Json.JValue)
+  -> Json.JValue
+  -> Json.JValue
+addJsonField [] added (Json.JObj fields) = Json.JObj $ added : fields
+addJsonField (field : remaining) added (Json.JObj fields) = Json.JObj
+  [ if name == field
+      then (name, addJsonField remaining added value)
+      else (name, value)
+  | (name, value) <- fields
+  ]
+addJsonField _ _ source = source
+
+reverseJsonObjectFields :: Json.JValue -> Json.JValue
+reverseJsonObjectFields value = case value of
+  Json.JArr values -> Json.JArr $ map reverseJsonObjectFields values
+  Json.JObj fields -> Json.JObj $ reverse
+    [ (name, reverseJsonObjectFields child)
+    | (name, child) <- fields
+    ]
+  _ -> value
 
 assertLengthRankingConfigurationRelativePath :: IO ()
 assertLengthRankingConfigurationRelativePath = do

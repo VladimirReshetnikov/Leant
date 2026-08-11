@@ -325,6 +325,27 @@ pre-spawn executable-file observation, not attestation of the image ultimately
 executed. See the
 [explicit live Length ranking configuration report](docs/reports/2026-08-11-explicit-live-length-ranking-configuration.md).
 
+`Leant.Synth.Length.Configuration.File` adds an exact version-1 JSON grammar
+for that policy without enabling it. The pure decoder consumes a caller-owned
+strict byte string through a separate bounded JSON parser, rejects malformed
+UTF-8, duplicate keys, unknown or missing fields, non-integral policy numbers,
+and any parser, contract, or operational value above its hard ceiling. Every
+object field is required. Contract expressions and formulas use closed tagged
+arrays. Their core limits are pinned to the corresponding Djex default Length
+limits, with additional Leant depth and name bounds; the file cannot widen
+candidate type, contract, provider, literal, or fingerprint authority. A
+successful decode returns an opaque *disabled*
+configuration. The caller must then explicitly require a pinned executable or
+explicitly permit an unpinned one before obtaining the already opaque runnable
+configuration. Neither choice runs Z3 or grants proof, solver-status, or
+contract authority. There is no file loader, automatic path, environment or
+executable discovery, Main/REPL wiring, or autoload behavior, and the parser's
+256-KiB post-acquisition check does not replace a future loader's obligation to
+acquire bytes with the same bound. The optional digest remains only a
+pre-spawn executable-file snapshot expectation, not executed-image
+attestation. The complete schema and budgets are recorded in the
+[bounded live Length ranking configuration-file report](docs/reports/2026-08-11-bounded-live-length-ranking-configuration-file.md).
+
 Three rules run through the design:
 
 - **The engine is never trusted.** Every candidate is re-elaborated by
