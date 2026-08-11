@@ -40,6 +40,7 @@ Executable leant
     Leant.Synth.Engine
     Leant.Synth.Fragment
     Leant.Synth.Length.Adapter
+    Leant.Synth.Length.Configuration
     Leant.Synth.Length.Ranking
     Leant.Synth.Observability
     Leant.Synth.ProviderCache
@@ -75,6 +76,7 @@ Test-Suite leant-synth-tests
     Leant.Synth.Engine
     Leant.Synth.Fragment
     Leant.Synth.Length.Adapter
+    Leant.Synth.Length.Configuration
     Leant.Synth.Length.Ranking
     Leant.Synth.Observability
     Leant.Synth.ProviderCache
