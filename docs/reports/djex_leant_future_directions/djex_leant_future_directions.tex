@@ -1,0 +1,3065 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=24mm,headheight=15pt,footskip=14mm]{geometry}
+\usepackage{fontspec}
+\defaultfontfeatures{Ligatures=TeX,Scale=MatchLowercase}
+\setmainfont{Latin Modern Roman}
+\setsansfont{Latin Modern Sans}
+\setmonofont{Latin Modern Mono}
+\usepackage{microtype}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{booktabs,longtable,tabularx,array,multirow}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{xurl}
+\usepackage{bookmark}
+\usepackage{listings}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{ragged2e}
+\usepackage{needspace}
+\usepackage{parskip}
+
+\definecolor{Ink}{HTML}{202428}
+\definecolor{Muted}{HTML}{5F6B73}
+\definecolor{Accent}{HTML}{315F72}
+\definecolor{AccentLight}{HTML}{EAF1F4}
+\definecolor{Rule}{HTML}{BCC9CF}
+\definecolor{CodeBg}{HTML}{F4F6F7}
+\definecolor{CodeFrame}{HTML}{CDD5D9}
+\definecolor{LinkBlue}{HTML}{1B5E82}
+\definecolor{WarnBg}{HTML}{FFF7E8}
+\definecolor{GoodBg}{HTML}{EDF6EE}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=Accent,
+  citecolor=Accent,
+  urlcolor=LinkBlue,
+  pdfauthor={OpenAI},
+  pdftitle={Future Directions for Djex and Leant},
+  pdfsubject={Co-evolution and automation of term synthesis for complex types},
+  pdfkeywords={Djex, Leant, Lean 4, Djinn, Exference, term synthesis, rank-N types}
+}
+\urlstyle{same}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\sffamily Djex + Leant: future directions}
+\fancyhead[R]{\small\sffamily Review snapshot: 2026-08-10}
+\fancyfoot[C]{\small\sffamily\thepage}
+\renewcommand{\headrulewidth}{0.35pt}
+\renewcommand{\footrulewidth}{0pt}
+
+\titleformat{\section}
+  {\Large\bfseries\sffamily\color{Ink}}
+  {\thesection}{0.7em}{}
+\titleformat{\subsection}
+  {\large\bfseries\sffamily\color{Ink}}
+  {\thesubsection}{0.7em}{}
+\titleformat{\subsubsection}
+  {\normalsize\bfseries\sffamily\color{Ink}}
+  {\thesubsubsection}{0.7em}{}
+\titlespacing*{\section}{0pt}{2.5ex plus .8ex minus .3ex}{1.1ex}
+\titlespacing*{\subsection}{0pt}{2.0ex plus .6ex minus .2ex}{0.8ex}
+\titlespacing*{\subsubsection}{0pt}{1.6ex plus .5ex minus .2ex}{0.6ex}
+
+\setlist[itemize]{leftmargin=1.5em,itemsep=0.28em,topsep=0.35em}
+\setlist[enumerate]{leftmargin=1.65em,itemsep=0.32em,topsep=0.4em}
+\setlist[description]{leftmargin=2.0em,labelindent=0pt,itemsep=0.35em,style=nextline}
+
+\newcolumntype{Y}{>{\RaggedRight\arraybackslash}X}
+\newcolumntype{L}[1]{>{\RaggedRight\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\Centering\arraybackslash}p{#1}}
+
+\lstdefinestyle{code}{
+  basicstyle=\small\ttfamily,
+  backgroundcolor=\color{CodeBg},
+  frame=single,
+  rulecolor=\color{CodeFrame},
+  framerule=0.4pt,
+  xleftmargin=0.7em,
+  xrightmargin=0.4em,
+  framexleftmargin=0.35em,
+  framexrightmargin=0.2em,
+  aboveskip=0.8em,
+  belowskip=0.8em,
+  breaklines=true,
+  breakatwhitespace=false,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false,
+  tabsize=2,
+  keywordstyle=\bfseries\color{Accent},
+  commentstyle=\itshape\color{Muted},
+  stringstyle=\color{LinkBlue}
+}
+\lstset{style=code}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\Djex}{\textsf{Djex}}
+\newcommand{\Leant}{\textsf{Leant}}
+\newcommand{\Lean}{Lean~4}
+\newcommand{\Djinn}{Djinn}
+\newcommand{\Exference}{Exference}
+\newcommand{\RepoDjex}{\href{https://github.com/VladimirReshetnikov/Djex}{\code{VladimirReshetnikov/Djex}}}
+\newcommand{\RepoLeant}{\href{https://github.com/VladimirReshetnikov/Leant}{\code{VladimirReshetnikov/Leant}}}
+\newcommand{\djcommit}[2]{\href{https://github.com/VladimirReshetnikov/Djex/commit/#1}{\code{#2}}}
+\newcommand{\lecommit}[2]{\href{https://github.com/VladimirReshetnikov/Leant/commit/#1}{\code{#2}}}
+\newcommand{\headsha}[1]{\code{#1}}
+\newcommand{\term}[1]{\emph{#1}}
+\newcommand{\yes}{\textbf{yes}}
+\newcommand{\no}{\textbf{no}}
+\newcommand{\risk}[1]{\textsf{#1}}
+
+\newenvironment{finding}[1]
+{\par\medskip\noindent\colorbox{AccentLight}{\parbox{\dimexpr\linewidth-2\fboxsep\relax}{\sffamily\bfseries #1}}\par\smallskip}
+{\par\medskip}
+
+\newenvironment{recommendation}[1]
+{\par\medskip\noindent\colorbox{GoodBg}{\parbox{\dimexpr\linewidth-2\fboxsep\relax}{\sffamily\bfseries #1}}\par\smallskip}
+{\par\medskip}
+
+\newenvironment{caution}[1]
+{\par\medskip\noindent\colorbox{WarnBg}{\parbox{\dimexpr\linewidth-2\fboxsep\relax}{\sffamily\bfseries #1}}\par\smallskip}
+{\par\medskip}
+
+\setlength{\emergencystretch}{3em}
+\sloppy
+
+\begin{document}
+\hypersetup{pageanchor=false}
+
+\begin{titlepage}
+  \centering
+  \vspace*{1.5cm}
+  {\sffamily\bfseries\fontsize{25}{31}\selectfont
+   From Bounded Rank-N Plumbing to\\[0.2em]
+   Typed, Feedback-Directed Synthesis\par}
+  \vspace{0.9cm}
+  {\sffamily\Large Future directions for \Djex{} and \Leant{}\par}
+  \vspace{0.45cm}
+  {\sffamily\large A review of their coordinated git history through 10 August 2026\par}
+  \vspace{1.5cm}
+  \rule{0.78\textwidth}{0.55pt}
+  \vspace{1.2cm}
+
+  \begin{minipage}{0.83\textwidth}
+  \large
+  \textbf{Repositories reviewed}\par
+  \vspace{0.25cm}
+  \RepoDjex\\
+  \RepoLeant
+
+  \vspace{0.75cm}
+  \textbf{Review snapshot}\par
+  \vspace{0.25cm}
+  \Djex{} main: \headsha{f50b5eac86726c7530d95e48c27101b7c0fa25c9}\\
+  \Leant{} main: \headsha{0160237e4bdf6e342a55f5a86ce5d5292728024f}\\
+  \Leant{} submodule \code{lib/Djex}: the same \Djex{} head
+  \end{minipage}
+
+  \vfill
+  {\sffamily\small Technical report prepared 10 August 2026\par}
+\end{titlepage}
+
+\hypersetup{pageanchor=true}
+\pagenumbering{roman}
+
+\begin{abstract}
+\noindent
+The recent histories of \Djex{} and \Leant{} show an unusually productive
+co-development loop.  \Leant{} exposes a concrete Lean-side synthesis failure;
+that failure identifies information erased at the language-neutral boundary;
+\Djex{} then generalizes the missing invariant or search rule; and \Leant{}
+advances its pinned submodule, preserves the source semantics that remain
+Lean-specific, and closes the loop with kernel-checked transcripts.  In roughly
+the last two days alone, this loop widened bounded instantiation to six leading
+binders, carried higher-kinded class arguments, preserved contextual rank-N
+provider assignments, enforced assignment fidelity through nested and sibling
+datatype fields, specialized provider results from exact term evidence, and
+finally retained the structural identities of \code{Prod}/\code{Sum} through
+higher-kinded substitutions.
+
+The success of that loop also reveals its next scaling limit.  More and more
+semantic information is transported beside an intentionally erased Haskell-like
+search term, then reconstructed in \Leant{}'s renderer by fitting generated
+syntax back against the original Lean fragment.  This works, and Lean
+verification makes it safe, but it creates a growing \emph{semantic
+recovery tax}: provider metadata must be coupled to individual occurrences;
+forall visibility and sort domains need parallel side channels; result types
+are rediscovered from term arguments; and canonical family identity needs
+special handling at every stage.
+
+The central recommendation of this report is therefore not simply to raise the
+six-binder bound, add a sextic occurrence frontier, or teach another structural
+constructor to the current adapters.  The next architectural layer should be a
+frontend-neutral, typed candidate graph carrying stable occurrence identities,
+expected types, source-provided certificates, explicit residual obligations,
+and a structured account of projection loss.  \Djex{} can continue to perform
+bounded structural search over a compact logical projection; \Leant{} can keep
+Lean expressions, universes, binder visibility, type-class evidence, and
+indices opaque where appropriate; and the two can communicate through typed
+skeletons instead of post-hoc textual repair.
+
+On that foundation, the most promising functional extensions are: an adaptive
+rather than fixed-degree rank-N plan search; a shared hash-consed subgoal and
+candidate DAG; generic correlated-substitution certificates; a frontend-declared
+algebra of structural families; first-class evidence and equality obligations;
+recursor-skeleton synthesis for recursive data; a staged dependent-index
+fragment; semantic provider retrieval at Mathlib scale; and genuinely
+cooperative scheduling between \Djinn{} and \Exference{}.  The report gives
+concrete data types, algorithms, invariants, migration steps, tests, and a
+priority-ordered roadmap designed to preserve the projects' current fail-closed
+and independently verified posture.
+\end{abstract}
+
+\tableofcontents
+\clearpage
+\pagenumbering{arabic}
+
+\section{Scope, method, and terminology}
+
+This report reviews the current source trees, the public architecture and
+proposal documents, and the recent commit histories of \RepoDjex{} and
+\RepoLeant{}.  The emphasis is not on listing every commit.  It is on finding
+repeated causal patterns across the two repositories: what class of Lean goal
+or provider exposed a gap; which repository supplied the general fix; what
+information had to cross the boundary; which conservative guard was added; and
+what that sequence implies for the next abstraction.
+
+The review snapshot is the pair of main-branch heads shown on the title page.
+At that point, \Leant{} pins \Djex{} exactly at
+\headsha{f50b5eac86726c7530d95e48c27101b7c0fa25c9}.  This is important: the two
+histories are not merely conceptually related.  The \Leant{} history records a
+series of exact gitlink advances to freshly reviewed \Djex{} capabilities,
+followed by Lean 4.31 transcripts that exercise those capabilities through the
+complete serializer--engine--renderer--elaborator path.
+
+Throughout the report:
+
+\begin{itemize}
+  \item \term{search type} means the type representation consumed by one of
+    the synthesis engines after frontend translation;
+  \item \term{source type} means the richer Haskell or Lean type known before
+    projection;
+  \item \term{candidate} means a generated term or term skeleton together with
+    whatever evidence and obligations are needed to interpret it;
+  \item \term{positive soundness} means that every displayed term is accepted
+    by the source language's checker (GHC in \Djex{} integration tests, the Lean
+    elaborator and kernel in \Leant{});
+  \item \term{negative completeness} means that an exhausted search justifies
+    a non-inhabitation claim for a stated fragment, rather than merely failing
+    to find a term under finite bounds;
+  \item \term{projection loss} means source structure deliberately hidden from
+    the engine: an opaque dependent atom, an unopened quantifier occurrence, an
+    omitted eliminator, a truncated provider inventory, or similar information.
+\end{itemize}
+
+The report deliberately distinguishes \emph{source-language semantics} from
+\emph{search semantics}.  The goal is not to turn \Djex{} into a Lean
+elaborator, nor to make \Leant{} duplicate both synthesis engines.  The goal is
+to choose a stronger interface at which each side can retain what it uniquely
+knows.
+
+\section{Current architecture at the reviewed heads}
+
+\subsection{Djex: two engines behind a checked neutral foundation}
+
+\Djex{} combines \Djinn{}, a complete terminating LJT-style search for its
+admitted intuitionistic fragment, and \Exference{}, a ranked heuristic search
+with explicit resource controls and type-class evidence resolution.  The
+merger is no longer just a shared executable.  The package exposes a
+parser-independent synthesis foundation containing validated names, kinds,
+types, constraints, declarations, environments, generated expressions,
+queries, diagnostics, and search batches.
+
+Several current public types are especially relevant to future work.
+The shared source type is structurally richer than the original engines:
+
+\begin{lstlisting}[language=Haskell,caption={Current shared source-type shape (abridged).}]
+data Type variable
+  = TypeVariable variable
+  | TypeConstructor Name
+  | TypeApplication (Type variable) (Type variable)
+  | FunctionType (Type variable) (Type variable)
+  | TupleType Boxity [Type variable]
+  | ForallType
+      [variable]
+      [Constraint (Type variable)]
+      (Type variable)
+\end{lstlisting}
+
+It distinguishes flexible inference variables from rigid skolems; provides
+capture-avoiding substitution and binder normalization; preserves explicit
+applications; and gives saturated functions and tuples canonical structural
+forms while still exposing a constructor-application view for higher-kinded
+unification.
+
+The shared generated-term syntax has also grown beyond a first-order lambda
+calculus.  It contains patterns, lambdas, applications, visible type
+applications, tuples, holes, lets, and cases.  A complete application spine can
+interleave term and visible-type arguments in source order.  Specified visible
+type arguments are closed and alpha-normalized rather than being raw strings.
+
+Most importantly for extensibility, a public candidate already has a natural
+place for information beyond the rendered term:
+
+\begin{lstlisting}[language=Haskell,caption={The existing candidate envelope is an opening for a richer protocol.}]
+data Candidate ty details output = Candidate
+  { candidateOutput              :: output
+  , candidateResidualConstraints :: [Constraint ty]
+  , candidateDetails             :: details
+  }
+\end{lstlisting}
+
+The current \code{details} parameter is backend-owned and the residual
+constraints are type-class-shaped.  The proposed architecture in this report
+extends, rather than discards, that idea: make residual obligations more
+general and give candidate details a stable neutral core that frontends and
+both engines can share.
+
+The provider-instantiation boundary is another major asset.  It has evolved
+from independent scalar candidates into exact, ordered, correlated vectors,
+and then into kinded vectors:
+
+\begin{itemize}
+  \item \code{ProviderInstantiationCandidate} contributes one provider-local
+    type to a pool;
+  \item \code{ProviderInstantiationAssignment} preserves a complete leading
+    binder assignment in source order;
+  \item \code{KindedProviderInstantiationAssignment} pairs each selected type
+    with its exact ground kind.
+\end{itemize}
+
+This is already a small certificate language: an external frontend asserts a
+provider identity and a correlated substitution; the checked backend validates
+session identity, arity, kinds, closure, and structural fidelity before using
+it.  Section~\ref{sec:certificates} argues that this should become the template
+for all source-provided semantic evidence.
+
+\subsection{Leant: semantic serializer, search adapter, and independent checker}
+
+\Leant{} is a Lean REPL whose \code{:synth} pipeline links \Djex{} in-process.
+The architecture intentionally keeps the engine boundary narrow:
+\code{Leant.Synth.Engine} is the only synthesis module importing \Djex{}, while
+\code{Fragment}, \code{Render}, and the backend worker own Lean-specific
+translation and verification.
+
+The input fragment is substantially richer than a simple propositional
+encoding.  It distinguishes:
+
+\begin{itemize}
+  \item arrows, products, sums, top, and bottom;
+  \item explicit or implicit sort quantifiers and erased instance binders;
+  \item exact contextual class applications with ground-kinded arguments;
+  \item bound and nominal proper-type applications;
+  \item parameterized finite inductive families;
+  \item parameterized recursive families with bounded constructor metadata;
+  \item safe and unsafe opaque atoms; and
+  \item a depth sentinel that makes truncation explicit.
+\end{itemize}
+
+The serializer runs inside Lean, after elaboration, and therefore has access to
+information no Haskell parser or string renderer can reliably reconstruct:
+exact constants, binder visibility, whether a domain is \code{Prop},
+\code{Type}, or a general \code{Sort}, active instance heads, constructor
+inventories, recursive occurrences, and definitional reduction through the
+current environment.
+
+The output path is just as important.  \Leant{} does not trust an engine term.
+It fits the generated expression against the original fragment, restores exact
+Lean names and binder positions, enumerates bounded source spellings where
+semantic information is genuinely ambiguous, and sends each surviving term
+back to Lean for elaboration against the exact goal.  A candidate is displayed
+only after that check succeeds.
+
+This independent checker is what permits aggressive positive search without
+compromising correctness.  It does \emph{not}, however, make arbitrary
+semantic erasure free.  Every erased fact that is later necessary for an
+otherwise valid term becomes either a dropped candidate or another
+renderer-side reconstruction rule.  The size and recent history of
+\code{Leant.Synth.Render} and \code{Leant.Synth.Fragment} are evidence that the
+cost has become architectural rather than incidental.
+
+\subsection{Current scheduling and honesty rules}
+
+At the reviewed head, the main interactive policy includes:
+
+\begin{itemize}
+  \item a provider-free structural baseline;
+  \item live-provider fallback, with bounded discovery and staged widths;
+  \item \Djinn{}, \Exference{}, or a combined portfolio;
+  \item at most five displayed terms, twelve fresh candidate groups tried per
+    standalone engine, and a combined frontier preserving twelve opportunities
+    for each engine;
+  \item an internal candidate collection window of sixty;
+  \item strict \Exference{} search first, followed by an allow-unused retry only
+    after a strict miss; and
+  \item Lean verification of every textual variant before display.
+\end{itemize}
+
+Negative verdicts follow a stricter rule than positive ones.  \Exference{}
+never provides a non-inhabitation proof.  \Djinn{} exhaustion is exposed as a
+sound refutation only when the logical projection is complete and the Lean
+translation did not hide concrete structure in an unsafe atom.  Provider lanes
+may still find a constructive term after a provider-free refutation; if they do
+not, \Leant{} restores the retained refutation before considering the classical
+fallback.
+
+This separation between positive verification and negative completeness is one
+of the strongest design decisions in both projects.  Future extensions should
+make it more expressive, not weaken it.
+
+\section{The co-evolution pattern in recent history}
+
+\subsection{A condensed cross-repository timeline}
+
+Table~\ref{tab:timeline} groups the most informative recent changes into
+capability loops.  Dates are commit dates; the short hashes link to the exact
+changes.
+
+\small
+\begin{longtable}{L{2.0cm} L{3.2cm} L{4.15cm} L{4.15cm}}
+\caption{Representative capability loops in the coordinated history.}
+\label{tab:timeline}\\
+\toprule
+\textbf{Date} & \textbf{Theme} & \textbf{Djex movement} & \textbf{Leant movement} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Date} & \textbf{Theme} & \textbf{Djex movement} & \textbf{Leant movement} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+
+2026-08-06 & Bounded rank-N occurrence plans &
+\djcommit{d728719ff2515a8a464398aaab3e789420cc86a6}{d728719f}
+adds quintuple-open and quintuple-opaque tails, capped at 512 views per
+orientation and exhaustive through eleven independent sites. &
+\lecommit{80f123a4}{80f123a4} and \lecommit{3fcf7cfa}{3fcf7cfa}
+advance the submodule and verify genuinely non-prefix ten- and eleven-site Lean
+examples. \\
+
+2026-08-09 & Query-closed and correlated instantiation &
+\djcommit{227bdc52e66e0b07606b84e89a7c3516493a718b}{227bdc52}
+adds closed query-subtree choices for local schemes;
+\djcommit{077f767fd75814bbcd74bed795e10455935e397f}{077f767f} through
+\djcommit{844e548de3b896d7d91ecc2c48750ba229560a3e}{844e548d}
+add result-correlated guarded impredicative choices while preserving historical
+prefixes. &
+\lecommit{21c0bab6746f5b6f309afd183ebe6ad26909e44d}{21c0bab6} pins the reviewed
+engine; \lecommit{e09bded3de507c2b28bb243421cdfe07371aaa1d}{e09bded3} and
+\lecommit{15fb0962ca7cf99c6df6a8c0c0776d79febe7ac9}{15fb0962}
+repair explicit provider heads and nested fitting; \lecommit{c333f2c070bdb61eee6b6558deb0a827f2bd1389}{c333f2c0}
+merges live Lean coverage. \\
+
+2026-08-10 & Scalar global aggregate elimination &
+\djcommit{db25170b2aed13d2bb1249c11229cc28f809aa95}{db25170b}
+lets \Exference{} derive boxed-tuple eliminators from all checked type sources
+and deconstruct a scalar global once. &
+\lecommit{690277ca282b8c196b6a8c34777e8689539cd582}{690277ca} carries exact
+provider result fragments through case and let;
+\lecommit{9893fef55dc47a529c4b4d547d6e18268e1d71f5}{9893fef5} normalizes the
+engine's intrinsic pair patterns; \lecommit{65b93bcc356fcdea30478dd127eb32ef8db61e1e}{65b93bcc}
+merges the checked path. \\
+
+2026-08-10 & Provider-result specialization &
+\djcommit{e10f7f018facef4445fc774118b39d716b36c02e}{e10f7f01} and
+\djcommit{d918334a72532fd1bb3967a6fc64cfa0eabcc4af}{d918334a}
+provide one strict, lazy, mixed term/type application-spine constructor. &
+\lecommit{892117dcc9756f3ede4b8500665892781e679fb7}{892117dc} through
+\lecommit{9189d509ca5dc6a377c02060beb79f8965cd9879}{9189d509}
+infer provider-result substitutions from exact term evidence, thread them
+through full higher-order applications, and preserve trailing quantified
+structure. \\
+
+2026-08-10 & Exact contextual assignments and fidelity &
+\djcommit{03aa3820284f9117011910b7eb931568ef4255cd}{03aa3820}
+accepts closed contextual polytypes in exact vectors but marks selected types
+through nested structures; \djcommit{103fdd391aaa350c09f07b682d6fd70a67a44989}{103fdd39}
+requires every marker-bearing sibling field to retain the selected identity. &
+\lecommit{2979dbe2fe25915cdaf497dca96b934a85c6b4c1}{2979dbe2}
+introduces an exact-assignment-only nominal Lean class context and private
+methodless engine classes; \lecommit{647f3940e3fd7859f02fde955f30bc75d4fb08a6}{647f3940}
+pins the strengthened fidelity boundary. \\
+
+2026-08-10 & Occurrence-local rendering metadata &
+The canonical visible type is intentionally language-neutral; \Djex{} keeps
+specified visible arguments alpha-normalized and bounded. &
+\lecommit{888e2b402529089e606a55c8374d9bbf1a7568d4}{888e2b40}
+retains forall visibility and sort-domain tags;
+\lecommit{fe4b2932d5ff356ac5792e26f698444d1b99fe81}{fe4b2932}
+couples one metadata choice to each provider occurrence so repeated uses can
+select independently. \\
+
+2026-08-10 & Higher-kinded contextual evidence &
+\djcommit{c5afc68a1b49adfb66f25d67c49402487cf9697d}{c5afc68a}
+preserves explicit class-parameter kinds in checked shared environments;
+\djcommit{0ea49f9b7efd995c40af44fe9a2ff27de2f177bb}{0ea49f9b}
+checks a rank-N assignment constrained by a type constructor. &
+\lecommit{1668c956b2488bfeb4af2659314a0317a8e97fb5}{1668c956}
+serializes residual kind arity, reconstructs private kinded classes, plans a
+nominal head at total arity, and rejects conflicts source-locally;
+\lecommit{d3662c3162b7f5014520f02b539a5ab1a657ef02}{d3662c31}
+merges Lean 4.31 verification. \\
+
+2026-08-10 & Six-binder common boundary &
+\djcommit{66955da710951fd525f7ad874d133132ffcd2cee}{66955da7}
+raises the single public provider/instantiation width from five to six so
+\Djinn{} and \Exference{} advance together; seven remains a productive checked
+rejection. &
+\lecommit{d04c1a8fb9971cd7eec07fc873016627ebb1e928}{d04c1a8f}
+keeps adjacent Lean forall nodes as one six-binder scheme and derives producer,
+parser, engine, and renderer bounds from \Djex{}; \lecommit{de4f562c77ffa339f97670058dde693119d76345}{de4f562c}
+merges all-engine and live tests. \\
+
+2026-08-10 & Canonical structural higher-kinded identity &
+\djcommit{5a550eb409c37c00256a41b14bad5a0d3792fa68}{5a550eb4}
+retains the bare boxed pair constructor through \Djinn{} exact substitutions;
+\djcommit{f50b5eac86726c7530d95e48c27101b7c0fa25c9}{f50b5eac}
+merges both-engine and GHC-checked support. &
+\lecommit{0dbe08a7819f44c872bf091685f6b30f170f0133}{0dbe08a7}
+separates canonical nominal context evidence from legacy fragments and maps
+exact \code{Prod}/\code{Sum} heads to their structural engine identities;
+\lecommit{0160237e4bdf6e342a55f5a86ce5d5292728024f}{0160237e}
+merges the Lean-verified result. \\
+\end{longtable}
+\normalsize
+
+\subsection{The recurring five-step capability loop}
+
+The timeline shows a stable development method:
+
+\begin{enumerate}
+  \item \textbf{A precise source-language counterexample appears.}
+    The useful failures are rarely abstract.  They are types such as a provider
+    whose visible type argument is itself quantified, a provider returning a
+    tuple containing a rank-N field, a class argument whose kind is
+    \code{Type -> Type}, or a canonical \code{Prod} assignment consumed later
+    in saturated form.
+
+  \item \textbf{Leant preserves just enough semantic evidence to state the
+    failure faithfully.}
+    Exact names, binder visibility, sort domains, instance-head correlations,
+    source fragments, and constructor inventories are kept rather than guessed
+    from pretty text.
+
+  \item \textbf{Djex generalizes the missing search or boundary invariant.}
+    Examples include exact ordered assignment vectors, shared kinded classes,
+    a strict mixed application spine, bounded closed/correlated instantiation,
+    scalar aggregate elimination, and structural assignment-fidelity checks.
+
+  \item \textbf{Leant advances the submodule and adapts only the remaining
+    Lean-specific semantics.}
+    The renderer restores source names and syntax; the serializer supplies
+    metadata that cannot be language-neutral; the engine module remains the
+    narrow adapter.
+
+  \item \textbf{The exact source-language case is independently checked.}
+    \Djex{} uses public-facade and GHC compilation regressions.  \Leant{} uses
+    pure boundary tests and Lean 4.31 transcripts.  Malformed, over-wide,
+    phantom, dictionary-dependent, and unsupported controls are generally
+    added beside the positive case.
+\end{enumerate}
+
+\begin{finding}{Finding 1: the synergy is not accidental coupling; it is a productive division of semantic authority.}
+\Djex{} is best placed to own finite search, alpha-safe neutral syntax,
+correlated substitutions, common bounds, and engine-independent invariants.
+\Leant{} is best placed to own elaborated Lean identities, universes, binder
+roles, instance provenance, constructor/recursor metadata, and final kernel
+checking.  The future architecture should formalize this division rather than
+trying to collapse it.
+\end{finding}
+
+\subsection{What the same history warns about}
+
+The loop is productive, but the shape of the fixes has changed.  Early work
+added logical rules or widened a clearly bounded family.  The most recent work
+is dominated by keeping semantic side channels synchronized across:
+
+\begin{itemize}
+  \item provider discovery and exact assignment parsing;
+  \item query-wide family planning;
+  \item the \Djinn{} and \Exference{} projections;
+  \item generated visible type applications;
+  \item occurrence-local fitting;
+  \item Lean binder-domain rendering; and
+  \item final elaboration.
+\end{itemize}
+
+The \code{Prod}/\code{Sum} higher-kinded change is illustrative.  A saturated
+product is structural in both engines; a bare \code{Prod} is a higher-kinded
+source constant; an exact assignment may carry the bare or partially applied
+head; a contextual class may mention it; provider planning must not close it as
+an ordinary proper-type atom; the engine must map it back to the same structural
+identity used by saturated products; and the renderer must retain the exact
+Lean source choice.  The implementation is correct and conservative, but each
+new family with analogous dual structural/nominal behavior would repeat much
+of that path.
+
+Likewise, provider-result specialization now uses exact term arguments to infer
+fragment substitutions, re-applies them before inspecting each residual
+constructor, fits later arguments against newly specialized domains, and
+recurses through nested provider applications.  This is valuable functionality.
+Architecturally, however, it is type propagation over an untyped generated
+expression---that is, a small bidirectional elaborator implemented after
+search because the candidate edge did not carry the information earlier.
+
+\begin{finding}{Finding 2: the dominant scaling problem is now semantic erasure followed by source-specific recovery.}
+The present boundary is no longer too weak because it lacks another expression
+constructor.  It is too weak because a generated expression does not carry a
+stable typed derivation explaining how each application, elimination, and
+visible specialization was justified.  Leant therefore has to reconstruct that
+explanation from the original fragment and occurrence metadata.
+\end{finding}
+
+\section{Capability envelope and the limits that now matter}
+
+\subsection{What is already unusually strong}
+
+It is easy to understate how far the combined system has moved beyond the
+classic \Djinn{} and \Exference{} projects.  At the reviewed heads, the joint
+capability includes all of the following.
+
+\paragraph{A checked, reusable neutral foundation.}
+Names, types, kinds, constraints, declarations, environments, generated terms,
+queries, diagnostics, and search outcomes cross explicit validation edges.
+Both engines are available through one package and one public facade, while
+retaining independent search semantics.
+
+\paragraph{Positive and negative search with honest evidence classes.}
+\Djinn{} supplies complete search and refutation within admitted projections;
+\Exference{} supplies ranked positive search under budgets.  Leant preserves
+that distinction and adds a source-language verification layer.
+
+\paragraph{Bounded higher-rank and guarded impredicative synthesis.}
+Positive forall occurrences can be opened according to a deterministic plan
+family.  Hypothesis-side schemes, loaded schemes, query-local schemes, and
+provider schemes can be instantiated from carefully delimited vocabularies.
+Quantified choices are admitted only when supplied by the checked query or by
+explicit external evidence; the engines do not invent arbitrary polytypes.
+
+\paragraph{Exact provider evidence.}
+A richer frontend can preserve the correlation among all leading type binders
+selected by one instance head, including heterogeneous kinds.  Evidence stays
+provider-local and is checked at the session boundary rather than being
+flattened into a global Cartesian pool.
+
+\paragraph{Nominal and structural inductive identity.}
+Compatible finite families can expose constructor introduction and elimination.
+Compatible recursive families have bounded positive construction in \Djinn{}
+and one-layer elimination in \Exference{}.  Query-wide planning prevents
+separate occurrences of the same exact family from drifting into unrelated
+engine types.
+
+\paragraph{Live source environments.}
+\Leant{} discovers a bounded, goal-relevant provider inventory from the actual
+Lean environment, preserves exact global names, accepts project ratings, caches
+semantic inventories, and verifies every use in the current session.
+
+\paragraph{Source-faithful rendering of difficult applications.}
+Visible type applications, mixed explicit and implicit forall binders, exact
+sort-domain alternatives, higher-kinded assignments, contextual rank-N
+arguments, and provider-result specialization all survive the round trip often
+enough to solve examples that a purely erased Haskell view could not express.
+
+These capabilities should be treated as assets and compatibility constraints.
+A future redesign should not discard the deterministic prefixes, independent
+verification, fail-closed evidence checks, or public bounds that made the
+current system trustworthy.
+
+\subsection{Current finite bounds}
+
+Table~\ref{tab:bounds} collects the most relevant finite limits at the reviewed
+heads.  Some are public \Djex{} constants; some are \Leant{} policy values; and
+some are documented search-family bounds.  Their exact values matter less than
+the fact that they are explicit, productive, and tested on malformed or cyclic
+caller-built inputs.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Selected finite bounds at the review snapshot.}
+\label{tab:bounds}
+\begin{tabularx}{\textwidth}{L{4.35cm} C{1.8cm} Y}
+\toprule
+\textbf{Bound} & \textbf{Value} & \textbf{Role} \\
+\midrule
+Provider instantiation candidates per checked query & 32 &
+Bounds provider-local scalar associations before search. \\
+Exact provider assignments per checked query & 32 &
+Bounds complete correlated vectors accepted by public runners. \\
+Leading arguments in one exact assignment & 6 &
+Single common eligibility boundary for current \Djinn{} and \Exference{}
+instantiation routes; seven is a fail-closed control. \\
+Ground-kind constructor nodes per argument & 129 &
+Admits the complete right-associated \code{Type -> ... -> Type} shape through
+arity 64 while productively rejecting cyclic or excessive values. \\
+Active Lean instance heads inspected per provider & 32 &
+Bounds frontend discovery in Lean resolver order. \\
+Retained alpha-distinct vectors per live provider & 16 &
+Preserves correlated source choices without unbounded metadata growth. \\
+Live providers serialized by Leant & 80 &
+Bounds one discovered inventory before staged search. \\
+Semantic provider-cache entries & 12 &
+Generation-aware LRU keyed by canonical query/provider-world information. \\
+Displayed candidates & 5 &
+Interactive result frontier. \\
+Fresh groups tried per standalone engine & 12 &
+Backend verification budget after source-local deduplication. \\
+Combined fresh-group frontier & 24 &
+Preserves twelve opportunities for each engine under the current merge order. \\
+Engine candidate collection window & 60 &
+Bounds \Djinn{} sorted collection and the shared ranking input. \\
+Rank-N quintic plan views & 512 per orientation &
+Covers all relevant ten- and eleven-site fifth-order selections; a twelve-site
+six/six split remains the documented gap. \\
+Instantiation tuple attempts & 512 per scheme family &
+Bounds fair candidate-tuple production. \\
+Retained axioms & 16 per scheme; 64 per family &
+Bounds positive-only generated specialization premises. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The right future direction is not to remove these bounds.  It is to make each
+bound measure a semantic resource rather than a historical implementation
+dimension.  For example, ``at most 1,024 distinct compiled formula views'' is a
+more general budget than ``quintuple-open plus quintuple-opaque''; ``at most 32
+validated substitution certificates'' is more general than a provider-only
+assignment vector; and ``at most 60 semantic candidate fingerprints'' is more
+useful than sixty derivations that later render to duplicates.
+
+\subsection{Five boundaries that block substantially more automation}
+
+\subsubsection{The generated term is mostly untyped at the neutral edge}
+
+The search engines know types internally, and \Leant{} knows the exact expected
+Lean fragment, but the shared generated expression is an unannotated syntax
+tree.  Once a candidate crosses that edge, local type information, rule
+provenance, instantiation substitutions, and branch refinements are represented
+only indirectly through global maps and a re-fitting traversal.
+
+This is the root cause behind several recent fixes:
+
+\begin{itemize}
+  \item recovering a provider's specialized result from exact term arguments;
+  \item carrying rank-N field types through case and let patterns;
+  \item deciding where explicit forall placeholders must be woven;
+  \item coupling a render-metadata choice to a specific provider occurrence;
+  \item preserving trailing forall structure during higher-order application;
+  \item distinguishing a canonical structural head from a merely similar
+    nominal source fragment.
+\end{itemize}
+
+\subsubsection{Quantifier occurrence planning is encoded by degree}
+
+The positive rank-N plan family has progressed from singleton choices through
+pairs, triples, quadruples, and capped quintuples.  The implementation is
+carefully prefix-preserving and the coverage results are strong: the quintic
+family is exhaustive through eleven independent sites.  But the next gap is
+already known: a twelve-site six-open/six-opaque split.  Adding a sextic family
+would close that case and expose the next central antichain.
+
+This is a sign that the representation of the search problem should change.
+The semantic object is a finite partially ordered set of occurrence decisions
+with ancestor prerequisites and formula equivalences.  ``Degree five'' is one
+enumeration strategy for that object, not an enduring abstraction.
+
+\subsubsection{Source evidence is divided among specialized side channels}
+
+Current evidence channels include scalar provider candidates, exact assignment
+vectors, kinded vectors, provider binder names, exact forall-domain tags,
+contextual class fragments, nominal higher-kinded heads, constructor maps,
+type-name maps, and source fragments retained for fitting.  Each addition has a
+reasonable local purpose.  Together, they describe a more general object: a
+source-certified substitution or family fact with a stable provenance and a
+specified lifetime.
+
+Until those channels share one certificate model, every new semantic fact must
+answer the same questions separately: how is it bounded, alpha-normalized,
+associated with a provider occurrence, invalidated with the session, projected
+into both engines, rendered in the source language, and rejected without
+poisoning unrelated evidence?
+
+\subsubsection{Dependent structure is transportable but not refinable}
+
+The current opaque-atom discipline is exactly right for many dependent goals.
+If two alpha-equivalent dependent propositions merely need to be transported,
+the engine can treat them as one atom and synthesize the higher-order plumbing.
+But constructor analysis of indexed families, equality transport, dependent
+pairs, subtypes, and motives remain beyond the structural projection.
+
+A binary choice between ``fully opaque'' and ``fully implement dependent type
+theory in the engine'' would be a mistake.  There is a valuable middle layer:
+search a structural term skeleton while retaining source-owned equality,
+index, universe, coercion, and type-class obligations as explicit holes.
+
+\subsubsection{Environment search is bounded by inventory width rather than
+semantic reachability}
+
+The provider-free baseline and geometric widths of 1, 4, 16, and the complete
+bounded inventory protect structural search from a large environment.  They do
+not answer the harder retrieval question: which declarations are jointly
+useful for a type that requires two or three compositions, perhaps through
+higher-ranked or constrained intermediates?
+
+A persistent Mathlib-scale inventory is already identified as future work in
+the project proposal.  The key extension is not merely persistence.  It is a
+semantic index and a backward relevance expansion driven by result types,
+argument requirements, family identities, constraints, and learned successful
+compositions.
+
+\section{Central diagnosis: the semantic recovery tax}
+\label{sec:recovery-tax}
+
+\subsection{A concrete model of the current round trip}
+
+A simplified current path for a difficult provider candidate is:
+
+\begin{enumerate}
+  \item Lean elaborates the provider and goal.
+  \item The serializer projects them to \code{Frag}, preserving selected exact
+    metadata in parallel records.
+  \item \code{Engine} lowers \code{Frag} into shared \Djex{} types and private
+    declarations, often erasing Lean binder roles or replacing exact families
+    with collision-free engine names.
+  \item \Djinn{} or \Exference{} searches and emits a neutral
+    \code{Expression} with visible type applications where the engine retained
+    them.
+  \item \code{Render} reconstructs a local domain environment, strips synthetic
+    premises, aliases provider occurrences, chooses source metadata,
+    specializes provider results from exact arguments, fits nested term
+    arguments, introduces missing binders, normalizes patterns, and enumerates
+    textual variants.
+  \item Lean elaborates every variant against the original goal; failures are
+    silently discarded.
+\end{enumerate}
+
+The path is safe because step 6 is authoritative.  Its incompleteness comes
+from steps 3--5: once information is erased, the renderer can recover it only
+when the original fragment and the generated syntax contain enough clues.
+
+\subsection{Why verification alone is not a substitute for typed candidates}
+
+One might argue that Lean is the checker, so the engine can emit arbitrary
+terms and let elaboration decide.  That is correct for soundness but poor for
+search completeness and cost.
+
+\begin{itemize}
+  \item \textbf{Rejected candidates consume the expensive resource.}
+    The engine's pure search is often cheap relative to a backend round trip.
+    Missing a type argument or choosing the wrong forall-domain spelling turns
+    one semantic candidate into many elaboration attempts.
+
+  \item \textbf{Elaboration failure is currently unstructured feedback.}
+    A rejected spelling does not tell the engine whether the problem was a
+    universe, binder visibility, an unsolved instance, a stale provider result,
+    an index mismatch, or a genuinely wrong proof skeleton.
+
+  \item \textbf{Untyped deduplication is weak.}
+    Distinct derivations may normalize to the same source term; source variants
+    of one semantic candidate may occupy multiple slots; and two terms with the
+    same printed skeleton can differ in exact instantiation provenance.
+
+  \item \textbf{Negative evidence cannot use verification failures.}
+    A finite list of rejected candidates says nothing about inhabitation.  The
+    projection and search completeness must still be tracked independently.
+\end{itemize}
+
+\subsection{The desired replacement}
+
+The replacement is not a fully source-specific core language.  It is a
+\term{typed synthesis skeleton}:
+
+\begin{itemize}
+  \item every term edge has an engine-visible expected or inferred neutral
+    type;
+  \item every local and global use has a stable occurrence identity;
+  \item every explicit specialization records the substitution certificate
+    that justified it;
+  \item every elimination records the family descriptor and branch-local field
+    types it exposes;
+  \item facts that remain source-specific become named residual obligations;
+  \item source rendering metadata is attached to the exact node whose choice it
+    affects; and
+  \item the candidate carries a derivation/provenance DAG sufficient for a
+    small independent neutral checker.
+\end{itemize}
+
+\begin{recommendation}{Recommendation 1: introduce a typed candidate graph before adding another major type-language feature.}
+This is the highest-leverage architectural change.  It directly simplifies
+provider-result fitting, occurrence-local metadata, structural elimination,
+semantic deduplication, elaboration diagnostics, and future dependent or
+recursive skeletons.  It can be added incrementally beside the existing
+\code{Expression} output and projected back to that syntax for compatibility.
+\end{recommendation}
+
+\section{Proposed target architecture}
+\label{sec:architecture}
+
+\subsection{Four layers with explicit contracts}
+
+The target architecture should make four layers visible.
+
+\begin{description}
+  \item[Layer A: source semantic package.]
+    Produced by the frontend after source elaboration.  It contains a neutral
+    type skeleton, opaque source atoms, exact family descriptors, provider
+    certificates, binder roles, and bounded rendering metadata.  In \Leant{},
+    this package is produced by Lean metaprograms.  In a Haskell frontend, it
+    is produced from the checked source environment.
+
+  \item[Layer B: logical/search projection.]
+    A compact representation tailored to \Djinn{} and \Exference{}.  It may
+    erase universes, indices, dictionaries, and some quantifier occurrences,
+    but it records every erasure as a structured projection-loss fact and
+    retains stable links back to Layer A.
+
+  \item[Layer C: typed candidate and derivation graph.]
+    Search produces typed skeletons, not only surface expressions.  Nodes
+    refer to source/global/family identities through stable handles.  Edges
+    carry expected types, substitutions, and residual obligations.  Both
+    engines can project this graph to the current generated syntax.
+
+  \item[Layer D: source completion and verification.]
+    The frontend renders or directly builds a source AST, solves residual
+    obligations using its elaborator, verifies the candidate, and optionally
+    returns structured failure information to a bounded refinement loop.
+\end{description}
+
+The crucial rule is that no layer is asked to rediscover information owned by a
+previous layer.  If a source fact is intentionally hidden from search, the
+candidate carries a reference or obligation, not an invitation for the
+renderer to infer it from text.
+
+\subsection{A frontend-neutral typed type skeleton}
+
+The existing shared \code{Type} should remain the Haskell-facing source type
+and the common type for the current engines.  A new adjacent representation can
+express the additional distinctions required by richer frontends without
+forcing every engine to understand them.
+
+One possible shape is:
+
+\begin{lstlisting}[language=Haskell,caption={Sketch of a richer neutral source-semantic type.}]
+data SortClass
+  = PropositionSort
+  | DataSort
+  | GeneralSort SortToken
+
+data BinderRole
+  = TypeBinder
+  | TermBinder
+  | InstanceBinder
+
+data Visibility
+  = Explicit
+  | Implicit
+  | StrictImplicit
+  | InstanceImplicit
+
+data SourceType variable atom
+  = STVariable variable
+  | STNominal FamilyId [SourceType variable atom]
+  | STFunction (SourceType variable atom)
+               (SourceType variable atom)
+  | STPi (Binder variable atom)
+         (SourceType variable atom)
+  | STProduct ProductFlavor [SourceType variable atom]
+  | STSum SumFlavor [SourceType variable atom]
+  | STIndexed FamilyId
+      [SourceType variable atom] -- parameters
+      [atom]                     -- source-owned indices
+  | STOpaque atom
+
+data Binder variable atom = Binder
+  { binderIdentity   :: BinderId
+  , binderSourceName :: Maybe SourceName
+  , binderRole       :: BinderRole
+  , binderVisibility :: Visibility
+  , binderSort       :: SortClass
+  , binderDomain     :: SourceType variable atom
+  }
+\end{lstlisting}
+
+This is deliberately not a complete Lean expression language.  An index term
+or a universe expression may remain an opaque, hash-consed source token with
+frontend-provided alpha/definitional-equality relations.  The search engines
+need only the structural distinctions that affect legal rules.  A frontend can
+supply more exact data without making \Djex{} depend on Lean.
+
+The current \code{Frag} can initially be the \Leant{} implementation of
+\code{SourceType}.  The migration benefit comes from moving its reusable
+semantics---binder roles, exact family identities, occurrence IDs, and source
+obligations---to a public neutral package consumed directly by the typed
+candidate edge.
+
+\subsection{Typed candidate nodes and residual obligations}
+
+A candidate graph can be represented with typed node references rather than a
+recursive tree.  Hash-consing then becomes natural, repeated subterms share
+storage, and provenance can refer to one stable node.
+
+\begin{lstlisting}[language=Haskell,caption={Sketch of a typed candidate envelope.}]
+data TypedCandidate ty local source = TypedCandidate
+  { candidateRoot        :: TermNodeId
+  , candidateGraph       :: TermGraph ty local source
+  , candidateObligations :: [Obligation ty source]
+  , candidateDerivation  :: DerivationGraph
+  , candidateLosses      :: ProjectionLossSet
+  , candidateCost        :: CostVector
+  , candidateFingerprint :: CandidateFingerprint
+  }
+
+data TermNode ty local source
+  = LocalNode local ty
+  | GlobalNode GlobalId ty source
+  | LambdaNode [TypedPattern ty local] TermNodeId ty
+  | ApplyNode TermNodeId TermNodeId ApplicationWitness ty
+  | TypeApplyNode TermNodeId SubstitutionCertificateId ty
+  | ConstructorNode ConstructorId [TermNodeId] ty
+  | EliminateNode EliminatorId TermNodeId [BranchNode] ty
+  | LetNode (TypedPattern ty local) TermNodeId TermNodeId ty
+  | ObligationNode ObligationId ty
+
+data Obligation ty source
+  = TypeClassGoal source ty
+  | EqualityGoal source ty ty
+  | CoercionGoal source ty ty
+  | UniverseGoal source
+  | ElaborationChoice source [SourceAlternative]
+  | TerminationGoal source
+  | FrontendGoal source ty
+\end{lstlisting}
+
+\code{ApplicationWitness} need not contain a full proof object.  It can record
+which neutral function type and substitution the engine used, enough for a
+small checker to re-run the typing step.  \code{source} is an opaque frontend
+payload or handle, bounded and validated when the query is sealed.
+
+This design makes the current \code{candidateResidualConstraints} a special
+case of \code{candidateObligations}.  Ordinary Haskell type-class constraints
+remain directly representable.  Lean instance synthesis, equality refinement,
+universe ambiguity, and coercion insertion become additional obligation kinds
+which \Djex{} may carry without solving.
+
+\subsection{Stable occurrence identities}
+
+Recent \Leant{} work had to create collision-safe aliases for separate uses of
+the same provider because two occurrences with the same canonical visible type
+may need different source visibility/domain alternatives.  That is a strong
+argument for occurrence identity in the neutral graph.
+
+Every source provider use, quantified occurrence, family occurrence, and
+opaque atom should have an \code{OccurrenceId} allocated by the checked
+frontend package.  Search-created nodes may have separate internal IDs.  The
+mapping must obey three invariants:
+
+\begin{enumerate}
+  \item IDs are stable within one sealed query and never inferred from printed
+    names.
+  \item Source metadata is keyed by the exact occurrence whose interpretation
+    it changes.
+  \item Alpha-equivalent types may share a semantic fingerprint without losing
+    distinct occurrence identity.
+\end{enumerate}
+
+This removes the need to synthesize fake global names solely to index metadata,
+and it allows multiple uses of one provider to make independent bounded
+choices while still normalizing to the same global source identity.
+
+\subsection{A typed, bounded source-certificate table}
+\label{sec:certificates}
+
+The current exact provider assignment is the prototype for a general source
+certificate.  A useful abstraction is:
+
+\begin{lstlisting}[language=Haskell,caption={Generalized source-certified substitution evidence.}]
+data SubstitutionCertificate ty source = SubstitutionCertificate
+  { certificateOwner       :: EvidenceOwner
+  , certificateTelescope   :: TelescopeFingerprint
+  , certificateSubstitution:: [KindedArgument ty]
+  , certificatePremises    :: [Obligation ty source]
+  , certificateProvenance  :: source
+  , certificateFidelity    :: FidelityWitness
+  , certificateRendering   :: RenderingMetadata
+  }
+
+data EvidenceOwner
+  = ProviderOwner GlobalId
+  | LocalSchemeOwner OccurrenceId
+  | FamilyOwner FamilyId
+  | FrontendRuleOwner FrontendRuleId
+\end{lstlisting}
+
+The checked query boundary validates:
+
+\begin{itemize}
+  \item owner/session identity;
+  \item exact telescope length and binder order;
+  \item kinds and closure;
+  \item capture safety and alpha normalization;
+  \item provenance-size bounds;
+  \item structural fidelity where the engine relies on nominal distinctions;
+  \item and source-local conflict handling.
+\end{itemize}
+
+Both engines then consume the same certificate, perhaps through different
+projections.  \Leant{} retains source rendering metadata under the certificate
+ID, not in a separate occurrence-guessing map.  This generalization can cover
+active instance-head assignments, query-correlated choices, exact class
+contexts, family equalities, and future frontend-derived coercion or recursor
+facts.
+
+\subsection{Frontend-declared family algebra}
+\label{sec:family-algebra}
+
+The system needs a single language-neutral description of a structural family.
+Hard-coded recognition of functions, tuples, lists, \code{Either},
+\code{Prod}, and \code{Sum} was a reasonable bootstrapping strategy.  The
+recent higher-kinded structural-identity work shows why it should now be
+factored.
+
+\begin{lstlisting}[language=Haskell,caption={Sketch of a family descriptor supplied at the checked boundary.}]
+data FamilyDescriptor ty source = FamilyDescriptor
+  { familyId          :: FamilyId
+  , familyKind        :: Kind
+  , familySortClass   :: SortClass
+  , familyParameters  :: [ParameterDescriptor]
+  , familyIndices     :: [IndexDescriptor source]
+  , familyConstructors:: [ConstructorDescriptor ty source]
+  , familyEliminators :: [EliminatorDescriptor ty source]
+  , familyRecursion   :: RecursionDescriptor
+  , familyLaws        :: FamilyLawSet
+  , familyRendering   :: source
+  }
+
+data ParameterRole
+  = RepresentationalParameter
+  | PhantomParameter
+  | IndexDeterminingParameter
+  | RecursiveParameter
+\end{lstlisting}
+
+The descriptor should state, rather than force the engines to rediscover:
+
+\begin{itemize}
+  \item exact nominal identity and total arity;
+  \item parameter versus index positions;
+  \item the sort of the result;
+  \item constructor field schemas after parameter substitution;
+  \item whether elimination is finite, one-layer recursive, recursor-based, or
+    unavailable;
+  \item recursive SCC membership and strictly positive positions;
+  \item whether a higher-kinded unsaturated head shares identity with an
+    existing structural form;
+  \item phantom/faithful parameter flow;
+  \item and source rendering or AST handles.
+\end{itemize}
+
+For Haskell, the descriptor can be derived from checked data declarations and
+intrinsic tuple/function syntax.  For Lean, it can be derived from
+\code{InductiveVal}, constructor telescopes, and recursor metadata.  The
+engines still decide which subset they support.  Unsupported laws are recorded
+as projection loss, not silently approximated.
+
+This one abstraction would subsume a surprising amount of recent special-case
+work: query-wide family identity, total-arity planning, constructor maps,
+recursive occurrence descriptions, \code{Prod}/\code{Sum} structural identity,
+phantom-fidelity analysis, and source-specific constructor rendering.
+
+\subsection{Capability-indexed projection and evidence}
+
+The current \code{SynthRefuted Bool} is simple and safe, but the Boolean is
+becoming too coarse.  A future outcome should explain what was complete and
+what was not.
+
+\begin{lstlisting}[language=Haskell,caption={Structured projection loss and negative evidence.}]
+data ProjectionLoss source
+  = OpaqueDependentAtom OccurrenceId source
+  | BoundedQuantifierPlan [OccurrenceId]
+  | UnsupportedFamilyElimination FamilyId
+  | RecursiveDepthBound FamilyId Int
+  | ProviderInventoryTruncated Int
+  | ProviderEvidenceTruncated GlobalId
+  | SearchBudgetReached SearchBudgetKind
+  | FrontendDepthReached OccurrenceId
+
+data NegativeEvidence source
+  = RefutedInFragment CapabilityFingerprint RefutationCertificate
+  | Inconclusive [ProjectionLoss source]
+\end{lstlisting}
+
+A refutation remains user-facing as a concise sentence, but internally it is
+indexed by a capability fingerprint: which connectives were exact, which
+families exposed complete constructor rules, whether every relevant forall
+occurrence was covered, whether provider premises were intentionally excluded,
+and whether any source atom hid analyzable structure.
+
+This yields two benefits.  First, new positive-only extensions can be added
+without threading another ad-hoc completeness flag.  Second, a later frontend
+or engine can compare capability fingerprints and decide whether one
+refutation strictly dominates another.
+
+\begin{recommendation}{Recommendation 2: generalize exact provider evidence and family metadata into checked source certificates.}
+Do this after the first typed-candidate slice, not before.  Certificates give a
+uniform home to the information already flowing through provider assignments,
+rendering maps, family plans, and Lean-side evidence.  They also preserve the
+projects' strongest invariant: untrusted caller-built metadata is validated at
+one finite boundary and cannot poison unrelated evidence.
+\end{recommendation}
+
+\section{Adaptive rank-N occurrence planning}
+\label{sec:adaptive-plans}
+
+\subsection{Why another fixed-degree frontier is the wrong primary move}
+
+The current occurrence-plan history is disciplined:
+
+\begin{itemize}
+  \item singleton frontiers established the basic positive-forall choice;
+  \item pair, triple, and quadruple tails expanded complete coverage while
+    preserving historical results;
+  \item the quintic tail alternates selections from both source edges, caps
+    each orientation at 512 compiled views, and covers every ten- and
+    eleven-site fifth-order choice;
+  \item explicit sentinels identify the next uncovered central split.
+\end{itemize}
+
+This is good engineering.  It should remain as the deterministic compatibility
+prefix.  But a sextic implementation would encode the same subset lattice one
+more time.  The underlying problem can be searched directly.
+
+\subsection{Plan lattice}
+
+Give every positive forall occurrence a stable ID.  A plan assigns each
+occurrence one of a small number of modes, initially:
+
+\[
+  \mathsf{Opaque},\qquad \mathsf{Open}.
+\]
+
+Nested occurrences impose prerequisite closure: opening a child requires
+opening the ancestor path that exposes it.  Future modes may include
+\(\mathsf{OpenWithCertificate}(c)\) or a source-specific obligation mode, but
+the binary lattice is enough for the first implementation.
+
+A plan is normalized by:
+
+\begin{enumerate}
+  \item ancestor closure;
+  \item elimination of choices for occurrences unreachable under the plan;
+  \item alpha-normalization of the resulting projected formula; and
+  \item hash-consing against previously compiled formula views.
+\end{enumerate}
+
+Two distinct bit vectors that compile to the same formula consume one semantic
+plan slot, not two.
+
+\subsection{Compatibility prefix followed by best-first expansion}
+
+The scheduler should emit the current historical sequence unchanged through
+the quintic tails.  If no term or conclusive result appears, continue with a
+best-first queue over normalized plans.
+
+A practical priority can combine:
+
+\[
+\begin{aligned}
+\mathsf{score}(p) ={}&
+  w_1\,\mathsf{newOpenSites}(p)
+ +w_2\,\mathsf{projectedFormulaSize}(p)\\
+ &+w_3\,\mathsf{estimatedPremiseCount}(p)\\
+ &+w_4\,\mathsf{distanceFromFailedPlans}(p)
+ -w_5\,\mathsf{queryCorrelation}(p).
+\end{aligned}
+\]
+
+The exact weights are policy, not correctness.  Determinism requires a stable
+tie-break by source occurrence order and normalized plan fingerprint.
+
+Candidate successors can be generated by:
+
+\begin{itemize}
+  \item flipping one boundary occurrence;
+  \item adding the smallest unmet ancestor-closed set;
+  \item moving toward the complement of a plan whose search was structurally
+    unproductive;
+  \item or satisfying a conflict set returned by the formula compiler or
+    source verifier.
+\end{itemize}
+
+The budget should be stated in semantic units: maximum distinct compiled
+formula views, maximum cumulative formula nodes, maximum prepared-premise
+cache size, and maximum search work.  The current 1,024 quintic views provide a
+reasonable starting ceiling for the adaptive tail.
+
+\subsection{Counterexample-guided refinement without trusting failures}
+
+Lean elaboration failures cannot justify negative evidence, but they can guide
+positive refinement.  Suppose a candidate skeleton fails because one provider
+use requires an explicit type application whose source forall remained opaque.
+If the verifier returns a structured failure associated with occurrence
+\(o\), the adaptive planner can prioritize plans opening \(o\) or select a
+certificate that fixes its source instantiation.
+
+The feedback loop is heuristic only:
+
+\begin{itemize}
+  \item a verifier rejection may increase a successor's priority;
+  \item it never removes a plan needed for completeness;
+  \item it never turns a bounded miss into a refutation; and
+  \item all historical deterministic plans remain available independently of
+    feedback quality.
+\end{itemize}
+
+Even without verifier feedback, the engine can derive useful conflict sets.
+Examples include a quantified hypothesis whose body cannot match any current
+goal subtree until a particular occurrence is opened, or a compiled plan in
+which all newly exposed premises are duplicates of existing axioms.
+
+\subsection{Data structures}
+
+The first implementation does not require a sophisticated decision diagram.
+A persistent bit set plus a hash map keyed by compiled formula fingerprint is
+sufficient at current scales.  If plans grow to dozens of sites, a zero-suppressed
+BDD is a natural representation for sparse occurrence subsets, while a normal
+BDD can compact complement-related open/opaque families.  The key is to keep
+that optimization below the semantic interface.
+
+\begin{recommendation}{Recommendation 3: preserve the current quintic prefix, then replace degree-by-degree widening with an adaptive normalized plan lattice.}
+This closes the known twelve-site central gap without committing the project to
+a permanent sequence of sextic, septic, and higher frontiers.  It also creates
+a place to use structured verification feedback and query-correlation scores
+while retaining finite, deterministic search.
+\end{recommendation}
+
+\section{Shared subgoal DAG, semantic identity, and dominance}
+\label{sec:dag}
+
+\subsection{Why both engines should share more than input declarations}
+
+The current combined mode runs \Djinn{} and \Exference{} independently and
+then merges candidate groups with a carefully designed fairness schedule.  This
+preserves each engine's semantics, but it duplicates work at three levels:
+
+\begin{itemize}
+  \item equivalent type substitutions and opened-forall views are prepared
+    separately;
+  \item structurally identical subgoals are explored under independently built
+    environments; and
+  \item semantically duplicate candidates are often recognized only after
+    rendering or exact-spelling comparison.
+\end{itemize}
+
+The engines need not share one search algorithm to share immutable canonical
+objects.  A neutral query preparation layer can intern types, substitutions,
+family descriptors, local contexts, and subgoal keys.  Each engine then keeps
+its own frontier and proof theory while reusing the same identities and caches.
+
+\subsection{Canonical subgoal keys}
+
+A subgoal cache key should include at least:
+
+\[
+\begin{aligned}
+K = (&\text{goal type},\ \text{local-environment fingerprint},\\
+     &\text{rigid scope},\ \text{available certificates},\\
+     &\text{usage policy},\ \text{projection capability}).
+\end{aligned}
+\]
+
+The local environment fingerprint must be order-sensitive where the engine's
+enumeration order matters, but it can separately carry an order-insensitive
+logical fingerprint for cache reuse.  This distinction mirrors the existing
+oldest-first fairness work: proof identity and candidate ordering are related
+but not identical concerns.
+
+Prepared premise families, rank-N plan views, and exact provider substitutions
+can all reference the same interned type nodes.  The current prepared-premise
+caches in \Djinn{} are a natural starting point.
+
+\subsection{Semantic candidate fingerprints}
+
+A candidate fingerprint should be computed before source rendering.  It must
+preserve semantic distinctions that affect typing while eliminating irrelevant
+implementation history.
+
+Recommended normalization steps are:
+
+\begin{enumerate}
+  \item alpha-normalize local binders and source-owned closed type binders;
+  \item flatten and rebuild mixed application spines in canonical source order;
+  \item normalize explicit constructor identities through family descriptors;
+  \item perform safe beta reduction of administrative lambdas and let nodes;
+  \item eta-contract only when the typed graph proves the contraction preserves
+    explicit source binder obligations;
+  \item canonicalize irrefutable tuple patterns and branch ordering where the
+    family descriptor permits it;
+  \item retain certificate IDs only through their semantic substitution and
+    obligation fingerprint, not allocation order; and
+  \item include residual obligations and expected result type.
+\end{enumerate}
+
+The result is not necessarily a source-language normal form.  It is a stable
+identity for scheduling and deduplication.  Source renderers may still offer
+multiple spellings of one fingerprint.
+
+This change would improve several current limits immediately.  The sixty-item
+collection window would contain sixty semantic terms rather than sixty backend
+derivations.  The twelve-group verification frontier would not be spent on
+terms already rejected under the same source semantics.  Combined mode could
+merge by fingerprint before applying its \(D_1\ldots D_4, E_1\ldots E_{12},
+D_5\ldots D_{12}\) fairness schedule.
+
+\subsection{Dominance pruning}
+
+For one semantic term, prefer a candidate that:
+
+\begin{itemize}
+  \item has fewer or weaker residual obligations;
+  \item relies on a smaller projection-loss set;
+  \item uses fewer providers or lower total provider penalty;
+  \item has a smaller typed term graph;
+  \item needs fewer source rendering alternatives; and
+  \item preserves more exact source metadata.
+\end{itemize}
+
+This defines a partial order rather than one scalar score.  Keep the Pareto
+frontier per semantic fingerprint.  A source frontend may accept a slightly
+larger term because it has no unsolved type-class obligation, while a Haskell
+frontend may prefer the opposite.  The current engine-specific details can
+remain as tie-break data below this neutral dominance relation.
+
+\subsection{Optional equality saturation}
+
+An e-graph is not required for the first implementation, but the typed term DAG
+makes it possible later.  A small, explicitly typed rewrite set could identify
+administrative equivalences such as:
+
+\begin{itemize}
+  \item beta/eta and let-floating within capture-safe scopes;
+  \item tuple projection after known construction;
+  \item case-of-constructor simplification;
+  \item reassociation of engine-generated applications; and
+  \item elimination of synthetic premise lambdas after substitution.
+\end{itemize}
+
+The rewrite set must never use proof irrelevance or source-specific definitional
+equality unless the frontend supplies an exact certificate.  Equality
+saturation is therefore an optimization for candidate identity and simplification,
+not a replacement for source checking.
+
+\begin{recommendation}{Recommendation 4: deduplicate and rank typed semantic candidates before rendering.}
+This is likely the best near-term latency improvement after the typed edge.  It
+reduces expensive Lean verification, improves the meaning of existing windows,
+and gives combined mode a shared unit of fairness without merging the engines'
+search semantics.
+\end{recommendation}
+
+\section{First-class evidence and source obligations}
+\label{sec:obligations}
+
+\subsection{From erased dictionaries to explicit proof goals}
+
+The present architecture deliberately avoids treating Lean instance binders as
+ordinary proof power inside \Djinn{}.  A provider use can leave a class argument
+implicit and let Lean's elaborator rebuild it.  Exact assignment discovery can
+use active instance heads to determine type arguments, but the dictionary
+itself is not transported as a general engine value.
+
+That conservative boundary is sound and has avoided cross-language confusion.
+It also excludes useful terms whose structure depends on an available class
+method or whose result has residual evidence obligations.
+
+A safe extension is not to import Lean dictionaries as executable Haskell
+terms.  It is to let the candidate graph contain an opaque evidence node:
+
+\begin{lstlisting}[language=Haskell]
+EvidenceNode
+  { evidenceGoal       :: SourceEvidenceGoalId
+  , evidenceNeutralType:: NeutralConstraint
+  , evidenceExpected   :: Type
+  }
+\end{lstlisting}
+
+The frontend certifies that the goal is well-formed in the sealed environment.
+The engine can carry the node, compose providers around it, and charge it a
+cost.  The source completion layer asks Lean's instance synthesizer to solve it
+in the exact local context.  Failure rejects the candidate; success fills the
+hole with a source expression not interpreted by \Djex{}.
+
+This supports a useful middle ground:
+
+\begin{itemize}
+  \item class-constrained provider composition;
+  \item \code{Decidable} and coercion obligations;
+  \item higher-kinded constraints retained inside rank-N arguments;
+  \item local instance hypotheses in prove mode; and
+  \item source-specific elaboration mechanisms that have no meaningful Haskell
+    analogue.
+\end{itemize}
+
+\subsection{Evidence tables rather than arbitrary callbacks}
+
+For determinism, purity, and cacheability, the preferred first design is a
+bounded evidence table produced before search, not an arbitrary engine-to-Lean
+callback during lazy evaluation.  A frontend request can include:
+
+\begin{itemize}
+  \item exact evidence goals known to be solvable in the current environment;
+  \item the type variables or source metavariables they determine;
+  \item complete correlated substitutions, where relevant;
+  \item a stable provenance token and environment generation; and
+  \item a cost or priority supplied by source resolution order.
+\end{itemize}
+
+Search may use only table entries.  A later bounded refinement round may ask the
+frontend for additional evidence goals discovered in a candidate skeleton,
+but each round seals a new immutable request.
+
+This reproduces the strongest properties of current active-instance
+assignments: isolation between attempts, exact vector correlation, finite
+limits, and no mutation of the next candidate's metavariable state.
+
+\subsection{Equality and coercion obligations}
+
+The same mechanism can carry source equalities without teaching the engines a
+full dependent conversion checker.  An \code{EqualityGoal} contains opaque
+source terms and their neutral types.  Search rules may create it only through
+a family descriptor or frontend certificate.  The source layer discharges it
+using definitional equality, an available proof, a coercion, or an explicit
+transport term.
+
+For example, a constructor branch of an indexed family may refine an index
+from \(n\) to \(0\) or \(m+1\).  The engine can solve the structural branch
+body under a source refinement token while leaving the exact equality proof to
+Lean.  The token is scoped to that branch and cannot escape unless the
+candidate carries a corresponding equality obligation.
+
+\subsection{Obligation-aware cost}
+
+Residual obligations should be visible to ranking.  A reasonable default cost
+order is:
+
+\[
+\begin{aligned}
+\text{no obligation}
+&< \text{known table evidence}
+ < \text{ordinary instance goal}\\
+&< \text{definitional equality}
+ < \text{explicit equality transport}\\
+&< \text{open frontend hole}.
+\end{aligned}
+\]
+
+The order is policy and frontend-dependent.  The important invariant is that a
+term with unresolved obligations is never presented as complete before the
+source layer fills and checks them.
+
+\section{Recursive synthesis through recursor skeletons}
+\label{sec:recursion}
+
+\subsection{Current conservative recursive support}
+
+The current split is principled:
+
+\begin{itemize}
+  \item \Djinn{} can construct bounded positive recursive values, limited by
+    SCC-aware rules and an independent-SCC cap;
+  \item \Exference{} can perform one finite constructor match and treats
+    recursive fields as ordinary locals without recursively eliminating them;
+  \item neither engine invents an unbounded recursive definition or performs
+    induction; and
+  \item Lean or GHC remains the final checker of generated terms.
+\end{itemize}
+
+This covers finite constructor terms and useful one-layer projections while
+keeping termination obvious.  The next step should preserve that posture.
+
+\subsection{Recursors as ordinary certified providers}
+
+In Lean, each inductive family already has recursors and cases eliminators with
+checked termination.  Rather than adding general recursion to the engine,
+serialize a bounded \term{recursor descriptor} as part of the family algebra.
+The descriptor identifies:
+
+\begin{itemize}
+  \item the motive parameters and indices;
+  \item the major premise;
+  \item one branch telescope per constructor;
+  \item which branch fields receive recursive hypotheses;
+  \item universe/sort restrictions; and
+  \item a source handle for rendering the exact recursor application.
+\end{itemize}
+
+Search can then synthesize a recursor skeleton:
+
+\[
+  \mathsf{recursor}\;\mathsf{motive}\;
+  \mathsf{branch}_1\;\cdots\;\mathsf{branch}_k\;\mathsf{major}.
+\]
+
+Each branch is a typed subgoal.  Recursive hypotheses are ordinary local
+providers whose types come from the descriptor.  \Djinn{} or \Exference{} can
+solve branch plumbing without ever constructing a self-reference.
+
+For Haskell, the analogous descriptor can point at an existing trusted fold or
+eliminator such as \code{foldr}, rather than requiring the neutral term syntax
+to express \code{let rec}.  A future Haskell-specific frontend may add checked
+structural recursion separately.
+
+\subsection{When to propose a recursor}
+
+Unrestricted recursor insertion can explode the search space.  Gate it by
+source and goal relevance:
+
+\begin{enumerate}
+  \item a local or provider value has an exact recursive family at its head;
+  \item the target type depends on, or is reachable from, fields exposed by one
+    constructor layer;
+  \item one-layer case analysis failed or leaves a branch goal whose type
+    matches the recursive result at a structurally smaller field;
+  \item a recursor descriptor is complete and source-certified; and
+  \item the per-query recursor budget has not been spent.
+\end{enumerate}
+
+Start with non-dependent catamorphism-like recursors for \code{Nat},
+\code{List}, and simple user families.  The branch result type must be uniform
+and first-order in the initial slice.  Later, the same typed skeleton can carry
+motive and index obligations.
+
+\subsection{Bounded recursion policies}
+
+Useful finite controls include:
+
+\begin{itemize}
+  \item at most one recursor skeleton on a term path initially;
+  \item at most one recursive family SCC per skeleton;
+  \item a cap on branch subgoals and recursive-hypothesis uses;
+  \item no synthesized nested recursor until all one-recursor candidates have
+    been tried;
+  \item a size penalty dominating ordinary application and one-layer cases;
+  \item and no negative completeness claim for projections that omit an
+    available recursor.
+\end{itemize}
+
+These bounds are semantic and can be widened independently of the source
+language.  Lean's termination checker remains authoritative because the
+neutral engine never generates an unchecked recursive binding.
+
+\begin{recommendation}{Recommendation 5: add certified recursor applications before general recursive definitions or induction tactics.}
+Recursor skeletons substantially widen useful program and proof synthesis while
+preserving the current termination story.  They reuse family descriptors,
+typed branch goals, provider premises, and source obligations introduced by the
+preceding architectural work.
+\end{recommendation}
+
+\section{A staged dependent and indexed fragment}
+\label{sec:dependent}
+
+\subsection{Why a staged approach is feasible}
+
+Full dependent program synthesis is not a single feature.  It combines
+higher-order unification, definitional equality, index refinement, motive
+synthesis, proof search, coercions, and source elaboration.  Attempting all of
+that in \Djex{} would destroy the present division of responsibility.
+
+The typed-skeleton architecture permits several useful fragments in increasing
+order of difficulty.
+
+\subsection{Stage D0: exact dependent transport}
+
+This stage largely exists already through alpha-aware opaque atoms.  Make it
+explicit and more reliable:
+
+\begin{itemize}
+  \item hash-cons dependent source atoms by an exact frontend fingerprint;
+  \item distinguish definitional equality, alpha equality, and mere pretty-text
+    equality;
+  \item preserve occurrence IDs and binder scopes;
+  \item let structural rules transport, pair, inject, select, and compose these
+    atoms without inspecting their internals; and
+  \item report hidden dependent atoms in projection-loss diagnostics.
+\end{itemize}
+
+This improves higher-order plumbing over propositions such as
+\(\forall n, P\,n\) without adding dependent elimination.
+
+\subsection{Stage D1: dependent pairs and subtypes as certified structures}
+
+\code{Sigma}, dependent records, and \code{Subtype} can be represented by
+family descriptors whose later field types refer to earlier branch locals via
+opaque source tokens.  The engine need not substitute those source terms
+itself.  It needs typed pattern binders and a scoped obligation environment.
+
+A constructor skeleton for \(\Sigma x:A, B\,x\) has two subgoals:
+
+\[
+  a : A, \qquad b : B\,a.
+\]
+
+The second expected type is a source handle instantiated by the frontend after
+\(a\) is chosen.  In the initial implementation, require \(a\) to be an exact
+local/global term known to the frontend, not an arbitrary generated expression.
+This still enables useful packaging and projection terms.
+
+Elimination exposes the first component and a second component whose exact type
+is supplied by the branch descriptor.  Lean verifies the dependency.
+
+\subsection{Stage D2: indexed constructor refinement}
+
+For an indexed inductive, constructor matching refines indices.  A descriptor
+can attach branch-local equations and specialized field types to each
+constructor.  Search proceeds structurally under a \code{RefinementContext}:
+
+\begin{lstlisting}[language=Haskell]
+data RefinementContext source = RefinementContext
+  { refinedIndices :: [(source, source)]
+  , localEqualities:: [ObligationId]
+  , sourceScope    :: SourceScopeId
+  }
+\end{lstlisting}
+
+The neutral checker ensures that a branch cannot use a refinement token outside
+its scope.  The frontend decides whether refinements are definitional, require
+an equality proof, or need an explicit transport.  A failed source check drops
+the candidate.
+
+Good initial targets include:
+
+\begin{itemize}
+  \item equality itself, with reflexivity and one controlled transport rule;
+  \item \code{Fin} and simple zero/successor index splits;
+  \item vectors under one constructor match; and
+  \item user GADTs whose branch result indices are syntactically constructor
+    forms after elaboration.
+\end{itemize}
+
+\subsection{Stage D3: motive holes and recursors}
+
+Only after D1 and D2 should the engine generate dependent recursor skeletons.
+The motive is an explicit frontend obligation with a neutral shape and exact
+source expected sort.  Search can use common templates:
+
+\begin{itemize}
+  \item constant motive;
+  \item target-as-motive after abstracting the major premise;
+  \item one index-variable abstraction; and
+  \item a frontend-supplied finite motive candidate table.
+\end{itemize}
+
+Lean elaboration determines universe correctness and dependent conversion.  No
+negative completeness claim should cover an omitted motive template.
+
+\subsection{What should remain opaque}
+
+Even after these stages, the following should remain source-owned unless a
+specific checked rule is added:
+
+\begin{itemize}
+  \item arbitrary term-level computation inside indices;
+  \item unrestricted higher-order unification;
+  \item synthesis of arbitrary equality lemmas;
+  \item quotient and heterogeneous equality reasoning;
+  \item well-founded recursion and termination measures;
+  \item and source-specific coercion search beyond finite obligations.
+\end{itemize}
+
+This boundary is not a failure.  It lets the system automate a much larger
+class of complex types while preserving an understandable and testable search
+core.
+
+\section{Semantic environment retrieval at project and Mathlib scale}
+\label{sec:retrieval}
+
+\subsection{Separate retrieval from search}
+
+The current live-provider inventory is intentionally bounded and goal-relevant,
+with project ratings and a semantic cache.  This validates the basic source
+integration.  Scaling it should not mean handing thousands of declarations to
+\Exference{} and hoping its ranking compensates.
+
+Introduce a distinct \term{retrieval layer}.  Its output is still a finite,
+checked provider package, so the existing engine boundary and soundness model
+remain intact.  Retrieval can evolve independently and can be tested against
+known useful provider sets.
+
+\subsection{Persistent signature index}
+
+For each declaration, store a compact normalized signature record:
+
+\begin{lstlisting}[language=Haskell]
+data ProviderIndexEntry = ProviderIndexEntry
+  { providerId          :: GlobalId
+  , providerResultHeads :: [HeadFeature]
+  , providerArgumentHeads:: [HeadFeature]
+  , providerForallShape :: ForallShape
+  , providerArrowDepth  :: Int
+  , providerFamilyUses  :: [FamilyId]
+  , providerConstraints :: [ConstraintFeature]
+  , providerSortClass   :: SortClass
+  , providerTypeSize    :: Int
+  , providerNamespace   :: NamespaceFeature
+  , providerModule      :: ModuleId
+  , providerBaseRating  :: Rating
+  , providerFingerprint :: TypeFingerprint
+  }
+\end{lstlisting}
+
+A \code{HeadFeature} should distinguish exact family identity from opaque
+nominal text.  Include partial higher-kinded heads and structural family IDs,
+so a query for \code{Prod} can retrieve declarations indexed under the same
+family descriptor as saturated products.
+
+In \Leant{}, the index can live in the synthesis companion already associated
+with snapshots, or in a project cache keyed by Lean toolchain, imported module
+fingerprints, and relevant options.  Incremental updates should append entries
+for session declarations and invalidate only affected namespace/result-head
+buckets.
+
+\subsection{Backward type-reachability expansion}
+
+Start from the exact goal feature set.  Retrieve providers whose result can
+match the goal under cheap head/kind/arity filters.  Their unsolved argument
+features become the next frontier.  Continue for a small semantic radius:
+
+\[
+  G_0 = \mathsf{features}(\text{goal}), \qquad
+  G_{i+1} = G_i \cup
+    \bigcup_{p : \mathsf{result}(p)\leadsto G_i}
+      \mathsf{arguments}(p).
+\]
+
+This is not full unification.  It is an admissible retrieval over-approximation.
+The checked engine still validates and searches exact types.  Useful filters
+include:
+
+\begin{itemize}
+  \item exact result head and structural family identity;
+  \item result-arrow depth;
+  \item proper kind and sort compatibility;
+  \item quantified-result shape;
+  \item required local head features already present in the query;
+  \item constraint satisfiability from the bounded evidence table;
+  \item namespace/module proximity;
+  \item and user ratings.
+\end{itemize}
+
+At each radius, apply diversity quotas: do not let dozens of near-identical
+lemmas from one namespace crowd out a composition bridge.  Keep at least a few
+entries per distinct result fingerprint, argument-head profile, and module.
+
+\subsection{Proof-graph retrieval}
+
+Successful synthesized terms provide valuable but deterministic local data.
+Record a graph edge from a provider's result feature to each argument feature,
+weighted by successful use count, final candidate rank, and verification
+success.  Project-local learning can reorder retrieval while preserving an
+unchanged lexical fallback and explicit ratings.
+
+This is not machine learning in the opaque-model sense.  It is a transparent
+weighted dependency graph.  Its cache can be deleted without changing
+soundness or available rules; only ranking changes.
+
+\subsection{Inventory packages and staged widening}
+
+Replace raw widths \(1,4,16,80\) with semantic packages:
+
+\begin{enumerate}
+  \item exact result-head providers;
+  \item one-step bridge providers;
+  \item constraint/evidence-complete providers;
+  \item two-step backward-reachable providers;
+  \item namespace/project neighborhood;
+  \item and the full bounded retrieved set.
+\end{enumerate}
+
+The current geometric widths can remain as caps within each package during
+migration.  The important change is that every stage has a semantic reason and
+can be cached by a query feature fingerprint.
+
+\begin{recommendation}{Recommendation 6: build a persistent semantic index and backward relevance expander before raising the live-provider cap.}
+This is the path to useful Mathlib-scale synthesis.  A larger unstructured
+inventory would mostly increase queue pressure, duplicate candidates, and Lean
+verification cost; a semantic retrieval layer increases the probability that a
+small inventory contains the necessary composition chain.
+\end{recommendation}
+
+\section{Cooperative Djinn--Exference search}
+\label{sec:cooperation}
+
+\subsection{Keep independent semantics, share typed artifacts}
+
+A single hybrid engine would risk losing the clearest property of the current
+system: \Djinn{} has a complete logical interpretation for an admitted
+fragment; \Exference{} has heuristic ranked search and evidence resolution.
+The better design is a portfolio over shared typed artifacts.
+
+Three levels of cooperation are increasingly powerful.
+
+\subsubsection{Level 1: shared preparation and semantic caches}
+
+Both engines consume the same interned types, source certificates, family
+descriptors, normalized provider inventory, and plan fingerprints.  They share
+candidate fingerprints and verification outcomes.  Search frontiers remain
+independent.
+
+This is low risk and should accompany the typed candidate graph.
+
+\subsubsection{Level 2: progress-aware portfolio scheduling}
+
+Replace fixed batch quotas after the compatibility prefix with a deterministic
+portfolio scheduler.  Give the next slice of work to the engine with the best
+recent marginal progress, measured by:
+
+\begin{itemize}
+  \item new semantic candidates produced;
+  \item new subgoal fingerprints solved;
+  \item reduction in unsolved obligation count;
+  \item source-verification acceptance rate;
+  \item unique family/provider coverage;
+  \item and frontier growth per unit of engine work.
+\end{itemize}
+
+Retain minimum service guarantees: each standalone twelve-group opportunity
+must still be reachable, and a complete \Djinn{} refutation cannot be delayed
+indefinitely by an expanding \Exference{} queue.  Deterministic counters and
+stable tie-breaking preserve reproducibility.
+
+\subsubsection{Level 3: proof skeletons and leaf filling}
+
+The typed candidate graph enables a more interesting composition:
+
+\begin{enumerate}
+  \item \Djinn{} produces a structural derivation with one or more opaque
+    atomic/provider/evidence leaves.
+  \item Each leaf becomes a typed subquery for \Exference{} with the exact
+    local context and obligations.
+  \item \Exference{} fills leaves using live providers, class evidence, or
+    recursive-family rules.
+  \item The combined graph is checked by the neutral checker and the source
+    frontend.
+\end{enumerate}
+
+Conversely, an \Exference{} candidate can contain structural holes which
+\Djinn{} solves completely.  This is especially promising for environment-rich
+higher-order plumbing: \Exference{} chooses the right library bridge, while
+\Djinn{} fills the pure structural lambda surrounding it.
+
+The leaf protocol must prevent cyclic self-justification.  A subquery records
+its parent candidate fingerprint and forbids a provider/certificate dependency
+cycle unless the source family descriptor explicitly authorizes a recursor.
+
+\subsection{Refutations in a cooperative portfolio}
+
+Only a complete engine projection may refute its exact subgoal.  A filled
+candidate can use such refutations to prune a branch locally, but the overall
+query is refuted only when:
+
+\begin{itemize}
+  \item the root projection is complete;
+  \item every structural plan required by the capability fingerprint has been
+    exhausted;
+  \item no omitted provider or source obligation could add proof power; and
+  \item every cooperative leaf is either solved or refuted in a complete
+    subfragment.
+\end{itemize}
+
+In practice, most new cooperative modes will be positive-only at first.  Their
+presence simply adds a \code{ProjectionLoss} to any otherwise complete
+provider-free refutation.  This is the conservative rule already used by many
+current extensions, generalized structurally.
+
+\section{Concrete changes by repository}
+\label{sec:repo-changes}
+
+\subsection{Djex responsibilities}
+
+The following additions belong naturally in \Djex{} because they are
+frontend-neutral and should be shared by both engines.
+
+\paragraph{New neutral modules.}
+
+\begin{itemize}
+  \item \code{Language.Haskell.Synthesis.TypedGenerated}: typed term graph,
+    patterns, application witnesses, obligations, and fingerprints;
+  \item \code{Language.Haskell.Synthesis.Certificate}: checked source
+    certificates, ownership, provenance bounds, and fidelity witnesses;
+  \item \code{Language.Haskell.Synthesis.Family}: family/constructor/eliminator
+    descriptors and recursion metadata;
+  \item \code{Language.Haskell.Synthesis.Capability}: projection losses,
+    capability fingerprints, and structured negative evidence;
+  \item \code{Language.Haskell.Synthesis.Plan}: occurrence IDs, normalized
+    plan lattice, deterministic adaptive scheduler, and plan fingerprints;
+  \item \code{Language.Haskell.Synthesis.Fingerprint}: interned type, context,
+    subgoal, and candidate identities; and
+  \item optionally \code{Language.Haskell.Djex.Portfolio}: shared preparation
+    and progress-aware orchestration without merging engine internals.
+\end{itemize}
+
+\paragraph{Backend adapters.}
+
+Each engine adapter should produce a typed candidate derivation.  This need not
+rewrite the engines immediately.  The first version can instrument existing
+search/checker steps:
+
+\begin{itemize}
+  \item \Djinn{} maps proof-term constructors and formula nodes to typed graph
+    nodes while erasing synthetic instantiation premises through explicit
+    substitution witnesses;
+  \item \Exference{} maps holes, inventory uses, unification substitutions,
+    tuple/constructor steps, and case rules to the same graph;
+  \item the current \code{Expression} is generated from the typed graph by a
+    compatibility projection; and
+  \item a small neutral checker validates every candidate before it leaves
+    \Djex{}.
+\end{itemize}
+
+\paragraph{Public query API.}
+
+Add a versioned request extension rather than changing every existing field:
+
+\begin{lstlisting}[language=Haskell]
+data QuerySemanticPackage variable source = QuerySemanticPackage
+  { semanticFamilies     :: [FamilyDescriptor ...]
+  , semanticCertificates :: [SubstitutionCertificate ...]
+  , semanticOccurrences  :: OccurrenceTable source
+  , semanticCapabilities :: RequestedCapabilities
+  , semanticLimits       :: SemanticLimits
+  }
+\end{lstlisting}
+
+Legacy callers receive an empty package derived from existing declarations and
+provider evidence.  This preserves the curated public facade and permits a
+long migration.
+
+\paragraph{Limits.}
+
+Keep the current public constants as compatibility defaults.  Introduce a
+\code{SemanticLimits} record whose fields are measured in unique plan views,
+certificate nodes, typed graph nodes, obligation count, and fingerprint cache
+size.  Reject malformed lazy/cyclic values at sealing time exactly as current
+kind and assignment bounds do.
+
+\subsection{Leant responsibilities}
+
+\Leant{} should remain the authority for elaborated Lean semantics.
+
+\paragraph{Source package producer.}
+
+Extend the generated Lean metaprogram to emit:
+
+\begin{itemize}
+  \item stable occurrence IDs for every serialized goal/provider/family node;
+  \item exact binder roles, visibility, and sort-domain tokens;
+  \item family descriptors derived from Lean inductive and recursor metadata;
+  \item active-instance and other substitution certificates;
+  \item exact source AST handles or bounded structural rendering metadata;
+  \item opaque term/index fingerprints with source equality classes; and
+  \item an environment generation/fingerprint for cache invalidation.
+\end{itemize}
+
+The producer already computes much of this information in specialized forms.
+The change is to emit one typed package rather than several parser-position
+specific strings and maps.
+
+\paragraph{Renderer becomes source completion.}
+
+\code{Leant.Synth.Render} should gradually stop inferring types from untyped
+syntax.  Its core operation becomes:
+
+\begin{enumerate}
+  \item traverse a typed candidate graph;
+  \item look up exact source metadata by occurrence/certificate/family ID;
+  \item materialize Lean syntax or an AST command;
+  \item discharge obligations in a bounded source-completion phase;
+  \item elaborate against the exact goal; and
+  \item return either a verified term or a structured rejection.
+\end{enumerate}
+
+The existing fitting code remains as a compatibility path for legacy
+\code{Expression} candidates until all engines emit enough typed data.
+Regression tests should assert that new candidates use the typed path and do
+not silently fall back.
+
+\paragraph{Verification API.}
+
+Extend the backend worker response with a small error taxonomy:
+
+\begin{lstlisting}[language=Haskell]
+data VerificationFailure
+  = TypeMismatch OccurrenceId SourceTypeSummary SourceTypeSummary
+  | UnsolvedInstance OccurrenceId SourceGoalSummary
+  | UnsolvedMetavariable OccurrenceId
+  | UniverseMismatch OccurrenceId
+  | BinderVisibilityMismatch OccurrenceId
+  | UnknownSourceIdentity SourceIdentity
+  | IndexRefinementFailure OccurrenceId
+  | TerminationFailure OccurrenceId
+  | OtherElaborationFailure String
+\end{lstlisting}
+
+This information is diagnostic and heuristic.  The full Lean message can still
+be retained for debugging.  The engine never trusts the category for
+soundness.
+
+\paragraph{Provider index.}
+
+Add a persistent index builder and query feature extractor outside
+\code{Leant.Synth.Engine}.  The engine continues to receive a finite checked
+inventory.  Provider cache keys incorporate the index generation and semantic
+retrieval stage rather than only a width.
+
+\subsection{Shared testing responsibilities}
+
+Every cross-repository capability should continue the current paired pattern:
+
+\begin{enumerate}
+  \item neutral \Djex{} unit/property tests;
+  \item public-facade tests through both engines;
+  \item generated Haskell accepted by GHC where applicable;
+  \item \Leant{} pure serializer/adapter/renderer tests;
+  \item malformed and over-bound controls;
+  \item a Lean transcript covering \Djinn{}, \Exference{}, and combined mode;
+  \item and a commit in \Leant{} pinning the exact reviewed \Djex{} revision.
+\end{enumerate}
+
+The typed architecture adds two valuable differential checks: the neutral
+checker must accept every engine candidate, and the source verifier must accept
+every displayed candidate.  A mismatch between those layers is a localized
+boundary bug rather than an unexplained text-rendering failure.
+
+\section{Worked target classes}
+\label{sec:targets}
+
+This section illustrates what the proposed architecture would make possible.
+The examples are not promises that one generic algorithm solves all of them.
+They identify the smallest new semantic mechanism needed beyond the current
+system.
+
+\subsection{Higher-rank provider composition with exact source metadata}
+
+Consider a schematic provider family:
+
+\begin{lstlisting}[language=Haskell]
+select
+  :: forall f g.
+     Evidence f g
+  => Box (f A B)
+  -> (forall x. f x x -> g x)
+  -> Result (g A)
+\end{lstlisting}
+
+and a source environment establishing one correlated choice
+\(f := (,)\), \(g := \mathsf{Either}\;E\), with a contextual rank-N argument.
+The recent structural higher-kinded work can preserve closely related cases,
+but the complete path currently relies on parallel canonical/source
+representations and renderer fitting.
+
+Under the proposed architecture:
+
+\begin{enumerate}
+  \item the frontend emits one substitution certificate for \code{select};
+  \item the certificate refers to the canonical pair/sum family descriptors and
+    carries exact Lean rendering metadata;
+  \item the typed application node records the selected substitution and the
+    specialized type of each term argument;
+  \item any class evidence is a source obligation associated with the same
+    certificate; and
+  \item the renderer performs no type reconstruction---it materializes the
+    known specialization and asks Lean to discharge the evidence.
+\end{enumerate}
+
+This generalizes the latest \code{Prod}/\code{Sum} fixes to arbitrary families
+whose descriptors explicitly declare an unsaturated structural identity.
+
+\subsection{A fold-shaped list program}
+
+A target such as
+
+\[
+  (\alpha \to \beta \to \beta) \to \beta \to
+  \mathsf{List}\,\alpha \to \beta
+\]
+
+has the obvious \code{List.foldr}-shaped inhabitant.  Current live-provider
+search may find the library function if it is retrieved.  A source-certified
+recursor descriptor allows synthesis even without a provider indexed under the
+exact target spelling:
+
+\begin{enumerate}
+  \item choose the \code{List} recursor because the major premise is a list and
+    the target result is uniform;
+  \item create nil- and cons-branch subgoals;
+  \item expose the recursive result as a typed local in the cons branch;
+  \item let \Djinn{} synthesize the structural application of the user's step
+    function, or let \Exference{} choose a relevant provider; and
+  \item render an exact \code{List.rec}, \code{List.foldr}, or source-preferred
+    eliminator application supplied by the descriptor.
+\end{enumerate}
+
+No recursive binding is generated, and Lean's recursor is already termination
+checked.
+
+\subsection{A dependent pair projection}
+
+For
+
+\[
+  (\Sigma x : A, B\,x) \to A,
+\]
+
+the engine needs only the first field type.  A dependent-family descriptor
+makes the pair eliminable; the second field remains source-typed under the
+first binder but can be unused.  The typed case node exposes
+\(x:A\) and \(y:B\,x\); \Djinn{} returns \(x\).  No equality reasoning or
+motive synthesis is required.
+
+For
+
+\[
+  (\Sigma x : A, B\,x) \to \Sigma x : A, B\,x,
+\]
+
+the current opaque-transport route can already return the input.  The new
+descriptor merely gives the engine an additional constructor/eliminator view
+without sacrificing the exact opaque identity.
+
+\subsection{One-layer indexed refinement}
+
+For a vector-like family, consider a function which eliminates an impossible
+constructor at length zero.  The source descriptor says that the nil
+constructor returns index zero and cons returns successor.  In a branch where
+the major premise has index zero:
+
+\begin{itemize}
+  \item the nil branch is admitted directly;
+  \item the cons branch carries an equality obligation
+    \(\mathsf{succ}(n)=0\);
+  \item Lean can discharge it as impossible during elaboration or via a source
+    no-confusion rule; and
+  \item the candidate graph records why the branch is impossible rather than
+    treating the whole indexed family as unrelated atoms.
+\end{itemize}
+
+This is a bounded constructor-refinement rule, not general dependent proof
+search.
+
+\subsection{Class-constrained higher-order plumbing}
+
+Suppose the environment contains:
+
+\begin{lstlisting}[language=Haskell]
+mapMLike :: Monad m => (a -> m b) -> Container a -> m (Container b)
+\end{lstlisting}
+
+and the target supplies a function \code{a -> m b} and a container.  The engine
+can structurally choose and apply the provider while leaving \code{Monad m} as
+an evidence obligation.  In \Leant{}, the frontend asks type-class synthesis to
+fill it in the exact context.  If no instance exists, the candidate is rejected
+or retained as a visibly incomplete skeleton in a future diagnostic mode; it
+is never displayed as a finished term.
+
+This is more expressive than erasing dictionaries entirely, but safer and more
+portable than importing source dictionary terms into the neutral engine.
+
+\subsection{Library bridge plus structural completion}
+
+A common complex synthesis shape is:
+
+\[
+\begin{aligned}
+&\text{local higher-order plumbing}
+  \quad\circ\quad \text{environment provider(s)}\\
+&\hspace{7em}\circ\quad
+  \text{local constructor/recursor plumbing}.
+\end{aligned}
+\]
+
+A cooperative portfolio can solve this efficiently:
+
+\begin{enumerate}
+  \item semantic retrieval selects a provider whose result head reaches the
+    goal;
+  \item \Exference{} chooses that bridge and leaves typed argument holes;
+  \item \Djinn{} fills purely structural holes completely;
+  \item source evidence fills class/equality obligations; and
+  \item semantic normalization removes administrative differences before Lean
+    verification.
+\end{enumerate}
+
+This is the most plausible route to substantially more automation for complex
+types.  It uses each subsystem where it is strongest instead of forcing one
+engine to solve the entire problem monolithically.
+
+\section{Soundness, completeness, and trust boundaries}
+\label{sec:soundness}
+
+\subsection{Positive soundness remains source-verified}
+
+The fundamental positive-soundness theorem is operational:
+
+\begin{quote}
+A candidate is presented as a term of source type \(T\) only after the source
+frontend has elaborated and checked that exact candidate against \(T\) in the
+current sealed environment.
+\end{quote}
+
+The typed neutral checker is defense in depth and a debugging aid.  It catches
+engine/boundary inconsistencies earlier, permits semantic normalization, and
+makes source failures more meaningful.  It does not replace GHC or Lean.
+
+Residual obligations preserve this theorem.  A candidate with unfilled
+obligations is a skeleton, not a finished term.  The source completion layer
+must fill every obligation and re-check the result before display.
+
+\subsection{Certificate trust is bounded and checked}
+
+A source certificate is not trusted merely because it came from a frontend.
+The sealed query validates the structural facts on which search relies:
+
+\begin{itemize}
+  \item no duplicate or stale owner identity;
+  \item exact telescope fingerprint and argument count;
+  \item well-formed kinds and closed substitutions;
+  \item bounded source payload size;
+  \item no free source variables outside the declared scope;
+  \item no conflicting family arities or class kind vectors;
+  \item and required fidelity through datatype fields when nominal identity is
+    used to justify a visible specialization.
+\end{itemize}
+
+Source-specific claims that \Djex{} cannot validate are obligations, not search
+axioms.  For example, ``Lean can synthesize this instance'' is confirmed by
+Lean during source completion; it is not used to prove a \Djinn{} refutation.
+
+\subsection{Negative evidence must be monotone under capability loss}
+
+Let \(P\) be the exact source problem and \(\pi_C(P)\) a logical projection
+under capability set \(C\).  A \Djinn{} refutation is source-valid only if the
+projection is complete for the stated fragment.  Adding positive-only
+certificates or omitted source rules must not strengthen that claim.
+
+A useful invariant is monotonicity:
+
+\[
+  C_1 \subseteq C_2
+  \quad\Longrightarrow\quad
+  \mathsf{loss}(C_2) \subseteq \mathsf{loss}(C_1).
+\]
+
+A refutation at \(C_1\) can be reused at \(C_2\) only when the newly added
+capabilities introduce no new proof power relevant to the root problem, or when
+those capabilities are themselves exhaustively searched.  Otherwise the old
+refutation is retained only as an internal provider-free fallback, exactly as
+\Leant{} already does.
+
+\subsection{Refutation certificates}
+
+A future \Djinn{} adapter could emit a compact certificate of saturated LJT
+search rather than only a status.  The certificate need not be a proof term of
+negation; it can be a replayable finite derivation showing that every applicable
+rule branch closes unsuccessfully under the normalized formula and context.
+
+Benefits include:
+
+\begin{itemize}
+  \item independent checking of negative results;
+  \item stable caching keyed by formula and capability fingerprint;
+  \item clearer diagnostics for which atom or omitted rule prevents a source
+    refutation; and
+  \item safer cooperative pruning of typed subgoals.
+\end{itemize}
+
+This is lower priority than typed positive candidates because the current
+\Djinn{} boundary already has a strong completeness discipline.  It becomes
+more valuable once capabilities and cooperative subqueries are more numerous.
+
+\subsection{No semantic inference from source spelling}
+
+The current projects already move away from raw text: validated names,
+alpha-normalized closed types, exact family keys, and structural context
+payloads replace guessed strings.  The target architecture should make the
+rule absolute:
+
+\begin{quote}
+Source spelling is for presentation and source AST construction.  Search
+identity, kinds, family arity, binder roles, and evidence ownership come only
+from checked structural data.
+\end{quote}
+
+This is particularly important for Lean, where pretty printing can omit
+universes, implicit arguments, qualifications, coercions, and binder
+information.
+
+\section{Implementation roadmap}
+\label{sec:roadmap}
+
+The roadmap below is dependency-ordered.  Effort labels are relative
+architectural sizes, not calendar estimates.
+
+\subsection{Milestone 0: observability and baseline corpus (S/M)}
+
+Before changing the candidate edge, make current costs visible.
+
+\begin{itemize}
+  \item Add per-query counters for compiled rank-N plans, unique formula
+    fingerprints, prepared-premise cache hits, engine states, raw derivations,
+    rendered groups, semantic/exact duplicates, Lean variants tried, and
+    verification failure classes.
+  \item Record provider retrieval stage, inventory composition, and provider
+    use in each verified candidate.
+  \item Store machine-readable benchmark output beside the human transcripts.
+  \item Freeze a representative corpus from the current pure tests and Lean
+    goldens, including every known fail-closed sentinel.
+\end{itemize}
+
+This milestone produces an immediate result: it will reveal whether current
+latency is dominated by plan compilation, \Exference{} queue growth, renderer
+variant multiplication, duplicate candidate groups, or Lean round trips for
+each class of query.
+
+\subsection{Milestone 1: typed candidate spine and occurrence IDs (M/L)}
+
+Implement the smallest typed slice that eliminates recent reconstruction work:
+
+\begin{itemize}
+  \item stable source occurrence IDs;
+  \item typed local/global/application/type-application/tuple/let/case nodes;
+  \item application witnesses containing the exact neutral function domain and
+    result;
+  \item provider certificate IDs on visible specializations;
+  \item typed pattern fields for product and finite-family elimination;
+  \item a neutral checker; and
+  \item projection back to the existing \code{Expression}.
+\end{itemize}
+
+Migrate provider-result specialization and occurrence-local metadata to the
+typed path first.  Keep the old renderer fitting as a fallback.  Success means
+that the current provider structural-elimination, contextual-assignment,
+implicit-forall, and higher-order-result regressions pass without using the
+legacy inference path.
+
+\subsection{Milestone 2: semantic fingerprinting and shared preparation (M)}
+
+\begin{itemize}
+  \item Intern neutral types, substitutions, contexts, and family IDs.
+  \item Compute candidate fingerprints before rendering.
+  \item Deduplicate each engine and combined mode by fingerprint.
+  \item Share provider/certificate/family preparation across engines.
+  \item Add dominance pruning over obligation/loss/cost vectors.
+\end{itemize}
+
+This milestone should reduce Lean verification attempts and make the existing
+60/12/24 windows materially more valuable without changing search power.
+
+\subsection{Milestone 3: adaptive occurrence-plan tail (L)}
+
+\begin{itemize}
+  \item Assign stable IDs to positive forall occurrences.
+  \item Preserve the historical plan prefix exactly.
+  \item Add normalized plan fingerprints and a best-first tail under a distinct
+    compiled-view budget.
+  \item Re-express the twelve-site six/six sentinel as an adaptive success.
+  \item Add larger adversarial cases to demonstrate bounded behavior without
+    adding fixed sextic code.
+\end{itemize}
+
+Structured verifier feedback can be added after a deterministic engine-only
+heuristic proves the architecture.
+
+\subsection{Milestone 4: generalized certificates and family descriptors (L)}
+
+\begin{itemize}
+  \item Lift provider assignments into a common certificate table while
+    preserving the existing public constructors as adapters.
+  \item Introduce family descriptors for current intrinsic and query-wide
+    finite/recursive families.
+  \item Move total arity, structural/nominal identity, constructor maps,
+    phantom fidelity, and source rendering handles into descriptors.
+  \item Reimplement \code{Prod}/\code{Sum}, tuples, \code{Either}, \code{List},
+    and \code{Nat} through the common path.
+\end{itemize}
+
+No new user-visible family need be added until the current families pass
+through the descriptor path.  This is an abstraction-validation milestone.
+
+\subsection{Milestone 5: source obligations and recursor skeletons (L/XL)}
+
+\begin{itemize}
+  \item Generalize residual constraints to obligations.
+  \item Add bounded evidence-table nodes and Lean source completion.
+  \item Serialize non-dependent recursor descriptors for \code{Nat},
+    \code{List}, and simple user inductives.
+  \item Generate one-recursor branch skeletons and solve branches with existing
+    engines.
+  \item Mark omitted recursors as projection loss for negative evidence.
+\end{itemize}
+
+This milestone should produce the first qualitatively new class of synthesized
+programs rather than only broader higher-rank transport.
+
+\subsection{Milestone 6: dependent structures and indexed refinement (XL)}
+
+Proceed through D0--D3 from Section~\ref{sec:dependent}.  Do not begin with
+arbitrary dependent recursors.  The first acceptance criteria should be exact
+dependent transport, \code{Sigma}/\code{Subtype} construction and projection,
+and one-layer index-refining cases with source equality obligations.
+
+\subsection{Milestone 7: semantic provider index and portfolio cooperation (L/XL)}
+
+The retrieval index can be developed in parallel after stable family/type
+fingerprints exist.  Progress-aware scheduling and leaf filling should wait for
+typed candidate graphs and shared subgoal keys.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Priority matrix.  Impact is on synthesis reach and architectural
+leverage; risk is implementation/semantic risk.}
+\begin{tabularx}{\textwidth}{L{4.7cm} C{1.35cm} C{1.35cm} C{1.55cm} Y}
+\toprule
+\textbf{Direction} & \textbf{Impact} & \textbf{Effort} & \textbf{Risk} &
+\textbf{Dependency} \\
+\midrule
+Typed candidate graph + occurrence IDs & Very high & L & Medium & None \\
+Semantic candidate fingerprinting & High & M & Low & Typed nodes \\
+Adaptive rank-N plan tail & High & L & Medium & Occurrence IDs \\
+General source certificates & Very high & L & Medium & Typed nodes \\
+Family descriptor algebra & Very high & L & Medium & Certificates helpful \\
+Evidence/equality obligations & High & L & Medium & Typed nodes \\
+Recursor skeletons & Very high & L/XL & Medium & Families + obligations \\
+Dependent/indexed refinement & Very high & XL & High & All preceding semantic layers \\
+Persistent semantic provider index & High & L & Low--med. & Stable fingerprints \\
+Cooperative leaf filling & High & XL & Med.-high & Typed DAG + shared cache \\
+Refutation certificates & Medium & L & Medium & Capability model \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{recommendation}{Recommendation 7: make Milestone 1 the next architectural project and use one current provider-result regression as its vertical slice.}
+A good first slice is a provider application whose exact first term argument
+specializes a later rank-N domain, followed by structural elimination of the
+provider result.  Today that path exercises mixed-spine recovery, substitution,
+fitting, occurrence metadata, and explicit binder weaving.  Carrying the same
+information in typed nodes would demonstrate the new interface against a
+hard, already well-tested case.
+\end{recommendation}
+
+\section{Evaluation and regression strategy}
+\label{sec:evaluation}
+
+\subsection{Measure semantic work, not only wall time}
+
+Interactive wall time matters, but it is a noisy aggregate of pure search,
+subprocess scheduling, Lean elaboration, cache state, and machine load.  Each
+benchmark should also report deterministic semantic counters:
+
+\begin{itemize}
+  \item source nodes serialized and opaque atoms introduced;
+  \item exact family descriptors and certificates admitted/rejected;
+  \item unique rank-N plans compiled versus raw plans proposed;
+  \item unique formula and prepared-premise fingerprints;
+  \item \Djinn{} sequents/rule branches and \Exference{} steps/queue prunes;
+  \item shared subgoal cache hits;
+  \item raw candidate derivations, semantic fingerprints, and dominated terms;
+  \item source alternatives generated and verification attempts;
+  \item verification outcomes by failure class;
+  \item obligations created, solved, and rejected; and
+  \item capability losses attached to the final outcome.
+\end{itemize}
+
+A change is an improvement if it reduces expensive semantic work or extends the
+solved corpus under the same explicit budgets, even when local wall-clock noise
+hides the gain.
+
+\subsection{Benchmark dimensions}
+
+Build a matrix rather than a flat list of showcase types.
+
+\paragraph{Quantifier planning.}
+
+Vary:
+
+\begin{itemize}
+  \item independent positive occurrence count from 1 through at least 20;
+  \item required open/opaque balance, especially central antichains;
+  \item nesting depth and shared ancestor paths;
+  \item duplicated occurrences that compile to the same formula;
+  \item and interaction with query-correlated or closed instantiations.
+\end{itemize}
+
+The current ten-, eleven-, and twelve-site sentinels should remain fixed anchor
+points.  Add cases where many raw plans normalize to few formula views to test
+semantic budgeting.
+
+\paragraph{Provider certificates.}
+
+Vary:
+
+\begin{itemize}
+  \item binder width, kinds, and vacuity;
+  \item complete versus partial vectors;
+  \item multiple vectors per provider;
+  \item nested quantified/contextual arguments;
+  \item canonical structural and nominal family heads;
+  \item phantom, mixed faithful/phantom, recursive, and empty datatypes;
+  \item occurrence-local rendering alternatives; and
+  \item conflicting or stale source metadata.
+\end{itemize}
+
+Every positive should have a malformed or semantically unsafe neighbor which
+fails closed without aborting unrelated evidence.
+
+\paragraph{Candidate identity.}
+
+Construct queries with many equivalent derivations:
+
+\begin{itemize}
+  \item repeated providers with alpha-equivalent types;
+  \item eta-expanded and contracted forms;
+  \item tuple construction followed by projection;
+  \item source alternatives differing only in explicit binder spelling;
+  \item equivalent synthetic premise paths; and
+  \item \Djinn{}/\Exference{} candidates normalizing to the same graph.
+\end{itemize}
+
+Assert the number and order of semantic fingerprints separately from rendered
+spellings.
+
+\paragraph{Recursive and dependent stages.}
+
+For recursor work, vary constructor count, branch arity, recursive fields,
+independent SCCs, and nested recursor depth.  For dependent stages, vary exact
+transport, dependent pair construction/projection, index-refining cases,
+definitional versus propositional equality, and deliberately unsupported
+motives.
+
+\paragraph{Environment retrieval.}
+
+Use synthetic environments containing controlled distractors as well as real
+Lean projects.  Record recall of a known minimal provider set at each semantic
+retrieval stage, inventory size, search work, and verified result rank.
+
+\subsection{Property-based and metamorphic tests}
+
+The current hand-crafted regressions are strong.  Typed interfaces enable
+additional systematic properties.
+
+\begin{description}
+  \item[Alpha invariance.]
+    Renaming source binders or private neutral identities does not change
+    semantic candidate fingerprints or outcomes, modulo source display names.
+
+  \item[Occurrence separation.]
+    Duplicating a provider use creates distinct occurrence IDs and permits
+    independent metadata choices without conflating substitutions.
+
+  \item[Projection round trip.]
+    Typed candidate \(\to\) legacy \code{Expression} \(\to\) typed checking
+    preserves the root neutral type for the compatibility fragment.
+
+  \item[Certificate permutation resistance.]
+    Reordering certificate storage does not change semantic results; reordering
+    the telescope inside a certificate is rejected or changes its fingerprint.
+
+  \item[Bound productivity.]
+    Infinite, cyclic, or excessively wide caller-built lists/kinds/graphs are
+    rejected without forcing beyond the advertised bound.
+
+  \item[Prefix preservation.]
+    Enabling an adaptive tail, source obligations, or cooperative search leaves
+    every historical candidate prefix byte-for-byte or fingerprint-for-fingerprint
+    unchanged until the old frontier is exhausted.
+
+  \item[Capability monotonicity.]
+    Adding a positive-only capability can add candidates or weaken a negative
+    verdict, but cannot create a stronger refutation.
+
+  \item[Frontend independence.]
+    Source rendering metadata changes spelling but not neutral typing or search
+    identity unless it is attached to a semantically distinct certificate.
+\end{description}
+
+\subsection{Fuzzing the checked boundary}
+
+The certificate/family/typed-graph parsers are security-like boundaries even in
+a local tool: they consume untrusted caller-built lazy Haskell values and
+machine-generated source metadata.  Add bounded generators for:
+
+\begin{itemize}
+  \item cyclic and shared graphs;
+  \item duplicate IDs and dangling references;
+  \item malformed kinds and arity conflicts;
+  \item scope escape and binder capture;
+  \item inconsistent field types;
+  \item certificate owners from another session;
+  \item branch refinements escaping their branch;
+  \item and terms whose annotation disagrees with the neutral checker.
+\end{itemize}
+
+The expected result is deterministic rejection with a focused diagnostic, not
+an exception, nontermination, or contamination of sibling evidence.
+
+\subsection{Golden tests without freezing accidents}
+
+Keep exact golden transcripts for source-visible behavior, especially candidate
+ordering and explanatory notes.  For internal architectural changes, add a
+parallel semantic golden format containing fingerprints, obligations, losses,
+and normalized term graphs.  This avoids forcing incidental private names or
+administrative lambdas when the user-visible output remains equivalent.
+
+\section{Risks and mitigations}
+\label{sec:risks}
+
+\subsection{The typed graph could become a second source language}
+
+\textbf{Risk.}  Adding binders, sorts, indices, equality, recursors, and source
+metadata may grow the neutral IR until it resembles Lean's full expression
+language.
+
+\textbf{Mitigation.}  Keep source terms and indices opaque; add only distinctions
+required by a generic search rule; make every source-specific operation an
+obligation or certificate; and require at least two frontend uses, or a clear
+engine-independent invariant, before moving a fact into the shared core.
+
+\subsection{Two representations can drift}
+
+\textbf{Risk.}  During migration, \code{Frag}, shared \code{Type}, typed
+candidates, and legacy \code{Expression} may encode overlapping semantics.
+
+\textbf{Mitigation.}  Define one-way checked projections and round-trip
+properties.  Do not maintain independent hand-written interpretations in each
+engine.  Mark compatibility adapters explicitly and migrate one vertical slice
+at a time.
+
+\subsection{Adaptive planning could destabilize candidate order}
+
+\textbf{Risk.}  A best-first tail changes which large-plan candidate appears
+first and may be sensitive to heuristic details.
+
+\textbf{Mitigation.}  Preserve the complete historical prefix; use stable
+source-order tie-breaking; version the tail policy; expose deterministic plan
+fingerprints in diagnostics; and treat heuristic order beyond the old frontier
+as experimental.
+
+\subsection{Source feedback could accidentally affect soundness}
+
+\textbf{Risk.}  Structured Lean failures used for refinement may be mistaken
+for proof that a plan is impossible.
+
+\textbf{Mitigation.}  Feedback changes only positive-search priority.  It may
+never eliminate a completeness-required plan or strengthen negative evidence.
+Capability and refutation code should not depend on verifier failure classes.
+
+\subsection{Obligation search could explode}
+
+\textbf{Risk.}  Allowing class, equality, coercion, and universe holes may turn
+one term skeleton into a huge source completion space.
+
+\textbf{Mitigation.}  Seal finite evidence tables; cap obligations and source
+alternatives per candidate; rank obligation-free candidates first; deduplicate
+by obligation fingerprint; and use one outer command deadline exactly as the
+current staged searches do.
+
+\subsection{Family descriptors may trust too much frontend data}
+
+\textbf{Risk.}  A malformed descriptor could give an engine an unsound
+constructor or eliminator rule.
+
+\textbf{Mitigation.}  Validate all neutral structural invariants; treat
+source-only facts as obligations; independently check every positive candidate;
+and exclude descriptor-dependent refutations until the descriptor class has a
+checked completeness proof.  Lean-derived descriptors can include a compact
+source fingerprint and be regenerated after environment changes.
+
+\subsection{Persistent retrieval can become nondeterministic}
+
+\textbf{Risk.}  Learned weights or cache history may make results hard to
+reproduce.
+
+\textbf{Mitigation.}  Store transparent counts; version index formats; include
+index generation in transcripts; provide a lexical/rating-only mode; and make
+all tie-breaking stable.  Cache deletion may affect speed and ranking, never
+soundness.
+
+\section{Directions not recommended as the primary next step}
+\label{sec:not-recommended}
+
+\begin{caution}{Do not make the next major project merely ``raise six to seven.''}
+The shared bound is well-factored, so a seven-binder widening may be a cheap and
+useful incremental change.  It does not address the semantic recovery tax,
+quantifier-plan lattice, dependent structure, or environment composition.  It
+should be treated as maintenance, not the strategic roadmap.
+\end{caution}
+
+\begin{caution}{Do not add sextic, septic, and higher fixed frontiers indefinitely.}
+Keep the quintic family as a deterministic prefix and validation oracle.  Put
+new coverage in a normalized adaptive tail whose budget is unique compiled
+views.  Otherwise each central antichain creates another bespoke scheduler and
+documentation burden.
+\end{caution}
+
+\begin{caution}{Do not move raw Lean syntax into Djex as semantic authority.}
+Exact source text is fragile under qualification, pretty-printing options,
+implicit arguments, binder visibility, universes, and notation.  Carry stable
+IDs and structural metadata; let \Leant{} build Lean syntax at the final edge.
+\end{caution}
+
+\begin{caution}{Do not rely on blind generate-and-reject as the main dependent-type strategy.}
+Lean verification makes blind search safe, not effective.  Explicit typed
+skeletons and obligations should constrain candidate generation before the
+expensive elaborator call.
+\end{caution}
+
+\begin{caution}{Do not merge Djinn and Exference into one monolithic algorithm.}
+Their independent completeness and ranking semantics are valuable.  Share
+interned artifacts, candidate identity, and typed leaves; cooperate through a
+portfolio protocol instead of erasing the distinction.
+\end{caution}
+
+\begin{caution}{Do not expose stronger non-inhabitation wording merely because the source checker rejected every generated variant.}
+Rejected candidates are positive-search evidence only.  Negative evidence must
+continue to come from a complete logical projection with an explicit capability
+fingerprint.
+\end{caution}
+
+\section{Overall assessment}
+
+The recent development of \Djex{} and \Leant{} is exceptionally coherent.  The
+repositories are not duplicating work.  They form a two-stage research and
+engineering system:
+
+\begin{itemize}
+  \item \Leant{} supplies difficult, source-realistic Lean cases and an
+    independent semantic oracle;
+  \item \Djex{} converts the reusable part of each case into a checked,
+    frontend-neutral search capability;
+  \item \Leant{} then proves that the abstraction was neither too weak to render
+    nor too permissive to trust.
+\end{itemize}
+
+That method should continue.  The architectural unit of progress, however,
+needs to change.  The last several capability loops increasingly preserve
+semantic provenance through parallel maps and recover types after search.  The
+next abstraction should make provenance, expected types, substitutions,
+family identity, and residual source obligations first-class in the candidate
+itself.
+
+With that layer in place, the future directions reinforce one another:
+
+\begin{enumerate}
+  \item typed nodes enable semantic deduplication and shared subgoal caches;
+  \item stable occurrence IDs enable adaptive quantifier planning and exact
+    source metadata;
+  \item generalized certificates unify provider, class, family, and equality
+    evidence;
+  \item family descriptors support canonical higher-kinded identity, recursive
+    recursors, and indexed refinement;
+  \item obligations let Lean solve source-specific evidence without infecting
+    the neutral engine;
+  \item semantic retrieval finds the small provider set needed for complex
+    compositions; and
+  \item a portfolio can let \Djinn{} solve structural leaves while
+    \Exference{} selects environment bridges.
+\end{enumerate}
+
+The likely result is not a universal synthesizer for arbitrary Lean types.
+It is something more useful and technically defensible: a substantially larger,
+explicitly bounded class of complex higher-order, higher-rank, constrained,
+recursive, and lightly dependent types for which the system can construct
+verified terms automatically, explain what semantic resources it used, and say
+precisely when a negative result is or is not justified.
+
+\begin{recommendation}{Final recommendation}
+Make a typed candidate graph with occurrence identity, substitution provenance,
+and residual obligations the next shared architectural milestone.  Validate it
+by migrating one of the current hardest provider-result/structural-elimination
+paths.  Then use that foundation for semantic deduplication, an adaptive rank-N
+plan tail, generalized source certificates, and family descriptors.  Those four
+steps convert the successful Djex--Leant feedback loop from a sequence of
+careful special cases into a platform for the next generation of synthesis
+rules.
+\end{recommendation}
+
+\appendix
+
+\section{Representative commit map}
+\label{app:commits}
+
+The following list is not exhaustive.  It records the commits most directly
+supporting the architectural inferences in this report.
+
+\subsection{Djex}
+
+\begin{longtable}{L{2.3cm} L{4.7cm} L{7.2cm}}
+\toprule
+\textbf{Commit} & \textbf{Theme} & \textbf{Architectural significance} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Commit} & \textbf{Theme} & \textbf{Architectural significance} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+\djcommit{d728719ff2515a8a464398aaab3e789420cc86a6}{d728719f} & Quintic rank-N frontiers & Fixed-degree plan family reaches complete coverage through eleven independent sites under a finite view cap. \\
+\djcommit{227bdc52e66e0b07606b84e89a7c3516493a718b}{227bdc52} & Closed local instantiation & Positive-only query-local scheme specialization at closed query subtrees. \\
+\djcommit{077f767fd75814bbcd74bed795e10455935e397f}{077f767f} & Query-correlated instantiation & Chooses supplied quantified types only when the complete specialized body occurs in the query. \\
+\djcommit{db25170b2aed13d2bb1249c11229cc28f809aa95}{db25170b} & Scalar aggregate elimination & Exposes checked tuple structure from globals and provider evidence to \Exference{}. \\
+\djcommit{e10f7f018facef4445fc774118b39d716b36c02e}{e10f7f01} & Mixed application spine & One shared constructor for term and visible-type arguments, preserving order and wide-spine strictness. \\
+\djcommit{03aa3820284f9117011910b7eb931568ef4255cd}{03aa3820} & Contextual exact assignments & Closed contextual rank-N vectors with occurrence-sensitive fidelity marking. \\
+\djcommit{103fdd391aaa350c09f07b682d6fd70a67a44989}{103fdd39} & Sibling-field fidelity & Prevents one faithful field from masking a selected argument erased in another field. \\
+\djcommit{c5afc68a1b49adfb66f25d67c49402487cf9697d}{c5afc68a} & Kinded shared classes & Preserves authoritative class-parameter kinds at the neutral environment boundary. \\
+\djcommit{66955da710951fd525f7ad874d133132ffcd2cee}{66955da7} & Six-binder widening & One public bound advances hypothesis, loaded-scheme, and provider routes together. \\
+\djcommit{5a550eb409c37c00256a41b14bad5a0d3792fa68}{5a550eb4} & Structural higher-kinded assignment & Connects bare pair-constructor evidence to the same identity as saturated tuple structure. \\
+\djcommit{f50b5eac86726c7530d95e48c27101b7c0fa25c9}{f50b5eac} & Reviewed head & Merges canonical structural higher-kinded assignment support. \\
+\end{longtable}
+
+\subsection{Leant}
+
+\begin{longtable}{L{2.3cm} L{4.7cm} L{7.2cm}}
+\toprule
+\textbf{Commit} & \textbf{Theme} & \textbf{Architectural significance} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Commit} & \textbf{Theme} & \textbf{Architectural significance} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+\lecommit{e09bded3de507c2b28bb243421cdfe07371aaa1d}{e09bded3} & Explicit provider heads & Reconstructs explicit forall placeholders for discovered provider applications. \\
+\lecommit{15fb0962ca7cf99c6df6a8c0c0776d79febe7ac9}{15fb0962} & Nested fitting traversal & Reaches provider applications beneath lambdas, tuples, unknown applications, and eliminations. \\
+\lecommit{690277ca282b8c196b6a8c34777e8689539cd582}{690277ca} & Rank-N fields through elimination & Transfers exact provider result fragments into case/let-bound fields. \\
+\lecommit{892117dcc9756f3ede4b8500665892781e679fb7}{892117dc} & Result specialization from terms & Infers quantified fragment substitutions from exact term arguments. \\
+\lecommit{77ee65b36a0544b3ce5cc37f44a6a3eb9d76caff}{77ee65b3} & Full-spine specialization & Propagates learned substitutions to later higher-rank arguments. \\
+\lecommit{888e2b402529089e606a55c8374d9bbf1a7568d4}{888e2b40} & Exact forall rendering metadata & Retains visibility and \code{Prop}/\code{Type}/\code{Sort} domain tags beside canonical fragments. \\
+\lecommit{fe4b2932d5ff356ac5792e26f698444d1b99fe81}{fe4b2932} & Occurrence-coupled metadata & Ensures the metadata used to fit one provider occurrence is the metadata later rendered there. \\
+\lecommit{2979dbe2fe25915cdaf497dca96b934a85c6b4c1}{2979dbe2} & Structured contextual assignments & Carries exact nominal Lean class contexts through private engine classes and source-faithful rendering. \\
+\lecommit{1668c956b2488bfeb4af2659314a0317a8e97fb5}{1668c956} & Higher-kinded context arguments & Preserves residual kind arity and total nominal-family identity. \\
+\lecommit{d04c1a8fb9971cd7eec07fc873016627ebb1e928}{d04c1a8f} & Six-binder integration & Derives every bridge width from the shared \Djex{} authority and verifies all-engine Lean cases. \\
+\lecommit{0dbe08a7819f44c872bf091685f6b30f170f0133}{0dbe08a7} & Structural higher-kinded synthesis & Separates canonical nominal evidence from legacy fragment payloads and maps \code{Prod}/\code{Sum} structurally. \\
+\lecommit{0160237e4bdf6e342a55f5a86ce5d5292728024f}{0160237e} & Reviewed head & Merges structural higher-kinded synthesis and pins \Djex{} at \code{f50b5eac}. \\
+\end{longtable}
+
+\section{Suggested initial API migration}
+\label{app:api}
+
+A deliberately incremental API sequence is:
+
+\begin{enumerate}
+  \item Add \code{OccurrenceId}, \code{CertificateId}, and \code{FamilyId} as
+    validated, collision-safe neutral identifiers.
+  \item Add \code{TypedExpression} as an annotation wrapper around current
+    \code{Expression} nodes rather than replacing the syntax immediately.
+  \item Let engine details optionally carry a \code{TypedCandidate} and keep
+    \code{candidateOutput} unchanged.
+  \item Add a neutral checker and semantic fingerprint for the typed path.
+  \item Extend \Leant{}'s provider maps to be keyed directly by occurrence and
+    certificate IDs.
+  \item Migrate one application/elimination vertical slice.
+  \item Once all public engines emit typed nodes for a constructor, make the
+    legacy renderer inference for that constructor diagnostic-only.
+  \item Generalize residual constraints to obligations under a new API version.
+  \item Introduce family descriptors and adaptive plans after typed occurrence
+    IDs are stable.
+\end{enumerate}
+
+A compatibility envelope might be:
+
+\begin{lstlisting}[language=Haskell]
+data CandidateDetails backend ty source = CandidateDetails
+  { backendDetails :: backend
+  , typedCandidate :: Maybe (TypedCandidate ty LocalId source)
+  , capabilityInfo :: CapabilityInfo source
+  }
+\end{lstlisting}
+
+Existing callers ignore \code{typedCandidate}; \Leant{} opts in immediately;
+new neutral tooling can inspect it without knowing \Djinn{} or \Exference{}
+internals.
+
+\section{Seed benchmark types}
+\label{app:benchmarks}
+
+The following schematic families are suitable for a future benchmark corpus.
+They should be instantiated in both Haskell-like neutral tests and Lean goldens
+where the source language permits.
+
+\begin{description}
+  \item[Central rank-N antichains.]
+    Twelve or more independent positive quantified sites where the witness
+    requires a balanced open/opaque choice not present in the fixed quintic
+    prefix.
+
+  \item[Correlated higher-kinded assignments.]
+    Providers with two to six binders assigned to a mixture of \code{Prod},
+    partially applied \code{Sum}, user constructors, and closed quantified
+    types, including exact contextual class arguments.
+
+  \item[Metadata-sensitive repeated uses.]
+    The same provider used twice with alpha-equivalent canonical types but
+    different explicit/implicit source binder spellings.
+
+  \item[Higher-order result specialization.]
+    An early exact term argument determines a later rank-N function domain and
+    the provider returns a product whose polymorphic field is eliminated.
+
+  \item[Phantom-fidelity adversaries.]
+    Nested aliases and mixed faithful/phantom sibling fields which would permit
+    an invalid visible specialization if any occurrence marker were lost.
+
+  \item[Recursor skeletons.]
+    \code{Nat} iteration, \code{List} fold, a binary tree catamorphism, and a
+    two-constructor user family with one recursive field.
+
+  \item[Dependent structures.]
+    \code{Sigma}/\code{Subtype} projection and reconstruction, followed by
+    one-layer indexed cases whose impossible branch requires an equality
+    obligation.
+
+  \item[Environment bridges.]
+    Synthetic libraries where the solution requires exactly one, two, or three
+    providers separated by distractors with the same result head.
+
+  \item[Portfolio leaf filling.]
+    A structural \Djinn{} skeleton with one provider leaf; an \Exference{}
+    provider choice with two pure structural argument holes; and a mixed case
+    with a source evidence obligation.
+\end{description}
+
+\section{Primary repository sources}
+\label{app:sources}
+
+The analysis used the following current repository materials in addition to the
+commit history linked above:
+
+\begin{itemize}
+  \item \href{https://github.com/VladimirReshetnikov/Djex/blob/main/README.md}{Djex README}
+    and its linked architecture, API, REPL, and dated implementation reports;
+  \item \href{https://github.com/VladimirReshetnikov/Djex/blob/main/synthesis/src/Language/Haskell/Synthesis/Type.hs}{shared type representation};
+  \item \href{https://github.com/VladimirReshetnikov/Djex/blob/main/synthesis/src/Language/Haskell/Synthesis/Generated.hs}{shared generated syntax};
+  \item \href{https://github.com/VladimirReshetnikov/Djex/blob/main/synthesis/src/Language/Haskell/Synthesis/Candidate.hs}{candidate envelope};
+  \item \href{https://github.com/VladimirReshetnikov/Djex/blob/main/synthesis/src/Language/Haskell/Synthesis/Query.hs}{query and provider-evidence bounds};
+  \item \href{https://github.com/VladimirReshetnikov/Leant/blob/main/README.md}{Leant README};
+  \item \href{https://github.com/VladimirReshetnikov/Leant/blob/main/docs/SYNTHESIS_PROPOSAL.md}{Leant synthesis proposal and implementation status};
+  \item \href{https://github.com/VladimirReshetnikov/Leant/blob/main/src/Leant/Synth/Fragment.hs}{Lean fragment serializer/parser};
+  \item \href{https://github.com/VladimirReshetnikov/Leant/blob/main/src/Leant/Synth/Engine.hs}{engine boundary and scheduling}; and
+  \item \href{https://github.com/VladimirReshetnikov/Leant/blob/main/src/Leant/Synth/Render.hs}{source fitting, rendering, and candidate specialization}.
+\end{itemize}
+
+\vfill
+\begin{center}
+\small\sffamily
+End of report.
+\end{center}
+
+\end{document}
