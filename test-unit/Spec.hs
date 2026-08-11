@@ -23,6 +23,7 @@ import System.Timeout (timeout)
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.HUnit ((@?=), assertBool, assertFailure, testCase)
 
+import qualified Language.Haskell.Djex as Djex
 import Language.Haskell.Djex
   ( Boxity (Boxed)
   , Constraint (..)
@@ -1616,6 +1617,22 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                     behavioralProblemFingerprint
                       (checkedLengthProblemBehavioralProblem
                         $ checkedLengthHandoffProblem handoff)
+                  let responseBytes = map $ fromIntegral . fromEnum
+                  Djex.parseLengthSMTLibCheckResponse
+                      Djex.defaultLengthSMTLibResponseLimits
+                      (responseBytes "unsat") @?=
+                    Right Djex.SolverUnsatisfiable
+                  Djex.parseLengthSMTLibInputValueResponse
+                      Djex.defaultLengthSMTLibResponseLimits query
+                      (responseBytes "()") @?=
+                    Left Djex.LengthSMTLibInputValueResponseNotExpected
+                  case Djex.parseLengthSMTLibCheckResponse
+                      Djex.defaultLengthSMTLibResponseLimits
+                      (responseBytes "unsat trailing") of
+                    Left _ -> pure ()
+                    Right status -> assertFailure $
+                      "a trailing response became solver authority: "
+                        ++ show status
                   case validateLengthSMTLibCounterexample
                       defaultLengthEvaluationLimits query [] of
                     Right Nothing -> pure ()
@@ -1718,6 +1735,112 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                 ++ show groups
           other -> assertFailure $
             "expected direct List provider candidates, got: " ++ show other
+  , testCase
+      "decode a direct Djex List model before exact evidence replay" $ do
+      -- The Leant handoff above is correctly zero-input, so get-value is not
+      -- part of its query.  This test-only dependency fixture supplies the
+      -- smallest honest one-input boundary: a typed Exference identity over
+      -- one declared List spine, sealed through the same public Length APIs.
+      responseListName <- expectRight $ Djex.mkIdentifier "ResponseList"
+      responseNilName <- expectRight $ Djex.mkIdentifier "ResponseNil"
+      responseConsName <- expectRight $ Djex.mkIdentifier "ResponseCons"
+      responseTargetName <- expectRight $
+        Djex.mkIdentifier "responseIdentity"
+      responseTarget <- expectRight $
+        Djex.mkDefinitionName responseTargetName
+      let parameter = Djex.FlexibleVariable 0
+            :: Djex.ExferenceTypeVariable
+          payload = Djex.TupleType Djex.Boxed [] :: Djex.ExferenceType
+          listOf value = Djex.TypeApplication
+            (Djex.TypeConstructor responseListName) value
+          recursiveList = listOf $ Djex.TypeVariable parameter
+          declaration = Djex.DataTypeDeclaration () responseListName
+            [Djex.TypeParameter parameter Nothing]
+            [ Djex.DataConstructor () responseNilName []
+            , Djex.DataConstructor () responseConsName
+                [Djex.TypeVariable parameter, recursiveList]
+            ]
+          goal = Djex.FunctionType (listOf payload) (listOf payload)
+          contract = Djex.LengthContractSource
+            { Djex.lengthContractPrecondition = Djex.LengthTruth True
+            , Djex.lengthContractPostcondition = Djex.LengthEqual
+                (Djex.LengthVariable Djex.LengthResult)
+                (Djex.LengthLiteral 0)
+            }
+          responseBytes = map $ fromIntegral . fromEnum
+      environment <- expectRight
+        (Djex.mkEnvironment [declaration] :: Either
+          (Djex.EnvironmentError Djex.ExferenceTypeVariable)
+          Djex.ExferenceEnvironment)
+      session <- expectRight $ Djex.mkExferenceSession environment
+      request <- expectRight $ Djex.mkExferenceRequest Djex.QueryRequest
+        { Djex.requestTarget = responseTarget
+        , Djex.requestGoal = goal
+        , Djex.requestContexts = []
+        , Djex.requestOptions = Djex.defaultExferenceOptions
+            { Djex.exferenceMaximumSteps = 8
+            , Djex.exferenceMultiConstructorPatterns = False
+            }
+        }
+      results <- expectRight $ Djex.runExferenceTypedQuery session request
+      let candidates =
+            [ retained
+            | result <- results
+            , retained <- Djex.batchCandidates $ Djex.resultSearch result
+            ]
+      lengthSession <- expectRight $ Djex.sealLengthSession
+        Djex.defaultLengthLimits
+        (Djex.exferenceSessionInventory session)
+        (Djex.DeclaredListSpine
+          responseListName responseNilName responseConsName)
+        []
+      checkedContract <- expectRight $ Djex.sealLengthContractInContext
+        Djex.defaultLengthLimits
+        (Djex.checkedLengthSessionContext lengthSession)
+        goal contract
+      problem <- case
+          [ retained
+          | candidate <- candidates
+          , Right retained <-
+              [ Djex.sealLengthTypedCandidateProblem
+                  Djex.defaultLengthProblemLimits
+                  lengthSession checkedContract candidate
+              ]
+          , Djex.checkedLengthCandidateResult
+              (Djex.checkedLengthProblemCandidate retained) ==
+                Djex.LengthVariable (Djex.LengthInput 0)
+          ] of
+        retained : _ -> pure retained
+        [] -> assertFailure
+          "the direct fixture returned no checked identity candidate"
+            >> error "unreachable"
+      query <- expectRight $ Djex.sealLengthSMTLibQuery
+        Djex.defaultLengthSMTLibLimits problem
+      Djex.parseLengthSMTLibCheckResponse
+          Djex.defaultLengthSMTLibResponseLimits
+          (responseBytes "sat") @?=
+        Right Djex.SolverSatisfiable
+      case Djex.lengthSMTLibQueryInputSymbols query of
+        [symbol] -> do
+          bindings <- expectRight $
+            Djex.parseLengthSMTLibInputValueResponse
+              Djex.defaultLengthSMTLibResponseLimits query
+              (responseBytes "((" ++ symbol ++ responseBytes " 3))")
+          evidence <- case Djex.validateLengthSMTLibCounterexample
+              Djex.defaultLengthEvaluationLimits query bindings of
+            Left failure -> assertFailure
+              ("model replay failed: " ++ show failure) >> error "unreachable"
+            Right Nothing -> assertFailure
+              "the violating identity model produced no evidence"
+                >> error "unreachable"
+            Right (Just retained) -> pure retained
+          receipt <- expectRight $ Djex.replayBehavioralEvidence
+            (Djex.checkedLengthProblemBehavioralProblem problem) evidence
+          Djex.validatedLengthCounterexampleInputs receipt @?= [3]
+          Djex.validatedLengthCounterexampleResult receipt @?= 3
+        symbols -> assertFailure $
+          "the direct identity query did not retain one input: "
+            ++ show symbols
   , testCase
       "resolve one polymorphic List provider scheme into Length sealing" $ do
       let parameter = FVar "a"
