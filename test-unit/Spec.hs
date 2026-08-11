@@ -7,14 +7,20 @@ import Data.List (isInfixOf)
 import Data.Maybe (isNothing)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import Numeric.Natural (Natural)
 import System.Directory
   ( canonicalizePath
+  , copyFile
   , createDirectory
   , createDirectoryIfMissing
   , createFileLink
+  , findExecutable
+  , getPermissions
   , getTemporaryDirectory
   , removeFile
   , removePathForcibly
+  , setOwnerExecutable
+  , setPermissions
   )
 import System.FilePath ((</>), normalise, takeDirectory)
 import System.IO (hClose, openBinaryTempFile)
@@ -73,7 +79,10 @@ import Language.Haskell.Djex
 
 import Leant.Backend (findBackendProject)
 import Leant.Synth.Engine
-  ( DetailedSynthOutcome (..)
+  ( CheckedLengthHandoff
+  , DetailedCandidateGroup
+  , DetailedSynthOutcome (..)
+  , DetailedVerificationVariant
   , ExferenceRunAuthorityInspection (..)
   , LeanLengthContract (..)
   , LeanLengthProviderLaw (..)
@@ -153,7 +162,23 @@ import Leant.Synth.Fragment
   , synthPrelude
   )
 import Leant.Synth.Length.Adapter
-  ( prepareLengthQueryFromHandoff )
+  ( CheckedLengthQuery
+  , prepareLengthQueryFromHandoff
+  )
+import Leant.Synth.Length.Ranking
+  ( LengthRanking
+  , LengthRankingAssessment (..)
+  , LengthRankingFailureClass (..)
+  , LengthRankingInputError (..)
+  , lengthRankingCandidates
+  , lengthRankingFailure
+  , lengthRankingFailureClass
+  , lengthRankingFailureCleanupIncomplete
+  , lengthRankingFailureOriginalIndex
+  , rankVerifiedLengthCandidates
+  , rankedLengthCandidateAssessment
+  , rankedLengthCandidateVerified
+  )
 import Leant.Synth.Observability
   ( CandidateRenderingRoute (..)
   , LeantSynthesisMetric (..)
@@ -183,6 +208,7 @@ import Leant.Synth.Render
   )
 import Leant.Synth.Verification
   ( VariantVerdict (..)
+  , Verified
   , failedCandidateGroups
   , verificationObservations
   , verifiedCandidate
@@ -213,6 +239,7 @@ main = defaultMain $ testGroup "Leant synthesis boundary"
   , providerScheduleTests
   , combinedEngineMergeTests
   , typedCandidateRoutingTests
+  , lengthRankingTests
   , replayPlanTests
   , providerProgramTests
   , candidateVerificationTests
@@ -1478,6 +1505,344 @@ combinedEngineMergeTests = testGroup "combined-engine verification frontier"
         @?= SynthCandidates [["e1"]]
           ["bounded", "exference: rated"]
   ]
+
+lengthRankingTests :: TestTree
+lengthRankingTests = testGroup "checked Length behavioral ranking"
+  [ testCase "admit the exact bound and reject a cyclic maximum-plus-one"
+      assertLengthRankingInputBound
+  , testCase "leave an all-ineligible batch unassessed without opening"
+      assertLengthRankingAllIneligible
+  , testCase "keep sat, unsat, and unknown heuristic statuses neutral"
+      assertLengthRankingNeutralStatuses
+  , testCase
+      "stably demote replayed counterexamples without pruning or reassociation"
+      assertLengthRankingCounterexampleDemotion
+  , testCase
+      "reset every candidate in original order after an operational failure"
+      assertLengthRankingAtomicFallback
+  ]
+
+data LengthRankingLiveFixture = LengthRankingLiveFixture
+  { lengthRankingFixtureZero
+      :: Verified DetailedVerificationVariant
+  , lengthRankingFixtureOne
+      :: Verified DetailedVerificationVariant
+  }
+
+assertLengthRankingInputBound :: IO ()
+assertLengthRankingInputBound = do
+  candidate <- syntheticLengthRankingCandidate "synthetic-bound"
+  let maximumCandidates =
+        Djex.defaultLengthSMTLibLiveSessionMaximumQueries
+      exact = replicate (fromIntegral maximumCandidates) candidate
+      unopened = error "Length ranking opened a worker during input admission"
+  admitted <- rankVerifiedLengthCandidates unopened
+    defaultLengthEvaluationLimits ineligibleLengthRankingContract exact
+  exactRanking <- expectRight admitted
+  length (lengthRankingCandidates exactRanking) @?=
+    fromIntegral maximumCandidates
+  lengthRankingFailure exactRanking @?= Nothing
+  map rankedLengthCandidateAssessment
+      (lengthRankingCandidates exactRanking) @?=
+    replicate (fromIntegral maximumCandidates) Unassessed
+
+  bounded <- timeout 1000000 $ rankVerifiedLengthCandidates unopened
+    defaultLengthEvaluationLimits ineligibleLengthRankingContract
+    $ repeat candidate
+  case bounded of
+    Just (Left (LengthRankingInputLimitExceeded admittedMaximum observed)) -> do
+      admittedMaximum @?= maximumCandidates
+      observed @?= maximumCandidates + 1
+    Just (Right _) -> assertFailure
+      "cyclic maximum-plus-one ranking input was admitted"
+    Nothing -> assertFailure
+      "cyclic maximum-plus-one ranking input was not rejected productively"
+
+assertLengthRankingAllIneligible :: IO ()
+assertLengthRankingAllIneligible = do
+  first <- syntheticLengthRankingCandidate "synthetic-first"
+  second <- syntheticLengthRankingCandidate "synthetic-second"
+  let original = [first, second]
+      unopened = error "all-ineligible Length ranking opened a live session"
+  result <- rankVerifiedLengthCandidates unopened
+    defaultLengthEvaluationLimits ineligibleLengthRankingContract original
+  ranking <- expectRight result
+  lengthRankingFailure ranking @?= Nothing
+  rankedLengthVerifiedCandidates ranking @?= original
+  map rankedLengthCandidateAssessment (lengthRankingCandidates ranking) @?=
+    [Unassessed, Unassessed]
+
+assertLengthRankingNeutralStatuses :: IO ()
+assertLengthRankingNeutralStatuses = do
+  fixture <- buildLengthRankingLiveFixture
+  ineligible <- syntheticLengthRankingCandidate "neutral-ineligible"
+  let zero = lengthRankingFixtureZero fixture
+      one = lengthRankingFixtureOne fixture
+      original =
+        [zero, ineligible, one]
+      cases =
+        [ ( "healthy"
+          , Djex.LengthSMTLibStatusOnly
+          , Djex.SolverSatisfiable
+          )
+        , ( "query-unsat"
+          , Djex.LengthSMTLibInputValuesAfterSatisfiable
+          , Djex.SolverUnsatisfiable
+          )
+        , ( "query-unknown"
+          , Djex.LengthSMTLibInputValuesAfterSatisfiable
+          , Djex.SolverUnknown
+          )
+        ]
+  mapM_ (assertNeutralCase original) cases
+
+assertNeutralCase
+  :: [Verified DetailedVerificationVariant]
+  -> (String, Djex.LengthSMTLibArtifactPolicy, Djex.SolverStatus)
+  -> IO ()
+assertNeutralCase original (mode, policy, expectedStatus) = do
+  ranking <- runLengthRankingWithFake mode policy
+    (lengthRankingContract 0) original
+  lengthRankingFailure ranking @?= Nothing
+  rankedLengthVerifiedCandidates ranking @?= original
+  case map rankedLengthCandidateAssessment
+      $ lengthRankingCandidates ranking of
+    [Heuristic zero, Unassessed, Heuristic one] ->
+      (zero, one) @?= (expectedStatus, expectedStatus)
+    assessments -> assertFailure $ "unexpected neutral Length assessments: "
+      ++ show assessments
+
+assertLengthRankingCounterexampleDemotion :: IO ()
+assertLengthRankingCounterexampleDemotion = do
+  fixture <- buildLengthRankingLiveFixture
+  retainedFirst <- syntheticLengthRankingCandidate "retained-first"
+  retainedSecond <- syntheticLengthRankingCandidate "retained-second"
+  let zero = lengthRankingFixtureZero fixture
+      one = lengthRankingFixtureOne fixture
+      contract = lengthRankingContract 2
+      original = [zero, retainedFirst, one, retainedSecond]
+      expected = [retainedFirst, retainedSecond, zero, one]
+  zeroHandoff <- expectRight $ prepareCheckedLengthHandoff contract zero
+  oneHandoff <- expectRight $ prepareCheckedLengthHandoff contract one
+  zeroQuery <- expectRight $ prepareLengthQueryFromHandoff zeroHandoff
+  oneQuery <- expectRight $ prepareLengthQueryFromHandoff oneHandoff
+  assertBool "distinct checked providers shared a Length query identity"
+    $ Djex.lengthSMTLibQueryFingerprint zeroQuery /=
+        Djex.lengthSMTLibQueryFingerprint oneQuery
+  assertLengthRankingQueryAssociation zeroHandoff zeroQuery
+  assertLengthRankingQueryAssociation oneHandoff oneQuery
+  ranking <- runLengthRankingWithFake "healthy"
+    Djex.LengthSMTLibInputValuesAfterSatisfiable
+    contract original
+  lengthRankingFailure ranking @?= Nothing
+  length (lengthRankingCandidates ranking) @?= length original
+  rankedLengthVerifiedCandidates ranking @?= expected
+  case map rankedLengthCandidateAssessment
+      $ lengthRankingCandidates ranking of
+    [Unassessed, Unassessed, Counterexample zeroReceipt,
+        Counterexample oneReceipt] -> do
+      assertLengthCounterexampleReceipt 0 zeroReceipt
+      assertLengthCounterexampleReceipt 1 oneReceipt
+    assessments -> assertFailure $
+      "unexpected stable counterexample partition: " ++ show assessments
+
+assertLengthRankingAtomicFallback :: IO ()
+assertLengthRankingAtomicFallback = do
+  fixture <- buildLengthRankingLiveFixture
+  trailing <- syntheticLengthRankingCandidate "fallback-trailing"
+  let zero = lengthRankingFixtureZero fixture
+      one = lengthRankingFixtureOne fixture
+      original = [one, zero, trailing]
+  ranking <- runLengthRankingWithFake "healthy"
+    Djex.LengthSMTLibInputValuesAfterSatisfiable
+    (lengthRankingContract 0) original
+  rankedLengthVerifiedCandidates ranking @?= original
+  map rankedLengthCandidateAssessment (lengthRankingCandidates ranking) @?=
+    replicate 3 Unassessed
+  failure <- case lengthRankingFailure ranking of
+    Nothing -> assertFailure
+      "a satisfiable non-counterexample did not fail closed"
+    Just value -> pure value
+  lengthRankingFailureClass failure @?=
+    LengthRankingLiveQueryFailed
+      Djex.LengthSMTLibLiveQueryCounterexampleRejected
+  lengthRankingFailureCleanupIncomplete failure @?= False
+  lengthRankingFailureOriginalIndex failure @?= Just 1
+
+assertLengthCounterexampleReceipt
+  :: Natural
+  -> Djex.ValidatedLengthCounterexample
+  -> IO ()
+assertLengthCounterexampleReceipt expectedResult receipt = do
+  Djex.validatedLengthCounterexampleInputs receipt @?= []
+  Djex.validatedLengthCounterexampleResult receipt @?= expectedResult
+
+assertLengthRankingQueryAssociation
+  :: CheckedLengthHandoff
+  -> CheckedLengthQuery
+  -> IO ()
+assertLengthRankingQueryAssociation handoff query = do
+  assertBool "the exact checked ranking query retained no identity"
+    $ not $ null $ Djex.fingerprintCanonicalBytes
+      $ Djex.lengthSMTLibQueryFingerprint query
+  Djex.behavioralProblemFingerprint
+      (Djex.lengthSMTLibQueryBehavioralProblem query) @?=
+    Djex.behavioralProblemFingerprint
+      (Djex.checkedLengthProblemBehavioralProblem
+        $ checkedLengthHandoffProblem handoff)
+
+rankedLengthVerifiedCandidates
+  :: LengthRanking
+  -> [Verified DetailedVerificationVariant]
+rankedLengthVerifiedCandidates =
+  map rankedLengthCandidateVerified . lengthRankingCandidates
+
+syntheticLengthRankingCandidate
+  :: String
+  -> IO (Verified DetailedVerificationVariant)
+syntheticLengthRankingCandidate spelling = do
+  let group = detailedCandidateGroup RouteTypedCandidate [spelling]
+  batch <- verifyCandidateGroups 1 (const $ pure VariantAccepted)
+    [detailedCandidateGroupVerificationVariants group]
+  case verifiedCandidateReceipts batch of
+    [verified] -> pure verified
+    receipts -> assertFailure $ "synthetic verification produced " ++
+      show (length receipts) ++ " receipts"
+
+ineligibleLengthRankingContract :: LeanLengthContract
+ineligibleLengthRankingContract = LeanLengthContract
+  { leanLengthContractSpine = LeanLengthSpineIdentity
+      { leanLengthSpineFamilyName = "Unreachable.List"
+      , leanLengthSpineZeroConstructorName = "Unreachable.List.nil"
+      , leanLengthSpineStepConstructorName = "Unreachable.List.cons"
+      }
+  , leanLengthContractSource = LengthContractSource
+      { lengthContractPrecondition = LengthTruth True
+      , lengthContractPostcondition = LengthTruth True
+      }
+  , leanLengthContractProviderLaws = []
+  }
+
+lengthRankingContract :: Natural -> LeanLengthContract
+lengthRankingContract expectedResult = LeanLengthContract
+  { leanLengthContractSpine = LeanLengthSpineIdentity
+      { leanLengthSpineFamilyName = "List"
+      , leanLengthSpineZeroConstructorName = "List.nil"
+      , leanLengthSpineStepConstructorName = "List.cons"
+      }
+  , leanLengthContractSource = LengthContractSource
+      { lengthContractPrecondition = LengthTruth True
+      , lengthContractPostcondition = LengthEqual
+          (LengthVariable LengthResult)
+          (LengthLiteral expectedResult)
+      }
+  , leanLengthContractProviderLaws =
+      [ LeanLengthProviderLaw
+          { leanLengthProviderLawName = "Demo.zeroList"
+          , leanLengthProviderLawArgumentRoles = []
+          , leanLengthProviderLawTransfer = LengthLiteral 0
+          }
+      , LeanLengthProviderLaw
+          { leanLengthProviderLawName = "Demo.oneList"
+          , leanLengthProviderLawArgumentRoles = []
+          , leanLengthProviderLawTransfer = LengthLiteral 1
+          }
+      ]
+  }
+
+buildLengthRankingLiveFixture :: IO LengthRankingLiveFixture
+buildLengthRankingLiveFixture = do
+  let natural = FAtom False "Nat"
+      listKey = "List Nat"
+      list = FParamRec True "List" listKey [natural]
+        [ ("List.nil", [])
+        , ("List.cons", [natural, FAtom False listKey])
+        ]
+      zeroProvider = ProviderFrag "Demo.zeroList" list
+      oneProvider = ProviderFrag "Demo.oneList" list
+  detailed <- expectRight $ synthesizeWithProvidersSkippingDetailed
+    EngineExference 256 Set.empty [zeroProvider, oneProvider] list
+  (zeroOrigin, oneOrigin) <- case detailed of
+    DetailedSynthCandidates candidates _ -> case
+        (directProvider "Demo.zeroList" candidates,
+          directProvider "Demo.oneList" candidates) of
+      (zero : _, one : _) -> pure (zero, one)
+      _ -> assertFailure $ "Length ranking fixture lacked its two direct " ++
+        "providers: " ++ show candidates
+    other -> assertFailure $ "Length ranking fixture produced: " ++ show other
+  zero <- verifySingleLengthRankingGroup zeroOrigin
+  one <- verifySingleLengthRankingGroup oneOrigin
+  zeroHandoff <- expectRight $ prepareCheckedLengthHandoff
+    (lengthRankingContract 0) zero
+  oneHandoff <- expectRight $ prepareCheckedLengthHandoff
+    (lengthRankingContract 0) one
+  checkedLengthCandidateResult
+      (checkedLengthProblemCandidate
+        $ checkedLengthHandoffProblem zeroHandoff) @?=
+    LengthLiteral 0
+  checkedLengthCandidateResult
+      (checkedLengthProblemCandidate
+        $ checkedLengthHandoffProblem oneHandoff) @?=
+    LengthLiteral 1
+  pure LengthRankingLiveFixture
+    { lengthRankingFixtureZero = zero
+    , lengthRankingFixtureOne = one
+    }
+ where
+  directProvider spelling = filter $ \group ->
+    detailedCandidateGroupVariants group == [spelling]
+      && not (isNothing $ detailedCandidateGroupSemanticSidecar group)
+
+verifySingleLengthRankingGroup
+  :: DetailedCandidateGroup
+  -> IO (Verified DetailedVerificationVariant)
+verifySingleLengthRankingGroup group = do
+  batch <- verifyCandidateGroups 1 (const $ pure VariantAccepted)
+    [detailedCandidateGroupVerificationVariants group]
+  case verifiedCandidateReceipts batch of
+    [verified] -> pure verified
+    receipts -> assertFailure $ "checked Length group produced " ++
+      show (length receipts) ++ " verification receipts"
+
+runLengthRankingWithFake
+  :: String
+  -> Djex.LengthSMTLibArtifactPolicy
+  -> LeanLengthContract
+  -> [Verified DetailedVerificationVariant]
+  -> IO LengthRanking
+runLengthRankingWithFake mode policy contract candidates =
+  withFakeLengthSolver mode $ \executable -> do
+    execution <- expectRight $ Djex.mkLengthSMTLibExecutionConfig
+      Djex.defaultLengthSMTLibExecutionLimits
+      $ (Djex.defaultLengthSMTLibExecutionConfigSource executable Nothing)
+          { Djex.lengthSMTLibExecutionConfigSourceSolverTimeoutMilliseconds =
+              100
+          , Djex.lengthSMTLibExecutionConfigSourceSolverResourceLimit = 4242
+          , Djex.lengthSMTLibExecutionConfigSourceHostDeadlineMilliseconds =
+              1000
+          , Djex.lengthSMTLibExecutionConfigSourceArtifactPolicy = policy
+          }
+    bounded <- timeout 8000000 $ rankVerifiedLengthCandidates execution
+      defaultLengthEvaluationLimits contract candidates
+    case bounded of
+      Nothing -> assertFailure $ "Length ranking mode exceeded its bound: " ++
+        mode
+      Just result -> expectRight result
+
+withFakeLengthSolver :: String -> (FilePath -> IO result) -> IO result
+withFakeLengthSolver mode action =
+  withTemporaryDirectory "leant-length-ranking" $ \root -> do
+    source <- findExecutable "djex-fake-z3" >>= maybe
+      (assertFailure "cannot locate the djex-fake-z3 build tool")
+      canonicalizePath
+    let extension
+          | os == "mingw32" = ".exe"
+          | otherwise = ""
+        target = root </> ("djex-fake-z3-" ++ mode ++ extension)
+    copyFile source target
+    permissions <- getPermissions source
+    setPermissions target $ setOwnerExecutable True permissions
+    canonicalizePath target >>= action
 
 typedCandidateRoutingTests :: TestTree
 typedCandidateRoutingTests = testGroup "typed candidate rendering routes"

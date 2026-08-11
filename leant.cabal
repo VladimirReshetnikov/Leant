@@ -40,6 +40,7 @@ Executable leant
     Leant.Synth.Engine
     Leant.Synth.Fragment
     Leant.Synth.Length.Adapter
+    Leant.Synth.Length.Ranking
     Leant.Synth.Observability
     Leant.Synth.ProviderCache
     Leant.Synth.Replay
@@ -74,6 +75,7 @@ Test-Suite leant-synth-tests
     Leant.Synth.Engine
     Leant.Synth.Fragment
     Leant.Synth.Length.Adapter
+    Leant.Synth.Length.Ranking
     Leant.Synth.Observability
     Leant.Synth.ProviderCache
     Leant.Synth.Replay
@@ -86,6 +88,8 @@ Test-Suite leant-synth-tests
     -Wall
     -Wcompat
     -Wincomplete-uni-patterns
+  Build-Tool-Depends:
+    djex:djex-fake-z3
   Build-Depends:
     base        >= 4.19  && < 5,
     bytestring  >= 0.11  && < 0.13,
