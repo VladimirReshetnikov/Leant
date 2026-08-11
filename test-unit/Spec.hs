@@ -1,6 +1,6 @@
 module Main (main) where
 
-import Control.Exception (finally)
+import Control.Exception (evaluate, finally)
 import qualified Data.ByteString.Char8 as BS
 import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.List (isInfixOf)
@@ -19,6 +19,7 @@ import System.Directory
 import System.FilePath ((</>), normalise, takeDirectory)
 import System.IO (hClose, openBinaryTempFile)
 import System.Info (os)
+import System.Timeout (timeout)
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.HUnit ((@?=), assertBool, assertFailure, testCase)
 
@@ -33,10 +34,21 @@ import Language.Haskell.Djex
       )
   , Pattern (Bind, Constructor, TuplePattern, Wildcard)
   , KindedProviderInstantiationAssignment (..)
+  , LengthContractSource (..)
+  , LengthContractVariable (..)
+  , LengthExpression (..)
+  , LengthFormula (..)
+  , LengthProviderArgumentRole (..)
+  , LengthProviderInventoryError (..)
+  , LengthProviderSummaryError (..)
+  , LengthSessionError (..)
   , QueryRequest (..)
   , Type (..)
   , Variable (FlexibleVariable)
   , inferredVisibleTypeArgument
+  , checkedLengthCandidateResult
+  , checkedLengthCandidateUsedProviders
+  , checkedLengthProblemCandidate
   , maximumProviderInstantiationArguments
   , maximumProviderInstantiationKindNodes
   , mkIdentifier
@@ -51,6 +63,10 @@ import Leant.Backend (findBackendProject)
 import Leant.Synth.Engine
   ( DetailedSynthOutcome (..)
   , ExferenceRunAuthorityInspection (..)
+  , LeanLengthContract (..)
+  , LeanLengthProviderLaw (..)
+  , LeanLengthSpineIdentity (..)
+  , LengthHandoffRefusal (..)
   , PreparedSynthesisInspection (..)
   , ProviderBindingInspection (..)
   , SynthEngine (..)
@@ -76,6 +92,8 @@ import Leant.Synth.Engine
   , providerStages
   , synthEngineName
   , candidateWindow
+  , checkedLengthHandoffFamilyInspection
+  , checkedLengthHandoffProblem
   , synthMaxShown
   , synthMaxTried
   , synthVerificationWindow
@@ -84,6 +102,7 @@ import Leant.Synth.Engine
   , synthesizeWithProvidersSkippingDetailed
   , synthesizeTunedDetailed
   , projectDetailedSynthOutcome
+  , prepareCheckedLengthHandoff
   , renderCandidateByAvailability
   , takeDistinct
   , takeDistinctOn
@@ -152,6 +171,8 @@ import Leant.Synth.Verification
   ( VariantVerdict (..)
   , failedCandidateGroups
   , verificationObservations
+  , verifiedCandidate
+  , verifiedCandidateReceipts
   , verifiedCandidates
   , verifyCandidateGroups
   )
@@ -569,6 +590,10 @@ verificationObservabilityTests = testGroup "verification observability"
       batch <- verifyCandidateGroups 1 verdict
         [["request", "fatal", "diagnostic", "sorry", "accepted"]]
       verifiedCandidates batch @?= ["accepted"]
+      case verifiedCandidateReceipts batch of
+        [receipt] -> verifiedCandidate receipt @?= "accepted"
+        receipts -> assertFailure $
+          "unexpected verification receipts: " ++ show receipts
       failedCandidateGroups batch @?= 0
       let observations = verificationObservations batch
           failures = sum
@@ -1470,6 +1495,274 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
           "expected a typed Exference identity candidate, got: "
             ++ show other
         Left err -> assertFailure err
+  , testCase "refuse callback acceptance without a semantic sidecar" $ do
+      let synthetic = detailedCandidateGroup RouteTypedCandidate ["synthetic"]
+          unreachableContract = LeanLengthContract
+            { leanLengthContractSpine = LeanLengthSpineIdentity
+                { leanLengthSpineFamilyName = "Demo.Unreachable"
+                , leanLengthSpineZeroConstructorName =
+                    "Demo.Unreachable.zero"
+                , leanLengthSpineStepConstructorName =
+                    "Demo.Unreachable.step"
+                }
+            , leanLengthContractSource = LengthContractSource
+                { lengthContractPrecondition = LengthTruth True
+                , lengthContractPostcondition = LengthTruth True
+                }
+            , leanLengthContractProviderLaws = []
+            }
+      batch <- verifyCandidateGroups 1
+        (const $ pure VariantAccepted)
+        [detailedCandidateGroupVerificationVariants synthetic]
+      case verifiedCandidateReceipts batch of
+        [verified] -> case prepareCheckedLengthHandoff
+            unreachableContract verified of
+          Left LengthHandoffMissingSemanticSidecar -> pure ()
+          Left refusal -> assertFailure $
+            "unexpected missing-sidecar refusal: " ++ show refusal
+          Right _ -> assertFailure
+            "callback acceptance invented a semantic sidecar"
+        receipts -> assertFailure $
+          "unexpected synthetic verification receipts: " ++ show receipts
+  , testCase
+      "seal one verified direct List provider into an exact Length problem" $
+      do
+        let element = FAtom False "Nat"
+            listKey = "List Nat"
+            list = FParamRec True "List" listKey [element]
+              [ ("List.nil", [])
+              , ("List.cons", [element, FAtom False listKey])
+              ]
+            provider = ProviderFrag "Demo.emptyList" list
+            goal = list
+            spine = LeanLengthSpineIdentity
+              { leanLengthSpineFamilyName = "List"
+              , leanLengthSpineZeroConstructorName = "List.nil"
+              , leanLengthSpineStepConstructorName = "List.cons"
+              }
+            providerLaw = LeanLengthProviderLaw
+              { leanLengthProviderLawName = "Demo.emptyList"
+              , leanLengthProviderLawArgumentRoles = []
+              , leanLengthProviderLawTransfer = LengthLiteral 0
+              }
+            contract = LeanLengthContract
+              { leanLengthContractSpine = spine
+              , leanLengthContractSource = LengthContractSource
+                  { lengthContractPrecondition = LengthTruth True
+                  , lengthContractPostcondition = LengthEqual
+                      (LengthVariable LengthResult)
+                      (LengthLiteral 0)
+                  }
+              , leanLengthContractProviderLaws = [providerLaw]
+              }
+        expected <- expectRight $ inspectExferencePreparation
+          [provider] [] goal goal
+        detailed <- expectRight $
+          synthesizeWithProvidersSkippingDetailed
+            EngineExference 256 Set.empty [provider] goal
+        case detailed of
+          DetailedSynthCandidates groups _ -> case
+              [ group
+              | group <- groups
+              , detailedCandidateGroupVariants group == ["Demo.emptyList"]
+              , not $ isNothing $ detailedCandidateGroupSemanticSidecar group
+              ] of
+            origin : _ -> do
+              batch <- verifyCandidateGroups 1
+                (const $ pure VariantAccepted)
+                [detailedCandidateGroupVerificationVariants origin]
+              case verifiedCandidateReceipts batch of
+                [verified] -> do
+                  handoff <- expectRight $
+                    prepareCheckedLengthHandoff contract verified
+                  case inspectedSemanticFamilyBindings expected of
+                    [expectedFamily] ->
+                      checkedLengthHandoffFamilyInspection handoff
+                        @?= expectedFamily
+                    families -> assertFailure $
+                      "expected one exact List family binding, got: "
+                        ++ show families
+                  let candidate = checkedLengthProblemCandidate
+                        $ checkedLengthHandoffProblem handoff
+                  checkedLengthCandidateResult candidate @?=
+                    LengthLiteral 0
+                  case inspectedProviderBindings expected of
+                    [binding] ->
+                      checkedLengthCandidateUsedProviders candidate @?=
+                        [inspectedProviderPrivateName binding]
+                    bindings -> assertFailure $
+                      "expected one exact provider binding, got: "
+                        ++ show bindings
+                  case prepareCheckedLengthHandoff
+                      (contract
+                        { leanLengthContractProviderLaws =
+                            [ providerLaw
+                                { leanLengthProviderLawName =
+                                    "Demo.missingProvider"
+                                }
+                            ]
+                        })
+                      verified of
+                    Left (LengthHandoffProviderUnavailable providerName) ->
+                      providerName @?= "Demo.missingProvider"
+                    Left refusal -> assertFailure $
+                      "unexpected missing-provider refusal: " ++ show refusal
+                    Right _ -> assertFailure
+                      "an unbound provider law entered Length sealing"
+                  case prepareCheckedLengthHandoff
+                      (contract
+                        { leanLengthContractProviderLaws =
+                            [ providerLaw
+                                { leanLengthProviderLawArgumentRoles =
+                                    [LengthSpineArgument]
+                                }
+                            ]
+                        })
+                      verified of
+                    Left (LengthHandoffSessionRejected
+                        (LengthSessionProviderInventoryRejected
+                          (LengthProviderSummaryRejected 0 _
+                            (LengthProviderRoleArityMismatch 0 1)))) ->
+                      pure ()
+                    Left refusal -> assertFailure $
+                      "unexpected provider-role refusal: " ++ show refusal
+                    Right _ -> assertFailure
+                      "a provider law with the wrong role arity was sealed"
+                  let cyclicProviderLaws =
+                        providerLaw : cyclicProviderLaws
+                  productive <- timeout 5000000 $ evaluate $
+                    case prepareCheckedLengthHandoff
+                        (contract
+                          { leanLengthContractProviderLaws =
+                              cyclicProviderLaws
+                          })
+                        verified of
+                      Left (LengthHandoffSessionRejected
+                          (LengthSessionProviderInventoryRejected
+                            (LengthProviderSummaryLimitExceeded
+                              maximumSummaries observedSummaries))) ->
+                        observedSummaries == maximumSummaries + 1
+                      _ -> False
+                  productive @?= Just True
+                  case prepareCheckedLengthHandoff
+                      (contract
+                        { leanLengthContractSpine = spine
+                            { leanLengthSpineFamilyName =
+                                "Demo.NotTheListFamily"
+                            }
+                        })
+                      verified of
+                    Left (LengthHandoffFamilyUnavailable family) ->
+                      family @?= "Demo.NotTheListFamily"
+                    Left refusal -> assertFailure $
+                      "unexpected missing-family refusal: " ++ show refusal
+                    Right _ -> assertFailure
+                      "an unbound Lean family entered Length sealing"
+                  case prepareCheckedLengthHandoff
+                      (contract
+                        { leanLengthContractSpine = spine
+                            { leanLengthSpineZeroConstructorName =
+                                "List.notNil"
+                            }
+                        })
+                      verified of
+                    Left (LengthHandoffConstructorUnavailable family ctor) ->
+                      (family, ctor) @?= ("List", "List.notNil")
+                    Left refusal -> assertFailure $
+                      "unexpected missing-constructor refusal: "
+                        ++ show refusal
+                    Right _ -> assertFailure
+                      "an unbound Lean constructor entered Length sealing"
+                receipts -> assertFailure $
+                  "unexpected direct-graph verification receipts: "
+                    ++ show receipts
+            _ -> assertFailure $
+              "expected a unique direct List provider group, got: "
+                ++ show groups
+          other -> assertFailure $
+            "expected direct List provider candidates, got: " ++ show other
+  , testCase
+      "resolve one polymorphic List provider scheme into Length sealing" $ do
+      let parameter = FVar "a"
+          natural = FAtom False "Nat"
+          list key element = FParamRec True "List" key [element]
+            [ ("List.nil", [])
+            , ("List.cons", [element, FAtom False key])
+            ]
+          genericList = list "List a" parameter
+          concreteList = list "List Nat" natural
+          provider = ProviderFragWithEvidence "Demo.emptyPolyList"
+            (FAll False "a" genericList)
+            ["a"]
+            [[ProviderInstantiationArgument 0 natural]]
+          goal = concreteList
+          contract = LeanLengthContract
+            { leanLengthContractSpine = LeanLengthSpineIdentity
+                { leanLengthSpineFamilyName = "List"
+                , leanLengthSpineZeroConstructorName = "List.nil"
+                , leanLengthSpineStepConstructorName = "List.cons"
+                }
+            , leanLengthContractSource = LengthContractSource
+                { lengthContractPrecondition = LengthTruth True
+                , lengthContractPostcondition = LengthEqual
+                    (LengthVariable LengthResult)
+                    (LengthLiteral 0)
+                }
+            , leanLengthContractProviderLaws =
+                [ LeanLengthProviderLaw
+                    { leanLengthProviderLawName = "Demo.emptyPolyList"
+                    , leanLengthProviderLawArgumentRoles = []
+                    , leanLengthProviderLawTransfer = LengthLiteral 0
+                    }
+                ]
+            }
+      expected <- expectRight $ inspectExferencePreparation
+        [provider] [] goal goal
+      case inspectedProviderBindings expected of
+        [binding] -> case inspectedProviderScheme binding of
+          ForallType [_] [] _ -> pure ()
+          scheme -> assertFailure $
+            "the retained provider scheme was not polymorphic: " ++ show scheme
+        bindings -> assertFailure $
+          "expected one polymorphic provider binding, got: " ++ show bindings
+      detailed <- expectRight $
+        synthesizeWithProvidersSkippingDetailed
+          EngineExference 512 Set.empty [provider] goal
+      case detailed of
+        DetailedSynthCandidates groups _ -> case
+            [ group
+            | group <- groups
+            , [variant] <- [detailedCandidateGroupVariants group]
+            , "Demo.emptyPolyList" `isInfixOf` variant
+            , not $ isNothing $ detailedCandidateGroupSemanticSidecar group
+            ] of
+          origin : _ -> do
+            batch <- verifyCandidateGroups 1
+              (const $ pure VariantAccepted)
+              [detailedCandidateGroupVerificationVariants origin]
+            case verifiedCandidateReceipts batch of
+              [verified] -> do
+                handoff <- expectRight $
+                  prepareCheckedLengthHandoff contract verified
+                let candidate = checkedLengthProblemCandidate
+                      $ checkedLengthHandoffProblem handoff
+                checkedLengthCandidateResult candidate @?=
+                  LengthLiteral 0
+                case inspectedProviderBindings expected of
+                  [binding] ->
+                    checkedLengthCandidateUsedProviders candidate @?=
+                      [inspectedProviderPrivateName binding]
+                  bindings -> assertFailure $
+                    "expected one resolved provider binding, got: "
+                      ++ show bindings
+              receipts -> assertFailure $
+                "unexpected polymorphic verification receipts: "
+                  ++ show receipts
+          _ -> assertFailure $
+            "expected one direct polymorphic provider group, got: "
+              ++ show groups
+        other -> assertFailure $
+          "expected polymorphic provider candidates, got: " ++ show other
   , testCase
       "retain exact preparation and strict request authority in the sidecar" $
       do
@@ -1483,12 +1776,12 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
         case detailed of
           DetailedSynthCandidates groups _ ->
             case
-              [ semantic
+              [ (group, semantic)
               | group <- groups
               , Just semantic <-
                   [detailedCandidateGroupSemanticSidecar group]
               ] of
-              semantic : _ -> do
+              (origin, semantic) : _ -> do
                 let authority =
                       typedCandidateSemanticAuthorityInspection semantic
                     table = inspectedAuthorityNameTable authority
@@ -1512,6 +1805,34 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                 exferenceMultiConstructorPatterns options @?= True
                 exferenceMaximumQueueSize options @?= Just 1024
                 inspectedAuthorityProviderAssignments authority @?= []
+                batch <- verifyCandidateGroups 1
+                  (const $ pure VariantAccepted)
+                  [detailedCandidateGroupVerificationVariants origin]
+                let unreachableContract = LeanLengthContract
+                      { leanLengthContractSpine = LeanLengthSpineIdentity
+                          { leanLengthSpineFamilyName = "Demo.Unreachable"
+                          , leanLengthSpineZeroConstructorName =
+                              "Demo.Unreachable.zero"
+                          , leanLengthSpineStepConstructorName =
+                              "Demo.Unreachable.step"
+                          }
+                      , leanLengthContractSource = LengthContractSource
+                          { lengthContractPrecondition = LengthTruth True
+                          , lengthContractPostcondition = LengthTruth True
+                          }
+                      , leanLengthContractProviderLaws = []
+                      }
+                case verifiedCandidateReceipts batch of
+                  [verified] -> case prepareCheckedLengthHandoff
+                      unreachableContract verified of
+                    Left LengthHandoffPremisesPresent -> pure ()
+                    Left refusal -> assertFailure $
+                      "unexpected premise-backed refusal: " ++ show refusal
+                    Right _ -> assertFailure
+                      "a premise-retargeted candidate entered Length sealing"
+                  receipts -> assertFailure $
+                    "unexpected premise verification receipts: "
+                      ++ show receipts
               [] -> assertFailure $
                 "expected a typed sidecar for the premise-backed candidate: "
                   ++ show groups
@@ -1605,6 +1926,35 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                   accepted -> assertFailure $
                     "unexpected accepted renderer variants: "
                       ++ show accepted
+                let unreachableContract = LeanLengthContract
+                      { leanLengthContractSpine = LeanLengthSpineIdentity
+                          { leanLengthSpineFamilyName = "Demo.unreachable"
+                          , leanLengthSpineZeroConstructorName =
+                              "Demo.unreachable.zero"
+                          , leanLengthSpineStepConstructorName =
+                              "Demo.unreachable.step"
+                          }
+                      , leanLengthContractSource = LengthContractSource
+                          { lengthContractPrecondition = LengthTruth True
+                          , lengthContractPostcondition = LengthTruth True
+                          }
+                      , leanLengthContractProviderLaws = []
+                      }
+                case verifiedCandidateReceipts batch of
+                  [verified] -> case prepareCheckedLengthHandoff
+                      unreachableContract verified of
+                    Left (LengthHandoffRendererNotUnique alternatives) ->
+                      assertBool
+                        "a multi-spelling renderer reported one alternative"
+                        (alternatives >= 2)
+                    Left refusal -> assertFailure $
+                      "renderer ambiguity reached a later authority phase: "
+                        ++ show refusal
+                    Right _ -> assertFailure
+                      "an ordinal alone certified an ambiguous rendering"
+                  receipts -> assertFailure $
+                    "unexpected multi-spelling verification receipts: "
+                      ++ show receipts
               [] -> assertFailure $
                 "expected a multi-spelling typed provider group, got: "
                   ++ show groups
