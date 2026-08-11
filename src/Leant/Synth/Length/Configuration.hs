@@ -1,22 +1,30 @@
 -- | Explicit ownership of live Length ranking policy.
 --
--- Construction is pure and performs only Djex's bounded policy validation.  A
--- successful value does not establish that the configured path resolves to a
--- usable executable, that a later pre-spawn executable-file snapshot matches
+-- Construction is pure and performs only Djex's bounded policy validation.
+-- 'LengthRankingPolicy' owns reusable execution and replay policy, while a
+-- 'LeanLengthContract' is supplied separately for each ranking request.  The
+-- older 'LengthRankingConfiguration' remains the opaque compatibility bundle
+-- decoded by the versioned configuration-file grammar.
+--
+-- A successful value does not establish that the configured path resolves to
+-- a usable executable, that a later pre-spawn executable-file snapshot matches
 -- an optional SHA-256 expectation, or that the child has the required Z3
 -- capability; those observations belong to the lexical live session opened by
--- the ranking run.
--- Likewise, the caller-supplied 'LeanLengthContract' remains an assertion until
--- it is checked together with each exact callback-verified candidate.
+-- each ranking run.  A caller-supplied contract likewise remains an assertion
+-- until checked with each exact callback-verified candidate.
 --
 -- There is deliberately no default source, executable discovery, path
 -- normalization, environment lookup, or projection from the opaque sealed
--- value.  Callers must provide the complete execution, replay, and contract
--- policy explicitly.  The configured runner retains no worker: every eligible
+-- value.  Callers must provide the complete execution and replay policy plus
+-- each contract explicitly.  Neither runner retains a worker: every eligible
 -- batch delegates to the rank-N live scope owned by
 -- 'rankVerifiedLengthCandidates'.
 module Leant.Synth.Length.Configuration
-  ( LengthRankingConfigurationSource (..)
+  ( LengthRankingPolicySource (..)
+  , LengthRankingPolicy
+  , mkLengthRankingPolicy
+  , rankVerifiedLengthCandidatesWithPolicy
+  , LengthRankingConfigurationSource (..)
   , LengthRankingConfiguration
   , LengthRankingConfigurationError (..)
   , mkLengthRankingConfiguration
@@ -44,7 +52,24 @@ import Leant.Synth.Length.Ranking
   )
 import Leant.Synth.Verification (Verified)
 
--- | Complete caller-owned source for one live Length ranking policy.
+-- | Reusable source policy for live solver ownership and independent replay.
+--
+-- This contains no behavioral contract.  One admitted policy may therefore be
+-- paired explicitly with different request-owned contracts without treating a
+-- goal assertion as process configuration.
+data LengthRankingPolicySource = LengthRankingPolicySource
+  { lengthRankingPolicyExecutionLimits :: LengthSMTLibExecutionLimits
+  , lengthRankingPolicyExecutionSource :: LengthSMTLibExecutionConfigSource
+  , lengthRankingPolicyEvaluationSource :: LengthEvaluationLimitSource
+  }
+
+-- | Validated reusable policy with no process, worker, or contract authority.
+-- The constructor and all execution material remain private.
+data LengthRankingPolicy = LengthRankingPolicy
+  !LengthSMTLibExecutionConfig
+  !LengthEvaluationLimits
+
+-- | Compatibility source which bundles one policy and one contract.
 --
 -- The execution source includes the absolute executable path, optional exact
 -- SHA-256 pre-spawn snapshot expectation, finite solver and host budgets,
@@ -61,13 +86,12 @@ data LengthRankingConfigurationSource = LengthRankingConfigurationSource
   , lengthRankingConfigurationContract :: LeanLengthContract
   }
 
--- | Execution- and replay-validated policy retaining a contract assertion.
+-- | Compatibility value retaining one validated policy and contract assertion.
 --
 -- In particular, this value exposes neither the executable path nor digest
 -- material and cannot retain a live session or process owner.
 data LengthRankingConfiguration = LengthRankingConfiguration
-  !LengthSMTLibExecutionConfig
-  !LengthEvaluationLimits
+  !LengthRankingPolicy
   !LeanLengthContract
 
 -- | Pure validation failure in fixed execution-before-evaluation order.
@@ -78,23 +102,49 @@ data LengthRankingConfigurationError
       !LengthEvaluationLimitError
   deriving (Eq, Ord, Show)
 
--- | Validate execution and replay inputs, then retain the explicit contract
--- assertion without performing IO.
+-- | Validate execution before replay limits without performing IO.
+mkLengthRankingPolicy
+  :: LengthRankingPolicySource
+  -> Either LengthRankingConfigurationError LengthRankingPolicy
+mkLengthRankingPolicy source = do
+  execution <- case mkLengthSMTLibExecutionConfig
+      (lengthRankingPolicyExecutionLimits source)
+      (lengthRankingPolicyExecutionSource source) of
+    Left failure -> Left $ LengthRankingExecutionConfigurationRejected failure
+    Right validated -> Right validated
+  evaluation <- case mkLengthEvaluationLimits
+      (lengthRankingPolicyEvaluationSource source) of
+    Left failure -> Left $ LengthRankingEvaluationLimitsRejected failure
+    Right validated -> Right validated
+  pure $ LengthRankingPolicy execution evaluation
+
+-- | Validate a reusable policy, then retain the explicit compatibility-file
+-- contract assertion without forcing it or performing IO.
 mkLengthRankingConfiguration
   :: LengthRankingConfigurationSource
   -> Either LengthRankingConfigurationError LengthRankingConfiguration
 mkLengthRankingConfiguration source = do
-  execution <- case mkLengthSMTLibExecutionConfig
-      (lengthRankingConfigurationExecutionLimits source)
-      (lengthRankingConfigurationExecutionSource source) of
-    Left failure -> Left $ LengthRankingExecutionConfigurationRejected failure
-    Right validated -> Right validated
-  evaluation <- case mkLengthEvaluationLimits
-      (lengthRankingConfigurationEvaluationSource source) of
-    Left failure -> Left $ LengthRankingEvaluationLimitsRejected failure
-    Right validated -> Right validated
-  pure $ LengthRankingConfiguration execution evaluation
+  policy <- mkLengthRankingPolicy LengthRankingPolicySource
+    { lengthRankingPolicyExecutionLimits =
+        lengthRankingConfigurationExecutionLimits source
+    , lengthRankingPolicyExecutionSource =
+        lengthRankingConfigurationExecutionSource source
+    , lengthRankingPolicyEvaluationSource =
+        lengthRankingConfigurationEvaluationSource source
+    }
+  pure $ LengthRankingConfiguration policy
     $ lengthRankingConfigurationContract source
+
+-- | Run a verified batch under one reusable policy and one explicitly supplied
+-- request contract.  Every eligible call still owns a fresh lexical worker.
+rankVerifiedLengthCandidatesWithPolicy
+  :: LengthRankingPolicy
+  -> LeanLengthContract
+  -> [Verified DetailedVerificationVariant]
+  -> IO (Either LengthRankingInputError LengthRanking)
+rankVerifiedLengthCandidatesWithPolicy
+    (LengthRankingPolicy execution evaluation) =
+  rankVerifiedLengthCandidates execution evaluation
 
 -- | Run one complete candidate batch under the retained policy.
 --
@@ -107,5 +157,5 @@ rankVerifiedLengthCandidatesConfigured
   -> [Verified DetailedVerificationVariant]
   -> IO (Either LengthRankingInputError LengthRanking)
 rankVerifiedLengthCandidatesConfigured
-    (LengthRankingConfiguration execution evaluation contract) =
-  rankVerifiedLengthCandidates execution evaluation contract
+    (LengthRankingConfiguration policy contract) =
+  rankVerifiedLengthCandidatesWithPolicy policy contract

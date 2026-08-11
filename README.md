@@ -309,16 +309,21 @@ checkpoint is detailed in the
 [live Length ranking foundation report](docs/reports/2026-08-11-live-length-ranking-foundation.md).
 
 `Leant.Synth.Length.Configuration` now seals that still-unwired call boundary
-without choosing any policy for the user. Its raw source explicitly carries
-execution admission limits, the complete execution source (absolute Z3 path,
-optional SHA-256 expectation, solver/host budgets, artifact policy, and response
-limits), replay-limit source, and `LeanLengthContract`. Execution validation
-precedes replay-limit validation; the contract remains candidate-specific and
-is checked only during the later full preparation pass. The resulting value is
-opaque, has no path or pin projection, and retains no worker. Its configured
-runner is equivalent to passing the validated execution/replay inputs and
-retained contract assertion directly to the ranking foundation, with lifecycle
-and per-query budgets still separate. There are no
+without choosing any policy for the user. `LengthRankingPolicy` retains only
+execution admission, the complete execution source (absolute Z3 path, optional
+SHA-256 expectation, solver/host budgets, artifact policy, and response
+limits), and replay limits. A `LeanLengthContract` is supplied separately to
+each `rankVerifiedLengthCandidatesWithPolicy` call, so a request assertion no
+longer has to share the lifetime of reusable process policy. Execution
+validation precedes replay-limit validation. The sealed policy is opaque, has
+no path or pin projection, and retains no worker; the explicit contract remains
+a passive assertion. Every eligible call still opens a fresh lexical session.
+
+The version-1 file format remains compatible through
+`LengthRankingConfiguration`, which bundles one validated policy with its
+decoded contract and delegates to the same separate-policy runner. The contract
+remains candidate-specific and is checked only during the later full
+preparation pass. Lifecycle and per-query budgets remain separate. There are no
 defaults, executable discovery, path normalization, environment reads, or
 Main/REPL activation. The digest is only an optional expectation for Djex's
 pre-spawn executable-file observation, not attestation of the image ultimately

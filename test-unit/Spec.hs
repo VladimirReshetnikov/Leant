@@ -180,8 +180,12 @@ import Leant.Synth.Length.Configuration
   ( LengthRankingConfiguration
   , LengthRankingConfigurationError (..)
   , LengthRankingConfigurationSource (..)
+  , LengthRankingPolicy
+  , LengthRankingPolicySource (..)
   , mkLengthRankingConfiguration
+  , mkLengthRankingPolicy
   , rankVerifiedLengthCandidatesConfigured
+  , rankVerifiedLengthCandidatesWithPolicy
   )
 import Leant.Synth.Length.Configuration.File
   ( DisabledLengthRankingConfiguration
@@ -1918,6 +1922,8 @@ lengthRankingConfigurationTests = testGroup "explicit ranking configuration"
       assertLengthRankingConfiguredAllIneligible
   , testCase "match the direct runner for healthy and failing live rankings"
       assertLengthRankingConfiguredLiveEquivalence
+  , testCase "reuse one sealed solver policy with request-owned contracts"
+      assertLengthRankingPolicyContractSeparation
   , lengthRankingConfigurationFileTests
   ]
 
@@ -3075,12 +3081,21 @@ assertLengthRankingConfigurationRelativePath = do
     $ case located of
         Nothing -> False
         Just _ -> True
-  let source = explicitLengthRankingConfigurationSource
+  let policySource = explicitLengthRankingPolicySource
+        Djex.defaultLengthSMTLibExecutionLimits
+        (explicitLengthRankingExecutionSource
+          "djex-fake-z3" Nothing Djex.LengthSMTLibStatusOnly)
+        (error "execution rejection forced the later evaluation source")
+      source = explicitLengthRankingConfigurationSource
         Djex.defaultLengthSMTLibExecutionLimits
         (explicitLengthRankingExecutionSource
           "djex-fake-z3" Nothing Djex.LengthSMTLibStatusOnly)
         (error "execution rejection forced the later evaluation source")
         (error "execution rejection forced the later Length contract")
+  assertLengthRankingPolicyError
+    (LengthRankingExecutionConfigurationRejected
+      Djex.LengthSMTLibExecutionExecutablePathNotAbsolute)
+    $ mkLengthRankingPolicy policySource
   assertLengthRankingConfigurationError
     (LengthRankingExecutionConfigurationRejected
       Djex.LengthSMTLibExecutionExecutablePathNotAbsolute)
@@ -3128,12 +3143,22 @@ assertLengthRankingConfigurationEvaluationLimits =
           { Djex.lengthEvaluationLimitSourceAssignmentValueBits = -1
           , Djex.lengthEvaluationLimitSourceIntermediateValueBits = -2
           }
+        policySource = explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits
+          (explicitLengthRankingExecutionSource executable Nothing
+            Djex.LengthSMTLibStatusOnly)
+          evaluation
         source = explicitLengthRankingConfigurationSource
           Djex.defaultLengthSMTLibExecutionLimits
           (explicitLengthRankingExecutionSource executable Nothing
             Djex.LengthSMTLibStatusOnly)
           evaluation
           $ error "evaluation rejection forced the later Length contract"
+    assertLengthRankingPolicyError
+      (LengthRankingEvaluationLimitsRejected
+        $ Djex.NegativeLengthEvaluationLimit
+            Djex.LengthAssignmentValueBits (-1))
+      $ mkLengthRankingPolicy policySource
     assertLengthRankingConfigurationError
       (LengthRankingEvaluationLimitsRejected
         $ Djex.NegativeLengthEvaluationLimit
@@ -3205,6 +3230,50 @@ assertLengthRankingConfiguredLiveEquivalence = do
     lengthRankingFailureCleanupIncomplete failure @?= False
     lengthRankingFailureOriginalIndex failure @?= Just 1
 
+assertLengthRankingPolicyContractSeparation :: IO ()
+assertLengthRankingPolicyContractSeparation = do
+  fixture <- buildLengthRankingLiveFixture
+  withFakeLengthSolver "healthy" $ \executable -> do
+    let candidates =
+          [ lengthRankingFixtureZero fixture
+          , lengthRankingFixtureOne fixture
+          ]
+        policySource = explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits
+          (explicitLengthRankingExecutionSource executable Nothing
+            Djex.LengthSMTLibStatusOnly)
+          Djex.defaultLengthEvaluationLimitSource
+    policy <- expectRight $ mkLengthRankingPolicy policySource
+    first <- expectLengthRankingWithin "first request-owned contract"
+      $ rankVerifiedLengthCandidatesWithPolicy policy
+          (lengthRankingContract 0) candidates
+    second <- expectLengthRankingWithin "second request-owned contract"
+      $ rankVerifiedLengthCandidatesWithPolicy policy
+          (lengthRankingContract 1) candidates
+    mapM_ (\ranking -> do
+        rankedLengthVerifiedCandidates ranking @?= candidates
+        case map rankedLengthCandidateAssessment
+            $ lengthRankingCandidates ranking of
+          [Heuristic firstStatus, Heuristic secondStatus] ->
+            (firstStatus, secondStatus) @?=
+              (Djex.SolverSatisfiable, Djex.SolverSatisfiable)
+          assessments -> assertFailure $ "unexpected policy assessments: "
+            ++ show assessments
+        lengthRankingFailure ranking @?= Nothing)
+      [first, second]
+
+explicitLengthRankingPolicySource
+  :: Djex.LengthSMTLibExecutionLimits
+  -> Djex.LengthSMTLibExecutionConfigSource
+  -> Djex.LengthEvaluationLimitSource
+  -> LengthRankingPolicySource
+explicitLengthRankingPolicySource executionLimits executionSource
+    evaluationSource = LengthRankingPolicySource
+  { lengthRankingPolicyExecutionLimits = executionLimits
+  , lengthRankingPolicyExecutionSource = executionSource
+  , lengthRankingPolicyEvaluationSource = evaluationSource
+  }
+
 explicitLengthRankingConfigurationSource
   :: Djex.LengthSMTLibExecutionLimits
   -> Djex.LengthSMTLibExecutionConfigSource
@@ -3241,6 +3310,15 @@ assertLengthRankingConfigurationError expected result = case result of
   Right _ -> assertFailure $ "expected ranking configuration failure: " ++
     show expected
 
+assertLengthRankingPolicyError
+  :: LengthRankingConfigurationError
+  -> Either LengthRankingConfigurationError LengthRankingPolicy
+  -> IO ()
+assertLengthRankingPolicyError expected result = case result of
+  Left failure -> failure @?= expected
+  Right _ -> assertFailure $ "expected ranking policy failure: "
+    ++ show expected
+
 assertConfiguredLengthRankingEquivalent
   :: FilePath
   -> Djex.LengthSMTLibArtifactPolicy
@@ -3255,6 +3333,10 @@ assertConfiguredLengthRankingEquivalent executable policy contract candidates = 
         Djex.defaultLengthEvaluationLimitSource contract
   configuration <- expectRight
     $ mkLengthRankingConfiguration configurationSource
+  policyConfiguration <- expectRight $ mkLengthRankingPolicy
+    $ explicitLengthRankingPolicySource
+        Djex.defaultLengthSMTLibExecutionLimits executionSource
+        Djex.defaultLengthEvaluationLimitSource
   execution <- expectRight $ Djex.mkLengthSMTLibExecutionConfig
     Djex.defaultLengthSMTLibExecutionLimits executionSource
   evaluation <- expectRight $ Djex.mkLengthEvaluationLimits
@@ -3263,7 +3345,11 @@ assertConfiguredLengthRankingEquivalent executable policy contract candidates = 
     $ rankVerifiedLengthCandidates execution evaluation contract candidates
   configured <- expectLengthRankingWithin "opaque live configuration"
     $ rankVerifiedLengthCandidatesConfigured configuration candidates
+  policyRanked <- expectLengthRankingWithin "separate policy and contract"
+    $ rankVerifiedLengthCandidatesWithPolicy policyConfiguration contract
+        candidates
   assertLengthRankingsEquivalent direct configured
+  assertLengthRankingsEquivalent direct policyRanked
   pure configured
 
 expectLengthRankingWithin
