@@ -60,6 +60,10 @@ module Leant.Synth.Engine
   , takeDistinct
   , takeDistinctOn
   , renderCandidateByAvailability
+  , TranslatedPremise (..)
+  , ProviderBindingInspection (..)
+  , PreparedSynthesisInspection (..)
+  , inspectExferencePreparation
   ) where
 
 import Data.Foldable (toList)
@@ -450,78 +454,119 @@ synthesizeTunedWithProvidersDetailed
 synthesizeTunedWithProvidersDetailed engine steps limits checked providers extras
     engineFrag fitFrag = case engine of
   EngineDjinn -> do
-    (goal, decls, providerDecls, instantiations, render, _, complete) <-
-      prepare djinnRecursiveProjection providers
-    outcome <- djinnRun limits fitFrag complete render goal
-      (decls ++ providerDecls) instantiations
+    prepared <- prepareSynthesis djinnRecursiveProjection
+      providers extras engineFrag fitFrag
+    outcome <- djinnRun limits fitFrag
+      (preparedProjectionCompleteness prepared)
+      (preparedRenderExpression prepared)
+      (preparedSearchGoal prepared)
+      (preparedDeclarations prepared)
+      (preparedProviderAssignments prepared)
     pure
       (withoutCheckedDetailedCandidates checked
         (detailUnobservedOutcome outcome))
   EngineExference -> do
-    (goal, decls, providerDecls, instantiations, render, renderGraph, _) <-
-      prepare exferenceRecursiveProjection providers
-    outcome <- exferenceRun steps render renderGraph goal
-      (decls ++ providerDecls)
-      instantiations
+    prepared <- prepareSynthesis exferenceRecursiveProjection
+      providers extras engineFrag fitFrag
+    outcome <- exferenceRun steps
+      (preparedRenderExpression prepared)
+      (preparedRenderTermGraph prepared)
+      (preparedSearchGoal prepared)
+      (preparedDeclarations prepared)
+      (preparedProviderAssignments prepared)
     pure (withoutCheckedDetailedCandidates checked outcome)
   EngineBoth -> do
-    ( djinnGoal, djinnDecls, djinnProviderDecls, djinnInstantiations
-      , djinnRender, _, djinnComplete) <-
-      prepare djinnRecursiveProjection providers
-    djinnCompatibility <- djinnRun limits fitFrag djinnComplete djinnRender
-      djinnGoal (djinnDecls ++ djinnProviderDecls) djinnInstantiations
+    djinnPrepared <- prepareSynthesis djinnRecursiveProjection
+      providers extras engineFrag fitFrag
+    djinnCompatibility <- djinnRun limits fitFrag
+      (preparedProjectionCompleteness djinnPrepared)
+      (preparedRenderExpression djinnPrepared)
+      (preparedSearchGoal djinnPrepared)
+      (preparedDeclarations djinnPrepared)
+      (preparedProviderAssignments djinnPrepared)
     let djinn = detailUnobservedOutcome djinnCompatibility
-    ( exferenceGoal, exferenceDecls, providerDecls, exferenceInstantiations
-      , exferenceRender, exferenceRenderGraph, _) <-
-      prepare exferenceRecursiveProjection providers
-    exference <- exferenceRun steps exferenceRender exferenceRenderGraph
-      exferenceGoal
-      (exferenceDecls ++ providerDecls) exferenceInstantiations
+    exferencePrepared <- prepareSynthesis exferenceRecursiveProjection
+      providers extras engineFrag fitFrag
+    exference <- exferenceRun steps
+      (preparedRenderExpression exferencePrepared)
+      (preparedRenderTermGraph exferencePrepared)
+      (preparedSearchGoal exferencePrepared)
+      (preparedDeclarations exferencePrepared)
+      (preparedProviderAssignments exferencePrepared)
     pure (mergeDetailedOutcomesSkipping checked djinn exference)
- where
-  prepare recursiveProjection activeProviders = do
-    ( goal0, decls, providerDecls, instantiations, ctorMap, providerMap
-      , typeMap, extrasPrems, ctorPrems, complete) <-
-        fragToDjinn recursiveProjection activeProviders extras engineFrag
-    -- Premises enter under the quantifier prefix, where their occurrences of
-    -- the goal's bound variables remain connected.  The two premise kinds sit
-    -- on opposite sides of the goal's own arrows.  Caller-supplied premises
-    -- (library functions and excluded-middle instances) go innermost, after
-    -- the goal arguments have entered Djinn's oldest-first atom inventory, so
-    -- short argument-using compositions stay inside the candidate window.
-    -- Conservative recursive constructor premises remain outside the goal
-    -- arrows, preserving alternatives that construct a richer argument before
-    -- applying a hypothesis.  Native exact recursive families produce no such
-    -- fallback premises.  The renderer strips both blocks around the kept
-    -- goal-arrow binders.
-    let antecedents prems body =
-          foldr (\(_, _, t) acc -> FunctionType t acc) body prems
-        insertInner ty = case ty of
-          FunctionType domain body -> FunctionType domain (insertInner body)
-          body -> antecedents extrasPrems body
-        insertOuter ty = case ty of
-          ForallType variables constraints body ->
-            ForallType variables constraints (insertOuter body)
-          body -> antecedents ctorPrems (insertInner body)
-        goal = insertOuter goal0
-        pairsOf prems = [(name, prem) | (name, prem, _) <- prems]
-        spineArrows = length [() | SlotArrow _ <- fragSpine engineFrag]
-        render expr =
-          renderLeanTerm ctorMap providerMap typeMap
-            (pairsOf ctorPrems, spineArrows, pairsOf extrasPrems)
-            fitFrag expr
-        renderGraph
-          :: TermGraph ExferenceType ExferenceLocal
-          -> Either String [String]
-        renderGraph graph =
-          renderLeanTermGraphProjection (("x" ++) . show)
-            ctorMap providerMap typeMap
-            (pairsOf ctorPrems, spineArrows, pairsOf extrasPrems)
-            fitFrag graph
-    pure
-      ( goal, decls, providerDecls, instantiations
-      , render, renderGraph, complete
-      )
+
+-- | Prepare one engine-specific translation without erasing which goal came
+-- from the source fragment and which goal search actually receives. Premise
+-- insertion and rendering share the same named layout, while provider and
+-- type maps remain attached to the declarations that introduced their private
+-- names. This is the stable seam for later semantic interpretation.
+prepareSynthesis
+  :: RecursiveProjection
+  -> [ProviderFrag]
+  -> [(String, Frag)]
+  -> Frag
+  -> Frag
+  -> Either String PreparedSynthesis
+prepareSynthesis recursiveProjection activeProviders extras engineFrag fitFrag = do
+  translation <-
+    fragToDjinn recursiveProjection activeProviders extras engineFrag
+  let sourceGoal = translationSourceGoal translation
+      callerPremises = translationCallerPremises translation
+      constructorPremises = translationConstructorPremises translation
+      premiseLayout = PremiseLayout
+        { premiseLayoutConstructorPremises = constructorPremises
+        , premiseLayoutSourceArrowCount =
+            length [() | SlotArrow _ <- fragSpine engineFrag]
+        , premiseLayoutCallerPremises = callerPremises
+        }
+      -- Premises enter under the quantifier prefix, where their occurrences of
+      -- the goal's bound variables remain connected. The two premise kinds sit
+      -- on opposite sides of the goal's own arrows. Caller-supplied premises
+      -- go innermost; conservative constructor premises remain outside.
+      antecedents premises body =
+        foldr (FunctionType . translatedPremiseType) body premises
+      insertInner ty = case ty of
+        FunctionType domain body -> FunctionType domain (insertInner body)
+        body -> antecedents callerPremises body
+      insertOuter ty = case ty of
+        ForallType variables constraints body ->
+          ForallType variables constraints (insertOuter body)
+        body -> antecedents constructorPremises (insertInner body)
+      searchGoal = insertOuter sourceGoal
+      renderPremiseLayout = premiseLayoutForRenderer premiseLayout
+      render expr =
+        renderLeanTerm
+          (translationConstructorMap translation)
+          (translationProviderMap translation)
+          (translationTypeMap translation)
+          renderPremiseLayout fitFrag expr
+      renderGraph
+        :: TermGraph ExferenceType ExferenceLocal
+        -> Either String [String]
+      renderGraph graph =
+        renderLeanTermGraphProjection (("x" ++) . show)
+          (translationConstructorMap translation)
+          (translationProviderMap translation)
+          (translationTypeMap translation)
+          renderPremiseLayout fitFrag graph
+  pure PreparedSynthesis
+    { preparedSourceGoal = sourceGoal
+    , preparedSearchGoal = searchGoal
+    , preparedDeclarations =
+        translationDeclarations translation
+          ++ translationProviderDeclarations translation
+    , preparedProviderBindings = translationProviderBindings translation
+    , preparedProviderAssignments =
+        translationProviderAssignments translation
+    , preparedConstructorMap = translationConstructorMap translation
+    , preparedProviderMap = translationProviderMap translation
+    , preparedTypeMap = translationTypeMap translation
+    , preparedPremiseLayout = premiseLayout
+    , preparedProjectionCompleteness =
+        translationProjectionCompleteness translation
+    , preparedRenderExpression = render
+    , preparedRenderTermGraph = renderGraph
+    }
 
 -- | The complete LJT search: candidates, or a refutation whose
 -- soundness depends on the translation having hidden nothing.
@@ -938,6 +983,180 @@ progressNotes progress = case progress of
 -- @Environment String Void ()@ element type of 'DjinnEnvironment').
 type DjinnDecl = Declaration String Void ()
 
+-- | One source premise after translation into the exact query type
+-- vocabulary. Keeping all three views named prevents later goal preparation
+-- from swapping a Lean spelling, fitting fragment, or engine type.
+data TranslatedPremise = TranslatedPremise
+  { translatedPremiseName :: String
+  , translatedPremiseFragment :: Frag
+  , translatedPremiseType :: Type String
+  }
+  deriving (Eq, Show)
+
+-- | One usable Lean provider bound to its collision-free engine identity.
+--
+-- The source fragment remains attached to the exact private 'Name', translated
+-- scheme, renderer metadata, and provider-local instantiation assignments.
+-- No behavioral law is inferred here; this record is only the source identity
+-- seam a later checked semantic layer can consume.
+data ProviderBinding = ProviderBinding
+  { providerBindingSource :: ProviderFrag
+  , providerBindingPrivateName :: Name
+  , providerBindingPrivateSpelling :: String
+  , providerBindingScheme :: Type String
+  , providerBindingRenderInfo :: ProviderInfo
+  , providerBindingAssignments ::
+      [KindedProviderInstantiationAssignment String]
+  }
+  deriving (Eq, Show)
+
+providerBindingDeclaration :: ProviderBinding -> DjinnDecl
+providerBindingDeclaration binding = ValueDeclaration
+  (ValueSignature ()
+    (providerBindingPrivateName binding)
+    (providerBindingScheme binding))
+
+-- | Complete pure output of fragment translation, before search-only premises
+-- are inserted around the source goal. Provider bindings are retained beside
+-- their historical declaration, assignment, and renderer-map projections so
+-- future consumers do not have to recover source identity from a private
+-- spelling.
+data SynthesisTranslation = SynthesisTranslation
+  { translationSourceGoal :: Type String
+  , translationDeclarations :: [DjinnDecl]
+  , translationProviderDeclarations :: [DjinnDecl]
+  , translationProviderBindings :: [ProviderBinding]
+  , translationProviderAssignments ::
+      [KindedProviderInstantiationAssignment String]
+  , translationConstructorMap :: CtorMap
+  , translationProviderMap :: ProviderMap
+  , translationTypeMap :: TypeMap
+  , translationCallerPremises :: [TranslatedPremise]
+  , translationConstructorPremises :: [TranslatedPremise]
+  , translationProjectionCompleteness :: ProjectionCompleteness
+  }
+
+-- | Values produced inside the translation state before its declaration and
+-- renderer indexes are projected into 'SynthesisTranslation'.
+data TranslationProduct = TranslationProduct
+  { translationProductCallerPremises :: [TranslatedPremise]
+  , translationProductSourceGoal :: Type String
+  , translationProductProviderBindings :: [ProviderBinding]
+  }
+
+-- | Exact premise ordering shared by search-goal construction and rendering.
+-- Constructor fallbacks surround the source arrows; caller premises are
+-- inserted at the innermost arrow result.
+data PremiseLayout = PremiseLayout
+  { premiseLayoutConstructorPremises :: [TranslatedPremise]
+  , premiseLayoutSourceArrowCount :: Int
+  , premiseLayoutCallerPremises :: [TranslatedPremise]
+  }
+
+premiseLayoutForRenderer
+  :: PremiseLayout
+  -> ([(String, Frag)], Int, [(String, Frag)])
+premiseLayoutForRenderer layout =
+  ( map premisePair $ premiseLayoutConstructorPremises layout
+  , premiseLayoutSourceArrowCount layout
+  , map premisePair $ premiseLayoutCallerPremises layout
+  )
+ where
+  premisePair premise =
+    (translatedPremiseName premise, translatedPremiseFragment premise)
+
+-- | One prepared lane. The source and premise-extended search goals remain
+-- separate, and every declaration/map/premise projection used by either
+-- backend is retained under a named field instead of tuple position.
+data PreparedSynthesis = PreparedSynthesis
+  { preparedSourceGoal :: Type String
+  , preparedSearchGoal :: Type String
+  , preparedDeclarations :: [DjinnDecl]
+  , preparedProviderBindings :: [ProviderBinding]
+  , preparedProviderAssignments ::
+      [KindedProviderInstantiationAssignment String]
+  , preparedConstructorMap :: CtorMap
+  , preparedProviderMap :: ProviderMap
+  , preparedTypeMap :: TypeMap
+  , preparedPremiseLayout :: PremiseLayout
+  , preparedProjectionCompleteness :: ProjectionCompleteness
+  , preparedRenderExpression ::
+      Expression String -> Either String [String]
+  , preparedRenderTermGraph ::
+      TermGraph ExferenceType ExferenceLocal -> Either String [String]
+  }
+
+-- | Comparable provider-binding projection exported only for focused boundary
+-- tests. It deliberately contains no semantic summary or trust claim.
+data ProviderBindingInspection = ProviderBindingInspection
+  { inspectedProviderSourceName :: String
+  , inspectedProviderPrivateName :: Name
+  , inspectedProviderPrivateSpelling :: String
+  , inspectedProviderScheme :: Type String
+  , inspectedProviderAssignments ::
+      [KindedProviderInstantiationAssignment String]
+  }
+  deriving (Eq, Show)
+
+-- | Comparable view of the preparation fields most vulnerable to positional
+-- tuple wiring mistakes. Leant has no public library surface; this projection
+-- exists for its executable boundary tests.
+data PreparedSynthesisInspection = PreparedSynthesisInspection
+  { inspectedSourceGoal :: Type String
+  , inspectedSearchGoal :: Type String
+  , inspectedProviderBindings :: [ProviderBindingInspection]
+  , inspectedAllProviderAssignments ::
+      [KindedProviderInstantiationAssignment String]
+  , inspectedConstructorPrivateNames :: [String]
+  , inspectedProviderMap :: ProviderMap
+  , inspectedTypeMap :: TypeMap
+  , inspectedConstructorPremises :: [TranslatedPremise]
+  , inspectedCallerPremises :: [TranslatedPremise]
+  , inspectedFamiliesComplete :: Bool
+  , inspectedFragmentsComplete :: Bool
+  }
+  deriving (Eq, Show)
+
+-- | Prepare the Exference projection and expose only the comparable boundary
+-- view above. This keeps tests on the exact same record path used by synthesis.
+inspectExferencePreparation
+  :: [ProviderFrag]
+  -> [(String, Frag)]
+  -> Frag
+  -> Frag
+  -> Either String PreparedSynthesisInspection
+inspectExferencePreparation providers extras engineFrag fitFrag = do
+  prepared <- prepareSynthesis exferenceRecursiveProjection
+    providers extras engineFrag fitFrag
+  let projection = preparedProjectionCompleteness prepared
+  pure PreparedSynthesisInspection
+    { inspectedSourceGoal = preparedSourceGoal prepared
+    , inspectedSearchGoal = preparedSearchGoal prepared
+    , inspectedProviderBindings = map inspectBinding
+        $ preparedProviderBindings prepared
+    , inspectedAllProviderAssignments = preparedProviderAssignments prepared
+    , inspectedConstructorPrivateNames = Map.keys
+        $ preparedConstructorMap prepared
+    , inspectedProviderMap = preparedProviderMap prepared
+    , inspectedTypeMap = preparedTypeMap prepared
+    , inspectedConstructorPremises =
+        premiseLayoutConstructorPremises $ preparedPremiseLayout prepared
+    , inspectedCallerPremises =
+        premiseLayoutCallerPremises $ preparedPremiseLayout prepared
+    , inspectedFamiliesComplete = projectionFamiliesComplete projection
+    , inspectedFragmentsComplete = projectionFragmentsComplete projection
+    }
+ where
+  inspectBinding binding = ProviderBindingInspection
+    { inspectedProviderSourceName = providerLeanName
+        $ providerBindingSource binding
+    , inspectedProviderPrivateName = providerBindingPrivateName binding
+    , inspectedProviderPrivateSpelling =
+        providerBindingPrivateSpelling binding
+    , inspectedProviderScheme = providerBindingScheme binding
+    , inspectedProviderAssignments = providerBindingAssignments binding
+    }
+
 data TransState = TransState
   { tsTable :: Map.Map String String
     -- ^ goal variable\/atom key -> engine type variable
@@ -955,9 +1174,9 @@ data TransState = TransState
   , tsRecFamilies :: Map.Map String RecInfo
     -- ^ nominal recursive datatype family -> private type constructor and
     -- inferred parameter arity (Exference's structural projection only)
-  , tsPrems :: [(String, Frag, Type String)]
-    -- ^ constructor premises (Lean name, fragment for the renderer's
-    -- domain fitting, engine type), in order
+  , tsPrems :: [TranslatedPremise]
+    -- ^ constructor premises, retaining their Lean name, renderer fragment,
+    -- and translated engine type together and in order
   , tsAppFamilies :: Map.Map String AppFamily
     -- ^ exact Lean family head -> its one query-wide private engine
     -- constructor, whether structurally declared or abstract
@@ -1306,18 +1525,7 @@ fragToDjinn
   -> [ProviderFrag]
   -> [(String, Frag)]
   -> Frag
-  -> Either String
-      ( Type String
-      , [DjinnDecl]
-      , [DjinnDecl]
-      , [KindedProviderInstantiationAssignment String]
-      , CtorMap
-      , ProviderMap
-      , TypeMap
-      , [(String, Frag, Type String)] -- caller-supplied premises
-      , [(String, Frag, Type String)] -- constructor fallback premises
-      , ProjectionCompleteness
-      )
+  -> Either String SynthesisTranslation
 fragToDjinn recursiveProjection providers extras frag0 = do
   eitherC <- viaShow (mkIdentifier "Either")
   voidC <- viaShow (mkIdentifier "Void")
@@ -1947,8 +2155,13 @@ fragToDjinn recursiveProjection providers extras frag0 = do
                 let premise = foldr FunctionType occurrence fieldTypes
                     premFrag = foldr FArr (FAtom False key) fields
                 modifyT (\s -> s
-                  { tsPrems =
-                      tsPrems s ++ [(leanName, premFrag, premise)] }))
+                  { tsPrems = tsPrems s ++
+                      [ TranslatedPremise
+                          { translatedPremiseName = leanName
+                          , translatedPremiseFragment = premFrag
+                          , translatedPremiseType = premise
+                          }
+                      ] }))
               ctors
             pure ()
 
@@ -1958,7 +2171,11 @@ fragToDjinn recursiveProjection providers extras frag0 = do
         extrasT <- mapM
           (\(name, prem) -> do
             premType <- go True prem
-            pure (name, prem, premType))
+            pure TranslatedPremise
+              { translatedPremiseName = name
+              , translatedPremiseFragment = prem
+              , translatedPremiseType = premType
+              })
           extras
         goal <- go True frag0
         translatedProviders <- mapM
@@ -2010,17 +2227,22 @@ fragToDjinn recursiveProjection providers extras frag0 = do
             let instantiations = nub (map fst translatedAssignments)
                 info = (providerInfo leanName binderNames providerFrag)
                   { piAssignments = map snd translatedAssignments }
-            pure
-              ( ValueDeclaration
-                  (ValueSignature () privateName providerType)
-              , ( "leantProvider" ++ show index
-                , info
-                )
-              , instantiations
-              ))
+            pure ProviderBinding
+              { providerBindingSource = provider
+              , providerBindingPrivateName = privateName
+              , providerBindingPrivateSpelling =
+                  "leantProvider" ++ show index
+              , providerBindingScheme = providerType
+              , providerBindingRenderInfo = info
+              , providerBindingAssignments = instantiations
+              })
           (zip [0 :: Int ..] usableProviders)
-        pure (extrasT, goal, translatedProviders)
-  ((extrasT, goal, translatedProviders), finalState) <-
+        pure TranslationProduct
+          { translationProductCallerPremises = extrasT
+          , translationProductSourceGoal = goal
+          , translationProductProviderBindings = translatedProviders
+          }
+  (translatedProduct, finalState) <-
     runTrans translate TransState
     { tsTable = Map.empty
     , tsNext = 0
@@ -2041,22 +2263,30 @@ fragToDjinn recursiveProjection providers extras frag0 = do
     , tsContextNext = 0
     , tsTypeMap = Map.empty
     }
-  let providerDecls = [declaration | (declaration, _, _) <- translatedProviders]
-      providerNames = [mapping | (_, mapping, _) <- translatedProviders]
-      instantiations = concat
-        [ candidates | (_, _, candidates) <- translatedProviders ]
-  Right
-    ( goal
-    , tsDecls finalState
-    , providerDecls
-    , instantiations
-    , tsCtorMap finalState
-    , Map.fromList providerNames
-    , tsTypeMap finalState
-    , extrasT
-    , tsPrems finalState
-    , projection
-    )
+  let providerBindings = translationProductProviderBindings translatedProduct
+      providerDecls = map providerBindingDeclaration providerBindings
+      providerMap = Map.fromList
+        [ ( providerBindingPrivateSpelling binding
+          , providerBindingRenderInfo binding
+          )
+        | binding <- providerBindings
+        ]
+      instantiations = concatMap providerBindingAssignments providerBindings
+      constructorPremises = tsPrems finalState
+  Right SynthesisTranslation
+    { translationSourceGoal = translationProductSourceGoal translatedProduct
+    , translationDeclarations = tsDecls finalState
+    , translationProviderDeclarations = providerDecls
+    , translationProviderBindings = providerBindings
+    , translationProviderAssignments = instantiations
+    , translationConstructorMap = tsCtorMap finalState
+    , translationProviderMap = providerMap
+    , translationTypeMap = tsTypeMap finalState
+    , translationCallerPremises =
+        translationProductCallerPremises translatedProduct
+    , translationConstructorPremises = constructorPremises
+    , translationProjectionCompleteness = projection
+    }
  where
   usableProvider = not . fragHasDepth . providerTypeFrag
 

@@ -29,6 +29,7 @@ import Language.Haskell.Djex
       , VisibleTypeApplication
       )
   , Pattern (Bind, Constructor, TuplePattern, Wildcard)
+  , KindedProviderInstantiationAssignment (..)
   , Type (..)
   , inferredVisibleTypeArgument
   , maximumProviderInstantiationArguments
@@ -43,12 +44,16 @@ import Language.Haskell.Djex
 import Leant.Backend (findBackendProject)
 import Leant.Synth.Engine
   ( DetailedSynthOutcome (..)
+  , PreparedSynthesisInspection (..)
+  , ProviderBindingInspection (..)
   , SynthEngine (..)
   , SynthOutcome (..)
+  , TranslatedPremise (..)
   , detailedCandidateGroup
   , detailedCandidateGroupRoute
   , detailedCandidateGroupVariants
   , forceDetailedOutcome
+  , inspectExferencePreparation
   , mergeCandidateGroups
   , mergeDetailedCandidateGroups
   , mergeDetailedOutcomesSkipping
@@ -149,6 +154,7 @@ main = defaultMain $ testGroup "Leant synthesis boundary"
   , snapshotMetadataTests
   , sessionReplayTests
   , providerCacheTests
+  , translationPreparationTests
   , providerScheduleTests
   , combinedEngineMergeTests
   , typedCandidateRoutingTests
@@ -676,6 +682,79 @@ providerCacheTests = testGroup "semantic provider cache"
         @?= [False, False, False]
       historyEntryAffectsProviders "def userValue : Nat := 3" @?= True
       historyEntryAffectsProviders "set_option pp.universes true" @?= True
+  ]
+
+translationPreparationTests :: TestTree
+translationPreparationTests = testGroup "prepared synthesis translation"
+  [ testCase "retain the source goal before inserting caller premises" $ do
+      let token = FAtom False "Demo.Token"
+      prepared <- expectRight $ inspectExferencePreparation
+        [] [("Demo.seed", token)] token token
+      let sourceGoal = inspectedSourceGoal prepared
+      inspectedSearchGoal prepared @?=
+        FunctionType sourceGoal sourceGoal
+      map translatedPremiseName (inspectedCallerPremises prepared)
+        @?= ["Demo.seed"]
+      map translatedPremiseType (inspectedCallerPremises prepared)
+        @?= [sourceGoal]
+      inspectedConstructorPremises prepared @?= []
+      inspectedProviderBindings prepared @?= []
+      inspectedAllProviderAssignments prepared @?= []
+  , testCase "bind private providers, assignments, and exact family maps" $ do
+      privateProvider <- expectRight $ mkIdentifier "leantProvider0"
+      privateType <- expectRight $ mkIdentifier "LeantType0"
+      let natural = FAtom False "Nat"
+          box key argument =
+            FApp False key (AppNominal "Demo.Box") [argument]
+          provider = ProviderFragWithEvidence "Demo.chooseBox"
+            (FAll False "a" (box "Demo.Box a" (FVar "a")))
+            ["a"] [[ProviderInstantiationArgument 0 natural]]
+          goal = box "Demo.Box Nat" natural
+      prepared <- expectRight $ inspectExferencePreparation
+        [provider] [] goal goal
+      inspectedSourceGoal prepared @?= inspectedSearchGoal prepared
+      case inspectedProviderBindings prepared of
+        [binding] -> do
+          inspectedProviderSourceName binding @?= "Demo.chooseBox"
+          inspectedProviderPrivateName binding @?= privateProvider
+          inspectedProviderPrivateSpelling binding @?= "leantProvider0"
+          case inspectedProviderScheme binding of
+            ForallType [binder] []
+                (TypeApplication (TypeConstructor family)
+                  (TypeVariable occurrence)) -> do
+              family @?= privateType
+              occurrence @?= binder
+            scheme -> assertFailure $
+              "expected the exact private provider scheme, got: "
+                ++ show scheme
+          case inspectedProviderAssignments binding of
+            [assignment] -> do
+              kindedProviderInstantiationAssignmentProvider assignment
+                @?= privateProvider
+              length
+                  (kindedProviderInstantiationAssignmentArguments assignment)
+                @?= 1
+              inspectedAllProviderAssignments prepared @?= [assignment]
+            assignments -> assertFailure $
+              "expected one exact provider assignment, got: "
+                ++ show assignments
+        bindings -> assertFailure $
+          "expected one private provider binding, got: " ++ show bindings
+      fmap piLeanName (Map.lookup "leantProvider0"
+          $ inspectedProviderMap prepared)
+        @?= Just "Demo.chooseBox"
+      Map.lookup "LeantType0" (inspectedTypeMap prepared)
+        @?= Just "Demo.Box"
+  , testCase "retain constructor and type maps from one structural family" $ do
+      let flag = FParamInd "Demo.Flag" "Demo.Flag" []
+            [("Demo.Flag.mk", [])]
+      prepared <- expectRight $ inspectExferencePreparation
+        [] [] flag flag
+      inspectedConstructorPrivateNames prepared @?=
+        ["LeantFamilyC0_0"]
+      Map.lookup "LeantType0" (inspectedTypeMap prepared)
+        @?= Just "Demo.Flag"
+      inspectedFamiliesComplete prepared @?= True
   ]
 
 providerParserTests :: TestTree
