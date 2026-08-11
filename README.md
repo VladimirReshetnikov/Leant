@@ -288,6 +288,26 @@ independent exact-problem replay can yield a finite-spine, model-relative
 counterexample receipt, still conditional on every named provider law. That
 receipt is not by itself a concrete Lean counterexample or kernel proof.
 
+`Leant.Synth.Length.Ranking` now supplies the next, deliberately unwired
+foundation. Its caller must provide an explicit Djex live-execution policy,
+explicit replay limits, an explicit `LeanLengthContract`, and the complete list
+of callback-verified candidates. It productively admits at most Djex's public
+64-query session bound, attempts every candidate handoff and seals every
+eligible canonical query before opening one lexical live session, and runs
+those queries serially in original order. `unsat`, `unknown`, and status-only
+`sat` are neutral; only a satisfiable model whose evidence replays again
+against the candidate's exact checked problem is stably moved behind the other
+candidates.
+Nothing is pruned. Any returned structured live session, query, association, or
+replay failure atomically restores every original candidate in original order
+as `Unassessed`, together with only a sanitized failure class, cleanup bit, and
+optional safe original index. Exceptions propagate instead of producing a
+ranking. Lifecycle and per-query budgets remain separate rather than
+pretending to be one batch deadline. Main and the REPL do not invoke this
+foundation yet; no executable path, contract, or policy is inferred. The
+checkpoint is detailed in the
+[live Length ranking foundation report](docs/reports/2026-08-11-live-length-ranking-foundation.md).
+
 Three rules run through the design:
 
 - **The engine is never trusted.** Every candidate is re-elaborated by
