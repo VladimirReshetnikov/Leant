@@ -146,7 +146,8 @@ import Leant.Synth.Verification
   ( VariantVerdict (..)
   , VerificationBatch
   , verificationObservations
-  , verifiedCandidates
+  , verifiedCandidate
+  , verifiedCandidateReceipts
   , verifyCandidateGroups
   )
 
@@ -2553,11 +2554,14 @@ verifyAndDisplay st args goal groups = do
     forM_ (leantObservationCodeEntries observations) $ \(code, count) ->
       emitLn st =<< cDim st
         ("debug metric: " ++ code ++ "=" ++ show count)
-  let accepted = take synthMaxShown (verifiedCandidates verification)
-      -- Keep the accepted semantic origin and original renderer ordinal alive
-      -- until this post-verification boundary. A future behavioral checker
-      -- belongs here, before projection; rsSynthIts intentionally remains the
-      -- established user-facing text/splice cache rather than a trust store.
+  let acceptedReceipts = take synthMaxShown
+        $ verifiedCandidateReceipts verification
+      -- Keep callback acceptance, semantic origin, and original renderer
+      -- ordinal together until this post-verification boundary. An explicit
+      -- behavioral contract may be handed to Djex here before projection;
+      -- rsSynthIts intentionally remains the established user-facing
+      -- text/splice cache rather than a trust store.
+      accepted = map verifiedCandidate acceptedReceipts
       shown = map detailedVerificationVariantText accepted
   if null shown
     then pure False

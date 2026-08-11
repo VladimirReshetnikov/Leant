@@ -1,3 +1,5 @@
+{-# LANGUAGE RoleAnnotations #-}
+
 -- | Lazy, quota-aware verification of rendered candidate groups.
 --
 -- A group contains textual variants of one semantic candidate.  Variants are
@@ -6,7 +8,10 @@
 -- attempt and outcome observations without changing synthesis-engine output.
 module Leant.Synth.Verification
   ( VariantVerdict (..)
+  , Verified
+  , verifiedCandidate
   , VerificationBatch
+  , verifiedCandidateReceipts
   , verifiedCandidates
   , failedCandidateGroups
   , verificationObservations
@@ -31,18 +36,56 @@ data VariantVerdict
   | VariantRejected VerificationFailureClass
   deriving (Eq, Ord, Show)
 
--- | The verified representatives and observations from one bounded pass.
+-- | Opaque receipt that the supplied verification callback accepted a
+-- candidate.
+--
+-- This records only callback acceptance at this boundary.  In particular, it
+-- is not behavioral evidence, a solver certificate, or a kernel proof.  A
+-- caller which needs one of those stronger claims must retain and replay that
+-- authority separately.
+data Verified candidate = Verified candidate
+  deriving (Eq, Show)
+
+type role Verified nominal
+
+-- | Recover the exact candidate accepted by the verification callback.
+verifiedCandidate :: Verified candidate -> candidate
+verifiedCandidate (Verified candidate) = candidate
+
+-- | The callback-accepted representatives and observations from one bounded
+-- pass.
 --
 -- Fields stay private so attempt and outcome counts cannot drift apart.
 data VerificationBatch candidate = VerificationBatch
-  [candidate]
+  [Verified candidate]
   Natural
   LeantObservations
-  deriving (Eq, Show)
+  deriving (Eq)
+
+-- Preserve the historical rendering of the private batch representation.
+-- The new receipt layer is observable only through its explicit projection.
+instance Show candidate => Show (VerificationBatch candidate) where
+  showsPrec precedence (VerificationBatch receipts failed observations) =
+    showParen (precedence > 10) $
+      showString "VerificationBatch "
+        . showsPrec 11 (map verifiedCandidate receipts)
+        . showChar ' '
+        . showsPrec 11 failed
+        . showChar ' '
+        . showsPrec 11 observations
+
+-- | Opaque callback-acceptance receipts, in input order.
+verifiedCandidateReceipts
+  :: VerificationBatch candidate
+  -> [Verified candidate]
+verifiedCandidateReceipts (VerificationBatch receipts _ _) = receipts
 
 -- | Accepted group representatives, in input order.
+--
+-- This compatibility projection intentionally discards only the receipt
+-- wrapper; it does not alter candidate order or force candidate payloads.
 verifiedCandidates :: VerificationBatch candidate -> [candidate]
-verifiedCandidates (VerificationBatch candidates _ _) = candidates
+verifiedCandidates = map verifiedCandidate . verifiedCandidateReceipts
 
 -- | Number of groups for which no variant was accepted.
 --
@@ -79,9 +122,9 @@ verifyCandidateGroups quota verifyVariant = go quota 0
         group : rest -> do
           groupResult <- verifyGroup group
           case groupResult of
-            GroupAccepted candidate observations -> do
+            GroupAccepted receipt observations -> do
               following <- go (remaining - 1) failed rest
-              pure $ prependCandidate candidate observations following
+              pure $ prependCandidate receipt observations following
             GroupRejected observations -> do
               following <- go remaining (failed + 1) rest
               pure $ prependObservations observations following
@@ -92,7 +135,7 @@ verifyCandidateGroups quota verifyVariant = go quota 0
       verdict <- verifyVariant candidate
       let attempted = recordObservation LeanVariantAttempted noObservations
       case verdict of
-        VariantAccepted -> pure $ GroupAccepted candidate
+        VariantAccepted -> pure $ GroupAccepted (Verified candidate)
           (recordObservation LeanCandidateVerified attempted)
         VariantRejected failure -> do
           following <- verifyGroup remaining
@@ -101,7 +144,7 @@ verifyCandidateGroups quota verifyVariant = go quota 0
             following
 
 data GroupResult candidate
-  = GroupAccepted candidate LeantObservations
+  = GroupAccepted (Verified candidate) LeantObservations
   | GroupRejected LeantObservations
 
 addGroupObservations
@@ -114,14 +157,14 @@ addGroupObservations observations result = case result of
   GroupRejected following -> GroupRejected (observations <> following)
 
 prependCandidate
-  :: candidate
+  :: Verified candidate
   -> LeantObservations
   -> VerificationBatch candidate
   -> VerificationBatch candidate
-prependCandidate candidate observations
-    (VerificationBatch candidates failed following) =
+prependCandidate receipt observations
+    (VerificationBatch receipts failed following) =
   VerificationBatch
-    (candidate : candidates)
+    (receipt : receipts)
     failed
     (observations <> following)
 
