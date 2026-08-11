@@ -85,11 +85,14 @@ import Leant.Session.Snapshot
   )
 import Leant.Synth.Engine
   ( DetailedCandidateGroup
+  , DetailedVerificationVariant
   , DetailedSynthOutcome (..)
   , SynthEngine (..)
   , candidateWindow
   , detailedCandidateGroupRoute
   , detailedCandidateGroupVariants
+  , detailedCandidateGroupVerificationVariants
+  , detailedVerificationVariantText
   , forceDetailedOutcome
   , mapDetailedCandidateGroupVariantsDroppingSemanticSidecar
   , parseSynthEngine
@@ -2540,7 +2543,7 @@ verifyAndDisplay
 verifyAndDisplay _ _ _ [] = pure False
 verifyAndDisplay st args goal groups = do
   verification <- synthVerify st goal
-    (map detailedCandidateGroupVariants groups)
+    (map detailedCandidateGroupVerificationVariants groups)
   let observations =
         candidateRenderingRouteObservations
           (map detailedCandidateGroupRoute groups)
@@ -2550,7 +2553,12 @@ verifyAndDisplay st args goal groups = do
     forM_ (leantObservationCodeEntries observations) $ \(code, count) ->
       emitLn st =<< cDim st
         ("debug metric: " ++ code ++ "=" ++ show count)
-  let shown = take synthMaxShown (verifiedCandidates verification)
+  let accepted = take synthMaxShown (verifiedCandidates verification)
+      -- Keep the accepted semantic origin and original renderer ordinal alive
+      -- until this post-verification boundary. A future behavioral checker
+      -- belongs here, before projection; rsSynthIts intentionally remains the
+      -- established user-facing text/splice cache rather than a trust store.
+      shown = map detailedVerificationVariantText accepted
   if null shown
     then pure False
     else do
@@ -2619,10 +2627,15 @@ synthBind st goal term = do
 -- variants of one engine candidate are tried in order and the first that
 -- elaborates represents the group.  Failure classification is deliberately
 -- ordered: transport, fatal response, error diagnostic, then a `sorry`.
-synthVerify :: St -> String -> [[String]] -> IO (VerificationBatch String)
+synthVerify
+  :: St
+  -> String
+  -> [[DetailedVerificationVariant]]
+  -> IO (VerificationBatch DetailedVerificationVariant)
 synthVerify st goal = verifyCandidateGroups synthMaxShown verifyVariant
  where
-  verifyVariant term = do
+  verifyVariant variant = do
+    let term = detailedVerificationVariantText variant
     result <- runCurrentCmd st (candidateVerificationProgram goal term)
     pure $ case result of
       Left _ -> VariantRejected BackendRequestFailure

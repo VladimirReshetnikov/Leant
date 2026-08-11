@@ -29,14 +29,21 @@ module Leant.Synth.Engine
   ( SynthEngine (..)
   , SynthOutcome (..)
   , DetailedCandidateGroup
+  , DetailedVerificationVariant
   , TypedCandidateSemanticSidecar
   , detailedCandidateGroup
   , detailedCandidateGroupRoute
   , detailedCandidateGroupVariants
+  , detailedCandidateGroupVerificationVariants
   , detailedCandidateGroupSemanticSidecar
+  , detailedVerificationVariantText
+  , detailedVerificationVariantOrdinal
+  , detailedVerificationVariantRoute
+  , detailedVerificationVariantSemanticSidecar
   , typedCandidateSemanticCandidate
   , typedCandidateSemanticInventory
   , typedCandidateSemanticFingerprint
+  , typedCandidateSemanticAuthorityInspection
   , mapDetailedCandidateGroupVariantsDroppingSemanticSidecar
   , DetailedSynthOutcome (..)
   , projectDetailedSynthOutcome
@@ -69,6 +76,7 @@ module Leant.Synth.Engine
   , TranslatedPremise (..)
   , ProviderBindingInspection (..)
   , PreparedSynthesisInspection (..)
+  , ExferenceRunAuthorityInspection (..)
   , inspectExferencePreparation
   ) where
 
@@ -77,6 +85,7 @@ import Data.List (intercalate, isPrefixOf, nub, nubBy, sortOn)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Data.Void (Void)
+import Numeric.Natural (Natural)
 
 import Language.Haskell.Djex
   ( Constraint (..)
@@ -96,9 +105,12 @@ import Language.Haskell.Djex
   , ExferenceInventory
   , ExferenceLocal
   , ExferenceOptions (..)
+  , ExferenceRequest
+  , ExferenceSession
   , ExferenceSessionPolicy (..)
   , ExferenceTypedCandidate
   , ExferenceType
+  , ExferenceTypeVariable
   , Expression
   , Fingerprint
   , GroundKind
@@ -155,6 +167,7 @@ import Language.Haskell.Djex
   , defaultTermGraphFingerprintByteLimit
   , defaultTermGraphLimits
   , exferenceSessionInventory
+  , exferenceRequestQuery
   , fingerprintSharedTermGraph
   )
 
@@ -211,27 +224,60 @@ data SynthOutcome
     -- ^ no candidate and no logical claim, with notes
   deriving (Eq, Show)
 
+-- | Exact checked inputs shared by every typed candidate from one Exference
+-- lane.  The session remains opaque, while the policy, request, provider
+-- assignments, variable identity, and pure Leant preparation stay attached so
+-- a later semantic checker never has to reconstruct authority from rendered
+-- text or private-name conventions.
+data ExferenceRunAuthority = ExferenceRunAuthority
+  { exferenceAuthorityPreparation :: PreparedSemanticOrigin
+  , exferenceAuthorityNameTable :: Map.Map String ExferenceLocal
+  , exferenceAuthorityConvertedSourceGoal :: ExferenceType
+  , exferenceAuthorityPolicy :: ExferenceSessionPolicy
+  , exferenceAuthoritySession :: ExferenceSession
+  , exferenceAuthorityRequest :: ExferenceRequest
+  , exferenceAuthorityProviderAssignments ::
+      [KindedProviderInstantiationAssignment ExferenceTypeVariable]
+  }
+
 -- | Checked Exference identity retained with one originating rendered group.
 --
 -- The opaque typed candidate keeps its compatibility projection inseparable
--- from the exact graph which produced the group.  The session inventory is the
--- source authority against which that candidate was checked.  Fingerprinting
--- remains deliberately lazy and fallible: inability to assign a structural
--- key cannot remove, reorder, or reroute an otherwise valid rendered term.
+-- from the exact graph which produced the group and the full checked run which
+-- admitted it. Fingerprinting remains deliberately lazy and fallible:
+-- inability to assign a structural key cannot remove, reorder, or reroute an
+-- otherwise valid rendered term.
 data TypedCandidateSemanticSidecar = TypedCandidateSemanticSidecar
   ExferenceTypedCandidate
-  ExferenceInventory
+  ExferenceRunAuthority
   (Either
     (TermGraphFingerprintError ExferenceLocal ExferenceLocal)
     (Fingerprint TermGraphFingerprintSubject))
 
 -- The fingerprint attempt is a pure, deterministic private projection of the
--- exact candidate graph under fixed limits. Comparing its two authorities is
--- therefore sufficient and keeps equality from forcing that lazy projection.
+-- exact candidate graph under fixed limits. Comparing the checked candidate
+-- and every observable run input is therefore sufficient and keeps equality
+-- from forcing either the opaque session internals or that lazy projection.
 instance Eq TypedCandidateSemanticSidecar where
-  TypedCandidateSemanticSidecar leftCandidate leftInventory _
-      == TypedCandidateSemanticSidecar rightCandidate rightInventory _ =
-    leftCandidate == rightCandidate && leftInventory == rightInventory
+  TypedCandidateSemanticSidecar leftCandidate leftAuthority _
+      == TypedCandidateSemanticSidecar rightCandidate rightAuthority _ =
+    leftCandidate == rightCandidate
+      && exferenceSessionInventory
+          (exferenceAuthoritySession leftAuthority)
+        == exferenceSessionInventory
+          (exferenceAuthoritySession rightAuthority)
+      && exferenceAuthorityPreparation leftAuthority
+        == exferenceAuthorityPreparation rightAuthority
+      && exferenceAuthorityNameTable leftAuthority
+        == exferenceAuthorityNameTable rightAuthority
+      && exferenceAuthorityConvertedSourceGoal leftAuthority
+        == exferenceAuthorityConvertedSourceGoal rightAuthority
+      && exferenceAuthorityPolicy leftAuthority
+        == exferenceAuthorityPolicy rightAuthority
+      && exferenceAuthorityRequest leftAuthority
+        == exferenceAuthorityRequest rightAuthority
+      && exferenceAuthorityProviderAssignments leftAuthority
+        == exferenceAuthorityProviderAssignments rightAuthority
 
 -- | Recover the checked candidate without detaching its graph association.
 typedCandidateSemanticCandidate
@@ -245,7 +291,8 @@ typedCandidateSemanticInventory
   :: TypedCandidateSemanticSidecar
   -> ExferenceInventory
 typedCandidateSemanticInventory
-    (TypedCandidateSemanticSidecar _ inventory _) = inventory
+    (TypedCandidateSemanticSidecar _ authority _) =
+  exferenceSessionInventory (exferenceAuthoritySession authority)
 
 -- | Lazily attempt the allocation-insensitive structural graph identity.
 -- Failure leaves ordinary synthesis and rendering unchanged.
@@ -257,13 +304,28 @@ typedCandidateSemanticFingerprint
 typedCandidateSemanticFingerprint
     (TypedCandidateSemanticSidecar _ _ fingerprint) = fingerprint
 
+-- | Comparable view of the exact checked lane authority. The actual session
+-- remains retained privately by the sidecar for later checked operations.
+typedCandidateSemanticAuthorityInspection
+  :: TypedCandidateSemanticSidecar
+  -> ExferenceRunAuthorityInspection
+typedCandidateSemanticAuthorityInspection
+    (TypedCandidateSemanticSidecar _ authority _) =
+  inspectExferenceRunAuthority authority
+
+-- | One renderer-produced spelling and its original zero-based ordinal.
+-- Filtering preserves this identity instead of silently renumbering the
+-- spellings which survive an earlier verification lane.
+data DetailedCandidateVariant = DetailedCandidateVariant Natural String
+  deriving (Eq, Show)
+
 -- | One semantic candidate and the route that supplied the expression handed
 -- to Leant's renderer.  Every deduplication boundary names the textual-variant
 -- key explicitly.  A sidecar belongs to the originating engine candidate, not
 -- to an arbitrary spelling which happens to compare equal.
 data DetailedCandidateGroup = DetailedCandidateGroup
   CandidateRenderingRoute
-  [String]
+  [DetailedCandidateVariant]
   (Maybe TypedCandidateSemanticSidecar)
 
 -- Compare the observable sidecar authority without forcing its potentially
@@ -282,7 +344,7 @@ instance Show DetailedCandidateGroup where
       showString "DetailedCandidateGroup "
         . showsPrec 11 route
         . showChar ' '
-        . showsPrec 11 variants
+        . showsPrec 11 (map detailedCandidateVariantText variants)
 
 -- | Construct one internal semantic group.  This is exported only to the
 -- executable's focused boundary tests; Leant has no public library surface.
@@ -291,7 +353,7 @@ detailedCandidateGroup
   -> [String]
   -> DetailedCandidateGroup
 detailedCandidateGroup route variants =
-  DetailedCandidateGroup route variants Nothing
+  DetailedCandidateGroup route (indexDetailedCandidateVariants variants) Nothing
 
 -- | Rendering-route sidecar for one semantic group.
 detailedCandidateGroupRoute
@@ -301,7 +363,69 @@ detailedCandidateGroupRoute (DetailedCandidateGroup route _ _) = route
 
 -- | Ordered textual variants of one semantic group.
 detailedCandidateGroupVariants :: DetailedCandidateGroup -> [String]
-detailedCandidateGroupVariants (DetailedCandidateGroup _ variants _) = variants
+detailedCandidateGroupVariants (DetailedCandidateGroup _ variants _) =
+  map detailedCandidateVariantText variants
+
+-- | Verification-facing candidates retain the spelling, its original
+-- renderer ordinal, and the group's semantic origin. The verifier stays
+-- generic; only the Lean callback projects the text it must elaborate.
+data DetailedVerificationVariant = DetailedVerificationVariant
+  CandidateRenderingRoute
+  DetailedCandidateVariant
+  (Maybe TypedCandidateSemanticSidecar)
+
+instance Eq DetailedVerificationVariant where
+  DetailedVerificationVariant leftRoute leftVariant leftSidecar
+      == DetailedVerificationVariant rightRoute rightVariant rightSidecar =
+    leftRoute == rightRoute
+      && leftVariant == rightVariant
+      && leftSidecar == rightSidecar
+
+instance Show DetailedVerificationVariant where
+  showsPrec precedence
+      (DetailedVerificationVariant route variant _) =
+    showParen (precedence > 10) $
+      showString "DetailedVerificationVariant "
+        . showsPrec 11 route
+        . showChar ' '
+        . showsPrec 11 variant
+
+-- | Preserve group provenance while presenting its spellings to verification.
+detailedCandidateGroupVerificationVariants
+  :: DetailedCandidateGroup
+  -> [DetailedVerificationVariant]
+detailedCandidateGroupVerificationVariants
+    (DetailedCandidateGroup route variants sidecar) =
+  map (\variant -> DetailedVerificationVariant route variant sidecar) variants
+
+-- | Exact Lean spelling passed to the backend verifier.
+detailedVerificationVariantText :: DetailedVerificationVariant -> String
+detailedVerificationVariantText
+    (DetailedVerificationVariant _ variant _) =
+  detailedCandidateVariantText variant
+
+-- | Original zero-based renderer ordinal, stable through filtering and merge.
+detailedVerificationVariantOrdinal
+  :: DetailedVerificationVariant
+  -> Natural
+detailedVerificationVariantOrdinal
+    (DetailedVerificationVariant _ variant _) =
+  detailedCandidateVariantOrdinal variant
+
+-- | Rendering path of the originating semantic group.
+detailedVerificationVariantRoute
+  :: DetailedVerificationVariant
+  -> CandidateRenderingRoute
+detailedVerificationVariantRoute
+    (DetailedVerificationVariant route _ _) = route
+
+-- | Checked Exference origin, when the accepted spelling still denotes the
+-- unwrapped typed candidate which produced it.
+detailedVerificationVariantSemanticSidecar
+  :: DetailedVerificationVariant
+  -> Maybe TypedCandidateSemanticSidecar
+detailedVerificationVariantSemanticSidecar
+    (DetailedVerificationVariant _ _ sidecar) = sidecar
 
 -- | Exact candidate identity, when this group came from a retained checked
 -- Exference graph and has not subsequently been wrapped as another term.
@@ -321,20 +445,38 @@ mapDetailedCandidateGroupVariantsDroppingSemanticSidecar
 mapDetailedCandidateGroupVariantsDroppingSemanticSidecar transform group =
   DetailedCandidateGroup
     (detailedCandidateGroupRoute group)
-    (map transform $ detailedCandidateGroupVariants group)
+    (map mapVariant $ detailedCandidateGroupVariantRecords group)
     Nothing
+ where
+  mapVariant (DetailedCandidateVariant ordinal text) =
+    DetailedCandidateVariant ordinal (transform text)
 
 -- | Replace a group by a stable subset of its spellings without changing the
 -- originating engine candidate. Used only by filtering and scheduling paths
 -- which never synthesize a new textual term.
 retainDetailedCandidateGroupVariants
-  :: [String]
+  :: [DetailedCandidateVariant]
   -> DetailedCandidateGroup
   -> DetailedCandidateGroup
 retainDetailedCandidateGroupVariants variants group = DetailedCandidateGroup
   (detailedCandidateGroupRoute group)
   variants
   (detailedCandidateGroupSemanticSidecar group)
+
+detailedCandidateGroupVariantRecords
+  :: DetailedCandidateGroup
+  -> [DetailedCandidateVariant]
+detailedCandidateGroupVariantRecords
+    (DetailedCandidateGroup _ variants _) = variants
+
+detailedCandidateVariantOrdinal :: DetailedCandidateVariant -> Natural
+detailedCandidateVariantOrdinal (DetailedCandidateVariant ordinal _) = ordinal
+
+detailedCandidateVariantText :: DetailedCandidateVariant -> String
+detailedCandidateVariantText (DetailedCandidateVariant _ text) = text
+
+indexDetailedCandidateVariants :: [String] -> [DetailedCandidateVariant]
+indexDetailedCandidateVariants = zipWith DetailedCandidateVariant [0 ..]
 
 -- | Internal outcome retaining rendering provenance until the bounded group
 -- prefix is observed.  Compatibility APIs project this type immediately.
@@ -419,7 +561,7 @@ forceDetailedOutcome n outcome = case outcome of
   Right (DetailedSynthNoTerm notes) -> noteSize notes
  where
   groupSize (DetailedCandidateGroup route variants _) =
-    route `seq` sum (map length variants)
+    route `seq` sum (map (length . detailedCandidateVariantText) variants)
   noteSize = sum . map length
 
 -- | Select and render the typed expression when present; only an explicit
@@ -581,12 +723,7 @@ synthesizeTunedWithProvidersDetailed engine steps limits checked providers extra
   EngineExference -> do
     prepared <- prepareSynthesis exferenceRecursiveProjection
       providers extras engineFrag fitFrag
-    outcome <- exferenceRun steps
-      (preparedRenderExpression prepared)
-      (preparedRenderTermGraph prepared)
-      (preparedSearchGoal prepared)
-      (preparedDeclarations prepared)
-      (preparedProviderAssignments prepared)
+    outcome <- exferenceRun steps prepared
     pure (withoutCheckedDetailedCandidates checked outcome)
   EngineBoth -> do
     djinnPrepared <- prepareSynthesis djinnRecursiveProjection
@@ -600,12 +737,7 @@ synthesizeTunedWithProvidersDetailed engine steps limits checked providers extra
     let djinn = detailUnobservedOutcome djinnCompatibility
     exferencePrepared <- prepareSynthesis exferenceRecursiveProjection
       providers extras engineFrag fitFrag
-    exference <- exferenceRun steps
-      (preparedRenderExpression exferencePrepared)
-      (preparedRenderTermGraph exferencePrepared)
-      (preparedSearchGoal exferencePrepared)
-      (preparedDeclarations exferencePrepared)
-      (preparedProviderAssignments exferencePrepared)
+    exference <- exferenceRun steps exferencePrepared
     pure (mergeDetailedOutcomesSkipping checked djinn exference)
 
 -- | Prepare one engine-specific translation without erasing which goal came
@@ -663,7 +795,9 @@ prepareSynthesis recursiveProjection activeProviders extras engineFrag fitFrag =
           (translationTypeMap translation)
           renderPremiseLayout fitFrag graph
   pure PreparedSynthesis
-    { preparedSourceGoal = sourceGoal
+    { preparedEngineFragment = engineFrag
+    , preparedFitFragment = fitFrag
+    , preparedSourceGoal = sourceGoal
     , preparedSearchGoal = searchGoal
     , preparedDeclarations =
         translationDeclarations translation
@@ -753,15 +887,16 @@ djinnRun (cutoff, budget) frag projection render goal decls instantiations = do
 -- Exference's own ranking; there is never negative evidence.
 exferenceRun
   :: Int
-  -> (Expression String -> Either String [String])
-  -> (TermGraph ExferenceType ExferenceLocal -> Either String [String])
-  -> Type String
-  -> [DjinnDecl]
-  -> [KindedProviderInstantiationAssignment String]
+  -> PreparedSynthesis
   -> Either String DetailedSynthOutcome
-exferenceRun steps render renderGraph goal decls instantiations = do
+exferenceRun steps prepared = do
   standard <- viaDiagnostic standardDjinnSession
-  let allDecls =
+  let render = preparedRenderExpression prepared
+      renderGraph = preparedRenderTermGraph prepared
+      goal = preparedSearchGoal prepared
+      decls = preparedDeclarations prepared
+      instantiations = preparedProviderAssignments prepared
+      allDecls =
         environmentDeclarations (djinnSessionEnvironment standard)
           ++ decls
       names = nub
@@ -802,6 +937,8 @@ exferenceRun steps render renderGraph goal decls instantiations = do
           [Penalty (fromIntegral rank * 20) | rank <- [0 :: Int ..]])
       policy = defaultExferenceSessionPolicy
         { exferenceRatingOverrides = providerRatings }
+      convertedSourceGoal = fmap convert $ preparedSourceGoal prepared
+      semanticOrigin = preparedSemanticOrigin prepared
   environment <- viaShow (mkEnvironment convertedDecls)
   session <- viaDiagnostic
     (mkExferenceSessionWithPolicy policy environment)
@@ -823,6 +960,16 @@ exferenceRun steps render renderGraph goal decls instantiations = do
                   }
               }
         request <- viaDiagnostic (mkExferenceRequest query)
+        let authority = ExferenceRunAuthority
+              { exferenceAuthorityPreparation = semanticOrigin
+              , exferenceAuthorityNameTable = table
+              , exferenceAuthorityConvertedSourceGoal = convertedSourceGoal
+              , exferenceAuthorityPolicy = policy
+              , exferenceAuthoritySession = session
+              , exferenceAuthorityRequest = request
+              , exferenceAuthorityProviderAssignments =
+                  convertedInstantiations
+              }
         results <- viaDiagnostic
           (runExferenceTypedQueryWithKindedInstantiationAssignments session
             convertedInstantiations request)
@@ -833,10 +980,10 @@ exferenceRun steps render renderGraph goal decls instantiations = do
             -- search histories may converge on the same rendered term, and
             -- repetitions must not crowd later distinct candidates out of a
             -- bounded interactive response.
-            inventory = exferenceSessionInventory session
             groups = takeDistinctOn detailedCandidateGroupVariants
               candidateWindow
-              [ DetailedCandidateGroup route group sidecar
+              [ DetailedCandidateGroup route
+                  (indexDetailedCandidateVariants group) sidecar
               | candidate <- selectionCandidates selection
               , let availability = typedCandidateTermGraph candidate
                     compatibility = typedCandidateCompatibility candidate
@@ -846,7 +993,7 @@ exferenceRun steps render renderGraph goal decls instantiations = do
                       renderGraph render availability compatibility fallback
                     sidecar = case availability of
                       Right graph -> Just $ TypedCandidateSemanticSidecar
-                        candidate inventory
+                        candidate authority
                         (fingerprintSharedTermGraph
                           defaultTermGraphLimits
                           defaultTermGraphFingerprintByteLimit
@@ -942,7 +1089,7 @@ mergeDetailedCandidateGroups = djinnHead (synthMaxShown - 1) Set.empty
   nextFresh _ [] = Nothing
   nextFresh seen (group : groups) =
     let (fresh, seen') =
-          retainFresh seen (detailedCandidateGroupVariants group)
+          retainFresh seen (detailedCandidateGroupVariantRecords group)
     in if null fresh
       then nextFresh seen' groups
       else Just
@@ -954,12 +1101,14 @@ mergeDetailedCandidateGroups = djinnHead (synthMaxShown - 1) Set.empty
   retainFresh seen = go seen
    where
     go retained [] = ([], retained)
-    go retained (spelling : spellings)
-      | spelling `Set.member` retained = go retained spellings
+    go retained (variant : variants)
+      | spelling `Set.member` retained = go retained variants
       | otherwise =
           let (fresh, retained') =
-                go (Set.insert spelling retained) spellings
-          in (spelling : fresh, retained')
+                go (Set.insert spelling retained) variants
+          in (variant : fresh, retained')
+     where
+      spelling = detailedCandidateVariantText variant
 
 -- | Both engines on one goal: merge their real candidates through the fair
 -- frontier above, and return negative evidence only when neither engine
@@ -1056,8 +1205,9 @@ withoutCheckedDetailedCandidates checked outcome = case outcome of
   freshGroups = filter (not . null . detailedCandidateGroupVariants)
     . map retainFresh
   retainFresh group = retainDetailedCandidateGroupVariants
-    (filter (`Set.notMember` checked)
-      (detailedCandidateGroupVariants group))
+    (filter
+      ((`Set.notMember` checked) . detailedCandidateVariantText)
+      (detailedCandidateGroupVariantRecords group))
     group
 
 viaDiagnostic :: Either Diagnostic a -> Either String a
@@ -1174,6 +1324,7 @@ data PremiseLayout = PremiseLayout
   , premiseLayoutSourceArrowCount :: Int
   , premiseLayoutCallerPremises :: [TranslatedPremise]
   }
+  deriving (Eq, Show)
 
 premiseLayoutForRenderer
   :: PremiseLayout
@@ -1191,7 +1342,9 @@ premiseLayoutForRenderer layout =
 -- separate, and every declaration/map/premise projection used by either
 -- backend is retained under a named field instead of tuple position.
 data PreparedSynthesis = PreparedSynthesis
-  { preparedSourceGoal :: Type String
+  { preparedEngineFragment :: Frag
+  , preparedFitFragment :: Frag
+  , preparedSourceGoal :: Type String
   , preparedSearchGoal :: Type String
   , preparedDeclarations :: [DjinnDecl]
   , preparedProviderBindings :: [ProviderBinding]
@@ -1206,6 +1359,44 @@ data PreparedSynthesis = PreparedSynthesis
       Expression String -> Either String [String]
   , preparedRenderTermGraph ::
       TermGraph ExferenceType ExferenceLocal -> Either String [String]
+  }
+
+-- | Pure, comparable preparation authority retained after renderer functions
+-- have served their output-only role. Both source fragments remain explicit:
+-- equality of engine and fitting targets is a future semantic precondition,
+-- never something reconstructed from their translated goals.
+data PreparedSemanticOrigin = PreparedSemanticOrigin
+  { semanticOriginEngineFragment :: Frag
+  , semanticOriginFitFragment :: Frag
+  , semanticOriginSourceGoal :: Type String
+  , semanticOriginSearchGoal :: Type String
+  , semanticOriginDeclarations :: [DjinnDecl]
+  , semanticOriginProviderBindings :: [ProviderBinding]
+  , semanticOriginProviderAssignments ::
+      [KindedProviderInstantiationAssignment String]
+  , semanticOriginConstructorMap :: CtorMap
+  , semanticOriginProviderMap :: ProviderMap
+  , semanticOriginTypeMap :: TypeMap
+  , semanticOriginPremiseLayout :: PremiseLayout
+  , semanticOriginProjectionCompleteness :: ProjectionCompleteness
+  }
+  deriving (Eq, Show)
+
+preparedSemanticOrigin :: PreparedSynthesis -> PreparedSemanticOrigin
+preparedSemanticOrigin prepared = PreparedSemanticOrigin
+  { semanticOriginEngineFragment = preparedEngineFragment prepared
+  , semanticOriginFitFragment = preparedFitFragment prepared
+  , semanticOriginSourceGoal = preparedSourceGoal prepared
+  , semanticOriginSearchGoal = preparedSearchGoal prepared
+  , semanticOriginDeclarations = preparedDeclarations prepared
+  , semanticOriginProviderBindings = preparedProviderBindings prepared
+  , semanticOriginProviderAssignments = preparedProviderAssignments prepared
+  , semanticOriginConstructorMap = preparedConstructorMap prepared
+  , semanticOriginProviderMap = preparedProviderMap prepared
+  , semanticOriginTypeMap = preparedTypeMap prepared
+  , semanticOriginPremiseLayout = preparedPremiseLayout prepared
+  , semanticOriginProjectionCompleteness =
+      preparedProjectionCompleteness prepared
   }
 
 -- | Comparable provider-binding projection exported only for focused boundary
@@ -1224,18 +1415,38 @@ data ProviderBindingInspection = ProviderBindingInspection
 -- tuple wiring mistakes. Leant has no public library surface; this projection
 -- exists for its executable boundary tests.
 data PreparedSynthesisInspection = PreparedSynthesisInspection
-  { inspectedSourceGoal :: Type String
+  { inspectedEngineFragment :: Frag
+  , inspectedFitFragment :: Frag
+  , inspectedSourceGoal :: Type String
   , inspectedSearchGoal :: Type String
+  , inspectedDeclarations :: [DjinnDecl]
   , inspectedProviderBindings :: [ProviderBindingInspection]
   , inspectedAllProviderAssignments ::
       [KindedProviderInstantiationAssignment String]
+  , inspectedConstructorMap :: CtorMap
   , inspectedConstructorPrivateNames :: [String]
   , inspectedProviderMap :: ProviderMap
   , inspectedTypeMap :: TypeMap
   , inspectedConstructorPremises :: [TranslatedPremise]
+  , inspectedSourceArrowCount :: Int
   , inspectedCallerPremises :: [TranslatedPremise]
   , inspectedFamiliesComplete :: Bool
   , inspectedFragmentsComplete :: Bool
+  }
+  deriving (Eq, Show)
+
+-- | Comparable projection of one exact Exference lane. The opaque session is
+-- intentionally absent from this view but remains owned by the sidecar.
+data ExferenceRunAuthorityInspection = ExferenceRunAuthorityInspection
+  { inspectedAuthorityPreparation :: PreparedSynthesisInspection
+  , inspectedAuthorityNameTable :: Map.Map String ExferenceLocal
+  , inspectedAuthorityConvertedSourceGoal :: ExferenceType
+  , inspectedAuthorityPolicy :: ExferenceSessionPolicy
+  , inspectedAuthorityRequest ::
+      QueryRequest ExferenceType ExferenceOptions
+  , inspectedAuthorityProviderAssignments ::
+      [KindedProviderInstantiationAssignment ExferenceTypeVariable]
+  , inspectedAuthorityInventory :: ExferenceInventory
   }
   deriving (Eq, Show)
 
@@ -1250,25 +1461,53 @@ inspectExferencePreparation
 inspectExferencePreparation providers extras engineFrag fitFrag = do
   prepared <- prepareSynthesis exferenceRecursiveProjection
     providers extras engineFrag fitFrag
-  let projection = preparedProjectionCompleteness prepared
-  pure PreparedSynthesisInspection
-    { inspectedSourceGoal = preparedSourceGoal prepared
-    , inspectedSearchGoal = preparedSearchGoal prepared
-    , inspectedProviderBindings = map inspectBinding
-        $ preparedProviderBindings prepared
-    , inspectedAllProviderAssignments = preparedProviderAssignments prepared
-    , inspectedConstructorPrivateNames = Map.keys
-        $ preparedConstructorMap prepared
-    , inspectedProviderMap = preparedProviderMap prepared
-    , inspectedTypeMap = preparedTypeMap prepared
-    , inspectedConstructorPremises =
-        premiseLayoutConstructorPremises $ preparedPremiseLayout prepared
-    , inspectedCallerPremises =
-        premiseLayoutCallerPremises $ preparedPremiseLayout prepared
-    , inspectedFamiliesComplete = projectionFamiliesComplete projection
-    , inspectedFragmentsComplete = projectionFragmentsComplete projection
-    }
+  pure $ inspectPreparedSemanticOrigin $ preparedSemanticOrigin prepared
+
+inspectExferenceRunAuthority
+  :: ExferenceRunAuthority
+  -> ExferenceRunAuthorityInspection
+inspectExferenceRunAuthority authority = ExferenceRunAuthorityInspection
+  { inspectedAuthorityPreparation = inspectPreparedSemanticOrigin
+      $ exferenceAuthorityPreparation authority
+  , inspectedAuthorityNameTable = exferenceAuthorityNameTable authority
+  , inspectedAuthorityConvertedSourceGoal =
+      exferenceAuthorityConvertedSourceGoal authority
+  , inspectedAuthorityPolicy = exferenceAuthorityPolicy authority
+  , inspectedAuthorityRequest = exferenceRequestQuery
+      $ exferenceAuthorityRequest authority
+  , inspectedAuthorityProviderAssignments =
+      exferenceAuthorityProviderAssignments authority
+  , inspectedAuthorityInventory = exferenceSessionInventory
+      $ exferenceAuthoritySession authority
+  }
+
+inspectPreparedSemanticOrigin
+  :: PreparedSemanticOrigin
+  -> PreparedSynthesisInspection
+inspectPreparedSemanticOrigin origin = PreparedSynthesisInspection
+  { inspectedEngineFragment = semanticOriginEngineFragment origin
+  , inspectedFitFragment = semanticOriginFitFragment origin
+  , inspectedSourceGoal = semanticOriginSourceGoal origin
+  , inspectedSearchGoal = semanticOriginSearchGoal origin
+  , inspectedDeclarations = semanticOriginDeclarations origin
+  , inspectedProviderBindings = map inspectBinding
+      $ semanticOriginProviderBindings origin
+  , inspectedAllProviderAssignments =
+      semanticOriginProviderAssignments origin
+  , inspectedConstructorMap = semanticOriginConstructorMap origin
+  , inspectedConstructorPrivateNames = Map.keys
+      $ semanticOriginConstructorMap origin
+  , inspectedProviderMap = semanticOriginProviderMap origin
+  , inspectedTypeMap = semanticOriginTypeMap origin
+  , inspectedConstructorPremises = premiseLayoutConstructorPremises layout
+  , inspectedSourceArrowCount = premiseLayoutSourceArrowCount layout
+  , inspectedCallerPremises = premiseLayoutCallerPremises layout
+  , inspectedFamiliesComplete = projectionFamiliesComplete projection
+  , inspectedFragmentsComplete = projectionFragmentsComplete projection
+  }
  where
+  layout = semanticOriginPremiseLayout origin
+  projection = semanticOriginProjectionCompleteness origin
   inspectBinding binding = ProviderBindingInspection
     { inspectedProviderSourceName = providerLeanName
         $ providerBindingSource binding
@@ -1594,6 +1833,7 @@ data ProjectionCompleteness = ProjectionCompleteness
     -- ^ engine goal and caller premises contain neither unsafe atoms nor
     -- depth truncation; the fitting fragment is checked separately at verdict
   }
+  deriving (Eq, Show)
 
 newtype Trans a = Trans
   { runTrans :: TransState -> Either String (a, TransState) }

@@ -25,13 +25,17 @@ import Test.Tasty.HUnit ((@?=), assertBool, assertFailure, testCase)
 import Language.Haskell.Djex
   ( Boxity (Boxed)
   , Constraint (..)
+  , ExferenceOptions (..)
+  , ExferenceSessionPolicy (..)
   , Expression
       ( Apply, Case, Global, Lambda, Let, Local, Tuple
       , VisibleTypeApplication
       )
   , Pattern (Bind, Constructor, TuplePattern, Wildcard)
   , KindedProviderInstantiationAssignment (..)
+  , QueryRequest (..)
   , Type (..)
+  , Variable (FlexibleVariable)
   , inferredVisibleTypeArgument
   , maximumProviderInstantiationArguments
   , maximumProviderInstantiationKindNodes
@@ -46,6 +50,7 @@ import Language.Haskell.Djex
 import Leant.Backend (findBackendProject)
 import Leant.Synth.Engine
   ( DetailedSynthOutcome (..)
+  , ExferenceRunAuthorityInspection (..)
   , PreparedSynthesisInspection (..)
   , ProviderBindingInspection (..)
   , SynthEngine (..)
@@ -55,6 +60,11 @@ import Leant.Synth.Engine
   , detailedCandidateGroupRoute
   , detailedCandidateGroupSemanticSidecar
   , detailedCandidateGroupVariants
+  , detailedCandidateGroupVerificationVariants
+  , detailedVerificationVariantOrdinal
+  , detailedVerificationVariantRoute
+  , detailedVerificationVariantSemanticSidecar
+  , detailedVerificationVariantText
   , forceDetailedOutcome
   , inspectExferencePreparation
   , mapDetailedCandidateGroupVariantsDroppingSemanticSidecar
@@ -65,17 +75,20 @@ import Leant.Synth.Engine
   , mergeOutcomesSkipping
   , providerStages
   , synthEngineName
+  , candidateWindow
   , synthMaxShown
   , synthMaxTried
   , synthVerificationWindow
   , synthesizeWith
   , synthesizeWithProviders
   , synthesizeWithProvidersSkippingDetailed
+  , synthesizeTunedDetailed
   , projectDetailedSynthOutcome
   , renderCandidateByAvailability
   , takeDistinct
   , takeDistinctOn
   , typedCandidateSemanticCandidate
+  , typedCandidateSemanticAuthorityInspection
   , typedCandidateSemanticFingerprint
   , typedCandidateSemanticInventory
   , withoutCheckedCandidates
@@ -605,6 +618,35 @@ verificationObservabilityTests = testGroup "verification observability"
       verifiedCandidates one @?= ["accepted"]
       observationCount LeanVariantAttempted
         (verificationObservations one) @?= 1
+  , testCase "keep indexed verification provenance lazy at both quotas" $ do
+      zero <- verifyCandidateGroups 0
+        (\_ -> assertFailure "zero quota attempted an indexed variant"
+          >> pure VariantAccepted)
+        (map detailedCandidateGroupVerificationVariants
+          (error "zero quota forced the detailed group list"))
+      verifiedCandidates zero @?= []
+      verificationObservations zero @?= noObservations
+      let group = detailedCandidateGroup RouteTypedCandidate
+            ("accepted" : error "accepted group forced its spelling tail")
+          variants = detailedCandidateGroupVerificationVariants group
+      one <- verifyCandidateGroups 1
+        (\variant -> pure $
+          if detailedVerificationVariantText variant == "accepted"
+            then VariantAccepted
+            else VariantRejected LeanErrorDiagnostic)
+        (variants : error "success quota forced the detailed group tail")
+      case verifiedCandidates one of
+        [accepted] -> do
+          detailedVerificationVariantText accepted @?= "accepted"
+          detailedVerificationVariantOrdinal accepted @?= 0
+          detailedVerificationVariantRoute accepted @?= RouteTypedCandidate
+          assertBool "a synthetic group acquired semantic authority"
+            (isNothing
+              $ detailedVerificationVariantSemanticSidecar accepted)
+        accepted -> assertFailure $
+          "unexpected indexed verification result: " ++ show accepted
+      observationCount LeanVariantAttempted
+        (verificationObservations one) @?= 1
   ]
 
 replayPlanTests :: TestTree
@@ -697,6 +739,8 @@ translationPreparationTests = testGroup "prepared synthesis translation"
       let token = FAtom False "Demo.Token"
       prepared <- expectRight $ inspectExferencePreparation
         [] [("Demo.seed", token)] token token
+      inspectedEngineFragment prepared @?= token
+      inspectedFitFragment prepared @?= token
       let sourceGoal = inspectedSourceGoal prepared
       inspectedSearchGoal prepared @?=
         FunctionType sourceGoal sourceGoal
@@ -705,8 +749,18 @@ translationPreparationTests = testGroup "prepared synthesis translation"
       map translatedPremiseType (inspectedCallerPremises prepared)
         @?= [sourceGoal]
       inspectedConstructorPremises prepared @?= []
+      inspectedSourceArrowCount prepared @?= 0
       inspectedProviderBindings prepared @?= []
       inspectedAllProviderAssignments prepared @?= []
+  , testCase "retain a distinct fitting target outside renderer closures" $ do
+      let engine = FAtom False "Demo.EngineTarget"
+          fit = FAll True "a" (FArr (FVar "a") (FVar "a"))
+      prepared <- expectRight $ inspectExferencePreparation
+        [] [] engine fit
+      inspectedEngineFragment prepared @?= engine
+      inspectedFitFragment prepared @?= fit
+      assertBool "engine and fitting targets collapsed"
+        (inspectedEngineFragment prepared /= inspectedFitFragment prepared)
   , testCase "bind private providers, assignments, and exact family maps" $ do
       privateProvider <- expectRight $ mkIdentifier "leantProvider0"
       privateType <- expectRight $ mkIdentifier "LeantType0"
@@ -1416,6 +1470,146 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
           "expected a typed Exference identity candidate, got: "
             ++ show other
         Left err -> assertFailure err
+  , testCase
+      "retain exact preparation and strict request authority in the sidecar" $
+      do
+        let token = FAtom False "Demo.AuthorityToken"
+            extras = [("Demo.seed", token)]
+        expected <- expectRight $ inspectExferencePreparation
+          [] extras token token
+        detailed <- expectRight $ synthesizeTunedDetailed
+          EngineExference 128 (candidateWindow, Nothing)
+          extras token token
+        case detailed of
+          DetailedSynthCandidates groups _ ->
+            case
+              [ semantic
+              | group <- groups
+              , Just semantic <-
+                  [detailedCandidateGroupSemanticSidecar group]
+              ] of
+              semantic : _ -> do
+                let authority =
+                      typedCandidateSemanticAuthorityInspection semantic
+                    table = inspectedAuthorityNameTable authority
+                    convert variable = FlexibleVariable (table Map.! variable)
+                    request = inspectedAuthorityRequest authority
+                    options = requestOptions request
+                inspectedAuthorityPreparation authority @?= expected
+                inspectedAuthorityInventory authority @?=
+                  typedCandidateSemanticInventory semantic
+                inspectedAuthorityConvertedSourceGoal authority @?=
+                  fmap convert (inspectedSourceGoal expected)
+                requestGoal request @?=
+                  fmap convert (inspectedSearchGoal expected)
+                assertBool
+                  "the premise-extended request collapsed to the source goal"
+                  (requestGoal request
+                    /= inspectedAuthorityConvertedSourceGoal authority)
+                requestContexts request @?= []
+                exferenceAllowUnused options @?= False
+                exferenceMaximumSteps options @?= 128
+                exferenceMultiConstructorPatterns options @?= True
+                exferenceMaximumQueueSize options @?= Just 1024
+                inspectedAuthorityProviderAssignments authority @?= []
+              [] -> assertFailure $
+                "expected a typed sidecar for the premise-backed candidate: "
+                  ++ show groups
+          other -> assertFailure $
+            "expected premise-backed candidates, got: " ++ show other
+  , testCase
+      "retain provider authority and the accepted original spelling ordinal" $
+      do
+        privateProvider <- expectRight $ mkIdentifier "leantProvider0"
+        let void = FParamInd "Demo.Void" "Demo.Void" [] []
+            polytype = FAll True "p" (FArr (FVar "p") (FVar "p"))
+            provider = ProviderFragWithEvidence "Demo.impossible"
+              (FAll False "a" void) ["a"]
+                [[ProviderInstantiationArgument 0 polytype]]
+        expected <- expectRight $ inspectExferencePreparation
+          [provider] [] void void
+        detailed <- expectRight $
+          synthesizeWithProvidersSkippingDetailed
+            EngineExference 128 Set.empty [provider] void
+        case detailed of
+          DetailedSynthCandidates groups _ ->
+            case
+              [ (group, semantic)
+              | group <- groups
+              , length (detailedCandidateGroupVariants group) >= 2
+              , Just semantic <-
+                  [detailedCandidateGroupSemanticSidecar group]
+              ] of
+              (origin, semantic) : _ -> do
+                let authority =
+                      typedCandidateSemanticAuthorityInspection semantic
+                inspectedAuthorityPreparation authority @?= expected
+                case inspectedProviderBindings expected of
+                  [binding] -> do
+                    inspectedProviderSourceName binding @?= "Demo.impossible"
+                    inspectedProviderPrivateName binding @?= privateProvider
+                    length (inspectedProviderAssignments binding) @?= 1
+                  bindings -> assertFailure $
+                    "expected one retained provider binding, got: "
+                      ++ show bindings
+                case inspectedAuthorityProviderAssignments authority of
+                  [assignment] -> do
+                    kindedProviderInstantiationAssignmentProvider assignment
+                      @?= privateProvider
+                    length
+                        (kindedProviderInstantiationAssignmentArguments
+                          assignment)
+                      @?= 1
+                  assignments -> assertFailure $
+                    "expected one converted provider assignment, got: "
+                      ++ show assignments
+                Map.keys
+                    (exferenceRatingOverrides
+                      $ inspectedAuthorityPolicy authority)
+                  @?= [privateProvider]
+                let variants =
+                      detailedCandidateGroupVerificationVariants origin
+                    verdict variant = pure $ case
+                        detailedVerificationVariantOrdinal variant of
+                      0 -> VariantRejected LeanErrorDiagnostic
+                      1 -> VariantAccepted
+                      ordinal -> error $
+                        "verification forced later renderer ordinal "
+                          ++ show ordinal
+                batch <- verifyCandidateGroups 1 verdict [variants]
+                failedCandidateGroups batch @?= 0
+                observationCount LeanVariantAttempted
+                  (verificationObservations batch) @?= 2
+                case verifiedCandidates batch of
+                  [accepted] -> do
+                    detailedVerificationVariantOrdinal accepted @?= 1
+                    detailedVerificationVariantText accepted @?=
+                      detailedCandidateGroupVariants origin !! 1
+                    detailedVerificationVariantRoute accepted @?=
+                      RouteTypedCandidate
+                    case detailedVerificationVariantSemanticSidecar
+                        accepted of
+                      Just acceptedSemantic -> do
+                        typedCandidateSemanticCandidate acceptedSemantic @?=
+                          typedCandidateSemanticCandidate semantic
+                        typedCandidateSemanticInventory acceptedSemantic @?=
+                          typedCandidateSemanticInventory semantic
+                        typedCandidateSemanticAuthorityInspection
+                            acceptedSemantic
+                          @?= authority
+                      Nothing -> assertFailure
+                        "accepted renderer variant lost its typed sidecar"
+                    assertBool
+                      "verification display exposed opaque run authority"
+                      (not $ "ExferenceRunAuthority" `isInfixOf` show accepted)
+                  accepted -> assertFailure $
+                    "unexpected accepted renderer variants: "
+                      ++ show accepted
+              [] -> assertFailure $
+                "expected a multi-spelling typed provider group, got: "
+                  ++ show groups
+          other -> assertFailure $
+            "expected provider-backed candidates, got: " ++ show other
   , testCase "use compatibility only for explicit typed graph absence" $ do
       let outer = FAtom False "Demo.Outer"
           goal = FArr outer
@@ -1444,6 +1638,32 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                 groups))
         Right other -> assertFailure $
           "expected a fallback Exference candidate, got: " ++ show other
+        Left err -> assertFailure err
+  , testCase "keep relaxed unused-binder candidates fail-closed" $ do
+      let left = FAtom False "Demo.RelaxedLeft"
+          right = FAtom False "Demo.RelaxedRight"
+          goal = FArr left (FArr right left)
+      case synthesizeWithProvidersSkippingDetailed
+          EngineExference 128 Set.empty [] goal of
+        Right (DetailedSynthCandidates groups _) -> do
+          assertBool
+            ("expected a relaxed wildcard rendering, got: " ++ show groups)
+            (any
+              (any ("_" `isInfixOf`) . detailedCandidateGroupVariants)
+              groups)
+          assertBool
+            "a relaxed compatibility projection claimed typed authority"
+            (all
+              (isNothing . detailedCandidateGroupSemanticSidecar)
+              groups)
+          assertBool
+            "a relaxed compatibility projection claimed the typed route"
+            (all
+              ((== RouteLegacyCandidateFallback)
+                . detailedCandidateGroupRoute)
+              groups)
+        Right other -> assertFailure $
+          "expected a relaxed candidate, got: " ++ show other
         Left err -> assertFailure err
   , testCase "never retry a failed typed rendering through compatibility" $ do
       let rendered = renderCandidateByAvailability
@@ -1511,6 +1731,11 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
           [["shared", "fallback-alt"]]
       map detailedCandidateGroupRoute merged @?=
         [RouteTypedCandidate, RouteLegacyCandidateFallback]
+      map
+          (map detailedVerificationVariantOrdinal
+            . detailedCandidateGroupVerificationVariants)
+          merged
+        @?= [[0], [1]]
       takeDistinctOn detailedCandidateGroupVariants 2
           [ fallback
           , detailedCandidateGroup RouteTypedCandidate ["shared", "fallback-alt"]
@@ -1578,6 +1803,10 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
             @?= detailedCandidateGroupRoute origin
           detailedCandidateGroupVariants wrapped
             @?= map wrap (detailedCandidateGroupVariants origin)
+          map detailedVerificationVariantOrdinal
+              (detailedCandidateGroupVerificationVariants wrapped)
+            @?= map detailedVerificationVariantOrdinal
+              (detailedCandidateGroupVerificationVariants origin)
           assertBool
             "Classical.byContradiction retained stale typed semantics"
             (isNothing $ detailedCandidateGroupSemanticSidecar wrapped)
@@ -1586,21 +1815,29 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
         Left err -> assertFailure err
   , testCase "filter routes as sidecars and preserve old merge projection" $ do
       let checked = Set.singleton "old"
-          typed = detailedCandidateGroup RouteTypedCandidate ["old", "fresh"]
+          typed = detailedCandidateGroup RouteTypedCandidate
+            ["old", "fresh", "later"]
           fallback = detailedCandidateGroup
             RouteLegacyCandidateFallback ["fallback"]
           filtered = withoutCheckedDetailedCandidates checked
             (DetailedSynthCandidates [typed] ["ranked"])
-      filtered @?= DetailedSynthCandidates
-        [detailedCandidateGroup RouteTypedCandidate ["fresh"]] ["ranked"]
       projectDetailedSynthOutcome filtered @?=
         withoutCheckedCandidates checked
-          (SynthCandidates [["old", "fresh"]] ["ranked"])
+          (SynthCandidates [["old", "fresh", "later"]] ["ranked"])
+      case filtered of
+        DetailedSynthCandidates [survivor] notes -> do
+          detailedCandidateGroupVariants survivor @?= ["fresh", "later"]
+          map detailedVerificationVariantOrdinal
+              (detailedCandidateGroupVerificationVariants survivor)
+            @?= [1, 2]
+          notes @?= ["ranked"]
+        other -> assertFailure $
+          "unexpected filtered ordinal outcome: " ++ show other
       let detailedMerged = mergeDetailedOutcomesSkipping checked
             (DetailedSynthCandidates [typed] ["smallest"])
             (DetailedSynthCandidates [fallback] ["rated"])
           compatibilityMerged = mergeOutcomesSkipping checked
-            (SynthCandidates [["old", "fresh"]] ["smallest"])
+            (SynthCandidates [["old", "fresh", "later"]] ["smallest"])
             (SynthCandidates [["fallback"]] ["rated"])
       projectDetailedSynthOutcome detailedMerged @?= compatibilityMerged
       case detailedMerged of

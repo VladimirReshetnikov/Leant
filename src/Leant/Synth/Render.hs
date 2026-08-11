@@ -107,6 +107,7 @@ data CtorInfo = CtorInfo
     -- ^ exact family head and private fragment formals when 'ciFields' is a
     -- generic family schema rather than an occurrence-specialized inventory
   }
+  deriving (Eq, Show)
 
 -- | Engine-side constructor spellings of the declared datatypes.
 type CtorMap = Map.Map String CtorInfo
