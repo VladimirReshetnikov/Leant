@@ -308,6 +308,23 @@ foundation yet; no executable path, contract, or policy is inferred. The
 checkpoint is detailed in the
 [live Length ranking foundation report](docs/reports/2026-08-11-live-length-ranking-foundation.md).
 
+`Leant.Synth.Length.Configuration` now seals that still-unwired call boundary
+without choosing any policy for the user. Its raw source explicitly carries
+execution admission limits, the complete execution source (absolute Z3 path,
+optional SHA-256 expectation, solver/host budgets, artifact policy, and response
+limits), replay-limit source, and `LeanLengthContract`. Execution validation
+precedes replay-limit validation; the contract remains candidate-specific and
+is checked only during the later full preparation pass. The resulting value is
+opaque, has no path or pin projection, and retains no worker. Its configured
+runner is equivalent to passing the validated execution/replay inputs and
+retained contract assertion directly to the ranking foundation, with lifecycle
+and per-query budgets still separate. There are no
+defaults, executable discovery, path normalization, environment reads, or
+Main/REPL activation. The digest is only an optional expectation for Djex's
+pre-spawn executable-file observation, not attestation of the image ultimately
+executed. See the
+[explicit live Length ranking configuration report](docs/reports/2026-08-11-explicit-live-length-ranking-configuration.md).
+
 Three rules run through the design:
 
 - **The engine is never trusted.** Every candidate is re-elaborated by
