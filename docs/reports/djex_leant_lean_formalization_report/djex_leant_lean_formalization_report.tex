@@ -1,0 +1,2764 @@
+\documentclass[11pt,letterpaper,openany]{report}
+
+\usepackage[letterpaper,margin=0.86in,headheight=15pt]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath,amssymb,mathtools,amsthm}
+\usepackage{array,booktabs,longtable,tabularx,multirow}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{upquote}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage[capitalise,noabbrev]{cleveref}
+\usepackage{fancyhdr}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,fit,calc,backgrounds}
+\usepackage{ragged2e}
+\usepackage{needspace}
+\usepackage{etoolbox}
+
+\definecolor{Ink}{HTML}{20252B}
+\definecolor{Slate}{HTML}{4C5967}
+\definecolor{Accent}{HTML}{315E7D}
+\definecolor{AccentLight}{HTML}{EAF1F5}
+\definecolor{Green}{HTML}{376B52}
+\definecolor{GreenLight}{HTML}{EAF3EE}
+\definecolor{Amber}{HTML}{8B6423}
+\definecolor{AmberLight}{HTML}{F8F1E3}
+\definecolor{Red}{HTML}{8B3A3A}
+\definecolor{RedLight}{HTML}{F8EAEA}
+\definecolor{CodeBg}{HTML}{F6F7F8}
+\definecolor{RuleGray}{HTML}{D7DCE0}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=Accent,
+  citecolor=Green,
+  urlcolor=Accent,
+  pdfauthor={OpenAI},
+  pdftitle={Machine-Checked Correctness for Djex and Leant},
+  pdfsubject={Lean 4 formalization feasibility study and proof architecture},
+  pdfkeywords={Djex, Djinn, Exference, Leant, Lean 4, formal verification, LJT, G4ip, synthesis}
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\nouppercase{\leftmark}}
+\fancyhead[R]{\small Djex/Leant correctness in Lean 4}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.35pt}
+\renewcommand{\footrulewidth}{0pt}
+\fancypagestyle{plain}{%
+  \fancyhf{}
+  \fancyfoot[C]{\thepage}
+  \renewcommand{\headrulewidth}{0pt}
+}
+
+\setcounter{tocdepth}{2}
+\setcounter{secnumdepth}{3}
+\setlist[itemize]{leftmargin=1.45em,itemsep=0.22em,topsep=0.35em}
+\setlist[enumerate]{leftmargin=1.75em,itemsep=0.25em,topsep=0.35em}
+\renewcommand{\arraystretch}{1.18}
+\setlength{\emergencystretch}{3em}
+\newcolumntype{Y}{>{\RaggedRight\arraybackslash}X}
+\newcolumntype{L}[1]{>{\RaggedRight\arraybackslash}p{#1}}
+
+\lstdefinelanguage{LeanFour}{
+  morekeywords={namespace,end,inductive,structure,def,theorem,lemma,where,match,with,if,then,else,let,in,fun,forall,Prop,Type,Sort,variable,deriving,instance,class,private,public,partial,unsafe,opaque,axiom,example,by,have,show,from,return,do},
+  sensitive=true,
+  morecomment=[l]{--},
+  morecomment=[s]{/-}{-/},
+  morestring=[b]"
+}
+\lstdefinelanguage{HaskellLite}{
+  morekeywords={data,type,newtype,class,instance,where,deriving,module,import,qualified,as,case,of,let,in,do,if,then,else,otherwise,forall},
+  sensitive=true,
+  morecomment=[l]{--},
+  morecomment=[s]{\{-}{-\}},
+  morestring=[b]"
+}
+\lstset{
+  basicstyle=\ttfamily\small,
+  keywordstyle=\bfseries\color{Accent},
+  commentstyle=\itshape\color{Slate},
+  stringstyle=\color{Green},
+  backgroundcolor=\color{CodeBg},
+  frame=single,
+  rulecolor=\color{RuleGray},
+  framerule=0.35pt,
+  breaklines=true,
+  breakatwhitespace=false,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false,
+  tabsize=2,
+  xleftmargin=0.35em,
+  xrightmargin=0.35em,
+  aboveskip=0.7em,
+  belowskip=0.7em
+}
+
+\newtheorem{theorem}{Theorem}[chapter]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{obligation}[theorem]{Proof obligation}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+\newcommand{\Djex}{\textsc{Djex}}
+\newcommand{\Djinn}{\textsc{Djinn}}
+\newcommand{\Exference}{\textsc{Exference}}
+\newcommand{\Leant}{\textsc{Leant}}
+\newcommand{\Lean}{\textsc{Lean 4}}
+\newcommand{\IPC}{\textsc{IPC}}
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\yes}{\textcolor{Green}{\textbf{yes}}}
+\newcommand{\partialyes}{\textcolor{Amber}{\textbf{partial}}}
+\newcommand{\no}{\textcolor{Red}{\textbf{no}}}
+\newcommand{\strong}{\textcolor{Green}{\textbf{strong}}}
+\newcommand{\medium}{\textcolor{Amber}{\textbf{medium}}}
+\newcommand{\weak}{\textcolor{Red}{\textbf{weak}}}
+\newcommand{\commit}[1]{\texttt{\small #1}}
+\newcommand{\claim}[1]{\par\medskip\noindent\colorbox{AccentLight}{\parbox{\dimexpr\linewidth-2\fboxsep\relax}{\textbf{#1}}}\par\medskip}
+\newcommand{\warningbox}[1]{\par\medskip\noindent\colorbox{AmberLight}{\parbox{\dimexpr\linewidth-2\fboxsep\relax}{\textbf{Scope warning.} #1}}\par\medskip}
+\newcommand{\findingbox}[1]{\par\medskip\noindent\colorbox{GreenLight}{\parbox{\dimexpr\linewidth-2\fboxsep\relax}{\textbf{Finding.} #1}}\par\medskip}
+\newcommand{\riskbox}[1]{\par\medskip\noindent\colorbox{RedLight}{\parbox{\dimexpr\linewidth-2\fboxsep\relax}{\textbf{Risk.} #1}}\par\medskip}
+
+\begin{document}
+\hypersetup{pageanchor=false}
+\pagenumbering{gobble}
+
+\begin{titlepage}
+\centering
+\vspace*{1.0in}
+{\Huge\bfseries\color{Ink} Machine-Checked Correctness for \Djex\ and \Leant\par}
+\vspace{0.32in}
+{\LARGE\color{Accent} A Lean 4 formalization feasibility study, proof decomposition, and certification architecture\par}
+\vspace{0.72in}
+\begin{minipage}{0.84\textwidth}
+\centering
+\large
+This report examines the current \Djex, \Leant, and \Lean\ implementations; identifies correctness claims that can be stated precisely; separates easy positive guarantees from substantially harder negative guarantees; and proposes a staged architecture in which the existing Haskell programs remain fast, untrusted certificate producers while small Lean components check all externally visible claims.
+\end{minipage}
+\vfill
+{\large Prepared for Vladimir Reshetnikov\par}
+\vspace{0.08in}
+{\large 10 August 2026\par}
+\vspace{0.32in}
+{\small Repository revisions are pinned in \cref{sec:scope}.}
+\end{titlepage}
+
+\hypersetup{pageanchor=true}
+\pagenumbering{roman}
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+The most valuable correctness properties of \Djex\ and \Leant\ are formalizable in Lean 4, but they do not form one monolithic theorem. They decompose into at least five layers: well-typedness of generated core terms; soundness and completeness of the \Djinn/LJT decision procedure; honest accounting for bounded \Exference\ search; adequacy of the Lean-to-\Djex\ abstraction; and acceptance of reconstructed terms by a particular Lean kernel and environment.
+
+The positive direction is unusually favorable. A generated candidate need not come with a proof that the synthesizer is correct: it can be treated as hostile input and checked independently. \Djinn\ already has a structurally separate proof checker, \Exference\ already reconstructs and checks candidate types, and \Leant\ already re-elaborates each rendered candidate against the exact target before displaying it. A Lean formalization of the small \Djinn\ proof checker, followed by proof-carrying candidate export and module replay, can therefore produce a strong result without verifying the Haskell search implementation.
+
+The negative direction is fundamentally different. Search exhaustion alone is not a proof that a Lean type has no inhabitant. A sound negative statement requires (i) a formally defined term language or calculus, (ii) a checked certificate that the corresponding sequent is underivable, and (iii) a one-way adequacy theorem saying that every source inhabitant permitted by the advertised scope would induce a derivation in the abstract calculus. Exact equivalence is unnecessary: an over-approximation is sufficient. This observation makes useful partial certification attainable, but it also exposes an important scope boundary. A provider-free \Djinn\ refutation establishes non-inhabitance in the structural calculus; it does not by itself exclude an arbitrary constant already present in the ambient Lean environment, nor does it exclude Haskell bottom.
+
+The recommended near-term architecture is therefore certificate-based. Positive results carry a checked proof term. Negative propositional results carry either a complete LJT refutation DAG or, preferably, a finite Kripke countermodel checked by Lean. \Leant's projection emits proof-carrying abstraction evidence rather than boolean completeness flags. The first fully certified negative fragment should be the pure, closed structural grammar of arrows, products, sums, top, bottom, and opaque parameters, with a precise environment policy. Rank-N instantiation, arbitrary inductive families, type classes, recursive providers, and full ambient-environment non-inhabitance should be added only when their one-way adequacy theorems exist.
+
+\tableofcontents
+\clearpage
+\pagenumbering{arabic}
+
+\chapter{Executive assessment}
+\label{ch:executive}
+
+\section{Bottom line}
+
+\claim{A substantial and useful formalization is feasible. The right first objective is not ``verify all of Djex's Haskell code,'' but ``make every externally visible claim checkable by a small Lean certificate checker.''}
+
+The existing code is already close to the right architectural shape. \Djinn\ separates proof search from proof checking. \Exference\ separates candidate generation from contextual type reconstruction. \Leant\ treats synthesized text as untrusted and asks Lean to elaborate it against the exact goal. These boundaries can be strengthened incrementally rather than replaced.
+
+The work divides sharply by claim strength:
+
+\begin{itemize}
+\item \textbf{Positive candidate correctness} is the easiest and highest-value theorem. It is possible to certify that every displayed term was accepted at the requested type by a kernel-enabled Lean process, and to attach a replayable declaration artifact.
+\item \textbf{Core-calculus correctness} is also tractable. The current \Djinn\ formula and term languages are small enough for a direct deep embedding, executable proof checker, and machine-checked soundness theorem.
+\item \textbf{Propositional negative certificates} are tractable without verifying Haskell search. A finite Kripke countermodel or a complete refutation tree can be checked in Lean and proves meta-level non-derivability.
+\item \textbf{The exact \Djinn\ decision procedure} is formalizable but more involved. The proof must cover the implementation's indexing, pruning, proof-term construction, fairness policy, and explicit budgets, not merely quote the paper theorem for G4ip/LJT.
+\item \textbf{Full Leant negative correctness for arbitrary Lean targets and environments} is a research-scale goal. It requires a formal abstraction theorem for Lean terms, a precise account of permitted global constants, and eventually normalization or parametricity results for richer fragments.
+\item \textbf{Bit-for-bit refinement of the current GHC-compiled Haskell executables} is possible in principle but is a poor first target. Laziness, exceptions, partial functions, finite machine integers, library behavior, and the gap between GHC semantics and a Lean model would dominate the project while adding little immediate assurance beyond certificate checking.
+\end{itemize}
+
+\section{Feasibility matrix}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{L{0.22\textwidth} L{0.31\textwidth} L{0.12\textwidth} Y}
+\toprule
+\textbf{Candidate claim} & \textbf{Precise formal target} & \textbf{Feasibility} & \textbf{Recommended treatment} \\
+\midrule
+Displayed \Leant\ term has the requested type & A fixed-option Lean kernel accepts a declaration whose type is the exact elaborated goal and whose value is the displayed term & \strong & Harden the existing gate; emit and replay a named declaration; record dependencies and toolchain hash \\
+\addlinespace
+\Djinn\ proof checker is sound & Successful executable checking implies a declarative typing derivation in the core calculus & \strong & First Lean package and first theorem \\
+\addlinespace
+\Djinn\ search returns only proofs & Every emitted search term passes the formal checker & \strong & Obtain immediately by certificate checking; separately prove generator refinement later \\
+\addlinespace
+\Djinn\ decides propositional inhabitation & Termination plus soundness and completeness for the exact implemented formula fragment & \medium & Formalize after the checker, using corrected G4ip termination arguments and implementation-specific lemmas \\
+\addlinespace
+Negative IPC verdict is sound & A checked refutation certificate implies no derivation in the formal IPC calculus & \strong & Prefer a verified finite Kripke countermodel; retain refutation DAG as an alternative \\
+\addlinespace
+\Exference\ candidates are well typed & Its contextual checker accepts only terms with the claimed type and solved constraints & \medium & Formalize checker, unifier, and constraint-solver soundness; do not claim complete search \\
+\addlinespace
+\Exference\ completion status is honest & Each status corresponds to a proved operational condition: exhaustion, bound, pruning, or identifier-space exhaustion & \strong & Model finite scheduler and counters; property tests become refinement tests \\
+\addlinespace
+Leant projection is negative-sound & Every permitted Lean inhabitant yields a derivation of the projected sequent & \medium--hard & Start with a small pure structural fragment and proof-carrying projection evidence \\
+\addlinespace
+``No Lean term exists'' in the full live environment & No kernel term using any available declaration has the target type & \weak & Do not use as the first theorem. State a restricted language/environment claim unless a closed environment model is certified \\
+\addlinespace
+Exact GHC executable refines Lean specification & All observable results of compiled Haskell agree with the formal model & \weak & Optional final layer; certificate checking gives much better assurance per unit of formalization \\
+\bottomrule
+\end{tabularx}
+\caption{The proposed correctness claims, ordered by practical attainability rather than by logical strength.}
+\label{tab:feasibility}
+\end{table}
+
+\section{The recommended first end-to-end result}
+
+A small but genuinely strong first milestone is:
+
+\begin{enumerate}
+\item Define the \Djinn\ core formula and proof-term syntax in Lean using de Bruijn indices.
+\item Define a declarative typing relation.
+\item Port the independent proof checker, including unification and constructor metadata checks.
+\item Prove that successful checking yields a typing derivation.
+\item Add a \Djex\ mode that serializes each generated proof term and formula as a certificate.
+\item In CI and optionally at runtime, ask the Lean checker to validate the certificate before rendering the Haskell or Lean term.
+\end{enumerate}
+
+This proves a meaningful theorem about the actual producer/checker boundary while leaving search order, heuristics, and Haskell execution outside the trusted computing base. It also creates the infrastructure needed for negative certificates and Leant projection evidence.
+
+\section{Two findings that should change the specification}
+
+\findingbox{For a sound negative result, Leant's abstraction need not be an isomorphism. It only needs to be an over-approximation: every source inhabitant in the advertised scope must map to an abstract derivation. This one-way theorem is sufficient by contraposition and is materially easier than full semantic equivalence.}
+
+\warningbox{A provider-free refutation does not exclude arbitrary constants in the ambient Lean environment. The current user-facing phrase ``no closed term of this polymorphic type exists'' should be read as a structural-calculus claim unless provider/environment closure is separately certified. The report proposes exact replacement labels in \cref{sec:wording}.}
+
+A third implementation hardening item is immediate: the verification command must force \code{debug.skipKernelTC = false}. Lean's checked declaration path explicitly bypasses kernel type checking when this option is enabled, while Leant exposes persistent option setting. A dedicated verifier process with fixed options is preferable to relying on mutable REPL state.
+
+\chapter{Scope, revisions, and method}
+\label{sec:scope}
+
+\section{Pinned source revisions}
+
+This report inspected the following repository states on 10 August 2026:
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{L{0.16\textwidth} L{0.45\textwidth} Y}
+\toprule
+\textbf{Repository} & \textbf{Revision} & \textbf{Role in this report} \\
+\midrule
+\Djex & \commit{f50b5eac86726c7530d95e48c27101b7c0fa25c9} & Shared synthesis types, \Djinn/LJT, independent proof checking, \Exference\ checking and bounded search \\
+\Leant & \commit{0160237e4bdf6e342a55f5a86ce5d5292728024f} & Lean serializer/projection, provider discovery, engine orchestration, rendering, candidate verification, and reporting \\
+\Lean & \commit{1d2dde6d64cb3da989bab118f4d386eb55237fe5} & Kernel declaration checking, option boundary, module replay via \code{leanchecker}, and the target implementation for generated artifacts \\
+\texttt{lean4lean} & \commit{1a16b72d2e35932a82aa501beb29ef2c3d072580} & Optional independent checker and reusable formal infrastructure for Lean expressions, environments, and type checking \\
+\bottomrule
+\end{tabularx}
+\caption{Pinned revisions. Leant's \texttt{lib/Djex} submodule points exactly to the Djex revision shown above.}
+\label{tab:revisions}
+\end{table}
+
+The repositories are under active development. All implementation observations in this report refer to these hashes, not to an unspecified future \code{main} or \code{master} branch \cite{djex,leant,lean4}.
+
+\section{Files and boundaries examined}
+
+The review concentrated on the following modules:
+
+\begin{itemize}
+\item \Djex: \path|synthesis/.../Type.hs|; \path|Djinn/Internal/LJTFormula.hs|; \path|Djinn/Internal/LJT.hs|; \path|Djinn/Internal/ProofCheck.hs|; \path|Djinn/Core.hs|; \path|Exference/Core/ExpressionCheck.hs|; \path|Exference/Core/Internal/SearchControl.hs|; and \path|Exference/Core/Internal/Exference.hs|.
+\item \Leant: \path|Leant/Synth/Fragment.hs|; \path|Leant/Synth/Engine.hs|; \path|Leant/Synth/Render.hs|; and the synthesis orchestration and verification code in \path|src/Main.hs|.
+\item \Lean: \path|src/Lean/AddDecl.lean| and \path|src/LeanChecker.lean|, plus the repository's current kernel-hardening issue and fix discussed in \cref{sec:kernel-independence}.
+\end{itemize}
+
+The review was architectural and proof-oriented rather than a line-by-line audit of every helper. It sought theorem boundaries, trusted inputs, explicit approximation flags, and places where a runtime check can be replaced by a proof-producing or proof-checking interface.
+
+\section{Methodological principle}
+
+The analysis uses a deliberately asymmetric trust model:
+
+\begin{quote}
+\textbf{Generators may be arbitrarily complicated and untrusted. Checkers should be small, total, deterministic, and proved sound.}
+\end{quote}
+
+This is the same broad architecture used by verified SAT tooling: a high-performance external solver produces a certificate, and a small checker with a soundness theorem imports the result. LeanSAT's verified LRAT checker is a direct precedent inside the Lean ecosystem; it has since moved into Lean core as part of \code{Std.Tactic.BVDecide} \cite{leansat}. The proposed \Djex/\Leant\ architecture applies the same separation to proof synthesis and negative inhabitation evidence.
+
+\chapter{What exactly should be proved?}
+\label{ch:claims}
+
+\section{Correctness is not one predicate}
+
+A statement such as ``Djex is correct'' can refer to several non-equivalent properties:
+
+\begin{enumerate}
+\item \textbf{Core typing soundness:} every generated proof term is well typed in a formal core calculus.
+\item \textbf{Search soundness:} every successful branch corresponds to a valid derivation.
+\item \textbf{Search completeness:} if a derivation exists in the target calculus, the unbounded decision procedure finds one.
+\item \textbf{Termination:} the unbounded decision procedure returns on every well-formed input in the advertised fragment.
+\item \textbf{Bound honesty:} a bounded search never reports logical impossibility merely because fuel, queue space, wall-clock time, or an identifier budget ran out.
+\item \textbf{Translation soundness for positive results:} a core proof can be reconstructed as a source-language term of the original type.
+\item \textbf{Abstraction adequacy for negative results:} every permitted source-language inhabitant would induce a core derivation.
+\item \textbf{Kernel acceptance:} a particular Lean kernel, in a particular environment and with kernel checking enabled, accepts the generated declaration.
+\item \textbf{Axiom policy:} the accepted term depends only on an allowed set of axioms and declarations.
+\item \textbf{Implementation refinement:} the compiled Haskell executable implements the formal specification for all relevant observations.
+\end{enumerate}
+
+These properties should be named separately in APIs, certificate formats, documentation, and user-facing output. A single boolean named \code{sound} cannot carry enough information.
+
+\section{Positive evidence and negative evidence are asymmetric}
+
+For a positive answer, an untrusted engine may output any string. If Lean accepts that string at the exact target type, engine correctness is no longer required for the displayed theorem. The engine affects completeness, ranking, and performance, but not logical soundness.
+
+For a negative answer, there is no analogous one-line kernel check. The absence of a generated term is not evidence unless the search space and the source-to-search abstraction are both formally delimited. This asymmetry should drive the whole design.
+
+\section{Meta-level non-derivability is not object-level negation}
+\label{sec:meta-vs-object}
+
+Let \(\Gamma \vdash A\) mean that the formal calculus has a derivation of \(A\) from \(\Gamma\). A decision procedure may return a Lean proof of
+\[
+  \neg\,\mathsf{Derives}(\Gamma,A).
+\]
+This is a proposition about syntax and derivations inside the metatheory. It is not generally a term of the object formula \(A \to \bot\).
+
+Intuitionistic logic makes the distinction unavoidable. There are formulas for which neither \(A\) nor \(\neg A\) is derivable. Excluded middle with an opaque atom is the canonical example. Therefore a successful refutation certificate should be described as \emph{non-derivability in a named calculus}, not as a proof of the target's negation.
+
+For some closed polymorphic types, an object-level refutation is available. For example, a hypothetical inhabitant of \(\forall a\,b:\mathsf{Type}, a\to b\) can be instantiated at \(a=\mathsf{Unit}\) and \(b=\mathsf{Empty}\). Such special cases are useful, but they do not replace the general meta-level statement.
+
+\section{Haskell bottom changes the meaning of ``uninhabited''}
+
+In ordinary non-strict Haskell semantics, every lifted type admits nontermination or \code{undefined}. Consequently, \Djinn's negative result cannot literally mean that no Haskell expression inhabits the type. The meaningful claim is instead one of the following:
+
+\begin{itemize}
+\item no total closed normal form exists in the pure generated lambda calculus;
+\item no term exists in the explicitly defined \Djinn\ core syntax;
+\item no parametric total term exists in a System-F-like model of the supported Haskell fragment.
+\end{itemize}
+
+The Lean formalization should choose one of these statements explicitly. The first implementation should use the syntactic core statement because it is exact, decidable, and independent of disputed operational notions of totality.
+
+\section{The minimum theorem for a sound negative projection}
+\label{sec:one-way}
+
+Suppose \(E\) is a source environment, \(T\) a source target, and \((\Gamma,A)\) the abstract sequent produced by the translator. Define \(\mathsf{SourceTerm}_L(E,T)\) to mean ``a source term of type \(T\) built from the permitted language and constant policy \(L\).'' The essential theorem is one-way:
+\[
+  \mathsf{Abstracts}(E,T,L,\Gamma,A)
+  \quad\Longrightarrow\quad
+  \bigl(\mathsf{SourceTerm}_L(E,T) \to \mathsf{Derives}(\Gamma,A)\bigr).
+\]
+Then
+\[
+  \neg\mathsf{Derives}(\Gamma,A)
+  \quad\Longrightarrow\quad
+  \neg\mathsf{SourceTerm}_L(E,T).
+\]
+
+The abstract calculus may have \emph{more} derivations than the source language. This is safe: failure in an over-approximation implies failure in the source. What is unsafe is an under-approximation that discards a source construction and thereby makes the abstract formula artificially difficult to inhabit.
+
+This observation gives a precise interpretation to many current approximation flags. A translation plan is negative-safe exactly when it carries a proof of the implication above, not merely when a boolean heuristic says that no depth marker or unsafe atom was encountered.
+
+\chapter{Current architecture and existing safeguards}
+\label{ch:current}
+
+\section{Djex: two search engines behind checked boundaries}
+
+\Djex\ is not one algorithm. It contains two engines with intentionally different contracts:
+
+\begin{itemize}
+\item \Djinn\ is a decision-procedure-oriented synthesizer for an intuitionistic structural calculus. Its formula language contains products, constructor-tagged sums, nominal empty types, implication, and atomic propositions. Its term language is a typed proof-term representation with variables, lambdas, application, tuples, splitting, injections, case analysis, and projections.
+\item \Exference\ is a heuristic ranked synthesizer over a richer polymorphic and constrained type language. It has explicit step, queue, depth, and identifier-space bounds. Its useful correctness target is soundness of emitted candidates and honesty of completion status, not global completeness.
+\end{itemize}
+
+The shared \path|haskell-synthesis| layer supplies names, source types, constraints, capture-avoiding substitution, and validation. This is a natural future location for a versioned certificate schema, but the two engines should retain distinct search specifications.
+
+\subsection{Djinn's independent proof checker}
+
+A particularly valuable boundary is \path|Djinn/Internal/ProofCheck.hs|. Search produces a term; the checker reconstructs a proof type, generates unification constraints, solves them with an occurs check, and compares the result with the expected formula. The public orchestration rejects a candidate that does not pass this checker before converting it into source syntax.
+
+This means the first formal proof need not establish that every branch in \path|LJT.hs| is implemented correctly. It can establish that the independent checker accepts only valid terms. The Haskell checker then becomes a reference implementation and test oracle; a Lean checker becomes the trusted one.
+
+\subsection{Djinn's current honesty lattice}
+
+The current \Djinn\ API already distinguishes several reasons why absence of a candidate is not a refutation. A search outcome records generated proofs, whether search was exhausted, and remaining budget. Translation and instantiation plans also carry whether negative evidence remains sound. The orchestration downgrades to an undecided result when, among other conditions, a budget stopped the search or an approximation invalidated negative evidence.
+
+This is conceptually right. The formal replacement is to make the evidence type indexed by the claim:
+
+\begin{lstlisting}[language=LeanFour,caption={Evidence should be typed by what it proves, not represented by a boolean.}]
+inductive SearchEvidence (s : Sequent) : Type
+  | witness    (d : Derives s)
+  | refutation (h : Not (Derives s))
+  | bounded    (r : BoundReport)
+  | approximate (r : ApproximationReport)
+\end{lstlisting}
+
+Only the \code{refutation} constructor may support an uninhabited verdict. A producer cannot manufacture it directly; it must provide a certificate accepted by the Lean checker.
+
+\section{Exference: bounded generation plus contextual checking}
+
+\Exference's current implementation has a similarly useful separation. Candidate generation is heuristic and resource-bounded. A distinct expression checker reconstructs types under local binders, global function bindings, deconstructors, rigid skolems, class constraints, and substitutions. Only privately wrapped validated candidates cross the core API boundary. Simplified and unsimplified forms are checked rather than trusting transformation passes.
+
+Its completion status is already richer than a single exhausted bit. The implementation distinguishes ordinary exhaustion, a step limit, pruning, and identifier-space exhaustion. These distinctions should survive formalization. In particular:
+
+\begin{itemize}
+\item \code{Exhausted} may mean the finite configured search graph was fully consumed.
+\item \code{StepLimitReached} is operational only and must never imply non-inhabitance.
+\item \code{Pruned} records deliberate incompleteness.
+\item \code{IdentifierSpaceExhausted} records an implementation resource failure rather than a logical result.
+\end{itemize}
+
+A formal model can prove that each constructor is returned only under its stated condition. It should not attempt to turn the heuristic engine into a complete decision procedure.
+
+\section{Leant's current synthesis pipeline}
+\label{sec:current-leant}
+
+At the inspected revision, the relevant pipeline is approximately:
+
+\begin{enumerate}
+\item Lean elaborates the user's goal and a generated Lean metaprogram serializes a structural fragment as an S-expression.
+\item Haskell parses that fragment, records refusal and approximation reasons, and optionally discovers a bounded provider inventory from the live environment.
+\item \Djinn\ or \Exference\ searches one or more structural/provider lanes.
+\item \Djex\ returns candidate proof terms or a structured negative/bounded outcome.
+\item \Leant's renderer produces one or more Lean textual variants for each engine candidate.
+\item Each variant is submitted as an \code{example : (goal) := (term)} declaration. A candidate is kept only when the backend reports no errors, no fatal result, and no newly introduced sorry.
+\item Survivors are displayed and optionally bound into the session.
+\end{enumerate}
+
+\begin{figure}[htbp]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+  node distance=9mm and 10mm,
+  box/.style={draw=Slate, rounded corners=2pt, align=center, minimum height=10mm, text width=32mm, fill=white},
+  trusted/.style={box, draw=Green, very thick, fill=GreenLight},
+  untrusted/.style={box, draw=Amber, fill=AmberLight},
+  arrow/.style={-{Latex[length=2.2mm]}, thick, draw=Slate},
+  note/.style={align=center, font=\footnotesize, text width=33mm}
+]
+\node[box] (goal) {Elaborated Lean goal and environment};
+\node[untrusted, right=of goal] (projection) {Meta serializer and \texttt{Frag} projection};
+\node[untrusted, right=of projection] (search) {Djinn or Exference search};
+\node[untrusted, right=of search] (render) {Lean renderer and textual variants};
+\node[trusted, right=of render] (kernel) {Fixed-option Lean elaborator and kernel};
+\draw[arrow] (goal) -- (projection);
+\draw[arrow] (projection) -- node[above,font=\scriptsize]{S-expression} (search);
+\draw[arrow] (search) -- node[above,font=\scriptsize]{candidate} (render);
+\draw[arrow] (render) -- node[above,font=\scriptsize]{declaration} (kernel);
+\node[note, below=8mm of search] (neg) {Negative path additionally needs a checked non-derivability certificate and a projection adequacy theorem.};
+\draw[arrow, dashed, draw=Red] (projection.south) |- (neg.west);
+\draw[arrow, dashed, draw=Red] (search.south) |- (neg.east);
+\node[note, below=8mm of kernel] (pos) {Positive soundness can terminate here: rejected text is simply discarded.};
+\draw[arrow, draw=Green] (kernel.south) -- (pos.north);
+\end{tikzpicture}%
+}
+\caption{Current and proposed trust boundaries. Search and rendering may remain untrusted on the positive path. The negative path requires additional formal evidence.}
+\label{fig:pipeline}
+\end{figure}
+
+\subsection{Positive candidates are already treated defensively}
+
+The implementation's strongest existing design rule is that only backend-verified candidates are shown. Textual ambiguity in universes, implicit binders, constructor syntax, and provider application is handled by generating variants and keeping the first one Lean accepts. This makes renderer bugs incompleteness bugs rather than soundness bugs.
+
+The guarantee is nevertheless conditional on the verifier configuration and environment. The verification process must ensure:
+
+\begin{itemize}
+\item kernel type checking is not disabled;
+\item no synthetic or explicit sorry entered the generated declaration;
+\item the checked target is byte-for-byte or expression-for-expression the intended elaborated target;
+\item the candidate is checked in the intended environment, not a stale or partially replayed one;
+\item imported axioms and dependencies satisfy the advertised policy.
+\end{itemize}
+
+\subsection{Negative reporting is careful, but the scope is still too broad}
+
+The current code distinguishes a sound \code{SynthRefuted True} result from opaque/unsafe cases and bounded misses. It also delays a provider-free refutation while trying provider lanes, and it describes timeouts as ``no answer, not a verdict.'' These are good safeguards.
+
+However, after provider lanes fail, the code restores the provider-free structural refutation and reports that no closed term of the polymorphic type exists. The provider inventory is an optimization and is explicitly bounded and filtered. Therefore this message cannot, without an additional closure theorem, quantify over every constant in the live Lean environment. A user may have declared an axiom or definition of exactly the target type outside the selected inventory.
+
+The formal result should instead expose the provider set or term-language policy in the proposition:
+\[
+  \neg\mathsf{TermUsing}(E,P,T),
+\]
+where \(P\) is the certified set of allowed providers. A full-environment claim requires proof that every usable global constant is represented in \(P\), or a syntactic rule that forbids all global constants except those explicitly listed.
+
+\section{Lean's declaration-checking boundary}
+\label{sec:lean-boundary}
+
+At the inspected Lean revision, \path|Lean/AddDecl.lean| routes a declaration through kernel checking unless \code{debug.skipKernelTC} is enabled \cite{lean4adddecl}. The same file separately warns about declarations containing sorry. These are distinct mechanisms: a warning policy is not a substitute for kernel checking, and kernel checking does not by itself enforce an axiom policy.
+
+Leant exposes persistent option setting. The candidate verification program should therefore override mutable state locally:
+
+\begin{lstlisting}[language=LeanFour,caption={Recommended fixed verifier wrapper.}]
+set_option debug.skipKernelTC false in
+set_option warn.sorry true in
+set_option autoImplicit true in
+noncomputable example : (TARGET) := (CANDIDATE)
+\end{lstlisting}
+
+A stronger design runs this declaration in a separate verifier backend whose options cannot be modified by the interactive session. The main REPL may remain flexible; the verifier should be deliberately boring.
+
+\section{Replay and independent checking}
+
+Lean's \code{leanchecker} replays declarations from compiled modules through the kernel \cite{leanchecker}. Its own source accurately describes it as a detector for environment hacking rather than an external verifier: it shares the implementation and kernel. It is still valuable as a second execution path and as a CI artifact checker.
+
+The \code{lean4lean} project supplies a mostly pure Lean reimplementation of Lean's environment and type-checking machinery, with a CLI intended to mirror \code{leanchecker} \cite{lean4lean}. It is a useful optional second checker and a source of reusable definitions. It should not be treated as magically independent: code derived from the same implementation can reproduce the same conceptual bug. The best assurance comes from diversity of checker structure and from small domain-specific certificates whose checker is far simpler than the full Lean kernel.
+
+\chapter{Proposed theorem decomposition}
+\label{ch:decomposition}
+
+\section{The dependency graph}
+
+The desired claims form a directed graph rather than a single proof. The central dependencies are shown in \cref{fig:theorem-dag}.
+
+\begin{figure}[htbp]
+\centering
+\resizebox{0.97\textwidth}{!}{%
+\begin{tikzpicture}[
+  node distance=9mm and 13mm,
+  box/.style={draw=Slate, rounded corners=2pt, align=center, text width=40mm, minimum height=11mm, fill=white},
+  easy/.style={box, draw=Green, fill=GreenLight},
+  hard/.style={box, draw=Amber, fill=AmberLight},
+  final/.style={box, draw=Accent, very thick, fill=AccentLight},
+  arrow/.style={-{Latex[length=2.1mm]}, thick, draw=Slate}
+]
+\node[easy] (syntax) {Core syntax, well-formedness, and declarative typing};
+\node[easy, below left=of syntax] (checker) {Executable proof checker soundness};
+\node[hard, below=of syntax] (search) {LJT soundness, completeness, and termination};
+\node[easy, below right=of syntax] (counter) {Kripke/refutation certificate checker soundness};
+\node[hard, below=17mm of search] (projection) {Lean-to-core one-way adequacy for a named scope};
+\node[final, below left=of projection] (positive) {Certified positive result};
+\node[final, below right=of projection] (negative) {Certified negative result};
+\draw[arrow] (syntax) -- (checker);
+\draw[arrow] (syntax) -- (search);
+\draw[arrow] (syntax) -- (counter);
+\draw[arrow] (checker) -- (positive);
+\draw[arrow] (projection) -- (negative);
+\draw[arrow] (counter) -- (negative);
+\draw[arrow, dashed] (search) -- node[right,font=\scriptsize]{optional if certificates suffice} (negative);
+\draw[arrow, dashed] (projection) -- (positive);
+\end{tikzpicture}%
+}
+\caption{Theorem dependency graph. Positive certification can stop at independent checking. Negative certification requires both non-derivability evidence and a one-way source abstraction theorem.}
+\label{fig:theorem-dag}
+\end{figure}
+
+\section{Layer A: core syntax and declarative typing}
+
+Define a small, implementation-independent calculus. The first version should use de Bruijn indices and a normalized binary grammar:
+\[
+ A,B ::= p \mid \mathbf{0} \mid \mathbf{1} \mid A\times B \mid A+B \mid A\to B.
+\]
+
+The current n-ary conjunction and constructor-tagged sum can be represented directly or normalized to binary syntax with a proved equivalence. Keeping constructor metadata in certificates is useful for reconstructing source terms, but logical non-derivability can ignore cosmetic constructor names after validating arities and distinctness.
+
+The declarative relation
+\[
+  \Gamma \vdash t : A
+\]
+should be an inductive family whose constructors correspond to variable, lambda, application, product introduction/elimination, sum introduction/elimination, top introduction, and bottom elimination. This relation is the specification against which both \Djinn\ and \Exference\ checkers are proved.
+
+\section{Layer B: executable checker soundness}
+
+The main theorem has the shape:
+
+\begin{lstlisting}[language=LeanFour,caption={First central theorem.}]
+theorem check_sound
+    (h : checkTerm env expected term = Except.ok unit) :
+    HasType env term expected
+\end{lstlisting}
+
+The checker may infer a type with metavariables and then unify it with the expected type. The proof therefore decomposes into:
+
+\begin{enumerate}
+\item well-formed substitutions preserve types;
+\item the occurs check prevents cyclic substitutions;
+\item unification success implies equality after applying the produced substitution;
+\item inferred constraints are sound with respect to declarative typing;
+\item solving all constraints and matching the expected formula yields the final derivation.
+\end{enumerate}
+
+Checker completeness is useful for regression testing and for avoiding rejected valid certificates, but it is not required for logical soundness. It can be postponed.
+
+\section{Layer C: positive reconstruction}
+
+There are two possible positive theorems:
+
+\begin{description}[style=nextline]
+\item[Core positive theorem]
+A checked certificate denotes a well-typed term in the formal core calculus.
+\item[Source positive theorem]
+The rendered source term elaborates to the exact requested type in the target environment.
+\end{description}
+
+The second is already established dynamically by Leant's final gate, provided the verifier is hardened. A formal proof that rendering preserves typing is optional; it would improve completeness and diagnostics but is not needed to protect soundness.
+
+For durable evidence, Leant should emit a named declaration module and a manifest containing the goal expression hash, candidate source, elaborated declaration name, imported modules, Lean revision, options, and axiom dependency set. The module can be replayed by the official kernel and optionally by an independent checker.
+
+\section{Layer D: negative certificate soundness}
+
+A negative certificate checker proves one of:
+\[
+  \mathsf{verifyRefutation}(s,c)=\mathsf{true}
+  \Longrightarrow \neg\mathsf{Derives}(s),
+\]
+or
+\[
+  \mathsf{verifyCountermodel}(A,m)=\mathsf{true}
+  \Longrightarrow \neg\mathsf{Derives}([],A).
+\]
+
+The producer may obtain the certificate by any method: the existing LJT search, a separate model finder, SAT/SMT search, exhaustive enumeration, or a future learned heuristic. Only the checker's theorem enters the trusted story.
+
+\section{Layer E: source abstraction adequacy}
+
+The projection theorem should be indexed by an explicit scope:
+
+\begin{lstlisting}[language=LeanFour,caption={One-way adequacy, sufficient for negative results.}]
+structure Scope where
+  allowedConstants : Name -> Prop
+  allowRecursion    : Bool
+  allowClassical    : Bool
+  allowUnsafe       : Bool
+
+structure ExactAbstraction
+    (env : SourceEnv) (target : SourceType)
+    (scope : Scope) (seq : Sequent) : Prop where
+  abstractTerm :
+    SourceHasType env scope term target -> Derives seq
+\end{lstlisting}
+
+The name \code{ExactAbstraction} may be replaced by \code{NegativeSoundAbstraction}; exactness is stronger than necessary. The important point is that the evidence is a proposition with proof fields, not a boolean computed by Haskell.
+
+\section{Layer F: full implementation refinement}
+
+Only after the certificate architecture is in place is it useful to prove that the Haskell producer always emits a valid certificate when it claims success. Such a theorem improves robustness and can eliminate runtime checker failures, but it is not required for external trust. A compiler-level theorem for the exact GHC executable is a separate project and should not block the earlier layers.
+
+\chapter{Certifying positive results}
+\label{ch:positive}
+
+\section{A positive result can bypass search correctness}
+
+Suppose the engine proposes a candidate \(e\) for target \(T\). The strongest practical positive contract is:
+\[
+  \mathsf{AcceptedByKernel}(E,e,T).
+\]
+No theorem about the producer is needed. A malformed internal proof, a renderer capture bug, a wrong universe guess, or an invalid provider application merely causes rejection.
+
+This principle should be reflected in the public result type:
+
+\begin{lstlisting}[language=LeanFour,caption={A proof-carrying positive result.}]
+structure VerifiedCandidate where
+  source        : String
+  declaration   : Name
+  targetHash    : UInt64
+  envFingerprint : ByteArray
+  moduleArtifact : FilePath
+  dependencies  : Array Name
+\end{lstlisting}
+
+The Haskell side should not be able to construct a \code{VerifiedCandidate} directly. It should receive one only from a verifier process that has successfully elaborated, kernel-checked, and persisted the declaration.
+
+\section{Hardening Leant's existing verifier}
+\label{sec:verifier-hardening}
+
+The inspected implementation already rejects errors, fatal backend results, and newly introduced sorries. The following changes would turn that good runtime check into a sharply specified boundary.
+
+\subsection{Use a dedicated verifier backend}
+
+A separate backend process should load the same module/environment snapshot but accept only a tiny verification protocol. Its options are fixed and not inherited from interactive \code{:set} commands. In particular it should force:
+
+\begin{itemize}
+\item \code{debug.skipKernelTC = false};
+\item \code{warn.sorry = true};
+\item a fixed trust level and heartbeat policy;
+\item no unsafe environment mutation APIs from the submitted snippet;
+\item a fresh collision-resistant declaration name.
+\end{itemize}
+
+The REPL backend remains responsible for exploration; the verifier backend is responsible for evidence.
+
+\subsection{Check an expression, not only a string convention}
+
+The verification request should carry the already elaborated target expression or a stable serialized target identity, not only a reprinted goal string. The verifier can elaborate the declaration and compare its type with the original target by definitional equality in the intended environment. This prevents accidental drift caused by pretty-printing, auto-implicit rebinding, namespace changes, or parser ambiguities.
+
+A robust protocol is:
+
+\begin{enumerate}
+\item Leant asks Lean to assign a stable target identifier and environment fingerprint.
+\item Candidate source is elaborated under that target.
+\item The resulting declaration is added with kernel checking enabled.
+\item The verifier reports the declaration name, type expression digest, value digest, and collected axioms.
+\item The caller verifies that the target/environment fingerprints match the request.
+\end{enumerate}
+
+\subsection{Turn axiom use into an explicit policy}
+
+Kernel acceptance means type correctness relative to the current environment. It does not mean axiom freedom. A candidate may depend on imported axioms, quotient soundness assumptions, classical choice, user axioms, or previous declarations containing sorry.
+
+Leant should report at least one of:
+
+\begin{itemize}
+\item \textbf{kernel-checked, unrestricted dependencies};
+\item \textbf{kernel-checked, dependencies listed};
+\item \textbf{kernel-checked, dependencies within allow-list};
+\item \textbf{kernel-checked and axiom-free relative to imported theorem declarations}, when that claim is actually verified.
+\end{itemize}
+
+Lean's existing axiom-collection utilities can provide the dependency set. The manifest should distinguish primitive trusted axioms from user declarations and from sorry-derived declarations.
+
+\subsection{Persist a replayable artifact}
+
+An ephemeral \code{example} proves acceptance only during that backend interaction. A stronger artifact mode emits:
+
+\begin{itemize}
+\item a small \code{.lean} source module containing the candidate theorem or definition;
+\item the corresponding \code{.olean};
+\item a JSON or S-expression manifest with source hashes and options;
+\item the certificate used by the core checker, if available.
+\end{itemize}
+
+CI can run the ordinary compiler, \code{leanchecker --fresh} where applicable, and \code{lean4lean}. The source module remains the durable human-readable proof object.
+
+\section{Formalizing Djinn's proof checker}
+\label{sec:djinn-checker}
+
+\subsection{Why this is the best first formal target}
+
+The checker is small enough to understand globally, independent of proof search, and already used as a defensive boundary. A Lean port therefore gives immediate value and a clean refinement target for the existing Haskell implementation.
+
+The formal checker should initially normalize away implementation conveniences:
+
+\begin{itemize}
+\item use de Bruijn indices instead of globally fresh symbols;
+\item represent binary products/sums first, then prove normalization of n-ary forms;
+\item separate well-formed constructor metadata from typing;
+\item use an explicit finite map for metavariable substitutions;
+\item return structured errors only after the soundness theorem is stable.
+\end{itemize}
+
+\subsection{Declarative typing rules}
+
+For a context \(\Gamma\), representative rules are:
+\[
+\frac{i:A\in\Gamma}{\Gamma\vdash \mathsf{var}\;i:A}
+\qquad
+\frac{A::\Gamma\vdash t:B}{\Gamma\vdash \lambda t:A\to B}
+\qquad
+\frac{\Gamma\vdash f:A\to B \quad \Gamma\vdash x:A}{\Gamma\vdash f\,x:B},
+\]
+\[
+\frac{\Gamma\vdash a:A \quad \Gamma\vdash b:B}{\Gamma\vdash \langle a,b\rangle:A\times B}
+\qquad
+\frac{\Gamma\vdash s:A+B \quad A::\Gamma\vdash l:C \quad B::\Gamma\vdash r:C}
+     {\Gamma\vdash \mathsf{case}\;s\;l\;r:C}.
+\]
+
+The current term language's constructor tags and projections can be represented as typed sugar. Proving the desugaring once keeps the kernel of the formalization small.
+
+\subsection{Unification obligations}
+
+The current checker uses proof-type metavariables because terms such as empty case analysis can inhabit an arbitrary expected type and because some constructor forms infer only partial information. A formal unifier needs these lemmas:
+
+\begin{enumerate}
+\item \textbf{Substitution lookup soundness:} lookup and application agree on mapped variables.
+\item \textbf{Occurs-check acyclicity:} inserting \(\alpha\mapsto \tau\) when \(\alpha\notin\mathrm{FV}(\tau)\) preserves finite expansion.
+\item \textbf{Unification preservation:} if the accumulated substitution satisfies prior constraints, one successful step preserves that invariant.
+\item \textbf{Success theorem:} a successful run produces a substitution satisfying every input equation.
+\item \textbf{Typing reconstruction:} inferred proof types and constraints imply declarative typing after substitution.
+\end{enumerate}
+
+A most-general-unifier theorem is unnecessary for soundness. It is useful only if checker completeness or principal typing is later desired.
+
+\subsection{Relating the Lean checker to Haskell certificates}
+
+The serialization format should contain only canonical data:
+
+\begin{itemize}
+\item a version number;
+\item normalized formula syntax with atom identifiers;
+\item normalized term syntax with de Bruijn indices;
+\item constructor arities and branch metadata;
+\item optionally, a hash of the original \Djinn\ formula and environment.
+\end{itemize}
+
+The Lean parser is part of the checker. Haskell's pretty-printer should not be trusted as the only identity boundary. A round-trip theorem for the canonical format is desirable; a parser failure simply rejects the certificate.
+
+\section{Formalizing Exference's candidate checker}
+\label{sec:exference-checker}
+
+\Exference's checker is richer than \Djinn's because it includes local/global bindings, rigid skolems, polymorphic schemes, deconstructors, class constraints, and residual constraint solving. The recommended proof decomposition is:
+
+\begin{enumerate}
+\item Formalize the shared type syntax and capture-avoiding substitution.
+\item Prove the relevant unifier sound, separately for flexible and rigid variables.
+\item Define declarative expression typing with explicit environments.
+\item Prove each expression form in the executable checker preserves the typing invariant.
+\item Prove class/instance resolution sound relative to a declarative entailment relation.
+\item Prove that a successful top-level check has no escaping rigid variables and no unsolved required constraints.
+\end{enumerate}
+
+This theorem certifies candidate validity but makes no claim that search found all candidates. That separation matches the engine's intended heuristic nature.
+
+\section{Ranking and simplification are secondary theorems}
+
+The order in which candidates are shown, alpha-renaming choices, and simplification quality are observable behavior but not logical soundness. They should be specified only after the checker boundary is certified.
+
+Useful later theorems include:
+
+\begin{itemize}
+\item simplification preserves typing;
+\item simplification preserves denotation in a chosen total semantics;
+\item alpha-renaming preserves scope and typing;
+\item candidate score sorting is stable and respects the documented ordering;
+\item bounded enumeration produces a prefix of a larger run under the same deterministic strategy.
+\end{itemize}
+
+The current property tests already exercise some of these claims. They should remain as cross-language refinement tests even after formal proofs exist.
+
+\chapter{Certifying negative results}
+\label{ch:negative}
+
+\section{Why search exhaustion is not enough}
+
+A negative result must close two independent gaps:
+
+\begin{enumerate}
+\item \textbf{Calculus gap:} show that the abstract sequent has no derivation.
+\item \textbf{Abstraction gap:} show that every permitted source inhabitant would yield such a derivation.
+\end{enumerate}
+
+The first can be certified without trusting the search implementation. The second is Leant-specific and controls the scope of the claim.
+
+\section{Option A: a complete refutation DAG}
+\label{sec:refutation-dag}
+
+The most direct certificate mirrors backward proof search. Each node contains a canonical sequent and either:
+
+\begin{itemize}
+\item a rule application whose children are all required premises;
+\item a locally closed failure reason, such as an atomic succedent absent from an irreducible context;
+\item references to earlier nodes, allowing DAG sharing.
+\end{itemize}
+
+The checker validates:
+
+\begin{enumerate}
+\item the selected rule is applicable;
+\item every required branch is present;
+\item each child sequent is exactly the rule's premise after normalization;
+\item leaves satisfy a proved failure condition;
+\item references are acyclic or decrease under a certified measure.
+\end{enumerate}
+
+The soundness theorem is proved by induction over the certificate: if a derivation of the parent existed, invertibility or completeness of the selected rule would produce a derivation in at least one child, contradicting the children's certificates.
+
+This approach is close to \Djinn's existing search and can preserve diagnostics. Its disadvantages are potentially large certificates and the need to formalize the exact completeness/invertibility facts for every branching rule.
+
+\section{Option B: a finite Kripke countermodel}
+\label{sec:kripke}
+
+For the pure intuitionistic propositional fragment, a finite Kripke countermodel is often a better negative certificate. The producer supplies:
+
+\begin{itemize}
+\item a finite set of worlds;
+\item a decidable partial order representing information growth;
+\item a monotone valuation of atoms;
+\item a designated root world;
+\item evidence, checked by computation, that the goal formula is not forced at the root while all assumptions are forced there.
+\end{itemize}
+
+Lean defines forcing recursively:
+\[
+\begin{aligned}
+ w\Vdash p &\iff V(w,p),\\
+ w\Vdash A\land B &\iff w\Vdash A\ \wedge\ w\Vdash B,\\
+ w\Vdash A\lor B &\iff w\Vdash A\ \vee\ w\Vdash B,\\
+ w\Vdash A\to B &\iff \forall v\ge w,\; v\Vdash A\to v\Vdash B,\\
+ w\not\Vdash\bot.&
+\end{aligned}
+\]
+
+The one substantial metatheorem is standard semantic soundness:
+\[
+  \Gamma\vdash A
+  \quad\Longrightarrow\quad
+  \forall M,w,\; w\Vdash\Gamma \to w\Vdash A.
+\]
+A checked countermodel therefore proves non-derivability. The untrusted producer does not need a completeness proof and may use any model-finding strategy.
+
+\subsection{Why this is particularly attractive}
+
+A countermodel certificate has several advantages:
+
+\begin{itemize}
+\item It avoids proving that the exact Haskell search exhausted every branch.
+\item It is independent of proof-term generation and can catch common-mode bugs.
+\item It gives a human-readable explanation: a small information-growth scenario in which the formula fails.
+\item It handles classically valid but intuitionistically invalid formulas, such as excluded middle, by using multiple worlds rather than an ordinary truth table.
+\item It can be generated after \Djinn\ reports exhaustion; failure to find a model merely downgrades the result instead of threatening soundness.
+\end{itemize}
+
+The finite-model property guarantees that invalid IPC formulas have finite Kripke countermodels, but the certificate architecture needs only semantic soundness, not a formal proof of the generator's completeness \cite{troelstra,sorensen}.
+
+\subsection{Recommended negative certificate strategy}
+
+Implement both formats behind one interface:
+
+\begin{lstlisting}[language=LeanFour,caption={Two independently checkable negative certificate forms.}]
+inductive NegativeCertificate (s : Sequent) : Type
+  | refutationDAG (c : RefutationDAG s)
+  | kripkeModel  (m : Countermodel s)
+\end{lstlisting}
+
+The Kripke route should be the default for pure IPC. The refutation DAG remains useful for formulas with implementation-specific nominal metadata, for proof-search debugging, and as a route to a full LJT formalization.
+
+\section{The exact formal statement of ``refuted''}
+
+For the first certified fragment, the result should be:
+\[
+  \mathsf{CertifiedRefutation}(\Gamma,A)
+  :\equiv
+  \neg\mathsf{Core.Derives}(\Gamma,A).
+\]
+
+Leant may lift this through an abstraction certificate:
+\[
+  \mathsf{CertifiedRefutation}(\Gamma,A)
+  \wedge
+  \mathsf{Abstracts}(E,T,L,\Gamma,A)
+  \Longrightarrow
+  \neg\mathsf{SourceTerm}_L(E,T).
+\]
+
+Notice what is absent: no claim that \(T\to\mathsf{False}\) is inhabited, no claim about all future environment extensions, and no claim about terms using disallowed constants.
+
+\section{Provider and environment closure}
+\label{sec:provider-closure}
+
+A source term may mention a global declaration. To obtain a full-environment theorem, every such declaration must be covered by the abstraction. There are three defensible policies.
+
+\subsection{Policy 1: pure structural terms}
+
+Forbid global constants except constructors and eliminators used to implement the recognized structural connectives. This produces the cleanest theorem and exactly matches traditional type-directed ``plumbing'' synthesis.
+
+The result is labeled:
+\begin{quote}
+No inhabitant exists in the pure structural term language.
+\end{quote}
+
+\subsection{Policy 2: explicit certified provider set}
+
+Allow a finite set \(P\) of constants. Each provider carries an elaborated Lean type and a checked abstraction to a core premise. The negative result is relative to \(P\):
+\[
+  \neg\mathsf{SourceTermUsing}(E,P,T).
+\]
+
+This is well suited to Leant's provider lanes and library ratings. The provider set must be displayed or stored in the certificate manifest.
+
+\subsection{Policy 3: closed environment snapshot}
+
+Model every usable constant in an environment snapshot and prove that source terms cannot refer outside it. This is the strongest policy but also the most expensive. Definitions may need unfolding summaries, opaque constants become assumptions, recursive constants require a term-language policy, and unsafe or axiom-bearing declarations must be classified.
+
+A bounded provider inventory is not evidence of closure. It can improve positive search while negative certification remains relative to the structural language or explicit set.
+
+\section{Approximation direction matters}
+
+The translator may intentionally abstract source structure. For negative soundness:
+
+\begin{itemize}
+\item \textbf{Merging distinct atoms} is generally safe as an over-approximation. If a source derivation exists, uniformly substituting one atom for several preserves derivability; therefore underivability after merging implies underivability before merging.
+\item \textbf{Splitting equal atoms} is unsafe. It may destroy a proof such as identity and create a false refutation. Canonical identity must never assign different abstract atoms to definitionally equal source expressions.
+\item \textbf{Treating a structured proposition as opaque} is usually unsafe. Removing introduction and elimination structure can make the abstract problem harder, leading to false negatives.
+\item \textbf{Adding extra premises or constructors} is safe for a negative over-approximation, although it may destroy completeness of refutation and reduce the number of certified negatives.
+\item \textbf{Dropping premises or constructors} is unsafe unless accompanied by a theorem showing that they are irrelevant to every permitted source term.
+\end{itemize}
+
+This gives a formal interpretation to Leant's current unsafe-atom and depth checks. The proof-carrying replacement should record the direction of each abstraction step.
+
+\section{A practical negative certificate protocol}
+
+A versioned certificate envelope should contain:
+
+\begin{longtable}{L{0.24\textwidth} L{0.68\textwidth}}
+\toprule
+\textbf{Field} & \textbf{Purpose} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Field} & \textbf{Purpose} \\
+\midrule
+\endhead
+Schema version & Reject incompatible syntax or rule changes deterministically. \\
+Engine/revision metadata & Diagnostic only; not trusted for soundness. \\
+Canonical sequent & The exact formula and premise environment checked by Lean. \\
+Atom table & Stable canonical identities and optional source pretty names. \\
+Projection manifest & Target/environment fingerprint, scope policy, provider set, and abstraction evidence identifiers. \\
+Negative payload & Refutation DAG or finite Kripke model. \\
+Digest & Detect accidental mismatch between Haskell output, Lean check, and displayed report. \\
+Optional trace & Human-readable search/model explanation, not trusted. \\
+\bottomrule
+\end{longtable}
+
+The checker returns a theorem object only after parsing and validating every trusted field. Unknown optional metadata is ignored; unknown trusted fields or versions cause rejection.
+
+\chapter{Formalizing Djinn and its LJT engine}
+\label{ch:djinn}
+
+\section{The implementation-specific target}
+
+It would be a mistake to prove only the textbook statement ``G4ip is sound and complete'' and then declare \path|Djinn/Internal/LJT.hs| verified. The current implementation adds engineering structure that must be connected to the calculus:
+
+\begin{itemize}
+\item n-ary products and constructor-tagged disjunctions;
+\item nominal empty formulas;
+\item context indexes and reachability pruning;
+\item proof-term construction interleaved with search;
+\item explicit alternatives, depth-first or interleaved scheduling, and choice-point budgets;
+\item special rules for antecedent implications and negations;
+\item deletion or transformation of formulas to avoid repeated contraction;
+\item conversion between Haskell type structure and LJT formulae.
+\end{itemize}
+
+The formal project should therefore define an abstract calculus first and then prove that each implementation layer refines it.
+
+\section{Suggested Lean module layout}
+
+A practical package layout is:
+
+\begin{lstlisting}[language=LeanFour,caption={Suggested formal package layout.}]
+DjexCert/
+  Formula.lean          -- atoms, products, sums, implication, bottom/top
+  Term.lean             -- de Bruijn proof terms
+  Typing.lean           -- declarative natural-deduction typing
+  Normalize.lean        -- n-ary/binary normalization and metadata checks
+  Unify.lean            -- checker metavariables and substitutions
+  Check.lean            -- executable proof checker
+  CheckSound.lean       -- check_sound theorem
+  Sequent.lean           -- G4ip/LJT sequents and derivations
+  Rules.lean             -- rule soundness/invertibility
+  Measure.lean           -- termination ordering
+  Decide.lean            -- verified decision procedure
+  SearchCert.lean        -- refutation DAG checker
+  Kripke.lean            -- semantics and countermodel checker
+  Codec.lean             -- canonical certificate format
+  Examples.lean          -- regression corpus
+\end{lstlisting}
+
+This isolates the minimal trusted checker from optional proofs about the producer and search order.
+
+\section{Formula normalization and metadata}
+
+The implementation's \code{Conj [Formula]} and constructor-tagged \code{Disj [(ConsDesc, Formula)]} are convenient for source reconstruction. There are two reasonable formal representations.
+
+\subsection{Direct n-ary representation}
+
+Keep vectors of fields and branches, with well-formedness predicates for constructor names and arities. Typing rules quantify over vector indices. This makes certificate comparison close to Haskell but increases dependent-vector bookkeeping.
+
+\subsection{Binary logical core plus annotations}
+
+Normalize products and sums to a binary tree and keep constructor metadata in a separate annotation proved consistent with the logical tree. This gives much simpler metatheory. Rendering can consume the annotation; proof checking and Kripke semantics consume the binary core.
+
+The second design is recommended. The normalization theorem should state both directions of derivability for well-formed formulas:
+\[
+  \mathsf{Derives}_{n\text{-ary}}(\Gamma,A)
+  \iff
+  \mathsf{Derives}_{binary}(N\Gamma,NA).
+\]
+
+\section{Nominal empty types}
+
+The implementation distinguishes empty types by symbol. Logically, every genuinely empty inductive type supports elimination to any target, so each behaves like bottom for inhabitation. The formalization can either map all nominal empties to \(\bot\) or retain labels and give each the same elimination rule.
+
+Retaining labels is useful for source reconstruction and diagnostics. The logical theorem can then prove that erasing labels preserves derivability. What must not happen is to treat a merely opaque atomic type as empty; the Leant projection must provide evidence that the source head has no constructors in the advertised environment.
+
+\section{Natural deduction as the checker specification}
+
+Use a typed de Bruijn syntax such as:
+
+\begin{lstlisting}[language=LeanFour,caption={Illustrative core syntax; exact names may change.}]
+namespace DjexCert
+
+inductive Ty where
+  | atom   : Nat -> Ty
+  | zero   : Ty
+  | one    : Ty
+  | prod   : Ty -> Ty -> Ty
+  | sum    : Ty -> Ty -> Ty
+  | arr    : Ty -> Ty -> Ty
+  deriving DecidableEq, Repr
+
+inductive Tm where
+  | var    : Nat -> Tm
+  | lam    : Tm -> Tm
+  | app    : Tm -> Tm -> Tm
+  | unit   : Tm
+  | pair   : Tm -> Tm -> Tm
+  | fst    : Tm -> Tm
+  | snd    : Tm -> Tm
+  | inl    : Tm -> Tm
+  | inr    : Tm -> Tm
+  | caseOf : Tm -> Tm -> Tm -> Tm
+  | absurd : Tm -> Tm
+  deriving DecidableEq, Repr
+
+inductive HasType : List Ty -> Tm -> Ty -> Prop where
+  | var    : ctx[n]? = some a -> HasType ctx (.var n) a
+  | lam    : HasType (a :: ctx) body b ->
+             HasType ctx (.lam body) (.arr a b)
+  | app    : HasType ctx f (.arr a b) -> HasType ctx x a ->
+             HasType ctx (.app f x) b
+  | unit   : HasType ctx .unit .one
+  | pair   : HasType ctx x a -> HasType ctx y b ->
+             HasType ctx (.pair x y) (.prod a b)
+  | inl    : HasType ctx x a -> HasType ctx (.inl x) (.sum a b)
+  | inr    : HasType ctx y b -> HasType ctx (.inr y) (.sum a b)
+  | caseOf : HasType ctx s (.sum a b) ->
+             HasType (a :: ctx) l c ->
+             HasType (b :: ctx) r c ->
+             HasType ctx (.caseOf s l r) c
+  | absurd : HasType ctx x .zero -> HasType ctx (.absurd x) a
+
+end DjexCert
+\end{lstlisting}
+
+This is an interface sketch rather than a claim that the listing was compiled verbatim. The production formalization should use library lookup lemmas and explicit weakening/lifting operations.
+
+\section{Proof checker proof plan}
+
+\subsection{Phase 1: a bidirectional checker without metavariables}
+
+Start with an expected-type-directed checker:
+
+\begin{itemize}
+\item lambdas are checked against arrows;
+\item pairs against products;
+\item injections against sums with the expected opposite branch known;
+\item case branches against a common expected type;
+\item applications infer the function's domain/codomain.
+\end{itemize}
+
+This checker is easier to prove and can validate a canonical certificate form in which ambiguous constructs carry type annotations.
+
+\subsection{Phase 2: compatibility with the current Haskell term format}
+
+Add proof-type metavariables and unification so the Lean checker accepts certificates close to the existing \code{ProofCheck.hs}. Prove a translation from the annotated canonical term to the Haskell-style term and, optionally, completeness of elaboration.
+
+This two-stage route reduces risk: the trusted kernel can remain the simple annotated checker even if Haskell emits a compact term plus an untrusted elaboration hint.
+
+\subsection{Phase 3: Haskell refinement tests}
+
+Generate formulas and proof terms in Haskell; serialize them; and require agreement among:
+
+\begin{itemize}
+\item the existing Haskell checker;
+\item the Lean executable checker;
+\item the Lean declarative theorem obtained from successful checking.
+\end{itemize}
+
+Mutation tests should alter constructor tags, branch arities, variable indices, and expected types to ensure certificates are rejected.
+
+\section{Formalizing the LJT rules}
+
+\subsection{Separate derivability from the algorithm state}
+
+Define a clean sequent calculus \code{LJT.Derives} whose contexts are multisets or normalized lists. Then define the executable state used by search, with indexes and caches. Prove a representation invariant connecting them.
+
+This separation prevents performance structures from contaminating every logical proof. Typical invariants include:
+
+\begin{itemize}
+\item each indexed formula occurs in the logical context;
+\item no required formula is lost by normalization;
+\item index categories partition formulas according to their outer connective;
+\item cached reachability information is conservative;
+\item fresh proof-term variables correspond bijectively to context assumptions.
+\end{itemize}
+
+\subsection{Rule soundness}
+
+For every backward rule, prove that derivations of all premises yield a derivation of the conclusion. For proof-producing search, strengthen the theorem to construct the corresponding natural-deduction term.
+
+The implication-left cases are the delicate part. G4ip/LJT replaces unrestricted contraction with specialized rules based on the antecedent's shape. The proof should follow the corrected calculus rather than infer correctness from operational intuition.
+
+\subsection{Invertibility and completeness}
+
+A decision procedure needs the converse direction appropriate to each deterministic reduction: if the conclusion is derivable, then the selected premises contain enough information to continue. Branching rules require at least one branch to be derivable; conjunctive proof obligations require all children.
+
+The implementation's rule priority must be covered. A theorem about a nondeterministic calculus does not automatically justify a deterministic rule-selection strategy unless the selected rules are invertible or permutations are proved admissible.
+
+\subsection{Termination}
+
+Dyckhoff's 1992 paper gives the classic contraction-free calculus, but its termination argument should be formalized using the shortened 2018 correction \cite{dyckhoff1992,dyckhoff2018,dyckhoffnegri2000}. The implementation proof should define a well-founded measure over sequents and show strict decrease for every recursive call after normalization.
+
+Candidate measures include a multiset of formula weights refined by implication shape. The formalization should avoid an opaque \code{termination\_by size} proof that accidentally relies on implementation artifacts; a named mathematical measure will be reusable for the certificate checker and documentation.
+
+\section{Pruning and reachability}
+\label{sec:pruning}
+
+The implementation contains a \code{goalMayBeReachable} optimization. Such pruning is sound only if
+\[
+  \neg\mathsf{goalMayBeReachable}(s)
+  \Longrightarrow
+  \neg\mathsf{Derives}(s).
+\]
+
+This theorem may be easier to prove semantically: construct a simple valuation or syntactic invariant showing that no antecedent can produce the goal's head atom. If the current predicate is too implementation-entangled, the formal checker should ignore the pruning decision. The producer can prune for speed, but a negative certificate must independently close the branch.
+
+This illustrates the general architecture: an optimization need not be verified to remain in production; it only needs to stop being trusted as evidence.
+
+\section{Budgets, laziness, and fairness}
+
+The Haskell engine uses a lazy search structure with configurable alternatives, scheduling, and optional choice-point budget. Formalizing the exact lazy stream is unnecessary for the first logical theorem.
+
+Use three layers:
+
+\begin{enumerate}
+\item a total decision procedure returning one derivation or a refutation;
+\item a finite bounded evaluator with a status theorem;
+\item an enumeration relation describing the set of proof terms the lazy Haskell search may emit.
+\end{enumerate}
+
+Then prove:
+
+\begin{itemize}
+\item every enumerated term checks;
+\item budget exhaustion returns only a bounded status;
+\item unbounded decision is complete and terminating;
+\item optional fairness/order properties separately, if they matter to user-visible ranking.
+\end{itemize}
+
+This avoids trying to prove productivity and exact interleaving before the core logic is secure.
+
+\section{Self-reference and recursive targets}
+
+\Djinn\ distinguishes full uninhabitability from cases where every candidate requires a distinguished target reference. This is not ordinary IPC non-derivability; it is a provenance-sensitive statement.
+
+Formalize it by extending the context with a marked assumption \(r:A\) and defining whether a derivation uses \(r\). The theorem can state:
+\[
+  \forall d:\Gamma,r:A\vdash A,\; \mathsf{uses}(d,r).
+\]
+
+A certificate may annotate each derivation or branch with a dependency bit. This turns the current operational distinction into a precise theorem and may also support cycle diagnostics for recursive provider synthesis.
+
+\section{Do we need a full LJT proof if countermodels are checked?}
+
+Not for external negative soundness. A checked Kripke countermodel already proves non-derivability. A complete LJT formalization remains valuable for four reasons:
+
+\begin{itemize}
+\item it verifies the engine's decision and termination claims;
+\item it can generate proof terms and refutation certificates inside Lean;
+\item it validates search optimizations and status reporting;
+\item it provides a reference implementation against which Haskell can be differentially tested.
+\end{itemize}
+
+The certificate architecture lets this work proceed without blocking a trustworthy product boundary.
+
+\chapter{Formalizing Exference without overclaiming}
+\label{ch:exference}
+
+\section{The correct target is partial correctness}
+
+\Exference\ is intentionally heuristic. Its formal contract should be:
+
+\begin{enumerate}
+\item every emitted candidate is well typed in the declared source calculus;
+\item every transformation between checked boundaries preserves typing or is rechecked;
+\item every operational status accurately describes why enumeration stopped;
+\item configured finite runs terminate;
+\item no negative logical conclusion is inferred from a bounded or pruned run.
+\end{enumerate}
+
+Completeness is not required and should not be smuggled in through the word \code{Exhausted}. Exhaustion is always relative to the configured state graph and pruning policy.
+
+\section{Shared type formalization}
+
+The shared type syntax includes variables, constructors, application, arrows, tuples, and explicit forall types with constraints. A robust Lean representation should distinguish:
+
+\begin{itemize}
+\item flexible unification variables;
+\item rigid skolems;
+\item bound type variables, preferably by de Bruijn index;
+\item globally named type constructors;
+\item quantified schemes and their binder scope;
+\item class constraints as nominal predicates over types.
+\end{itemize}
+
+The main foundational theorems are:
+
+\begin{itemize}
+\item substitution is capture-avoiding;
+\item opening and closing binders are inverse under freshness conditions;
+\item rigid variables are never solved by flexible substitution;
+\item alpha-equivalent schemes have equal checking behavior;
+\item well-kindedness is preserved by substitution.
+\end{itemize}
+
+Even if the first checker proof erases kinds, kind soundness should be added before claiming source-Haskell correctness.
+
+\section{Unification and constraint solving}
+
+\Exference\ has several related unifiers with offsets and directional restrictions. They should not be forced into one generic implementation merely because their code resembles one another. Formalize a common declarative relation, then prove each executable variant satisfies the relation it needs.
+
+For class constraints, define an entailment relation generated by:
+
+\begin{itemize}
+\item assumed query constraints;
+\item superclass closure;
+\item matching instance heads;
+\item recursively discharged instance prerequisites;
+\item cycle guards with a stated semantics.
+\end{itemize}
+
+Soundness means that every solved constraint has a derivation in this relation. Completeness may fail due ordering, overlap policy, and cycle cutoffs; that is acceptable if residual constraints are not silently dropped.
+
+\section{Search-control theorem}
+
+Model the scheduler as a finite transition system parameterized by limits. The status theorem can be stated as:
+
+\begin{lstlisting}[language=LeanFour,caption={Operational status honesty.}]
+theorem run_status_sound :
+  match run cfg initial with
+  | .exhausted out => noRunnableState cfg out.finalState
+  | .stepLimit out => out.steps = cfg.maxSteps
+  | .pruned out    => out.prunedBranches > 0
+  | .idExhausted out => noFreshIdentifier out.finalState
+  | .running _     => True
+\end{lstlisting}
+
+The exact data structures may differ, but each status must have a mechanically checkable witness. A status should never be inferred from an empty lazy list whose evaluation may have been truncated elsewhere.
+
+\section{Simplification and rendering}
+
+Historical audits in the repository found that checked candidates could once be changed by simplification or captured by rendering. The current architecture has been hardened, but these incidents identify excellent regression theorems:
+
+\begin{itemize}
+\item simplification does not introduce a global name absent from the allowed environment;
+\item generated binder spellings are injective and disjoint from rendered global spellings;
+\item qualification policy preserves global identity;
+\item rendering followed by parsing/elaboration preserves the intended binding graph;
+\item any transformation after checking is either proved type-preserving or followed by rechecking.
+\end{itemize}
+
+Leant's final Lean gate already contains the damage from renderer mistakes. Formalizing the properties is still valuable for completeness, deterministic output, and direct Haskell use outside Leant.
+
+\section{What not to prove}
+
+Do not state that \Exference\ is complete for rank-N Haskell inhabitation. Its bounds, pruning, rating, omission policy, class solver, and finite identifier supply are deliberate. The meaningful theorem is that success is valid and failure is honestly labeled.
+
+\chapter{Formalizing Leant's projection}
+\label{ch:projection}
+
+\section{The serializer is already in the right language, but not yet proof carrying}
+
+Leant's serializer is generated Lean meta code executed over an elaborated \code{Lean.Expr}. It instantiates metavariables, reduces to weak-head normal form, recognizes structural constants and inductive families, and emits an S-expression consumed by Haskell. This is a much better starting point than a textual parser because the source object is already elaborated and name-resolved.
+
+However, Lean meta code is not trusted merely because it is written in Lean. \code{MetaM} can inspect and construct expressions incorrectly, pretty-printer strings are not canonical identities, and the serializer currently emits data plus boolean-style completeness information rather than a theorem. The proposed change is:
+
+\begin{quote}
+The serializer becomes an untrusted \emph{certificate producer}; a small Lean checker validates a typed projection certificate against the original target expression.
+\end{quote}
+
+\section{Replace Frag with a checked abstraction object}
+
+The current \code{Frag} datatype usefully records arrows, products, sums, top, bottom, quantified binders, exact contexts, atoms, applications, and finite or recursive inductive descriptions. The formal checker should split this into:
+
+\begin{enumerate}
+\item a small logical formula consumed by the core checker;
+\item a source-node description retaining the exact Lean expression, sort, head constant, parameters, and constructor/eliminator evidence;
+\item an abstraction derivation showing how the source node maps to the logical formula.
+\end{enumerate}
+
+An illustrative evidence family is:
+
+\begin{lstlisting}[language=LeanFour,caption={Projection evidence should explain each abstraction step.}]
+inductive Abstracts (env : LeanEnv) : LeanExpr -> Core.Ty -> Prop
+  | atomMerge
+      (hCanonical : canonicalKey e = k)
+      (hSafe : PureOpaqueAtom env e) :
+      Abstracts env e (.atom k)
+  | arrow
+      (ha : Abstracts env a A)
+      (hb : Abstracts env b B) :
+      Abstracts env (mkArrow a b) (.arr A B)
+  | product
+      (headEvidence : ProductHead env head a b)
+      (ha : Abstracts env a A)
+      (hb : Abstracts env b B) :
+      Abstracts env (mkApp2 head a b) (.prod A B)
+  | sum
+      (headEvidence : SumHead env head a b)
+      (ha : Abstracts env a A)
+      (hb : Abstracts env b B) :
+      Abstracts env (mkApp2 head a b) (.sum A B)
+  | finiteInductive
+      (schema : CheckedFiniteSchema env e core) :
+      Abstracts env e core
+  | overApprox
+      (h : EverySourceTermMaps env e core) :
+      Abstracts env e core
+\end{lstlisting}
+
+The constructor names are schematic. The important requirement is that a certificate cannot claim negative safety without supplying the corresponding proof object.
+
+\section{Recognized connectives}
+
+The current serializer recognizes multiple Lean encodings of the same logical shape: \code{And}/\code{Prod}/\code{PProd}, \code{Or}/\code{Sum}/\code{PSum}, \code{True}/\code{Unit}/\code{PUnit}, \code{False}/\code{Empty}/\code{PEmpty}, \code{Iff}, and \code{Not}. The formalization should prove a small lemma for each recognized head.
+
+\subsection{Products}
+
+For \code{And}, \code{Prod}, and \code{PProd}, prove that any source inhabitant yields two component inhabitants and that component inhabitants reconstruct a source inhabitant. Only the first direction is required for negative soundness. The exact sort and universe levels must be retained in source evidence even if the logical core erases them.
+
+\subsection{Sums}
+
+For \code{Or}, \code{Sum}, and \code{PSum}, prove that any source inhabitant is produced by one of the recognized constructors and therefore maps to a core injection. This uses the inductive declaration's constructor metadata, not only the printed head name.
+
+\subsection{Top and bottom}
+
+For unit-like heads, map the unique constructor to top. For empty-like heads, validate from the environment that the inductive declaration has no constructors and supports the expected elimination. A merely unknown constant with an evocative name must not be accepted as bottom.
+
+\subsection{Iff and Not}
+
+\code{Iff p q} is structurally a pair of implications, while \code{Not p} unfolds to \code{p -> False}. The certificate checker can either reduce these definitionally or use head-specific abstraction lemmas. Keeping the exact source head in evidence improves diagnostics and replay stability.
+
+\section{Sort and universe information}
+\label{sec:sorts}
+
+The logical core deliberately forgets whether a product came from \code{And : Prop} or \code{Prod : Type}. This is acceptable only because the projection evidence records a source-specific mapping. A future direct renderer theorem cannot reconstruct Lean syntax from the erased formula alone.
+
+For negative adequacy, the main issue is not universe equality but whether every source introduction/elimination form maps to the core connective. The checker should nevertheless retain:
+
+\begin{itemize}
+\item the sort of each source node;
+\item universe levels and level parameters;
+\item explicit versus implicit binder information;
+\item dependency information for forall binders;
+\item the exact head constant after weak-head reduction.
+\end{itemize}
+
+This prevents a proof for one head or universe instance from being reused accidentally for another.
+
+\section{Atom identity: canonicalization is a proof obligation}
+\label{sec:atoms}
+
+The current serializer uses printed or generated keys to identify opaque atoms and records whether an atom is safe based partly on whether the expression uses constants. For positive search, a bad key is harmless because Lean rejects invalid reconstructions. For negative search, key behavior is logical.
+
+There are two failure modes:
+
+\begin{description}[style=nextline]
+\item[False splitting]
+Two definitionally equal source expressions receive different abstract atoms. This can remove an identity proof and create a false negative. It is unacceptable.
+\item[False merging]
+Two distinct source expressions receive one abstract atom. This usually makes the abstract calculus more permissive. It may create extra positive candidates, but underivability in the merged abstraction remains safe by uniform substitution. It is therefore an acceptable deliberate over-approximation when documented.
+\end{description}
+
+The certificate checker should avoid relying on pretty printing. Better canonical identities are:
+
+\begin{itemize}
+\item locally nameless expressions after metavariable instantiation and controlled reduction;
+\item structural hashes checked by structural equality rather than trusted alone;
+\item equivalence classes generated by a verified union operation that only merges, never splits, occurrences known to be the same source node;
+\item explicit source-expression references within one certificate rather than global strings.
+\end{itemize}
+
+A theorem should state that every repeated source occurrence maps consistently. Deliberate merging can be represented as a quotient map from source atom IDs to core atom IDs.
+
+\section{Opaque global constants}
+
+The current notion of an unsafe atom correctly reflects a major danger: replacing a structured global proposition or type by an opaque atom can remove constructors, eliminators, reducibility, or existing inhabitants. This is an under-approximation and cannot support a full negative claim.
+
+There are three safe responses:
+
+\begin{enumerate}
+\item Refuse negative certification and continue positive search only.
+\item Add an abstract premise representing every known global inhabitant/provider, producing an over-approximation.
+\item Supply a head-specific abstraction theorem or an exact finite inductive schema.
+\end{enumerate}
+
+The first should remain the default for unknown constants.
+
+\section{Non-recursive inductive families}
+\label{sec:finite-inductives}
+
+A non-recursive inductive instance can be abstracted as a finite sum of constructor payload products. A checked schema must validate:
+
+\begin{itemize}
+\item the exact inductive head and parameters;
+\item every constructor of the instantiated family is included;
+\item constructor result indices unify with the target instance;
+\item constructor arguments are classified correctly as parameters, indices, recursive occurrences, and payload fields;
+\item inaccessible or dependent fields are handled conservatively;
+\item no constructor is silently discarded by a depth or representation bound.
+\end{itemize}
+
+For a simple algebraic datatype
+\[
+  D\;\vec p = C_1\;\vec A_1 \mid \cdots \mid C_n\;\vec A_n,
+\]
+the negative-sound abstraction theorem maps a hypothetical source value by induction/case analysis to one of the core branches. The converse reconstruction theorem is optional because final Lean elaboration checks positive candidates.
+
+Indexed families require more care: some constructors may be impossible at a particular index. Including impossible constructors is a safe over-approximation for negative results; excluding a possible constructor is unsafe. Therefore the checker may choose a simple policy that includes all constructors whose impossibility is not formally established.
+
+\section{Recursive inductive families}
+
+The current code preserves bounded one-layer elimination for compatible recursive families and marks recursive completeness separately. This is an excellent positive feature but not an immediate basis for a full negative theorem.
+
+A one-layer abstraction that replaces recursive tails with opaque atoms is generally an under-approximation if recursive elimination or induction could construct the target. Safe options are:
+
+\begin{itemize}
+\item positive-only treatment, with negative evidence disabled;
+\item a coarser over-approximation that adds enough constructors/eliminators to include every source use, accepting that few formulas will refute;
+\item a formal polynomial-functor/fixed-point semantics for a restricted strictly positive family;
+\item a normal-form theorem showing that every inhabitant relevant to the target uses only the bounded eliminations represented.
+\end{itemize}
+
+The first is the correct initial policy. Recursive-family negative certification should be a later theorem family, not a boolean extension of the finite case.
+
+\section{Forall, rank-N types, and parametricity}
+\label{sec:rankn}
+
+Leant and Djex support sophisticated bounded instantiation plans for quantified hypotheses and impredicative targets. These plans are highly useful for positive synthesis because final Lean checking filters invalid choices. They are much harder to justify for negative results.
+
+Treating a polymorphic type variable as an opaque propositional atom relies on a parametricity principle: source terms must not inspect or branch on the identity of the type. In Haskell, bottoms, \code{seq}, type classes, \code{Typeable}, unsafe coercions, and non-parametric primitives complicate this statement. In Lean, dependent elimination, type classes, universe polymorphism, quotients, and arbitrary global constants complicate it differently.
+
+A certified negative rank-N fragment needs one of the following; the logical-relations route is the classic parametricity approach \cite{reynolds}:
+
+\begin{enumerate}
+\item a syntactically restricted System F-like source term language with a proved abstraction theorem;
+\item a logical-relations/parametricity theorem for the admitted Lean fragment;
+\item explicit semantic counterexamples specialized to the closed target;
+\item a conservative over-approximation that includes all bounded instantiations and refuses to refute when the bound is not proved complete.
+\end{enumerate}
+
+The fourth matches the current honesty policy and should remain in place. Bounded instantiation can contribute candidates; it cannot contribute general negative evidence without a completeness theorem for the frontier.
+
+\section{Type classes and instances}
+
+Contexts and instances become premises or provider-like operations in the abstract calculus. A sound negative theorem requires a closed account of available instance resolution. Important questions include:
+
+\begin{itemize}
+\item Are superclass projections included?
+\item Are overlapping instances resolved with the same priority as Lean?
+\item Can local instances or synthesized instances appear outside the inventory?
+\item Are instance methods opaque providers, or are their definitions unfolded?
+\item Can type-class search use recursive or generated instances not represented in the core?
+\end{itemize}
+
+Until these are formalized, constraints should either disable negative evidence or be represented by an explicit finite assumption set. Positive terms remain safe through final Lean checking.
+
+\section{Local hypotheses and providers}
+
+Local hypotheses are easier than global providers because the target context explicitly lists them. The projection certificate can map each accessible local hypothesis to a core premise and prove that source use of the hypothesis corresponds to the core variable rule.
+
+Quantified local providers need an instantiation policy. For negative soundness, the abstract environment must include every instantiation that a permitted source term could make, or use a genuinely quantified core calculus. A finite query-derived frontier is not complete without a separate theorem. Therefore quantified-provider lanes should remain positive-only unless the source term language itself is restricted to that frontier.
+
+\section{Depth limits and partial translation}
+
+The current translator uses explicit fuel and emits a depth marker when it stops. This is operationally honest. The formal checker should interpret a depth marker as a refusal to establish negative adequacy, not as an atom.
+
+A useful evidence type is:
+
+\begin{lstlisting}[language=LeanFour,caption={Projection result with explicit proof strength.}]
+inductive ProjectionResult (target : LeanExpr) : Type
+  | certified (core : Core.Ty)
+      (scope : Scope)
+      (adequate : NegativeAdequate target scope core)
+  | positiveOnly (core : Core.Ty)
+      (reasons : Array ApproximationReason)
+  | refused (reason : RefusalReason)
+\end{lstlisting}
+
+The Haskell engine can search both \code{certified} and \code{positiveOnly} results. Only the first can combine with a negative certificate.
+
+\section{Proving the projection checker, not the MetaM serializer}
+
+The serializer may remain complex and partial. It emits:
+
+\begin{itemize}
+\item references to source expressions;
+\item proposed connective classifications;
+\item constructor schemas;
+\item atom quotient maps;
+\item provider mappings;
+\item scope declarations.
+\end{itemize}
+
+A pure or mostly pure Lean checker validates these claims by querying the pinned environment through a narrow API and constructs the abstraction proof. This is analogous to elaboration followed by kernel checking: the producer is convenient; the checker is authoritative.
+
+\chapter{Can Leant prove that no Lean term exists?}
+\label{ch:no-lean-term}
+
+\section{Three different domains of quantification}
+
+The sentence ``no Lean term of type \(T\) exists'' can quantify over:
+
+\begin{enumerate}
+\item source terms in a small structural DSL;
+\item elaborated kernel expressions using a finite allowed constant set;
+\item all kernel expressions typeable in the entire current environment.
+\end{enumerate}
+
+The first is readily certifiable. The second is feasible for carefully closed environments and fragments. The third is dramatically stronger and usually inappropriate for an interactive synthesizer with bounded provider discovery.
+
+\section{Why the ambient environment defeats an unrestricted claim}
+
+Suppose the pure structural calculus proves \(T\) underivable. The live Lean environment may nevertheless contain:
+
+\begin{itemize}
+\item a declaration whose type is definitionally equal to \(T\);
+\item an axiom such as a polymorphic inhabitant;
+\item a theorem deriving \(T\) from imported axioms;
+\item a recursive or opaque definition whose type is \(T\);
+\item a provider hidden by namespace, rating, inventory cap, or query relevance filter.
+\end{itemize}
+
+No amount of completeness in LJT excludes these terms unless the environment abstraction includes them. A formal theorem forces this scope question into the type of the result, which is exactly where it belongs.
+
+\section{A restricted kernel-term theorem}
+
+A meaningful intermediate target is to define a reified subset of Lean expressions:
+
+\begin{itemize}
+\item variables, lambdas, and applications;
+\item recognized product/sum/unit/empty constructors and eliminators;
+\item a finite certified constant set;
+\item no recursion, unsafe declarations, macros, metavariables, or sorry;
+\item controlled universe and implicit-argument forms.
+\end{itemize}
+
+Then prove a reification theorem:
+\[
+  E\vdash e:T \ \wedge\ \mathsf{InRestrictedGrammar}(e,L)
+  \Longrightarrow
+  \mathsf{Derives}(\alpha(E,L,T)).
+\]
+
+This produces a genuine statement about elaborated Lean terms, not merely generated syntax, while keeping normalization and environment closure manageable.
+
+\section{Using lean4lean infrastructure}
+
+The \code{lean4lean} repository contains definitions and verification work for Lean expressions, levels, environments, local contexts, type checking, and typing metatheory. It may substantially reduce the cost of stating a restricted-kernel theorem. Potential reuse points are:
+
+\begin{itemize}
+\item reified expression and environment formats;
+\item declarative typing relations;
+\item verified type-checker components;
+\item environment boundary and replay machinery;
+\item expression traversal and name handling.
+\end{itemize}
+
+The new Djex/Leant formalization should not depend on the whole project initially. A small adapter can import only stable expression/typing definitions. Domain-specific structural adequacy remains a separate theorem.
+
+\section{Kernel independence and revision pinning}
+\label{sec:kernel-independence}
+
+On 28 July 2026, Lean issue \#14576 demonstrated that the checked declaration path in a then-current nightly accepted a malformed nested-inductive projection and permitted an axiom-free proof of \code{False}. Pull request \#14577 added the missing type check for parametric arguments of nested inductives and was merged the same day \cite{leanbug14576,leanfix14577}. The Lean revision inspected for this report is after that fix.
+
+The lesson is not that kernel checking is useless; it is that evidence should be reproducible, revision-pinned, and preferably checked through structurally diverse implementations. Discussion around the fix also showed the limits of common-mode diversity: a checker derived closely from the official implementation may reproduce the same omission, whereas a checker organized around independently rechecking exported declaration signatures can reject it.
+
+For Leant artifacts, record:
+
+\begin{itemize}
+\item exact Lean commit/toolchain;
+\item exact imported module hashes;
+\item whether kernel checking was enabled;
+\item checker implementations used;
+\item dependency/axiom manifest;
+\item certificate checker revision.
+\end{itemize}
+
+A small domain-specific proof certificate remains the most attractive independent layer because its checker can be orders of magnitude smaller than a complete Lean kernel.
+
+\section{Object-level refutations as an optional stronger result}
+
+When possible, Leant can synthesize a Lean term of \(T\to\mathsf{False}\), or a theorem \(\neg\mathsf{Nonempty}\,T\), and kernel-check it. This is stronger and easier to consume than a meta-level derivability certificate.
+
+A negative-result pipeline may therefore try, in order:
+
+\begin{enumerate}
+\item synthesize and kernel-check an object-level refutation;
+\item check a semantic/core non-derivability certificate and report its exact scope;
+\item otherwise report only bounded failure.
+\end{enumerate}
+
+The first route is not complete in intuitionistic logic, so the second remains essential.
+
+\chapter{Recommended certification architecture}
+\label{ch:architecture}
+
+\section{Design goal}
+
+Keep \Djex\ and \Leant\ fast and feature-rich while shrinking the trusted computing base. Search, ranking, provider discovery, rendering heuristics, and certificate generation may remain in Haskell and Lean meta code. A small Lean library validates canonical artifacts and exposes theorems.
+
+\section{Components}
+
+\subsection{DjexCert: the logical core}
+
+\code{DjexCert} is a standalone Lean package with no dependency on Leant or the Lean metaprogramming framework. It contains:
+
+\begin{itemize}
+\item core formulas and terms;
+\item well-formedness and declarative typing;
+\item executable positive checker and soundness theorem;
+\item Kripke semantics and countermodel checker;
+\item optional LJT decision procedure and refutation-DAG checker;
+\item canonical certificate codec;
+\item extraction-friendly executable entry points.
+\end{itemize}
+
+This package should be small enough to audit independently and stable enough to version conservatively.
+
+\subsection{Djex producer adapters}
+
+The Haskell repository gains producer-only modules:
+
+\begin{itemize}
+\item convert the current formula/term representation to canonical certificates;
+\item request a finite countermodel after a complete \Djinn\ miss;
+\item include precise bound and approximation metadata;
+\item never label a result certified until the Lean checker returns success.
+\end{itemize}
+
+A local checker executable can be invoked by pipe, file, or FFI. A failed checker call degrades the result to diagnostic output; it does not crash the REPL or produce a trusted claim.
+
+\subsection{LeantProjectionCert: environment-specific abstraction}
+
+A second Lean package depends on Lean's metaprogramming API and, optionally, small pieces of \code{lean4lean}. It checks projection certificates against an elaborated target and environment snapshot. Its output is an adequacy theorem indexed by a scope and provider set.
+
+The package should distinguish:
+
+\begin{itemize}
+\item \code{PositiveProjection}: enough information to render or fit candidates, no negative theorem;
+\item \code{NegativeAdequateProjection}: carries the one-way source-to-core theorem;
+\item \code{Refusal}: source structure could not be classified conservatively.
+\end{itemize}
+
+\subsection{LeantVerifier: fixed-option kernel gate}
+
+A minimal process accepts a target handle and candidate source, checks the candidate with kernel checking forced on, records dependencies, and emits a signed or hashed manifest. It performs no synthesis.
+
+\subsection{Artifact replay}
+
+CI or an explicit \code{:synth --certify} mode writes a self-contained directory:
+
+\begin{lstlisting}[caption={Proposed artifact bundle.}]
+result/
+  Candidate.lean
+  Candidate.olean
+  manifest.json
+  core-positive.cert       # when available
+  projection.cert          # for certified negative scope
+  countermodel.cert        # or refutation.cert
+  transcript.txt           # untrusted diagnostic trace
+\end{lstlisting}
+
+The bundle can be checked without rerunning search.
+
+\section{Data-flow protocol}
+
+A robust protocol is request/response oriented:
+
+\begin{enumerate}
+\item \Leant\ asks the serializer for an elaborated target handle and proposed projection.
+\item The projection checker returns either certified adequacy, positive-only data, or refusal.
+\item \Djex\ searches the core goal and emits candidate or negative payloads.
+\item Positive core payloads are checked by \code{DjexCert}; rendered Lean terms are then checked by \code{LeantVerifier}.
+\item Negative payloads are checked by \code{DjexCert}; only if a negative-adequate projection exists may \Leant\ combine the theorems and display a certified scoped verdict.
+\item Every displayed result includes a strength label and an artifact ID.
+\end{enumerate}
+
+\section{Trusted computing base}
+
+For a positive Lean result, the unavoidable trusted base includes the selected Lean parser/elaborator/kernel binary, imported axioms, and operating-system integrity. The synthesizer and renderer are excluded.
+
+For a core negative result, the trusted base can be smaller:
+
+\begin{itemize}
+\item the Lean kernel checking \code{DjexCert};
+\item the definitions and proofs in \code{DjexCert};
+\item the certificate parser/checker;
+\item the canonical formula supplied to the checker.
+\end{itemize}
+
+For a lifted Leant negative result, add the projection checker and its environment interface. The Haskell search engine remains excluded.
+
+\section{Certificate identity and replay safety}
+
+Every certificate must bind to the exact problem it proves. Use cryptographic hashes or structural digests for accidental mismatch detection, but never treat a hash as proof of structural equality without comparing the corresponding data.
+
+The manifest should bind:
+
+\begin{itemize}
+\item core formula and context;
+\item original target expression serialization;
+\item environment/module fingerprint;
+\item allowed provider set and scope flags;
+\item checker schema and theorem package versions;
+\item result artifact hashes.
+\end{itemize}
+
+A stale certificate from a previous session or environment must be rejected even when the pretty-printed goal looks identical.
+
+\section{Failure semantics}
+
+The system should be fail-closed for claims and fail-open for exploration:
+
+\begin{itemize}
+\item certificate parse/check failure: candidate may still be sent to Lean for ordinary positive verification, but no core certificate label is shown;
+\item verifier unavailable: show unverified engine output only in an explicitly diagnostic mode, never as a verified candidate;
+\item projection proof unavailable: allow positive search, disable negative certification;
+\item countermodel generation failure: report no certificate, not a refutation;
+\item replay checker disagreement: quarantine the artifact and display the disagreement prominently.
+\end{itemize}
+
+This policy preserves the interactive usefulness of Leant while making strong labels dependable.
+
+\chapter{Concrete Lean specification skeleton}
+\label{ch:skeleton}
+
+This chapter gives a plausible interface for the first formal package. It is intentionally small and avoids committing to every implementation detail. The listings are design-level Lean 4 sketches; they were not compiled as part of producing this report because the execution environment did not contain a Lean toolchain.
+
+\section{Core syntax and typing}
+
+\begin{lstlisting}[language=LeanFour,caption={Core definitions.}]
+namespace DjexCert
+
+abbrev Atom := Nat
+
+inductive Formula where
+  | atom : Atom -> Formula
+  | bot  : Formula
+  | top  : Formula
+  | and  : Formula -> Formula -> Formula
+  | or   : Formula -> Formula -> Formula
+  | imp  : Formula -> Formula -> Formula
+  deriving DecidableEq, Repr
+
+inductive Term where
+  | var    : Nat -> Term
+  | lam    : Term -> Term
+  | app    : Term -> Term -> Term
+  | triv   : Term
+  | pair   : Term -> Term -> Term
+  | fst    : Term -> Term
+  | snd    : Term -> Term
+  | inl    : Term -> Term
+  | inr    : Term -> Term
+  | cases  : Term -> Term -> Term -> Term
+  | abort  : Term -> Term
+  deriving DecidableEq, Repr
+
+abbrev Context := List Formula
+
+inductive HasType : Context -> Term -> Formula -> Prop where
+  | var (h : ctx[n]? = some a) : HasType ctx (.var n) a
+  | lam (h : HasType (a :: ctx) body b) :
+      HasType ctx (.lam body) (.imp a b)
+  | app (hf : HasType ctx f (.imp a b))
+        (hx : HasType ctx x a) :
+      HasType ctx (.app f x) b
+  | triv : HasType ctx .triv .top
+  | pair (ha : HasType ctx x a) (hb : HasType ctx y b) :
+      HasType ctx (.pair x y) (.and a b)
+  | fst (h : HasType ctx p (.and a b)) :
+      HasType ctx (.fst p) a
+  | snd (h : HasType ctx p (.and a b)) :
+      HasType ctx (.snd p) b
+  | inl (h : HasType ctx x a) :
+      HasType ctx (.inl x) (.or a b)
+  | inr (h : HasType ctx y b) :
+      HasType ctx (.inr y) (.or a b)
+  | cases (hs : HasType ctx s (.or a b))
+      (hl : HasType (a :: ctx) l c)
+      (hr : HasType (b :: ctx) r c) :
+      HasType ctx (.cases s l r) c
+  | abort (h : HasType ctx x .bot) :
+      HasType ctx (.abort x) a
+
+end DjexCert
+\end{lstlisting}
+
+The actual implementation should add lifting and substitution lemmas early. These will be needed by both the checker proof and sequent-to-natural-deduction translation.
+
+\section{Annotated executable checker}
+
+The smallest checker can require annotations on eliminators and ambiguous introductions:
+
+\begin{lstlisting}[language=LeanFour,caption={A deliberately simple trusted checker interface.}]
+namespace DjexCert
+
+inductive CheckedTerm where
+  | var    : Nat -> CheckedTerm
+  | lam    : Formula -> CheckedTerm -> CheckedTerm
+  | app    : Formula -> Formula -> CheckedTerm -> CheckedTerm -> CheckedTerm
+  | triv   : CheckedTerm
+  | pair   : CheckedTerm -> CheckedTerm -> CheckedTerm
+  | fst    : Formula -> Formula -> CheckedTerm -> CheckedTerm
+  | snd    : Formula -> Formula -> CheckedTerm -> CheckedTerm
+  | inl    : Formula -> CheckedTerm -> CheckedTerm
+  | inr    : Formula -> CheckedTerm -> CheckedTerm
+  | cases  : Formula -> Formula -> Formula ->
+             CheckedTerm -> CheckedTerm -> CheckedTerm -> CheckedTerm
+  | abort  : Formula -> CheckedTerm -> CheckedTerm
+
+-- Returns an erased raw term when all annotations are consistent.
+def check : Context -> Formula -> CheckedTerm -> Option Term
+
+/-- The foundational positive-certificate theorem. -/
+theorem check_sound
+    (h : check ctx expected cert = some term) :
+    HasType ctx term expected
+
+end DjexCert
+\end{lstlisting}
+
+Haskell can emit the annotations. If they are wrong, checking fails. This design avoids trusting a unifier in the first trusted base. A compact unannotated certificate and a proved elaborator can be added later.
+
+\section{Kripke semantics}
+
+\begin{lstlisting}[language=LeanFour,caption={Finite Kripke countermodel interface.}]
+namespace DjexCert
+
+structure FiniteKripke (nAtoms : Nat) where
+  nWorlds : Nat
+  le      : Fin nWorlds -> Fin nWorlds -> Bool
+  atom    : Fin nWorlds -> Fin nAtoms -> Bool
+  le_refl  : forall w, le w w = true
+  le_trans : forall u v w,
+    le u v = true -> le v w = true -> le u w = true
+  atom_mono : forall u v p,
+    le u v = true -> atom u p = true -> atom v p = true
+
+def Forces (m : FiniteKripke nAtoms)
+    (w : Fin m.nWorlds) : Formula -> Prop
+  | .atom p => m.atom w p = true
+  | .bot    => False
+  | .top    => True
+  | .and a b => Forces m w a /\ Forces m w b
+  | .or a b  => Forces m w a \/ Forces m w b
+  | .imp a b => forall v, m.le w v = true ->
+                  Forces m v a -> Forces m v b
+
+inductive Derives : Context -> Formula -> Prop
+  -- G4ip or natural-deduction/sequent rules
+
+theorem derives_sound_kripke
+    (d : Derives ctx goal) :
+    forall m w,
+      (forall a, a in ctx -> Forces m w a) -> Forces m w goal
+
+structure Countermodel (ctx : Context) (goal : Formula) where
+  model : FiniteKripke (atomBound ctx goal)
+  root  : Fin model.nWorlds
+  assumptions : forall a, a in ctx -> Forces model root a
+  refutes : Not (Forces model root goal)
+
+theorem countermodel_no_derivation
+    (c : Countermodel ctx goal) :
+    Not (Derives ctx goal)
+
+end DjexCert
+\end{lstlisting}
+
+In executable certificates, the proof fields of \code{FiniteKripke} and \code{Countermodel} need not be serialized. A boolean checker validates the finite order, monotonic valuation, assumptions, and failure; a reflection theorem converts successful computation into these structures.
+
+\section{Reflection pattern}
+
+\begin{lstlisting}[language=LeanFour,caption={Certificate checking by reflection.}]
+def checkCountermodel
+    (ctx : Context) (goal : Formula) (raw : RawModel) : Bool :=
+  checkShape raw &&
+  checkPreorder raw &&
+  checkMonotonicity raw &&
+  ctx.all (eval raw raw.root) &&
+  not (eval raw raw.root goal)
+
+theorem checkCountermodel_sound
+    (h : checkCountermodel ctx goal raw = true) :
+    Not (Derives ctx goal)
+\end{lstlisting}
+
+This theorem is the trusted negative boundary. The model finder is irrelevant to its soundness.
+
+\section{Projection adequacy interface}
+
+A first Leant-specific formal statement may avoid full \code{Lean.Expr} metatheory by defining a checked structural view:
+
+\begin{lstlisting}[language=LeanFour,caption={Restricted structural source view.}]
+namespace LeantCert
+
+inductive SourceView where
+  | local  : FVarId -> SourceView
+  | arrow  : SourceView -> SourceView -> SourceView
+  | product : ProductWitness -> SourceView -> SourceView -> SourceView
+  | sum     : SumWitness -> SourceView -> SourceView -> SourceView
+  | top     : TopWitness -> SourceView
+  | bottom  : BottomWitness -> SourceView
+  | atom    : PureAtomWitness -> SourceView
+
+structure Projection (target : Lean.Expr) where
+  view : SourceView
+  core : DjexCert.Formula
+  matchesTarget : ViewDenotes target view
+  negativeAdequate :
+    forall term, RestrictedLeanTerm term target ->
+      DjexCert.Derives [] core
+
+end LeantCert
+\end{lstlisting}
+
+The first version can state \code{RestrictedLeanTerm} as an inductive syntax rather than all kernel expressions. Later versions can connect it to \code{Lean.Expr} typing and environment semantics.
+
+\section{Combining the theorems}
+
+The final negative theorem is tiny once its premises are available:
+
+\begin{lstlisting}[language=LeanFour,caption={The lifted negative theorem.}]
+theorem no_restricted_lean_term
+    (p : Projection target)
+    (c : DjexCert.Countermodel [] p.core) :
+    Not (Exists fun term => RestrictedLeanTerm term target) := by
+  intro h
+  cases h with
+  | intro term ht =>
+    have d : DjexCert.Derives [] p.core :=
+      p.negativeAdequate term ht
+    exact (DjexCert.countermodel_no_derivation c) d
+\end{lstlisting}
+
+This is the central logical shape of the project. Most of the work lies in constructing the two premises honestly.
+
+\chapter{Implementation roadmap}
+\label{ch:roadmap}
+
+The roadmap is ordered by dependency and assurance value, not by calendar estimates.
+
+\section{Phase 0: freeze claim vocabulary and evidence types}
+
+\textbf{Deliverables}
+\begin{itemize}
+\item A short specification defining candidate, bounded miss, structural refutation, provider-relative refutation, and full-environment claim.
+\item Versioned result/evidence types in Haskell.
+\item User-facing messages updated to reflect scope.
+\end{itemize}
+
+\textbf{Exit criterion}
+
+No code path can turn timeout, pruning, opaque translation, bounded instantiation, or provider discovery failure into a logically stronger result type.
+
+\section{Phase 1: DjexCert formula, term, and annotated checker}
+
+\textbf{Deliverables}
+\begin{itemize}
+\item Lean definitions for core syntax and typing.
+\item Canonical annotated certificate format.
+\item Executable checker and \code{check\_sound} theorem.
+\item Port of representative \Djinn\ regression examples.
+\end{itemize}
+
+\textbf{Exit criterion}
+
+Every accepted certificate yields a theorem of declarative typing; malformed certificates are rejected by tests and mutation cases.
+
+\section{Phase 2: Haskell positive-certificate integration}
+
+\textbf{Deliverables}
+\begin{itemize}
+\item \Djex\ emits canonical certificates for all \Djinn\ candidates.
+\item A checker executable or library validates them.
+\item Public results distinguish internally generated from Lean-certified candidates.
+\end{itemize}
+
+\textbf{Exit criterion}
+
+Disabling or corrupting the Haskell proof checker cannot cause an invalid certificate to be labeled valid by the external Lean checker.
+
+\section{Phase 3: finite Kripke countermodel checker}
+
+\textbf{Deliverables}
+\begin{itemize}
+\item Finite Kripke semantics and derivability soundness proof.
+\item Raw model checker and reflection theorem.
+\item An untrusted model generator, initially separate from LJT.
+\item Countermodels for representative unprovable formulas, including intuitionistically but not classically invalid cases.
+\end{itemize}
+
+\textbf{Exit criterion}
+
+A \Djinn\ negative verdict is labeled certified only when Lean accepts a countermodel or refutation certificate for the exact core sequent.
+
+\section{Phase 4: harden Leant's positive verifier}
+
+\textbf{Deliverables}
+\begin{itemize}
+\item Dedicated fixed-option verifier backend.
+\item Explicit forcing of kernel checking.
+\item Stable target/environment fingerprints.
+\item Axiom/dependency manifest.
+\item Replayable candidate module.
+\end{itemize}
+
+\textbf{Exit criterion}
+
+Every displayed ``kernel-verified'' candidate has a replayable artifact and cannot be affected by interactive \code{debug.skipKernelTC} settings.
+
+\section{Phase 5: certified pure structural projection}
+
+\textbf{Initial grammar}
+\[
+  A ::= p \mid \bot \mid \top \mid A\to A \mid A\times A \mid A+A.
+\]
+
+\textbf{Source restrictions}
+\begin{itemize}
+\item closed target modulo explicitly bound type/proposition parameters;
+\item no arbitrary global constants or type-class synthesis;
+\item recognized structural heads only;
+\item no recursive inductive expansion;
+\item no bounded rank-N hypothesis instantiation in negative mode;
+\item local premises mapped explicitly.
+\end{itemize}
+
+\textbf{Exit criterion}
+
+Leant can combine a checked projection theorem and a checked core countermodel to report ``no inhabitant in the pure structural fragment.''
+
+\section{Phase 6: explicit provider-relative negatives}
+
+\textbf{Deliverables}
+\begin{itemize}
+\item Provider certificates containing exact elaborated type and core abstraction.
+\item Result theorem indexed by the finite provider set.
+\item UI and artifact manifest displaying that set.
+\end{itemize}
+
+\textbf{Exit criterion}
+
+Adding or removing a provider changes the certified problem identity, and no result is described as full-environment non-inhabitance.
+
+\section{Phase 7: full LJT decision-procedure formalization}
+
+\textbf{Deliverables}
+\begin{itemize}
+\item Formal G4ip/LJT sequent calculus.
+\item Rule soundness, invertibility, completeness, and corrected termination proof.
+\item Verified decision procedure.
+\item Refinement relation to Haskell search states and pruning.
+\end{itemize}
+
+\textbf{Exit criterion}
+
+The Lean decision procedure returns either a derivation or a proof of non-derivability for every well-formed formula, and the Haskell engine is differentially tested against it.
+
+\section{Phase 8: Exference partial correctness}
+
+\textbf{Deliverables}
+\begin{itemize}
+\item Shared type/substitution formalization.
+\item Contextual checker and unifier soundness.
+\item Constraint entailment and solver soundness.
+\item Scheduler termination/status theorem.
+\end{itemize}
+
+\textbf{Exit criterion}
+
+Every public \Exference\ candidate is either checked by the formal checker or by the final Lean source checker; every stopped run has an honest operational reason.
+
+\section{Phase 9: richer projection families}
+
+Add features only with a named theorem:
+
+\begin{itemize}
+\item finite non-recursive inductive schemas;
+\item indexed families with conservative constructor inclusion;
+\item restricted prenex polymorphism;
+\item logical-relations support for selected rank-N fragments;
+\item instance/provider closure for selected environments;
+\item strictly positive recursive families with formal fixed-point semantics.
+\end{itemize}
+
+Each extension should preserve the ability to run positive-only when negative adequacy is unavailable.
+
+\section{Phase 10: optional exact implementation refinement}
+
+Possible routes include:
+
+\begin{itemize}
+\item translate a pure Haskell subset to Lean and prove functional equivalence;
+\item extract the verified Lean decision procedure and compare traces;
+\item use property-based bisimulation between Haskell and Lean states;
+\item model GHC-specific operational behavior only for the small certificate producer boundary.
+\end{itemize}
+
+This phase is optional because the certificate checker already excludes the producer from the logical trusted base.
+
+\chapter{Testing, CI, and adversarial validation}
+\label{ch:testing}
+
+Formal proofs reduce the burden on tests; they do not eliminate testing. Tests remain essential for connecting Haskell producers, certificate codecs, environment fingerprints, and the compiled Lean checker.
+
+\section{Four complementary test layers}
+
+\subsection{Proof-level unit examples}
+
+Inside Lean, construct small formulas, terms, and models whose outcomes are known. Examples should include:
+
+\begin{itemize}
+\item identity, composition, currying, product/sum associativity, and distributive plumbing;
+\item uninhabited atomic targets under empty context;
+\item \((A\to B)\to A\to B\);
+\item Peirce's law and excluded middle, requiring multi-world countermodels;
+\item formulas with top and bottom;
+\item malformed de Bruijn indices and branch types;
+\item model valuations that violate monotonicity.
+\end{itemize}
+
+The goal is to exercise reflection reductions and certificate error paths in addition to theorem statements.
+
+\subsection{Cross-language property tests}
+
+Generate bounded random formulas and terms in Haskell, then compare:
+
+\begin{itemize}
+\item existing \Djinn\ checker acceptance;
+\item Lean certificate checker acceptance;
+\item source rendering followed by Haskell/Lean parsing;
+\item \Djinn\ unbounded decision versus the verified Lean reference procedure, when available;
+\item countermodel evaluation in Haskell versus Lean.
+\end{itemize}
+
+Existing \Djex\ property tests for independently checked generated proofs, identity inhabitation, budget-prefix behavior, and rendering round trips are an excellent seed corpus. They become executable refinement checks rather than the sole correctness argument.
+
+\subsection{Mutation testing}
+
+Every accepted artifact should be mutated systematically:
+
+\begin{itemize}
+\item change one atom ID;
+\item swap a product field or sum branch;
+\item increment a variable index;
+\item alter one constructor arity;
+\item delete a refutation child;
+\item add a cycle to a DAG;
+\item break Kripke monotonicity;
+\item change the root or provider set;
+\item change target or environment fingerprint;
+\item flip the \code{debug.skipKernelTC} option in the interactive session.
+\end{itemize}
+
+The checker must reject every mutation that invalidates the theorem. Mutation testing is especially good at finding fields accidentally omitted from a digest or comparison.
+
+\subsection{End-to-end replay tests}
+
+For each release artifact:
+
+\begin{enumerate}
+\item start from a clean project and pinned toolchain;
+\item replay the generated \code{.lean} module;
+\item run \code{leanchecker};
+\item optionally run \code{lean4lean};
+\item compare the axiom/dependency manifest;
+\item verify all core and projection certificates without running search;
+\item confirm that changing the imported environment invalidates the manifest.
+\end{enumerate}
+
+\section{Regression cases derived from historical boundaries}
+
+The repository's own audits identify high-value adversarial cases:
+
+\begin{itemize}
+\item a candidate is checked, then simplification changes its binding structure;
+\item a rendered local name captures a global constant or vice versa;
+\item a unifier accepts a rigid-variable escape;
+\item search truncation is mistaken for exhaustion;
+\item an approximated rank-N goal contributes negative evidence;
+\item an inductive family occurrence is accidentally split or merged by a display key;
+\item a provider-free refutation survives an unseen live provider;
+\item a session option disables the intended kernel gate.
+\end{itemize}
+
+Each case should have both a producer regression test and, where applicable, a certificate-level rejection test.
+
+\section{CI matrix}
+
+A useful CI matrix separates proof, producer, and integration concerns:
+
+\begin{longtable}{L{0.22\textwidth} L{0.32\textwidth} L{0.37\textwidth}}
+\toprule
+\textbf{Job} & \textbf{Inputs} & \textbf{Required result} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Job} & \textbf{Inputs} & \textbf{Required result} \\
+\midrule
+\endhead
+Lean formal library & Pinned Lean toolchain & All theorems compile; no sorry in trusted modules; axiom report matches allow-list \\
+Haskell unit/property suite & Current GHC/Cabal matrix & Existing behavior and status tests pass \\
+Certificate differential & Generated bounded corpus & Haskell and Lean checkers agree on valid/invalid certificates \\
+Model differential & Generated formulas/models & Evaluation and monotonicity checks agree \\
+Leant verifier hardening & Interactive option fuzzing & Kernel checking remains enabled in verifier; invalid declarations never pass \\
+Environment scope & Projects with hidden axioms/providers & Structural negative never masquerades as full-environment negative \\
+Replay & Generated artifact bundles & Compiler, \code{leanchecker}, and optional independent checker accept the exact artifacts \\
+Compatibility & Previous schema versions & Supported versions replay; unsupported versions fail explicitly \\
+Adversarial parser & Fuzzed certificate bytes & Deterministic rejection without resource blowup or partial acceptance \\
+\bottomrule
+\end{longtable}
+
+\section{Performance tests without weakening proofs}
+
+Certificate checking should have explicit resource bounds, but a bound failure is an operational error rather than a logical result. Track:
+
+\begin{itemize}
+\item certificate size versus formula size;
+\item checker time and peak memory;
+\item DAG sharing ratio;
+\item Kripke world count;
+\item parser depth and integer limits;
+\item cost of environment/projection validation;
+\item official and independent replay time.
+\end{itemize}
+
+If a certificate exceeds the checker budget, Leant should retain the ordinary bounded-search message. It must not trust the producer's claim merely because verification is expensive.
+
+\chapter{Risks and mitigations}
+\label{ch:risks}
+
+\begin{longtable}{L{0.21\textwidth} L{0.31\textwidth} L{0.39\textwidth}}
+\toprule
+\textbf{Risk} & \textbf{Failure mode} & \textbf{Mitigation} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Risk} & \textbf{Failure mode} & \textbf{Mitigation} \\
+\midrule
+\endhead
+Scope inflation & A theorem about a restricted calculus is described as a theorem about all Lean or Haskell terms & Index evidence by explicit language/environment scope; use precise UI labels; include provider manifest \\
+Common-mode checking & Official Lean and a derived checker share the same conceptual omission & Add a small domain-specific checker; use structurally diverse replay; pin revisions; retain source artifacts \\
+Mutable verifier options & Interactive \code{:set debug.skipKernelTC true} weakens positive checking & Dedicated verifier process; force option false locally; regression test \\
+Pretty-print identity & Alpha-equivalent or definitionally equal atoms split, or unrelated nodes collide unexpectedly & Canonical structural IDs; checked quotient maps; compare expressions, not only hashes or strings \\
+Opaque structure & A global proposition/type is collapsed to an atom, removing valid constructions & Positive-only fallback; head-specific certificates; conservative over-approximation \\
+Provider incompleteness & A live constant inhabits the target but was outside the bounded inventory & Never claim full environment; certify explicit provider set or environment closure \\
+Rank-N frontier incompleteness & Bounded instantiation misses a valid polymorphic use & Disable negative evidence unless frontier completeness or parametricity is proved \\
+Recursive-family truncation & One-layer view omits recursive eliminations or induction & Positive-only initially; later fixed-point semantics or proved normal-form restriction \\
+Haskell bottom & ``Uninhabited Haskell type'' is false under ordinary non-strict semantics & State total core-term claim; do not quantify over \code{undefined}, exceptions, or unsafe features \\
+Certificate blowup & Complete refutation trees become too large & DAG sharing; prefer Kripke models; compress untrusted envelope but check canonical decompression \\
+Parser/codec bug & Haskell and Lean interpret the same bytes differently & Canonical grammar; versioning; round-trip properties; length-delimited fields; independent parser fuzzing \\
+Theorem/package drift & Lean upgrades change expression or environment behavior & Pin toolchains; explicit compatibility layer; artifact manifests; upgrade proofs before strengthening labels \\
+Axiom ambiguity & Kernel-checked candidate depends on user axioms or sorry-bearing imports & Collect dependencies; display/allow-list axioms; distinguish type correctness from axiom policy \\
+Over-verifying Haskell & Project stalls on GHC semantics before any user-visible assurance ships & Maintain certificate-first roadmap; exact refinement is optional final layer \\
+\bottomrule
+\end{longtable}
+
+\section{A note on proof maintenance}
+
+The formal library should keep its logical core independent of Lean metaprogramming internals. Formula, term, typing, Kripke semantics, and certificate checkers are stable mathematics. Only the Leant projection adapter should track changes to \code{Lean.Expr}, inductive metadata, environment APIs, and module formats.
+
+This separation is the main maintenance defense against Lean's rapid development.
+
+\chapter{Recommended user-facing semantics}
+\label{sec:wording}
+
+Correct labels are part of correctness. The UI should expose evidence strength rather than compress it into success/failure.
+
+\section{Positive labels}
+
+\begin{description}[style=nextline]
+\item[Lean-kernel verified candidate]
+The fixed-option verifier accepted a declaration at the exact target in the recorded environment.
+\item[Lean-kernel verified; dependencies listed]
+As above, with an explicit axiom/declaration dependency manifest.
+\item[Core-certificate checked]
+The corresponding \Djinn/\Exference\ core certificate passed the formally proved checker. This is supplementary when a Lean term is also checked.
+\item[Engine candidate, unverified]
+Diagnostic mode only; never the default display category.
+\end{description}
+
+\section{Negative labels}
+
+\begin{description}[style=nextline]
+\item[Certified structurally uninhabited]
+No term exists in the pure structural calculus represented by the checked projection.
+\item[Certified uninhabited relative to providers \(P\)]
+No permitted term exists using only the explicitly listed provider set.
+\item[Core formula refuted]
+A checked countermodel/refutation establishes non-derivability of the abstract sequent, but no source adequacy theorem was available.
+\item[No candidate found within bounds]
+Search stopped without a logical verdict.
+\item[Positive-only projection]
+The goal was approximated in a way suitable for candidate generation but unsuitable for negative reasoning.
+\item[Out of certified fragment]
+The translator refused to make a claim because the source structure or environment could not be abstracted conservatively.
+\end{description}
+
+\section{Suggested replacement for the current strongest message}
+
+Instead of
+\begin{quote}
+``provably uninhabited -- no closed term of this polymorphic type exists,''
+\end{quote}
+use one of:
+
+\begin{quote}
+``certified: no inhabitant exists in the pure structural term language''
+\end{quote}
+
+or
+
+\begin{quote}
+``certified relative to 12 listed providers: no permitted inhabitant exists''
+\end{quote}
+
+A secondary note can explain that the result is constructive/meta-theoretic and does not prove the object's negation. If a full environment theorem or object-level refutation is actually available, it may receive a stronger label.
+
+\section{Machine-readable strength}
+
+The REPL output is not enough. JSON/transcript output should include:
+
+\begin{lstlisting}[caption={Illustrative result strength metadata.}]
+{
+  "kind": "negative",
+  "strength": "structural-calculus",
+  "coreCertificate": "kripke-v1",
+  "projectionCertificate": "lean-structural-v1",
+  "scope": {
+    "globalConstants": "forbidden-except-structural-heads",
+    "providers": [],
+    "rankN": "positive-only",
+    "recursiveInductives": "positive-only"
+  },
+  "environmentFingerprint": "...",
+  "leanRevision": "1d2dde6d..."
+}
+\end{lstlisting}
+
+This makes downstream automation robust against wording changes.
+
+\chapter{Prioritized theorem inventory}
+\label{ch:inventory}
+
+\begin{longtable}{L{0.07\textwidth} L{0.235\textwidth} L{0.365\textwidth} L{0.19\textwidth}}
+\toprule
+\textbf{ID} & \textbf{Theorem} & \textbf{Statement sketch} & \textbf{Dependency} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{ID} & \textbf{Theorem} & \textbf{Statement sketch} & \textbf{Dependency} \\
+\midrule
+\endhead
+D1 & Core weakening & Typing is preserved when the context is extended with correctly shifted variables & Syntax/typing \\
+D2 & Core substitution & Substituting a well-typed term for the newest variable preserves typing & D1 \\
+D3 & Annotated checker soundness & \code{check ctx A c = some t} implies \code{HasType ctx t A} & D1--D2 \\
+D4 & Haskell certificate normalization & A well-formed Haskell formula/term certificate decodes to the same normalized core object & Codec, metadata \\
+D5 & Unification soundness & Successful proof-type unification satisfies all generated equations & Substitution/occurs check \\
+D6 & Compact checker soundness & Current-style unannotated proof checking implies declarative typing & D3, D5 \\
+L1 & G4ip rule soundness & Derivations of premises yield a derivation of the conclusion & Sequent calculus \\
+L2 & Rule invertibility/complete branching & A derivation of a conclusion yields derivability of required child branch(es) & L1, structural rules \\
+L3 & Termination measure & Every recursive decision call strictly decreases a well-founded measure & Corrected G4ip measure \\
+L4 & Decision soundness & A returned proof is a derivation & L1 \\
+L5 & Decision completeness & A negative decision implies no derivation & L2--L3 \\
+L6 & Haskell search refinement & Haskell unbounded search result corresponds to verified decision/certificate & State invariants \\
+K1 & Kripke monotonicity & Forcing is monotone along accessibility & Model definition \\
+K2 & Derivability semantic soundness & Derivable sequents hold in every Kripke model & K1, typing/rules \\
+K3 & Countermodel checker soundness & Accepted raw model implies no derivation & K2, reflection \\
+E1 & Shared type substitution & Capture-avoiding substitution preserves scope/kinding & Type syntax \\
+E2 & Exference unifier soundness & Solved equations hold and rigid variables remain rigid & E1 \\
+E3 & Constraint solver soundness & Every discharged class constraint is derivable from declared instances/premises & Instance relation \\
+E4 & Expression checker soundness & Accepted expression has the claimed type and no escaped rigid obligations & E1--E3 \\
+E5 & Scheduler status honesty & Each completion status has its documented operational witness & Finite transition model \\
+P1 & Structural-head recognition & Checked Lean heads implement the corresponding core connective abstraction & Lean environment adapter \\
+P2 & Atom quotient safety & Every source atom occurrence maps consistently; deliberate merges preserve derivability & Canonical IDs, substitution \\
+P3 & Pure projection adequacy & Every restricted source inhabitant maps to a core derivation & P1--P2 \\
+P4 & Finite-inductive adequacy & Every value of a checked non-recursive family maps to a sum-of-products derivation & Constructor schema \\
+P5 & Provider adequacy & Every use of a listed provider maps to the corresponding core premise & Elaborated provider type \\
+V1 & Fixed verifier soundness & Accepted artifact was kernel checked with required options and exact target/environment & Verifier protocol \\
+V2 & Dependency manifest soundness & Listed axioms/declarations cover the accepted candidate's dependencies & Environment traversal \\
+C1 & Structural negative lift & Core refutation plus P3 implies no restricted Lean inhabitant & K3 or L5, P3 \\
+C2 & Provider-relative negative lift & Core refutation plus P3/P5 implies no inhabitant using provider set \(P\) & K3 or L5, P3/P5 \\
+\bottomrule
+\end{longtable}
+
+\chapter{Source-to-obligation map}
+\label{ch:source-map}
+
+\section{Djex modules}
+
+\begin{longtable}{L{0.32\textwidth} L{0.59\textwidth}}
+\toprule
+\textbf{Source module} & \textbf{Formalization relevance} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Source module} & \textbf{Formalization relevance} \\
+\midrule
+\endhead
+\path|synthesis/.../Type.hs| & Shared type grammar, substitution, validation, rigid/flexible distinction, forall and constraint syntax \\
+\path|Djinn/Internal/LJTFormula.hs| & Formula and proof-term grammar, metadata validation, source of canonical certificate mapping \\
+\path|Djinn/Internal/ProofCheck.hs| & Independent checker, proof-type metavariables, unification, occurs check; highest-priority proof target \\
+\path|Djinn/Internal/LJT.hs| & Actual search rules, state organization, pruning, scheduling, and budget semantics \\
+\path|Djinn/Core.hs| & Translation plans, negative-evidence flags, search completion, internal checking, and public evidence classification \\
+\path|Exference/Core/ExpressionCheck.hs| & Contextual candidate checker, deconstructor typing, rigid provenance, residual constraints \\
+\path|Exference/Core/Internal/SearchControl.hs| & Branch scheduling, truncation, and identifier allocation \\
+\path|Exference/Core/Internal/Exference.hs| & Public validated-candidate boundary and rich completion status \\
+\path|djinn/test-property/PropertySpec.hs| & Existing randomized regression corpus to reuse for checker/refinement testing \\
+\bottomrule
+\end{longtable}
+
+\section{Leant modules}
+
+\begin{longtable}{L{0.32\textwidth} L{0.59\textwidth}}
+\toprule
+\textbf{Source module} & \textbf{Formalization relevance} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Source module} & \textbf{Formalization relevance} \\
+\midrule
+\endhead
+\path|Leant/Synth/Fragment.hs| & Lean meta serializer, structural grammar, atom safety, fuel/depth, inductive schemas, current projection completeness predicate \\
+\path|Leant/Synth/Engine.hs| & Engine routing, refutation strength, projection/family completeness gating, Exference non-refutation policy \\
+\path|Leant/Synth/Render.hs| & Positive-only renderer variants and the boundary at which textual ambiguity is delegated to Lean \\
+\path|src/Main.hs| & Goal translation, provider lanes, timeout semantics, classical fallback, candidate verification, display, and current strongest negative wording \\
+\bottomrule
+\end{longtable}
+
+\section{Lean modules and adjacent projects}
+
+\begin{longtable}{L{0.32\textwidth} L{0.59\textwidth}}
+\toprule
+\textbf{Source} & \textbf{Formalization relevance} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Source} & \textbf{Formalization relevance} \\
+\midrule
+\endhead
+\path|Lean/AddDecl.lean| & Exact kernel-check option boundary and sorry warning behavior \\
+\path|LeanChecker.lean| & Official declaration replay; useful second path but not an external verifier \\
+\code{lean4lean} & Reified Lean expressions/environments/type checking and verification infrastructure; optional independent replay and reusable metatheory \\
+LeanSAT / \code{Std.Tactic.BVDecide} & Established pattern of untrusted high-performance producer plus verified certificate checker \\
+Lean issue \#14576 and PR \#14577 & Recent example motivating revision pinning, fixed verifier options, and structurally diverse checking \\
+\bottomrule
+\end{longtable}
+
+\chapter{Conclusions}
+\label{ch:conclusion}
+
+The possibility investigated in this report is real and technically promising. A formalization does not need to wait for a complete semantics of GHC Haskell or a full normalization theorem for arbitrary Lean environments. The repositories already contain the right seams for a certificate-oriented design.
+
+The most important conclusions are:
+
+\begin{enumerate}
+\item \textbf{Positive correctness can be made very strong immediately.} Harden Leant's existing kernel gate, force kernel checking on, persist declarations, and report dependencies. Search and rendering remain untrusted.
+\item \textbf{Djinn's independent proof checker is the best first formal theorem.} Its soundness is small, useful, and directly connected to current implementation behavior.
+\item \textbf{Negative IPC results should be certificate based.} A finite Kripke countermodel checked in Lean can establish non-derivability without proving the exact Haskell search complete. A complete LJT refutation DAG is a complementary format.
+\item \textbf{The hard part of Leant negatives is the source abstraction theorem.} One-way over-approximation is sufficient; full equivalence is not. This makes a pure structural fragment attainable.
+\item \textbf{Environment scope must be explicit.} Provider-free or bounded-provider search cannot justify an unrestricted claim about every term in a live Lean environment. Formal result types and UI wording should expose the structural or provider-relative scope.
+\item \textbf{Rank-N, recursive-inductive, and type-class features should stay positive-only until their adequacy theorems exist.} The current design already tends in this direction; proof-carrying projection evidence will make the boundary exact.
+\item \textbf{Verifying the exact Haskell implementation is optional, not foundational.} Once certificates are checked, producer bugs cause rejected or missing results rather than false theorems.
+\end{enumerate}
+
+The proposed architecture therefore supports a sequence of genuine formal wins: first checked core witnesses, then checked countermodels, then a certified Lean structural projection, and finally richer fragments. Each stage strengthens the product without making later research a prerequisite for present trustworthiness.
+
+\appendix
+
+\chapter{Minimal first pull-request specification}
+\label{app:first-pr}
+
+A narrowly scoped first formalization contribution could contain the following.
+
+\section{Lean files}
+
+\begin{itemize}
+\item \path|DjexCert/Formula.lean|: binary formula grammar and decidable equality.
+\item \path|DjexCert/Term.lean|: raw and annotated de Bruijn terms.
+\item \path|DjexCert/Typing.lean|: declarative typing plus weakening/substitution.
+\item \path|DjexCert/Check.lean|: executable annotated checker.
+\item \path|DjexCert/CheckSound.lean|: proof of checker soundness.
+\item \path|DjexCert/Codec.lean|: simple S-expression or JSON-subset parser for certificates.
+\item \path|DjexCert/Examples.lean|: hand-written examples and malformed cases.
+\end{itemize}
+
+\section{Haskell files}
+
+\begin{itemize}
+\item a canonical formula normalization module;
+\item a de Bruijn conversion module for checked \Djinn\ terms;
+\item a certificate encoder with explicit schema version;
+\item an integration test invoking the Lean checker on generated examples.
+\end{itemize}
+
+\section{Non-goals}
+
+The first contribution does not need:
+
+\begin{itemize}
+\item LJT completeness or termination;
+\item Kripke semantics;
+\item Leant projection formalization;
+\item rank-N types or constraints;
+\item exact source rendering equivalence;
+\item GHC refinement.
+\end{itemize}
+
+Its single theorem is already valuable: accepted \Djinn\ certificates denote well-typed core proof terms.
+
+\chapter{Countermodel certificate example}
+\label{app:countermodel}
+
+Consider excluded middle over one atom, \(p\lor(p\to\bot)\). A one-world classical valuation cannot refute it. A two-world Kripke model can:
+
+\begin{itemize}
+\item worlds \(w_0\le w_1\);
+\item \(p\) is false at \(w_0\) and true at \(w_1\);
+\item at \(w_0\), \(p\) is not forced;
+\item at \(w_0\), \(p\to\bot\) is not forced because the extension \(w_1\) forces \(p\) but not \(\bot\);
+\item therefore the disjunction is not forced at \(w_0\).
+\end{itemize}
+
+A raw certificate could be:
+
+\begin{lstlisting}[caption={Illustrative countermodel payload.}]
+(model
+  (worlds 2)
+  (order (0 0) (0 1) (1 1))
+  (atoms
+    (p 0 false)
+    (p 1 true))
+  (root 0))
+\end{lstlisting}
+
+The checker validates reflexivity/transitivity, monotonicity of \(p\), and recursive forcing. The certificate then proves that the formula has no derivation in IPC, while correctly avoiding the stronger and generally unavailable object-level claim \(\neg(p\lor\neg p)\).
+
+\chapter{Result-type sketch for Haskell}
+\label{app:haskell-result}
+
+A Haskell API can mirror proof strength without pretending that Haskell values themselves are proofs:
+
+\begin{lstlisting}[language=HaskellLite,caption={Illustrative evidence-aware result type.}]
+data PositiveEvidence
+  = EngineChecked CoreCertificate
+  | LeanKernelChecked LeanArtifact
+
+data NegativeScope
+  = PureStructural
+  | ExplicitProviders [ProviderId]
+  | ClosedEnvironment EnvironmentFingerprint
+
+data NegativeEvidence
+  = CoreCountermodel CoreFormula CountermodelCertificate
+  | CoreRefutation   CoreFormula RefutationCertificate
+  | LiftedNegative  NegativeScope ProjectionCertificate
+                    CoreNegativeCertificate
+
+data SynthesisResult
+  = Candidates [Candidate] [PositiveEvidence]
+  | CertifiedNegative NegativeEvidence
+  | NoTermFound [SearchLimit] [ApproximationReason]
+  | Refused RefusalReason
+  | EngineFailure Text
+\end{lstlisting}
+
+Constructors carrying certified evidence should be private to modules that have invoked the external checker and validated artifact identity.
+
+\chapter{Bibliographic and repository references}
+
+\begin{thebibliography}{99}
+
+\bibitem{djex}
+Vladimir Reshetnikov.
+\emph{Djex repository}, revision
+\commit{f50b5eac86726c7530d95e48c27101b7c0fa25c9}, 10 August 2026.
+\url{https://github.com/VladimirReshetnikov/Djex/tree/f50b5eac86726c7530d95e48c27101b7c0fa25c9}
+
+\bibitem{leant}
+Vladimir Reshetnikov.
+\emph{Leant repository}, revision
+\commit{0160237e4bdf6e342a55f5a86ce5d5292728024f}, 10 August 2026.
+\url{https://github.com/VladimirReshetnikov/Leant/tree/0160237e4bdf6e342a55f5a86ce5d5292728024f}
+
+\bibitem{lean4}
+Lean developers.
+\emph{Lean 4 repository}, revision
+\commit{1d2dde6d64cb3da989bab118f4d386eb55237fe5}, 10 August 2026.
+\url{https://github.com/leanprover/lean4/tree/1d2dde6d64cb3da989bab118f4d386eb55237fe5}
+
+\bibitem{lean4adddecl}
+Lean developers.
+\emph{Lean/AddDecl.lean}, checked declaration and \code{debug.skipKernelTC} boundary, revision
+\commit{1d2dde6d64cb3da989bab118f4d386eb55237fe5}.
+\url{https://github.com/leanprover/lean4/blob/1d2dde6d64cb3da989bab118f4d386eb55237fe5/src/Lean/AddDecl.lean}
+
+\bibitem{leanchecker}
+Lean developers.
+\emph{LeanChecker.lean}, declaration replay utility, revision
+\commit{1d2dde6d64cb3da989bab118f4d386eb55237fe5}.
+\url{https://github.com/leanprover/lean4/blob/1d2dde6d64cb3da989bab118f4d386eb55237fe5/src/LeanChecker.lean}
+
+\bibitem{lean4lean}
+Mario Carneiro and contributors.
+\emph{lean4lean}, revision
+\commit{1a16b72d2e35932a82aa501beb29ef2c3d072580}, 5 August 2026.
+\url{https://github.com/digama0/lean4lean/tree/1a16b72d2e35932a82aa501beb29ef2c3d072580}
+
+\bibitem{leansat}
+Lean developers.
+\emph{LeanSAT: verified SAT reasoning and LRAT certificate checking}.
+The project is archived after integration into Lean core as \code{Std.Tactic.BVDecide}.
+\url{https://github.com/leanprover/leansat}
+
+\bibitem{dyckhoff1992}
+Roy Dyckhoff.
+``Contraction-Free Sequent Calculi for Intuitionistic Logic.''
+\emph{Journal of Symbolic Logic}, 57(3):795--807, 1992.
+DOI: \href{https://doi.org/10.2307/2275431}{10.2307/2275431}.
+
+\bibitem{dyckhoff2018}
+Roy Dyckhoff.
+``Contraction-Free Sequent Calculi for Intuitionistic Logic: A Correction.''
+\emph{Journal of Symbolic Logic}, 83(4):1680--1682, 2018.
+DOI: \href{https://doi.org/10.1017/jsl.2018.38}{10.1017/jsl.2018.38}.
+
+\bibitem{dyckhoffnegri2000}
+Roy Dyckhoff and Sara Negri.
+``Admissibility of Structural Rules for Contraction-Free Systems of Intuitionistic Logic.''
+\emph{Journal of Symbolic Logic}, 65(4):1499--1518, 2000.
+DOI: \href{https://doi.org/10.2307/2695061}{10.2307/2695061}.
+
+\bibitem{troelstra}
+A. S. Troelstra and D. van Dalen.
+\emph{Constructivism in Mathematics: An Introduction}, Volume I.
+North-Holland, 1988.
+
+\bibitem{sorensen}
+Morten Heine S\o rensen and Pawe\l{} Urzyczyn.
+\emph{Lectures on the Curry--Howard Isomorphism}.
+Elsevier, 2006.
+
+\bibitem{reynolds}
+John C. Reynolds.
+``Types, Abstraction and Parametric Polymorphism.''
+In \emph{Information Processing 83}, pages 513--523, 1983.
+
+\bibitem{leanbug14576}
+Lean issue \#14576.
+``Kernel accepts wrong-structure projections, allowing an axiom-free proof of False,'' opened and closed 28 July 2026.
+\url{https://github.com/leanprover/lean4/issues/14576}
+
+\bibitem{leanfix14577}
+Lean pull request \#14577.
+``fix: missing check at kernel inductive declaration,'' merged 28 July 2026, merge commit
+\commit{a39eab69e1eee9ad38f4efe507907b1026a77808}.
+\url{https://github.com/leanprover/lean4/pull/14577}
+
+\end{thebibliography}
+
+\end{document}
