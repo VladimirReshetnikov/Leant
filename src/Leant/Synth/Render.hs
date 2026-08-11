@@ -2203,8 +2203,9 @@ renderVisibleTypeArgumentWithForallMetadata visibleBinderDomain
 
   renderConstraintArguments visibilities arguments = case arguments of
     [] -> Right ([], visibilities)
-    argument : remainingArguments -> do
-      (rendered, afterArgument) <- renderType False 2 visibilities argument
+    nextArgument : remainingArguments -> do
+      (rendered, afterArgument) <-
+        renderType False 2 visibilities nextArgument
       (rest, remaining) <-
         renderConstraintArguments afterArgument remainingArguments
       Right (rendered : rest, remaining)
