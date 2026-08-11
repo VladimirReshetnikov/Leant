@@ -1,12 +1,15 @@
 module Main (main) where
 
 import Control.Exception (evaluate, finally)
+import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as BS
 import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.List (isInfixOf)
 import Data.Maybe (isNothing)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Data.Text as Text
+import qualified Data.Text.Encoding as TextEncoding
 import Data.Word (Word8)
 import Numeric.Natural (Natural)
 import System.Directory
@@ -79,6 +82,14 @@ import Language.Haskell.Djex
   )
 
 import Leant.Backend (findBackendProject)
+import Leant.Json.Bounded
+  ( BoundedJsonError (..)
+  , BoundedJsonErrorKind (..)
+  , BoundedJsonLimit (..)
+  , BoundedJsonLimits (..)
+  , BoundedJsonValue (..)
+  , parseBoundedJson
+  )
 import Leant.Synth.Engine
   ( CheckedLengthHandoff
   , DetailedCandidateGroup
@@ -240,6 +251,7 @@ import Leant.Session.Snapshot
 main :: IO ()
 main = defaultMain $ testGroup "Leant synthesis boundary"
   [ backendDiscoveryTests
+  , boundedJsonTests
   , snapshotMetadataTests
   , sessionReplayTests
   , providerCacheTests
@@ -305,6 +317,329 @@ withTemporaryDirectory template action = do
   removeFile path
   createDirectory path
   action path `finally` removePathForcibly path
+
+boundedJsonTests :: TestTree
+boundedJsonTests = testGroup "strict bounded JSON"
+  [ testCase "retain exact values, number spellings, and object order"
+      assertBoundedJsonValues
+  , testCase "decode UTF-8 scalars and every permitted string escape"
+      assertBoundedJsonUnicode
+  , testCase "recognize the complete closed syntax-error vocabulary"
+      assertBoundedJsonSyntaxErrors
+  , testCase "enforce exact JSON number grammar without rounding"
+      assertBoundedJsonNumbers
+  , testCase "reject decoded duplicate keys, including escaped aliases"
+      assertBoundedJsonDuplicateKeys
+  , testCase "admit every exact resource boundary and stop at maximum plus one"
+      assertBoundedJsonLimits
+  , testCase "keep source snippets and duplicate keys out of errors"
+      assertBoundedJsonErrorSanitization
+  ]
+
+assertBoundedJsonValues :: IO ()
+assertBoundedJsonValues = do
+  parseBoundedJson generousBoundedJsonLimits
+      (BS.pack
+        "{\"second\":[null,true,false,-12,1.25,1e+2],\"first\":0}")
+    @?= Right (BoundedJsonObject
+      [ ( Text.pack "second"
+        , BoundedJsonArray
+            [ BoundedJsonNull
+            , BoundedJsonBool True
+            , BoundedJsonBool False
+            , BoundedJsonInteger (-12)
+            , BoundedJsonNonInteger $ Text.pack "1.25"
+            , BoundedJsonNonInteger $ Text.pack "1e+2"
+            ]
+        )
+      , (Text.pack "first", BoundedJsonInteger 0)
+      ])
+  parseBoundedJson generousBoundedJsonLimits
+      (BS.pack " { \"first\" : 0, \"second\" : 1 } \r\n")
+    @?= Right (BoundedJsonObject
+      [ (Text.pack "first", BoundedJsonInteger 0)
+      , (Text.pack "second", BoundedJsonInteger 1)
+      ])
+
+assertBoundedJsonUnicode :: IO ()
+assertBoundedJsonUnicode = do
+  let unicode = Text.pack "\233\x1d11e"
+      rawDocument = ByteString.concat
+        [BS.pack "\"", TextEncoding.encodeUtf8 unicode, BS.pack "\""]
+      escapedDocument = BS.pack
+        "\"\\\"\\\\\\/\\b\\f\\n\\r\\t\\u0041\\uD834\\uDD1E\""
+      escapedValue = Text.pack
+        ['"', '\\', '/', '\b', '\f', '\n', '\r', '\t', 'A', '\x1d11e']
+  parseBoundedJson generousBoundedJsonLimits rawDocument @?=
+    Right (BoundedJsonString unicode)
+  parseBoundedJson generousBoundedJsonLimits escapedDocument @?=
+    Right (BoundedJsonString escapedValue)
+
+assertBoundedJsonSyntaxErrors :: IO ()
+assertBoundedJsonSyntaxErrors = do
+  mapM_ assertCase cases
+  parseBoundedJson generousBoundedJsonLimits
+      (ByteString.pack [0x6e, 0x75, 0x6c, 0x6c, 0x20, 0xe2, 0x28, 0xa1])
+    @?= Left (BoundedJsonSyntaxRejected BoundedJsonInvalidUTF8 6)
+ where
+  assertCase (label, expected, input) =
+    assertBoundedJsonSyntax label expected input
+
+  cases =
+    [ ("UTF-8 BOM", BoundedJsonUTF8BOM,
+        ByteString.pack [0xef, 0xbb, 0xbf] `ByteString.append`
+          BS.pack "null")
+    , ("invalid UTF-8", BoundedJsonInvalidUTF8,
+        ByteString.pack [0xed, 0xa0, 0x80])
+    , ("unexpected end", BoundedJsonUnexpectedEnd, BS.empty)
+    , ("unexpected token", BoundedJsonUnexpectedToken, BS.pack "?")
+    , ("trailing content", BoundedJsonTrailingContent,
+        BS.pack "null null")
+    , ("object key", BoundedJsonExpectedObjectKey, BS.pack "{0:0}")
+    , ("colon", BoundedJsonExpectedColon, BS.pack "{\"a\" 0}")
+    , ("object delimiter", BoundedJsonExpectedObjectDelimiter,
+        BS.pack "{\"a\":0 \"b\":1}")
+    , ("array delimiter", BoundedJsonExpectedArrayDelimiter,
+        BS.pack "[0 1]")
+    , ("unterminated string", BoundedJsonUnterminatedString,
+        BS.pack "\"unterminated")
+    , ("raw control", BoundedJsonRawControlCharacter,
+        ByteString.pack [0x22, 0x0a, 0x22])
+    , ("escape", BoundedJsonInvalidEscape, BS.pack "\"\\x\"")
+    , ("Unicode escape", BoundedJsonInvalidUnicodeEscape,
+        BS.pack "\"\\u00xz\"")
+    , ("lone high surrogate", BoundedJsonLoneSurrogate,
+        BS.pack "\"\\uD800\"")
+    , ("number", BoundedJsonInvalidNumber, BS.pack "01")
+    , ("duplicate key", BoundedJsonDuplicateObjectKey,
+        BS.pack "{\"a\":0,\"\\u0061\":1}")
+    ]
+
+assertBoundedJsonNumbers :: IO ()
+assertBoundedJsonNumbers = do
+  mapM_ assertValid valid
+  mapM_ assertInvalid invalid
+  assertBoundedJsonSyntax "leading plus" BoundedJsonUnexpectedToken
+    $ BS.pack "+1"
+ where
+  assertValid (source, expected) =
+    parseBoundedJson generousBoundedJsonLimits (BS.pack source) @?=
+      Right expected
+
+  valid =
+    [ ("0", BoundedJsonInteger 0)
+    , ("-0", BoundedJsonInteger 0)
+    , ("123456789", BoundedJsonInteger 123456789)
+    , ("-42", BoundedJsonInteger (-42))
+    , ("0.0", BoundedJsonNonInteger $ Text.pack "0.0")
+    , ("-0.5", BoundedJsonNonInteger $ Text.pack "-0.5")
+    , ("1e9", BoundedJsonNonInteger $ Text.pack "1e9")
+    , ("1E+9", BoundedJsonNonInteger $ Text.pack "1E+9")
+    , ("1e-9", BoundedJsonNonInteger $ Text.pack "1e-9")
+    ]
+
+  assertInvalid source = assertBoundedJsonSyntax source
+    BoundedJsonInvalidNumber $ BS.pack source
+
+  invalid = ["01", "-01", "1.", "1e", "1e+", "--1", "1-2"]
+
+assertBoundedJsonDuplicateKeys :: IO ()
+assertBoundedJsonDuplicateKeys = do
+  mapM_ (assertBoundedJsonSyntax "duplicate object key"
+      BoundedJsonDuplicateObjectKey . BS.pack)
+    [ "{\"a\":0,\"a\":1}"
+    , "{\"a\":0,\"b\":1,\"a\":2}"
+    , "{\"a\":0,\"\\u0061\":1}"
+    , "{\"\\u00e9\":0,\"\\u00E9\":1}"
+    ]
+
+assertBoundedJsonLimits :: IO ()
+assertBoundedJsonLimits = do
+  mapM_ assertCase boundedJsonLimitCases
+  let zeroDepth = generousBoundedJsonLimits
+        { boundedJsonMaximumNestingDepth = 0 }
+      zeroNodes = generousBoundedJsonLimits
+        { boundedJsonMaximumNodes = 0 }
+      zeroDepthAndNodes = zeroDepth
+        { boundedJsonMaximumNodes = 0 }
+  parseBoundedJson zeroDepth (BS.pack "0") @?=
+    Right (BoundedJsonInteger 0)
+  parseBoundedJson zeroDepth (BS.pack "[]") @?=
+    Left (BoundedJsonLimitExceeded BoundedJsonNestingDepth 0 1 0)
+  parseBoundedJson zeroNodes (BS.pack "0") @?=
+    Left (BoundedJsonLimitExceeded BoundedJsonNodes 0 1 0)
+  parseBoundedJson zeroDepthAndNodes (BS.pack "[]") @?=
+    Left (BoundedJsonLimitExceeded BoundedJsonNestingDepth 0 1 0)
+  parseBoundedJson zeroDepthAndNodes (BS.pack "?") @?=
+    Left (BoundedJsonSyntaxRejected BoundedJsonUnexpectedToken 0)
+ where
+  assertCase
+      (label, field, maximumValue, offset, limits, exact, excessive) = do
+    case parseBoundedJson limits exact of
+      Left failure -> assertFailure $ "exact " ++ label ++
+        " boundary was rejected: " ++ show failure
+      Right _ -> pure ()
+    observed <- timeout 1000000 $ evaluate $
+      parseBoundedJson limits excessive
+    observed @?= Just (Left $ BoundedJsonLimitExceeded
+      field maximumValue (maximumValue + 1) offset)
+
+boundedJsonLimitCases
+  :: [( String
+      , BoundedJsonLimit
+      , Natural
+      , Natural
+      , BoundedJsonLimits
+      , ByteString.ByteString
+      , ByteString.ByteString
+      )]
+boundedJsonLimitCases =
+  [ ( "total bytes"
+    , BoundedJsonTotalBytes
+    , 4
+    , 4
+    , generousBoundedJsonLimits
+        { boundedJsonMaximumTotalBytes = 4 }
+    , BS.pack "null"
+    , BS.pack "null "
+    )
+  , ( "nesting depth"
+    , BoundedJsonNestingDepth
+    , 2
+    , 2
+    , generousBoundedJsonLimits
+        { boundedJsonMaximumNestingDepth = 2 }
+    , BS.pack "[[0]]"
+    , BS.pack "[[[0]]]"
+    )
+  , ( "nodes"
+    , BoundedJsonNodes
+    , 2
+    , 3
+    , generousBoundedJsonLimits
+        { boundedJsonMaximumNodes = 2 }
+    , BS.pack "[0]"
+    , BS.pack "[0,0]"
+    )
+  , ( "object members"
+    , BoundedJsonObjectMembers
+    , 2
+    , 13
+    , generousBoundedJsonLimits
+        { boundedJsonMaximumObjectMembers = 2 }
+    , BS.pack "{\"a\":0,\"b\":0}"
+    , BS.pack "{\"a\":0,\"b\":0,\"c\":0}"
+    )
+  , ( "array elements"
+    , BoundedJsonArrayElements
+    , 2
+    , 5
+    , generousBoundedJsonLimits
+        { boundedJsonMaximumArrayElements = 2 }
+    , BS.pack "[0,0]"
+    , BS.pack "[0,0,0]"
+    )
+  , ( "object-key UTF-8 bytes"
+    , BoundedJsonObjectKeyUtf8Bytes
+    , 2
+    , 2
+    , generousBoundedJsonLimits
+        { boundedJsonMaximumObjectKeyUtf8Bytes = 2 }
+    , utf8JsonObject "\233"
+    , utf8JsonObject "\8364"
+    )
+  , ( "string UTF-8 bytes"
+    , BoundedJsonStringUtf8Bytes
+    , 2
+    , 1
+    , generousBoundedJsonLimits
+        { boundedJsonMaximumStringUtf8Bytes = 2 }
+    , utf8JsonString "\233"
+    , utf8JsonString "\8364"
+    )
+  , ( "string Unicode scalars"
+    , BoundedJsonStringUnicodeScalars
+    , 1
+    , 5
+    , generousBoundedJsonLimits
+        { boundedJsonMaximumStringUnicodeScalars = 1 }
+    , utf8JsonString "\x1d11e"
+    , utf8JsonString "\x1d11e\&a"
+    )
+  , ( "number bytes"
+    , BoundedJsonNumberBytes
+    , 2
+    , 2
+    , generousBoundedJsonLimits
+        { boundedJsonMaximumNumberBytes = 2 }
+    , BS.pack "-1"
+    , BS.pack "-12"
+    )
+  ]
+
+assertBoundedJsonErrorSanitization :: IO ()
+assertBoundedJsonErrorSanitization = do
+  first <- expectBoundedJsonFailure $ BS.pack
+    "{\"private-a\":0,\"private-a\":1}"
+  second <- expectBoundedJsonFailure $ BS.pack
+    "{\"private-b\":0,\"private-b\":1}"
+  first @?= second
+  let rendered = show first
+  assertBool "a duplicate object key leaked through the error"
+    $ not $ "private-a" `isInfixOf` rendered
+  trailing <- expectBoundedJsonFailure
+    $ BS.pack "null PRIVATE_DYNAMIC_TRAILING_BYTES"
+  assertBool "trailing source bytes leaked through the error"
+    $ not $ "PRIVATE_DYNAMIC_TRAILING_BYTES" `isInfixOf` show trailing
+
+assertBoundedJsonSyntax
+  :: String
+  -> BoundedJsonErrorKind
+  -> ByteString.ByteString
+  -> IO ()
+assertBoundedJsonSyntax label expected input =
+  case parseBoundedJson generousBoundedJsonLimits input of
+    Left (BoundedJsonSyntaxRejected observed _) -> observed @?= expected
+    Left failure -> assertFailure $ label ++
+      " produced a limit failure instead of " ++ show expected ++
+      ": " ++ show failure
+    Right value -> assertFailure $ label ++ " was accepted as " ++ show value
+
+expectBoundedJsonFailure
+  :: ByteString.ByteString
+  -> IO BoundedJsonError
+expectBoundedJsonFailure input =
+  case parseBoundedJson generousBoundedJsonLimits input of
+    Left failure -> pure failure
+    Right value -> assertFailure ("expected bounded JSON rejection, got " ++
+      show value) >> error "unreachable"
+
+generousBoundedJsonLimits :: BoundedJsonLimits
+generousBoundedJsonLimits = BoundedJsonLimits
+  { boundedJsonMaximumTotalBytes = 1048576
+  , boundedJsonMaximumNestingDepth = 1024
+  , boundedJsonMaximumNodes = 65536
+  , boundedJsonMaximumObjectMembers = 1024
+  , boundedJsonMaximumArrayElements = 1024
+  , boundedJsonMaximumObjectKeyUtf8Bytes = 65536
+  , boundedJsonMaximumStringUtf8Bytes = 65536
+  , boundedJsonMaximumStringUnicodeScalars = 65536
+  , boundedJsonMaximumNumberBytes = 1024
+  }
+
+utf8JsonString :: String -> ByteString.ByteString
+utf8JsonString value = ByteString.concat
+  [ BS.pack "\""
+  , TextEncoding.encodeUtf8 $ Text.pack value
+  , BS.pack "\""
+  ]
+
+utf8JsonObject :: String -> ByteString.ByteString
+utf8JsonObject key = ByteString.concat
+  [ BS.pack "{\""
+  , TextEncoding.encodeUtf8 $ Text.pack key
+  , BS.pack "\":null}"
+  ]
 
 sessionReplayTests :: TestTree
 sessionReplayTests = testGroup "transactional session replay"
