@@ -362,6 +362,14 @@ is still no loader discovery, default path, Main/REPL use, activation, or
 solver launch. See the
 [bounded acquisition report](docs/reports/2026-08-11-bounded-live-length-ranking-configuration-acquisition.md).
 
+The passive finite-spine source vocabulary now lives in
+`Leant.Synth.Length.Contract`.  Modules that need only those assertions no
+longer have to obtain their declarations from the full synthesis engine;
+`Leant.Synth.Engine` retains a compatibility re-export and owns the later
+provenance-bound handoff checks.  Ranking still imports the engine for those
+candidate-specific checks.  This gives contract assertions, candidate
+authority, and live execution policy distinct source owners.
+
 Three rules run through the design:
 
 - **The engine is never trusted.** Every candidate is re-elaborated by

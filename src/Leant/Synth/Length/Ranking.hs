@@ -67,7 +67,6 @@ import Language.Haskell.Djex
 import Leant.Synth.Engine
   ( CheckedLengthHandoff
   , DetailedVerificationVariant
-  , LeanLengthContract
   , checkedLengthHandoffProblem
   , checkedLengthHandoffVerifiedVariant
   , prepareCheckedLengthHandoff
@@ -76,6 +75,7 @@ import Leant.Synth.Length.Adapter
   ( CheckedLengthQuery
   , prepareLengthQueryFromHandoff
   )
+import Leant.Synth.Length.Contract (LeanLengthContract)
 import Leant.Synth.Verification (Verified)
 
 -- | Productive rejection of maximum-plus-one input candidates.  The observed

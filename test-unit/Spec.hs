@@ -98,9 +98,6 @@ import Leant.Synth.Engine
   , DetailedSynthOutcome (..)
   , DetailedVerificationVariant
   , ExferenceRunAuthorityInspection (..)
-  , LeanLengthContract (..)
-  , LeanLengthProviderLaw (..)
-  , LeanLengthSpineIdentity (..)
   , LengthHandoffRefusal (..)
   , PreparedSynthesisInspection (..)
   , ProviderBindingInspection (..)
@@ -217,6 +214,11 @@ import Leant.Synth.Length.Configuration.File.Acquire
   , lengthRankingConfigurationFileMaximumTimeoutMilliseconds
   , loadLengthRankingConfigurationFile
   , mkLengthRankingConfigurationFileRequest
+  )
+import Leant.Synth.Length.Contract
+  ( LeanLengthContract (..)
+  , LeanLengthProviderLaw (..)
+  , LeanLengthSpineIdentity (..)
   )
 import Leant.Synth.Length.Ranking
   ( LengthRanking

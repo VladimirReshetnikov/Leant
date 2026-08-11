@@ -35,10 +35,8 @@ import Language.Haskell.Djex
   , mkLengthSMTLibExecutionConfig
   )
 
-import Leant.Synth.Engine
-  ( DetailedVerificationVariant
-  , LeanLengthContract
-  )
+import Leant.Synth.Engine (DetailedVerificationVariant)
+import Leant.Synth.Length.Contract (LeanLengthContract)
 import Leant.Synth.Length.Ranking
   ( LengthRanking
   , LengthRankingInputError

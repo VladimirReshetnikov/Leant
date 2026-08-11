@@ -128,13 +128,9 @@ import Language.Haskell.Djex
   , Fingerprint
   , GroundKind
   , LengthContractError
-  , LengthContractSource
-  , LengthExpression
   , LengthProblemError
-  , LengthProviderArgumentRole
   , LengthProviderInventoryError (..)
   , LengthProviderSummarySource (..)
-  , LengthProviderVariable
   , LengthSessionError (..)
   , LengthSpineModelSource (DeclaredListSpine)
   , Name
@@ -207,6 +203,12 @@ import Leant.Synth.Observability
       , RouteTypedCandidate
       , RouteUnobserved
       )
+  )
+
+import Leant.Synth.Length.Contract
+  ( LeanLengthContract (..)
+  , LeanLengthProviderLaw (..)
+  , LeanLengthSpineIdentity (..)
   )
 
 import Leant.Synth.Fragment
@@ -460,44 +462,6 @@ detailedVerificationVariantSemanticSidecar
   -> Maybe TypedCandidateSemanticSidecar
 detailedVerificationVariantSemanticSidecar
     (DetailedVerificationVariant _ _ sidecar) = sidecar
-
--- | Exact Lean names supplied by an external Length contract for the unary
--- finite spine it describes.  These names are matched only against provenance
--- retained from structural declarations; their spelling is never translated
--- into a private Djex identity by convention.
-data LeanLengthSpineIdentity = LeanLengthSpineIdentity
-  { leanLengthSpineFamilyName :: String
-  , leanLengthSpineZeroConstructorName :: String
-  , leanLengthSpineStepConstructorName :: String
-  }
-  deriving (Eq, Show)
-
--- | One explicitly assumed behavioral law for an exact Lean provider.
---
--- The provider's closed scheme and private Djex name come from its retained
--- translation binding.  Callers supply only the semantic roles and transfer
--- they intend to assume; Leant does not derive either from a provider name or
--- implementation.
-data LeanLengthProviderLaw = LeanLengthProviderLaw
-  { leanLengthProviderLawName :: String
-  , leanLengthProviderLawArgumentRoles :: [LengthProviderArgumentRole]
-  , leanLengthProviderLawTransfer ::
-      LengthExpression LengthProviderVariable
-  }
-  deriving (Eq, Show)
-
--- | Explicit finite-spine contract to bind to one accepted typed candidate.
---
--- The contract remains an assertion supplied by the integration layer.  A
--- successful handoff proves that its exact identities, target, renderer
--- correspondence, session, and candidate were checked together; it does not
--- infer a behavioral specification from Lean declarations.
-data LeanLengthContract = LeanLengthContract
-  { leanLengthContractSpine :: LeanLengthSpineIdentity
-  , leanLengthContractSource :: LengthContractSource
-  , leanLengthContractProviderLaws :: [LeanLengthProviderLaw]
-  }
-  deriving (Eq, Show)
 
 -- | Stable fail-closed phases of preparing one Length behavioral problem.
 -- Djex's structured sealing errors remain nested instead of being flattened

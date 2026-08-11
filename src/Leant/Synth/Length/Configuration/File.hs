@@ -65,7 +65,7 @@ import Leant.Json.Bounded
   , BoundedJsonValue (..)
   , parseBoundedJson
   )
-import Leant.Synth.Engine
+import Leant.Synth.Length.Contract
   ( LeanLengthContract (..)
   , LeanLengthProviderLaw (..)
   , LeanLengthSpineIdentity (..)
