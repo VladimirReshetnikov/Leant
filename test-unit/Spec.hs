@@ -42,9 +42,16 @@ import Language.Haskell.Djex
 
 import Leant.Backend (findBackendProject)
 import Leant.Synth.Engine
-  ( SynthEngine (..)
+  ( DetailedSynthOutcome (..)
+  , SynthEngine (..)
   , SynthOutcome (..)
+  , detailedCandidateGroup
+  , detailedCandidateGroupRoute
+  , detailedCandidateGroupVariants
+  , forceDetailedOutcome
   , mergeCandidateGroups
+  , mergeDetailedCandidateGroups
+  , mergeDetailedOutcomesSkipping
   , mergeOutcomes
   , mergeOutcomesSkipping
   , providerStages
@@ -54,8 +61,13 @@ import Leant.Synth.Engine
   , synthVerificationWindow
   , synthesizeWith
   , synthesizeWithProviders
+  , synthesizeWithProvidersSkippingDetailed
+  , projectDetailedSynthOutcome
+  , renderCandidateByAvailability
   , takeDistinct
+  , takeDistinctOn
   , withoutCheckedCandidates
+  , withoutCheckedDetailedCandidates
   )
 import Leant.Synth.Fragment
   ( AppHead (..)
@@ -85,8 +97,11 @@ import Leant.Synth.Fragment
   , synthPrelude
   )
 import Leant.Synth.Observability
-  ( LeantSynthesisMetric (..)
+  ( CandidateRenderingRoute (..)
+  , LeantSynthesisMetric (..)
   , VerificationFailureClass (..)
+  , candidateRenderingRouteMetric
+  , candidateRenderingRouteObservations
   , leantObservationCodeEntries
   , leantSynthesisMetricCode
   )
@@ -136,6 +151,7 @@ main = defaultMain $ testGroup "Leant synthesis boundary"
   , providerCacheTests
   , providerScheduleTests
   , combinedEngineMergeTests
+  , typedCandidateRoutingTests
   , replayPlanTests
   , providerProgramTests
   , candidateVerificationTests
@@ -1282,6 +1298,157 @@ combinedEngineMergeTests = testGroup "combined-engine verification frontier"
           (SynthCandidates [["e1"]] ["rated"])
         @?= SynthCandidates [["e1"]]
           ["bounded", "exference: rated"]
+  ]
+
+typedCandidateRoutingTests :: TestTree
+typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
+  [ testCase "render a supported Exference graph and preserve projection" $ do
+      let token = FAtom False "Demo.TypedToken"
+          goal = FArr token token
+          detailed = synthesizeWithProvidersSkippingDetailed
+            EngineExference 128 Set.empty [] goal
+          compatibility = synthesizeWithProviders
+            EngineExference 128 [] goal
+      fmap projectDetailedSynthOutcome detailed @?= compatibility
+      case detailed of
+        Right (DetailedSynthCandidates (group : _) _) ->
+          detailedCandidateGroupRoute group @?= RouteTypedCandidate
+        Right other -> assertFailure $
+          "expected a typed Exference identity candidate, got: "
+            ++ show other
+        Left err -> assertFailure err
+  , testCase "use compatibility only for explicit typed graph absence" $ do
+      let outer = FAtom False "Demo.Outer"
+          goal = FArr outer
+            (FAll True "a" (FArr (FVar "a") (FVar "a")))
+          detailed = synthesizeWithProvidersSkippingDetailed
+            EngineExference 256 Set.empty [] goal
+          compatibility = synthesizeWithProviders
+            EngineExference 256 [] goal
+      fmap projectDetailedSynthOutcome detailed @?= compatibility
+      case detailed of
+        Right (DetailedSynthCandidates groups _) ->
+          assertBool
+            ("expected an explicit nested-forall fallback, got: "
+              ++ show groups)
+            (any
+              ((== RouteLegacyCandidateFallback)
+                . detailedCandidateGroupRoute)
+              groups)
+        Right other -> assertFailure $
+          "expected a fallback Exference candidate, got: " ++ show other
+        Left err -> assertFailure err
+  , testCase "never retry a failed typed rendering through compatibility" $ do
+      let rendered = renderCandidateByAvailability
+            (\typed -> Left ("typed render rejected: " ++ typed))
+            (\_ -> error "legacy renderer was retried")
+            (Right "typed-expression" :: Either () String)
+            (error "compatibility candidate was forced" :: String)
+            id
+      rendered @?=
+        ( RouteTypedCandidate
+        , Left "typed render rejected: typed-expression"
+        )
+  , testCase "consult compatibility on an explicit absence only" $ do
+      let rendered
+            :: (CandidateRenderingRoute, Either String [String])
+          rendered = renderCandidateByAvailability
+            (\_ -> error "typed renderer was forced")
+            (\legacy -> Right ["rendered " ++ legacy])
+            (Left () :: Either () String)
+            "legacy-expression"
+            id
+      rendered @?=
+        (RouteLegacyCandidateFallback, Right ["rendered legacy-expression"])
+  , testCase "count each bounded Exference group independently of Lean" $ do
+      candidateRenderingRouteMetric RouteUnobserved @?= Nothing
+      candidateRenderingRouteMetric RouteLegacyCandidateFallback
+        @?= Just LegacyCandidateFallback
+      candidateRenderingRouteMetric RouteTypedCandidate
+        @?= Just TypedCandidateRendered
+      let observations = candidateRenderingRouteObservations
+            [ RouteTypedCandidate
+            , RouteUnobserved
+            , RouteLegacyCandidateFallback
+            , RouteTypedCandidate
+            ]
+      observationCount TypedCandidateRendered observations @?= 2
+      observationCount LegacyCandidateFallback observations @?= 1
+      observationCount LeanVariantAttempted observations @?= 0
+  , testCase "keep route counts orthogonal to verifier invariants" $ do
+      batch <- verifyCandidateGroups 1
+        (\candidate -> pure $ if candidate == "accepted"
+          then VariantAccepted
+          else VariantRejected LeanErrorDiagnostic)
+        [["rejected", "accepted"]]
+      let combined = candidateRenderingRouteObservations
+            [RouteTypedCandidate, RouteLegacyCandidateFallback]
+            <> verificationObservations batch
+          attempted = observationCount LeanVariantAttempted combined
+          failed = sum
+            [ observationCount (LeanVerificationFailure failure) combined
+            | failure <- [minBound .. maxBound]
+            ]
+          verified = observationCount LeanCandidateVerified combined
+      attempted @?= failed + verified
+      attempted @?= 2
+      observationCount TypedCandidateRendered combined @?= 1
+      observationCount LegacyCandidateFallback combined @?= 1
+  , testCase "deduplicate on variants and retain the first surviving route" $ do
+      let typed = detailedCandidateGroup RouteTypedCandidate ["shared"]
+          fallback = detailedCandidateGroup
+            RouteLegacyCandidateFallback ["shared", "fallback-alt"]
+          merged = mergeDetailedCandidateGroups [typed] [fallback]
+      map detailedCandidateGroupVariants merged
+        @?= mergeCandidateGroups [["shared"]]
+          [["shared", "fallback-alt"]]
+      map detailedCandidateGroupRoute merged @?=
+        [RouteTypedCandidate, RouteLegacyCandidateFallback]
+      takeDistinctOn detailedCandidateGroupVariants 2
+          [ fallback
+          , detailedCandidateGroup RouteTypedCandidate ["shared", "fallback-alt"]
+          , typed
+          ]
+        @?= [fallback, typed]
+  , testCase "filter routes as sidecars and preserve old merge projection" $ do
+      let checked = Set.singleton "old"
+          typed = detailedCandidateGroup RouteTypedCandidate ["old", "fresh"]
+          fallback = detailedCandidateGroup
+            RouteLegacyCandidateFallback ["fallback"]
+          filtered = withoutCheckedDetailedCandidates checked
+            (DetailedSynthCandidates [typed] ["ranked"])
+      filtered @?= DetailedSynthCandidates
+        [detailedCandidateGroup RouteTypedCandidate ["fresh"]] ["ranked"]
+      projectDetailedSynthOutcome filtered @?=
+        withoutCheckedCandidates checked
+          (SynthCandidates [["old", "fresh"]] ["ranked"])
+      let detailedMerged = mergeDetailedOutcomesSkipping checked
+            (DetailedSynthCandidates [typed] ["smallest"])
+            (DetailedSynthCandidates [fallback] ["rated"])
+          compatibilityMerged = mergeOutcomesSkipping checked
+            (SynthCandidates [["old", "fresh"]] ["smallest"])
+            (SynthCandidates [["fallback"]] ["rated"])
+      projectDetailedSynthOutcome detailedMerged @?= compatibilityMerged
+      case detailedMerged of
+        DetailedSynthCandidates groups _ ->
+          map detailedCandidateGroupRoute groups @?=
+            [RouteTypedCandidate, RouteLegacyCandidateFallback]
+        other -> assertFailure $ "unexpected detailed merge: " ++ show other
+  , testCase "keep bounded detailed projections lazy in poison tails" $ do
+      let first = detailedCandidateGroup RouteTypedCandidate ["first"]
+          poison = error "entered detailed candidate tail"
+          groups = first : poison
+          outcome = Right (DetailedSynthCandidates groups [])
+      forceDetailedOutcome 1 outcome @?= length "first"
+      let routeObservations = candidateRenderingRouteObservations
+            (map detailedCandidateGroupRoute (take 1 groups))
+      observationCount TypedCandidateRendered routeObservations @?= 1
+      observationCount LegacyCandidateFallback routeObservations @?= 0
+      case projectDetailedSynthOutcome
+          (DetailedSynthCandidates groups []) of
+        SynthCandidates projected _ -> take 1 projected @?= [["first"]]
+        other -> assertFailure $ "unexpected projection: " ++ show other
+      take 1 (mergeDetailedCandidateGroups groups poison) @?= [first]
   ]
 
 providerEngineTests :: TestTree

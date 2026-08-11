@@ -84,18 +84,22 @@ import Leant.Session.Snapshot
   , synthesisToolingABI
   )
 import Leant.Synth.Engine
-  ( SynthEngine (..)
-  , SynthOutcome (..)
+  ( DetailedCandidateGroup
+  , DetailedSynthOutcome (..)
+  , SynthEngine (..)
   , candidateWindow
-  , forceOutcome
+  , detailedCandidateGroup
+  , detailedCandidateGroupRoute
+  , detailedCandidateGroupVariants
+  , forceDetailedOutcome
   , parseSynthEngine
   , providerStages
   , synthMaxShown
   , synthMaxTried
   , synthVerificationWindow
   , synthEngineName
-  , synthesizeWithProvidersSkipping
-  , synthesizeTuned
+  , synthesizeWithProvidersSkippingDetailed
+  , synthesizeTunedDetailed
   )
 import Leant.Synth.Fragment
   ( Frag (..)
@@ -120,6 +124,7 @@ import Leant.Synth.Fragment
   )
 import Leant.Synth.Observability
   ( VerificationFailureClass (..)
+  , candidateRenderingRouteObservations
   , leantObservationCodeEntries
   )
 import Leant.Synth.ProviderCache
@@ -2026,7 +2031,7 @@ synthGo' st args retriedVars goal parsed = do
         | otherwise = Just (addUTCTime (fromIntegral limit) started)
       runSynthesis includeLibrary checked laneEngine providers =
         let groupLimit = synthVerificationWindow laneEngine
-            base = synthesizeWithProvidersSkipping
+            base = synthesizeWithProvidersSkippingDetailed
               laneEngine (rsSynthSteps state) checked providers fragment
             -- Library premises are an isolated, deliberately budgeted
             -- extension of the structural lane.  Their candidates lead the
@@ -2035,8 +2040,8 @@ synthGo' st args retriedVars goal parsed = do
             -- cannot crowd out either ordinary or library synthesis.
             outcome
               | includeLibrary && not (null libraryPremises) =
-                  mergeLibraryOutcomes base
-                    (synthesizeTuned laneEngine (rsSynthSteps state)
+                  mergeLibraryDetailedOutcomes base
+                    (synthesizeTunedDetailed laneEngine (rsSynthSteps state)
                       (candidateWindow, Just 100000)
                       [ (name, stripRecCtors premise)
                       | (name, premise) <- libraryPremises
@@ -2061,7 +2066,7 @@ synthGo' st args retriedVars goal parsed = do
         -- unavailable, timed-out, or unsuccessful provider search.  Reporting
         -- it (and therefore any classical retry) is delayed until those
         -- constructive lanes have failed.
-        Just (Right (SynthRefuted True)) -> do
+        Just (Right (DetailedSynthRefuted True)) -> do
           providers <-
             if discoverProviders
               then loadSynthProviders st (pgProviderQuery parsed)
@@ -2097,7 +2102,7 @@ synthGo' st args retriedVars goal parsed = do
           (providerStages engine providers)
  where
   runProviderLanes fallback runLane checked lanes = case lanes of
-    [] -> finish synthMaxTried False (Just (Right (SynthNoTerm [])))
+    [] -> finish synthMaxTried False (Just (Right (DetailedSynthNoTerm [])))
     (laneEngine, providers) : remaining -> do
       let groupLimit = synthVerificationWindow laneEngine
       fresh <- runLane checked laneEngine providers
@@ -2126,11 +2131,14 @@ synthGo' st args retriedVars goal parsed = do
       Nothing -> report groupLimit candidatesChecked bounded
 
   tryCandidates groupLimit bounded = case bounded of
-    Just (Right (SynthCandidates groups notes)) -> do
+    Just (Right (DetailedSynthCandidates groups notes)) -> do
       let checkedGroups = take groupLimit groups
       shown <- verifyGroups groupLimit checkedGroups
       when shown (reportNotes notes)
-      pure (Just (concat checkedGroups), shown)
+      pure
+        ( Just (concatMap detailedCandidateGroupVariants checkedGroups)
+        , shown
+        )
     _ -> pure (Nothing, False)
 
   report _ _ Nothing = do
@@ -2144,7 +2152,7 @@ synthGo' st args retriedVars goal parsed = do
        ++ "or 0 to wait indefinitely)")
   report groupLimit candidatesChecked (Just outcome) = case outcome of
     Left err -> emitLn st =<< cRed st ("synthesis engine error: " ++ err)
-    Right (SynthCandidates groups notes) -> do
+    Right (DetailedSynthCandidates groups notes) -> do
       shown <-
         if candidatesChecked
           then pure False
@@ -2153,7 +2161,7 @@ synthGo' st args retriedVars goal parsed = do
         ("the engine proposed " ++ show (length (take groupLimit groups))
          ++ " candidate(s) but none survived Lean verification")
       reportNotes notes
-    Right (SynthRefuted sound)
+    Right (DetailedSynthRefuted sound)
       | sound -> do
           wantClassical <- rsSynthClassical <$> readIORef st
           classical <-
@@ -2181,7 +2189,7 @@ synthGo' st args retriedVars goal parsed = do
             ("no term found within bounds (opaque atoms `" ++ listing
              ++ "` hide structure the engine cannot analyze \8212 "
              ++ "not a refutation)")
-    Right (SynthNoTerm notes) -> do
+    Right (DetailedSynthNoTerm notes) -> do
       emitLn st =<< cYellow st "no term found within the search bounds"
       reportNotes notes
 
@@ -2192,7 +2200,8 @@ synthGo' st args retriedVars goal parsed = do
     debug <- lookupEnv "LEANT_SYNTH_DEBUG"
     when (isJust debug) $
       forM_ (zip [1 :: Int ..] (take groupLimit groups)) $
-        \(i, group) -> forM_ group $ \variant ->
+        \(i, group) ->
+          forM_ (detailedCandidateGroupVariants group) $ \variant ->
           emitLn st =<< cDim st ("debug " ++ show i ++ ": " ++ variant)
     verifyAndDisplay st args goal (take groupLimit groups)
 
@@ -2358,41 +2367,46 @@ selectLibraryPremises ratings parsed = take 8 (sortOn rank offered)
 -- functions - the feature), the base run's other candidates after,
 -- and negative verdicts only from the base run (the library run is
 -- budgeted, so its negatives claim nothing).
-mergeLibraryOutcomes
-  :: Either String SynthOutcome -> Either String SynthOutcome
-  -> Either String SynthOutcome
-mergeLibraryOutcomes base lib = case (base, lib) of
+mergeLibraryDetailedOutcomes
+  :: Either String DetailedSynthOutcome
+  -> Either String DetailedSynthOutcome
+  -> Either String DetailedSynthOutcome
+mergeLibraryDetailedOutcomes base lib = case (base, lib) of
   (Left err, _) -> Left err
   (_, Left err) -> Left err
   (Right x, Right y) -> Right (merge x y)
  where
   merge x y = case (x, y) of
-    (SynthCandidates a na, SynthCandidates b nb) ->
-      SynthCandidates (b ++ filter (`notElem` b) a) (nub (na ++ nb))
-    (SynthCandidates a na, other) ->
-      SynthCandidates a (na ++ notesOf other)
-    (other, SynthCandidates b nb) ->
-      SynthCandidates b (notesOf other ++ nb)
+    (DetailedSynthCandidates a na, DetailedSynthCandidates b nb) ->
+      let libraryVariants = map detailedCandidateGroupVariants b
+      in DetailedSynthCandidates
+        (b ++ filter
+          ((`notElem` libraryVariants) . detailedCandidateGroupVariants) a)
+        (nub (na ++ nb))
+    (DetailedSynthCandidates a na, other) ->
+      DetailedSynthCandidates a (na ++ notesOf other)
+    (other, DetailedSynthCandidates b nb) ->
+      DetailedSynthCandidates b (notesOf other ++ nb)
     (other, _) -> other
   notesOf outcome = case outcome of
-    SynthCandidates _ notes -> notes
-    SynthNoTerm notes -> notes
-    SynthRefuted _ -> []
+    DetailedSynthCandidates _ notes -> notes
+    DetailedSynthNoTerm notes -> notes
+    DetailedSynthRefuted _ -> []
 
 -- | Run the pure engine under the wall-clock guard, forcing enough of
 -- the outcome that the whole search happens inside the guard (the
--- engine is lazy; see 'forceOutcome').  'Nothing' means the guard
+-- engine is lazy; see 'forceDetailedOutcome').  'Nothing' means the guard
 -- fired.  The excluded-middle retry passes its deliberately cheap frontier;
 -- the full double-negation retry preserves the ordinary per-engine window.
 runEngineBounded
-  :: Int -> Int -> Either String SynthOutcome
-  -> IO (Maybe (Either String SynthOutcome))
+  :: Int -> Int -> Either String DetailedSynthOutcome
+  -> IO (Maybe (Either String DetailedSynthOutcome))
 runEngineBounded groupLimit limit outcome
   | limit <= 0 =
-      Just outcome <$ evaluate (forceOutcome groupLimit outcome)
+      Just outcome <$ evaluate (forceDetailedOutcome groupLimit outcome)
   | otherwise = do
       done <- timeout (limit * 1000000)
-        (evaluate (forceOutcome groupLimit outcome))
+        (evaluate (forceDetailedOutcome groupLimit outcome))
       pure (outcome <$ done)
 
 -- | Run an engine lane before one command-wide deadline.  Structural search
@@ -2401,10 +2415,10 @@ runEngineBounded groupLimit limit outcome
 -- configured wall-clock allowance rather than receiving a fresh timeout each.
 -- 'Nothing' as the deadline retains the explicit wait-forever setting.
 runEngineBefore
-  :: Int -> Maybe UTCTime -> Either String SynthOutcome
-  -> IO (Maybe (Either String SynthOutcome))
+  :: Int -> Maybe UTCTime -> Either String DetailedSynthOutcome
+  -> IO (Maybe (Either String DetailedSynthOutcome))
 runEngineBefore groupLimit Nothing outcome =
-  Just outcome <$ evaluate (forceOutcome groupLimit outcome)
+  Just outcome <$ evaluate (forceDetailedOutcome groupLimit outcome)
 runEngineBefore groupLimit (Just deadline) outcome = do
   now <- getCurrentTime
   let remainingMicros = floor
@@ -2413,7 +2427,7 @@ runEngineBefore groupLimit (Just deadline) outcome = do
     then pure Nothing
     else do
       done <- timeout remainingMicros
-        (evaluate (forceOutcome groupLimit outcome))
+        (evaluate (forceDetailedOutcome groupLimit outcome))
       pure (outcome <$ done)
 
 -- | The Glivenko fallback (SYNTHESIS_PROPOSAL.md \167 7 B): a sound
@@ -2448,7 +2462,7 @@ synthClassical st args goal parsed = case glivenkoSplit (pgFrag parsed) of
         atoms = propAtoms body
         emPremises =
           [("Classical.em _", FSum v (FArr v FBot)) | v <- atoms]
-        -- the engine goal is just the body: synthesizeTuned prepends
+        -- the engine goal is just the body: synthesizeTunedDetailed prepends
         -- the premises itself, and the prefix's binders stay free
         -- opaque variables
         emEngineFrag = body
@@ -2462,25 +2476,28 @@ synthClassical st args goal parsed = case glivenkoSplit (pgFrag parsed) of
           -- miss falls through to the complete ¬¬ route, and negative
           -- verdicts from this run are discarded anyway)
           bounded <- runEngineBounded synthMaxTried limit
-            (synthesizeTuned engine steps (synthMaxTried, Just 100000)
+            (synthesizeTunedDetailed engine steps
+              (synthMaxTried, Just 100000)
               emPremises emEngineFrag (pgFrag parsed))
           debug <- lookupEnv "LEANT_SYNTH_DEBUG"
           when (isJust debug) $ emitLn st =<< cDim st
             ("debug em outcome: " ++ case bounded of
               Nothing -> "timeout"
               Just (Left err) -> "error: " ++ err
-              Just (Right (SynthCandidates groups _)) ->
+              Just (Right (DetailedSynthCandidates groups _)) ->
                 show (length groups) ++ " groups: "
-                  ++ show (take 3 (map (take 2) groups))
-              Just (Right (SynthRefuted _)) -> "refuted"
-              Just (Right (SynthNoTerm notes)) ->
+                  ++ show
+                    (take 3
+                      (map (take 2 . detailedCandidateGroupVariants) groups))
+              Just (Right (DetailedSynthRefuted _)) -> "refuted"
+              Just (Right (DetailedSynthNoTerm notes)) ->
                 "no term: " ++ show notes)
           -- half the usual group budget: every failed verification
           -- leaks an environment in the backend, and a systematically
           -- failing em batch (a goal whose atoms are not Props, say)
           -- should stay cheap before the ¬¬ route takes over
           pure $ case bounded of
-            Just (Right (SynthCandidates groups _)) ->
+            Just (Right (DetailedSynthCandidates groups _)) ->
               take (synthMaxTried `div` 2) groups
             _ -> []
     shownEm <- verifyAndDisplay st args goal emGroups
@@ -2502,12 +2519,18 @@ synthClassical st args goal parsed = case glivenkoSplit (pgFrag parsed) of
                   ++ unwords binders ++ ")"
         let groupLimit = synthVerificationWindow engine
         bounded <- runEngineBounded groupLimit limit
-          (synthesizeTuned engine steps (synthMaxTried, Nothing) []
+          (synthesizeTunedDetailed engine steps (synthMaxTried, Nothing) []
             nnFrag nnFrag)
         case bounded of
-          Just (Right (SynthCandidates groups _)) -> verifyAndDisplay
-            st args goal (map (map wrap) (take groupLimit groups))
+          Just (Right (DetailedSynthCandidates groups _)) ->
+            verifyAndDisplay st args goal
+              (map (mapDetailedCandidateGroup wrap)
+                (take groupLimit groups))
           _ -> pure False
+ where
+  mapDetailedCandidateGroup transform group = detailedCandidateGroup
+    (detailedCandidateGroupRoute group)
+    (map transform (detailedCandidateGroupVariants group))
 
 -- | Verify candidate groups, bind the survivors as `it1`, `it2`, ...,
 -- and display them.  In the session the candidates become real
@@ -2515,14 +2538,19 @@ synthClassical st args goal parsed = case glivenkoSplit (pgFrag parsed) of
 -- `itN` becomes a splice of the candidate applied to the goal's
 -- hypotheses, so `exact it1` closes the goal.  'True' when anything
 -- was shown.
-verifyAndDisplay :: St -> [String] -> String -> [[String]] -> IO Bool
+verifyAndDisplay
+  :: St -> [String] -> String -> [DetailedCandidateGroup] -> IO Bool
 verifyAndDisplay _ _ _ [] = pure False
 verifyAndDisplay st args goal groups = do
-  verification <- synthVerify st goal groups
+  verification <- synthVerify st goal
+    (map detailedCandidateGroupVariants groups)
+  let observations =
+        candidateRenderingRouteObservations
+          (map detailedCandidateGroupRoute groups)
+        <> verificationObservations verification
   debug <- lookupEnv "LEANT_SYNTH_DEBUG"
   when (isJust debug) $
-    forM_ (leantObservationCodeEntries
-        $ verificationObservations verification) $ \(code, count) ->
+    forM_ (leantObservationCodeEntries observations) $ \(code, count) ->
       emitLn st =<< cDim st
         ("debug metric: " ++ code ++ "=" ++ show count)
   let shown = take synthMaxShown (verifiedCandidates verification)

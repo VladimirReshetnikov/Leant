@@ -28,28 +28,42 @@
 module Leant.Synth.Engine
   ( SynthEngine (..)
   , SynthOutcome (..)
+  , DetailedCandidateGroup
+  , detailedCandidateGroup
+  , detailedCandidateGroupRoute
+  , detailedCandidateGroupVariants
+  , DetailedSynthOutcome (..)
+  , projectDetailedSynthOutcome
   , parseSynthEngine
   , synthEngineName
   , providerStages
   , mergeCandidateGroups
+  , mergeDetailedCandidateGroups
   , mergeOutcomes
   , mergeOutcomesSkipping
+  , mergeDetailedOutcomesSkipping
   , withoutCheckedCandidates
+  , withoutCheckedDetailedCandidates
   , synthesize
   , synthesizeWithProviders
   , synthesizeWithProvidersSkipping
+  , synthesizeWithProvidersSkippingDetailed
   , synthesizeWith
   , synthesizeTuned
+  , synthesizeTunedDetailed
   , forceOutcome
+  , forceDetailedOutcome
   , synthMaxShown
   , synthMaxTried
   , synthVerificationWindow
   , candidateWindow
   , takeDistinct
+  , takeDistinctOn
+  , renderCandidateByAvailability
   ) where
 
 import Data.Foldable (toList)
-import Data.List (intercalate, isPrefixOf, nub, sortOn)
+import Data.List (intercalate, isPrefixOf, nub, nubBy, sortOn)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Data.Void (Void)
@@ -69,8 +83,10 @@ import Language.Haskell.Djex
       , ValueDeclaration
       )
   , Diagnostic
+  , ExferenceLocal
   , ExferenceOptions (..)
   , ExferenceSessionPolicy (..)
+  , ExferenceType
   , Expression
   , GroundKind
   , Name
@@ -112,12 +128,23 @@ import Language.Haskell.Djex
   , resultEvidence
   , resultSearch
   , runDjinnQueryWithKindedInstantiationAssignments
-  , runExferenceQueryWithKindedInstantiationAssignments
+  , runExferenceTypedQueryWithKindedInstantiationAssignments
   , selectQueryResults
   , specifiedVisibleTypeArgument
   , standardDjinnSession
   , tupleName
   , valueName
+  , typedCandidateCompatibility
+  , typedCandidateTermGraph
+  , TermGraph
+  )
+
+import Leant.Synth.Observability
+  ( CandidateRenderingRoute
+      ( RouteLegacyCandidateFallback
+      , RouteTypedCandidate
+      , RouteUnobserved
+      )
   )
 
 import Leant.Synth.Fragment
@@ -148,6 +175,7 @@ import Leant.Synth.Render
   , TypeMap
   , providerInfo
   , renderLeanTerm
+  , renderLeanTermGraphProjection
   )
 
 -- | What the engine established for one goal.  Candidate terms are a lazy
@@ -163,6 +191,49 @@ data SynthOutcome
   | SynthNoTerm [String]
     -- ^ no candidate and no logical claim, with notes
   deriving (Eq, Show)
+
+-- | One semantic candidate and the route that supplied the expression handed
+-- to Leant's renderer.  Every deduplication boundary names the textual-variant
+-- key explicitly, so ordinary structural equality can still expose route
+-- mistakes in tests.
+data DetailedCandidateGroup = DetailedCandidateGroup
+  CandidateRenderingRoute
+  [String]
+  deriving (Eq, Show)
+
+-- | Construct one internal semantic group.  This is exported only to the
+-- executable's focused boundary tests; Leant has no public library surface.
+detailedCandidateGroup
+  :: CandidateRenderingRoute
+  -> [String]
+  -> DetailedCandidateGroup
+detailedCandidateGroup = DetailedCandidateGroup
+
+-- | Rendering-route sidecar for one semantic group.
+detailedCandidateGroupRoute
+  :: DetailedCandidateGroup
+  -> CandidateRenderingRoute
+detailedCandidateGroupRoute (DetailedCandidateGroup route _) = route
+
+-- | Ordered textual variants of one semantic group.
+detailedCandidateGroupVariants :: DetailedCandidateGroup -> [String]
+detailedCandidateGroupVariants (DetailedCandidateGroup _ variants) = variants
+
+-- | Internal outcome retaining rendering provenance until the bounded group
+-- prefix is observed.  Compatibility APIs project this type immediately.
+data DetailedSynthOutcome
+  = DetailedSynthCandidates [DetailedCandidateGroup] [String]
+  | DetailedSynthRefuted Bool
+  | DetailedSynthNoTerm [String]
+  deriving (Eq, Show)
+
+-- | Forget rendering provenance without changing any historical result.
+projectDetailedSynthOutcome :: DetailedSynthOutcome -> SynthOutcome
+projectDetailedSynthOutcome outcome = case outcome of
+  DetailedSynthCandidates groups notes ->
+    SynthCandidates (map detailedCandidateGroupVariants groups) notes
+  DetailedSynthRefuted sound -> SynthRefuted sound
+  DetailedSynthNoTerm notes -> SynthNoTerm notes
 
 -- | Product-wide verification limits.  Combined-engine scheduling keeps
 -- Exference's first fresh group inside the displayed frontier while the
@@ -195,7 +266,14 @@ candidateWindow = 60
 -- precedes the bound so repeated backend derivations cannot consume slots that
 -- belong to later semantic candidates.
 takeDistinct :: Eq value => Int -> [value] -> [value]
-takeDistinct limit = take limit . nub
+takeDistinct = takeDistinctOn id
+
+-- | Retain the first bounded set of distinct values under an explicit
+-- semantic key.  Sidecar metadata therefore cannot accidentally redefine
+-- candidate identity at a future call site.
+takeDistinctOn :: Eq key => (value -> key) -> Int -> [value] -> [value]
+takeDistinctOn key limit =
+  take limit . nubBy (\left right -> key left == key right)
 
 -- | Drive an outcome's evaluation far enough that the whole search has
 -- run: the verdict itself, plus the first @n@ candidate groups.  The
@@ -211,6 +289,43 @@ forceOutcome n outcome = case outcome of
   Right (SynthNoTerm notes) -> noteSize notes
  where
   noteSize = sum . map length
+
+-- | 'forceOutcome' for the internal route-preserving stream.  Forcing the
+-- route alongside each bounded group keeps search and observation provenance
+-- under the same caller-owned deadline without inspecting the tail.
+forceDetailedOutcome :: Int -> Either String DetailedSynthOutcome -> Int
+forceDetailedOutcome n outcome = case outcome of
+  Left err -> length err
+  Right (DetailedSynthCandidates groups notes) ->
+    sum (map groupSize (take n groups)) + noteSize notes
+  Right (DetailedSynthRefuted sound) -> if sound then 1 else 0
+  Right (DetailedSynthNoTerm notes) -> noteSize notes
+ where
+  groupSize (DetailedCandidateGroup route variants) =
+    route `seq` sum (map length variants)
+  noteSize = sum . map length
+
+-- | Select and render the typed expression when present; only an explicit
+-- absence may consult the compatibility projection.  A typed rendering
+-- failure is returned unchanged and never retried through the fallback.
+-- Keeping this policy in one small helper makes its laziness independently
+-- testable: the compatibility payload and projector are not forced on a
+-- typed route.
+renderCandidateByAvailability
+  :: (typed -> Either renderError [String])
+  -> (legacy -> Either renderError [String])
+  -> Either absence typed
+  -> compatibility
+  -> (compatibility -> legacy)
+  -> (CandidateRenderingRoute, Either renderError [String])
+renderCandidateByAvailability
+    renderTyped renderLegacy availability compatibility fallback =
+  case availability of
+    Right typed -> (RouteTypedCandidate, renderTyped typed)
+    Left _ ->
+      ( RouteLegacyCandidateFallback
+      , renderLegacy (fallback compatibility)
+      )
 
 -- | Which synthesis engine(s) a query runs (proposal F of
 -- SYNTHESIS_PROPOSAL.md \167 7).  Djinn is the complete, terminating LJT
@@ -281,7 +396,17 @@ synthesizeWithProvidersSkipping
   :: SynthEngine -> Int -> Set.Set String -> [ProviderFrag] -> Frag
   -> Either String SynthOutcome
 synthesizeWithProvidersSkipping engine steps checked providers frag =
-  synthesizeTunedWithProviders engine steps
+  fmap projectDetailedSynthOutcome $
+    synthesizeWithProvidersSkippingDetailed
+      engine steps checked providers frag
+
+-- | Route-preserving counterpart used by the REPL until its bounded
+-- verification frontier has recorded rendering observations.
+synthesizeWithProvidersSkippingDetailed
+  :: SynthEngine -> Int -> Set.Set String -> [ProviderFrag] -> Frag
+  -> Either String DetailedSynthOutcome
+synthesizeWithProvidersSkippingDetailed engine steps checked providers frag =
+  synthesizeTunedWithProvidersDetailed engine steps
     (candidateWindow, Nothing) checked providers [] frag frag
 
 -- | 'synthesize' with caller-supplied premises (name, fragment) - used
@@ -306,40 +431,53 @@ synthesizeWith engine steps =
 synthesizeTuned
   :: SynthEngine -> Int -> (Int, Maybe Integer) -> [(String, Frag)]
   -> Frag -> Frag -> Either String SynthOutcome
-synthesizeTuned engine steps limits extras engineFrag fitFrag = do
-  synthesizeTunedWithProviders engine steps limits Set.empty [] extras
+synthesizeTuned engine steps limits extras engineFrag fitFrag =
+  fmap projectDetailedSynthOutcome $
+    synthesizeTunedDetailed engine steps limits extras engineFrag fitFrag
+
+-- | Route-preserving tuned search for the REPL's library and classical lanes.
+synthesizeTunedDetailed
+  :: SynthEngine -> Int -> (Int, Maybe Integer) -> [(String, Frag)]
+  -> Frag -> Frag -> Either String DetailedSynthOutcome
+synthesizeTunedDetailed engine steps limits extras engineFrag fitFrag =
+  synthesizeTunedWithProvidersDetailed engine steps limits Set.empty [] extras
     engineFrag fitFrag
 
-synthesizeTunedWithProviders
+synthesizeTunedWithProvidersDetailed
   :: SynthEngine -> Int -> (Int, Maybe Integer) -> Set.Set String
   -> [ProviderFrag] -> [(String, Frag)] -> Frag -> Frag
-  -> Either String SynthOutcome
-synthesizeTunedWithProviders engine steps limits checked providers extras
+  -> Either String DetailedSynthOutcome
+synthesizeTunedWithProvidersDetailed engine steps limits checked providers extras
     engineFrag fitFrag = case engine of
   EngineDjinn -> do
-    (goal, decls, providerDecls, instantiations, render, complete) <-
+    (goal, decls, providerDecls, instantiations, render, _, complete) <-
       prepare djinnRecursiveProjection providers
     outcome <- djinnRun limits fitFrag complete render goal
       (decls ++ providerDecls) instantiations
-    pure (withoutCheckedCandidates checked outcome)
+    pure
+      (withoutCheckedDetailedCandidates checked
+        (detailUnobservedOutcome outcome))
   EngineExference -> do
-    (goal, decls, providerDecls, instantiations, render, _) <-
+    (goal, decls, providerDecls, instantiations, render, renderGraph, _) <-
       prepare exferenceRecursiveProjection providers
-    outcome <- exferenceRun steps render goal (decls ++ providerDecls)
+    outcome <- exferenceRun steps render renderGraph goal
+      (decls ++ providerDecls)
       instantiations
-    pure (withoutCheckedCandidates checked outcome)
+    pure (withoutCheckedDetailedCandidates checked outcome)
   EngineBoth -> do
     ( djinnGoal, djinnDecls, djinnProviderDecls, djinnInstantiations
-      , djinnRender, djinnComplete) <-
+      , djinnRender, _, djinnComplete) <-
       prepare djinnRecursiveProjection providers
-    djinn <- djinnRun limits fitFrag djinnComplete djinnRender
+    djinnCompatibility <- djinnRun limits fitFrag djinnComplete djinnRender
       djinnGoal (djinnDecls ++ djinnProviderDecls) djinnInstantiations
+    let djinn = detailUnobservedOutcome djinnCompatibility
     ( exferenceGoal, exferenceDecls, providerDecls, exferenceInstantiations
-      , exferenceRender, _) <-
+      , exferenceRender, exferenceRenderGraph, _) <-
       prepare exferenceRecursiveProjection providers
-    exference <- exferenceRun steps exferenceRender exferenceGoal
+    exference <- exferenceRun steps exferenceRender exferenceRenderGraph
+      exferenceGoal
       (exferenceDecls ++ providerDecls) exferenceInstantiations
-    pure (mergeOutcomesSkipping checked djinn exference)
+    pure (mergeDetailedOutcomesSkipping checked djinn exference)
  where
   prepare recursiveProjection activeProviders = do
     ( goal0, decls, providerDecls, instantiations, ctorMap, providerMap
@@ -372,7 +510,18 @@ synthesizeTunedWithProviders engine steps limits checked providers extras
           renderLeanTerm ctorMap providerMap typeMap
             (pairsOf ctorPrems, spineArrows, pairsOf extrasPrems)
             fitFrag expr
-    pure (goal, decls, providerDecls, instantiations, render, complete)
+        renderGraph
+          :: TermGraph ExferenceType ExferenceLocal
+          -> Either String [String]
+        renderGraph graph =
+          renderLeanTermGraphProjection (("x" ++) . show)
+            ctorMap providerMap typeMap
+            (pairsOf ctorPrems, spineArrows, pairsOf extrasPrems)
+            fitFrag graph
+    pure
+      ( goal, decls, providerDecls, instantiations
+      , render, renderGraph, complete
+      )
 
 -- | The complete LJT search: candidates, or a refutation whose
 -- soundness depends on the translation having hidden nothing.
@@ -447,11 +596,12 @@ djinnRun (cutoff, budget) frag projection render goal decls instantiations = do
 exferenceRun
   :: Int
   -> (Expression String -> Either String [String])
+  -> (TermGraph ExferenceType ExferenceLocal -> Either String [String])
   -> Type String
   -> [DjinnDecl]
   -> [KindedProviderInstantiationAssignment String]
-  -> Either String SynthOutcome
-exferenceRun steps render goal decls instantiations = do
+  -> Either String DetailedSynthOutcome
+exferenceRun steps render renderGraph goal decls instantiations = do
   standard <- viaDiagnostic standardDjinnSession
   let allDecls =
         environmentDeclarations (djinnSessionEnvironment standard)
@@ -516,7 +666,7 @@ exferenceRun steps render goal decls instantiations = do
               }
         request <- viaDiagnostic (mkExferenceRequest query)
         results <- viaDiagnostic
-          (runExferenceQueryWithKindedInstantiationAssignments session
+          (runExferenceTypedQueryWithKindedInstantiationAssignments session
             convertedInstantiations request)
         let selection =
               selectQueryResults SelectAll (const (0 :: Int))
@@ -525,18 +675,23 @@ exferenceRun steps render goal decls instantiations = do
             -- search histories may converge on the same rendered term, and
             -- repetitions must not crowd later distinct candidates out of a
             -- bounded interactive response.
-            groups = takeDistinct candidateWindow
-              [ group
+            groups = takeDistinctOn detailedCandidateGroupVariants
+              candidateWindow
+              [ DetailedCandidateGroup route group
               | candidate <- selectionCandidates selection
-              , let expr = fmap (("x" ++) . show)
-                      (functionClauseExpression (candidateOutput candidate))
-              , Right group <- [render expr]
+              , let availability = typedCandidateTermGraph candidate
+                    compatibility = typedCandidateCompatibility candidate
+                    fallback = fmap (("x" ++) . show)
+                      . functionClauseExpression . candidateOutput
+                    (route, rendered) = renderCandidateByAvailability
+                      renderGraph render availability compatibility fallback
+              , Right group <- [rendered]
               ]
             notes = maybe [] progressNotes (selectionProgress selection)
         pure (groups, notes)
   (strictGroups, strictNotes) <- runLane False
   if not (null strictGroups)
-    then pure $ SynthCandidates strictGroups strictNotes
+    then pure $ DetailedSynthCandidates strictGroups strictNotes
     else do
       -- Exference normally prefers terms which use every introduced binder.
       -- Lean accepts intentional omission, however, and recursive projection
@@ -546,8 +701,8 @@ exferenceRun steps render goal decls instantiations = do
       -- and provider preference for every existing successful query.
       (relaxedGroups, relaxedNotes) <- runLane True
       pure $ if null relaxedGroups
-        then SynthNoTerm (nub $ strictNotes ++ relaxedNotes)
-        else SynthCandidates relaxedGroups relaxedNotes
+        then DetailedSynthNoTerm (nub $ strictNotes ++ relaxedNotes)
+        else DetailedSynthCandidates relaxedGroups relaxedNotes
 
 -- | Merge two ranked group streams without letting either engine's bounded
 -- tail suppress a candidate from the other.  Djinn owns the first four fresh
@@ -564,7 +719,20 @@ exferenceRun steps render goal decls instantiations = do
 -- scheduling turn.  In particular, an early Exference spelling beats an
 -- otherwise identical /later/ Djinn spelling.
 mergeCandidateGroups :: [[String]] -> [[String]] -> [[String]]
-mergeCandidateGroups = djinnHead (synthMaxShown - 1) Set.empty
+mergeCandidateGroups left right =
+  map detailedCandidateGroupVariants $
+    mergeDetailedCandidateGroups
+      (map (DetailedCandidateGroup RouteUnobserved) left)
+      (map (DetailedCandidateGroup RouteUnobserved) right)
+
+-- | Route-preserving form of 'mergeCandidateGroups'.  Dedupe looks only at
+-- rendered spellings and keeps the route of the first group with a surviving
+-- spelling.
+mergeDetailedCandidateGroups
+  :: [DetailedCandidateGroup]
+  -> [DetailedCandidateGroup]
+  -> [DetailedCandidateGroup]
+mergeDetailedCandidateGroups = djinnHead (synthMaxShown - 1) Set.empty
  where
   djinnHead remaining seen djinn exference
     | remaining <= 0 =
@@ -606,10 +774,15 @@ mergeCandidateGroups = djinnHead (synthMaxShown - 1) Set.empty
 
   nextFresh _ [] = Nothing
   nextFresh seen (group : groups) =
-    let (fresh, seen') = retainFresh seen group
+    let (fresh, seen') =
+          retainFresh seen (detailedCandidateGroupVariants group)
     in if null fresh
       then nextFresh seen' groups
-      else Just (fresh, seen', groups)
+      else Just
+        ( DetailedCandidateGroup (detailedCandidateGroupRoute group) fresh
+        , seen'
+        , groups
+        )
 
   retainFresh seen = go seen
    where
@@ -634,52 +807,91 @@ mergeOutcomes = mergeOutcomesSkipping Set.empty
 -- quota on empty groups from the other.
 mergeOutcomesSkipping
   :: Set.Set String -> SynthOutcome -> SynthOutcome -> SynthOutcome
-mergeOutcomesSkipping checked djinn0 exference0 =
-  case (djinn, exference) of
-    (SynthCandidates a na, SynthCandidates b nb) ->
-      SynthCandidates (mergeCandidateGroups a b) (na ++ tag nb)
-    (SynthCandidates a na, other) ->
-      SynthCandidates a (na ++ tag (notesOf other))
-    (other, SynthCandidates b nb) ->
-      SynthCandidates b (notesOf other ++ tag nb)
-    (SynthRefuted sound, _) -> SynthRefuted sound
-    (SynthNoTerm na, other) -> SynthNoTerm (na ++ tag (notesOf other))
- where
-  djinn = normalize (withoutCheckedCandidates checked djinn0)
-  exference = normalize (withoutCheckedCandidates checked exference0)
-
-  tag = map ("exference: " ++)
-
-  candidatesOr fallback groups notes
-    | null groups = fallback
-    | otherwise = SynthCandidates groups notes
-
-  normalize outcome = case outcome of
-    SynthCandidates groups notes ->
-      candidatesOr (SynthNoTerm notes)
-        (mergeCandidateGroups groups []) notes
-    other -> other
-
-  notesOf outcome = case outcome of
-    SynthCandidates _ notes -> notes
-    SynthNoTerm notes -> notes
-    SynthRefuted _ -> []
+mergeOutcomesSkipping checked djinn exference =
+  projectDetailedSynthOutcome $
+    mergeDetailedOutcomesSkipping checked
+      (detailUnobservedOutcome djinn)
+      (detailUnobservedOutcome exference)
 
 -- | Remove spellings already sent to Lean by an earlier structural/provider
 -- lane.  Empty groups do not consume the next lane's verification budget, and
 -- the transformation stays lazy so 'forceOutcome' can pull the first bounded
 -- /fresh/ prefix while it is still under the command deadline.
 withoutCheckedCandidates :: Set.Set String -> SynthOutcome -> SynthOutcome
-withoutCheckedCandidates checked outcome = case outcome of
-  SynthCandidates groups notes -> case freshGroups groups of
-    [] -> SynthNoTerm notes
-    fresh -> SynthCandidates fresh notes
+withoutCheckedCandidates checked =
+  projectDetailedSynthOutcome
+    . withoutCheckedDetailedCandidates checked
+    . detailUnobservedOutcome
+
+-- | Attach no rendering observation to today's Djinn compatibility stream.
+-- The mapping is lazy in the candidate tail and does not alter its ordering.
+detailUnobservedOutcome :: SynthOutcome -> DetailedSynthOutcome
+detailUnobservedOutcome outcome = case outcome of
+  SynthCandidates groups notes -> DetailedSynthCandidates
+    (map (DetailedCandidateGroup RouteUnobserved) groups) notes
+  SynthRefuted sound -> DetailedSynthRefuted sound
+  SynthNoTerm notes -> DetailedSynthNoTerm notes
+
+-- | Route-preserving combined-engine merge.  As in the compatibility merge,
+-- filtering happens in each source before scheduling so an emptied group does
+-- not consume the other engine's reserved frontier.
+mergeDetailedOutcomesSkipping
+  :: Set.Set String
+  -> DetailedSynthOutcome
+  -> DetailedSynthOutcome
+  -> DetailedSynthOutcome
+mergeDetailedOutcomesSkipping checked djinn0 exference0 =
+  case (djinn, exference) of
+    (DetailedSynthCandidates a na, DetailedSynthCandidates b nb) ->
+      DetailedSynthCandidates
+        (mergeDetailedCandidateGroups a b) (na ++ tag nb)
+    (DetailedSynthCandidates a na, other) ->
+      DetailedSynthCandidates a (na ++ tag (notesOf other))
+    (other, DetailedSynthCandidates b nb) ->
+      DetailedSynthCandidates b (notesOf other ++ tag nb)
+    (DetailedSynthRefuted sound, _) -> DetailedSynthRefuted sound
+    (DetailedSynthNoTerm na, other) ->
+      DetailedSynthNoTerm (na ++ tag (notesOf other))
+ where
+  djinn = normalize (withoutCheckedDetailedCandidates checked djinn0)
+  exference = normalize
+    (withoutCheckedDetailedCandidates checked exference0)
+
+  tag = map ("exference: " ++)
+
+  candidatesOr fallback groups notes
+    | null groups = fallback
+    | otherwise = DetailedSynthCandidates groups notes
+
+  normalize outcome = case outcome of
+    DetailedSynthCandidates groups notes ->
+      candidatesOr (DetailedSynthNoTerm notes)
+        (mergeDetailedCandidateGroups groups []) notes
+    other -> other
+
+  notesOf outcome = case outcome of
+    DetailedSynthCandidates _ notes -> notes
+    DetailedSynthNoTerm notes -> notes
+    DetailedSynthRefuted _ -> []
+
+-- | Filter exact previously checked spellings while retaining the route of a
+-- semantic group with at least one surviving textual variant.
+withoutCheckedDetailedCandidates
+  :: Set.Set String
+  -> DetailedSynthOutcome
+  -> DetailedSynthOutcome
+withoutCheckedDetailedCandidates checked outcome = case outcome of
+  DetailedSynthCandidates groups notes -> case freshGroups groups of
+    [] -> DetailedSynthNoTerm notes
+    fresh -> DetailedSynthCandidates fresh notes
   other -> other
  where
-  freshGroups groups = filter (not . null)
-    [ filter (`Set.notMember` checked) group
-    | group <- groups
-    ]
+  freshGroups = filter (not . null . detailedCandidateGroupVariants)
+    . map retainFresh
+  retainFresh group = DetailedCandidateGroup
+    (detailedCandidateGroupRoute group)
+    (filter (`Set.notMember` checked)
+      (detailedCandidateGroupVariants group))
 
 viaDiagnostic :: Either Diagnostic a -> Either String a
 viaDiagnostic = either (Left . renderDiagnostic) Right

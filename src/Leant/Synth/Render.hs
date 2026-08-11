@@ -41,6 +41,7 @@ module Leant.Synth.Render
   , TypeMap
   , providerInfo
   , renderLeanTerm
+  , renderLeanTermGraphProjection
   ) where
 
 import Control.Monad (foldM)
@@ -64,6 +65,10 @@ import Language.Haskell.Synthesis.Generated
   , expressionFullApplicationSpine
   , isInferredVisibleTypeArgument
   , visibleTypeArgumentClosedType
+  )
+import Language.Haskell.Synthesis.TypedGenerated
+  ( TermGraph
+  , eraseTermGraph
   )
 import Language.Haskell.Synthesis.Constraint (Constraint (..))
 import Language.Haskell.Synthesis.Name
@@ -148,6 +153,23 @@ providerInfo leanName binderNames frag = ProviderInfo
 -- spelling.  Family heads are restored with their full explicit argument
 -- vector; rigid opaque field types have no engine-visible arguments.
 type TypeMap = Map.Map String String
+
+-- | Initial checked-graph rendering seam.
+--
+-- Today this narrow projection deliberately reuses the established renderer
+-- through the graph's checked one-way erasure.  Keeping the graph at this
+-- module boundary lets a later direct typed walk replace only this helper,
+-- without teaching the engine orchestrator about rendering structure.
+renderLeanTermGraphProjection
+  :: (local -> String)
+  -> CtorMap -> ProviderMap -> TypeMap
+  -> ([(String, Frag)], Int, [(String, Frag)]) -> Frag
+  -> TermGraph ty local
+  -> Either String [String]
+renderLeanTermGraphProjection localName cm providers typeNames premises goalFrag =
+  renderLeanTerm cm providers typeNames premises goalFrag
+    . fmap localName
+    . eraseTermGraph
 
 -- | Render one candidate expression against the goal fragment.  The
 -- candidate proves the premise-extended goal (see
