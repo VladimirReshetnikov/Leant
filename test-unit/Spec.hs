@@ -1604,7 +1604,7 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                     prepareLengthQueryFromHandoff handoff
                   lengthSMTLibQuerySchemaTag @?=
                     map (fromIntegral . fromEnum)
-                      ("djex-length-z3-qf-lia-smtlib2/v1" :: String)
+                      ("djex-length-z3-qf-lia-smtlib2/v2" :: String)
                   lengthSMTLibQueryLogic @?=
                     map (fromIntegral . fromEnum) ("QF_LIA" :: String)
                   lengthSMTLibQueryInputSymbols query @?= []
