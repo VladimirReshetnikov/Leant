@@ -43,6 +43,7 @@ Executable leant
     Leant.Synth.Length.Adapter
     Leant.Synth.Length.Configuration
     Leant.Synth.Length.Configuration.File
+    Leant.Synth.Length.Configuration.File.Acquire
     Leant.Synth.Length.Ranking
     Leant.Synth.Observability
     Leant.Synth.ProviderCache
@@ -68,6 +69,8 @@ Executable leant
     time       >= 1.12 && < 1.15
   if os(windows)
     Build-Depends: Win32 >= 2.13 && < 2.15
+  else
+    Build-Depends: unix >= 2.8 && < 2.9
 
 Test-Suite leant-synth-tests
   Type:             exitcode-stdio-1.0
@@ -81,6 +84,7 @@ Test-Suite leant-synth-tests
     Leant.Synth.Length.Adapter
     Leant.Synth.Length.Configuration
     Leant.Synth.Length.Configuration.File
+    Leant.Synth.Length.Configuration.File.Acquire
     Leant.Synth.Length.Ranking
     Leant.Synth.Observability
     Leant.Synth.ProviderCache
@@ -109,3 +113,5 @@ Test-Suite leant-synth-tests
     text        >= 2.0   && < 2.2,
     tasty       >= 1.4.2 && < 2,
     tasty-hunit >= 0.10  && < 1
+  if !os(windows)
+    Build-Depends: unix >= 2.8 && < 2.9

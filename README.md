@@ -346,6 +346,22 @@ pre-spawn executable-file snapshot expectation, not executed-image
 attestation. The complete schema and budgets are recorded in the
 [bounded live Length ranking configuration-file report](docs/reports/2026-08-11-bounded-live-length-ranking-configuration-file.md).
 
+`Leant.Synth.Length.Configuration.File.Acquire` now adds a separate bounded
+filesystem boundary without enabling that policy. Callers must explicitly
+admit an absolute path of at most 4,096 characters and a positive timeout of
+at most 60 seconds. On POSIX the final component is opened once with
+no-follow, nonblocking, no-controlling-terminal, and close-on-exec flags; its
+descriptor must report a regular file before any read. Strict reads stop at
+the decoder's 262,144-byte maximum plus one, and only the still-disabled
+configuration can escape. Errors retain closed phases, capped counts, and a
+cleanup bit rather than paths, errno text, or file content. The timeout is an
+interruption budget rather than a hard kernel deadline, final-component
+no-follow does not exclude ancestor symlinks or in-place mutation, and Windows
+fails closed until an equivalent native handle implementation exists. There
+is still no loader discovery, default path, Main/REPL use, activation, or
+solver launch. See the
+[bounded acquisition report](docs/reports/2026-08-11-bounded-live-length-ranking-configuration-acquisition.md).
+
 Three rules run through the design:
 
 - **The engine is never trusted.** Every candidate is re-elaborated by

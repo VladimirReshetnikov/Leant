@@ -204,6 +204,20 @@ import Leant.Synth.Length.Configuration.File
   , lengthRankingConfigurationFileJsonLimits
   , lengthRankingConfigurationFileVersion
   )
+import Leant.Synth.Length.Configuration.File.Acquire
+  ( LengthRankingConfigurationFileAdmissionError (..)
+  , LengthRankingConfigurationFileLoadError
+  , LengthRankingConfigurationFileLoadErrorClass (..)
+  , LengthRankingConfigurationFileRequest
+  , LengthRankingConfigurationFileSource (..)
+  , lengthRankingConfigurationFileLoadCleanupIncomplete
+  , lengthRankingConfigurationFileLoadErrorClass
+  , lengthRankingConfigurationFileLoadMaximumBytes
+  , lengthRankingConfigurationFileMaximumPathCharacters
+  , lengthRankingConfigurationFileMaximumTimeoutMilliseconds
+  , loadLengthRankingConfigurationFile
+  , mkLengthRankingConfigurationFileRequest
+  )
 import Leant.Synth.Length.Ranking
   ( LengthRanking
   , LengthRankingAssessment (..)
@@ -1928,7 +1942,189 @@ lengthRankingConfigurationFileTests = testGroup
       assertLengthRankingConfigurationFileLiveEquivalence
   , testCase "keep paths, digests, fields, tags, and names out of Show errors"
       assertLengthRankingConfigurationFileShowRedaction
+  , lengthRankingConfigurationFileAcquisitionTests
   ]
+
+lengthRankingConfigurationFileAcquisitionTests :: TestTree
+lengthRankingConfigurationFileAcquisitionTests = testGroup
+  "bounded explicit file acquisition"
+  [ testCase "admit finite paths and timeouts in a productive fixed order"
+      assertLengthRankingConfigurationFileRequestAdmission
+  , testCase "load and decode one explicitly admitted regular file"
+      assertLengthRankingConfigurationFileAcquisition
+  , testCase "reject non-regular and final-component symlink sources"
+      assertLengthRankingConfigurationFileSourceTypes
+  , testCase "probe the exact byte ceiling and cap the excess observation"
+      assertLengthRankingConfigurationFileAcquisitionByteLimit
+  , testCase "sanitize acquisition failures without losing their phase"
+      assertLengthRankingConfigurationFileAcquisitionRedaction
+  ]
+
+assertLengthRankingConfigurationFileRequestAdmission :: IO ()
+assertLengthRankingConfigurationFileRequestAdmission =
+  withTemporaryDirectory "leant-length-acquisition-admission" $ \root -> do
+    lengthRankingConfigurationFileMaximumPathCharacters @?= 4096
+    lengthRankingConfigurationFileMaximumTimeoutMilliseconds @?= 60000
+    lengthRankingConfigurationFileLoadMaximumBytes @?=
+      boundedJsonMaximumTotalBytes lengthRankingConfigurationFileJsonLimits
+    let exactPath = root ++ replicate
+          (fromIntegral lengthRankingConfigurationFileMaximumPathCharacters
+            - length root)
+          'a'
+        exactSource = LengthRankingConfigurationFileSource exactPath
+          lengthRankingConfigurationFileMaximumTimeoutMilliseconds
+    case mkLengthRankingConfigurationFileRequest exactSource of
+      Left failure -> assertFailure $ "exact request was rejected: "
+        ++ show failure
+      Right _ -> pure ()
+
+    let cyclicPath = root ++ repeat 'a'
+        cyclicSource = LengthRankingConfigurationFileSource cyclicPath
+          (error "timeout forced after an oversized path")
+    case mkLengthRankingConfigurationFileRequest cyclicSource of
+      Left failure -> failure @?=
+        LengthRankingConfigurationFilePathCharacterLimitExceeded 4096 4097
+      Right _ -> assertFailure "cyclic oversized path was admitted"
+
+    assertAdmissionFailure LengthRankingConfigurationFilePathEmpty
+      $ LengthRankingConfigurationFileSource "" 1
+    assertAdmissionFailure LengthRankingConfigurationFilePathContainsNul
+      $ LengthRankingConfigurationFileSource (root ++ "\0private") 1
+    assertAdmissionFailure LengthRankingConfigurationFilePathNotAbsolute
+      $ LengthRankingConfigurationFileSource "relative.json" 1
+    assertAdmissionFailure LengthRankingConfigurationFileTimeoutNotPositive
+      $ LengthRankingConfigurationFileSource root 0
+    assertAdmissionFailure
+      (LengthRankingConfigurationFileTimeoutLimitExceeded 60000 60001)
+      $ LengthRankingConfigurationFileSource root 60001
+
+assertLengthRankingConfigurationFileAcquisition :: IO ()
+assertLengthRankingConfigurationFileAcquisition =
+  withTemporaryDirectory "leant-length-acquisition-success" $ \root -> do
+    let sourcePath = root </> "length-ranking.json"
+        executable = root </> "missing-z3"
+    ByteString.writeFile sourcePath $ encodeLengthRankingConfigurationFile
+      $ lengthRankingConfigurationFileFixture executable Nothing
+    request <- expectLengthRankingConfigurationFileRequest sourcePath 1000
+    loaded <- loadLengthRankingConfigurationFile request
+    if os == "mingw32"
+      then expectLengthRankingConfigurationFileLoadFailure
+        LengthRankingConfigurationFilePlatformUnsupported loaded
+      else case loaded of
+        Left failure -> assertFailure $ "regular configuration was rejected: "
+          ++ show (lengthRankingConfigurationFileLoadErrorClass failure)
+        Right disabled -> do
+          _ <- expectLengthRankingConfigurationActivation
+            PermitUnpinnedExecutable disabled
+          pure ()
+
+assertLengthRankingConfigurationFileSourceTypes :: IO ()
+assertLengthRankingConfigurationFileSourceTypes =
+  withTemporaryDirectory "leant-length-acquisition-types" $ \root -> do
+    directoryRequest <- expectLengthRankingConfigurationFileRequest root 1000
+    directoryResult <- loadLengthRankingConfigurationFile directoryRequest
+    if os == "mingw32"
+      then expectLengthRankingConfigurationFileLoadFailure
+        LengthRankingConfigurationFilePlatformUnsupported directoryResult
+      else expectLengthRankingConfigurationFileLoadFailure
+        LengthRankingConfigurationFileNotRegular directoryResult
+
+    let target = root </> "target.json"
+        linked = root </> "linked.json"
+    ByteString.writeFile target $ BS.pack "{}"
+    if os == "mingw32"
+      then pure ()
+      else do
+        createFileLink target linked
+        linkedRequest <- expectLengthRankingConfigurationFileRequest linked 1000
+        linkedResult <- loadLengthRankingConfigurationFile linkedRequest
+        expectLengthRankingConfigurationFileLoadFailure
+          LengthRankingConfigurationFileOpenFailed linkedResult
+
+assertLengthRankingConfigurationFileAcquisitionByteLimit :: IO ()
+assertLengthRankingConfigurationFileAcquisitionByteLimit =
+  withTemporaryDirectory "leant-length-acquisition-bytes" $ \root -> do
+    let exactPath = root </> "exact.json"
+        excessivePath = root </> "excessive.json"
+        maximumBytes = fromIntegral
+          lengthRankingConfigurationFileLoadMaximumBytes
+    ByteString.writeFile exactPath $ ByteString.replicate maximumBytes 32
+    ByteString.writeFile excessivePath
+      $ ByteString.replicate (maximumBytes + 1) 32
+    exactRequest <- expectLengthRankingConfigurationFileRequest exactPath 1000
+    excessiveRequest <- expectLengthRankingConfigurationFileRequest
+      excessivePath 1000
+    exactResult <- loadLengthRankingConfigurationFile exactRequest
+    excessiveResult <- loadLengthRankingConfigurationFile excessiveRequest
+    if os == "mingw32"
+      then do
+        expectLengthRankingConfigurationFileLoadFailure
+          LengthRankingConfigurationFilePlatformUnsupported exactResult
+        expectLengthRankingConfigurationFileLoadFailure
+          LengthRankingConfigurationFilePlatformUnsupported excessiveResult
+      else do
+        case exactResult of
+          Left failure -> case
+              lengthRankingConfigurationFileLoadErrorClass failure of
+            LengthRankingConfigurationFileDecodeRejected _ ->
+              lengthRankingConfigurationFileLoadCleanupIncomplete failure @?=
+                False
+            other -> assertFailure $ "exact byte ceiling failed before decode: "
+              ++ show other
+          Right _ -> assertFailure "all-whitespace document unexpectedly decoded"
+        expectLengthRankingConfigurationFileLoadFailure
+          (LengthRankingConfigurationFileByteLimitExceeded 262144 262145)
+          excessiveResult
+
+assertLengthRankingConfigurationFileAcquisitionRedaction :: IO ()
+assertLengthRankingConfigurationFileAcquisitionRedaction =
+  withTemporaryDirectory "leant-length-acquisition-redaction" $ \root -> do
+    let privateFragment = "private-acquisition-path-fragment"
+        missing = root </> privateFragment
+    request <- expectLengthRankingConfigurationFileRequest missing 1000
+    loaded <- loadLengthRankingConfigurationFile request
+    case loaded of
+      Right _ -> assertFailure "missing configuration unexpectedly loaded"
+      Left failure -> do
+        lengthRankingConfigurationFileLoadErrorClass failure @?=
+          if os == "mingw32"
+            then LengthRankingConfigurationFilePlatformUnsupported
+            else LengthRankingConfigurationFileOpenFailed
+        lengthRankingConfigurationFileLoadCleanupIncomplete failure @?= False
+        assertBool "load failure exposed the private source path"
+          $ not $ privateFragment `isInfixOf` show failure
+
+assertAdmissionFailure
+  :: LengthRankingConfigurationFileAdmissionError
+  -> LengthRankingConfigurationFileSource
+  -> IO ()
+assertAdmissionFailure expected source =
+  case mkLengthRankingConfigurationFileRequest source of
+    Left failure -> failure @?= expected
+    Right _ -> assertFailure $ "expected request rejection: " ++ show expected
+
+expectLengthRankingConfigurationFileRequest
+  :: FilePath
+  -> Int
+  -> IO LengthRankingConfigurationFileRequest
+expectLengthRankingConfigurationFileRequest path timeoutMilliseconds =
+  case mkLengthRankingConfigurationFileRequest
+      $ LengthRankingConfigurationFileSource path timeoutMilliseconds of
+    Left failure -> assertFailure ("request admission failed: " ++ show failure)
+      >> error "unreachable"
+    Right request -> pure request
+
+expectLengthRankingConfigurationFileLoadFailure
+  :: LengthRankingConfigurationFileLoadErrorClass
+  -> Either
+      LengthRankingConfigurationFileLoadError
+      DisabledLengthRankingConfiguration
+  -> IO ()
+expectLengthRankingConfigurationFileLoadFailure expected result = case result of
+  Right _ -> assertFailure $ "expected acquisition failure: " ++ show expected
+  Left failure -> do
+    lengthRankingConfigurationFileLoadErrorClass failure @?= expected
+    lengthRankingConfigurationFileLoadCleanupIncomplete failure @?= False
 
 assertLengthRankingConfigurationFileActivation :: IO ()
 assertLengthRankingConfigurationFileActivation =
