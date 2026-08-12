@@ -122,9 +122,13 @@ fingerprints. This factors runtime accounting without moving domain phase
 schemas, plan identities, or solver authority into the shared cursor.
 
 The package-private terminal protocol value likewise retains only the closed
-solver status and optional decoded integer bindings. The live owner separately
-retains the exact plan through driving and binds its complete key directly into
-the unchanged query-run identity. Exact bounded status-frame and
+solver status and optional decoded integer bindings. Both readiness and
+ordinary-query driver invocations take their final transcript cap from the
+exact sealed plan whose initial action they drive: the capability plan and
+protocol plan, respectively. Pre-reservation query-run identity sizing uses
+that same protocol-plan projection. The live Session carries the protocol plan
+through driving and binds its complete key directly into the unchanged
+query-run identity. Exact bounded status-frame and
 input-value-frame bytes remain singly stored in the causal transcript rather
 than being copied into that decoded branch.
 
