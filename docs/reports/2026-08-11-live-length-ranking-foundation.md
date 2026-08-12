@@ -152,6 +152,20 @@ predecessor boundary, Driver opens the receipt only after its first exact write
 succeeds; later completed-epoch drains preserve their existing append timing.
 No transcript, wire, fingerprint, schema, public API, or Leant behavior changes.
 
+The sibling schema-free `Internal.SMTLib.Causal.StdoutChunk` receipt now
+admits every nonempty strict Process read before enqueue. Empty reads retain
+their FIFO EOF terminal; at the stdout maximum a nonempty permitted prefix is
+queued before the maximum-plus-one terminal, while an empty prefix cannot be
+represented as a successful chunk. The generic driver can therefore receive
+neither a zero-progress success nor an empty success masquerading as the
+delimiter required before another write. This receipt proves nonemptiness
+only: FIFO origin, configured bounds, cancellation/deadline and process
+association remain Length transport laws. Boundary-drain rollback retains the
+original typed stdout receipts and their segmentation. Driver projects the
+receipt only at its existing receiver-feed and post-epoch boundary-collection
+edges. Transcript bytes, failure order, fingerprints, schemas, public
+behavior, and Leant remain unchanged.
+
 The package-private terminal protocol value likewise retains only the closed
 solver status and optional decoded integer bindings. Both readiness and
 ordinary-query driver invocations take their final transcript cap from the
