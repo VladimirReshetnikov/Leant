@@ -72,6 +72,11 @@ problem, so retaining the renderer/session/family handoff solely for a second
 replay would duplicate authority and heap residency without strengthening
 query/evidence replay.
 
+The handoff wrapper itself now contains only that sealed problem. Callback
+receipt and resolved family values are consumed while constructing it rather
+than being copied into the transient result; the ranking record owns the one
+receipt it still needs for occurrence-preserving presentation.
+
 The receipt remains finite-spine and model-relative, including any named
 provider-law assumptions. It is not a Lean source-level counterexample, an
 executable-realization claim, a solver-soundness certificate, or a kernel proof.

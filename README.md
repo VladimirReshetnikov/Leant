@@ -309,7 +309,10 @@ replay gate is stably moved behind the other candidates. That gate checks the
 exact canonical query fingerprint before inspecting optional evidence and
 replays any evidence against the behavioral problem retained by the query.
 The heavier checked handoff is therefore transient after query sealing;
-prepared live state retains only the exact verified receipt and sealed query.
+the opaque handoff itself retains only the already sealed problem, not a
+second callback receipt or resolved family binding. Prepared live state
+retains only the exact verified receipt and sealed query because ordering
+still needs that receipt.
 Nothing is pruned. A candidate-local handoff or query-construction refusal
 still projects through the compatible `Unassessed` assessment, but now also
 retains one bounded payload-free `LengthPreparationRefusalClass` with a fixed

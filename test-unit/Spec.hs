@@ -125,7 +125,6 @@ import Leant.Synth.Engine
   , providerStages
   , synthEngineName
   , candidateWindow
-  , checkedLengthHandoffFamilyInspection
   , checkedLengthHandoffProblem
   , synthMaxShown
   , synthMaxTried
@@ -4347,13 +4346,6 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                 [verified] -> do
                   handoff <- expectRight $
                     prepareCheckedLengthHandoff contract verified
-                  case inspectedSemanticFamilyBindings expected of
-                    [expectedFamily] ->
-                      checkedLengthHandoffFamilyInspection handoff
-                        @?= expectedFamily
-                    families -> assertFailure $
-                      "expected one exact List family binding, got: "
-                        ++ show families
                   let candidate = checkedLengthProblemCandidate
                         $ checkedLengthHandoffProblem handoff
                   checkedLengthCandidateResult candidate @?=

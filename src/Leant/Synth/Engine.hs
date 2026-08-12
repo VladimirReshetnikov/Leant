@@ -50,8 +50,6 @@ module Leant.Synth.Engine
   , LeanLengthContract (..)
   , LengthHandoffRefusal (..)
   , CheckedLengthHandoff
-  , checkedLengthHandoffVerifiedVariant
-  , checkedLengthHandoffFamilyInspection
   , checkedLengthHandoffProblem
   , prepareCheckedLengthHandoff
   , mapDetailedCandidateGroupVariantsDroppingSemanticSidecar
@@ -546,38 +544,20 @@ data LengthHandoffRefusal
         ExferenceTermGraphAbsence ExferenceLocal ExferenceLocal)
   deriving (Eq, Show)
 
--- | One callback-accepted spelling bound conservatively to the exact checked
--- Exference graph, structural family provenance, and complete Djex Length
--- problem derived from that same run.
+-- | One callback-accepted spelling reduced conservatively to the complete
+-- Djex Length problem derived from its exact checked Exference origin.
 --
 -- The constructor stays private.  In particular, neither a raw rendered term
 -- nor a detached typed candidate can be paired with a problem after sealing.
 data CheckedLengthHandoff = CheckedLengthHandoff
-  (Verified DetailedVerificationVariant)
-  SemanticFamilyBinding
   (CheckedLengthProblem ExferenceLocal ExferenceLocal)
-
--- | Callback-acceptance receipt retained by the checked handoff.
-checkedLengthHandoffVerifiedVariant
-  :: CheckedLengthHandoff
-  -> Verified DetailedVerificationVariant
-checkedLengthHandoffVerifiedVariant
-    (CheckedLengthHandoff verified _ _) = verified
-
--- | Exact public family identity used to select the declared spine model.
-checkedLengthHandoffFamilyInspection
-  :: CheckedLengthHandoff
-  -> SemanticFamilyBindingInspection
-checkedLengthHandoffFamilyInspection
-    (CheckedLengthHandoff _ family _) =
-  inspectSemanticFamilyBinding family
 
 -- | Complete solver-neutral problem sealed for the retained candidate.
 checkedLengthHandoffProblem
   :: CheckedLengthHandoff
   -> CheckedLengthProblem ExferenceLocal ExferenceLocal
 checkedLengthHandoffProblem
-    (CheckedLengthHandoff _ _ problem) = problem
+    (CheckedLengthHandoff problem) = problem
 
 -- | Prepare the only currently supported Leant-to-Djex behavioral handoff.
 --
@@ -657,7 +637,7 @@ prepareCheckedLengthHandoff source verified = do
   problem <- either (Left . LengthHandoffProblemRejected) Right
     $ sealLengthTypedCandidateProblem
         defaultLengthProblemLimits session contract candidate
-  pure $ CheckedLengthHandoff verified family problem
+  pure $ CheckedLengthHandoff problem
  where
   resolveSemanticFamily origin spine = case
       [ binding
