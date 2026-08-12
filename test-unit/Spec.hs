@@ -5063,7 +5063,7 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
         other -> assertFailure $
           "expected polymorphic provider candidates, got: " ++ show other
   , testCase
-      "retain exact preparation and strict request authority in the sidecar" $
+      "share one exact preparation with strict request authority" $
       do
         let token = FAtom False "Demo.AuthorityToken"
             extras = [("Demo.seed", token)]

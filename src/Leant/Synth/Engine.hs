@@ -833,12 +833,13 @@ synthesizeTunedWithProvidersDetailed engine steps limits checked providers extra
   EngineDjinn -> do
     prepared <- prepareSynthesis djinnRecursiveProjection
       providers extras engineFrag fitFrag
+    let origin = preparedSemanticOrigin prepared
     outcome <- djinnRun limits fitFrag
-      (preparedProjectionCompleteness prepared)
+      (semanticOriginProjectionCompleteness origin)
       (preparedRenderExpression prepared)
-      (preparedSearchGoal prepared)
-      (preparedDeclarations prepared)
-      (preparedProviderAssignments prepared)
+      (semanticOriginSearchGoal origin)
+      (semanticOriginDeclarations origin)
+      (semanticOriginProviderAssignments origin)
     pure
       (withoutCheckedDetailedCandidates checked
         (detailUnobservedOutcome outcome))
@@ -850,12 +851,13 @@ synthesizeTunedWithProvidersDetailed engine steps limits checked providers extra
   EngineBoth -> do
     djinnPrepared <- prepareSynthesis djinnRecursiveProjection
       providers extras engineFrag fitFrag
+    let djinnOrigin = preparedSemanticOrigin djinnPrepared
     djinnCompatibility <- djinnRun limits fitFrag
-      (preparedProjectionCompleteness djinnPrepared)
+      (semanticOriginProjectionCompleteness djinnOrigin)
       (preparedRenderExpression djinnPrepared)
-      (preparedSearchGoal djinnPrepared)
-      (preparedDeclarations djinnPrepared)
-      (preparedProviderAssignments djinnPrepared)
+      (semanticOriginSearchGoal djinnOrigin)
+      (semanticOriginDeclarations djinnOrigin)
+      (semanticOriginProviderAssignments djinnOrigin)
     let djinn = detailUnobservedOutcome djinnCompatibility
     exferencePrepared <- prepareSynthesis exferenceRecursiveProjection
       providers extras engineFrag fitFrag
@@ -900,41 +902,49 @@ prepareSynthesis recursiveProjection activeProviders extras engineFrag fitFrag =
           ForallType variables constraints (insertOuter body)
         body -> antecedents constructorPremises (insertInner body)
       searchGoal = insertOuter sourceGoal
-      renderPremiseLayout = premiseLayoutForRenderer premiseLayout
+      declarations =
+        translationDeclarations translation
+          ++ translationProviderDeclarations translation
+      semanticOrigin = PreparedSemanticOrigin
+        { semanticOriginEngineFragment = engineFrag
+        , semanticOriginFitFragment = fitFrag
+        , semanticOriginSourceGoal = sourceGoal
+        , semanticOriginSearchGoal = searchGoal
+        , semanticOriginDeclarations = declarations
+        , semanticOriginProviderBindings =
+            translationProviderBindings translation
+        , semanticOriginSemanticFamilyBindings =
+            translationSemanticFamilyBindings translation
+        , semanticOriginProviderAssignments =
+            translationProviderAssignments translation
+        , semanticOriginConstructorMap = translationConstructorMap translation
+        , semanticOriginProviderMap = translationProviderMap translation
+        , semanticOriginTypeMap = translationTypeMap translation
+        , semanticOriginPremiseLayout = premiseLayout
+        , semanticOriginProjectionCompleteness =
+            translationProjectionCompleteness translation
+        }
+      renderPremiseLayout = premiseLayoutForRenderer
+        $ semanticOriginPremiseLayout semanticOrigin
       render expr =
         renderLeanTerm
-          (translationConstructorMap translation)
-          (translationProviderMap translation)
-          (translationTypeMap translation)
-          renderPremiseLayout fitFrag expr
+          (semanticOriginConstructorMap semanticOrigin)
+          (semanticOriginProviderMap semanticOrigin)
+          (semanticOriginTypeMap semanticOrigin)
+          renderPremiseLayout
+          (semanticOriginFitFragment semanticOrigin) expr
       renderGraph
         :: TermGraph ExferenceType ExferenceLocal
         -> Either String [String]
       renderGraph graph =
         renderLeanTermGraphProjection (("x" ++) . show)
-          (translationConstructorMap translation)
-          (translationProviderMap translation)
-          (translationTypeMap translation)
-          renderPremiseLayout fitFrag graph
+          (semanticOriginConstructorMap semanticOrigin)
+          (semanticOriginProviderMap semanticOrigin)
+          (semanticOriginTypeMap semanticOrigin)
+          renderPremiseLayout
+          (semanticOriginFitFragment semanticOrigin) graph
   pure PreparedSynthesis
-    { preparedEngineFragment = engineFrag
-    , preparedFitFragment = fitFrag
-    , preparedSourceGoal = sourceGoal
-    , preparedSearchGoal = searchGoal
-    , preparedDeclarations =
-        translationDeclarations translation
-          ++ translationProviderDeclarations translation
-    , preparedProviderBindings = translationProviderBindings translation
-    , preparedSemanticFamilyBindings =
-        translationSemanticFamilyBindings translation
-    , preparedProviderAssignments =
-        translationProviderAssignments translation
-    , preparedConstructorMap = translationConstructorMap translation
-    , preparedProviderMap = translationProviderMap translation
-    , preparedTypeMap = translationTypeMap translation
-    , preparedPremiseLayout = premiseLayout
-    , preparedProjectionCompleteness =
-        translationProjectionCompleteness translation
+    { preparedSemanticOrigin = semanticOrigin
     , preparedRenderExpression = render
     , preparedRenderTermGraph = renderGraph
     }
@@ -1015,11 +1025,12 @@ exferenceRun
   -> Either String DetailedSynthOutcome
 exferenceRun steps prepared = do
   standard <- viaDiagnostic standardDjinnSession
-  let render = preparedRenderExpression prepared
+  let semanticOrigin = preparedSemanticOrigin prepared
+      render = preparedRenderExpression prepared
       renderGraph = preparedRenderTermGraph prepared
-      goal = preparedSearchGoal prepared
-      decls = preparedDeclarations prepared
-      instantiations = preparedProviderAssignments prepared
+      goal = semanticOriginSearchGoal semanticOrigin
+      decls = semanticOriginDeclarations semanticOrigin
+      instantiations = semanticOriginProviderAssignments semanticOrigin
       allDecls =
         environmentDeclarations (djinnSessionEnvironment standard)
           ++ decls
@@ -1061,8 +1072,8 @@ exferenceRun steps prepared = do
           [Penalty (fromIntegral rank * 20) | rank <- [0 :: Int ..]])
       policy = defaultExferenceSessionPolicy
         { exferenceRatingOverrides = providerRatings }
-      convertedSourceGoal = fmap convert $ preparedSourceGoal prepared
-      semanticOrigin = preparedSemanticOrigin prepared
+      convertedSourceGoal = fmap convert
+        $ semanticOriginSourceGoal semanticOrigin
   environment <- viaShow (mkEnvironment convertedDecls)
   session <- viaDiagnostic
     (mkExferenceSessionWithPolicy policy environment)
@@ -1589,34 +1600,22 @@ premiseLayoutForRenderer layout =
   premisePair premise =
     (translatedPremiseName premise, translatedPremiseFragment premise)
 
--- | One prepared lane. The source and premise-extended search goals remain
--- separate, and every declaration/map/premise projection used by either
--- backend is retained under a named field instead of tuple position.
+-- | One prepared lane. A single comparable semantic origin owns every pure
+-- preparation field consumed by search, rendering, and later exact-origin
+-- handoff. Only the two output renderer closures live beside that authority.
 data PreparedSynthesis = PreparedSynthesis
-  { preparedEngineFragment :: Frag
-  , preparedFitFragment :: Frag
-  , preparedSourceGoal :: Type String
-  , preparedSearchGoal :: Type String
-  , preparedDeclarations :: [DjinnDecl]
-  , preparedProviderBindings :: [ProviderBinding]
-  , preparedSemanticFamilyBindings :: [SemanticFamilyBinding]
-  , preparedProviderAssignments ::
-      [KindedProviderInstantiationAssignment String]
-  , preparedConstructorMap :: CtorMap
-  , preparedProviderMap :: ProviderMap
-  , preparedTypeMap :: TypeMap
-  , preparedPremiseLayout :: PremiseLayout
-  , preparedProjectionCompleteness :: ProjectionCompleteness
+  { preparedSemanticOrigin :: PreparedSemanticOrigin
   , preparedRenderExpression ::
       Expression String -> Either String [String]
   , preparedRenderTermGraph ::
       TermGraph ExferenceType ExferenceLocal -> Either String [String]
   }
 
--- | Pure, comparable preparation authority retained after renderer functions
--- have served their output-only role. Both source fragments remain explicit:
--- equality of engine and fitting targets is a future semantic precondition,
--- never something reconstructed from their translated goals.
+-- | Pure, comparable preparation authority shared by search and rendering,
+-- then retained after the renderer functions have served their output-only
+-- role. Both source fragments remain explicit: equality of engine and fitting
+-- targets is a future semantic precondition, never something reconstructed
+-- from their translated goals.
 data PreparedSemanticOrigin = PreparedSemanticOrigin
   { semanticOriginEngineFragment :: Frag
   , semanticOriginFitFragment :: Frag
@@ -1634,25 +1633,6 @@ data PreparedSemanticOrigin = PreparedSemanticOrigin
   , semanticOriginProjectionCompleteness :: ProjectionCompleteness
   }
   deriving (Eq, Show)
-
-preparedSemanticOrigin :: PreparedSynthesis -> PreparedSemanticOrigin
-preparedSemanticOrigin prepared = PreparedSemanticOrigin
-  { semanticOriginEngineFragment = preparedEngineFragment prepared
-  , semanticOriginFitFragment = preparedFitFragment prepared
-  , semanticOriginSourceGoal = preparedSourceGoal prepared
-  , semanticOriginSearchGoal = preparedSearchGoal prepared
-  , semanticOriginDeclarations = preparedDeclarations prepared
-  , semanticOriginProviderBindings = preparedProviderBindings prepared
-  , semanticOriginSemanticFamilyBindings =
-      preparedSemanticFamilyBindings prepared
-  , semanticOriginProviderAssignments = preparedProviderAssignments prepared
-  , semanticOriginConstructorMap = preparedConstructorMap prepared
-  , semanticOriginProviderMap = preparedProviderMap prepared
-  , semanticOriginTypeMap = preparedTypeMap prepared
-  , semanticOriginPremiseLayout = preparedPremiseLayout prepared
-  , semanticOriginProjectionCompleteness =
-      preparedProjectionCompleteness prepared
-  }
 
 -- | Exact package-private provider-binding view consumed by the checked
 -- Length handoff and focused boundary tests. It deliberately contains no

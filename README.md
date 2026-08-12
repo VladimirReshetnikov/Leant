@@ -297,8 +297,14 @@ schemes are instantiated at a bounded set of query and environment types, and
 impredicative instantiation is admitted under a guard that never invents a
 polytype the checked input did not supply.
 
-Leant's detailed Exference route now retains an opaque checked candidate and
-its exact run authority beside the originating rendered group. The candidate
+Leant's synthesis preparation now builds one semantic-origin record whose
+source and search goals, declarations, provider assignments, renderer maps,
+premise layout, and completeness facts provide the respective inputs projected
+by search and the renderer closures, then remain unchanged in the exact
+Exference run authority. There is no post-search field-for-field preparation
+copy. The
+detailed Exference route retains an opaque checked candidate and that exact
+run authority beside the originating rendered group. The candidate
 remains the sole owner of its graph, and Djex fingerprints that graph only
 while sealing an actual behavioral problem; the rendering sidecar carries no
 parallel fallible graph-key cache. Filtering preserves a group sidecar only
