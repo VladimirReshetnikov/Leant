@@ -13,8 +13,10 @@ live Length/Z3 facade. It accepts four explicit inputs:
 - the complete `[Verified DetailedVerificationVariant]` batch.
 
 The module does not discover an executable, infer a contract, choose a digest
-pin, or read configuration from ambient process state. It is a foundation only:
-Main and the REPL do not call it yet.
+pin, or read configuration from ambient process state. Main can now call it
+through an explicit startup-owned integration facade; that facade supplies a
+bounded file, pinned-by-default activation, and a fixed decoded contract rather
+than weakening this module's explicit inputs.
 
 ## Admission and preparation
 
@@ -139,7 +141,7 @@ latency can outlive the operation or deadline that initiated it.
 The ranking runner deliberately propagates synchronous and asynchronous
 exceptions. Exceptions raised while the live callback owns a session flow
 through Djex's durable cleanup; pre-open exceptions own no worker, and
-post-scope exceptions occur after cleanup. The module contains no Main,
-command-line, configuration-file, or REPL wiring. Enabling user-visible live
-ranking later requires an explicit executable/pin policy and explicit contract
-source; this checkpoint does not guess either.
+post-scope exceptions occur after cleanup. The module itself contains no Main,
+command-line, configuration-file, or REPL wiring. The later explicit
+`Leant.Synth.Length.Integration` layer composes those boundaries without making
+this ranker guess an executable, pin policy, or contract.

@@ -93,6 +93,9 @@ environment variable.
 leant [FILE] [--project DIR] [--plain] [-i MOD]
       [--timeout N] [--time] [--transcript [FILE]] [--timestamps]
       [--repl-exe PATH] [--lake PATH]
+      [--length-ranking-config ABSOLUTE-PATH]
+      [--length-ranking-config-timeout MS]
+      [--length-ranking-allow-unpinned]
 ```
 
 Run inside a Lake project (auto-detected, or `--project DIR`) to make
@@ -101,6 +104,27 @@ bare stdlib session with subsecond startup. Expressions evaluate via
 `#eval` with `#check` fallback; declarations (`def`, `theorem`,
 `inductive`, `open`, …) run verbatim and, on success, advance the
 session environment; `#`-commands pass straight through.
+
+Finite-list-spine Length counterexample ranking is disabled by default. To opt
+in, pass `--length-ranking-config` with an explicitly chosen absolute path to
+the version-1 configuration file. Leant admits and reads that file once at
+startup, requires the configuration to contain an executable SHA-256
+expectation by default, and retains the decoded contract as a fixed
+process-wide assertion. Presence at activation is not a digest match; Djex
+compares the expectation with its bounded pre-spawn file observation only when
+an eligible batch later opens a worker.
+`--length-ranking-allow-unpinned` is a separate explicit relaxation;
+`--length-ranking-config-timeout` sets only the bounded file-load interruption
+budget (default 5,000 ms, maximum 60,000 ms). No option discovers a file or
+solver. POSIX descriptor acquisition is implemented; Windows currently fails
+closed. Every eligible verified synthesis batch still receives a fresh lexical
+solver worker, and any structured live failure preserves callback order.
+Only callback-verified candidates with direct or exact-duplicate-recovered
+typed Exference authority are eligible. Candidates with neither authority
+remain in place with a payload-free preparation refusal and do not open a
+worker by themselves. The default `djinn` synthesis engine supplies no typed
+graph; select `:set synth-engine exference` or `both` to produce candidates
+which may reach this ranking path.
 
 | Command | Meaning |
 |---|---|
@@ -315,8 +339,8 @@ the full typed plan.
 The collision boundary is detailed in the
 [exact-duplicate typed-provenance report](docs/reports/2026-08-11-exact-duplicate-typed-provenance.md).
 
-`Leant.Synth.Length.Ranking` now supplies the next, deliberately unwired
-foundation. Its caller must provide an explicit Djex live-execution policy,
+`Leant.Synth.Length.Ranking` supplies the checked ranking foundation. Its
+caller must provide an explicit Djex live-execution policy,
 explicit replay limits, an explicit `LeanLengthContract`, and the complete list
 of callback-verified candidates. It productively admits at most Djex's public
 64-query session bound, attempts every candidate handoff and seals every
@@ -347,14 +371,14 @@ sanitized batch failure class, cleanup bit, and optional safe original index.
 Candidate-local pure preparation classes survive that fallback; candidates
 whose preparation succeeded have no invented refusal reason. Exceptions
 propagate instead of producing a ranking. Lifecycle and per-query budgets
-remain separate rather than pretending to be one batch deadline. Main and the
-REPL do not invoke this
-foundation yet; no executable path, contract, or policy is inferred. The
-checkpoint is detailed in the
+remain separate rather than pretending to be one batch deadline. Main invokes
+this foundation only after the explicit startup opt-in described above; it
+never infers an executable path, contract, or policy. The foundation is
+detailed in the
 [live Length ranking foundation report](docs/reports/2026-08-11-live-length-ranking-foundation.md).
 
-`Leant.Synth.Length.Configuration` now seals that still-unwired call boundary
-without choosing any policy for the user. `LengthRankingPolicy` retains only
+`Leant.Synth.Length.Configuration` seals that call boundary without choosing
+any policy for the user. `LengthRankingPolicy` retains only
 execution admission, the complete execution source (absolute Z3 path, optional
 SHA-256 expectation, solver/host budgets, artifact policy, and response
 limits), and replay limits. A `LeanLengthContract` is supplied separately to
@@ -372,16 +396,18 @@ decoded contract and delegates to the same separate-policy runner. That opaque
 bundle can also enter the post-verification adapter directly: its candidates
 retain their batch-scoped occurrence handles through ranking, and the adapter
 seals the complete permutation before projecting the compatibility report. The
-contract remains candidate-specific and is checked only during the later full
-preparation pass. Lifecycle and per-query budgets remain separate. There are
-no defaults, executable discovery, path normalization, environment reads, or
-Main/REPL activation. The digest is only an optional expectation for Djex's
+contract is checked candidate-by-candidate only during the later full
+preparation pass. The CLI compatibility path deliberately reuses that decoded
+contract for the process; lower-level policy APIs still accept a request-owned
+contract. Lifecycle and per-query budgets remain separate. There are no
+execution defaults, executable discovery, path normalization, or environment
+reads. The digest is only an optional expectation for Djex's
 pre-spawn executable-file observation, not attestation of the image ultimately
 executed. See the
 [explicit live Length ranking configuration report](docs/reports/2026-08-11-explicit-live-length-ranking-configuration.md).
 
 `Leant.Synth.Length.Configuration.File` adds an exact version-1 JSON grammar
-for that policy without enabling it. The pure decoder consumes a caller-owned
+for that policy. The pure decoder consumes a caller-owned
 strict byte string through a separate bounded JSON parser, rejects malformed
 UTF-8, duplicate keys, unknown or missing fields, non-integral policy numbers,
 and any parser, contract, or operational value above its hard ceiling. Every
@@ -395,11 +421,10 @@ explicitly permit an unpinned one before obtaining the already opaque runnable
 configuration. Activation derives that absent/present decision from the sealed
 Djex execution policy itself; the decoder retains no second JSON-derived pin
 Boolean which could drift from the policy. Neither choice runs Z3 or grants
-proof, solver-status, or contract authority. There is no file loader,
-automatic path, environment or executable discovery, Main/REPL wiring, or
-autoload behavior, and the parser's
-256-KiB post-acquisition check does not replace a future loader's obligation to
-acquire bytes with the same bound. The optional digest remains only a
+proof, solver-status, or contract authority. There is no automatic path,
+environment or executable discovery, or autoload behavior. The explicit CLI
+loader uses the same 256-KiB bound before activation. The optional digest
+remains only a
 pre-spawn executable-file snapshot expectation, not executed-image
 attestation. The complete schema and budgets are recorded in the
 [bounded live Length ranking configuration-file report](docs/reports/2026-08-11-bounded-live-length-ranking-configuration-file.md).
@@ -412,8 +437,8 @@ sources through aggregate records, and sealing both again. The unreachable
 post-validation assembly failure has consequently been
 removed; execution, evaluation, then contract remain the fixed decode order.
 
-`Leant.Synth.Length.Configuration.File.Acquire` now adds a separate bounded
-filesystem boundary without enabling that policy. Callers must explicitly
+`Leant.Synth.Length.Configuration.File.Acquire` adds a separate bounded
+filesystem boundary. Callers must explicitly
 admit an absolute path of at most 4,096 characters and a positive timeout of
 at most 60 seconds. On POSIX the final component is opened once with
 no-follow, nonblocking, no-controlling-terminal, and close-on-exec flags; its
@@ -423,9 +448,9 @@ configuration can escape. Errors retain closed phases, capped counts, and a
 cleanup bit rather than paths, errno text, or file content. The timeout is an
 interruption budget rather than a hard kernel deadline, final-component
 no-follow does not exclude ancestor symlinks or in-place mutation, and Windows
-fails closed until an equivalent native handle implementation exists. There
-is still no loader discovery, default path, Main/REPL use, activation, or
-solver launch. See the
+fails closed until an equivalent native handle implementation exists. Main
+uses this boundary only for the explicit CLI path; there is still no discovery
+or default path, and loading/activation alone never launches a solver. See the
 [bounded acquisition report](docs/reports/2026-08-11-bounded-live-length-ranking-configuration-acquisition.md).
 
 The passive finite-spine source vocabulary now lives in
@@ -436,11 +461,11 @@ provenance-bound handoff checks.  Ranking still imports the engine for those
 candidate-specific checks.  This gives contract assertions, candidate
 authority, and live execution policy distinct source owners.
 
-`Leant.Synth.PostVerification` now makes the boundary after callback
-acceptance explicit. Main sends the opaque, nominal `VerificationBatch`
-through `skipPostVerificationAssessment`, an exact non-strict receipt
-projection which performs no IO, cannot start a worker, and claims no
-validated ordering authority. An opt-in assessor may instead give
+`Leant.Synth.PostVerification` makes the boundary after callback acceptance
+explicit. Without the startup opt-in, Main sends the opaque, nominal
+`VerificationBatch` through the exact non-strict disabled identity path, which
+performs no IO, cannot start a worker, and claims no validated ordering
+authority. With the opt-in, the Length assessor instead gives
 `sealPostVerificationBatch` opaque occurrence handles minted from that batch
 inside a rank-2 `PostVerificationInput` epoch. Handle constructors and original
 indices are private, and nominal roles prevent coercion; handles from another
@@ -463,18 +488,21 @@ projector, while the public configuration surface exports no associated
 runner and its post-verification assessment entry points return only sealed
 results. The deliberately retained association-free compatibility runners do
 not claim presentation authority. The adapter runs one explicitly supplied
-`LengthRankingPolicy` and request-owned contract, seals the returned handle
-order against the exact input epoch, and only then erases handles into the
-ordinary ranking report.
+`LengthRankingPolicy` and contract, seals the returned handle order against the
+exact input epoch, and only then erases handles into the ordinary ranking
+report. Policy callers may supply a request-owned contract; the version-1 CLI
+bundle intentionally fixes its decoded contract at startup.
 Input or proposal failure preserves the original opaque verification batch,
 exposes no sealed output, and withholds the unsealed associated plan.
 Operational ranking failure already
 produces an original-order all-`Unassessed` ranking and passes through the same
-seal. Main deliberately selects only the identity path, so configuration-file
-acquisition, policy activation, Z3 launch, and user-visible behavioral
-reordering remain disabled. Replayed counterexamples may rank but never prune;
+seal. Main selects this path only for an explicitly loaded and activated
+configuration; otherwise the historical identity path is exact. Replayed
+counterexamples may rank but never prune;
 raw `sat`, `unsat`, and `unknown` still grant no proof authority. See the
-[post-verification assessment seam report](docs/reports/2026-08-11-post-verification-assessment-seam.md).
+[post-verification assessment seam report](docs/reports/2026-08-11-post-verification-assessment-seam.md)
+and the
+[explicit integration report](docs/reports/2026-08-12-explicit-length-ranking-integration.md).
 
 Three rules run through the design:
 

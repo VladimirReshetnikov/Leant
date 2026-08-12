@@ -36,6 +36,7 @@ Executable leant
     Leant.Format
     Leant.Json
     Leant.Json.Bounded
+    Leant.Options
     Leant.Session.Replay
     Leant.Session.Snapshot
     Leant.Synth.Engine
@@ -45,6 +46,7 @@ Executable leant
     Leant.Synth.Length.Configuration.File
     Leant.Synth.Length.Configuration.File.Acquire
     Leant.Synth.Length.Contract
+    Leant.Synth.Length.Integration
     Leant.Synth.Length.PostVerification
     Leant.Synth.Length.PostVerification.Internal
     Leant.Synth.Length.Ranking
@@ -84,6 +86,7 @@ Test-Suite leant-synth-tests
   Main-Is:          Spec.hs
   Other-Modules:
     Leant.Backend
+    Leant.Options
     Leant.Synth.Engine
     Leant.Synth.Fragment
     Leant.Synth.Length.Adapter
@@ -91,6 +94,7 @@ Test-Suite leant-synth-tests
     Leant.Synth.Length.Configuration.File
     Leant.Synth.Length.Configuration.File.Acquire
     Leant.Synth.Length.Contract
+    Leant.Synth.Length.Integration
     Leant.Synth.Length.PostVerification
     Leant.Synth.Length.PostVerification.Internal
     Leant.Synth.Length.Ranking

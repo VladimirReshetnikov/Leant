@@ -16,12 +16,11 @@ callback verifier and exposes two paths:
   bounded complete permutation of opaque occurrence handles minted from that
   exact callback batch under one fresh rank-2 epoch.
 
-`Main.verifyAndDisplay` uses only the first path. Its input remains the same
-`VerificationBatch` already produced by `synthVerify` under the
-`synthMaxShown` success quota, and its output remains that batch's receipt list
-in the same order. The new seam therefore changes no default CLI or REPL
-behavior and supplies no solver discovery, policy activation, or contract
-inference.
+`Main.verifyAndDisplay` selects the first path by default, so no-option CLI and
+REPL behavior remains the exact receipt list in callback order. An explicit
+startup configuration instead selects the sealed Length adapter for the same
+`VerificationBatch` produced by `synthVerify`. No path performs solver or
+contract discovery or contract inference.
 
 ## Exact permutation boundary
 
@@ -131,13 +130,12 @@ not change order. No result prunes a candidate. Any returned live session,
 query, fingerprint-association, or evidence-replay failure restores the entire
 original order atomically.
 
-Main does not call the Length adapter. Enabling it later still requires an
-explicit user-owned activation path connecting bounded configuration
-acquisition, an activation choice, the request's behavioral contract, and this
-adapter. An explicitly activated version-1 file can now reach the adapter
-without exposing or detaching its sealed policy and contract, but no code
-selects that route implicitly. This checkpoint establishes the safe
-post-verification shape without making those policy choices.
+Main now calls the Length adapter only after
+`--length-ranking-config ABSOLUTE-PATH`. Startup owns bounded acquisition,
+pinned-by-default activation, and the version-1 file's fixed process-wide
+contract. The no-option route remains the non-strict identity path. Each
+eligible batch still owns a fresh worker. Setup failure stops startup with a
+sanitized diagnostic; a later adapter or live failure preserves callback order.
 
 ## Validation
 

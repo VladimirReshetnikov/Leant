@@ -24,6 +24,7 @@ import System.Directory
   , getTemporaryDirectory
   , removeFile
   , removePathForcibly
+  , renameFile
   , setOwnerExecutable
   , setPermissions
   )
@@ -91,6 +92,11 @@ import Leant.Json.Bounded
   , BoundedJsonLimits (..)
   , BoundedJsonValue (..)
   , parseBoundedJson
+  )
+import Leant.Options
+  ( Options (..)
+  , lengthAssessmentSetup
+  , parseArgs
   )
 import Leant.Synth.Engine
   ( DetailedCandidateGroup
@@ -224,6 +230,17 @@ import Leant.Synth.Length.Contract
   , LeanLengthProviderLaw (..)
   , LeanLengthSpineIdentity (..)
   )
+import Leant.Synth.Length.Integration
+  ( LengthAssessmentFailure (..)
+  , LengthAssessmentSetupError (..)
+  , assessLengthVerificationBatch
+  , disabledLengthAssessmentMode
+  , lengthAssessmentCandidates
+  , lengthAssessmentFailure
+  , lengthAssessmentModeEnabled
+  , lengthAssessmentPostVerificationResult
+  , loadLengthAssessmentMode
+  )
 import Leant.Synth.Length.PostVerification
   ( LengthPostVerificationFailure (..)
   , LengthPostVerificationResult
@@ -317,7 +334,8 @@ import Leant.Session.Snapshot
 
 main :: IO ()
 main = defaultMain $ testGroup "Leant synthesis boundary"
-  [ backendDiscoveryTests
+  [ commandLineTests
+  , backendDiscoveryTests
   , boundedJsonTests
   , snapshotMetadataTests
   , sessionReplayTests
@@ -341,6 +359,78 @@ main = defaultMain $ testGroup "Leant synthesis boundary"
   , rankNFrontierTests
   , visibleTypeApplicationTests
   ]
+
+commandLineTests :: TestTree
+commandLineTests = testGroup "command-line admission"
+  [ testCase "keep Length assessment disabled unless a file is explicit" $ do
+      options <- expectOptions []
+      optLengthRankingConfig options @?= Nothing
+      optLengthRankingLoadTimeout options @?= Nothing
+      optLengthRankingAllowUnpinned options @?= False
+      assertBool "default command line selected Length assessment"
+        $ isNothing $ lengthAssessmentSetup options
+  , testCase "retain the complete explicit Length assessment request" $ do
+      options <- expectOptions
+        [ "--length-ranking-config", "/tmp/length-ranking.json"
+        , "--length-ranking-config-timeout", "1234"
+        , "--length-ranking-allow-unpinned"
+        ]
+      optLengthRankingConfig options @?=
+        Just "/tmp/length-ranking.json"
+      optLengthRankingLoadTimeout options @?= Just 1234
+      optLengthRankingAllowUnpinned options @?= True
+      case lengthAssessmentSetup options of
+        Just (PermitUnpinnedExecutable,
+            LengthRankingConfigurationFileSource path milliseconds) ->
+              (path, milliseconds) @?=
+                ("/tmp/length-ranking.json", 1234)
+        _ -> assertFailure
+          "explicit unpinned Length options acquired the wrong setup"
+      maximumOptions <- expectOptions
+        [ "--length-ranking-config", "/tmp/length-ranking.json"
+        , "--length-ranking-config-timeout", "60000"
+        ]
+      optLengthRankingLoadTimeout maximumOptions @?= Just 60000
+      defaultSetup <- expectOptions
+        ["--length-ranking-config", "/tmp/length-ranking.json"]
+      case lengthAssessmentSetup defaultSetup of
+        Just (RequirePinnedExecutable,
+            LengthRankingConfigurationFileSource path milliseconds) ->
+              (path, milliseconds) @?=
+                ("/tmp/length-ranking.json", 5000)
+        _ -> assertFailure
+          "config-only Length options did not require a pin by default"
+  , testCase "reject Length modifiers without an explicit file" $ do
+      assertOptionError
+        "--length-ranking-config-timeout requires --length-ranking-config"
+        ["--length-ranking-config-timeout", "10"]
+      assertOptionError
+        "--length-ranking-allow-unpinned requires --length-ranking-config"
+        ["--length-ranking-allow-unpinned"]
+      assertOptionError
+        "--length-ranking-config-timeout expects 1..60000 milliseconds"
+        [ "--length-ranking-config", "/tmp/config"
+        , "--length-ranking-config-timeout", "x"
+        ]
+      mapM_ (assertOptionError
+          "--length-ranking-config-timeout expects 1..60000 milliseconds")
+        [ [ "--length-ranking-config", "/tmp/config"
+          , "--length-ranking-config-timeout", invalid
+          ]
+        | invalid <- ["0", "60001", "18446744073709551617"]
+        ]
+  ]
+
+expectOptions :: [String] -> IO Options
+expectOptions arguments = case parseArgs arguments of
+  Left failure -> assertFailure ("option parsing failed: " ++ failure)
+    >> error "unreachable"
+  Right options -> pure options
+
+assertOptionError :: String -> [String] -> IO ()
+assertOptionError expected arguments = case parseArgs arguments of
+  Left failure -> failure @?= expected
+  Right _ -> assertFailure "invalid command-line options were admitted"
 
 backendDiscoveryTests :: TestTree
 backendDiscoveryTests = testGroup "Lean backend discovery"
@@ -2087,6 +2177,7 @@ lengthRankingConfigurationFileTests = testGroup
   , testCase "keep paths, digests, fields, tags, and names out of Show errors"
       assertLengthRankingConfigurationFileShowRedaction
   , lengthRankingConfigurationFileAcquisitionTests
+  , lengthAssessmentIntegrationTests
   ]
 
 lengthRankingConfigurationFileAcquisitionTests :: TestTree
@@ -2103,6 +2194,214 @@ lengthRankingConfigurationFileAcquisitionTests = testGroup
   , testCase "sanitize acquisition failures without losing their phase"
       assertLengthRankingConfigurationFileAcquisitionRedaction
   ]
+
+lengthAssessmentIntegrationTests :: TestTree
+lengthAssessmentIntegrationTests = testGroup
+  "explicit Length assessment integration"
+  [ testCase "keep the disabled mode an exact lazy identity"
+      assertLengthAssessmentDisabled
+  , testCase "admit setup before IO or activation"
+      assertLengthAssessmentSetupAdmission
+  , testCase "load one fixed contract and assess through the sealed adapter"
+      assertLengthAssessmentConfigured
+  , testCase "preserve sealed callback order after a live failure"
+      assertLengthAssessmentFailureFallback
+  ]
+
+assertLengthAssessmentDisabled :: IO ()
+assertLengthAssessmentDisabled = do
+  lengthAssessmentModeEnabled disabledLengthAssessmentMode @?= False
+  verification <- syntheticPostVerificationBatch
+    ["integration-disabled-first", "integration-disabled-second"]
+  result <- assessLengthVerificationBatch
+    disabledLengthAssessmentMode verification
+  lengthAssessmentCandidates result @?= verifiedCandidateReceipts verification
+  lengthAssessmentFailure result @?= Nothing
+  assertBool "disabled Length assessment retained a configured result"
+    $ isNothing $ lengthAssessmentPostVerificationResult result
+
+  lazyResult <- assessLengthVerificationBatch disabledLengthAssessmentMode
+    (error "disabled Length integration forced its verification batch")
+  lengthAssessmentFailure lazyResult @?= Nothing
+  assertBool "lazy disabled Length assessment retained a configured result"
+    $ isNothing $ lengthAssessmentPostVerificationResult lazyResult
+
+assertLengthAssessmentSetupAdmission :: IO ()
+assertLengthAssessmentSetupAdmission = do
+  loaded <- loadLengthAssessmentMode
+    (error "Length setup admission forced its activation policy")
+    $ LengthRankingConfigurationFileSource
+        "relative-length-ranking.json"
+        (error "Length setup admission forced its timeout")
+  case loaded of
+    Left failure -> failure @?= LengthAssessmentFileAdmissionRejected
+      LengthRankingConfigurationFilePathNotAbsolute
+    Right _ -> assertFailure
+      "relative Length assessment configuration reached acquisition"
+  if os == "mingw32"
+    then pure ()
+    else withTemporaryDirectory "leant-length-integration-load" $ \root -> do
+      missing <- loadLengthAssessmentMode
+        (error "Length setup load failure forced its activation policy")
+        $ LengthRankingConfigurationFileSource
+            (root </> "missing-length-ranking.json") 1000
+      case missing of
+        Left (LengthAssessmentFileLoadRejected failure) ->
+          lengthRankingConfigurationFileLoadErrorClass failure @?=
+            LengthRankingConfigurationFileOpenFailed
+        Left failure -> assertFailure $ "unexpected setup failure: " ++
+          show failure
+        Right _ -> assertFailure
+          "missing Length assessment configuration reached activation"
+
+assertLengthAssessmentConfigured :: IO ()
+assertLengthAssessmentConfigured
+  | os == "mingw32" = pure ()
+  | otherwise = do
+      fixture <- buildLengthRankingLiveFixture
+      retained <- syntheticLengthRankingCandidate "integration-retained"
+      withFakeLengthSolver "healthy" $ \executable -> do
+        let sourcePath = takeDirectory executable </>
+              "length-assessment-integration.json"
+            zero = lengthRankingFixtureZero fixture
+            one = lengthRankingFixtureOne fixture
+            contract = jsonLengthContract
+              (jsonLengthTruth True)
+              (jsonLengthEqual jsonLengthResult $ jsonLengthLiteral 2)
+              [ jsonLengthProviderLaw "Demo.zeroList" []
+                  $ jsonLengthLiteral 0
+              , jsonLengthProviderLaw "Demo.oneList" []
+                  $ jsonLengthLiteral 1
+              ]
+            document = setJsonField ["contract"] contract
+              $ setJsonField ["execution", "artifactPolicy"]
+                  (Json.JStr "input-values-after-satisfiable")
+              $ lengthRankingConfigurationFileFixture executable Nothing
+        ByteString.writeFile sourcePath
+          $ encodeLengthRankingConfigurationFile document
+
+        requirePinned <- loadLengthAssessmentMode RequirePinnedExecutable
+          $ LengthRankingConfigurationFileSource sourcePath 1000
+        case requirePinned of
+          Left failure -> failure @?= LengthAssessmentActivationRejected
+            LengthRankingConfigurationExecutablePinRequired
+          Right _ -> assertFailure
+            "an unpinned integration configuration was activated implicitly"
+
+        loaded <- loadLengthAssessmentMode PermitUnpinnedExecutable
+          $ LengthRankingConfigurationFileSource sourcePath 1000
+        mode <- case loaded of
+          Left failure -> assertFailure
+            ("Length assessment setup failed: " ++ show failure)
+              >> error "unreachable"
+          Right configured -> pure configured
+        lengthAssessmentModeEnabled mode @?= True
+        doesFileExist (executable ++ ".events") >>= (@?= False)
+
+        verification <- verificationBatchFromReceipts [zero, retained, one]
+        assessed <- expectLengthAssessmentWithin
+          $ assessLengthVerificationBatch mode verification
+        lengthAssessmentFailure assessed @?= Nothing
+        lengthAssessmentCandidates assessed @?= [retained, zero, one]
+        case lengthAssessmentPostVerificationResult assessed of
+          Nothing -> assertFailure
+            "enabled Length assessment bypassed post-verification sealing"
+          Just result -> assertLengthPostVerificationSealed result
+
+        let firstEvents = executable ++ ".events"
+            retainedEvents = executable ++ ".events.first"
+        doesFileExist firstEvents >>= (@?= True)
+        renameFile firstEvents retainedEvents
+        ByteString.writeFile sourcePath $ BS.pack "{}"
+        repeated <- expectLengthAssessmentWithin
+          $ assessLengthVerificationBatch mode verification
+        lengthAssessmentFailure repeated @?= Nothing
+        lengthAssessmentCandidates repeated @?= [retained, zero, one]
+        doesFileExist retainedEvents >>= (@?= True)
+        doesFileExist firstEvents >>= (@?= True)
+
+        let maximumCandidates =
+              Djex.defaultLengthSMTLibLiveSessionMaximumQueries
+            oversizedCount = fromIntegral maximumCandidates + 1
+        oversized <- verificationBatchFromReceipts
+          $ replicate oversizedCount zero
+        rejected <- expectLengthAssessmentWithin
+          $ assessLengthVerificationBatch mode oversized
+        case lengthAssessmentFailure rejected of
+          Just (LengthAssessmentPostVerificationFailed
+              (LengthPostVerificationInputRejected
+                (LengthRankingInputLimitExceeded maximumValue observed))) ->
+                  (maximumValue, observed) @?=
+                    (maximumCandidates, maximumCandidates + 1)
+          failure -> assertFailure $ "unexpected integration rejection: " ++
+            show failure
+        lengthAssessmentCandidates rejected @?=
+          verifiedCandidateReceipts oversized
+        case lengthAssessmentPostVerificationResult rejected of
+          Nothing -> assertFailure
+            "enabled input rejection discarded its adapter result"
+          Just result -> do
+            assertBool "rejected integration input acquired a sealed batch"
+              $ isNothing $ lengthPostVerificationSealedBatch result
+            assertBool "rejected integration input acquired a ranking"
+              $ isNothing $ lengthPostVerificationRanking result
+
+assertLengthAssessmentFailureFallback :: IO ()
+assertLengthAssessmentFailureFallback
+  | os == "mingw32" = pure ()
+  | otherwise = do
+      fixture <- buildLengthRankingLiveFixture
+      retained <- syntheticLengthRankingCandidate "integration-failure-retained"
+      withFakeLengthSolver "immediate-eof" $ \executable -> do
+        let sourcePath = takeDirectory executable </>
+              "length-assessment-failure.json"
+            original =
+              [ lengthRankingFixtureOne fixture
+              , retained
+              , lengthRankingFixtureZero fixture
+              ]
+            contract = jsonLengthContract
+              (jsonLengthTruth True) (jsonLengthTruth True)
+              [ jsonLengthProviderLaw "Demo.zeroList" []
+                  $ jsonLengthLiteral 0
+              , jsonLengthProviderLaw "Demo.oneList" []
+                  $ jsonLengthLiteral 1
+              ]
+            document = setJsonField ["contract"] contract
+              $ lengthRankingConfigurationFileFixture executable Nothing
+        ByteString.writeFile sourcePath
+          $ encodeLengthRankingConfigurationFile document
+        loaded <- loadLengthAssessmentMode PermitUnpinnedExecutable
+          $ LengthRankingConfigurationFileSource sourcePath 1000
+        mode <- case loaded of
+          Left failure -> assertFailure
+            ("Length failure setup failed: " ++ show failure)
+              >> error "unreachable"
+          Right configured -> pure configured
+        verification <- verificationBatchFromReceipts original
+        assessed <- expectLengthAssessmentWithin
+          $ assessLengthVerificationBatch mode verification
+        lengthAssessmentCandidates assessed @?= original
+        case lengthAssessmentFailure assessed of
+          Just (LengthAssessmentRankingFailed failure) -> do
+            lengthRankingFailureOriginalIndex failure @?= Nothing
+            lengthRankingFailureCleanupIncomplete failure @?= False
+          failure -> assertFailure $ "unexpected live integration failure: " ++
+            show failure
+        case lengthAssessmentPostVerificationResult assessed of
+          Nothing -> assertFailure
+            "live integration fallback discarded its sealed result"
+          Just result -> assertLengthPostVerificationSealed result
+
+expectLengthAssessmentWithin
+  :: IO result
+  -> IO result
+expectLengthAssessmentWithin action = do
+  bounded <- timeout 8000000 action
+  case bounded of
+    Nothing -> assertFailure "Length assessment integration exceeded its bound"
+      >> error "unreachable"
+    Just result -> pure result
 
 assertLengthRankingConfigurationFileRequestAdmission :: IO ()
 assertLengthRankingConfigurationFileRequestAdmission =

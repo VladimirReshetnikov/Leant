@@ -65,6 +65,11 @@ import Leant.Builtins (builtinInfo)
 import Leant.Classify
 import Leant.Format (formatInfo, indentDefBody)
 import Leant.Json
+import Leant.Options
+  ( Options (..)
+  , lengthAssessmentSetup
+  , parseArgs
+  )
 import Leant.Session.Replay
   ( generatedItBinding
   , itCounterAfterHistory
@@ -125,6 +130,15 @@ import Leant.Synth.Fragment
   , stripRecCtors
   , synthPrelude
   )
+import Leant.Synth.Length.Integration
+  ( LengthAssessmentMode
+  , assessLengthVerificationBatch
+  , disabledLengthAssessmentMode
+  , lengthAssessmentCandidates
+  , lengthAssessmentFailure
+  , lengthAssessmentModeEnabled
+  , loadLengthAssessmentMode
+  )
 import Leant.Synth.Observability
   ( VerificationFailureClass (..)
   , candidateRenderingRouteObservations
@@ -141,8 +155,6 @@ import Leant.Synth.ProviderCache
   , insertProviderCache
   , lookupProviderCache
   )
-import Leant.Synth.PostVerification
-  ( skipPostVerificationAssessment )
 import Leant.Synth.Replay (ReplayPlan (..), planReplay)
 import Leant.Synth.Verification
   ( VariantVerdict (..)
@@ -278,6 +290,11 @@ data ReplState = ReplState
   , rsSynthLibrary :: Bool
     -- ^ :set synth-library on|off - seed the search with curated
     -- library functions over the goal's recursive inductives
+  , rsLengthAssessmentMode :: LengthAssessmentMode
+    -- ^ Explicitly disabled by default. Enabled values come only from one
+    -- bounded, activated configuration-file setup at process startup. Its
+    -- finite-list-spine contract remains fixed for this process, while each
+    -- eligible batch still owns a fresh lexical solver session.
   , rsRatings :: [(String, Double)]
     -- ^ the library inventory with ratings (lower is better), best
     -- first: the defaults merged with the project's `leant.ratings`
@@ -2555,10 +2572,15 @@ verifyAndDisplay st args goal groups = do
     forM_ (leantObservationCodeEntries observations) $ \(code, count) ->
       emitLn st =<< cDim st
         ("debug metric: " ++ code ++ "=" ++ show count)
-  let -- This is the explicit disabled assessment stage.  It performs no IO
-      -- and preserves exact callback order.  An opt-in domain adapter may
-      -- replace it only with a validated permutation of this opaque batch.
-      acceptedReceipts = skipPostVerificationAssessment verification
+  assessmentMode <- rsLengthAssessmentMode <$> readIORef st
+  assessment <- assessLengthVerificationBatch assessmentMode verification
+  forM_ (lengthAssessmentFailure assessment) $ \failure -> do
+    prefix <- cYellow st "warning: "
+    emitLn st $ prefix ++
+      "finite-list-spine Length counterexample ranking preserved callback " ++
+      "order: " ++
+      show failure
+  let acceptedReceipts = lengthAssessmentCandidates assessment
       -- Keep callback acceptance, semantic origin, and original renderer
       -- ordinal together until this post-verification boundary. An explicit
       -- behavioral contract may be handed to Djex here before projection;
@@ -4198,70 +4220,6 @@ mkSettings st = Settings
           Left e -> const (pure []) (e :: SomeException)
     | otherwise = pure []
 
--- CLI -----------------------------------------------------------------------
-
-data Options = Options
-  { optProject :: Maybe FilePath
-  , optPlain :: Bool
-  , optImports :: [String]
-  , optTimeout :: Int
-  , optTime :: Bool
-  , optTranscript :: Maybe (Maybe FilePath)
-  , optTimestamps :: Bool
-  , optReplExe :: Maybe FilePath
-  , optLake :: FilePath
-  , optFile :: Maybe FilePath
-  }
-
-defaultOptions :: Options
-defaultOptions = Options Nothing False [] 300 False Nothing False Nothing "lake" Nothing
-
-parseArgs :: [String] -> Either String Options
-parseArgs = go defaultOptions
- where
-  go opts [] = Right opts
-  go opts (a : rest) = case a of
-    "--project" -> withValue rest (\v r -> go opts { optProject = Just v } r)
-    "-p" -> withValue rest (\v r -> go opts { optProject = Just v } r)
-    "--plain" -> go opts { optPlain = True } rest
-    "--import" -> withValue rest (\v r ->
-      go opts { optImports = optImports opts ++ splitCommas v } r)
-    "-i" -> withValue rest (\v r ->
-      go opts { optImports = optImports opts ++ splitCommas v } r)
-    "--timeout" -> withValue rest (\v r -> case reads v of
-      [(n, "")] -> go opts { optTimeout = n } r
-      _ -> Left "--timeout expects a number")
-    "--time" -> go opts { optTime = True } rest
-    "--transcript" -> case rest of
-      v : r | not ("-" `isPrefixOf` v) ->
-        go opts { optTranscript = Just (Just v) } r
-      _ -> go opts { optTranscript = Just Nothing } rest
-    "--timestamps" -> go opts { optTimestamps = True } rest
-    "--repl-exe" -> withValue rest (\v r -> go opts { optReplExe = Just v } r)
-    "--lake" -> withValue rest (\v r -> go opts { optLake = v } r)
-    "--help" -> Left usage
-    _ | "-" `isPrefixOf` a -> Left ("unknown option " ++ a ++ "\n" ++ usage)
-      | otherwise -> go opts { optFile = Just a } rest
-
-  withValue (v : rest) k = k v rest
-  withValue [] _ = Left "missing option value"
-
-  splitCommas = filter (not . null) . splitOn ','
-
-usage :: String
-usage = unlines
-  [ "usage: leant [FILE] [options]"
-  , "  --project DIR    path to a Lake project to run inside"
-  , "  --plain          do not use any Lake project (backend project only)"
-  , "  -i, --import M   module to import at startup (repeatable)"
-  , "  --timeout N      per-command timeout in seconds (0 = none, default 300)"
-  , "  --time           show per-command timing"
-  , "  --transcript [F] record a full transcript of the session"
-  , "  --timestamps     timestamp each command in the transcript"
-  , "  --repl-exe PATH  Lean REPL backend executable (see also LEANT_BACKEND)"
-  , "  --lake PATH      lake executable (default: lake)"
-  ]
-
 trim :: String -> String
 trim = dropWhile isSpace . reverse . dropWhile isSpace . reverse
 
@@ -4283,6 +4241,17 @@ run opts = do
   tty <- hIsTerminalDevice stdout
   interactive <- hIsTerminalDevice stdin
   let useColor = vtOk && tty
+
+  lengthAssessmentMode <- case lengthAssessmentSetup opts of
+    Nothing -> pure disabledLengthAssessmentMode
+    Just (activation, source) -> do
+      loaded <- loadLengthAssessmentMode activation source
+      case loaded of
+        Left failure -> do
+          putStrLn $ "error: finite-list-spine Length counterexample " ++
+            "ranking setup failed: " ++ show failure
+          exitWith $ ExitFailure 1
+        Right mode -> pure mode
 
   replExe <- case optReplExe opts of
     Just path -> pure (Just path)
@@ -4350,6 +4319,7 @@ run opts = do
         , rsSynthSteps = 4096
         , rsSynthClassical = True
         , rsSynthLibrary = True
+        , rsLengthAssessmentMode = lengthAssessmentMode
         , rsRatings = ratings
         , rsTimeout = if optTimeout opts <= 0 then Nothing
             else Just (optTimeout opts)
@@ -4392,6 +4362,16 @@ run opts = do
       bold2 <- cBold st ":quit"
       emitLn st ("Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type "
         ++ bold1 ++ " for help, " ++ bold2 ++ " to exit.")
+      when (lengthAssessmentModeEnabled lengthAssessmentMode) $ do
+        emitLn st =<< cDim st (if optLengthRankingAllowUnpinned opts
+          then "Finite-list-spine Length counterexample ranking enabled for " ++
+            "eligible typed Exference origins with a startup-fixed contract; " ++
+            "unpinned solver execution was explicitly permitted."
+          else "Finite-list-spine Length counterexample ranking enabled for " ++
+            "eligible typed Exference origins with a startup-fixed contract; " ++
+            "a solver executable digest expectation was required.")
+        emitLn st =<< cDim st
+          "Select synth-engine exference or both to produce graph-eligible candidates."
 
       forM_ (optFile opts) (cmdLoad st)
 

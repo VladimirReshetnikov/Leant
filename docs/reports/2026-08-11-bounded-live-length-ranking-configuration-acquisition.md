@@ -4,11 +4,11 @@ Date: 2026-08-11
 
 ## Outcome
 
-`Leant.Synth.Length.Configuration.File.Acquire` adds the first filesystem
-boundary around the pure version-1 Length-ranking configuration decoder.  It
-does not discover a file, activate a decoded policy, start Z3, or wire live
-ranking into Main or the REPL.  A successful load returns only the existing
-opaque `DisabledLengthRankingConfiguration`.
+`Leant.Synth.Length.Configuration.File.Acquire` adds the filesystem boundary
+around the pure version-1 Length-ranking configuration decoder. The module
+does not discover a file, activate a decoded policy, or start Z3. A successful
+load returns only the existing opaque `DisabledLengthRankingConfiguration`;
+Main's later integration composes this explicit boundary with activation.
 
 The caller must first supply both an exact path and an acquisition timeout to
 `mkLengthRankingConfigurationFileRequest`.  The resulting request is opaque.
@@ -143,7 +143,9 @@ against the checked candidate problem.  `unsat`, `unknown`, and status-only
 `sat` remain neutral, and Lean verification remains the final acceptance
 boundary.
 
-Main and the REPL still do not import, load, activate, cache, watch, or execute
-this configuration.  User-visible wiring continues to require an explicit
-command/configuration authority and an explicit policy for how acquisition or
-live-ranking failures affect presentation.
+Main now loads exactly one caller-named absolute file at startup when the
+explicit option is present. It neither discovers nor watches the file, and it
+does not retain file bytes or reopen it for later requests. Requiring a digest
+expectation is the default activation choice; permitting an unpinned executable
+requires a separate flag. Setup failure stops startup with a sanitized error,
+while later structured ranking failure preserves callback order.

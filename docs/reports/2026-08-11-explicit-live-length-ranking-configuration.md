@@ -88,6 +88,7 @@ and exception behavior. Neither caches a worker between calls.
 
 The private lifecycle bounds and explicit per-query host deadline remain
 separate. The wrapper adds no batch-wide or command-wide deadline and does not
-derive one from Leant's synthesis or backend timeouts. Main and the REPL still
-do not construct or invoke this configuration, so live Length ranking remains
-disabled unless a future integration supplies the complete explicit policy.
+derive one from Leant's synthesis or backend timeouts. Main now constructs this
+configuration only through an explicit bounded startup file. That CLI
+compatibility path fixes the decoded contract for the process; the separate
+policy API above still accepts a request-owned contract per invocation.

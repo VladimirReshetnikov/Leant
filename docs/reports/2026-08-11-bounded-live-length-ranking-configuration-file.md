@@ -5,7 +5,7 @@ Date: 2026-08-11
 ## Outcome
 
 `Leant.Synth.Length.Configuration.File` defines one closed JSON format for the
-still-unwired live Length-ranking policy:
+explicit live Length-ranking policy:
 
 - `format` is exactly `"leant-live-length-ranking-configuration"`;
 - `version` is the integral JSON number `1`; and
@@ -13,10 +13,10 @@ still-unwired live Length-ranking policy:
 
 The pure `decodeLengthRankingConfigurationFile` function accepts a strict
 `ByteString` and returns either a sanitized structured error or an opaque
-`DisabledLengthRankingConfiguration`. It performs no IO. In particular, this
-checkpoint adds no file loader, default path, executable discovery, path
-normalization, environment lookup, Main command, REPL command, autoload rule,
-or solver launch.
+`DisabledLengthRankingConfiguration`. It performs no IO. The later CLI
+integration supplies an explicit bounded file loader, but still adds no default
+path, executable discovery, path normalization, environment lookup, autoload
+rule, or solver launch during decoding.
 
 The disabled wrapper retains only the completed opaque configuration. It does
 not copy a Boolean from the raw JSON digest field. Later activation derives
@@ -143,10 +143,10 @@ Unknown object fields are also rejected rather than ignored.
 
 The total-byte check occurs *after* the caller has acquired the strict
 `ByteString`. It bounds decoding and retained parser state, not allocation or IO
-performed by a future file reader. Any future loader must own bounded
-acquisition itself—for example, stop after observing the maximum plus one byte
-and reject—before passing the retained bytes to this decoder. This module does
-not claim that merely calling the decoder makes an unbounded read safe.
+performed by a reader. `Configuration.File.Acquire` owns the corresponding
+maximum-plus-one bounded acquisition before passing retained bytes here. This
+module does not claim that merely calling the decoder makes an unbounded read
+safe.
 
 ## Hard semantic limits
 
@@ -287,5 +287,6 @@ can produce a model-relative counterexample receipt. `unsat`, `unknown`, and
 status-only `sat` stay neutral. No candidate is pruned, validated
 counterexamples are only stably demoted, and any returned structured live
 failure restores the original all-`Unassessed` ordering atomically. Exceptions
-continue to propagate. Main and the REPL still never decode, activate, or run
-this policy.
+continue to propagate. Main decodes, activates, and runs this policy only after
+the explicit startup option; the decoded contract then remains fixed for that
+process while every eligible batch opens a fresh lexical worker.
