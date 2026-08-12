@@ -116,6 +116,22 @@ identity-byte budget to newly admit the same policy. This later runtime/facade
 extraction leaves canonical raw-process, ready-worker, and query-run bytes
 unchanged. Leant's configuration API and activation boundary remain unchanged.
 
+After capability admission, the opaque ready worker no longer retains the
+complete five-part pre-readiness Session configuration. One strict private
+query policy keeps only maximum queries, the query-run identity budget,
+protocol limits, and the complete execution policy needed to derive each query
+deadline and seal future plans. Exact process limits are projected from the
+same retained runtime; workspace-allocation, capability, and ready-identity
+admission have completed, while the opener deadline and Session
+workspace-cleanup authority remain with the enclosing rank-2 scope; process
+shutdown limits remain process-owned. The sealed protocol plan then supplies
+both its exact query and artifact policy during replay, rather than being paired
+with an independent worker-wide replay copy.
+Run-identity admission likewise derives its budget from the worker and its
+transport limits from that worker's process. This heap/association narrowing
+changes no ready-worker or query-run identity field, wire byte, failure order,
+public Djex API, or Leant behavior.
+
 The private protocol plan follows the same single-owner rule. Its unchanged
 complete fingerprint still binds the exact initial and optional value writes,
 but the plan retains only the sealed query and positional sentinels needed to
@@ -188,11 +204,11 @@ exact plan, marker roles, admitted replay limits, and deadline, but no
 accounting anchors and no execution authority. Atomic reservation burns the
 ordinal and markers, reads the last-committed stdout and stderr anchors, and
 mints the private nominal epoch-bound receipt accepted by execution and commit.
-Replay projects the exact query from that receipt's plan. The live Session
-carries the protocol plan through driving and binds its complete key directly
-into the unchanged version-1 query-run field layout. Exact bounded
-status-frame and input-value-frame bytes remain singly stored in the causal
-transcript rather than being copied into that decoded branch.
+Replay projects the exact query and artifact policy from that receipt's plan.
+The live Session carries the protocol plan through driving and binds its
+complete key directly into the unchanged version-1 query-run field layout.
+Exact bounded status-frame and input-value-frame bytes remain singly stored in
+the causal transcript rather than being copied into that decoded branch.
 
 Preparation returns only the sealed problem. Callback receipt and resolved
 family values are consumed before that result rather than being copied into a
