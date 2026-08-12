@@ -293,8 +293,11 @@ bounded canonical QF_LIA query. It launches no solver and grants no authority
 to raw `sat`, `unsat`, or `unknown`: only decoded input values which pass Djex's
 independent exact-problem replay can yield a finite-spine, model-relative
 counterexample receipt, still conditional on every named provider law used by
-that candidate. That receipt is not by itself a concrete Lean counterexample
-or kernel proof.
+that candidate. Inside problem sealing, the exact checked provider summaries
+reached by symbolic interpretation flow directly into the canonical used-law
+identity; the names-only receipt is derived separately and never becomes an
+authority lookup key. That receipt is not by itself a concrete Lean
+counterexample or kernel proof.
 The query's typed SMT plan is transient through rendering and structural
 fingerprinting. Once sealed, the opaque query retains only its checked problem,
 exact ordered input symbols, bounded command bytes, and complete fingerprint;
