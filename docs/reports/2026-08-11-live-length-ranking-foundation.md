@@ -94,6 +94,20 @@ are derived again on demand through the selectors used at the causal write
 edges; presence-only inspection of the optional write does not render request
 bytes.
 
+Query protocol and readiness capability now share Djex's opaque cumulative
+stream policy and zero-start cursor. A completed frame keeps its exact policy,
+absolute charged end, and untouched tail together for same-write continuation;
+only fully consumed and validated boundary whitespace can produce the opaque
+policy-and-offset token used to start a next-write receiver. Thus neither
+machine can restart a detached tail under a different cumulative budget or
+absolute offset. The configured frame-total failure still wins an exact tie,
+while only a strictly tighter remaining transaction budget becomes the
+established cumulative maximum-plus-one failure. The base stream layer owns the
+canonical ordered SMT-LIB whitespace bytes used by framing, cursor, process
+boundary draining, causal attribution, and the unchanged protocol/capability
+fingerprints. This factors runtime accounting without moving domain phase
+schemas, plan identities, or solver authority into the shared cursor.
+
 The package-private terminal protocol value likewise retains only the closed
 solver status and optional decoded integer bindings. The live owner separately
 retains the exact plan through driving and binds its complete key directly into
