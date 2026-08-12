@@ -3457,9 +3457,9 @@ explicitLengthRankingConfigurationSource
   -> LengthRankingConfigurationSource
 explicitLengthRankingConfigurationSource executionLimits executionSource
     evaluationSource contract = LengthRankingConfigurationSource
-  { lengthRankingConfigurationExecutionLimits = executionLimits
-  , lengthRankingConfigurationExecutionSource = executionSource
-  , lengthRankingConfigurationEvaluationSource = evaluationSource
+  { lengthRankingConfigurationPolicySource =
+      explicitLengthRankingPolicySource
+        executionLimits executionSource evaluationSource
   , lengthRankingConfigurationContract = contract
   }
 

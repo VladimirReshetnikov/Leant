@@ -89,20 +89,14 @@ data LengthRankingPolicy = LengthRankingPolicy
   !LengthSMTLibExecutionConfig
   !LengthEvaluationLimits
 
--- | Compatibility source which bundles one policy and one contract.
+-- | Compatibility source which bundles one policy source and one contract.
 --
--- The execution source includes the absolute executable path, optional exact
--- SHA-256 pre-spawn snapshot expectation, finite solver and host budgets,
--- artifact policy, and bounded response policy.  Execution admission limits
--- and replay limits are separate and equally explicit.  No field is inferred
--- from the host or current goal.
+-- Reusing 'LengthRankingPolicySource' keeps execution admission, execution
+-- policy, and replay limits under the same validation vocabulary as the
+-- reusable policy path.  The contract remains a separate request assertion.
+-- No field is inferred from the host or current goal.
 data LengthRankingConfigurationSource = LengthRankingConfigurationSource
-  { lengthRankingConfigurationExecutionLimits
-      :: LengthSMTLibExecutionLimits
-  , lengthRankingConfigurationExecutionSource
-      :: LengthSMTLibExecutionConfigSource
-  , lengthRankingConfigurationEvaluationSource
-      :: LengthEvaluationLimitSource
+  { lengthRankingConfigurationPolicySource :: LengthRankingPolicySource
   , lengthRankingConfigurationContract :: LeanLengthContract
   }
 
@@ -147,14 +141,8 @@ mkLengthRankingConfiguration
   :: LengthRankingConfigurationSource
   -> Either LengthRankingConfigurationError LengthRankingConfiguration
 mkLengthRankingConfiguration source = do
-  policy <- mkLengthRankingPolicy LengthRankingPolicySource
-    { lengthRankingPolicyExecutionLimits =
-        lengthRankingConfigurationExecutionLimits source
-    , lengthRankingPolicyExecutionSource =
-        lengthRankingConfigurationExecutionSource source
-    , lengthRankingPolicyEvaluationSource =
-        lengthRankingConfigurationEvaluationSource source
-    }
+  policy <- mkLengthRankingPolicy
+    $ lengthRankingConfigurationPolicySource source
   pure $ LengthRankingConfiguration policy
     $ lengthRankingConfigurationContract source
 

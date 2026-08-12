@@ -17,9 +17,11 @@ front of the existing live Length ranking foundation. The reusable
 `mkLengthRankingPolicy` validates those values into an opaque
 `LengthRankingPolicy`. A `LeanLengthContract` is supplied independently to each
 `rankVerifiedLengthCandidatesWithPolicy` call. The version-1 configuration-file
-grammar remains source-compatible through `LengthRankingConfigurationSource`,
-which bundles those same three policy fields with one explicit contract and
-seals an opaque `LengthRankingConfiguration` compatibility value.
+grammar remains unchanged. Its compatibility path uses
+`LengthRankingConfigurationSource`, which nests that same
+`LengthRankingPolicySource` beside one explicit contract and seals an opaque
+`LengthRankingConfiguration` compatibility value. There is one source
+vocabulary and one validation path for reusable and bundled policy.
 
 The module supplies no default source and performs no executable discovery,
 path normalization, environment lookup, or configuration inference. A caller
