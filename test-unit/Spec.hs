@@ -4025,8 +4025,11 @@ assertLengthPostVerificationSealed result = case
     lengthPostVerificationSealedBatch result of
   Nothing -> assertFailure
     "Length post-verification output bypassed its permutation seal"
-  Just batch -> postVerificationBatchCandidates batch @?=
-    lengthPostVerificationCandidates result
+  Just batch -> do
+    let sealed = postVerificationBatchCandidates batch
+    sealed @?= lengthPostVerificationCandidates result
+    ranking <- expectLengthPostVerificationRanking result
+    rankedLengthVerifiedCandidates ranking @?= sealed
 
 assertLengthCounterexampleReceipt
   :: Natural

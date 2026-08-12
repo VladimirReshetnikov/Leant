@@ -325,8 +325,11 @@ exact canonical query fingerprint before inspecting optional evidence and
 replays any evidence against the behavioral problem retained by the query.
 The checked problem is transient until query sealing; there is no separate
 runtime handoff wrapper, second callback receipt, or retained family binding.
-Prepared live state retains only the exact verified receipt and sealed query
-because ordering still needs that receipt.
+Prepared live state retains only the caller-owned receipt association and
+sealed query. The direct compatibility path uses the verified receipt itself
+as that association; the presentation-safe path uses the batch-scoped
+occurrence handle without a parallel detached receipt. It erases that handle
+into the public ranked receipt only after the permutation seal.
 Nothing is pruned. A candidate-local handoff or query-construction refusal
 still projects through the compatible `Unassessed` assessment, but now also
 retains one bounded payload-free `LengthPreparationRefusalClass` with a fixed
@@ -449,8 +452,9 @@ manufactured, substituted, or reassociated candidate batch.
 `Leant.Synth.Length.PostVerification` is the first domain adapter for that
 boundary. The Length ranker now retains each receipt's safe original index;
 package-private `Ranking.Internal` and `PostVerification.Internal` modules
-thread each batch-scoped occurrence handle through preparation, live
-assessment, stable partitioning, atomic fallback, and the final seal. The
+thread each batch-scoped occurrence handle as the only receipt-bearing field
+in transient ranking state through preparation, live assessment, stable
+partitioning, atomic fallback, and the final seal. The
 ordinary `Ranking` facade exports neither the associated plan nor its
 projector, while the public configuration surface exports no associated
 runner and its post-verification assessment entry points return only sealed

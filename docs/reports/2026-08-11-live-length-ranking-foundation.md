@@ -66,8 +66,11 @@ problem retained by the query. Only a successful replay releases the safe
 opaque ranked-candidate association.
 
 The checked problem is transient until it is sealed into a canonical query.
-Each eligible prepared record retains only the exact verified callback receipt
-and that query. The query already owns the same behavioral problem, so
+Each eligible prepared record retains only its caller-owned receipt association
+and that query. The direct compatibility runner uses the verified callback
+receipt itself as the association; the presentation-safe runner uses the
+batch-scoped occurrence handle as the only receipt-bearing field in its
+transient ranking state. The query already owns the same behavioral problem, so
 retaining the earlier renderer, session, or family preparation state solely
 for a second replay would duplicate authority and heap residency without
 strengthening query/evidence replay.
@@ -81,8 +84,10 @@ rendered bytes the semantic source of truth or alter query identity.
 
 Preparation returns only the sealed problem. Callback receipt and resolved
 family values are consumed before that result rather than being copied into a
-transient wrapper; the ranking record separately owns the one receipt it still
-needs for occurrence-preserving presentation. The fused adapter preserves the
+transient wrapper; the ranking association is the only receipt-bearing slot
+retained for occurrence-preserving presentation. The fixed post-verification
+erasure materializes the association-free public ranked receipt only after the
+permutation seal. The fused adapter preserves the
 handoff-before-query refusal boundary with nested closed results rather than
 another runtime authority type.
 

@@ -76,10 +76,13 @@ Before that public report exists, a package-private
 through transient handoff preparation, query execution, Djex's query-owned
 evidence replay, stable counterexample partitioning, and atomic fallback. The
 post-verification adapter instantiates `association` with the current epoch's
-opaque occurrence handle. Its internal sealing core seals the reordered handles
-first and calls
-the internal projector only on success, so an assessment is never detached and
-later reassociated by candidate equality or numeric lookup. The ordinary
+opaque occurrence handle, which is the only receipt-bearing field in transient
+ranking state throughout those phases. Preparation may inspect the receipt
+through that handle, but retains no parallel detached copy. The internal
+sealing core seals the reordered handles first and calls the fixed
+association-free report erasure only on success, so an assessment is never
+detached and later reassociated by candidate equality, numeric lookup, or a
+caller-supplied projection. The ordinary
 `Leant.Synth.Length.Ranking` facade exports neither associated types nor the
 projector, and `Configuration` exports only the two sealed assessment entry
 points rather than its lower-level associated runners.

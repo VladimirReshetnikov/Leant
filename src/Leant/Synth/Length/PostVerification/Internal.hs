@@ -27,7 +27,7 @@ import Leant.Synth.Length.Ranking.Internal
   , LengthRankingInputError
   , associatedLengthRankingCandidates
   , associatedRankedLengthCandidateAssociation
-  , projectAssociatedLengthRanking
+  , projectPostVerificationLengthRanking
   )
 import Leant.Synth.PostVerification
   ( PostVerificationBatch
@@ -119,4 +119,4 @@ assessVerifiedLengthCandidatesWith rankCandidates verification = do
         Left failure -> LengthPostVerificationRejected verification
           $ LengthPostVerificationProposalRejected failure
         Right batch -> LengthPostVerificationAccepted batch
-          $ projectAssociatedLengthRanking associated
+          $ projectPostVerificationLengthRanking associated
