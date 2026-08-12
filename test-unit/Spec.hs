@@ -224,6 +224,15 @@ import Leant.Synth.Length.Contract
   , LeanLengthProviderLaw (..)
   , LeanLengthSpineIdentity (..)
   )
+import Leant.Synth.Length.PostVerification
+  ( LengthPostVerificationFailure (..)
+  , LengthPostVerificationResult
+  , assessVerifiedLengthCandidatesWithPolicy
+  , lengthPostVerificationAdapterFailure
+  , lengthPostVerificationCandidates
+  , lengthPostVerificationRanking
+  , lengthPostVerificationSealedBatch
+  )
 import Leant.Synth.Length.Ranking
   ( LengthRanking
   , LengthRankingAssessment (..)
@@ -236,6 +245,7 @@ import Leant.Synth.Length.Ranking
   , lengthRankingFailureOriginalIndex
   , rankVerifiedLengthCandidates
   , rankedLengthCandidateAssessment
+  , rankedLengthCandidateOriginalIndex
   , rankedLengthCandidateVerified
   )
 import Leant.Synth.Observability
@@ -257,6 +267,16 @@ import Leant.Synth.ProviderCache
   , lookupProviderCache
   , providerCacheSize
   )
+import Leant.Synth.PostVerification
+  ( PostVerificationCollection (..)
+  , PostVerificationError (..)
+  , postVerificationBatchCandidates
+  , postVerificationCandidateVerified
+  , postVerificationInputCandidates
+  , sealPostVerificationBatch
+  , skipPostVerificationAssessment
+  , withPostVerificationInput
+  )
 import Leant.Synth.Replay (ReplayPlan (..), planReplay)
 import Leant.Synth.Render
   ( CtorInfo (..)
@@ -267,6 +287,7 @@ import Leant.Synth.Render
   )
 import Leant.Synth.Verification
   ( VariantVerdict (..)
+  , VerificationBatch
   , Verified
   , failedCandidateGroups
   , verificationObservations
@@ -304,6 +325,7 @@ main = defaultMain $ testGroup "Leant synthesis boundary"
   , providerProgramTests
   , candidateVerificationTests
   , verificationObservabilityTests
+  , postVerificationTests
   , providerParserTests
   , instanceImplicitTests
   , providerEngineTests
@@ -1097,6 +1119,109 @@ verificationObservabilityTests = testGroup "verification observability"
       observationCount LeanVariantAttempted
         (verificationObservations one) @?= 1
   ]
+
+postVerificationTests :: TestTree
+postVerificationTests = testGroup "post-verification ordering boundary"
+  [ testCase "keep the disabled stage exact and non-strict" $ do
+      verification <- syntheticPostVerificationBatch
+        ["post-verification-first", "post-verification-second"]
+      skipPostVerificationAssessment verification @?=
+        verifiedCandidateReceipts verification
+      let poison :: DetailedVerificationVariant
+          poison = error "disabled stage forced a verified candidate"
+      lazyVerification <- verifyCandidateGroups 1
+        (const $ pure VariantAccepted) [[poison]]
+      length (skipPostVerificationAssessment lazyVerification) @?= 1
+      withPostVerificationInput lazyVerification $ \input -> case
+          postVerificationInputCandidates input of
+        [candidate] -> do
+          batch <- expectRight $ sealPostVerificationBatch 1 input [candidate]
+          length (postVerificationBatchCandidates batch) @?= 1
+        candidates -> assertFailure $
+          "unexpected lazy handle count: " ++ show (length candidates)
+  , testCase "seal only a complete exact permutation" $ do
+      verification <- syntheticPostVerificationBatch
+        [ "post-verification-first"
+        , "post-verification-second"
+        , "post-verification-third"
+        ]
+      withPostVerificationInput verification $ \input -> case
+          postVerificationInputCandidates input of
+        [first, second, third] -> do
+          batch <- expectRight $ sealPostVerificationBatch 3 input
+            [third, first, second]
+          postVerificationBatchCandidates batch @?=
+            map postVerificationCandidateVerified [third, first, second]
+          assertPostVerificationError
+            (PostVerificationProposalLengthMismatch 3 2)
+            $ sealPostVerificationBatch 3 input [first, second]
+          assertPostVerificationError
+            (PostVerificationProposalDuplicateIndex 0)
+            $ sealPostVerificationBatch 3 input [first, first, second]
+        candidates -> assertFailure $
+          "unexpected post-verification handle count: "
+            ++ show (length candidates)
+  , testCase "keep equal occurrences distinct and bound proposals productively" $ do
+      verification <- syntheticPostVerificationBatch
+        [ "post-verification-first"
+        , "post-verification-second"
+        , "post-verification-third"
+        ]
+      withPostVerificationInput verification $ \input -> case
+          postVerificationInputCandidates input of
+        [first, second, third] -> do
+          assertPostVerificationError
+            (PostVerificationCollectionLimitExceeded
+              PostVerificationCandidates 2 3)
+            $ sealPostVerificationBatch 2 input
+                (error "candidate admission forced the proposals")
+          bounded <- timeout 1000000 $ evaluate
+            $ sealPostVerificationBatch 3 input
+                (cycle [first, second, third])
+          case bounded of
+            Just result -> assertPostVerificationError
+              (PostVerificationCollectionLimitExceeded
+                PostVerificationProposals 3 4)
+              result
+            Nothing -> assertFailure
+              "cyclic post-verification proposals were not rejected"
+        candidates -> assertFailure $
+          "unexpected bounded handle count: " ++ show (length candidates)
+
+      duplicates <- syntheticPostVerificationBatch
+        ["post-verification-same", "post-verification-same"]
+      withPostVerificationInput duplicates $ \input -> case
+          postVerificationInputCandidates input of
+        [first, second] -> do
+          batch <- expectRight $ sealPostVerificationBatch 2 input
+            [second, first]
+          postVerificationBatchCandidates batch @?=
+            map postVerificationCandidateVerified [second, first]
+          assertPostVerificationError
+            (PostVerificationProposalDuplicateIndex 0)
+            $ sealPostVerificationBatch 2 input [first, first]
+        candidates -> assertFailure $
+          "unexpected duplicate handle count: " ++ show (length candidates)
+  ]
+
+syntheticPostVerificationBatch
+  :: [String]
+  -> IO (VerificationBatch DetailedVerificationVariant)
+syntheticPostVerificationBatch spellings =
+  verifyCandidateGroups (length spellings) (const $ pure VariantAccepted)
+    [ detailedCandidateGroupVerificationVariants
+        $ detailedCandidateGroup RouteTypedCandidate [spelling]
+    | spelling <- spellings
+    ]
+
+assertPostVerificationError
+  :: PostVerificationError
+  -> Either PostVerificationError batch
+  -> IO ()
+assertPostVerificationError expected result = case result of
+  Left actual -> actual @?= expected
+  Right _ -> assertFailure $
+    "post-verification proposal was admitted; expected: " ++ show expected
 
 replayPlanTests :: TestTree
 replayPlanTests = testGroup "synthesis history replay"
@@ -1903,6 +2028,9 @@ lengthRankingTests = testGroup "checked Length behavioral ranking"
   , testCase
       "reset every candidate in original order after an operational failure"
       assertLengthRankingAtomicFallback
+  , testCase
+      "adapt ranking only through a validated post-verification permutation"
+      assertLengthPostVerificationAdapter
   , lengthRankingConfigurationTests
   ]
 
@@ -3517,6 +3645,127 @@ assertLengthRankingAtomicFallback = do
       Djex.LengthSMTLibLiveQueryCounterexampleRejected
   lengthRankingFailureCleanupIncomplete failure @?= False
   lengthRankingFailureOriginalIndex failure @?= Just 1
+
+assertLengthPostVerificationAdapter :: IO ()
+assertLengthPostVerificationAdapter = do
+  fixture <- buildLengthRankingLiveFixture
+  retainedFirst <- syntheticLengthRankingCandidate
+    "post-verification-retained-first"
+  retainedSecond <- syntheticLengthRankingCandidate
+    "post-verification-retained-second"
+  trailing <- syntheticLengthRankingCandidate
+    "post-verification-fallback-trailing"
+  let zero = lengthRankingFixtureZero fixture
+      one = lengthRankingFixtureOne fixture
+      rawDemotion = [zero, retainedFirst, one, retainedSecond]
+      rawFallback = [one, zero, trailing]
+      maximumCandidates =
+        Djex.defaultLengthSMTLibLiveSessionMaximumQueries
+      oversizedCount = fromIntegral maximumCandidates + 1
+  oversizedVerification <- verificationBatchFromReceipts
+    $ replicate oversizedCount zero
+  demotionVerification <- verificationBatchFromReceipts rawDemotion
+  fallbackVerification <- verificationBatchFromReceipts rawFallback
+  let demotionInput = verifiedCandidateReceipts demotionVerification
+      demotionExpected = case demotionInput of
+        [verifiedZero, verifiedRetainedFirst, verifiedOne,
+            verifiedRetainedSecond] ->
+          [ verifiedRetainedFirst
+          , verifiedRetainedSecond
+          , verifiedZero
+          , verifiedOne
+          ]
+        _ -> error "post-verification demotion fixture changed cardinality"
+      fallbackInput = verifiedCandidateReceipts fallbackVerification
+  withFakeLengthSolver "healthy" $ \executable -> do
+    let policySource = explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits
+          (explicitLengthRankingExecutionSource executable Nothing
+            Djex.LengthSMTLibInputValuesAfterSatisfiable)
+          Djex.defaultLengthEvaluationLimitSource
+    policy <- expectRight $ mkLengthRankingPolicy policySource
+
+    rejected <- expectLengthPostVerificationWithin "bounded input rejection"
+      $ assessVerifiedLengthCandidatesWithPolicy policy
+          (error "input rejection forced the Length contract")
+          oversizedVerification
+    lengthPostVerificationAdapterFailure rejected @?= Just
+      (LengthPostVerificationInputRejected
+        $ LengthRankingInputLimitExceeded maximumCandidates
+            (maximumCandidates + 1))
+    assertBool "input rejection retained an impossible ranking report"
+      $ isNothing $ lengthPostVerificationRanking rejected
+    assertBool "rejected input masqueraded as a sealed candidate batch"
+      $ isNothing $ lengthPostVerificationSealedBatch rejected
+    lengthPostVerificationCandidates rejected @?=
+      verifiedCandidateReceipts oversizedVerification
+
+    demotion <- expectLengthPostVerificationWithin "counterexample demotion"
+      $ assessVerifiedLengthCandidatesWithPolicy policy
+          (lengthRankingContract 2) demotionVerification
+    lengthPostVerificationAdapterFailure demotion @?= Nothing
+    lengthPostVerificationCandidates demotion @?= demotionExpected
+    assertLengthPostVerificationSealed demotion
+    demotionRanking <- expectLengthPostVerificationRanking demotion
+    map rankedLengthCandidateOriginalIndex
+        (lengthRankingCandidates demotionRanking) @?=
+      [1, 3, 0, 2]
+    rankedLengthVerifiedCandidates demotionRanking @?= demotionExpected
+
+    fallback <- expectLengthPostVerificationWithin "atomic ranking fallback"
+      $ assessVerifiedLengthCandidatesWithPolicy policy
+          (lengthRankingContract 0) fallbackVerification
+    lengthPostVerificationAdapterFailure fallback @?= Nothing
+    lengthPostVerificationCandidates fallback @?= fallbackInput
+    assertLengthPostVerificationSealed fallback
+    fallbackRanking <- expectLengthPostVerificationRanking fallback
+    map rankedLengthCandidateOriginalIndex
+        (lengthRankingCandidates fallbackRanking) @?=
+      [0, 1, 2]
+    rankedLengthVerifiedCandidates fallbackRanking @?= fallbackInput
+    case lengthRankingFailure fallbackRanking of
+      Nothing -> assertFailure
+        "post-verification adapter discarded the ranking failure report"
+      Just failure -> lengthRankingFailureClass failure @?=
+        LengthRankingLiveQueryFailed
+          Djex.LengthSMTLibLiveQueryCounterexampleRejected
+
+verificationBatchFromReceipts
+  :: [Verified DetailedVerificationVariant]
+  -> IO (VerificationBatch DetailedVerificationVariant)
+verificationBatchFromReceipts receipts =
+  verifyCandidateGroups (length receipts) (const $ pure VariantAccepted)
+    [[verifiedCandidate receipt] | receipt <- receipts]
+
+expectLengthPostVerificationWithin
+  :: String
+  -> IO LengthPostVerificationResult
+  -> IO LengthPostVerificationResult
+expectLengthPostVerificationWithin label action = do
+  bounded <- timeout 8000000 action
+  case bounded of
+    Nothing -> assertFailure $ "Length post-verification " ++ label
+      ++ " exceeded its outer bound"
+    Just result -> pure result
+
+expectLengthPostVerificationRanking
+  :: LengthPostVerificationResult
+  -> IO LengthRanking
+expectLengthPostVerificationRanking result = case
+    lengthPostVerificationRanking result of
+  Nothing -> assertFailure
+    "Length post-verification result discarded its ranking report"
+  Just ranking -> pure ranking
+
+assertLengthPostVerificationSealed
+  :: LengthPostVerificationResult
+  -> IO ()
+assertLengthPostVerificationSealed result = case
+    lengthPostVerificationSealedBatch result of
+  Nothing -> assertFailure
+    "Length post-verification output bypassed its permutation seal"
+  Just batch -> postVerificationBatchCandidates batch @?=
+    lengthPostVerificationCandidates result
 
 assertLengthCounterexampleReceipt
   :: Natural

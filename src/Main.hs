@@ -141,13 +141,14 @@ import Leant.Synth.ProviderCache
   , insertProviderCache
   , lookupProviderCache
   )
+import Leant.Synth.PostVerification
+  ( skipPostVerificationAssessment )
 import Leant.Synth.Replay (ReplayPlan (..), planReplay)
 import Leant.Synth.Verification
   ( VariantVerdict (..)
   , VerificationBatch
   , verificationObservations
   , verifiedCandidate
-  , verifiedCandidateReceipts
   , verifyCandidateGroups
   )
 
@@ -2554,8 +2555,10 @@ verifyAndDisplay st args goal groups = do
     forM_ (leantObservationCodeEntries observations) $ \(code, count) ->
       emitLn st =<< cDim st
         ("debug metric: " ++ code ++ "=" ++ show count)
-  let acceptedReceipts = take synthMaxShown
-        $ verifiedCandidateReceipts verification
+  let -- This is the explicit disabled assessment stage.  It performs no IO
+      -- and preserves exact callback order.  An opt-in domain adapter may
+      -- replace it only with a validated permutation of this opaque batch.
+      acceptedReceipts = skipPostVerificationAssessment verification
       -- Keep callback acceptance, semantic origin, and original renderer
       -- ordinal together until this post-verification boundary. An explicit
       -- behavioral contract may be handed to Djex here before projection;

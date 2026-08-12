@@ -1,3 +1,5 @@
+{-# LANGUAGE RoleAnnotations #-}
+
 -- | Conservative live Length ranking for callback-verified candidates.
 --
 -- This module is the only Leant layer which opens Djex's public live Length
@@ -21,6 +23,7 @@ module Leant.Synth.Length.Ranking
   ( LengthRankingInputError (..)
   , LengthRankingAssessment (..)
   , RankedLengthCandidate
+  , rankedLengthCandidateOriginalIndex
   , rankedLengthCandidateVerified
   , rankedLengthCandidateAssessment
   , LengthRankingFailureClass (..)
@@ -31,6 +34,12 @@ module Leant.Synth.Length.Ranking
   , LengthRanking
   , lengthRankingCandidates
   , lengthRankingFailure
+  , AssociatedRankedLengthCandidate
+  , associatedRankedLengthCandidateAssociation
+  , AssociatedLengthRanking
+  , associatedLengthRankingCandidates
+  , projectAssociatedLengthRanking
+  , rankPostVerificationLengthCandidates
   , rankVerifiedLengthCandidates
   ) where
 
@@ -76,6 +85,10 @@ import Leant.Synth.Length.Adapter
   , prepareLengthQueryFromHandoff
   )
 import Leant.Synth.Length.Contract (LeanLengthContract)
+import Leant.Synth.PostVerification
+  ( PostVerificationCandidate
+  , postVerificationCandidateVerified
+  )
 import Leant.Synth.Verification (Verified)
 
 -- | Productive rejection of maximum-plus-one input candidates.  The observed
@@ -99,18 +112,23 @@ data LengthRankingAssessment
 -- The constructor stays private so receipts cannot be detached and paired
 -- with another candidate's assessment.
 data RankedLengthCandidate = RankedLengthCandidate
+  !Natural
   !(Verified DetailedVerificationVariant)
   !LengthRankingAssessment
+
+rankedLengthCandidateOriginalIndex :: RankedLengthCandidate -> Natural
+rankedLengthCandidateOriginalIndex (RankedLengthCandidate index _ _) = index
 
 rankedLengthCandidateVerified
   :: RankedLengthCandidate
   -> Verified DetailedVerificationVariant
-rankedLengthCandidateVerified (RankedLengthCandidate verified _) = verified
+rankedLengthCandidateVerified (RankedLengthCandidate _ verified _) = verified
 
 rankedLengthCandidateAssessment
   :: RankedLengthCandidate
   -> LengthRankingAssessment
-rankedLengthCandidateAssessment (RankedLengthCandidate _ assessment) = assessment
+rankedLengthCandidateAssessment (RankedLengthCandidate _ _ assessment) =
+  assessment
 
 -- | Payload-free failure classes.  Nested live failures are already sanitized
 -- by Djex; association and replay failures deliberately discard their richer
@@ -159,11 +177,58 @@ lengthRankingCandidates (LengthRanking candidates _) = candidates
 lengthRankingFailure :: LengthRanking -> Maybe LengthRankingFailure
 lengthRankingFailure (LengthRanking _ failure) = failure
 
-data PreparedLengthCandidate
+-- | Internal ranking result which keeps one caller-owned occurrence handle
+-- inseparable from the verified receipt and assessment derived from it.
+data AssociatedRankedLengthCandidate association =
+  AssociatedRankedLengthCandidate
+    !Natural
+    !association
+    !(Verified DetailedVerificationVariant)
+    !LengthRankingAssessment
+
+type role AssociatedRankedLengthCandidate nominal
+
+associatedRankedLengthCandidateAssociation
+  :: AssociatedRankedLengthCandidate association
+  -> association
+associatedRankedLengthCandidateAssociation
+    (AssociatedRankedLengthCandidate _ association _ _) = association
+
+-- | Complete associated plan before its batch-scoped handles are erased.
+data AssociatedLengthRanking association = AssociatedLengthRanking
+  ![AssociatedRankedLengthCandidate association]
+  !(Maybe LengthRankingFailure)
+
+type role AssociatedLengthRanking nominal
+
+associatedLengthRankingCandidates
+  :: AssociatedLengthRanking association
+  -> [AssociatedRankedLengthCandidate association]
+associatedLengthRankingCandidates
+    (AssociatedLengthRanking candidates _) = candidates
+
+-- | Project an association-free compatibility report.  A batch-scoped adapter
+-- must validate its occurrence order before calling this; the legacy direct
+-- runner uses the verified receipt itself as its association and therefore
+-- needs no separate post-verification handle seal.
+projectAssociatedLengthRanking
+  :: AssociatedLengthRanking association
+  -> LengthRanking
+projectAssociatedLengthRanking (AssociatedLengthRanking candidates failure) =
+  LengthRanking (map projectCandidate candidates) failure
+ where
+  projectCandidate (AssociatedRankedLengthCandidate
+      index _ verified assessment) =
+    RankedLengthCandidate index verified assessment
+
+data PreparedLengthCandidate association
   = PreparedLengthCandidateUnassessed
+      !Natural
+      !association
       !(Verified DetailedVerificationVariant)
   | PreparedLengthCandidateEligible
       !Natural
+      !association
       !CheckedLengthHandoff
       !CheckedLengthQuery
 
@@ -179,30 +244,65 @@ rankVerifiedLengthCandidates
   -> LeanLengthContract
   -> [Verified DetailedVerificationVariant]
   -> IO (Either LengthRankingInputError LengthRanking)
-rankVerifiedLengthCandidates execution evaluation contract candidates =
-  case admitCandidates defaultLengthSMTLibLiveSessionMaximumQueries candidates of
+rankVerifiedLengthCandidates execution evaluation contract candidates = fmap
+  (fmap projectAssociatedLengthRanking)
+  $ rankAssociatedLengthCandidates execution evaluation contract id candidates
+
+-- | Safe associated entry point for the post-verification seam.  The receipt
+-- projection is fixed here so callers cannot rank one receipt while retaining
+-- another occurrence's batch-scoped handle.
+rankPostVerificationLengthCandidates
+  :: LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LeanLengthContract
+  -> [PostVerificationCandidate epoch DetailedVerificationVariant]
+  -> IO
+      (Either LengthRankingInputError
+        (AssociatedLengthRanking
+          (PostVerificationCandidate epoch DetailedVerificationVariant)))
+rankPostVerificationLengthCandidates execution evaluation contract =
+  rankAssociatedLengthCandidates execution evaluation contract
+    postVerificationCandidateVerified
+
+-- | Rank caller-owned occurrences while retaining each occurrence handle
+-- through preparation, live assessment, stable partitioning, and atomic
+-- fallback.  The projection is not touched until complete input admission has
+-- succeeded.
+rankAssociatedLengthCandidates
+  :: LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LeanLengthContract
+  -> (association -> Verified DetailedVerificationVariant)
+  -> [association]
+  -> IO
+      (Either LengthRankingInputError
+        (AssociatedLengthRanking association))
+rankAssociatedLengthCandidates execution evaluation contract
+    verifiedFor associations =
+  case admitCandidates defaultLengthSMTLibLiveSessionMaximumQueries
+      associations of
     Left failure -> pure $ Left failure
-    Right admitted -> case prepareCandidates contract admitted of
-      [] -> pure $ Right $ LengthRanking [] Nothing
+    Right admitted -> case prepareCandidates contract verifiedFor admitted of
+      [] -> pure $ Right $ AssociatedLengthRanking [] Nothing
       prepared
-        | not (hasEligibleCandidate prepared) -> pure $ Right $ LengthRanking
-            (map preparedCandidateUnassessed prepared) Nothing
+        | not (hasEligibleCandidate prepared) -> pure $ Right
+            $ AssociatedLengthRanking
+                (map preparedCandidateUnassessed prepared) Nothing
         | otherwise -> do
             scoped <- withLengthSMTLibLiveSession execution
               $ \session -> runPreparedCandidates evaluation session prepared
             pure $ Right $ case scoped of
-              Left failure -> unassessedRanking admitted
+              Left failure -> unassessedRanking admitted verifiedFor
                 $ sessionRankingFailure failure
-              Right (Left failure) -> unassessedRanking admitted failure
-              Right (Right assessed) -> LengthRanking
+              Right (Left failure) ->
+                unassessedRanking admitted verifiedFor failure
+              Right (Right assessed) -> AssociatedLengthRanking
                 (stableCounterexampleDemotion assessed) Nothing
 
 admitCandidates
   :: Natural
-  -> [Verified DetailedVerificationVariant]
-  -> Either
-      LengthRankingInputError
-      [Verified DetailedVerificationVariant]
+  -> [candidate]
+  -> Either LengthRankingInputError [candidate]
 admitCandidates maximumCandidates = go 0 []
  where
   go observed reversed remaining
@@ -216,23 +316,28 @@ admitCandidates maximumCandidates = go 0 []
 
 prepareCandidates
   :: LeanLengthContract
-  -> [Verified DetailedVerificationVariant]
-  -> [PreparedLengthCandidate]
-prepareCandidates contract = go 0 []
+  -> (association -> Verified DetailedVerificationVariant)
+  -> [association]
+  -> [PreparedLengthCandidate association]
+prepareCandidates contract verifiedFor = go 0 []
  where
   go _ reversed [] = reverse reversed
-  go index reversed (verified : rest) =
-    let prepared = prepareCandidate index verified
+  go index reversed (association : rest) =
+    let prepared = prepareCandidate index association
     in prepared `seq` go (index + 1) (prepared : reversed) rest
 
-  prepareCandidate index verified = case
-      prepareCheckedLengthHandoff contract verified of
-    Left _ -> PreparedLengthCandidateUnassessed verified
-    Right handoff -> case prepareLengthQueryFromHandoff handoff of
-      Left _ -> PreparedLengthCandidateUnassessed verified
-      Right query -> PreparedLengthCandidateEligible index handoff query
+  prepareCandidate index association =
+    let verified = verifiedFor association
+    in case prepareCheckedLengthHandoff contract verified of
+      Left _ -> PreparedLengthCandidateUnassessed
+        index association verified
+      Right handoff -> case prepareLengthQueryFromHandoff handoff of
+        Left _ -> PreparedLengthCandidateUnassessed
+          index association verified
+        Right query -> PreparedLengthCandidateEligible
+          index association handoff query
 
-hasEligibleCandidate :: [PreparedLengthCandidate] -> Bool
+hasEligibleCandidate :: [PreparedLengthCandidate association] -> Bool
 hasEligibleCandidate = any isEligible
  where
   isEligible prepared = case prepared of
@@ -240,42 +345,49 @@ hasEligibleCandidate = any isEligible
     PreparedLengthCandidateEligible {} -> True
 
 preparedCandidateUnassessed
-  :: PreparedLengthCandidate
-  -> RankedLengthCandidate
+  :: PreparedLengthCandidate association
+  -> AssociatedRankedLengthCandidate association
 preparedCandidateUnassessed prepared = case prepared of
-  PreparedLengthCandidateUnassessed verified ->
-    RankedLengthCandidate verified Unassessed
-  PreparedLengthCandidateEligible _ handoff _ -> RankedLengthCandidate
-    (checkedLengthHandoffVerifiedVariant handoff) Unassessed
+  PreparedLengthCandidateUnassessed index association verified ->
+    AssociatedRankedLengthCandidate
+      index association verified Unassessed
+  PreparedLengthCandidateEligible index association handoff _ ->
+    AssociatedRankedLengthCandidate index association
+      (checkedLengthHandoffVerifiedVariant handoff) Unassessed
 
 runPreparedCandidates
   :: LengthEvaluationLimits
   -> LengthSMTLibLiveSession epoch
-  -> [PreparedLengthCandidate]
-  -> IO (Either LengthRankingFailure [RankedLengthCandidate])
+  -> [PreparedLengthCandidate association]
+  -> IO
+      (Either LengthRankingFailure
+        [AssociatedRankedLengthCandidate association])
 runPreparedCandidates evaluation session = go []
  where
   go reversed remaining = case remaining of
     [] -> pure $ Right $ reverse reversed
-    PreparedLengthCandidateUnassessed verified : rest ->
-      go (RankedLengthCandidate verified Unassessed : reversed) rest
-    PreparedLengthCandidateEligible index handoff query : rest -> do
+    PreparedLengthCandidateUnassessed index association verified : rest ->
+      go (AssociatedRankedLengthCandidate
+        index association verified Unassessed : reversed) rest
+    PreparedLengthCandidateEligible index association handoff query : rest -> do
       observed <- runLengthSMTLibLiveQuery evaluation session query
       case observed of
         Left failure -> pure $ Left $ queryRankingFailure index failure
         Right observation -> case
-            assessCandidate index handoff query observation of
+            assessCandidate index association handoff query observation of
           Left failure -> pure $ Left failure
           Right assessed -> go (assessed : reversed) rest
 
 assessCandidate
   :: Natural
+  -> association
   -> CheckedLengthHandoff
   -> CheckedLengthQuery
   -> LengthSMTLibLiveQueryObservation
       epoch ExferenceLocal ExferenceLocal
-  -> Either LengthRankingFailure RankedLengthCandidate
-assessCandidate index handoff query observation
+  -> Either LengthRankingFailure
+      (AssociatedRankedLengthCandidate association)
+assessCandidate index association handoff query observation
   | lengthSMTLibLiveQueryObservationQueryFingerprint observation /=
       lengthSMTLibQueryFingerprint query =
         Left $ localRankingFailure
@@ -292,26 +404,32 @@ assessCandidate index handoff query observation
           Left _ -> Left $ localRankingFailure
             LengthRankingEvidenceReplayMismatch index
           Right receipt -> Right $ Counterexample receipt
-      pure $ RankedLengthCandidate
+      pure $ AssociatedRankedLengthCandidate index association
         (checkedLengthHandoffVerifiedVariant handoff) assessment
 
 stableCounterexampleDemotion
-  :: [RankedLengthCandidate]
-  -> [RankedLengthCandidate]
+  :: [AssociatedRankedLengthCandidate association]
+  -> [AssociatedRankedLengthCandidate association]
 stableCounterexampleDemotion candidates =
   let (counterexamples, retained) = partition hasCounterexample candidates
-  in retained ++ counterexamples
+ in retained ++ counterexamples
  where
-  hasCounterexample candidate = case rankedLengthCandidateAssessment candidate of
-    Counterexample _ -> True
-    _ -> False
+  hasCounterexample (AssociatedRankedLengthCandidate _ _ _ assessment) =
+    case assessment of
+      Counterexample _ -> True
+      _ -> False
 
 unassessedRanking
-  :: [Verified DetailedVerificationVariant]
+  :: [association]
+  -> (association -> Verified DetailedVerificationVariant)
   -> LengthRankingFailure
-  -> LengthRanking
-unassessedRanking candidates failure = LengthRanking
-  (map (`RankedLengthCandidate` Unassessed) candidates)
+  -> AssociatedLengthRanking association
+unassessedRanking associations verifiedFor failure = AssociatedLengthRanking
+  (zipWith
+    (\index association -> AssociatedRankedLengthCandidate
+      index association (verifiedFor association) Unassessed)
+    [0 ..]
+    associations)
   (Just failure)
 
 localRankingFailure

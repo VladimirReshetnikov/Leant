@@ -375,6 +375,39 @@ provenance-bound handoff checks.  Ranking still imports the engine for those
 candidate-specific checks.  This gives contract assertions, candidate
 authority, and live execution policy distinct source owners.
 
+`Leant.Synth.PostVerification` now makes the boundary after callback
+acceptance explicit. Main sends the opaque, nominal `VerificationBatch`
+through `skipPostVerificationAssessment`, an exact non-strict receipt
+projection which performs no IO, cannot start a worker, and claims no
+validated ordering authority. An opt-in assessor may instead give
+`sealPostVerificationBatch` opaque occurrence handles minted from that batch
+inside a rank-2 `PostVerificationInput` epoch. Handle constructors and original
+indices are private, and nominal roles prevent coercion; handles from another
+batch inhabit a different abstract epoch and cannot be mixed without an
+explicit unsafe operation. The seal productively bounds the original handles
+and proposals, then rejects every omission, duplicate, out-of-range occurrence,
+or over-limit tail without comparing or forcing candidate payloads. Only
+success can construct the opaque `PostVerificationBatch`, which therefore
+carries a complete occurrence permutation rather than a pruned, duplicated,
+manufactured, substituted, or reassociated candidate batch.
+
+`Leant.Synth.Length.PostVerification` is the first domain adapter for that
+boundary. The Length ranker now retains each receipt's safe original index;
+an internal associated ranking plan also threads each batch-scoped occurrence
+handle through preparation, live assessment, stable partitioning, and atomic
+fallback. The adapter runs one explicitly supplied `LengthRankingPolicy` and
+request-owned contract, seals the returned handle order against the exact
+input epoch, and only then erases handles into the ordinary ranking report.
+Input or proposal failure preserves the original opaque verification batch,
+exposes no sealed output, and withholds the unsealed associated plan.
+Operational ranking failure already
+produces an original-order all-`Unassessed` ranking and passes through the same
+seal. Main deliberately selects only the identity path, so configuration-file
+acquisition, policy activation, Z3 launch, and user-visible behavioral
+reordering remain disabled. Replayed counterexamples may rank but never prune;
+raw `sat`, `unsat`, and `unknown` still grant no proof authority. See the
+[post-verification assessment seam report](docs/reports/2026-08-11-post-verification-assessment-seam.md).
+
 Three rules run through the design:
 
 - **The engine is never trusted.** Every candidate is re-elaborated by

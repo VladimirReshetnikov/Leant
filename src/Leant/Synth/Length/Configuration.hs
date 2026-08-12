@@ -23,6 +23,7 @@ module Leant.Synth.Length.Configuration
   ( LengthRankingPolicySource (..)
   , LengthRankingPolicy
   , mkLengthRankingPolicy
+  , rankPostVerificationLengthCandidatesWithPolicy
   , rankVerifiedLengthCandidatesWithPolicy
   , LengthRankingConfigurationSource (..)
   , LengthRankingConfiguration
@@ -46,10 +47,13 @@ import Language.Haskell.Djex
 import Leant.Synth.Engine (DetailedVerificationVariant)
 import Leant.Synth.Length.Contract (LeanLengthContract)
 import Leant.Synth.Length.Ranking
-  ( LengthRanking
+  ( AssociatedLengthRanking
+  , LengthRanking
   , LengthRankingInputError
+  , rankPostVerificationLengthCandidates
   , rankVerifiedLengthCandidates
   )
+import Leant.Synth.PostVerification (PostVerificationCandidate)
 import Leant.Synth.Verification (Verified)
 
 -- | Reusable source policy for live solver ownership and independent replay.
@@ -145,6 +149,21 @@ rankVerifiedLengthCandidatesWithPolicy
 rankVerifiedLengthCandidatesWithPolicy
     (LengthRankingPolicy execution evaluation) =
   rankVerifiedLengthCandidates execution evaluation
+
+-- | Associated variant used by a batch-scoped post-verification adapter.
+-- Caller-owned occurrence handles remain attached until that adapter validates
+-- the final permutation and deliberately erases them.
+rankPostVerificationLengthCandidatesWithPolicy
+  :: LengthRankingPolicy
+  -> LeanLengthContract
+  -> [PostVerificationCandidate epoch DetailedVerificationVariant]
+  -> IO
+      (Either LengthRankingInputError
+        (AssociatedLengthRanking
+          (PostVerificationCandidate epoch DetailedVerificationVariant)))
+rankPostVerificationLengthCandidatesWithPolicy
+    (LengthRankingPolicy execution evaluation) =
+  rankPostVerificationLengthCandidates execution evaluation
 
 -- | Run one complete candidate batch under the retained policy.
 --

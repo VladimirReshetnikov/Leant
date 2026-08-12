@@ -45,8 +45,10 @@ Executable leant
     Leant.Synth.Length.Configuration.File
     Leant.Synth.Length.Configuration.File.Acquire
     Leant.Synth.Length.Contract
+    Leant.Synth.Length.PostVerification
     Leant.Synth.Length.Ranking
     Leant.Synth.Observability
+    Leant.Synth.PostVerification
     Leant.Synth.ProviderCache
     Leant.Synth.Replay
     Leant.Synth.Render
@@ -87,8 +89,10 @@ Test-Suite leant-synth-tests
     Leant.Synth.Length.Configuration.File
     Leant.Synth.Length.Configuration.File.Acquire
     Leant.Synth.Length.Contract
+    Leant.Synth.Length.PostVerification
     Leant.Synth.Length.Ranking
     Leant.Synth.Observability
+    Leant.Synth.PostVerification
     Leant.Synth.ProviderCache
     Leant.Synth.Replay
     Leant.Synth.Render

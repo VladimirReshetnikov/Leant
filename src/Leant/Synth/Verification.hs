@@ -62,6 +62,8 @@ data VerificationBatch candidate = VerificationBatch
   LeantObservations
   deriving (Eq)
 
+type role VerificationBatch nominal
+
 -- Preserve the historical rendering of the private batch representation.
 -- The new receipt layer is observable only through its explicit projection.
 instance Show candidate => Show (VerificationBatch candidate) where
