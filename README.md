@@ -303,15 +303,17 @@ still projects through the compatible `Unassessed` assessment, but now also
 retains one bounded payload-free `LengthPreparationRefusalClass` with a fixed
 machine code. The exhaustive classifiers inspect only the outer refusal
 constructor: renderer text, source names, types, graph identities, and nested
-Djex errors are neither evaluated nor retained, and the class makes no
-behavioral-evidence claim. Any returned structured live session, query,
-association, or replay failure atomically restores every original candidate in
-original order as `Unassessed`, together with only a sanitized batch failure
-class, cleanup bit, and optional safe original index. Candidate-local pure
-preparation classes survive that fallback; candidates whose preparation
-succeeded have no invented refusal reason. Exceptions propagate instead of
-producing a ranking. Lifecycle and per-query budgets remain separate rather
-than pretending to be one batch deadline. Main and the REPL do not invoke this
+Djex errors are neither evaluated nor retained in the refusal diagnostic, and
+the class makes no behavioral-evidence claim. The exact verified receipt and
+its semantic sidecar remain attached to the candidate. Any returned structured
+live session, query, association, or replay failure atomically restores every
+original candidate in original order as `Unassessed`, together with only a
+sanitized batch failure class, cleanup bit, and optional safe original index.
+Candidate-local pure preparation classes survive that fallback; candidates
+whose preparation succeeded have no invented refusal reason. Exceptions
+propagate instead of producing a ranking. Lifecycle and per-query budgets
+remain separate rather than pretending to be one batch deadline. Main and the
+REPL do not invoke this
 foundation yet; no executable path, contract, or policy is inferred. The
 checkpoint is detailed in the
 [live Length ranking foundation report](docs/reports/2026-08-11-live-length-ranking-foundation.md).

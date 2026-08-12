@@ -34,10 +34,12 @@ assessment projection and records a separate
 payload-free, and each value has a fixed `lengthPreparationRefusalClassCode`.
 Its exhaustive handoff and query classifiers inspect only the already-known
 outer constructor; they do not evaluate or retain renderer text, source names,
-types, graph identities, or nested Djex errors. These classes identify only the
-phase that refused preparation. They are not behavioral evidence and do not
-affect ranking. A refusal does not prevent other eligible candidates from
-running. If no candidate is eligible, no live session is opened.
+types, graph identities, or nested Djex errors in the refusal diagnostic. The
+exact verified receipt and semantic sidecar remain attached to the candidate
+for association. These classes identify only the phase that refused
+preparation. They are not behavioral evidence and do not affect ranking. A
+refusal does not prevent other eligible candidates from running. If no
+candidate is eligible, no live session is opened.
 
 ## One scoped serial pass
 
@@ -83,8 +85,8 @@ carry no fabricated refusal class. The batch failure retains only Djex's
 public session/query class when applicable, an incomplete-cleanup Boolean, and
 a safe zero-based original input index when the failure belongs to one query.
 Exceptions propagate and return no ranking. No child bytes, symbols, values,
-paths, process details, candidate text, or private identities cross this
-boundary.
+paths, process details, candidate text, or private identities appear in the
+batch-failure payload.
 
 ## Budgets and integration boundary
 

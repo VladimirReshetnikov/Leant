@@ -120,7 +120,9 @@ data LengthRankingAssessment
 -- These classes are diagnostics only.  They are neither behavioral evidence
 -- nor ranking strength, and their derived order must not influence candidate
 -- selection.  Exact renderer text, source names, types, graph identities, and
--- nested Djex errors are deliberately discarded before a ranking is built.
+-- nested Djex errors are never copied from the raw refusal into this
+-- diagnostic.  The exact verified receipt and its sidecar remain attached to
+-- the ranked candidate for association.
 data LengthPreparationRefusalClass
   = LengthPreparationUnsupportedRoute
   | LengthPreparationTypedAuthorityUnavailable
