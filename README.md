@@ -304,9 +304,12 @@ of callback-verified candidates. It productively admits at most Djex's public
 64-query session bound, attempts every candidate handoff and seals every
 eligible canonical query before opening one lexical live session, and runs
 those queries serially in original order. `unsat`, `unknown`, and status-only
-`sat` are neutral; only a satisfiable model whose evidence replays again
-against the candidate's exact checked problem is stably moved behind the other
-candidates.
+`sat` are neutral; only a satisfiable model accepted by Djex's query-first live
+replay gate is stably moved behind the other candidates. That gate checks the
+exact canonical query fingerprint before inspecting optional evidence and
+replays any evidence against the behavioral problem retained by the query.
+The heavier checked handoff is therefore transient after query sealing;
+prepared live state retains only the exact verified receipt and sealed query.
 Nothing is pruned. A candidate-local handoff or query-construction refusal
 still projects through the compatible `Unassessed` assessment, but now also
 retains one bounded payload-free `LengthPreparationRefusalClass` with a fixed

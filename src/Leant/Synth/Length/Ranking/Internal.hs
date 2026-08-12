@@ -8,12 +8,13 @@
 -- queries run serially in original order inside one rank-N scope.
 --
 -- A solver status is heuristic only.  An optional counterexample is retained
--- only after the public live result has the exact query fingerprint and its
--- evidence replays again against the handoff's exact checked problem.  Even
--- that receipt is finite-spine and model-relative: it is neither a proof nor a
--- claim about the source-level realization of a Lean term.  Ranking therefore
--- never prunes.  It stably moves candidates with replayed counterexamples after
--- every other candidate and preserves source order within both partitions.
+-- only after Djex's public live replay gate checks the exact query fingerprint
+-- and replays its evidence against the behavioral problem retained by that
+-- query.  Even that receipt is finite-spine and model-relative: it is neither a
+-- proof nor a claim about the source-level realization of a Lean term.
+-- Ranking therefore never prunes.  It stably moves candidates with replayed
+-- counterexamples after every other candidate and preserves source order
+-- within both partitions.
 --
 -- The private opener/finalizer budgets and the execution policy's per-query
 -- host budget remain separate; this function promises no batch-wide hard
@@ -56,6 +57,7 @@ import Language.Haskell.Djex
   , LengthEvaluationLimits
   , LengthSMTLibExecutionConfig
   , LengthSMTLibQueryError (..)
+  , LengthSMTLibLiveObservationReplayError (..)
   , LengthSMTLibLiveQueryError
   , LengthSMTLibLiveQueryFailure
   , LengthSMTLibLiveQueryObservation
@@ -64,27 +66,20 @@ import Language.Haskell.Djex
   , LengthSMTLibLiveSessionFailure
   , SolverStatus
   , ValidatedLengthCounterexample
-  , checkedLengthProblemBehavioralProblem
   , defaultLengthSMTLibLiveSessionMaximumQueries
   , lengthSMTLibLiveQueryCleanupIncomplete
-  , lengthSMTLibLiveQueryObservationCounterexampleEvidence
-  , lengthSMTLibLiveQueryObservationQueryFingerprint
   , lengthSMTLibLiveQueryObservationSolverStatus
   , lengthSMTLibLiveQueryPrimaryFailure
   , lengthSMTLibLiveSessionCleanupIncomplete
   , lengthSMTLibLiveSessionPrimaryFailure
-  , lengthSMTLibQueryFingerprint
-  , replayBehavioralEvidence
+  , replayLengthSMTLibLiveQueryObservation
   , runLengthSMTLibLiveQuery
   , withLengthSMTLibLiveSession
   )
 
 import Leant.Synth.Engine
-  ( CheckedLengthHandoff
-  , DetailedVerificationVariant
+  ( DetailedVerificationVariant
   , LengthHandoffRefusal (..)
-  , checkedLengthHandoffProblem
-  , checkedLengthHandoffVerifiedVariant
   , prepareCheckedLengthHandoff
   )
 import Leant.Synth.Length.Adapter
@@ -311,15 +306,17 @@ data PreparedLengthCandidate association
   | PreparedLengthCandidateEligible
       !Natural
       !association
-      !CheckedLengthHandoff
+      !(Verified DetailedVerificationVariant)
       !CheckedLengthQuery
 
 -- | Rank one already Lean-callback-verified batch under an explicit behavioral
 -- contract and explicit live/evaluation policies.
 --
--- Input admission precedes all handoff work.  An empty admitted batch opens no
--- worker.  Every nonempty eligible batch uses exactly one live session and
--- executes its pre-sealed queries serially in original order.
+-- Input admission precedes all handoff work.  A successful handoff is
+-- transient: after it seals a query, prepared state retains only that exact
+-- verified receipt and query.  An empty admitted batch opens no worker. Every
+-- nonempty eligible batch uses exactly one live session and executes its
+-- pre-sealed queries serially in original order.
 rankVerifiedLengthCandidates
   :: LengthSMTLibExecutionConfig
   -> LengthEvaluationLimits
@@ -419,7 +416,7 @@ prepareCandidates contract verifiedFor = go 0 []
           index association verified
             $ lengthQueryPreparationRefusalClass refusal
         Right query -> PreparedLengthCandidateEligible
-          index association handoff query
+          index association verified query
 
 hasEligibleCandidate :: [PreparedLengthCandidate association] -> Bool
 hasEligibleCandidate = any isEligible
@@ -435,9 +432,8 @@ preparedCandidateUnassessed prepared = case prepared of
   PreparedLengthCandidateUnassessed index association verified refusal ->
     AssociatedRankedLengthCandidate
       index association verified $ LengthCandidatePreparationRefused refusal
-  PreparedLengthCandidateEligible index association handoff _ ->
-    AssociatedRankedLengthCandidate index association
-      (checkedLengthHandoffVerifiedVariant handoff)
+  PreparedLengthCandidateEligible index association verified _ ->
+    AssociatedRankedLengthCandidate index association verified
       $ LengthCandidateAssessed Unassessed
 
 runPreparedCandidates
@@ -456,44 +452,37 @@ runPreparedCandidates evaluation session = go []
       go (AssociatedRankedLengthCandidate
         index association verified
           (LengthCandidatePreparationRefused refusal) : reversed) rest
-    PreparedLengthCandidateEligible index association handoff query : rest -> do
+    PreparedLengthCandidateEligible
+        index association verified query : rest -> do
       observed <- runLengthSMTLibLiveQuery evaluation session query
       case observed of
         Left failure -> pure $ Left $ queryRankingFailure index failure
         Right observation -> case
-            assessCandidate index association handoff query observation of
+            assessCandidate index association verified query observation of
           Left failure -> pure $ Left failure
           Right assessed -> go (assessed : reversed) rest
 
 assessCandidate
   :: Natural
   -> association
-  -> CheckedLengthHandoff
+  -> Verified DetailedVerificationVariant
   -> CheckedLengthQuery
   -> LengthSMTLibLiveQueryObservation
       epoch ExferenceLocal ExferenceLocal
   -> Either LengthRankingFailure
       (AssociatedRankedLengthCandidate association)
-assessCandidate index association handoff query observation
-  | lengthSMTLibLiveQueryObservationQueryFingerprint observation /=
-      lengthSMTLibQueryFingerprint query =
-        Left $ localRankingFailure
-          LengthRankingQueryAssociationMismatch index
-  | otherwise = do
-      assessment <- case
-          lengthSMTLibLiveQueryObservationCounterexampleEvidence observation of
-        Nothing -> Right $ Heuristic
-          $ lengthSMTLibLiveQueryObservationSolverStatus observation
-        Just evidence -> case replayBehavioralEvidence
-            (checkedLengthProblemBehavioralProblem
-              $ checkedLengthHandoffProblem handoff)
-            evidence of
-          Left _ -> Left $ localRankingFailure
-            LengthRankingEvidenceReplayMismatch index
-          Right receipt -> Right $ Counterexample receipt
-      pure $ AssociatedRankedLengthCandidate index association
-        (checkedLengthHandoffVerifiedVariant handoff)
-        $ LengthCandidateAssessed assessment
+assessCandidate index association verified query observation = do
+  assessment <- case
+      replayLengthSMTLibLiveQueryObservation query observation of
+    Left LengthSMTLibLiveObservationQueryFingerprintMismatch ->
+      Left $ localRankingFailure LengthRankingQueryAssociationMismatch index
+    Left LengthSMTLibLiveObservationEvidenceProblemMismatch{} ->
+      Left $ localRankingFailure LengthRankingEvidenceReplayMismatch index
+    Right Nothing -> Right $ Heuristic
+      $ lengthSMTLibLiveQueryObservationSolverStatus observation
+    Right (Just receipt) -> Right $ Counterexample receipt
+  pure $ AssociatedRankedLengthCandidate index association verified
+    $ LengthCandidateAssessed assessment
 
 stableCounterexampleDemotion
   :: [AssociatedRankedLengthCandidate association]
@@ -517,8 +506,8 @@ unassessedRanking prepared failure = AssociatedLengthRanking
 
 -- Force the complete already-bounded fallback spine and each sanitized record
 -- before exposing the result.  A lazy 'map' would hide the same public values
--- but could retain checked handoffs and sealed query command bytes behind an
--- unevaluated tail after an early live failure.
+-- but could retain sealed queries, their checked problems, and command bytes
+-- behind an unevaluated tail after an early live failure.
 sanitizePreparedCandidates
   :: [PreparedLengthCandidate association]
   -> [AssociatedRankedLengthCandidate association]

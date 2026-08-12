@@ -57,12 +57,20 @@ All eligible queries run in original input order inside one lexical
 retains Djex's process, workspace, barriers, ordinals, transcripts, or private
 run identities.
 
-For each successful query, Leant checks that the observation carries the exact
-fingerprint of the already sealed query. Optional counterexample evidence is
-then replayed again against `checkedLengthHandoffProblem`'s exact behavioral
-problem. Only a successful second association replay releases the safe
+For each successful query, Leant calls Djex's
+`replayLengthSMTLibLiveQueryObservation`. The gate checks that the observation
+carries the exact fingerprint of the already sealed query before inspecting
+optional evidence, then replays that evidence against the exact behavioral
+problem retained by the query. Only a successful replay releases the safe
 `ValidatedLengthCounterexample` receipt into the assessment stored by the
 opaque ranked-candidate association.
+
+The checked handoff is transient during preparation. Once it has sealed a
+canonical query, each eligible prepared record retains only the exact verified
+callback receipt and that query. The query already owns the same behavioral
+problem, so retaining the renderer/session/family handoff solely for a second
+replay would duplicate authority and heap residency without strengthening
+query/evidence replay.
 
 The receipt remains finite-spine and model-relative, including any named
 provider-law assumptions. It is not a Lean source-level counterexample, an

@@ -73,10 +73,11 @@ restores indices `0..n-1` with the original all-`Unassessed` order.
 
 Before that public report exists, a package-private
 `AssociatedLengthRanking association` threads each caller-owned association
-through handoff preparation, query execution, evidence replay, stable
-counterexample partitioning, and atomic fallback. The post-verification
-adapter instantiates `association` with the current epoch's opaque occurrence
-handle. Its internal sealing core seals the reordered handles first and calls
+through transient handoff preparation, query execution, Djex's query-owned
+evidence replay, stable counterexample partitioning, and atomic fallback. The
+post-verification adapter instantiates `association` with the current epoch's
+opaque occurrence handle. Its internal sealing core seals the reordered handles
+first and calls
 the internal projector only on success, so an assessment is never detached and
 later reassociated by candidate equality or numeric lookup. The ordinary
 `Leant.Synth.Length.Ranking` facade exports neither associated types nor the
@@ -116,11 +117,11 @@ partial output.
 ## Behavioral authority
 
 The ordering policy is unchanged. A satisfiable model may demote a candidate
-only after Djex decodes bounded input values and independent Leant-side replay
-accepts the candidate-specific checked Length problem. Even that receipt is a
-finite-spine, model-relative counterexample conditional on the named provider
-laws. It is not a concrete Lean counterexample, solver certificate, or kernel
-proof.
+only after Djex decodes bounded input values and its query-owned replay gate,
+invoked by Leant, accepts the exact sealed query and candidate-specific checked
+Length problem. Even that receipt is a finite-spine, model-relative
+counterexample conditional on the named provider laws. It is not a concrete
+Lean counterexample, solver certificate, or kernel proof.
 
 Status-only `sat`, `unsat`, and `unknown` remain heuristic observations and do
 not change order. No result prunes a candidate. Any returned live session,
