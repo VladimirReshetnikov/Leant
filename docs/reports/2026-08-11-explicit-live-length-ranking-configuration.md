@@ -59,17 +59,16 @@ distinct contracts, but each eligible call still opens a fresh lexical live
 session. `rankVerifiedLengthCandidatesConfigured` only unwraps the compatible
 policy-plus-contract bundle and delegates to that same runner.
 
-For candidate presentation,
-`rankPostVerificationLengthCandidatesConfigured` unwraps the same opaque
-bundle while retaining the caller's batch-scoped occurrence handles. The
-only presentation-safe entry point is
-`assessVerifiedLengthCandidatesConfigured`: it uses the same private rank-2
-adapter as the separate policy/request-contract entry point, validates the
-exact complete occurrence permutation, and erases those associations only
-after the seal succeeds. The lower-level associated runner grants no sealed
-presentation result by itself. Callers therefore do not need a policy or
-contract projection to connect an explicitly activated version-1
-configuration to the safe presentation boundary.
+For candidate presentation, `assessVerifiedLengthCandidatesConfigured`
+unwraps the same opaque bundle while retaining the caller's batch-scoped
+occurrence handles. It uses the same package-private rank-2 adapter as the
+separate policy/request-contract entry point, validates the exact complete
+occurrence permutation, and erases those associations only after the seal
+succeeds. The lower-level associated runners and projector now live only in
+`Ranking.Internal` and `PostVerification.Internal`; the ordinary ranking and
+configuration facades cannot return an unsealed associated value. Callers
+therefore do not need a policy or contract projection to connect an explicitly
+activated version-1 configuration to the safe presentation boundary.
 
 Both paths preserve productive input admission, complete pre-sealing, serial
 query order, stable counterexample demotion, atomic all-`Unassessed` fallback,

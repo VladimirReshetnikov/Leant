@@ -415,11 +415,17 @@ manufactured, substituted, or reassociated candidate batch.
 
 `Leant.Synth.Length.PostVerification` is the first domain adapter for that
 boundary. The Length ranker now retains each receipt's safe original index;
-an internal associated ranking plan also threads each batch-scoped occurrence
-handle through preparation, live assessment, stable partitioning, and atomic
-fallback. The adapter runs one explicitly supplied `LengthRankingPolicy` and
-request-owned contract, seals the returned handle order against the exact
-input epoch, and only then erases handles into the ordinary ranking report.
+package-private `Ranking.Internal` and `PostVerification.Internal` modules
+thread each batch-scoped occurrence handle through preparation, live
+assessment, stable partitioning, atomic fallback, and the final seal. The
+ordinary `Ranking` facade exports neither the associated plan nor its
+projector, while the public configuration surface exports no associated
+runner and its post-verification assessment entry points return only sealed
+results. The deliberately retained association-free compatibility runners do
+not claim presentation authority. The adapter runs one explicitly supplied
+`LengthRankingPolicy` and request-owned contract, seals the returned handle
+order against the exact input epoch, and only then erases handles into the
+ordinary ranking report.
 Input or proposal failure preserves the original opaque verification batch,
 exposes no sealed output, and withholds the unsealed associated plan.
 Operational ranking failure already

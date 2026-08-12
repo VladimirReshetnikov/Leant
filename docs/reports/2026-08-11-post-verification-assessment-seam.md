@@ -71,13 +71,17 @@ opaque verified receipt and assessment. Stable counterexample demotion carries
 those indices through the reordered result, while atomic failure reconstruction
 restores indices `0..n-1` with the original all-`Unassessed` order.
 
-Before that public report exists, `AssociatedLengthRanking association`
-threads each caller-owned association through handoff preparation, query
-execution, evidence replay, stable counterexample partitioning, and atomic
-fallback. The post-verification adapter instantiates `association` with the
-current epoch's opaque occurrence handle. It seals the reordered handles first
-and calls `projectAssociatedLengthRanking` only on success, so an assessment is
-never detached and later reassociated by candidate equality or numeric lookup.
+Before that public report exists, a package-private
+`AssociatedLengthRanking association` threads each caller-owned association
+through handoff preparation, query execution, evidence replay, stable
+counterexample partitioning, and atomic fallback. The post-verification
+adapter instantiates `association` with the current epoch's opaque occurrence
+handle. Its internal sealing core seals the reordered handles first and calls
+the internal projector only on success, so an assessment is never detached and
+later reassociated by candidate equality or numeric lookup. The ordinary
+`Leant.Synth.Length.Ranking` facade exports neither associated types nor the
+projector, and `Configuration` exports only the two sealed assessment entry
+points rather than its lower-level associated runners.
 
 `assessVerifiedLengthCandidatesWithPolicy` requires an already sealed
 `LengthRankingPolicy`, one request-owned `LeanLengthContract`, and the exact
@@ -86,7 +90,7 @@ opaque verification input. The parallel
 policy-plus-contract compatibility bundle. Its configuration wrapper retains
 the same batch-scoped occurrence handles rather than falling back to the older
 association-free configured ranking projection. Both entry points share one
-private rank-2 adapter and the same sealing tail. Their private result is an
+private rank-2 adapter and the same sealing tail. Their opaque result is an
 accepted/rejected sum and exposes a `PostVerificationBatch` and `LengthRanking`
 only when permutation and receipt association sealing succeeded:
 

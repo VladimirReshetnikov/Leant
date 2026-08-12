@@ -16,20 +16,20 @@
 -- There is deliberately no default source, executable discovery, path
 -- normalization, environment lookup, or projection from the opaque sealed
 -- value.  Callers must provide the complete execution and replay policy plus
--- each contract explicitly.  Neither runner retains a worker: every eligible
+-- each contract explicitly.  No runner retains a worker: every eligible
 -- batch delegates to the rank-N live scope owned by
 -- 'rankVerifiedLengthCandidates'.
 module Leant.Synth.Length.Configuration
   ( LengthRankingPolicySource (..)
   , LengthRankingPolicy
   , mkLengthRankingPolicy
-  , rankPostVerificationLengthCandidatesWithPolicy
+  , assessVerifiedLengthCandidatesWithPolicy
   , rankVerifiedLengthCandidatesWithPolicy
   , LengthRankingConfigurationSource (..)
   , LengthRankingConfiguration
   , LengthRankingConfigurationError (..)
   , mkLengthRankingConfiguration
-  , rankPostVerificationLengthCandidatesConfigured
+  , assessVerifiedLengthCandidatesConfigured
   , rankVerifiedLengthCandidatesConfigured
   ) where
 
@@ -48,14 +48,23 @@ import Language.Haskell.Djex
 import Leant.Synth.Engine (DetailedVerificationVariant)
 import Leant.Synth.Length.Contract (LeanLengthContract)
 import Leant.Synth.Length.Ranking
-  ( AssociatedLengthRanking
-  , LengthRanking
+  ( LengthRanking
   , LengthRankingInputError
-  , rankPostVerificationLengthCandidates
   , rankVerifiedLengthCandidates
   )
+import Leant.Synth.Length.Ranking.Internal
+  ( AssociatedLengthRanking
+  , rankPostVerificationLengthCandidates
+  )
+import Leant.Synth.Length.PostVerification.Internal
+  ( LengthPostVerificationResult
+  , assessVerifiedLengthCandidatesWith
+  )
 import Leant.Synth.PostVerification (PostVerificationCandidate)
-import Leant.Synth.Verification (Verified)
+import Leant.Synth.Verification
+  ( VerificationBatch
+  , Verified
+  )
 
 -- | Reusable source policy for live solver ownership and independent replay.
 --
@@ -169,6 +178,18 @@ rankPostVerificationLengthCandidatesWithPolicy
     (LengthRankingPolicy execution evaluation) =
   rankPostVerificationLengthCandidates execution evaluation
 
+-- | Assess one exact callback batch with an explicit reusable policy and
+-- request-owned contract, then expose a report only through the generative
+-- occurrence-permutation seal.
+assessVerifiedLengthCandidatesWithPolicy
+  :: LengthRankingPolicy
+  -> LeanLengthContract
+  -> VerificationBatch DetailedVerificationVariant
+  -> IO LengthPostVerificationResult
+assessVerifiedLengthCandidatesWithPolicy policy contract =
+  assessVerifiedLengthCandidatesWith
+    $ rankPostVerificationLengthCandidatesWithPolicy policy contract
+
 -- | Preserve batch-scoped occurrence handles while running the compatible
 -- policy-plus-contract bundle.  This is the configured counterpart of
 -- 'rankPostVerificationLengthCandidatesWithPolicy'; a post-verification
@@ -184,6 +205,17 @@ rankPostVerificationLengthCandidatesConfigured
 rankPostVerificationLengthCandidatesConfigured
     (LengthRankingConfiguration policy contract) =
   rankPostVerificationLengthCandidatesWithPolicy policy contract
+
+-- | Assess one exact callback batch with the compatibility policy-plus-
+-- contract bundle.  The associated configured runner remains private here;
+-- only this sealed presentation result crosses the public facade.
+assessVerifiedLengthCandidatesConfigured
+  :: LengthRankingConfiguration
+  -> VerificationBatch DetailedVerificationVariant
+  -> IO LengthPostVerificationResult
+assessVerifiedLengthCandidatesConfigured configuration =
+  assessVerifiedLengthCandidatesWith
+    $ rankPostVerificationLengthCandidatesConfigured configuration
 
 -- | Run one complete candidate batch under the retained policy.
 --
