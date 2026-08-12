@@ -72,6 +72,13 @@ problem, so retaining the renderer/session/family handoff solely for a second
 replay would duplicate authority and heap residency without strengthening
 query/evidence replay.
 
+Djex likewise drops the private typed SMT plan after bounded rendering and
+structural fingerprint construction. The sealed query keeps only the checked
+problem, exact decoder-symbol order, canonical check/request bytes, and full
+query fingerprint needed by live execution and replay. The fingerprint's
+typed-plan field remains unchanged, so this heap reduction does not make
+rendered bytes the semantic source of truth or alter query identity.
+
 The handoff wrapper itself now contains only that sealed problem. Callback
 receipt and resolved family values are consumed while constructing it rather
 than being copied into the transient result; the ranking record owns the one
