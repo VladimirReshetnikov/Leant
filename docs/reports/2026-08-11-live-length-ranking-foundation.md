@@ -95,14 +95,26 @@ eleven-field identity slice. It owns no behavioral protocol schema, standalone
 fingerprint, or fingerprint budget. The Length wrapper still owns both Length
 schema tags, artifact and response policy, the sole fingerprint admission pass,
 and the complete reversible policy key.
-The raw process now consumes only that admitted launch profile. Its v2 identity
-binds the path observation, pin result, arguments, environment, working
-directory, deadline, limits, and launch flags it enforces, with no nested copy
-of the complete Length key. The scoped Session's v4 ready-worker identity binds
-one occurrence of that complete key beside the raw process observation.
-Ready-worker and transitive query-run identities therefore change and shrink;
-a tight custom identity-byte budget can newly admit the same policy. Leant's
-configuration API and activation boundary remain unchanged.
+The package-private `Internal.SMTLib.Z3.Process` runtime opens from that admitted
+launch profile and now owns the child, bounded executable observation, FIFO
+typed pipe events, cancellation/deadline control, and staged cleanup without
+importing Length semantics. One opaque process associates the schema-free
+observation slice with its exact limits; the generic owner chooses no domain
+identity root, schema tag, or fingerprint budget. The former Length
+`...Session.Process` module is now a compatibility and identity facade. It maps
+the closed generic phase/failure/cleanup vocabulary exhaustively and seals the
+same-process observation and limit fields under the existing raw-process v2
+root and limits-v1 wrapper.
+
+That v2 identity still binds the path observation, pin result, arguments,
+environment, working directory, deadline, limits, and launch flags it
+enforces, with no nested copy of the complete Length key. The scoped Session's
+v4 ready-worker identity still binds one occurrence of that complete key beside
+the raw process field. The earlier v2/v4 migration changed and shortened
+ready-worker and transitive query-run identities, allowing a tight custom
+identity-byte budget to newly admit the same policy. This later runtime/facade
+extraction leaves canonical raw-process, ready-worker, and query-run bytes
+unchanged. Leant's configuration API and activation boundary remain unchanged.
 
 The private protocol plan follows the same single-owner rule. Its unchanged
 complete fingerprint still binds the exact initial and optional value writes,
