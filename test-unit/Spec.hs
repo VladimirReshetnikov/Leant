@@ -253,6 +253,7 @@ import Leant.Synth.Length.PostVerification
   , lengthPostVerificationAdapterFailure
   , lengthPostVerificationCandidates
   , lengthPostVerificationRanking
+  , lengthPostVerificationRankingFailure
   , lengthPostVerificationSealedBatch
   )
 import Leant.Synth.Length.Ranking
@@ -4200,6 +4201,7 @@ assertLengthPostVerificationAdapter = do
             (maximumCandidates + 1))
     assertBool "input rejection retained an impossible ranking report"
       $ isNothing $ lengthPostVerificationRanking rejected
+    lengthPostVerificationRankingFailure rejected @?= Nothing
     assertBool "rejected input masqueraded as a sealed candidate batch"
       $ isNothing $ lengthPostVerificationSealedBatch rejected
     lengthPostVerificationCandidates rejected @?=
@@ -4221,6 +4223,7 @@ assertLengthPostVerificationAdapter = do
             (maximumCandidates + 1))
     assertBool "configured input rejection retained an impossible ranking"
       $ isNothing $ lengthPostVerificationRanking configuredRejected
+    lengthPostVerificationRankingFailure configuredRejected @?= Nothing
     assertBool "configured input rejection masqueraded as a sealed batch"
       $ isNothing $ lengthPostVerificationSealedBatch configuredRejected
     length (lengthPostVerificationCandidates configuredRejected) @?=
@@ -4233,6 +4236,8 @@ assertLengthPostVerificationAdapter = do
     lengthPostVerificationCandidates demotion @?= demotionExpected
     assertLengthPostVerificationSealed demotion
     demotionRanking <- expectLengthPostVerificationRanking demotion
+    demotionRankingAgain <- expectLengthPostVerificationRanking demotion
+    assertLengthRankingsEquivalent demotionRanking demotionRankingAgain
     map rankedLengthCandidateOriginalIndex
         (lengthRankingCandidates demotionRanking) @?=
       [1, 3, 0, 2]
@@ -4360,6 +4365,8 @@ assertLengthPostVerificationSealed result = case
     let sealed = postVerificationBatchCandidates batch
     sealed @?= lengthPostVerificationCandidates result
     ranking <- expectLengthPostVerificationRanking result
+    lengthPostVerificationRankingFailure result @?=
+      lengthRankingFailure ranking
     rankedLengthVerifiedCandidates ranking @?= sealed
 
 assertLengthCounterexampleReceipt

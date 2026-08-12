@@ -198,8 +198,11 @@ Preparation returns only the sealed problem. Callback receipt and resolved
 family values are consumed before that result rather than being copied into a
 transient wrapper; the ranking association is the only receipt-bearing slot
 retained for occurrence-preserving presentation. The fixed post-verification
-erasure materializes the association-free public ranked receipt only after the
-permutation seal. The fused adapter preserves the
+seal then becomes the accepted result's sole verified-receipt owner beside an
+eager receipt-free index/assessment/failure summary. The fixed compatibility
+projection materializes the association-free public ranked receipt from those
+two associated values without caching a second receipt list in the accepted
+result. The fused adapter preserves the
 handoff-before-query refusal boundary with nested closed results rather than
 another runtime authority type.
 

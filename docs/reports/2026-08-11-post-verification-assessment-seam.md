@@ -78,8 +78,12 @@ post-verification adapter instantiates `association` with the current epoch's
 opaque occurrence handle, which is the only receipt-bearing field in transient
 ranking state throughout those phases. Preparation may inspect the receipt
 through that handle, but retains no parallel detached copy. The internal
-sealing core seals the reordered handles first and calls the fixed
-association-free report erasure only on success, so an assessment is never
+sealing core seals the reordered handles first and retains the resulting
+opaque `PostVerificationBatch` as the accepted result's sole verified-receipt
+owner. Only original indices, assessment state, and the optional sanitized
+failure survive in its separately eager bounded summary. The established
+receipt-bearing `LengthRanking` is materialized on projection by one fixed
+exact-length traversal of that batch and summary, so an assessment is never
 detached and later reassociated by candidate equality, numeric lookup, or a
 caller-supplied projection. The ordinary
 `Leant.Synth.Length.Ranking` facade exports neither associated types nor the
@@ -94,15 +98,17 @@ policy-plus-contract compatibility bundle. Its configuration wrapper retains
 the same batch-scoped occurrence handles rather than falling back to the older
 association-free configured ranking projection. Both entry points share one
 private rank-2 adapter and the same sealing tail. Their opaque result is an
-accepted/rejected sum and exposes a `PostVerificationBatch` and `LengthRanking`
-only when permutation and receipt association sealing succeeded:
+accepted/rejected sum. Only when permutation and receipt association sealing
+succeeds does it retain a `PostVerificationBatch` and expose the corresponding
+materialized `LengthRanking` compatibility view:
 
 - productive ranking-input rejection preserves the original opaque callback
   batch, reports a sanitized adapter input failure, and has neither a ranking
   report nor a sealed batch;
-- a completed ranking is retained in full and its original-index order is
-  still coupled to its batch-scoped handle, then sealed against the exact input
-  epoch under Djex's public 64-query maximum and deliberately erased;
+- a completed associated ranking keeps its original-index order coupled to its
+  batch-scoped handle, then seals against the exact input epoch under Djex's
+  public 64-query maximum; the accepted result retains the sealed batch and a
+  receipt-free summary rather than a second receipt-bearing report;
 - an impossible malformed proposal preserves the original opaque callback
   batch, reports a sanitized proposal failure, and exposes neither the suspect
   ranking nor a sealed batch;

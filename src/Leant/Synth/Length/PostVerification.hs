@@ -11,6 +11,7 @@ module Leant.Synth.Length.PostVerification
   , lengthPostVerificationSealedBatch
   , lengthPostVerificationAdapterFailure
   , lengthPostVerificationRanking
+  , lengthPostVerificationRankingFailure
   , assessVerifiedLengthCandidatesConfigured
   , assessVerifiedLengthCandidatesWithPolicy
   ) where
@@ -25,5 +26,6 @@ import Leant.Synth.Length.PostVerification.Internal
   , lengthPostVerificationAdapterFailure
   , lengthPostVerificationCandidates
   , lengthPostVerificationRanking
+  , lengthPostVerificationRankingFailure
   , lengthPostVerificationSealedBatch
   )

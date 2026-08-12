@@ -44,7 +44,11 @@ module Leant.Synth.Length.Ranking.Internal
   , associatedRankedLengthCandidateAssociation
   , AssociatedLengthRanking
   , associatedLengthRankingCandidates
-  , projectPostVerificationLengthRanking
+  , PostVerificationLengthRanking
+  , sealPostVerificationLengthRanking
+  , postVerificationLengthRankingBatch
+  , postVerificationLengthRankingFailure
+  , materializePostVerificationLengthRanking
   , rankPostVerificationLengthCandidates
   , rankVerifiedLengthCandidates
   ) where
@@ -85,8 +89,13 @@ import Leant.Synth.Length.Adapter
 import Leant.Synth.Length.Contract (LeanLengthContract)
 import Leant.Synth.Length.Handoff (LengthHandoffRefusal (..))
 import Leant.Synth.PostVerification
-  ( PostVerificationCandidate
+  ( PostVerificationBatch
+  , PostVerificationCandidate
+  , PostVerificationError
+  , PostVerificationInput
+  , postVerificationBatchCandidates
   , postVerificationCandidateVerified
+  , sealPostVerificationBatch
   )
 import Leant.Synth.Verification (Verified)
 
@@ -303,15 +312,86 @@ projectAssociatedLengthRankingWith verifiedFor
       in projected `seq`
           projectCandidates (projected : reversed) rest
 
--- | Fixed erasure for an already sealed post-verification proposal.  The
--- adapter validates the occurrence-handle permutation before calling this
--- function, so it cannot choose a different receipt projection at that edge.
-projectPostVerificationLengthRanking
-  :: AssociatedLengthRanking
+-- | One exact sealed permutation and its receipt-free compatibility state.
+-- The opaque value stores verified receipts only through the sealed batch.
+-- Its already bounded summary spine is materialized eagerly so no erased
+-- epoch handle can survive behind an accepted post-verification result.
+data PostVerificationLengthRanking = PostVerificationLengthRanking
+    !(PostVerificationBatch DetailedVerificationVariant)
+    ![PostVerificationRankedCandidateSummary]
+    !(Maybe LengthRankingFailure)
+
+data PostVerificationRankedCandidateSummary =
+  PostVerificationRankedCandidateSummary
+    !Natural
+    !LengthCandidateAssessment
+
+-- | Seal one associated proposal and retain its receipt-free compatibility
+-- state in the same fixed operation.  No package caller can pair a summary
+-- with an independently sourced same-cardinality batch.  Receipt weak-head
+-- demand deliberately matches the old complete-report projection even though
+-- the values are now retained only by the sealed 'PostVerificationBatch'.
+sealPostVerificationLengthRanking
+  :: Natural
+  -> PostVerificationInput epoch DetailedVerificationVariant
+  -> AssociatedLengthRanking
       (PostVerificationCandidate epoch DetailedVerificationVariant)
+  -> Either PostVerificationError PostVerificationLengthRanking
+sealPostVerificationLengthRanking maximumCandidates input associated = do
+  batch <- sealPostVerificationBatch maximumCandidates input
+    $ map associatedRankedLengthCandidateAssociation
+    $ associatedLengthRankingCandidates associated
+  pure $ retain batch associated
+ where
+  retain batch (AssociatedLengthRanking candidates failure) =
+    PostVerificationLengthRanking batch
+      (projectCandidates [] candidates) failure
+
+  projectCandidates reversed remaining = case remaining of
+    [] -> reverse reversed
+    AssociatedRankedLengthCandidate index association state : rest ->
+      let verified = postVerificationCandidateVerified association
+          projected = PostVerificationRankedCandidateSummary index state
+      in verified `seq` projected `seq`
+          projectCandidates (projected : reversed) rest
+
+postVerificationLengthRankingBatch
+  :: PostVerificationLengthRanking
+  -> PostVerificationBatch DetailedVerificationVariant
+postVerificationLengthRankingBatch
+    (PostVerificationLengthRanking batch _ _) = batch
+
+postVerificationLengthRankingFailure
+  :: PostVerificationLengthRanking
+  -> Maybe LengthRankingFailure
+postVerificationLengthRankingFailure
+    (PostVerificationLengthRanking _ _ failure) = failure
+
+-- | Materialize the established association-free compatibility report from
+-- the sole retained receipt owner and its receipt-free summary.  Both inputs
+-- are package-private products of the same successful seal.  A cardinality
+-- mismatch therefore denotes an internal invariant violation rather than a
+-- caller-controlled ranking failure.
+materializePostVerificationLengthRanking
+  :: PostVerificationLengthRanking
   -> LengthRanking
-projectPostVerificationLengthRanking = projectAssociatedLengthRankingWith
-  postVerificationCandidateVerified
+materializePostVerificationLengthRanking
+    (PostVerificationLengthRanking batch summaries failure) =
+  LengthRanking
+    (materializeCandidates []
+      (postVerificationBatchCandidates batch) summaries)
+    failure
+ where
+  materializeCandidates reversed verifiedRemaining summaryRemaining =
+    case (verifiedRemaining, summaryRemaining) of
+      ([], []) -> reverse reversed
+      (verified : verifiedRest,
+          PostVerificationRankedCandidateSummary index state : summaryRest) ->
+        let projected = RankedLengthCandidate index verified state
+        in projected `seq` materializeCandidates
+            (projected : reversed) verifiedRest summaryRest
+      _ -> error
+        "sealed post-verification ranking summary cardinality changed"
 
 data PreparedLengthCandidate association
   = PreparedLengthCandidateUnassessed

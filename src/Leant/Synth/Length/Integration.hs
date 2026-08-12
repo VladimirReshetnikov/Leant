@@ -46,12 +46,9 @@ import Leant.Synth.Length.PostVerification
   , assessVerifiedLengthCandidatesConfigured
   , lengthPostVerificationAdapterFailure
   , lengthPostVerificationCandidates
-  , lengthPostVerificationRanking
+  , lengthPostVerificationRankingFailure
   )
-import Leant.Synth.Length.Ranking
-  ( LengthRankingFailure
-  , lengthRankingFailure
-  )
+import Leant.Synth.Length.Ranking (LengthRankingFailure)
 import Leant.Synth.PostVerification
   ( skipPostVerificationAssessment )
 import Leant.Synth.Verification
@@ -171,6 +168,6 @@ lengthAssessmentFailure result = case result of
   LengthAssessmentCompleted assessed -> case
       lengthPostVerificationAdapterFailure assessed of
     Just failure -> Just $ LengthAssessmentPostVerificationFailed failure
-    Nothing -> case lengthPostVerificationRanking assessed >>= lengthRankingFailure of
+    Nothing -> case lengthPostVerificationRankingFailure assessed of
       Nothing -> Nothing
       Just failure -> Just $ LengthAssessmentRankingFailed failure

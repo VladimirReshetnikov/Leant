@@ -370,8 +370,10 @@ runtime handoff wrapper, second callback receipt, or retained family binding.
 Prepared live state retains only the caller-owned receipt association and
 sealed query. The direct compatibility path uses the verified receipt itself
 as that association; the presentation-safe path uses the batch-scoped
-occurrence handle without a parallel detached receipt. It erases that handle
-into the public ranked receipt only after the permutation seal.
+occurrence handle without a parallel detached receipt. After the permutation
+seal, the accepted result retains the sealed batch as its sole receipt owner
+beside an eager receipt-free ranking summary; the public ranked receipts are
+materialized from those associated values only when requested.
 Nothing is pruned. A candidate-local handoff or query-construction refusal
 still projects through the compatible `Unassessed` assessment, but now also
 retains one bounded payload-free `LengthPreparationRefusalClass` with a fixed
@@ -509,9 +511,13 @@ runner and its post-verification assessment entry points return only sealed
 results. The deliberately retained association-free compatibility runners do
 not claim presentation authority. The adapter runs one explicitly supplied
 `LengthRankingPolicy` and contract, seals the returned handle order against the
-exact input epoch, and only then erases handles into the ordinary ranking
-report. Policy callers may supply a request-owned contract; the version-1 CLI
-bundle intentionally fixes its decoded contract at startup.
+exact input epoch, then retains that opaque batch as the accepted result's sole
+verified-receipt owner. A bounded eager summary keeps only original indices,
+assessment state, and the optional sanitized failure; the ordinary
+receipt-bearing `LengthRanking` is materialized as a compatibility view from
+that batch and summary only when projected. Policy callers may supply a
+request-owned contract; the version-1 CLI bundle intentionally fixes its
+decoded contract at startup.
 Input or proposal failure preserves the original opaque verification batch,
 exposes no sealed output, and withholds the unsealed associated plan.
 Operational ranking failure already
