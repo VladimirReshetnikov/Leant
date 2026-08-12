@@ -30,7 +30,6 @@ module Leant.Synth.Length.Configuration.File
 import Data.ByteString (ByteString)
 import Data.Char (ord)
 import Data.List (find)
-import Data.Maybe (isJust)
 import qualified Data.Text as Text
 import Data.Text (Text)
 import Data.Word (Word8)
@@ -50,6 +49,7 @@ import Language.Haskell.Djex
   , LengthSMTLibExecutionConfigSource (..)
   , LengthSMTLibExecutionLimitSource (..)
   , LengthSMTLibExecutionLimits
+  , LengthSMTLibExecutableDigestExpectation (..)
   , LengthSMTLibResponseLimitError
   , LengthSMTLibResponseLimitSource (..)
   , LengthSMTLibResponseLimits
@@ -74,6 +74,7 @@ import Leant.Synth.Length.Configuration
   ( LengthRankingConfiguration
   , LengthRankingConfigurationError
   , LengthRankingConfigurationSource (..)
+  , lengthRankingConfigurationExecutableDigestExpectation
   , mkLengthRankingConfiguration
   )
 
@@ -228,10 +229,12 @@ data LengthRankingConfigurationFileError
   deriving (Eq, Ord, Show)
 
 -- | A fully decoded and sealed policy which still grants no permission to run.
--- The Boolean records only whether the sealed source supplied an exact digest
--- expectation; the path and digest themselves remain inside the opaque policy.
+-- Its opaque execution policy is the sole owner of any executable digest
+-- expectation; no second source-derived activation flag is retained.
+-- The strict field preserves the existing disabled wrapper's demand on the
+-- already-sealed configuration without forcing its deliberately lazy contract.
 data DisabledLengthRankingConfiguration =
-  DisabledLengthRankingConfiguration !Bool !LengthRankingConfiguration
+  DisabledLengthRankingConfiguration !LengthRankingConfiguration
 
 data LengthRankingConfigurationActivationPolicy
   = RequirePinnedExecutable
@@ -243,8 +246,9 @@ data LengthRankingConfigurationActivationError
   deriving (Bounded, Enum, Eq, Ord, Show)
 
 -- | Explicitly activate a decoded policy.  Requiring a pin fails closed when
--- the file supplied @null@; permitting an unpinned executable is a distinct,
--- visible caller decision rather than a decoder default.
+-- the sealed execution policy classifies its digest expectation as absent;
+-- permitting an unpinned executable is a distinct, visible caller decision
+-- rather than a decoder default.
 activateLengthRankingConfiguration
   :: LengthRankingConfigurationActivationPolicy
   -> DisabledLengthRankingConfiguration
@@ -252,10 +256,13 @@ activateLengthRankingConfiguration
       LengthRankingConfigurationActivationError
       LengthRankingConfiguration
 activateLengthRankingConfiguration policy
-    (DisabledLengthRankingConfiguration pinned configuration) = case policy of
-  RequirePinnedExecutable
-    | not pinned -> Left LengthRankingConfigurationExecutablePinRequired
-  _ -> Right configuration
+    (DisabledLengthRankingConfiguration configuration) = case policy of
+  RequirePinnedExecutable ->
+    case lengthRankingConfigurationExecutableDigestExpectation configuration of
+      LengthSMTLibExecutableDigestExpectationAbsent ->
+        Left LengthRankingConfigurationExecutablePinRequired
+      LengthSMTLibExecutableDigestExpectationPresent -> Right configuration
+  PermitUnpinnedExecutable -> Right configuration
 
 decodeLengthRankingConfigurationFile
   :: ByteString
@@ -296,7 +303,7 @@ decodeLengthRankingConfigurationFile bytes = do
     LengthRankingConfigurationExecutionField
     "execution"
     root
-  (executionSource, pinned) <- decodeExecution executionLimits executionValue
+  executionSource <- decodeExecution executionLimits executionValue
   evaluationValue <- requiredField
     LengthRankingConfigurationRootObject
     LengthRankingConfigurationEvaluationField
@@ -318,7 +325,7 @@ decodeLengthRankingConfigurationFile bytes = do
   configuration <- either
     (Left . LengthRankingConfigurationAssemblyRejected) Right
     $ mkLengthRankingConfiguration source
-  pure $ DisabledLengthRankingConfiguration pinned configuration
+  pure $ DisabledLengthRankingConfiguration configuration
 
 rootFields :: [(Text, LengthRankingConfigurationFileField)]
 rootFields =
@@ -500,7 +507,7 @@ decodeExecution
   -> BoundedJsonValue
   -> Either
       LengthRankingConfigurationFileError
-      (LengthSMTLibExecutionConfigSource, Bool)
+      LengthSMTLibExecutionConfigSource
 decodeExecution limits value = do
   object <- exactObject LengthRankingConfigurationExecutionObject
     executionFields value
@@ -572,7 +579,7 @@ decodeExecution limits value = do
         }
   case mkLengthSMTLibExecutionConfig limits source of
     Left failure -> Left $ LengthRankingConfigurationExecutionRejected failure
-    Right _ -> Right (source, isJust expectedDigest)
+    Right _ -> Right source
 
 executionFields :: [(Text, LengthRankingConfigurationFileField)]
 executionFields =

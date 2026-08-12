@@ -341,8 +341,10 @@ limits), and replay limits. A `LeanLengthContract` is supplied separately to
 each `rankVerifiedLengthCandidatesWithPolicy` call, so a request assertion no
 longer has to share the lifetime of reusable process policy. Execution
 validation precedes replay-limit validation. The sealed policy is opaque, has
-no path or pin projection, and retains no worker; the explicit contract remains
-a passive assertion. Every eligible call still opens a fresh lexical session.
+no path or digest-byte projection, and retains no worker; a closed classifier
+reveals only whether its execution policy contains a digest expectation. The
+explicit contract remains a passive assertion. Every eligible call still
+opens a fresh lexical session.
 
 The version-1 file format remains compatible through
 `LengthRankingConfiguration`, which bundles one validated policy with its
@@ -370,9 +372,12 @@ candidate type, contract, provider, literal, or fingerprint authority. A
 successful decode returns an opaque *disabled*
 configuration. The caller must then explicitly require a pinned executable or
 explicitly permit an unpinned one before obtaining the already opaque runnable
-configuration. Neither choice runs Z3 or grants proof, solver-status, or
-contract authority. There is no file loader, automatic path, environment or
-executable discovery, Main/REPL wiring, or autoload behavior, and the parser's
+configuration. Activation derives that absent/present decision from the sealed
+Djex execution policy itself; the decoder retains no second JSON-derived pin
+Boolean which could drift from the policy. Neither choice runs Z3 or grants
+proof, solver-status, or contract authority. There is no file loader,
+automatic path, environment or executable discovery, Main/REPL wiring, or
+autoload behavior, and the parser's
 256-KiB post-acquisition check does not replace a future loader's obligation to
 acquire bytes with the same bound. The optional digest remains only a
 pre-spawn executable-file snapshot expectation, not executed-image

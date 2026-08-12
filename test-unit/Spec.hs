@@ -184,6 +184,7 @@ import Leant.Synth.Length.Configuration
   , LengthRankingPolicySource (..)
   , mkLengthRankingConfiguration
   , mkLengthRankingPolicy
+  , lengthRankingConfigurationExecutableDigestExpectation
   , rankVerifiedLengthCandidatesConfigured
   , rankVerifiedLengthCandidatesWithPolicy
   )
@@ -3393,7 +3394,20 @@ assertLengthRankingPolicyContractSeparation = do
           (explicitLengthRankingExecutionSource executable Nothing
             Djex.LengthSMTLibStatusOnly)
           Djex.defaultLengthEvaluationLimitSource
+        sealedConfiguration digest = mkLengthRankingConfiguration
+          $ explicitLengthRankingConfigurationSource
+              Djex.defaultLengthSMTLibExecutionLimits
+              (explicitLengthRankingExecutionSource executable digest
+                Djex.LengthSMTLibStatusOnly)
+              Djex.defaultLengthEvaluationLimitSource
+              (error "digest expectation classification forced the contract")
     policy <- expectRight $ mkLengthRankingPolicy policySource
+    unpinned <- expectRight $ sealedConfiguration Nothing
+    pinned <- expectRight $ sealedConfiguration $ Just $ replicate 32 0
+    lengthRankingConfigurationExecutableDigestExpectation unpinned @?=
+      Djex.LengthSMTLibExecutableDigestExpectationAbsent
+    lengthRankingConfigurationExecutableDigestExpectation pinned @?=
+      Djex.LengthSMTLibExecutableDigestExpectationPresent
     first <- expectLengthRankingWithin "first request-owned contract"
       $ rankVerifiedLengthCandidatesWithPolicy policy
           (lengthRankingContract 0) candidates

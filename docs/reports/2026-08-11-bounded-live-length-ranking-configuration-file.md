@@ -18,6 +18,11 @@ checkpoint adds no file loader, default path, executable discovery, path
 normalization, environment lookup, Main command, REPL command, autoload rule,
 or solver launch.
 
+The disabled wrapper retains only the completed opaque configuration. It does
+not copy a Boolean from the raw JSON digest field. Later activation derives
+digest-expectation presence from the sealed Djex execution policy, so the
+activation decision cannot drift from the policy it releases.
+
 A document has this exact version-1 object shape (the concrete values are an
 illustration, not defaults selected by Leant):
 
@@ -251,9 +256,12 @@ choice with `activateLengthRankingConfiguration`:
 
 The disabled value exposes only that activation operation; it does not expose
 the retained path, digest, contract, or policy. Requiring a pin fails closed
-for `null`. Permitting an unpinned executable is a caller decision, never a
-decoder fallback. Activation itself remains pure and does not inspect the
-filesystem or start a worker.
+for the sealed policy's absent classification. Permitting an unpinned
+executable is a caller decision, never a decoder fallback. Activation itself
+remains pure, does not inspect digest bytes, the contract, or the filesystem,
+and does not start a worker. The present classification says only that the
+policy retained an expectation; it does not say that a live executable matched
+it.
 
 Even a non-null digest is only an expectation for Djex's later pre-spawn
 SHA-256 observation of the executable file. It is not attestation of the image

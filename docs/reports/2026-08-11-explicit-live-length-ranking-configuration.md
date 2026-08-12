@@ -42,13 +42,16 @@ origin, provider assumptions, and checked problem. A successful configuration
 therefore grants no solver, contract, or candidate authority.
 
 Both the sealed policy and compatibility configuration are opaque and have no
-path, digest, execution-policy, replay-policy, or contract projection. Neither
-has an `Eq`, `Show`, or `Generic` instance or can contain a process, live
-session, or reusable worker. The optional digest is compared by Djex with its
-pre-spawn executable-file
-observation before launch. It is not executed-image attestation: portable direct
-spawn cannot execute the descriptor that was hashed, and the loader and shared
-libraries are outside that observation.
+path, digest-byte, execution-policy, replay-policy, or contract projection.
+The compatibility configuration exposes only a closed absent/present
+classification of the digest expectation already retained by its sealed Djex
+execution policy. That classification cannot recover the expected bytes or
+path and makes no claim about a later match. Neither opaque value has an `Eq`,
+`Show`, or `Generic` instance or can contain a process, live session, or
+reusable worker. The optional digest is compared by Djex with its pre-spawn
+executable-file observation before launch. It is not executed-image
+attestation: portable direct spawn cannot execute the descriptor that was
+hashed, and the loader and shared libraries are outside that observation.
 
 ## Configured runner and budgets
 

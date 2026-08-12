@@ -14,10 +14,12 @@
 -- until checked with each exact callback-verified candidate.
 --
 -- There is deliberately no default source, executable discovery, path
--- normalization, environment lookup, or projection from the opaque sealed
--- value.  Callers must provide the complete execution and replay policy plus
--- each contract explicitly.  No runner retains a worker: every eligible
--- batch delegates to the rank-N live scope owned by
+-- normalization, environment lookup, or projection of executable paths or
+-- digest bytes from the opaque sealed value.  A closed classifier reports
+-- only whether the retained execution policy contains a digest expectation.
+-- Callers must provide the complete execution and replay policy plus each
+-- contract explicitly.  No runner retains a worker: every eligible batch
+-- delegates to the rank-N live scope owned by
 -- 'rankVerifiedLengthCandidates'.
 module Leant.Synth.Length.Configuration
   ( LengthRankingPolicySource (..)
@@ -29,6 +31,7 @@ module Leant.Synth.Length.Configuration
   , LengthRankingConfiguration
   , LengthRankingConfigurationError (..)
   , mkLengthRankingConfiguration
+  , lengthRankingConfigurationExecutableDigestExpectation
   , assessVerifiedLengthCandidatesConfigured
   , rankVerifiedLengthCandidatesConfigured
   ) where
@@ -41,6 +44,8 @@ import Language.Haskell.Djex
   , LengthSMTLibExecutionConfigError
   , LengthSMTLibExecutionConfigSource
   , LengthSMTLibExecutionLimits
+  , LengthSMTLibExecutableDigestExpectation
+  , lengthSMTLibExecutionExecutableDigestExpectation
   , mkLengthEvaluationLimits
   , mkLengthSMTLibExecutionConfig
   )
@@ -151,6 +156,17 @@ mkLengthRankingConfiguration source = do
     }
   pure $ LengthRankingConfiguration policy
     $ lengthRankingConfigurationContract source
+
+-- | Classify only whether the sealed execution policy contains an executable
+-- digest expectation.  This reveals neither the digest bytes nor the path and
+-- does not claim that a later live executable matches the expectation.  The
+-- request-owned contract remains lazy and is not inspected.
+lengthRankingConfigurationExecutableDigestExpectation
+  :: LengthRankingConfiguration
+  -> LengthSMTLibExecutableDigestExpectation
+lengthRankingConfigurationExecutableDigestExpectation
+    (LengthRankingConfiguration (LengthRankingPolicy execution _) _) =
+  lengthSMTLibExecutionExecutableDigestExpectation execution
 
 -- | Run a verified batch under one reusable policy and one explicitly supplied
 -- request contract.  Every eligible call still owns a fresh lexical worker.
