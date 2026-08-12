@@ -86,6 +86,19 @@ already bounded and structurally fingerprinted during sealing. The
 fingerprint's typed-plan field remains unchanged, so this heap reduction does
 not make rendered bytes the semantic source of truth or alter query identity.
 
+Below the public Length execution policy, Djex now admits reusable launch facts
+once into a package-private pure Z3 profile. That profile owns the bounded path,
+optional digest expectation, timeout, resource limit, host deadline, the
+controls which determine configured arguments, startup and reset bytes, empty
+environment, fresh-working-directory policy, and the established flat
+eleven-field identity slice. It owns no behavioral protocol schema, standalone
+fingerprint, or fingerprint budget. The Length wrapper still owns both Length
+schema tags, artifact and response policy, the sole fingerprint admission pass,
+and the complete reversible policy key.
+The live process still binds that complete Length key together with its
+pre-spawn file observation and launch facts; Leant's configuration API and
+activation boundary remain unchanged.
+
 The private protocol plan follows the same single-owner rule. Its unchanged
 complete fingerprint still binds the exact initial and optional value writes,
 but the plan retains only the sealed query and positional sentinels needed to

@@ -393,17 +393,19 @@ detailed in the
 [live Length ranking foundation report](docs/reports/2026-08-11-live-length-ranking-foundation.md).
 
 `Leant.Synth.Length.Configuration` seals that call boundary without choosing
-any policy for the user. `LengthRankingPolicy` retains only
-execution admission, the complete execution source (absolute Z3 path, optional
-SHA-256 expectation, solver/host budgets, artifact policy, and response
-limits), and replay limits. A `LeanLengthContract` is supplied separately to
-each `rankVerifiedLengthCandidatesWithPolicy` call, so a request assertion no
-longer has to share the lifetime of reusable process policy. Execution
-validation precedes replay-limit validation. The sealed policy is opaque, has
-no path or digest-byte projection, and retains no worker; a closed classifier
-reveals only whether its execution policy contains a digest expectation. The
-explicit contract remains a passive assertion. Every eligible call still
-opens a fresh lexical session.
+any policy for the user. `LengthRankingPolicySource` carries the execution
+admission, complete execution source (absolute Z3 path, optional SHA-256
+expectation, solver/host budgets, artifact policy, and response limits), and
+replay-limit source. After validation, `LengthRankingPolicy` retains only the
+opaque sealed Djex execution configuration and evaluation limits. A
+`LeanLengthContract` is supplied separately to each
+`rankVerifiedLengthCandidatesWithPolicy` call, so a request assertion no longer
+has to share the lifetime of reusable process policy. Execution validation
+precedes replay-limit validation. The sealed policy is opaque, has no path or
+digest-byte projection, and retains no worker; a closed classifier reveals only
+whether its execution policy contains a digest expectation. The explicit
+contract remains a passive assertion. Every eligible call still opens a fresh
+lexical session.
 
 The version-1 file format remains compatible through
 `LengthRankingConfiguration`, which bundles one validated policy with its
