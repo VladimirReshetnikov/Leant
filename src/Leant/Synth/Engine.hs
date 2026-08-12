@@ -2,8 +2,9 @@
 -- SYNTHESIS_PROPOSAL.md): fragment goal in, candidate batch out.  This is
 -- the module that owns Djex translation and search; the engine behind the
 -- boundary (today: Djinn's LJT search, in-process) is swappable without
--- touching the REPL layer.  "Leant.Synth.Length.Adapter" is the separate
--- narrow consumer of the exact checked problem projected below.
+-- touching the REPL layer. "Leant.Synth.Length.Handoff" separately consumes
+-- the retained provenance to seal a checked domain problem; the engine itself
+-- owns no behavioral contract or domain sealer.
 --
 -- Verdicts follow Djex's evidence\/progress split, extended by the
 -- two-axis honesty rule of the proposal: a refutation is reported as
@@ -31,6 +32,7 @@ module Leant.Synth.Engine
   , SynthOutcome (..)
   , DetailedCandidateGroup
   , DetailedVerificationVariant
+  , ExactTypedVariantOrigin
   , TypedCandidateSemanticSidecar
   , detailedCandidateGroup
   , detailedCandidateGroupRoute
@@ -41,14 +43,12 @@ module Leant.Synth.Engine
   , detailedVerificationVariantOrdinal
   , detailedVerificationVariantRoute
   , detailedVerificationVariantSemanticSidecar
+  , detailedVerificationVariantExactTypedOrigin
+  , exactTypedVariantOriginOrdinal
+  , exactTypedVariantOriginSidecar
   , typedCandidateSemanticCandidate
   , typedCandidateSemanticInventory
   , typedCandidateSemanticAuthorityInspection
-  , LeanLengthSpineIdentity (..)
-  , LeanLengthProviderLaw (..)
-  , LeanLengthContract (..)
-  , LengthHandoffRefusal (..)
-  , prepareCheckedLengthProblem
   , mapDetailedCandidateGroupVariantsDroppingSemanticSidecar
   , DetailedSynthOutcome (..)
   , projectDetailedSynthOutcome
@@ -108,8 +108,6 @@ import Language.Haskell.Djex
       , ValueDeclaration
       )
   , Diagnostic
-  , CheckedLengthProblem
-  , ExferenceTermGraphAbsence
   , ExferenceInventory
   , ExferenceLocal
   , ExferenceOptions (..)
@@ -121,12 +119,6 @@ import Language.Haskell.Djex
   , ExferenceTypeVariable
   , Expression
   , GroundKind
-  , LengthContractError
-  , LengthProblemError
-  , LengthProviderInventoryError (..)
-  , LengthProviderSummarySource (..)
-  , LengthSessionError (..)
-  , LengthSpineModelSource (DeclaredListSpine)
   , Name
   , Kind (FunctionKind, ProperTypeKind)
   , Penalty (..)
@@ -146,8 +138,6 @@ import Language.Haskell.Djex
   , declarationTypeVariables
   , defaultExferenceOptions
   , defaultExferenceSessionPolicy
-  , defaultLengthLimits
-  , defaultLengthProblemLimits
   , defaultQueryOptions
   , djinnSessionEnvironment
   , environmentDeclarations
@@ -179,11 +169,6 @@ import Language.Haskell.Djex
   , TermGraph
   , exferenceSessionInventory
   , exferenceRequestQuery
-  , checkedLengthSessionContext
-  , lengthProviderSummaryLimit
-  , sealLengthContractInContext
-  , sealLengthSession
-  , sealLengthTypedCandidateProblem
   )
 
 import Leant.Synth.Observability
@@ -192,12 +177,6 @@ import Leant.Synth.Observability
       , RouteTypedCandidate
       , RouteUnobserved
       )
-  )
-
-import Leant.Synth.Length.Contract
-  ( LeanLengthContract (..)
-  , LeanLengthProviderLaw (..)
-  , LeanLengthSpineIdentity (..)
   )
 
 import Leant.Synth.Fragment
@@ -229,10 +208,6 @@ import Leant.Synth.Render
   , providerInfo
   , renderLeanTerm
   , renderLeanTermGraphProjection
-  )
-import Leant.Synth.Verification
-  ( Verified
-  , verifiedCandidate
   )
 
 -- | What the engine established for one goal.  Candidate terms are a lazy
@@ -500,232 +475,6 @@ detailedVerificationVariantSemanticSidecar
 detailedVerificationVariantSemanticSidecar variant =
   exactTypedVariantOriginSidecar
     <$> detailedVerificationVariantExactTypedOrigin variant
-
--- | Stable fail-closed phases of preparing one Length behavioral problem.
--- Djex's structured sealing errors remain nested instead of being flattened
--- into renderer diagnostics or treated as an ordinary absence of evidence.
-data LengthHandoffRefusal
-  = LengthHandoffNotTypedRoute CandidateRenderingRoute
-  | LengthHandoffMissingSemanticSidecar
-  | LengthHandoffRetargetedFragments
-  | LengthHandoffPremisesPresent
-  | LengthHandoffSearchGoalChanged
-  | LengthHandoffSourceGoalVariableMissing String
-  | LengthHandoffSourceGoalConversionChanged
-  | LengthHandoffRequestContextsPresent Int
-  | LengthHandoffRequestGoalChanged
-  | LengthHandoffTypedGraphLost ExferenceTermGraphAbsence
-  | LengthHandoffRendererRejected String
-  | LengthHandoffRendererNotUnique Int
-  | LengthHandoffRendererOrdinalChanged Natural
-  | LengthHandoffRendererTextChanged String String
-  | LengthHandoffFamilyUnavailable String
-  | LengthHandoffConstructorUnavailable String String
-  | LengthHandoffProviderUnavailable String
-  | LengthHandoffProviderAmbiguous String Int
-  | LengthHandoffProviderVariableMissing String String
-  | LengthHandoffSessionRejected (LengthSessionError ExferenceLocal)
-  | LengthHandoffContractRejected (LengthContractError ExferenceTypeVariable)
-  | LengthHandoffProblemRejected
-      (LengthProblemError
-        ExferenceTermGraphAbsence ExferenceLocal ExferenceLocal)
-  deriving (Eq, Show)
-
--- | Prepare the only currently supported Leant-to-Djex behavioral problem.
---
--- This intentionally accepts a 'Verified' value rather than an unverified
--- variant, but that receipt records only callback acceptance.  The additional
--- checks below establish a narrow correspondence: the source and fitting
--- targets are identical, no premises or request contexts retarget search, and
--- the exact retained graph re-renders to one spelling at ordinal zero which
--- equals the accepted text.  Ambiguous renderer alternatives fail closed.
---
--- Once correspondence succeeds, exact family/provider bindings are resolved
--- from retained translation provenance. Djex seals the inventory, spine, and
--- provider laws once into an opaque session, revalidates the separately
--- supplied contract through that session, and then seals the typed graph,
--- semantic encoding, and problem identity. The returned problem is the direct
--- Djex authority; no additional Leant handoff wrapper is retained.
-prepareCheckedLengthProblem
-  :: LeanLengthContract
-  -> Verified DetailedVerificationVariant
-  -> Either LengthHandoffRefusal
-      (CheckedLengthProblem ExferenceLocal ExferenceLocal)
-prepareCheckedLengthProblem source verified = do
-  let variant = verifiedCandidate verified
-      route = detailedVerificationVariantRoute variant
-  exactOrigin <- case detailedVerificationVariantExactTypedOrigin variant of
-    Just retained -> Right retained
-    Nothing
-      | route == RouteTypedCandidate ->
-          Left LengthHandoffMissingSemanticSidecar
-      | otherwise -> Left $ LengthHandoffNotTypedRoute route
-  let semantic = exactTypedVariantOriginSidecar exactOrigin
-  let TypedCandidateSemanticSidecar candidate authority = semantic
-      origin = exferenceAuthorityPreparation authority
-      layout = semanticOriginPremiseLayout origin
-  if semanticOriginEngineFragment origin == semanticOriginFitFragment origin
-    then pure ()
-    else Left LengthHandoffRetargetedFragments
-  if null (premiseLayoutConstructorPremises layout)
-      && null (premiseLayoutCallerPremises layout)
-    then pure ()
-    else Left LengthHandoffPremisesPresent
-  if semanticOriginSourceGoal origin == semanticOriginSearchGoal origin
-    then pure ()
-    else Left LengthHandoffSearchGoalChanged
-  convertedSource <- traverse (convertSourceVariable authority)
-    $ semanticOriginSourceGoal origin
-  if convertedSource == exferenceAuthorityConvertedSourceGoal authority
-    then pure ()
-    else Left LengthHandoffSourceGoalConversionChanged
-  let request = exferenceRequestQuery $ exferenceAuthorityRequest authority
-  if null $ requestContexts request
-    then pure ()
-    else Left $ LengthHandoffRequestContextsPresent
-      $ length $ requestContexts request
-  if requestGoal request == convertedSource
-    then pure ()
-    else Left LengthHandoffRequestGoalChanged
-  checkUniqueDirectRendering
-    (exactTypedVariantOriginOrdinal exactOrigin)
-    variant candidate origin
-  (family, zeroConstructor, stepConstructor) <- resolveSemanticFamily origin
-    $ leanLengthContractSpine source
-  providerLaws <- boundedProviderLawPrefix
-    $ leanLengthContractProviderLaws source
-  providerSources <- mapM (resolveProviderLaw authority origin) providerLaws
-  session <- either (Left . LengthHandoffSessionRejected) Right
-    $ sealLengthSession
-        defaultLengthLimits
-        (exferenceSessionInventory $ exferenceAuthoritySession authority)
-        (DeclaredListSpine
-          (semanticFamilyPrivateTypeName family)
-          zeroConstructor
-          stepConstructor)
-        providerSources
-  contract <- either (Left . LengthHandoffContractRejected) Right
-    $ sealLengthContractInContext
-        defaultLengthLimits
-        (checkedLengthSessionContext session)
-        convertedSource
-        (leanLengthContractSource source)
-  problem <- either (Left . LengthHandoffProblemRejected) Right
-    $ sealLengthTypedCandidateProblem
-        defaultLengthProblemLimits session contract candidate
-  pure problem
- where
-  resolveSemanticFamily origin spine = case
-      [ binding
-      | binding <- semanticOriginSemanticFamilyBindings origin
-      , semanticFamilyLeanName binding == leanLengthSpineFamilyName spine
-      ] of
-    [binding] -> do
-      zeroConstructor <- checkedSpineConstructor binding
-        $ leanLengthSpineZeroConstructorName spine
-      stepConstructor <- checkedSpineConstructor binding
-        $ leanLengthSpineStepConstructorName spine
-      Right (binding, zeroConstructor, stepConstructor)
-    _ -> Left $ LengthHandoffFamilyUnavailable
-      $ leanLengthSpineFamilyName spine
-
-  checkedSpineConstructor family leanConstructor =
-    case Map.lookup leanConstructor $ semanticFamilyConstructors family of
-      Just privateConstructor -> Right privateConstructor
-      Nothing -> Left $ LengthHandoffConstructorUnavailable
-        (semanticFamilyLeanName family) leanConstructor
-
--- | Bound caller-owned law-list traversal before translating any element.
--- Djex applies this same limit while sealing raw summaries, but Leant must
--- resolve exact provider bindings first. Mirroring the sealer's productive
--- width check here preserves its structured rejection for cyclic or oversized
--- source lists instead of doing unbounded work ahead of that boundary.
-boundedProviderLawPrefix
-  :: [LeanLengthProviderLaw]
-  -> Either LengthHandoffRefusal [LeanLengthProviderLaw]
-boundedProviderLawPrefix laws = case beyondLimit of
-  [] -> Right withinLimit
-  _ : _ -> Left $ LengthHandoffSessionRejected
-    $ LengthSessionProviderInventoryRejected
-    $ LengthProviderSummaryLimitExceeded maximumSummaries
-      (maximumSummaries + 1)
- where
-  maximumSummaries = lengthProviderSummaryLimit defaultLengthLimits
-  (withinLimit, beyondLimit) = splitAt maximumSummaries laws
-
-convertSourceVariable
-  :: ExferenceRunAuthority
-  -> String
-  -> Either LengthHandoffRefusal ExferenceTypeVariable
-convertSourceVariable authority sourceVariable = case Map.lookup sourceVariable
-    $ exferenceAuthorityNameTable authority of
-  Nothing -> Left $ LengthHandoffSourceGoalVariableMissing sourceVariable
-  Just local -> Right $ FlexibleVariable local
-
-resolveProviderLaw
-  :: ExferenceRunAuthority
-  -> PreparedSemanticOrigin
-  -> LeanLengthProviderLaw
-  -> Either
-      LengthHandoffRefusal
-      (LengthProviderSummarySource ExferenceTypeVariable)
-resolveProviderLaw authority origin law = case
-    [ binding
-    | binding <- semanticOriginProviderBindings origin
-    , providerLeanName (providerBindingSource binding)
-        == leanLengthProviderLawName law
-    ] of
-  [] -> Left $ LengthHandoffProviderUnavailable
-    $ leanLengthProviderLawName law
-  [binding] -> do
-    scheme <- traverse convertProviderVariable
-      $ providerBindingScheme binding
-    Right AssumedProviderSummary
-      { lengthProviderName = providerBindingPrivateName binding
-      , lengthProviderScheme = scheme
-      , lengthProviderArgumentRoles =
-          leanLengthProviderLawArgumentRoles law
-      , lengthProviderTransfer = leanLengthProviderLawTransfer law
-      }
-   where
-    convertProviderVariable providerVariable = case Map.lookup providerVariable
-        $ exferenceAuthorityNameTable authority of
-      Nothing -> Left $ LengthHandoffProviderVariableMissing
-        (leanLengthProviderLawName law) providerVariable
-      Just local -> Right $ FlexibleVariable local
-  bindings -> Left $ LengthHandoffProviderAmbiguous
-    (leanLengthProviderLawName law) (length bindings)
-
-checkUniqueDirectRendering
-  :: Natural
-  -> DetailedVerificationVariant
-  -> ExferenceTypedCandidate
-  -> PreparedSemanticOrigin
-  -> Either LengthHandoffRefusal ()
-checkUniqueDirectRendering originatingOrdinal variant candidate origin = do
-  graph <- case typedCandidateTermGraph candidate of
-    Left absence -> Left $ LengthHandoffTypedGraphLost absence
-    Right retained -> Right retained
-  rendered <- either (Left . LengthHandoffRendererRejected) Right
-    $ renderLeanTermGraphProjection
-        (("x" ++) . show)
-        (semanticOriginConstructorMap origin)
-        (semanticOriginProviderMap origin)
-        (semanticOriginTypeMap origin)
-        (premiseLayoutForRenderer $ semanticOriginPremiseLayout origin)
-        (semanticOriginFitFragment origin)
-        graph
-  exactText <- case rendered of
-    [text] -> Right text
-    alternatives -> Left $ LengthHandoffRendererNotUnique
-      $ length alternatives
-  if originatingOrdinal == 0
-    then pure ()
-    else Left $ LengthHandoffRendererOrdinalChanged originatingOrdinal
-  let acceptedText = detailedVerificationVariantText variant
-  if acceptedText == exactText
-    then Right ()
-    else Left $ LengthHandoffRendererTextChanged exactText acceptedText
 
 -- | Exact candidate identity, when this group came from a retained checked
 -- Exference graph and has not subsequently been wrapped as another term.
@@ -1866,8 +1615,9 @@ preparedSemanticOrigin prepared = PreparedSemanticOrigin
       preparedProjectionCompleteness prepared
   }
 
--- | Comparable provider-binding projection exported only for focused boundary
--- tests. It deliberately contains no semantic summary or trust claim.
+-- | Exact package-private provider-binding view consumed by the checked
+-- Length handoff and focused boundary tests. It deliberately contains no
+-- semantic summary or independent trust claim.
 data ProviderBindingInspection = ProviderBindingInspection
   { inspectedProviderSourceName :: String
   , inspectedProviderPrivateName :: Name
@@ -1899,9 +1649,10 @@ inspectSemanticFamilyBinding binding = SemanticFamilyBindingInspection
       semanticFamilyConstructors binding
   }
 
--- | Comparable view of the preparation fields most vulnerable to positional
--- tuple wiring mistakes. Leant has no public library surface; this projection
--- exists for its executable boundary tests.
+-- | Exact package-private view of the preparation fields consumed by the
+-- checked Length handoff and inspected by focused boundary tests. The record
+-- is descriptive rather than independent authority: the handoff derives it
+-- only from the opaque exact-origin sidecar.
 data PreparedSynthesisInspection = PreparedSynthesisInspection
   { inspectedEngineFragment :: Frag
   , inspectedFitFragment :: Frag
@@ -1924,8 +1675,10 @@ data PreparedSynthesisInspection = PreparedSynthesisInspection
   }
   deriving (Eq, Show)
 
--- | Comparable projection of one exact Exference lane. The opaque session is
--- intentionally absent from this view but remains owned by the sidecar.
+-- | Exact package-private view of one Exference lane. The opaque session is
+-- intentionally absent; its checked inventory is projected explicitly while
+-- the session remains owned by the sidecar. The Length handoff derives this
+-- record internally and never accepts one from a caller.
 data ExferenceRunAuthorityInspection = ExferenceRunAuthorityInspection
   { inspectedAuthorityPreparation :: PreparedSynthesisInspection
   , inspectedAuthorityNameTable :: Map.Map String ExferenceLocal

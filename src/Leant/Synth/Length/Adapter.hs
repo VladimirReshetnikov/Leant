@@ -1,7 +1,7 @@
 -- | The narrow checked projection from one callback-accepted Leant candidate
 -- to Djex's pure, canonical Length query.
 --
--- This module first uses 'prepareCheckedLengthProblem' to tie the exact
+-- This module first uses "Leant.Synth.Length.Handoff" to tie the exact
 -- accepted Exference term graph to structural family provenance and a sealed
 -- Length problem, then immediately seals that problem into an opaque query.
 -- It never exposes an adapter which promotes an arbitrary checked problem into
@@ -28,12 +28,12 @@ import Language.Haskell.Djex
   , sealLengthSMTLibQuery
   )
 
-import Leant.Synth.Engine
-  ( DetailedVerificationVariant
-  , LengthHandoffRefusal
+import Leant.Synth.Engine (DetailedVerificationVariant)
+import Leant.Synth.Length.Contract (LeanLengthContract)
+import Leant.Synth.Length.Handoff
+  ( LengthHandoffRefusal
   , prepareCheckedLengthProblem
   )
-import Leant.Synth.Length.Contract (LeanLengthContract)
 import Leant.Synth.Verification (Verified)
 
 -- | Query specialization for the exact Exference identities checked by the

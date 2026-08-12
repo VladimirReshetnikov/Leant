@@ -46,6 +46,7 @@ Executable leant
     Leant.Synth.Length.Configuration.File
     Leant.Synth.Length.Configuration.File.Acquire
     Leant.Synth.Length.Contract
+    Leant.Synth.Length.Handoff
     Leant.Synth.Length.Integration
     Leant.Synth.Length.PostVerification
     Leant.Synth.Length.PostVerification.Internal
@@ -94,6 +95,7 @@ Test-Suite leant-synth-tests
     Leant.Synth.Length.Configuration.File
     Leant.Synth.Length.Configuration.File.Acquire
     Leant.Synth.Length.Contract
+    Leant.Synth.Length.Handoff
     Leant.Synth.Length.Integration
     Leant.Synth.Length.PostVerification
     Leant.Synth.Length.PostVerification.Internal

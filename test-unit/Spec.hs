@@ -104,7 +104,6 @@ import Leant.Synth.Engine
   , DetailedVerificationVariant
   , TypedCandidateSemanticSidecar
   , ExferenceRunAuthorityInspection (..)
-  , LengthHandoffRefusal (..)
   , PreparedSynthesisInspection (..)
   , ProviderBindingInspection (..)
   , SynthEngine (..)
@@ -138,7 +137,6 @@ import Leant.Synth.Engine
   , synthesizeWithProvidersSkippingDetailed
   , synthesizeTunedDetailed
   , projectDetailedSynthOutcome
-  , prepareCheckedLengthProblem
   , renderCandidateByAvailability
   , takeDistinct
   , takeDistinctOn
@@ -229,6 +227,10 @@ import Leant.Synth.Length.Contract
   ( LeanLengthContract (..)
   , LeanLengthProviderLaw (..)
   , LeanLengthSpineIdentity (..)
+  )
+import Leant.Synth.Length.Handoff
+  ( LengthHandoffRefusal (..)
+  , prepareCheckedLengthProblem
   )
 import Leant.Synth.Length.Integration
   ( LengthAssessmentFailure (..)
@@ -4585,6 +4587,14 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
         [detailedCandidateGroupVerificationVariants synthetic]
       case verifiedCandidateReceipts batch of
         [verified] -> do
+          case prepareCheckedLengthProblem
+              (error "contract forced before missing semantic origin")
+              verified of
+            Left LengthHandoffMissingSemanticSidecar -> pure ()
+            Left refusal -> assertFailure $
+              "unexpected poisoned-contract refusal: " ++ show refusal
+            Right _ -> assertFailure
+              "missing semantic origin forced or bypassed the contract"
           case prepareCheckedLengthProblem unreachableContract verified of
             Left LengthHandoffMissingSemanticSidecar -> pure ()
             Left refusal -> assertFailure $

@@ -314,15 +314,15 @@ Wrappers such as
 `Classical.byContradiction` discard both direct and recovered authority because
 they denote a new term.
 This is deliberately a solver-neutral identity seam, not behavioral evidence.
-Checked Length preparation now binds callback-accepted text back to its exact
+`Leant.Synth.Length.Handoff` binds callback-accepted text back to its exact
 typed origin, original Exference renderer ordinal, singleton exact re-render,
 family provenance, an opaque Djex session which owns the exact inventory and
 provider assumptions, the separately reassociated contract, and the
-candidate-specific Djex problem. That preparation consumes the renderer,
-family, and session authority and returns only the sealed problem;
+candidate-specific Djex problem. That checked preparation consumes the
+renderer, family, and session authority and returns only the sealed problem;
 `Leant.Synth.Length.Adapter` then seals it into a bounded canonical QF_LIA
-query without exposing an arbitrary problem-taking entrance. It launches no
-solver and grants no authority
+query without exposing an arbitrary problem-taking entrance. Neither step
+launches a solver or grants authority
 to raw `sat`, `unsat`, or `unknown`: only decoded input values which pass Djex's
 independent exact-problem replay can yield a finite-spine, model-relative
 counterexample receipt, still conditional on every named provider law used by
@@ -461,12 +461,15 @@ or default path, and loading/activation alone never launches a solver. See the
 [bounded acquisition report](docs/reports/2026-08-11-bounded-live-length-ranking-configuration-acquisition.md).
 
 The passive finite-spine source vocabulary now lives in
-`Leant.Synth.Length.Contract`.  Modules that need only those assertions no
-longer have to obtain their declarations from the full synthesis engine;
-`Leant.Synth.Engine` retains a compatibility re-export and owns the later
-provenance-bound handoff checks.  Ranking still imports the engine for those
-candidate-specific checks.  This gives contract assertions, candidate
-authority, and live execution policy distinct source owners.
+`Leant.Synth.Length.Contract`. Modules that need only those assertions no
+longer depend on the full synthesis engine. `Leant.Synth.Engine` owns neutral
+synthesis and retained candidate provenance;
+`Leant.Synth.Length.Handoff` derives the opaque verified origin and owns the
+candidate-specific correspondence checks and Djex problem sealing. Ranking
+reaches that preparation through `Leant.Synth.Length.Adapter` and imports the
+handoff refusal taxonomy only for closed classification. This gives contract
+assertions, candidate authority, checked domain preparation, and live
+execution policy distinct source owners.
 
 `Leant.Synth.PostVerification` makes the boundary after callback acceptance
 explicit. Without the startup opt-in, Main sends the opaque, nominal

@@ -2,11 +2,11 @@
 --
 -- These values are passive assertions supplied by an integration layer.  They
 -- do not retain an engine session, a verified candidate, a solver policy, or
--- any authority to run Z3.  'Leant.Synth.Engine' checks the exact names against
--- retained translation provenance when it prepares a candidate-specific
--- handoff.  Modules which need only the source vocabulary can therefore avoid
--- depending on the complete synthesis engine implementation; current ranking
--- code still imports that engine separately for candidate-specific handoffs.
+-- any authority to run Z3. "Leant.Synth.Length.Handoff" checks the exact names
+-- against retained translation provenance when it prepares a
+-- candidate-specific problem. Modules which need only the source vocabulary
+-- can therefore avoid depending on the complete synthesis engine
+-- implementation.
 module Leant.Synth.Length.Contract
   ( LeanLengthSpineIdentity (..)
   , LeanLengthProviderLaw (..)

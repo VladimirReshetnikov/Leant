@@ -77,15 +77,13 @@ import Language.Haskell.Djex
   , withLengthSMTLibLiveSession
   )
 
-import Leant.Synth.Engine
-  ( DetailedVerificationVariant
-  , LengthHandoffRefusal (..)
-  )
+import Leant.Synth.Engine (DetailedVerificationVariant)
 import Leant.Synth.Length.Adapter
   ( CheckedLengthQuery
   , prepareCheckedLengthQuery
   )
 import Leant.Synth.Length.Contract (LeanLengthContract)
+import Leant.Synth.Length.Handoff (LengthHandoffRefusal (..))
 import Leant.Synth.PostVerification
   ( PostVerificationCandidate
   , postVerificationCandidateVerified
