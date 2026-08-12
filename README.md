@@ -300,8 +300,11 @@ reached by symbolic interpretation flow directly into the canonical used-law
 identity; the names-only receipt is derived separately and never becomes an
 authority lookup key. The problem's generic behavioral envelope is the single
 retained owner of its concrete encoding fingerprint; the Length-specific
-projection derives from that envelope rather than storing a second copy. That
-receipt is not by itself a concrete Lean counterexample or kernel proof.
+projection derives from that envelope rather than storing a second copy. The
+candidate's versioned key already embeds the exact freshly checked graph
+fingerprint, so the interpreted receipt does not retain a second detachable
+graph key. That receipt is not by itself a concrete Lean counterexample or
+kernel proof.
 The query's typed SMT plan is transient through rendering and structural
 fingerprinting. Once sealed, the opaque query retains only its checked problem,
 exact ordered input symbols, bounded command bytes, and complete fingerprint;
