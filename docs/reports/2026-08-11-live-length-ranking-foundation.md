@@ -95,9 +95,14 @@ eleven-field identity slice. It owns no behavioral protocol schema, standalone
 fingerprint, or fingerprint budget. The Length wrapper still owns both Length
 schema tags, artifact and response policy, the sole fingerprint admission pass,
 and the complete reversible policy key.
-The live process still binds that complete Length key together with its
-pre-spawn file observation and launch facts; Leant's configuration API and
-activation boundary remain unchanged.
+The raw process now consumes only that admitted launch profile. Its v2 identity
+binds the path observation, pin result, arguments, environment, working
+directory, deadline, limits, and launch flags it enforces, with no nested copy
+of the complete Length key. The scoped Session's v4 ready-worker identity binds
+one occurrence of that complete key beside the raw process observation.
+Ready-worker and transitive query-run identities therefore change and shrink;
+a tight custom identity-byte budget can newly admit the same policy. Leant's
+configuration API and activation boundary remain unchanged.
 
 The private protocol plan follows the same single-owner rule. Its unchanged
 complete fingerprint still binds the exact initial and optional value writes,
@@ -147,9 +152,9 @@ ordinal and markers, reads the last-committed stdout and stderr anchors, and
 mints the private nominal epoch-bound receipt accepted by execution and commit.
 Replay projects the exact query from that receipt's plan. The live Session
 carries the protocol plan through driving and binds its complete key directly
-into the unchanged query-run identity. Exact bounded status-frame and
-input-value-frame bytes remain singly stored in the causal transcript rather
-than being copied into that decoded branch.
+into the unchanged version-1 query-run field layout. Exact bounded
+status-frame and input-value-frame bytes remain singly stored in the causal
+transcript rather than being copied into that decoded branch.
 
 Preparation returns only the sealed problem. Callback receipt and resolved
 family values are consumed before that result rather than being copied into a
