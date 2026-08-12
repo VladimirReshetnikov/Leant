@@ -138,7 +138,6 @@ import Leant.Synth.Engine
   , takeDistinctOn
   , typedCandidateSemanticCandidate
   , typedCandidateSemanticAuthorityInspection
-  , typedCandidateSemanticFingerprint
   , typedCandidateSemanticInventory
   , withoutCheckedCandidates
   , withoutCheckedDetailedCandidates
@@ -4233,10 +4232,6 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                 Left absence -> assertFailure $
                   "typed semantic candidate lost its graph: " ++ show absence
                 Right _ -> pure ()
-              case typedCandidateSemanticFingerprint semantic of
-                Left fingerprintError -> assertFailure $
-                  "typed graph fingerprint failed: " ++ show fingerprintError
-                Right _ -> pure ()
         Right other -> assertFailure $
           "expected a typed Exference identity candidate, got: "
             ++ show other
@@ -5081,8 +5076,10 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                           @?= typedCandidateSemanticCandidate originalSemantic
                         typedCandidateSemanticInventory survivorSemantic
                           @?= typedCandidateSemanticInventory originalSemantic
-                        typedCandidateSemanticFingerprint survivorSemantic
-                          @?= typedCandidateSemanticFingerprint originalSemantic
+                        typedCandidateSemanticAuthorityInspection
+                            survivorSemantic
+                          @?= typedCandidateSemanticAuthorityInspection
+                            originalSemantic
                   other -> assertFailure $
                     "unexpected filtered typed outcome: " ++ show other
                 assertBool
@@ -5317,8 +5314,8 @@ assertRecovered expected variant = case
       typedCandidateSemanticCandidate expected
     typedCandidateSemanticInventory recovered @?=
       typedCandidateSemanticInventory expected
-    typedCandidateSemanticFingerprint recovered @?=
-      typedCandidateSemanticFingerprint expected
+    typedCandidateSemanticAuthorityInspection recovered @?=
+      typedCandidateSemanticAuthorityInspection expected
   Nothing -> assertFailure $
     "exact duplicate spelling lacked recovered typed authority: "
       ++ detailedVerificationVariantText variant

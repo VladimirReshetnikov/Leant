@@ -270,14 +270,14 @@ schemes are instantiated at a bounded set of query and environment types, and
 impredicative instantiation is admitted under a guard that never invents a
 polytype the checked input did not supply.
 
-Leant's detailed Exference route now retains an opaque checked candidate, the
-exact session inventory, and a lazy attempt at Djex's canonical typed-graph
-fingerprint beside the originating rendered group. Textual ordering and the
-compatibility result stay unchanged when that structural fingerprint is
-unavailable. Filtering preserves a group sidecar only with its original
-candidate. During combined-engine exact-text deduplication, an earlier
-compatibility-only spelling may retain a private variant-scoped witness to the
-first later Exference candidate which rendered the identical bytes; display
+Leant's detailed Exference route now retains an opaque checked candidate and
+its exact run authority beside the originating rendered group. The candidate
+remains the sole owner of its graph, and Djex fingerprints that graph only
+while sealing an actual behavioral problem; the rendering sidecar carries no
+parallel fallible graph-key cache. Filtering preserves a group sidecar only
+with its original candidate. During combined-engine exact-text deduplication,
+an earlier compatibility-only spelling may retain a private variant-scoped
+witness to the first later Exference candidate which rendered the identical bytes; display
 ownership, route, ordinal, ordering, and sibling variants remain unchanged, so
 no sidecar is transferred onto a Djinn group. Wrappers such as
 `Classical.byContradiction` discard both direct and recovered authority because

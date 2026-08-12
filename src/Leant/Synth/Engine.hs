@@ -43,7 +43,6 @@ module Leant.Synth.Engine
   , detailedVerificationVariantSemanticSidecar
   , typedCandidateSemanticCandidate
   , typedCandidateSemanticInventory
-  , typedCandidateSemanticFingerprint
   , typedCandidateSemanticAuthorityInspection
   , LeanLengthSpineIdentity (..)
   , LeanLengthProviderLaw (..)
@@ -121,7 +120,6 @@ import Language.Haskell.Djex
   , ExferenceType
   , ExferenceTypeVariable
   , Expression
-  , Fingerprint
   , GroundKind
   , LengthContractError
   , LengthProblemError
@@ -179,13 +177,8 @@ import Language.Haskell.Djex
   , typedCandidateCompatibility
   , typedCandidateTermGraph
   , TermGraph
-  , TermGraphFingerprintError
-  , TermGraphFingerprintSubject
-  , defaultTermGraphFingerprintByteLimit
-  , defaultTermGraphLimits
   , exferenceSessionInventory
   , exferenceRequestQuery
-  , fingerprintSharedTermGraph
   , checkedLengthSessionContext
   , lengthProviderSummaryLimit
   , sealLengthContractInContext
@@ -276,23 +269,18 @@ data ExferenceRunAuthority = ExferenceRunAuthority
 --
 -- The opaque typed candidate keeps its compatibility projection inseparable
 -- from the exact graph which produced the group and the full checked run which
--- admitted it. Fingerprinting remains deliberately lazy and fallible:
--- inability to assign a structural key cannot remove, reorder, or reroute an
--- otherwise valid rendered term.
+-- admitted it.  The graph remains owned only by that checked candidate, and
+-- Djex fingerprints it only while sealing an actual behavioral problem; rendering
+-- retains no parallel fallible graph-key cache.
 data TypedCandidateSemanticSidecar = TypedCandidateSemanticSidecar
   ExferenceTypedCandidate
   ExferenceRunAuthority
-  (Either
-    (TermGraphFingerprintError ExferenceLocal ExferenceLocal)
-    (Fingerprint TermGraphFingerprintSubject))
 
--- The fingerprint attempt is a pure, deterministic private projection of the
--- exact candidate graph under fixed limits. Comparing the checked candidate
--- and every observable run input is therefore sufficient and keeps equality
--- from forcing either the opaque session internals or that lazy projection.
+-- Comparing the checked candidate and every observable run input is
+-- sufficient and keeps equality from forcing opaque session internals.
 instance Eq TypedCandidateSemanticSidecar where
-  TypedCandidateSemanticSidecar leftCandidate leftAuthority _
-      == TypedCandidateSemanticSidecar rightCandidate rightAuthority _ =
+  TypedCandidateSemanticSidecar leftCandidate leftAuthority
+      == TypedCandidateSemanticSidecar rightCandidate rightAuthority =
     leftCandidate == rightCandidate
       && exferenceSessionInventory
           (exferenceAuthoritySession leftAuthority)
@@ -316,25 +304,15 @@ typedCandidateSemanticCandidate
   :: TypedCandidateSemanticSidecar
   -> ExferenceTypedCandidate
 typedCandidateSemanticCandidate
-    (TypedCandidateSemanticSidecar candidate _ _) = candidate
+    (TypedCandidateSemanticSidecar candidate _) = candidate
 
 -- | Recover the exact checked inventory from the candidate's Exference run.
 typedCandidateSemanticInventory
   :: TypedCandidateSemanticSidecar
   -> ExferenceInventory
 typedCandidateSemanticInventory
-    (TypedCandidateSemanticSidecar _ authority _) =
+    (TypedCandidateSemanticSidecar _ authority) =
   exferenceSessionInventory (exferenceAuthoritySession authority)
-
--- | Lazily attempt the allocation-insensitive structural graph identity.
--- Failure leaves ordinary synthesis and rendering unchanged.
-typedCandidateSemanticFingerprint
-  :: TypedCandidateSemanticSidecar
-  -> Either
-      (TermGraphFingerprintError ExferenceLocal ExferenceLocal)
-      (Fingerprint TermGraphFingerprintSubject)
-typedCandidateSemanticFingerprint
-    (TypedCandidateSemanticSidecar _ _ fingerprint) = fingerprint
 
 -- | Comparable view of the exact checked lane authority. The actual session
 -- remains retained privately by the sidecar for later checked operations.
@@ -342,7 +320,7 @@ typedCandidateSemanticAuthorityInspection
   :: TypedCandidateSemanticSidecar
   -> ExferenceRunAuthorityInspection
 typedCandidateSemanticAuthorityInspection
-    (TypedCandidateSemanticSidecar _ authority _) =
+    (TypedCandidateSemanticSidecar _ authority) =
   inspectExferenceRunAuthority authority
 
 -- | Exact typed origin for one spelling.  It can be the direct Exference
@@ -398,9 +376,9 @@ data DetailedCandidateGroup = DetailedCandidateGroup
   [DetailedCandidateVariant]
   (Maybe TypedCandidateSemanticSidecar)
 
--- Compare the observable sidecar authority without forcing its potentially
--- expensive fingerprint thunk. The custom 'Show' instance likewise keeps
--- routine diagnostics independent of that thunk.
+-- Compare the observable checked-candidate and run authority.  The custom
+-- 'Show' instance keeps routine diagnostics independent of the retained
+-- session authority.
 instance Eq DetailedCandidateGroup where
   DetailedCandidateGroup leftRoute leftVariants leftSidecar
       == DetailedCandidateGroup rightRoute rightVariants rightSidecar =
@@ -572,7 +550,7 @@ prepareCheckedLengthProblem source verified = do
           Left LengthHandoffMissingSemanticSidecar
       | otherwise -> Left $ LengthHandoffNotTypedRoute route
   let semantic = exactTypedVariantOriginSidecar exactOrigin
-  let TypedCandidateSemanticSidecar candidate authority _ = semantic
+  let TypedCandidateSemanticSidecar candidate authority = semantic
       origin = exferenceAuthorityPreparation authority
       layout = semanticOriginPremiseLayout origin
   if semanticOriginEngineFragment origin == semanticOriginFitFragment origin
@@ -1340,12 +1318,8 @@ exferenceRun steps prepared = do
                     (route, rendered) = renderCandidateByAvailability
                       renderGraph render availability compatibility fallback
                     sidecar = case availability of
-                      Right graph -> Just $ TypedCandidateSemanticSidecar
+                      Right _ -> Just $ TypedCandidateSemanticSidecar
                         candidate authority
-                        (fingerprintSharedTermGraph
-                          defaultTermGraphLimits
-                          defaultTermGraphFingerprintByteLimit
-                          graph)
                       Left _ -> Nothing
               , Right group <- [rendered]
               ]
