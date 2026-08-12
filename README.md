@@ -285,15 +285,16 @@ they denote a new term.
 This is deliberately a solver-neutral identity seam, not behavioral evidence.
 The checked Length handoff now binds callback-accepted text back to its exact
 typed origin, original Exference renderer ordinal, singleton exact re-render,
-family provenance, inventory, provider assumptions, contract, and
-candidate-specific Djex problem. `Leant.Synth.Length.Adapter` immediately
-drops the heavier renderer and session authority while sealing that problem
-into a bounded canonical QF_LIA query. It launches no solver and grants no
-authority to raw `sat`, `unsat`, or `unknown`: only decoded input values which
-pass Djex's independent exact-problem replay can yield a finite-spine,
-model-relative counterexample receipt, still conditional on every named
-provider law used by that candidate. That receipt is not by itself a concrete
-Lean counterexample or kernel proof.
+family provenance, an opaque Djex session which owns the exact inventory and
+provider assumptions, the separately reassociated contract, and the
+candidate-specific Djex problem. `Leant.Synth.Length.Adapter` immediately drops
+the heavier renderer and session authority while sealing that problem into a
+bounded canonical QF_LIA query. It launches no solver and grants no authority
+to raw `sat`, `unsat`, or `unknown`: only decoded input values which pass Djex's
+independent exact-problem replay can yield a finite-spine, model-relative
+counterexample receipt, still conditional on every named provider law used by
+that candidate. That receipt is not by itself a concrete Lean counterexample
+or kernel proof.
 The query's typed SMT plan is transient through rendering and structural
 fingerprinting. Once sealed, the opaque query retains only its checked problem,
 exact ordered input symbols, bounded command bytes, and complete fingerprint;

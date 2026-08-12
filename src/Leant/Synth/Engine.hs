@@ -569,8 +569,10 @@ checkedLengthHandoffProblem
 -- equals the accepted text.  Ambiguous renderer alternatives fail closed.
 --
 -- Once correspondence succeeds, exact family/provider bindings are resolved
--- from retained translation provenance and Djex atomically re-seals the
--- inventory, contract, typed graph, semantic encoding, and problem identity.
+-- from retained translation provenance. Djex seals the inventory, spine, and
+-- provider laws once into an opaque session, revalidates the separately
+-- supplied contract through that session, and then seals the typed graph,
+-- semantic encoding, and problem identity.
 prepareCheckedLengthHandoff
   :: LeanLengthContract
   -> Verified DetailedVerificationVariant
