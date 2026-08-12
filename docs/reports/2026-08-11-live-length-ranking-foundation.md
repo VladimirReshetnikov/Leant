@@ -95,10 +95,10 @@ edges; presence-only inspection of the optional write does not render request
 bytes.
 
 The package-private terminal protocol value likewise retains only the complete
-plan key, closed solver status, and optional decoded value artifact. During a
-live run, the exact bounded status-frame bytes remain singly owned by the causal
-transcript and unchanged query-run identity rather than being copied into that
-decoded branch.
+plan key, closed solver status, and optional decoded integer bindings. During a
+live run, the exact bounded status-frame and input-value-frame bytes remain
+singly stored in the causal transcript, whose exact bytes are bound into the
+unchanged query-run identity rather than being copied into that decoded branch.
 
 Preparation returns only the sealed problem. Callback receipt and resolved
 family values are consumed before that result rather than being copied into a
