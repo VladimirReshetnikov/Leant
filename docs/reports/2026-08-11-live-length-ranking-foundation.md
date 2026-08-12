@@ -107,6 +107,17 @@ are derived again on demand through the selectors used at the causal write
 edges; presence-only inspection of the optional write does not render request
 bytes.
 
+Below Length's compatibility decoder, Djex's package-private Standard response
+layer owns canonical `sat`/`unsat`/`unknown` bytes, bounded check-status
+classification, and the closed `unsupported`/solver-error shapes. Length maps
+that vocabulary exhaustively into its unchanged errors and continues to own
+its limit wrapper/defaults, response schema, and query-specific valuation
+shape. The readiness capability imports only canonical `sat`/`unsat` bytes and
+still exact-compares complete frames with payload-free phase failures. The
+shared layer grants no query, process, schema, or evidence authority; changing
+its accepted bytes or classification requires every consuming domain to revise
+the corresponding response/plan schema identity.
+
 Query protocol and readiness capability now share Djex's opaque cumulative
 stream policy and zero-start cursor. A completed frame keeps its exact policy,
 absolute charged end, and untouched tail together for same-write continuation;
