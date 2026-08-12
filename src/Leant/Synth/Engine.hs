@@ -349,11 +349,49 @@ typedCandidateSemanticAuthorityInspection
     (TypedCandidateSemanticSidecar _ authority _) =
   inspectExferenceRunAuthority authority
 
+-- | Exact typed origin for one spelling.  It can be the direct Exference
+-- display owner or an Exference origin retained after a later duplicate was
+-- collapsed.  This is deliberately variant-scoped: in the latter case the
+-- sidecar still belongs to that Exference candidate and its original renderer
+-- ordinal, never to the Djinn group which displayed the same text first.
+data ExactTypedVariantOrigin = ExactTypedVariantOrigin
+  !Natural
+  !String
+  !TypedCandidateSemanticSidecar
+
+instance Eq ExactTypedVariantOrigin where
+  ExactTypedVariantOrigin leftOrdinal leftText leftSidecar
+      == ExactTypedVariantOrigin rightOrdinal rightText rightSidecar =
+    leftOrdinal == rightOrdinal
+      && leftText == rightText
+      && leftSidecar == rightSidecar
+
 -- | One renderer-produced spelling and its original zero-based ordinal.
 -- Filtering preserves this identity instead of silently renumbering the
--- spellings which survive an earlier verification lane.
-data DetailedCandidateVariant = DetailedCandidateVariant Natural String
-  deriving (Eq, Show)
+-- spellings which survive an earlier verification lane.  A merge may retain
+-- a separate exact typed origin for this spelling without changing its
+-- display owner, route, ordinal, or group membership.
+data DetailedCandidateVariant = DetailedCandidateVariant
+  Natural
+  String
+  (Maybe ExactTypedVariantOrigin)
+
+-- The recovered typed origin is a merge-time assessment witness, not part of
+-- the displayed candidate identity.  In particular, group equality and
+-- compatibility projections remain exactly as they were before the witness
+-- existed.
+instance Eq DetailedCandidateVariant where
+  DetailedCandidateVariant leftOrdinal leftText _
+      == DetailedCandidateVariant rightOrdinal rightText _ =
+    leftOrdinal == rightOrdinal && leftText == rightText
+
+instance Show DetailedCandidateVariant where
+  showsPrec precedence (DetailedCandidateVariant ordinal text _) =
+    showParen (precedence > 10) $
+      showString "DetailedCandidateVariant "
+        . showsPrec 11 ordinal
+        . showChar ' '
+        . showsPrec 11 text
 
 -- | One semantic candidate and the route that supplied the expression handed
 -- to Leant's renderer.  Every deduplication boundary names the textual-variant
@@ -402,13 +440,16 @@ detailedCandidateGroupVariants :: DetailedCandidateGroup -> [String]
 detailedCandidateGroupVariants (DetailedCandidateGroup _ variants _) =
   map detailedCandidateVariantText variants
 
--- | Verification-facing candidates retain the spelling, its original
--- renderer ordinal, and the group's semantic origin. The verifier stays
--- generic; only the Lean callback projects the text it must elaborate.
+-- | Verification-facing candidates retain the displayed spelling, its
+-- display owner's renderer ordinal and route, and any exact typed assessment
+-- origin for that spelling.  The latter may come from a duplicate later
+-- Exference group, so it is intentionally independent of display provenance.
+-- The verifier stays generic; only the Lean callback projects the text it
+-- must elaborate.
 data DetailedVerificationVariant = DetailedVerificationVariant
   CandidateRenderingRoute
   DetailedCandidateVariant
-  (Maybe TypedCandidateSemanticSidecar)
+  (Maybe ExactTypedVariantOrigin)
 
 instance Eq DetailedVerificationVariant where
   DetailedVerificationVariant leftRoute leftVariant leftSidecar
@@ -432,7 +473,15 @@ detailedCandidateGroupVerificationVariants
   -> [DetailedVerificationVariant]
 detailedCandidateGroupVerificationVariants
     (DetailedCandidateGroup route variants sidecar) =
-  map (\variant -> DetailedVerificationVariant route variant sidecar) variants
+  map (\variant -> DetailedVerificationVariant route variant
+    $ exactOrigin variant sidecar) variants
+ where
+  exactOrigin variant retained = case retained of
+    Just semantic -> Just $ ExactTypedVariantOrigin
+      (detailedCandidateVariantOrdinal variant)
+      (detailedCandidateVariantText variant)
+      semantic
+    Nothing -> detailedCandidateVariantExactTypedOrigin variant
 
 -- | Exact Lean spelling passed to the backend verifier.
 detailedVerificationVariantText :: DetailedVerificationVariant -> String
@@ -448,20 +497,24 @@ detailedVerificationVariantOrdinal
     (DetailedVerificationVariant _ variant _) =
   detailedCandidateVariantOrdinal variant
 
--- | Rendering path of the originating semantic group.
+-- | Rendering path of the group which owns this displayed occurrence.  A
+-- recovered typed assessment origin does not rewrite this observation.
 detailedVerificationVariantRoute
   :: DetailedVerificationVariant
   -> CandidateRenderingRoute
 detailedVerificationVariantRoute
     (DetailedVerificationVariant route _ _) = route
 
--- | Checked Exference origin, when the accepted spelling still denotes the
--- unwrapped typed candidate which produced it.
+-- | Checked Exference origin, when the accepted spelling still denotes an
+-- unwrapped typed candidate.  This can be the displayed group itself or the
+-- exact same spelling from a later Exference group; it never applies to a
+-- merely neighboring variant.
 detailedVerificationVariantSemanticSidecar
   :: DetailedVerificationVariant
   -> Maybe TypedCandidateSemanticSidecar
-detailedVerificationVariantSemanticSidecar
-    (DetailedVerificationVariant _ _ sidecar) = sidecar
+detailedVerificationVariantSemanticSidecar variant =
+  exactTypedVariantOriginSidecar
+    <$> detailedVerificationVariantExactTypedOrigin variant
 
 -- | Stable fail-closed phases of preparing one Length behavioral problem.
 -- Djex's structured sealing errors remain nested instead of being flattened
@@ -545,12 +598,13 @@ prepareCheckedLengthHandoff
 prepareCheckedLengthHandoff source verified = do
   let variant = verifiedCandidate verified
       route = detailedVerificationVariantRoute variant
-  if route == RouteTypedCandidate
-    then pure ()
-    else Left $ LengthHandoffNotTypedRoute route
-  semantic <- case detailedVerificationVariantSemanticSidecar variant of
-    Nothing -> Left LengthHandoffMissingSemanticSidecar
+  exactOrigin <- case detailedVerificationVariantExactTypedOrigin variant of
     Just retained -> Right retained
+    Nothing
+      | route == RouteTypedCandidate ->
+          Left LengthHandoffMissingSemanticSidecar
+      | otherwise -> Left $ LengthHandoffNotTypedRoute route
+  let semantic = exactTypedVariantOriginSidecar exactOrigin
   let TypedCandidateSemanticSidecar candidate authority _ = semantic
       origin = exferenceAuthorityPreparation authority
       layout = semanticOriginPremiseLayout origin
@@ -577,7 +631,9 @@ prepareCheckedLengthHandoff source verified = do
   if requestGoal request == convertedSource
     then pure ()
     else Left LengthHandoffRequestGoalChanged
-  checkUniqueDirectRendering variant candidate origin
+  checkUniqueDirectRendering
+    (exactTypedVariantOriginOrdinal exactOrigin)
+    variant candidate origin
   (family, zeroConstructor, stepConstructor) <- resolveSemanticFamily origin
     $ leanLengthContractSpine source
   providerLaws <- boundedProviderLawPrefix
@@ -685,11 +741,12 @@ resolveProviderLaw authority origin law = case
     (leanLengthProviderLawName law) (length bindings)
 
 checkUniqueDirectRendering
-  :: DetailedVerificationVariant
+  :: Natural
+  -> DetailedVerificationVariant
   -> ExferenceTypedCandidate
   -> PreparedSemanticOrigin
   -> Either LengthHandoffRefusal ()
-checkUniqueDirectRendering variant candidate origin = do
+checkUniqueDirectRendering originatingOrdinal variant candidate origin = do
   graph <- case typedCandidateTermGraph candidate of
     Left absence -> Left $ LengthHandoffTypedGraphLost absence
     Right retained -> Right retained
@@ -706,10 +763,9 @@ checkUniqueDirectRendering variant candidate origin = do
     [text] -> Right text
     alternatives -> Left $ LengthHandoffRendererNotUnique
       $ length alternatives
-  let ordinal = detailedVerificationVariantOrdinal variant
-  if ordinal == 0
+  if originatingOrdinal == 0
     then pure ()
-    else Left $ LengthHandoffRendererOrdinalChanged ordinal
+    else Left $ LengthHandoffRendererOrdinalChanged originatingOrdinal
   let acceptedText = detailedVerificationVariantText variant
   if acceptedText == exactText
     then Right ()
@@ -736,8 +792,8 @@ mapDetailedCandidateGroupVariantsDroppingSemanticSidecar transform group =
     (map mapVariant $ detailedCandidateGroupVariantRecords group)
     Nothing
  where
-  mapVariant (DetailedCandidateVariant ordinal text) =
-    DetailedCandidateVariant ordinal (transform text)
+  mapVariant (DetailedCandidateVariant ordinal text _) =
+    DetailedCandidateVariant ordinal (transform text) Nothing
 
 -- | Replace a group by a stable subset of its spellings without changing the
 -- originating engine candidate. Used only by filtering and scheduling paths
@@ -758,13 +814,45 @@ detailedCandidateGroupVariantRecords
     (DetailedCandidateGroup _ variants _) = variants
 
 detailedCandidateVariantOrdinal :: DetailedCandidateVariant -> Natural
-detailedCandidateVariantOrdinal (DetailedCandidateVariant ordinal _) = ordinal
+detailedCandidateVariantOrdinal
+    (DetailedCandidateVariant ordinal _ _) = ordinal
 
 detailedCandidateVariantText :: DetailedCandidateVariant -> String
-detailedCandidateVariantText (DetailedCandidateVariant _ text) = text
+detailedCandidateVariantText (DetailedCandidateVariant _ text _) = text
+
+detailedCandidateVariantExactTypedOrigin
+  :: DetailedCandidateVariant
+  -> Maybe ExactTypedVariantOrigin
+detailedCandidateVariantExactTypedOrigin
+    (DetailedCandidateVariant _ _ exactOrigin) = exactOrigin
+
+detailedVerificationVariantExactTypedOrigin
+  :: DetailedVerificationVariant
+  -> Maybe ExactTypedVariantOrigin
+detailedVerificationVariantExactTypedOrigin
+    (DetailedVerificationVariant _ variant exactOrigin) = case exactOrigin of
+  Just retained
+    | exactTypedVariantOriginText retained
+        == detailedCandidateVariantText variant -> Just retained
+  _ -> Nothing
+
+exactTypedVariantOriginOrdinal :: ExactTypedVariantOrigin -> Natural
+exactTypedVariantOriginOrdinal
+    (ExactTypedVariantOrigin ordinal _ _) = ordinal
+
+exactTypedVariantOriginText :: ExactTypedVariantOrigin -> String
+exactTypedVariantOriginText (ExactTypedVariantOrigin _ text _) = text
+
+exactTypedVariantOriginSidecar
+  :: ExactTypedVariantOrigin
+  -> TypedCandidateSemanticSidecar
+exactTypedVariantOriginSidecar
+    (ExactTypedVariantOrigin _ _ sidecar) = sidecar
 
 indexDetailedCandidateVariants :: [String] -> [DetailedCandidateVariant]
-indexDetailedCandidateVariants = zipWith DetailedCandidateVariant [0 ..]
+indexDetailedCandidateVariants = zipWith
+  (\ordinal text -> DetailedCandidateVariant ordinal text Nothing)
+  [0 ..]
 
 -- | Internal outcome retaining rendering provenance until the bounded group
 -- prefix is observed.  Compatibility APIs project this type immediately.
@@ -839,7 +927,10 @@ forceOutcome n outcome = case outcome of
 
 -- | 'forceOutcome' for the internal route-preserving stream.  Forcing the
 -- route alongside each bounded group keeps search and observation provenance
--- under the same caller-owned deadline without inspecting the tail.
+-- under the same caller-owned deadline without inspecting the tail.  Exact
+-- duplicate origins stay deliberately lazy: opt-in behavioral preparation
+-- pays their locally 'candidateWindow'-bounded lookup instead of widening
+-- Main's established synthesis work.
 forceDetailedOutcome :: Int -> Either String DetailedSynthOutcome -> Int
 forceDetailedOutcome n outcome = case outcome of
   Left err -> length err
@@ -1331,12 +1422,18 @@ mergeCandidateGroups left right =
 
 -- | Route-preserving form of 'mergeCandidateGroups'.  Dedupe looks only at
 -- rendered spellings and keeps the route of the first group with a surviving
--- spelling.
+-- spelling.  When that first group is compatibility-only, an exact duplicate
+-- from the Exference lane remains attached solely as that spelling's typed
+-- assessment origin.  This neither transfers the sidecar to the Djinn group
+-- nor gives any distinct spelling the later candidate's authority.
 mergeDetailedCandidateGroups
   :: [DetailedCandidateGroup]
   -> [DetailedCandidateGroup]
   -> [DetailedCandidateGroup]
-mergeDetailedCandidateGroups = djinnHead (synthMaxShown - 1) Set.empty
+mergeDetailedCandidateGroups djinnGroups exferenceGroups =
+  djinnHead (synthMaxShown - 1) Set.empty
+    (map (retainExactExferenceVariantOrigins exferenceGroups) djinnGroups)
+    exferenceGroups
  where
   djinnHead remaining seen djinn exference
     | remaining <= 0 =
@@ -1399,6 +1496,58 @@ mergeDetailedCandidateGroups = djinnHead (synthMaxShown - 1) Set.empty
           in (variant : fresh, retained')
      where
       spelling = detailedCandidateVariantText variant
+
+-- | Retain a later Exference origin only on the byte-for-byte identical
+-- spelling of an earlier compatibility group.  The lookup is deliberately
+-- stored as a lazy variant field: ordinary display projection and bounded
+-- scheduling do not force the other engine's tail.  Recovery itself is capped
+-- at the production Exference lane's established 'candidateWindow'; a wider
+-- synthetic stream therefore fails closed instead of widening work.
+retainExactExferenceVariantOrigins
+  :: [DetailedCandidateGroup]
+  -> DetailedCandidateGroup
+  -> DetailedCandidateGroup
+retainExactExferenceVariantOrigins exference group
+  | detailedCandidateGroupRoute group == RouteTypedCandidate = group
+  | Just _ <- detailedCandidateGroupSemanticSidecar group = group
+  | otherwise = DetailedCandidateGroup
+      (detailedCandidateGroupRoute group)
+      (map retainOrigin $ detailedCandidateGroupVariantRecords group)
+      Nothing
+ where
+  retainOrigin variant = DetailedCandidateVariant
+    (detailedCandidateVariantOrdinal variant)
+    (detailedCandidateVariantText variant)
+    (case detailedCandidateVariantExactTypedOrigin variant of
+      Just retained -> Just retained
+      Nothing -> findExactTypedVariantOrigin
+        (detailedCandidateVariantText variant) exference)
+
+findExactTypedVariantOrigin
+  :: String
+  -> [DetailedCandidateGroup]
+  -> Maybe ExactTypedVariantOrigin
+findExactTypedVariantOrigin spelling = go candidateWindow
+ where
+  go remaining _ | remaining <= 0 = Nothing
+  go _ [] = Nothing
+  go remaining (group : groups)
+    | detailedCandidateGroupRoute group /= RouteTypedCandidate =
+        go (remaining - 1) groups
+    | otherwise = case detailedCandidateGroupSemanticSidecar group of
+        Nothing -> go (remaining - 1) groups
+        Just sidecar -> case matchingVariant
+            (detailedCandidateGroupVariantRecords group) of
+          Nothing -> go (remaining - 1) groups
+          Just variant -> Just $ ExactTypedVariantOrigin
+            (detailedCandidateVariantOrdinal variant)
+            spelling
+            sidecar
+
+  matchingVariant [] = Nothing
+  matchingVariant (variant : variants)
+    | detailedCandidateVariantText variant == spelling = Just variant
+    | otherwise = matchingVariant variants
 
 -- | Both engines on one goal: merge their real candidates through the fair
 -- frontier above, and return negative evidence only when neither engine

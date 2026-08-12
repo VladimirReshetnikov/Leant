@@ -97,6 +97,7 @@ import Leant.Synth.Engine
   , DetailedCandidateGroup
   , DetailedSynthOutcome (..)
   , DetailedVerificationVariant
+  , TypedCandidateSemanticSidecar
   , ExferenceRunAuthorityInspection (..)
   , LengthHandoffRefusal (..)
   , PreparedSynthesisInspection (..)
@@ -4179,6 +4180,60 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
               , not $ isNothing $ detailedCandidateGroupSemanticSidecar group
               ] of
             origin : _ -> do
+              let compatibilityGroup = detailedCandidateGroup
+                    RouteUnobserved
+                    [ "djinn-only"
+                    , "Demo.emptyList"
+                    , "djinn-tail"
+                    ]
+                  recoveredGroups = mergeDetailedCandidateGroups
+                    [compatibilityGroup] [origin]
+              map detailedCandidateGroupVariants recoveredGroups @?=
+                mergeCandidateGroups
+                  [["djinn-only", "Demo.emptyList", "djinn-tail"]]
+                  [["Demo.emptyList"]]
+              case recoveredGroups of
+                recovered : _ -> do
+                  detailedCandidateGroupRoute recovered @?= RouteUnobserved
+                  assertBool
+                    "the display-owning Djinn group acquired a typed sidecar"
+                    (isNothing
+                      $ detailedCandidateGroupSemanticSidecar recovered)
+                  let recoveredVariants =
+                        detailedCandidateGroupVerificationVariants recovered
+                  map detailedVerificationVariantOrdinal recoveredVariants
+                    @?= [0, 1, 2]
+                  map detailedVerificationVariantRoute recoveredVariants
+                    @?= replicate 3 RouteUnobserved
+                  map
+                      (isNothing
+                        . detailedVerificationVariantSemanticSidecar)
+                      recoveredVariants
+                    @?= [True, False, True]
+                  recoveredBatch <- verifyCandidateGroups 1
+                    (\variant -> pure $
+                      if detailedVerificationVariantText variant
+                          == "Demo.emptyList"
+                        then VariantAccepted
+                        else VariantRejected LeanErrorDiagnostic)
+                    [recoveredVariants]
+                  case verifiedCandidateReceipts recoveredBatch of
+                    [recoveredVerified] -> do
+                      detailedVerificationVariantOrdinal
+                          (verifiedCandidate recoveredVerified) @?= 1
+                      recoveredHandoff <- expectRight $
+                        prepareCheckedLengthHandoff
+                          contract recoveredVerified
+                      checkedLengthCandidateResult
+                          (checkedLengthProblemCandidate
+                            $ checkedLengthHandoffProblem
+                              recoveredHandoff)
+                        @?= LengthLiteral 0
+                    receipts -> assertFailure $
+                      "exact duplicate provenance produced unexpected "
+                        ++ "verification receipts: " ++ show receipts
+                [] -> assertFailure
+                  "exact duplicate provenance removed the displayed group"
               batch <- verifyCandidateGroups 1
                 (const $ pure VariantAccepted)
                 [detailedCandidateGroupVerificationVariants origin]
@@ -4850,7 +4905,7 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
           ]
         @?= [fallback, typed]
   , testCase
-      "preserve only the originating typed sidecar through filtering and merge" $
+      "preserve the originating typed sidecar through filtering" $
       do
         let token = FAtom False "Demo.SemanticToken"
             goal = FArr token token
@@ -4878,21 +4933,122 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                           @?= typedCandidateSemanticFingerprint originalSemantic
                   other -> assertFailure $
                     "unexpected filtered typed outcome: " ++ show other
-                let earlier = detailedCandidateGroup RouteUnobserved
-                      (detailedCandidateGroupVariants origin)
-                    merged = mergeDetailedCandidateGroups [earlier] [origin]
                 assertBool
                   "observable semantic ownership was absent from equality"
-                  (origin /= earlier)
-                merged @?= [earlier]
-                assertBool
-                  "a later duplicate transferred its sidecar to earlier text"
-                  (all
-                    (isNothing . detailedCandidateGroupSemanticSidecar)
-                    merged)
+                  (origin /= detailedCandidateGroup RouteUnobserved
+                    (detailedCandidateGroupVariants origin))
           Right other -> assertFailure $
             "expected a typed semantic candidate, got: " ++ show other
           Left err -> assertFailure err
+  , testCase
+      "recover a later exact Exference origin without changing Djinn display" $
+      do
+        origin <- typedIdentityCandidateGroup "Demo.LaterSemanticToken"
+        let variants = detailedCandidateGroupVariants origin
+            earlier = detailedCandidateGroup RouteUnobserved variants
+            merged = mergeDetailedCandidateGroups [earlier] [origin]
+        map detailedCandidateGroupVariants merged @?=
+          mergeCandidateGroups [variants] [variants]
+        merged @?= [earlier]
+        case (detailedCandidateGroupSemanticSidecar origin, merged) of
+          (Just originalSemantic, [displayed]) -> do
+            detailedCandidateGroupRoute displayed @?= RouteUnobserved
+            assertBool
+              "a later exact origin became the Djinn group's own sidecar"
+              (isNothing
+                $ detailedCandidateGroupSemanticSidecar displayed)
+            let recovered =
+                  detailedCandidateGroupVerificationVariants displayed
+            map detailedVerificationVariantText recovered @?= variants
+            map detailedVerificationVariantRoute recovered @?=
+              replicate (length variants) RouteUnobserved
+            map detailedVerificationVariantOrdinal recovered @?=
+              take (length variants) [0 ..]
+            mapM_ (assertRecovered originalSemantic) recovered
+          (Nothing, _) -> assertFailure
+            "the later Exference group lacked typed authority"
+          (_, groups) -> assertFailure $
+            "the duplicate changed the displayed group structure: "
+              ++ show groups
+  , testCase
+      "retain an earlier exact Exference origin over a compatibility duplicate" $
+      do
+        origin <- typedIdentityCandidateGroup "Demo.EarlierSemanticToken"
+        let variants = detailedCandidateGroupVariants origin
+            compatibility = detailedCandidateGroup RouteUnobserved variants
+            merged = mergeDetailedCandidateGroups [origin] [compatibility]
+        map detailedCandidateGroupVariants merged @?=
+          mergeCandidateGroups [variants] [variants]
+        merged @?= [origin]
+        case merged of
+          [displayed] -> do
+            detailedCandidateGroupRoute displayed @?= RouteTypedCandidate
+            assertBool
+              "the earlier typed owner lost its group sidecar"
+              (not $ isNothing
+                $ detailedCandidateGroupSemanticSidecar displayed)
+            assertBool
+              "the earlier typed owner lost a verification sidecar"
+              (all
+                (not . isNothing
+                  . detailedVerificationVariantSemanticSidecar)
+                (detailedCandidateGroupVerificationVariants displayed))
+          groups -> assertFailure $
+            "the reverse duplicate changed the displayed group structure: "
+              ++ show groups
+  , testCase
+      "scope a recovered typed origin to only the identical spelling" $ do
+        origin <- typedIdentityCandidateGroup "Demo.MultiVariantToken"
+        case detailedCandidateGroupVariants origin of
+          [] -> assertFailure "the typed identity group had no spelling"
+          shared : typedTail -> do
+            let compatibilityVariants =
+                  ["djinn-only", shared, "djinn-tail"]
+                compatibility = detailedCandidateGroup
+                  RouteUnobserved compatibilityVariants
+                merged = mergeDetailedCandidateGroups
+                  [compatibility] [origin]
+            map detailedCandidateGroupVariants merged @?=
+              mergeCandidateGroups [compatibilityVariants]
+                [shared : typedTail]
+            case merged of
+              displayed : _ -> do
+                detailedCandidateGroupVariants displayed @?=
+                  compatibilityVariants
+                detailedCandidateGroupRoute displayed @?= RouteUnobserved
+                observationCount TypedCandidateRendered
+                    (candidateRenderingRouteObservations
+                      [detailedCandidateGroupRoute displayed])
+                  @?= 0
+                assertBool
+                  "variant recovery transferred ownership to the Djinn group"
+                  (isNothing
+                    $ detailedCandidateGroupSemanticSidecar displayed)
+                let recovered =
+                      detailedCandidateGroupVerificationVariants displayed
+                map detailedVerificationVariantText recovered @?=
+                  compatibilityVariants
+                map detailedVerificationVariantOrdinal recovered @?=
+                  [0, 1, 2]
+                map
+                    (isNothing
+                      . detailedVerificationVariantSemanticSidecar)
+                    recovered
+                  @?= [True, False, True]
+                let wrap term = "wrapped (" ++ term ++ ")"
+                    wrapped =
+                      mapDetailedCandidateGroupVariantsDroppingSemanticSidecar
+                        wrap displayed
+                detailedCandidateGroupVariants wrapped @?=
+                  map wrap compatibilityVariants
+                assertBool
+                  "a textual wrapper retained recovered typed authority"
+                  (all
+                    (isNothing
+                      . detailedVerificationVariantSemanticSidecar)
+                    (detailedCandidateGroupVerificationVariants wrapped))
+              [] -> assertFailure
+                "variant-scoped recovery removed the display owner"
   , testCase "drop typed semantics when wrapping a candidate as a new term" $ do
       let token = FAtom False "Demo.WrappedToken"
           goal = FArr token token
@@ -4967,7 +5123,53 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
         SynthCandidates projected _ -> take 1 projected @?= [["first"]]
         other -> assertFailure $ "unexpected projection: " ++ show other
       take 1 (mergeDetailedCandidateGroups groups poison) @?= [first]
+      let compatibility = detailedCandidateGroup
+            RouteUnobserved ["compatibility"]
+          lazyMerge = mergeDetailedCandidateGroups [compatibility] poison
+      map detailedCandidateGroupVariants (take 1 lazyMerge)
+        @?= [["compatibility"]]
+      forceDetailedOutcome 1
+          (Right $ DetailedSynthCandidates lazyMerge [])
+        @?= length "compatibility"
+      let twiceMerged = mergeDetailedCandidateGroups lazyMerge poison
+      map detailedCandidateGroupVariants (take 1 twiceMerged)
+        @?= [["compatibility"]]
+      forceDetailedOutcome 1
+          (Right $ DetailedSynthCandidates twiceMerged [])
+        @?= length "compatibility"
   ]
+
+typedIdentityCandidateGroup :: String -> IO DetailedCandidateGroup
+typedIdentityCandidateGroup tokenName = do
+  let token = FAtom False tokenName
+      goal = FArr token token
+  case synthesizeWithProvidersSkippingDetailed
+      EngineExference 128 Set.empty [] goal of
+    Right (DetailedSynthCandidates (origin : _) _) ->
+      case detailedCandidateGroupSemanticSidecar origin of
+        Just _ -> pure origin
+        Nothing -> assertFailure $
+          "typed identity origin lost its sidecar: " ++ show origin
+    Right other -> assertFailure $
+      "expected a typed identity candidate, got: " ++ show other
+    Left err -> assertFailure err
+
+assertRecovered
+  :: TypedCandidateSemanticSidecar
+  -> DetailedVerificationVariant
+  -> IO ()
+assertRecovered expected variant = case
+    detailedVerificationVariantSemanticSidecar variant of
+  Just recovered -> do
+    typedCandidateSemanticCandidate recovered @?=
+      typedCandidateSemanticCandidate expected
+    typedCandidateSemanticInventory recovered @?=
+      typedCandidateSemanticInventory expected
+    typedCandidateSemanticFingerprint recovered @?=
+      typedCandidateSemanticFingerprint expected
+  Nothing -> assertFailure $
+    "exact duplicate spelling lacked recovered typed authority: "
+      ++ detailedVerificationVariantText variant
 
 providerEngineTests :: TestTree
 providerEngineTests = testGroup "foreign providers"
