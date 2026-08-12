@@ -77,10 +77,12 @@ strengthening query/evidence replay.
 
 Djex likewise drops the private typed SMT plan after bounded rendering and
 structural fingerprint construction. The sealed query keeps only the checked
-problem, exact decoder-symbol order, canonical check/request bytes, and full
-query fingerprint needed by live execution and replay. The fingerprint's
-typed-plan field remains unchanged, so this heap reduction does not make
-rendered bytes the semantic source of truth or alter query identity.
+problem, canonical check bytes, and full query fingerprint needed by live
+execution and replay. Exact decoder-symbol order and optional canonical
+`get-value` bytes are rederived from the problem's sealed arity after both were
+already bounded and structurally fingerprinted during sealing. The
+fingerprint's typed-plan field remains unchanged, so this heap reduction does
+not make rendered bytes the semantic source of truth or alter query identity.
 
 Preparation returns only the sealed problem. Callback receipt and resolved
 family values are consumed before that result rather than being copied into a

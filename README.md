@@ -307,8 +307,11 @@ graph key. That receipt is not by itself a concrete Lean counterexample or
 kernel proof.
 The query's typed SMT plan is transient through rendering and structural
 fingerprinting. Once sealed, the opaque query retains only its checked problem,
-exact ordered input symbols, bounded command bytes, and complete fingerprint;
-the unchanged structural fingerprint still binds the full typed plan.
+bounded canonical check bytes, and complete fingerprint. Exact ordered input
+symbols and optional canonical `get-value` bytes are rederived from the
+problem's sealed arity after both were already bounded and structurally
+fingerprinted during sealing; the unchanged structural fingerprint still binds
+the full typed plan.
 The collision boundary is detailed in the
 [exact-duplicate typed-provenance report](docs/reports/2026-08-11-exact-duplicate-typed-provenance.md).
 
