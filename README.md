@@ -306,7 +306,11 @@ with its original candidate. During combined-engine exact-text deduplication,
 an earlier compatibility-only spelling may retain a private variant-scoped
 witness to the first later Exference candidate which rendered the identical bytes; display
 ownership, route, ordinal, ordering, and sibling variants remain unchanged, so
-no sidecar is transferred onto a Djinn group. Wrappers such as
+no sidecar is transferred onto a Djinn group. At the verification boundary the
+display route, ordinal, and text are flattened into the callback candidate and
+that spelling carries its exact typed origin in one field; the accepted receipt
+does not retain the scheduling-only variant record or a parallel origin copy.
+Wrappers such as
 `Classical.byContradiction` discard both direct and recovered authority because
 they denote a new term.
 This is deliberately a solver-neutral identity seam, not behavioral evidence.

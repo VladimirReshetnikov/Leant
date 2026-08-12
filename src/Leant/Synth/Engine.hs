@@ -361,11 +361,15 @@ instance Eq DetailedCandidateVariant where
 
 instance Show DetailedCandidateVariant where
   showsPrec precedence (DetailedCandidateVariant ordinal text _) =
-    showParen (precedence > 10) $
-      showString "DetailedCandidateVariant "
-        . showsPrec 11 ordinal
-        . showChar ' '
-        . showsPrec 11 text
+    showsDetailedCandidateVariant precedence ordinal text
+
+showsDetailedCandidateVariant :: Int -> Natural -> String -> ShowS
+showsDetailedCandidateVariant precedence ordinal text =
+  showParen (precedence > 10) $
+    showString "DetailedCandidateVariant "
+      . showsPrec 11 ordinal
+      . showChar ' '
+      . showsPrec 11 text
 
 -- | One semantic candidate and the route that supplied the expression handed
 -- to Leant's renderer.  Every deduplication boundary names the textual-variant
@@ -415,31 +419,36 @@ detailedCandidateGroupVariants (DetailedCandidateGroup _ variants _) =
   map detailedCandidateVariantText variants
 
 -- | Verification-facing candidates retain the displayed spelling, its
--- display owner's renderer ordinal and route, and any exact typed assessment
+-- display owner's renderer ordinal and route, and one exact typed assessment
 -- origin for that spelling.  The latter may come from a duplicate later
 -- Exference group, so it is intentionally independent of display provenance.
--- The verifier stays generic; only the Lean callback projects the text it
--- must elaborate.
+-- Scheduling's 'DetailedCandidateVariant' is flattened at this boundary: an
+-- accepted receipt therefore keeps neither that intermediate record nor a
+-- parallel copy of its recovered origin.  The verifier stays generic; only
+-- the Lean callback projects the text it must elaborate.
 data DetailedVerificationVariant = DetailedVerificationVariant
   CandidateRenderingRoute
-  DetailedCandidateVariant
+  Natural
+  String
   (Maybe ExactTypedVariantOrigin)
 
 instance Eq DetailedVerificationVariant where
-  DetailedVerificationVariant leftRoute leftVariant leftSidecar
-      == DetailedVerificationVariant rightRoute rightVariant rightSidecar =
+  DetailedVerificationVariant leftRoute leftOrdinal leftText leftOrigin
+      == DetailedVerificationVariant
+          rightRoute rightOrdinal rightText rightOrigin =
     leftRoute == rightRoute
-      && leftVariant == rightVariant
-      && leftSidecar == rightSidecar
+      && leftOrdinal == rightOrdinal
+      && leftText == rightText
+      && leftOrigin == rightOrigin
 
 instance Show DetailedVerificationVariant where
   showsPrec precedence
-      (DetailedVerificationVariant route variant _) =
+      (DetailedVerificationVariant route ordinal text _) =
     showParen (precedence > 10) $
       showString "DetailedVerificationVariant "
         . showsPrec 11 route
         . showChar ' '
-        . showsPrec 11 variant
+        . showsDetailedCandidateVariant 11 ordinal text
 
 -- | Preserve group provenance while presenting its spellings to verification.
 detailedCandidateGroupVerificationVariants
@@ -447,29 +456,31 @@ detailedCandidateGroupVerificationVariants
   -> [DetailedVerificationVariant]
 detailedCandidateGroupVerificationVariants
     (DetailedCandidateGroup route variants sidecar) =
-  map (\variant -> DetailedVerificationVariant route variant
-    $ exactOrigin variant sidecar) variants
- where
-  exactOrigin variant retained = case retained of
+  map (verificationVariant route sidecar) variants
+
+verificationVariant
+  :: CandidateRenderingRoute
+  -> Maybe TypedCandidateSemanticSidecar
+  -> DetailedCandidateVariant
+  -> DetailedVerificationVariant
+verificationVariant route retained
+    (DetailedCandidateVariant ordinal text recoveredOrigin) =
+  DetailedVerificationVariant route ordinal text $ case retained of
     Just semantic -> Just $ ExactTypedVariantOrigin
-      (detailedCandidateVariantOrdinal variant)
-      (detailedCandidateVariantText variant)
-      semantic
-    Nothing -> detailedCandidateVariantExactTypedOrigin variant
+      ordinal text semantic
+    Nothing -> recoveredOrigin
 
 -- | Exact Lean spelling passed to the backend verifier.
 detailedVerificationVariantText :: DetailedVerificationVariant -> String
 detailedVerificationVariantText
-    (DetailedVerificationVariant _ variant _) =
-  detailedCandidateVariantText variant
+    (DetailedVerificationVariant _ _ text _) = text
 
 -- | Original zero-based renderer ordinal, stable through filtering and merge.
 detailedVerificationVariantOrdinal
   :: DetailedVerificationVariant
   -> Natural
 detailedVerificationVariantOrdinal
-    (DetailedVerificationVariant _ variant _) =
-  detailedCandidateVariantOrdinal variant
+    (DetailedVerificationVariant _ ordinal _ _) = ordinal
 
 -- | Rendering path of the group which owns this displayed occurrence.  A
 -- recovered typed assessment origin does not rewrite this observation.
@@ -477,7 +488,7 @@ detailedVerificationVariantRoute
   :: DetailedVerificationVariant
   -> CandidateRenderingRoute
 detailedVerificationVariantRoute
-    (DetailedVerificationVariant route _ _) = route
+    (DetailedVerificationVariant route _ _ _) = route
 
 -- | Checked Exference origin, when the accepted spelling still denotes an
 -- unwrapped typed candidate.  This can be the displayed group itself or the
@@ -775,10 +786,9 @@ detailedVerificationVariantExactTypedOrigin
   :: DetailedVerificationVariant
   -> Maybe ExactTypedVariantOrigin
 detailedVerificationVariantExactTypedOrigin
-    (DetailedVerificationVariant _ variant exactOrigin) = case exactOrigin of
+    (DetailedVerificationVariant _ _ text exactOrigin) = case exactOrigin of
   Just retained
-    | exactTypedVariantOriginText retained
-        == detailedCandidateVariantText variant -> Just retained
+    | exactTypedVariantOriginText retained == text -> Just retained
   _ -> Nothing
 
 exactTypedVariantOriginOrdinal :: ExactTypedVariantOrigin -> Natural

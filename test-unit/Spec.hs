@@ -5436,11 +5436,17 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                 $ detailedCandidateGroupSemanticSidecar displayed)
             let recovered =
                   detailedCandidateGroupVerificationVariants displayed
+                unassociated =
+                  detailedCandidateGroupVerificationVariants earlier
             map detailedVerificationVariantText recovered @?= variants
             map detailedVerificationVariantRoute recovered @?=
               replicate (length variants) RouteUnobserved
             map detailedVerificationVariantOrdinal recovered @?=
               take (length variants) [0 ..]
+            map show recovered @?= map show unassociated
+            assertBool
+              "verification equality ignored its exact typed origin"
+              (recovered /= unassociated)
             mapM_ (assertRecovered originalSemantic) recovered
           (Nothing, _) -> assertFailure
             "the later Exference group lacked typed authority"
@@ -5605,6 +5611,20 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
           lazyMerge = mergeDetailedCandidateGroups [compatibility] poison
       map detailedCandidateGroupVariants (take 1 lazyMerge)
         @?= [["compatibility"]]
+      case take 1 lazyMerge of
+        [lazyGroup] -> case
+            detailedCandidateGroupVerificationVariants lazyGroup of
+          [variant] -> do
+            detailedVerificationVariantText variant @?= "compatibility"
+            detailedVerificationVariantOrdinal variant @?= 0
+            detailedVerificationVariantRoute variant @?= RouteUnobserved
+            show variant @?=
+              "DetailedVerificationVariant RouteUnobserved \
+              \(DetailedCandidateVariant 0 \"compatibility\")"
+          variants -> assertFailure $
+            "unexpected lazy verification variants: " ++ show variants
+        groups' -> assertFailure $
+          "unexpected lazy merged groups: " ++ show groups'
       forceDetailedOutcome 1
           (Right $ DetailedSynthCandidates lazyMerge [])
         @?= length "compatibility"

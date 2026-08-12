@@ -13,10 +13,13 @@ may retain a private `ExactTypedVariantOrigin` for behavioral preparation.
 This is not a sidecar transfer. The first occurrence still owns its group,
 route observation, display ordinal, order, verification slot, and compatibility
 projection. Group/display equality ignores the witness, while the
-verification-facing value retains it. Its group-level semantic sidecar remains
-absent. The witness retains the later Exference candidate, authority, exact
-spelling, and that origin's renderer ordinal only on the matching variant.
-Other spellings in the same Djinn group remain untyped.
+verification-facing value retains it in its single exact-origin field. That
+value flattens the scheduling-only variant to its display route, ordinal, and
+text instead of retaining the intermediate record plus a parallel copy of the
+same recovered origin. Its group-level semantic sidecar remains absent. The
+witness retains the later Exference candidate, authority, exact spelling, and
+that origin's renderer ordinal only on the matching variant. Other spellings
+in the same Djinn group remain untyped.
 
 ## Checked use
 
@@ -51,6 +54,12 @@ Stable filtering keeps a witness only with the unchanged spelling. Arbitrary
 text transformations, including the classical wrapper, discard direct and
 recovered authority. Nested merges preserve the lazy witness without entering
 a poison or unbounded right tail merely to display the first group.
+
+Flattening at verification preserves that productivity boundary: route,
+display ordinal, text, and the legacy authority-free `Show` rendering do not
+force the lazy exact-origin lookup. Verification equality still compares the
+origin after route, ordinal, and text, so callback receipts cannot treat an
+association-free occurrence as the same value as its origin-bearing twin.
 
 Tests cover both collision directions, exact-spelling-only recovery inside a
 multi-variant group, unchanged route and ordinal observations, a real recovered
