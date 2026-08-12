@@ -915,8 +915,6 @@ prepareSynthesis recursiveProjection activeProviders extras engineFrag fitFrag =
             translationProviderBindings translation
         , semanticOriginSemanticFamilyBindings =
             translationSemanticFamilyBindings translation
-        , semanticOriginProviderAssignments =
-            translationProviderAssignments translation
         , semanticOriginConstructorMap = translationConstructorMap translation
         , semanticOriginProviderMap = translationProviderMap translation
         , semanticOriginTypeMap = translationTypeMap translation
@@ -1550,8 +1548,9 @@ providerBindingDeclaration binding = ValueDeclaration
     (providerBindingScheme binding))
 
 -- | Complete pure output of fragment translation, before search-only premises
--- are inserted around the source goal. Provider bindings are retained beside
--- their historical declaration, assignment, and renderer-map projections so
+-- are inserted around the source goal. Provider bindings are the sole owner
+-- of their ordered canonical source-domain instantiation assignments and
+-- remain beside the historical declaration and renderer-map projections, so
 -- future consumers do not have to recover source identity from a private
 -- spelling.
 data SynthesisTranslation = SynthesisTranslation
@@ -1560,8 +1559,6 @@ data SynthesisTranslation = SynthesisTranslation
   , translationProviderDeclarations :: [DjinnDecl]
   , translationProviderBindings :: [ProviderBinding]
   , translationSemanticFamilyBindings :: [SemanticFamilyBinding]
-  , translationProviderAssignments ::
-      [KindedProviderInstantiationAssignment String]
   , translationConstructorMap :: CtorMap
   , translationProviderMap :: ProviderMap
   , translationTypeMap :: TypeMap
@@ -1624,8 +1621,6 @@ data PreparedSemanticOrigin = PreparedSemanticOrigin
   , semanticOriginDeclarations :: [DjinnDecl]
   , semanticOriginProviderBindings :: [ProviderBinding]
   , semanticOriginSemanticFamilyBindings :: [SemanticFamilyBinding]
-  , semanticOriginProviderAssignments ::
-      [KindedProviderInstantiationAssignment String]
   , semanticOriginConstructorMap :: CtorMap
   , semanticOriginProviderMap :: ProviderMap
   , semanticOriginTypeMap :: TypeMap
@@ -1633,6 +1628,16 @@ data PreparedSemanticOrigin = PreparedSemanticOrigin
   , semanticOriginProjectionCompleteness :: ProjectionCompleteness
   }
   deriving (Eq, Show)
+
+-- | Exact search-order projection of source-domain canonical assignments from
+-- their sole prepared owner. Provider order and each provider-local assignment
+-- order are retained verbatim; the aggregate list is never cached beside the
+-- bindings. The separately converted Exference list remains run authority.
+semanticOriginProviderAssignments
+  :: PreparedSemanticOrigin
+  -> [KindedProviderInstantiationAssignment String]
+semanticOriginProviderAssignments =
+  concatMap providerBindingAssignments . semanticOriginProviderBindings
 
 -- | Exact package-private provider-binding view consumed by the checked
 -- Length handoff and focused boundary tests. It deliberately contains no
@@ -2896,7 +2901,6 @@ fragToDjinn recursiveProjection providers extras frag0 = do
           )
         | binding <- providerBindings
         ]
-      instantiations = concatMap providerBindingAssignments providerBindings
       constructorPremises = tsPrems finalState
       familyBindings = semanticFamilyBindings
         (tsDecls finalState)
@@ -2908,7 +2912,6 @@ fragToDjinn recursiveProjection providers extras frag0 = do
     , translationProviderDeclarations = providerDecls
     , translationProviderBindings = providerBindings
     , translationSemanticFamilyBindings = familyBindings
-    , translationProviderAssignments = instantiations
     , translationConstructorMap = tsCtorMap finalState
     , translationProviderMap = providerMap
     , translationTypeMap = tsTypeMap finalState

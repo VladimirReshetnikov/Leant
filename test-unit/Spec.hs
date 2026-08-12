@@ -1436,6 +1436,31 @@ translationPreparationTests = testGroup "prepared synthesis translation"
       inspectedFitFragment prepared @?= fit
       assertBool "engine and fitting targets collapsed"
         (inspectedEngineFragment prepared /= inspectedFitFragment prepared)
+  , testCase "derive aggregate provider assignments in binding order" $ do
+      privateZero <- expectRight $ mkIdentifier "leantProvider0"
+      privateOne <- expectRight $ mkIdentifier "leantProvider1"
+      let providerType = FAll False "a" (FVar "a")
+          argument name = ProviderInstantiationArgument 0
+            $ FAtom False name
+          first = ProviderFragWithEvidence "Demo.firstProvider"
+            providerType ["a"] [[argument "Nat"], [argument "Bool"]]
+          second = ProviderFragWithEvidence "Demo.secondProvider"
+            providerType ["a"] [[argument "Char"]]
+          goal = FAtom False "Demo.Target"
+      prepared <- expectRight $ inspectExferencePreparation
+        [first, second] [] goal goal
+      bindings <- case inspectedProviderBindings prepared of
+        [firstBinding, secondBinding] -> pure
+          [firstBinding, secondBinding]
+        other -> assertFailure
+          ("expected two ordered provider bindings, got: " ++ show other)
+          >> pure []
+      map (length . inspectedProviderAssignments) bindings @?= [2, 1]
+      map kindedProviderInstantiationAssignmentProvider
+          (inspectedAllProviderAssignments prepared) @?=
+        [privateZero, privateZero, privateOne]
+      inspectedAllProviderAssignments prepared @?=
+        concatMap inspectedProviderAssignments bindings
   , testCase "bind private providers, assignments, and exact family maps" $ do
       privateProvider <- expectRight $ mkIdentifier "leantProvider0"
       privateType <- expectRight $ mkIdentifier "LeantType0"
