@@ -86,6 +86,14 @@ already bounded and structurally fingerprinted during sealing. The
 fingerprint's typed-plan field remains unchanged, so this heap reduction does
 not make rendered bytes the semantic source of truth or alter query identity.
 
+The private protocol plan follows the same single-owner rule. Its unchanged
+complete fingerprint still binds the exact initial and optional value writes,
+but the plan retains only the sealed query and positional sentinels needed to
+render them. Concatenated write fragments are transient fingerprint inputs and
+are derived again on demand through the selectors used at the causal write
+edges; presence-only inspection of the optional write does not render request
+bytes.
+
 Preparation returns only the sealed problem. Callback receipt and resolved
 family values are consumed before that result rather than being copied into a
 transient wrapper; the ranking association is the only receipt-bearing slot
