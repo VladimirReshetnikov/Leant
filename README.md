@@ -320,6 +320,8 @@ family provenance, an opaque Djex session which owns the exact inventory and
 provider assumptions, the separately reassociated contract, and the
 candidate-specific Djex problem. That checked preparation consumes the
 renderer, family, and session authority and returns only the sealed problem;
+Engine owns the exact-origin rerender mechanics and private premise-layout ABI,
+while Handoff owns the singleton, original-ordinal, and accepted-text policy.
 `Leant.Synth.Length.Adapter` then seals it into a bounded canonical QF_LIA
 query without exposing an arbitrary problem-taking entrance. Neither step
 launches a solver or grants authority

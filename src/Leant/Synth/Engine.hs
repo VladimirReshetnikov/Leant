@@ -33,6 +33,7 @@ module Leant.Synth.Engine
   , DetailedCandidateGroup
   , DetailedVerificationVariant
   , ExactTypedVariantOrigin
+  , ExactTypedVariantRenderingFailure (..)
   , TypedCandidateSemanticSidecar
   , detailedCandidateGroup
   , detailedCandidateGroupRoute
@@ -46,6 +47,7 @@ module Leant.Synth.Engine
   , detailedVerificationVariantExactTypedOrigin
   , exactTypedVariantOriginOrdinal
   , exactTypedVariantOriginSidecar
+  , renderExactTypedVariantOrigin
   , typedCandidateSemanticCandidate
   , typedCandidateSemanticInventory
   , typedCandidateSemanticAuthorityInspection
@@ -114,6 +116,7 @@ import Language.Haskell.Djex
   , ExferenceRequest
   , ExferenceSession
   , ExferenceSessionPolicy (..)
+  , ExferenceTermGraphAbsence
   , ExferenceTypedCandidate
   , ExferenceType
   , ExferenceTypeVariable
@@ -552,6 +555,42 @@ exactTypedVariantOriginSidecar
   -> TypedCandidateSemanticSidecar
 exactTypedVariantOriginSidecar
     (ExactTypedVariantOrigin _ _ sidecar) = sidecar
+
+-- | Closed failure phases of re-rendering the exact checked graph retained by
+-- one typed verification origin. The graph remains owned by its opaque Djex
+-- candidate; this classification exposes neither the graph nor the renderer's
+-- input maps or premise layout.
+data ExactTypedVariantRenderingFailure
+  = ExactTypedVariantGraphUnavailable ExferenceTermGraphAbsence
+  | ExactTypedVariantRendererRejected String
+  deriving (Eq, Show)
+
+-- | Re-run the exact renderer from the origin's retained Engine provenance.
+--
+-- Keeping this operation beside 'PremiseLayout' makes the positional renderer
+-- ABI single-owner. Domain handoffs may impose their own cardinality, ordinal,
+-- and accepted-text rules over the returned alternatives; this operation keeps
+-- current handoffs from rebuilding constructor, provider, type, or
+-- premise-layout inputs independently.
+renderExactTypedVariantOrigin
+  :: ExactTypedVariantOrigin
+  -> Either ExactTypedVariantRenderingFailure [String]
+renderExactTypedVariantOrigin
+    (ExactTypedVariantOrigin _ _
+      (TypedCandidateSemanticSidecar candidate authority)) = do
+  graph <- case typedCandidateTermGraph candidate of
+    Left absence -> Left $ ExactTypedVariantGraphUnavailable absence
+    Right retained -> Right retained
+  let origin = exferenceAuthorityPreparation authority
+  either (Left . ExactTypedVariantRendererRejected) Right
+    $ renderLeanTermGraphProjection
+        (("x" ++) . show)
+        (semanticOriginConstructorMap origin)
+        (semanticOriginProviderMap origin)
+        (semanticOriginTypeMap origin)
+        (premiseLayoutForRenderer $ semanticOriginPremiseLayout origin)
+        (semanticOriginFitFragment origin)
+        graph
 
 indexDetailedCandidateVariants :: [String] -> [DetailedCandidateVariant]
 indexDetailedCandidateVariants = zipWith

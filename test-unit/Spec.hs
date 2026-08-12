@@ -115,6 +115,7 @@ import Leant.Synth.Engine
   , detailedCandidateGroupVariants
   , detailedCandidateGroupVerificationVariants
   , detailedVerificationVariantOrdinal
+  , detailedVerificationVariantExactTypedOrigin
   , detailedVerificationVariantRoute
   , detailedVerificationVariantSemanticSidecar
   , detailedVerificationVariantText
@@ -137,6 +138,7 @@ import Leant.Synth.Engine
   , synthesizeWithProvidersSkippingDetailed
   , synthesizeTunedDetailed
   , projectDetailedSynthOutcome
+  , renderExactTypedVariantOrigin
   , renderCandidateByAvailability
   , takeDistinct
   , takeDistinctOn
@@ -5205,6 +5207,13 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                       detailedCandidateGroupVariants origin !! 1
                     detailedVerificationVariantRoute accepted @?=
                       RouteTypedCandidate
+                    case detailedVerificationVariantExactTypedOrigin
+                        accepted of
+                      Just exactOrigin ->
+                        renderExactTypedVariantOrigin exactOrigin @?=
+                          Right (detailedCandidateGroupVariants origin)
+                      Nothing -> assertFailure
+                        "accepted renderer variant lost its exact origin"
                     case detailedVerificationVariantSemanticSidecar
                         accepted of
                       Just acceptedSemantic -> do

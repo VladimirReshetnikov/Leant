@@ -4,9 +4,10 @@
 -- This is the sole Length-specific consumer of synthesis provenance.  Its
 -- public entrance accepts the opaque verification receipt, not a detached
 -- candidate, origin, inspection record, or rendered spelling.  The exact
--- typed origin is recovered through "Leant.Synth.Engine" first; candidate,
--- inventory, renderer provenance, and source identities are then projected
--- from that one retained sidecar before Djex seals the problem.
+-- typed origin is recovered through "Leant.Synth.Engine" first. Candidate,
+-- inventory, and source identities are projected from its one retained
+-- sidecar, while Engine rerenders that opaque origin without exposing its
+-- private map or premise-layout inputs, before Djex seals the problem.
 --
 -- Callback acceptance is not a kernel proof, behavioral observation, or
 -- solver certificate.  This module establishes only the narrow structural
@@ -24,7 +25,6 @@ import Language.Haskell.Djex
   , ExferenceLocal
   , ExferenceTermGraphAbsence
   , ExferenceTypeVariable
-  , ExferenceTypedCandidate
   , LengthContractError
   , LengthProblemError
   , LengthProviderInventoryError (..)
@@ -41,11 +41,12 @@ import Language.Haskell.Djex
   , sealLengthContractInContext
   , sealLengthSession
   , sealLengthTypedCandidateProblem
-  , typedCandidateTermGraph
   )
 
 import Leant.Synth.Engine
   ( DetailedVerificationVariant
+  , ExactTypedVariantOrigin
+  , ExactTypedVariantRenderingFailure (..)
   , ExferenceRunAuthorityInspection
   , PreparedSynthesisInspection
   , SemanticFamilyBindingInspection
@@ -59,12 +60,10 @@ import Leant.Synth.Engine
   , inspectedAuthorityPreparation
   , inspectedAuthorityRequest
   , inspectedCallerPremises
-  , inspectedConstructorMap
   , inspectedConstructorPremises
   , inspectedEngineFragment
   , inspectedFitFragment
   , inspectedProviderBindings
-  , inspectedProviderMap
   , inspectedProviderPrivateName
   , inspectedProviderScheme
   , inspectedProviderSourceName
@@ -73,11 +72,8 @@ import Leant.Synth.Engine
   , inspectedSemanticFamilyConstructors
   , inspectedSemanticFamilyLeanName
   , inspectedSemanticFamilyPrivateTypeName
-  , inspectedSourceArrowCount
   , inspectedSourceGoal
-  , inspectedTypeMap
-  , translatedPremiseFragment
-  , translatedPremiseName
+  , renderExactTypedVariantOrigin
   , typedCandidateSemanticAuthorityInspection
   , typedCandidateSemanticCandidate
   , typedCandidateSemanticInventory
@@ -87,10 +83,8 @@ import Leant.Synth.Length.Contract
   , LeanLengthProviderLaw (..)
   , LeanLengthSpineIdentity (..)
   )
-import Leant.Synth.Fragment (Frag)
 import Leant.Synth.Observability
   ( CandidateRenderingRoute (RouteTypedCandidate) )
-import Leant.Synth.Render (renderLeanTermGraphProjection)
 import Leant.Synth.Verification (Verified, verifiedCandidate)
 
 -- | Stable fail-closed phases of preparing one Length behavioral problem.
@@ -177,9 +171,7 @@ prepareCheckedLengthProblem source verified = do
   if requestGoal request == convertedSource
     then pure ()
     else Left LengthHandoffRequestGoalChanged
-  checkUniqueDirectRendering
-    (exactTypedVariantOriginOrdinal exactOrigin)
-    variant candidate origin
+  checkUniqueDirectRendering exactOrigin variant
   (family, zeroConstructor, stepConstructor) <- resolveSemanticFamily origin
     $ leanLengthContractSpine source
   providerLaws <- boundedProviderLawPrefix
@@ -297,28 +289,21 @@ resolveProviderLaw authority origin law = case
     (leanLengthProviderLawName law) (length bindings)
 
 checkUniqueDirectRendering
-  :: Natural
+  :: ExactTypedVariantOrigin
   -> DetailedVerificationVariant
-  -> ExferenceTypedCandidate
-  -> PreparedSynthesisInspection
   -> Either LengthHandoffRefusal ()
-checkUniqueDirectRendering originatingOrdinal variant candidate origin = do
-  graph <- case typedCandidateTermGraph candidate of
-    Left absence -> Left $ LengthHandoffTypedGraphLost absence
-    Right retained -> Right retained
-  rendered <- either (Left . LengthHandoffRendererRejected) Right
-    $ renderLeanTermGraphProjection
-        (("x" ++) . show)
-        (inspectedConstructorMap origin)
-        (inspectedProviderMap origin)
-        (inspectedTypeMap origin)
-        (rendererPremiseLayout origin)
-        (inspectedFitFragment origin)
-        graph
+checkUniqueDirectRendering exactOrigin variant = do
+  rendered <- case renderExactTypedVariantOrigin exactOrigin of
+    Left (ExactTypedVariantGraphUnavailable absence) ->
+      Left $ LengthHandoffTypedGraphLost absence
+    Left (ExactTypedVariantRendererRejected refusal) ->
+      Left $ LengthHandoffRendererRejected refusal
+    Right alternatives -> Right alternatives
   exactText <- case rendered of
     [text] -> Right text
     alternatives -> Left $ LengthHandoffRendererNotUnique
       $ length alternatives
+  let originatingOrdinal = exactTypedVariantOriginOrdinal exactOrigin
   if originatingOrdinal == 0
     then pure ()
     else Left $ LengthHandoffRendererOrdinalChanged originatingOrdinal
@@ -326,15 +311,3 @@ checkUniqueDirectRendering originatingOrdinal variant candidate origin = do
   if acceptedText == exactText
     then Right ()
     else Left $ LengthHandoffRendererTextChanged exactText acceptedText
-
-rendererPremiseLayout
-  :: PreparedSynthesisInspection
-  -> ([(String, Frag)], Int, [(String, Frag)])
-rendererPremiseLayout origin =
-  ( map premisePair $ inspectedConstructorPremises origin
-  , inspectedSourceArrowCount origin
-  , map premisePair $ inspectedCallerPremises origin
-  )
- where
-  premisePair premise =
-    (translatedPremiseName premise, translatedPremiseFragment premise)
