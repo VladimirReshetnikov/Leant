@@ -237,7 +237,7 @@ import Leant.Synth.Length.Integration
   , disabledLengthAssessmentMode
   , lengthAssessmentCandidates
   , lengthAssessmentFailure
-  , lengthAssessmentModeEnabled
+  , lengthAssessmentModeActivationPolicy
   , lengthAssessmentPostVerificationResult
   , loadLengthAssessmentMode
   )
@@ -2210,7 +2210,8 @@ lengthAssessmentIntegrationTests = testGroup
 
 assertLengthAssessmentDisabled :: IO ()
 assertLengthAssessmentDisabled = do
-  lengthAssessmentModeEnabled disabledLengthAssessmentMode @?= False
+  lengthAssessmentModeActivationPolicy disabledLengthAssessmentMode @?=
+    Nothing
   verification <- syntheticPostVerificationBatch
     ["integration-disabled-first", "integration-disabled-second"]
   result <- assessLengthVerificationBatch
@@ -2288,6 +2289,33 @@ assertLengthAssessmentConfigured
           Right _ -> assertFailure
             "an unpinned integration configuration was activated implicitly"
 
+        let pinnedDocument = setJsonField
+              ["execution", "expectedExecutableSha256"]
+              (Json.JStr $ replicate 64 '0') document
+        ByteString.writeFile sourcePath
+          $ encodeLengthRankingConfigurationFile pinnedDocument
+        pinnedRequired <- loadLengthAssessmentMode RequirePinnedExecutable
+          $ LengthRankingConfigurationFileSource sourcePath 1000
+        requiredMode <- case pinnedRequired of
+          Left failure -> assertFailure
+            ("pinned Length assessment setup failed: " ++ show failure)
+              >> error "unreachable"
+          Right configured -> pure configured
+        lengthAssessmentModeActivationPolicy requiredMode @?=
+          Just RequirePinnedExecutable
+
+        pinnedPermitted <- loadLengthAssessmentMode PermitUnpinnedExecutable
+          $ LengthRankingConfigurationFileSource sourcePath 1000
+        permittedPinnedMode <- case pinnedPermitted of
+          Left failure -> assertFailure
+            ("relaxed pinned Length assessment setup failed: " ++ show failure)
+              >> error "unreachable"
+          Right configured -> pure configured
+        lengthAssessmentModeActivationPolicy permittedPinnedMode @?=
+          Just PermitUnpinnedExecutable
+
+        ByteString.writeFile sourcePath
+          $ encodeLengthRankingConfigurationFile document
         loaded <- loadLengthAssessmentMode PermitUnpinnedExecutable
           $ LengthRankingConfigurationFileSource sourcePath 1000
         mode <- case loaded of
@@ -2295,7 +2323,8 @@ assertLengthAssessmentConfigured
             ("Length assessment setup failed: " ++ show failure)
               >> error "unreachable"
           Right configured -> pure configured
-        lengthAssessmentModeEnabled mode @?= True
+        lengthAssessmentModeActivationPolicy mode @?=
+          Just PermitUnpinnedExecutable
         doesFileExist (executable ++ ".events") >>= (@?= False)
 
         verification <- verificationBatchFromReceipts [zero, retained, one]

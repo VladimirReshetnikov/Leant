@@ -119,6 +119,9 @@ budget (default 5,000 ms, maximum 60,000 ms). No option discovers a file or
 solver. POSIX descriptor acquisition is implemented; Windows currently fails
 closed. Every eligible verified synthesis batch still receives a fresh lexical
 solver worker, and any structured live failure preserves callback order.
+The opaque activated mode retains the exact require-pin or permit-unpinned
+decision that released it, and Main derives its startup notice from that mode
+rather than reinterpreting the raw command-line flag.
 Only callback-verified candidates with direct or exact-duplicate-recovered
 typed Exference authority are eligible. Candidates with neither authority
 remain in place with a payload-free preparation refusal and do not open a

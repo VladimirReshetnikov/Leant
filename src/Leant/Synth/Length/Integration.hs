@@ -16,7 +16,7 @@ module Leant.Synth.Length.Integration
   , LengthAssessmentMode
   , disabledLengthAssessmentMode
   , loadLengthAssessmentMode
-  , lengthAssessmentModeEnabled
+  , lengthAssessmentModeActivationPolicy
   , LengthAssessmentFailure (..)
   , LengthAssessmentResult
   , assessLengthVerificationBatch
@@ -77,15 +77,23 @@ data LengthAssessmentSetupError
 -- complete setup path.
 data LengthAssessmentMode
   = LengthAssessmentDisabled
-  | LengthAssessmentConfigured !LengthRankingConfiguration
+  | LengthAssessmentConfigured
+      !LengthRankingConfigurationActivationPolicy
+      !LengthRankingConfiguration
 
 disabledLengthAssessmentMode :: LengthAssessmentMode
 disabledLengthAssessmentMode = LengthAssessmentDisabled
 
-lengthAssessmentModeEnabled :: LengthAssessmentMode -> Bool
-lengthAssessmentModeEnabled mode = case mode of
-  LengthAssessmentDisabled -> False
-  LengthAssessmentConfigured _ -> True
+-- | The permission decision that actually released a configured mode.
+-- This deliberately reports no executable path, digest bytes, or later
+-- executable-match observation, and inspecting a configured policy does not
+-- select the retained configuration.
+lengthAssessmentModeActivationPolicy
+  :: LengthAssessmentMode
+  -> Maybe LengthRankingConfigurationActivationPolicy
+lengthAssessmentModeActivationPolicy mode = case mode of
+  LengthAssessmentDisabled -> Nothing
+  LengthAssessmentConfigured activation _ -> Just activation
 
 -- | Admit and acquire exactly one caller-named file, then apply the explicit
 -- pin policy.  Request admission happens before any IO.  Loading and activation
@@ -106,7 +114,7 @@ loadLengthAssessmentMode activation source =
             activateLengthRankingConfiguration activation disabled of
           Left failure -> Left $ LengthAssessmentActivationRejected failure
           Right configuration -> Right
-            $ LengthAssessmentConfigured configuration
+            $ LengthAssessmentConfigured activation configuration
 
 -- | One sanitized reason why enabled ranking preserved callback order.
 -- Candidate-local preparation refusal remains part of the ranking report and
@@ -136,7 +144,7 @@ assessLengthVerificationBatch
   -> IO LengthAssessmentResult
 assessLengthVerificationBatch mode verification = case mode of
   LengthAssessmentDisabled -> pure $ LengthAssessmentSkipped verification
-  LengthAssessmentConfigured configuration -> LengthAssessmentCompleted <$>
+  LengthAssessmentConfigured _ configuration -> LengthAssessmentCompleted <$>
     assessVerifiedLengthCandidatesConfigured configuration verification
 
 lengthAssessmentCandidates

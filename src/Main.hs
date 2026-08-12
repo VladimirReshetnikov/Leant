@@ -132,11 +132,12 @@ import Leant.Synth.Fragment
   )
 import Leant.Synth.Length.Integration
   ( LengthAssessmentMode
+  , LengthRankingConfigurationActivationPolicy (..)
   , assessLengthVerificationBatch
   , disabledLengthAssessmentMode
   , lengthAssessmentCandidates
   , lengthAssessmentFailure
-  , lengthAssessmentModeEnabled
+  , lengthAssessmentModeActivationPolicy
   , loadLengthAssessmentMode
   )
 import Leant.Synth.Observability
@@ -4362,16 +4363,20 @@ run opts = do
       bold2 <- cBold st ":quit"
       emitLn st ("Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type "
         ++ bold1 ++ " for help, " ++ bold2 ++ " to exit.")
-      when (lengthAssessmentModeEnabled lengthAssessmentMode) $ do
-        emitLn st =<< cDim st (if optLengthRankingAllowUnpinned opts
-          then "Finite-list-spine Length counterexample ranking enabled for " ++
-            "eligible typed Exference origins with a startup-fixed contract; " ++
-            "unpinned solver execution was explicitly permitted."
-          else "Finite-list-spine Length counterexample ranking enabled for " ++
-            "eligible typed Exference origins with a startup-fixed contract; " ++
-            "a solver executable digest expectation was required.")
-        emitLn st =<< cDim st
-          "Select synth-engine exference or both to produce graph-eligible candidates."
+      case lengthAssessmentModeActivationPolicy lengthAssessmentMode of
+        Nothing -> pure ()
+        Just activation -> do
+          emitLn st =<< cDim st (case activation of
+            RequirePinnedExecutable ->
+              "Finite-list-spine Length counterexample ranking enabled for " ++
+                "eligible typed Exference origins with a startup-fixed " ++
+                "contract; a solver executable digest expectation was required."
+            PermitUnpinnedExecutable ->
+              "Finite-list-spine Length counterexample ranking enabled for " ++
+                "eligible typed Exference origins with a startup-fixed " ++
+                "contract; unpinned solver execution was explicitly permitted.")
+          emitLn st =<< cDim st
+            "Select synth-engine exference or both to produce graph-eligible candidates."
 
       forM_ (optFile opts) (cmdLoad st)
 

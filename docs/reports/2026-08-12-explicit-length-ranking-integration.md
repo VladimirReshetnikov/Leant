@@ -10,7 +10,8 @@ startup seam. `Leant.Synth.Length.Integration` owns two opaque modes:
 - disabled mode is the historical non-strict identity projection of the exact
   callback-owned `VerificationBatch`;
 - configured mode contains one already admitted, decoded, and activated
-  version-1 `LengthRankingConfiguration`.
+  version-1 `LengthRankingConfiguration` together with the exact closed
+  activation policy which released it.
 
 Main selects configured mode only with
 `--length-ranking-config ABSOLUTE-PATH`. No project, home, environment,
@@ -33,6 +34,11 @@ released only when `--length-ranking-allow-unpinned` is also present. This
 choice merely permits later execution; it does not claim that an expected
 digest matches, that the file ultimately executed is attested, or that the
 program is Z3. Setup never launches a process.
+
+After activation, Main obtains the startup notice's require-pin versus
+permit-unpinned fact from the opaque mode rather than consulting the original
+CLI Boolean again. The mode exposes no path, timeout, digest bytes, contract
+projection, executable observation, or worker authority through that edge.
 
 The version-1 document intentionally bundles a contract. Main reads it once
 and treats the decoded contract as a fixed process-wide assertion for later
