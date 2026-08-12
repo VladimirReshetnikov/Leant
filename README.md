@@ -340,10 +340,13 @@ a passive assertion. Every eligible call still opens a fresh lexical session.
 
 The version-1 file format remains compatible through
 `LengthRankingConfiguration`, which bundles one validated policy with its
-decoded contract and delegates to the same separate-policy runner. The contract
-remains candidate-specific and is checked only during the later full
-preparation pass. Lifecycle and per-query budgets remain separate. There are no
-defaults, executable discovery, path normalization, environment reads, or
+decoded contract and delegates to the same separate-policy runner. That opaque
+bundle can also enter the post-verification adapter directly: its candidates
+retain their batch-scoped occurrence handles through ranking, and the adapter
+seals the complete permutation before projecting the compatibility report. The
+contract remains candidate-specific and is checked only during the later full
+preparation pass. Lifecycle and per-query budgets remain separate. There are
+no defaults, executable discovery, path normalization, environment reads, or
 Main/REPL activation. The digest is only an optional expectation for Djex's
 pre-spawn executable-file observation, not attestation of the image ultimately
 executed. See the

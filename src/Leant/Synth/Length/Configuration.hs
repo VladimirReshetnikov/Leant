@@ -29,6 +29,7 @@ module Leant.Synth.Length.Configuration
   , LengthRankingConfiguration
   , LengthRankingConfigurationError (..)
   , mkLengthRankingConfiguration
+  , rankPostVerificationLengthCandidatesConfigured
   , rankVerifiedLengthCandidatesConfigured
   ) where
 
@@ -93,10 +94,13 @@ data LengthRankingConfigurationSource = LengthRankingConfigurationSource
 -- | Compatibility value retaining one validated policy and contract assertion.
 --
 -- In particular, this value exposes neither the executable path nor digest
--- material and cannot retain a live session or process owner.
+-- material and cannot retain a live session or process owner.  The contract
+-- field is deliberately lazy so productive candidate admission can reject a
+-- maximum-plus-one batch before inspecting request-owned behavioral syntax,
+-- matching the separate policy/request-contract entry point.
 data LengthRankingConfiguration = LengthRankingConfiguration
   !LengthRankingPolicy
-  !LeanLengthContract
+  LeanLengthContract
 
 -- | Pure validation failure in fixed execution-before-evaluation order.
 data LengthRankingConfigurationError
@@ -164,6 +168,22 @@ rankPostVerificationLengthCandidatesWithPolicy
 rankPostVerificationLengthCandidatesWithPolicy
     (LengthRankingPolicy execution evaluation) =
   rankPostVerificationLengthCandidates execution evaluation
+
+-- | Preserve batch-scoped occurrence handles while running the compatible
+-- policy-plus-contract bundle.  This is the configured counterpart of
+-- 'rankPostVerificationLengthCandidatesWithPolicy'; a post-verification
+-- adapter must still validate the returned handle permutation before erasing
+-- those associations.
+rankPostVerificationLengthCandidatesConfigured
+  :: LengthRankingConfiguration
+  -> [PostVerificationCandidate epoch DetailedVerificationVariant]
+  -> IO
+      (Either LengthRankingInputError
+        (AssociatedLengthRanking
+          (PostVerificationCandidate epoch DetailedVerificationVariant)))
+rankPostVerificationLengthCandidatesConfigured
+    (LengthRankingConfiguration policy contract) =
+  rankPostVerificationLengthCandidatesWithPolicy policy contract
 
 -- | Run one complete candidate batch under the retained policy.
 --

@@ -81,9 +81,14 @@ never detached and later reassociated by candidate equality or numeric lookup.
 
 `assessVerifiedLengthCandidatesWithPolicy` requires an already sealed
 `LengthRankingPolicy`, one request-owned `LeanLengthContract`, and the exact
-opaque verification input. Its private result is an accepted/rejected sum and
-exposes a `PostVerificationBatch` and `LengthRanking` only when permutation and
-receipt association sealing succeeded:
+opaque verification input. The parallel
+`assessVerifiedLengthCandidatesConfigured` accepts the version-1 opaque
+policy-plus-contract compatibility bundle. Its configuration wrapper retains
+the same batch-scoped occurrence handles rather than falling back to the older
+association-free configured ranking projection. Both entry points share one
+private rank-2 adapter and the same sealing tail. Their private result is an
+accepted/rejected sum and exposes a `PostVerificationBatch` and `LengthRanking`
+only when permutation and receipt association sealing succeeded:
 
 - productive ranking-input rejection preserves the original opaque callback
   batch, reports a sanitized adapter input failure, and has neither a ranking
@@ -121,8 +126,10 @@ original order atomically.
 Main does not call the Length adapter. Enabling it later still requires an
 explicit user-owned activation path connecting bounded configuration
 acquisition, an activation choice, the request's behavioral contract, and this
-adapter. This checkpoint establishes the safe post-verification shape without
-making those policy choices.
+adapter. An explicitly activated version-1 file can now reach the adapter
+without exposing or detaching its sealed policy and contract, but no code
+selects that route implicitly. This checkpoint establishes the safe
+post-verification shape without making those policy choices.
 
 ## Validation
 
@@ -136,6 +143,14 @@ The unit suite covers:
   batch mixing is excluded statically by the abstract epoch;
 - productive Length input rejection with the exact opaque callback batch
   retained and no sealed output;
+- parity between the separate policy/request-contract path and the configured
+  path for stable counterexample demotion and atomic operational fallback;
+- a decoded, explicitly activated version-1 file reaches the same sealed
+  ranking report as its established association-free compatibility runner;
+- configured maximum-plus-one rejection without forcing either the retained
+  contract or any candidate payload;
+- equal-valued repeated occurrences retain distinct indices across configured
+  counterexample demotion and the final seal;
 - stable replayed-counterexample demotion with original indices `[1,3,0,2]`;
 - operational failure with identity indices `[0,1,2]`, a complete unchanged
   candidate batch, the sanitized ranking failure report retained, and only the
@@ -143,4 +158,5 @@ The unit suite covers:
 - exhaustive fixed refusal codes plus non-strict classification of every
   handoff refusal constructor, including deliberately unevaluated payloads.
 
-All 303 Leant synthesis-boundary unit tests pass with the seam in place.
+All 306 Leant synthesis-boundary unit tests pass with the configured bridge in
+place.

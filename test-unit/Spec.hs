@@ -228,6 +228,7 @@ import Leant.Synth.Length.Contract
 import Leant.Synth.Length.PostVerification
   ( LengthPostVerificationFailure (..)
   , LengthPostVerificationResult
+  , assessVerifiedLengthCandidatesConfigured
   , assessVerifiedLengthCandidatesWithPolicy
   , lengthPostVerificationAdapterFailure
   , lengthPostVerificationCandidates
@@ -2946,6 +2947,14 @@ assertLengthRankingConfigurationFileLiveEquivalence = do
       , Unassessed
       , Heuristic Djex.SolverSatisfiable
       ]
+    verification <- verificationBatchFromReceipts candidates
+    postVerification <- expectLengthPostVerificationWithin
+      "decoded and activated file configuration"
+      $ assessVerifiedLengthCandidatesConfigured configuration verification
+    assertLengthPostVerificationSealed postVerification
+    postVerificationRanking <- expectLengthPostVerificationRanking
+      postVerification
+    assertLengthRankingsEquivalent configured postVerificationRanking
 
 assertLengthRankingConfigurationFileShowRedaction :: IO ()
 assertLengthRankingConfigurationFileShowRedaction =
@@ -3512,6 +3521,10 @@ assertLengthRankingsEquivalent direct configured = do
   map rankedLengthCandidateAssessment
       (lengthRankingCandidates configured) @?=
     map rankedLengthCandidateAssessment (lengthRankingCandidates direct)
+  map rankedLengthCandidateOriginalIndex
+      (lengthRankingCandidates configured) @?=
+    map rankedLengthCandidateOriginalIndex
+      (lengthRankingCandidates direct)
   rankedLengthPreparationRefusals configured @?=
     rankedLengthPreparationRefusals direct
   lengthRankingFailure configured @?= lengthRankingFailure direct
@@ -3799,12 +3812,26 @@ assertLengthPostVerificationAdapter = do
         _ -> error "post-verification demotion fixture changed cardinality"
       fallbackInput = verifiedCandidateReceipts fallbackVerification
   withFakeLengthSolver "healthy" $ \executable -> do
-    let policySource = explicitLengthRankingPolicySource
+    let executionSource = explicitLengthRankingExecutionSource
+          executable Nothing Djex.LengthSMTLibInputValuesAfterSatisfiable
+        policySource = explicitLengthRankingPolicySource
           Djex.defaultLengthSMTLibExecutionLimits
-          (explicitLengthRankingExecutionSource executable Nothing
-            Djex.LengthSMTLibInputValuesAfterSatisfiable)
+          executionSource
           Djex.defaultLengthEvaluationLimitSource
+        configured contract = mkLengthRankingConfiguration
+          $ explicitLengthRankingConfigurationSource
+              Djex.defaultLengthSMTLibExecutionLimits
+              executionSource
+              Djex.defaultLengthEvaluationLimitSource
+              contract
     policy <- expectRight $ mkLengthRankingPolicy policySource
+    demotionConfiguration <- expectRight
+      $ configured $ lengthRankingContract 2
+    fallbackConfiguration <- expectRight
+      $ configured $ lengthRankingContract 0
+    poisonContractConfiguration <- expectRight
+      $ configured
+          $ error "configured input admission forced the Length contract"
 
     rejected <- expectLengthPostVerificationWithin "bounded input rejection"
       $ assessVerifiedLengthCandidatesWithPolicy policy
@@ -3820,6 +3847,27 @@ assertLengthPostVerificationAdapter = do
       $ isNothing $ lengthPostVerificationSealedBatch rejected
     lengthPostVerificationCandidates rejected @?=
       verifiedCandidateReceipts oversizedVerification
+
+    let poison :: DetailedVerificationVariant
+        poison = error
+          "configured post-verification input admission forced a candidate"
+    poisonedOversizedVerification <- verifyCandidateGroups oversizedCount
+      (const $ pure VariantAccepted)
+      $ replicate oversizedCount [poison]
+    configuredRejected <- expectLengthPostVerificationWithin
+      "configured bounded input rejection"
+      $ assessVerifiedLengthCandidatesConfigured poisonContractConfiguration
+          poisonedOversizedVerification
+    lengthPostVerificationAdapterFailure configuredRejected @?= Just
+      (LengthPostVerificationInputRejected
+        $ LengthRankingInputLimitExceeded maximumCandidates
+            (maximumCandidates + 1))
+    assertBool "configured input rejection retained an impossible ranking"
+      $ isNothing $ lengthPostVerificationRanking configuredRejected
+    assertBool "configured input rejection masqueraded as a sealed batch"
+      $ isNothing $ lengthPostVerificationSealedBatch configuredRejected
+    length (lengthPostVerificationCandidates configuredRejected) @?=
+      oversizedCount
 
     demotion <- expectLengthPostVerificationWithin "counterexample demotion"
       $ assessVerifiedLengthCandidatesWithPolicy policy
@@ -3838,6 +3886,31 @@ assertLengthPostVerificationAdapter = do
       , Nothing
       , Nothing
       ]
+    configuredDemotion <- expectLengthPostVerificationWithin
+      "configured counterexample demotion"
+      $ assessVerifiedLengthCandidatesConfigured demotionConfiguration
+          demotionVerification
+    assertLengthPostVerificationResultsEquivalent demotion
+      configuredDemotion
+
+    duplicateVerification <- verificationBatchFromReceipts
+      [zero, zero, retainedFirst]
+    duplicatePolicy <- expectLengthPostVerificationWithin
+      "equal-occurrence policy demotion"
+      $ assessVerifiedLengthCandidatesWithPolicy policy
+          (lengthRankingContract 2) duplicateVerification
+    duplicateConfigured <- expectLengthPostVerificationWithin
+      "equal-occurrence configured demotion"
+      $ assessVerifiedLengthCandidatesConfigured demotionConfiguration
+          duplicateVerification
+    assertLengthPostVerificationResultsEquivalent duplicatePolicy
+      duplicateConfigured
+    duplicateRanking <- expectLengthPostVerificationRanking
+      duplicateConfigured
+    map rankedLengthCandidateOriginalIndex
+        (lengthRankingCandidates duplicateRanking) @?=
+      [2, 0, 1]
+    length (lengthPostVerificationCandidates duplicateConfigured) @?= 3
 
     fallback <- expectLengthPostVerificationWithin "atomic ranking fallback"
       $ assessVerifiedLengthCandidatesWithPolicy policy
@@ -3858,6 +3931,39 @@ assertLengthPostVerificationAdapter = do
       Just failure -> lengthRankingFailureClass failure @?=
         LengthRankingLiveQueryFailed
           Djex.LengthSMTLibLiveQueryCounterexampleRejected
+    configuredFallback <- expectLengthPostVerificationWithin
+      "configured atomic ranking fallback"
+      $ assessVerifiedLengthCandidatesConfigured fallbackConfiguration
+          fallbackVerification
+    assertLengthPostVerificationResultsEquivalent fallback
+      configuredFallback
+
+assertLengthPostVerificationResultsEquivalent
+  :: LengthPostVerificationResult
+  -> LengthPostVerificationResult
+  -> IO ()
+assertLengthPostVerificationResultsEquivalent expected actual = do
+  lengthPostVerificationCandidates actual @?=
+    lengthPostVerificationCandidates expected
+  lengthPostVerificationAdapterFailure actual @?=
+    lengthPostVerificationAdapterFailure expected
+  case ( lengthPostVerificationSealedBatch expected
+       , lengthPostVerificationSealedBatch actual
+       ) of
+    (Nothing, Nothing) -> pure ()
+    (Just expectedBatch, Just actualBatch) ->
+      postVerificationBatchCandidates actualBatch @?=
+        postVerificationBatchCandidates expectedBatch
+    _ -> assertFailure
+      "configured post-verification sealing disagreed with the policy path"
+  case ( lengthPostVerificationRanking expected
+       , lengthPostVerificationRanking actual
+       ) of
+    (Nothing, Nothing) -> pure ()
+    (Just expectedRanking, Just actualRanking) ->
+      assertLengthRankingsEquivalent expectedRanking actualRanking
+    _ -> assertFailure
+      "configured post-verification ranking disagreed with the policy path"
 
 verificationBatchFromReceipts
   :: [Verified DetailedVerificationVariant]

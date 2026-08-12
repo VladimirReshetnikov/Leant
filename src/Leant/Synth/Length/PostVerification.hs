@@ -1,3 +1,5 @@
+{-# LANGUAGE RankNTypes #-}
+
 -- | Safe post-verification adapter for live Length ranking.
 --
 -- The adapter retains the complete 'LengthRanking' report while sealing its
@@ -12,6 +14,7 @@ module Leant.Synth.Length.PostVerification
   , lengthPostVerificationSealedBatch
   , lengthPostVerificationAdapterFailure
   , lengthPostVerificationRanking
+  , assessVerifiedLengthCandidatesConfigured
   , assessVerifiedLengthCandidatesWithPolicy
   ) where
 
@@ -20,12 +23,15 @@ import Language.Haskell.Djex
 
 import Leant.Synth.Engine (DetailedVerificationVariant)
 import Leant.Synth.Length.Configuration
-  ( LengthRankingPolicy
+  ( LengthRankingConfiguration
+  , LengthRankingPolicy
+  , rankPostVerificationLengthCandidatesConfigured
   , rankPostVerificationLengthCandidatesWithPolicy
   )
 import Leant.Synth.Length.Contract (LeanLengthContract)
 import Leant.Synth.Length.Ranking
-  ( LengthRanking
+  ( AssociatedLengthRanking
+  , LengthRanking
   , LengthRankingInputError
   , associatedLengthRankingCandidates
   , associatedRankedLengthCandidateAssociation
@@ -33,6 +39,7 @@ import Leant.Synth.Length.Ranking
   )
 import Leant.Synth.PostVerification
   ( PostVerificationBatch
+  , PostVerificationCandidate
   , PostVerificationError
   , postVerificationBatchCandidates
   , postVerificationInputCandidates
@@ -97,9 +104,36 @@ assessVerifiedLengthCandidatesWithPolicy
   -> LeanLengthContract
   -> VerificationBatch DetailedVerificationVariant
   -> IO LengthPostVerificationResult
-assessVerifiedLengthCandidatesWithPolicy policy contract verification = do
+assessVerifiedLengthCandidatesWithPolicy policy contract =
+  assessVerifiedLengthCandidatesWith
+    $ rankPostVerificationLengthCandidatesWithPolicy policy contract
+
+-- | Run the compatibility policy-plus-contract bundle through the same
+-- batch-scoped occurrence seal as the separate policy/request-contract path.
+-- This is the only configured entry point suitable for candidate
+-- presentation: the association-free configured ranking runner does not mint
+-- or validate post-verification occurrence handles.
+assessVerifiedLengthCandidatesConfigured
+  :: LengthRankingConfiguration
+  -> VerificationBatch DetailedVerificationVariant
+  -> IO LengthPostVerificationResult
+assessVerifiedLengthCandidatesConfigured configuration =
+  assessVerifiedLengthCandidatesWith
+    $ rankPostVerificationLengthCandidatesConfigured configuration
+
+assessVerifiedLengthCandidatesWith
+  :: (forall epoch.
+      [PostVerificationCandidate epoch DetailedVerificationVariant]
+      -> IO
+          (Either LengthRankingInputError
+            (AssociatedLengthRanking
+              (PostVerificationCandidate
+                epoch DetailedVerificationVariant))))
+  -> VerificationBatch DetailedVerificationVariant
+  -> IO LengthPostVerificationResult
+assessVerifiedLengthCandidatesWith rankCandidates verification = do
   withPostVerificationInput verification $ \input -> do
-    ranked <- rankPostVerificationLengthCandidatesWithPolicy policy contract
+    ranked <- rankCandidates
       $ postVerificationInputCandidates input
     pure $ case ranked of
       Left failure -> LengthPostVerificationRejected verification
