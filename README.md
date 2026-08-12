@@ -274,19 +274,28 @@ Leant's detailed Exference route now retains an opaque checked candidate, the
 exact session inventory, and a lazy attempt at Djex's canonical typed-graph
 fingerprint beside the originating rendered group. Textual ordering and the
 compatibility result stay unchanged when that structural fingerprint is
-unavailable. Filtering preserves the sidecar only with its original candidate;
-deduplication never transfers it to an earlier textual duplicate, and wrappers
-such as `Classical.byContradiction` discard it because they denote a new term.
+unavailable. Filtering preserves a group sidecar only with its original
+candidate. During combined-engine exact-text deduplication, an earlier
+compatibility-only spelling may retain a private variant-scoped witness to the
+first later Exference candidate which rendered the identical bytes; display
+ownership, route, ordinal, ordering, and sibling variants remain unchanged, so
+no sidecar is transferred onto a Djinn group. Wrappers such as
+`Classical.byContradiction` discard both direct and recovered authority because
+they denote a new term.
 This is deliberately a solver-neutral identity seam, not behavioral evidence.
 The checked Length handoff now binds callback-accepted text back to its exact
-typed graph, family provenance, inventory, provider assumptions, contract, and
-candidate-specific Djex problem. `Leant.Synth.Length.Adapter` immediately drops
-the heavier renderer and session authority while sealing that problem into a
-bounded canonical QF_LIA query. It launches no solver and grants no authority to
-raw `sat`, `unsat`, or `unknown`: only decoded input values which pass Djex's
-independent exact-problem replay can yield a finite-spine, model-relative
-counterexample receipt, still conditional on every named provider law. That
-receipt is not by itself a concrete Lean counterexample or kernel proof.
+typed origin, original Exference renderer ordinal, singleton exact re-render,
+family provenance, inventory, provider assumptions, contract, and
+candidate-specific Djex problem. `Leant.Synth.Length.Adapter` immediately
+drops the heavier renderer and session authority while sealing that problem
+into a bounded canonical QF_LIA query. It launches no solver and grants no
+authority to raw `sat`, `unsat`, or `unknown`: only decoded input values which
+pass Djex's independent exact-problem replay can yield a finite-spine,
+model-relative counterexample receipt, still conditional on every named
+provider law used by that candidate. That receipt is not by itself a concrete
+Lean counterexample or kernel proof.
+The collision boundary is detailed in the
+[exact-duplicate typed-provenance report](docs/reports/2026-08-11-exact-duplicate-typed-provenance.md).
 
 `Leant.Synth.Length.Ranking` now supplies the next, deliberately unwired
 foundation. Its caller must provide an explicit Djex live-execution policy,
@@ -1338,7 +1347,11 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   before applying the internal 60-candidate collection window. The first
   spelling remains authoritative, while repeated backend derivations cannot
   consume slots ahead of later distinct terms; the outer 12/24-group
-  verification frontiers then apply as above.
+  verification frontiers then apply as above. Combined exact-text deduplication
+  likewise keeps the first display occurrence. If that occurrence has no typed
+  authority, the exact spelling may lazily retain the first bounded later
+  Exference origin solely for checked behavioral preparation; route metrics,
+  ordinals, sibling variants, and displayed order do not change.
   Refutations still come only from Djinn. The default `djinn` remains the
   complete, terminating LJT search.
 - Every engine mode gives a structurally accepted goal a provider-free
@@ -1527,9 +1540,12 @@ Combined mode runs both engines at the singleton and terminal full widths and
 Djinn alone at intermediate widths. Within a combined lane, stable exact-text
 deduplication keeps the first scheduled spelling and preserves variant order
 inside each group: `D1–D4, E1–E12, D5–D12` form the 24-group frontier, then the
-tails alternate. Empty or duplicate-only groups spend no slot. Constructor and
-exact provider names are restored and binders named by role before every
-verification; only survivors are shown and bound.
+tails alternate. Empty or duplicate-only groups spend no slot. An exact later
+Exference duplicate may supply a private variant-local behavioral origin, but
+never changes the first occurrence's display ownership or gives authority to a
+different spelling. Constructor and exact provider names are restored and
+binders named by role before every verification; only survivors are shown and
+bound.
 
 The synthesis side environment tracks exactly which session history it
 has replayed. An unchanged history reuses it directly; an append replays

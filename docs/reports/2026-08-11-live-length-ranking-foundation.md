@@ -24,9 +24,18 @@ structured limit error before the contract or any candidate handoff is touched,
 so an unbounded candidate tail cannot trigger unbounded preparation.
 
 For an admitted batch, Leant completes the entire pure preparation pass before
-opening a worker. Every candidate is first bound back to its callback-verified
-variant, retained typed graph, exact family provenance, inventory, provider
-assumptions, and explicit contract through `prepareCheckedLengthHandoff`.
+opening a worker. For each candidate it attempts to bind the callback-verified
+variant to an exact typed origin. An unmatched Djinn or compatibility spelling
+has no such origin and remains `Unassessed`. For an eligible spelling the origin
+is usually the displayed Exference group itself. If combined-engine exact-text
+deduplication displayed an earlier compatibility-only occurrence, a private
+variant-scoped witness may instead refer to the first bounded later Exference
+occurrence with identical bytes. The displayed route, display ordinal,
+ordering, group sidecar, and sibling variants do not change.
+`prepareCheckedLengthHandoff` uses the origin's own renderer ordinal and
+requires the retained graph to re-render to one spelling equal to the
+callback-accepted text before binding its family provenance, inventory,
+provider assumptions, and explicit contract.
 Eligible handoffs are then sealed into canonical QF_LIA queries. A pure refusal
 at either boundary leaves that one candidate `Unassessed` through the legacy
 assessment projection and records a separate
