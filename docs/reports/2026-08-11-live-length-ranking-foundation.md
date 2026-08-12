@@ -140,6 +140,18 @@ consume that one vocabulary. Any vocabulary change must revise the affected
 response, framing, and plan schema identities; no domain phase, plan, or solver
 authority moves into the lexical leaf or shared cursor.
 
+The schema-free `Internal.SMTLib.Causal.BoundaryWhitespace` leaf now admits
+finite strict queued-drain bytes into an opaque lexical-content receipt.
+Process mints each nonempty receipt inside the same all-or-nothing STM
+inspection which can restore a non-whitespace snapshot before poison, so the
+generic transport operation cannot report raw unchecked drain bytes as a
+success. The receipt proves content only: FIFO origin, boundedness,
+nonblocking behavior, cancellation/deadline and process association, and
+restoration remain concrete transport laws. For the initial adopted
+predecessor boundary, Driver opens the receipt only after its first exact write
+succeeds; later completed-epoch drains preserve their existing append timing.
+No transcript, wire, fingerprint, schema, public API, or Leant behavior changes.
+
 The package-private terminal protocol value likewise retains only the closed
 solver status and optional decoded integer bindings. Both readiness and
 ordinary-query driver invocations take their final transcript cap from the
