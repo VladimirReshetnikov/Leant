@@ -238,6 +238,10 @@ import Leant.Synth.Length.Ranking
   , LengthRankingAssessment (..)
   , LengthRankingFailureClass (..)
   , LengthRankingInputError (..)
+  , LengthPreparationRefusalClass (..)
+  , lengthHandoffPreparationRefusalClass
+  , lengthPreparationRefusalClassCode
+  , lengthQueryPreparationRefusalClass
   , lengthRankingCandidates
   , lengthRankingFailure
   , lengthRankingFailureClass
@@ -246,6 +250,7 @@ import Leant.Synth.Length.Ranking
   , rankVerifiedLengthCandidates
   , rankedLengthCandidateAssessment
   , rankedLengthCandidateOriginalIndex
+  , rankedLengthCandidatePreparationRefusal
   , rankedLengthCandidateVerified
   )
 import Leant.Synth.Observability
@@ -2016,7 +2021,9 @@ combinedEngineMergeTests = testGroup "combined-engine verification frontier"
 
 lengthRankingTests :: TestTree
 lengthRankingTests = testGroup "checked Length behavioral ranking"
-  [ testCase "admit the exact bound and reject a cyclic maximum-plus-one"
+  [ testCase "sanitize every pure preparation refusal without forcing payloads"
+      assertLengthPreparationRefusalClasses
+  , testCase "admit the exact bound and reject a cyclic maximum-plus-one"
       assertLengthRankingInputBound
   , testCase "leave an all-ineligible batch unassessed without opening"
       assertLengthRankingAllIneligible
@@ -3322,6 +3329,8 @@ assertLengthRankingConfiguredAllIneligible =
     map rankedLengthCandidateAssessment
         (lengthRankingCandidates configured) @?=
       [Unassessed, Unassessed]
+    rankedLengthPreparationRefusals configured @?=
+      replicate 2 (Just LengthPreparationTypedAuthorityUnavailable)
     lengthRankingFailure configured @?= Nothing
 
 assertLengthRankingConfiguredLiveEquivalence :: IO ()
@@ -3342,6 +3351,8 @@ assertLengthRankingConfiguredLiveEquivalence = do
           (Djex.SolverSatisfiable, Djex.SolverSatisfiable)
       assessments -> assertFailure $
         "unexpected configured healthy assessments: " ++ show assessments
+    rankedLengthPreparationRefusals healthy @?=
+      [Nothing, Just LengthPreparationTypedAuthorityUnavailable, Nothing]
 
     failed <- assertConfiguredLengthRankingEquivalent executable
       Djex.LengthSMTLibInputValuesAfterSatisfiable
@@ -3349,6 +3360,8 @@ assertLengthRankingConfiguredLiveEquivalence = do
     rankedLengthVerifiedCandidates failed @?= [one, zero, trailing]
     map rankedLengthCandidateAssessment (lengthRankingCandidates failed) @?=
       replicate 3 Unassessed
+    rankedLengthPreparationRefusals failed @?=
+      [Nothing, Nothing, Just LengthPreparationTypedAuthorityUnavailable]
     failure <- case lengthRankingFailure failed of
       Nothing -> assertFailure "configured live failure was not retained"
       Just value -> pure value
@@ -3387,6 +3400,7 @@ assertLengthRankingPolicyContractSeparation = do
               (Djex.SolverSatisfiable, Djex.SolverSatisfiable)
           assessments -> assertFailure $ "unexpected policy assessments: "
             ++ show assessments
+        rankedLengthPreparationRefusals ranking @?= [Nothing, Nothing]
         lengthRankingFailure ranking @?= Nothing)
       [first, second]
 
@@ -3497,6 +3511,8 @@ assertLengthRankingsEquivalent direct configured = do
   map rankedLengthCandidateAssessment
       (lengthRankingCandidates configured) @?=
     map rankedLengthCandidateAssessment (lengthRankingCandidates direct)
+  rankedLengthPreparationRefusals configured @?=
+    rankedLengthPreparationRefusals direct
   lengthRankingFailure configured @?= lengthRankingFailure direct
 
 data LengthRankingLiveFixture = LengthRankingLiveFixture
@@ -3505,6 +3521,95 @@ data LengthRankingLiveFixture = LengthRankingLiveFixture
   , lengthRankingFixtureOne
       :: Verified DetailedVerificationVariant
   }
+
+assertLengthPreparationRefusalClasses :: IO ()
+assertLengthPreparationRefusalClasses = do
+  let poison label = error $ "preparation sanitizer forced " ++ label
+      handoffRefusals =
+        [ LengthHandoffNotTypedRoute $ poison "route"
+        , LengthHandoffMissingSemanticSidecar
+        , LengthHandoffRetargetedFragments
+        , LengthHandoffPremisesPresent
+        , LengthHandoffSearchGoalChanged
+        , LengthHandoffSourceGoalVariableMissing $ poison "source variable"
+        , LengthHandoffSourceGoalConversionChanged
+        , LengthHandoffRequestContextsPresent $ poison "request contexts"
+        , LengthHandoffRequestGoalChanged
+        , LengthHandoffTypedGraphLost $ poison "typed graph"
+        , LengthHandoffRendererRejected $ poison "renderer refusal"
+        , LengthHandoffRendererNotUnique $ poison "renderer alternatives"
+        , LengthHandoffRendererOrdinalChanged $ poison "renderer ordinal"
+        , LengthHandoffRendererTextChanged
+            (poison "rendered candidate") (poison "accepted candidate")
+        , LengthHandoffFamilyUnavailable $ poison "family"
+        , LengthHandoffConstructorUnavailable
+            (poison "family constructor") (poison "constructor")
+        , LengthHandoffProviderUnavailable $ poison "provider"
+        , LengthHandoffProviderAmbiguous
+            (poison "ambiguous provider") (poison "provider matches")
+        , LengthHandoffProviderVariableMissing
+            (poison "provider variable") (poison "provider source")
+        , LengthHandoffSessionRejected $ poison "session error"
+        , LengthHandoffContractRejected $ poison "contract error"
+        , LengthHandoffProblemRejected $ poison "problem error"
+        ]
+      expectedHandoffClasses =
+        [ LengthPreparationUnsupportedRoute
+        , LengthPreparationTypedAuthorityUnavailable
+        , LengthPreparationCandidateAssociationRejected
+        , LengthPreparationCandidateAssociationRejected
+        , LengthPreparationCandidateAssociationRejected
+        , LengthPreparationCandidateAssociationRejected
+        , LengthPreparationCandidateAssociationRejected
+        , LengthPreparationCandidateAssociationRejected
+        , LengthPreparationCandidateAssociationRejected
+        , LengthPreparationTypedAuthorityUnavailable
+        , LengthPreparationRenderingAssociationRejected
+        , LengthPreparationRenderingAssociationRejected
+        , LengthPreparationRenderingAssociationRejected
+        , LengthPreparationRenderingAssociationRejected
+        , LengthPreparationSpineBindingUnavailable
+        , LengthPreparationSpineBindingUnavailable
+        , LengthPreparationProviderBindingUnavailable
+        , LengthPreparationProviderBindingUnavailable
+        , LengthPreparationProviderBindingUnavailable
+        , LengthPreparationSessionRejected
+        , LengthPreparationContractRejected
+        , LengthPreparationCandidateSemanticsRejected
+        ]
+      queryRefusals =
+        [ Djex.LengthSMTLibUnexpectedResultVariable
+        , Djex.LengthSMTLibInputVariableOutOfRange 0 0
+        , Djex.LengthSMTLibNumeralBitLimitExceeded
+            Djex.LengthSMTLibLiteralNumeral 1 0
+        , Djex.LengthSMTLibCommandByteLimitExceeded
+            Djex.LengthSMTLibCheckCommand 1 0
+        , Djex.LengthSMTLibFingerprintByteLimitExceeded 1 0
+        ]
+      classes = [minBound .. maxBound]
+      expectedCodes =
+        [ "unsupported-route"
+        , "typed-authority-unavailable"
+        , "candidate-association-rejected"
+        , "rendering-association-rejected"
+        , "spine-binding-unavailable"
+        , "provider-binding-unavailable"
+        , "session-rejected"
+        , "contract-rejected"
+        , "candidate-semantics-rejected"
+        , "query-construction-rejected"
+        ]
+  map lengthHandoffPreparationRefusalClass handoffRefusals @?=
+    expectedHandoffClasses
+  map lengthQueryPreparationRefusalClass queryRefusals @?=
+    replicate 5 LengthPreparationQueryConstructionRejected
+  map lengthPreparationRefusalClassCode classes @?= expectedCodes
+  Set.size (Set.fromList expectedCodes) @?= length expectedCodes
+  let sanitized = show $ lengthHandoffPreparationRefusalClass
+        $ LengthHandoffRendererTextChanged
+            "private-rendered-candidate" "private-accepted-candidate"
+  assertBool "preparation sanitizer retained renderer payload text"
+    $ not $ "private-" `isInfixOf` sanitized
 
 assertLengthRankingInputBound :: IO ()
 assertLengthRankingInputBound = do
@@ -3522,6 +3627,9 @@ assertLengthRankingInputBound = do
   map rankedLengthCandidateAssessment
       (lengthRankingCandidates exactRanking) @?=
     replicate (fromIntegral maximumCandidates) Unassessed
+  rankedLengthPreparationRefusals exactRanking @?=
+    replicate (fromIntegral maximumCandidates)
+      (Just LengthPreparationTypedAuthorityUnavailable)
 
   bounded <- timeout 1000000 $ rankVerifiedLengthCandidates unopened
     defaultLengthEvaluationLimits ineligibleLengthRankingContract
@@ -3548,6 +3656,8 @@ assertLengthRankingAllIneligible = do
   rankedLengthVerifiedCandidates ranking @?= original
   map rankedLengthCandidateAssessment (lengthRankingCandidates ranking) @?=
     [Unassessed, Unassessed]
+  rankedLengthPreparationRefusals ranking @?=
+    replicate 2 (Just LengthPreparationTypedAuthorityUnavailable)
 
 assertLengthRankingNeutralStatuses :: IO ()
 assertLengthRankingNeutralStatuses = do
@@ -3588,6 +3698,8 @@ assertNeutralCase original (mode, policy, expectedStatus) = do
       (zero, one) @?= (expectedStatus, expectedStatus)
     assessments -> assertFailure $ "unexpected neutral Length assessments: "
       ++ show assessments
+  rankedLengthPreparationRefusals ranking @?=
+    [Nothing, Just LengthPreparationTypedAuthorityUnavailable, Nothing]
 
 assertLengthRankingCounterexampleDemotion :: IO ()
 assertLengthRankingCounterexampleDemotion = do
@@ -3622,6 +3734,12 @@ assertLengthRankingCounterexampleDemotion = do
       assertLengthCounterexampleReceipt 1 oneReceipt
     assessments -> assertFailure $
       "unexpected stable counterexample partition: " ++ show assessments
+  rankedLengthPreparationRefusals ranking @?=
+    [ Just LengthPreparationTypedAuthorityUnavailable
+    , Just LengthPreparationTypedAuthorityUnavailable
+    , Nothing
+    , Nothing
+    ]
 
 assertLengthRankingAtomicFallback :: IO ()
 assertLengthRankingAtomicFallback = do
@@ -3636,6 +3754,8 @@ assertLengthRankingAtomicFallback = do
   rankedLengthVerifiedCandidates ranking @?= original
   map rankedLengthCandidateAssessment (lengthRankingCandidates ranking) @?=
     replicate 3 Unassessed
+  rankedLengthPreparationRefusals ranking @?=
+    [Nothing, Nothing, Just LengthPreparationTypedAuthorityUnavailable]
   failure <- case lengthRankingFailure ranking of
     Nothing -> assertFailure
       "a satisfiable non-counterexample did not fail closed"
@@ -3711,6 +3831,12 @@ assertLengthPostVerificationAdapter = do
         (lengthRankingCandidates demotionRanking) @?=
       [1, 3, 0, 2]
     rankedLengthVerifiedCandidates demotionRanking @?= demotionExpected
+    rankedLengthPreparationRefusals demotionRanking @?=
+      [ Just LengthPreparationTypedAuthorityUnavailable
+      , Just LengthPreparationTypedAuthorityUnavailable
+      , Nothing
+      , Nothing
+      ]
 
     fallback <- expectLengthPostVerificationWithin "atomic ranking fallback"
       $ assessVerifiedLengthCandidatesWithPolicy policy
@@ -3723,6 +3849,8 @@ assertLengthPostVerificationAdapter = do
         (lengthRankingCandidates fallbackRanking) @?=
       [0, 1, 2]
     rankedLengthVerifiedCandidates fallbackRanking @?= fallbackInput
+    rankedLengthPreparationRefusals fallbackRanking @?=
+      [Nothing, Nothing, Just LengthPreparationTypedAuthorityUnavailable]
     case lengthRankingFailure fallbackRanking of
       Nothing -> assertFailure
         "post-verification adapter discarded the ranking failure report"
@@ -3794,6 +3922,12 @@ rankedLengthVerifiedCandidates
   -> [Verified DetailedVerificationVariant]
 rankedLengthVerifiedCandidates =
   map rankedLengthCandidateVerified . lengthRankingCandidates
+
+rankedLengthPreparationRefusals
+  :: LengthRanking
+  -> [Maybe LengthPreparationRefusalClass]
+rankedLengthPreparationRefusals =
+  map rankedLengthCandidatePreparationRefusal . lengthRankingCandidates
 
 syntheticLengthRankingCandidate
   :: String

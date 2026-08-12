@@ -96,6 +96,9 @@ receipt association sealing succeeded:
   ranking nor a sealed batch;
 - a structured operational ranking failure remains a completed original-order
   all-`Unassessed` ranking and therefore seals as the identity permutation.
+  Its payload-free candidate-local preparation refusal classes survive the
+  fallback and the adapter projection, while candidates which reached live
+  execution retain no invented refusal reason.
 
 Synchronous and asynchronous exceptions retain the ranking layer's existing
 propagation and Djex cleanup behavior; the adapter does not translate them into
@@ -135,6 +138,9 @@ The unit suite covers:
   retained and no sealed output;
 - stable replayed-counterexample demotion with original indices `[1,3,0,2]`;
 - operational failure with identity indices `[0,1,2]`, a complete unchanged
-  candidate batch, and the sanitized ranking failure report retained.
+  candidate batch, the sanitized ranking failure report retained, and only the
+  pre-existing pure preparation refusal class preserved; and
+- exhaustive fixed refusal codes plus non-strict classification of every
+  handoff refusal constructor, including deliberately unevaluated payloads.
 
-All 302 Leant synthesis-boundary unit tests pass with the seam in place.
+All 303 Leant synthesis-boundary unit tests pass with the seam in place.

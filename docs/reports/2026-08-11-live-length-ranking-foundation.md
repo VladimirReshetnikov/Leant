@@ -28,9 +28,16 @@ opening a worker. Every candidate is first bound back to its callback-verified
 variant, retained typed graph, exact family provenance, inventory, provider
 assumptions, and explicit contract through `prepareCheckedLengthHandoff`.
 Eligible handoffs are then sealed into canonical QF_LIA queries. A pure refusal
-at either boundary leaves that one candidate `Unassessed`; it does not prevent
-other eligible candidates from running. If no candidate is eligible, no live
-session is opened.
+at either boundary leaves that one candidate `Unassessed` through the legacy
+assessment projection and records a separate
+`LengthPreparationRefusalClass`. The ten-value taxonomy is bounded and
+payload-free, and each value has a fixed `lengthPreparationRefusalClassCode`.
+Its exhaustive handoff and query classifiers inspect only the already-known
+outer constructor; they do not evaluate or retain renderer text, source names,
+types, graph identities, or nested Djex errors. These classes identify only the
+phase that refused preparation. They are not behavioral evidence and do not
+affect ranking. A refusal does not prevent other eligible candidates from
+running. If no candidate is eligible, no live session is opened.
 
 ## One scoped serial pass
 
@@ -69,12 +76,15 @@ ranking.
 Any returned structured live session, query, query-fingerprint association, or
 evidence-replay failure discards every partial assessment and partial
 reordering. The returned ranking contains every original callback receipt in
-original order, all marked `Unassessed`, plus one sanitized failure. That
-failure retains only Djex's public session/query class when applicable, an
-incomplete-cleanup Boolean, and a safe zero-based original input index when the
-failure belongs to one query. Exceptions propagate and return no ranking.
-No child bytes, symbols, values, paths, process details, or private identities
-cross this boundary.
+original order, all marked `Unassessed`, plus one sanitized failure. Pure
+candidate-local preparation classes already established before the worker was
+opened survive this atomic fallback; candidates which reached query execution
+carry no fabricated refusal class. The batch failure retains only Djex's
+public session/query class when applicable, an incomplete-cleanup Boolean, and
+a safe zero-based original input index when the failure belongs to one query.
+Exceptions propagate and return no ranking. No child bytes, symbols, values,
+paths, process details, candidate text, or private identities cross this
+boundary.
 
 ## Budgets and integration boundary
 

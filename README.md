@@ -298,12 +298,20 @@ those queries serially in original order. `unsat`, `unknown`, and status-only
 `sat` are neutral; only a satisfiable model whose evidence replays again
 against the candidate's exact checked problem is stably moved behind the other
 candidates.
-Nothing is pruned. Any returned structured live session, query, association, or
-replay failure atomically restores every original candidate in original order
-as `Unassessed`, together with only a sanitized failure class, cleanup bit, and
-optional safe original index. Exceptions propagate instead of producing a
-ranking. Lifecycle and per-query budgets remain separate rather than
-pretending to be one batch deadline. Main and the REPL do not invoke this
+Nothing is pruned. A candidate-local handoff or query-construction refusal
+still projects through the compatible `Unassessed` assessment, but now also
+retains one bounded payload-free `LengthPreparationRefusalClass` with a fixed
+machine code. The exhaustive classifiers inspect only the outer refusal
+constructor: renderer text, source names, types, graph identities, and nested
+Djex errors are neither evaluated nor retained, and the class makes no
+behavioral-evidence claim. Any returned structured live session, query,
+association, or replay failure atomically restores every original candidate in
+original order as `Unassessed`, together with only a sanitized batch failure
+class, cleanup bit, and optional safe original index. Candidate-local pure
+preparation classes survive that fallback; candidates whose preparation
+succeeded have no invented refusal reason. Exceptions propagate instead of
+producing a ranking. Lifecycle and per-query budgets remain separate rather
+than pretending to be one batch deadline. Main and the REPL do not invoke this
 foundation yet; no executable path, contract, or policy is inferred. The
 checkpoint is detailed in the
 [live Length ranking foundation report](docs/reports/2026-08-11-live-length-ranking-foundation.md).

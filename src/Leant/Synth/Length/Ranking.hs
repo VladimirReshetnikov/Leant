@@ -22,10 +22,15 @@
 module Leant.Synth.Length.Ranking
   ( LengthRankingInputError (..)
   , LengthRankingAssessment (..)
+  , LengthPreparationRefusalClass (..)
+  , lengthPreparationRefusalClassCode
+  , lengthHandoffPreparationRefusalClass
+  , lengthQueryPreparationRefusalClass
   , RankedLengthCandidate
   , rankedLengthCandidateOriginalIndex
   , rankedLengthCandidateVerified
   , rankedLengthCandidateAssessment
+  , rankedLengthCandidatePreparationRefusal
   , LengthRankingFailureClass (..)
   , LengthRankingFailure
   , lengthRankingFailureClass
@@ -50,6 +55,7 @@ import Language.Haskell.Djex
   ( ExferenceLocal
   , LengthEvaluationLimits
   , LengthSMTLibExecutionConfig
+  , LengthSMTLibQueryError (..)
   , LengthSMTLibLiveQueryError
   , LengthSMTLibLiveQueryFailure
   , LengthSMTLibLiveQueryObservation
@@ -76,6 +82,7 @@ import Language.Haskell.Djex
 import Leant.Synth.Engine
   ( CheckedLengthHandoff
   , DetailedVerificationVariant
+  , LengthHandoffRefusal (..)
   , checkedLengthHandoffProblem
   , checkedLengthHandoffVerifiedVariant
   , prepareCheckedLengthHandoff
@@ -108,13 +115,62 @@ data LengthRankingAssessment
   | Counterexample !ValidatedLengthCounterexample
   deriving (Eq, Show)
 
+-- | Stable, payload-free phase at which pure candidate preparation refused.
+--
+-- These classes are diagnostics only.  They are neither behavioral evidence
+-- nor ranking strength, and their derived order must not influence candidate
+-- selection.  Exact renderer text, source names, types, graph identities, and
+-- nested Djex errors are deliberately discarded before a ranking is built.
+data LengthPreparationRefusalClass
+  = LengthPreparationUnsupportedRoute
+  | LengthPreparationTypedAuthorityUnavailable
+  | LengthPreparationCandidateAssociationRejected
+  | LengthPreparationRenderingAssociationRejected
+  | LengthPreparationSpineBindingUnavailable
+  | LengthPreparationProviderBindingUnavailable
+  | LengthPreparationSessionRejected
+  | LengthPreparationContractRejected
+  | LengthPreparationCandidateSemanticsRejected
+  | LengthPreparationQueryConstructionRejected
+  deriving (Bounded, Enum, Eq, Ord, Show)
+
+-- | Fixed machine-readable code containing no refusal payload.
+lengthPreparationRefusalClassCode
+  :: LengthPreparationRefusalClass
+  -> String
+lengthPreparationRefusalClassCode refusal = case refusal of
+  LengthPreparationUnsupportedRoute -> "unsupported-route"
+  LengthPreparationTypedAuthorityUnavailable ->
+    "typed-authority-unavailable"
+  LengthPreparationCandidateAssociationRejected ->
+    "candidate-association-rejected"
+  LengthPreparationRenderingAssociationRejected ->
+    "rendering-association-rejected"
+  LengthPreparationSpineBindingUnavailable ->
+    "spine-binding-unavailable"
+  LengthPreparationProviderBindingUnavailable ->
+    "provider-binding-unavailable"
+  LengthPreparationSessionRejected -> "session-rejected"
+  LengthPreparationContractRejected -> "contract-rejected"
+  LengthPreparationCandidateSemanticsRejected ->
+    "candidate-semantics-rejected"
+  LengthPreparationQueryConstructionRejected ->
+    "query-construction-rejected"
+
+-- | Private invariant separating a pure preparation refusal from the legacy
+-- assessment projection.  Operational batch fallback is represented by
+-- 'LengthCandidateAssessed' 'Unassessed', with no candidate-local refusal.
+data LengthCandidateAssessment
+  = LengthCandidatePreparationRefused !LengthPreparationRefusalClass
+  | LengthCandidateAssessed !LengthRankingAssessment
+
 -- | One callback receipt and the assessment made for that exact candidate.
 -- The constructor stays private so receipts cannot be detached and paired
 -- with another candidate's assessment.
 data RankedLengthCandidate = RankedLengthCandidate
   !Natural
   !(Verified DetailedVerificationVariant)
-  !LengthRankingAssessment
+  !LengthCandidateAssessment
 
 rankedLengthCandidateOriginalIndex :: RankedLengthCandidate -> Natural
 rankedLengthCandidateOriginalIndex (RankedLengthCandidate index _ _) = index
@@ -127,8 +183,31 @@ rankedLengthCandidateVerified (RankedLengthCandidate _ verified _) = verified
 rankedLengthCandidateAssessment
   :: RankedLengthCandidate
   -> LengthRankingAssessment
-rankedLengthCandidateAssessment (RankedLengthCandidate _ _ assessment) =
-  assessment
+rankedLengthCandidateAssessment (RankedLengthCandidate _ _ state) =
+  candidateAssessment state
+
+-- | Candidate-local pure preparation refusal, if one occurred.
+--
+-- 'Nothing' with 'Unassessed' means that preparation succeeded but an
+-- operational batch failure atomically reset the assessment; callers should
+-- inspect 'lengthRankingFailure' for that batch-wide cause.
+rankedLengthCandidatePreparationRefusal
+  :: RankedLengthCandidate
+  -> Maybe LengthPreparationRefusalClass
+rankedLengthCandidatePreparationRefusal (RankedLengthCandidate _ _ state) =
+  candidatePreparationRefusal state
+
+candidateAssessment :: LengthCandidateAssessment -> LengthRankingAssessment
+candidateAssessment state = case state of
+  LengthCandidatePreparationRefused _ -> Unassessed
+  LengthCandidateAssessed assessment -> assessment
+
+candidatePreparationRefusal
+  :: LengthCandidateAssessment
+  -> Maybe LengthPreparationRefusalClass
+candidatePreparationRefusal state = case state of
+  LengthCandidatePreparationRefused refusal -> Just refusal
+  LengthCandidateAssessed _ -> Nothing
 
 -- | Payload-free failure classes.  Nested live failures are already sanitized
 -- by Djex; association and replay failures deliberately discard their richer
@@ -184,7 +263,7 @@ data AssociatedRankedLengthCandidate association =
     !Natural
     !association
     !(Verified DetailedVerificationVariant)
-    !LengthRankingAssessment
+    !LengthCandidateAssessment
 
 type role AssociatedRankedLengthCandidate nominal
 
@@ -218,14 +297,15 @@ projectAssociatedLengthRanking (AssociatedLengthRanking candidates failure) =
   LengthRanking (map projectCandidate candidates) failure
  where
   projectCandidate (AssociatedRankedLengthCandidate
-      index _ verified assessment) =
-    RankedLengthCandidate index verified assessment
+      index _ verified state) =
+    RankedLengthCandidate index verified state
 
 data PreparedLengthCandidate association
   = PreparedLengthCandidateUnassessed
       !Natural
       !association
       !(Verified DetailedVerificationVariant)
+      !LengthPreparationRefusalClass
   | PreparedLengthCandidateEligible
       !Natural
       !association
@@ -292,10 +372,10 @@ rankAssociatedLengthCandidates execution evaluation contract
             scoped <- withLengthSMTLibLiveSession execution
               $ \session -> runPreparedCandidates evaluation session prepared
             pure $ Right $ case scoped of
-              Left failure -> unassessedRanking admitted verifiedFor
+              Left failure -> unassessedRanking prepared
                 $ sessionRankingFailure failure
               Right (Left failure) ->
-                unassessedRanking admitted verifiedFor failure
+                unassessedRanking prepared failure
               Right (Right assessed) -> AssociatedLengthRanking
                 (stableCounterexampleDemotion assessed) Nothing
 
@@ -329,11 +409,13 @@ prepareCandidates contract verifiedFor = go 0 []
   prepareCandidate index association =
     let verified = verifiedFor association
     in case prepareCheckedLengthHandoff contract verified of
-      Left _ -> PreparedLengthCandidateUnassessed
+      Left refusal -> PreparedLengthCandidateUnassessed
         index association verified
+          $ lengthHandoffPreparationRefusalClass refusal
       Right handoff -> case prepareLengthQueryFromHandoff handoff of
-        Left _ -> PreparedLengthCandidateUnassessed
+        Left refusal -> PreparedLengthCandidateUnassessed
           index association verified
+            $ lengthQueryPreparationRefusalClass refusal
         Right query -> PreparedLengthCandidateEligible
           index association handoff query
 
@@ -348,12 +430,13 @@ preparedCandidateUnassessed
   :: PreparedLengthCandidate association
   -> AssociatedRankedLengthCandidate association
 preparedCandidateUnassessed prepared = case prepared of
-  PreparedLengthCandidateUnassessed index association verified ->
+  PreparedLengthCandidateUnassessed index association verified refusal ->
     AssociatedRankedLengthCandidate
-      index association verified Unassessed
+      index association verified $ LengthCandidatePreparationRefused refusal
   PreparedLengthCandidateEligible index association handoff _ ->
     AssociatedRankedLengthCandidate index association
-      (checkedLengthHandoffVerifiedVariant handoff) Unassessed
+      (checkedLengthHandoffVerifiedVariant handoff)
+      $ LengthCandidateAssessed Unassessed
 
 runPreparedCandidates
   :: LengthEvaluationLimits
@@ -366,9 +449,11 @@ runPreparedCandidates evaluation session = go []
  where
   go reversed remaining = case remaining of
     [] -> pure $ Right $ reverse reversed
-    PreparedLengthCandidateUnassessed index association verified : rest ->
+    PreparedLengthCandidateUnassessed
+        index association verified refusal : rest ->
       go (AssociatedRankedLengthCandidate
-        index association verified Unassessed : reversed) rest
+        index association verified
+          (LengthCandidatePreparationRefused refusal) : reversed) rest
     PreparedLengthCandidateEligible index association handoff query : rest -> do
       observed <- runLengthSMTLibLiveQuery evaluation session query
       case observed of
@@ -405,7 +490,8 @@ assessCandidate index association handoff query observation
             LengthRankingEvidenceReplayMismatch index
           Right receipt -> Right $ Counterexample receipt
       pure $ AssociatedRankedLengthCandidate index association
-        (checkedLengthHandoffVerifiedVariant handoff) assessment
+        (checkedLengthHandoffVerifiedVariant handoff)
+        $ LengthCandidateAssessed assessment
 
 stableCounterexampleDemotion
   :: [AssociatedRankedLengthCandidate association]
@@ -414,23 +500,101 @@ stableCounterexampleDemotion candidates =
   let (counterexamples, retained) = partition hasCounterexample candidates
  in retained ++ counterexamples
  where
-  hasCounterexample (AssociatedRankedLengthCandidate _ _ _ assessment) =
-    case assessment of
+  hasCounterexample (AssociatedRankedLengthCandidate _ _ _ state) =
+    case candidateAssessment state of
       Counterexample _ -> True
       _ -> False
 
 unassessedRanking
-  :: [association]
-  -> (association -> Verified DetailedVerificationVariant)
+  :: [PreparedLengthCandidate association]
   -> LengthRankingFailure
   -> AssociatedLengthRanking association
-unassessedRanking associations verifiedFor failure = AssociatedLengthRanking
-  (zipWith
-    (\index association -> AssociatedRankedLengthCandidate
-      index association (verifiedFor association) Unassessed)
-    [0 ..]
-    associations)
+unassessedRanking prepared failure = AssociatedLengthRanking
+  (sanitizePreparedCandidates prepared)
   (Just failure)
+
+-- Force the complete already-bounded fallback spine and each sanitized record
+-- before exposing the result.  A lazy 'map' would hide the same public values
+-- but could retain checked handoffs and sealed query command bytes behind an
+-- unevaluated tail after an early live failure.
+sanitizePreparedCandidates
+  :: [PreparedLengthCandidate association]
+  -> [AssociatedRankedLengthCandidate association]
+sanitizePreparedCandidates = go []
+ where
+  go reversed remaining = case remaining of
+    [] -> reverse reversed
+    candidate : rest ->
+      let sanitized = preparedCandidateUnassessed candidate
+      in sanitized `seq` go (sanitized : reversed) rest
+
+-- | Reduce a checked-handoff refusal to its stable payload-free phase.
+--
+-- This classifier inspects only the already-known outer constructor.  Every
+-- payload wildcard is intentional: evaluating, retaining, or rendering a raw
+-- refusal payload could expose candidate text and private semantic authority.
+lengthHandoffPreparationRefusalClass
+  :: LengthHandoffRefusal
+  -> LengthPreparationRefusalClass
+lengthHandoffPreparationRefusalClass refusal = case refusal of
+  LengthHandoffNotTypedRoute _ -> LengthPreparationUnsupportedRoute
+  LengthHandoffMissingSemanticSidecar ->
+    LengthPreparationTypedAuthorityUnavailable
+  LengthHandoffRetargetedFragments ->
+    LengthPreparationCandidateAssociationRejected
+  LengthHandoffPremisesPresent ->
+    LengthPreparationCandidateAssociationRejected
+  LengthHandoffSearchGoalChanged ->
+    LengthPreparationCandidateAssociationRejected
+  LengthHandoffSourceGoalVariableMissing _ ->
+    LengthPreparationCandidateAssociationRejected
+  LengthHandoffSourceGoalConversionChanged ->
+    LengthPreparationCandidateAssociationRejected
+  LengthHandoffRequestContextsPresent _ ->
+    LengthPreparationCandidateAssociationRejected
+  LengthHandoffRequestGoalChanged ->
+    LengthPreparationCandidateAssociationRejected
+  LengthHandoffTypedGraphLost _ ->
+    LengthPreparationTypedAuthorityUnavailable
+  LengthHandoffRendererRejected _ ->
+    LengthPreparationRenderingAssociationRejected
+  LengthHandoffRendererNotUnique _ ->
+    LengthPreparationRenderingAssociationRejected
+  LengthHandoffRendererOrdinalChanged _ ->
+    LengthPreparationRenderingAssociationRejected
+  LengthHandoffRendererTextChanged _ _ ->
+    LengthPreparationRenderingAssociationRejected
+  LengthHandoffFamilyUnavailable _ ->
+    LengthPreparationSpineBindingUnavailable
+  LengthHandoffConstructorUnavailable _ _ ->
+    LengthPreparationSpineBindingUnavailable
+  LengthHandoffProviderUnavailable _ ->
+    LengthPreparationProviderBindingUnavailable
+  LengthHandoffProviderAmbiguous _ _ ->
+    LengthPreparationProviderBindingUnavailable
+  LengthHandoffProviderVariableMissing _ _ ->
+    LengthPreparationProviderBindingUnavailable
+  LengthHandoffSessionRejected _ -> LengthPreparationSessionRejected
+  LengthHandoffContractRejected _ -> LengthPreparationContractRejected
+  LengthHandoffProblemRejected _ ->
+    LengthPreparationCandidateSemanticsRejected
+
+-- | Reduce a canonical-query construction refusal to its payload-free phase.
+-- Like the handoff classifier, this is exhaustive and does not inspect fields.
+lengthQueryPreparationRefusalClass
+  :: LengthSMTLibQueryError
+  -> LengthPreparationRefusalClass
+lengthQueryPreparationRefusalClass refusal = case refusal of
+  LengthSMTLibUnexpectedResultVariable ->
+    LengthPreparationQueryConstructionRejected
+  LengthSMTLibInputVariableOutOfRange _ _ ->
+    LengthPreparationQueryConstructionRejected
+  LengthSMTLibNumeralBitLimitExceeded _ _ _ ->
+    LengthPreparationQueryConstructionRejected
+  LengthSMTLibCommandByteLimitExceeded _ _ _ ->
+    LengthPreparationQueryConstructionRejected
+  LengthSMTLibFingerprintByteLimitExceeded _ _ ->
+    LengthPreparationQueryConstructionRejected
 
 localRankingFailure
   :: LengthRankingFailureClass
