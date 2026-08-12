@@ -126,11 +126,14 @@ policy-and-offset token used to start a next-write receiver. Thus neither
 machine can restart a detached tail under a different cumulative budget or
 absolute offset. The configured frame-total failure still wins an exact tie,
 while only a strictly tighter remaining transaction budget becomes the
-established cumulative maximum-plus-one failure. The base stream layer owns the
-canonical ordered SMT-LIB whitespace bytes used by framing, cursor, process
-boundary draining, causal attribution, and the unchanged protocol/capability
-fingerprints. This factors runtime accounting without moving domain phase
-schemas, plan identities, or solver authority into the shared cursor.
+established cumulative maximum-plus-one failure. The schema-free
+`Internal.SMTLib.Lexical` leaf owns the exact SMT-LIB whitespace predicate and
+canonical horizontal-tab, line-feed, carriage-return, space order. Bounded
+response parsing, framing, the cumulative cursor, process boundary draining,
+causal attribution, and the unchanged protocol/capability fingerprints all
+consume that one vocabulary. Any vocabulary change must revise the affected
+response, framing, and plan schema identities; no domain phase, plan, or solver
+authority moves into the lexical leaf or shared cursor.
 
 The package-private terminal protocol value likewise retains only the closed
 solver status and optional decoded integer bindings. Both readiness and
