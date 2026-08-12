@@ -126,9 +126,14 @@ solver status and optional decoded integer bindings. Both readiness and
 ordinary-query driver invocations take their final transcript cap from the
 exact sealed plan whose initial action they drive: the capability plan and
 protocol plan, respectively. Pre-reservation query-run identity sizing uses
-that same protocol-plan projection. The live Session carries the protocol plan
-through driving and binds its complete key directly into the unchanged
-query-run identity. Exact bounded status-frame and
+that same protocol-plan projection. A prepared query transaction retains the
+exact plan, marker roles, admitted replay limits, and deadline, but no
+accounting anchors and no execution authority. Atomic reservation burns the
+ordinal and markers, reads the last-committed stdout and stderr anchors, and
+mints the private nominal epoch-bound receipt accepted by execution and commit.
+Replay projects the exact query from that receipt's plan. The live Session
+carries the protocol plan through driving and binds its complete key directly
+into the unchanged query-run identity. Exact bounded status-frame and
 input-value-frame bytes remain singly stored in the causal transcript rather
 than being copied into that decoded branch.
 
