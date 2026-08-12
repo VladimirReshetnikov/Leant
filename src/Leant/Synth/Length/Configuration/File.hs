@@ -40,12 +40,14 @@ import Language.Haskell.Djex
   , LengthContractVariable (..)
   , LengthEvaluationLimitError
   , LengthEvaluationLimitSource (..)
+  , LengthEvaluationLimits
   , LengthExpression (..)
   , LengthFormula (..)
   , LengthProviderArgumentRole (..)
   , LengthProviderVariable (..)
   , LengthSMTLibArtifactPolicy (..)
   , LengthSMTLibExecutionConfigError
+  , LengthSMTLibExecutionConfig
   , LengthSMTLibExecutionConfigSource (..)
   , LengthSMTLibExecutionLimitSource (..)
   , LengthSMTLibExecutionLimits
@@ -72,10 +74,8 @@ import Leant.Synth.Length.Contract
   )
 import Leant.Synth.Length.Configuration
   ( LengthRankingConfiguration
-  , LengthRankingConfigurationError
-  , LengthRankingConfigurationSource (..)
+  , lengthRankingConfigurationFromValidatedComponents
   , lengthRankingConfigurationExecutableDigestExpectation
-  , mkLengthRankingConfiguration
   )
 
 lengthRankingConfigurationFileFormat :: Text
@@ -224,8 +224,6 @@ data LengthRankingConfigurationFileError
   | LengthRankingConfigurationSyntaxRejected
       !LengthRankingConfigurationSyntaxPhase
       !LengthRankingConfigurationSyntaxError
-  | LengthRankingConfigurationAssemblyRejected
-      !LengthRankingConfigurationError
   deriving (Eq, Ord, Show)
 
 -- | A fully decoded and sealed policy which still grants no permission to run.
@@ -303,28 +301,21 @@ decodeLengthRankingConfigurationFile bytes = do
     LengthRankingConfigurationExecutionField
     "execution"
     root
-  executionSource <- decodeExecution executionLimits executionValue
+  execution <- decodeExecution executionLimits executionValue
   evaluationValue <- requiredField
     LengthRankingConfigurationRootObject
     LengthRankingConfigurationEvaluationField
     "evaluation"
     root
-  evaluationSource <- decodeEvaluation evaluationValue
+  evaluation <- decodeEvaluation evaluationValue
   contractValue <- requiredField
     LengthRankingConfigurationRootObject
     LengthRankingConfigurationContractField
     "contract"
     root
   contract <- decodeContract contractValue
-  let source = LengthRankingConfigurationSource
-        { lengthRankingConfigurationExecutionLimits = executionLimits
-        , lengthRankingConfigurationExecutionSource = executionSource
-        , lengthRankingConfigurationEvaluationSource = evaluationSource
-        , lengthRankingConfigurationContract = contract
-        }
-  configuration <- either
-    (Left . LengthRankingConfigurationAssemblyRejected) Right
-    $ mkLengthRankingConfiguration source
+  let configuration = lengthRankingConfigurationFromValidatedComponents
+        execution evaluation contract
   pure $ DisabledLengthRankingConfiguration configuration
 
 rootFields :: [(Text, LengthRankingConfigurationFileField)]
@@ -507,7 +498,7 @@ decodeExecution
   -> BoundedJsonValue
   -> Either
       LengthRankingConfigurationFileError
-      LengthSMTLibExecutionConfigSource
+      LengthSMTLibExecutionConfig
 decodeExecution limits value = do
   object <- exactObject LengthRankingConfigurationExecutionObject
     executionFields value
@@ -579,7 +570,7 @@ decodeExecution limits value = do
         }
   case mkLengthSMTLibExecutionConfig limits source of
     Left failure -> Left $ LengthRankingConfigurationExecutionRejected failure
-    Right _ -> Right source
+    Right validated -> Right validated
 
 executionFields :: [(Text, LengthRankingConfigurationFileField)]
 executionFields =
@@ -715,7 +706,7 @@ decodeEvaluation
   :: BoundedJsonValue
   -> Either
       LengthRankingConfigurationFileError
-      LengthEvaluationLimitSource
+      LengthEvaluationLimits
 decodeEvaluation value = do
   object <- exactObject LengthRankingConfigurationEvaluationObject
     evaluationFields value
@@ -742,7 +733,7 @@ decodeEvaluation value = do
         }
   case mkLengthEvaluationLimits source of
     Left failure -> Left $ LengthRankingConfigurationEvaluationRejected failure
-    Right _ -> Right source
+    Right validated -> Right validated
 
 evaluationFields :: [(Text, LengthRankingConfigurationFileField)]
 evaluationFields =

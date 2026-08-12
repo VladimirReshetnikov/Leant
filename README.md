@@ -384,6 +384,14 @@ pre-spawn executable-file snapshot expectation, not executed-image
 attestation. The complete schema and budgets are recorded in the
 [bounded live Length ranking configuration-file report](docs/reports/2026-08-11-bounded-live-length-ranking-configuration-file.md).
 
+The file decoder now retains the sealed Djex execution configuration and
+evaluation limits produced by their first validation pass. It assembles the
+opaque Leant compatibility bundle directly from those authorities and the lazy
+contract, instead of discarding the sealed values, rethreading their raw
+sources through aggregate records, and sealing both again. The unreachable
+post-validation assembly failure has consequently been
+removed; execution, evaluation, then contract remain the fixed decode order.
+
 `Leant.Synth.Length.Configuration.File.Acquire` now adds a separate bounded
 filesystem boundary without enabling that policy. Callers must explicitly
 admit an absolute path of at most 4,096 characters and a positive timeout of

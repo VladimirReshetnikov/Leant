@@ -35,6 +35,13 @@ source. `mkLengthRankingConfiguration` delegates to the same function and does
 not force its later contract when either policy phase rejects, preserving the
 established compatibility validation precedence.
 
+`lengthRankingConfigurationFromValidatedComponents` is the total one-way bridge
+for owners which already possess Djex's opaque `LengthSMTLibExecutionConfig`
+and `LengthEvaluationLimits`. It stores those same sealed authorities in the
+Leant policy without reconstructing sources or repeating validation, while the
+contract remains lazy. The bounded file decoder uses this bridge after its
+execution and evaluation phases have each succeeded.
+
 Configuration does not validate the behavioral contract in isolation. The
 contract remains a caller assertion until the ranking preparation pass checks
 it separately with each exact callback-verified candidate, retained structural

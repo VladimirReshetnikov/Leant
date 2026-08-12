@@ -233,15 +233,19 @@ The decoder has a deterministic fail-closed order:
    resource limit, host deadline, and artifact policy in that order, then let
    Djex apply its semantic timeout, resource, deadline, path, digest, and
    fingerprint precedence;
-7. within the contract, validate the spine, precondition, postcondition, and
+7. retain that sealed execution configuration, then decode and retain Djex's
+   sealed evaluation limits;
+8. within the contract, validate the spine, precondition, postcondition, and
    provider laws in that order; and
-8. assemble the already decoded source through the opaque configuration
-   constructor, whose execution validation precedes replay-limit validation.
+9. assemble those already validated authorities and the lazy contract into the
+   opaque compatibility configuration without rethreading raw sources through
+   aggregate records or running either validation a second time.
 
 JSON duplicate keys are rejected earlier than all schema checks. Errors retain
 closed field/object/phase classifications and bounded numeric observations,
 not unknown key text, tag text, source snippets, paths, digests, Lean names, or
-solver output.
+solver output. Because successful execution and evaluation values are retained
+directly, there is no separate post-validation assembly failure class.
 
 ## Disabled decoding and explicit activation
 

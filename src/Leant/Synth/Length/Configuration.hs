@@ -31,6 +31,7 @@ module Leant.Synth.Length.Configuration
   , LengthRankingConfiguration
   , LengthRankingConfigurationError (..)
   , mkLengthRankingConfiguration
+  , lengthRankingConfigurationFromValidatedComponents
   , lengthRankingConfigurationExecutableDigestExpectation
   , assessVerifiedLengthCandidatesConfigured
   , rankVerifiedLengthCandidatesConfigured
@@ -156,6 +157,18 @@ mkLengthRankingConfiguration source = do
     }
   pure $ LengthRankingConfiguration policy
     $ lengthRankingConfigurationContract source
+
+-- | Assemble one compatibility configuration from already validated Djex
+-- execution and replay authorities.  No validation is repeated and no IO is
+-- performed.  The contract remains a lazy caller assertion until candidate
+-- preparation checks it against an exact verified occurrence.
+lengthRankingConfigurationFromValidatedComponents
+  :: LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LeanLengthContract
+  -> LengthRankingConfiguration
+lengthRankingConfigurationFromValidatedComponents execution evaluation =
+  LengthRankingConfiguration $ LengthRankingPolicy execution evaluation
 
 -- | Classify only whether the sealed execution policy contains an executable
 -- digest expectation.  This reveals neither the digest bytes nor the path and

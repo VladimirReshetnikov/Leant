@@ -184,6 +184,7 @@ import Leant.Synth.Length.Configuration
   , LengthRankingPolicySource (..)
   , mkLengthRankingConfiguration
   , mkLengthRankingPolicy
+  , lengthRankingConfigurationFromValidatedComponents
   , lengthRankingConfigurationExecutableDigestExpectation
   , rankVerifiedLengthCandidatesConfigured
   , rankVerifiedLengthCandidatesWithPolicy
@@ -3407,6 +3408,17 @@ assertLengthRankingPolicyContractSeparation = do
     lengthRankingConfigurationExecutableDigestExpectation unpinned @?=
       Djex.LengthSMTLibExecutableDigestExpectationAbsent
     lengthRankingConfigurationExecutableDigestExpectation pinned @?=
+      Djex.LengthSMTLibExecutableDigestExpectationPresent
+    sealedExecution <- expectRight $ Djex.mkLengthSMTLibExecutionConfig
+      Djex.defaultLengthSMTLibExecutionLimits
+      $ explicitLengthRankingExecutionSource executable (Just $ replicate 32 1)
+          Djex.LengthSMTLibStatusOnly
+    sealedEvaluation <- expectRight $ Djex.mkLengthEvaluationLimits
+      Djex.defaultLengthEvaluationLimitSource
+    let bridged = lengthRankingConfigurationFromValidatedComponents
+          sealedExecution sealedEvaluation
+          (error "validated-policy bridge forced the contract")
+    lengthRankingConfigurationExecutableDigestExpectation bridged @?=
       Djex.LengthSMTLibExecutableDigestExpectationPresent
     first <- expectLengthRankingWithin "first request-owned contract"
       $ rankVerifiedLengthCandidatesWithPolicy policy
