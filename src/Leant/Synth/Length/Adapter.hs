@@ -1,11 +1,12 @@
--- | The narrow projection from a callback-accepted Leant candidate handoff to
--- Djex's pure, canonical Length query.
+-- | The narrow checked projection from one callback-accepted Leant candidate
+-- to Djex's pure, canonical Length query.
 --
--- The source 'CheckedLengthHandoff' has already tied an exact Exference term
--- graph to structural family provenance and a sealed Length problem.  This
--- module immediately projects that problem and returns only the opaque query;
--- verification spelling, renderer state, family bindings, and synthesis
--- session authority are not retained by the result.
+-- This module first uses 'prepareCheckedLengthProblem' to tie the exact
+-- accepted Exference term graph to structural family provenance and a sealed
+-- Length problem, then immediately seals that problem into an opaque query.
+-- It never exposes an adapter which promotes an arbitrary checked problem into
+-- this Leant staging boundary. Verification spelling, renderer state, family
+-- bindings, and synthesis session authority are not retained by the result.
 --
 -- No solver is launched here.  Callback acceptance is not a Lean kernel
 -- receipt, raw solver statuses remain heuristic, and a replayed model can
@@ -14,8 +15,8 @@
 -- pruning or a source-level claim that Lean behavior has been disproved.
 module Leant.Synth.Length.Adapter
   ( CheckedLengthQuery
-  , prepareLengthQueryFromHandoff
-  , prepareLengthQueryFromHandoffWithLimits
+  , prepareCheckedLengthQuery
+  , prepareCheckedLengthQueryWithLimits
   ) where
 
 import Language.Haskell.Djex
@@ -28,28 +29,39 @@ import Language.Haskell.Djex
   )
 
 import Leant.Synth.Engine
-  ( CheckedLengthHandoff
-  , checkedLengthHandoffProblem
+  ( DetailedVerificationVariant
+  , LengthHandoffRefusal
+  , prepareCheckedLengthProblem
   )
+import Leant.Synth.Length.Contract (LeanLengthContract)
+import Leant.Synth.Verification (Verified)
 
--- | Query specialization for the exact Exference identities retained by a
--- Leant handoff.  The alias adds no wrapper or projection around Djex's opaque
--- nominal association.
+-- | Query specialization for the exact Exference identities checked by the
+-- Leant preparation boundary. The alias adds no wrapper or projection around
+-- Djex's opaque nominal association.
 type CheckedLengthQuery = LengthSMTLibQuery ExferenceLocal ExferenceLocal
 
--- | Project with Djex's conservative query-construction bounds.
-prepareLengthQueryFromHandoff
-  :: CheckedLengthHandoff
-  -> Either LengthSMTLibQueryError CheckedLengthQuery
-prepareLengthQueryFromHandoff =
-  prepareLengthQueryFromHandoffWithLimits defaultLengthSMTLibLimits
+-- | Check the verified origin, then construct a query with Djex's conservative
+-- bounds. The nested result preserves the handoff/query refusal boundary
+-- without retaining a separate runtime handoff wrapper.
+prepareCheckedLengthQuery
+  :: LeanLengthContract
+  -> Verified DetailedVerificationVariant
+  -> Either LengthHandoffRefusal
+      (Either LengthSMTLibQueryError CheckedLengthQuery)
+prepareCheckedLengthQuery =
+  prepareCheckedLengthQueryWithLimits defaultLengthSMTLibLimits
 
--- | Project with explicit operational construction bounds.  Limits can reject
--- a query but cannot change its fixed QF_LIA semantics or translator schema.
-prepareLengthQueryFromHandoffWithLimits
+-- | Check and construct with explicit operational bounds. Limits can reject a
+-- query but cannot change its fixed QF_LIA semantics or translator schema.
+prepareCheckedLengthQueryWithLimits
   :: LengthSMTLibLimits
-  -> CheckedLengthHandoff
-  -> Either LengthSMTLibQueryError CheckedLengthQuery
-prepareLengthQueryFromHandoffWithLimits limits handoff =
-  let problem = checkedLengthHandoffProblem handoff
-  in problem `seq` sealLengthSMTLibQuery limits problem
+  -> LeanLengthContract
+  -> Verified DetailedVerificationVariant
+  -> Either LengthHandoffRefusal
+      (Either LengthSMTLibQueryError CheckedLengthQuery)
+prepareCheckedLengthQueryWithLimits limits contract verified =
+  case prepareCheckedLengthProblem contract verified of
+    Left refusal -> Left refusal
+    Right problem -> Right $ problem `seq`
+      sealLengthSMTLibQuery limits problem

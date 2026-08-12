@@ -3,9 +3,9 @@
 -- | Package-private implementation of conservative live Length ranking.
 --
 -- This module is the only Leant layer which opens Djex's public live Length
--- session.  It first productively bounds the complete input, then seals every
--- checked handoff and canonical query before launching a worker.  Eligible
--- queries run serially in original order inside one rank-N scope.
+-- session.  It first productively bounds the complete input, then prepares
+-- every checked problem and canonical query before launching a worker.
+-- Eligible queries run serially in original order inside one rank-N scope.
 --
 -- A solver status is heuristic only.  An optional counterexample is retained
 -- only after Djex's public live replay gate checks the exact query fingerprint
@@ -80,11 +80,10 @@ import Language.Haskell.Djex
 import Leant.Synth.Engine
   ( DetailedVerificationVariant
   , LengthHandoffRefusal (..)
-  , prepareCheckedLengthHandoff
   )
 import Leant.Synth.Length.Adapter
   ( CheckedLengthQuery
-  , prepareLengthQueryFromHandoff
+  , prepareCheckedLengthQuery
   )
 import Leant.Synth.Length.Contract (LeanLengthContract)
 import Leant.Synth.PostVerification
@@ -312,11 +311,11 @@ data PreparedLengthCandidate association
 -- | Rank one already Lean-callback-verified batch under an explicit behavioral
 -- contract and explicit live/evaluation policies.
 --
--- Input admission precedes all handoff work.  A successful handoff is
--- transient: after it seals a query, prepared state retains only that exact
--- verified receipt and query.  An empty admitted batch opens no worker. Every
--- nonempty eligible batch uses exactly one live session and executes its
--- pre-sealed queries serially in original order.
+-- Input admission precedes all behavioral-preparation work. A successfully
+-- checked problem is transient until query sealing; prepared state retains
+-- only that exact verified receipt and query. An empty admitted batch opens no
+-- worker. Every nonempty eligible batch uses exactly one live session and
+-- executes its pre-sealed queries serially in original order.
 rankVerifiedLengthCandidates
   :: LengthSMTLibExecutionConfig
   -> LengthEvaluationLimits
@@ -407,16 +406,15 @@ prepareCandidates contract verifiedFor = go 0 []
 
   prepareCandidate index association =
     let verified = verifiedFor association
-    in case prepareCheckedLengthHandoff contract verified of
+    in case prepareCheckedLengthQuery contract verified of
       Left refusal -> PreparedLengthCandidateUnassessed
         index association verified
           $ lengthHandoffPreparationRefusalClass refusal
-      Right handoff -> case prepareLengthQueryFromHandoff handoff of
-        Left refusal -> PreparedLengthCandidateUnassessed
-          index association verified
-            $ lengthQueryPreparationRefusalClass refusal
-        Right query -> PreparedLengthCandidateEligible
-          index association verified query
+      Right (Left refusal) -> PreparedLengthCandidateUnassessed
+        index association verified
+          $ lengthQueryPreparationRefusalClass refusal
+      Right (Right query) -> PreparedLengthCandidateEligible
+        index association verified query
 
 hasEligibleCandidate :: [PreparedLengthCandidate association] -> Bool
 hasEligibleCandidate = any isEligible

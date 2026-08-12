@@ -32,13 +32,13 @@ deduplication displayed an earlier compatibility-only occurrence, a private
 variant-scoped witness may instead refer to the first bounded later Exference
 occurrence with identical bytes. The displayed route, display ordinal,
 ordering, group sidecar, and sibling variants do not change.
-`prepareCheckedLengthHandoff` uses the origin's own renderer ordinal and
+`prepareCheckedLengthProblem` uses the origin's own renderer ordinal and
 requires the retained graph to re-render to one spelling equal to the
 callback-accepted text before binding its family provenance, inventory,
 provider assumptions, and explicit contract.
-Eligible handoffs are then sealed into canonical QF_LIA queries. A pure refusal
-at either boundary leaves that one candidate `Unassessed` through the legacy
-assessment projection and records a separate
+Eligible checked problems are then sealed into canonical QF_LIA queries. A
+pure refusal at either boundary leaves that one candidate `Unassessed` through
+the legacy assessment projection and records a separate
 `LengthPreparationRefusalClass`. The ten-value taxonomy is bounded and
 payload-free, and each value has a fixed `lengthPreparationRefusalClassCode`.
 Its exhaustive handoff and query classifiers inspect only the already-known
@@ -65,12 +65,12 @@ problem retained by the query. Only a successful replay releases the safe
 `ValidatedLengthCounterexample` receipt into the assessment stored by the
 opaque ranked-candidate association.
 
-The checked handoff is transient during preparation. Once it has sealed a
-canonical query, each eligible prepared record retains only the exact verified
-callback receipt and that query. The query already owns the same behavioral
-problem, so retaining the renderer/session/family handoff solely for a second
-replay would duplicate authority and heap residency without strengthening
-query/evidence replay.
+The checked problem is transient until it is sealed into a canonical query.
+Each eligible prepared record retains only the exact verified callback receipt
+and that query. The query already owns the same behavioral problem, so
+retaining the earlier renderer, session, or family preparation state solely
+for a second replay would duplicate authority and heap residency without
+strengthening query/evidence replay.
 
 Djex likewise drops the private typed SMT plan after bounded rendering and
 structural fingerprint construction. The sealed query keeps only the checked
@@ -79,10 +79,12 @@ query fingerprint needed by live execution and replay. The fingerprint's
 typed-plan field remains unchanged, so this heap reduction does not make
 rendered bytes the semantic source of truth or alter query identity.
 
-The handoff wrapper itself now contains only that sealed problem. Callback
-receipt and resolved family values are consumed while constructing it rather
-than being copied into the transient result; the ranking record owns the one
-receipt it still needs for occurrence-preserving presentation.
+Preparation returns only the sealed problem. Callback receipt and resolved
+family values are consumed before that result rather than being copied into a
+transient wrapper; the ranking record separately owns the one receipt it still
+needs for occurrence-preserving presentation. The fused adapter preserves the
+handoff-before-query refusal boundary with nested closed results rather than
+another runtime authority type.
 
 The receipt remains finite-spine and model-relative, including any named
 provider-law assumptions. It is not a Lean source-level counterexample, an

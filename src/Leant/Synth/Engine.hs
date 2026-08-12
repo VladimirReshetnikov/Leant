@@ -49,9 +49,7 @@ module Leant.Synth.Engine
   , LeanLengthProviderLaw (..)
   , LeanLengthContract (..)
   , LengthHandoffRefusal (..)
-  , CheckedLengthHandoff
-  , checkedLengthHandoffProblem
-  , prepareCheckedLengthHandoff
+  , prepareCheckedLengthProblem
   , mapDetailedCandidateGroupVariantsDroppingSemanticSidecar
   , DetailedSynthOutcome (..)
   , projectDetailedSynthOutcome
@@ -544,22 +542,7 @@ data LengthHandoffRefusal
         ExferenceTermGraphAbsence ExferenceLocal ExferenceLocal)
   deriving (Eq, Show)
 
--- | One callback-accepted spelling reduced conservatively to the complete
--- Djex Length problem derived from its exact checked Exference origin.
---
--- The constructor stays private.  In particular, neither a raw rendered term
--- nor a detached typed candidate can be paired with a problem after sealing.
-data CheckedLengthHandoff = CheckedLengthHandoff
-  (CheckedLengthProblem ExferenceLocal ExferenceLocal)
-
--- | Complete solver-neutral problem sealed for the retained candidate.
-checkedLengthHandoffProblem
-  :: CheckedLengthHandoff
-  -> CheckedLengthProblem ExferenceLocal ExferenceLocal
-checkedLengthHandoffProblem
-    (CheckedLengthHandoff problem) = problem
-
--- | Prepare the only currently supported Leant-to-Djex behavioral handoff.
+-- | Prepare the only currently supported Leant-to-Djex behavioral problem.
 --
 -- This intentionally accepts a 'Verified' value rather than an unverified
 -- variant, but that receipt records only callback acceptance.  The additional
@@ -572,12 +555,14 @@ checkedLengthHandoffProblem
 -- from retained translation provenance. Djex seals the inventory, spine, and
 -- provider laws once into an opaque session, revalidates the separately
 -- supplied contract through that session, and then seals the typed graph,
--- semantic encoding, and problem identity.
-prepareCheckedLengthHandoff
+-- semantic encoding, and problem identity. The returned problem is the direct
+-- Djex authority; no additional Leant handoff wrapper is retained.
+prepareCheckedLengthProblem
   :: LeanLengthContract
   -> Verified DetailedVerificationVariant
-  -> Either LengthHandoffRefusal CheckedLengthHandoff
-prepareCheckedLengthHandoff source verified = do
+  -> Either LengthHandoffRefusal
+      (CheckedLengthProblem ExferenceLocal ExferenceLocal)
+prepareCheckedLengthProblem source verified = do
   let variant = verifiedCandidate verified
       route = detailedVerificationVariantRoute variant
   exactOrigin <- case detailedVerificationVariantExactTypedOrigin variant of
@@ -639,7 +624,7 @@ prepareCheckedLengthHandoff source verified = do
   problem <- either (Left . LengthHandoffProblemRejected) Right
     $ sealLengthTypedCandidateProblem
         defaultLengthProblemLimits session contract candidate
-  pure $ CheckedLengthHandoff problem
+  pure problem
  where
   resolveSemanticFamily origin spine = case
       [ binding

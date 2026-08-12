@@ -283,13 +283,15 @@ no sidecar is transferred onto a Djinn group. Wrappers such as
 `Classical.byContradiction` discard both direct and recovered authority because
 they denote a new term.
 This is deliberately a solver-neutral identity seam, not behavioral evidence.
-The checked Length handoff now binds callback-accepted text back to its exact
+Checked Length preparation now binds callback-accepted text back to its exact
 typed origin, original Exference renderer ordinal, singleton exact re-render,
 family provenance, an opaque Djex session which owns the exact inventory and
 provider assumptions, the separately reassociated contract, and the
-candidate-specific Djex problem. `Leant.Synth.Length.Adapter` immediately drops
-the heavier renderer and session authority while sealing that problem into a
-bounded canonical QF_LIA query. It launches no solver and grants no authority
+candidate-specific Djex problem. That preparation consumes the renderer,
+family, and session authority and returns only the sealed problem;
+`Leant.Synth.Length.Adapter` then seals it into a bounded canonical QF_LIA
+query without exposing an arbitrary problem-taking entrance. It launches no
+solver and grants no authority
 to raw `sat`, `unsat`, or `unknown`: only decoded input values which pass Djex's
 independent exact-problem replay can yield a finite-spine, model-relative
 counterexample receipt, still conditional on every named provider law used by
@@ -318,11 +320,10 @@ those queries serially in original order. `unsat`, `unknown`, and status-only
 replay gate is stably moved behind the other candidates. That gate checks the
 exact canonical query fingerprint before inspecting optional evidence and
 replays any evidence against the behavioral problem retained by the query.
-The heavier checked handoff is therefore transient after query sealing;
-the opaque handoff itself retains only the already sealed problem, not a
-second callback receipt or resolved family binding. Prepared live state
-retains only the exact verified receipt and sealed query because ordering
-still needs that receipt.
+The checked problem is transient until query sealing; there is no separate
+runtime handoff wrapper, second callback receipt, or retained family binding.
+Prepared live state retains only the exact verified receipt and sealed query
+because ordering still needs that receipt.
 Nothing is pruned. A candidate-local handoff or query-construction refusal
 still projects through the compatible `Unassessed` assessment, but now also
 retains one bounded payload-free `LengthPreparationRefusalClass` with a fixed

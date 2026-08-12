@@ -93,8 +93,7 @@ import Leant.Json.Bounded
   , parseBoundedJson
   )
 import Leant.Synth.Engine
-  ( CheckedLengthHandoff
-  , DetailedCandidateGroup
+  ( DetailedCandidateGroup
   , DetailedSynthOutcome (..)
   , DetailedVerificationVariant
   , TypedCandidateSemanticSidecar
@@ -125,7 +124,6 @@ import Leant.Synth.Engine
   , providerStages
   , synthEngineName
   , candidateWindow
-  , checkedLengthHandoffProblem
   , synthMaxShown
   , synthMaxTried
   , synthVerificationWindow
@@ -134,7 +132,7 @@ import Leant.Synth.Engine
   , synthesizeWithProvidersSkippingDetailed
   , synthesizeTunedDetailed
   , projectDetailedSynthOutcome
-  , prepareCheckedLengthHandoff
+  , prepareCheckedLengthProblem
   , renderCandidateByAvailability
   , takeDistinct
   , takeDistinctOn
@@ -174,7 +172,8 @@ import Leant.Synth.Fragment
   )
 import Leant.Synth.Length.Adapter
   ( CheckedLengthQuery
-  , prepareLengthQueryFromHandoff
+  , prepareCheckedLengthQuery
+  , prepareCheckedLengthQueryWithLimits
   )
 import Leant.Synth.Length.Configuration
   ( LengthRankingConfiguration
@@ -3750,15 +3749,17 @@ assertLengthRankingCounterexampleDemotion = do
       contract = lengthRankingContract 2
       original = [zero, retainedFirst, one, retainedSecond]
       expected = [retainedFirst, retainedSecond, zero, one]
-  zeroHandoff <- expectRight $ prepareCheckedLengthHandoff contract zero
-  oneHandoff <- expectRight $ prepareCheckedLengthHandoff contract one
-  zeroQuery <- expectRight $ prepareLengthQueryFromHandoff zeroHandoff
-  oneQuery <- expectRight $ prepareLengthQueryFromHandoff oneHandoff
+  zeroProblem <- expectRight $ prepareCheckedLengthProblem contract zero
+  oneProblem <- expectRight $ prepareCheckedLengthProblem contract one
+  zeroQuery <- expectRight (prepareCheckedLengthQuery contract zero)
+    >>= expectRight
+  oneQuery <- expectRight (prepareCheckedLengthQuery contract one)
+    >>= expectRight
   assertBool "distinct checked providers shared a Length query identity"
     $ Djex.lengthSMTLibQueryFingerprint zeroQuery /=
         Djex.lengthSMTLibQueryFingerprint oneQuery
-  assertLengthRankingQueryAssociation zeroHandoff zeroQuery
-  assertLengthRankingQueryAssociation oneHandoff oneQuery
+  assertLengthRankingQueryAssociation zeroProblem zeroQuery
+  assertLengthRankingQueryAssociation oneProblem oneQuery
   ranking <- runLengthRankingWithFake "healthy"
     Djex.LengthSMTLibInputValuesAfterSatisfiable
     contract original
@@ -4036,18 +4037,17 @@ assertLengthCounterexampleReceipt expectedResult receipt = do
   Djex.validatedLengthCounterexampleResult receipt @?= expectedResult
 
 assertLengthRankingQueryAssociation
-  :: CheckedLengthHandoff
+  :: Djex.CheckedLengthProblem Djex.ExferenceLocal Djex.ExferenceLocal
   -> CheckedLengthQuery
   -> IO ()
-assertLengthRankingQueryAssociation handoff query = do
+assertLengthRankingQueryAssociation problem query = do
   assertBool "the exact checked ranking query retained no identity"
     $ not $ null $ Djex.fingerprintCanonicalBytes
       $ Djex.lengthSMTLibQueryFingerprint query
   Djex.behavioralProblemFingerprint
       (Djex.lengthSMTLibQueryBehavioralProblem query) @?=
     Djex.behavioralProblemFingerprint
-      (Djex.checkedLengthProblemBehavioralProblem
-        $ checkedLengthHandoffProblem handoff)
+      (Djex.checkedLengthProblemBehavioralProblem problem)
 
 rankedLengthVerifiedCandidates
   :: LengthRanking
@@ -4136,17 +4136,17 @@ buildLengthRankingLiveFixture = do
     other -> assertFailure $ "Length ranking fixture produced: " ++ show other
   zero <- verifySingleLengthRankingGroup zeroOrigin
   one <- verifySingleLengthRankingGroup oneOrigin
-  zeroHandoff <- expectRight $ prepareCheckedLengthHandoff
+  zeroProblem <- expectRight $ prepareCheckedLengthProblem
     (lengthRankingContract 0) zero
-  oneHandoff <- expectRight $ prepareCheckedLengthHandoff
+  oneProblem <- expectRight $ prepareCheckedLengthProblem
     (lengthRankingContract 0) one
   checkedLengthCandidateResult
       (checkedLengthProblemCandidate
-        $ checkedLengthHandoffProblem zeroHandoff) @?=
+        zeroProblem) @?=
     LengthLiteral 0
   checkedLengthCandidateResult
       (checkedLengthProblemCandidate
-        $ checkedLengthHandoffProblem oneHandoff) @?=
+        oneProblem) @?=
     LengthLiteral 1
   pure LengthRankingLiveFixture
     { lengthRankingFixtureZero = zero
@@ -4258,13 +4258,21 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
         (const $ pure VariantAccepted)
         [detailedCandidateGroupVerificationVariants synthetic]
       case verifiedCandidateReceipts batch of
-        [verified] -> case prepareCheckedLengthHandoff
-            unreachableContract verified of
-          Left LengthHandoffMissingSemanticSidecar -> pure ()
-          Left refusal -> assertFailure $
-            "unexpected missing-sidecar refusal: " ++ show refusal
-          Right _ -> assertFailure
-            "callback acceptance invented a semantic sidecar"
+        [verified] -> do
+          case prepareCheckedLengthProblem unreachableContract verified of
+            Left LengthHandoffMissingSemanticSidecar -> pure ()
+            Left refusal -> assertFailure $
+              "unexpected missing-sidecar refusal: " ++ show refusal
+            Right _ -> assertFailure
+              "callback acceptance invented a semantic sidecar"
+          case prepareCheckedLengthQueryWithLimits
+              (error "query limits forced before handoff refusal")
+              unreachableContract verified of
+            Left LengthHandoffMissingSemanticSidecar -> pure ()
+            Left refusal -> assertFailure $
+              "unexpected fused missing-sidecar refusal: " ++ show refusal
+            Right _ -> assertFailure
+              "query preparation bypassed a missing semantic sidecar"
         receipts -> assertFailure $
           "unexpected synthetic verification receipts: " ++ show receipts
   , testCase
@@ -4352,13 +4360,12 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                     [recoveredVerified] -> do
                       detailedVerificationVariantOrdinal
                           (verifiedCandidate recoveredVerified) @?= 1
-                      recoveredHandoff <- expectRight $
-                        prepareCheckedLengthHandoff
+                      recoveredProblem <- expectRight $
+                        prepareCheckedLengthProblem
                           contract recoveredVerified
                       checkedLengthCandidateResult
                           (checkedLengthProblemCandidate
-                            $ checkedLengthHandoffProblem
-                              recoveredHandoff)
+                            recoveredProblem)
                         @?= LengthLiteral 0
                     receipts -> assertFailure $
                       "exact duplicate provenance produced unexpected "
@@ -4370,14 +4377,34 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                 [detailedCandidateGroupVerificationVariants origin]
               case verifiedCandidateReceipts batch of
                 [verified] -> do
-                  handoff <- expectRight $
-                    prepareCheckedLengthHandoff contract verified
-                  let candidate = checkedLengthProblemCandidate
-                        $ checkedLengthHandoffProblem handoff
+                  problem <- expectRight $
+                    prepareCheckedLengthProblem contract verified
+                  let candidate = checkedLengthProblemCandidate problem
                   checkedLengthCandidateResult candidate @?=
                     LengthLiteral 0
-                  query <- expectRight $
-                    prepareLengthQueryFromHandoff handoff
+                  query <- expectRight
+                      (prepareCheckedLengthQuery contract verified)
+                    >>= expectRight
+                  case prepareCheckedLengthQueryWithLimits
+                      (error "query limits forced by outer success")
+                      contract verified of
+                    Right _ -> pure ()
+                    Left refusal -> assertFailure $
+                      "valid checked preparation failed before its query: "
+                        ++ show refusal
+                  noCommand <- expectRight $ Djex.mkLengthSMTLibLimits
+                    Djex.defaultLengthSMTLibLimitSource
+                      { Djex.lengthSMTLibLimitSourceCommandBytes = 0 }
+                  case prepareCheckedLengthQueryWithLimits
+                      noCommand contract verified of
+                    Right (Left refusal) -> refusal @?=
+                      Djex.LengthSMTLibCommandByteLimitExceeded
+                        Djex.LengthSMTLibCheckCommand 0 1
+                    Left refusal -> assertFailure $
+                      "valid checked query preparation failed early: "
+                        ++ show refusal
+                    Right (Right _) -> assertFailure
+                      "zero command limit admitted a checked query"
                   lengthSMTLibQuerySchemaTag @?=
                     map (fromIntegral . fromEnum)
                       ("djex-length-z3-qf-lia-smtlib2/v2" :: String)
@@ -4391,8 +4418,7 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                   behavioralProblemFingerprint
                       (lengthSMTLibQueryBehavioralProblem query) @?=
                     behavioralProblemFingerprint
-                      (checkedLengthProblemBehavioralProblem
-                        $ checkedLengthHandoffProblem handoff)
+                      (checkedLengthProblemBehavioralProblem problem)
                   let responseBytes = map $ fromIntegral . fromEnum
                   Djex.parseLengthSMTLibCheckResponse
                       Djex.defaultLengthSMTLibResponseLimits
@@ -4423,7 +4449,7 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                     bindings -> assertFailure $
                       "expected one exact provider binding, got: "
                         ++ show bindings
-                  case prepareCheckedLengthHandoff
+                  case prepareCheckedLengthProblem
                       (contract
                         { leanLengthContractProviderLaws =
                             [ providerLaw
@@ -4439,7 +4465,7 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                       "unexpected missing-provider refusal: " ++ show refusal
                     Right _ -> assertFailure
                       "an unbound provider law entered Length sealing"
-                  case prepareCheckedLengthHandoff
+                  case prepareCheckedLengthProblem
                       (contract
                         { leanLengthContractProviderLaws =
                             [ providerLaw
@@ -4461,7 +4487,7 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                   let cyclicProviderLaws =
                         providerLaw : cyclicProviderLaws
                   productive <- timeout 5000000 $ evaluate $
-                    case prepareCheckedLengthHandoff
+                    case prepareCheckedLengthProblem
                         (contract
                           { leanLengthContractProviderLaws =
                               cyclicProviderLaws
@@ -4474,7 +4500,7 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                         observedSummaries == maximumSummaries + 1
                       _ -> False
                   productive @?= Just True
-                  case prepareCheckedLengthHandoff
+                  case prepareCheckedLengthProblem
                       (contract
                         { leanLengthContractSpine = spine
                             { leanLengthSpineFamilyName =
@@ -4488,7 +4514,7 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                       "unexpected missing-family refusal: " ++ show refusal
                     Right _ -> assertFailure
                       "an unbound Lean family entered Length sealing"
-                  case prepareCheckedLengthHandoff
+                  case prepareCheckedLengthProblem
                       (contract
                         { leanLengthContractSpine = spine
                             { leanLengthSpineZeroConstructorName =
@@ -4678,10 +4704,9 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
               [detailedCandidateGroupVerificationVariants origin]
             case verifiedCandidateReceipts batch of
               [verified] -> do
-                handoff <- expectRight $
-                  prepareCheckedLengthHandoff contract verified
-                let candidate = checkedLengthProblemCandidate
-                      $ checkedLengthHandoffProblem handoff
+                problem <- expectRight $
+                  prepareCheckedLengthProblem contract verified
+                let candidate = checkedLengthProblemCandidate problem
                 checkedLengthCandidateResult candidate @?=
                   LengthLiteral 0
                 case inspectedProviderBindings expected of
@@ -4759,7 +4784,7 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                       , leanLengthContractProviderLaws = []
                       }
                 case verifiedCandidateReceipts batch of
-                  [verified] -> case prepareCheckedLengthHandoff
+                  [verified] -> case prepareCheckedLengthProblem
                       unreachableContract verified of
                     Left LengthHandoffPremisesPresent -> pure ()
                     Left refusal -> assertFailure $
@@ -4877,7 +4902,7 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                       , leanLengthContractProviderLaws = []
                       }
                 case verifiedCandidateReceipts batch of
-                  [verified] -> case prepareCheckedLengthHandoff
+                  [verified] -> case prepareCheckedLengthProblem
                       unreachableContract verified of
                     Left (LengthHandoffRendererNotUnique alternatives) ->
                       assertBool

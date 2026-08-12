@@ -20,7 +20,7 @@ Other spellings in the same Djinn group remain untyped.
 
 ## Checked use
 
-`prepareCheckedLengthHandoff` consumes the callback-accepted
+`prepareCheckedLengthProblem` consumes the callback-accepted
 `DetailedVerificationVariant`. A direct Exference occurrence and a recovered
 exact-text occurrence meet at the same private origin boundary. Preparation
 preserves its fixed refusal precedence and establishes all of the following:
