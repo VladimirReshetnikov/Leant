@@ -6,8 +6,8 @@
 -- Decoding performs no discovery, path normalization, environment lookup, or
 -- IO.  Every field is required.  A successful decode returns a deliberately
 -- disabled opaque value: callers must separately choose whether an absent
--- executable digest pin is acceptable before they can obtain the runnable
--- 'LengthRankingConfiguration'.
+-- executable digest pin is acceptable before they can obtain the validated
+-- policy and this file's fixed compatibility contract.
 module Leant.Synth.Length.Configuration.File
   ( lengthRankingConfigurationFileFormat
   , lengthRankingConfigurationFileVersion
@@ -24,6 +24,7 @@ module Leant.Synth.Length.Configuration.File
   , LengthRankingConfigurationActivationPolicy (..)
   , LengthRankingConfigurationActivationError (..)
   , decodeLengthRankingConfigurationFile
+  , disableLengthRankingConfiguration
   , activateLengthRankingConfiguration
   ) where
 
@@ -73,9 +74,9 @@ import Leant.Synth.Length.Contract
   , LeanLengthSpineIdentity (..)
   )
 import Leant.Synth.Length.Configuration
-  ( LengthRankingConfiguration
-  , lengthRankingConfigurationFromValidatedComponents
-  , lengthRankingConfigurationExecutableDigestExpectation
+  ( LengthRankingPolicy
+  , lengthRankingPolicyExecutableDigestExpectation
+  , lengthRankingPolicyFromValidatedComponents
   )
 
 lengthRankingConfigurationFileFormat :: Text
@@ -230,9 +231,21 @@ data LengthRankingConfigurationFileError
 -- Its opaque execution policy is the sole owner of any executable digest
 -- expectation; no second source-derived activation flag is retained.
 -- The strict field preserves the existing disabled wrapper's demand on the
--- already-sealed configuration without forcing its deliberately lazy contract.
+-- already-sealed policy without forcing its deliberately lazy contract.
 data DisabledLengthRankingConfiguration =
-  DisabledLengthRankingConfiguration !LengthRankingConfiguration
+  DisabledLengthRankingConfiguration
+    !LengthRankingPolicy
+    LeanLengthContract
+
+-- | Retain an already validated policy beside one passive contract assertion
+-- without granting permission to execute it.  The strict policy and lazy
+-- contract fields match the compatibility-file decoder's demand boundary.
+-- This package-private bridge performs no validation or IO.
+disableLengthRankingConfiguration
+  :: LengthRankingPolicy
+  -> LeanLengthContract
+  -> DisabledLengthRankingConfiguration
+disableLengthRankingConfiguration = DisabledLengthRankingConfiguration
 
 data LengthRankingConfigurationActivationPolicy
   = RequirePinnedExecutable
@@ -246,21 +259,23 @@ data LengthRankingConfigurationActivationError
 -- | Explicitly activate a decoded policy.  Requiring a pin fails closed when
 -- the sealed execution policy classifies its digest expectation as absent;
 -- permitting an unpinned executable is a distinct, visible caller decision
--- rather than a decoder default.
+-- rather than a decoder default.  Neither branch inspects the retained lazy
+-- contract or performs IO.
 activateLengthRankingConfiguration
   :: LengthRankingConfigurationActivationPolicy
   -> DisabledLengthRankingConfiguration
   -> Either
       LengthRankingConfigurationActivationError
-      LengthRankingConfiguration
+      (LengthRankingPolicy, LeanLengthContract)
 activateLengthRankingConfiguration policy
-    (DisabledLengthRankingConfiguration configuration) = case policy of
+    (DisabledLengthRankingConfiguration rankingPolicy contract) = case policy of
   RequirePinnedExecutable ->
-    case lengthRankingConfigurationExecutableDigestExpectation configuration of
+    case lengthRankingPolicyExecutableDigestExpectation rankingPolicy of
       LengthSMTLibExecutableDigestExpectationAbsent ->
         Left LengthRankingConfigurationExecutablePinRequired
-      LengthSMTLibExecutableDigestExpectationPresent -> Right configuration
-  PermitUnpinnedExecutable -> Right configuration
+      LengthSMTLibExecutableDigestExpectationPresent ->
+        Right (rankingPolicy, contract)
+  PermitUnpinnedExecutable -> Right (rankingPolicy, contract)
 
 decodeLengthRankingConfigurationFile
   :: ByteString
@@ -314,9 +329,8 @@ decodeLengthRankingConfigurationFile bytes = do
     "contract"
     root
   contract <- decodeContract contractValue
-  let configuration = lengthRankingConfigurationFromValidatedComponents
-        execution evaluation contract
-  pure $ DisabledLengthRankingConfiguration configuration
+  let policy = lengthRankingPolicyFromValidatedComponents execution evaluation
+  pure $ disableLengthRankingConfiguration policy contract
 
 rootFields :: [(Text, LengthRankingConfigurationFileField)]
 rootFields =

@@ -1,7 +1,8 @@
 -- | Explicit optional integration of finite-list-spine Length ranking.
 --
 -- This module owns the complete caller-facing transition from an explicitly
--- named configuration file to one reusable, activated ranking configuration.
+-- named configuration file to one reusable, activated ranking policy and the
+-- file's fixed compatibility contract.
 -- The v1 file's contract is a fixed startup choice for the process: every
 -- later verified batch is checked against that same contract, while every
 -- eligible batch still gets a fresh worker scope.  This module also owns the
@@ -28,7 +29,9 @@ module Leant.Synth.Length.Integration
 
 import Leant.Synth.Engine (DetailedVerificationVariant)
 import Leant.Synth.Length.Configuration
-  ( LengthRankingConfiguration )
+  ( LengthRankingPolicy
+  , assessVerifiedLengthCandidatesWithPolicy
+  )
 import Leant.Synth.Length.Configuration.File
   ( LengthRankingConfigurationActivationError
   , LengthRankingConfigurationActivationPolicy (..)
@@ -44,12 +47,12 @@ import Leant.Synth.Length.Configuration.File.Acquire
 import Leant.Synth.Length.PostVerification
   ( LengthPostVerificationFailure
   , LengthPostVerificationResult
-  , assessVerifiedLengthCandidatesConfigured
   , lengthPostVerificationAdapterFailure
   , lengthPostVerificationCandidates
   , lengthPostVerificationRanking
   , lengthPostVerificationRankingFailure
   )
+import Leant.Synth.Length.Contract (LeanLengthContract)
 import Leant.Synth.Length.Ranking
   ( LengthRanking
   , LengthRankingFailure
@@ -74,14 +77,15 @@ data LengthAssessmentSetupError
   deriving (Eq, Ord, Show)
 
 -- | Either the established non-IO identity seam or one already decoded,
--- sealed, and explicitly activated fixed-contract configuration.  The
+-- sealed, and explicitly activated fixed policy/contract pair.  The
 -- constructor stays private so enabled values can arise only through the
 -- complete setup path.
 data LengthAssessmentMode
   = LengthAssessmentDisabled
   | LengthAssessmentConfigured
       !LengthRankingConfigurationActivationPolicy
-      !LengthRankingConfiguration
+      !LengthRankingPolicy
+      LeanLengthContract
 
 disabledLengthAssessmentMode :: LengthAssessmentMode
 disabledLengthAssessmentMode = LengthAssessmentDisabled
@@ -89,17 +93,17 @@ disabledLengthAssessmentMode = LengthAssessmentDisabled
 -- | The permission decision that actually released a configured mode.
 -- This deliberately reports no executable path, digest bytes, or later
 -- executable-match observation, and inspecting a configured policy does not
--- select the retained configuration.
+-- inspect the retained fixed contract.
 lengthAssessmentModeActivationPolicy
   :: LengthAssessmentMode
   -> Maybe LengthRankingConfigurationActivationPolicy
 lengthAssessmentModeActivationPolicy mode = case mode of
   LengthAssessmentDisabled -> Nothing
-  LengthAssessmentConfigured activation _ -> Just activation
+  LengthAssessmentConfigured activation _ _ -> Just activation
 
 -- | Admit and acquire exactly one caller-named file, then apply the explicit
 -- pin policy.  Request admission happens before any IO.  Loading and activation
--- do not open a solver; the returned configuration remains process-free.
+-- do not open a solver; the returned mode remains process-free.
 loadLengthAssessmentMode
   :: LengthRankingConfigurationActivationPolicy
   -> LengthRankingConfigurationFileSource
@@ -115,8 +119,8 @@ loadLengthAssessmentMode activation source =
         Right disabled -> case
             activateLengthRankingConfiguration activation disabled of
           Left failure -> Left $ LengthAssessmentActivationRejected failure
-          Right configuration -> Right
-            $ LengthAssessmentConfigured activation configuration
+          Right (policy, contract) -> Right
+            $ LengthAssessmentConfigured activation policy contract
 
 -- | One sanitized reason why enabled ranking preserved callback order.
 -- Candidate-local preparation refusal remains part of the ranking report and
@@ -146,8 +150,8 @@ assessLengthVerificationBatch
   -> IO LengthAssessmentResult
 assessLengthVerificationBatch mode verification = case mode of
   LengthAssessmentDisabled -> pure $ LengthAssessmentSkipped verification
-  LengthAssessmentConfigured _ configuration -> LengthAssessmentCompleted <$>
-    assessVerifiedLengthCandidatesConfigured configuration verification
+  LengthAssessmentConfigured _ policy contract -> LengthAssessmentCompleted <$>
+    assessVerifiedLengthCandidatesWithPolicy policy contract verification
 
 lengthAssessmentCandidates
   :: LengthAssessmentResult

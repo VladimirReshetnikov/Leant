@@ -437,12 +437,14 @@ whether its execution policy contains a digest expectation. The explicit
 contract remains a passive assertion. Every eligible call still opens a fresh
 lexical session.
 
-The version-1 file format remains compatible through
-`LengthRankingConfiguration`, which bundles one validated policy with its
-decoded contract and delegates to the same separate-policy runner. That opaque
-bundle can also enter the post-verification adapter directly: its candidates
-retain their batch-scoped occurrence handles through ranking, and the adapter
-seals the complete permutation before projecting the compatibility report. The
+The version-1 file format remains compatible without a second generic
+policy-plus-contract aggregate. Its disabled value retains one strict validated
+policy beside the decoded contract, which stays lazy. Activation checks only
+the policy's digest-expectation presence and releases that fixed compatibility
+pair to `Integration`; the private configured mode keeps the pair together and
+calls the occurrence-sealed policy-plus-contract assessor directly. Its
+candidates retain their batch-scoped occurrence handles through ranking, and
+the adapter seals the complete permutation before projecting the report. The
 contract is checked candidate-by-candidate only during the later full
 preparation pass. The CLI compatibility path deliberately reuses that decoded
 contract for the process; lower-level policy APIs still accept a request-owned
@@ -452,6 +454,10 @@ reads. The digest is only an optional expectation for Djex's
 pre-spawn executable-file observation, not attestation of the image ultimately
 executed. See the
 [explicit live Length ranking configuration report](docs/reports/2026-08-11-explicit-live-length-ranking-configuration.md).
+The later
+[single-owner policy checkpoint](docs/reports/2026-08-13-length-ranking-policy-single-ownership.md)
+records removal of the redundant generic configuration aggregate while
+preserving the version-1 compatibility path.
 
 `Leant.Synth.Length.Configuration.File` adds an exact version-1 JSON grammar
 for that policy. The pure decoder consumes a caller-owned
@@ -464,25 +470,26 @@ limits, with additional Leant depth and name bounds; the file cannot widen
 candidate type, contract, provider, literal, or fingerprint authority. A
 successful decode returns an opaque *disabled*
 configuration. The caller must then explicitly require a pinned executable or
-explicitly permit an unpinned one before obtaining the already opaque runnable
-configuration. Activation derives that absent/present decision from the sealed
-Djex execution policy itself; the decoder retains no second JSON-derived pin
-Boolean which could drift from the policy. Neither choice runs Z3 or grants
-proof, solver-status, or contract authority. There is no automatic path,
-environment or executable discovery, or autoload behavior. The explicit CLI
-loader uses the same 256-KiB bound before activation. The optional digest
-remains only a
+explicitly permit an unpinned one before releasing its strict policy and lazy
+fixed contract to the package-private integration boundary. Activation derives
+that absent/present decision from the sealed Djex execution policy itself; the
+decoder retains no second JSON-derived pin Boolean which could drift from the
+policy, and activation does not inspect the contract. Neither choice launches
+Z3. Neither grants proof, solver-status, or contract authority. There is no
+automatic path, environment or executable discovery, or autoload behavior.
+The explicit CLI loader uses the same 256-KiB bound before activation. The
+optional digest remains only a
 pre-spawn executable-file snapshot expectation, not executed-image
 attestation. The complete schema and budgets are recorded in the
 [bounded live Length ranking configuration-file report](docs/reports/2026-08-11-bounded-live-length-ranking-configuration-file.md).
 
-The file decoder now retains the sealed Djex execution configuration and
-evaluation limits produced by their first validation pass. It assembles the
-opaque Leant compatibility bundle directly from those authorities and the lazy
-contract, instead of discarding the sealed values, rethreading their raw
-sources through aggregate records, and sealing both again. The unreachable
-post-validation assembly failure has consequently been
-removed; execution, evaluation, then contract remain the fixed decode order.
+The file decoder retains the sealed Djex execution configuration and evaluation
+limits produced by their first validation pass. It assembles the reusable
+opaque Leant policy directly from those authorities and retains the lazy fixed
+contract beside it, instead of either resealing sources or introducing a
+second generic configuration aggregate. The unreachable post-validation
+assembly failure remains absent; execution, evaluation, then contract remain
+the fixed decode order.
 
 `Leant.Synth.Length.Configuration.File.Acquire` adds a separate bounded
 filesystem boundary. Callers must explicitly

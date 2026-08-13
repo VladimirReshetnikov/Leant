@@ -3,8 +3,8 @@
 -- Construction is pure and performs only Djex's bounded policy validation.
 -- 'LengthRankingPolicy' owns reusable execution and replay policy, while a
 -- 'LeanLengthContract' is supplied separately for each ranking request.  The
--- older 'LengthRankingConfiguration' remains the opaque compatibility bundle
--- decoded by the versioned configuration-file grammar.
+-- versioned compatibility-file grammar retains its fixed startup contract
+-- beside this policy without introducing a second generic aggregate.
 --
 -- A successful value does not establish that the configured path resolves to
 -- a usable executable, that a later pre-spawn executable-file snapshot matches
@@ -25,16 +25,11 @@ module Leant.Synth.Length.Configuration
   ( LengthRankingPolicySource (..)
   , LengthRankingPolicy
   , mkLengthRankingPolicy
+  , lengthRankingPolicyFromValidatedComponents
+  , lengthRankingPolicyExecutableDigestExpectation
+  , LengthRankingConfigurationError (..)
   , assessVerifiedLengthCandidatesWithPolicy
   , rankVerifiedLengthCandidatesWithPolicy
-  , LengthRankingConfigurationSource (..)
-  , LengthRankingConfiguration
-  , LengthRankingConfigurationError (..)
-  , mkLengthRankingConfiguration
-  , lengthRankingConfigurationFromValidatedComponents
-  , lengthRankingConfigurationExecutableDigestExpectation
-  , assessVerifiedLengthCandidatesConfigured
-  , rankVerifiedLengthCandidatesConfigured
   ) where
 
 import Language.Haskell.Djex
@@ -89,28 +84,6 @@ data LengthRankingPolicy = LengthRankingPolicy
   !LengthSMTLibExecutionConfig
   !LengthEvaluationLimits
 
--- | Compatibility source which bundles one policy source and one contract.
---
--- Reusing 'LengthRankingPolicySource' keeps execution admission, execution
--- policy, and replay limits under the same validation vocabulary as the
--- reusable policy path.  The contract remains a separate request assertion.
--- No field is inferred from the host or current goal.
-data LengthRankingConfigurationSource = LengthRankingConfigurationSource
-  { lengthRankingConfigurationPolicySource :: LengthRankingPolicySource
-  , lengthRankingConfigurationContract :: LeanLengthContract
-  }
-
--- | Compatibility value retaining one validated policy and contract assertion.
---
--- In particular, this value exposes neither the executable path nor digest
--- material and cannot retain a live session or process owner.  The contract
--- field is deliberately lazy so productive candidate admission can reject a
--- maximum-plus-one batch before inspecting request-owned behavioral syntax,
--- matching the separate policy/request-contract entry point.
-data LengthRankingConfiguration = LengthRankingConfiguration
-  !LengthRankingPolicy
-  LeanLengthContract
-
 -- | Pure validation failure in fixed execution-before-evaluation order.
 data LengthRankingConfigurationError
   = LengthRankingExecutionConfigurationRejected
@@ -135,38 +108,25 @@ mkLengthRankingPolicy source = do
     Right validated -> Right validated
   pure $ LengthRankingPolicy execution evaluation
 
--- | Validate a reusable policy, then retain the explicit compatibility-file
--- contract assertion without forcing it or performing IO.
-mkLengthRankingConfiguration
-  :: LengthRankingConfigurationSource
-  -> Either LengthRankingConfigurationError LengthRankingConfiguration
-mkLengthRankingConfiguration source = do
-  policy <- mkLengthRankingPolicy
-    $ lengthRankingConfigurationPolicySource source
-  pure $ LengthRankingConfiguration policy
-    $ lengthRankingConfigurationContract source
-
--- | Assemble one compatibility configuration from already validated Djex
--- execution and replay authorities.  No validation is repeated and no IO is
--- performed.  The contract remains a lazy caller assertion until candidate
--- preparation checks it against an exact verified occurrence.
-lengthRankingConfigurationFromValidatedComponents
+-- | Assemble one reusable policy from already validated Djex execution and
+-- replay authorities.  No validation is repeated and no IO is performed.
+-- This bridge is used by the closed compatibility-file decoder after it has
+-- preserved the same execution-before-evaluation validation precedence.
+lengthRankingPolicyFromValidatedComponents
   :: LengthSMTLibExecutionConfig
   -> LengthEvaluationLimits
-  -> LeanLengthContract
-  -> LengthRankingConfiguration
-lengthRankingConfigurationFromValidatedComponents execution evaluation =
-  LengthRankingConfiguration $ LengthRankingPolicy execution evaluation
+  -> LengthRankingPolicy
+lengthRankingPolicyFromValidatedComponents = LengthRankingPolicy
 
 -- | Classify only whether the sealed execution policy contains an executable
 -- digest expectation.  This reveals neither the digest bytes nor the path and
 -- does not claim that a later live executable matches the expectation.  The
--- request-owned contract remains lazy and is not inspected.
-lengthRankingConfigurationExecutableDigestExpectation
-  :: LengthRankingConfiguration
+-- separately retained request-owned contract is not inspected.
+lengthRankingPolicyExecutableDigestExpectation
+  :: LengthRankingPolicy
   -> LengthSMTLibExecutableDigestExpectation
-lengthRankingConfigurationExecutableDigestExpectation
-    (LengthRankingConfiguration (LengthRankingPolicy execution _) _) =
+lengthRankingPolicyExecutableDigestExpectation
+    (LengthRankingPolicy execution _) =
   lengthSMTLibExecutionExecutableDigestExpectation execution
 
 -- | Run a verified batch under one reusable policy and one explicitly supplied
@@ -206,44 +166,3 @@ assessVerifiedLengthCandidatesWithPolicy
 assessVerifiedLengthCandidatesWithPolicy policy contract =
   assessVerifiedLengthCandidatesWith
     $ rankPostVerificationLengthCandidatesWithPolicy policy contract
-
--- | Preserve batch-scoped occurrence handles while running the compatible
--- policy-plus-contract bundle.  This is the configured counterpart of
--- 'rankPostVerificationLengthCandidatesWithPolicy'; a post-verification
--- adapter must still validate the returned handle permutation before erasing
--- those associations.
-rankPostVerificationLengthCandidatesConfigured
-  :: LengthRankingConfiguration
-  -> [PostVerificationCandidate epoch DetailedVerificationVariant]
-  -> IO
-      (Either LengthRankingInputError
-        (AssociatedLengthRanking
-          (PostVerificationCandidate epoch DetailedVerificationVariant)))
-rankPostVerificationLengthCandidatesConfigured
-    (LengthRankingConfiguration policy contract) =
-  rankPostVerificationLengthCandidatesWithPolicy policy contract
-
--- | Assess one exact callback batch with the compatibility policy-plus-
--- contract bundle.  The associated configured runner remains private here;
--- only this sealed presentation result crosses the public facade.
-assessVerifiedLengthCandidatesConfigured
-  :: LengthRankingConfiguration
-  -> VerificationBatch DetailedVerificationVariant
-  -> IO LengthPostVerificationResult
-assessVerifiedLengthCandidatesConfigured configuration =
-  assessVerifiedLengthCandidatesWith
-    $ rankPostVerificationLengthCandidatesConfigured configuration
-
--- | Run one complete candidate batch under the retained policy.
---
--- Eligible queries use one fresh lexical live session and execute serially;
--- the configuration retains no worker between calls.  Input-limit results and
--- the ranking layer's atomic operational fallback are preserved unchanged,
--- while synchronous and asynchronous exceptions continue to propagate.
-rankVerifiedLengthCandidatesConfigured
-  :: LengthRankingConfiguration
-  -> [Verified DetailedVerificationVariant]
-  -> IO (Either LengthRankingInputError LengthRanking)
-rankVerifiedLengthCandidatesConfigured
-    (LengthRankingConfiguration policy contract) =
-  rankVerifiedLengthCandidatesWithPolicy policy contract

@@ -1,9 +1,9 @@
 -- | Safe post-verification facade for live Length ranking.
 --
--- Both entry points retain opaque batch-scoped occurrence handles through
--- ranking and expose an association-free report only after the complete
--- permutation seal succeeds.  The lower-level associated plan and projector
--- are confined to package-private modules.
+-- The policy-plus-contract entry point retains opaque batch-scoped occurrence
+-- handles through ranking.  It exposes an association-free report only after
+-- the complete permutation seal succeeds.  The lower-level associated plan
+-- and projector are confined to package-private modules.
 module Leant.Synth.Length.PostVerification
   ( LengthPostVerificationFailure (..)
   , LengthPostVerificationResult
@@ -12,14 +12,11 @@ module Leant.Synth.Length.PostVerification
   , lengthPostVerificationAdapterFailure
   , lengthPostVerificationRanking
   , lengthPostVerificationRankingFailure
-  , assessVerifiedLengthCandidatesConfigured
   , assessVerifiedLengthCandidatesWithPolicy
   ) where
 
 import Leant.Synth.Length.Configuration
-  ( assessVerifiedLengthCandidatesConfigured
-  , assessVerifiedLengthCandidatesWithPolicy
-  )
+  ( assessVerifiedLengthCandidatesWithPolicy )
 import Leant.Synth.Length.PostVerification.Internal
   ( LengthPostVerificationFailure (..)
   , LengthPostVerificationResult
