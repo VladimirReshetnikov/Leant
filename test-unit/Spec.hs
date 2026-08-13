@@ -5211,19 +5211,35 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
           other -> assertFailure $
             "expected premise-backed candidates, got: " ++ show other
   , testCase
-      "retain provider authority and the accepted original spelling ordinal" $
+      "derive two-provider run authority and retain the accepted ordinal" $
       do
-        privateProvider <- expectRight $ mkIdentifier "leantProvider0"
+        privateProviderZero <- expectRight $ mkIdentifier "leantProvider0"
+        privateProviderOne <- expectRight $ mkIdentifier "leantProvider1"
         let void = FParamInd "Demo.Void" "Demo.Void" [] []
-            polytype = FAll True "p" (FArr (FVar "p") (FVar "p"))
-            provider = ProviderFragWithEvidence "Demo.impossible"
-              (FAll False "a" void) ["a"]
-                [[ProviderInstantiationArgument 0 polytype]]
+            identityType = FAll True "p"
+              (FArr (FVar "p") (FVar "p"))
+            constantType = FAll True "q"
+              (FArr (FVar "q") (FArr (FVar "q") (FVar "q")))
+            firstProvider = ProviderFragWithEvidence "Demo.impossibleZero"
+              (FAll False "F" $ FAll False "a" void) ["F", "a"]
+                [ [ ProviderInstantiationArgument 1
+                      (FAtom False "Demo.Wrap")
+                  , ProviderInstantiationArgument 0 identityType
+                  ]
+                , [ ProviderInstantiationArgument 1
+                      (FAtom False "Demo.OtherWrap")
+                  , ProviderInstantiationArgument 0 constantType
+                  ]
+                ]
+            secondProvider = ProviderFragWithEvidence "Demo.impossibleOne"
+              (FAll False "b" void) ["b"]
+                [[ProviderInstantiationArgument 0 identityType]]
         expected <- expectRight $ inspectExferencePreparation
-          [provider] [] void void
+          [firstProvider, secondProvider] [] void void
         detailed <- expectRight $
           synthesizeWithProvidersSkippingDetailed
-            EngineExference 128 Set.empty [provider] void
+            EngineExference 128 Set.empty
+              [firstProvider, secondProvider] void
         case detailed of
           DetailedSynthCandidates groups _ ->
             case
@@ -5236,30 +5252,68 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
               (origin, semantic) : _ -> do
                 let authority =
                       typedCandidateSemanticAuthorityInspection semantic
+                    table = inspectedAuthorityNameTable authority
+                    convert variable = FlexibleVariable (table Map.! variable)
+                    convertAssignment assignment =
+                      KindedProviderInstantiationAssignment
+                        { kindedProviderInstantiationAssignmentProvider =
+                            kindedProviderInstantiationAssignmentProvider
+                              assignment
+                        , kindedProviderInstantiationAssignmentArguments =
+                            [ (kind, fmap convert argument)
+                            | (kind, argument) <-
+                                kindedProviderInstantiationAssignmentArguments
+                                  assignment
+                            ]
+                        }
                 inspectedAuthorityPreparation authority @?= expected
                 case inspectedProviderBindings expected of
-                  [binding] -> do
-                    inspectedProviderSourceName binding @?= "Demo.impossible"
-                    inspectedProviderPrivateName binding @?= privateProvider
-                    length (inspectedProviderAssignments binding) @?= 1
+                  [zeroBinding, oneBinding] -> do
+                    map inspectedProviderSourceName [zeroBinding, oneBinding]
+                      @?= ["Demo.impossibleZero", "Demo.impossibleOne"]
+                    map inspectedProviderPrivateName [zeroBinding, oneBinding]
+                      @?= [privateProviderZero, privateProviderOne]
+                    map (length . inspectedProviderAssignments)
+                        [zeroBinding, oneBinding] @?= [2, 1]
                   bindings -> assertFailure $
-                    "expected one retained provider binding, got: "
+                    "expected two retained provider bindings, got: "
                       ++ show bindings
-                case inspectedAuthorityProviderAssignments authority of
-                  [assignment] -> do
-                    kindedProviderInstantiationAssignmentProvider assignment
-                      @?= privateProvider
-                    length
-                        (kindedProviderInstantiationAssignmentArguments
-                          assignment)
-                      @?= 1
-                  assignments -> assertFailure $
-                    "expected one converted provider assignment, got: "
-                      ++ show assignments
+                let sourceAssignments = concatMap inspectedProviderAssignments
+                      $ inspectedProviderBindings expected
+                    expectedAssignments =
+                      map convertAssignment sourceAssignments
+                    convertedAssignments =
+                      inspectedAuthorityProviderAssignments authority
+                convertedAssignments @?= expectedAssignments
+                map kindedProviderInstantiationAssignmentProvider
+                    convertedAssignments @?=
+                  [privateProviderZero, privateProviderZero, privateProviderOne]
+                map (map fst .
+                      kindedProviderInstantiationAssignmentArguments)
+                    convertedAssignments @?=
+                  map (map fst .
+                      kindedProviderInstantiationAssignmentArguments)
+                    sourceAssignments
+                case convertedAssignments of
+                  firstAssignment : _ -> case map fst
+                      $ kindedProviderInstantiationAssignmentArguments
+                        firstAssignment of
+                    [higherKind, properKind] -> assertBool
+                      "distinct provider argument kinds collapsed or reordered"
+                      (higherKind /= properKind)
+                    kinds -> assertFailure $
+                      "expected two ordered kinds in the first assignment: "
+                        ++ show kinds
+                  [] -> assertFailure
+                    "expected converted provider assignments"
+                assertBool
+                  "inspection Show lost the derived provider assignments"
+                  ("inspectedAuthorityProviderAssignments =" `isInfixOf`
+                    show authority)
                 Map.keys
                     (exferenceRatingOverrides
                       $ inspectedAuthorityPolicy authority)
-                  @?= [privateProvider]
+                  @?= [privateProviderZero, privateProviderOne]
                 let variants =
                       detailedCandidateGroupVerificationVariants origin
                     verdict variant = pure $ case

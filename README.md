@@ -309,12 +309,15 @@ rerendering and inspection derive that same map projection at their use edges.
 Djinn, Exference, and inspection likewise derive or project the historical
 aggregate assignment list in binding order. The prepared semantic origin does
 not cache an aggregate assignment list or a provider renderer map beside the
-bindings. The Exference run authority likewise retains its prepared source
-goal and exact source-name table instead of caching their converted source-goal
-projection. Its package-private inspection view derives that historical field
-lazily, while the Length handoff performs the same total conversion before it
-checks request contexts and the request goal. There is no post-search
-field-for-field preparation copy. The
+bindings. One private conversion maps that exact ordered projection through the
+Exference lane's complete source-name table for the search call; the run
+authority retains the bindings and table instead of caching the converted
+assignment list, and its package-private inspection view derives the historical
+field lazily. The authority likewise does not cache a converted source goal
+beside the prepared source goal and name table. Its inspection view derives
+that historical field lazily, while the Length handoff performs the same
+checked conversion before it checks request contexts and the request goal.
+There is no post-search field-for-field preparation copy. The
 detailed Exference route retains an opaque checked candidate and that exact
 run authority beside the originating rendered group. The candidate
 remains the sole owner of its graph, and Djex fingerprints that graph only

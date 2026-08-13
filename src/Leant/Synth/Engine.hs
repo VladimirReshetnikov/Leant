@@ -229,17 +229,16 @@ data SynthOutcome
 
 -- | Exact checked inputs shared by every typed candidate from one Exference
 -- lane.  The session remains opaque, while the policy, request, provider
--- assignments, variable identity, and pure Leant preparation stay attached so
--- a later semantic checker never has to reconstruct authority from rendered
--- text or private-name conventions.
+-- bindings, variable identity, and pure Leant preparation stay attached so a
+-- later semantic checker never has to reconstruct authority from rendered text
+-- or private-name conventions. Converted provider assignments are projected
+-- from those bindings and the exact name table at their run or inspection edge.
 data ExferenceRunAuthority = ExferenceRunAuthority
   { exferenceAuthorityPreparation :: PreparedSemanticOrigin
   , exferenceAuthorityNameTable :: Map.Map String ExferenceLocal
   , exferenceAuthorityPolicy :: ExferenceSessionPolicy
   , exferenceAuthoritySession :: ExferenceSession
   , exferenceAuthorityRequest :: ExferenceRequest
-  , exferenceAuthorityProviderAssignments ::
-      [KindedProviderInstantiationAssignment ExferenceTypeVariable]
   }
 
 -- | Checked Exference identity retained with one originating rendered group.
@@ -271,8 +270,6 @@ instance Eq TypedCandidateSemanticSidecar where
         == exferenceAuthorityPolicy rightAuthority
       && exferenceAuthorityRequest leftAuthority
         == exferenceAuthorityRequest rightAuthority
-      && exferenceAuthorityProviderAssignments leftAuthority
-        == exferenceAuthorityProviderAssignments rightAuthority
 
 -- | Recover the checked candidate without detaching its graph association.
 typedCandidateSemanticCandidate
@@ -1043,19 +1040,7 @@ exferenceRun steps prepared = do
       table = Map.fromList (zip names [0 :: Int ..])
       convert v = FlexibleVariable (table Map.! v)
   let convertedDecls = map (mapDeclarationTypeVariables convert) allDecls
-      convertedInstantiations =
-        [ KindedProviderInstantiationAssignment
-            { kindedProviderInstantiationAssignmentProvider = provider
-            , kindedProviderInstantiationAssignmentArguments =
-                [ (kind, fmap convert argument)
-                | (kind, argument) <- arguments
-                ]
-            }
-        | KindedProviderInstantiationAssignment
-            { kindedProviderInstantiationAssignmentProvider = provider
-            , kindedProviderInstantiationAssignmentArguments = arguments
-            } <- instantiations
-        ]
+      convertedInstantiations = convertProviderAssignments table instantiations
       providerNames =
         [ valueName signature
         | ValueDeclaration signature <- convertedDecls
@@ -1097,8 +1082,6 @@ exferenceRun steps prepared = do
               , exferenceAuthorityPolicy = policy
               , exferenceAuthoritySession = session
               , exferenceAuthorityRequest = request
-              , exferenceAuthorityProviderAssignments =
-                  convertedInstantiations
               }
         results <- viaDiagnostic
           (runExferenceTypedQueryWithKindedInstantiationAssignments session
@@ -1644,7 +1627,7 @@ data PreparedSemanticOrigin = PreparedSemanticOrigin
 -- | Exact search-order projection of source-domain canonical assignments from
 -- their sole prepared owner. Provider order and each provider-local assignment
 -- order are retained verbatim; the aggregate list is never cached beside the
--- bindings. The separately converted Exference list remains run authority.
+-- bindings. The Exference-domain view is likewise derived instead of retained.
 semanticOriginProviderAssignments
   :: PreparedSemanticOrigin
   -> [KindedProviderInstantiationAssignment String]
@@ -1724,6 +1707,8 @@ data ExferenceRunAuthorityInspection = ExferenceRunAuthorityInspection
   , inspectedAuthorityPolicy :: ExferenceSessionPolicy
   , inspectedAuthorityRequest ::
       QueryRequest ExferenceType ExferenceOptions
+  -- Compatibility view derived lazily from the retained provider bindings and
+  -- exact name table; the run authority keeps no parallel converted list.
   , inspectedAuthorityProviderAssignments ::
       [KindedProviderInstantiationAssignment ExferenceTypeVariable]
   , inspectedAuthorityInventory :: ExferenceInventory
@@ -1756,7 +1741,7 @@ inspectExferenceRunAuthority authority = ExferenceRunAuthorityInspection
   , inspectedAuthorityRequest = exferenceRequestQuery
       $ exferenceAuthorityRequest authority
   , inspectedAuthorityProviderAssignments =
-      exferenceAuthorityProviderAssignments authority
+      convertedProviderAssignmentsFromAuthority authority
   , inspectedAuthorityInventory = exferenceSessionInventory
       $ exferenceAuthoritySession authority
   }
@@ -1769,6 +1754,42 @@ convertedSourceGoalFromAuthority authority = fmap convert
  where
   convert sourceVariable = FlexibleVariable
     $ exferenceAuthorityNameTable authority Map.! sourceVariable
+
+convertedProviderAssignmentsFromAuthority
+  :: ExferenceRunAuthority
+  -> [KindedProviderInstantiationAssignment ExferenceTypeVariable]
+convertedProviderAssignmentsFromAuthority authority =
+  convertProviderAssignments
+    (exferenceAuthorityNameTable authority)
+    (semanticOriginProviderAssignments
+      $ exferenceAuthorityPreparation authority)
+
+-- | Convert one exact source-domain assignment projection through the table
+-- built from every declaration, goal, and provider-assignment variable in this
+-- lane. Mapping remains lazy in the assignment spine and argument types, and
+-- is total under that complete-table construction invariant. The private
+-- partial lookup deliberately retains the historical variable-demand behavior
+-- if an internal caller ever violates the invariant.
+convertProviderAssignments
+  :: Map.Map String ExferenceLocal
+  -> [KindedProviderInstantiationAssignment String]
+  -> [KindedProviderInstantiationAssignment ExferenceTypeVariable]
+convertProviderAssignments table assignments =
+  [ KindedProviderInstantiationAssignment
+      { kindedProviderInstantiationAssignmentProvider = provider
+      , kindedProviderInstantiationAssignmentArguments =
+          [ (kind, fmap convertVariable argument)
+          | (kind, argument) <- arguments
+          ]
+      }
+  | KindedProviderInstantiationAssignment
+      { kindedProviderInstantiationAssignmentProvider = provider
+      , kindedProviderInstantiationAssignmentArguments = arguments
+      } <- assignments
+  ]
+ where
+  convertVariable sourceVariable = FlexibleVariable
+    $ table Map.! sourceVariable
 
 inspectPreparedSemanticOrigin
   :: PreparedSemanticOrigin
