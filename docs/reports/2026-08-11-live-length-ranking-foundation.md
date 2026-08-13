@@ -75,10 +75,21 @@ Euclidean witness equations and deterministic mixed witness order, projects
 the quotient rather than the remainder, emits no SMT-LIB `div`, and is
 independently recomputed during replay.
 
-For version 3, the checked Handoff passes one retained role choice to Djex's
-role-aware session, contract, and problem sealers only after the established exact
-origin, renderer, family, and provider checks. Djex aligns the vector against the
-normalized physical target arrow spine; Leant does not infer roles from the type.
+For every grammar version, the checked Handoff converts the decoded case
+policy and optional target-role vector exactly once into Djex's closed
+`LengthInterpretationPolicySource`, and it does so only after the established
+exact-origin, renderer, family, and provider checks. Startup and contract-only
+versions 1--2 select the legacy case-rejecting source; version 3 and version 5
+`cases-rejected` select the explicit-role case-rejecting source; version 4 and
+version 5 `exact-spine-zero-step-v1` select the explicit-role exact source.
+The otherwise invalid exact-without-roles pair is still refused after family
+and provider resolution. Handoff then calls only the unified, session-owned
+session, contract, and problem sealers. It does not use Djex's legacy,
+role-aware, or exact compatibility problem wrappers, so later stages cannot
+reselect role or case authority independently. Renderer association remains
+based on the raw decoded case policy and therefore keeps its existing demand
+and refusal order. Djex aligns every explicit vector against the normalized
+physical target arrow spine; Leant does not infer roles from the type.
 Observed roles are numbered compactly as `LengthInput 0..`, while provider transfer
 variables keep physical provider-argument ordinals. An unobserved role supplies only
 an opaque, non-inspectable Length-interpreter token which a candidate may ignore or
@@ -94,15 +105,15 @@ input, while the provider-backed counterexample remains explicitly conditional o
 the assumed law. Reusing the same one-shot request after its source file is mutated
 does not reopen it, and the next compatibility request receives no sticky v3 roles.
 
-For version 4, Handoff retains the version-3 role association but selects
-Djex's exact-case session and typed-candidate problem entrances. Exference must
-have independently checked the complete recursive zero/step case graph, and
-Djex freshly re-seals it against the resolved spine schema. A production
-`List Nat -> List Nat` rebuild case yields a checked conditional result using
-zero and `monus 1` tail semantics, one compact QF_LIA input, and a replayed
-input-3/result-3 counterexample. Versions 1--3 continue to reject the same
-case. The policy remains command-local and supplies neither proof nor pruning
-authority.
+For version 4, Handoff retains the version-3 role association in the unified
+checked session beside exact-case authority. Exference must have independently
+checked the complete recursive zero/step case graph, and Djex freshly re-seals
+it through the session-owned problem entrance against the resolved spine
+schema. A production `List Nat -> List Nat` rebuild case yields a checked
+conditional result using zero and `monus 1` tail semantics, one compact QF_LIA
+input, and a replayed input-3/result-3 counterexample. Versions 1--3 continue
+to reject the same case. The policy remains command-local and supplies neither
+proof nor pruning authority.
 
 Version 5 composes that same production handoff with quotient without granting
 case authority implicitly. A role-aware higher-order map under

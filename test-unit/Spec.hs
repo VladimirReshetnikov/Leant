@@ -3,6 +3,7 @@ module Main (main) where
 import Control.Exception (evaluate, finally)
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as BS
+import Data.Char (isAlphaNum)
 import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.List (isInfixOf)
 import Data.Maybe (isNothing)
@@ -2355,6 +2356,7 @@ assertLengthSynthCommandParsing = do
 
 assertLengthContractFileGrammar :: IO ()
 assertLengthContractFileGrammar = do
+  assertLengthHandoffUsesUnifiedSealers
   lengthContractFileFormat @?=
     Text.pack "leant-finite-list-spine-length-contract"
   lengthContractFileVersion @?= 1
@@ -3141,6 +3143,38 @@ lengthAssessmentIntegrationTests = testGroup
   , testCase "bound and sanitize counterexample presentation"
       assertLengthCounterexamplePresentation
   ]
+
+assertLengthHandoffUsesUnifiedSealers :: IO ()
+assertLengthHandoffUsesUnifiedSealers = do
+  source <- readFile "src/Leant/Synth/Length/Handoff.hs"
+  let identifiers = words
+        [ if isAlphaNum character || character == '_'
+            || character == '\''
+            then character
+            else ' '
+        | character <- source
+        ]
+      required =
+        [ "sealLengthSessionWithInterpretationPolicy"
+        , "sealLengthContractInSession"
+        , "sealLengthTypedCandidateProblemInSession"
+        ]
+      forbidden =
+        [ "sealLengthSession"
+        , "sealRoleAwareLengthSession"
+        , "sealExactSpineCaseLengthSession"
+        , "sealLengthContractInContext"
+        , "sealRoleAwareLengthContractInContext"
+        , "sealLengthTypedCandidateProblem"
+        , "sealRoleAwareLengthTypedCandidateProblem"
+        , "sealExactSpineCaseLengthTypedCandidateProblem"
+        ]
+  mapM_ (\identifier -> assertBool
+      ("production Handoff omitted unified sealer " ++ identifier)
+      $ identifier `elem` identifiers) required
+  mapM_ (\identifier -> assertBool
+      ("production Handoff retained compatibility sealer " ++ identifier)
+      $ identifier `notElem` identifiers) forbidden
 
 assertLengthAssessmentDisabled :: IO ()
 assertLengthAssessmentDisabled = do
@@ -6417,6 +6451,13 @@ buildLengthRankingLiveFixture = do
         ((lengthRankingContract 0)
           { leanLengthContractTargetArgumentRoles = Just [] }) zero)
     >>= expectRight
+  explicitAllObservedProblem <- expectRight $ prepareCheckedLengthProblem
+    ((lengthRankingContract 0)
+      { leanLengthContractTargetArgumentRoles = Just [] }) zero
+  behavioralProblemFingerprint
+      (checkedLengthProblemBehavioralProblem zeroProblem) @?=
+    behavioralProblemFingerprint
+      (checkedLengthProblemBehavioralProblem explicitAllObservedProblem)
   fingerprintCanonicalBytes (lengthSMTLibQueryFingerprint legacyQuery) @?=
     fingerprintCanonicalBytes
       (lengthSMTLibQueryFingerprint explicitAllObservedQuery)

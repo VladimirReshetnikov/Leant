@@ -502,7 +502,8 @@ This is deliberately a solver-neutral identity seam, not behavioral evidence.
 `Leant.Synth.Length.Handoff` binds callback-accepted text back to its exact
 typed origin, original Exference renderer ordinal and exact re-rendered variant,
 family provenance, an opaque Djex session which owns the exact inventory and
-provider assumptions, the separately reassociated contract, and the
+provider assumptions, its checked interpretation policy, the separately
+reassociated contract, and the
 candidate-specific Djex problem. That checked preparation consumes the
 renderer, family, and session authority and returns only the sealed problem;
 Engine owns the exact-origin rerender mechanics and private premise-layout ABI.
@@ -512,6 +513,24 @@ The exact policy in version 4 or 5 instead owns selection of the retained
 original ordinal and equality with the callback-accepted text; other valid
 renderer alternatives neither replace that retained variant nor make its exact
 association ambiguous.
+Only after renderer correspondence and exact family/provider resolution,
+Handoff converts the contract's `(candidate case policy, target roles)` pair
+once into Djex's closed `LengthInterpretationPolicySource`. Legacy
+case-rejecting contracts retain the implicit all-observed source; v3 and v5
+case-rejecting contracts retain their explicit role vector; and v4/v5 exact
+contracts retain that same vector beside exact zero/step authority. Exact
+authority without roles is still refused at this point, so family and provider
+failures retain their historical precedence. Handoff then uses only Djex's
+session-owned `sealLengthSessionWithInterpretationPolicy`,
+`sealLengthContractInSession`, and
+`sealLengthTypedCandidateProblemInSession` path. The contract and candidate
+cannot be sealed under separately selected role or case modes, and Leant no
+longer calls the compatibility problem wrappers. Renderer selection continues
+to use the raw decoded case policy, while all historical legacy, explicit
+all-observed, mixed-target, and exact problem/query fingerprint projections
+remain unchanged.
+The authority migration and compatibility matrix are detailed in the
+[unified checked Length handoff policy report](docs/reports/2026-08-13-unified-length-handoff-policy.md).
 `Leant.Synth.Length.Adapter` then seals it into a bounded canonical QF_LIA
 query without exposing an arbitrary problem-taking entrance. Neither step
 launches a solver or grants authority

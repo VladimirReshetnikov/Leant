@@ -29,23 +29,19 @@ import Language.Haskell.Djex
   , LengthProblemError
   , LengthProviderInventoryError (..)
   , LengthProviderSummarySource (..)
+  , LengthInterpretationPolicySource (..)
   , LengthSessionError (..)
   , LengthSpineModelSource (DeclaredListSpine)
+  , LengthTargetArgumentRole
   , Name
   , QueryRequest (..)
   , Variable (FlexibleVariable)
-  , checkedLengthSessionContext
   , defaultLengthLimits
   , defaultLengthProblemLimits
   , lengthProviderSummaryLimit
-  , sealLengthContractInContext
-  , sealExactSpineCaseLengthSession
-  , sealExactSpineCaseLengthTypedCandidateProblem
-  , sealLengthSession
-  , sealLengthTypedCandidateProblem
-  , sealRoleAwareLengthContractInContext
-  , sealRoleAwareLengthSession
-  , sealRoleAwareLengthTypedCandidateProblem
+  , sealLengthContractInSession
+  , sealLengthSessionWithInterpretationPolicy
+  , sealLengthTypedCandidateProblemInSession
   )
 
 import Leant.Synth.Engine
@@ -187,45 +183,37 @@ prepareCheckedLengthProblem source verified = do
         stepConstructor
       targetRoles = leanLengthContractTargetArgumentRoles source
       casePolicy = leanLengthContractCandidateCasePolicy source
-  session <- case (casePolicy, targetRoles) of
+  interpretationPolicy <- lengthInterpretationPolicySource
+    casePolicy targetRoles
+  session <- either (Left . LengthHandoffSessionRejected) Right
+    $ sealLengthSessionWithInterpretationPolicy defaultLengthLimits
+        interpretationPolicy inventory spineModel providerSources
+  contract <- either (Left . LengthHandoffContractRejected) Right
+    $ sealLengthContractInSession session convertedSource
+        (leanLengthContractSource source)
+  problem <- either (Left . LengthHandoffProblemRejected) Right
+    $ sealLengthTypedCandidateProblemInSession
+        defaultLengthProblemLimits session contract candidate
+  pure problem
+
+-- | Convert Leant's two decoded policy axes once, after every exact family and
+-- provider identity has been resolved.  The closed Djex source makes invalid
+-- combinations unrepresentable past this point while retaining the startup
+-- and contract-only legacy entrance exactly.
+lengthInterpretationPolicySource
+  :: LeanLengthCandidateCasePolicy
+  -> Maybe [LengthTargetArgumentRole]
+  -> Either LengthHandoffRefusal LengthInterpretationPolicySource
+lengthInterpretationPolicySource casePolicy targetRoles =
+  case (casePolicy, targetRoles) of
     (LeanLengthCasesRejected, Nothing) ->
-      either (Left . LengthHandoffSessionRejected) Right
-        $ sealLengthSession defaultLengthLimits inventory
-            spineModel providerSources
+      Right LengthLegacyCasesRejected
     (LeanLengthCasesRejected, Just roles) ->
-      either (Left . LengthHandoffSessionRejected) Right
-        $ sealRoleAwareLengthSession defaultLengthLimits roles
-            inventory spineModel providerSources
+      Right $ LengthExplicitTargetRolesCasesRejected roles
     (LeanLengthExactSpineZeroStepV1, Just roles) ->
-      either (Left . LengthHandoffSessionRejected) Right
-        $ sealExactSpineCaseLengthSession defaultLengthLimits roles
-            inventory spineModel providerSources
+      Right $ LengthExplicitTargetRolesExactZeroStepCases roles
     (LeanLengthExactSpineZeroStepV1, Nothing) ->
       Left LengthHandoffExactCasePolicyRequiresTargetRoles
-  contract <- either (Left . LengthHandoffContractRejected) Right
-    $ case targetRoles of
-        Nothing -> sealLengthContractInContext
-          defaultLengthLimits
-          (checkedLengthSessionContext session)
-          convertedSource
-          (leanLengthContractSource source)
-        Just roles -> sealRoleAwareLengthContractInContext
-          defaultLengthLimits
-          (checkedLengthSessionContext session)
-          roles
-          convertedSource
-          (leanLengthContractSource source)
-  problem <- either (Left . LengthHandoffProblemRejected) Right
-    $ case casePolicy of
-        LeanLengthCasesRejected -> case targetRoles of
-          Nothing -> sealLengthTypedCandidateProblem
-            defaultLengthProblemLimits session contract candidate
-          Just _ -> sealRoleAwareLengthTypedCandidateProblem
-            defaultLengthProblemLimits session contract candidate
-        LeanLengthExactSpineZeroStepV1 ->
-          sealExactSpineCaseLengthTypedCandidateProblem
-            defaultLengthProblemLimits session contract candidate
-  pure problem
 
 resolveSemanticFamily
   :: PreparedSynthesisInspection
