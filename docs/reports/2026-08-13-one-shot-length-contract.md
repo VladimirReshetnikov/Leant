@@ -24,7 +24,7 @@ the startup compatibility file, or the exact lazy disabled identity when no
 policy was activated. Main's default output and solver behavior therefore do
 not change.
 
-## Contract-only version 1
+## Contract-only versions 1 and 2
 
 `Leant.Synth.Length.Contract.File` owns an exact three-field root:
 
@@ -49,7 +49,30 @@ Unknown, missing, or mistyped root fields fail closed. The nested value goes
 through `decodeLeanLengthContractValue`, the same package-private owner used by
 the compatibility configuration decoder. Contract tags, names, provider-law
 roles and associations, depth/node/count limits, input arity, literals, and
-4,096-bit natural ceilings therefore cannot drift between the two formats.
+the 256-bit contract-literal ceiling therefore cannot drift between the two
+formats.
+Version 1 remains byte-for-byte the compatibility contract grammar. Version 2
+keeps the same format and exact root, but admits one additional Length
+expression in preconditions, postconditions, and provider transfers:
+
+```json
+["modulo", 2, ["input", 0]]
+```
+
+The divisor is a positive Natural literal no wider than 256 bits. Zero,
+negative or mistyped values, wrong arity, and maximum-plus-one bits fail closed;
+divisor validation precedes operand traversal. The startup compatibility file
+remains version 1 and rejects the tag, and contract-only version-1 documents
+continue to decode exactly as before.
+
+Leant retains the passive expression rather than normalizing it. Djex owns
+normalization, evaluation, replay, and query identity. A surviving occurrence
+is not rendered with SMT-LIB `mod` (which is outside QF_LIA): Djex introduces
+private deterministic quotient and remainder witnesses and asserts
+`e = k*q + r`, `q >= 0`, `r >= 0`, and `r <= k-1`. Those witnesses are never
+requested by `get-value` or exposed by replay/presentation. Provider transfers
+remain caller-supplied assumptions, regardless of whether they use modulo.
+
 The contract-only root deliberately contains no execution admission,
 execution, or evaluation object.
 
@@ -125,23 +148,31 @@ The focused regressions cover:
 
 - exact option parsing, mandatory delimiter, missing path, and the
   longer-token non-option case;
-- contract-root format/version/schema failures and redacted nested errors;
-- parity with the compatibility contract decoder, exact 256-provider-law
-  admission, and maximum-plus-one refusal;
+- contract-root format/version/schema failures, reordered version-2 roots, and
+  redacted nested errors;
+- exact version-1 compatibility, version-1 rejection of modulo, version-2
+  no-modulo parity, and modulo decoding in preconditions, postconditions, and
+  provider transfers;
+- positive-divisor arity/type/zero checks, exact 256-bit admission, 257-bit
+  refusal, and divisor-before-operand failure precedence;
+- exact 256-provider-law admission and maximum-plus-one refusal;
 - relative-path-before-timeout admission, real regular-file decoding,
   missing/malformed files, the byte cap, sanitized diagnostics, and cleanup;
 - disabled authorization without file IO or batch demand;
-- one activated policy used with two different contracts, with different
-  sealed candidate orders;
+- one activated policy used with version-1 and version-2 contracts, including
+  provider-transfer and constant modulo through sealing and fake-Z3 assessment
+  with different sealed candidate orders;
 - source mutation after each one-time load, repeated use of the retained first
   request, and no contract stickiness between request values; and
 - maximum-plus-one candidate rejection before a poisoned contract or candidate
   tail can be inspected.
 
-The maintained default, startup activation, sealed ordering, fallback,
+The maintained default, startup v1 activation, sealed ordering, fallback,
 presentation, and configuration-file suites continue to run beside these
-checks. This checkpoint changes no Djex gitlink, fingerprint schema, wire
-protocol, Main state snapshot, or default command behavior.
+checks. The modulo tandem advances the Djex gitlink, but changes no existing
+fingerprint bytes, wire protocol, Main state snapshot, or default command
+behavior; only contracts which actually contain modulo use Djex's versioned
+node/lowering identity additions.
 
 ## Deliberate limits
 

@@ -242,6 +242,7 @@ import Leant.Synth.Length.Contract.File
   , decodeLengthContractFile
   , lengthContractFileFormat
   , lengthContractFileJsonLimits
+  , lengthContractFileModuloVersion
   , lengthContractFileVersion
   )
 import Leant.Synth.Length.Contract.File.Acquire
@@ -2296,6 +2297,8 @@ lengthContractFileTests = testGroup
       assertLengthSynthCommandParsing
   , testCase "reuse the exact compatibility contract grammar and bounds"
       assertLengthContractFileGrammar
+  , testCase "gate positive-literal modulo to contract-only version 2"
+      assertLengthContractFileModuloGrammar
   , testCase "reject contract roots and redact nested private values"
       assertLengthContractFileSchemaAndRedaction
   , testCase "admit and acquire one explicit contract-only regular file"
@@ -2377,6 +2380,123 @@ assertLengthContractFileGrammar = do
     result -> assertFailure $ "unexpected contract maximum-plus-one result: "
       ++ show result
 
+assertLengthContractFileModuloGrammar :: IO ()
+assertLengthContractFileModuloGrammar = do
+  lengthContractFileVersion @?= 1
+  lengthContractFileModuloVersion @?= 2
+  let precondition = jsonLengthEqual
+        (jsonLengthModulo 2 $ jsonLengthInput 0)
+        (jsonLengthLiteral 1)
+      postcondition = jsonLengthEqual jsonLengthResult
+        (jsonLengthModulo 3 $ jsonLengthInput 0)
+      providerTransfer = jsonLengthModulo 5 $ jsonLengthArgument 0
+      contractValue = jsonLengthContract precondition postcondition
+        [jsonLengthProviderLaw "Demo.provider" ["spine"] providerTransfer]
+      v1 = lengthContractFileFixture contractValue
+      v2 = lengthContractFileFixtureVersion
+        lengthContractFileModuloVersion contractValue
+      expected = LeanLengthContract
+        { leanLengthContractSpine = LeanLengthSpineIdentity
+            { leanLengthSpineFamilyName = "List"
+            , leanLengthSpineZeroConstructorName = "List.nil"
+            , leanLengthSpineStepConstructorName = "List.cons"
+            }
+        , leanLengthContractSource = LengthContractSource
+            { lengthContractPrecondition = LengthEqual
+                (LengthModulo 2 $ LengthVariable $ LengthInput 0)
+                (LengthLiteral 1)
+            , lengthContractPostcondition = LengthEqual
+                (LengthVariable LengthResult)
+                (LengthModulo 3 $ LengthVariable $ LengthInput 0)
+            }
+        , leanLengthContractProviderLaws =
+            [ LeanLengthProviderLaw
+                { leanLengthProviderLawName = "Demo.provider"
+                , leanLengthProviderLawArgumentRoles = [LengthSpineArgument]
+                , leanLengthProviderLawTransfer = LengthModulo 5
+                    $ LengthVariable $ Djex.LengthProviderArgument 0
+                }
+            ]
+        }
+      unknownModulo = LengthRankingConfigurationSyntaxRejected
+        LengthRankingConfigurationPreconditionSyntax
+        LengthRankingConfigurationUnknownTag
+      noModulo = jsonLengthContract
+        (jsonLengthTruth True)
+        (jsonLengthEqual jsonLengthResult $ jsonLengthLiteral 2)
+        []
+      contractWithPre expression = jsonLengthContract
+        (jsonLengthEqual expression $ jsonLengthLiteral 0)
+        (jsonLengthTruth True) []
+  assertLengthContractFileError
+    (LengthContractFileContractRejected unknownModulo) v1
+  assertLengthRankingConfigurationFileError unknownModulo
+    $ setJsonField ["contract"] contractValue
+    $ lengthRankingConfigurationFileFixture "/tmp/not-opened-z3" Nothing
+  expectLengthContractFile v2 >>= (@?= expected)
+  expectLengthContractFile (Json.JObj
+      [ ("contract", contractValue)
+      , ("version", Json.JInt $ toInteger lengthContractFileModuloVersion)
+      , ("format", Json.JStr $ Text.unpack lengthContractFileFormat)
+      ]) >>= (@?= expected)
+  assertLengthContractFileError LengthContractFileUnexpectedRootField
+    $ addJsonField [] ("execution", Json.JObj []) v2
+  assertLengthContractFileError
+    (LengthContractFileMissingRootField LengthContractFileContractField)
+    $ deleteJsonField ["contract"] v2
+  assertLengthContractFileError LengthContractFileUnsupportedVersion
+    $ setJsonField ["version"] (Json.JInt 3)
+    $ addJsonField [] ("execution", Json.JObj []) v2
+  legacyNoModulo <- expectLengthContractFile
+    $ lengthContractFileFixture noModulo
+  currentNoModulo <- expectLengthContractFile
+    $ lengthContractFileFixtureVersion lengthContractFileModuloVersion
+        noModulo
+  currentNoModulo @?= legacyNoModulo
+
+  let maximumDivisor = 2 ^ (256 :: Int) - 1
+  _ <- expectLengthContractFile
+    $ lengthContractFileFixtureVersion lengthContractFileModuloVersion
+    $ contractWithPre
+    $ jsonLengthModulo maximumDivisor (jsonLengthLiteral 0)
+  assertLengthContractFileError
+    (LengthContractFileContractRejected
+      $ LengthRankingConfigurationSyntaxRejected
+          (LengthRankingConfigurationProviderTransferSyntax 0)
+          LengthRankingConfigurationUnknownTag)
+    $ lengthContractFileFixture
+    $ jsonLengthContract (jsonLengthTruth True) (jsonLengthTruth True)
+        [jsonLengthProviderLaw "Demo.provider" ["spine"] providerTransfer]
+
+  let badChild = Json.JArr [Json.JStr "private-child"]
+      contractWithPost expression = jsonLengthContract
+        (jsonLengthTruth True)
+        (jsonLengthEqual jsonLengthResult expression) []
+      rejected phase failure contract = assertLengthContractFileError
+        (LengthContractFileContractRejected
+          $ LengthRankingConfigurationSyntaxRejected phase failure)
+        $ lengthContractFileFixtureVersion
+            lengthContractFileModuloVersion contract
+  rejected LengthRankingConfigurationPreconditionSyntax
+    LengthRankingConfigurationModuloDivisorZero
+    $ contractWithPre $ jsonLengthModulo 0 badChild
+  rejected LengthRankingConfigurationPostconditionSyntax
+    (LengthRankingConfigurationSyntaxLimitExceeded
+      LengthRankingConfigurationLiteralBits 256 257)
+    $ contractWithPost $ jsonLengthModulo (2 ^ (256 :: Int)) badChild
+  rejected LengthRankingConfigurationPreconditionSyntax
+    LengthRankingConfigurationExpectedSyntaxNatural
+    $ contractWithPre $ Json.JArr
+        [Json.JStr "modulo", Json.JInt (-1), badChild]
+  rejected LengthRankingConfigurationPreconditionSyntax
+    LengthRankingConfigurationExpectedSyntaxNatural
+    $ contractWithPre $ Json.JArr
+        [Json.JStr "modulo", Json.JStr "2", badChild]
+  rejected LengthRankingConfigurationPreconditionSyntax
+    (LengthRankingConfigurationTagArityMismatch 2 1)
+    $ contractWithPre $ Json.JArr
+        [Json.JStr "modulo", Json.JInt 2]
+
 assertLengthContractFileSchemaAndRedaction :: IO ()
 assertLengthContractFileSchemaAndRedaction = do
   let contract = jsonLengthContract
@@ -2385,7 +2505,7 @@ assertLengthContractFileSchemaAndRedaction = do
   assertLengthContractFileError LengthContractFileUnsupportedFormat
     $ setJsonField ["format"] (Json.JStr "wrong-format") base
   assertLengthContractFileError LengthContractFileUnsupportedVersion
-    $ setJsonField ["version"] (Json.JInt 2) base
+    $ setJsonField ["version"] (Json.JInt 3) base
   assertLengthContractFileError LengthContractFileUnexpectedRootField
     $ addJsonField [] ("execution", Json.JObj []) base
   assertLengthContractFileError
@@ -2447,11 +2567,22 @@ assertLengthContractFileAcquisition = do
           malformedPath = root </> "malformed.json"
           missingPath = root </> "missing.json"
           oversizedPath = root </> "oversized.json"
-          expected = lengthRankingContract 0
+          expected = (lengthRankingContract 0)
+            { leanLengthContractSource = LengthContractSource
+                { lengthContractPrecondition = LengthEqual
+                    (LengthModulo 2 $ LengthLiteral 3)
+                    (LengthLiteral 1)
+                , lengthContractPostcondition = LengthEqual
+                    (LengthVariable LengthResult)
+                    (LengthLiteral 0)
+                }
+            }
       ByteString.writeFile path $ encodeLengthRankingConfigurationFile
-        $ lengthContractFileFixture
+        $ lengthContractFileFixtureVersion lengthContractFileModuloVersion
         $ jsonLengthContract
-            (jsonLengthTruth True)
+            (jsonLengthEqual
+              (jsonLengthModulo 2 $ jsonLengthLiteral 3)
+              $ jsonLengthLiteral 1)
             (jsonLengthEqual jsonLengthResult $ jsonLengthLiteral 0)
             [ jsonLengthProviderLaw "Demo.zeroList" []
                 $ jsonLengthLiteral 0
@@ -2512,9 +2643,16 @@ assertLengthContractFileAcquisition = do
         Right _ -> assertFailure "oversized contract file loaded"
 
 lengthContractFileFixture :: Json.JValue -> Json.JValue
-lengthContractFileFixture contract = Json.JObj
+lengthContractFileFixture = lengthContractFileFixtureVersion
+  lengthContractFileVersion
+
+lengthContractFileFixtureVersion
+  :: Natural
+  -> Json.JValue
+  -> Json.JValue
+lengthContractFileFixtureVersion version contract = Json.JObj
   [ ("format", Json.JStr $ Text.unpack lengthContractFileFormat)
-  , ("version", Json.JInt $ toInteger lengthContractFileVersion)
+  , ("version", Json.JInt $ toInteger version)
   , ("contract", contract)
   ]
 
@@ -2842,11 +2980,26 @@ assertLengthAssessmentExplicitContracts
                 Left failure ->
                   assertFailure (show failure) >> error "unreachable"
                 Right contract -> pure contract
+            writeModuloContract = ByteString.writeFile contractPath
+              $ encodeLengthRankingConfigurationFile
+              $ lengthContractFileFixtureVersion
+                  lengthContractFileModuloVersion
+              $ jsonLengthContract
+                  (jsonLengthTruth True)
+                  (jsonLengthEqual jsonLengthResult
+                    $ jsonLengthModulo 5 $ jsonLengthLiteral 2)
+                  [ jsonLengthProviderLaw "Demo.zeroList" []
+                      $ jsonLengthModulo 2 $ jsonLengthLiteral 2
+                  , jsonLengthProviderLaw "Demo.oneList" []
+                      $ jsonLengthModulo 2 $ jsonLengthLiteral 3
+                  ]
         writeContract 0
         firstContract <- loadContract
         writeContract 1
         secondContract <- loadContract
-        -- Both request values must remain self-contained after their source
+        writeModuloContract
+        moduloContract <- loadContract
+        -- All request values must remain self-contained after their source
         -- has changed again; no later batch may reopen the command path.
         ByteString.writeFile contractPath $ BS.pack "{"
         let zero = lengthRankingFixtureZero fixture
@@ -2862,6 +3015,11 @@ assertLengthAssessmentExplicitContracts
               (explicitLengthAssessmentRequest permission
                 secondContract)
               verification
+        modulo <- expectLengthAssessmentWithin
+          $ assessLengthVerificationRequest
+              (explicitLengthAssessmentRequest permission
+                moduloContract)
+              verification
         compatibility <- expectLengthAssessmentWithin
           $ assessLengthVerificationRequest
               (compatibilityLengthAssessmentRequest mode)
@@ -2873,6 +3031,7 @@ assertLengthAssessmentExplicitContracts
               verification
         lengthAssessmentCandidates first @?= [zero, retained]
         lengthAssessmentCandidates second @?= [retained, zero]
+        lengthAssessmentCandidates modulo @?= [retained, zero]
         lengthAssessmentCandidates compatibility @?= [retained, zero]
         lengthAssessmentCandidates repeatedFirst @?= [zero, retained]
         case lengthAssessmentFailure first of
@@ -2884,13 +3043,16 @@ assertLengthAssessmentExplicitContracts
             show failure
         lengthAssessmentFailure repeatedFirst @?=
           lengthAssessmentFailure first
-        map lengthAssessmentFailure [second, compatibility] @?=
-          [Nothing, Nothing]
+        map lengthAssessmentFailure [second, modulo, compatibility] @?=
+          [Nothing, Nothing, Nothing]
         let presentationText = map lengthCandidatePresentationText .
               presentLengthAssessment
             renderReceipt = detailedVerificationVariantText . verifiedCandidate
         presentationText first @?= map renderReceipt [zero, retained]
         presentationText second @?= map renderReceipt [retained, zero]
+        presentationText modulo @?= map renderReceipt [retained, zero]
+        assertLengthPresentationAssociations
+          (presentLengthAssessment modulo) [Nothing, Just 0]
         presentationText compatibility @?= map renderReceipt [retained, zero]
         presentationText repeatedFirst @?= map renderReceipt [zero, retained]
         mapM_ (\assessed ->
@@ -2898,7 +3060,7 @@ assertLengthAssessmentExplicitContracts
             Nothing -> assertFailure
               "enabled command-local assessment bypassed its occurrence seal"
             Just result -> assertLengthPostVerificationSealed result)
-          [first, second, compatibility, repeatedFirst]
+          [first, second, modulo, compatibility, repeatedFirst]
         let maximumCandidates =
               Djex.defaultLengthSMTLibLiveSessionMaximumQueries
             oversizedCount = fromIntegral maximumCandidates + 1
@@ -4070,6 +4232,10 @@ jsonLengthScale :: Integer -> Json.JValue -> Json.JValue
 jsonLengthScale factor expression = Json.JArr
   [Json.JStr "scale", Json.JInt factor, expression]
 
+jsonLengthModulo :: Integer -> Json.JValue -> Json.JValue
+jsonLengthModulo divisor expression = Json.JArr
+  [Json.JStr "modulo", Json.JInt divisor, expression]
+
 jsonLengthMonus :: Json.JValue -> Json.JValue -> Json.JValue
 jsonLengthMonus left right = Json.JArr
   [Json.JStr "monus", left, right]
@@ -4578,7 +4744,8 @@ assertLengthPreparationRefusalClasses = do
         , LengthPreparationCandidateSemanticsRejected
         ]
       queryRefusals =
-        [ Djex.LengthSMTLibUnexpectedResultVariable
+        [ Djex.LengthSMTLibModuloDivisorZero
+        , Djex.LengthSMTLibUnexpectedResultVariable
         , Djex.LengthSMTLibInputVariableOutOfRange 0 0
         , Djex.LengthSMTLibNumeralBitLimitExceeded
             Djex.LengthSMTLibLiteralNumeral 1 0
@@ -4602,7 +4769,7 @@ assertLengthPreparationRefusalClasses = do
   map lengthHandoffPreparationRefusalClass handoffRefusals @?=
     expectedHandoffClasses
   map lengthQueryPreparationRefusalClass queryRefusals @?=
-    replicate 5 LengthPreparationQueryConstructionRejected
+    replicate 6 LengthPreparationQueryConstructionRejected
   map lengthPreparationRefusalClassCode classes @?= expectedCodes
   Set.size (Set.fromList expectedCodes) @?= length expectedCodes
   let sanitized = show $ lengthHandoffPreparationRefusalClass

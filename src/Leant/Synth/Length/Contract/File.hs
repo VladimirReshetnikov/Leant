@@ -3,12 +3,13 @@
 -- | Closed, bounded contract-only grammar for one synthesis request.
 --
 -- This document contains no executable, solver, replay, activation, or
--- process policy.  Its nested contract object is decoded by the same entrance
--- as the version-1 compatibility configuration, so the two file formats
--- cannot drift in name, provider-role, syntax, or resource-limit semantics.
+-- process policy. Version 1 reuses the exact compatibility grammar; version 2
+-- adds only positive-literal Natural modulo through the same parser owner.
+-- Names, provider roles, and resource limits therefore cannot drift.
 module Leant.Synth.Length.Contract.File
   ( lengthContractFileFormat
   , lengthContractFileVersion
+  , lengthContractFileModuloVersion
   , lengthContractFileJsonLimits
   , LengthContractFileField (..)
   , LengthContractFileValueType (..)
@@ -30,6 +31,7 @@ import Leant.Json.Bounded
 import Leant.Synth.Length.Configuration.File
   ( LengthRankingConfigurationFileError
   , decodeLeanLengthContractValue
+  , decodeLeanLengthContractValueV2
   , lengthRankingConfigurationFileJsonLimits
   )
 import Leant.Synth.Length.Contract (LeanLengthContract)
@@ -37,8 +39,15 @@ import Leant.Synth.Length.Contract (LeanLengthContract)
 lengthContractFileFormat :: Text
 lengthContractFileFormat = "leant-finite-list-spine-length-contract"
 
+-- | The preserved base version, identical to the startup compatibility
+-- contract grammar.
 lengthContractFileVersion :: Natural
 lengthContractFileVersion = 1
+
+-- | Contract-only version 2 adds positive-literal Natural modulo while the
+-- startup compatibility configuration remains fixed at version 1.
+lengthContractFileModuloVersion :: Natural
+lengthContractFileModuloVersion = 2
 
 -- | The contract-only format deliberately uses the compatibility grammar's
 -- complete parser ceiling.  More specific contract limits still win at their
@@ -96,9 +105,11 @@ decodeLengthContractFile bytes = do
     BoundedJsonInteger value -> Right value
     _ -> Left $ LengthContractFileFieldTypeMismatch
       LengthContractFileVersionField LengthContractFileIntegerValue
-  if version == toInteger lengthContractFileVersion
-    then pure ()
-    else Left LengthContractFileUnsupportedVersion
+  decoder <- if version == toInteger lengthContractFileVersion
+    then Right decodeLeanLengthContractValue
+    else if version == toInteger lengthContractFileModuloVersion
+      then Right decodeLeanLengthContractValueV2
+      else Left LengthContractFileUnsupportedVersion
   case find (not . permitted . fst) root of
     Nothing -> pure ()
     Just _ -> Left LengthContractFileUnexpectedRootField
@@ -109,7 +120,7 @@ decodeLengthContractFile bytes = do
     _ -> Left $ LengthContractFileFieldTypeMismatch
       LengthContractFileContractField LengthContractFileObjectValue
   either (Left . LengthContractFileContractRejected) Right
-    $ decodeLeanLengthContractValue contractValue
+    $ decoder contractValue
  where
   permitted name = name `elem` ["format", "version", "contract"]
 

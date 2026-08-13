@@ -142,11 +142,13 @@ reserved as the delimiter. Leant first requires an activated startup policy;
 when ranking is disabled it rejects the option before path admission or file
 IO. Otherwise it admits and reads that absolute POSIX path once, before goal
 translation, using a fixed 5,000-ms interruption budget and the same 256-KiB
-JSON ceiling as the compatibility file. The separate
-contract-only version 1 root has format
-`leant-finite-list-spine-length-contract` and contains only the existing
-bounded contract grammar: it cannot replace the executable, pin choice, solver
-limits, artifact policy, or replay limits. The decoded contract is carried only through
+JSON ceiling as the compatibility file. The separate contract-only root has
+format `leant-finite-list-spine-length-contract`. Version 1 preserves the
+existing bounded compatibility grammar; version 2 adds the exact expression
+form `["modulo", positiveLiteral, expression]` in preconditions,
+postconditions, and provider transfers. Neither version can replace the
+executable, pin choice, solver limits, artifact policy, or replay limits. The
+decoded contract is carried only through
 that command's ordinary, universe-retry, provider, and classical synthesis
 lanes; it is not stored in `ReplState`, `ParsedGoal`, snapshots, history, or a
 cache, and later commands return to the startup-fixed contract unless they name
@@ -167,6 +169,15 @@ The contract-only document has exactly three root fields; for example:
   }
 }
 ```
+
+Changing only `"version"` to `2` enables positive-literal Natural modulo. The
+divisor must be nonzero and no wider than 256 bits. Leant preserves the passive
+AST; Djex normalization and sealing own its semantics and lower every surviving
+modulo occurrence to private quotient/remainder witness equations using only
+QF_LIA. No SMT-LIB `mod` term is emitted, and private witnesses never enter
+`get-value` or counterexample presentation. Startup configuration remains
+version 1 and rejects `modulo`; old one-shot version-1 documents decode exactly
+as before.
 
 After a successful occurrence seal, Main prints a subordinate note only for a
 candidate carrying an independently replayed counterexample. The note calls it
@@ -551,11 +562,14 @@ still no discovery or default path, and loading/activation alone never launches
 a solver. See the
 [bounded acquisition report](docs/reports/2026-08-11-bounded-live-length-ranking-configuration-acquisition.md).
 
-`Leant.Synth.Length.Contract.File` adds the separate contract-only version 1
+`Leant.Synth.Length.Contract.File` adds the separate contract-only versioned
 root with format `leant-finite-list-spine-length-contract` for a command-owned
-passive contract. It contains exact `format`, `version`, and `contract` fields
-and delegates the nested value to the compatibility decoder's single contract
-grammar and limits; execution and evaluation fields are unknown and rejected.
+passive contract. It contains exact `format`, `version`, and `contract` fields.
+Version 1 delegates to the unchanged compatibility grammar. Version 2 uses the
+same bounded parser owner and adds only positive-literal Natural modulo to
+contract and provider-transfer expressions. Execution and evaluation fields
+remain unknown and rejected, and the startup configuration decoder remains
+fixed at version 1.
 Its `Contract.File.Acquire` facade uses the same path, descriptor, and timeout
 owner as startup acquisition, but maps failures into contract-only closed
 vocabulary. `Leant.Synth.Length.Command` recognizes only the exact
@@ -572,6 +586,8 @@ contract once before translating the goal and threads that value through every
 retry and synthesis lane. It never writes the request to interactive state or
 a snapshot. See the
 [one-shot contract report](docs/reports/2026-08-13-one-shot-length-contract.md).
+The version-2 extension and its QF_LIA witness boundary are recorded in the
+[contract-only v2 modulo report](docs/reports/2026-08-13-contract-only-v2-modulo.md).
 
 The passive finite-spine source vocabulary now lives in
 `Leant.Synth.Length.Contract`. Modules that need only those assertions no

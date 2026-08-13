@@ -17,15 +17,16 @@ pin, or read configuration from ambient process state. Main can now call it
 through an explicit startup-owned integration facade; that facade supplies a
 bounded file, pinned-by-default activation, and a fixed decoded contract rather
 than weakening this module's explicit inputs. The activated policy can also be
-paired with one separately decoded contract-only version 1 document for an
+paired with one separately decoded contract-only version 1 or 2 document for an
 explicit `:synth --length-contract ABSOLUTE-PATH -- TYPE` command. This changes
 contract lifetime, not the ranking module's authority or input shape.
 
 The one-shot document has the exact format string
-`leant-finite-list-spine-length-contract`, version `1`, and only a `contract`
-payload beside those two root fields. It reuses the compatibility file's single
-bounded contract decoder and contains no execution, activation, artifact,
-response, or replay policy. A shared package-private acquisition leaf owns the
+`leant-finite-list-spine-length-contract` and only a `contract` payload beside
+those two root fields. Version 1 reuses the unchanged compatibility grammar;
+version 2 adds positive-literal Natural modulo to contract and provider-transfer
+expressions through that same bounded parser owner. Neither contains execution,
+activation, artifact, response, or replay policy. A shared package-private acquisition leaf owns the
 same absolute-path, POSIX descriptor, byte, timeout, and cleanup rules for both
 file facades.
 
@@ -50,7 +51,14 @@ requires the retained graph to re-render to one spelling equal to the
 callback-accepted text before binding its family provenance, inventory,
 provider assumptions, and explicit contract.
 Eligible checked problems are then sealed into canonical QF_LIA queries. A
-pure refusal at either boundary leaves that one candidate `Unassessed` through
+version-2 modulo expression is retained passively until this Djex boundary.
+Djex normalizes it and lowers every surviving occurrence to private,
+deterministically allocated quotient/remainder equations using only QF_LIA;
+it emits no SMT-LIB `mod` term and requests no witness values. Version-1
+startup and one-shot documents remain unchanged, and existing no-modulo query
+identities remain byte-identical.
+
+A pure refusal at either boundary leaves that one candidate `Unassessed` through
 the legacy assessment projection and records a separate
 `LengthPreparationRefusalClass`. The ten-value taxonomy is bounded and
 payload-free, and each value has a fixed `lengthPreparationRefusalClassCode`.

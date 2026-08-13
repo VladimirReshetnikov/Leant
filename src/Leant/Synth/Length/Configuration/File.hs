@@ -25,6 +25,7 @@ module Leant.Synth.Length.Configuration.File
   , LengthRankingConfigurationActivationError (..)
   , decodeLengthRankingConfigurationFile
   , decodeLeanLengthContractValue
+  , decodeLeanLengthContractValueV2
   , disableLengthRankingConfiguration
   , activateLengthRankingConfiguration
   ) where
@@ -189,6 +190,7 @@ data LengthRankingConfigurationSyntaxError
   | LengthRankingConfigurationExpectedSyntaxArray
   | LengthRankingConfigurationExpectedSyntaxBoolean
   | LengthRankingConfigurationExpectedSyntaxNatural
+  | LengthRankingConfigurationModuloDivisorZero
   | LengthRankingConfigurationSyntaxLimitExceeded
       !LengthRankingConfigurationSyntaxLimit !Natural !Natural
   deriving (Eq, Ord, Show)
@@ -761,12 +763,34 @@ evaluationFields =
   ]
 
 -- | Decode exactly the contract object embedded by the compatibility file.
--- The separate one-shot contract-file boundary reuses this entrance so both
--- formats have one owner for names, provider roles, syntax, and hard limits.
+-- Contract-only version 1 reuses this entrance. Version 2 selects the sibling
+-- entrance below; both delegate to one owner for names, provider roles,
+-- recursive syntax, and hard limits.
 decodeLeanLengthContractValue
   :: BoundedJsonValue
   -> Either LengthRankingConfigurationFileError LeanLengthContract
-decodeLeanLengthContractValue value = do
+decodeLeanLengthContractValue = decodeLeanLengthContractValueWithGrammar
+  LengthContractGrammarV1
+
+-- | Decode the contract-only version-2 grammar.  This is the version-1
+-- grammar plus positive-literal Natural modulo; the startup compatibility
+-- file deliberately continues to call the version-1 entrance above.
+decodeLeanLengthContractValueV2
+  :: BoundedJsonValue
+  -> Either LengthRankingConfigurationFileError LeanLengthContract
+decodeLeanLengthContractValueV2 = decodeLeanLengthContractValueWithGrammar
+  LengthContractGrammarV2
+
+data LengthContractGrammar
+  = LengthContractGrammarV1
+  | LengthContractGrammarV2
+  deriving (Eq)
+
+decodeLeanLengthContractValueWithGrammar
+  :: LengthContractGrammar
+  -> BoundedJsonValue
+  -> Either LengthRankingConfigurationFileError LeanLengthContract
+decodeLeanLengthContractValueWithGrammar grammar value = do
   object <- exactObject LengthRankingConfigurationContractObject
     contractFields value
   spineValue <- requiredField
@@ -780,7 +804,7 @@ decodeLeanLengthContractValue value = do
     LengthRankingConfigurationPreconditionField
     "precondition"
     object
-  (precondition, afterPrecondition) <- parseLengthFormula
+  (precondition, afterPrecondition) <- parseLengthFormula grammar
     LengthRankingConfigurationPreconditionSyntax
     contractVariable
     1
@@ -791,7 +815,7 @@ decodeLeanLengthContractValue value = do
     LengthRankingConfigurationPostconditionField
     "postcondition"
     object
-  (postcondition, _) <- parseLengthFormula
+  (postcondition, _) <- parseLengthFormula grammar
     LengthRankingConfigurationPostconditionSyntax
     contractVariable
     1
@@ -806,7 +830,7 @@ decodeLeanLengthContractValue value = do
     providerLawsValue
   boundedCollection LengthRankingConfigurationProviderLawsField
     maximumProviderLaws lawValues
-  providerLaws <- decodeProviderLaws 0 emptySyntaxUsage lawValues
+  providerLaws <- decodeProviderLaws grammar 0 emptySyntaxUsage lawValues
   pure LeanLengthContract
     { leanLengthContractSpine = spine
     , leanLengthContractSource = LengthContractSource
@@ -865,12 +889,13 @@ spineFields =
   ]
 
 decodeProviderLaws
-  :: Natural
+  :: LengthContractGrammar
+  -> Natural
   -> SyntaxUsage
   -> [BoundedJsonValue]
   -> Either LengthRankingConfigurationFileError [LeanLengthProviderLaw]
-decodeProviderLaws _ _ [] = Right []
-decodeProviderLaws index usage (value : remaining) = do
+decodeProviderLaws _ _ _ [] = Right []
+decodeProviderLaws grammar index usage (value : remaining) = do
   let lawObject = LengthRankingConfigurationProviderLawObject index
   object <- exactObject lawObject
     (providerLawFields index) value
@@ -892,13 +917,13 @@ decodeProviderLaws index usage (value : remaining) = do
     (LengthRankingConfigurationProviderLawTransferField index)
     "transfer"
     object
-  (transfer, afterTransfer) <- parseLengthExpression
+  (transfer, afterTransfer) <- parseLengthExpression grammar
     (LengthRankingConfigurationProviderTransferSyntax index)
     (providerVariable $ fromIntegral $ length roles)
     1
     usage
     transferValue
-  following <- decodeProviderLaws (index + 1) afterTransfer remaining
+  following <- decodeProviderLaws grammar (index + 1) afterTransfer remaining
   pure $ LeanLengthProviderLaw
     { leanLengthProviderLawName = name
     , leanLengthProviderLawArgumentRoles = roles
@@ -1050,7 +1075,8 @@ maximumContractInputIndex = 7
 maximumProviderArgumentIndex = 15
 
 parseLengthExpression
-  :: LengthRankingConfigurationSyntaxPhase
+  :: LengthContractGrammar
+  -> LengthRankingConfigurationSyntaxPhase
   -> VariableDecoder variable
   -> Natural
   -> SyntaxUsage
@@ -1058,7 +1084,7 @@ parseLengthExpression
   -> Either
       LengthRankingConfigurationFileError
       (LengthExpression variable, SyntaxUsage)
-parseLengthExpression phase decodeVariable depth usage value = do
+parseLengthExpression grammar phase decodeVariable depth usage value = do
   (tag, arguments) <- syntax phase $ tagged value
   afterNode <- enterSyntax phase depth usage
   variable <- syntax phase $ decodeVariable tag arguments
@@ -1074,41 +1100,52 @@ parseLengthExpression phase decodeVariable depth usage value = do
         terms <- syntax phase $ syntaxArray argument
         syntaxCollection phase LengthRankingConfigurationSumTerms
           maximumSyntaxCollection terms
-        (parsed, afterTerms) <- parseExpressions phase decodeVariable
+        (parsed, afterTerms) <- parseExpressions grammar phase decodeVariable
           (depth + 1) afterNode terms
         Right (LengthSum parsed, afterTerms)
       "scale" -> do
         (factorValue, expressionValue) <- syntax phase
           $ twoArguments arguments
         factor <- boundedLiteral phase factorValue
-        (expression, afterExpression) <- parseLengthExpression
+        (expression, afterExpression) <- parseLengthExpression grammar
           phase decodeVariable (depth + 1) afterNode expressionValue
         Right (LengthScale factor expression, afterExpression)
+      "modulo" | grammar == LengthContractGrammarV2 -> do
+        (divisorValue, expressionValue) <- syntax phase
+          $ twoArguments arguments
+        divisor <- boundedLiteral phase divisorValue
+        if divisor == 0
+          then syntax phase $ Left LengthRankingConfigurationModuloDivisorZero
+          else do
+            (expression, afterExpression) <- parseLengthExpression grammar
+              phase decodeVariable (depth + 1) afterNode expressionValue
+            Right (LengthModulo divisor expression, afterExpression)
       "monus" -> parseBinaryExpression arguments afterNode LengthMonus
       "minimum" -> parseBinaryExpression arguments afterNode LengthMinimum
       "maximum" -> parseBinaryExpression arguments afterNode LengthMaximum
       "if" -> do
         (conditionValue, trueValue, falseValue) <- syntax phase
           $ threeArguments arguments
-        (condition, afterCondition) <- parseLengthFormula
+        (condition, afterCondition) <- parseLengthFormula grammar
           phase decodeVariable (depth + 1) afterNode conditionValue
-        (trueBranch, afterTrue) <- parseLengthExpression
+        (trueBranch, afterTrue) <- parseLengthExpression grammar
           phase decodeVariable (depth + 1) afterCondition trueValue
-        (falseBranch, afterFalse) <- parseLengthExpression
+        (falseBranch, afterFalse) <- parseLengthExpression grammar
           phase decodeVariable (depth + 1) afterTrue falseValue
         Right (LengthIf condition trueBranch falseBranch, afterFalse)
       _ -> syntax phase $ Left LengthRankingConfigurationUnknownTag
  where
   parseBinaryExpression arguments afterNode constructor = do
     (leftValue, rightValue) <- syntax phase $ twoArguments arguments
-    (left, afterLeft) <- parseLengthExpression
+    (left, afterLeft) <- parseLengthExpression grammar
       phase decodeVariable (depth + 1) afterNode leftValue
-    (right, afterRight) <- parseLengthExpression
+    (right, afterRight) <- parseLengthExpression grammar
       phase decodeVariable (depth + 1) afterLeft rightValue
     Right (constructor left right, afterRight)
 
 parseExpressions
-  :: LengthRankingConfigurationSyntaxPhase
+  :: LengthContractGrammar
+  -> LengthRankingConfigurationSyntaxPhase
   -> VariableDecoder variable
   -> Natural
   -> SyntaxUsage
@@ -1116,16 +1153,17 @@ parseExpressions
   -> Either
       LengthRankingConfigurationFileError
       ([LengthExpression variable], SyntaxUsage)
-parseExpressions _ _ _ usage [] = Right ([], usage)
-parseExpressions phase decodeVariable depth usage (value : remaining) = do
-  (expression, afterExpression) <- parseLengthExpression
+parseExpressions _ _ _ _ usage [] = Right ([], usage)
+parseExpressions grammar phase decodeVariable depth usage (value : remaining) = do
+  (expression, afterExpression) <- parseLengthExpression grammar
     phase decodeVariable depth usage value
-  (following, afterFollowing) <- parseExpressions
+  (following, afterFollowing) <- parseExpressions grammar
     phase decodeVariable depth afterExpression remaining
   Right (expression : following, afterFollowing)
 
 parseLengthFormula
-  :: LengthRankingConfigurationSyntaxPhase
+  :: LengthContractGrammar
+  -> LengthRankingConfigurationSyntaxPhase
   -> VariableDecoder variable
   -> Natural
   -> SyntaxUsage
@@ -1133,7 +1171,7 @@ parseLengthFormula
   -> Either
       LengthRankingConfigurationFileError
       (LengthFormula variable, SyntaxUsage)
-parseLengthFormula phase decodeVariable depth usage value = do
+parseLengthFormula grammar phase decodeVariable depth usage value = do
   (tag, arguments) <- syntax phase $ tagged value
   afterNode <- enterSyntax phase depth usage
   case tag of
@@ -1146,7 +1184,7 @@ parseLengthFormula phase decodeVariable depth usage value = do
     "at-most" -> parseComparison arguments afterNode LengthAtMost
     "not" -> do
       argument <- syntax phase $ onlyArgument arguments
-      (formula, afterFormula) <- parseLengthFormula
+      (formula, afterFormula) <- parseLengthFormula grammar
         phase decodeVariable (depth + 1) afterNode argument
       Right (LengthNot formula, afterFormula)
     "all" -> do
@@ -1154,7 +1192,7 @@ parseLengthFormula phase decodeVariable depth usage value = do
       formulas <- syntax phase $ syntaxArray argument
       syntaxCollection phase LengthRankingConfigurationAllClauses
         maximumSyntaxCollection formulas
-      (parsed, afterFormulas) <- parseFormulas phase decodeVariable
+      (parsed, afterFormulas) <- parseFormulas grammar phase decodeVariable
         (depth + 1) afterNode formulas
       Right (LengthAll parsed, afterFormulas)
     _ -> syntax phase $ Left LengthRankingConfigurationUnknownTag
@@ -1162,14 +1200,15 @@ parseLengthFormula phase decodeVariable depth usage value = do
   parseComparison arguments afterNode constructor = do
     (leftValue, rightValue) <- syntax phase $ twoArguments arguments
     afterClause <- consumeClause phase afterNode
-    (left, afterLeft) <- parseLengthExpression
+    (left, afterLeft) <- parseLengthExpression grammar
       phase decodeVariable (depth + 1) afterClause leftValue
-    (right, afterRight) <- parseLengthExpression
+    (right, afterRight) <- parseLengthExpression grammar
       phase decodeVariable (depth + 1) afterLeft rightValue
     Right (constructor left right, afterRight)
 
 parseFormulas
-  :: LengthRankingConfigurationSyntaxPhase
+  :: LengthContractGrammar
+  -> LengthRankingConfigurationSyntaxPhase
   -> VariableDecoder variable
   -> Natural
   -> SyntaxUsage
@@ -1177,11 +1216,11 @@ parseFormulas
   -> Either
       LengthRankingConfigurationFileError
       ([LengthFormula variable], SyntaxUsage)
-parseFormulas _ _ _ usage [] = Right ([], usage)
-parseFormulas phase decodeVariable depth usage (value : remaining) = do
-  (formula, afterFormula) <- parseLengthFormula
+parseFormulas _ _ _ _ usage [] = Right ([], usage)
+parseFormulas grammar phase decodeVariable depth usage (value : remaining) = do
+  (formula, afterFormula) <- parseLengthFormula grammar
     phase decodeVariable depth usage value
-  (following, afterFollowing) <- parseFormulas
+  (following, afterFollowing) <- parseFormulas grammar
     phase decodeVariable depth afterFormula remaining
   Right (formula : following, afterFollowing)
 
