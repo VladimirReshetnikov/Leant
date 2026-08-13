@@ -582,11 +582,13 @@ renderExactTypedVariantOrigin
     Left absence -> Left $ ExactTypedVariantGraphUnavailable absence
     Right retained -> Right retained
   let origin = exferenceAuthorityPreparation authority
+      providerMap = providerMapFromBindings
+        $ semanticOriginProviderBindings origin
   either (Left . ExactTypedVariantRendererRejected) Right
     $ renderLeanTermGraphProjection
         (("x" ++) . show)
         (semanticOriginConstructorMap origin)
-        (semanticOriginProviderMap origin)
+        providerMap
         (semanticOriginTypeMap origin)
         (premiseLayoutForRenderer $ semanticOriginPremiseLayout origin)
         (semanticOriginFitFragment origin)
@@ -866,9 +868,10 @@ synthesizeTunedWithProvidersDetailed engine steps limits checked providers extra
 
 -- | Prepare one engine-specific translation without erasing which goal came
 -- from the source fragment and which goal search actually receives. Premise
--- insertion and rendering share the same named layout, while provider and
--- type maps remain attached to the declarations that introduced their private
--- names. This is the stable seam for later semantic interpretation.
+-- insertion and rendering share the same named layout. Provider renderer
+-- metadata remains attached to the binding which introduced its private name;
+-- constructor and type maps remain attached to their declarations. This is
+-- the stable seam for later semantic interpretation.
 prepareSynthesis
   :: RecursiveProjection
   -> [ProviderFrag]
@@ -880,6 +883,8 @@ prepareSynthesis recursiveProjection activeProviders extras engineFrag fitFrag =
   translation <-
     fragToDjinn recursiveProjection activeProviders extras engineFrag
   let sourceGoal = translationSourceGoal translation
+      providerBindings = translationProviderBindings translation
+      providerMap = providerMapFromBindings providerBindings
       callerPremises = translationCallerPremises translation
       constructorPremises = translationConstructorPremises translation
       premiseLayout = PremiseLayout
@@ -904,19 +909,17 @@ prepareSynthesis recursiveProjection activeProviders extras engineFrag fitFrag =
       searchGoal = insertOuter sourceGoal
       declarations =
         translationDeclarations translation
-          ++ translationProviderDeclarations translation
+          ++ providerDeclarationsFromBindings providerBindings
       semanticOrigin = PreparedSemanticOrigin
         { semanticOriginEngineFragment = engineFrag
         , semanticOriginFitFragment = fitFrag
         , semanticOriginSourceGoal = sourceGoal
         , semanticOriginSearchGoal = searchGoal
         , semanticOriginDeclarations = declarations
-        , semanticOriginProviderBindings =
-            translationProviderBindings translation
+        , semanticOriginProviderBindings = providerBindings
         , semanticOriginSemanticFamilyBindings =
             translationSemanticFamilyBindings translation
         , semanticOriginConstructorMap = translationConstructorMap translation
-        , semanticOriginProviderMap = translationProviderMap translation
         , semanticOriginTypeMap = translationTypeMap translation
         , semanticOriginPremiseLayout = premiseLayout
         , semanticOriginProjectionCompleteness =
@@ -927,7 +930,7 @@ prepareSynthesis recursiveProjection activeProviders extras engineFrag fitFrag =
       render expr =
         renderLeanTerm
           (semanticOriginConstructorMap semanticOrigin)
-          (semanticOriginProviderMap semanticOrigin)
+          providerMap
           (semanticOriginTypeMap semanticOrigin)
           renderPremiseLayout
           (semanticOriginFitFragment semanticOrigin) expr
@@ -937,7 +940,7 @@ prepareSynthesis recursiveProjection activeProviders extras engineFrag fitFrag =
       renderGraph graph =
         renderLeanTermGraphProjection (("x" ++) . show)
           (semanticOriginConstructorMap semanticOrigin)
-          (semanticOriginProviderMap semanticOrigin)
+          providerMap
           (semanticOriginTypeMap semanticOrigin)
           renderPremiseLayout
           (semanticOriginFitFragment semanticOrigin) graph
@@ -1547,20 +1550,34 @@ providerBindingDeclaration binding = ValueDeclaration
     (providerBindingPrivateName binding)
     (providerBindingScheme binding))
 
+-- | Derive the declaration projection in binding order. Provider bindings are
+-- the sole prepared owner of the private identity and translated scheme.
+providerDeclarationsFromBindings :: [ProviderBinding] -> [DjinnDecl]
+providerDeclarationsFromBindings = map providerBindingDeclaration
+
+-- | Derive the exact renderer index from its retained provider bindings.
+-- 'Map.fromList' preserves the historical ascending-key index and last-wins
+-- behavior for any repeated private spelling while forcing each mapped
+-- 'ProviderInfo' to the same weak-head-normal-form boundary as before.
+providerMapFromBindings :: [ProviderBinding] -> ProviderMap
+providerMapFromBindings bindings = Map.fromList
+  [ ( providerBindingPrivateSpelling binding
+    , providerBindingRenderInfo binding
+    )
+  | binding <- bindings
+  ]
+
 -- | Complete pure output of fragment translation, before search-only premises
 -- are inserted around the source goal. Provider bindings are the sole owner
 -- of their ordered canonical source-domain instantiation assignments and
--- remain beside the historical declaration and renderer-map projections, so
--- future consumers do not have to recover source identity from a private
--- spelling.
+-- of the declaration and renderer metadata projected from them, so future
+-- consumers do not have to recover source identity from a private spelling.
 data SynthesisTranslation = SynthesisTranslation
   { translationSourceGoal :: Type String
   , translationDeclarations :: [DjinnDecl]
-  , translationProviderDeclarations :: [DjinnDecl]
   , translationProviderBindings :: [ProviderBinding]
   , translationSemanticFamilyBindings :: [SemanticFamilyBinding]
   , translationConstructorMap :: CtorMap
-  , translationProviderMap :: ProviderMap
   , translationTypeMap :: TypeMap
   , translationCallerPremises :: [TranslatedPremise]
   , translationConstructorPremises :: [TranslatedPremise]
@@ -1612,7 +1629,9 @@ data PreparedSynthesis = PreparedSynthesis
 -- then retained after the renderer functions have served their output-only
 -- role. Both source fragments remain explicit: equality of engine and fitting
 -- targets is a future semantic precondition, never something reconstructed
--- from their translated goals.
+-- from their translated goals. Provider bindings remain the sole owner of
+-- private declaration inputs and renderer metadata; their historical
+-- declaration and map views are derived only at the edges which consume them.
 data PreparedSemanticOrigin = PreparedSemanticOrigin
   { semanticOriginEngineFragment :: Frag
   , semanticOriginFitFragment :: Frag
@@ -1622,7 +1641,6 @@ data PreparedSemanticOrigin = PreparedSemanticOrigin
   , semanticOriginProviderBindings :: [ProviderBinding]
   , semanticOriginSemanticFamilyBindings :: [SemanticFamilyBinding]
   , semanticOriginConstructorMap :: CtorMap
-  , semanticOriginProviderMap :: ProviderMap
   , semanticOriginTypeMap :: TypeMap
   , semanticOriginPremiseLayout :: PremiseLayout
   , semanticOriginProjectionCompleteness :: ProjectionCompleteness
@@ -1756,8 +1774,7 @@ inspectPreparedSemanticOrigin origin = PreparedSynthesisInspection
   , inspectedSourceGoal = semanticOriginSourceGoal origin
   , inspectedSearchGoal = semanticOriginSearchGoal origin
   , inspectedDeclarations = semanticOriginDeclarations origin
-  , inspectedProviderBindings = map inspectBinding
-      $ semanticOriginProviderBindings origin
+  , inspectedProviderBindings = map inspectBinding providerBindings
   , inspectedSemanticFamilyBindings = map inspectSemanticFamilyBinding
       $ semanticOriginSemanticFamilyBindings origin
   , inspectedAllProviderAssignments =
@@ -1765,7 +1782,7 @@ inspectPreparedSemanticOrigin origin = PreparedSynthesisInspection
   , inspectedConstructorMap = semanticOriginConstructorMap origin
   , inspectedConstructorPrivateNames = Map.keys
       $ semanticOriginConstructorMap origin
-  , inspectedProviderMap = semanticOriginProviderMap origin
+  , inspectedProviderMap = providerMapFromBindings providerBindings
   , inspectedTypeMap = semanticOriginTypeMap origin
   , inspectedConstructorPremises = premiseLayoutConstructorPremises layout
   , inspectedSourceArrowCount = premiseLayoutSourceArrowCount layout
@@ -1776,6 +1793,7 @@ inspectPreparedSemanticOrigin origin = PreparedSynthesisInspection
  where
   layout = semanticOriginPremiseLayout origin
   projection = semanticOriginProjectionCompleteness origin
+  providerBindings = semanticOriginProviderBindings origin
   inspectBinding binding = ProviderBindingInspection
     { inspectedProviderSourceName = providerLeanName
         $ providerBindingSource binding
@@ -2894,13 +2912,6 @@ fragToDjinn recursiveProjection providers extras frag0 = do
     , tsTypeMap = Map.empty
     }
   let providerBindings = translationProductProviderBindings translatedProduct
-      providerDecls = map providerBindingDeclaration providerBindings
-      providerMap = Map.fromList
-        [ ( providerBindingPrivateSpelling binding
-          , providerBindingRenderInfo binding
-          )
-        | binding <- providerBindings
-        ]
       constructorPremises = tsPrems finalState
       familyBindings = semanticFamilyBindings
         (tsDecls finalState)
@@ -2909,11 +2920,9 @@ fragToDjinn recursiveProjection providers extras frag0 = do
   Right SynthesisTranslation
     { translationSourceGoal = translationProductSourceGoal translatedProduct
     , translationDeclarations = tsDecls finalState
-    , translationProviderDeclarations = providerDecls
     , translationProviderBindings = providerBindings
     , translationSemanticFamilyBindings = familyBindings
     , translationConstructorMap = tsCtorMap finalState
-    , translationProviderMap = providerMap
     , translationTypeMap = tsTypeMap finalState
     , translationCallerPremises =
         translationProductCallerPremises translatedProduct

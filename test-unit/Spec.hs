@@ -38,6 +38,7 @@ import Test.Tasty.HUnit ((@?=), assertBool, assertFailure, testCase)
 import qualified Language.Haskell.Djex as Djex
 import Language.Haskell.Djex
   ( Boxity (Boxed)
+  , Declaration (..)
   , Constraint (..)
   , ExferenceOptions (..)
   , ExferenceSessionPolicy (..)
@@ -57,6 +58,7 @@ import Language.Haskell.Djex
   , LengthSessionError (..)
   , QueryRequest (..)
   , Type (..)
+  , ValueSignature (..)
   , Variable (FlexibleVariable)
   , inferredVisibleTypeArgument
   , checkedLengthCandidateResult
@@ -1447,6 +1449,22 @@ translationPreparationTests = testGroup "prepared synthesis translation"
           second = ProviderFragWithEvidence "Demo.secondProvider"
             providerType ["a"] [[argument "Char"]]
           goal = FAtom False "Demo.Target"
+          expectedProviderInfo provider sourceAssignments binding = do
+            renderAssignments <- mapM
+              (\(assignment, sourceArguments) -> do
+                visibleArguments <- mapM
+                  (expectRight . specifiedVisibleTypeArgument . snd)
+                  $ kindedProviderInstantiationAssignmentArguments assignment
+                pure ProviderAssignmentInfo
+                  { paiVisibleArguments = visibleArguments
+                  , paiSourceArguments = sourceArguments
+                  })
+              $ zip (inspectedProviderAssignments binding) sourceAssignments
+            pure (providerInfo
+              (providerLeanName provider)
+              (Just $ providerTypeBinderNames provider)
+              (providerTypeFrag provider))
+              { piAssignments = renderAssignments }
       prepared <- expectRight $ inspectExferencePreparation
         [first, second] [] goal goal
       bindings <- case inspectedProviderBindings prepared of
@@ -1456,11 +1474,32 @@ translationPreparationTests = testGroup "prepared synthesis translation"
           ("expected two ordered provider bindings, got: " ++ show other)
           >> pure []
       map (length . inspectedProviderAssignments) bindings @?= [2, 1]
+      let expectedProviderDeclarations =
+            [ ValueDeclaration $ ValueSignature ()
+                (inspectedProviderPrivateName binding)
+                (inspectedProviderScheme binding)
+            | binding <- bindings
+            ]
+          declarations = inspectedDeclarations prepared
+      drop (length declarations - length expectedProviderDeclarations)
+          declarations @?= expectedProviderDeclarations
       map kindedProviderInstantiationAssignmentProvider
           (inspectedAllProviderAssignments prepared) @?=
         [privateZero, privateZero, privateOne]
       inspectedAllProviderAssignments prepared @?=
         concatMap inspectedProviderAssignments bindings
+      let providerMap = inspectedProviderMap prepared
+          privateSpellings = map inspectedProviderPrivateSpelling bindings
+      Map.keys providerMap @?= privateSpellings
+      expectedFirst <- expectedProviderInfo first
+        [[argument "Nat"], [argument "Bool"]] (bindings !! 0)
+      expectedSecond <- expectedProviderInfo second
+        [[argument "Char"]] (bindings !! 1)
+      map
+          (\binding -> Map.lookup
+            (inspectedProviderPrivateSpelling binding)
+            providerMap)
+          bindings @?= [Just expectedFirst, Just expectedSecond]
   , testCase "bind private providers, assignments, and exact family maps" $ do
       privateProvider <- expectRight $ mkIdentifier "leantProvider0"
       privateType <- expectRight $ mkIdentifier "LeantType0"

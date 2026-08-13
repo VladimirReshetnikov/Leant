@@ -298,14 +298,18 @@ impredicative instantiation is admitted under a guard that never invents a
 polytype the checked input did not supply.
 
 Leant's synthesis preparation now builds one semantic-origin record whose
-source and search goals, declarations, provider bindings, renderer maps,
-premise layout, and completeness facts provide the respective inputs projected
-by search and the renderer closures, then remain unchanged in the exact
-Exference run authority. Each provider binding is the sole prepared owner of
-its ordered instantiation assignments; Djinn, Exference, and inspection derive
-or project the historical aggregate list in binding order. The prepared
-semantic origin does not cache that aggregate beside the bindings. There is no
-post-search field-for-field preparation copy. The
+source and search goals, declarations, provider bindings, constructor and type
+renderer maps, premise layout, and completeness facts provide the respective
+inputs projected by search and the renderer closures, then remain unchanged in
+the exact Exference run authority. Each provider binding is the sole prepared
+owner of its private declaration inputs, renderer metadata, and ordered
+instantiation assignments. Preparation derives provider declarations and one
+lazy strict-map projection shared by both renderer closures; exact-origin
+rerendering and inspection derive that same map projection at their use edges.
+Djinn, Exference, and inspection likewise derive or project the historical
+aggregate assignment list in binding order. The prepared semantic origin does
+not cache an aggregate assignment list or a provider renderer map beside the
+bindings. There is no post-search field-for-field preparation copy. The
 detailed Exference route retains an opaque checked candidate and that exact
 run authority beside the originating rendered group. The candidate
 remains the sole owner of its graph, and Djex fingerprints that graph only
