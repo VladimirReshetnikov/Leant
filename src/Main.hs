@@ -135,10 +135,14 @@ import Leant.Synth.Length.Integration
   , LengthRankingConfigurationActivationPolicy (..)
   , assessLengthVerificationBatch
   , disabledLengthAssessmentMode
-  , lengthAssessmentCandidates
   , lengthAssessmentFailure
   , lengthAssessmentModeActivationPolicy
   , loadLengthAssessmentMode
+  )
+import Leant.Synth.Length.Presentation
+  ( lengthCandidatePresentationNote
+  , lengthCandidatePresentationText
+  , presentLengthAssessment
   )
 import Leant.Synth.Observability
   ( VerificationFailureClass (..)
@@ -161,7 +165,6 @@ import Leant.Synth.Verification
   ( VariantVerdict (..)
   , VerificationBatch
   , verificationObservations
-  , verifiedCandidate
   , verifyCandidateGroups
   )
 
@@ -2581,14 +2584,13 @@ verifyAndDisplay st args goal groups = do
       "finite-list-spine Length counterexample ranking preserved callback " ++
       "order: " ++
       show failure
-  let acceptedReceipts = lengthAssessmentCandidates assessment
+  let presentations = presentLengthAssessment assessment
       -- Keep callback acceptance, semantic origin, and original renderer
-      -- ordinal together until this post-verification boundary. An explicit
-      -- behavioral contract may be handed to Djex here before projection;
+      -- ordinal together through semantic presentation. Candidate text and
+      -- any model-relative note are projected from one opaque ranked receipt;
       -- rsSynthIts intentionally remains the established user-facing
       -- text/splice cache rather than a trust store.
-      accepted = map verifiedCandidate acceptedReceipts
-      shown = map detailedVerificationVariantText accepted
+      shown = map lengthCandidatePresentationText presentations
   if null shown
     then pure False
     else do
@@ -2611,9 +2613,12 @@ verifyAndDisplay st args goal groups = do
               ]
       modifyIORef' st (\s -> s
         { rsSynthIts = splices, rsSynthItsProve = proving })
-      forM_ (zip [1 :: Int ..] shown) $ \(i, term) -> do
+      forM_ (zip [1 :: Int ..] presentations) $ \(i, presentation) -> do
         label <- cBold st ("it" ++ show i)
+        let term = lengthCandidatePresentationText presentation
         emitLn st ("  " ++ label ++ "  " ++ term)
+        forM_ (lengthCandidatePresentationNote presentation) $ \note ->
+          emitLn st ("       " ++ note)
       pure True
 
 -- | Leave prove mode.  Prove-scoped `itN` splices mention the goal's

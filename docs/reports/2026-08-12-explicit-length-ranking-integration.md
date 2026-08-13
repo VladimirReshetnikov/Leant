@@ -75,6 +75,14 @@ independently replayed finite-list-spine counterexample. No candidate is
 pruned. `sat`, `unsat`, `unknown`, and status-only observations grant no proof
 or pruning authority.
 
+After the seal, the presentation layer traverses each whole materialized
+`RankedLengthCandidate`. Candidate text and any note therefore come from the
+same receipt rather than from detached lists joined by spelling or position.
+Only a replayed counterexample gets a bounded subordinate note. It is labeled
+model-relative, reports spine lengths, and reduces any provider-backed basis
+to the count of assumed laws; the note never projects or displays the
+receipt's private provider-name list.
+
 ## Failures and presentation
 
 Admission, acquisition, decode, or activation rejection stops startup with a
@@ -92,13 +100,18 @@ During assessment:
   propagation and Djex cleanup behavior rather than becoming presentation
   output.
 
+Rejected input, heuristic status, and the all-`Unassessed` operational
+fallback produce no semantic note. A successful counterexample note explains
+stable demotion only; it is not pruning, proof, Z3 attestation, provider-law
+validation, or a claim about concrete Lean execution.
+
 The disabled path emits no new startup line or batch warning and performs no
 configuration or solver IO, so the existing transcript corpus remains the
 default contract.
 
 ## Validation
 
-The 313-test Leant unit suite now covers:
+The 315-test Leant unit suite now covers:
 
 - exact disabled-mode laziness and identity;
 - CLI dependency rules, pin default, explicit unpinned choice, 5,000-ms setup
@@ -113,6 +126,10 @@ The 313-test Leant unit suite now covers:
   ownership rather than a cached process;
 - productive maximum-plus-one adapter rejection without a suspect ranking;
 - structured live failure with exact original-order sealed fallback.
+- exact text/evidence association after reordering, including equal
+  occurrences;
+- provider-name redaction, provider-independent/conditional wording, no-note
+  neutral and fallback branches, and bounded 4,096-bit value presentation.
 
 The no-option golden transcript corpus remains the separate compatibility
 check. In the implementation environment it was attempted but could not enter

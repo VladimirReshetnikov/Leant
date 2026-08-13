@@ -100,7 +100,15 @@ association-free configured ranking projection. Both entry points share one
 private rank-2 adapter and the same sealing tail. Their opaque result is an
 accepted/rejected sum. Only when permutation and receipt association sealing
 succeeds does it retain a `PostVerificationBatch` and expose the corresponding
-materialized `LengthRanking` compatibility view:
+materialized `LengthRanking` compatibility view.
+
+The caller-facing presentation layer consumes that whole materialized ranked
+receipt when deriving candidate text and its optional counterexample note.
+Equal spellings and reordered occurrences therefore cannot borrow evidence by
+equality, index lookup, or list zipping; disabled, rejected, heuristic, and
+fallback branches produce no semantic note.
+
+The result cases are:
 
 - productive ranking-input rejection preserves the original opaque callback
   batch, reports a sanitized adapter input failure, and has neither a ranking

@@ -128,6 +128,15 @@ remain in place with a payload-free preparation refusal and do not open a
 worker by themselves. The default `djinn` synthesis engine supplies no typed
 graph; select `:set synth-engine exference` or `both` to produce candidates
 which may reach this ranking path.
+After a successful occurrence seal, Main prints a subordinate note only for a
+candidate carrying an independently replayed counterexample. The note calls it
+a replayed, model-relative finite-list-spine Length counterexample, gives a
+bounded summary of input and result spine lengths, and reports only the number
+of assumed provider laws used by that candidate. The semantic note never
+projects the receipt's private provider-name list. Disabled assessment,
+rejected input, heuristic status,
+and atomic operational fallback add no semantic note. The note can explain a
+stable demotion; it never proves, prunes, or claims concrete Lean behavior.
 
 | Command | Meaning |
 |---|---|
@@ -388,7 +397,11 @@ as that association; the presentation-safe path uses the batch-scoped
 occurrence handle without a parallel detached receipt. After the permutation
 seal, the accepted result retains the sealed batch as its sole receipt owner
 beside an eager receipt-free ranking summary; the public ranked receipts are
-materialized from those associated values only when requested.
+materialized from those associated values only when requested. The
+package-private presentation layer traverses each whole materialized ranked
+receipt and projects one opaque text-plus-note value. Main uses that single
+ordered list for bindings, splices, and `itN` output; it never zips candidate
+text with a detached evidence list.
 Nothing is pruned. A candidate-local handoff or query-construction refusal
 still projects through the compatible `Unassessed` assessment, but now also
 retains one bounded payload-free `LengthPreparationRefusalClass` with a fixed
@@ -539,7 +552,8 @@ Operational ranking failure already
 produces an original-order all-`Unassessed` ranking and passes through the same
 seal. Main selects this path only for an explicitly loaded and activated
 configuration; otherwise the historical identity path is exact. Replayed
-counterexamples may rank but never prune;
+counterexamples may rank and receive a bounded model-relative note, but never
+prune or prove source behavior;
 raw `sat`, `unsat`, and `unknown` still grant no proof authority. See the
 [post-verification assessment seam report](docs/reports/2026-08-11-post-verification-assessment-seam.md)
 and the

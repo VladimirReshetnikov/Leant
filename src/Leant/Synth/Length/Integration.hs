@@ -21,6 +21,7 @@ module Leant.Synth.Length.Integration
   , LengthAssessmentResult
   , assessLengthVerificationBatch
   , lengthAssessmentCandidates
+  , lengthAssessmentRanking
   , lengthAssessmentFailure
   , lengthAssessmentPostVerificationResult
   ) where
@@ -46,9 +47,13 @@ import Leant.Synth.Length.PostVerification
   , assessVerifiedLengthCandidatesConfigured
   , lengthPostVerificationAdapterFailure
   , lengthPostVerificationCandidates
+  , lengthPostVerificationRanking
   , lengthPostVerificationRankingFailure
   )
-import Leant.Synth.Length.Ranking (LengthRankingFailure)
+import Leant.Synth.Length.Ranking
+  ( LengthRanking
+  , LengthRankingFailure
+  )
 import Leant.Synth.PostVerification
   ( skipPostVerificationAssessment )
 import Leant.Synth.Verification
@@ -152,6 +157,19 @@ lengthAssessmentCandidates result = case result of
     skipPostVerificationAssessment verification
   LengthAssessmentCompleted assessed ->
     lengthPostVerificationCandidates assessed
+
+-- | The receipt-associated compatibility ranking after the occurrence seal.
+-- Disabled assessment and rejected configured input have no ranking.  The
+-- skipped branch deliberately does not inspect its retained batch, so callers
+-- may decide whether semantic presentation is available without traversing a
+-- disabled result.
+lengthAssessmentRanking
+  :: LengthAssessmentResult
+  -> Maybe LengthRanking
+lengthAssessmentRanking result = case result of
+  LengthAssessmentSkipped _ -> Nothing
+  LengthAssessmentCompleted assessed ->
+    lengthPostVerificationRanking assessed
 
 lengthAssessmentPostVerificationResult
   :: LengthAssessmentResult

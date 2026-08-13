@@ -69,6 +69,7 @@ import Language.Haskell.Djex
   , mkIdentifier
   , noObservations
   , observationCount
+  , renderCanonical
   , specifiedVisibleTypeArgument
   , typedCandidateTermGraph
   , tupleName
@@ -245,6 +246,7 @@ import Leant.Synth.Length.Integration
   , lengthAssessmentFailure
   , lengthAssessmentModeActivationPolicy
   , lengthAssessmentPostVerificationResult
+  , lengthAssessmentRanking
   , loadLengthAssessmentMode
   )
 import Leant.Synth.Length.PostVerification
@@ -257,6 +259,15 @@ import Leant.Synth.Length.PostVerification
   , lengthPostVerificationRanking
   , lengthPostVerificationRankingFailure
   , lengthPostVerificationSealedBatch
+  )
+import Leant.Synth.Length.Presentation
+  ( LengthCandidatePresentation
+  , lengthCandidatePresentationNote
+  , lengthCandidatePresentationText
+  , maximumLengthCounterexampleNoteCharacters
+  , presentLengthAssessment
+  , presentLengthPostVerificationResult
+  , renderLengthCounterexampleNote
   )
 import Leant.Synth.Length.Ranking
   ( LengthRanking
@@ -2275,6 +2286,8 @@ lengthAssessmentIntegrationTests = testGroup
       assertLengthAssessmentConfigured
   , testCase "preserve sealed callback order after a live failure"
       assertLengthAssessmentFailureFallback
+  , testCase "bound and sanitize counterexample presentation"
+      assertLengthCounterexamplePresentation
   ]
 
 assertLengthAssessmentDisabled :: IO ()
@@ -2287,12 +2300,20 @@ assertLengthAssessmentDisabled = do
     disabledLengthAssessmentMode verification
   lengthAssessmentCandidates result @?= verifiedCandidateReceipts verification
   lengthAssessmentFailure result @?= Nothing
+  assertBool "disabled Length assessment retained a ranking"
+    $ isNothing $ lengthAssessmentRanking result
+  map lengthCandidatePresentationText (presentLengthAssessment result) @?=
+    ["integration-disabled-first", "integration-disabled-second"]
+  map lengthCandidatePresentationNote (presentLengthAssessment result) @?=
+    [Nothing, Nothing]
   assertBool "disabled Length assessment retained a configured result"
     $ isNothing $ lengthAssessmentPostVerificationResult result
 
   lazyResult <- assessLengthVerificationBatch disabledLengthAssessmentMode
     (error "disabled Length integration forced its verification batch")
   lengthAssessmentFailure lazyResult @?= Nothing
+  assertBool "lazy disabled Length assessment retained a ranking"
+    $ isNothing $ lengthAssessmentRanking lazyResult
   assertBool "lazy disabled Length assessment retained a configured result"
     $ isNothing $ lengthAssessmentPostVerificationResult lazyResult
 
@@ -2401,6 +2422,25 @@ assertLengthAssessmentConfigured
           $ assessLengthVerificationBatch mode verification
         lengthAssessmentFailure assessed @?= Nothing
         lengthAssessmentCandidates assessed @?= [retained, zero, one]
+        _ <- case lengthAssessmentRanking assessed of
+          Nothing -> assertFailure
+            "enabled Length assessment discarded its compatibility ranking"
+              >> error "unreachable"
+          Just value -> pure value
+        let presentations = presentLengthAssessment assessed
+        map lengthCandidatePresentationText presentations @?=
+          map (detailedVerificationVariantText . verifiedCandidate)
+            [retained, zero, one]
+        map (fmap (const True) . lengthCandidatePresentationNote)
+            presentations @?=
+          [Nothing, Just True, Just True]
+        map lengthCandidatePresentationText presentations @?=
+          map lengthCandidatePresentationText
+            (presentLengthPostVerificationResult
+              $ maybe (error "configured presentation lost its result") id
+              $ lengthAssessmentPostVerificationResult assessed)
+        assertLengthPresentationAssociations presentations [Nothing, Just 0,
+          Just 1]
         case lengthAssessmentPostVerificationResult assessed of
           Nothing -> assertFailure
             "enabled Length assessment bypassed post-verification sealing"
@@ -2435,6 +2475,12 @@ assertLengthAssessmentConfigured
             show failure
         lengthAssessmentCandidates rejected @?=
           verifiedCandidateReceipts oversized
+        assertBool "rejected integration input retained a ranking"
+          $ isNothing $ lengthAssessmentRanking rejected
+        assertBool "rejected integration input exposed semantic notes"
+          $ all isNothing
+          $ map lengthCandidatePresentationNote
+          $ presentLengthAssessment rejected
         case lengthAssessmentPostVerificationResult rejected of
           Nothing -> assertFailure
             "enabled input rejection discarded its adapter result"
@@ -2480,6 +2526,17 @@ assertLengthAssessmentFailureFallback
         assessed <- expectLengthAssessmentWithin
           $ assessLengthVerificationBatch mode verification
         lengthAssessmentCandidates assessed @?= original
+        case lengthAssessmentRanking assessed of
+          Nothing -> assertFailure
+            "live integration fallback discarded its ranking report"
+          Just ranking -> do
+            map rankedLengthCandidateAssessment
+                (lengthRankingCandidates ranking) @?=
+              replicate (length original) Unassessed
+            assertBool "live integration fallback exposed stale evidence"
+              $ all isNothing
+              $ map lengthCandidatePresentationNote
+              $ presentLengthAssessment assessed
         case lengthAssessmentFailure assessed of
           Just (LengthAssessmentRankingFailed failure) -> do
             lengthRankingFailureOriginalIndex failure @?= Nothing
@@ -2490,6 +2547,118 @@ assertLengthAssessmentFailureFallback
           Nothing -> assertFailure
             "live integration fallback discarded its sealed result"
           Just result -> assertLengthPostVerificationSealed result
+
+assertLengthPresentationAssociations
+  :: [LengthCandidatePresentation]
+  -> [Maybe Natural]
+  -> IO ()
+assertLengthPresentationAssociations presentations expected = do
+  length presentations @?= length expected
+  sequence_
+    [ case (expectedResult, lengthCandidatePresentationNote presentation) of
+        (Nothing, Nothing) -> pure ()
+        (Just result, Just note) -> do
+          assertBool "counterexample note lost its result association"
+            $ ("result spine length = " ++ show result) `isInfixOf` note
+          assertBool "counterexample note leaked a private provider name"
+            $ not $ "Demo." `isInfixOf` note
+        pair -> assertFailure $ "unexpected presentation association: "
+          ++ show pair
+    | (presentation, expectedResult) <- zip presentations expected
+    ]
+
+assertLengthCounterexamplePresentation :: IO ()
+assertLengthCounterexamplePresentation = do
+  fixture <- buildLengthRankingLiveFixture
+  retained <- syntheticLengthRankingCandidate "presentation-retained"
+  let zero = lengthRankingFixtureZero fixture
+      one = lengthRankingFixtureOne fixture
+      original = [zero, retained, zero, one]
+      expected = [retained, zero, zero, one]
+  withFakeLengthSolver "healthy" $ \executable -> do
+    let executionSource = explicitLengthRankingExecutionSource executable
+          Nothing Djex.LengthSMTLibInputValuesAfterSatisfiable
+    configuration <- expectRight $ mkLengthRankingConfiguration
+      $ explicitLengthRankingConfigurationSource
+          Djex.defaultLengthSMTLibExecutionLimits executionSource
+          Djex.defaultLengthEvaluationLimitSource (lengthRankingContract 2)
+    verification <- verificationBatchFromReceipts original
+    assessedResult <- expectLengthPostVerificationWithin
+      "presentation association"
+      $ assessVerifiedLengthCandidatesConfigured configuration verification
+    let presentations = presentLengthPostVerificationResult assessedResult
+        ranking = case lengthPostVerificationRanking assessedResult of
+          Just retainedRanking -> retainedRanking
+          Nothing -> error "sealed presentation fixture discarded its ranking"
+    map lengthCandidatePresentationText presentations @?=
+      map (detailedVerificationVariantText . verifiedCandidate) expected
+    assertLengthPresentationAssociations presentations
+      [Nothing, Just 0, Just 0, Just 1]
+    let assessed = lengthRankingCandidates ranking
+        receipts =
+          [ receipt
+          | candidate <- assessed
+          , Counterexample receipt <-
+              [rankedLengthCandidateAssessment candidate]
+          ]
+        notes =
+          [ note
+          | presentation <- presentations
+          , Just note <- [lengthCandidatePresentationNote presentation]
+          ]
+    length notes @?= 3
+    sequence_ $ zipWith (\receipt note -> do
+        assertBool "counterexample note omitted model qualification"
+          $ "replayed finite-list-spine Length counterexample "
+              `isInfixOf` note
+        assertBool "counterexample note omitted provider-law qualification"
+          $ "conditional on 1 assumed provider law used by this candidate"
+              `isInfixOf` note
+        assertBool "counterexample note exposed a private provider name"
+          $ not $ "Demo.zeroList" `isInfixOf` note
+        assertBool "counterexample note exposed an internal basis constructor"
+          $ not $ "FiniteSpineModelUnderAssumedProviderLaws" `isInfixOf` note
+        assertBool "counterexample note exposed its receipt constructor"
+          $ not $ "ValidatedLengthCounterexample" `isInfixOf` note
+        mapM_ (\overclaim -> assertBool
+            "counterexample note made a source-language or solver claim"
+            $ not $ overclaim `isInfixOf` note)
+          ["Lean", "Z3", "proved", "correct", "incorrect"]
+        case Djex.validatedLengthCounterexampleBasis receipt of
+          Djex.ProviderIndependentFiniteSpineModel -> pure ()
+          Djex.FiniteSpineModelUnderAssumedProviderLaws names ->
+            mapM_ (\name -> assertBool
+                "counterexample note exposed a private provider name"
+                $ not $ renderCanonical name `isInfixOf` note)
+              names
+      ) receipts notes
+
+    let statusSource = explicitLengthRankingExecutionSource executable
+          Nothing Djex.LengthSMTLibStatusOnly
+    statusConfiguration <- expectRight $ mkLengthRankingConfiguration
+      $ explicitLengthRankingConfigurationSource
+          Djex.defaultLengthSMTLibExecutionLimits statusSource
+          Djex.defaultLengthEvaluationLimitSource (lengthRankingContract 2)
+    statusVerification <- verificationBatchFromReceipts [zero, one]
+    statusResult <- expectLengthPostVerificationWithin
+      "status-only presentation"
+      $ assessVerifiedLengthCandidatesConfigured statusConfiguration
+          statusVerification
+    assertBool "status-only ranking emitted a counterexample claim"
+      $ all isNothing
+      $ map lengthCandidatePresentationNote
+      $ presentLengthPostVerificationResult statusResult
+
+  providerIndependent <- buildProviderIndependentCounterexampleReceipt
+    (2 ^ (4095 :: Int))
+  let huge = renderLengthCounterexampleNote providerIndependent
+  assertBool "provider-independent note lost its semantic basis"
+    $ "model-relative; provider-independent" `isInfixOf` huge
+  assertBool "large natural reached terminal presentation verbatim"
+    $ "<4096-bit natural>" `isInfixOf` huge
+  assertBool "counterexample terminal note exceeded its configured bound"
+    $ length huge <= maximumLengthCounterexampleNoteCharacters
+
 
 expectLengthAssessmentWithin
   :: IO result
@@ -4439,6 +4608,113 @@ assertLengthCounterexampleReceipt expectedResult receipt = do
   Djex.validatedLengthCounterexampleInputs receipt @?= []
   Djex.validatedLengthCounterexampleResult receipt @?= expectedResult
 
+-- The provider-backed Leant handoff fixtures are correctly zero-input.  This
+-- test-only dependency fixture supplies the smallest honest one-input basis:
+-- a provider-free typed Exference identity over one declared List spine,
+-- sealed and replayed through the same public Length APIs.
+buildProviderIndependentCounterexampleReceipt
+  :: Natural
+  -> IO Djex.ValidatedLengthCounterexample
+buildProviderIndependentCounterexampleReceipt input = do
+  responseListName <- expectRight $ Djex.mkIdentifier "ResponseList"
+  responseNilName <- expectRight $ Djex.mkIdentifier "ResponseNil"
+  responseConsName <- expectRight $ Djex.mkIdentifier "ResponseCons"
+  responseTargetName <- expectRight $ Djex.mkIdentifier "responseIdentity"
+  responseTarget <- expectRight $ Djex.mkDefinitionName responseTargetName
+  let parameter = Djex.FlexibleVariable 0 :: Djex.ExferenceTypeVariable
+      payload = Djex.TupleType Djex.Boxed [] :: Djex.ExferenceType
+      listOf value = Djex.TypeApplication
+        (Djex.TypeConstructor responseListName) value
+      recursiveList = listOf $ Djex.TypeVariable parameter
+      declaration = Djex.DataTypeDeclaration () responseListName
+        [Djex.TypeParameter parameter Nothing]
+        [ Djex.DataConstructor () responseNilName []
+        , Djex.DataConstructor () responseConsName
+            [Djex.TypeVariable parameter, recursiveList]
+        ]
+      goal = Djex.FunctionType (listOf payload) (listOf payload)
+      contract = Djex.LengthContractSource
+        { Djex.lengthContractPrecondition = Djex.LengthTruth True
+        , Djex.lengthContractPostcondition = Djex.LengthEqual
+            (Djex.LengthVariable Djex.LengthResult)
+            (Djex.LengthLiteral 0)
+        }
+      responseBytes = map $ fromIntegral . fromEnum
+  environment <- expectRight
+    (Djex.mkEnvironment [declaration] :: Either
+      (Djex.EnvironmentError Djex.ExferenceTypeVariable)
+      Djex.ExferenceEnvironment)
+  session <- expectRight $ Djex.mkExferenceSession environment
+  request <- expectRight $ Djex.mkExferenceRequest Djex.QueryRequest
+    { Djex.requestTarget = responseTarget
+    , Djex.requestGoal = goal
+    , Djex.requestContexts = []
+    , Djex.requestOptions = Djex.defaultExferenceOptions
+        { Djex.exferenceMaximumSteps = 8
+        , Djex.exferenceMultiConstructorPatterns = False
+        }
+    }
+  results <- expectRight $ Djex.runExferenceTypedQuery session request
+  let candidates =
+        [ retained
+        | result <- results
+        , retained <- Djex.batchCandidates $ Djex.resultSearch result
+        ]
+  lengthSession <- expectRight $ Djex.sealLengthSession
+    Djex.defaultLengthLimits
+    (Djex.exferenceSessionInventory session)
+    (Djex.DeclaredListSpine
+      responseListName responseNilName responseConsName)
+    []
+  checkedContract <- expectRight $ Djex.sealLengthContractInContext
+    Djex.defaultLengthLimits
+    (Djex.checkedLengthSessionContext lengthSession)
+    goal contract
+  problem <- case
+      [ retained
+      | candidate <- candidates
+      , Right retained <-
+          [ Djex.sealLengthTypedCandidateProblem
+              Djex.defaultLengthProblemLimits
+              lengthSession checkedContract candidate
+          ]
+      , Djex.checkedLengthCandidateResult
+          (Djex.checkedLengthProblemCandidate retained) ==
+            Djex.LengthVariable (Djex.LengthInput 0)
+      ] of
+    retained : _ -> pure retained
+    [] -> assertFailure
+      "provider-independent fixture returned no checked identity"
+        >> error "unreachable"
+  query <- expectRight $ Djex.sealLengthSMTLibQuery
+    Djex.defaultLengthSMTLibLimits problem
+  Djex.parseLengthSMTLibCheckResponse
+      Djex.defaultLengthSMTLibResponseLimits
+      (responseBytes "sat") @?=
+    Right Djex.SolverSatisfiable
+  symbol <- case Djex.lengthSMTLibQueryInputSymbols query of
+    [retained] -> pure retained
+    symbols -> assertFailure
+      ("provider-independent fixture retained unexpected inputs: "
+        ++ show symbols) >> error "unreachable"
+  bindings <- expectRight $ Djex.parseLengthSMTLibInputValueResponse
+    Djex.defaultLengthSMTLibResponseLimits query
+    $ responseBytes "((" ++ symbol ++ responseBytes (" " ++ show input ++ "))")
+  evidence <- case Djex.validateLengthSMTLibCounterexample
+      Djex.defaultLengthEvaluationLimits query bindings of
+    Left failure -> assertFailure
+      ("provider-independent replay failed: " ++ show failure)
+        >> error "unreachable"
+    Right Nothing -> assertFailure
+      "provider-independent violating model produced no evidence"
+        >> error "unreachable"
+    Right (Just retained) -> pure retained
+  receipt <- expectRight $ Djex.replayBehavioralEvidence
+    (Djex.checkedLengthProblemBehavioralProblem problem) evidence
+  Djex.validatedLengthCounterexampleBasis receipt @?=
+    Djex.ProviderIndependentFiniteSpineModel
+  pure receipt
+
 assertLengthRankingQueryAssociation
   :: Djex.CheckedLengthProblem Djex.ExferenceLocal Djex.ExferenceLocal
   -> CheckedLengthQuery
@@ -4946,110 +5222,9 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
             "expected direct List provider candidates, got: " ++ show other
   , testCase
       "decode a direct Djex List model before exact evidence replay" $ do
-      -- The Leant handoff above is correctly zero-input, so get-value is not
-      -- part of its query.  This test-only dependency fixture supplies the
-      -- smallest honest one-input boundary: a typed Exference identity over
-      -- one declared List spine, sealed through the same public Length APIs.
-      responseListName <- expectRight $ Djex.mkIdentifier "ResponseList"
-      responseNilName <- expectRight $ Djex.mkIdentifier "ResponseNil"
-      responseConsName <- expectRight $ Djex.mkIdentifier "ResponseCons"
-      responseTargetName <- expectRight $
-        Djex.mkIdentifier "responseIdentity"
-      responseTarget <- expectRight $
-        Djex.mkDefinitionName responseTargetName
-      let parameter = Djex.FlexibleVariable 0
-            :: Djex.ExferenceTypeVariable
-          payload = Djex.TupleType Djex.Boxed [] :: Djex.ExferenceType
-          listOf value = Djex.TypeApplication
-            (Djex.TypeConstructor responseListName) value
-          recursiveList = listOf $ Djex.TypeVariable parameter
-          declaration = Djex.DataTypeDeclaration () responseListName
-            [Djex.TypeParameter parameter Nothing]
-            [ Djex.DataConstructor () responseNilName []
-            , Djex.DataConstructor () responseConsName
-                [Djex.TypeVariable parameter, recursiveList]
-            ]
-          goal = Djex.FunctionType (listOf payload) (listOf payload)
-          contract = Djex.LengthContractSource
-            { Djex.lengthContractPrecondition = Djex.LengthTruth True
-            , Djex.lengthContractPostcondition = Djex.LengthEqual
-                (Djex.LengthVariable Djex.LengthResult)
-                (Djex.LengthLiteral 0)
-            }
-          responseBytes = map $ fromIntegral . fromEnum
-      environment <- expectRight
-        (Djex.mkEnvironment [declaration] :: Either
-          (Djex.EnvironmentError Djex.ExferenceTypeVariable)
-          Djex.ExferenceEnvironment)
-      session <- expectRight $ Djex.mkExferenceSession environment
-      request <- expectRight $ Djex.mkExferenceRequest Djex.QueryRequest
-        { Djex.requestTarget = responseTarget
-        , Djex.requestGoal = goal
-        , Djex.requestContexts = []
-        , Djex.requestOptions = Djex.defaultExferenceOptions
-            { Djex.exferenceMaximumSteps = 8
-            , Djex.exferenceMultiConstructorPatterns = False
-            }
-        }
-      results <- expectRight $ Djex.runExferenceTypedQuery session request
-      let candidates =
-            [ retained
-            | result <- results
-            , retained <- Djex.batchCandidates $ Djex.resultSearch result
-            ]
-      lengthSession <- expectRight $ Djex.sealLengthSession
-        Djex.defaultLengthLimits
-        (Djex.exferenceSessionInventory session)
-        (Djex.DeclaredListSpine
-          responseListName responseNilName responseConsName)
-        []
-      checkedContract <- expectRight $ Djex.sealLengthContractInContext
-        Djex.defaultLengthLimits
-        (Djex.checkedLengthSessionContext lengthSession)
-        goal contract
-      problem <- case
-          [ retained
-          | candidate <- candidates
-          , Right retained <-
-              [ Djex.sealLengthTypedCandidateProblem
-                  Djex.defaultLengthProblemLimits
-                  lengthSession checkedContract candidate
-              ]
-          , Djex.checkedLengthCandidateResult
-              (Djex.checkedLengthProblemCandidate retained) ==
-                Djex.LengthVariable (Djex.LengthInput 0)
-          ] of
-        retained : _ -> pure retained
-        [] -> assertFailure
-          "the direct fixture returned no checked identity candidate"
-            >> error "unreachable"
-      query <- expectRight $ Djex.sealLengthSMTLibQuery
-        Djex.defaultLengthSMTLibLimits problem
-      Djex.parseLengthSMTLibCheckResponse
-          Djex.defaultLengthSMTLibResponseLimits
-          (responseBytes "sat") @?=
-        Right Djex.SolverSatisfiable
-      case Djex.lengthSMTLibQueryInputSymbols query of
-        [symbol] -> do
-          bindings <- expectRight $
-            Djex.parseLengthSMTLibInputValueResponse
-              Djex.defaultLengthSMTLibResponseLimits query
-              (responseBytes "((" ++ symbol ++ responseBytes " 3))")
-          evidence <- case Djex.validateLengthSMTLibCounterexample
-              Djex.defaultLengthEvaluationLimits query bindings of
-            Left failure -> assertFailure
-              ("model replay failed: " ++ show failure) >> error "unreachable"
-            Right Nothing -> assertFailure
-              "the violating identity model produced no evidence"
-                >> error "unreachable"
-            Right (Just retained) -> pure retained
-          receipt <- expectRight $ Djex.replayBehavioralEvidence
-            (Djex.checkedLengthProblemBehavioralProblem problem) evidence
-          Djex.validatedLengthCounterexampleInputs receipt @?= [3]
-          Djex.validatedLengthCounterexampleResult receipt @?= 3
-        symbols -> assertFailure $
-          "the direct identity query did not retain one input: "
-            ++ show symbols
+      receipt <- buildProviderIndependentCounterexampleReceipt 3
+      Djex.validatedLengthCounterexampleInputs receipt @?= [3]
+      Djex.validatedLengthCounterexampleResult receipt @?= 3
   , testCase
       "resolve one polymorphic List provider scheme into Length sealing" $ do
       let parameter = FVar "a"

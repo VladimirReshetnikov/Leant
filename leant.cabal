@@ -50,6 +50,7 @@ Executable leant
     Leant.Synth.Length.Integration
     Leant.Synth.Length.PostVerification
     Leant.Synth.Length.PostVerification.Internal
+    Leant.Synth.Length.Presentation
     Leant.Synth.Length.Ranking
     Leant.Synth.Length.Ranking.Internal
     Leant.Synth.Observability
@@ -99,6 +100,7 @@ Test-Suite leant-synth-tests
     Leant.Synth.Length.Integration
     Leant.Synth.Length.PostVerification
     Leant.Synth.Length.PostVerification.Internal
+    Leant.Synth.Length.Presentation
     Leant.Synth.Length.Ranking
     Leant.Synth.Length.Ranking.Internal
     Leant.Synth.Observability

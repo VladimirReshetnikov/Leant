@@ -259,6 +259,10 @@ another runtime authority type.
 The receipt remains finite-spine and model-relative, including any named
 provider-law assumptions. It is not a Lean source-level counterexample, an
 executable-realization claim, a solver-soundness certificate, or a kernel proof.
+After post-verification sealing, the presentation boundary traverses each
+whole materialized ranked receipt and produces one opaque text-plus-note
+value. Main never zips candidate text to a detached evidence list; only a
+counterexample receives a bounded, provider-name-free model summary.
 
 ## Ranking and failure policy
 
