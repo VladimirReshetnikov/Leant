@@ -10,6 +10,7 @@
 module Leant.Synth.Length.Contract
   ( LeanLengthSpineIdentity (..)
   , LeanLengthProviderLaw (..)
+  , LeanLengthCandidateCasePolicy (..)
   , LeanLengthContract (..)
   ) where
 
@@ -46,6 +47,16 @@ data LeanLengthProviderLaw = LeanLengthProviderLaw
   }
   deriving (Eq, Show)
 
+-- | Closed candidate-case authority carried by one passive contract.
+--
+-- Ordinary startup and contract-only versions 1--3 retain the rejecting
+-- policy. Contract-only version 4 must spell the exact zero/step policy
+-- explicitly; Handoff never infers it from a graph or a failed sealer.
+data LeanLengthCandidateCasePolicy
+  = LeanLengthCasesRejected
+  | LeanLengthExactSpineZeroStepV1
+  deriving (Bounded, Enum, Eq, Ord, Show)
+
 -- | Explicit finite-spine contract to bind to one accepted typed candidate.
 --
 -- The contract remains an assertion supplied by the integration layer.  A
@@ -56,10 +67,14 @@ data LeanLengthContract = LeanLengthContract
   { leanLengthContractSpine :: LeanLengthSpineIdentity
   -- | 'Nothing' is the exact legacy all-observed compatibility policy used
   -- by the startup v1 file and contract-only v1/v2.  'Just' retains the exact
-  -- source-ordered role vector required by contract-only v3; no roles are
+  -- source-ordered role vector required by contract-only v3/v4; no roles are
   -- inferred from the target type or provider declarations.
   , leanLengthContractTargetArgumentRoles ::
       Maybe [LengthTargetArgumentRole]
+  -- | Explicit candidate-case authority. Versions 1--3 and startup v1 use
+  -- 'LeanLengthCasesRejected'; contract-only v4 alone can retain the exact
+  -- zero/step policy beside its required role vector.
+  , leanLengthContractCandidateCasePolicy :: LeanLengthCandidateCasePolicy
   , leanLengthContractSource :: LengthContractSource
   , leanLengthContractProviderLaws :: [LeanLengthProviderLaw]
   }

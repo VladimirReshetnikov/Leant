@@ -39,6 +39,8 @@ import Language.Haskell.Djex
   , defaultLengthProblemLimits
   , lengthProviderSummaryLimit
   , sealLengthContractInContext
+  , sealExactSpineCaseLengthSession
+  , sealExactSpineCaseLengthTypedCandidateProblem
   , sealLengthSession
   , sealLengthTypedCandidateProblem
   , sealRoleAwareLengthContractInContext
@@ -82,6 +84,7 @@ import Leant.Synth.Engine
   )
 import Leant.Synth.Length.Contract
   ( LeanLengthContract (..)
+  , LeanLengthCandidateCasePolicy (..)
   , LeanLengthProviderLaw (..)
   , LeanLengthSpineIdentity (..)
   )
@@ -111,6 +114,7 @@ data LengthHandoffRefusal
   | LengthHandoffProviderUnavailable String
   | LengthHandoffProviderAmbiguous String Int
   | LengthHandoffProviderVariableMissing String String
+  | LengthHandoffExactCasePolicyRequiresTargetRoles
   | LengthHandoffSessionRejected (LengthSessionError ExferenceLocal)
   | LengthHandoffContractRejected (LengthContractError ExferenceTypeVariable)
   | LengthHandoffProblemRejected
@@ -169,7 +173,8 @@ prepareCheckedLengthProblem source verified = do
   if requestGoal request == convertedSource
     then pure ()
     else Left LengthHandoffRequestGoalChanged
-  checkUniqueDirectRendering exactOrigin variant
+  checkDirectRendering
+    (leanLengthContractCandidateCasePolicy source) exactOrigin variant
   (family, zeroConstructor, stepConstructor) <- resolveSemanticFamily origin
     $ leanLengthContractSpine source
   providerLaws <- boundedProviderLawPrefix
@@ -181,12 +186,22 @@ prepareCheckedLengthProblem source verified = do
         zeroConstructor
         stepConstructor
       targetRoles = leanLengthContractTargetArgumentRoles source
-  session <- either (Left . LengthHandoffSessionRejected) Right
-    $ case targetRoles of
-        Nothing -> sealLengthSession defaultLengthLimits inventory
-          spineModel providerSources
-        Just roles -> sealRoleAwareLengthSession defaultLengthLimits roles
-          inventory spineModel providerSources
+      casePolicy = leanLengthContractCandidateCasePolicy source
+  session <- case (casePolicy, targetRoles) of
+    (LeanLengthCasesRejected, Nothing) ->
+      either (Left . LengthHandoffSessionRejected) Right
+        $ sealLengthSession defaultLengthLimits inventory
+            spineModel providerSources
+    (LeanLengthCasesRejected, Just roles) ->
+      either (Left . LengthHandoffSessionRejected) Right
+        $ sealRoleAwareLengthSession defaultLengthLimits roles
+            inventory spineModel providerSources
+    (LeanLengthExactSpineZeroStepV1, Just roles) ->
+      either (Left . LengthHandoffSessionRejected) Right
+        $ sealExactSpineCaseLengthSession defaultLengthLimits roles
+            inventory spineModel providerSources
+    (LeanLengthExactSpineZeroStepV1, Nothing) ->
+      Left LengthHandoffExactCasePolicyRequiresTargetRoles
   contract <- either (Left . LengthHandoffContractRejected) Right
     $ case targetRoles of
         Nothing -> sealLengthContractInContext
@@ -201,11 +216,15 @@ prepareCheckedLengthProblem source verified = do
           convertedSource
           (leanLengthContractSource source)
   problem <- either (Left . LengthHandoffProblemRejected) Right
-    $ case targetRoles of
-        Nothing -> sealLengthTypedCandidateProblem
-          defaultLengthProblemLimits session contract candidate
-        Just _ -> sealRoleAwareLengthTypedCandidateProblem
-          defaultLengthProblemLimits session contract candidate
+    $ case casePolicy of
+        LeanLengthCasesRejected -> case targetRoles of
+          Nothing -> sealLengthTypedCandidateProblem
+            defaultLengthProblemLimits session contract candidate
+          Just _ -> sealRoleAwareLengthTypedCandidateProblem
+            defaultLengthProblemLimits session contract candidate
+        LeanLengthExactSpineZeroStepV1 ->
+          sealExactSpineCaseLengthTypedCandidateProblem
+            defaultLengthProblemLimits session contract candidate
   pure problem
 
 resolveSemanticFamily
@@ -299,26 +318,45 @@ resolveProviderLaw authority origin law = case
   bindings -> Left $ LengthHandoffProviderAmbiguous
     (leanLengthProviderLawName law) (length bindings)
 
-checkUniqueDirectRendering
-  :: ExactTypedVariantOrigin
+checkDirectRendering
+  :: LeanLengthCandidateCasePolicy
+  -> ExactTypedVariantOrigin
   -> DetailedVerificationVariant
   -> Either LengthHandoffRefusal ()
-checkUniqueDirectRendering exactOrigin variant = do
+checkDirectRendering casePolicy exactOrigin variant = do
   rendered <- case renderExactTypedVariantOrigin exactOrigin of
     Left (ExactTypedVariantGraphUnavailable absence) ->
       Left $ LengthHandoffTypedGraphLost absence
     Left (ExactTypedVariantRendererRejected refusal) ->
       Left $ LengthHandoffRendererRejected refusal
     Right alternatives -> Right alternatives
-  exactText <- case rendered of
-    [text] -> Right text
-    alternatives -> Left $ LengthHandoffRendererNotUnique
-      $ length alternatives
-  let originatingOrdinal = exactTypedVariantOriginOrdinal exactOrigin
-  if originatingOrdinal == 0
-    then pure ()
-    else Left $ LengthHandoffRendererOrdinalChanged originatingOrdinal
+  exactText <- case casePolicy of
+    LeanLengthCasesRejected -> selectLegacyAlternative rendered
+    LeanLengthExactSpineZeroStepV1 -> selectOriginatingAlternative
+      (exactTypedVariantOriginOrdinal exactOrigin) rendered
   let acceptedText = detailedVerificationVariantText variant
   if acceptedText == exactText
     then Right ()
     else Left $ LengthHandoffRendererTextChanged exactText acceptedText
+ where
+  -- Versions 1--3 keep their original singleton renderer requirement and
+  -- ordinal-zero check. Version 4 alone can associate the retained exact
+  -- ordinal within a multi-alternative rendering.
+  selectLegacyAlternative [text]
+    | exactTypedVariantOriginOrdinal exactOrigin == 0 = Right text
+    | otherwise = Left $ LengthHandoffRendererOrdinalChanged
+        $ exactTypedVariantOriginOrdinal exactOrigin
+  selectLegacyAlternative alternatives = Left
+    $ LengthHandoffRendererNotUnique $ length alternatives
+
+  -- The origin records the renderer ordinal and exact text before verification.
+  -- Re-running the same renderer over the retained graph and authority lets a
+  -- later spelling be associated without requiring the graph to have only one
+  -- valid Lean presentation. Traversal is bounded by the renderer's already
+  -- finite alternative list and avoids converting a caller-visible Natural.
+  selectOriginatingAlternative 0 (text : _) = Right text
+  selectOriginatingAlternative remaining (_ : alternatives) =
+    selectOriginatingAlternative (remaining - 1) alternatives
+  selectOriginatingAlternative _ [] = Left
+    $ LengthHandoffRendererOrdinalChanged
+    $ exactTypedVariantOriginOrdinal exactOrigin

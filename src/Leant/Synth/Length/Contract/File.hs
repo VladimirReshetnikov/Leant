@@ -5,13 +5,15 @@
 -- This document contains no executable, solver, replay, activation, or
 -- process policy. Version 1 reuses the exact compatibility grammar; version 2
 -- adds positive-literal Natural modulo; version 3 additionally requires an
--- exact source-ordered target-role vector. Names, provider roles, target
--- roles, and resource limits therefore cannot drift.
+-- exact source-ordered target-role vector; version 4 requires an explicit
+-- candidate-case policy. Names, provider roles, target roles, case semantics,
+-- and resource limits therefore cannot drift.
 module Leant.Synth.Length.Contract.File
   ( lengthContractFileFormat
   , lengthContractFileVersion
   , lengthContractFileModuloVersion
   , lengthContractFileTargetRolesVersion
+  , lengthContractFileExactCaseVersion
   , lengthContractFileJsonLimits
   , LengthContractFileField (..)
   , LengthContractFileValueType (..)
@@ -35,6 +37,7 @@ import Leant.Synth.Length.Configuration.File
   , decodeLeanLengthContractValue
   , decodeLeanLengthContractValueV2
   , decodeLeanLengthContractValueV3
+  , decodeLeanLengthContractValueV4
   , lengthRankingConfigurationFileJsonLimits
   )
 import Leant.Synth.Length.Contract (LeanLengthContract)
@@ -57,6 +60,12 @@ lengthContractFileModuloVersion = 2
 -- target argument. The startup compatibility configuration remains version 1.
 lengthContractFileTargetRolesVersion :: Natural
 lengthContractFileTargetRolesVersion = 3
+
+-- | Contract-only version 4 retains the version-3 grammar and requires one
+-- explicit closed candidate-case policy. This is the only file version which
+-- can authorize the exact recursive zero/step spine case.
+lengthContractFileExactCaseVersion :: Natural
+lengthContractFileExactCaseVersion = 4
 
 -- | The contract-only format deliberately uses the compatibility grammar's
 -- complete parser ceiling.  More specific contract limits still win at their
@@ -120,7 +129,9 @@ decodeLengthContractFile bytes = do
       then Right decodeLeanLengthContractValueV2
       else if version == toInteger lengthContractFileTargetRolesVersion
         then Right decodeLeanLengthContractValueV3
-        else Left LengthContractFileUnsupportedVersion
+        else if version == toInteger lengthContractFileExactCaseVersion
+          then Right decodeLeanLengthContractValueV4
+          else Left LengthContractFileUnsupportedVersion
   case find (not . permitted . fst) root of
     Nothing -> pure ()
     Just _ -> Left LengthContractFileUnexpectedRootField

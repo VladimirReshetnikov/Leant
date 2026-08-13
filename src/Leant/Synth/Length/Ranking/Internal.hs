@@ -655,6 +655,8 @@ lengthHandoffPreparationRefusalClass refusal = case refusal of
     LengthPreparationProviderBindingUnavailable
   LengthHandoffProviderVariableMissing _ _ ->
     LengthPreparationProviderBindingUnavailable
+  LengthHandoffExactCasePolicyRequiresTargetRoles ->
+    LengthPreparationContractRejected
   LengthHandoffSessionRejected _ -> LengthPreparationSessionRejected
   LengthHandoffContractRejected _ -> LengthPreparationContractRejected
   LengthHandoffProblemRejected _ ->

@@ -243,3 +243,8 @@ source-level behavioral equivalence, grant proof or pruning authority, or turn
 raw solver status into evidence. The explicit roles only make a previously
 unsupported mixed physical target spine available to the same checked,
 bounded, replayed counterexample pipeline.
+
+The later contract-only version 4 composes with this exact role authority and
+adds an explicit zero/step candidate-case policy. Version 3 itself remains
+case-rejecting and grammar compatible. See the
+[v4 exact-case report](2026-08-13-contract-only-v4-exact-spine-cases.md).

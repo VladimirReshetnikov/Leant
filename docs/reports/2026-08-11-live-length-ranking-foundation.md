@@ -17,7 +17,7 @@ pin, or read configuration from ambient process state. Main can now call it
 through an explicit startup-owned integration facade; that facade supplies a
 bounded file, pinned-by-default activation, and a fixed decoded contract rather
 than weakening this module's explicit inputs. The activated policy can also be
-paired with one separately decoded contract-only version 1, 2, or 3 document for an
+paired with one separately decoded contract-only version 1, 2, 3, or 4 document for an
 explicit `:synth --length-contract ABSOLUTE-PATH -- TYPE` command. This changes
 contract lifetime, not the ranking module's authority or input shape.
 
@@ -28,7 +28,9 @@ version 2 adds positive-literal Natural modulo to contract and provider-transfer
 expressions through that same bounded parser owner. Version 3 retains that grammar
 and requires an exact ordered target-role vector: every physical target argument is
 either `observed-spine` or `unobserved-target`, with a maximum of eight. Older
-contract documents and the startup configuration reject the field. Neither contains execution,
+contract documents and the startup configuration reject the field. Version 4
+retains the version-3 grammar and additionally requires the sole exact
+zero/step candidate-case policy; older versions reject that field. Neither contains execution,
 activation, artifact, response, or replay policy. A shared package-private acquisition leaf owns the
 same absolute-path, POSIX descriptor, byte, timeout, and cleanup rules for both
 file facades.
@@ -49,10 +51,14 @@ deduplication displayed an earlier compatibility-only occurrence, a private
 variant-scoped witness may instead refer to the first bounded later Exference
 occurrence with identical bytes. The displayed route, display ordinal,
 ordering, group sidecar, and sibling variants do not change.
-`prepareCheckedLengthProblem` uses the origin's own renderer ordinal and
-requires the retained graph to re-render to one spelling equal to the
-callback-accepted text before binding its family provenance, inventory,
-provider assumptions, and explicit contract.
+`prepareCheckedLengthProblem` preserves the singleton/ordinal-zero association
+for startup and contract-only versions 1--3. The explicit version-4 exact-case
+policy instead uses the origin's own renderer ordinal and requires the retained
+graph to re-render that exact alternative to the callback-accepted text before
+binding its family provenance, inventory, provider assumptions, and explicit
+contract. A graph may have multiple valid Lean renderings under that policy; a
+sibling spelling or a missing/changed ordinal does not gain the accepted
+occurrence's authority.
 Eligible checked problems are then sealed into canonical QF_LIA queries. A
 version-2 modulo expression is retained passively until this Djex boundary.
 Djex normalizes it and lowers every surviving occurrence to private,
@@ -79,6 +85,16 @@ observed-spine]`, provider roles `[unobserved,spine]`, and provider transfer arg
 input, while the provider-backed counterexample remains explicitly conditional on
 the assumed law. Reusing the same one-shot request after its source file is mutated
 does not reopen it, and the next compatibility request receives no sticky v3 roles.
+
+For version 4, Handoff retains the version-3 role association but selects
+Djex's exact-case session and typed-candidate problem entrances. Exference must
+have independently checked the complete recursive zero/step case graph, and
+Djex freshly re-seals it against the resolved spine schema. A production
+`List Nat -> List Nat` rebuild case yields a checked conditional result using
+zero and `monus 1` tail semantics, one compact QF_LIA input, and a replayed
+input-3/result-3 counterexample. Versions 1--3 continue to reject the same
+case. The policy remains command-local and supplies neither proof nor pruning
+authority.
 
 A pure refusal at either boundary leaves that one candidate `Unassessed` through
 the legacy assessment projection and records a separate

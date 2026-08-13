@@ -182,3 +182,10 @@ provider laws, attest Z3, cache a worker, or establish source-level behavioral
 equivalence. Future domains require their own checked semantics and evidence
 replay rather than an extension of this command parser into a generic solver
 interface.
+
+Later additive contract-only versions preserve this command-local acquisition
+and lifetime owner. Version 3 adds explicit target roles and version 4 adds the
+single explicit exact zero/step case policy; neither can replace execution
+authority or become sticky state. See the
+[v3 role report](2026-08-13-contract-only-v3-target-roles.md) and
+[v4 exact-case report](2026-08-13-contract-only-v4-exact-spine-cases.md).

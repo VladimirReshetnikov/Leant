@@ -30,16 +30,21 @@ preserves its fixed refusal precedence and establishes all of the following:
 
 1. the engine/fit fragments, premise layout, search goal, converted source goal,
    request contexts, and request goal still match the origin;
-2. the retained Exference graph is available and re-renders exactly once under
-   that origin's preparation;
-3. the origin's renderer ordinal, rather than the display ordinal, is zero and
-   the rendering's bytes equal the Lean-accepted spelling; and
+2. the retained Exference graph is available and, under the historical
+   startup/version-1--3 policy, re-renders to exactly one alternative;
+3. that historical origin renderer ordinal is zero and the rendering's bytes
+   equal the Lean-accepted spelling; and
 4. the existing family, provider, session, contract, and candidate-problem
    sealing checks succeed.
 
 The resulting problem therefore describes the accepted term text through the
 exact Exference graph which independently produced that same text. It does not
 claim that Djinn produced or owns the graph.
+
+The contract-only version-4 exact-case policy, added later, deliberately
+extends only its own association rule: the retained origin ordinal selects one
+in-range alternative and sibling renderer alternatives cannot replace that
+exact accepted spelling. Older policies retain the singleton rule above.
 
 ## Compatibility and bounds
 

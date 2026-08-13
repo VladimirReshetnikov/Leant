@@ -77,6 +77,7 @@ import Language.Haskell.Djex
   , behavioralProblemFingerprint
   , checkedLengthProblemBehavioralProblem
   , defaultLengthEvaluationLimits
+  , eraseTermGraph
   , fingerprintCanonicalBytes
   , lengthSMTLibQueryBehavioralProblem
   , lengthSMTLibQueryFingerprint
@@ -234,6 +235,7 @@ import Leant.Synth.Length.Command
   )
 import Leant.Synth.Length.Contract
   ( LeanLengthContract (..)
+  , LeanLengthCandidateCasePolicy (..)
   , LeanLengthProviderLaw (..)
   , LeanLengthSpineIdentity (..)
   )
@@ -243,6 +245,7 @@ import Leant.Synth.Length.Contract.File
   , LengthContractFileValueType (..)
   , decodeLengthContractFile
   , lengthContractFileFormat
+  , lengthContractFileExactCaseVersion
   , lengthContractFileJsonLimits
   , lengthContractFileModuloVersion
   , lengthContractFileTargetRolesVersion
@@ -2304,6 +2307,8 @@ lengthContractFileTests = testGroup
       assertLengthContractFileModuloGrammar
   , testCase "require exact target argument roles in contract-only version 3"
       assertLengthContractFileTargetRoleGrammar
+  , testCase "require explicit exact case semantics in contract-only version 4"
+      assertLengthContractFileExactCaseGrammar
   , testCase "reject contract roots and redact nested private values"
       assertLengthContractFileSchemaAndRedaction
   , testCase "admit and acquire one explicit contract-only regular file"
@@ -2407,6 +2412,7 @@ assertLengthContractFileModuloGrammar = do
             , leanLengthSpineStepConstructorName = "List.cons"
             }
         , leanLengthContractTargetArgumentRoles = Nothing
+        , leanLengthContractCandidateCasePolicy = LeanLengthCasesRejected
         , leanLengthContractSource = LengthContractSource
             { lengthContractPrecondition = LengthEqual
                 (LengthModulo 2 $ LengthVariable $ LengthInput 0)
@@ -2451,7 +2457,7 @@ assertLengthContractFileModuloGrammar = do
     (LengthContractFileMissingRootField LengthContractFileContractField)
     $ deleteJsonField ["contract"] v2
   assertLengthContractFileError LengthContractFileUnsupportedVersion
-    $ setJsonField ["version"] (Json.JInt 4)
+    $ setJsonField ["version"] (Json.JInt 5)
     $ addJsonField [] ("execution", Json.JObj []) v2
   legacyNoModulo <- expectLengthContractFile
     $ lengthContractFileFixture noModulo
@@ -2608,6 +2614,96 @@ assertLengthContractFileTargetRoleGrammar = do
           LengthRankingConfigurationTargetArgumentRolesField 8 9)
     $ poisonWithRoles $ replicate 9 "unobserved-target"
 
+assertLengthContractFileExactCaseGrammar :: IO ()
+assertLengthContractFileExactCaseGrammar = do
+  lengthContractFileExactCaseVersion @?= 4
+  let roles = ["observed-spine"]
+      precondition = jsonLengthEqual
+        (jsonLengthModulo 2 $ jsonLengthInput 0)
+        (jsonLengthLiteral 1)
+      postcondition = jsonLengthEqual jsonLengthResult
+        (jsonLengthModulo 3 $ jsonLengthInput 0)
+      roleAware = jsonRoleAwareLengthContract roles precondition postcondition []
+      withPolicy policy = addJsonField []
+        ("candidateCasePolicy", policy) roleAware
+      exactContract = withPolicy $ Json.JStr "exact-spine-zero-step-v1"
+      policyOnly = addJsonField []
+        ("candidateCasePolicy", Json.JStr "exact-spine-zero-step-v1")
+        $ jsonLengthContract
+            (jsonLengthTruth True) (jsonLengthTruth True) []
+      v1 = lengthContractFileFixture policyOnly
+      v2 = lengthContractFileFixtureVersion
+        lengthContractFileModuloVersion policyOnly
+      v3 = lengthContractFileFixtureVersion
+        lengthContractFileTargetRolesVersion exactContract
+      v4 = lengthContractFileFixtureVersion
+        lengthContractFileExactCaseVersion exactContract
+      unexpected = LengthContractFileContractRejected
+        $ LengthRankingConfigurationUnexpectedField
+            LengthRankingConfigurationContractObject
+      casePolicyField = LengthRankingConfigurationCandidateCasePolicyField
+  decoded <- expectLengthContractFile v4
+  leanLengthContractTargetArgumentRoles decoded @?=
+    Just [LengthObservedSpine]
+  leanLengthContractCandidateCasePolicy decoded @?=
+    LeanLengthExactSpineZeroStepV1
+  leanLengthContractSource decoded @?= LengthContractSource
+    { lengthContractPrecondition = LengthEqual
+        (LengthModulo 2 $ LengthVariable $ LengthInput 0)
+        (LengthLiteral 1)
+    , lengthContractPostcondition = LengthEqual
+        (LengthVariable LengthResult)
+        (LengthModulo 3 $ LengthVariable $ LengthInput 0)
+    }
+  expectLengthContractFile (reverseJsonObjectFields v4) >>= (@?= decoded)
+
+  mapM_ (assertLengthContractFileError unexpected) [v1, v2, v3]
+  assertLengthRankingConfigurationFileError
+    (LengthRankingConfigurationUnexpectedField
+      LengthRankingConfigurationContractObject)
+    $ setJsonField ["contract"] policyOnly
+    $ lengthRankingConfigurationFileFixture "/tmp/not-opened-z3" Nothing
+  assertLengthContractFileError
+    (LengthContractFileContractRejected
+      $ LengthRankingConfigurationMissingField
+          LengthRankingConfigurationContractObject
+          LengthRankingConfigurationTargetArgumentRolesField)
+    $ deleteJsonField ["contract", "targetArgumentRoles"] v4
+  assertLengthContractFileError
+    (LengthContractFileContractRejected
+      $ LengthRankingConfigurationMissingField
+          LengthRankingConfigurationContractObject
+          LengthRankingConfigurationTargetArgumentRolesField)
+    $ deleteJsonField ["contract", "targetArgumentRoles"]
+    $ setJsonField ["contract", "candidateCasePolicy"]
+        (Json.JStr "private-case-policy")
+    $ setJsonField ["contract", "precondition"]
+        (Json.JStr "private-later-formula") v4
+  assertLengthContractFileError
+    (LengthContractFileContractRejected
+      $ LengthRankingConfigurationMissingField
+          LengthRankingConfigurationContractObject casePolicyField)
+    $ deleteJsonField ["contract", "candidateCasePolicy"] v4
+  assertLengthContractFileError
+    (LengthContractFileContractRejected
+      $ LengthRankingConfigurationFieldTypeMismatch casePolicyField
+          LengthRankingConfigurationStringValue)
+    $ setJsonField ["contract", "candidateCasePolicy"] (Json.JInt 1) v4
+  let rejectedPolicy policy = assertLengthContractFileError
+        (LengthContractFileContractRejected
+          $ LengthRankingConfigurationFieldValueRejected casePolicyField)
+        $ lengthContractFileFixtureVersion lengthContractFileExactCaseVersion
+        $ withPolicy $ Json.JStr policy
+  rejectedPolicy "cases-rejected"
+  rejectedPolicy "private-case-policy"
+  assertLengthContractFileError
+    (LengthContractFileContractRejected
+      $ LengthRankingConfigurationFieldValueRejected casePolicyField)
+    $ setJsonField ["contract", "precondition"]
+        (Json.JStr "private-later-formula")
+    $ setJsonField ["contract", "candidateCasePolicy"]
+        (Json.JStr "private-case-policy") v4
+
 assertLengthContractFileSchemaAndRedaction :: IO ()
 assertLengthContractFileSchemaAndRedaction = do
   let contract = jsonLengthContract
@@ -2616,7 +2712,7 @@ assertLengthContractFileSchemaAndRedaction = do
   assertLengthContractFileError LengthContractFileUnsupportedFormat
     $ setJsonField ["format"] (Json.JStr "wrong-format") base
   assertLengthContractFileError LengthContractFileUnsupportedVersion
-    $ setJsonField ["version"] (Json.JInt 4) base
+    $ setJsonField ["version"] (Json.JInt 5) base
   assertLengthContractFileError LengthContractFileUnexpectedRootField
     $ addJsonField [] ("execution", Json.JObj []) base
   assertLengthContractFileError
@@ -2817,6 +2913,9 @@ lengthAssessmentIntegrationTests = testGroup
   , testCase
       "rank one role-aware higher-order map request without policy stickiness"
       assertLengthAssessmentRoleAwareMap
+  , testCase
+      "rank one production exact zero-step case under explicit v4 policy"
+      assertLengthAssessmentExactSpineCase
   , testCase "preserve sealed callback order after a live failure"
       assertLengthAssessmentFailureFallback
   , testCase "bound and sanitize counterexample presentation"
@@ -3457,6 +3556,251 @@ buildRoleAwareMapFixture = do
       pure (contract, verified)
     receipts -> assertFailure ("higher-order map verification produced " ++
       show (length receipts) ++ " receipts") >> error "unreachable"
+
+assertLengthAssessmentExactSpineCase :: IO ()
+assertLengthAssessmentExactSpineCase
+  | os == "mingw32" = pure ()
+  | otherwise = do
+      (legacyContract, exactContract, verified) <-
+        buildExactSpineCaseFixture
+      leanLengthContractCandidateCasePolicy legacyContract @?=
+        LeanLengthCasesRejected
+      leanLengthContractCandidateCasePolicy exactContract @?=
+        LeanLengthExactSpineZeroStepV1
+      case prepareCheckedLengthProblem legacyContract verified of
+        Left (LengthHandoffRendererNotUnique 2) -> pure ()
+        Left refusal -> assertFailure $ "unexpected legacy case refusal: "
+          ++ show refusal
+        Right _ -> assertFailure
+          "the version-3 policy relaxed its singleton renderer rule"
+      let exactWithoutRoles = exactContract
+            { leanLengthContractTargetArgumentRoles = Nothing }
+          unresolvedFamily = exactWithoutRoles
+            { leanLengthContractSpine =
+                (leanLengthContractSpine exactWithoutRoles)
+                  { leanLengthSpineFamilyName = "Unreachable.List" }
+            }
+          unresolvedProvider = exactWithoutRoles
+            { leanLengthContractProviderLaws =
+                [ LeanLengthProviderLaw
+                    { leanLengthProviderLawName = "Demo.missingListProvider"
+                    , leanLengthProviderLawArgumentRoles = []
+                    , leanLengthProviderLawTransfer = LengthLiteral 0
+                    }
+                ]
+            }
+      case prepareCheckedLengthProblem unresolvedFamily verified of
+        Left (LengthHandoffFamilyUnavailable "Unreachable.List") -> pure ()
+        Left refusal -> assertFailure $ "unexpected exact bad-family refusal: "
+          ++ show refusal
+        Right _ -> assertFailure
+          "exact policy checked target roles before family resolution"
+      case prepareCheckedLengthProblem unresolvedProvider verified of
+        Left (LengthHandoffProviderUnavailable
+            "Demo.missingListProvider") -> pure ()
+        Left refusal -> assertFailure $
+          "unexpected exact bad-provider refusal: " ++ show refusal
+        Right _ -> assertFailure
+          "exact policy checked target roles before provider resolution"
+      case prepareCheckedLengthProblem exactWithoutRoles verified of
+        Left LengthHandoffExactCasePolicyRequiresTargetRoles -> pure ()
+        Left refusal -> assertFailure $ "unexpected role-free case refusal: "
+          ++ show refusal
+        Right _ -> assertFailure
+          "exact case policy inferred an omitted target-role vector"
+      problem <- expectRight $ prepareCheckedLengthProblem exactContract verified
+      checkedLengthCandidateResult
+          (checkedLengthProblemCandidate problem) @?=
+        LengthIf
+          (LengthEqual (LengthVariable $ LengthInput 0) $ LengthLiteral 0)
+          (LengthLiteral 0)
+          (LengthSum
+            [ LengthLiteral 1
+            , LengthMonus (LengthVariable $ LengthInput 0)
+                (LengthLiteral 1)
+            ])
+      query <- expectRight
+          (prepareCheckedLengthQuery exactContract verified)
+        >>= expectRight
+      symbol <- case lengthSMTLibQueryInputSymbols query of
+        [retained] -> pure retained
+        symbols -> assertFailure ("exact case query retained unexpected inputs: "
+          ++ show symbols) >> error "unreachable"
+      let bytes = map $ fromIntegral . fromEnum
+      bindings <- expectRight $ Djex.parseLengthSMTLibInputValueResponse
+        Djex.defaultLengthSMTLibResponseLimits query
+        $ bytes "((" ++ symbol ++ bytes " 3))"
+      evidence <- case validateLengthSMTLibCounterexample
+          defaultLengthEvaluationLimits query bindings of
+        Left failure -> assertFailure ("exact case replay failed: "
+          ++ show failure) >> error "unreachable"
+        Right Nothing -> assertFailure
+          "the exact case's violating input produced no evidence"
+            >> error "unreachable"
+        Right (Just retained) -> pure retained
+      receipt <- expectRight $ Djex.replayBehavioralEvidence
+        (checkedLengthProblemBehavioralProblem problem) evidence
+      Djex.validatedLengthCounterexampleInputs receipt @?= [3]
+      Djex.validatedLengthCounterexampleResult receipt @?= 3
+
+      withFakeLengthSolver "healthy" $ \executable -> do
+        let configurationPath = takeDirectory executable </>
+              "exact-spine-case-policy.json"
+            contractPath = takeDirectory executable </>
+              "exact-spine-case-contract.json"
+            fixedContract = jsonLengthContract
+              (jsonLengthTruth True) (jsonLengthTruth True) []
+            configuration = setJsonField ["contract"] fixedContract
+              $ setJsonField ["execution", "artifactPolicy"]
+                  (Json.JStr "input-values-after-satisfiable")
+              $ lengthRankingConfigurationFileFixture executable Nothing
+            exactDocument = lengthContractFileFixtureVersion
+              lengthContractFileExactCaseVersion
+              exactSpineCaseContractValue
+        ByteString.writeFile configurationPath
+          $ encodeLengthRankingConfigurationFile configuration
+        loadedMode <- loadLengthAssessmentMode PermitUnpinnedExecutable
+          $ LengthRankingConfigurationFileSource configurationPath 1000
+        mode <- case loadedMode of
+          Left failure -> assertFailure (show failure) >> error "unreachable"
+          Right configured -> pure configured
+        permission <- case authorizeExplicitLengthAssessmentRequest mode of
+          Left failure -> assertFailure (show failure) >> error "unreachable"
+          Right authorized -> pure authorized
+        ByteString.writeFile contractPath
+          $ encodeLengthRankingConfigurationFile exactDocument
+        request <- case mkLengthContractFileRequest
+            $ LengthContractFileSource contractPath 1000 of
+          Left failure -> assertFailure (show failure) >> error "unreachable"
+          Right admitted -> pure admitted
+        loadedContract <- loadLengthContractFile request >>= either
+          (\failure -> assertFailure (show failure) >> error "unreachable")
+          pure
+        loadedContract @?= exactContract
+        -- The request owns the decoded v4 case policy. Reusing it must not
+        -- reopen the source, and neither compatibility nor a v3 request may
+        -- inherit that case authority from an earlier command.
+        ByteString.writeFile contractPath $ BS.pack "{"
+        verification <- verificationBatchFromReceipts [verified]
+        let exactRequest = explicitLengthAssessmentRequest
+              permission loadedContract
+            legacyRequest = explicitLengthAssessmentRequest
+              permission legacyContract
+            assessments label assessed = case lengthAssessmentRanking assessed of
+              Just ranking -> pure $ map rankedLengthCandidateAssessment
+                $ lengthRankingCandidates ranking
+              Nothing -> assertFailure (label ++ " lost its ranking")
+                >> error "unreachable"
+            assertExactCounterexample label assessed = do
+              retainedAssessments <- assessments label assessed
+              case retainedAssessments of
+                [Counterexample liveReceipt] -> do
+                  Djex.validatedLengthCounterexampleInputs liveReceipt @?= [3]
+                  Djex.validatedLengthCounterexampleResult liveReceipt @?= 3
+                unexpected -> assertFailure $ label ++
+                  " retained unexpected assessments: " ++ show unexpected
+            assertUnassessed label assessed =
+              assessments label assessed >>= (@?= [Unassessed])
+        assessed <- expectLengthAssessmentWithin
+          $ assessLengthVerificationRequest exactRequest verification
+        compatibility <- expectLengthAssessmentWithin
+          $ assessLengthVerificationRequest
+              (compatibilityLengthAssessmentRequest mode) verification
+        legacy <- expectLengthAssessmentWithin
+          $ assessLengthVerificationRequest legacyRequest verification
+        repeated <- expectLengthAssessmentWithin
+          $ assessLengthVerificationRequest exactRequest verification
+        map lengthAssessmentFailure
+            [assessed, compatibility, legacy, repeated] @?=
+          [Nothing, Nothing, Nothing, Nothing]
+        map lengthAssessmentCandidates
+            [assessed, compatibility, legacy, repeated] @?=
+          replicate 4 [verified]
+        assertExactCounterexample "loaded v4 request" assessed
+        assertUnassessed "compatibility request" compatibility
+        assertUnassessed "version-3 request" legacy
+        assertExactCounterexample "reused v4 request" repeated
+
+buildExactSpineCaseFixture
+  :: IO
+      ( LeanLengthContract
+      , LeanLengthContract
+      , Verified DetailedVerificationVariant
+      )
+buildExactSpineCaseFixture = do
+  let element = FAtom False "Nat"
+      listKey = "List Nat"
+      list = FParamRec True "List" listKey [element]
+        [ ("List.nil", [])
+        , ("List.cons", [element, FAtom False listKey])
+        ]
+      goal = FArr list list
+  legacyContract <- expectLengthContractFile
+    $ lengthContractFileFixtureVersion lengthContractFileTargetRolesVersion
+        exactSpineCaseRoleAwareContractValue
+  exactContract <- expectLengthContractFile
+    $ lengthContractFileFixtureVersion lengthContractFileExactCaseVersion
+        exactSpineCaseContractValue
+  detailed <- expectRight $ synthesizeWithProvidersSkippingDetailed
+    EngineExference 1024 Set.empty [] goal
+  group <- case detailed of
+    DetailedSynthCandidates groups _ -> case filter exactRebuildGroup groups of
+      retained : _ -> pure retained
+      [] -> assertFailure ("production Exference returned no exact rebuild "
+        ++ "case: " ++ show (map detailedCandidateGroupVariants groups))
+          >> error "unreachable"
+    other -> assertFailure ("production exact-case synthesis failed: "
+      ++ show other) >> error "unreachable"
+  acceptedSpelling <- case detailedCandidateGroupVariants group of
+    retained : _ -> pure retained
+    [] -> assertFailure "the exact case group contained no renderer variant"
+      >> error "unreachable"
+  batch <- verifyCandidateGroups 1
+    (\variant -> pure $ if detailedVerificationVariantText variant
+        == acceptedSpelling
+      then VariantAccepted
+      else VariantRejected LeanErrorDiagnostic)
+    [detailedCandidateGroupVerificationVariants group]
+  case verifiedCandidateReceipts batch of
+    [verified] -> pure (legacyContract, exactContract, verified)
+    receipts -> assertFailure ("exact case verification produced "
+      ++ show (length receipts) ++ " receipts") >> error "unreachable"
+ where
+  exactRebuildGroup group = case detailedCandidateGroupSemanticSidecar group of
+    Nothing -> False
+    Just semantic -> case typedCandidateTermGraph
+        $ typedCandidateSemanticCandidate semantic of
+      Left _ -> False
+      Right graph -> exactSpineRebuildExpression $ eraseTermGraph graph
+
+exactSpineCaseRoleAwareContractValue :: Json.JValue
+exactSpineCaseRoleAwareContractValue = jsonRoleAwareLengthContract
+  ["observed-spine"]
+  (jsonLengthTruth True)
+  (jsonLengthEqual jsonLengthResult $ jsonLengthLiteral 0)
+  []
+
+exactSpineCaseContractValue :: Json.JValue
+exactSpineCaseContractValue = addJsonField []
+  ( "candidateCasePolicy"
+  , Json.JStr "exact-spine-zero-step-v1"
+  ) exactSpineCaseRoleAwareContractValue
+
+exactSpineRebuildExpression :: Eq local => Expression local -> Bool
+exactSpineRebuildExpression expression = case expression of
+  Lambda [Bind argument] (Case (Local scrutinee)
+      [ (Constructor zero [], Global returnedZero)
+      , ( Constructor step [Bind payload, Bind spineTail]
+        , Apply (Apply (Global returnedStep) (Local returnedPayload))
+            (Local returnedTail)
+        )
+      ]) ->
+        argument == scrutinee
+          && zero == returnedZero
+          && step == returnedStep
+          && payload == returnedPayload
+          && spineTail == returnedTail
+  _ -> False
 
 assertLengthAssessmentFailureFallback :: IO ()
 assertLengthAssessmentFailureFallback
@@ -5101,6 +5445,7 @@ assertLengthPreparationRefusalClasses = do
             (poison "ambiguous provider") (poison "provider matches")
         , LengthHandoffProviderVariableMissing
             (poison "provider variable") (poison "provider source")
+        , LengthHandoffExactCasePolicyRequiresTargetRoles
         , LengthHandoffSessionRejected
             $ LengthSessionTargetArgumentRoleLimitExceeded
                 (poison "session role maximum")
@@ -5133,6 +5478,7 @@ assertLengthPreparationRefusalClasses = do
         , LengthPreparationProviderBindingUnavailable
         , LengthPreparationProviderBindingUnavailable
         , LengthPreparationProviderBindingUnavailable
+        , LengthPreparationContractRejected
         , LengthPreparationSessionRejected
         , LengthPreparationContractRejected
         , LengthPreparationCandidateSemanticsRejected
@@ -5662,6 +6008,7 @@ ineligibleLengthRankingContract = LeanLengthContract
       , leanLengthSpineStepConstructorName = "Unreachable.List.cons"
       }
   , leanLengthContractTargetArgumentRoles = Nothing
+  , leanLengthContractCandidateCasePolicy = LeanLengthCasesRejected
   , leanLengthContractSource = LengthContractSource
       { lengthContractPrecondition = LengthTruth True
       , lengthContractPostcondition = LengthTruth True
@@ -5677,6 +6024,7 @@ lengthRankingContract expectedResult = LeanLengthContract
       , leanLengthSpineStepConstructorName = "List.cons"
       }
   , leanLengthContractTargetArgumentRoles = Nothing
+  , leanLengthContractCandidateCasePolicy = LeanLengthCasesRejected
   , leanLengthContractSource = LengthContractSource
       { lengthContractPrecondition = LengthTruth True
       , lengthContractPostcondition = LengthEqual
@@ -5839,6 +6187,7 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                     "Demo.Unreachable.step"
                 }
             , leanLengthContractTargetArgumentRoles = Nothing
+            , leanLengthContractCandidateCasePolicy = LeanLengthCasesRejected
             , leanLengthContractSource = LengthContractSource
                 { lengthContractPrecondition = LengthTruth True
                 , lengthContractPostcondition = LengthTruth True
@@ -5898,6 +6247,7 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
             contract = LeanLengthContract
               { leanLengthContractSpine = spine
               , leanLengthContractTargetArgumentRoles = Nothing
+              , leanLengthContractCandidateCasePolicy = LeanLengthCasesRejected
               , leanLengthContractSource = LengthContractSource
                   { lengthContractPrecondition = LengthTruth True
                   , lengthContractPostcondition = LengthEqual
@@ -6164,6 +6514,7 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                 , leanLengthSpineStepConstructorName = "List.cons"
                 }
             , leanLengthContractTargetArgumentRoles = Nothing
+            , leanLengthContractCandidateCasePolicy = LeanLengthCasesRejected
             , leanLengthContractSource = LengthContractSource
                 { lengthContractPrecondition = LengthTruth True
                 , lengthContractPostcondition = LengthEqual
@@ -6282,6 +6633,8 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                               "Demo.Unreachable.step"
                           }
                       , leanLengthContractTargetArgumentRoles = Nothing
+                      , leanLengthContractCandidateCasePolicy =
+                          LeanLengthCasesRejected
                       , leanLengthContractSource = LengthContractSource
                           { lengthContractPrecondition = LengthTruth True
                           , lengthContractPostcondition = LengthTruth True
@@ -6462,6 +6815,8 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                               "Demo.unreachable.step"
                           }
                       , leanLengthContractTargetArgumentRoles = Nothing
+                      , leanLengthContractCandidateCasePolicy =
+                          LeanLengthCasesRejected
                       , leanLengthContractSource = LengthContractSource
                           { lengthContractPrecondition = LengthTruth True
                           , lengthContractPostcondition = LengthTruth True
@@ -6469,17 +6824,30 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                       , leanLengthContractProviderLaws = []
                       }
                 case verifiedCandidateReceipts batch of
-                  [verified] -> case prepareCheckedLengthProblem
-                      unreachableContract verified of
-                    Left (LengthHandoffRendererNotUnique alternatives) ->
-                      assertBool
-                        "a multi-spelling renderer reported one alternative"
-                        (alternatives >= 2)
-                    Left refusal -> assertFailure $
-                      "renderer ambiguity reached a later authority phase: "
-                        ++ show refusal
-                    Right _ -> assertFailure
-                      "an ordinal alone certified an ambiguous rendering"
+                  [verified] -> do
+                    case prepareCheckedLengthProblem
+                        unreachableContract verified of
+                      Left (LengthHandoffRendererNotUnique alternatives) ->
+                        alternatives @?=
+                          length (detailedCandidateGroupVariants origin)
+                      Left refusal -> assertFailure $
+                        "legacy rendering changed its singleton policy: "
+                          ++ show refusal
+                      Right _ -> assertFailure
+                        "legacy rendering admitted multiple alternatives"
+                    let exactContract = unreachableContract
+                          { leanLengthContractTargetArgumentRoles = Just []
+                          , leanLengthContractCandidateCasePolicy =
+                              LeanLengthExactSpineZeroStepV1
+                          }
+                    case prepareCheckedLengthProblem exactContract verified of
+                      Left (LengthHandoffFamilyUnavailable
+                          "Demo.unreachable") -> pure ()
+                      Left refusal -> assertFailure $
+                        "the v4 exact renderer ordinal was not retained: "
+                          ++ show refusal
+                      Right _ -> assertFailure
+                        "an unreachable family entered Length sealing"
                   receipts -> assertFailure $
                     "unexpected multi-spelling verification receipts: "
                       ++ show receipts

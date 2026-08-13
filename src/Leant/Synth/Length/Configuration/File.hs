@@ -27,6 +27,7 @@ module Leant.Synth.Length.Configuration.File
   , decodeLeanLengthContractValue
   , decodeLeanLengthContractValueV2
   , decodeLeanLengthContractValueV3
+  , decodeLeanLengthContractValueV4
   , disableLengthRankingConfiguration
   , activateLengthRankingConfiguration
   ) where
@@ -74,6 +75,7 @@ import Leant.Json.Bounded
   )
 import Leant.Synth.Length.Contract
   ( LeanLengthContract (..)
+  , LeanLengthCandidateCasePolicy (..)
   , LeanLengthProviderLaw (..)
   , LeanLengthSpineIdentity (..)
   )
@@ -151,6 +153,7 @@ data LengthRankingConfigurationFileField
   | LengthRankingConfigurationProviderLawArgumentRolesField !Natural
   | LengthRankingConfigurationProviderLawTransferField !Natural
   | LengthRankingConfigurationTargetArgumentRolesField
+  | LengthRankingConfigurationCandidateCasePolicyField
   deriving (Eq, Ord, Show)
 
 data LengthRankingConfigurationFileValueType
@@ -766,9 +769,9 @@ evaluationFields =
   ]
 
 -- | Decode exactly the contract object embedded by the compatibility file.
--- Contract-only version 1 reuses this entrance. Versions 2 and 3 select the
--- sibling entrances below; all three delegate to one owner for names, target
--- and provider roles, recursive syntax, and hard limits.
+-- Contract-only version 1 reuses this entrance. Later contract-only versions
+-- select the sibling entrances below; all delegate to one owner for names,
+-- target and provider roles, case policy, recursive syntax, and hard limits.
 decodeLeanLengthContractValue
   :: BoundedJsonValue
   -> Either LengthRankingConfigurationFileError LeanLengthContract
@@ -794,10 +797,21 @@ decodeLeanLengthContractValueV3
 decodeLeanLengthContractValueV3 = decodeLeanLengthContractValueWithGrammar
   LengthContractGrammarV3
 
+-- | Decode the contract-only version-4 grammar. This retains modulo and the
+-- required target-role vector from version 3, and additionally requires an
+-- explicit closed candidate-case policy. Startup configuration and older
+-- contract-only versions reject the new field as unexpected.
+decodeLeanLengthContractValueV4
+  :: BoundedJsonValue
+  -> Either LengthRankingConfigurationFileError LeanLengthContract
+decodeLeanLengthContractValueV4 = decodeLeanLengthContractValueWithGrammar
+  LengthContractGrammarV4
+
 data LengthContractGrammar
   = LengthContractGrammarV1
   | LengthContractGrammarV2
   | LengthContractGrammarV3
+  | LengthContractGrammarV4
   deriving (Eq)
 
 decodeLeanLengthContractValueWithGrammar
@@ -823,6 +837,22 @@ decodeLeanLengthContractValueWithGrammar grammar value = do
         "targetArgumentRoles"
         object
       Just <$> decodeTargetRoles rolesValue
+    LengthContractGrammarV4 -> do
+      rolesValue <- requiredField
+        LengthRankingConfigurationContractObject
+        LengthRankingConfigurationTargetArgumentRolesField
+        "targetArgumentRoles"
+        object
+      Just <$> decodeTargetRoles rolesValue
+  casePolicy <- case grammar of
+    LengthContractGrammarV4 -> do
+      policyValue <- requiredField
+        LengthRankingConfigurationContractObject
+        LengthRankingConfigurationCandidateCasePolicyField
+        "candidateCasePolicy"
+        object
+      decodeCandidateCasePolicy policyValue
+    _ -> Right LeanLengthCasesRejected
   preconditionValue <- requiredField
     LengthRankingConfigurationContractObject
     LengthRankingConfigurationPreconditionField
@@ -858,6 +888,7 @@ decodeLeanLengthContractValueWithGrammar grammar value = do
   pure LeanLengthContract
     { leanLengthContractSpine = spine
     , leanLengthContractTargetArgumentRoles = targetRoles
+    , leanLengthContractCandidateCasePolicy = casePolicy
     , leanLengthContractSource = LengthContractSource
         { lengthContractPrecondition = precondition
         , lengthContractPostcondition = postcondition
@@ -870,7 +901,7 @@ contractFields
   -> [(Text, LengthRankingConfigurationFileField)]
 contractFields grammar =
   [ ("spine", LengthRankingConfigurationSpineField)
-  ] ++ targetRoleFields ++
+  ] ++ targetRoleFields ++ casePolicyFields ++
   [ ("precondition", LengthRankingConfigurationPreconditionField)
   , ("postcondition", LengthRankingConfigurationPostconditionField)
   , ("providerLaws", LengthRankingConfigurationProviderLawsField)
@@ -884,6 +915,30 @@ contractFields grammar =
         , LengthRankingConfigurationTargetArgumentRolesField
         )
       ]
+    LengthContractGrammarV4 ->
+      [ ( "targetArgumentRoles"
+        , LengthRankingConfigurationTargetArgumentRolesField
+        )
+      ]
+  casePolicyFields = case grammar of
+    LengthContractGrammarV4 ->
+      [ ( "candidateCasePolicy"
+        , LengthRankingConfigurationCandidateCasePolicyField
+        )
+      ]
+    _ -> []
+
+decodeCandidateCasePolicy
+  :: BoundedJsonValue
+  -> Either
+      LengthRankingConfigurationFileError
+      LeanLengthCandidateCasePolicy
+decodeCandidateCasePolicy value = do
+  let field = LengthRankingConfigurationCandidateCasePolicyField
+  policy <- stringField field value
+  case policy of
+    "exact-spine-zero-step-v1" -> Right LeanLengthExactSpineZeroStepV1
+    _ -> Left $ LengthRankingConfigurationFieldValueRejected field
 
 decodeTargetRoles
   :: BoundedJsonValue
@@ -1204,6 +1259,7 @@ grammarSupportsModulo grammar = case grammar of
   LengthContractGrammarV1 -> False
   LengthContractGrammarV2 -> True
   LengthContractGrammarV3 -> True
+  LengthContractGrammarV4 -> True
 
 parseExpressions
   :: LengthContractGrammar

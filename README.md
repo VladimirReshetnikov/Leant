@@ -149,10 +149,12 @@ form `["modulo", positiveLiteral, expression]` in preconditions,
 postconditions, and provider transfers. Version 3 retains that modulo grammar
 and requires an exact source-ordered `targetArgumentRoles` array containing
 only `"observed-spine"` and `"unobserved-target"`. Versions 1 and 2 reject that
-field, while version 3 rejects its absence. The startup configuration remains
-fixed at version 1 and rejects both the role field and modulo. No contract-only
-version can replace the executable, pin choice, solver limits, artifact policy,
-or replay limits. The
+field, while version 3 rejects its absence. Version 4 retains version 3 and
+also requires `"candidateCasePolicy": "exact-spine-zero-step-v1"`; this is the
+only file grammar which can authorize the checked recursive zero/step case.
+The startup configuration remains fixed at version 1 and rejects roles,
+candidate-case policy, and modulo. No contract-only version can replace the
+executable, pin choice, solver limits, artifact policy, or replay limits. The
 decoded contract is carried only through
 that command's ordinary, universe-retry, provider, and classical synthesis
 lanes; it is not stored in `ReplState`, `ParsedGoal`, snapshots, history, or a
@@ -231,6 +233,38 @@ Version 3 changes no contract lifetime. Its file is still read once for that
 lane, and neither it nor its roles enter `ReplState`, history, snapshots, or a
 cache. A later command returns to the startup-fixed version-1 compatibility
 contract unless it explicitly names another contract-only file.
+
+Version 4 explicitly enables the one nonempty case shape currently modeled by
+Length. It requires the version-3 role vector and the exact field below:
+
+```json
+{
+  "format": "leant-finite-list-spine-length-contract",
+  "version": 4,
+  "contract": {
+    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
+    "targetArgumentRoles": ["observed-spine"],
+    "candidateCasePolicy": "exact-spine-zero-step-v1",
+    "precondition": ["truth", true],
+    "postcondition": ["equal", ["result"], ["literal", 0]],
+    "providerLaws": []
+  }
+}
+```
+
+The policy is not inferred from a graph. Exference must independently retain a
+checked complete case over the exact recursive two-constructor spine, with one
+zero-field constructor and one two-field constructor whose single recursive
+field is the scrutinized spine. Djex freshly re-seals that graph against the
+contract-resolved `List` schema. The zero branch receives length zero; the step
+branch receives an opaque payload and a tail length `input monus 1`; the whole
+case retains the union of provider laws reached by either branch. Every other
+case shape fails closed, and versions 1--3 keep rejecting all nonempty cases.
+
+This remains a bounded model-relative interpretation. It does not prove Lean
+purity, totality, termination, strictness, source-level equivalence, or a
+provider law, and it grants no pruning authority. Like version 3, version 4 is
+command-local and leaves no role or case-policy state behind.
 
 After a successful occurrence seal, Main prints a subordinate note only for a
 candidate carrying an independently replayed counterexample. The note calls it
@@ -450,13 +484,17 @@ Wrappers such as
 they denote a new term.
 This is deliberately a solver-neutral identity seam, not behavioral evidence.
 `Leant.Synth.Length.Handoff` binds callback-accepted text back to its exact
-typed origin, original Exference renderer ordinal, singleton exact re-render,
+typed origin, original Exference renderer ordinal and exact re-rendered variant,
 family provenance, an opaque Djex session which owns the exact inventory and
 provider assumptions, the separately reassociated contract, and the
 candidate-specific Djex problem. That checked preparation consumes the
 renderer, family, and session authority and returns only the sealed problem;
-Engine owns the exact-origin rerender mechanics and private premise-layout ABI,
-while Handoff owns the singleton, original-ordinal, and accepted-text policy.
+Engine owns the exact-origin rerender mechanics and private premise-layout ABI.
+Handoff preserves the historical singleton/ordinal-zero rule for startup and
+contract-only versions 1--3. Version 4 instead owns selection of the retained
+original ordinal and equality with the callback-accepted text; other valid
+renderer alternatives neither replace that retained variant nor make its exact
+association ambiguous.
 `Leant.Synth.Length.Adapter` then seals it into a bounded canonical QF_LIA
 query without exposing an arbitrary problem-taking entrance. Neither step
 launches a solver or grants authority
@@ -622,9 +660,11 @@ Version 1 delegates to the unchanged compatibility grammar. Version 2 uses the
 same bounded parser owner and adds only positive-literal Natural modulo to
 contract and provider-transfer expressions. Version 3 retains version 2's
 expression grammar and additionally requires the exact ordered target-role
-vector; versions 1 and 2 reject that field. Execution and evaluation fields
-remain unknown and rejected, and the startup configuration decoder remains
-fixed at version 1, so it also rejects the v3 field.
+vector; versions 1 and 2 reject that field. Version 4 retains the v3 grammar
+and requires the sole admitted candidate-case policy,
+`exact-spine-zero-step-v1`; versions 1--3 reject that field. Execution and
+evaluation fields remain unknown and rejected, and the startup configuration
+decoder remains fixed at version 1, so it rejects both later authorities.
 Its `Contract.File.Acquire` facade uses the same path, descriptor, and timeout
 owner as startup acquisition, but maps failures into contract-only closed
 vocabulary. `Leant.Synth.Length.Command` recognizes only the exact
@@ -646,6 +686,9 @@ The version-2 extension and its QF_LIA witness boundary are recorded in the
 The explicit role vocabulary, compact numbering, checked opaque-token boundary,
 focused map path, and conditional Djex identities are recorded in the
 [contract-only v3 target-role report](docs/reports/2026-08-13-contract-only-v3-target-roles.md).
+The explicit exact-case policy, accepted-renderer association, production
+Exference bridge, and fake-protocol model replay are recorded in the
+[contract-only v4 exact-case report](docs/reports/2026-08-13-contract-only-v4-exact-spine-cases.md).
 
 The passive finite-spine source vocabulary now lives in
 `Leant.Synth.Length.Contract`. Modules that need only those assertions no
