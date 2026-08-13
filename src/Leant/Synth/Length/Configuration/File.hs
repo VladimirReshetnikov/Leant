@@ -24,6 +24,7 @@ module Leant.Synth.Length.Configuration.File
   , LengthRankingConfigurationActivationPolicy (..)
   , LengthRankingConfigurationActivationError (..)
   , decodeLengthRankingConfigurationFile
+  , decodeLeanLengthContractValue
   , disableLengthRankingConfiguration
   , activateLengthRankingConfiguration
   ) where
@@ -328,7 +329,7 @@ decodeLengthRankingConfigurationFile bytes = do
     LengthRankingConfigurationContractField
     "contract"
     root
-  contract <- decodeContract contractValue
+  contract <- decodeLeanLengthContractValue contractValue
   let policy = lengthRankingPolicyFromValidatedComponents execution evaluation
   pure $ disableLengthRankingConfiguration policy contract
 
@@ -759,10 +760,13 @@ evaluationFields =
     )
   ]
 
-decodeContract
+-- | Decode exactly the contract object embedded by the compatibility file.
+-- The separate one-shot contract-file boundary reuses this entrance so both
+-- formats have one owner for names, provider roles, syntax, and hard limits.
+decodeLeanLengthContractValue
   :: BoundedJsonValue
   -> Either LengthRankingConfigurationFileError LeanLengthContract
-decodeContract value = do
+decodeLeanLengthContractValue value = do
   object <- exactObject LengthRankingConfigurationContractObject
     contractFields value
   spineValue <- requiredField

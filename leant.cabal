@@ -42,10 +42,14 @@ Executable leant
     Leant.Synth.Engine
     Leant.Synth.Fragment
     Leant.Synth.Length.Adapter
+    Leant.Synth.Length.Command
     Leant.Synth.Length.Configuration
     Leant.Synth.Length.Configuration.File
     Leant.Synth.Length.Configuration.File.Acquire
     Leant.Synth.Length.Contract
+    Leant.Synth.Length.Contract.File
+    Leant.Synth.Length.Contract.File.Acquire
+    Leant.Synth.Length.File.Acquire
     Leant.Synth.Length.Handoff
     Leant.Synth.Length.Integration
     Leant.Synth.Length.PostVerification
@@ -92,10 +96,14 @@ Test-Suite leant-synth-tests
     Leant.Synth.Engine
     Leant.Synth.Fragment
     Leant.Synth.Length.Adapter
+    Leant.Synth.Length.Command
     Leant.Synth.Length.Configuration
     Leant.Synth.Length.Configuration.File
     Leant.Synth.Length.Configuration.File.Acquire
     Leant.Synth.Length.Contract
+    Leant.Synth.Length.Contract.File
+    Leant.Synth.Length.Contract.File.Acquire
+    Leant.Synth.Length.File.Acquire
     Leant.Synth.Length.Handoff
     Leant.Synth.Length.Integration
     Leant.Synth.Length.PostVerification

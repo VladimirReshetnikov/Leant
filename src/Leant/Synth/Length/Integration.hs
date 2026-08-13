@@ -18,9 +18,16 @@ module Leant.Synth.Length.Integration
   , disabledLengthAssessmentMode
   , loadLengthAssessmentMode
   , lengthAssessmentModeActivationPolicy
+  , LengthAssessmentRequestError (..)
+  , ExplicitLengthAssessmentPermission
+  , LengthAssessmentRequest
+  , compatibilityLengthAssessmentRequest
+  , authorizeExplicitLengthAssessmentRequest
+  , explicitLengthAssessmentRequest
   , LengthAssessmentFailure (..)
   , LengthAssessmentResult
   , assessLengthVerificationBatch
+  , assessLengthVerificationRequest
   , lengthAssessmentCandidates
   , lengthAssessmentRanking
   , lengthAssessmentFailure
@@ -87,8 +94,66 @@ data LengthAssessmentMode
       !LengthRankingPolicy
       LeanLengthContract
 
+-- | Closed refusal before a one-shot contract file may be touched.  An
+-- explicit contract can reuse only a policy which passed startup activation;
+-- the default disabled mode contains no execution authority to pair with it.
+data LengthAssessmentRequestError
+  = LengthAssessmentExplicitContractRequiresActivatedPolicy
+  deriving (Bounded, Enum, Eq, Ord, Show)
+
+-- | Opaque command-local permission retaining exactly the activated policy.
+-- Main obtains this before contract-file admission or IO, then associates the
+-- successfully decoded passive contract without projecting the policy.
+data ExplicitLengthAssessmentPermission =
+  ExplicitLengthAssessmentPermission !LengthRankingPolicy
+
+-- | One command's exact assessment choice.  Both the fixed compatibility path
+-- and an explicit request enter the same enabled owner: one activated policy
+-- beside one lazy contract.  The origin and lifetime of that passive contract
+-- are not a second execution authority.  The disabled constructor preserves
+-- the established non-strict identity path.
+data LengthAssessmentRequest
+  = LengthAssessmentRequestDisabled
+  | LengthAssessmentEnabledRequest
+      !LengthRankingPolicy
+      LeanLengthContract
+
 disabledLengthAssessmentMode :: LengthAssessmentMode
 disabledLengthAssessmentMode = LengthAssessmentDisabled
+
+-- | Select the established startup-fixed compatibility behavior without
+-- inspecting the configured contract.  This is the exact no-option path.
+compatibilityLengthAssessmentRequest
+  :: LengthAssessmentMode
+  -> LengthAssessmentRequest
+compatibilityLengthAssessmentRequest mode = case mode of
+  LengthAssessmentDisabled -> LengthAssessmentRequestDisabled
+  LengthAssessmentConfigured _ policy contract ->
+    LengthAssessmentEnabledRequest policy contract
+
+-- | Authorize one explicit request before its path is admitted or read.
+-- Matching a configured mode does not inspect its fixed compatibility
+-- contract; a disabled mode fails without accepting a contract value.
+authorizeExplicitLengthAssessmentRequest
+  :: LengthAssessmentMode
+  -> Either
+      LengthAssessmentRequestError
+      ExplicitLengthAssessmentPermission
+authorizeExplicitLengthAssessmentRequest mode = case mode of
+  LengthAssessmentDisabled -> Left
+    LengthAssessmentExplicitContractRequiresActivatedPolicy
+  LengthAssessmentConfigured _ policy _ -> Right
+    $ ExplicitLengthAssessmentPermission policy
+
+-- | Associate one successfully decoded passive contract with the exact
+-- startup-activated policy.  The contract remains lazy and no IO occurs.
+explicitLengthAssessmentRequest
+  :: ExplicitLengthAssessmentPermission
+  -> LeanLengthContract
+  -> LengthAssessmentRequest
+explicitLengthAssessmentRequest
+    (ExplicitLengthAssessmentPermission policy) contract =
+  LengthAssessmentEnabledRequest policy contract
 
 -- | The permission decision that actually released a configured mode.
 -- This deliberately reports no executable path, digest bytes, or later
@@ -148,10 +213,22 @@ assessLengthVerificationBatch
   :: LengthAssessmentMode
   -> VerificationBatch DetailedVerificationVariant
   -> IO LengthAssessmentResult
-assessLengthVerificationBatch mode verification = case mode of
-  LengthAssessmentDisabled -> pure $ LengthAssessmentSkipped verification
-  LengthAssessmentConfigured _ policy contract -> LengthAssessmentCompleted <$>
-    assessVerifiedLengthCandidatesWithPolicy policy contract verification
+assessLengthVerificationBatch mode = assessLengthVerificationRequest
+  $ compatibilityLengthAssessmentRequest mode
+
+-- | Assess one exact callback batch under the command-local contract choice.
+-- Both contract lifetimes use the same occurrence-sealed policy runner.  The
+-- disabled request retains the batch lazily and performs no IO.
+assessLengthVerificationRequest
+  :: LengthAssessmentRequest
+  -> VerificationBatch DetailedVerificationVariant
+  -> IO LengthAssessmentResult
+assessLengthVerificationRequest request verification = case request of
+  LengthAssessmentRequestDisabled ->
+    pure $ LengthAssessmentSkipped verification
+  LengthAssessmentEnabledRequest policy contract ->
+    LengthAssessmentCompleted <$>
+      assessVerifiedLengthCandidatesWithPolicy policy contract verification
 
 lengthAssessmentCandidates
   :: LengthAssessmentResult

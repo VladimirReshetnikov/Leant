@@ -1,20 +1,9 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE CPP #-}
-
 -- | Bounded acquisition of one explicitly named Length-ranking policy file.
 --
--- This module deliberately stops at 'DisabledLengthRankingConfiguration'.  It
--- performs no discovery, activation, solver launch, or Main/REPL integration.
--- On POSIX the final path component is opened once with @O_NOFOLLOW@,
--- @O_NONBLOCK@, @O_NOCTTY@, and @O_CLOEXEC@; the descriptor is required to be
--- regular before any byte is read.  Ancestor symlinks are not excluded, and a
--- regular file can still be modified in place while it is being read.
---
--- The timeout is a same-process interruption bound, not a hard kernel IO
--- deadline.  Descriptor cleanup is attempted before timeout or caller async
--- exceptions propagate, but an uninterruptible filesystem operation or close
--- can outlive the requested interval.  Windows fails closed until an
--- equivalent native handle/type implementation exists.
+-- This compatibility facade preserves the established configuration-specific
+-- API and failure vocabulary while delegating path, descriptor, byte,
+-- interruption, and cleanup ownership to the shared Length file boundary.
+-- The final path component is no-follow on POSIX; Windows fails closed.
 module Leant.Synth.Length.Configuration.File.Acquire
   ( lengthRankingConfigurationFileMaximumPathCharacters
   , lengthRankingConfigurationFileMaximumTimeoutMilliseconds
@@ -30,28 +19,7 @@ module Leant.Synth.Length.Configuration.File.Acquire
   , lengthRankingConfigurationFileLoadCleanupIncomplete
   ) where
 
-#ifndef mingw32_HOST_OS
-import Control.Exception (evaluate, mask, onException)
-import Control.Monad (void)
-import qualified Data.ByteString as ByteString
-import Data.IORef (IORef, newIORef, readIORef, writeIORef)
-#endif
 import Numeric.Natural (Natural)
-import System.FilePath (isAbsolute)
-#ifndef mingw32_HOST_OS
-import System.IO.Error (isEOFError, tryIOError)
-import System.Posix.Files (fileSize, getFdStatus, isRegularFile)
-import System.Posix.IO
-  ( OpenFileFlags (..)
-  , OpenMode (ReadOnly)
-  , closeFd
-  , defaultFileFlags
-  , openFd
-  )
-import qualified System.Posix.IO.ByteString as PosixByteString
-import System.Posix.Types (Fd)
-import System.Timeout (timeout)
-#endif
 
 import Leant.Json.Bounded (BoundedJsonLimits (..))
 import Leant.Synth.Length.Configuration.File
@@ -60,19 +28,34 @@ import Leant.Synth.Length.Configuration.File
   , decodeLengthRankingConfigurationFile
   , lengthRankingConfigurationFileJsonLimits
   )
+import Leant.Synth.Length.File.Acquire
+  ( LengthFileAdmissionError (..)
+  , LengthFileLoadError
+  , LengthFileLoadErrorClass (..)
+  , LengthFileRequest
+  , LengthFileSource (..)
+  , lengthFileLoadCleanupIncomplete
+  , lengthFileLoadErrorClass
+  , lengthFileMaximumPathCharacters
+  , lengthFileMaximumTimeoutMilliseconds
+  , loadLengthFile
+  , mkLengthFileRequest
+  )
 
 lengthRankingConfigurationFileMaximumPathCharacters :: Natural
-lengthRankingConfigurationFileMaximumPathCharacters = 4096
+lengthRankingConfigurationFileMaximumPathCharacters =
+  lengthFileMaximumPathCharacters
 
 lengthRankingConfigurationFileMaximumTimeoutMilliseconds :: Int
-lengthRankingConfigurationFileMaximumTimeoutMilliseconds = 60000
+lengthRankingConfigurationFileMaximumTimeoutMilliseconds =
+  lengthFileMaximumTimeoutMilliseconds
 
 lengthRankingConfigurationFileLoadMaximumBytes :: Natural
 lengthRankingConfigurationFileLoadMaximumBytes =
   boundedJsonMaximumTotalBytes lengthRankingConfigurationFileJsonLimits
 
--- | Raw caller input.  The fields intentionally remain lazy so an oversized
--- or cyclic path is rejected before the timeout field is demanded.
+-- | Raw compatibility input.  Both fields remain lazy so productive path
+-- admission wins before timeout demand, exactly as at the shared boundary.
 data LengthRankingConfigurationFileSource =
   LengthRankingConfigurationFileSource
     { lengthRankingConfigurationFileSourcePath :: FilePath
@@ -89,10 +72,10 @@ data LengthRankingConfigurationFileAdmissionError
   | LengthRankingConfigurationFileTimeoutLimitExceeded !Int !Int
   deriving (Eq, Ord, Show)
 
--- | A finite explicit path and timeout.  The constructor stays private so a
--- caller cannot bypass the admission order or fabricate an unbounded request.
+-- | Opaque admitted compatibility-file request.  The strict retained generic
+-- request preserves the former finite-path and finite-timeout demand point.
 data LengthRankingConfigurationFileRequest =
-  LengthRankingConfigurationFileRequest !FilePath !Int
+  LengthRankingConfigurationFileRequest !LengthFileRequest
 
 data LengthRankingConfigurationFileLoadErrorClass
   = LengthRankingConfigurationFilePlatformUnsupported
@@ -107,8 +90,6 @@ data LengthRankingConfigurationFileLoadErrorClass
   | LengthRankingConfigurationFileCleanupFailed
   deriving (Eq, Ord, Show)
 
--- | Sanitized primary failure plus whether descriptor cleanup was observed to
--- fail or was interrupted.  No path, errno text, or file byte is retained.
 data LengthRankingConfigurationFileLoadError =
   LengthRankingConfigurationFileLoadError
     !LengthRankingConfigurationFileLoadErrorClass
@@ -127,51 +108,17 @@ lengthRankingConfigurationFileLoadCleanupIncomplete
 lengthRankingConfigurationFileLoadCleanupIncomplete
     (LengthRankingConfigurationFileLoadError _ incomplete) = incomplete
 
--- | Admit the path productively at maximum plus one, then validate its exact
--- spelling and the finite timeout.  Nothing is read or inspected here.
 mkLengthRankingConfigurationFileRequest
   :: LengthRankingConfigurationFileSource
   -> Either
       LengthRankingConfigurationFileAdmissionError
       LengthRankingConfigurationFileRequest
-mkLengthRankingConfigurationFileRequest source = do
-  let path = lengthRankingConfigurationFileSourcePath source
-      observed = observedPathCharacters
-        lengthRankingConfigurationFileMaximumPathCharacters path
-  if observed > lengthRankingConfigurationFileMaximumPathCharacters
-    then Left $ LengthRankingConfigurationFilePathCharacterLimitExceeded
-      lengthRankingConfigurationFileMaximumPathCharacters
-      (lengthRankingConfigurationFileMaximumPathCharacters + 1)
-    else pure ()
-  case path of
-    [] -> Left LengthRankingConfigurationFilePathEmpty
-    _ -> pure ()
-  if '\0' `elem` path
-    then Left LengthRankingConfigurationFilePathContainsNul
-    else pure ()
-  if isAbsolute path
-    then pure ()
-    else Left LengthRankingConfigurationFilePathNotAbsolute
-  let timeoutMilliseconds =
-        lengthRankingConfigurationFileSourceTimeoutMilliseconds source
-  if timeoutMilliseconds <= 0
-    then Left LengthRankingConfigurationFileTimeoutNotPositive
-    else pure ()
-  if timeoutMilliseconds >
-      lengthRankingConfigurationFileMaximumTimeoutMilliseconds
-    then Left $ LengthRankingConfigurationFileTimeoutLimitExceeded
-      lengthRankingConfigurationFileMaximumTimeoutMilliseconds
-      (lengthRankingConfigurationFileMaximumTimeoutMilliseconds + 1)
-    else Right $ LengthRankingConfigurationFileRequest
-      path timeoutMilliseconds
-
-observedPathCharacters :: Natural -> FilePath -> Natural
-observedPathCharacters maximumValue = go 0
- where
-  go !observed [] = observed
-  go !observed (_ : remaining)
-    | observed >= maximumValue = maximumValue + 1
-    | otherwise = go (observed + 1) remaining
+mkLengthRankingConfigurationFileRequest source =
+  case mkLengthFileRequest $ LengthFileSource
+      (lengthRankingConfigurationFileSourcePath source)
+      (lengthRankingConfigurationFileSourceTimeoutMilliseconds source) of
+    Left failure -> Left $ mapAdmissionError failure
+    Right request -> Right $ LengthRankingConfigurationFileRequest request
 
 loadLengthRankingConfigurationFile
   :: LengthRankingConfigurationFileRequest
@@ -179,118 +126,50 @@ loadLengthRankingConfigurationFile
       (Either
         LengthRankingConfigurationFileLoadError
         DisabledLengthRankingConfiguration)
-#ifdef mingw32_HOST_OS
-loadLengthRankingConfigurationFile _ = pure $ Left
-  $ LengthRankingConfigurationFileLoadError
-      LengthRankingConfigurationFilePlatformUnsupported False
-#else
 loadLengthRankingConfigurationFile
-    (LengthRankingConfigurationFileRequest path timeoutMilliseconds) = do
-  cleanupIncomplete <- newIORef False
-  bounded <- timeout (timeoutMilliseconds * 1000)
-    $ loadWithinDeadline cleanupIncomplete path
-  case bounded of
-    Just result -> pure result
-    Nothing -> do
-      incomplete <- readIORef cleanupIncomplete
-      pure $ Left $ LengthRankingConfigurationFileLoadError
-        LengthRankingConfigurationFileDeadlineExceeded incomplete
+    (LengthRankingConfigurationFileRequest request) = do
+  loaded <- loadLengthFile
+    lengthRankingConfigurationFileLoadMaximumBytes
+    decodeLengthRankingConfigurationFile
+    request
+  pure $ case loaded of
+    Left failure -> Left $ mapLoadError failure
+    Right value -> Right value
 
-loadWithinDeadline
-  :: IORef Bool
-  -> FilePath
-  -> IO
-      (Either
-        LengthRankingConfigurationFileLoadError
-        DisabledLengthRankingConfiguration)
-loadWithinDeadline cleanupIncomplete path = mask $ \restore -> do
-  opened <- tryIOError $ openFd path ReadOnly acquisitionOpenFlags
-  case opened of
-    Left _ -> pure $ loadFailure LengthRankingConfigurationFileOpenFailed
-      False
-    Right descriptor -> do
-      outcome <- restore (readConfiguration descriptor)
-        `onException` void (closeOwned cleanupIncomplete descriptor)
-      closeIncomplete <- closeOwned cleanupIncomplete descriptor
-      pure $ case outcome of
-        Left primary -> Left $ LengthRankingConfigurationFileLoadError
-          primary closeIncomplete
-        Right _ | closeIncomplete -> loadFailure
-          LengthRankingConfigurationFileCleanupFailed True
-        Right configuration -> Right configuration
+mapAdmissionError
+  :: LengthFileAdmissionError
+  -> LengthRankingConfigurationFileAdmissionError
+mapAdmissionError failure = case failure of
+  LengthFilePathCharacterLimitExceeded maximumValue observed ->
+    LengthRankingConfigurationFilePathCharacterLimitExceeded
+      maximumValue observed
+  LengthFilePathEmpty -> LengthRankingConfigurationFilePathEmpty
+  LengthFilePathContainsNul ->
+    LengthRankingConfigurationFilePathContainsNul
+  LengthFilePathNotAbsolute ->
+    LengthRankingConfigurationFilePathNotAbsolute
+  LengthFileTimeoutNotPositive ->
+    LengthRankingConfigurationFileTimeoutNotPositive
+  LengthFileTimeoutLimitExceeded maximumValue observed ->
+    LengthRankingConfigurationFileTimeoutLimitExceeded
+      maximumValue observed
 
-acquisitionOpenFlags :: OpenFileFlags
-acquisitionOpenFlags = defaultFileFlags
-  { nofollow = True
-  , nonBlock = True
-  , noctty = True
-  , cloexec = True
-  }
-
-closeOwned :: IORef Bool -> Fd -> IO Bool
-closeOwned cleanupIncomplete descriptor = do
-  writeIORef cleanupIncomplete True
-  closed <- tryIOError $ closeFd descriptor
-  case closed of
-    Left _ -> pure True
-    Right () -> writeIORef cleanupIncomplete False >> pure False
-
-readConfiguration
-  :: Fd
-  -> IO
-      (Either
-        LengthRankingConfigurationFileLoadErrorClass
-        DisabledLengthRankingConfiguration)
-readConfiguration descriptor = do
-  inspected <- tryIOError $ getFdStatus descriptor
-  case inspected of
-    Left _ -> pure $ Left LengthRankingConfigurationFileInspectFailed
-    Right status
-      | not $ isRegularFile status -> pure $ Left
-          LengthRankingConfigurationFileNotRegular
-      | fileSize status >
-          fromIntegral lengthRankingConfigurationFileLoadMaximumBytes ->
-          pure $ Left $ LengthRankingConfigurationFileByteLimitExceeded
-            lengthRankingConfigurationFileLoadMaximumBytes
-            (lengthRankingConfigurationFileLoadMaximumBytes + 1)
-      | otherwise -> readChunks 0 []
- where
-  readChunks !observed chunks = do
-    let probeMaximum = lengthRankingConfigurationFileLoadMaximumBytes + 1
-        requested = min acquisitionChunkBytes $ probeMaximum - observed
-    next <- tryIOError $ PosixByteString.fdRead descriptor
-      $ fromIntegral requested
-    case next of
-      Left failure
-        | isEOFError failure -> finish chunks
-        | otherwise -> pure $ Left LengthRankingConfigurationFileReadFailed
-      Right chunk
-        | ByteString.null chunk -> finish chunks
-        | otherwise ->
-            let admitted = fromIntegral $ ByteString.length chunk
-                following = observed + admitted
-            in if following > lengthRankingConfigurationFileLoadMaximumBytes
-              then pure $ Left
-                $ LengthRankingConfigurationFileByteLimitExceeded
-                    lengthRankingConfigurationFileLoadMaximumBytes
-                    (lengthRankingConfigurationFileLoadMaximumBytes + 1)
-              else readChunks following (chunk : chunks)
-
-  finish chunks = evaluate $ case decodeLengthRankingConfigurationFile
-      $ ByteString.concat $ reverse chunks of
-    Left failure -> Left
-      $ LengthRankingConfigurationFileDecodeRejected failure
-    Right configuration -> Right configuration
-
-acquisitionChunkBytes :: Natural
-acquisitionChunkBytes = 32768
-
-loadFailure
-  :: LengthRankingConfigurationFileLoadErrorClass
-  -> Bool
-  -> Either
-      LengthRankingConfigurationFileLoadError
-      DisabledLengthRankingConfiguration
-loadFailure failure cleanupIncomplete = Left
-  $ LengthRankingConfigurationFileLoadError failure cleanupIncomplete
-#endif
+mapLoadError
+  :: LengthFileLoadError LengthRankingConfigurationFileError
+  -> LengthRankingConfigurationFileLoadError
+mapLoadError failure = LengthRankingConfigurationFileLoadError
+  (case lengthFileLoadErrorClass failure of
+    LengthFilePlatformUnsupported ->
+      LengthRankingConfigurationFilePlatformUnsupported
+    LengthFileOpenFailed -> LengthRankingConfigurationFileOpenFailed
+    LengthFileInspectFailed -> LengthRankingConfigurationFileInspectFailed
+    LengthFileNotRegular -> LengthRankingConfigurationFileNotRegular
+    LengthFileReadFailed -> LengthRankingConfigurationFileReadFailed
+    LengthFileByteLimitExceeded maximumValue observed ->
+      LengthRankingConfigurationFileByteLimitExceeded maximumValue observed
+    LengthFileDecodeRejected rejected ->
+      LengthRankingConfigurationFileDecodeRejected rejected
+    LengthFileDeadlineExceeded ->
+      LengthRankingConfigurationFileDeadlineExceeded
+    LengthFileCleanupFailed -> LengthRankingConfigurationFileCleanupFailed)
+  (lengthFileLoadCleanupIncomplete failure)

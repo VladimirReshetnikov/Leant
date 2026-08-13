@@ -16,7 +16,18 @@ The module does not discover an executable, infer a contract, choose a digest
 pin, or read configuration from ambient process state. Main can now call it
 through an explicit startup-owned integration facade; that facade supplies a
 bounded file, pinned-by-default activation, and a fixed decoded contract rather
-than weakening this module's explicit inputs.
+than weakening this module's explicit inputs. The activated policy can also be
+paired with one separately decoded contract-only version 1 document for an
+explicit `:synth --length-contract ABSOLUTE-PATH -- TYPE` command. This changes
+contract lifetime, not the ranking module's authority or input shape.
+
+The one-shot document has the exact format string
+`leant-finite-list-spine-length-contract`, version `1`, and only a `contract`
+payload beside those two root fields. It reuses the compatibility file's single
+bounded contract decoder and contains no execution, activation, artifact,
+response, or replay policy. A shared package-private acquisition leaf owns the
+same absolute-path, POSIX descriptor, byte, timeout, and cleanup rules for both
+file facades.
 
 ## Admission and preparation
 
@@ -328,4 +339,11 @@ through Djex's durable cleanup; pre-open exceptions own no worker, and
 post-scope exceptions occur after cleanup. The module itself contains no Main,
 command-line, configuration-file, or REPL wiring. The later explicit
 `Leant.Synth.Length.Integration` layer composes those boundaries without making
-this ranker guess an executable, pin policy, or contract.
+this ranker guess an executable, pin policy, or contract. Its command-local
+request is either the exact disabled identity or one activated policy beside
+one lazy contract. Main authorizes an explicit contract before admitting or
+opening its path, loads it once before goal translation, and threads that
+request through ordinary, universe-retry, provider, and classical lanes. It is
+never stored in `ReplState`, `ParsedGoal`, history, snapshots, or a cache; the
+no-option path still uses the fixed startup contract, and disabled mode refuses
+the option before IO or verification.

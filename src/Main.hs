@@ -132,12 +132,26 @@ import Leant.Synth.Fragment
   )
 import Leant.Synth.Length.Integration
   ( LengthAssessmentMode
+  , LengthAssessmentRequest
   , LengthRankingConfigurationActivationPolicy (..)
-  , assessLengthVerificationBatch
+  , assessLengthVerificationRequest
+  , authorizeExplicitLengthAssessmentRequest
+  , compatibilityLengthAssessmentRequest
   , disabledLengthAssessmentMode
+  , explicitLengthAssessmentRequest
   , lengthAssessmentFailure
   , lengthAssessmentModeActivationPolicy
   , loadLengthAssessmentMode
+  )
+import Leant.Synth.Length.Command
+  ( LengthSynthCommand (..)
+  , parseLengthSynthCommand
+  )
+import Leant.Synth.Length.Contract.File.Acquire
+  ( LengthContractFileSource (..)
+  , lengthContractFileDefaultTimeoutMilliseconds
+  , loadLengthContractFile
+  , mkLengthContractFileRequest
   )
 import Leant.Synth.Length.Presentation
   ( lengthCandidatePresentationNote
@@ -1035,6 +1049,8 @@ helpText = unlines
   , "  :search TEXT             search declaration names (case-insensitive)"
   , "  :search? TYPE            proof search: what proves TYPE? (via exact?)"
   , "  :synth TYPE              synthesize verified terms of TYPE (LJT engine)"
+  , "  :synth --length-contract ABSOLUTE-PATH -- TYPE"
+  , "                           use one contract file for this command only"
   , "                           candidates are bound as it1 (= it), it2, ..."
   , "  :set synth-engine E      djinn (default) | exference | both"
   , "  :set synth-steps N       Exference step budget (default 4096)"
@@ -1822,9 +1838,13 @@ synthTimeoutSeconds = do
 
 cmdSynth :: St -> String -> IO ()
 cmdSynth st rawArg = do
-  state <- readIORef st
-  let arg = trim rawArg
-  do
+  case parseLengthSynthCommand rawArg of
+    Left _ -> emitLn st =<< cRed st
+      ("usage: :synth [--length-contract ABSOLUTE-PATH --] TYPE " ++
+       "(TYPE may be empty in prove mode / after a `sorry`)")
+    Right command -> do
+      state <- readIORef st
+      let arg = lengthSynthCommandGoal command
       goalOr <-
         if not (null arg)
           then pure
@@ -1845,21 +1865,58 @@ cmdSynth st rawArg = do
       case goalOr of
         Left err -> emitLn st =<< cRed st err
         Right (goal, args, skipped) -> do
-          unless (null skipped) $ emitLn st =<< cDim st
-            ("(inaccessible hypotheses are not visible to :synth: "
-             ++ unwords skipped ++ ")")
-          unless (null args) $ emitLn st =<< cDim st
-            ("(synthesizing with hypotheses " ++ unwords args
-             ++ " as premises)")
-          synthRun st args goal
+          requestOr <- lengthAssessmentRequestForCommand state command
+          case requestOr of
+            Left failure -> emitLn st =<< cRed st failure
+            Right assessmentRequest -> do
+              unless (null skipped) $ emitLn st =<< cDim st
+                ("(inaccessible hypotheses are not visible to :synth: "
+                 ++ unwords skipped ++ ")")
+              unless (null args) $ emitLn st =<< cDim st
+                ("(synthesizing with hypotheses " ++ unwords args
+                 ++ " as premises)")
+              synthRun assessmentRequest st args goal
 
-synthRun :: St -> [String] -> String -> IO ()
-synthRun st args goal = do
+-- | Select one command-local assessment authority.  Explicit requests must
+-- first obtain permission from the already activated mode; only then is the
+-- path admitted and read exactly once.  The decoded contract and permission
+-- travel on the stack through every synthesis lane and never enter ReplState.
+lengthAssessmentRequestForCommand
+  :: ReplState
+  -> LengthSynthCommand
+  -> IO (Either String LengthAssessmentRequest)
+lengthAssessmentRequestForCommand state command =
+  case lengthSynthCommandContractPath command of
+    Nothing -> pure $ Right $ compatibilityLengthAssessmentRequest
+      $ rsLengthAssessmentMode state
+    Just path -> case authorizeExplicitLengthAssessmentRequest
+        $ rsLengthAssessmentMode state of
+      Left failure -> pure $ Left
+        $ "one-shot finite-list-spine Length contract rejected before IO: "
+            ++ show failure
+      Right permission -> case mkLengthContractFileRequest
+          $ LengthContractFileSource path
+              lengthContractFileDefaultTimeoutMilliseconds of
+        Left failure -> pure $ Left
+          $ "one-shot finite-list-spine Length contract admission failed: "
+              ++ show failure
+        Right admittedRequest -> do
+          loaded <- loadLengthContractFile admittedRequest
+          pure $ case loaded of
+            Left failure -> Left
+              $ "one-shot finite-list-spine Length contract load failed: "
+                  ++ show failure
+            Right contract -> Right
+              $ explicitLengthAssessmentRequest permission contract
+
+synthRun :: LengthAssessmentRequest -> St -> [String] -> String -> IO ()
+synthRun assessmentRequest st args goal = do
   outcome <- translateGoal st goal
   case outcome of
-    Right parsed -> synthGo st args Nothing goal parsed
+    Right parsed -> synthGo assessmentRequest st args Nothing goal parsed
     Left errors
-      | any stuckUniverse errors -> synthUniverseRetry st args goal errors
+      | any stuckUniverse errors ->
+          synthUniverseRetry assessmentRequest st args goal errors
       | otherwise -> reportTranslationErrors st errors
  where
   stuckUniverse = ("stuck at solving universe constraint" `isInfixOf`)
@@ -1907,8 +1964,9 @@ reportTranslationErrors st errors = do
 -- connective), that variable's marker universe @u_synth_v@ appears in
 -- the new errors; such variables are dropped and the retry narrows
 -- until it translates or no candidates remain.
-synthUniverseRetry :: St -> [String] -> String -> [String] -> IO ()
-synthUniverseRetry st args goal originalErrors = do
+synthUniverseRetry
+  :: LengthAssessmentRequest -> St -> [String] -> String -> [String] -> IO ()
+synthUniverseRetry assessmentRequest st args goal originalErrors = do
   let vars = autoShapedTokens goal
   unknowns <- if null vars then pure [] else do
     envOr <- ensureSynthEnv st
@@ -1931,7 +1989,8 @@ synthUniverseRetry st args goal originalErrors = do
       ++ " : Type \8212 Sort-polymorphic elaboration was stuck)")
     outcome <- translateGoal st wrapped
     case outcome of
-      Right parsed -> synthGo st args (Just wrapVars) wrapped parsed
+      Right parsed ->
+        synthGo assessmentRequest st args (Just wrapVars) wrapped parsed
       Left retryErrors -> do
         let misplaced =
               [ v | v <- wrapVars
@@ -2013,15 +2072,29 @@ unknownCheckProgram vars = unlines
   , "  logInfo (\"(unknown \" ++ String.intercalate \" \" unknown ++ \")\")"
   ]
 
-synthGo :: St -> [String] -> Maybe [String] -> String -> ParsedGoal -> IO ()
-synthGo st args retriedVars goal parsed = do
+synthGo
+  :: LengthAssessmentRequest
+  -> St
+  -> [String]
+  -> Maybe [String]
+  -> String
+  -> ParsedGoal
+  -> IO ()
+synthGo assessmentRequest st args retriedVars goal parsed = do
   debugFrag <- lookupEnv "LEANT_SYNTH_DEBUG"
   when (isJust debugFrag) $
     emitLn st =<< cDim st ("debug fragment: " ++ show (pgFrag parsed))
-  synthGo' st args retriedVars goal parsed
+  synthGo' assessmentRequest st args retriedVars goal parsed
 
-synthGo' :: St -> [String] -> Maybe [String] -> String -> ParsedGoal -> IO ()
-synthGo' st args retriedVars goal parsed = do
+synthGo'
+  :: LengthAssessmentRequest
+  -> St
+  -> [String]
+  -> Maybe [String]
+  -> String
+  -> ParsedGoal
+  -> IO ()
+synthGo' assessmentRequest st args retriedVars goal parsed = do
   state <- readIORef st
   let fragment = pgFrag parsed
       engine = rsSynthEngine state
@@ -2192,7 +2265,7 @@ synthGo' st args retriedVars goal parsed = do
           wantClassical <- rsSynthClassical <$> readIORef st
           classical <-
             if wantClassical
-              then synthClassical st args goal parsed
+              then synthClassical assessmentRequest st args goal parsed
               else pure False
           unless classical $ do
             message <- cYellow st
@@ -2229,7 +2302,7 @@ synthGo' st args retriedVars goal parsed = do
         \(i, group) ->
           forM_ (detailedCandidateGroupVariants group) $ \variant ->
           emitLn st =<< cDim st ("debug " ++ show i ++ ": " ++ variant)
-    verifyAndDisplay st args goal (take groupLimit groups)
+    verifyAndDisplay assessmentRequest st args goal (take groupLimit groups)
 
   reportNotes notes =
     forM_ notes $ \note -> emitLn st =<< cDim st ("note: " ++ note)
@@ -2469,8 +2542,10 @@ runEngineBefore groupLimit (Just deadline) outcome = do
 -- fallback runs for every sound refutation rather than trusting the
 -- serializer's sort classification of Sort-polymorphic goals.
 -- Returns whether verified classical candidates were displayed.
-synthClassical :: St -> [String] -> String -> ParsedGoal -> IO Bool
-synthClassical st args goal parsed = case glivenkoSplit (pgFrag parsed) of
+synthClassical
+  :: LengthAssessmentRequest -> St -> [String] -> String -> ParsedGoal -> IO Bool
+synthClassical assessmentRequest st args goal parsed =
+  case glivenkoSplit (pgFrag parsed) of
   Nothing -> pure False
   Just (prefix, body) -> do
     limit <- synthTimeoutSeconds
@@ -2526,7 +2601,7 @@ synthClassical st args goal parsed = case glivenkoSplit (pgFrag parsed) of
             Just (Right (DetailedSynthCandidates groups _)) ->
               take (synthMaxTried `div` 2) groups
             _ -> []
-    shownEm <- verifyAndDisplay st args goal emGroups
+    shownEm <- verifyAndDisplay assessmentRequest st args goal emGroups
     if shownEm
       then pure True
       else do
@@ -2549,7 +2624,7 @@ synthClassical st args goal parsed = case glivenkoSplit (pgFrag parsed) of
             nnFrag nnFrag)
         case bounded of
           Just (Right (DetailedSynthCandidates groups _)) ->
-            verifyAndDisplay st args goal
+            verifyAndDisplay assessmentRequest st args goal
               (map
                 (mapDetailedCandidateGroupVariantsDroppingSemanticSidecar wrap)
                 (take groupLimit groups))
@@ -2562,9 +2637,14 @@ synthClassical st args goal parsed = case glivenkoSplit (pgFrag parsed) of
 -- hypotheses, so `exact it1` closes the goal.  'True' when anything
 -- was shown.
 verifyAndDisplay
-  :: St -> [String] -> String -> [DetailedCandidateGroup] -> IO Bool
-verifyAndDisplay _ _ _ [] = pure False
-verifyAndDisplay st args goal groups = do
+  :: LengthAssessmentRequest
+  -> St
+  -> [String]
+  -> String
+  -> [DetailedCandidateGroup]
+  -> IO Bool
+verifyAndDisplay _ _ _ _ [] = pure False
+verifyAndDisplay assessmentRequest st args goal groups = do
   verification <- synthVerify st goal
     (map detailedCandidateGroupVerificationVariants groups)
   let observations =
@@ -2576,8 +2656,7 @@ verifyAndDisplay st args goal groups = do
     forM_ (leantObservationCodeEntries observations) $ \(code, count) ->
       emitLn st =<< cDim st
         ("debug metric: " ++ code ++ "=" ++ show count)
-  assessmentMode <- rsLengthAssessmentMode <$> readIORef st
-  assessment <- assessLengthVerificationBatch assessmentMode verification
+  assessment <- assessLengthVerificationRequest assessmentRequest verification
   forM_ (lengthAssessmentFailure assessment) $ \failure -> do
     prefix <- cYellow st "warning: "
     emitLn st $ prefix ++
@@ -3312,6 +3391,8 @@ proveHelp = unlines
   , "  :auto              try common finishing tactics on the current goal"
   , "  :synth             synthesize terms for the goal, with the hypotheses"
   , "                     as premises (then `exact it1` records the step)"
+  , "  :synth --length-contract ABSOLUTE-PATH --"
+  , "                     use one Length contract for this command's goal"
   , "  :qed [NAME]        finish - save as `theorem NAME` in the session"
   , "                     (a `def` if the statement is not a proposition)"
   , "  :abort             leave prove mode (the script is printed, not lost)"

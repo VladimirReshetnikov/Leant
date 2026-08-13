@@ -128,6 +128,46 @@ remain in place with a payload-free preparation refusal and do not open a
 worker by themselves. The default `djinn` synthesis engine supplies no typed
 graph; select `:set synth-engine exference` or `both` to produce candidates
 which may reach this ranking path.
+
+After startup activation, one command may replace only the fixed compatibility
+contract with an explicitly named contract-only document:
+
+```text
+:synth --length-contract ABSOLUTE-PATH -- TYPE
+```
+
+The standalone `--` is mandatory and keeps the remaining text opaque Lean goal
+syntax. The path may contain spaces, but a standalone `--` inside it is
+reserved as the delimiter. Leant first requires an activated startup policy;
+when ranking is disabled it rejects the option before path admission or file
+IO. Otherwise it admits and reads that absolute POSIX path once, before goal
+translation, using a fixed 5,000-ms interruption budget and the same 256-KiB
+JSON ceiling as the compatibility file. The separate
+contract-only version 1 root has format
+`leant-finite-list-spine-length-contract` and contains only the existing
+bounded contract grammar: it cannot replace the executable, pin choice, solver
+limits, artifact policy, or replay limits. The decoded contract is carried only through
+that command's ordinary, universe-retry, provider, and classical synthesis
+lanes; it is not stored in `ReplState`, `ParsedGoal`, snapshots, history, or a
+cache, and later commands return to the startup-fixed contract unless they name
+their own file. Malformed option syntax is rejected rather than silently
+treated as a goal.
+
+The contract-only document has exactly three root fields; for example:
+
+```json
+{
+  "format": "leant-finite-list-spine-length-contract",
+  "version": 1,
+  "contract": {
+    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
+    "precondition": ["truth", true],
+    "postcondition": ["equal", ["result"], ["literal", 0]],
+    "providerLaws": []
+  }
+}
+```
+
 After a successful occurrence seal, Main prints a subordinate note only for a
 candidate carrying an independently replayed counterexample. The note calls it
 a replayed, model-relative finite-list-spine Length counterexample, gives a
@@ -153,6 +193,7 @@ stable demotion; it never proves, prunes, or claims concrete Lean behavior.
 | `:search TEXT` | case-insensitive name search over the environment |
 | `:search? TYPE` | proof search: what proves TYPE? (via `exact?`) |
 | `:synth TYPE` | verified term synthesis (see below) |
+| `:synth --length-contract ABSOLUTE-PATH -- TYPE` | use one passive Length contract for this synthesis command |
 | `:prove [PROP]` | interactive prove mode; bare form resumes the last `sorry` |
 | `:set OPT VAL` | `set_option` persisting in the session |
 | `:undo` | revert the last state-changing command |
@@ -446,9 +487,10 @@ calls the occurrence-sealed policy-plus-contract assessor directly. Its
 candidates retain their batch-scoped occurrence handles through ranking, and
 the adapter seals the complete permutation before projecting the report. The
 contract is checked candidate-by-candidate only during the later full
-preparation pass. The CLI compatibility path deliberately reuses that decoded
-contract for the process; lower-level policy APIs still accept a request-owned
-contract. Lifecycle and per-query budgets remain separate. There are no
+preparation pass. The no-option command deliberately reuses that decoded
+contract for the process. Lower-level policy APIs and the one-shot Main path
+can instead associate the same activated policy with a request-owned contract.
+Lifecycle and per-query budgets remain separate. There are no
 execution defaults, executable discovery, path normalization, or environment
 reads. The digest is only an optional expectation for Djex's
 pre-spawn executable-file observation, not attestation of the image ultimately
@@ -491,8 +533,9 @@ second generic configuration aggregate. The unreachable post-validation
 assembly failure remains absent; execution, evaluation, then contract remain
 the fixed decode order.
 
-`Leant.Synth.Length.Configuration.File.Acquire` adds a separate bounded
-filesystem boundary. Callers must explicitly
+`Leant.Synth.Length.Configuration.File.Acquire` is the compatibility facade
+over the shared bounded `Leant.Synth.Length.File.Acquire` filesystem boundary.
+Callers must explicitly
 admit an absolute path of at most 4,096 characters and a positive timeout of
 at most 60 seconds. On POSIX the final component is opened once with
 no-follow, nonblocking, no-controlling-terminal, and close-on-exec flags; its
@@ -503,9 +546,32 @@ cleanup bit rather than paths, errno text, or file content. The timeout is an
 interruption budget rather than a hard kernel deadline, final-component
 no-follow does not exclude ancestor symlinks or in-place mutation, and Windows
 fails closed until an equivalent native handle implementation exists. Main
-uses this boundary only for the explicit CLI path; there is still no discovery
-or default path, and loading/activation alone never launches a solver. See the
+uses the configuration facade only for its explicit startup CLI path; there is
+still no discovery or default path, and loading/activation alone never launches
+a solver. See the
 [bounded acquisition report](docs/reports/2026-08-11-bounded-live-length-ranking-configuration-acquisition.md).
+
+`Leant.Synth.Length.Contract.File` adds the separate contract-only version 1
+root with format `leant-finite-list-spine-length-contract` for a command-owned
+passive contract. It contains exact `format`, `version`, and `contract` fields
+and delegates the nested value to the compatibility decoder's single contract
+grammar and limits; execution and evaluation fields are unknown and rejected.
+Its `Contract.File.Acquire` facade uses the same path, descriptor, and timeout
+owner as startup acquisition, but maps failures into contract-only closed
+vocabulary. `Leant.Synth.Length.Command` recognizes only the exact
+`--length-contract` spelling and requires a standalone `--`, so malformed
+request syntax cannot disappear into Lean goal text.
+
+`Leant.Synth.Length.Integration` authorizes an explicit request from the
+already activated policy before Main admits or opens its contract path. The
+result is an opaque command-local choice containing either the historical
+disabled identity or one strict policy beside one lazy contract. Compatibility
+and one-shot contracts enter the same occurrence-sealed assessor; the request
+does not remember a second policy/contract origin tag. Main loads a named
+contract once before translating the goal and threads that value through every
+retry and synthesis lane. It never writes the request to interactive state or
+a snapshot. See the
+[one-shot contract report](docs/reports/2026-08-13-one-shot-length-contract.md).
 
 The passive finite-spine source vocabulary now lives in
 `Leant.Synth.Length.Contract`. Modules that need only those assertions no
@@ -551,14 +617,17 @@ verified-receipt owner. A bounded eager summary keeps only original indices,
 assessment state, and the optional sanitized failure; the ordinary
 receipt-bearing `LengthRanking` is materialized as a compatibility view from
 that batch and summary only when projected. Policy callers may supply a
-request-owned contract; the version-1 CLI bundle intentionally fixes its
-decoded contract at startup.
+request-owned contract. The version-1 startup bundle fixes its decoded
+compatibility contract, while an exact
+`:synth --length-contract ... --` request can reuse that activated policy with
+one separately decoded command-local contract.
 Input or proposal failure preserves the original opaque verification batch,
 exposes no sealed output, and withholds the unsealed associated plan.
 Operational ranking failure already
 produces an original-order all-`Unassessed` ranking and passes through the same
 seal. Main selects this path only for an explicitly loaded and activated
-configuration; otherwise the historical identity path is exact. Replayed
+policy; without one, even an explicit command contract is rejected before file
+IO and the historical no-option identity path is exact. Replayed
 counterexamples may rank and receive a bounded model-relative note, but never
 prune or prove source behavior;
 raw `sat`, `unsat`, and `unknown` still grant no proof authority. See the

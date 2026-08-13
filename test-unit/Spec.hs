@@ -225,10 +225,37 @@ import Leant.Synth.Length.Configuration.File.Acquire
   , loadLengthRankingConfigurationFile
   , mkLengthRankingConfigurationFileRequest
   )
+import Leant.Synth.Length.Command
+  ( LengthSynthCommand (..)
+  , LengthSynthCommandError (..)
+  , parseLengthSynthCommand
+  )
 import Leant.Synth.Length.Contract
   ( LeanLengthContract (..)
   , LeanLengthProviderLaw (..)
   , LeanLengthSpineIdentity (..)
+  )
+import Leant.Synth.Length.Contract.File
+  ( LengthContractFileError (..)
+  , LengthContractFileField (..)
+  , LengthContractFileValueType (..)
+  , decodeLengthContractFile
+  , lengthContractFileFormat
+  , lengthContractFileJsonLimits
+  , lengthContractFileVersion
+  )
+import Leant.Synth.Length.Contract.File.Acquire
+  ( LengthContractFileAdmissionError (..)
+  , LengthContractFileLoadErrorClass (..)
+  , LengthContractFileSource (..)
+  , lengthContractFileDefaultTimeoutMilliseconds
+  , lengthContractFileLoadCleanupIncomplete
+  , lengthContractFileLoadErrorClass
+  , lengthContractFileLoadMaximumBytes
+  , lengthContractFileMaximumPathCharacters
+  , lengthContractFileMaximumTimeoutMilliseconds
+  , loadLengthContractFile
+  , mkLengthContractFileRequest
   )
 import Leant.Synth.Length.Handoff
   ( LengthHandoffRefusal (..)
@@ -236,9 +263,14 @@ import Leant.Synth.Length.Handoff
   )
 import Leant.Synth.Length.Integration
   ( LengthAssessmentFailure (..)
+  , LengthAssessmentRequestError (..)
   , LengthAssessmentSetupError (..)
+  , assessLengthVerificationRequest
   , assessLengthVerificationBatch
+  , authorizeExplicitLengthAssessmentRequest
+  , compatibilityLengthAssessmentRequest
   , disabledLengthAssessmentMode
+  , explicitLengthAssessmentRequest
   , lengthAssessmentCandidates
   , lengthAssessmentFailure
   , lengthAssessmentModeActivationPolicy
@@ -2252,9 +2284,258 @@ lengthRankingConfigurationFileTests = testGroup
       assertLengthRankingConfigurationFileLiveEquivalence
   , testCase "keep paths, digests, fields, tags, and names out of Show errors"
       assertLengthRankingConfigurationFileShowRedaction
+  , lengthContractFileTests
   , lengthRankingConfigurationFileAcquisitionTests
   , lengthAssessmentIntegrationTests
   ]
+
+lengthContractFileTests :: TestTree
+lengthContractFileTests = testGroup
+  "one-shot bounded Length contract file"
+  [ testCase "parse explicit command paths without opening Lean goal syntax"
+      assertLengthSynthCommandParsing
+  , testCase "reuse the exact compatibility contract grammar and bounds"
+      assertLengthContractFileGrammar
+  , testCase "reject contract roots and redact nested private values"
+      assertLengthContractFileSchemaAndRedaction
+  , testCase "admit and acquire one explicit contract-only regular file"
+      assertLengthContractFileAcquisition
+  ]
+
+assertLengthSynthCommandParsing :: IO ()
+assertLengthSynthCommandParsing = do
+  parseLengthSynthCommand "List Nat -> List Nat" @?= Right
+    LengthSynthCommand
+      { lengthSynthCommandContractPath = Nothing
+      , lengthSynthCommandGoal = "List Nat -> List Nat"
+      }
+  parseLengthSynthCommand
+      " --length-contract /tmp/my contract.json -- List Nat -- List Nat " @?=
+    Right LengthSynthCommand
+      { lengthSynthCommandContractPath = Just "/tmp/my contract.json"
+      , lengthSynthCommandGoal = "List Nat -- List Nat"
+      }
+  parseLengthSynthCommand "--length-contract /tmp/request.json --" @?=
+    Right LengthSynthCommand
+      { lengthSynthCommandContractPath = Just "/tmp/request.json"
+      , lengthSynthCommandGoal = ""
+      }
+  parseLengthSynthCommand "--length-contract -- List Nat" @?= Left
+    LengthSynthCommandContractPathMissing
+  parseLengthSynthCommand "--length-contract /tmp/request.json List Nat" @?=
+    Left LengthSynthCommandDelimiterMissing
+  -- Ordinary goal text beginning with a longer identifier is not an option.
+  parseLengthSynthCommand "--length-contractual" @?= Right
+    LengthSynthCommand
+      { lengthSynthCommandContractPath = Nothing
+      , lengthSynthCommandGoal = "--length-contractual"
+      }
+  productive <- timeout 1000000 $ evaluate $ parseLengthSynthCommand
+    $ "--length-contract /tmp/request.json"
+        ++ replicate 131072 ' ' ++ "not-a-delimiter"
+  productive @?= Just (Left LengthSynthCommandDelimiterMissing)
+
+assertLengthContractFileGrammar :: IO ()
+assertLengthContractFileGrammar = do
+  lengthContractFileFormat @?=
+    Text.pack "leant-finite-list-spine-length-contract"
+  lengthContractFileVersion @?= 1
+  lengthContractFileJsonLimits @?= lengthRankingConfigurationFileJsonLimits
+  let contract = jsonLengthContract
+        (jsonLengthTruth True)
+        (jsonLengthEqual jsonLengthResult $ jsonLengthLiteral 2)
+        [ jsonLengthProviderLaw "Demo.zeroList" []
+            $ jsonLengthLiteral 0
+        ]
+      contractDocument = lengthContractFileFixture contract
+      compatibilityDocument = setJsonField ["contract"] contract
+        $ lengthRankingConfigurationFileFixture "/tmp/not-opened-z3" Nothing
+  decoded <- expectLengthContractFile contractDocument
+  compatibility <- expectLengthRankingConfigurationFile compatibilityDocument
+  let compatibleContract = case activateLengthRankingConfiguration
+        PermitUnpinnedExecutable compatibility of
+        Left failure -> error $ "compatibility activation failed: " ++
+          show failure
+        Right (_, retained) -> retained
+  decoded @?= compatibleContract
+
+  let maximumLaws = replicate 256
+        $ jsonLengthProviderLaw "Demo.zeroList" [] (jsonLengthLiteral 0)
+  _ <- expectLengthContractFile
+    $ lengthContractFileFixture
+    $ jsonLengthContract (jsonLengthTruth True) (jsonLengthTruth True)
+        maximumLaws
+  case decodeLengthContractFile
+      $ encodeLengthRankingConfigurationFile
+      $ lengthContractFileFixture
+      $ jsonLengthContract (jsonLengthTruth True) (jsonLengthTruth True)
+          (maximumLaws ++ [jsonLengthProviderLaw "extra" []
+            $ jsonLengthLiteral 0]) of
+    Left (LengthContractFileContractRejected
+        (LengthRankingConfigurationPolicyLimitExceeded
+          LengthRankingConfigurationProviderLawsField 256 257)) -> pure ()
+    result -> assertFailure $ "unexpected contract maximum-plus-one result: "
+      ++ show result
+
+assertLengthContractFileSchemaAndRedaction :: IO ()
+assertLengthContractFileSchemaAndRedaction = do
+  let contract = jsonLengthContract
+        (jsonLengthTruth True) (jsonLengthTruth True) []
+      base = lengthContractFileFixture contract
+  assertLengthContractFileError LengthContractFileUnsupportedFormat
+    $ setJsonField ["format"] (Json.JStr "wrong-format") base
+  assertLengthContractFileError LengthContractFileUnsupportedVersion
+    $ setJsonField ["version"] (Json.JInt 2) base
+  assertLengthContractFileError LengthContractFileUnexpectedRootField
+    $ addJsonField [] ("execution", Json.JObj []) base
+  assertLengthContractFileError
+    (LengthContractFileMissingRootField LengthContractFileContractField)
+    $ deleteJsonField ["contract"] base
+  assertLengthContractFileError
+    (LengthContractFileFieldTypeMismatch
+      LengthContractFileContractField LengthContractFileObjectValue)
+    $ setJsonField ["contract"] (Json.JStr "private-contract") base
+  let privateName = "private-Lean-provider-name"
+      privateTag = "private-syntax-tag"
+      rejected = setJsonField ["contract", "providerLaws"]
+        (Json.JArr [jsonLengthProviderLaw privateName []
+          $ Json.JArr [Json.JStr privateTag]]) base
+  case decodeLengthContractFile
+      $ encodeLengthRankingConfigurationFile rejected of
+    Right _ -> assertFailure "private contract fixture unexpectedly decoded"
+    Left failure -> do
+      assertBool "contract error exposed a private provider name"
+        $ not $ privateName `isInfixOf` show failure
+      assertBool "contract error exposed a private syntax tag"
+        $ not $ privateTag `isInfixOf` show failure
+
+assertLengthContractFileAcquisition :: IO ()
+assertLengthContractFileAcquisition = do
+  lengthContractFileDefaultTimeoutMilliseconds @?= 5000
+  lengthContractFileMaximumPathCharacters @?= 4096
+  lengthContractFileMaximumTimeoutMilliseconds @?= 60000
+  lengthContractFileLoadMaximumBytes @?=
+    boundedJsonMaximumTotalBytes lengthContractFileJsonLimits
+  case mkLengthContractFileRequest $ LengthContractFileSource
+      "relative-contract.json" (error "relative path forced timeout") of
+    Left LengthContractFilePathNotAbsolute -> pure ()
+    Left failure -> assertFailure $ "unexpected relative contract failure: "
+      ++ show failure
+    Right _ -> assertFailure "relative contract path was admitted"
+  case mkLengthContractFileRequest $ LengthContractFileSource
+      "/tmp/request.json" 0 of
+    Left LengthContractFileTimeoutNotPositive -> pure ()
+    Left failure -> assertFailure $ "unexpected contract timeout failure: "
+      ++ show failure
+    Right _ -> assertFailure "zero contract timeout was admitted"
+  case mkLengthContractFileRequest $ LengthContractFileSource
+      ('/' : replicate 4096 'x') (error "oversized path forced timeout") of
+    Left (LengthContractFilePathCharacterLimitExceeded 4096 4097) -> pure ()
+    Left failure -> assertFailure $ "unexpected contract path limit: " ++
+      show failure
+    Right _ -> assertFailure "oversized contract path was admitted"
+  case mkLengthContractFileRequest $ LengthContractFileSource
+      "/tmp/request.json" 60001 of
+    Left (LengthContractFileTimeoutLimitExceeded 60000 60001) -> pure ()
+    Left failure -> assertFailure $ "unexpected contract timeout limit: " ++
+      show failure
+    Right _ -> assertFailure "oversized contract timeout was admitted"
+  if os == "mingw32"
+    then pure ()
+    else withTemporaryDirectory "leant-one-shot-contract" $ \root -> do
+      let path = root </> "request.json"
+          malformedPath = root </> "malformed.json"
+          missingPath = root </> "missing.json"
+          oversizedPath = root </> "oversized.json"
+          expected = lengthRankingContract 0
+      ByteString.writeFile path $ encodeLengthRankingConfigurationFile
+        $ lengthContractFileFixture
+        $ jsonLengthContract
+            (jsonLengthTruth True)
+            (jsonLengthEqual jsonLengthResult $ jsonLengthLiteral 0)
+            [ jsonLengthProviderLaw "Demo.zeroList" []
+                $ jsonLengthLiteral 0
+            , jsonLengthProviderLaw "Demo.oneList" []
+                $ jsonLengthLiteral 1
+            ]
+      request <- case mkLengthContractFileRequest
+          $ LengthContractFileSource path 1000 of
+        Left failure -> assertFailure (show failure) >> error "unreachable"
+        Right admitted -> pure admitted
+      loaded <- loadLengthContractFile request
+      case loaded of
+        Left failure -> assertFailure ("contract load failed: " ++ show failure)
+        Right actual -> actual @?= expected
+      ByteString.writeFile malformedPath $ BS.pack "{"
+      malformedRequest <- case mkLengthContractFileRequest
+          $ LengthContractFileSource malformedPath 1000 of
+        Left failure -> assertFailure (show failure) >> error "unreachable"
+        Right admitted -> pure admitted
+      malformed <- loadLengthContractFile malformedRequest
+      case malformed of
+        Left failure -> do
+          case lengthContractFileLoadErrorClass failure of
+            LengthContractFileDecodeRejected _ -> pure ()
+            failureClass -> assertFailure $ "unexpected malformed contract " ++
+              "failure class: " ++ show failureClass
+          lengthContractFileLoadCleanupIncomplete failure @?= False
+          assertBool "contract load error exposed its source path"
+            $ not $ malformedPath `isInfixOf` show failure
+        Right _ -> assertFailure "malformed contract file decoded"
+      missingRequest <- case mkLengthContractFileRequest
+          $ LengthContractFileSource missingPath 1000 of
+        Left failure -> assertFailure (show failure) >> error "unreachable"
+        Right admitted -> pure admitted
+      missing <- loadLengthContractFile missingRequest
+      case missing of
+        Left failure -> do
+          lengthContractFileLoadErrorClass failure @?=
+            LengthContractFileOpenFailed
+          lengthContractFileLoadCleanupIncomplete failure @?= False
+          assertBool "contract open error exposed its source path"
+            $ not $ missingPath `isInfixOf` show failure
+        Right _ -> assertFailure "missing contract file loaded"
+      ByteString.writeFile oversizedPath $ ByteString.replicate
+        (fromIntegral lengthContractFileLoadMaximumBytes + 1) 32
+      oversizedRequest <- case mkLengthContractFileRequest
+          $ LengthContractFileSource oversizedPath 1000 of
+        Left failure -> assertFailure (show failure) >> error "unreachable"
+        Right admitted -> pure admitted
+      oversized <- loadLengthContractFile oversizedRequest
+      case oversized of
+        Left failure -> do
+          lengthContractFileLoadErrorClass failure @?=
+            LengthContractFileByteLimitExceeded
+              lengthContractFileLoadMaximumBytes
+              (lengthContractFileLoadMaximumBytes + 1)
+          lengthContractFileLoadCleanupIncomplete failure @?= False
+        Right _ -> assertFailure "oversized contract file loaded"
+
+lengthContractFileFixture :: Json.JValue -> Json.JValue
+lengthContractFileFixture contract = Json.JObj
+  [ ("format", Json.JStr $ Text.unpack lengthContractFileFormat)
+  , ("version", Json.JInt $ toInteger lengthContractFileVersion)
+  , ("contract", contract)
+  ]
+
+expectLengthContractFile :: Json.JValue -> IO LeanLengthContract
+expectLengthContractFile document =
+  case decodeLengthContractFile
+      $ encodeLengthRankingConfigurationFile document of
+    Left failure -> assertFailure ("contract file was rejected: " ++
+      show failure) >> error "unreachable"
+    Right contract -> pure contract
+
+assertLengthContractFileError
+  :: LengthContractFileError
+  -> Json.JValue
+  -> IO ()
+assertLengthContractFileError expected document =
+  case decodeLengthContractFile
+      $ encodeLengthRankingConfigurationFile document of
+    Left failure -> failure @?= expected
+    Right _ -> assertFailure $ "expected contract-file failure: " ++
+      show expected
 
 lengthRankingConfigurationFileAcquisitionTests :: TestTree
 lengthRankingConfigurationFileAcquisitionTests = testGroup
@@ -2276,10 +2557,14 @@ lengthAssessmentIntegrationTests = testGroup
   "explicit Length assessment integration"
   [ testCase "keep the disabled mode an exact lazy identity"
       assertLengthAssessmentDisabled
+  , testCase "reject one-shot contracts before file IO when disabled"
+      assertLengthAssessmentExplicitDisabled
   , testCase "admit setup before IO or activation"
       assertLengthAssessmentSetupAdmission
   , testCase "load one fixed contract and assess through the sealed adapter"
       assertLengthAssessmentConfigured
+  , testCase "reuse one activated policy with command-local contracts"
+      assertLengthAssessmentExplicitContracts
   , testCase "preserve sealed callback order after a live failure"
       assertLengthAssessmentFailureFallback
   , testCase "bound and sanitize counterexample presentation"
@@ -2312,6 +2597,20 @@ assertLengthAssessmentDisabled = do
     $ isNothing $ lengthAssessmentRanking lazyResult
   assertBool "lazy disabled Length assessment retained a configured result"
     $ isNothing $ lengthAssessmentPostVerificationResult lazyResult
+
+assertLengthAssessmentExplicitDisabled :: IO ()
+assertLengthAssessmentExplicitDisabled = do
+  case authorizeExplicitLengthAssessmentRequest disabledLengthAssessmentMode of
+    Left failure -> failure @?=
+      LengthAssessmentExplicitContractRequiresActivatedPolicy
+    Right _ -> assertFailure "disabled mode authorized a one-shot contract"
+  let disabledRequest = compatibilityLengthAssessmentRequest
+        disabledLengthAssessmentMode
+  lazyResult <- assessLengthVerificationRequest disabledRequest
+    (error "disabled command request forced its verification batch")
+  lengthAssessmentFailure lazyResult @?= Nothing
+  assertBool "disabled command request retained a ranking"
+    $ isNothing $ lengthAssessmentRanking lazyResult
 
 assertLengthAssessmentSetupAdmission :: IO ()
 assertLengthAssessmentSetupAdmission = do
@@ -2485,6 +2784,143 @@ assertLengthAssessmentConfigured
               $ isNothing $ lengthPostVerificationSealedBatch result
             assertBool "rejected integration input acquired a ranking"
               $ isNothing $ lengthPostVerificationRanking result
+
+assertLengthAssessmentExplicitContracts :: IO ()
+assertLengthAssessmentExplicitContracts
+  | os == "mingw32" = pure ()
+  | otherwise = do
+      fixture <- buildLengthRankingLiveFixture
+      retained <- syntheticLengthRankingCandidate
+        "one-shot-contract-retained"
+      withFakeLengthSolver "healthy" $ \executable -> do
+        let configurationPath = takeDirectory executable </>
+              "length-request-policy.json"
+            contractPath = takeDirectory executable </>
+              "length-request-contract.json"
+            fixedContract = jsonLengthContract
+              (jsonLengthTruth True)
+              (jsonLengthEqual jsonLengthResult $ jsonLengthLiteral 2)
+              [ jsonLengthProviderLaw "Demo.zeroList" []
+                  $ jsonLengthLiteral 0
+              , jsonLengthProviderLaw "Demo.oneList" []
+                  $ jsonLengthLiteral 1
+              ]
+            document = setJsonField ["contract"] fixedContract
+              $ setJsonField ["execution", "artifactPolicy"]
+                  (Json.JStr "input-values-after-satisfiable")
+              $ lengthRankingConfigurationFileFixture executable Nothing
+        ByteString.writeFile configurationPath
+          $ encodeLengthRankingConfigurationFile document
+        loaded <- loadLengthAssessmentMode PermitUnpinnedExecutable
+          $ LengthRankingConfigurationFileSource configurationPath 1000
+        mode <- case loaded of
+          Left failure -> assertFailure (show failure) >> error "unreachable"
+          Right configured -> pure configured
+        permission <- case authorizeExplicitLengthAssessmentRequest mode of
+          Left failure -> assertFailure (show failure) >> error "unreachable"
+          Right authorized -> pure authorized
+        let writeContract expected = ByteString.writeFile contractPath
+              $ encodeLengthRankingConfigurationFile
+              $ lengthContractFileFixture
+              $ jsonLengthContract
+                  (jsonLengthTruth True)
+                  (jsonLengthEqual jsonLengthResult
+                    $ jsonLengthLiteral expected)
+                  [ jsonLengthProviderLaw "Demo.zeroList" []
+                      $ jsonLengthLiteral 0
+                  , jsonLengthProviderLaw "Demo.oneList" []
+                      $ jsonLengthLiteral 1
+                  ]
+            loadContract = do
+              request <- case mkLengthContractFileRequest
+                  $ LengthContractFileSource contractPath 1000 of
+                Left failure ->
+                  assertFailure (show failure) >> error "unreachable"
+                Right admitted -> pure admitted
+              loadedContract <- loadLengthContractFile request
+              case loadedContract of
+                Left failure ->
+                  assertFailure (show failure) >> error "unreachable"
+                Right contract -> pure contract
+        writeContract 0
+        firstContract <- loadContract
+        writeContract 1
+        secondContract <- loadContract
+        -- Both request values must remain self-contained after their source
+        -- has changed again; no later batch may reopen the command path.
+        ByteString.writeFile contractPath $ BS.pack "{"
+        let zero = lengthRankingFixtureZero fixture
+        verification <- verificationBatchFromReceipts
+          [zero, retained]
+        first <- expectLengthAssessmentWithin
+          $ assessLengthVerificationRequest
+              (explicitLengthAssessmentRequest permission
+                firstContract)
+              verification
+        second <- expectLengthAssessmentWithin
+          $ assessLengthVerificationRequest
+              (explicitLengthAssessmentRequest permission
+                secondContract)
+              verification
+        compatibility <- expectLengthAssessmentWithin
+          $ assessLengthVerificationRequest
+              (compatibilityLengthAssessmentRequest mode)
+              verification
+        repeatedFirst <- expectLengthAssessmentWithin
+          $ assessLengthVerificationRequest
+              (explicitLengthAssessmentRequest permission
+                firstContract)
+              verification
+        lengthAssessmentCandidates first @?= [zero, retained]
+        lengthAssessmentCandidates second @?= [retained, zero]
+        lengthAssessmentCandidates compatibility @?= [retained, zero]
+        lengthAssessmentCandidates repeatedFirst @?= [zero, retained]
+        case lengthAssessmentFailure first of
+          Just (LengthAssessmentRankingFailed failure) ->
+            lengthRankingFailureClass failure @?=
+              LengthRankingLiveQueryFailed
+                Djex.LengthSMTLibLiveQueryCounterexampleRejected
+          failure -> assertFailure $ "unexpected first one-shot outcome: " ++
+            show failure
+        lengthAssessmentFailure repeatedFirst @?=
+          lengthAssessmentFailure first
+        map lengthAssessmentFailure [second, compatibility] @?=
+          [Nothing, Nothing]
+        let presentationText = map lengthCandidatePresentationText .
+              presentLengthAssessment
+            renderReceipt = detailedVerificationVariantText . verifiedCandidate
+        presentationText first @?= map renderReceipt [zero, retained]
+        presentationText second @?= map renderReceipt [retained, zero]
+        presentationText compatibility @?= map renderReceipt [retained, zero]
+        presentationText repeatedFirst @?= map renderReceipt [zero, retained]
+        mapM_ (\assessed ->
+          case lengthAssessmentPostVerificationResult assessed of
+            Nothing -> assertFailure
+              "enabled command-local assessment bypassed its occurrence seal"
+            Just result -> assertLengthPostVerificationSealed result)
+          [first, second, compatibility, repeatedFirst]
+        let maximumCandidates =
+              Djex.defaultLengthSMTLibLiveSessionMaximumQueries
+            oversizedCount = fromIntegral maximumCandidates + 1
+        oversized <- verificationBatchFromReceipts
+          $ replicate oversizedCount (lengthRankingFixtureZero fixture)
+        rejected <- expectLengthAssessmentWithin
+          $ assessLengthVerificationRequest
+              (explicitLengthAssessmentRequest permission
+                $ error "maximum-plus-one forced one-shot contract")
+              oversized
+        case lengthAssessmentFailure rejected of
+          Just (LengthAssessmentPostVerificationFailed
+              (LengthPostVerificationInputRejected
+                (LengthRankingInputLimitExceeded maximumValue observed))) ->
+                  (maximumValue, observed) @?=
+                    (maximumCandidates, maximumCandidates + 1)
+          failure -> assertFailure $ "unexpected one-shot rejection: " ++
+            show failure
+        lengthAssessmentCandidates rejected @?=
+          verifiedCandidateReceipts oversized
+        assertBool "one-shot maximum-plus-one retained a ranking"
+          $ isNothing $ lengthAssessmentRanking rejected
 
 assertLengthAssessmentFailureFallback :: IO ()
 assertLengthAssessmentFailureFallback
