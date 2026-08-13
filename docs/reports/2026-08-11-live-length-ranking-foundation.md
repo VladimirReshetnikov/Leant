@@ -125,19 +125,26 @@ same retained runtime; workspace-allocation, capability, and ready-identity
 admission have completed, while the opener deadline and Session
 workspace-cleanup authority remain with the enclosing rank-2 scope; process
 shutdown limits remain process-owned. The sealed protocol plan then supplies
-both its exact query and artifact policy during replay, rather than being paired
+its exact query and artifact policy during replay, while response decoding uses
+the limits retained by that same plan, rather than pairing either operation
 with an independent worker-wide replay copy.
 Run-identity admission likewise derives its budget from the worker and its
 transport limits from that worker's process. This heap/association narrowing
 changes no ready-worker or query-run identity field, wire byte, failure order,
 public Djex API, or Leant behavior.
 
-The private protocol plan follows the same single-owner rule. Its unchanged
-complete fingerprint still binds the exact initial and optional value writes,
-but the plan retains only the sealed query and positional sentinels needed to
-render them. Concatenated write fragments are transient fingerprint inputs and
-are derived again on demand through the selectors used at the causal write
-edges; presence-only inspection of the optional write does not render request
+The private protocol plan follows the same single-owner rule. After validation
+and fingerprint sealing it retains the exact artifact policy, bounded response
+limits, nominal query, cumulative cursor policy, positional barriers, and
+reversible plan key needed by later protocol consumers, rather than the full
+structured `LengthSMTLibExecutionConfig`. The unchanged plan key still embeds
+the complete execution-policy key. Launch-profile, digest, solver-control,
+deadline, environment, and working-directory facts are not retained as
+separate structured runtime authority. The complete fingerprint still binds
+the exact initial and optional value writes; concatenated write fragments are
+transient fingerprint inputs and are derived again on demand from the retained
+query and positional sentinels through the selectors used at the causal write
+edges. Presence-only inspection of the optional write does not render request
 bytes.
 
 Below Length's compatibility decoder, Djex's package-private Standard response
