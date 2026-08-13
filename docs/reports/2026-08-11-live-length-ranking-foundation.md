@@ -102,9 +102,17 @@ importing Length semantics. One opaque process associates the schema-free
 observation slice with its exact limits; the generic owner chooses no domain
 identity root, schema tag, or fingerprint budget. The former Length
 `...Session.Process` module is now a compatibility and identity facade. It maps
-the closed generic phase/failure/cleanup vocabulary exhaustively and seals the
-same-process observation and limit fields under the existing raw-process v2
-root and limits-v1 wrapper.
+the closed generic phase/failure/cleanup vocabulary exhaustively and retains
+only that exact generic process. Its identity selector derives the existing
+raw-process v2 root from the process-associated schema-free observation and
+process-owned limits, including the unchanged limits-v1 wrapper; the facade
+caches no parallel `FingerprintField`.
+
+Successful generic acquisition returns under the facade's existing mask. The
+handoff first forces the strict one-field facade and then a transiently derived
+outer root to weak head normal form before returning, preserving the former
+cached-root demand point without evaluating the lazy ordered observation and
+limit field list or opening an asynchronous-exception window.
 
 That v2 identity still binds the path observation, pin result, arguments,
 environment, working directory, deadline, limits, and launch flags it
@@ -113,8 +121,11 @@ v4 ready-worker identity still binds one occurrence of that complete key beside
 the raw process field. The earlier v2/v4 migration changed and shortened
 ready-worker and transitive query-run identities, allowing a tight custom
 identity-byte budget to newly admit the same policy. This later runtime/facade
-extraction leaves canonical raw-process, ready-worker, and query-run bytes
-unchanged. Leant's configuration API and activation boundary remain unchanged.
+extraction and the later cached-root deletion leave canonical raw-process,
+ready-worker, and query-run bytes and schema tags unchanged. This is structured
+authority removal, not byte scrubbing: the reversible identities still contain
+the exact derived raw-process field. Leant's configuration API, activation
+boundary, and public behavior remain unchanged.
 
 After capability admission, the opaque ready worker no longer retains the
 complete five-part pre-readiness Session configuration. One strict private
