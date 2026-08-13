@@ -119,29 +119,35 @@ unchanged. Leant's configuration API and activation boundary remain unchanged.
 After capability admission, the opaque ready worker no longer retains the
 complete five-part pre-readiness Session configuration. One strict private
 query policy keeps only maximum queries, the query-run identity budget,
-protocol limits, and the complete execution policy needed to derive each query
-deadline and seal future plans. Exact process limits are projected from the
-same retained runtime; workspace-allocation, capability, and ready-identity
-admission have completed, while the opener deadline and Session
-workspace-cleanup authority remain with the enclosing rank-2 scope; process
-shutdown limits remain process-owned. The sealed protocol plan then supplies
-its exact query and artifact policy during replay, while response decoding uses
-the limits retained by that same plan, rather than pairing either operation
-with an independent worker-wide replay copy.
+protocol limits, and one strict post-launch policy containing the host deadline,
+artifact policy, response limits, and original complete execution-policy
+reversible key. This narrower value does not retain the structured Z3 launch
+profile or separately projectable executable path, digest expectation, solver
+timeout or resource limit, argument vector, environment, or working-directory
+policy. Because the reversible key still contains the exact original policy
+bytes, this is structured-authority narrowing rather than byte scrubbing.
+Exact process limits are projected from the same retained runtime;
+workspace-allocation, capability, and ready-identity admission have completed,
+while the opener deadline and Session workspace-cleanup authority remain with
+the enclosing rank-2 scope; process shutdown limits remain process-owned. The
+protocol sealer consumes that associated post-launch policy. Its sealed plan
+then supplies its exact query and artifact policy during replay, while response
+decoding uses the limits retained by that same plan, rather than pairing either
+operation with an independent worker-wide replay copy.
 Run-identity admission likewise derives its budget from the worker and its
 transport limits from that worker's process. This heap/association narrowing
-changes no ready-worker or query-run identity field, wire byte, failure order,
-public Djex API, or Leant behavior.
+changes no ready-worker or query-run identity field or byte, schema tag, wire
+byte, failure order, public Djex API, or Leant behavior.
 
 The private protocol plan follows the same single-owner rule. After validation
-and fingerprint sealing it retains the exact artifact policy, bounded response
-limits, nominal query, cumulative cursor policy, positional barriers, and
-reversible plan key needed by later protocol consumers, rather than the full
-structured `LengthSMTLibExecutionConfig`. The unchanged plan key still embeds
-the complete execution-policy key. Launch-profile, digest, solver-control,
+and fingerprint sealing from the post-launch policy it retains the exact
+artifact-policy and bounded-response-limit projections, nominal query,
+cumulative cursor policy, positional barriers, and reversible plan key needed
+by later protocol consumers. The unchanged plan key still embeds the original
+complete execution-policy key. Launch-profile, digest, solver-control,
 deadline, environment, and working-directory facts are not retained as
-separate structured runtime authority. The complete fingerprint still binds
-the exact initial and optional value writes; concatenated write fragments are
+separate structured plan authority. The complete fingerprint still binds the
+exact initial and optional value writes; concatenated write fragments are
 transient fingerprint inputs and are derived again on demand from the retained
 query and positional sentinels through the selectors used at the causal write
 edges. Presence-only inspection of the optional write does not render request
@@ -276,11 +282,12 @@ batch-failure payload.
 
 The live lifecycle and query budgets stay distinct. Djex's private policy owns
 workspace allocation, capability probing, final readiness, and cleanup bounds;
-the explicit execution configuration supplies the host deadline for each
-serial query. Sixty-four admitted candidates do not imply one 64-query
-wall-clock deadline, and cumulative process-output limits can still stop a
-session earlier. Durable cleanup is bounded by its own staged policy, and its
-latency can outlive the operation or deadline that initiated it.
+the strict post-launch policy retained from the explicit execution
+configuration supplies the host deadline for each serial query. Sixty-four
+admitted candidates do not imply one 64-query wall-clock deadline, and
+cumulative process-output limits can still stop a session earlier. Durable
+cleanup is bounded by its own staged policy, and its latency can outlive the
+operation or deadline that initiated it.
 
 The ranking runner deliberately propagates synchronous and asynchronous
 exceptions. Exceptions raised while the live callback owns a session flow
