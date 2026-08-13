@@ -62,10 +62,13 @@ run identities.
 For each successful query, Leant calls Djex's
 `replayLengthSMTLibLiveQueryObservation`. The gate checks that the observation
 carries the exact fingerprint of the already sealed query before inspecting
-optional evidence, then replays that evidence against the exact behavioral
-problem retained by the query. Only a successful replay releases the safe
-`ValidatedLengthCounterexample` receipt into the assessment stored by the
-opaque ranked-candidate association.
+its private whole status-indexed solver observation. Only the satisfiable
+branch can contain optional evidence; the gate then replays any such evidence
+against the exact behavioral problem retained by the query. Only a successful
+replay releases the safe `ValidatedLengthCounterexample` receipt into the
+assessment stored by the opaque ranked-candidate association. The whole
+observation has no public projection, so this query-first gate remains the only
+semantic extraction edge and Djex's public Live API is unchanged.
 
 The checked problem is transient until it is sealed into a canonical query.
 Each eligible prepared record retains only its caller-owned receipt association
@@ -218,16 +221,31 @@ receipt only at its existing receiver-feed and post-epoch boundary-collection
 edges. Transcript bytes, failure order, fingerprints, schemas, public
 behavior, and Leant remain unchanged.
 
-The package-private terminal protocol value likewise retains only the closed
-solver status and optional decoded integer bindings. Those bindings remain
-local through independent counterexample replay and the unchanged version-1
-query-run identity builder. Successful lease commit then forces a narrower run
-which retains its ordinal, strict status, optional problem-bound evidence,
-reversible key, transcript digest, and accounting boundaries, but no parsed
-symbol/integer binding list. The evidence receipt retains normalized
-source-ordered inputs, while the private reversible key retains exact bounded
-transcript bytes carrying the raw model. This is structured-authority
-narrowing, not byte scrubbing.
+The package-private terminal protocol value now owns one strict
+status-indexed `SolverObservation` instead of a status beside an optional
+binding payload. Only the satisfiable branch can carry decoded bindings:
+`Nothing` remains status-only `sat`, `Just []` remains the vacuous zero-input
+value result, and a nonempty `Just` remains a framed valuation. The `unsat` and
+`unknown` branches carry unit, so invalid status/payload pairs are
+unrepresentable. Generic `SolverObservation` payloads remain lazy; the opaque
+Length owner separately forces only the satisfiable `Maybe` spine, preserving
+the former demand without forcing the binding list.
+
+Session consumes that whole protocol observation and produces one private
+five-way replay result for status-only satisfiable, validated vacuous
+satisfiable, validated framed satisfiable, unsatisfiable, or unknown. That
+single owner supplies both unchanged version-1 identity fields and the
+completed run observation, preventing decoded status/value classification from
+being paired independently with evidence. Successful lease commit retains the
+run's ordinal, one strict status-indexed observation, reversible key,
+transcript digest, and accounting boundaries, but no parsed symbol/integer
+binding list. Only its satisfiable branch can contain optional problem-bound
+evidence. The Live facade copies that whole observation once and keeps it
+private behind the query-first replay gate. The evidence receipt retains
+normalized source-ordered inputs, while the private reversible key retains
+exact bounded transcript bytes carrying the raw model. Query-run identity
+bytes, field order, schema, wire behavior, and public API remain unchanged;
+this is structured-authority narrowing, not byte scrubbing.
 
 Both readiness and ordinary-query driver invocations take their final
 transcript cap from the exact sealed plan whose initial action they drive: the
