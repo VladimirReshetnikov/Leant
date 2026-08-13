@@ -50,8 +50,9 @@ data LeanLengthProviderLaw = LeanLengthProviderLaw
 -- | Closed candidate-case authority carried by one passive contract.
 --
 -- Ordinary startup and contract-only versions 1--3 retain the rejecting
--- policy. Contract-only version 4 must spell the exact zero/step policy
--- explicitly; Handoff never infers it from a graph or a failed sealer.
+-- policy. Contract-only version 4 must spell the exact zero/step policy;
+-- version 5 must explicitly choose either policy. Handoff never infers the
+-- choice from a graph or a failed sealer.
 data LeanLengthCandidateCasePolicy
   = LeanLengthCasesRejected
   | LeanLengthExactSpineZeroStepV1
@@ -72,8 +73,8 @@ data LeanLengthContract = LeanLengthContract
   , leanLengthContractTargetArgumentRoles ::
       Maybe [LengthTargetArgumentRole]
   -- | Explicit candidate-case authority. Versions 1--3 and startup v1 use
-  -- 'LeanLengthCasesRejected'; contract-only v4 alone can retain the exact
-  -- zero/step policy beside its required role vector.
+  -- 'LeanLengthCasesRejected'; contract-only v4 selects the exact zero/step
+  -- policy, and v5 explicitly selects either policy beside its required roles.
   , leanLengthContractCandidateCasePolicy :: LeanLengthCandidateCasePolicy
   , leanLengthContractSource :: LengthContractSource
   , leanLengthContractProviderLaws :: [LeanLengthProviderLaw]

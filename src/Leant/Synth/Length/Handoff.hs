@@ -339,9 +339,10 @@ checkDirectRendering casePolicy exactOrigin variant = do
     then Right ()
     else Left $ LengthHandoffRendererTextChanged exactText acceptedText
  where
-  -- Versions 1--3 keep their original singleton renderer requirement and
-  -- ordinal-zero check. Version 4 alone can associate the retained exact
-  -- ordinal within a multi-alternative rendering.
+  -- The case-rejecting policy keeps the original singleton renderer
+  -- requirement and ordinal-zero check. The exact case policy associates the
+  -- retained ordinal within a multi-alternative rendering. This follows the
+  -- decoded semantic policy rather than assuming a particular file version.
   selectLegacyAlternative [text]
     | exactTypedVariantOriginOrdinal exactOrigin == 0 = Right text
     | otherwise = Left $ LengthHandoffRendererOrdinalChanged

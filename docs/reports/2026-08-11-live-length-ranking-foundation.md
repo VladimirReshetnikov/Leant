@@ -17,9 +17,10 @@ pin, or read configuration from ambient process state. Main can now call it
 through an explicit startup-owned integration facade; that facade supplies a
 bounded file, pinned-by-default activation, and a fixed decoded contract rather
 than weakening this module's explicit inputs. The activated policy can also be
-paired with one separately decoded contract-only version 1, 2, 3, or 4 document for an
-explicit `:synth --length-contract ABSOLUTE-PATH -- TYPE` command. This changes
-contract lifetime, not the ranking module's authority or input shape.
+paired with one separately decoded contract-only version 1, 2, 3, 4, or 5
+document for an explicit
+`:synth --length-contract ABSOLUTE-PATH -- TYPE` command. This changes contract
+lifetime, not the ranking module's authority or input shape.
 
 The one-shot document has the exact format string
 `leant-finite-list-spine-length-contract` and only a `contract` payload beside
@@ -30,10 +31,13 @@ and requires an exact ordered target-role vector: every physical target argument
 either `observed-spine` or `unobserved-target`, with a maximum of eight. Older
 contract documents and the startup configuration reject the field. Version 4
 retains the version-3 grammar and additionally requires the sole exact
-zero/step candidate-case policy; older versions reject that field. Neither contains execution,
-activation, artifact, response, or replay policy. A shared package-private acquisition leaf owns the
-same absolute-path, POSIX descriptor, byte, timeout, and cleanup rules for both
-file facades.
+zero/step candidate-case policy; older versions reject that field. Version 5
+requires the role vector and an explicit choice of either `cases-rejected` or
+`exact-spine-zero-step-v1`, and adds positive-literal Natural floor quotient.
+None of these versions contains execution, activation, artifact, response, or
+replay policy. A shared package-private acquisition leaf owns the same
+absolute-path, POSIX descriptor, byte, timeout, and cleanup rules for both file
+facades.
 
 ## Admission and preparation
 
@@ -52,8 +56,9 @@ variant-scoped witness may instead refer to the first bounded later Exference
 occurrence with identical bytes. The displayed route, display ordinal,
 ordering, group sidecar, and sibling variants do not change.
 `prepareCheckedLengthProblem` preserves the singleton/ordinal-zero association
-for startup and contract-only versions 1--3. The explicit version-4 exact-case
-policy instead uses the origin's own renderer ordinal and requires the retained
+for startup, contract-only versions 1--3, and version 5's explicit
+`cases-rejected` policy. The explicit exact-case policy in version 4 or 5
+instead uses the origin's own renderer ordinal and requires the retained
 graph to re-render that exact alternative to the callback-accepted text before
 binding its family provenance, inventory, provider assumptions, and explicit
 contract. A graph may have multiple valid Lean renderings under that policy; a
@@ -65,7 +70,10 @@ Djex normalizes it and lowers every surviving occurrence to private,
 deterministically allocated quotient/remainder equations using only QF_LIA;
 it emits no SMT-LIB `mod` term and requests no witness values. Version-1
 startup and one-shot documents remain unchanged, and existing no-modulo query
-identities remain byte-identical.
+identities remain byte-identical. Version 5 quotient uses the same private
+Euclidean witness equations and deterministic mixed witness order, projects
+the quotient rather than the remainder, emits no SMT-LIB `div`, and is
+independently recomputed during replay.
 
 For version 3, the checked Handoff passes one retained role choice to Djex's
 role-aware session, contract, and problem sealers only after the established exact
@@ -95,6 +103,16 @@ zero and `monus 1` tail semantics, one compact QF_LIA input, and a replayed
 input-3/result-3 counterexample. Versions 1--3 continue to reject the same
 case. The policy remains command-local and supplies neither proof nor pruning
 authority.
+
+Version 5 composes that same production handoff with quotient without granting
+case authority implicitly. A role-aware higher-order map under
+`cases-rejected` seals a quotient postcondition to QF_LIA and replays one
+compact input-3/result-3 counterexample. A production recursive rebuild case
+remains ineligible under version 5 `cases-rejected`, but the same quotient
+contract under `exact-spine-zero-step-v1` retains the accepted renderer ordinal
+and replays the counterexample. Reusing decoded requests after source mutation
+and interleaving startup, v3, v4, and both v5 policies demonstrates that neither
+grammar nor case choice enters interactive state.
 
 A pure refusal at either boundary leaves that one candidate `Unassessed` through
 the legacy assessment projection and records a separate

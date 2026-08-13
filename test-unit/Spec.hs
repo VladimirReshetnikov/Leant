@@ -80,6 +80,7 @@ import Language.Haskell.Djex
   , eraseTermGraph
   , fingerprintCanonicalBytes
   , lengthSMTLibQueryBehavioralProblem
+  , lengthSMTLibQueryCheckBytes
   , lengthSMTLibQueryFingerprint
   , lengthSMTLibQueryInputSymbols
   , lengthSMTLibQueryInputValueRequestBytes
@@ -248,6 +249,7 @@ import Leant.Synth.Length.Contract.File
   , lengthContractFileExactCaseVersion
   , lengthContractFileJsonLimits
   , lengthContractFileModuloVersion
+  , lengthContractFileQuotientVersion
   , lengthContractFileTargetRolesVersion
   , lengthContractFileVersion
   )
@@ -2309,6 +2311,9 @@ lengthContractFileTests = testGroup
       assertLengthContractFileTargetRoleGrammar
   , testCase "require explicit exact case semantics in contract-only version 4"
       assertLengthContractFileExactCaseGrammar
+  , testCase
+      "gate quotient to contract-only version 5 with either explicit case policy"
+      assertLengthContractFileQuotientGrammar
   , testCase "reject contract roots and redact nested private values"
       assertLengthContractFileSchemaAndRedaction
   , testCase "admit and acquire one explicit contract-only regular file"
@@ -2457,7 +2462,7 @@ assertLengthContractFileModuloGrammar = do
     (LengthContractFileMissingRootField LengthContractFileContractField)
     $ deleteJsonField ["contract"] v2
   assertLengthContractFileError LengthContractFileUnsupportedVersion
-    $ setJsonField ["version"] (Json.JInt 5)
+    $ setJsonField ["version"] (Json.JInt 6)
     $ addJsonField [] ("execution", Json.JObj []) v2
   legacyNoModulo <- expectLengthContractFile
     $ lengthContractFileFixture noModulo
@@ -2704,6 +2709,221 @@ assertLengthContractFileExactCaseGrammar = do
     $ setJsonField ["contract", "candidateCasePolicy"]
         (Json.JStr "private-case-policy") v4
 
+assertLengthContractFileQuotientGrammar :: IO ()
+assertLengthContractFileQuotientGrammar = do
+  lengthContractFileQuotientVersion @?= 5
+  let roles = ["unobserved-target", "observed-spine"]
+      precondition = jsonLengthEqual
+        (jsonLengthQuotient 2 $ jsonLengthInput 0)
+        (jsonLengthLiteral 1)
+      postcondition = jsonLengthEqual jsonLengthResult
+        $ jsonLengthQuotient 3
+        $ jsonLengthSum
+            [ jsonLengthInput 0
+            , jsonLengthModulo 2 $ jsonLengthInput 0
+            ]
+      providerTransfer = jsonLengthQuotient 5 $ jsonLengthArgument 1
+      roleAware = jsonRoleAwareLengthContract roles precondition postcondition
+        [ jsonLengthProviderLaw "Demo.mapList"
+            ["unobserved", "spine"] providerTransfer
+        ]
+      withPolicy policy = addJsonField []
+        ("candidateCasePolicy", Json.JStr policy) roleAware
+      v5 policy = lengthContractFileFixtureVersion
+        lengthContractFileQuotientVersion $ withPolicy policy
+      casesRejectedDocument = v5 "cases-rejected"
+      exactDocument = v5 "exact-spine-zero-step-v1"
+      expectedSource = LengthContractSource
+        { lengthContractPrecondition = LengthEqual
+            (LengthQuotient 2 $ LengthVariable $ LengthInput 0)
+            (LengthLiteral 1)
+        , lengthContractPostcondition = LengthEqual
+            (LengthVariable LengthResult)
+            (LengthQuotient 3 $ LengthSum
+              [ LengthVariable $ LengthInput 0
+              , LengthModulo 2 $ LengthVariable $ LengthInput 0
+              ])
+        }
+      unknownQuotient phase = LengthContractFileContractRejected
+        $ LengthRankingConfigurationSyntaxRejected phase
+            LengthRankingConfigurationUnknownTag
+      casePolicyField = LengthRankingConfigurationCandidateCasePolicyField
+      quotientRejected phase failure = assertLengthContractFileError
+        (LengthContractFileContractRejected
+          $ LengthRankingConfigurationSyntaxRejected phase failure)
+        . lengthContractFileFixtureVersion lengthContractFileQuotientVersion
+      contractWithPre expression = jsonRoleAwareLengthContract
+        ["observed-spine"]
+        (jsonLengthEqual expression $ jsonLengthLiteral 0)
+        (jsonLengthTruth True) []
+      contractWithPost expression = jsonRoleAwareLengthContract
+        ["observed-spine"]
+        (jsonLengthTruth True)
+        (jsonLengthEqual jsonLengthResult expression) []
+      withCasesRejected contract = addJsonField []
+        ("candidateCasePolicy", Json.JStr "cases-rejected") contract
+      poisonedChild = Json.JArr [Json.JStr "private-child"]
+  casesRejected <- expectLengthContractFile casesRejectedDocument
+  exact <- expectLengthContractFile exactDocument
+  leanLengthContractTargetArgumentRoles casesRejected @?=
+    Just [LengthUnobservedTarget, LengthObservedSpine]
+  leanLengthContractCandidateCasePolicy casesRejected @?=
+    LeanLengthCasesRejected
+  leanLengthContractCandidateCasePolicy exact @?=
+    LeanLengthExactSpineZeroStepV1
+  leanLengthContractSource casesRejected @?= expectedSource
+  leanLengthContractSource exact @?= expectedSource
+  leanLengthContractProviderLaws casesRejected @?=
+    [ LeanLengthProviderLaw
+        { leanLengthProviderLawName = "Demo.mapList"
+        , leanLengthProviderLawArgumentRoles =
+            [LengthUnobservedArgument, LengthSpineArgument]
+        , leanLengthProviderLawTransfer = LengthQuotient 5
+            $ LengthVariable $ Djex.LengthProviderArgument 1
+        }
+    ]
+  expectLengthContractFile (reverseJsonObjectFields casesRejectedDocument)
+    >>= (@?= casesRejected)
+
+  -- Quotient remains unknown in every frozen entrance: startup compatibility
+  -- and contract-only versions 1 through 4.
+  let quotientV1 = lengthContractFileFixture
+        $ jsonLengthContract precondition (jsonLengthTruth True) []
+      quotientV2 = lengthContractFileFixtureVersion
+        lengthContractFileModuloVersion
+        $ jsonLengthContract precondition (jsonLengthTruth True) []
+      quotientV3 = lengthContractFileFixtureVersion
+        lengthContractFileTargetRolesVersion
+        $ jsonRoleAwareLengthContract roles precondition
+            (jsonLengthTruth True) []
+      quotientV4 = lengthContractFileFixtureVersion
+        lengthContractFileExactCaseVersion
+        $ addJsonField []
+            ( "candidateCasePolicy"
+            , Json.JStr "exact-spine-zero-step-v1"
+            )
+        $ jsonRoleAwareLengthContract roles precondition
+            (jsonLengthTruth True) []
+      quotientV4Post = lengthContractFileFixtureVersion
+        lengthContractFileExactCaseVersion
+        $ addJsonField []
+            ( "candidateCasePolicy"
+            , Json.JStr "exact-spine-zero-step-v1"
+            )
+        $ jsonRoleAwareLengthContract roles (jsonLengthTruth True)
+            (jsonLengthEqual jsonLengthResult
+              $ jsonLengthQuotient 2 $ jsonLengthInput 0) []
+      quotientV4Provider = lengthContractFileFixtureVersion
+        lengthContractFileExactCaseVersion
+        $ addJsonField []
+            ( "candidateCasePolicy"
+            , Json.JStr "exact-spine-zero-step-v1"
+            )
+        $ jsonRoleAwareLengthContract roles
+            (jsonLengthTruth True) (jsonLengthTruth True)
+            [ jsonLengthProviderLaw "Demo.provider" ["spine"]
+                $ jsonLengthQuotient 2 $ jsonLengthArgument 0
+            ]
+  mapM_ (assertLengthContractFileError
+      $ unknownQuotient LengthRankingConfigurationPreconditionSyntax)
+    [quotientV1, quotientV2, quotientV3, quotientV4]
+  assertLengthContractFileError
+    (unknownQuotient LengthRankingConfigurationPostconditionSyntax)
+    quotientV4Post
+  assertLengthContractFileError
+    (unknownQuotient $ LengthRankingConfigurationProviderTransferSyntax 0)
+    quotientV4Provider
+  assertLengthRankingConfigurationFileError
+    (LengthRankingConfigurationSyntaxRejected
+      LengthRankingConfigurationPreconditionSyntax
+      LengthRankingConfigurationUnknownTag)
+    $ setJsonField ["contract"]
+        (jsonLengthContract precondition (jsonLengthTruth True) [])
+    $ lengthRankingConfigurationFileFixture "/tmp/not-opened-z3" Nothing
+
+  assertLengthContractFileError
+    (LengthContractFileContractRejected
+      $ LengthRankingConfigurationMissingField
+          LengthRankingConfigurationContractObject
+          LengthRankingConfigurationTargetArgumentRolesField)
+    $ setJsonField ["contract", "precondition"]
+        (Json.JStr "private-later-formula")
+    $ setJsonField ["contract", "candidateCasePolicy"]
+        (Json.JStr "private-case-policy")
+    $ deleteJsonField ["contract", "targetArgumentRoles"]
+        casesRejectedDocument
+  assertLengthContractFileError
+    (LengthContractFileContractRejected
+      $ LengthRankingConfigurationFieldValueRejected
+          LengthRankingConfigurationTargetArgumentRolesField)
+    $ setJsonField ["contract", "precondition"]
+        (Json.JStr "private-later-formula")
+    $ setJsonField ["contract", "candidateCasePolicy"]
+        (Json.JStr "private-case-policy")
+    $ setJsonField ["contract", "targetArgumentRoles"]
+        (Json.JArr [Json.JStr "private-role"])
+        casesRejectedDocument
+  assertLengthContractFileError
+    (LengthContractFileContractRejected
+      $ LengthRankingConfigurationMissingField
+          LengthRankingConfigurationContractObject casePolicyField)
+    $ deleteJsonField ["contract", "candidateCasePolicy"]
+        casesRejectedDocument
+  assertLengthContractFileError
+    (LengthContractFileContractRejected
+      $ LengthRankingConfigurationFieldTypeMismatch casePolicyField
+          LengthRankingConfigurationStringValue)
+    $ setJsonField ["contract", "candidateCasePolicy"] (Json.JInt 1)
+        casesRejectedDocument
+  assertLengthContractFileError
+    (LengthContractFileContractRejected
+      $ LengthRankingConfigurationFieldValueRejected casePolicyField)
+    $ setJsonField ["contract", "precondition"]
+        (Json.JStr "private-later-formula")
+    $ setJsonField ["contract", "candidateCasePolicy"]
+        (Json.JStr "private-case-policy") casesRejectedDocument
+
+  let maximumDivisor = 2 ^ (256 :: Int) - 1
+  _ <- expectLengthContractFile
+    $ lengthContractFileFixtureVersion lengthContractFileQuotientVersion
+    $ withCasesRejected
+    $ contractWithPre
+    $ jsonLengthQuotient maximumDivisor $ jsonLengthLiteral 0
+  quotientRejected LengthRankingConfigurationPreconditionSyntax
+      LengthRankingConfigurationQuotientDivisorZero
+    $ withCasesRejected
+    $ contractWithPre $ jsonLengthQuotient 0 poisonedChild
+  quotientRejected LengthRankingConfigurationPostconditionSyntax
+      (LengthRankingConfigurationSyntaxLimitExceeded
+        LengthRankingConfigurationLiteralBits 256 257)
+    $ withCasesRejected
+    $ contractWithPost
+    $ jsonLengthQuotient (2 ^ (256 :: Int)) poisonedChild
+  quotientRejected LengthRankingConfigurationPreconditionSyntax
+      LengthRankingConfigurationExpectedSyntaxNatural
+    $ withCasesRejected
+    $ contractWithPre $ Json.JArr
+        [Json.JStr "quotient", Json.JInt (-1), poisonedChild]
+  quotientRejected LengthRankingConfigurationPreconditionSyntax
+      LengthRankingConfigurationExpectedSyntaxNatural
+    $ withCasesRejected
+    $ contractWithPre $ Json.JArr
+        [Json.JStr "quotient", Json.JStr "2", poisonedChild]
+  quotientRejected LengthRankingConfigurationPreconditionSyntax
+      (LengthRankingConfigurationTagArityMismatch 2 1)
+    $ withCasesRejected
+    $ contractWithPre $ Json.JArr
+        [Json.JStr "quotient", Json.JInt 2]
+  quotientRejected
+      (LengthRankingConfigurationProviderTransferSyntax 0)
+      LengthRankingConfigurationQuotientDivisorZero
+    $ withCasesRejected
+    $ jsonRoleAwareLengthContract ["observed-spine"]
+        (jsonLengthTruth True) (jsonLengthTruth True)
+        [ jsonLengthProviderLaw "Demo.provider" ["spine"]
+            $ jsonLengthQuotient 0 poisonedChild
+        ]
+
 assertLengthContractFileSchemaAndRedaction :: IO ()
 assertLengthContractFileSchemaAndRedaction = do
   let contract = jsonLengthContract
@@ -2712,7 +2932,7 @@ assertLengthContractFileSchemaAndRedaction = do
   assertLengthContractFileError LengthContractFileUnsupportedFormat
     $ setJsonField ["format"] (Json.JStr "wrong-format") base
   assertLengthContractFileError LengthContractFileUnsupportedVersion
-    $ setJsonField ["version"] (Json.JInt 5) base
+    $ setJsonField ["version"] (Json.JInt 6) base
   assertLengthContractFileError LengthContractFileUnexpectedRootField
     $ addJsonField [] ("execution", Json.JObj []) base
   assertLengthContractFileError
@@ -2911,10 +3131,10 @@ lengthAssessmentIntegrationTests = testGroup
   , testCase "reuse one activated policy with command-local contracts"
       assertLengthAssessmentExplicitContracts
   , testCase
-      "rank one role-aware higher-order map request without policy stickiness"
+      "rank role-aware map requests including v5 quotient without stickiness"
       assertLengthAssessmentRoleAwareMap
   , testCase
-      "rank one production exact zero-step case under explicit v4 policy"
+      "rank an exact zero-step case under v4 and both v5 policies"
       assertLengthAssessmentExactSpineCase
   , testCase "preserve sealed callback order after a live failure"
       assertLengthAssessmentFailureFallback
@@ -3317,6 +3537,51 @@ assertLengthAssessmentRoleAwareMap
             Just bytes -> not $ null bytes
             Nothing -> False
 
+      quotientContract <- expectLengthContractFile
+        $ lengthContractFileFixtureVersion lengthContractFileQuotientVersion
+            roleAwareMapQuotientContractValue
+      leanLengthContractCandidateCasePolicy quotientContract @?=
+        LeanLengthCasesRejected
+      quotientProblem <- expectRight
+        $ prepareCheckedLengthProblem quotientContract verified
+      checkedLengthCandidateResult
+          (checkedLengthProblemCandidate quotientProblem) @?=
+        LengthVariable (LengthInput 0)
+      quotientQuery <- expectRight
+          (prepareCheckedLengthQuery quotientContract verified)
+        >>= expectRight
+      let quotientCheck = map (toEnum . fromIntegral)
+            $ lengthSMTLibQueryCheckBytes quotientQuery
+      lengthSMTLibQueryLogic @?= map (fromIntegral . fromEnum) "QF_LIA"
+      assertBool "v5 role-aware query did not select QF_LIA"
+        $ "(set-logic QF_LIA)\n" `isInfixOf` quotientCheck
+      assertBool "v5 role-aware query omitted the quotient witness"
+        $ "djex_length_quotient_quotient_0" `isInfixOf` quotientCheck
+      assertBool "v5 role-aware query omitted the quotient remainder"
+        $ "djex_length_quotient_remainder_0" `isInfixOf` quotientCheck
+      assertBool "v5 role-aware query delegated quotient to SMT div"
+        $ not $ "(div " `isInfixOf` quotientCheck
+      quotientSymbol <- case lengthSMTLibQueryInputSymbols quotientQuery of
+        [retained] -> pure retained
+        symbols -> assertFailure
+          ("v5 role-aware query retained unexpected inputs: " ++ show symbols)
+            >> error "unreachable"
+      quotientEvidence <- case validateLengthSMTLibCounterexample
+          defaultLengthEvaluationLimits quotientQuery
+          [Djex.LengthSMTLibIntegerBinding quotientSymbol 3] of
+        Left failure -> assertFailure
+          ("v5 role-aware quotient replay failed: " ++ show failure)
+            >> error "unreachable"
+        Right Nothing -> assertFailure
+          "the v5 role-aware quotient violation produced no evidence"
+            >> error "unreachable"
+        Right (Just retained) -> pure retained
+      quotientReceipt <- expectRight $ Djex.replayBehavioralEvidence
+        (checkedLengthProblemBehavioralProblem quotientProblem)
+        quotientEvidence
+      Djex.validatedLengthCounterexampleInputs quotientReceipt @?= [3]
+      Djex.validatedLengthCounterexampleResult quotientReceipt @?= 3
+
       let oneRole = contract
             { leanLengthContractTargetArgumentRoles =
                 Just [LengthObservedSpine]
@@ -3395,8 +3660,8 @@ assertLengthAssessmentRoleAwareMap
                   (Json.JStr "input-values-after-satisfiable")
               $ lengthRankingConfigurationFileFixture executable Nothing
             roleAwareDocument = lengthContractFileFixtureVersion
-              lengthContractFileTargetRolesVersion
-              roleAwareMapContractValue
+              lengthContractFileQuotientVersion
+              roleAwareMapQuotientContractValue
         ByteString.writeFile configurationPath
           $ encodeLengthRankingConfigurationFile configuration
         loadedMode <- loadLengthAssessmentMode PermitUnpinnedExecutable
@@ -3416,9 +3681,11 @@ assertLengthAssessmentRoleAwareMap
         loadedContract <- loadLengthContractFile request >>= either
           (\failure -> assertFailure (show failure) >> error "unreachable")
           pure
-        loadedContract @?= contract
-        -- The decoded request owns its passive contract. Neither the first
-        -- assessment nor a later reuse may reopen the one-shot path.
+        loadedContract @?= quotientContract
+        -- The decoded request owns its passive v5 quotient contract. Neither
+        -- the first assessment nor a later reuse may reopen the one-shot path,
+        -- and the startup compatibility request cannot inherit its grammar or
+        -- explicit case-rejecting policy.
         ByteString.writeFile contractPath $ BS.pack "{"
         verification <- verificationBatchFromReceipts [verified]
         let explicitRequest = explicitLengthAssessmentRequest
@@ -3485,6 +3752,18 @@ roleAwareMapContractValue = jsonRoleAwareLengthContract
   [ jsonLengthProviderLaw "Demo.mapList" ["unobserved", "spine"]
       $ jsonLengthArgument 1
   ]
+
+roleAwareMapQuotientContractValue :: Json.JValue
+roleAwareMapQuotientContractValue = addJsonField []
+  ("candidateCasePolicy", Json.JStr "cases-rejected")
+  $ jsonRoleAwareLengthContract
+      ["unobserved-target", "observed-spine"]
+      (jsonLengthTruth True)
+      (jsonLengthEqual jsonLengthResult
+        $ jsonLengthQuotient 2 $ jsonLengthInput 0)
+      [ jsonLengthProviderLaw "Demo.mapList" ["unobserved", "spine"]
+          $ jsonLengthArgument 1
+      ]
 
 buildRoleAwareMapFixture
   :: IO (LeanLengthContract, Verified DetailedVerificationVariant)
@@ -3567,12 +3846,29 @@ assertLengthAssessmentExactSpineCase
         LeanLengthCasesRejected
       leanLengthContractCandidateCasePolicy exactContract @?=
         LeanLengthExactSpineZeroStepV1
+      v5CasesRejectedContract <- expectLengthContractFile
+        $ lengthContractFileFixtureVersion lengthContractFileQuotientVersion
+        $ exactSpineCaseQuotientContractValue "cases-rejected"
+      v5ExactContract <- expectLengthContractFile
+        $ lengthContractFileFixtureVersion lengthContractFileQuotientVersion
+        $ exactSpineCaseQuotientContractValue
+            "exact-spine-zero-step-v1"
+      leanLengthContractCandidateCasePolicy v5CasesRejectedContract @?=
+        LeanLengthCasesRejected
+      leanLengthContractCandidateCasePolicy v5ExactContract @?=
+        LeanLengthExactSpineZeroStepV1
       case prepareCheckedLengthProblem legacyContract verified of
         Left (LengthHandoffRendererNotUnique 2) -> pure ()
         Left refusal -> assertFailure $ "unexpected legacy case refusal: "
           ++ show refusal
         Right _ -> assertFailure
           "the version-3 policy relaxed its singleton renderer rule"
+      case prepareCheckedLengthProblem v5CasesRejectedContract verified of
+        Left (LengthHandoffRendererNotUnique 2) -> pure ()
+        Left refusal -> assertFailure
+          $ "unexpected v5 case-rejecting refusal: " ++ show refusal
+        Right _ -> assertFailure
+          "v5 cases-rejected relaxed the singleton renderer rule"
       let exactWithoutRoles = exactContract
             { leanLengthContractTargetArgumentRoles = Nothing }
           unresolvedFamily = exactWithoutRoles
@@ -3608,7 +3904,11 @@ assertLengthAssessmentExactSpineCase
           ++ show refusal
         Right _ -> assertFailure
           "exact case policy inferred an omitted target-role vector"
-      problem <- expectRight $ prepareCheckedLengthProblem exactContract verified
+      -- Version 4 and version 5 exact policies both retain the accepted typed
+      -- renderer ordinal. Quotient is orthogonal to that case authority.
+      _ <- expectRight $ prepareCheckedLengthProblem exactContract verified
+      problem <- expectRight
+        $ prepareCheckedLengthProblem v5ExactContract verified
       checkedLengthCandidateResult
           (checkedLengthProblemCandidate problem) @?=
         LengthIf
@@ -3620,8 +3920,17 @@ assertLengthAssessmentExactSpineCase
                 (LengthLiteral 1)
             ])
       query <- expectRight
-          (prepareCheckedLengthQuery exactContract verified)
+          (prepareCheckedLengthQuery v5ExactContract verified)
         >>= expectRight
+      let quotientCheck = map (toEnum . fromIntegral)
+            $ lengthSMTLibQueryCheckBytes query
+      lengthSMTLibQueryLogic @?= map (fromIntegral . fromEnum) "QF_LIA"
+      assertBool "v5 exact query omitted its quotient witness"
+        $ "djex_length_quotient_quotient_0" `isInfixOf` quotientCheck
+      assertBool "v5 exact query omitted its quotient remainder"
+        $ "djex_length_quotient_remainder_0" `isInfixOf` quotientCheck
+      assertBool "v5 exact query delegated quotient to SMT div"
+        $ not $ "(div " `isInfixOf` quotientCheck
       symbol <- case lengthSMTLibQueryInputSymbols query of
         [retained] -> pure retained
         symbols -> assertFailure ("exact case query retained unexpected inputs: "
@@ -3655,8 +3964,9 @@ assertLengthAssessmentExactSpineCase
                   (Json.JStr "input-values-after-satisfiable")
               $ lengthRankingConfigurationFileFixture executable Nothing
             exactDocument = lengthContractFileFixtureVersion
-              lengthContractFileExactCaseVersion
-              exactSpineCaseContractValue
+              lengthContractFileQuotientVersion
+              $ exactSpineCaseQuotientContractValue
+                  "exact-spine-zero-step-v1"
         ByteString.writeFile configurationPath
           $ encodeLengthRankingConfigurationFile configuration
         loadedMode <- loadLengthAssessmentMode PermitUnpinnedExecutable
@@ -3676,16 +3986,20 @@ assertLengthAssessmentExactSpineCase
         loadedContract <- loadLengthContractFile request >>= either
           (\failure -> assertFailure (show failure) >> error "unreachable")
           pure
-        loadedContract @?= exactContract
-        -- The request owns the decoded v4 case policy. Reusing it must not
-        -- reopen the source, and neither compatibility nor a v3 request may
-        -- inherit that case authority from an earlier command.
+        loadedContract @?= v5ExactContract
+        -- The request owns the decoded v5 quotient grammar and exact case
+        -- policy. Reusing it must not reopen the source, and compatibility,
+        -- v3, or v5 cases-rejected requests cannot inherit that authority.
         ByteString.writeFile contractPath $ BS.pack "{"
         verification <- verificationBatchFromReceipts [verified]
         let exactRequest = explicitLengthAssessmentRequest
               permission loadedContract
             legacyRequest = explicitLengthAssessmentRequest
               permission legacyContract
+            v4Request = explicitLengthAssessmentRequest
+              permission exactContract
+            v5CasesRejectedRequest = explicitLengthAssessmentRequest
+              permission v5CasesRejectedContract
             assessments label assessed = case lengthAssessmentRanking assessed of
               Just ranking -> pure $ map rankedLengthCandidateAssessment
                 $ lengthRankingCandidates ranking
@@ -3708,18 +4022,27 @@ assertLengthAssessmentExactSpineCase
               (compatibilityLengthAssessmentRequest mode) verification
         legacy <- expectLengthAssessmentWithin
           $ assessLengthVerificationRequest legacyRequest verification
+        casesRejected <- expectLengthAssessmentWithin
+          $ assessLengthVerificationRequest
+              v5CasesRejectedRequest verification
+        v4Exact <- expectLengthAssessmentWithin
+          $ assessLengthVerificationRequest v4Request verification
         repeated <- expectLengthAssessmentWithin
           $ assessLengthVerificationRequest exactRequest verification
         map lengthAssessmentFailure
-            [assessed, compatibility, legacy, repeated] @?=
-          [Nothing, Nothing, Nothing, Nothing]
+            [ assessed, compatibility, legacy, casesRejected
+            , v4Exact, repeated
+            ] @?= replicate 6 Nothing
         map lengthAssessmentCandidates
-            [assessed, compatibility, legacy, repeated] @?=
-          replicate 4 [verified]
-        assertExactCounterexample "loaded v4 request" assessed
+            [ assessed, compatibility, legacy, casesRejected
+            , v4Exact, repeated
+            ] @?= replicate 6 [verified]
+        assertExactCounterexample "loaded v5 quotient request" assessed
         assertUnassessed "compatibility request" compatibility
         assertUnassessed "version-3 request" legacy
-        assertExactCounterexample "reused v4 request" repeated
+        assertUnassessed "v5 cases-rejected request" casesRejected
+        assertExactCounterexample "version-4 exact request" v4Exact
+        assertExactCounterexample "reused v5 quotient request" repeated
 
 buildExactSpineCaseFixture
   :: IO
@@ -3785,6 +4108,16 @@ exactSpineCaseContractValue = addJsonField []
   ( "candidateCasePolicy"
   , Json.JStr "exact-spine-zero-step-v1"
   ) exactSpineCaseRoleAwareContractValue
+
+exactSpineCaseQuotientContractValue :: String -> Json.JValue
+exactSpineCaseQuotientContractValue policy = addJsonField []
+  ("candidateCasePolicy", Json.JStr policy)
+  $ jsonRoleAwareLengthContract
+      ["observed-spine"]
+      (jsonLengthTruth True)
+      (jsonLengthEqual jsonLengthResult
+        $ jsonLengthQuotient 2 $ jsonLengthInput 0)
+      []
 
 exactSpineRebuildExpression :: Eq local => Expression local -> Bool
 exactSpineRebuildExpression expression = case expression of
@@ -4954,6 +5287,10 @@ jsonLengthModulo :: Integer -> Json.JValue -> Json.JValue
 jsonLengthModulo divisor expression = Json.JArr
   [Json.JStr "modulo", Json.JInt divisor, expression]
 
+jsonLengthQuotient :: Integer -> Json.JValue -> Json.JValue
+jsonLengthQuotient divisor expression = Json.JArr
+  [Json.JStr "quotient", Json.JInt divisor, expression]
+
 jsonLengthMonus :: Json.JValue -> Json.JValue -> Json.JValue
 jsonLengthMonus left right = Json.JArr
   [Json.JStr "monus", left, right]
@@ -5484,7 +5821,8 @@ assertLengthPreparationRefusalClasses = do
         , LengthPreparationCandidateSemanticsRejected
         ]
       queryRefusals =
-        [ Djex.LengthSMTLibModuloDivisorZero
+        [ Djex.LengthSMTLibQuotientDivisorZero
+        , Djex.LengthSMTLibModuloDivisorZero
         , Djex.LengthSMTLibUnexpectedResultVariable
         , Djex.LengthSMTLibInputVariableOutOfRange 0 0
         , Djex.LengthSMTLibNumeralBitLimitExceeded
@@ -5509,7 +5847,7 @@ assertLengthPreparationRefusalClasses = do
   map lengthHandoffPreparationRefusalClass handoffRefusals @?=
     expectedHandoffClasses
   map lengthQueryPreparationRefusalClass queryRefusals @?=
-    replicate 6 LengthPreparationQueryConstructionRejected
+    replicate 7 LengthPreparationQueryConstructionRejected
   map lengthPreparationRefusalClassCode classes @?= expectedCodes
   Set.size (Set.fromList expectedCodes) @?= length expectedCodes
   let sanitized = show $ lengthHandoffPreparationRefusalClass

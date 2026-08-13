@@ -28,6 +28,7 @@ module Leant.Synth.Length.Configuration.File
   , decodeLeanLengthContractValueV2
   , decodeLeanLengthContractValueV3
   , decodeLeanLengthContractValueV4
+  , decodeLeanLengthContractValueV5
   , disableLengthRankingConfiguration
   , activateLengthRankingConfiguration
   ) where
@@ -197,6 +198,7 @@ data LengthRankingConfigurationSyntaxError
   | LengthRankingConfigurationExpectedSyntaxBoolean
   | LengthRankingConfigurationExpectedSyntaxNatural
   | LengthRankingConfigurationModuloDivisorZero
+  | LengthRankingConfigurationQuotientDivisorZero
   | LengthRankingConfigurationSyntaxLimitExceeded
       !LengthRankingConfigurationSyntaxLimit !Natural !Natural
   deriving (Eq, Ord, Show)
@@ -807,11 +809,23 @@ decodeLeanLengthContractValueV4
 decodeLeanLengthContractValueV4 = decodeLeanLengthContractValueWithGrammar
   LengthContractGrammarV4
 
+-- | Decode the contract-only version-5 grammar. This retains modulo, required
+-- target roles, and an explicit case policy, and additionally admits
+-- positive-literal Natural quotient. Unlike version 4, version 5 accepts an
+-- explicit case-rejecting policy so new arithmetic does not itself grant case
+-- authority.
+decodeLeanLengthContractValueV5
+  :: BoundedJsonValue
+  -> Either LengthRankingConfigurationFileError LeanLengthContract
+decodeLeanLengthContractValueV5 = decodeLeanLengthContractValueWithGrammar
+  LengthContractGrammarV5
+
 data LengthContractGrammar
   = LengthContractGrammarV1
   | LengthContractGrammarV2
   | LengthContractGrammarV3
   | LengthContractGrammarV4
+  | LengthContractGrammarV5
   deriving (Eq)
 
 decodeLeanLengthContractValueWithGrammar
@@ -844,6 +858,13 @@ decodeLeanLengthContractValueWithGrammar grammar value = do
         "targetArgumentRoles"
         object
       Just <$> decodeTargetRoles rolesValue
+    LengthContractGrammarV5 -> do
+      rolesValue <- requiredField
+        LengthRankingConfigurationContractObject
+        LengthRankingConfigurationTargetArgumentRolesField
+        "targetArgumentRoles"
+        object
+      Just <$> decodeTargetRoles rolesValue
   casePolicy <- case grammar of
     LengthContractGrammarV4 -> do
       policyValue <- requiredField
@@ -851,7 +872,14 @@ decodeLeanLengthContractValueWithGrammar grammar value = do
         LengthRankingConfigurationCandidateCasePolicyField
         "candidateCasePolicy"
         object
-      decodeCandidateCasePolicy policyValue
+      decodeCandidateCasePolicy grammar policyValue
+    LengthContractGrammarV5 -> do
+      policyValue <- requiredField
+        LengthRankingConfigurationContractObject
+        LengthRankingConfigurationCandidateCasePolicyField
+        "candidateCasePolicy"
+        object
+      decodeCandidateCasePolicy grammar policyValue
     _ -> Right LeanLengthCasesRejected
   preconditionValue <- requiredField
     LengthRankingConfigurationContractObject
@@ -920,8 +948,18 @@ contractFields grammar =
         , LengthRankingConfigurationTargetArgumentRolesField
         )
       ]
+    LengthContractGrammarV5 ->
+      [ ( "targetArgumentRoles"
+        , LengthRankingConfigurationTargetArgumentRolesField
+        )
+      ]
   casePolicyFields = case grammar of
     LengthContractGrammarV4 ->
+      [ ( "candidateCasePolicy"
+        , LengthRankingConfigurationCandidateCasePolicyField
+        )
+      ]
+    LengthContractGrammarV5 ->
       [ ( "candidateCasePolicy"
         , LengthRankingConfigurationCandidateCasePolicyField
         )
@@ -929,15 +967,18 @@ contractFields grammar =
     _ -> []
 
 decodeCandidateCasePolicy
-  :: BoundedJsonValue
+  :: LengthContractGrammar
+  -> BoundedJsonValue
   -> Either
       LengthRankingConfigurationFileError
       LeanLengthCandidateCasePolicy
-decodeCandidateCasePolicy value = do
+decodeCandidateCasePolicy grammar value = do
   let field = LengthRankingConfigurationCandidateCasePolicyField
   policy <- stringField field value
   case policy of
     "exact-spine-zero-step-v1" -> Right LeanLengthExactSpineZeroStepV1
+    "cases-rejected"
+      | grammar == LengthContractGrammarV5 -> Right LeanLengthCasesRejected
     _ -> Left $ LengthRankingConfigurationFieldValueRejected field
 
 decodeTargetRoles
@@ -1231,6 +1272,16 @@ parseLengthExpression grammar phase decodeVariable depth usage value = do
             (expression, afterExpression) <- parseLengthExpression grammar
               phase decodeVariable (depth + 1) afterNode expressionValue
             Right (LengthModulo divisor expression, afterExpression)
+      "quotient" | grammarSupportsQuotient grammar -> do
+        (divisorValue, expressionValue) <- syntax phase
+          $ twoArguments arguments
+        divisor <- boundedLiteral phase divisorValue
+        if divisor == 0
+          then syntax phase $ Left LengthRankingConfigurationQuotientDivisorZero
+          else do
+            (expression, afterExpression) <- parseLengthExpression grammar
+              phase decodeVariable (depth + 1) afterNode expressionValue
+            Right (LengthQuotient divisor expression, afterExpression)
       "monus" -> parseBinaryExpression arguments afterNode LengthMonus
       "minimum" -> parseBinaryExpression arguments afterNode LengthMinimum
       "maximum" -> parseBinaryExpression arguments afterNode LengthMaximum
@@ -1260,6 +1311,15 @@ grammarSupportsModulo grammar = case grammar of
   LengthContractGrammarV2 -> True
   LengthContractGrammarV3 -> True
   LengthContractGrammarV4 -> True
+  LengthContractGrammarV5 -> True
+
+grammarSupportsQuotient :: LengthContractGrammar -> Bool
+grammarSupportsQuotient grammar = case grammar of
+  LengthContractGrammarV1 -> False
+  LengthContractGrammarV2 -> False
+  LengthContractGrammarV3 -> False
+  LengthContractGrammarV4 -> False
+  LengthContractGrammarV5 -> True
 
 parseExpressions
   :: LengthContractGrammar

@@ -670,6 +670,8 @@ lengthQueryPreparationRefusalClass
 lengthQueryPreparationRefusalClass refusal = case refusal of
   LengthSMTLibModuloDivisorZero ->
     LengthPreparationQueryConstructionRejected
+  LengthSMTLibQuotientDivisorZero ->
+    LengthPreparationQueryConstructionRejected
   LengthSMTLibUnexpectedResultVariable ->
     LengthPreparationQueryConstructionRejected
   LengthSMTLibInputVariableOutOfRange _ _ ->

@@ -5,8 +5,9 @@
 -- This document contains no executable, solver, replay, activation, or
 -- process policy. Version 1 reuses the exact compatibility grammar; version 2
 -- adds positive-literal Natural modulo; version 3 additionally requires an
--- exact source-ordered target-role vector; version 4 requires an explicit
--- candidate-case policy. Names, provider roles, target roles, case semantics,
+-- exact source-ordered target-role vector; version 4 requires the exact-case
+-- policy; and version 5 adds positive-literal Natural quotient while requiring
+-- an explicit case choice. Names, provider roles, target roles, case semantics,
 -- and resource limits therefore cannot drift.
 module Leant.Synth.Length.Contract.File
   ( lengthContractFileFormat
@@ -14,6 +15,7 @@ module Leant.Synth.Length.Contract.File
   , lengthContractFileModuloVersion
   , lengthContractFileTargetRolesVersion
   , lengthContractFileExactCaseVersion
+  , lengthContractFileQuotientVersion
   , lengthContractFileJsonLimits
   , LengthContractFileField (..)
   , LengthContractFileValueType (..)
@@ -38,6 +40,7 @@ import Leant.Synth.Length.Configuration.File
   , decodeLeanLengthContractValueV2
   , decodeLeanLengthContractValueV3
   , decodeLeanLengthContractValueV4
+  , decodeLeanLengthContractValueV5
   , lengthRankingConfigurationFileJsonLimits
   )
 import Leant.Synth.Length.Contract (LeanLengthContract)
@@ -62,10 +65,16 @@ lengthContractFileTargetRolesVersion :: Natural
 lengthContractFileTargetRolesVersion = 3
 
 -- | Contract-only version 4 retains the version-3 grammar and requires one
--- explicit closed candidate-case policy. This is the only file version which
--- can authorize the exact recursive zero/step spine case.
+-- explicit closed candidate-case policy. In this version the only accepted
+-- value authorizes the exact recursive zero/step spine case.
 lengthContractFileExactCaseVersion :: Natural
 lengthContractFileExactCaseVersion = 4
+
+-- | Contract-only version 5 retains roles, modulo, and an explicit case
+-- policy, and adds positive-literal Natural quotient. It accepts either the
+-- case-rejecting or exact zero/step policy without changing startup version 1.
+lengthContractFileQuotientVersion :: Natural
+lengthContractFileQuotientVersion = 5
 
 -- | The contract-only format deliberately uses the compatibility grammar's
 -- complete parser ceiling.  More specific contract limits still win at their
@@ -131,7 +140,9 @@ decodeLengthContractFile bytes = do
         then Right decodeLeanLengthContractValueV3
         else if version == toInteger lengthContractFileExactCaseVersion
           then Right decodeLeanLengthContractValueV4
-          else Left LengthContractFileUnsupportedVersion
+          else if version == toInteger lengthContractFileQuotientVersion
+            then Right decodeLeanLengthContractValueV5
+            else Left LengthContractFileUnsupportedVersion
   case find (not . permitted . fst) root of
     Nothing -> pure ()
     Just _ -> Left LengthContractFileUnexpectedRootField

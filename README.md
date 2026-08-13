@@ -150,12 +150,15 @@ postconditions, and provider transfers. Version 3 retains that modulo grammar
 and requires an exact source-ordered `targetArgumentRoles` array containing
 only `"observed-spine"` and `"unobserved-target"`. Versions 1 and 2 reject that
 field, while version 3 rejects its absence. Version 4 retains version 3 and
-also requires `"candidateCasePolicy": "exact-spine-zero-step-v1"`; this is the
-only file grammar which can authorize the checked recursive zero/step case.
+also requires `"candidateCasePolicy": "exact-spine-zero-step-v1"`. Version 5
+retains roles and modulo, requires an explicit case policy, accepts exactly
+`"cases-rejected"` or `"exact-spine-zero-step-v1"`, and adds
+`["quotient", positiveLiteral, expression]` to preconditions, postconditions,
+and provider transfers. Thus quotient does not itself grant case authority.
 The startup configuration remains fixed at version 1 and rejects roles,
-candidate-case policy, and modulo. No contract-only version can replace the
-executable, pin choice, solver limits, artifact policy, or replay limits. The
-decoded contract is carried only through
+candidate-case policy, modulo, and quotient. No contract-only version can
+replace the executable, pin choice, solver limits, artifact policy, or replay
+limits. The decoded contract is carried only through
 that command's ordinary, universe-retry, provider, and classical synthesis
 lanes; it is not stored in `ReplState`, `ParsedGoal`, snapshots, history, or a
 cache, and later commands return to the startup-fixed contract unless they name
@@ -265,6 +268,19 @@ This remains a bounded model-relative interpretation. It does not prove Lean
 purity, totality, termination, strictness, source-level equivalence, or a
 provider law, and it grants no pruning authority. Like version 3, version 4 is
 command-local and leaves no role or case-policy state behind.
+
+Version 5 adds positive-literal Natural floor quotient without changing that
+authority model. For example, a postcondition can contain
+`["quotient", 2, ["input", 0]]`. The divisor is checked before its child, must
+be nonzero, and is bounded by the same 256-bit numeral limit as modulo. Djex
+lowers every surviving quotient to the same private Euclidean witness shape
+`e = k*q + r`, `q >= 0`, `r >= 0`, and `r <= k-1`, then projects `q`; it emits
+no SMT-LIB `div`. Replay independently recomputes Natural quotient from the
+original input. Version 5 requires both `targetArgumentRoles` and
+`candidateCasePolicy`. Choosing `"cases-rejected"` preserves the singleton,
+ordinal-zero renderer rule, while choosing `"exact-spine-zero-step-v1"`
+retains the accepted typed renderer ordinal just as version 4 does. Versions
+1--4 and startup continue to reject the quotient tag.
 
 After a successful occurrence seal, Main prints a subordinate note only for a
 candidate carrying an independently replayed counterexample. The note calls it
@@ -490,8 +506,9 @@ provider assumptions, the separately reassociated contract, and the
 candidate-specific Djex problem. That checked preparation consumes the
 renderer, family, and session authority and returns only the sealed problem;
 Engine owns the exact-origin rerender mechanics and private premise-layout ABI.
-Handoff preserves the historical singleton/ordinal-zero rule for startup and
-contract-only versions 1--3. Version 4 instead owns selection of the retained
+Handoff preserves the historical singleton/ordinal-zero rule for startup,
+contract-only versions 1--3, and version 5's explicit `cases-rejected` policy.
+The exact policy in version 4 or 5 instead owns selection of the retained
 original ordinal and equality with the callback-accepted text; other valid
 renderer alternatives neither replace that retained variant nor make its exact
 association ambiguous.
@@ -662,7 +679,10 @@ contract and provider-transfer expressions. Version 3 retains version 2's
 expression grammar and additionally requires the exact ordered target-role
 vector; versions 1 and 2 reject that field. Version 4 retains the v3 grammar
 and requires the sole admitted candidate-case policy,
-`exact-spine-zero-step-v1`; versions 1--3 reject that field. Execution and
+`exact-spine-zero-step-v1`; versions 1--3 reject that field. Version 5 retains
+roles, modulo, and required explicit case choice; it accepts exactly
+`cases-rejected` or `exact-spine-zero-step-v1` and alone adds positive-literal
+Natural quotient. Execution and
 evaluation fields remain unknown and rejected, and the startup configuration
 decoder remains fixed at version 1, so it rejects both later authorities.
 Its `Contract.File.Acquire` facade uses the same path, descriptor, and timeout
@@ -689,6 +709,9 @@ focused map path, and conditional Djex identities are recorded in the
 The explicit exact-case policy, accepted-renderer association, production
 Exference bridge, and fake-protocol model replay are recorded in the
 [contract-only v4 exact-case report](docs/reports/2026-08-13-contract-only-v4-exact-spine-cases.md).
+The positive-literal quotient grammar, policy-orthogonal case choice, shared
+QF_LIA witness lowering, and production replay checks are recorded in the
+[contract-only v5 quotient report](docs/reports/2026-08-13-contract-only-v5-quotient.md).
 
 The passive finite-spine source vocabulary now lives in
 `Leant.Synth.Length.Contract`. Modules that need only those assertions no
