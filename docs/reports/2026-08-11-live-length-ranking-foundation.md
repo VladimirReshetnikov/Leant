@@ -202,12 +202,22 @@ edges. Transcript bytes, failure order, fingerprints, schemas, public
 behavior, and Leant remain unchanged.
 
 The package-private terminal protocol value likewise retains only the closed
-solver status and optional decoded integer bindings. Both readiness and
-ordinary-query driver invocations take their final transcript cap from the
-exact sealed plan whose initial action they drive: the capability plan and
-protocol plan, respectively. Pre-reservation query-run identity sizing uses
-that same protocol-plan projection. A prepared query transaction retains the
-exact plan, marker roles, admitted replay limits, and deadline, but no
+solver status and optional decoded integer bindings. Those bindings remain
+local through independent counterexample replay and the unchanged version-1
+query-run identity builder. Successful lease commit then forces a narrower run
+which retains its ordinal, strict status, optional problem-bound evidence,
+reversible key, transcript digest, and accounting boundaries, but no parsed
+symbol/integer binding list. The evidence receipt retains normalized
+source-ordered inputs, while the private reversible key retains exact bounded
+transcript bytes carrying the raw model. This is structured-authority
+narrowing, not byte scrubbing.
+
+Both readiness and ordinary-query driver invocations take their final
+transcript cap from the exact sealed plan whose initial action they drive: the
+capability plan and protocol plan, respectively. Pre-reservation query-run
+identity sizing uses that same protocol-plan projection. A prepared query
+transaction retains the exact plan, marker roles, admitted replay limits, and
+deadline, but no
 accounting anchors and no execution authority. Atomic reservation burns the
 ordinal and markers, reads the last-committed stdout and stderr anchors, and
 mints the private nominal epoch-bound receipt accepted by execution and commit.
