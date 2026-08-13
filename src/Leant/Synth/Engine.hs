@@ -68,6 +68,7 @@ module Leant.Synth.Engine
   , synthesizeWithProviders
   , synthesizeWithProvidersSkipping
   , synthesizeWithProvidersSkippingDetailed
+  , synthesizeWithProvidersSkippingDetailedWithMultiConstructorPatterns
   , synthesizeWith
   , synthesizeTuned
   , synthesizeTunedDetailed
@@ -786,6 +787,20 @@ synthesizeWithProvidersSkippingDetailed engine steps checked providers frag =
   synthesizeTunedWithProvidersDetailed engine steps
     (candidateWindow, Nothing) checked providers [] frag frag
 
+-- | Package-private tuned counterpart used by focused boundary tests which
+-- need to retain a simple checked provider graph without changing the REPL's
+-- established multi-constructor search policy. Production callers use
+-- 'synthesizeWithProvidersSkippingDetailed', whose policy remains enabled.
+synthesizeWithProvidersSkippingDetailedWithMultiConstructorPatterns
+  :: Bool
+  -> SynthEngine -> Int -> Set.Set String -> [ProviderFrag] -> Frag
+  -> Either String DetailedSynthOutcome
+synthesizeWithProvidersSkippingDetailedWithMultiConstructorPatterns
+    multiConstructorPatterns engine steps checked providers frag =
+  synthesizeTunedWithProvidersDetailedWithMultiConstructorPatterns
+    multiConstructorPatterns engine steps (candidateWindow, Nothing)
+    checked providers [] frag frag
+
 -- | 'synthesize' with caller-supplied premises (name, fragment) - used
 -- by the classical fallback to hand the engine excluded-middle
 -- assumptions spelled @Classical.em _@ - and a separate fitting
@@ -825,6 +840,17 @@ synthesizeTunedWithProvidersDetailed
   -> [ProviderFrag] -> [(String, Frag)] -> Frag -> Frag
   -> Either String DetailedSynthOutcome
 synthesizeTunedWithProvidersDetailed engine steps limits checked providers extras
+    engineFrag fitFrag =
+  synthesizeTunedWithProvidersDetailedWithMultiConstructorPatterns
+    True engine steps limits checked providers extras engineFrag fitFrag
+
+synthesizeTunedWithProvidersDetailedWithMultiConstructorPatterns
+  :: Bool
+  -> SynthEngine -> Int -> (Int, Maybe Integer) -> Set.Set String
+  -> [ProviderFrag] -> [(String, Frag)] -> Frag -> Frag
+  -> Either String DetailedSynthOutcome
+synthesizeTunedWithProvidersDetailedWithMultiConstructorPatterns
+    multiConstructorPatterns engine steps limits checked providers extras
     engineFrag fitFrag = case engine of
   EngineDjinn -> do
     prepared <- prepareSynthesis djinnRecursiveProjection
@@ -842,7 +868,7 @@ synthesizeTunedWithProvidersDetailed engine steps limits checked providers extra
   EngineExference -> do
     prepared <- prepareSynthesis exferenceRecursiveProjection
       providers extras engineFrag fitFrag
-    outcome <- exferenceRun steps prepared
+    outcome <- exferenceRun multiConstructorPatterns steps prepared
     pure (withoutCheckedDetailedCandidates checked outcome)
   EngineBoth -> do
     djinnPrepared <- prepareSynthesis djinnRecursiveProjection
@@ -857,7 +883,7 @@ synthesizeTunedWithProvidersDetailed engine steps limits checked providers extra
     let djinn = detailUnobservedOutcome djinnCompatibility
     exferencePrepared <- prepareSynthesis exferenceRecursiveProjection
       providers extras engineFrag fitFrag
-    exference <- exferenceRun steps exferencePrepared
+    exference <- exferenceRun multiConstructorPatterns steps exferencePrepared
     pure (mergeDetailedOutcomesSkipping checked djinn exference)
 
 -- | Prepare one engine-specific translation without erasing which goal came
@@ -1015,10 +1041,11 @@ djinnRun (cutoff, budget) frag projection render goal decls instantiations = do
 -- converted to Exference's integer variable domain.  Candidates keep
 -- Exference's own ranking; there is never negative evidence.
 exferenceRun
-  :: Int
+  :: Bool
+  -> Int
   -> PreparedSynthesis
   -> Either String DetailedSynthOutcome
-exferenceRun steps prepared = do
+exferenceRun multiConstructorPatterns steps prepared = do
   standard <- viaDiagnostic standardDjinnSession
   let semanticOrigin = preparedSemanticOrigin prepared
       render = preparedRenderExpression prepared
@@ -1068,7 +1095,8 @@ exferenceRun steps prepared = do
               , requestOptions = defaultExferenceOptions
                   { exferenceAllowUnused = allowUnused
                   , exferenceMaximumSteps = steps
-                  , exferenceMultiConstructorPatterns = True
+                  , exferenceMultiConstructorPatterns =
+                      multiConstructorPatterns
                     -- the queue is the memory hog; a modest bound keeps the
                     -- search interactive on small machines, reported honestly
                     -- as pruning

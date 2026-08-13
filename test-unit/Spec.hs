@@ -53,6 +53,7 @@ import Language.Haskell.Djex
   , LengthExpression (..)
   , LengthFormula (..)
   , LengthProviderArgumentRole (..)
+  , LengthTargetArgumentRole (..)
   , LengthProviderInventoryError (..)
   , LengthProviderSummaryError (..)
   , LengthSessionError (..)
@@ -139,6 +140,7 @@ import Leant.Synth.Engine
   , synthesizeWith
   , synthesizeWithProviders
   , synthesizeWithProvidersSkippingDetailed
+  , synthesizeWithProvidersSkippingDetailedWithMultiConstructorPatterns
   , synthesizeTunedDetailed
   , projectDetailedSynthOutcome
   , renderExactTypedVariantOrigin
@@ -243,6 +245,7 @@ import Leant.Synth.Length.Contract.File
   , lengthContractFileFormat
   , lengthContractFileJsonLimits
   , lengthContractFileModuloVersion
+  , lengthContractFileTargetRolesVersion
   , lengthContractFileVersion
   )
 import Leant.Synth.Length.Contract.File.Acquire
@@ -2299,6 +2302,8 @@ lengthContractFileTests = testGroup
       assertLengthContractFileGrammar
   , testCase "gate positive-literal modulo to contract-only version 2"
       assertLengthContractFileModuloGrammar
+  , testCase "require exact target argument roles in contract-only version 3"
+      assertLengthContractFileTargetRoleGrammar
   , testCase "reject contract roots and redact nested private values"
       assertLengthContractFileSchemaAndRedaction
   , testCase "admit and acquire one explicit contract-only regular file"
@@ -2401,6 +2406,7 @@ assertLengthContractFileModuloGrammar = do
             , leanLengthSpineZeroConstructorName = "List.nil"
             , leanLengthSpineStepConstructorName = "List.cons"
             }
+        , leanLengthContractTargetArgumentRoles = Nothing
         , leanLengthContractSource = LengthContractSource
             { lengthContractPrecondition = LengthEqual
                 (LengthModulo 2 $ LengthVariable $ LengthInput 0)
@@ -2445,7 +2451,7 @@ assertLengthContractFileModuloGrammar = do
     (LengthContractFileMissingRootField LengthContractFileContractField)
     $ deleteJsonField ["contract"] v2
   assertLengthContractFileError LengthContractFileUnsupportedVersion
-    $ setJsonField ["version"] (Json.JInt 3)
+    $ setJsonField ["version"] (Json.JInt 4)
     $ addJsonField [] ("execution", Json.JObj []) v2
   legacyNoModulo <- expectLengthContractFile
     $ lengthContractFileFixture noModulo
@@ -2497,6 +2503,111 @@ assertLengthContractFileModuloGrammar = do
     $ contractWithPre $ Json.JArr
         [Json.JStr "modulo", Json.JInt 2]
 
+assertLengthContractFileTargetRoleGrammar :: IO ()
+assertLengthContractFileTargetRoleGrammar = do
+  lengthContractFileTargetRolesVersion @?= 3
+  let roles = ["unobserved-target", "observed-spine"]
+      swappedRoles = reverse roles
+      providerTransfer = jsonLengthModulo 5 $ jsonLengthArgument 1
+      baseContract = jsonLengthContract
+        (jsonLengthEqual
+          (jsonLengthModulo 2 $ jsonLengthInput 0)
+          (jsonLengthLiteral 1))
+        (jsonLengthEqual jsonLengthResult
+          (jsonLengthModulo 3 $ jsonLengthInput 0))
+        [ jsonLengthProviderLaw "Demo.mapList"
+            ["unobserved", "spine"] providerTransfer
+        ]
+      withRoles selected = addJsonField []
+        ( "targetArgumentRoles"
+        , Json.JArr $ map Json.JStr selected
+        ) baseContract
+      v1 = lengthContractFileFixture $ withRoles roles
+      v2 = lengthContractFileFixtureVersion
+        lengthContractFileModuloVersion $ withRoles roles
+      v3 selected = lengthContractFileFixtureVersion
+        lengthContractFileTargetRolesVersion $ withRoles selected
+  decoded <- expectLengthContractFile $ v3 roles
+  leanLengthContractTargetArgumentRoles decoded @?=
+    Just [LengthUnobservedTarget, LengthObservedSpine]
+  leanLengthContractSource decoded @?= LengthContractSource
+    { lengthContractPrecondition = LengthEqual
+        (LengthModulo 2 $ LengthVariable $ LengthInput 0)
+        (LengthLiteral 1)
+    , lengthContractPostcondition = LengthEqual
+        (LengthVariable LengthResult)
+        (LengthModulo 3 $ LengthVariable $ LengthInput 0)
+    }
+  leanLengthContractProviderLaws decoded @?=
+    [ LeanLengthProviderLaw
+        { leanLengthProviderLawName = "Demo.mapList"
+        , leanLengthProviderLawArgumentRoles =
+            [LengthUnobservedArgument, LengthSpineArgument]
+        , leanLengthProviderLawTransfer = LengthModulo 5
+            $ LengthVariable $ Djex.LengthProviderArgument 1
+        }
+    ]
+  swapped <- expectLengthContractFile $ v3 swappedRoles
+  leanLengthContractTargetArgumentRoles swapped @?=
+    Just [LengthObservedSpine, LengthUnobservedTarget]
+  assertBool "ordered target roles collapsed during decoding"
+    $ swapped /= decoded
+
+  let unexpected = LengthContractFileContractRejected
+        $ LengthRankingConfigurationUnexpectedField
+          LengthRankingConfigurationContractObject
+  assertLengthContractFileError unexpected v1
+  assertLengthContractFileError unexpected v2
+  assertLengthRankingConfigurationFileError
+    (LengthRankingConfigurationUnexpectedField
+      LengthRankingConfigurationContractObject)
+    $ setJsonField ["contract"] (withRoles roles)
+    $ lengthRankingConfigurationFileFixture "/tmp/not-opened-z3" Nothing
+  assertLengthContractFileError
+    (LengthContractFileContractRejected
+      $ LengthRankingConfigurationMissingField
+          LengthRankingConfigurationContractObject
+          LengthRankingConfigurationTargetArgumentRolesField)
+    $ lengthContractFileFixtureVersion
+        lengthContractFileTargetRolesVersion baseContract
+  assertLengthContractFileError
+    (LengthContractFileContractRejected
+      $ LengthRankingConfigurationFieldTypeMismatch
+          LengthRankingConfigurationTargetArgumentRolesField
+          LengthRankingConfigurationArrayValue)
+    $ lengthContractFileFixtureVersion lengthContractFileTargetRolesVersion
+    $ addJsonField [] ("targetArgumentRoles", Json.JStr "private-role")
+        baseContract
+  assertLengthContractFileError
+    (LengthContractFileContractRejected
+      $ LengthRankingConfigurationFieldValueRejected
+          LengthRankingConfigurationTargetArgumentRolesField)
+    $ v3 ["private-role"]
+  let poisonLater = setJsonField ["precondition"]
+        (Json.JStr "private-later-contract") baseContract
+      poisonWithRoles selected = lengthContractFileFixtureVersion
+        lengthContractFileTargetRolesVersion
+        $ addJsonField []
+            ( "targetArgumentRoles"
+            , Json.JArr $ map Json.JStr selected
+            ) poisonLater
+  assertLengthContractFileError
+    (LengthContractFileContractRejected
+      $ LengthRankingConfigurationFieldValueRejected
+          LengthRankingConfigurationTargetArgumentRolesField)
+    $ poisonWithRoles ["private-role"]
+  _ <- expectLengthContractFile $ v3 $ replicate 8 "unobserved-target"
+  assertLengthContractFileError
+    (LengthContractFileContractRejected
+      $ LengthRankingConfigurationPolicyLimitExceeded
+          LengthRankingConfigurationTargetArgumentRolesField 8 9)
+    $ v3 $ replicate 9 "unobserved-target"
+  assertLengthContractFileError
+    (LengthContractFileContractRejected
+      $ LengthRankingConfigurationPolicyLimitExceeded
+          LengthRankingConfigurationTargetArgumentRolesField 8 9)
+    $ poisonWithRoles $ replicate 9 "unobserved-target"
+
 assertLengthContractFileSchemaAndRedaction :: IO ()
 assertLengthContractFileSchemaAndRedaction = do
   let contract = jsonLengthContract
@@ -2505,7 +2616,7 @@ assertLengthContractFileSchemaAndRedaction = do
   assertLengthContractFileError LengthContractFileUnsupportedFormat
     $ setJsonField ["format"] (Json.JStr "wrong-format") base
   assertLengthContractFileError LengthContractFileUnsupportedVersion
-    $ setJsonField ["version"] (Json.JInt 3) base
+    $ setJsonField ["version"] (Json.JInt 4) base
   assertLengthContractFileError LengthContractFileUnexpectedRootField
     $ addJsonField [] ("execution", Json.JObj []) base
   assertLengthContractFileError
@@ -2703,6 +2814,9 @@ lengthAssessmentIntegrationTests = testGroup
       assertLengthAssessmentConfigured
   , testCase "reuse one activated policy with command-local contracts"
       assertLengthAssessmentExplicitContracts
+  , testCase
+      "rank one role-aware higher-order map request without policy stickiness"
+      assertLengthAssessmentRoleAwareMap
   , testCase "preserve sealed callback order after a live failure"
       assertLengthAssessmentFailureFallback
   , testCase "bound and sanitize counterexample presentation"
@@ -3083,6 +3197,266 @@ assertLengthAssessmentExplicitContracts
           verifiedCandidateReceipts oversized
         assertBool "one-shot maximum-plus-one retained a ranking"
           $ isNothing $ lengthAssessmentRanking rejected
+
+assertLengthAssessmentRoleAwareMap :: IO ()
+assertLengthAssessmentRoleAwareMap
+  | os == "mingw32" = pure ()
+  | otherwise = do
+      (contract, verified) <- buildRoleAwareMapFixture
+      problem <- expectRight $ prepareCheckedLengthProblem contract verified
+      checkedLengthCandidateResult (checkedLengthProblemCandidate problem) @?=
+        LengthVariable (LengthInput 0)
+      length (checkedLengthCandidateUsedProviders
+        $ checkedLengthProblemCandidate problem) @?= 1
+      query <- expectRight (prepareCheckedLengthQuery contract verified)
+        >>= expectRight
+      map (map $ toEnum . fromIntegral)
+          (lengthSMTLibQueryInputSymbols query) @?=
+        (["djex_length_input_0"] :: [String])
+      assertBool "role-aware map query omitted its compact get-value request"
+        $ case lengthSMTLibQueryInputValueRequestBytes query of
+            Just bytes -> not $ null bytes
+            Nothing -> False
+
+      let oneRole = contract
+            { leanLengthContractTargetArgumentRoles =
+                Just [LengthObservedSpine]
+            }
+          swapped = contract
+            { leanLengthContractTargetArgumentRoles =
+                Just [LengthObservedSpine, LengthUnobservedTarget]
+            }
+          cyclicRoles = LengthUnobservedTarget : cyclicRoles
+          cyclic = contract
+            { leanLengthContractTargetArgumentRoles = Just cyclicRoles }
+          badSpine = contract
+            { leanLengthContractSpine =
+                (leanLengthContractSpine contract)
+                  { leanLengthSpineFamilyName = "Unreachable.List" }
+            , leanLengthContractTargetArgumentRoles =
+                error "target roles forced before spine resolution"
+            }
+          badProvider = contract
+            { leanLengthContractTargetArgumentRoles =
+                error "target roles forced before provider resolution"
+            , leanLengthContractProviderLaws =
+                [ law { leanLengthProviderLawName = "Demo.missingMap" }
+                | law <- leanLengthContractProviderLaws contract
+                ]
+            }
+          legacy = contract
+            { leanLengthContractTargetArgumentRoles = Nothing }
+      case prepareCheckedLengthProblem badSpine verified of
+        Left (LengthHandoffFamilyUnavailable "Unreachable.List") -> pure ()
+        Left refusal -> assertFailure $ "unexpected bad-spine refusal: "
+          ++ show refusal
+        Right _ -> assertFailure "target roles preceded spine resolution"
+      case prepareCheckedLengthProblem badProvider verified of
+        Left (LengthHandoffProviderUnavailable "Demo.missingMap") -> pure ()
+        Left refusal -> assertFailure $ "unexpected bad-provider refusal: "
+          ++ show refusal
+        Right _ -> assertFailure "target roles preceded provider resolution"
+      case prepareCheckedLengthProblem legacy verified of
+        Left (LengthHandoffContractRejected
+            (Djex.LengthContractInputIsNotList 0 _)) -> pure ()
+        Left refusal -> assertFailure $ "unexpected legacy-role refusal: "
+          ++ show refusal
+        Right _ -> assertFailure
+          "omitted target roles inferred higher-order Length semantics"
+      case prepareCheckedLengthProblem oneRole verified of
+        Left (LengthHandoffContractRejected
+            (Djex.LengthContractTargetArgumentRoleArityMismatch 2 1)) ->
+          pure ()
+        Left refusal -> assertFailure $ "unexpected target-role arity refusal: "
+          ++ show refusal
+        Right _ -> assertFailure "a short target-role vector reached sealing"
+      case prepareCheckedLengthProblem swapped verified of
+        Left (LengthHandoffContractRejected
+            (Djex.LengthContractInputIsNotList 0 _)) -> pure ()
+        Left refusal -> assertFailure $ "unexpected swapped-role refusal: "
+          ++ show refusal
+        Right _ -> assertFailure
+          "an observed higher-order target argument became a list spine"
+      case prepareCheckedLengthProblem cyclic verified of
+        Left (LengthHandoffSessionRejected
+            (LengthSessionTargetArgumentRoleLimitExceeded 8 9)) -> pure ()
+        Left refusal -> assertFailure $ "unexpected cyclic-role refusal: "
+          ++ show refusal
+        Right _ -> assertFailure "a cyclic target-role vector reached sealing"
+
+      withFakeLengthSolver "healthy" $ \executable -> do
+        let configurationPath = takeDirectory executable </>
+              "role-aware-map-policy.json"
+            contractPath = takeDirectory executable </>
+              "role-aware-map-contract.json"
+            fixedContract = jsonLengthContract
+              (jsonLengthTruth True) (jsonLengthTruth True) []
+            configuration = setJsonField ["contract"] fixedContract
+              $ setJsonField ["execution", "artifactPolicy"]
+                  (Json.JStr "input-values-after-satisfiable")
+              $ lengthRankingConfigurationFileFixture executable Nothing
+            roleAwareDocument = lengthContractFileFixtureVersion
+              lengthContractFileTargetRolesVersion
+              roleAwareMapContractValue
+        ByteString.writeFile configurationPath
+          $ encodeLengthRankingConfigurationFile configuration
+        loadedMode <- loadLengthAssessmentMode PermitUnpinnedExecutable
+          $ LengthRankingConfigurationFileSource configurationPath 1000
+        mode <- case loadedMode of
+          Left failure -> assertFailure (show failure) >> error "unreachable"
+          Right configured -> pure configured
+        permission <- case authorizeExplicitLengthAssessmentRequest mode of
+          Left failure -> assertFailure (show failure) >> error "unreachable"
+          Right authorized -> pure authorized
+        ByteString.writeFile contractPath
+          $ encodeLengthRankingConfigurationFile roleAwareDocument
+        request <- case mkLengthContractFileRequest
+            $ LengthContractFileSource contractPath 1000 of
+          Left failure -> assertFailure (show failure) >> error "unreachable"
+          Right admitted -> pure admitted
+        loadedContract <- loadLengthContractFile request >>= either
+          (\failure -> assertFailure (show failure) >> error "unreachable")
+          pure
+        loadedContract @?= contract
+        -- The decoded request owns its passive contract. Neither the first
+        -- assessment nor a later reuse may reopen the one-shot path.
+        ByteString.writeFile contractPath $ BS.pack "{"
+        verification <- verificationBatchFromReceipts [verified]
+        let explicitRequest = explicitLengthAssessmentRequest
+              permission loadedContract
+        assessed <- expectLengthAssessmentWithin
+          $ assessLengthVerificationRequest explicitRequest verification
+        compatibility <- expectLengthAssessmentWithin
+          $ assessLengthVerificationRequest
+              (compatibilityLengthAssessmentRequest mode) verification
+        repeated <- expectLengthAssessmentWithin
+          $ assessLengthVerificationRequest explicitRequest verification
+        map lengthAssessmentFailure [assessed, compatibility, repeated] @?=
+          [Nothing, Nothing, Nothing]
+        map lengthAssessmentCandidates [assessed, compatibility, repeated] @?=
+          [[verified], [verified], [verified]]
+        map rankedLengthCandidateAssessment
+            (maybe (error "role-aware assessment lost its ranking")
+              lengthRankingCandidates $ lengthAssessmentRanking assessed) @?=
+          [Counterexample $ roleAwareMapReceipt assessed]
+        Djex.validatedLengthCounterexampleInputs
+            (roleAwareMapReceipt assessed) @?= [3]
+        Djex.validatedLengthCounterexampleResult
+            (roleAwareMapReceipt assessed) @?= 3
+        map rankedLengthCandidateAssessment
+            (maybe (error "compatibility assessment lost its ranking")
+              lengthRankingCandidates
+              $ lengthAssessmentRanking compatibility) @?= [Unassessed]
+        map lengthCandidatePresentationNote
+            (presentLengthAssessment compatibility) @?= [Nothing]
+        let notes = map lengthCandidatePresentationNote
+              $ presentLengthAssessment assessed
+        case notes of
+          [Just note] -> do
+            assertBool "role-aware presentation lost the compact input"
+              $ "observed input spine lengths = [3]" `isInfixOf` note
+            assertBool "role-aware presentation lost model qualification"
+              $ "model-relative" `isInfixOf` note
+            assertBool "role-aware presentation lost the replayed result"
+              $ "result spine length = 3" `isInfixOf` note
+            assertBool "role-aware presentation overstated provider trust"
+              $ "conditional on 1 assumed provider law" `isInfixOf` note
+            assertBool "role-aware presentation exposed the provider name"
+              $ not $ "Demo.mapList" `isInfixOf` note
+          other -> assertFailure $ "unexpected role-aware presentation: "
+            ++ show other
+        map rankedLengthCandidateAssessment
+            (maybe (error "repeated assessment lost its ranking")
+              lengthRankingCandidates $ lengthAssessmentRanking repeated) @?=
+          [Counterexample $ roleAwareMapReceipt repeated]
+ where
+  roleAwareMapReceipt assessed = case lengthAssessmentRanking assessed of
+    Just ranking -> case map rankedLengthCandidateAssessment
+        $ lengthRankingCandidates ranking of
+      [Counterexample receipt] -> receipt
+      assessments -> error $ "unexpected role-aware assessments: "
+        ++ show assessments
+    Nothing -> error "role-aware assessment retained no ranking"
+
+roleAwareMapContractValue :: Json.JValue
+roleAwareMapContractValue = jsonRoleAwareLengthContract
+  ["unobserved-target", "observed-spine"]
+  (jsonLengthTruth True)
+  (jsonLengthEqual jsonLengthResult $ jsonLengthLiteral 0)
+  [ jsonLengthProviderLaw "Demo.mapList" ["unobserved", "spine"]
+      $ jsonLengthArgument 1
+  ]
+
+buildRoleAwareMapFixture
+  :: IO (LeanLengthContract, Verified DetailedVerificationVariant)
+buildRoleAwareMapFixture = do
+  let alpha = FVar "alpha"
+      beta = FVar "beta"
+      source = FVar "source"
+      targetElement = FVar "target"
+      list key element = FParamRec True "List" key [element]
+        [ ("List.nil", [])
+        , ("List.cons", [element, FAtom False key])
+        ]
+      mapType sourceKey resultKey sourceType resultType =
+        FArr (FArr sourceType resultType)
+          $ FArr (list sourceKey sourceType) (list resultKey resultType)
+      target = FAll False "alpha" $ FAll False "beta"
+        $ mapType "List alpha" "List beta" alpha beta
+      providerScheme = FAll False "source" $ FAll False "target"
+        $ mapType "List source" "List target" source targetElement
+      provider = ProviderFrag "Demo.mapList" providerScheme
+  preparation <- expectRight $ inspectExferencePreparation
+    [provider] [] target target
+  contract <- expectLengthContractFile
+    $ lengthContractFileFixtureVersion lengthContractFileTargetRolesVersion
+        roleAwareMapContractValue
+  production <- expectRight $ synthesizeWithProvidersSkippingDetailed
+    EngineExference 512 Set.empty [provider] target
+  explicitProduction <- expectRight $
+    synthesizeWithProvidersSkippingDetailedWithMultiConstructorPatterns
+      True EngineExference 512 Set.empty [provider] target
+  explicitProduction @?= production
+  detailed <- expectRight $
+    synthesizeWithProvidersSkippingDetailedWithMultiConstructorPatterns
+      False EngineExference 512 Set.empty [provider] target
+  (origin, acceptedSpelling) <- case detailed of
+    DetailedSynthCandidates groups _ -> case
+        [ (group, spelling)
+        | group <- groups
+        , spelling <- detailedCandidateGroupVariants group
+        , "Demo.mapList" `isInfixOf` spelling
+        , not $ isNothing $ detailedCandidateGroupSemanticSidecar group
+        ] of
+      match : _ -> pure match
+      [] -> assertFailure ("higher-order map provider produced no typed " ++
+        "origin: " ++ show
+          [ ( detailedCandidateGroupVariants group
+            , detailedCandidateGroupRoute group
+            , isNothing $ detailedCandidateGroupSemanticSidecar group
+            )
+          | group <- groups
+          ]) >> error "unreachable"
+    other -> assertFailure ("higher-order map synthesis failed: " ++
+      show other) >> error "unreachable"
+  batch <- verifyCandidateGroups 1
+    (\variant -> pure $ if detailedVerificationVariantText variant
+        == acceptedSpelling
+      then VariantAccepted
+      else VariantRejected LeanErrorDiagnostic)
+    [detailedCandidateGroupVerificationVariants origin]
+  case verifiedCandidateReceipts batch of
+    [verified] -> do
+      problem <- expectRight $ prepareCheckedLengthProblem contract verified
+      case inspectedProviderBindings preparation of
+        [binding] -> checkedLengthCandidateUsedProviders
+            (checkedLengthProblemCandidate problem) @?=
+          [inspectedProviderPrivateName binding]
+        bindings -> assertFailure ("role-aware map retained unexpected " ++
+          "provider bindings: " ++ show bindings)
+      pure (contract, verified)
+    receipts -> assertFailure ("higher-order map verification produced " ++
+      show (length receipts) ++ " receipts") >> error "unreachable"
 
 assertLengthAssessmentFailureFallback :: IO ()
 assertLengthAssessmentFailureFallback
@@ -4298,6 +4672,17 @@ jsonLengthContract precondition postcondition laws = Json.JObj
   , ("providerLaws", Json.JArr laws)
   ]
 
+jsonRoleAwareLengthContract
+  :: [String]
+  -> Json.JValue
+  -> Json.JValue
+  -> [Json.JValue]
+  -> Json.JValue
+jsonRoleAwareLengthContract roles precondition postcondition laws =
+  addJsonField []
+    ("targetArgumentRoles", Json.JArr $ map Json.JStr roles)
+    $ jsonLengthContract precondition postcondition laws
+
 encodeLengthRankingConfigurationFile
   :: Json.JValue
   -> ByteString.ByteString
@@ -4716,9 +5101,18 @@ assertLengthPreparationRefusalClasses = do
             (poison "ambiguous provider") (poison "provider matches")
         , LengthHandoffProviderVariableMissing
             (poison "provider variable") (poison "provider source")
-        , LengthHandoffSessionRejected $ poison "session error"
-        , LengthHandoffContractRejected $ poison "contract error"
-        , LengthHandoffProblemRejected $ poison "problem error"
+        , LengthHandoffSessionRejected
+            $ LengthSessionTargetArgumentRoleLimitExceeded
+                (poison "session role maximum")
+                (poison "session role observed")
+        , LengthHandoffContractRejected
+            $ Djex.LengthContractTargetArgumentRoleArityMismatch
+                (poison "contract target arity")
+                (poison "contract role arity")
+        , LengthHandoffProblemRejected
+            $ Djex.LengthProblemUnobservedTargetArgumentDemanded
+                (poison "unobserved target ordinal")
+                (poison "unobserved target demand site")
         ]
       expectedHandoffClasses =
         [ LengthPreparationUnsupportedRoute
@@ -5267,6 +5661,7 @@ ineligibleLengthRankingContract = LeanLengthContract
       , leanLengthSpineZeroConstructorName = "Unreachable.List.nil"
       , leanLengthSpineStepConstructorName = "Unreachable.List.cons"
       }
+  , leanLengthContractTargetArgumentRoles = Nothing
   , leanLengthContractSource = LengthContractSource
       { lengthContractPrecondition = LengthTruth True
       , lengthContractPostcondition = LengthTruth True
@@ -5281,6 +5676,7 @@ lengthRankingContract expectedResult = LeanLengthContract
       , leanLengthSpineZeroConstructorName = "List.nil"
       , leanLengthSpineStepConstructorName = "List.cons"
       }
+  , leanLengthContractTargetArgumentRoles = Nothing
   , leanLengthContractSource = LengthContractSource
       { lengthContractPrecondition = LengthTruth True
       , lengthContractPostcondition = LengthEqual
@@ -5327,6 +5723,17 @@ buildLengthRankingLiveFixture = do
     (lengthRankingContract 0) zero
   oneProblem <- expectRight $ prepareCheckedLengthProblem
     (lengthRankingContract 0) one
+  legacyQuery <- expectRight
+      (prepareCheckedLengthQuery (lengthRankingContract 0) zero)
+    >>= expectRight
+  explicitAllObservedQuery <- expectRight
+      (prepareCheckedLengthQuery
+        ((lengthRankingContract 0)
+          { leanLengthContractTargetArgumentRoles = Just [] }) zero)
+    >>= expectRight
+  fingerprintCanonicalBytes (lengthSMTLibQueryFingerprint legacyQuery) @?=
+    fingerprintCanonicalBytes
+      (lengthSMTLibQueryFingerprint explicitAllObservedQuery)
   checkedLengthCandidateResult
       (checkedLengthProblemCandidate
         zeroProblem) @?=
@@ -5431,6 +5838,7 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                 , leanLengthSpineStepConstructorName =
                     "Demo.Unreachable.step"
                 }
+            , leanLengthContractTargetArgumentRoles = Nothing
             , leanLengthContractSource = LengthContractSource
                 { lengthContractPrecondition = LengthTruth True
                 , lengthContractPostcondition = LengthTruth True
@@ -5489,6 +5897,7 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
               }
             contract = LeanLengthContract
               { leanLengthContractSpine = spine
+              , leanLengthContractTargetArgumentRoles = Nothing
               , leanLengthContractSource = LengthContractSource
                   { lengthContractPrecondition = LengthTruth True
                   , lengthContractPostcondition = LengthEqual
@@ -5754,6 +6163,7 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                 , leanLengthSpineZeroConstructorName = "List.nil"
                 , leanLengthSpineStepConstructorName = "List.cons"
                 }
+            , leanLengthContractTargetArgumentRoles = Nothing
             , leanLengthContractSource = LengthContractSource
                 { lengthContractPrecondition = LengthTruth True
                 , lengthContractPostcondition = LengthEqual
@@ -5871,6 +6281,7 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                           , leanLengthSpineStepConstructorName =
                               "Demo.Unreachable.step"
                           }
+                      , leanLengthContractTargetArgumentRoles = Nothing
                       , leanLengthContractSource = LengthContractSource
                           { lengthContractPrecondition = LengthTruth True
                           , lengthContractPostcondition = LengthTruth True
@@ -6050,6 +6461,7 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                           , leanLengthSpineStepConstructorName =
                               "Demo.unreachable.step"
                           }
+                      , leanLengthContractTargetArgumentRoles = Nothing
                       , leanLengthContractSource = LengthContractSource
                           { lengthContractPrecondition = LengthTruth True
                           , lengthContractPostcondition = LengthTruth True

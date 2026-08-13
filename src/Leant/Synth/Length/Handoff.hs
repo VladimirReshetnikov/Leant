@@ -41,6 +41,9 @@ import Language.Haskell.Djex
   , sealLengthContractInContext
   , sealLengthSession
   , sealLengthTypedCandidateProblem
+  , sealRoleAwareLengthContractInContext
+  , sealRoleAwareLengthSession
+  , sealRoleAwareLengthTypedCandidateProblem
   )
 
 import Leant.Synth.Engine
@@ -172,24 +175,37 @@ prepareCheckedLengthProblem source verified = do
   providerLaws <- boundedProviderLawPrefix
     $ leanLengthContractProviderLaws source
   providerSources <- mapM (resolveProviderLaw authority origin) providerLaws
+  let inventory = typedCandidateSemanticInventory semantic
+      spineModel = DeclaredListSpine
+        (inspectedSemanticFamilyPrivateTypeName family)
+        zeroConstructor
+        stepConstructor
+      targetRoles = leanLengthContractTargetArgumentRoles source
   session <- either (Left . LengthHandoffSessionRejected) Right
-    $ sealLengthSession
-        defaultLengthLimits
-        (typedCandidateSemanticInventory semantic)
-        (DeclaredListSpine
-          (inspectedSemanticFamilyPrivateTypeName family)
-          zeroConstructor
-          stepConstructor)
-        providerSources
+    $ case targetRoles of
+        Nothing -> sealLengthSession defaultLengthLimits inventory
+          spineModel providerSources
+        Just roles -> sealRoleAwareLengthSession defaultLengthLimits roles
+          inventory spineModel providerSources
   contract <- either (Left . LengthHandoffContractRejected) Right
-    $ sealLengthContractInContext
-        defaultLengthLimits
-        (checkedLengthSessionContext session)
-        convertedSource
-        (leanLengthContractSource source)
+    $ case targetRoles of
+        Nothing -> sealLengthContractInContext
+          defaultLengthLimits
+          (checkedLengthSessionContext session)
+          convertedSource
+          (leanLengthContractSource source)
+        Just roles -> sealRoleAwareLengthContractInContext
+          defaultLengthLimits
+          (checkedLengthSessionContext session)
+          roles
+          convertedSource
+          (leanLengthContractSource source)
   problem <- either (Left . LengthHandoffProblemRejected) Right
-    $ sealLengthTypedCandidateProblem
-        defaultLengthProblemLimits session contract candidate
+    $ case targetRoles of
+        Nothing -> sealLengthTypedCandidateProblem
+          defaultLengthProblemLimits session contract candidate
+        Just _ -> sealRoleAwareLengthTypedCandidateProblem
+          defaultLengthProblemLimits session contract candidate
   pure problem
 
 resolveSemanticFamily

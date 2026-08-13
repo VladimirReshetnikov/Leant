@@ -146,8 +146,13 @@ JSON ceiling as the compatibility file. The separate contract-only root has
 format `leant-finite-list-spine-length-contract`. Version 1 preserves the
 existing bounded compatibility grammar; version 2 adds the exact expression
 form `["modulo", positiveLiteral, expression]` in preconditions,
-postconditions, and provider transfers. Neither version can replace the
-executable, pin choice, solver limits, artifact policy, or replay limits. The
+postconditions, and provider transfers. Version 3 retains that modulo grammar
+and requires an exact source-ordered `targetArgumentRoles` array containing
+only `"observed-spine"` and `"unobserved-target"`. Versions 1 and 2 reject that
+field, while version 3 rejects its absence. The startup configuration remains
+fixed at version 1 and rejects both the role field and modulo. No contract-only
+version can replace the executable, pin choice, solver limits, artifact policy,
+or replay limits. The
 decoded contract is carried only through
 that command's ordinary, universe-retry, provider, and classical synthesis
 lanes; it is not stored in `ReplState`, `ParsedGoal`, snapshots, history, or a
@@ -175,14 +180,62 @@ divisor must be nonzero and no wider than 256 bits. Leant preserves the passive
 AST; Djex normalization and sealing own its semantics and lower every surviving
 modulo occurrence to private quotient/remainder witness equations using only
 QF_LIA. No SMT-LIB `mod` term is emitted, and private witnesses never enter
-`get-value` or counterexample presentation. Startup configuration remains
-version 1 and rejects `modulo`; old one-shot version-1 documents decode exactly
-as before.
+`get-value` or counterexample presentation. Old one-shot version-1 documents
+and version-2 documents retain their exact grammar and behavior.
+
+Version 3 is the explicit role-aware form. A map-shaped request can use this
+exact contract object:
+
+```json
+{
+  "format": "leant-finite-list-spine-length-contract",
+  "version": 3,
+  "contract": {
+    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
+    "targetArgumentRoles": ["unobserved-target", "observed-spine"],
+    "precondition": ["truth", true],
+    "postcondition": ["equal", ["result"], ["literal", 0]],
+    "providerLaws": [
+      {
+        "name": "Demo.mapList",
+        "argumentRoles": ["unobserved", "spine"],
+        "transfer": ["argument", 1]
+      }
+    ]
+  }
+}
+```
+
+The target-role array is bounded to eight entries and must match the complete
+physical target argument spine after leading quantifiers. Leant never infers
+it from the target, a provider name, a provider scheme, or a candidate. Only
+`"observed-spine"` positions must have the configured list-spine type. They
+receive compact contract indices in observed-position order, so the two
+physical target roles above expose only `LengthInput 0`. Provider-law roles are
+different: they still align with every physical provider argument, and a
+transfer such as `["argument", 1]` refers to physical provider argument 1; it
+is not renumbered to 0 merely because argument 0 is `"unobserved"`.
+
+`"unobserved-target"` means only that the checked Length interpreter carries a
+non-inspectable token at that position and may pass it through a non-demanding
+path, including forwarding it to an explicitly `"unobserved"` provider
+argument. Calling, spine-observing, or tuple-destructuring the token rejects
+candidate preparation. The role makes no claim about whether the source type
+is inhabited, whether a source implementation evaluates the argument, or
+about purity, totality, parametricity, strictness, or effects. The resulting
+counterexample remains model-relative evidence under the explicit provider
+laws, not a theorem about Lean execution.
+
+Version 3 changes no contract lifetime. Its file is still read once for that
+`:synth` command, the decoded request is shared by every retry and synthesis
+lane, and neither it nor its roles enter `ReplState`, history, snapshots, or a
+cache. A later command returns to the startup-fixed version-1 compatibility
+contract unless it explicitly names another contract-only file.
 
 After a successful occurrence seal, Main prints a subordinate note only for a
 candidate carrying an independently replayed counterexample. The note calls it
 a replayed, model-relative finite-list-spine Length counterexample, gives a
-bounded summary of input and result spine lengths, and reports only the number
+bounded summary of observed input and result spine lengths, and reports only the number
 of assumed provider laws used by that candidate. The semantic note never
 projects the receipt's private provider-name list. Disabled assessment,
 rejected input, heuristic status,
@@ -567,9 +620,11 @@ root with format `leant-finite-list-spine-length-contract` for a command-owned
 passive contract. It contains exact `format`, `version`, and `contract` fields.
 Version 1 delegates to the unchanged compatibility grammar. Version 2 uses the
 same bounded parser owner and adds only positive-literal Natural modulo to
-contract and provider-transfer expressions. Execution and evaluation fields
+contract and provider-transfer expressions. Version 3 retains version 2's
+expression grammar and additionally requires the exact ordered target-role
+vector; versions 1 and 2 reject that field. Execution and evaluation fields
 remain unknown and rejected, and the startup configuration decoder remains
-fixed at version 1.
+fixed at version 1, so it also rejects the v3 field.
 Its `Contract.File.Acquire` facade uses the same path, descriptor, and timeout
 owner as startup acquisition, but maps failures into contract-only closed
 vocabulary. `Leant.Synth.Length.Command` recognizes only the exact
@@ -588,6 +643,9 @@ a snapshot. See the
 [one-shot contract report](docs/reports/2026-08-13-one-shot-length-contract.md).
 The version-2 extension and its QF_LIA witness boundary are recorded in the
 [contract-only v2 modulo report](docs/reports/2026-08-13-contract-only-v2-modulo.md).
+The explicit role vocabulary, compact numbering, checked opaque-token boundary,
+focused map path, and conditional Djex identities are recorded in the
+[contract-only v3 target-role report](docs/reports/2026-08-13-contract-only-v3-target-roles.md).
 
 The passive finite-spine source vocabulary now lives in
 `Leant.Synth.Length.Contract`. Modules that need only those assertions no

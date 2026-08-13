@@ -18,6 +18,7 @@ import Language.Haskell.Djex
   , LengthExpression
   , LengthProviderArgumentRole
   , LengthProviderVariable
+  , LengthTargetArgumentRole
   )
 
 -- | Exact Lean names supplied by an external Length contract for the unary
@@ -53,6 +54,12 @@ data LeanLengthProviderLaw = LeanLengthProviderLaw
 -- infer a behavioral specification from Lean declarations.
 data LeanLengthContract = LeanLengthContract
   { leanLengthContractSpine :: LeanLengthSpineIdentity
+  -- | 'Nothing' is the exact legacy all-observed compatibility policy used
+  -- by the startup v1 file and contract-only v1/v2.  'Just' retains the exact
+  -- source-ordered role vector required by contract-only v3; no roles are
+  -- inferred from the target type or provider declarations.
+  , leanLengthContractTargetArgumentRoles ::
+      Maybe [LengthTargetArgumentRole]
   , leanLengthContractSource :: LengthContractSource
   , leanLengthContractProviderLaws :: [LeanLengthProviderLaw]
   }

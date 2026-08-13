@@ -17,7 +17,7 @@ pin, or read configuration from ambient process state. Main can now call it
 through an explicit startup-owned integration facade; that facade supplies a
 bounded file, pinned-by-default activation, and a fixed decoded contract rather
 than weakening this module's explicit inputs. The activated policy can also be
-paired with one separately decoded contract-only version 1 or 2 document for an
+paired with one separately decoded contract-only version 1, 2, or 3 document for an
 explicit `:synth --length-contract ABSOLUTE-PATH -- TYPE` command. This changes
 contract lifetime, not the ranking module's authority or input shape.
 
@@ -25,7 +25,10 @@ The one-shot document has the exact format string
 `leant-finite-list-spine-length-contract` and only a `contract` payload beside
 those two root fields. Version 1 reuses the unchanged compatibility grammar;
 version 2 adds positive-literal Natural modulo to contract and provider-transfer
-expressions through that same bounded parser owner. Neither contains execution,
+expressions through that same bounded parser owner. Version 3 retains that grammar
+and requires an exact ordered target-role vector: every physical target argument is
+either `observed-spine` or `unobserved-target`, with a maximum of eight. Older
+contract documents and the startup configuration reject the field. Neither contains execution,
 activation, artifact, response, or replay policy. A shared package-private acquisition leaf owns the
 same absolute-path, POSIX descriptor, byte, timeout, and cleanup rules for both
 file facades.
@@ -57,6 +60,25 @@ deterministically allocated quotient/remainder equations using only QF_LIA;
 it emits no SMT-LIB `mod` term and requests no witness values. Version-1
 startup and one-shot documents remain unchanged, and existing no-modulo query
 identities remain byte-identical.
+
+For version 3, the checked Handoff passes one retained role choice to Djex's
+role-aware session, contract, and problem sealers only after the established exact
+origin, renderer, family, and provider checks. Djex aligns the vector against the
+normalized physical target arrow spine; Leant does not infer roles from the type.
+Observed roles are numbered compactly as `LengthInput 0..`, while provider transfer
+variables keep physical provider-argument ordinals. An unobserved role supplies only
+an opaque, non-inspectable Length-interpreter token which a candidate may ignore or
+forward into an unobserved provider position. It is not a claim about source
+inhabitance, evaluation, purity, totality, parametricity, strictness, or effects.
+Any attempt by the interpreter to inspect such a token fails closed as candidate
+semantics rejection.
+
+A focused checked-map regression uses target roles `[unobserved-target,
+observed-spine]`, provider roles `[unobserved,spine]`, and provider transfer argument
+1. It proves that the canonical query and replay expose exactly one compact observed
+input, while the provider-backed counterexample remains explicitly conditional on
+the assumed law. Reusing the same one-shot request after its source file is mutated
+does not reopen it, and the next compatibility request receives no sticky v3 roles.
 
 A pure refusal at either boundary leaves that one candidate `Unassessed` through
 the legacy assessment projection and records a separate

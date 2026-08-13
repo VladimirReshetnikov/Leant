@@ -4,12 +4,14 @@
 --
 -- This document contains no executable, solver, replay, activation, or
 -- process policy. Version 1 reuses the exact compatibility grammar; version 2
--- adds only positive-literal Natural modulo through the same parser owner.
--- Names, provider roles, and resource limits therefore cannot drift.
+-- adds positive-literal Natural modulo; version 3 additionally requires an
+-- exact source-ordered target-role vector. Names, provider roles, target
+-- roles, and resource limits therefore cannot drift.
 module Leant.Synth.Length.Contract.File
   ( lengthContractFileFormat
   , lengthContractFileVersion
   , lengthContractFileModuloVersion
+  , lengthContractFileTargetRolesVersion
   , lengthContractFileJsonLimits
   , LengthContractFileField (..)
   , LengthContractFileValueType (..)
@@ -32,6 +34,7 @@ import Leant.Synth.Length.Configuration.File
   ( LengthRankingConfigurationFileError
   , decodeLeanLengthContractValue
   , decodeLeanLengthContractValueV2
+  , decodeLeanLengthContractValueV3
   , lengthRankingConfigurationFileJsonLimits
   )
 import Leant.Synth.Length.Contract (LeanLengthContract)
@@ -48,6 +51,12 @@ lengthContractFileVersion = 1
 -- startup compatibility configuration remains fixed at version 1.
 lengthContractFileModuloVersion :: Natural
 lengthContractFileModuloVersion = 2
+
+-- | Contract-only version 3 retains the version-2 expression grammar and
+-- requires explicit observed-spine/unobserved-target roles for every physical
+-- target argument. The startup compatibility configuration remains version 1.
+lengthContractFileTargetRolesVersion :: Natural
+lengthContractFileTargetRolesVersion = 3
 
 -- | The contract-only format deliberately uses the compatibility grammar's
 -- complete parser ceiling.  More specific contract limits still win at their
@@ -109,7 +118,9 @@ decodeLengthContractFile bytes = do
     then Right decodeLeanLengthContractValue
     else if version == toInteger lengthContractFileModuloVersion
       then Right decodeLeanLengthContractValueV2
-      else Left LengthContractFileUnsupportedVersion
+      else if version == toInteger lengthContractFileTargetRolesVersion
+        then Right decodeLeanLengthContractValueV3
+        else Left LengthContractFileUnsupportedVersion
   case find (not . permitted . fst) root of
     Nothing -> pure ()
     Just _ -> Left LengthContractFileUnexpectedRootField

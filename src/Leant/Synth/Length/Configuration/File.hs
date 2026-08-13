@@ -26,6 +26,7 @@ module Leant.Synth.Length.Configuration.File
   , decodeLengthRankingConfigurationFile
   , decodeLeanLengthContractValue
   , decodeLeanLengthContractValueV2
+  , decodeLeanLengthContractValueV3
   , disableLengthRankingConfiguration
   , activateLengthRankingConfiguration
   ) where
@@ -48,6 +49,7 @@ import Language.Haskell.Djex
   , LengthFormula (..)
   , LengthProviderArgumentRole (..)
   , LengthProviderVariable (..)
+  , LengthTargetArgumentRole (..)
   , LengthSMTLibArtifactPolicy (..)
   , LengthSMTLibExecutionConfigError
   , LengthSMTLibExecutionConfig
@@ -148,6 +150,7 @@ data LengthRankingConfigurationFileField
   | LengthRankingConfigurationProviderLawNameField !Natural
   | LengthRankingConfigurationProviderLawArgumentRolesField !Natural
   | LengthRankingConfigurationProviderLawTransferField !Natural
+  | LengthRankingConfigurationTargetArgumentRolesField
   deriving (Eq, Ord, Show)
 
 data LengthRankingConfigurationFileValueType
@@ -763,9 +766,9 @@ evaluationFields =
   ]
 
 -- | Decode exactly the contract object embedded by the compatibility file.
--- Contract-only version 1 reuses this entrance. Version 2 selects the sibling
--- entrance below; both delegate to one owner for names, provider roles,
--- recursive syntax, and hard limits.
+-- Contract-only version 1 reuses this entrance. Versions 2 and 3 select the
+-- sibling entrances below; all three delegate to one owner for names, target
+-- and provider roles, recursive syntax, and hard limits.
 decodeLeanLengthContractValue
   :: BoundedJsonValue
   -> Either LengthRankingConfigurationFileError LeanLengthContract
@@ -781,9 +784,20 @@ decodeLeanLengthContractValueV2
 decodeLeanLengthContractValueV2 = decodeLeanLengthContractValueWithGrammar
   LengthContractGrammarV2
 
+-- | Decode the contract-only version-3 grammar. This retains modulo from
+-- version 2 and requires one explicit role for every physical target
+-- argument. Startup configuration and older contract-only versions never
+-- call this entrance and reject the new field as unexpected.
+decodeLeanLengthContractValueV3
+  :: BoundedJsonValue
+  -> Either LengthRankingConfigurationFileError LeanLengthContract
+decodeLeanLengthContractValueV3 = decodeLeanLengthContractValueWithGrammar
+  LengthContractGrammarV3
+
 data LengthContractGrammar
   = LengthContractGrammarV1
   | LengthContractGrammarV2
+  | LengthContractGrammarV3
   deriving (Eq)
 
 decodeLeanLengthContractValueWithGrammar
@@ -792,13 +806,23 @@ decodeLeanLengthContractValueWithGrammar
   -> Either LengthRankingConfigurationFileError LeanLengthContract
 decodeLeanLengthContractValueWithGrammar grammar value = do
   object <- exactObject LengthRankingConfigurationContractObject
-    contractFields value
+    (contractFields grammar) value
   spineValue <- requiredField
     LengthRankingConfigurationContractObject
     LengthRankingConfigurationSpineField
     "spine"
     object
   spine <- decodeSpine spineValue
+  targetRoles <- case grammar of
+    LengthContractGrammarV1 -> Right Nothing
+    LengthContractGrammarV2 -> Right Nothing
+    LengthContractGrammarV3 -> do
+      rolesValue <- requiredField
+        LengthRankingConfigurationContractObject
+        LengthRankingConfigurationTargetArgumentRolesField
+        "targetArgumentRoles"
+        object
+      Just <$> decodeTargetRoles rolesValue
   preconditionValue <- requiredField
     LengthRankingConfigurationContractObject
     LengthRankingConfigurationPreconditionField
@@ -833,6 +857,7 @@ decodeLeanLengthContractValueWithGrammar grammar value = do
   providerLaws <- decodeProviderLaws grammar 0 emptySyntaxUsage lawValues
   pure LeanLengthContract
     { leanLengthContractSpine = spine
+    , leanLengthContractTargetArgumentRoles = targetRoles
     , leanLengthContractSource = LengthContractSource
         { lengthContractPrecondition = precondition
         , lengthContractPostcondition = postcondition
@@ -840,13 +865,43 @@ decodeLeanLengthContractValueWithGrammar grammar value = do
     , leanLengthContractProviderLaws = providerLaws
     }
 
-contractFields :: [(Text, LengthRankingConfigurationFileField)]
-contractFields =
+contractFields
+  :: LengthContractGrammar
+  -> [(Text, LengthRankingConfigurationFileField)]
+contractFields grammar =
   [ ("spine", LengthRankingConfigurationSpineField)
-  , ("precondition", LengthRankingConfigurationPreconditionField)
+  ] ++ targetRoleFields ++
+  [ ("precondition", LengthRankingConfigurationPreconditionField)
   , ("postcondition", LengthRankingConfigurationPostconditionField)
   , ("providerLaws", LengthRankingConfigurationProviderLawsField)
   ]
+ where
+  targetRoleFields = case grammar of
+    LengthContractGrammarV1 -> []
+    LengthContractGrammarV2 -> []
+    LengthContractGrammarV3 ->
+      [ ( "targetArgumentRoles"
+        , LengthRankingConfigurationTargetArgumentRolesField
+        )
+      ]
+
+decodeTargetRoles
+  :: BoundedJsonValue
+  -> Either
+      LengthRankingConfigurationFileError
+      [LengthTargetArgumentRole]
+decodeTargetRoles value = do
+  let field = LengthRankingConfigurationTargetArgumentRolesField
+  values <- arrayField field value
+  boundedCollection field maximumTargetRoles values
+  mapM (decodeRole field) values
+ where
+  decodeRole field roleValue = do
+    role <- stringField field roleValue
+    case role of
+      "observed-spine" -> Right LengthObservedSpine
+      "unobserved-target" -> Right LengthUnobservedTarget
+      _ -> Left $ LengthRankingConfigurationFieldValueRejected field
 
 decodeSpine
   :: BoundedJsonValue
@@ -972,9 +1027,10 @@ boundedCollection field maximumValues values =
       else Left $ LengthRankingConfigurationPolicyLimitExceeded
         field maximumValues (maximumValues + 1)
 
-maximumProviderLaws, maximumProviderRoles :: Natural
+maximumProviderLaws, maximumProviderRoles, maximumTargetRoles :: Natural
 maximumProviderLaws = 256
 maximumProviderRoles = 16
+maximumTargetRoles = 8
 
 boundedName
   :: LengthRankingConfigurationFileField
@@ -1110,7 +1166,7 @@ parseLengthExpression grammar phase decodeVariable depth usage value = do
         (expression, afterExpression) <- parseLengthExpression grammar
           phase decodeVariable (depth + 1) afterNode expressionValue
         Right (LengthScale factor expression, afterExpression)
-      "modulo" | grammar == LengthContractGrammarV2 -> do
+      "modulo" | grammarSupportsModulo grammar -> do
         (divisorValue, expressionValue) <- syntax phase
           $ twoArguments arguments
         divisor <- boundedLiteral phase divisorValue
@@ -1142,6 +1198,12 @@ parseLengthExpression grammar phase decodeVariable depth usage value = do
     (right, afterRight) <- parseLengthExpression grammar
       phase decodeVariable (depth + 1) afterLeft rightValue
     Right (constructor left right, afterRight)
+
+grammarSupportsModulo :: LengthContractGrammar -> Bool
+grammarSupportsModulo grammar = case grammar of
+  LengthContractGrammarV1 -> False
+  LengthContractGrammarV2 -> True
+  LengthContractGrammarV3 -> True
 
 parseExpressions
   :: LengthContractGrammar

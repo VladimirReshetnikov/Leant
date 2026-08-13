@@ -130,16 +130,16 @@ renderLengthCounterexampleNote receipt =
   take maximumLengthCounterexampleNoteCharacters $
   "replayed finite-list-spine Length counterexample (model-relative; "
     ++ renderBasis (validatedLengthCounterexampleBasis receipt)
-    ++ "): input spine lengths = "
+    ++ "): observed input spine lengths = "
     ++ renderInputs (validatedLengthCounterexampleInputs receipt)
     ++ "; result spine length = "
     ++ renderNatural (validatedLengthCounterexampleResult receipt)
 
--- | Hard terminal-output ceiling.  The version-1 configuration caps make a
+-- | Hard terminal-output ceiling.  The supported file-format caps make a
 -- valid Main-path note fit below this limit; the final projection also keeps
 -- custom lower-level receipts from expanding terminal output past it.
 maximumLengthCounterexampleNoteCharacters :: Int
-maximumLengthCounterexampleNoteCharacters = 360
+maximumLengthCounterexampleNoteCharacters = 384
 
 renderBasis :: LengthCounterexampleBasis -> String
 renderBasis basis = case basis of
