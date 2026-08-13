@@ -631,8 +631,6 @@ lengthHandoffPreparationRefusalClass refusal = case refusal of
     LengthPreparationCandidateAssociationRejected
   LengthHandoffSourceGoalVariableMissing _ ->
     LengthPreparationCandidateAssociationRejected
-  LengthHandoffSourceGoalConversionChanged ->
-    LengthPreparationCandidateAssociationRejected
   LengthHandoffRequestContextsPresent _ ->
     LengthPreparationCandidateAssociationRejected
   LengthHandoffRequestGoalChanged ->

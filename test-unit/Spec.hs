@@ -3966,7 +3966,6 @@ assertLengthPreparationRefusalClasses = do
         , LengthHandoffPremisesPresent
         , LengthHandoffSearchGoalChanged
         , LengthHandoffSourceGoalVariableMissing $ poison "source variable"
-        , LengthHandoffSourceGoalConversionChanged
         , LengthHandoffRequestContextsPresent $ poison "request contexts"
         , LengthHandoffRequestGoalChanged
         , LengthHandoffTypedGraphLost $ poison "typed graph"
@@ -3990,7 +3989,6 @@ assertLengthPreparationRefusalClasses = do
       expectedHandoffClasses =
         [ LengthPreparationUnsupportedRoute
         , LengthPreparationTypedAuthorityUnavailable
-        , LengthPreparationCandidateAssociationRejected
         , LengthPreparationCandidateAssociationRejected
         , LengthPreparationCandidateAssociationRejected
         , LengthPreparationCandidateAssociationRejected
@@ -5163,6 +5161,10 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                   typedCandidateSemanticInventory semantic
                 inspectedAuthorityConvertedSourceGoal authority @?=
                   fmap convert (inspectedSourceGoal expected)
+                assertBool
+                  "compatibility inspection Show lost the derived source goal"
+                  ("inspectedAuthorityConvertedSourceGoal =" `isInfixOf`
+                    show authority)
                 requestGoal request @?=
                   fmap convert (inspectedSearchGoal expected)
                 assertBool

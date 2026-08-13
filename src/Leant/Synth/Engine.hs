@@ -235,7 +235,6 @@ data SynthOutcome
 data ExferenceRunAuthority = ExferenceRunAuthority
   { exferenceAuthorityPreparation :: PreparedSemanticOrigin
   , exferenceAuthorityNameTable :: Map.Map String ExferenceLocal
-  , exferenceAuthorityConvertedSourceGoal :: ExferenceType
   , exferenceAuthorityPolicy :: ExferenceSessionPolicy
   , exferenceAuthoritySession :: ExferenceSession
   , exferenceAuthorityRequest :: ExferenceRequest
@@ -268,8 +267,6 @@ instance Eq TypedCandidateSemanticSidecar where
         == exferenceAuthorityPreparation rightAuthority
       && exferenceAuthorityNameTable leftAuthority
         == exferenceAuthorityNameTable rightAuthority
-      && exferenceAuthorityConvertedSourceGoal leftAuthority
-        == exferenceAuthorityConvertedSourceGoal rightAuthority
       && exferenceAuthorityPolicy leftAuthority
         == exferenceAuthorityPolicy rightAuthority
       && exferenceAuthorityRequest leftAuthority
@@ -1073,8 +1070,6 @@ exferenceRun steps prepared = do
           [Penalty (fromIntegral rank * 20) | rank <- [0 :: Int ..]])
       policy = defaultExferenceSessionPolicy
         { exferenceRatingOverrides = providerRatings }
-      convertedSourceGoal = fmap convert
-        $ semanticOriginSourceGoal semanticOrigin
   environment <- viaShow (mkEnvironment convertedDecls)
   session <- viaDiagnostic
     (mkExferenceSessionWithPolicy policy environment)
@@ -1099,7 +1094,6 @@ exferenceRun steps prepared = do
         let authority = ExferenceRunAuthority
               { exferenceAuthorityPreparation = semanticOrigin
               , exferenceAuthorityNameTable = table
-              , exferenceAuthorityConvertedSourceGoal = convertedSourceGoal
               , exferenceAuthorityPolicy = policy
               , exferenceAuthoritySession = session
               , exferenceAuthorityRequest = request
@@ -1724,6 +1718,8 @@ data PreparedSynthesisInspection = PreparedSynthesisInspection
 data ExferenceRunAuthorityInspection = ExferenceRunAuthorityInspection
   { inspectedAuthorityPreparation :: PreparedSynthesisInspection
   , inspectedAuthorityNameTable :: Map.Map String ExferenceLocal
+  -- Compatibility view derived lazily from the retained preparation and
+  -- name table; the run authority keeps no parallel converted source goal.
   , inspectedAuthorityConvertedSourceGoal :: ExferenceType
   , inspectedAuthorityPolicy :: ExferenceSessionPolicy
   , inspectedAuthorityRequest ::
@@ -1755,7 +1751,7 @@ inspectExferenceRunAuthority authority = ExferenceRunAuthorityInspection
       $ exferenceAuthorityPreparation authority
   , inspectedAuthorityNameTable = exferenceAuthorityNameTable authority
   , inspectedAuthorityConvertedSourceGoal =
-      exferenceAuthorityConvertedSourceGoal authority
+      convertedSourceGoalFromAuthority authority
   , inspectedAuthorityPolicy = exferenceAuthorityPolicy authority
   , inspectedAuthorityRequest = exferenceRequestQuery
       $ exferenceAuthorityRequest authority
@@ -1764,6 +1760,15 @@ inspectExferenceRunAuthority authority = ExferenceRunAuthorityInspection
   , inspectedAuthorityInventory = exferenceSessionInventory
       $ exferenceAuthoritySession authority
   }
+
+convertedSourceGoalFromAuthority
+  :: ExferenceRunAuthority
+  -> ExferenceType
+convertedSourceGoalFromAuthority authority = fmap convert
+  $ semanticOriginSourceGoal $ exferenceAuthorityPreparation authority
+ where
+  convert sourceVariable = FlexibleVariable
+    $ exferenceAuthorityNameTable authority Map.! sourceVariable
 
 inspectPreparedSemanticOrigin
   :: PreparedSemanticOrigin

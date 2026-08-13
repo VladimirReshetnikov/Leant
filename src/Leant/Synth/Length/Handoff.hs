@@ -55,7 +55,6 @@ import Leant.Synth.Engine
   , detailedVerificationVariantText
   , exactTypedVariantOriginOrdinal
   , exactTypedVariantOriginSidecar
-  , inspectedAuthorityConvertedSourceGoal
   , inspectedAuthorityNameTable
   , inspectedAuthorityPreparation
   , inspectedAuthorityRequest
@@ -97,7 +96,6 @@ data LengthHandoffRefusal
   | LengthHandoffPremisesPresent
   | LengthHandoffSearchGoalChanged
   | LengthHandoffSourceGoalVariableMissing String
-  | LengthHandoffSourceGoalConversionChanged
   | LengthHandoffRequestContextsPresent Int
   | LengthHandoffRequestGoalChanged
   | LengthHandoffTypedGraphLost ExferenceTermGraphAbsence
@@ -160,9 +158,6 @@ prepareCheckedLengthProblem source verified = do
     else Left LengthHandoffSearchGoalChanged
   convertedSource <- traverse (convertSourceVariable authority)
     $ inspectedSourceGoal origin
-  if convertedSource == inspectedAuthorityConvertedSourceGoal authority
-    then pure ()
-    else Left LengthHandoffSourceGoalConversionChanged
   let request = inspectedAuthorityRequest authority
   if null $ requestContexts request
     then pure ()
