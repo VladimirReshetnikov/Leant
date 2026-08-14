@@ -6,22 +6,25 @@
 -- session.  It first productively bounds the complete input, then prepares
 -- every checked problem and canonical query before launching a worker.
 -- Eligible candidates are processed serially in original order inside one
--- rank-N scope.  Before a later live call, the most recent exact
--- counterexample input vector is independently validated and replayed against
--- that candidate's checked query.  A replay hit avoids one live query; every
--- miss follows the established live path.
+-- rank-N scope.  Before a later live call, at most four exact counterexample
+-- input vectors are independently validated and replayed in newest-first
+-- order against that candidate's checked query.  A replay hit avoids one live
+-- query and promotes that vector; every all-miss follows the established live
+-- path.
 --
 -- A solver status is heuristic only.  A live observation can yield a
 -- counterexample only after Djex's public query-first gate checks its exact
 -- fingerprint and replays its evidence.  A seed hit can yield one only after
--- the later query independently validates its rebuilt bindings and replays the
--- resulting evidence against its own behavioral problem.  Even that receipt
--- is finite-spine and model-relative: it is neither a proof nor a claim about
--- the source-level realization of a Lean term.
+-- the later query independently validates the input vector against the checked
+-- problem retained by that query and associates the resulting evidence back
+-- to its own behavioral problem.  Even that receipt is finite-spine and
+-- model-relative: it is neither a proof nor a claim about the source-level
+-- realization of a Lean term.
 -- Ranking therefore never prunes.  It stably moves candidates with replayed
 -- counterexamples after every other candidate and preserves source order
--- within both partitions.  The seed is not a cached verdict, solver result,
--- or proof, and it never crosses a ranking batch.
+-- within both partitions.  The seed bank contains only input vectors, not
+-- cached verdicts, solver results, receipts, or proofs, and it never crosses a
+-- ranking batch.
 --
 -- The private opener/finalizer budgets and the execution policy's per-query
 -- host budget remain separate; this function promises no batch-wide hard
@@ -58,16 +61,18 @@ module Leant.Synth.Length.Ranking.Internal
   , materializePostVerificationLengthRanking
   , rankPostVerificationLengthCandidates
   , rankVerifiedLengthCandidates
+  , promoteCounterexampleSeed
+  , replayCounterexampleSeeds
   ) where
 
+import Control.DeepSeq (force)
 import Data.List (partition)
-import Data.Word (Word8)
 import Numeric.Natural (Natural)
 
 import Language.Haskell.Djex
   ( ExferenceLocal
   , LengthEvaluationLimits
-  , LengthSMTLibIntegerBinding (..)
+  , LengthSMTLibInputReplayError (..)
   , LengthSMTLibExecutionConfig
   , LengthSMTLibQueryError (..)
   , LengthSMTLibLiveObservationReplayError (..)
@@ -80,17 +85,14 @@ import Language.Haskell.Djex
   , SolverStatus
   , ValidatedLengthCounterexample
   , defaultLengthSMTLibLiveSessionMaximumQueries
-  , lengthSMTLibQueryBehavioralProblem
-  , lengthSMTLibQueryInputSymbols
   , lengthSMTLibLiveQueryCleanupIncomplete
   , lengthSMTLibLiveQueryObservationSolverStatus
   , lengthSMTLibLiveQueryPrimaryFailure
   , lengthSMTLibLiveSessionCleanupIncomplete
   , lengthSMTLibLiveSessionPrimaryFailure
+  , replayLengthSMTLibCounterexampleInputs
   , replayLengthSMTLibLiveQueryObservation
-  , replayBehavioralEvidence
   , runLengthSMTLibLiveQuery
-  , validateLengthSMTLibCounterexample
   , validatedLengthCounterexampleInputs
   , withLengthSMTLibLiveSession
   )
@@ -551,22 +553,23 @@ runPreparedCandidates
   -> IO
       (Either LengthRankingFailure
         [AssociatedRankedLengthCandidate association])
-runPreparedCandidates evaluation session = go [] Nothing
+runPreparedCandidates evaluation session = go [] []
  where
-  go reversed seed remaining = case remaining of
+  go reversed seedBank remaining = case remaining of
     [] -> pure $ Right $ reverse reversed
     PreparedLengthCandidateUnassessed
         index association refusal : rest ->
       go (AssociatedRankedLengthCandidate
         index association (LengthCandidatePreparationRefused refusal) : reversed)
-        seed rest
+        seedBank rest
     PreparedLengthCandidateEligible
         index association query : rest -> case
-          seed >>= replayCounterexampleSeed evaluation query of
-      Just receipt -> go
-        (assessedCounterexample index association receipt : reversed)
-        (Just $ validatedLengthCounterexampleInputs receipt)
-        rest
+          replayCounterexampleSeeds evaluation query seedBank of
+      Just (inputs, receipt) ->
+        let promoted = promoteCounterexampleSeed inputs seedBank
+        in promoted `seq` go
+            (assessedCounterexample index association receipt : reversed)
+            promoted rest
       Nothing -> do
         observed <- runLengthSMTLibLiveQuery evaluation session query
         case observed of
@@ -575,45 +578,54 @@ runPreparedCandidates evaluation session = go [] Nothing
               assessCandidate index association query observation of
             Left failure -> pure $ Left failure
             Right assessed ->
-              let nextSeed = case counterexampleSeed assessed of
-                    Nothing -> seed
-                    Just retained -> Just retained
-              in go (assessed : reversed) nextSeed rest
+              let nextSeedBank = case counterexampleSeed assessed of
+                    Nothing -> seedBank
+                    Just retained ->
+                      promoteCounterexampleSeed retained seedBank
+              in nextSeedBank `seq`
+                  go (assessed : reversed) nextSeedBank rest
 
--- A seed is only an input vector from the most recent exact receipt.  The
--- later checked query reconstructs symbol bindings and independently replays
--- its own retained behavioral problem; no earlier verdict, provider basis,
--- query identity, or solver observation crosses this edge.
-replayCounterexampleSeed
+-- A seed is only an input vector from an exact receipt.  The later checked
+-- query independently evaluates that vector against its own retained problem
+-- and associates the resulting evidence back to that problem; no earlier
+-- verdict, receipt, provider basis, query identity, or solver observation
+-- crosses this edge.  Every rejection and ordinary non-counterexample is a
+-- miss, so an older vector can still be attempted.
+replayCounterexampleSeeds
   :: LengthEvaluationLimits
   -> CheckedLengthQuery
-  -> [Natural]
-  -> Maybe ValidatedLengthCounterexample
-replayCounterexampleSeed evaluation query inputs = do
-  bindings <- exactInputBindings
-    (lengthSMTLibQueryInputSymbols query) inputs
-  evidence <- case
-      validateLengthSMTLibCounterexample evaluation query bindings of
-    Left _ -> Nothing
-    Right retained -> retained
-  case replayBehavioralEvidence
-      (lengthSMTLibQueryBehavioralProblem query) evidence of
-    Left _ -> Nothing
-    Right receipt -> Just receipt
-
-exactInputBindings
-  :: [[Word8]]
-  -> [Natural]
-  -> Maybe [LengthSMTLibIntegerBinding]
-exactInputBindings = go []
+  -> [[Natural]]
+  -> Maybe ([Natural], ValidatedLengthCounterexample)
+replayCounterexampleSeeds evaluation query =
+  go counterexampleSeedBankMaximumEntries
  where
-  go reversed symbols inputs = case (symbols, inputs) of
-    ([], []) -> Just $ reverse reversed
-    (symbol : remainingSymbols, input : remainingInputs) ->
-      let binding = LengthSMTLibIntegerBinding symbol $ toInteger input
-      in binding `seq` go (binding : reversed)
-          remainingSymbols remainingInputs
-    _ -> Nothing
+  go remaining seedBank
+    | remaining <= 0 = Nothing
+    | otherwise = case seedBank of
+        [] -> Nothing
+        inputs : rest -> case
+            replayLengthSMTLibCounterexampleInputs evaluation query inputs of
+          Right (Just receipt) -> Just (inputs, receipt)
+          Left (LengthSMTLibInputReplayEvaluationRejected _) ->
+            go (remaining - 1) rest
+          Left (LengthSMTLibInputReplayAssociationRejected _) ->
+            go (remaining - 1) rest
+          Right Nothing -> go (remaining - 1) rest
+
+counterexampleSeedBankMaximumEntries :: Int
+counterexampleSeedBankMaximumEntries = 4
+
+-- Insert at the MRU end, remove every exact duplicate, retain at most the four
+-- newest distinct vectors, and force that bounded value before it is retained
+-- across another candidate.  The bank never contains receipts or query
+-- metadata, and repeated promotions cannot accumulate a lazy history chain.
+promoteCounterexampleSeed
+  :: [Natural]
+  -> [[Natural]]
+  -> [[Natural]]
+promoteCounterexampleSeed inputs seedBank = force $
+  inputs : take (counterexampleSeedBankMaximumEntries - 1)
+    (filter (/= inputs) seedBank)
 
 assessedCounterexample
   :: Natural

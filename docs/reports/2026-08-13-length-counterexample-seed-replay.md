@@ -1,15 +1,23 @@
 # Batch-local Length counterexample seed replay
 
+> **2026-08-14 follow-up.** This report records the original one-entry replay
+> checkpoint. The current ranker uses a fixed four-entry, newest-first MRU bank
+> and calls Djex's query-owned
+> `replayLengthSMTLibCounterexampleInputs` entrance instead of rebuilding SMT
+> symbols and integer bindings in Leant. The bounded policy and unchanged trust
+> boundary are detailed in the
+> [Length input replay bank report](2026-08-14-length-input-replay-bank.md).
+
 ## Outcome
 
-Leant's conservative Length ranking pass now tries the input vector from its
-most recent validated counterexample before running each later eligible Z3
-query. This is a narrow, batch-local CEGIS-style feedback edge. It reduces
-redundant live solver work without reusing a verdict or widening behavioral
-authority.
+At this checkpoint, Leant's conservative Length ranking pass tried the input
+vector from its most recent validated counterexample before running each later
+eligible Z3 query. This established a narrow, batch-local CEGIS-style feedback
+edge which reduced redundant live solver work without reusing a verdict or
+widening behavioral authority.
 
-The pass retains at most one seed: the bounded source-ordered `[Natural]`
-projection of an exact `ValidatedLengthCounterexample`. For a later
+The original pass retained at most one seed: the bounded source-ordered
+`[Natural]` projection of an exact `ValidatedLengthCounterexample`. For a later
 `CheckedLengthQuery`, Leant requires exact symbol/input cardinality, rebuilds
 `LengthSMTLibIntegerBinding`s from that query's own generated input symbols,
 and calls `validateLengthSMTLibCounterexample` with the configured evaluation
@@ -19,10 +27,10 @@ same query. Only the resulting fresh problem-bound receipt can mark the later
 candidate as a counterexample.
 
 An arity mismatch, validation error, non-counterexample assignment, or replay
-rejection is a seed miss, not a ranking failure. The candidate then follows
+rejection was a seed miss, not a ranking failure. The candidate then followed
 the exact pre-existing live Z3 path. A counterexample from that live path
-replaces the seed; a heuristic status leaves the most recent exact seed in
-place. Pure preparation refusals do not inspect or modify it.
+replaced the seed; a heuristic status left the most recent exact seed in
+place. Pure preparation refusals did not inspect or modify it.
 
 ## Failure and ordering policy
 
@@ -37,10 +45,10 @@ association, or evidence failure, the established fallback still discards all
 partial assessments and returns every admitted occurrence in original order as
 `Unassessed`. Seed replay itself is pure and fail-closed to a miss.
 
-The policy deliberately keeps only one most-recent seed. A multi-seed bank
-would introduce a new attempt-order and work-bound policy; a durable cache
-would additionally need complete cache and run identities. Neither is part of
-this checkpoint.
+This checkpoint deliberately kept only one most-recent seed. The later
+four-entry extension makes its attempt order and work bound explicit; it still
+does not introduce a durable cache or the cache and run identities that one
+would require.
 
 ## Authority and identity
 
@@ -84,8 +92,8 @@ The focused strict unit suite pins both sides of the boundary:
   replay-derived and live partial assessments with the complete batch to
   `Unassessed`.
 
-The binding helper checks exact symbol/input cardinality and treats a mismatch
-as a seed miss. The compatibility ranker accepts independently verified
+The former binding helper checked exact symbol/input cardinality and treated a
+mismatch as a seed miss. The compatibility ranker accepted independently verified
 receipts and a legacy contract derives all-observed roles in each candidate's
 own checked context, so the cross-arity regression exercises that public seam
 without constructing raw queries or bypassing handoff authority.

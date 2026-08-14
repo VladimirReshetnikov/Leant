@@ -1,6 +1,6 @@
 module Main (main) where
 
-import Control.Exception (evaluate, finally)
+import Control.Exception (SomeException, evaluate, finally, try)
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as BS
 import Data.Char (isAlphaNum)
@@ -346,6 +346,7 @@ import Leant.Synth.Length.Ranking
   , rankedLengthCandidatePreparationRefusal
   , rankedLengthCandidateVerified
   )
+import qualified Leant.Synth.Length.Ranking.Internal as LengthRankingInternal
 import Leant.Synth.Observability
   ( CandidateRenderingRoute (..)
   , LeantSynthesisMetric (..)
@@ -3048,7 +3049,22 @@ lengthRankingTests = testGroup "checked Length behavioral ranking"
       "run Z3 when the latest counterexample input has another arity"
       assertLengthRankingCounterexampleSeedArityMismatch
   , testCase
-      "reset every candidate in original order after an operational failure"
+      "retain four exact counterexample vectors in promoted MRU order"
+      assertLengthRankingCounterexampleSeedMRU
+  , testCase
+      "try equally applicable counterexample seeds newest first"
+      assertLengthRankingCounterexampleSeedNewestFirst
+  , testCase
+      "derive every replay hit from the later query's result and provider basis"
+      assertLengthRankingCounterexampleSeedFreshReceipt
+  , testCase
+      "leave the counterexample seed bank unchanged for heuristic assessments"
+      assertLengthRankingCounterexampleSeedHeuristicIsolation
+  , testCase
+      "apply the caller's evaluation limits to every seed replay attempt"
+      assertLengthRankingCounterexampleSeedEvaluationLimits
+  , testCase
+      "reset earlier live and seed-hit assessments after a later live failure"
       assertLengthRankingAtomicFallback
   , testCase
       "adapt ranking only through a validated post-verification permutation"
@@ -6889,6 +6905,249 @@ assertLengthRankingCounterexampleSeedArityMismatch = do
       "unexpected arity-mismatch assessments: " ++ show assessments
   assertFakeLengthQueryEvents [0, 1] [1] events
 
+assertLengthRankingCounterexampleSeedMRU :: IO ()
+assertLengthRankingCounterexampleSeedMRU = do
+  (contract, arityCandidates) <- buildLengthSeedBankArityFixture
+  refused <- syntheticLengthRankingCandidate "seed-bank-preparation-refusal"
+  (zeroInput, oneInput, twoInput, threeInput, fourInput) <-
+    case arityCandidates of
+    [zero, one, two, three, four] -> pure (zero, one, two, three, four)
+    _ -> assertFailure "the bounded projection fixture changed cardinality"
+      >> error "unreachable"
+  let candidates =
+        [ zeroInput
+        , oneInput
+        , twoInput
+        , threeInput
+        , refused
+        , twoInput
+        , zeroInput
+        , fourInput
+        , oneInput
+        , twoInput
+        ]
+      expectedCounterexampleInputs =
+        [ []
+        , [3]
+        , [3, 5]
+        , [3, 5, 7]
+        , [3, 5]
+        , []
+        , [3, 5, 7, 9]
+        , [3]
+        , [3, 5]
+        ]
+  (ranking, events) <- runLengthRankingWithFakeTrace "healthy"
+    Djex.LengthSMTLibInputValuesAfterSatisfiable
+    contract candidates
+  lengthRankingFailure ranking @?= Nothing
+  -- Stable counterexample demotion moves only the preparation refusal.  The
+  -- retained original indices also make every repeated occurrence explicit.
+  map rankedLengthCandidateOriginalIndex
+      (lengthRankingCandidates ranking) @?=
+    [4, 0, 1, 2, 3, 5, 6, 7, 8, 9]
+  rankedLengthVerifiedCandidates ranking @?=
+    refused : [ zeroInput, oneInput, twoInput, threeInput, twoInput
+              , zeroInput, fourInput, oneInput, twoInput
+              ]
+  rankedLengthPreparationRefusals ranking @?=
+    Just LengthPreparationTypedAuthorityUnavailable : replicate 9 Nothing
+  case map rankedLengthCandidateAssessment
+      $ lengthRankingCandidates ranking of
+    Unassessed : counterexamples -> do
+      actualInputs <- mapM extractCounterexampleInputs counterexamples
+      actualInputs @?= expectedCounterexampleInputs
+    assessments -> assertFailure $
+      "unexpected MRU seed-bank assessments: " ++ show assessments
+  -- The first four distinct vectors are live ordinals 0..3.  The repeated
+  -- arity-two query must skip the newer arity-three vector and hit the older
+  -- vector, promoting it.  The following arity-zero hit proves that promotion
+  -- removed the exact duplicate instead of consuming a slot.  Arity four is
+  -- the fifth distinct vector and evicts arity one, which therefore becomes
+  -- actual-live ordinal 5.  The final arity-two hit proves its earlier hit was
+  -- promoted.  Both all-miss paths retain compact actual-live ordinals.
+  assertFakeLengthQueryEvents [0 .. 5] [1 .. 5] events
+ where
+  extractCounterexampleInputs assessment = case assessment of
+    Counterexample receipt ->
+      pure $ Djex.validatedLengthCounterexampleInputs receipt
+    other -> assertFailure
+      ("MRU seed-bank candidate was not a counterexample: " ++ show other)
+        >> error "unreachable"
+
+assertLengthRankingCounterexampleSeedNewestFirst :: IO ()
+assertLengthRankingCounterexampleSeedNewestFirst = do
+  identity <- buildOneInputLengthRankingCandidate
+  query <- expectRight
+      (prepareCheckedLengthQuery (lengthRankingContract 2) identity)
+    >>= expectRight
+  -- Both distinct one-input vectors violate the same later identity query.
+  -- The two remaining entries make each case a full-capacity bank but cannot
+  -- match that query's arity.
+  mapM_ (assertIndependentCounterexample query) [[5], [3]]
+  assertNewestFirst query [[5], [3], [], [3, 5]] [5]
+  assertNewestFirst query [[3], [5], [], [3, 5]] [3]
+  let oversizedMissBank =
+        [] : [3, 5] : [3, 5, 7] : [3, 5, 7, 9]
+          : error "replay forced a fifth bank entry"
+  case LengthRankingInternal.replayCounterexampleSeeds
+      defaultLengthEvaluationLimits query oversizedMissBank of
+    Nothing -> pure ()
+    Just _ -> assertFailure
+      "an arity-mismatched oversized bank unexpectedly replayed"
+  strictPromotion <- try $ evaluate $
+    LengthRankingInternal.promoteCounterexampleSeed
+      [error "promoted input vector remained lazy"] []
+  case strictPromotion :: Either SomeException [[Natural]] of
+    Left _ -> pure ()
+    Right _ -> assertFailure
+      "counterexample seed promotion retained a lazy input vector"
+ where
+  assertIndependentCounterexample query inputs = case inputs of
+    [expectedResult] -> case
+        Djex.replayLengthSMTLibCounterexampleInputs
+          defaultLengthEvaluationLimits query inputs of
+      Left failure -> assertFailure $
+        "applicable newest-first fixture input was rejected: " ++ show failure
+      Right Nothing -> assertFailure $
+        "applicable newest-first fixture input satisfied the contract: "
+          ++ show inputs
+      Right (Just receipt) -> do
+        Djex.validatedLengthCounterexampleInputs receipt @?= inputs
+        Djex.validatedLengthCounterexampleResult receipt @?= expectedResult
+    _ -> assertFailure "newest-first fixture input was not unary"
+
+  assertNewestFirst query bank expected = case
+      LengthRankingInternal.replayCounterexampleSeeds
+        defaultLengthEvaluationLimits query bank of
+    Nothing -> assertFailure
+      "the full counterexample seed bank produced no replay hit"
+    Just (inputs, receipt) -> case expected of
+      [expectedResult] -> do
+        inputs @?= expected
+        Djex.validatedLengthCounterexampleInputs receipt @?= expected
+        Djex.validatedLengthCounterexampleResult receipt @?= expectedResult
+      _ -> assertFailure "newest-first expected input was not unary"
+
+assertLengthRankingCounterexampleSeedFreshReceipt :: IO ()
+assertLengthRankingCounterexampleSeedFreshReceipt = do
+  (contract, scaled, independent) <-
+    buildScaledProviderReplayFixture
+  scaledProblem <- expectRight
+    $ prepareCheckedLengthProblem contract scaled
+  independentProblem <- expectRight
+    $ prepareCheckedLengthProblem contract independent
+  scaledQuery <- expectRight (prepareCheckedLengthQuery contract scaled)
+    >>= expectRight
+  independentQuery <- expectRight
+      (prepareCheckedLengthQuery contract independent)
+    >>= expectRight
+  assertBool "distinct replay fixture problems shared a query identity"
+    $ lengthSMTLibQueryFingerprint scaledQuery /=
+        lengthSMTLibQueryFingerprint independentQuery
+  checkedLengthCandidateResult
+      (checkedLengthProblemCandidate scaledProblem) @?=
+    LengthScale 2 (LengthVariable $ LengthInput 0)
+  checkedLengthCandidateResult
+      (checkedLengthProblemCandidate independentProblem) @?=
+    LengthVariable (LengthInput 0)
+  let scaledProviders = checkedLengthCandidateUsedProviders
+        $ checkedLengthProblemCandidate scaledProblem
+  length scaledProviders @?= 1
+  checkedLengthCandidateUsedProviders
+      (checkedLengthProblemCandidate independentProblem) @?= []
+  (ranking, events) <- runLengthRankingWithFakeTrace "healthy"
+    Djex.LengthSMTLibInputValuesAfterSatisfiable contract
+    [scaled, independent, scaled, independent]
+  lengthRankingFailure ranking @?= Nothing
+  map rankedLengthCandidateOriginalIndex
+      (lengthRankingCandidates ranking) @?= [0, 1, 2, 3]
+  case map rankedLengthCandidateAssessment
+      $ lengthRankingCandidates ranking of
+    [ Counterexample firstScaled
+      , Counterexample firstIndependent
+      , Counterexample secondScaled
+      , Counterexample secondIndependent
+      ] -> do
+        let receipts =
+              [ firstScaled
+              , firstIndependent
+              , secondScaled
+              , secondIndependent
+              ]
+        map Djex.validatedLengthCounterexampleInputs receipts @?=
+          replicate 4 [3]
+        map Djex.validatedLengthCounterexampleResult receipts @?=
+          [6, 3, 6, 3]
+        map Djex.validatedLengthCounterexampleBasis receipts @?=
+          [ Djex.FiniteSpineModelUnderAssumedProviderLaws scaledProviders
+          , Djex.ProviderIndependentFiniteSpineModel
+          , Djex.FiniteSpineModelUnderAssumedProviderLaws scaledProviders
+          , Djex.ProviderIndependentFiniteSpineModel
+          ]
+    assessments -> assertFailure $
+      "unexpected query-owned replay assessments: " ++ show assessments
+  -- Only the first occurrence is live.  Every later equal-vector hit must
+  -- rebuild the result and provider basis from its own checked query.
+  assertFakeLengthQueryEvents [0] [0] events
+
+assertLengthRankingCounterexampleSeedHeuristicIsolation :: IO ()
+assertLengthRankingCounterexampleSeedHeuristicIsolation = do
+  identity <- buildOneInputLengthRankingCandidate
+  refused <- syntheticLengthRankingCandidate "heuristic-seed-refusal"
+  let candidates = [identity, refused, identity]
+  (ranking, events) <- runLengthRankingWithFakeTrace "healthy"
+    Djex.LengthSMTLibStatusOnly (lengthRankingContract 0) candidates
+  lengthRankingFailure ranking @?= Nothing
+  rankedLengthVerifiedCandidates ranking @?= candidates
+  map rankedLengthCandidateAssessment
+      (lengthRankingCandidates ranking) @?=
+    [ Heuristic Djex.SolverSatisfiable
+    , Unassessed
+    , Heuristic Djex.SolverSatisfiable
+    ]
+  rankedLengthPreparationRefusals ranking @?=
+    [ Nothing
+    , Just LengthPreparationTypedAuthorityUnavailable
+    , Nothing
+    ]
+  -- A heuristic has no input receipt to seed, and a preparation refusal has
+  -- no bank effect.  The repeated exact query must therefore remain the next
+  -- compact live ordinal rather than becoming a replay hit.
+  assertFakeLengthQueryEvents [0, 1] [] events
+
+assertLengthRankingCounterexampleSeedEvaluationLimits :: IO ()
+assertLengthRankingCounterexampleSeedEvaluationLimits = do
+  (contract, scaled, independent) <- buildScaledProviderReplayFixture
+  evaluation <- expectRight $ Djex.mkLengthEvaluationLimits
+    Djex.LengthEvaluationLimitSource
+      { Djex.lengthEvaluationLimitSourceAssignmentValueBits = 2
+      , Djex.lengthEvaluationLimitSourceIntermediateValueBits = 2
+      }
+  (ranking, events) <- runLengthRankingWithFakeTraceWithEvaluation
+    "healthy" Djex.LengthSMTLibInputValuesAfterSatisfiable evaluation
+    contract [independent, scaled]
+  rankedLengthVerifiedCandidates ranking @?= [independent, scaled]
+  map rankedLengthCandidateAssessment
+      (lengthRankingCandidates ranking) @?=
+    [Unassessed, Unassessed]
+  rankedLengthPreparationRefusals ranking @?= [Nothing, Nothing]
+  failure <- case lengthRankingFailure ranking of
+    Nothing -> assertFailure
+      "a seed replay bypassed the caller's intermediate-value limit"
+        >> error "unreachable"
+    Just retained -> pure retained
+  lengthRankingFailureClass failure @?=
+    LengthRankingLiveQueryFailed
+      Djex.LengthSMTLibLiveQueryCounterexampleRejected
+  lengthRankingFailureCleanupIncomplete failure @?= False
+  lengthRankingFailureOriginalIndex failure @?= Just 1
+  -- The independent query admits input/result 3 and seeds [3].  Replaying it
+  -- against the scaled query must reject intermediate result 6 under this
+  -- nondefault two-bit limit, then fall through to compact live ordinal 1.
+  -- Live validation rejects the same model and triggers atomic fallback.
+  assertFakeLengthQueryEvents [0, 1] [0, 1] events
+
 assertLengthRankingAtomicFallback :: IO ()
 assertLengthRankingAtomicFallback = do
   fixture <- buildLengthRankingLiveFixture
@@ -7100,7 +7359,13 @@ assertLengthCounterexampleReceipt expectedResult receipt = do
 
 buildOneInputLengthRankingCandidate
   :: IO (Verified DetailedVerificationVariant)
-buildOneInputLengthRankingCandidate = do
+buildOneInputLengthRankingCandidate =
+  buildLengthProjectionRankingCandidate 1
+
+buildLengthProjectionRankingCandidate
+  :: Int
+  -> IO (Verified DetailedVerificationVariant)
+buildLengthProjectionRankingCandidate inputArity = do
   let element = FAtom False "Nat"
       listKey = "List Nat"
       list = FParamRec True "List" listKey [element]
@@ -7110,23 +7375,34 @@ buildOneInputLengthRankingCandidate = do
       goal = FArr list list
       zeroProvider = ProviderFrag "Demo.zeroList" list
       oneProvider = ProviderFrag "Demo.oneList" list
+  assertBool "the provider-independent fixture is unary"
+    $ inputArity == 1
   detailed <- expectRight $
     synthesizeWithProvidersSkippingDetailedWithMultiConstructorPatterns
-      False EngineExference 128 Set.empty [zeroProvider, oneProvider] goal
+      False EngineExference 512 Set.empty [zeroProvider, oneProvider] goal
+  let expectedSpelling = providerIndependentProjectionSpelling inputArity
   (group, acceptedSpelling) <- case detailed of
     DetailedSynthCandidates groups _ -> case
-        [ (retained, spelling)
-        | retained <- groups
-        , providerIndependentIdentity retained
-        , spelling <- take 1 $ detailedCandidateGroupVariants retained
+      [ (retained, spelling)
+      | retained <- groups
+        , not $ isNothing $ detailedCandidateGroupSemanticSidecar retained
+        , spelling <- detailedCandidateGroupVariants retained
+        , spelling == expectedSpelling
         ] of
       retained : _ -> pure retained
       [] -> assertFailure
-        ("one-input ranking fixture returned no identity: "
-          ++ show (map detailedCandidateGroupVariants groups))
+        ("Length ranking fixture returned no " ++ show inputArity
+          ++ "-input projection " ++ show expectedSpelling ++ ": "
+          ++ show
+            [ ( detailedCandidateGroupVariants retained
+              , detailedCandidateGroupRoute retained
+              , isNothing $ detailedCandidateGroupSemanticSidecar retained
+              )
+            | retained <- groups
+            ])
             >> error "unreachable"
     other -> assertFailure
-      ("one-input ranking synthesis failed: " ++ show other)
+      ("Length projection ranking synthesis failed: " ++ show other)
         >> error "unreachable"
   batch <- verifyCandidateGroups 1
     (\variant -> pure $ if detailedVerificationVariantText variant
@@ -7137,18 +7413,176 @@ buildOneInputLengthRankingCandidate = do
   case verifiedCandidateReceipts batch of
     [verified] -> pure verified
     receipts -> assertFailure
-      ("one-input identity verification produced "
+      ("Length projection verification produced "
         ++ show (length receipts) ++ " receipts") >> error "unreachable"
+
+-- Select a callback-verifiable provider-independent projection without
+-- depending on occurrence-local lambda grouping in the erased Djex graph.
+-- The checked Length problem assertions below remain the semantic authority.
+providerIndependentProjectionSpelling :: Int -> String
+providerIndependentProjectionSpelling inputArity = "fun "
+  ++ unwords (replicate (inputArity - 1) "_" ++ ["x"])
+  ++ " => x"
+
+-- Multi-argument pure projections currently retain only the compatibility
+-- expression, not the exact typed graph required by the Length handoff.  The
+-- MRU test therefore uses direct providers whose result family differs from
+-- their input family.  Identity cannot inhabit any of these goals, every
+-- provider is retained in every run authority, and one shared contract can
+-- resolve the whole law inventory for candidates of arities zero through
+-- four.
+buildLengthSeedBankArityFixture
+  :: IO
+      ( LeanLengthContract
+      , [Verified DetailedVerificationVariant]
+      )
+buildLengthSeedBankArityFixture = do
+  let natural = FAtom False "Nat"
+      boolean = FAtom False "Bool"
+      list key element = FParamRec True "List" key [element]
+        [ ("List.nil", [])
+        , ("List.cons", [element, FAtom False key])
+        ]
+      sourceList = list "List Nat" natural
+      resultList = list "List Bool" boolean
+      arities = [0 .. 4]
+      providerName arity = "Demo.project" ++ show arity
+      providerType arity =
+        foldr FArr resultList $ replicate arity sourceList
+      providerLaw arity = LeanLengthProviderLaw
+        { leanLengthProviderLawName = providerName arity
+        , leanLengthProviderLawArgumentRoles =
+            replicate arity LengthSpineArgument
+        , leanLengthProviderLawTransfer = if arity == 0
+            then LengthLiteral 1
+            else LengthVariable $ Djex.LengthProviderArgument
+              $ fromIntegral $ arity - 1
+        }
+      contract = (lengthRankingContract 0)
+        { leanLengthContractProviderLaws = map providerLaw arities }
+  verified <- mapM
+    (buildDirectProviderCandidate arities providerName providerType)
+    arities
+  mapM_ (assertArity contract) $ zip arities verified
+  pure (contract, verified)
  where
-  providerIndependentIdentity group = case
-      detailedCandidateGroupSemanticSidecar group of
-    Nothing -> False
-    Just semantic -> case typedCandidateTermGraph
-        $ typedCandidateSemanticCandidate semantic of
-      Left _ -> False
-      Right graph -> case eraseTermGraph graph of
-        Lambda [Bind parameter] (Local returned) -> parameter == returned
-        _ -> False
+  buildDirectProviderCandidate arities providerName providerType arity = do
+    let prioritizedArities = arity : filter (/= arity) arities
+        providers =
+          [ ProviderFrag (providerName retainedArity)
+              (providerType retainedArity)
+          | retainedArity <- prioritizedArities
+          ]
+    detailed <- expectRight $
+      synthesizeWithProvidersSkippingDetailedWithMultiConstructorPatterns
+        False EngineExference 512 Set.empty providers $ providerType arity
+    group <- case detailed of
+      DetailedSynthCandidates groups _ -> case
+          [ retained
+          | retained <- groups
+          , detailedCandidateGroupVariants retained == [providerName arity]
+          , not $ isNothing
+              $ detailedCandidateGroupSemanticSidecar retained
+          ] of
+        retained : _ -> pure retained
+        [] -> assertFailure
+          ("seed-bank fixture lacked typed direct provider "
+            ++ providerName arity ++ ": " ++ show
+              [ ( detailedCandidateGroupVariants retained
+                , detailedCandidateGroupRoute retained
+                , isNothing
+                    $ detailedCandidateGroupSemanticSidecar retained
+                )
+              | retained <- groups
+              ]) >> error "unreachable"
+      other -> assertFailure
+        ("seed-bank provider synthesis failed at arity " ++ show arity
+          ++ ": " ++ show other) >> error "unreachable"
+    verifySingleLengthRankingGroup group
+
+  assertArity contract (arity, verified) = do
+    problem <- expectRight $ prepareCheckedLengthProblem contract verified
+    query <- expectRight (prepareCheckedLengthQuery contract verified)
+      >>= expectRight
+    length (lengthSMTLibQueryInputSymbols query) @?= arity
+    checkedLengthCandidateResult
+        (checkedLengthProblemCandidate problem) @?= if arity == 0
+      then LengthLiteral 1
+      else LengthVariable $ LengthInput $ fromIntegral $ arity - 1
+
+buildScaledProviderReplayFixture
+  :: IO
+      ( LeanLengthContract
+      , Verified DetailedVerificationVariant
+      , Verified DetailedVerificationVariant
+      )
+buildScaledProviderReplayFixture = do
+  let natural = FAtom False "Nat"
+      boolean = FAtom False "Bool"
+      list key element = FParamRec True "List" key [element]
+        [ ("List.nil", [])
+        , ("List.cons", [element, FAtom False key])
+        ]
+      sourceList = list "List Nat" natural
+      resultList = list "List Bool" boolean
+      scaledGoal = FArr sourceList resultList
+      independentGoal = FArr sourceList sourceList
+      scaledProvider = ProviderFrag "Demo.scaleList" scaledGoal
+      providers = [scaledProvider]
+      contract = (lengthRankingContract 0)
+        { leanLengthContractProviderLaws =
+            [ LeanLengthProviderLaw
+                { leanLengthProviderLawName = "Demo.scaleList"
+                , leanLengthProviderLawArgumentRoles =
+                    [LengthSpineArgument]
+                , leanLengthProviderLawTransfer = LengthScale 2
+                    $ LengthVariable $ Djex.LengthProviderArgument 0
+                }
+            ]
+        }
+  scaledDetailed <- expectRight $
+    synthesizeWithProvidersSkippingDetailedWithMultiConstructorPatterns
+      False EngineExference 512 Set.empty providers scaledGoal
+  scaledGroups <- case scaledDetailed of
+    DetailedSynthCandidates retained _ -> pure retained
+    other -> assertFailure
+      ("scaled-provider replay synthesis failed: " ++ show other)
+        >> error "unreachable"
+  scaledGroup <- case
+      [ group
+      | group <- scaledGroups
+      , [spelling] <- [detailedCandidateGroupVariants group]
+      , "Demo.scaleList" `isInfixOf` spelling
+      , not $ isNothing $ detailedCandidateGroupSemanticSidecar group
+      ] of
+    group : _ -> pure group
+    [] -> assertFailure
+      ("scaled-provider replay fixture lacked its direct provider: "
+        ++ show (map detailedCandidateGroupVariants scaledGroups))
+        >> error "unreachable"
+  independentDetailed <- expectRight $
+    synthesizeWithProvidersSkippingDetailedWithMultiConstructorPatterns
+      False EngineExference 512 Set.empty providers independentGoal
+  independentGroups <- case independentDetailed of
+    DetailedSynthCandidates retained _ -> pure retained
+    other -> assertFailure
+      ("provider-independent replay synthesis failed: " ++ show other)
+        >> error "unreachable"
+  independentGroup <- case
+      [ group
+      | group <- independentGroups
+      , providerIndependentProjectionSpelling 1 `elem`
+          detailedCandidateGroupVariants group
+      , not $ isNothing $ detailedCandidateGroupSemanticSidecar group
+      ] of
+    group : _ -> pure group
+    [] -> assertFailure
+      ("scaled-provider replay fixture lacked its independent identity: "
+        ++ show (map detailedCandidateGroupVariants independentGroups))
+        >> error "unreachable"
+  scaled <- verifySingleLengthRankingGroup scaledGroup
+  independent <- verifySingleLengthRankingGroup independentGroup
+  pure (contract, scaled, independent)
 
 -- The provider-backed Leant handoff fixtures are correctly zero-input.  This
 -- test-only dependency fixture supplies the smallest honest one-input basis:
@@ -7427,6 +7861,18 @@ runLengthRankingWithFakeTrace
   -> [Verified DetailedVerificationVariant]
   -> IO (LengthRanking, BS.ByteString)
 runLengthRankingWithFakeTrace mode policy contract candidates =
+  runLengthRankingWithFakeTraceWithEvaluation mode policy
+    defaultLengthEvaluationLimits contract candidates
+
+runLengthRankingWithFakeTraceWithEvaluation
+  :: String
+  -> Djex.LengthSMTLibArtifactPolicy
+  -> Djex.LengthEvaluationLimits
+  -> LeanLengthContract
+  -> [Verified DetailedVerificationVariant]
+  -> IO (LengthRanking, BS.ByteString)
+runLengthRankingWithFakeTraceWithEvaluation
+    mode policy evaluation contract candidates =
   withFakeLengthSolver mode $ \executable -> do
     execution <- expectRight $ Djex.mkLengthSMTLibExecutionConfig
       Djex.defaultLengthSMTLibExecutionLimits
@@ -7439,7 +7885,7 @@ runLengthRankingWithFakeTrace mode policy contract candidates =
           , Djex.lengthSMTLibExecutionConfigSourceArtifactPolicy = policy
           }
     bounded <- timeout 8000000 $ rankVerifiedLengthCandidates execution
-      defaultLengthEvaluationLimits contract candidates
+      evaluation contract candidates
     case bounded of
       Nothing -> assertFailure $ "Length ranking mode exceeded its bound: " ++
         mode
@@ -7454,18 +7900,33 @@ assertFakeLengthQueryEvents expectedChecks expectedValues events = do
     length expectedChecks
   byteStringOccurrenceCount (encoded "EVENT query-get-value ") events @?=
     length expectedValues
-  mapM_ (assertEventOrdinal events "query-check" (2 :: Int)) expectedChecks
-  mapM_ (assertEventOrdinal events "query-get-value" (3 :: Int)) expectedValues
+  mapM_ (assertEventOrdinal events "query-check") expectedChecks
+  mapM_ (assertEventOrdinal events "query-get-value") expectedValues
  where
   encoded = BS.pack
-  assertEventOrdinal trace tag fieldCount ordinal =
+  assertEventOrdinal trace tag ordinal =
     let rendered = show ordinal
-        marker = encoded $ "EVENT " ++ tag ++ " " ++ show fieldCount
-          ++ "\nFIELD ordinal "
+        marker = encoded $ "\nFIELD ordinal "
           ++ show (length rendered) ++ "\n" ++ rendered ++ "\n"
     in assertBool
       ("fake Length trace lost " ++ tag ++ " ordinal " ++ rendered)
-      $ marker `BS.isInfixOf` trace
+      $ eventWithField trace (encoded $ "EVENT " ++ tag ++ " ") marker
+
+  -- A get-value event owns one symbol field per modeled input, so its header
+  -- field count is intentionally arity-dependent.  Search only within blocks
+  -- of the requested event kind instead of assuming the unary count of three.
+  eventWithField trace prefix marker = go trace
+   where
+    terminator = encoded "\nEND\n"
+    go remaining = case BS.breakSubstring prefix remaining of
+      (_, suffix) | BS.null suffix -> False
+      (_, suffix) ->
+        let afterPrefix = BS.drop (BS.length prefix) suffix
+            (eventBody, afterBody) =
+              BS.breakSubstring terminator afterPrefix
+        in marker `BS.isInfixOf` eventBody
+          || (not (BS.null afterBody)
+            && go (BS.drop (BS.length terminator) afterBody))
 
 byteStringOccurrenceCount :: BS.ByteString -> BS.ByteString -> Int
 byteStringOccurrenceCount needle = go 0

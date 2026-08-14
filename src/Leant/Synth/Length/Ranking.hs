@@ -4,9 +4,9 @@
 -- occurrence-associated plan used by the post-verification permutation seal
 -- is package-private, so ordinary ranking consumers cannot erase a
 -- batch-scoped handle before that seal succeeds.  Within one batch, a later
--- checked problem may independently replay the most recent validated input
--- vector before opening another live query; no earlier verdict or evidence
--- receipt is reused.
+-- checked problem may independently try up to four validated input vectors
+-- from a fixed newest-first MRU bank before opening another live query; no
+-- earlier verdict or evidence receipt is reused.
 module Leant.Synth.Length.Ranking
   ( LengthRankingInputError (..)
   , LengthRankingAssessment (..)

@@ -591,16 +591,25 @@ explicit replay limits, an explicit `LeanLengthContract`, and the complete list
 of callback-verified candidates. It productively admits at most Djex's public
 64-query session bound, attempts every candidate handoff and seals every
 eligible canonical query before opening one lexical live session, and processes
-those candidates serially in original order. After one exact counterexample,
-the ranking pass retains only its bounded source-ordered input naturals as the
-single batch-local seed. Before a later live call it rebuilds that later
-query's exact symbol bindings, asks Djex to validate the inputs against the
-later checked query, and replays the resulting evidence against the later
-query's retained behavioral problem. A replay hit creates a fresh receipt for
-that later problem and avoids one Z3 call. Arity mismatch, validation refusal,
-a non-counterexample, or replay mismatch is only a seed miss and follows the
-established live path. The seed is never a cached solver result, verdict,
-provider-law basis, proof, or durable cache entry.
+those candidates serially in original order. After an exact counterexample,
+the ranking pass retains its bounded source-ordered input naturals in a fixed
+four-entry batch-local bank. The bank is newest first, deduplicates exact
+vectors, promotes a replay hit or live counterexample, and evicts the least
+recently used vector when a fifth distinct live counterexample is inserted.
+For each later eligible query, Leant makes at most four pure replay attempts in
+that order through Djex's
+`replayLengthSMTLibCounterexampleInputs`. The sealed query owns its checked
+problem and behavioral association and rederives its modeled arity and symbols
+from that problem; Leant supplies only `[Natural]` and the configured
+evaluation limits. Every hit is therefore freshly evaluated and associated
+with that later query, creates a
+fresh receipt, promotes the exact vector, and avoids one Z3 call. Arity or
+evaluation rejection, a non-counterexample, or association mismatch is only a
+bank miss; replay continues with the next vector and then follows the
+established live path if all four miss. Pure misses, heuristic live statuses,
+and preparation refusals do not mutate the bank. The bank never contains a
+cached solver result, verdict, query, receipt, provider-law basis, proof,
+solver status, or durable cache entry.
 
 `unsat`, `unknown`, and status-only `sat` remain neutral; only independently
 replayed counterexamples are stably moved behind the other candidates. Live
@@ -642,6 +651,9 @@ detailed in the
 The batch-local replay optimization and its unchanged trust and identity
 boundaries are recorded in the
 [Length counterexample seed replay report](docs/reports/2026-08-13-length-counterexample-seed-replay.md).
+Its fixed four-entry MRU policy and Djex's query-owned raw-input replay boundary
+are detailed in the
+[Length input replay bank report](docs/reports/2026-08-14-length-input-replay-bank.md).
 
 `Leant.Synth.Length.Configuration` seals that call boundary without choosing
 any policy for the user. `LengthRankingPolicySource` carries the execution

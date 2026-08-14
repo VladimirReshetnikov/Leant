@@ -1,10 +1,15 @@
 # Live Length ranking foundation
 
-> **2026-08-13 follow-up.** Later candidates now first try the most recent
-> validated input vector through their own exact checked query and behavioral
-> replay boundary. A hit avoids one live query; a miss follows the serial live
-> path described below. This batch-local orchestration change is detailed in
-> the [Length counterexample seed replay report](2026-08-13-length-counterexample-seed-replay.md).
+> **2026-08-14 follow-up.** Later eligible candidates now try at most four
+> distinct prior input vectors from a fixed newest-first MRU bank. Each attempt
+> calls Djex's query-owned `replayLengthSMTLibCounterexampleInputs` boundary, so
+> the sealed query freshly evaluates and associates the inputs without Leant
+> reconstructing SMT symbols or bindings. A hit avoids one live query; after
+> all misses, the candidate follows the serial live path described below. The
+> original one-entry checkpoint is recorded in the
+> [Length counterexample seed replay report](2026-08-13-length-counterexample-seed-replay.md),
+> and the current bounded policy is detailed in the
+> [Length input replay bank report](2026-08-14-length-input-replay-bank.md).
 
 Date: 2026-08-11
 
@@ -148,9 +153,9 @@ candidate is eligible, no live session is opened.
 
 All eligible candidates are processed in original input order inside one
 lexical `withLengthSMTLibLiveSession` rank-N scope. Queries whose batch-local
-seed replay misses run live in that same order. The ranking layer neither
-exposes nor retains Djex's process, workspace, barriers, ordinals, transcripts,
-or private run identities.
+bank replay attempts all miss run live in that same order. The ranking layer
+neither exposes nor retains Djex's process, workspace, barriers, ordinals,
+transcripts, or private run identities.
 
 For each successful live query, Leant calls Djex's
 `replayLengthSMTLibLiveQueryObservation`. The gate checks that the observation
@@ -162,9 +167,11 @@ replay releases the safe `ValidatedLengthCounterexample` receipt into the
 assessment stored by the opaque ranked-candidate association. The whole
 observation has no public projection, so this query-first gate remains the only
 semantic extraction edge from a live observation and Djex's public Live API is
-unchanged. A seed hit has no observation: it rebuilds bindings for the later
-query, independently validates them, and replays any resulting evidence against
-that query's retained behavioral problem.
+unchanged. A bank hit has no observation: Leant passes only the saved
+source-ordered naturals and configured evaluation limits to
+`replayLengthSMTLibCounterexampleInputs`; the sealed query independently
+evaluates them and associates any resulting evidence with its own retained
+behavioral problem.
 
 The checked problem is transient until it is sealed into a canonical query.
 Each eligible prepared record retains only its caller-owned receipt association
