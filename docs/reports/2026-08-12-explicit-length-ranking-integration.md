@@ -2,6 +2,13 @@
 
 Date: 2026-08-12
 
+> **2026-08-14 follow-up.** Configured mode now also admits exact startup
+> version 3. It retains version 2's required finite box and selects the
+> query-owned all-zero probe after four MRU misses and before live Z3. The
+> worker is already open and capability-probed at that point, so a hit skips a
+> live query transaction, not process launch. See the
+> [origin-probe orchestration report](2026-08-14-length-origin-probe-orchestration.md).
+
 ## Outcome
 
 Leant now composes its existing checked Length/Z3 boundaries at one explicit
@@ -10,8 +17,8 @@ startup seam. `Leant.Synth.Length.Integration` owns two opaque modes:
 - disabled mode is the historical non-strict identity projection of the exact
   callback-owned `VerificationBatch`;
 - configured mode contains one already admitted, decoded, and activated
-  version-1 or version-2 Length ranking policy and contract together with the exact closed
-  activation policy which released it.
+  version-1, version-2, or version-3 Length ranking policy and contract
+  together with the exact closed activation policy which released it.
 
 Main selects configured mode only with
 `--length-ranking-config ABSOLUTE-PATH`. No project, home, environment,
@@ -40,7 +47,7 @@ permit-unpinned fact from the opaque mode rather than consulting the original
 CLI Boolean again. The mode exposes no path, timeout, digest bytes, contract
 projection, executable observation, or worker authority through that edge.
 
-Both startup document versions intentionally bundle the same compatibility
+All three startup document versions intentionally bundle the same compatibility
 contract grammar. Main reads it once
 and treats the decoded contract as a fixed process-wide assertion for later
 synthesis requests. It does not reread or watch the source file, infer a new
@@ -67,22 +74,28 @@ solver. The default `djinn` engine has no typed graph, so an operator expecting
 eligible candidates must select `:set synth-engine exference` or `both`.
 
 Every batch containing an eligible query opens a fresh lexical Djex live
-session. No worker, process handle, workspace, transcript, query ordinal, or
-rank-2 session authority enters `ReplState`. A reusable process policy and
-fixed contract are retained; live process authority is not.
+session and completes its capability probe before candidate processing. No
+worker, process handle, workspace, transcript, query ordinal, or rank-2 session
+authority enters `ReplState`. A reusable process policy and fixed contract are
+retained; live process authority is not. Version 3 then tries the four-entry
+MRU bank, the query-owned origin, and finally the candidate's live query. An
+origin hit avoids only that live transaction and its ordinal; it cannot bypass
+an earlier session-open or capability failure.
 
 The only ordering change remains stable demotion of candidates carrying an
-independently replayed finite-list-spine counterexample. Version-2 bounded
-positive assessments stay in the neutral partition. No candidate is pruned.
-`sat`, `unsat`, `unknown`, and status-only observations grant no proof or
-pruning authority; version 2 uses `unsat` only to schedule independent traversal.
+independently replayed finite-list-spine counterexample. Version-2 and
+version-3 bounded-positive assessments stay in the neutral partition. No
+candidate is pruned. `sat`, `unsat`, `unknown`, and status-only observations
+grant no proof or pruning authority; versions 2 and 3 use an actual live
+`unsat` only to schedule independent traversal. A version-3 origin miss is
+likewise no evidence.
 
 After the seal, the presentation layer traverses each whole materialized
 `RankedLengthCandidate`. Candidate text and any note therefore come from the
 same receipt rather than from detached lists joined by spelling or position.
 A replayed counterexample gets its bounded subordinate note. A completed
-version-2 finite box gets a distinct bounded-positive note with maxima,
-checked/applicable counts, and visible vacuity. Both are labeled
+version-2 or version-3 finite box gets a distinct bounded-positive note with
+maxima, checked/applicable counts, and visible vacuity. Both are labeled
 model-relative and reduce any provider-backed basis to the count of assumed
 laws; neither projects or displays the receipt's private provider-name list.
 
@@ -96,9 +109,10 @@ During assessment:
 
 - input or permutation rejection preserves the exact original verification
   batch and exposes neither a suspect ranking nor a sealed proposal;
-- a returned structured live or input-box-validation failure yields the established original-order,
-  all-`Unassessed` ranking, seals that identity order, and emits one sanitized
-  warning;
+- a returned structured live or input-box-validation failure yields the
+  established original-order, all-`Unassessed` ranking, seals that identity
+  order, and emits one sanitized warning; origin evaluation or association
+  failure follows this same indexed atomic path;
 - synchronous and asynchronous exceptions retain the ranking layer's existing
   propagation and Djex cleanup behavior rather than becoming presentation
   output.

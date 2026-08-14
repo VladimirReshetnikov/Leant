@@ -1,8 +1,8 @@
 -- | Explicit ownership of live Length ranking policy.
 --
 -- Construction is pure and performs only Djex's bounded policy validation.
--- 'LengthRankingPolicy' owns reusable execution and replay policy plus an
--- optional explicit finite input-box validation policy, while a
+-- 'LengthRankingPolicy' owns reusable execution and replay policy plus
+-- independent optional origin-probe and finite input-box policies, while a
 -- 'LeanLengthContract' is supplied separately for each ranking request.  The
 -- versioned configuration-file grammar retains its fixed startup contract
 -- beside this policy without introducing a second generic aggregate.
@@ -27,6 +27,7 @@ module Leant.Synth.Length.Configuration
   , LengthRankingPolicy
   , mkLengthRankingPolicy
   , lengthRankingPolicyFromValidatedComponents
+  , enableLengthRankingOriginProbe
   , enableLengthRankingInputBoxValidation
   , lengthRankingPolicyExecutableDigestExpectation
   , LengthRankingConfigurationError (..)
@@ -62,7 +63,11 @@ import Leant.Synth.Length.Ranking
 import Leant.Synth.Length.Ranking.Internal
   ( AssociatedLengthRanking
   , rankPostVerificationLengthCandidates
+  , rankPostVerificationLengthCandidatesWithOriginProbe
   , rankPostVerificationLengthCandidatesWithInputBoxValidation
+  , rankPostVerificationLengthCandidatesWithInputBoxValidationAndOriginProbe
+  , rankVerifiedLengthCandidatesWithOriginProbe
+  , rankVerifiedLengthCandidatesWithInputBoxValidationAndOriginProbe
   )
 import Leant.Synth.Length.PostVerification.Internal
   ( LengthPostVerificationResult
@@ -92,6 +97,7 @@ data LengthRankingPolicy = LengthRankingPolicy
   !LengthSMTLibExecutionConfig
   !LengthEvaluationLimits
   !LengthRankingInputBoxValidation
+  !LengthRankingOriginProbe
 
 -- | Private optional orchestration policy.  It contains no solver status,
 -- query, receipt, or verdict; each enabled use must still pass Djex's exact
@@ -99,6 +105,13 @@ data LengthRankingPolicy = LengthRankingPolicy
 data LengthRankingInputBoxValidation
   = LengthRankingInputBoxValidationDisabled
   | LengthRankingInputBoxValidationEnabled !LengthInputBoxLimits [Natural]
+
+-- | Private permission to run Djex's query-owned canonical origin replay
+-- after the MRU bank misses and before a live query.  This retains no input
+-- vector, arity, query, receipt, status, or behavioral verdict.
+data LengthRankingOriginProbe
+  = LengthRankingOriginProbeDisabled
+  | LengthRankingOriginProbeEnabled
 
 -- | Pure validation failure in fixed execution-before-evaluation order.
 data LengthRankingConfigurationError
@@ -109,8 +122,8 @@ data LengthRankingConfigurationError
   deriving (Eq, Ord, Show)
 
 -- | Validate execution before replay limits without performing IO.  This
--- established constructor leaves finite-box validation disabled; callers must
--- derive a separate opt-in value explicitly.
+-- established constructor leaves the origin probe and finite-box validation
+-- disabled; callers must derive either opt-in value explicitly.
 mkLengthRankingPolicy
   :: LengthRankingPolicySource
   -> Either LengthRankingConfigurationError LengthRankingPolicy
@@ -125,11 +138,11 @@ mkLengthRankingPolicy source = do
     Left failure -> Left $ LengthRankingEvaluationLimitsRejected failure
     Right validated -> Right validated
   pure $ LengthRankingPolicy execution evaluation
-    LengthRankingInputBoxValidationDisabled
+    LengthRankingInputBoxValidationDisabled LengthRankingOriginProbeDisabled
 
 -- | Assemble one reusable policy from already validated Djex execution and
--- replay authorities with finite-box validation disabled.  No validation is
--- repeated and no IO is performed.
+-- replay authorities with the origin probe and finite-box validation disabled.
+-- No validation is repeated and no IO is performed.
 -- This bridge is used by the closed compatibility-file decoder after it has
 -- preserved the same execution-before-evaluation validation precedence.
 lengthRankingPolicyFromValidatedComponents
@@ -138,7 +151,20 @@ lengthRankingPolicyFromValidatedComponents
   -> LengthRankingPolicy
 lengthRankingPolicyFromValidatedComponents execution evaluation =
   LengthRankingPolicy execution evaluation
-    LengthRankingInputBoxValidationDisabled
+    LengthRankingInputBoxValidationDisabled LengthRankingOriginProbeDisabled
+
+-- | Derive an origin-probing sibling without changing the validated
+-- execution/evaluation authorities or any independently selected finite box.
+-- The probe itself remains query-owned and is attempted only after all four
+-- batch-local MRU vectors miss.  Its ordinary non-counterexample result is not
+-- positive evidence and cannot suppress the subsequent live query.
+enableLengthRankingOriginProbe
+  :: LengthRankingPolicy
+  -> LengthRankingPolicy
+enableLengthRankingOriginProbe
+    (LengthRankingPolicy execution evaluation inputBoxValidation _) =
+  LengthRankingPolicy execution evaluation inputBoxValidation
+    LengthRankingOriginProbeEnabled
 
 -- | Derive an explicitly enabled finite-box policy without changing the
 -- already validated execution/evaluation authorities or the reusable base
@@ -153,9 +179,9 @@ enableLengthRankingInputBoxValidation
   -> LengthRankingPolicy
   -> LengthRankingPolicy
 enableLengthRankingInputBoxValidation limits maximums
-    (LengthRankingPolicy execution evaluation _) =
+    (LengthRankingPolicy execution evaluation _ originProbe) =
   LengthRankingPolicy execution evaluation
-    $ LengthRankingInputBoxValidationEnabled limits maximums
+    (LengthRankingInputBoxValidationEnabled limits maximums) originProbe
 
 -- | Classify only whether the sealed execution policy contains an executable
 -- digest expectation.  This reveals neither the digest bytes nor the path and
@@ -165,7 +191,7 @@ lengthRankingPolicyExecutableDigestExpectation
   :: LengthRankingPolicy
   -> LengthSMTLibExecutableDigestExpectation
 lengthRankingPolicyExecutableDigestExpectation
-    (LengthRankingPolicy execution _ _) =
+    (LengthRankingPolicy execution _ _ _) =
   lengthSMTLibExecutionExecutableDigestExpectation execution
 
 -- | Run a verified batch under one reusable policy and one explicitly supplied
@@ -176,12 +202,22 @@ rankVerifiedLengthCandidatesWithPolicy
   -> [Verified DetailedVerificationVariant]
   -> IO (Either LengthRankingInputError LengthRanking)
 rankVerifiedLengthCandidatesWithPolicy
-    (LengthRankingPolicy execution evaluation inputBoxValidation) =
-  case inputBoxValidation of
-    LengthRankingInputBoxValidationDisabled ->
+    (LengthRankingPolicy execution evaluation inputBoxValidation
+      originProbe) =
+  case (inputBoxValidation, originProbe) of
+    (LengthRankingInputBoxValidationDisabled,
+        LengthRankingOriginProbeDisabled) ->
       rankVerifiedLengthCandidates execution evaluation
-    LengthRankingInputBoxValidationEnabled limits maximums ->
+    (LengthRankingInputBoxValidationDisabled,
+        LengthRankingOriginProbeEnabled) ->
+      rankVerifiedLengthCandidatesWithOriginProbe execution evaluation
+    (LengthRankingInputBoxValidationEnabled limits maximums,
+        LengthRankingOriginProbeDisabled) ->
       rankVerifiedLengthCandidatesWithInputBoxValidation
+        execution evaluation limits maximums
+    (LengthRankingInputBoxValidationEnabled limits maximums,
+        LengthRankingOriginProbeEnabled) ->
+      rankVerifiedLengthCandidatesWithInputBoxValidationAndOriginProbe
         execution evaluation limits maximums
 
 -- | Associated variant used by a batch-scoped post-verification adapter.
@@ -196,12 +232,22 @@ rankPostVerificationLengthCandidatesWithPolicy
         (AssociatedLengthRanking
           (PostVerificationCandidate epoch DetailedVerificationVariant)))
 rankPostVerificationLengthCandidatesWithPolicy
-    (LengthRankingPolicy execution evaluation inputBoxValidation) =
-  case inputBoxValidation of
-    LengthRankingInputBoxValidationDisabled ->
+    (LengthRankingPolicy execution evaluation inputBoxValidation
+      originProbe) =
+  case (inputBoxValidation, originProbe) of
+    (LengthRankingInputBoxValidationDisabled,
+        LengthRankingOriginProbeDisabled) ->
       rankPostVerificationLengthCandidates execution evaluation
-    LengthRankingInputBoxValidationEnabled limits maximums ->
+    (LengthRankingInputBoxValidationDisabled,
+        LengthRankingOriginProbeEnabled) ->
+      rankPostVerificationLengthCandidatesWithOriginProbe execution evaluation
+    (LengthRankingInputBoxValidationEnabled limits maximums,
+        LengthRankingOriginProbeDisabled) ->
       rankPostVerificationLengthCandidatesWithInputBoxValidation
+        execution evaluation limits maximums
+    (LengthRankingInputBoxValidationEnabled limits maximums,
+        LengthRankingOriginProbeEnabled) ->
+      rankPostVerificationLengthCandidatesWithInputBoxValidationAndOriginProbe
         execution evaluation limits maximums
 
 -- | Assess one exact callback batch with an explicit reusable policy and

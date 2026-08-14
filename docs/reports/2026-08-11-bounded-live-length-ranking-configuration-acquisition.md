@@ -7,7 +7,8 @@ Date: 2026-08-11
 `Leant.Synth.Length.Configuration.File.Acquire` adds the filesystem boundary
 around the pure versioned Length-ranking configuration decoder. It admits the
 literal version-1 compatibility grammar and the additive version-2 bounded-box
-grammar under the same byte, path, descriptor, and timeout policy. The module
+grammar plus version 3's bounded-box-and-origin grammar under the same byte,
+path, descriptor, and timeout policy. The module
 does not discover a file, activate a decoded policy, or start Z3. A successful
 load returns only the existing opaque `DisabledLengthRankingConfiguration`;
 Main's later integration composes this explicit boundary with activation.
@@ -143,10 +144,16 @@ Each eventual ranking invocation must still open a fresh Djex rank-N session,
 perform capability checks, associate each query exactly, and replay any model
 against the checked candidate problem. Version 1 keeps `unsat` neutral. Version
 2 may use it only to schedule independent exact-query input-box traversal;
-`unknown` and status-only `sat` remain neutral under either version, and no
-status grants proof authority. Lean verification remains the final acceptance
-boundary. The bounded extension is detailed in the
+version 3 first performs its query-owned origin probe after the MRU bank and
+uses its retained version-2 box only after an actual live `unsat`. `unknown`, status-only
+`sat`, and an origin miss remain neutral, and no status grants proof authority.
+The worker has already opened and passed capability checks before the
+per-candidate origin step, so a hit does not avoid process launch and cannot
+bypass an earlier session-open or capability failure. Lean verification
+remains the final acceptance boundary. The bounded extension is detailed in the
 [unsat-triggered validation report](2026-08-14-unsat-triggered-length-input-box-validation.md).
+The origin extension is detailed in the
+[origin-probe orchestration report](2026-08-14-length-origin-probe-orchestration.md).
 
 Main now loads exactly one caller-named absolute file at startup when the
 explicit option is present. It neither discovers nor watches the file, and it

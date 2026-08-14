@@ -5,10 +5,12 @@
 -- policy.
 --
 -- Version 1 remains the exact compatibility grammar.  Version 2 adds one
--- required, explicit finite input-box validation policy without widening the
--- embedded version-1 contract grammar.  Decoding performs no discovery, path
--- normalization, environment lookup, or IO.  Every field is required.  A
--- successful decode returns a deliberately disabled opaque value: callers
+-- required, explicit finite input-box validation policy.  Version 3 retains
+-- that exact box and additionally requires a closed query-owned origin-probe
+-- selection.  Neither widens the embedded version-1 contract grammar.
+-- Decoding performs no discovery, path normalization, environment lookup, or
+-- IO.  Every field is required.  A successful decode returns a deliberately
+-- disabled opaque value: callers
 -- must separately choose whether an absent executable digest pin is
 -- acceptable before they can obtain the validated policy and this file's
 -- fixed compatibility contract.
@@ -16,6 +18,7 @@ module Leant.Synth.Length.Configuration.File
   ( lengthRankingConfigurationFileFormat
   , lengthRankingConfigurationFileVersion
   , lengthRankingConfigurationFileInputBoxVersion
+  , lengthRankingConfigurationFileOriginProbeVersion
   , lengthRankingConfigurationFileJsonLimits
   , LengthRankingConfigurationFileObject (..)
   , LengthRankingConfigurationFileField (..)
@@ -91,6 +94,7 @@ import Leant.Synth.Length.Contract
   )
 import Leant.Synth.Length.Configuration
   ( LengthRankingPolicy
+  , enableLengthRankingOriginProbe
   , enableLengthRankingInputBoxValidation
   , lengthRankingPolicyExecutableDigestExpectation
   , lengthRankingPolicyFromValidatedComponents
@@ -107,6 +111,11 @@ lengthRankingConfigurationFileVersion = 1
 -- The established version-1 constant above deliberately remains unchanged.
 lengthRankingConfigurationFileInputBoxVersion :: Natural
 lengthRankingConfigurationFileInputBoxVersion = 2
+
+-- | Opt-in grammar which retains version 2's exact finite box and adds one
+-- explicit query-owned origin probe before live execution.
+lengthRankingConfigurationFileOriginProbeVersion :: Natural
+lengthRankingConfigurationFileOriginProbeVersion = 3
 
 -- | Fixed admission policy for the v1 document itself.  The array maximum is
 -- one greater than the widest typed collection so maximum-plus-one reaches the
@@ -143,6 +152,7 @@ data LengthRankingConfigurationFileField
   | LengthRankingConfigurationExecutionField
   | LengthRankingConfigurationEvaluationField
   | LengthRankingConfigurationInputBoxValidationField
+  | LengthRankingConfigurationCounterexampleProbeField
   | LengthRankingConfigurationContractField
   | LengthRankingConfigurationExecutablePathCharactersField
   | LengthRankingConfigurationPolicyFingerprintBytesField
@@ -339,7 +349,10 @@ decodeLengthRankingConfigurationFile bytes = do
     else if version ==
         toInteger lengthRankingConfigurationFileInputBoxVersion
       then decodeLengthRankingConfigurationFileInputBoxV2 root
-      else Left LengthRankingConfigurationUnsupportedVersion
+      else if version ==
+          toInteger lengthRankingConfigurationFileOriginProbeVersion
+        then decodeLengthRankingConfigurationFileOriginProbeV3 root
+        else Left LengthRankingConfigurationUnsupportedVersion
 
 -- Keep the established version-1 path literal: its exact root, validation
 -- order, embedded contract grammar, and disabled policy construction do not
@@ -422,6 +435,60 @@ decodeLengthRankingConfigurationFileInputBoxV2 root = do
         inputBoxLimits inclusiveMaximums basePolicy
   pure $ disableLengthRankingConfiguration policy contract
 
+-- Keep version 2's path literal above.  Version 3 repeats its fixed decode
+-- precedence, then validates the new closed root selection before demanding
+-- the embedded compatibility contract.
+decodeLengthRankingConfigurationFileOriginProbeV3
+  :: ObjectFields
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthRankingConfiguration
+decodeLengthRankingConfigurationFileOriginProbeV3 root = do
+  exactFields LengthRankingConfigurationRootObject rootFieldsOriginProbeV3 root
+  executionAdmissionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationExecutionAdmissionField
+    "executionAdmission"
+    root
+  executionLimits <- decodeExecutionAdmission executionAdmissionValue
+  executionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationExecutionField
+    "execution"
+    root
+  execution <- decodeExecution executionLimits executionValue
+  evaluationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationEvaluationField
+    "evaluation"
+    root
+  evaluation <- decodeEvaluation evaluationValue
+  inputBoxValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationInputBoxValidationField
+    "inputBoxValidation"
+    root
+  (inputBoxLimits, inclusiveMaximums) <-
+    decodeInputBoxValidation inputBoxValue
+  counterexampleProbeValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationCounterexampleProbeField
+    "counterexampleProbe"
+    root
+  decodeCounterexampleProbe counterexampleProbeValue
+  contractValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationContractField
+    "contract"
+    root
+  contract <- decodeLeanLengthContractValue contractValue
+  let basePolicy =
+        lengthRankingPolicyFromValidatedComponents execution evaluation
+      inputBoxPolicy = enableLengthRankingInputBoxValidation
+        inputBoxLimits inclusiveMaximums basePolicy
+      policy = enableLengthRankingOriginProbe inputBoxPolicy
+  pure $ disableLengthRankingConfiguration policy contract
+
 rootFields :: [(Text, LengthRankingConfigurationFileField)]
 rootFields =
   [ ("format", LengthRankingConfigurationFormatField)
@@ -441,6 +508,23 @@ rootFieldsInputBoxV2 =
   , ("evaluation", LengthRankingConfigurationEvaluationField)
   , ( "inputBoxValidation"
     , LengthRankingConfigurationInputBoxValidationField
+    )
+  , ("contract", LengthRankingConfigurationContractField)
+  ]
+
+rootFieldsOriginProbeV3
+  :: [(Text, LengthRankingConfigurationFileField)]
+rootFieldsOriginProbeV3 =
+  [ ("format", LengthRankingConfigurationFormatField)
+  , ("version", LengthRankingConfigurationVersionField)
+  , ("executionAdmission", LengthRankingConfigurationExecutionAdmissionField)
+  , ("execution", LengthRankingConfigurationExecutionField)
+  , ("evaluation", LengthRankingConfigurationEvaluationField)
+  , ( "inputBoxValidation"
+    , LengthRankingConfigurationInputBoxValidationField
+    )
+  , ( "counterexampleProbe"
+    , LengthRankingConfigurationCounterexampleProbeField
     )
   , ("contract", LengthRankingConfigurationContractField)
   ]
@@ -861,6 +945,19 @@ evaluationFields =
     , LengthRankingConfigurationIntermediateValueBitsField
     )
   ]
+
+-- | Decode version 3's only origin-probe mode.  The closed literal grants
+-- permission to ask each exact query for its canonical all-zero replay after
+-- the MRU bank misses; it contains no caller-supplied arity or input vector.
+decodeCounterexampleProbe
+  :: BoundedJsonValue
+  -> Either LengthRankingConfigurationFileError ()
+decodeCounterexampleProbe value = do
+  mode <- stringField LengthRankingConfigurationCounterexampleProbeField value
+  case mode of
+    "origin-before-live" -> Right ()
+    _ -> Left $ LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationCounterexampleProbeField
 
 -- | Decode version 2's explicit source-ordered inclusive input box.  Width is
 -- bounded before any element is decoded, element values are then decoded

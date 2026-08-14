@@ -17,6 +17,15 @@
 > traversal produces neutral `BoundedPositive` evidence, and traversal failure
 > activates the established atomic fallback. See the
 > [unsat-triggered bounded validation report](2026-08-14-unsat-triggered-length-input-box-validation.md).
+>
+> **Later 2026-08-14 follow-up.** Additive startup configuration version 3
+> inserts Djex's query-owned canonical origin replay after all four MRU misses
+> and before the candidate's live query. A hit follows the ordinary
+> counterexample/MRU/demotion path, a miss is no evidence, and evaluation or
+> association failure activates indexed atomic fallback. The lexical worker is
+> already open and capability-probed before candidate processing, so a hit
+> skips a query transaction and ordinal, not process launch. See the
+> [origin-probe orchestration report](2026-08-14-length-origin-probe-orchestration.md).
 
 Date: 2026-08-11
 
@@ -159,10 +168,13 @@ candidate is eligible, no live session is opened.
 ## One scoped serial pass
 
 All eligible candidates are processed in original input order inside one
-lexical `withLengthSMTLibLiveSession` rank-N scope. Queries whose batch-local
-bank replay attempts all miss run live in that same order. The ranking layer
-neither exposes nor retains Djex's process, workspace, barriers, ordinals,
-transcripts, or private run identities.
+lexical `withLengthSMTLibLiveSession` rank-N scope. That scope opens the worker
+and completes Djex's capability probe before serial candidate processing.
+Queries whose batch-local bank replay attempts all miss run live in that same
+order on versions 1 and 2. Version 3 first performs one query-owned origin
+probe and runs live only after that probe also misses. The ranking layer neither
+exposes nor retains Djex's process, workspace, barriers, ordinals, transcripts,
+or private run identities.
 
 For each successful live query, Leant calls Djex's
 `replayLengthSMTLibLiveQueryObservation`. The gate checks that the observation
@@ -179,6 +191,21 @@ source-ordered naturals and configured evaluation limits to
 `replayLengthSMTLibCounterexampleInputs`; the sealed query independently
 evaluates them and associates any resulting evidence with its own retained
 behavioral problem.
+
+A version-3 origin attempt likewise has no observation. Leant passes only the
+evaluation limits and exact query to
+`probeLengthSMTLibCounterexampleAtOrigin`; Djex derives the compact all-zero
+assignment and performs ordinary replay. A hit becomes the same counterexample
+assessment and MRU seed as a bank or live hit. `Nothing` has no positive
+authority and proceeds live. Origin evaluation failure becomes its dedicated
+indexed ranking class, while association failure maps to the established
+indexed evidence mismatch; either atomically restores the batch.
+
+This pre-live branch emits no SMT-LIB and creates no new receipt, verifier,
+query, protocol, execution, worker, run, observation, MRU, or presentation
+identity schema. Startup ranking configuration-file version 3 is the sole new
+schema selection; actual later live ordinals can compact when an origin hit
+skips a transaction under the unchanged live construction rules.
 
 The checked problem is transient until it is sealed into a canonical query.
 Each eligible prepared record retains only its caller-owned receipt association
@@ -413,8 +440,8 @@ instance, so constructor order cannot become an accidental solver-status
 ranking.
 
 Any returned structured live session, query, query-fingerprint association,
-evidence-replay, or input-box-validation failure discards every partial assessment and partial
-reordering. The returned ranking contains every original callback receipt in
+evidence-replay, origin-probe, or input-box-validation failure discards every
+partial assessment and partial reordering. The returned ranking contains every original callback receipt in
 original order, all marked `Unassessed`, plus one sanitized failure. Pure
 candidate-local preparation classes already established before the worker was
 opened survive this atomic fallback; candidates which reached query execution

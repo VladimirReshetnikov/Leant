@@ -2,6 +2,13 @@
 
 Date: 2026-08-14
 
+> **Later 2026-08-14 follow-up.** Startup configuration version 3 retains this
+> exact required box and adds a query-owned origin probe between the four-entry
+> MRU bank and live Z3. The finite box still runs only after an actual live
+> `unsat`; an origin hit creates no solver status and therefore cannot schedule
+> this traversal. See the
+> [origin-probe orchestration report](2026-08-14-length-origin-probe-orchestration.md).
+
 ## Outcome
 
 Leant now has an explicit opt-in path which can turn a live Length query's
@@ -21,18 +28,22 @@ created by `mkLengthRankingPolicy` remain input-box-disabled.
 
 ## Exact configuration opt-in
 
-The startup configuration decoder now accepts two exact root versions under the
+The startup configuration decoder now accepts three exact root versions under the
 unchanged format `leant-live-length-ranking-configuration`:
 
-- version 1 is the literal compatibility grammar and retains the disabled
-  ranking behavior; and
+- version 1 is the literal compatibility grammar and retains input-box-disabled
+  ranking behavior;
 - version 2 requires one additional `inputBoxValidation` object and enables the
-  bounded path.
+  bounded path; and
+- version 3 retains that exact required object and additionally requires the
+  closed `"counterexampleProbe": "origin-before-live"` selection.
 
 `lengthRankingConfigurationFileVersion` deliberately remains `1`.
 `lengthRankingConfigurationFileInputBoxVersion` names the additive value `2`.
-Version 1 rejects the new root field as unexpected, while version 2 rejects its
-absence. The version-2 root fields are exactly `format`, `version`,
+Version 1 rejects the box root field as unexpected, while versions 2 and 3
+reject its absence. Version 3 additionally rejects a missing or unsupported
+probe selection, and versions 1 and 2 reject that probe field as unexpected.
+The version-2 root fields are exactly `format`, `version`,
 `executionAdmission`, `execution`, `evaluation`, `inputBoxValidation`, and
 `contract`. The `inputBoxValidation` field's value is exactly:
 
@@ -50,9 +61,11 @@ field which could disagree with it. `maximumAssignments` is a Natural capped at
 65,536. These are caller choices, not Leant-selected defaults.
 
 The decoder preserves fixed precedence: exact root shape, execution admission,
-execution policy, evaluation limits, input-box object, then contract. Within the
-box object it checks the array width before decoding elements left-to-right,
-then decodes the assignment cap and seals `LengthInputBoxLimits`. Candidate
+execution policy, evaluation limits, and input-box object. Version 2 then
+decodes the contract; version 3 validates its closed counterexample-probe
+selection before that same contract. Within the box object it checks the array
+width before decoding elements left-to-right, then decodes the assignment cap
+and seals `LengthInputBoxLimits`. Candidate
 arity, each maximum under the configured assignment-value bit limit, and the
 Cartesian product under the assignment cap remain exact-problem runtime checks;
 they are not guessed from the passive JSON contract.
@@ -63,6 +76,16 @@ Eligible candidates still traverse serially in original order. Before a live
 call, each candidate tries the established newest-first four-entry MRU bank.
 A seed hit is already an independently replayed counterexample, avoids the live
 call, and therefore never reaches input-box validation.
+The batch's lexical worker has already opened and passed Djex's capability
+probe before this per-candidate sequence, so a replay hit does not avoid
+process launch or a possible earlier session-open failure.
+
+Version 3 performs its query-owned all-zero origin probe after every MRU miss.
+An origin hit is likewise an ordinary independently replayed counterexample and
+never reaches live status handling. An origin miss contributes no evidence and
+continues to the live call. Thus the table below applies only after MRU and,
+under version 3, origin have both missed and a live observation actually
+exists.
 
 After a live call, the established query-first association and evidence replay
 gate runs before status handling. A validated live counterexample remains an
@@ -128,15 +151,18 @@ replay those values under its own checked problem. A positive receipt, solver
 status, query, provider basis, or verdict never enters the bank.
 
 Version 1 retains its exact root fields, accepted grammar, decode order,
-disabled policy, and ranking behavior. Version 2 is an additive Leant configuration
-grammar; it does not change the contract grammar or any Djex contract,
-provider-inventory, semantic-inventory, session-policy, candidate,
+input-box/origin-disabled policy, and ranking behavior. Version 2 is an
+additive Leant configuration grammar. Version 3 retains the exact version-2
+box and adds only
+its required closed origin-probe selection. Neither changes the embedded
+contract grammar or any Djex contract, provider-inventory, semantic-inventory,
+session-policy, candidate,
 concrete-problem, SMT-query, protocol, response, execution, process, worker,
-query-run, or live-observation identity or schema. It does not change the
+query-run, or live-observation identity or schema. They do not change the
 canonical SMT-LIB bytes for a query.
 
-Finite-box traversal is pure and creates no solver query, transcript, ordinal,
-or run identity. The preceding live `unsat` call retains the identity it already
-earned under the unchanged live construction rules. A seed hit can still avoid
-that call entirely, so later actual live ordinals remain compact exactly as in
-the existing MRU policy.
+Finite-box and origin traversal are pure and create no solver query,
+transcript, ordinal, or run identity. The live `unsat` call which precedes a
+finite-box traversal retains the identity it already earned under the
+unchanged live construction rules. A bank or origin hit can avoid that call
+entirely, so later actual live ordinals remain compact under those same rules.

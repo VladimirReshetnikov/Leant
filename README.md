@@ -107,11 +107,14 @@ session environment; `#`-commands pass straight through.
 
 Finite-list-spine Length counterexample ranking is disabled by default. To opt
 in, pass `--length-ranking-config` with an explicitly chosen absolute path to
-a version-1 or version-2 configuration file. Version 1 preserves the established
-counterexample-only behavior. Version 2 additionally requires an explicit
-per-input finite box and enables independent bounded validation after a live
-`unsat` trigger. Leant admits and reads that file once at
-startup, requires the configuration to contain an executable SHA-256
+a version-1, version-2, or version-3 configuration file. Version 1 preserves
+the established counterexample-only behavior. Version 2 additionally requires
+an explicit per-input finite box and enables independent bounded validation
+after a live `unsat` trigger. Version 3 retains that exact box and requires
+`"counterexampleProbe": "origin-before-live"`; after the four-entry MRU bank
+misses, each exact query asks Djex to replay its canonical all-zero input before
+Leant issues that candidate's live Z3 query. Leant admits and reads that file
+once at startup, requires the configuration to contain an executable SHA-256
 expectation by default, and retains the decoded contract as a fixed
 process-wide assertion. Presence at activation is not a digest match; Djex
 compares the expectation with its bounded pre-spawn file observation only when
@@ -158,8 +161,9 @@ retains roles and modulo, requires an explicit case policy, accepts exactly
 `"cases-rejected"` or `"exact-spine-zero-step-v1"`, and adds
 `["quotient", positiveLiteral, expression]` to preconditions, postconditions,
 and provider transfers. Thus quotient does not itself grant case authority.
-Both startup configuration versions retain the compatibility contract grammar
-from version 1 and reject roles, candidate-case policy, modulo, and quotient.
+All three startup configuration versions retain the compatibility contract
+grammar from version 1 and reject roles, candidate-case policy, modulo, and
+quotient.
 No contract-only version can
 replace the executable, pin choice, solver limits, artifact policy, or replay
 limits. The decoded contract is carried only through
@@ -615,10 +619,26 @@ and preparation refusals do not mutate the bank. The bank never contains a
 cached solver result, verdict, query, receipt, provider-law basis, proof,
 solver status, or durable cache entry.
 
-With the historical path, `unsat`, `unknown`, and status-only `sat` remain
-neutral. The explicit input-box path instead uses a live `unsat` only to trigger
-Djex's independent exhaustive replay of caller-selected per-input inclusive
-maxima. A discovered violation becomes the ordinary `Counterexample`, is
+Configuration version 3 inserts one query-owned origin probe after all four
+bank entries miss and before that candidate's live Z3 query. Leant supplies no
+arity or values: Djex derives one zero per compact modeled input from the
+sealed checked problem and runs the ordinary bounded replay and exact
+association gate. A hit is the ordinary `Counterexample`; it is stably demoted
+and its exact zero vector is inserted or promoted in the same MRU bank. A miss
+is no evidence, leaves the bank unchanged, and proceeds to live Z3. An
+evaluation rejection or association mismatch is an indexed operational
+failure and activates the same batch-wide original-order, all-`Unassessed`
+fallback. The probe consumes no solver status and does not itself schedule the
+finite box. The eligible batch's lexical worker has already opened and passed
+Djex's capability probe before this per-candidate sequence begins, so an origin
+hit avoids a live query transaction and ordinal, not process launch or a prior
+session-open failure.
+
+With the version-1 historical path, `unsat`, `unknown`, and status-only `sat`
+remain neutral. The explicit input-box path in versions 2 and 3 instead uses a
+live `unsat` only to trigger Djex's independent exhaustive replay of
+caller-selected per-input inclusive maxima. A discovered violation becomes the
+ordinary `Counterexample`, is
 stably demoted, and updates the MRU bank. Complete traversal becomes
 `BoundedPositive`: it stays in the neutral stable partition, contributes no
 seed, and records only bounded/model-relative positive evidence. A validation
@@ -649,8 +669,9 @@ constructor: renderer text, source names, types, graph identities, and nested
 Djex errors are neither evaluated nor retained in the refusal diagnostic, and
 the class makes no behavioral-evidence claim. The exact verified receipt and
 its semantic sidecar remain attached to the candidate. Any returned structured
-live session, query, association, or replay failure atomically restores every
-original candidate in original order as `Unassessed`, together with only a
+live session, query, association, replay, origin-probe, or finite-box failure
+atomically restores every original candidate in original order as
+`Unassessed`, together with only a
 sanitized batch failure class, cleanup bit, and optional safe original index.
 Candidate-local pure preparation classes survive that fallback; candidates
 whose preparation succeeded have no invented refusal reason. Exceptions
@@ -666,6 +687,9 @@ boundaries are recorded in the
 Its fixed four-entry MRU policy and Djex's query-owned raw-input replay boundary
 are detailed in the
 [Length input replay bank report](docs/reports/2026-08-14-length-input-replay-bank.md).
+The version-3 all-zero checkpoint, exact MRU/origin/live order, and failure and
+identity boundaries are detailed in the
+[Length origin-probe orchestration report](docs/reports/2026-08-14-length-origin-probe-orchestration.md).
 The opt-in finite-box policy, its unsat-as-trigger-only boundary, positive
 receipt, and additive configuration grammar are detailed in the
 [unsat-triggered bounded Length validation report](docs/reports/2026-08-14-unsat-triggered-length-input-box-validation.md).
@@ -676,10 +700,10 @@ admission, complete execution source (absolute Z3 path, optional SHA-256
 expectation, solver/host budgets, artifact policy, and response limits), and
 replay-limit source. After validation, `LengthRankingPolicy` retains the
 opaque sealed Djex execution configuration and evaluation limits plus a
-private optional finite-input-box orchestration policy. `mkLengthRankingPolicy`
-leaves that policy disabled; it is enabled only by the explicit builder or the
-version-2 configuration decoder. A
-`LeanLengthContract` is supplied separately to each
+private optional origin probe and an independent optional finite-input-box
+orchestration policy. `mkLengthRankingPolicy` leaves both disabled. The finite
+box is enabled by its explicit builder or the version-2 decoder; version 3
+enables both policies. A `LeanLengthContract` is supplied separately to each
 `rankVerifiedLengthCandidatesWithPolicy` call, so a request assertion no longer
 has to share the lifetime of reusable process policy. Execution validation
 precedes replay-limit validation. The sealed policy is opaque, has no path or
@@ -712,7 +736,7 @@ records removal of the redundant generic configuration aggregate while
 preserving the version-1 compatibility path.
 
 `Leant.Synth.Length.Configuration.File` keeps the exact version-1 JSON grammar
-for that policy and adds an exact opt-in version 2. The pure decoder consumes a caller-owned
+for that policy and adds exact opt-in versions 2 and 3. The pure decoder consumes a caller-owned
 strict byte string through a separate bounded JSON parser, rejects malformed
 UTF-8, duplicate keys, unknown or missing fields, non-integral policy numbers,
 and any parser, contract, or operational value above its hard ceiling. Every
@@ -747,6 +771,15 @@ itself supplies the input-width authority; `maximumAssignments` is capped at
 65,536. The object is explicit, has no inferred or default box, and enables the
 policy through `enableLengthRankingInputBoxValidation`.
 
+Version 3 keeps the literal version-2 path unchanged and requires the same
+`inputBoxValidation` object plus the closed root selection
+`"counterexampleProbe": "origin-before-live"`. Its fixed decode order is
+execution admission, execution, evaluation, input box, counterexample probe,
+then the unchanged embedded version-1 contract. The field supplies only
+permission for the query-owned all-zero replay after four MRU misses; it
+contains no arity, vector, solver status, receipt, or verdict. Versions 1 and 2
+reject the field, retain their exact ranking behavior, and never run the probe.
+
 `Leant.Synth.Length.Configuration.File.Acquire` is the compatibility facade
 over the shared bounded `Leant.Synth.Length.File.Acquire` filesystem boundary.
 Callers must explicitly
@@ -778,8 +811,8 @@ and requires the sole admitted candidate-case policy,
 roles, modulo, and required explicit case choice; it accepts exactly
 `cases-rejected` or `exact-spine-zero-step-v1` and alone adds positive-literal
 Natural quotient. Execution and
-evaluation fields remain unknown and rejected, and both startup configuration
-versions retain contract grammar version 1, so they reject both later
+evaluation fields remain unknown and rejected, and all three startup
+configuration versions retain contract grammar version 1, so they reject both later
 authorities.
 Its `Contract.File.Acquire` facade uses the same path, descriptor, and timeout
 owner as startup acquisition, but maps failures into contract-only closed

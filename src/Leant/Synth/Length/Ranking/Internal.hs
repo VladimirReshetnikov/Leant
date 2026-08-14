@@ -10,7 +10,9 @@
 -- input vectors are independently validated and replayed in newest-first
 -- order against that candidate's checked query.  A replay hit avoids one live
 -- query and promotes that vector; every all-miss follows the established live
--- path.
+-- path.  An independently enabled origin policy may next probe the canonical
+-- all-zero vector owned by that exact query.  A hit enters the same receipt
+-- and MRU path, while an ordinary miss proceeds to live execution.
 -- An explicitly enabled policy may use a live @unsat@ only as the trigger for
 -- independent, query-owned exhaustive validation of one finite input box.  A
 -- validation counterexample enters the same exact receipt/MRU path; complete
@@ -66,8 +68,12 @@ module Leant.Synth.Length.Ranking.Internal
   , materializePostVerificationLengthRanking
   , rankPostVerificationLengthCandidates
   , rankVerifiedLengthCandidates
+  , rankPostVerificationLengthCandidatesWithOriginProbe
+  , rankVerifiedLengthCandidatesWithOriginProbe
   , rankPostVerificationLengthCandidatesWithInputBoxValidation
   , rankVerifiedLengthCandidatesWithInputBoxValidation
+  , rankPostVerificationLengthCandidatesWithInputBoxValidationAndOriginProbe
+  , rankVerifiedLengthCandidatesWithInputBoxValidationAndOriginProbe
   , promoteCounterexampleSeed
   , replayCounterexampleSeeds
   ) where
@@ -78,6 +84,7 @@ import Numeric.Natural (Natural)
 
 import Language.Haskell.Djex
   ( ExferenceLocal
+  , LengthEvaluationError
   , LengthEvaluationLimits
   , LengthInputBoxLimits
   , LengthInputBoxValidation (..)
@@ -102,6 +109,7 @@ import Language.Haskell.Djex
   , lengthSMTLibLiveQueryPrimaryFailure
   , lengthSMTLibLiveSessionCleanupIncomplete
   , lengthSMTLibLiveSessionPrimaryFailure
+  , probeLengthSMTLibCounterexampleAtOrigin
   , replayLengthSMTLibCounterexampleInputs
   , replayLengthSMTLibLiveQueryObservation
   , runLengthSMTLibLiveQuery
@@ -242,15 +250,17 @@ candidatePreparationRefusal state = case state of
   LengthCandidatePreparationRefused refusal -> Just refusal
   LengthCandidateAssessed _ -> Nothing
 
--- | Payload-free failure classes.  Nested live failures are already sanitized
--- by Djex; association and replay failures deliberately discard their richer
--- internal diagnostics here.  Pure handoff/query-sealing refusals are ordinary
--- per-candidate absence of assessment rather than batch failures.
+-- | Sanitized failure classes.  Nested live and bounded-evaluation failures
+-- retain only Djex's closed public diagnostics; association and replay failures
+-- deliberately discard their richer internal details here.  Pure
+-- handoff/query-sealing refusals are ordinary per-candidate absence of
+-- assessment rather than batch failures.
 data LengthRankingFailureClass
   = LengthRankingLiveSessionFailed !LengthSMTLibLiveSessionFailure
   | LengthRankingLiveQueryFailed !LengthSMTLibLiveQueryFailure
   | LengthRankingQueryAssociationMismatch
   | LengthRankingEvidenceReplayMismatch
+  | LengthRankingOriginProbeEvaluationFailed !LengthEvaluationError
   | LengthRankingInputBoxValidationFailed !LengthInputBoxValidationError
   deriving (Eq, Ord, Show)
 
@@ -442,6 +452,13 @@ data LengthInputBoxRankingPolicy
   = LengthInputBoxRankingDisabled
   | LengthInputBoxRankingEnabled !LengthInputBoxLimits [Natural]
 
+-- | Private query-owned pre-live probe policy.  The enabled constructor is
+-- only permission to run Djex's canonical origin replay after every MRU miss;
+-- it carries no arity, input vector, query, receipt, or verdict.
+data LengthOriginProbeRankingPolicy
+  = LengthOriginProbeRankingDisabled
+  | LengthOriginProbeRankingEnabled
+
 -- | Rank one already Lean-callback-verified batch under an explicit behavioral
 -- contract and explicit live/evaluation policies.
 --
@@ -460,6 +477,23 @@ rankVerifiedLengthCandidates
 rankVerifiedLengthCandidates execution evaluation contract candidates = fmap
   (fmap $ projectAssociatedLengthRankingWith id)
   $ rankAssociatedLengthCandidates LengthInputBoxRankingDisabled
+      LengthOriginProbeRankingDisabled
+      execution evaluation contract id candidates
+
+-- | Opt in to one query-owned all-zero replay after the bounded MRU bank
+-- misses and before live execution.  A counterexample follows the ordinary
+-- receipt/MRU path; an ordinary replay miss has no positive authority.
+rankVerifiedLengthCandidatesWithOriginProbe
+  :: LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LeanLengthContract
+  -> [Verified DetailedVerificationVariant]
+  -> IO (Either LengthRankingInputError LengthRanking)
+rankVerifiedLengthCandidatesWithOriginProbe execution evaluation contract
+    candidates = fmap
+  (fmap $ projectAssociatedLengthRankingWith id)
+  $ rankAssociatedLengthCandidates LengthInputBoxRankingDisabled
+      LengthOriginProbeRankingEnabled
       execution evaluation contract id candidates
 
 -- | Opt in to independently validating one exact finite input box after a
@@ -479,6 +513,26 @@ rankVerifiedLengthCandidatesWithInputBoxValidation execution evaluation
   (fmap $ projectAssociatedLengthRankingWith id)
   $ rankAssociatedLengthCandidates
       (LengthInputBoxRankingEnabled limits maximums)
+      LengthOriginProbeRankingDisabled
+      execution evaluation contract id candidates
+
+-- | Compose the independent pre-live origin probe with the established
+-- post-@unsat@ finite-box validation.  A probe hit avoids the live query, so
+-- no solver status exists which could schedule the box for that candidate.
+rankVerifiedLengthCandidatesWithInputBoxValidationAndOriginProbe
+  :: LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LengthInputBoxLimits
+  -> [Natural]
+  -> LeanLengthContract
+  -> [Verified DetailedVerificationVariant]
+  -> IO (Either LengthRankingInputError LengthRanking)
+rankVerifiedLengthCandidatesWithInputBoxValidationAndOriginProbe
+    execution evaluation limits maximums contract candidates = fmap
+  (fmap $ projectAssociatedLengthRankingWith id)
+  $ rankAssociatedLengthCandidates
+      (LengthInputBoxRankingEnabled limits maximums)
+      LengthOriginProbeRankingEnabled
       execution evaluation contract id candidates
 
 -- | Safe associated entry point for the post-verification seam.  The receipt
@@ -495,8 +549,26 @@ rankPostVerificationLengthCandidates
           (PostVerificationCandidate epoch DetailedVerificationVariant)))
 rankPostVerificationLengthCandidates execution evaluation contract =
   rankAssociatedLengthCandidates LengthInputBoxRankingDisabled
+    LengthOriginProbeRankingDisabled
     execution evaluation contract
     postVerificationCandidateVerified
+
+-- | Occurrence-associated origin-probe sibling used by the generative
+-- post-verification permutation seal.
+rankPostVerificationLengthCandidatesWithOriginProbe
+  :: LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LeanLengthContract
+  -> [PostVerificationCandidate epoch DetailedVerificationVariant]
+  -> IO
+      (Either LengthRankingInputError
+        (AssociatedLengthRanking
+          (PostVerificationCandidate epoch DetailedVerificationVariant)))
+rankPostVerificationLengthCandidatesWithOriginProbe execution evaluation
+    contract =
+  rankAssociatedLengthCandidates LengthInputBoxRankingDisabled
+    LengthOriginProbeRankingEnabled
+    execution evaluation contract postVerificationCandidateVerified
 
 -- | Occurrence-associated opt-in used by the post-verification permutation
 -- seal.  The finite-box receipt remains attached to the exact occurrence until
@@ -516,6 +588,27 @@ rankPostVerificationLengthCandidatesWithInputBoxValidation execution evaluation
     limits maximums contract =
   rankAssociatedLengthCandidates
     (LengthInputBoxRankingEnabled limits maximums)
+    LengthOriginProbeRankingDisabled
+    execution evaluation contract postVerificationCandidateVerified
+
+-- | Occurrence-associated composition of the pre-live origin probe and the
+-- post-@unsat@ finite-box validator.
+rankPostVerificationLengthCandidatesWithInputBoxValidationAndOriginProbe
+  :: LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LengthInputBoxLimits
+  -> [Natural]
+  -> LeanLengthContract
+  -> [PostVerificationCandidate epoch DetailedVerificationVariant]
+  -> IO
+      (Either LengthRankingInputError
+        (AssociatedLengthRanking
+          (PostVerificationCandidate epoch DetailedVerificationVariant)))
+rankPostVerificationLengthCandidatesWithInputBoxValidationAndOriginProbe
+    execution evaluation limits maximums contract =
+  rankAssociatedLengthCandidates
+    (LengthInputBoxRankingEnabled limits maximums)
+    LengthOriginProbeRankingEnabled
     execution evaluation contract postVerificationCandidateVerified
 
 -- | Rank caller-owned occurrences while retaining each occurrence handle
@@ -524,6 +617,7 @@ rankPostVerificationLengthCandidatesWithInputBoxValidation execution evaluation
 -- succeeded.
 rankAssociatedLengthCandidates
   :: LengthInputBoxRankingPolicy
+  -> LengthOriginProbeRankingPolicy
   -> LengthSMTLibExecutionConfig
   -> LengthEvaluationLimits
   -> LeanLengthContract
@@ -532,8 +626,8 @@ rankAssociatedLengthCandidates
   -> IO
       (Either LengthRankingInputError
         (AssociatedLengthRanking association))
-rankAssociatedLengthCandidates inputBoxPolicy execution evaluation contract
-    verifiedFor associations =
+rankAssociatedLengthCandidates inputBoxPolicy originProbePolicy execution
+    evaluation contract verifiedFor associations =
   case admitCandidates defaultLengthSMTLibLiveSessionMaximumQueries
       associations of
     Left failure -> pure $ Left failure
@@ -546,7 +640,7 @@ rankAssociatedLengthCandidates inputBoxPolicy execution evaluation contract
         | otherwise -> do
             scoped <- withLengthSMTLibLiveSession execution
               $ \session -> runPreparedCandidates
-                  evaluation inputBoxPolicy session prepared
+                  evaluation inputBoxPolicy originProbePolicy session prepared
             pure $ Right $ case scoped of
               Left failure -> unassessedRanking prepared
                 $ sessionRankingFailure failure
@@ -615,12 +709,14 @@ preparedCandidateUnassessed prepared = case prepared of
 runPreparedCandidates
   :: LengthEvaluationLimits
   -> LengthInputBoxRankingPolicy
+  -> LengthOriginProbeRankingPolicy
   -> LengthSMTLibLiveSession epoch
   -> [PreparedLengthCandidate association]
   -> IO
       (Either LengthRankingFailure
         [AssociatedRankedLengthCandidate association])
-runPreparedCandidates evaluation inputBoxPolicy session = go [] []
+runPreparedCandidates evaluation inputBoxPolicy originProbePolicy session =
+  go [] []
  where
   go reversed seedBank remaining = case remaining of
     [] -> pure $ Right $ reverse reversed
@@ -637,21 +733,49 @@ runPreparedCandidates evaluation inputBoxPolicy session = go [] []
         in promoted `seq` go
             (assessedCounterexample index association receipt : reversed)
             promoted rest
-      Nothing -> do
-        observed <- runLengthSMTLibLiveQuery evaluation session query
-        case observed of
-          Left failure -> pure $ Left $ queryRankingFailure index failure
-          Right observation -> case
-              assessCandidate evaluation inputBoxPolicy
-                index association query observation of
-            Left failure -> pure $ Left failure
-            Right assessed ->
-              let nextSeedBank = case counterexampleSeed assessed of
-                    Nothing -> seedBank
-                    Just retained ->
-                      promoteCounterexampleSeed retained seedBank
-              in nextSeedBank `seq`
-                  go (assessed : reversed) nextSeedBank rest
+      Nothing -> case probeOriginCounterexample evaluation originProbePolicy
+          query of
+        Left (LengthSMTLibInputReplayEvaluationRejected failure) -> pure
+          $ Left $ localRankingFailure
+              (LengthRankingOriginProbeEvaluationFailed failure) index
+        Left (LengthSMTLibInputReplayAssociationRejected _) -> pure
+          $ Left $ localRankingFailure
+              LengthRankingEvidenceReplayMismatch index
+        Right (Just receipt) ->
+          let inputs = validatedLengthCounterexampleInputs receipt
+              promoted = promoteCounterexampleSeed inputs seedBank
+          in promoted `seq` go
+              (assessedCounterexample index association receipt : reversed)
+              promoted rest
+        Right Nothing -> do
+          observed <- runLengthSMTLibLiveQuery evaluation session query
+          case observed of
+            Left failure -> pure $ Left $ queryRankingFailure index failure
+            Right observation -> case
+                assessCandidate evaluation inputBoxPolicy
+                  index association query observation of
+              Left failure -> pure $ Left failure
+              Right assessed ->
+                let nextSeedBank = case counterexampleSeed assessed of
+                      Nothing -> seedBank
+                      Just retained ->
+                        promoteCounterexampleSeed retained seedBank
+                in nextSeedBank `seq`
+                    go (assessed : reversed) nextSeedBank rest
+
+-- | Run no replay at all on the compatibility path.  The enabled path
+-- delegates arity and zero construction to the exact sealed query; Leant never
+-- fabricates or retains an origin vector before a validated receipt exists.
+probeOriginCounterexample
+  :: LengthEvaluationLimits
+  -> LengthOriginProbeRankingPolicy
+  -> CheckedLengthQuery
+  -> Either LengthSMTLibInputReplayError
+      (Maybe ValidatedLengthCounterexample)
+probeOriginCounterexample evaluation policy query = case policy of
+  LengthOriginProbeRankingDisabled -> Right Nothing
+  LengthOriginProbeRankingEnabled ->
+    probeLengthSMTLibCounterexampleAtOrigin evaluation query
 
 -- A seed is only an input vector from an exact receipt.  The later checked
 -- query independently evaluates that vector against its own retained problem

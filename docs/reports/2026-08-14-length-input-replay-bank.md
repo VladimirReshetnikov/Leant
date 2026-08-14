@@ -8,6 +8,14 @@ Date: 2026-08-14
 > promotes its input vector in this same bank. A completed positive receipt is
 > neutral and never enters the bank. The extension is detailed in the
 > [unsat-triggered bounded validation report](2026-08-14-unsat-triggered-length-input-box-validation.md).
+>
+> **Later 2026-08-14 follow-up.** Explicit configuration version 3 keeps this
+> bank unchanged but inserts Djex's query-owned all-zero origin probe after all
+> four entries miss and before the candidate's live query. An origin hit is an
+> ordinary counterexample and enters this same bank; a miss contributes no
+> evidence, while evaluation or association failure activates indexed atomic
+> fallback. See the
+> [origin-probe orchestration report](2026-08-14-length-origin-probe-orchestration.md).
 
 ## Outcome and work bound
 
@@ -15,14 +23,16 @@ Leant's batch-local Length ranking feedback edge now retains a fixed-capacity
 bank of four source-ordered natural input vectors. The bank is newest first.
 Before an eligible candidate runs Z3, the ranker tries each retained vector in
 that order, making at most four pure replay attempts for that candidate. If
-none produces a counterexample, the candidate follows the unchanged live Z3
-path.
+none produces a counterexample, versions 1 and 2 follow their unchanged live
+Z3 path. Version 3 next performs one query-owned origin probe and reaches live
+Z3 only when that probe also misses.
 
 The bank deduplicates by exact `[Natural]` equality. A successful replay hit
-promotes its vector to the newest position. A counterexample returned after an
-actual live call, including one found by independent post-`unsat` input-box
-traversal, inserts or promotes its vector, and a fifth distinct vector
-evicts the least recently used entry. An arity or evaluation rejection, an
+promotes its vector to the newest position. A counterexample returned by the
+version-3 origin probe or after an actual live call, including one found by
+independent post-`unsat` input-box traversal, inserts or promotes its vector,
+and a fifth distinct vector evicts the least recently used entry. An arity or
+evaluation rejection, an
 honest non-counterexample, or a behavioral association rejection is only a
 miss and continues with the next retained vector. If all vectors miss, their
 order is unchanged. A pure preparation refusal and a heuristic live status
@@ -84,11 +94,13 @@ discovered and associated counterexample vector can do so.
 
 ## Live ordering and failure behavior
 
-Only actual solver calls consume live session ordinals. A replay hit performs
-no live call, so later live ordinals remain compact and count the calls which
-actually occurred. A live counterexample both supplies the candidate's fresh
-receipt and updates the bank; the bank never fabricates or reserves a skipped
-run identity.
+Only actual solver calls consume live session ordinals. A bank or origin hit
+performs no live query, so later live ordinals remain compact and count the
+calls which actually occurred. The eligible batch has already opened its
+lexical worker and passed its capability probe; the optimization skips a query
+transaction, not process launch, session opening, or that batch worker. An
+origin or live counterexample supplies the candidate's fresh receipt and
+updates the bank; the bank never fabricates or reserves a skipped run identity.
 
 Candidate traversal, stable ranking, and no-pruning behavior are unchanged. If
 an actual live query returns a structured session, query, association, or
@@ -100,16 +112,16 @@ Exceptions continue to propagate.
 ## Identity compatibility
 
 The bank changes only Leant's bounded call orchestration. Djex's query-owned
-input entrance adds no field to the sealed query and neither component changes
-Length semantics, QF_LIA translation, canonical solver bytes for a given
-query, solver protocol, response interpretation, the then-current version-1
-JSON configuration grammar,
-checked-problem or query fingerprints, presentation schema or renderer,
-identity schemas or construction rules, or any semantic, solver, JSON, schema,
-or identity version number. The wider replay policy can nevertheless newly
+input and origin entrances add no field to the sealed query and neither
+component changes Length semantics, QF_LIA translation, canonical solver bytes
+for a given query, solver protocol, response interpretation, checked-problem
+or query fingerprints, presentation schema or renderer, or identity schemas
+and construction rules. The wider replay policy can nevertheless newly
 assess and stably demote a candidate that the former single-entry policy would
 have sent to Z3. Actual later live identity values and ordinals can compact
 when replay skips a solver call; only calls which actually occur receive those
 identities, under the unchanged identity schemas and construction rules. The
-later additive version-2 JSON grammar selects the bounded validation policy
-without changing any of those Djex identities or the bank's representation.
+additive version-2 startup JSON grammar selects bounded validation. Startup
+version 3 is the only schema addition in this checkpoint: it retains that box
+and selects the origin probe with its required closed root field. Neither
+version changes any of those Djex identities or the bank's representation.

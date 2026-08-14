@@ -4,13 +4,14 @@ Date: 2026-08-11
 
 ## Outcome
 
-`Leant.Synth.Length.Configuration.File` defines one closed JSON format with two
+`Leant.Synth.Length.Configuration.File` defines one closed JSON format with three
 exact versions for the explicit live Length-ranking policy:
 
 - `format` is exactly `"leant-live-length-ranking-configuration"`;
 - version 1 is the literal historical compatibility grammar;
 - version 2 is an additive opt-in for independent bounded input-box validation;
-  and
+- version 3 retains that exact box and adds the closed query-owned origin-probe
+  selection; and
 - every object has exactly the fields listed below. All fields are required.
 
 The pure `decodeLengthRankingConfigurationFile` function accepts a strict
@@ -105,6 +106,27 @@ no redundant width field. `maximumAssignments` is a Natural no greater than
 left-to-right, then decodes the assignment cap and seals the traversal limits.
 Candidate-specific arity, maximum-value, Cartesian-product, evaluation, and
 behavioral checks remain deferred to Djex's exact query-owned verifier.
+
+## Version-3 origin-probe extension
+
+`lengthRankingConfigurationFileOriginProbeVersion` names the additive value
+`3`. Version 3 retains the exact version-2 execution, evaluation,
+`inputBoxValidation`, and embedded version-1 contract grammars. Its root adds
+one required closed field after the box in semantic validation order:
+
+```json
+{
+  "counterexampleProbe": "origin-before-live"
+}
+```
+
+No other string, Boolean, object, or null value is accepted. Versions 1 and 2
+reject this field as unexpected; version 3 rejects its absence. The selection
+contains no arity or caller-supplied values. It permits Leant to call Djex's
+query-owned canonical all-zero replay only after all four MRU entries miss and
+before that candidate's live query. Version 3 validates this selection after
+the complete input-box object and before demanding the unchanged embedded
+contract.
 
 `expectedExecutableSha256` is either `null` or exactly 64 lowercase
 hexadecimal characters. `artifactPolicy` is exactly `"status-only"` or
@@ -256,8 +278,9 @@ The decoder has a deterministic fail-closed order:
 3. once those two gates succeed, reject an unexpected root field before
    reporting any other missing root field;
 4. validate `executionAdmission`, then `execution`, then `evaluation`; version
-   1 then validates `contract`, while version 2 first validates
-   `inputBoxValidation` and only then validates `contract`;
+   1 then validates `contract`, version 2 first validates
+   `inputBoxValidation` and only then validates `contract`, and version 3
+   validates `inputBoxValidation`, `counterexampleProbe`, then `contract`;
 5. for each exact nested object, reject an unexpected field before a missing
    field, and establish the complete field set before decoding its values;
 6. within execution, schema-decode `responseLimits`, path, digest, timeout,
@@ -312,14 +335,26 @@ capabilities, remains the observed file at launch, or returns sound answers.
 They do not prove the behavioral contract, authorize raw `sat`/`unsat` status,
 or turn bounded model evidence into a Lean theorem.
 
-Version 1's configured runner behavior is unchanged. Under version 2, `unsat`
-is only a trigger for Djex to traverse the explicit finite box; it grants no
-authority to the result. A discovered violation becomes the ordinary replayed
-counterexample and MRU seed. Complete traversal becomes neutral
-`BoundedPositive` evidence and does not seed. A validation or association
-rejection joins the existing indexed atomic-failure policy and restores the
-original all-`Unassessed` ordering. `unknown` and status-only `sat` remain
-neutral. No candidate is pruned and exceptions continue to propagate. Main
-decodes, activates, and runs either policy only after the explicit startup
-option; the decoded contract then remains fixed for that process while every
-eligible batch opens a fresh lexical worker.
+Version 1's and version 2's configured runner behavior is unchanged. Under
+version 2, `unsat` is only a trigger for Djex to traverse the explicit finite
+box; it grants no authority to the result. Version 3 first tries the four-entry
+MRU bank and then the query-owned origin before live Z3. An origin hit becomes
+the ordinary replayed counterexample and MRU seed; a miss contributes no
+evidence; evaluation or association failure joins the indexed atomic-failure
+policy. The batch worker has already opened and passed its capability probe at
+that point, so the hit avoids only a live query transaction and ordinal; a
+session-open or capability failure can occur before any origin attempt. Only a
+subsequent actual live `unsat` can trigger version 3's retained
+finite box. A box-discovered violation becomes the ordinary counterexample and
+MRU seed. Complete traversal becomes neutral `BoundedPositive` evidence and
+does not seed. A validation or association rejection restores the original
+all-`Unassessed` ordering. `unknown` and status-only `sat` remain neutral. No
+candidate is pruned and exceptions continue to propagate. Main decodes,
+activates, and runs any version only after the explicit startup option; the
+decoded contract then remains fixed for that process while every eligible
+batch opens a fresh lexical worker.
+
+Configuration-file version 3 is the only new schema/version in this
+checkpoint. The origin selection changes no Djex or Leant behavioral,
+candidate, problem, SMT query, protocol, execution, process, worker,
+query-run, live-observation, receipt, MRU, or presentation identity schema.

@@ -212,6 +212,7 @@ import Leant.Synth.Length.Configuration
   , LengthRankingPolicy
   , LengthRankingPolicySource (..)
   , enableLengthRankingInputBoxValidation
+  , enableLengthRankingOriginProbe
   , mkLengthRankingPolicy
   , lengthRankingPolicyExecutableDigestExpectation
   , lengthRankingPolicyFromValidatedComponents
@@ -234,6 +235,7 @@ import Leant.Synth.Length.Configuration.File
   , disableLengthRankingConfiguration
   , lengthRankingConfigurationFileFormat
   , lengthRankingConfigurationFileInputBoxVersion
+  , lengthRankingConfigurationFileOriginProbeVersion
   , lengthRankingConfigurationFileJsonLimits
   , lengthRankingConfigurationFileVersion
   )
@@ -3068,6 +3070,12 @@ lengthRankingTests = testGroup "checked Length behavioral ranking"
       "apply the caller's evaluation limits to every seed replay attempt"
       assertLengthRankingCounterexampleSeedEvaluationLimits
   , testCase
+      "probe query-owned origins after MRU misses and compact live ordinals"
+      assertLengthRankingOriginProbeOrdering
+  , testCase
+      "atomically reset an indexed origin-probe evaluation failure"
+      assertLengthRankingOriginProbeAtomicFallback
+  , testCase
       "reset earlier live and seed-hit assessments after a later live failure"
       assertLengthRankingAtomicFallback
   , testCase
@@ -3104,6 +3112,9 @@ lengthRankingConfigurationTests = testGroup "explicit ranking policy"
   , testCase "reuse one sealed solver policy with request-owned contracts"
       assertLengthRankingPolicyContractSeparation
   , testCase
+      "compose origin and input-box builders commutatively without mutation"
+      assertLengthRankingOriginProbePolicyComposition
+  , testCase
       "keep legacy policy disabled and match explicit input-box policy"
       assertLengthRankingInputBoxPolicyEquivalence
   , lengthRankingConfigurationFileTests
@@ -3118,6 +3129,11 @@ lengthRankingConfigurationFileTests = testGroup
       assertLengthRankingConfigurationFileInputBoxV2
   , testCase "bound v2 input-box grammar in fixed validation order"
       assertLengthRankingConfigurationFileInputBoxV2Bounds
+  , testCase
+      "decode exact v3 origin policy while preserving v1 and v2 gating"
+      assertLengthRankingConfigurationFileOriginProbeV3
+  , testCase "bound v3 origin grammar in fixed validation order"
+      assertLengthRankingConfigurationFileOriginProbeV3Bounds
   , testCase "apply format, version, schema, decimal, and digest precedence"
       assertLengthRankingConfigurationFileSchemaPrecedence
   , testCase "validate execution before evaluation before contract syntax"
@@ -5572,6 +5588,168 @@ assertLengthRankingConfigurationFileInputBoxV2Bounds =
         LengthRankingConfigurationUnknownTag)
       $ badContract base
 
+assertLengthRankingConfigurationFileOriginProbeV3 :: IO ()
+assertLengthRankingConfigurationFileOriginProbeV3 = do
+  fixture <- buildLengthRankingLiveFixture
+  withFakeLengthSolver "query-unsat" $ \executable -> do
+    let one = lengthRankingFixtureOne fixture
+        contract = lengthRankingContract 0
+        contractValue = jsonLengthContract
+          (jsonLengthTruth True)
+          (jsonLengthEqual jsonLengthResult $ jsonLengthLiteral 0)
+          [ jsonLengthProviderLaw "Demo.zeroList" []
+              $ jsonLengthLiteral 0
+          , jsonLengthProviderLaw "Demo.oneList" []
+              $ jsonLengthLiteral 1
+          ]
+        v1 = setJsonField ["contract"] contractValue
+          $ lengthRankingConfigurationFileFixture executable Nothing
+        v2 = setJsonField ["contract"] contractValue
+          $ lengthRankingConfigurationFileInputBoxFixture
+              executable Nothing [] 1
+        v3 = setJsonField ["contract"] contractValue
+          $ lengthRankingConfigurationFileOriginProbeFixture
+              executable Nothing [] 1
+        activate document = do
+          disabled <- expectLengthRankingConfigurationFile document
+          expectLengthRankingConfigurationActivation
+            PermitUnpinnedExecutable disabled
+    lengthRankingConfigurationFileVersion @?= 1
+    lengthRankingConfigurationFileInputBoxVersion @?= 2
+    lengthRankingConfigurationFileOriginProbeVersion @?= 3
+    doesFileExist (executable ++ ".events") >>= (@?= False)
+
+    (v1Policy, v1Contract) <- activate v1
+    v1Contract @?= contract
+    v1Ranking <- expectLengthRankingWithin "v1 origin-disabled policy"
+      $ rankVerifiedLengthCandidatesWithPolicy v1Policy v1Contract [one]
+    map rankedLengthCandidateAssessment
+        (lengthRankingCandidates v1Ranking) @?=
+      [Heuristic Djex.SolverUnsatisfiable]
+    assertFakeLengthQueryEvents [0] [] =<<
+      BS.readFile (executable ++ ".events")
+
+    (v2Policy, v2Contract) <- activate v2
+    v2Contract @?= contract
+    v2Ranking <- expectLengthRankingWithin "v2 origin-disabled policy"
+      $ rankVerifiedLengthCandidatesWithPolicy v2Policy v2Contract [one]
+    v2Receipt <- expectOnlyRankingCounterexample v2Ranking
+    Djex.validatedLengthCounterexampleInputs v2Receipt @?= []
+    Djex.validatedLengthCounterexampleResult v2Receipt @?= 1
+    -- Version 2 reaches live unsat before the independent box finds this
+    -- counterexample; the new pre-live policy is not retroactive.
+    assertFakeLengthQueryEvents [0] [] =<<
+      BS.readFile (executable ++ ".events")
+
+    (v3Policy, v3Contract) <- activate v3
+    v3Contract @?= contract
+    v3Ranking <- expectLengthRankingWithin "v3 origin-enabled policy"
+      $ rankVerifiedLengthCandidatesWithPolicy v3Policy v3Contract [one]
+    v3Receipt <- expectOnlyRankingCounterexample v3Ranking
+    v3Receipt @?= v2Receipt
+    -- The same independently replayed receipt is now discovered before any
+    -- live query.  Capability admission may still open the lexical worker.
+    assertFakeLengthQueryEvents [] [] =<<
+      BS.readFile (executable ++ ".events")
+
+    reordered <- expectLengthRankingConfigurationFile
+      $ reverseJsonObjectFields v3
+    (_, reorderedContract) <- expectLengthRankingConfigurationActivation
+      PermitUnpinnedExecutable reordered
+    reorderedContract @?= contract
+ where
+  expectOnlyRankingCounterexample ranking = case
+      map rankedLengthCandidateAssessment
+        $ lengthRankingCandidates ranking of
+    [Counterexample receipt] -> pure receipt
+    assessments -> assertFailure
+      ("expected one configuration counterexample: " ++ show assessments)
+        >> error "unreachable"
+
+assertLengthRankingConfigurationFileOriginProbeV3Bounds :: IO ()
+assertLengthRankingConfigurationFileOriginProbeV3Bounds =
+  withTemporaryDirectory "leant-length-file-origin-v3" $ \root -> do
+    let executable = root </> "missing-z3"
+        v1 = lengthRankingConfigurationFileFixture executable Nothing
+        v2 = lengthRankingConfigurationFileInputBoxFixture
+          executable Nothing [0] 1
+        base = lengthRankingConfigurationFileOriginProbeFixture
+          executable Nothing [0] 1
+        badContract = setJsonField ["contract", "precondition"]
+          $ Json.JArr [Json.JStr "private-unknown-formula"]
+        badProbe = setJsonField ["counterexampleProbe"]
+          $ Json.JStr "private-origin-mode"
+        badInputBox = setJsonField
+          ["inputBoxValidation", "maximumAssignments"] (Json.JInt (-1))
+        badEvaluation = setJsonField
+          ["evaluation", "assignmentValueBits"] (Json.JInt (-1))
+        badExecution = setJsonField ["execution", "executablePath"]
+          $ Json.JStr "djex-fake-z3"
+        allBad = badExecution $ badEvaluation $ badInputBox $ badProbe
+          $ badContract base
+    _ <- expectLengthRankingConfigurationFile base
+    _ <- expectLengthRankingConfigurationFile
+      $ reverseJsonObjectFields base
+
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationUnexpectedField
+        LengthRankingConfigurationRootObject)
+      $ addJsonField []
+          ("counterexampleProbe", Json.JStr "origin-before-live") v1
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationUnexpectedField
+        LengthRankingConfigurationRootObject)
+      $ addJsonField []
+          ("counterexampleProbe", Json.JStr "origin-before-live") v2
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationUnexpectedField
+        LengthRankingConfigurationRootObject)
+      $ addJsonField [] ("private-origin-field", Json.JNull) base
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationMissingField
+        LengthRankingConfigurationRootObject
+        LengthRankingConfigurationCounterexampleProbeField)
+      $ deleteJsonField ["counterexampleProbe"] base
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationFieldTypeMismatch
+        LengthRankingConfigurationCounterexampleProbeField
+        LengthRankingConfigurationStringValue)
+      $ setJsonField ["counterexampleProbe"] (Json.JBool False) base
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationFieldValueRejected
+        LengthRankingConfigurationCounterexampleProbeField)
+      $ badProbe base
+    assertLengthRankingConfigurationFileError
+      LengthRankingConfigurationUnsupportedVersion
+      $ addJsonField [] ("private-origin-field", Json.JNull)
+      $ setJsonField ["version"]
+          (Json.JInt
+            $ toInteger lengthRankingConfigurationFileOriginProbeVersion + 1)
+          base
+
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationExecutionRejected
+        Djex.LengthSMTLibExecutionExecutablePathNotAbsolute)
+      allBad
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationEvaluationRejected
+        $ Djex.NegativeLengthEvaluationLimit
+            Djex.LengthAssignmentValueBits (-1))
+      $ badEvaluation $ badInputBox $ badProbe $ badContract base
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationFieldValueRejected
+        LengthRankingConfigurationInputBoxMaximumAssignmentsField)
+      $ badInputBox $ badProbe $ badContract base
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationFieldValueRejected
+        LengthRankingConfigurationCounterexampleProbeField)
+      $ badProbe $ badContract base
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationSyntaxRejected
+        LengthRankingConfigurationPreconditionSyntax
+        LengthRankingConfigurationUnknownTag)
+      $ badContract base
+
 assertLengthRankingConfigurationFileSchemaPrecedence :: IO ()
 assertLengthRankingConfigurationFileSchemaPrecedence =
   withTemporaryDirectory "leant-length-file-schema" $ \root -> do
@@ -5580,7 +5758,7 @@ assertLengthRankingConfigurationFileSchemaPrecedence =
         badEnvelope = addJsonField [] ("private-root-field", Json.JNull)
           $ setJsonField ["version"]
               (Json.JInt
-                $ toInteger lengthRankingConfigurationFileInputBoxVersion + 1)
+                $ toInteger lengthRankingConfigurationFileOriginProbeVersion + 1)
           $ setJsonField ["format"] (Json.JStr "private-format") base
     assertLengthRankingConfigurationFileError
       LengthRankingConfigurationUnsupportedFormat badEnvelope
@@ -6324,6 +6502,21 @@ lengthRankingConfigurationFileInputBoxFixture executable digest maximums
       (Json.JInt $ toInteger lengthRankingConfigurationFileInputBoxVersion)
   $ lengthRankingConfigurationFileFixture executable digest
 
+lengthRankingConfigurationFileOriginProbeFixture
+  :: FilePath
+  -> Maybe String
+  -> [Integer]
+  -> Integer
+  -> Json.JValue
+lengthRankingConfigurationFileOriginProbeFixture executable digest maximums
+    maximumAssignments =
+  addJsonField []
+    ("counterexampleProbe", Json.JStr "origin-before-live")
+  $ setJsonField ["version"]
+      (Json.JInt $ toInteger lengthRankingConfigurationFileOriginProbeVersion)
+  $ lengthRankingConfigurationFileInputBoxFixture
+      executable digest maximums maximumAssignments
+
 jsonLengthTruth :: Bool -> Json.JValue
 jsonLengthTruth value = Json.JArr
   [Json.JStr "truth", Json.JBool value]
@@ -6731,6 +6924,91 @@ assertLengthRankingPolicyContractSeparation = do
         rankedLengthPreparationRefusals ranking @?= [Nothing, Nothing]
         lengthRankingFailure ranking @?= Nothing)
       [first, second]
+
+assertLengthRankingOriginProbePolicyComposition :: IO ()
+assertLengthRankingOriginProbePolicyComposition = do
+  fixture <- buildLengthRankingLiveFixture
+  limits <- explicitLengthInputBoxLimits 0 1
+  withFakeLengthSolver "query-unsat" $ \executable -> do
+    let one = lengthRankingFixtureOne fixture
+        zero = lengthRankingFixtureZero fixture
+        candidates = [one, zero]
+        contract = lengthRankingContract 0
+        executionSource = explicitLengthRankingExecutionSource
+          executable Nothing Djex.LengthSMTLibStatusOnly
+        policySource = explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits executionSource
+          Djex.defaultLengthEvaluationLimitSource
+        runPolicy label policy = expectLengthRankingWithin label
+          $ rankVerifiedLengthCandidatesWithPolicy policy contract candidates
+    base <- expectRight $ mkLengthRankingPolicy policySource
+    let boxThenOrigin = enableLengthRankingOriginProbe
+          $ enableLengthRankingInputBoxValidation limits [] base
+        originThenBox = enableLengthRankingInputBoxValidation limits []
+          $ enableLengthRankingOriginProbe base
+
+    first <- runPolicy "input box then origin probe" boxThenOrigin
+    assertComposedRanking zero one first
+    assertFakeLengthQueryEvents [0] [] =<<
+      BS.readFile (executable ++ ".events")
+    second <- runPolicy "origin probe then input box" originThenBox
+    assertComposedRanking zero one second
+    assertLengthRankingsEquivalent first second
+    assertFakeLengthQueryEvents [0] [] =<<
+      BS.readFile (executable ++ ".events")
+
+    -- Both builders are persistent derivations: reusing their common base
+    -- still runs both candidates live and retains the historical heuristics.
+    legacy <- runPolicy "immutable base after composed builders" base
+    rankedLengthVerifiedCandidates legacy @?= candidates
+    map rankedLengthCandidateAssessment
+        (lengthRankingCandidates legacy) @?=
+      replicate 2 (Heuristic Djex.SolverUnsatisfiable)
+    assertFakeLengthQueryEvents [0, 1] [] =<<
+      BS.readFile (executable ++ ".events")
+
+    verification <- verificationBatchFromReceipts candidates
+    associated <- expectLengthPostVerificationWithin
+      "composed origin and input-box policy association"
+      $ assessVerifiedLengthCandidatesWithPolicy
+          boxThenOrigin contract verification
+    assertLengthPostVerificationSealed associated
+    associatedRanking <- expectLengthPostVerificationRanking associated
+    (postOne, postZero) <- case verifiedCandidateReceipts verification of
+      [retainedOne, retainedZero] -> pure (retainedOne, retainedZero)
+      receipts -> assertFailure
+        ("composed verification changed cardinality: "
+          ++ show (length receipts)) >> error "unreachable"
+    assertComposedRanking postZero postOne associatedRanking
+    map rankedLengthCandidateOriginalIndex
+        (lengthRankingCandidates associatedRanking) @?= [1, 0]
+    let presentations = presentLengthPostVerificationResult associated
+    map lengthCandidatePresentationText presentations @?=
+      map (detailedVerificationVariantText . verifiedCandidate)
+        [postZero, postOne]
+    case map lengthCandidatePresentationNote presentations of
+      [Just positiveNote, Just counterexampleNote] -> do
+        assertBool "origin composition lost its bounded-positive occurrence"
+          $ "checked assignments = 1" `isInfixOf` positiveNote
+        assertBool "origin counterexample followed the wrong occurrence"
+          $ "result spine length = 1" `isInfixOf` counterexampleNote
+      notes -> assertFailure
+        $ "origin composition lost presentation association: " ++ show notes
+    assertFakeLengthQueryEvents [0] [] =<<
+      BS.readFile (executable ++ ".events")
+ where
+  assertComposedRanking zero one ranking = do
+    lengthRankingFailure ranking @?= Nothing
+    rankedLengthVerifiedCandidates ranking @?= [zero, one]
+    case map rankedLengthCandidateAssessment
+        $ lengthRankingCandidates ranking of
+      [BoundedPositive positive, Counterexample counterexample] -> do
+        Djex.validatedLengthInputBoxInclusiveMaximums positive @?= []
+        Djex.validatedLengthInputBoxAssignmentCount positive @?= 1
+        Djex.validatedLengthCounterexampleInputs counterexample @?= []
+        Djex.validatedLengthCounterexampleResult counterexample @?= 1
+      assessments -> assertFailure
+        $ "unexpected composed origin/box assessments: " ++ show assessments
 
 assertLengthRankingInputBoxPolicyEquivalence :: IO ()
 assertLengthRankingInputBoxPolicyEquivalence = do
@@ -7439,6 +7717,142 @@ assertLengthRankingCounterexampleSeedEvaluationLimits = do
   -- nondefault two-bit limit, then fall through to compact live ordinal 1.
   -- Live validation rejects the same model and triggers atomic fallback.
   assertFakeLengthQueryEvents [0, 1] [0, 1] events
+
+assertLengthRankingOriginProbeOrdering :: IO ()
+assertLengthRankingOriginProbeOrdering = do
+  (contract, arityCandidates) <- buildLengthSeedBankArityFixture
+  (zeroInput, oneInput, threeInput) <- case arityCandidates of
+    zero : one : _ : three : _ -> pure (zero, one, three)
+    _ -> assertFailure "the origin-probe arity fixture changed cardinality"
+      >> error "unreachable"
+  let hitContract = contract
+        { leanLengthContractSource = LengthContractSource
+            { lengthContractPrecondition = LengthTruth True
+            , lengthContractPostcondition = LengthEqual
+                (LengthVariable LengthResult) (LengthLiteral 2)
+            }
+        }
+      coldCandidates = [zeroInput, oneInput, threeInput]
+      queryIdentity query =
+        ( fingerprintCanonicalBytes $ lengthSMTLibQueryFingerprint query
+        , lengthSMTLibQueryCheckBytes query
+        , lengthSMTLibQueryInputSymbols query
+        , lengthSMTLibQueryInputValueRequestBytes query
+        )
+      prepareQuery candidate =
+        expectRight (prepareCheckedLengthQuery hitContract candidate)
+          >>= expectRight
+  beforeQueries <- mapM prepareQuery coldCandidates
+  coldRuns <- mapM
+    (\candidate -> runLengthRankingWithFakeTraceWithOriginProbe
+      "healthy" Djex.LengthSMTLibInputValuesAfterSatisfiable
+      defaultLengthEvaluationLimits hitContract [candidate]) coldCandidates
+  coldReceipts <- mapM expectColdReceipt coldRuns
+  map Djex.validatedLengthCounterexampleInputs coldReceipts @?=
+    [[], [0], [0, 0, 0]]
+  map Djex.validatedLengthCounterexampleResult coldReceipts @?= [1, 0, 0]
+  afterQueries <- mapM prepareQuery coldCandidates
+  map queryIdentity afterQueries @?= map queryIdentity beforeQueries
+
+  -- The lexical worker and its capability probe still precede the pure
+  -- candidate loop.  An origin hit skips a query transaction, not session
+  -- establishment, so a capability failure atomically withholds that hit.
+  (sessionFailureRanking, sessionFailureEvents) <-
+    runLengthRankingWithFakeTraceWithOriginProbe
+      "wrong-echo" Djex.LengthSMTLibInputValuesAfterSatisfiable
+      defaultLengthEvaluationLimits hitContract [zeroInput]
+  map rankedLengthCandidateAssessment
+      (lengthRankingCandidates sessionFailureRanking) @?= [Unassessed]
+  sessionFailure <- case lengthRankingFailure sessionFailureRanking of
+    Nothing -> assertFailure "origin probing bypassed session establishment"
+      >> error "unreachable"
+    Just retained -> pure retained
+  case lengthRankingFailureClass sessionFailure of
+    LengthRankingLiveSessionFailed _ -> pure ()
+    failureClass -> assertFailure
+      $ "unexpected origin session failure: " ++ show failureClass
+  assertFakeLengthQueryEvents [] [] sessionFailureEvents
+
+  let replayCandidates = [zeroInput, zeroInput, oneInput, oneInput]
+  (replayRanking, replayEvents) <-
+    runLengthRankingWithFakeTraceWithOriginProbe
+      "healthy" Djex.LengthSMTLibInputValuesAfterSatisfiable
+      defaultLengthEvaluationLimits contract replayCandidates
+  lengthRankingFailure replayRanking @?= Nothing
+  map rankedLengthCandidateOriginalIndex
+      (lengthRankingCandidates replayRanking) @?= [0, 1, 2, 3]
+  replayReceipts <- mapM expectOriginCounterexample
+    $ map rankedLengthCandidateAssessment
+    $ lengthRankingCandidates replayRanking
+  map Djex.validatedLengthCounterexampleInputs replayReceipts @?=
+    [[], [], [3], [3]]
+  map Djex.validatedLengthCounterexampleResult replayReceipts @?=
+    [1, 1, 3, 3]
+  -- The second nullary candidate and final unary candidate are MRU hits.  The
+  -- intervening unary origin miss reaches the first compact live ordinal even
+  -- though two candidates have already been assessed without live queries.
+  assertFakeLengthQueryEvents [0] [0] replayEvents
+  LengthRankingInternal.promoteCounterexampleSeed []
+      ([[3], [], [5], []] :: [[Natural]]) @?=
+    [[], [3], [5]]
+ where
+  expectOriginCounterexample assessment = case assessment of
+    Counterexample receipt -> pure receipt
+    other -> assertFailure
+      ("expected an origin or seed counterexample: " ++ show other)
+        >> error "unreachable"
+
+  expectColdReceipt (ranking, events) = do
+    lengthRankingFailure ranking @?= Nothing
+    map rankedLengthCandidateOriginalIndex
+        (lengthRankingCandidates ranking) @?= [0]
+    assertFakeLengthQueryEvents [] [] events
+    case map rankedLengthCandidateAssessment
+        $ lengthRankingCandidates ranking of
+      [assessment] -> expectOriginCounterexample assessment
+      assessments -> assertFailure
+        ("cold origin run changed cardinality: " ++ show assessments)
+          >> error "unreachable"
+
+assertLengthRankingOriginProbeAtomicFallback :: IO ()
+assertLengthRankingOriginProbeAtomicFallback = do
+  (contract, arityCandidates) <- buildLengthSeedBankArityFixture
+  (zeroInput, oneInput) <- case arityCandidates of
+    zero : one : _ -> pure (zero, one)
+    _ -> assertFailure "the origin failure fixture changed cardinality"
+      >> error "unreachable"
+  providerLaws <- case leanLengthContractProviderLaws contract of
+    zeroLaw : oneLaw : remaining -> pure
+      $ zeroLaw
+      : oneLaw { leanLengthProviderLawTransfer = LengthLiteral 2 }
+      : remaining
+    _ -> assertFailure "the origin failure provider inventory changed"
+      >> error "unreachable"
+  evaluation <- expectRight $ Djex.mkLengthEvaluationLimits
+    Djex.defaultLengthEvaluationLimitSource
+      { Djex.lengthEvaluationLimitSourceIntermediateValueBits = 1 }
+  trailing <- syntheticLengthRankingCandidate "origin-failure-trailing"
+  let failingContract = contract
+        { leanLengthContractProviderLaws = providerLaws }
+      original = [zeroInput, oneInput, trailing]
+  (ranking, events) <- runLengthRankingWithFakeTraceWithOriginProbe
+    "healthy" Djex.LengthSMTLibStatusOnly evaluation failingContract original
+  rankedLengthVerifiedCandidates ranking @?= original
+  map rankedLengthCandidateAssessment (lengthRankingCandidates ranking) @?=
+    replicate 3 Unassessed
+  rankedLengthPreparationRefusals ranking @?=
+    [Nothing, Nothing, Just LengthPreparationTypedAuthorityUnavailable]
+  failure <- case lengthRankingFailure ranking of
+    Nothing -> assertFailure "origin evaluation rejection was not retained"
+      >> error "unreachable"
+    Just retained -> pure retained
+  lengthRankingFailureClass failure @?=
+    LengthRankingOriginProbeEvaluationFailed
+      (Djex.LengthEvaluationValueBitLimitExceeded
+        Djex.LengthIntermediateValue 1 2)
+  lengthRankingFailureCleanupIncomplete failure @?= False
+  lengthRankingFailureOriginalIndex failure @?= Just 1
+  assertFakeLengthQueryEvents [] [] events
 
 assertLengthRankingAtomicFallback :: IO ()
 assertLengthRankingAtomicFallback = do
@@ -8397,6 +8811,38 @@ runLengthRankingWithFakeTraceWithEvaluation
     case bounded of
       Nothing -> assertFailure $ "Length ranking mode exceeded its bound: " ++
         mode
+      Just result -> do
+        ranking <- expectRight result
+        events <- BS.readFile $ executable ++ ".events"
+        pure (ranking, events)
+
+runLengthRankingWithFakeTraceWithOriginProbe
+  :: String
+  -> Djex.LengthSMTLibArtifactPolicy
+  -> Djex.LengthEvaluationLimits
+  -> LeanLengthContract
+  -> [Verified DetailedVerificationVariant]
+  -> IO (LengthRanking, BS.ByteString)
+runLengthRankingWithFakeTraceWithOriginProbe
+    mode policy evaluation contract candidates =
+  withFakeLengthSolver mode $ \executable -> do
+    execution <- expectRight $ Djex.mkLengthSMTLibExecutionConfig
+      Djex.defaultLengthSMTLibExecutionLimits
+      $ (Djex.defaultLengthSMTLibExecutionConfigSource executable Nothing)
+          { Djex.lengthSMTLibExecutionConfigSourceSolverTimeoutMilliseconds =
+              100
+          , Djex.lengthSMTLibExecutionConfigSourceSolverResourceLimit = 4242
+          , Djex.lengthSMTLibExecutionConfigSourceHostDeadlineMilliseconds =
+              1000
+          , Djex.lengthSMTLibExecutionConfigSourceArtifactPolicy = policy
+          }
+    bounded <- timeout 8000000
+      $ LengthRankingInternal.rankVerifiedLengthCandidatesWithOriginProbe
+          execution evaluation contract candidates
+    case bounded of
+      Nothing -> assertFailure
+        ("Length origin-probe ranking mode exceeded its bound: " ++ mode)
+          >> error "unreachable"
       Just result -> do
         ranking <- expectRight result
         events <- BS.readFile $ executable ++ ".events"

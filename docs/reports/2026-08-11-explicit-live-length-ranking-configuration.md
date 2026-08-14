@@ -7,6 +7,13 @@
 > the same explicit policy through its required `inputBoxValidation` object.
 > See the
 > [unsat-triggered bounded validation report](2026-08-14-unsat-triggered-length-input-box-validation.md).
+>
+> **Later 2026-08-14 follow-up.** `LengthRankingPolicy` also retains an
+> independent optional origin-probe policy. `mkLengthRankingPolicy` leaves it
+> disabled, `enableLengthRankingOriginProbe` enables it explicitly, and startup
+> configuration version 3 composes it with version 2's exact finite box. The
+> runtime order is four-entry MRU, query-owned origin, then live Z3. See the
+> [origin-probe orchestration report](2026-08-14-length-origin-probe-orchestration.md).
 
 Date: 2026-08-11
 
@@ -26,7 +33,8 @@ front of the existing live Length ranking foundation. The reusable
 `LengthRankingPolicy`. A `LeanLengthContract` is supplied independently to each
 `rankVerifiedLengthCandidatesWithPolicy` call. The version-1 configuration-file
 grammar remains unchanged; additive version 2 enables the finite box without
-changing that version-1 path. Its compatibility path uses
+changing that version-1 path, and additive version 3 retains the box while
+enabling the pre-live query-owned origin probe. Its compatibility path uses
 `LengthRankingConfigurationSource`, which nests that same
 `LengthRankingPolicySource` beside one explicit contract and seals an opaque
 `LengthRankingConfiguration` compatibility value. There is one source
@@ -89,15 +97,21 @@ succeeds. The lower-level associated runners and projector now live only in
 `Ranking.Internal` and `PostVerification.Internal`; the ordinary ranking and
 configuration facades cannot return an unsealed associated value. Callers
 therefore do not need a policy or contract projection to connect an explicitly
-activated version-1 or version-2 configuration to the safe presentation
-boundary.
+activated version-1, version-2, or version-3 configuration to the safe
+presentation boundary.
 
 Both paths preserve productive input admission, complete pre-sealing, serial
 query order, stable counterexample demotion, atomic all-`Unassessed` fallback,
-and exception behavior. An enabled policy uses `unsat` only to trigger Djex's
-independent bounded traversal; a resulting counterexample follows the existing
-demotion/MRU path, while positive completion is neutral and does not seed.
-Neither caches a worker between calls.
+and exception behavior. With the origin policy enabled, every candidate tries
+the four-entry MRU bank, then Djex's query-owned all-zero replay, then its live
+query. The lexical worker has already opened and passed its capability probe,
+so an origin hit avoids only that query transaction and ordinal. The hit
+follows the existing counterexample demotion/MRU path; a
+miss has no authority; an evaluation or association rejection is indexed and
+atomically fails the batch. An enabled box policy still uses only an actual
+live `unsat` to trigger Djex's independent bounded traversal; a resulting
+counterexample follows the same demotion/MRU path, while positive completion
+is neutral and does not seed. Neither policy caches a worker between calls.
 
 The private lifecycle bounds and explicit per-query host deadline remain
 separate. The wrapper adds no batch-wide or command-wide deadline and does not

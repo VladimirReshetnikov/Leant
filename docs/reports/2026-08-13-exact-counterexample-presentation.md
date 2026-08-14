@@ -7,6 +7,12 @@
 > and precondition-applicable assignment counts, provider-count-only basis, and
 > explicit zero-applicable vacuity under the same 384-character ceiling. See the
 > [unsat-triggered bounded validation report](2026-08-14-unsat-triggered-length-input-box-validation.md).
+>
+> **Later 2026-08-14 follow-up.** A version-3 origin hit produces the same
+> ordinary associated `Counterexample` and therefore uses this unchanged
+> counterexample note. An origin miss or indexed atomic failure produces no new
+> semantic presentation. See the
+> [origin-probe orchestration report](2026-08-14-length-origin-probe-orchestration.md).
 
 ## Scope
 
@@ -47,8 +53,9 @@ never projects or renders the receipt's private Djex provider-name list.
 Provider-independent evidence is named
 explicitly.
 
-The version-1 and version-2 files admit at most eight inputs, 256 provider laws,
-and 4,096-bit evaluation values. Presentation renders at most eight inputs, shows
+The version-1, version-2, and version-3 startup files admit at most eight
+inputs, 256 provider laws, and 4,096-bit evaluation values. Presentation
+renders at most eight inputs, shows
 ordinary naturals exactly only through 24 decimal digits, and replaces larger
 ones with a bounded bit-length summary such as `<4096-bit natural>`. A valid
 configured note is bounded by the hard 384-character terminal ceiling.
