@@ -2248,6 +2248,12 @@ lengthRankingTests = testGroup "checked Length behavioral ranking"
       "stably demote replayed counterexamples without pruning or reassociation"
       assertLengthRankingCounterexampleDemotion
   , testCase
+      "replay the latest exact counterexample input before another Z3 query"
+      assertLengthRankingCounterexampleSeedReplay
+  , testCase
+      "run Z3 when the latest counterexample input has another arity"
+      assertLengthRankingCounterexampleSeedArityMismatch
+  , testCase
       "reset every candidate in original order after an operational failure"
       assertLengthRankingAtomicFallback
   , testCase
@@ -6007,7 +6013,7 @@ assertLengthRankingCounterexampleDemotion = do
         Djex.lengthSMTLibQueryFingerprint oneQuery
   assertLengthRankingQueryAssociation zeroProblem zeroQuery
   assertLengthRankingQueryAssociation oneProblem oneQuery
-  ranking <- runLengthRankingWithFake "healthy"
+  (ranking, events) <- runLengthRankingWithFakeTrace "healthy"
     Djex.LengthSMTLibInputValuesAfterSatisfiable
     contract original
   lengthRankingFailure ranking @?= Nothing
@@ -6019,6 +6025,14 @@ assertLengthRankingCounterexampleDemotion = do
         Counterexample oneReceipt] -> do
       assertLengthCounterexampleReceipt 0 zeroReceipt
       assertLengthCounterexampleReceipt 1 oneReceipt
+      Djex.validatedLengthCounterexampleBasis zeroReceipt @?=
+        Djex.FiniteSpineModelUnderAssumedProviderLaws
+          (checkedLengthCandidateUsedProviders
+            $ checkedLengthProblemCandidate zeroProblem)
+      Djex.validatedLengthCounterexampleBasis oneReceipt @?=
+        Djex.FiniteSpineModelUnderAssumedProviderLaws
+          (checkedLengthCandidateUsedProviders
+            $ checkedLengthProblemCandidate oneProblem)
     assessments -> assertFailure $
       "unexpected stable counterexample partition: " ++ show assessments
   rankedLengthPreparationRefusals ranking @?=
@@ -6027,6 +6041,59 @@ assertLengthRankingCounterexampleDemotion = do
     , Nothing
     , Nothing
     ]
+  assertFakeLengthQueryEvents [0] [] events
+
+assertLengthRankingCounterexampleSeedReplay :: IO ()
+assertLengthRankingCounterexampleSeedReplay = do
+  (contract, verified) <- buildRoleAwareMapFixture
+  problem <- expectRight $ prepareCheckedLengthProblem contract verified
+  let expectedProviders = checkedLengthCandidateUsedProviders
+        $ checkedLengthProblemCandidate problem
+  (ranking, events) <- runLengthRankingWithFakeTrace "healthy"
+    Djex.LengthSMTLibInputValuesAfterSatisfiable
+    contract [verified, verified]
+  lengthRankingFailure ranking @?= Nothing
+  map rankedLengthCandidateOriginalIndex
+      (lengthRankingCandidates ranking) @?= [0, 1]
+  case map rankedLengthCandidateAssessment
+      $ lengthRankingCandidates ranking of
+    [Counterexample first, Counterexample second] -> do
+      map Djex.validatedLengthCounterexampleInputs [first, second] @?=
+        [[3], [3]]
+      map Djex.validatedLengthCounterexampleResult [first, second] @?=
+        [3, 3]
+      map Djex.validatedLengthCounterexampleBasis [first, second] @?=
+        replicate 2
+          (Djex.FiniteSpineModelUnderAssumedProviderLaws expectedProviders)
+    assessments -> assertFailure $
+      "unexpected seed-replayed assessments: " ++ show assessments
+  assertFakeLengthQueryEvents [0] [0] events
+
+assertLengthRankingCounterexampleSeedArityMismatch :: IO ()
+assertLengthRankingCounterexampleSeedArityMismatch = do
+  fixture <- buildLengthRankingLiveFixture
+  identity <- buildOneInputLengthRankingCandidate
+  let contract = lengthRankingContract 2
+      candidates = [lengthRankingFixtureZero fixture, identity]
+  identityQuery <- expectRight (prepareCheckedLengthQuery contract identity)
+    >>= expectRight
+  length (lengthSMTLibQueryInputSymbols identityQuery) @?= 1
+  (ranking, events) <- runLengthRankingWithFakeTrace "healthy"
+    Djex.LengthSMTLibInputValuesAfterSatisfiable contract candidates
+  lengthRankingFailure ranking @?= Nothing
+  rankedLengthVerifiedCandidates ranking @?= candidates
+  case map rankedLengthCandidateAssessment
+      $ lengthRankingCandidates ranking of
+    [Counterexample zeroReceipt, Counterexample identityReceipt] -> do
+      Djex.validatedLengthCounterexampleInputs zeroReceipt @?= []
+      Djex.validatedLengthCounterexampleResult zeroReceipt @?= 0
+      Djex.validatedLengthCounterexampleInputs identityReceipt @?= [3]
+      Djex.validatedLengthCounterexampleResult identityReceipt @?= 3
+      Djex.validatedLengthCounterexampleBasis identityReceipt @?=
+        Djex.ProviderIndependentFiniteSpineModel
+    assessments -> assertFailure $
+      "unexpected arity-mismatch assessments: " ++ show assessments
+  assertFakeLengthQueryEvents [0, 1] [1] events
 
 assertLengthRankingAtomicFallback :: IO ()
 assertLengthRankingAtomicFallback = do
@@ -6034,15 +6101,17 @@ assertLengthRankingAtomicFallback = do
   trailing <- syntheticLengthRankingCandidate "fallback-trailing"
   let zero = lengthRankingFixtureZero fixture
       one = lengthRankingFixtureOne fixture
-      original = [one, zero, trailing]
-  ranking <- runLengthRankingWithFake "healthy"
+      original = [one, one, zero, trailing]
+  (ranking, events) <- runLengthRankingWithFakeTrace "healthy"
     Djex.LengthSMTLibInputValuesAfterSatisfiable
     (lengthRankingContract 0) original
   rankedLengthVerifiedCandidates ranking @?= original
   map rankedLengthCandidateAssessment (lengthRankingCandidates ranking) @?=
-    replicate 3 Unassessed
+    replicate 4 Unassessed
   rankedLengthPreparationRefusals ranking @?=
-    [Nothing, Nothing, Just LengthPreparationTypedAuthorityUnavailable]
+    [ Nothing, Nothing, Nothing
+    , Just LengthPreparationTypedAuthorityUnavailable
+    ]
   failure <- case lengthRankingFailure ranking of
     Nothing -> assertFailure
       "a satisfiable non-counterexample did not fail closed"
@@ -6051,7 +6120,8 @@ assertLengthRankingAtomicFallback = do
     LengthRankingLiveQueryFailed
       Djex.LengthSMTLibLiveQueryCounterexampleRejected
   lengthRankingFailureCleanupIncomplete failure @?= False
-  lengthRankingFailureOriginalIndex failure @?= Just 1
+  lengthRankingFailureOriginalIndex failure @?= Just 2
+  assertFakeLengthQueryEvents [0, 1] [] events
 
 assertLengthPostVerificationAdapter :: IO ()
 assertLengthPostVerificationAdapter = do
@@ -6233,6 +6303,58 @@ assertLengthCounterexampleReceipt
 assertLengthCounterexampleReceipt expectedResult receipt = do
   Djex.validatedLengthCounterexampleInputs receipt @?= []
   Djex.validatedLengthCounterexampleResult receipt @?= expectedResult
+
+buildOneInputLengthRankingCandidate
+  :: IO (Verified DetailedVerificationVariant)
+buildOneInputLengthRankingCandidate = do
+  let element = FAtom False "Nat"
+      listKey = "List Nat"
+      list = FParamRec True "List" listKey [element]
+        [ ("List.nil", [])
+        , ("List.cons", [element, FAtom False listKey])
+        ]
+      goal = FArr list list
+      zeroProvider = ProviderFrag "Demo.zeroList" list
+      oneProvider = ProviderFrag "Demo.oneList" list
+  detailed <- expectRight $
+    synthesizeWithProvidersSkippingDetailedWithMultiConstructorPatterns
+      False EngineExference 128 Set.empty [zeroProvider, oneProvider] goal
+  (group, acceptedSpelling) <- case detailed of
+    DetailedSynthCandidates groups _ -> case
+        [ (retained, spelling)
+        | retained <- groups
+        , providerIndependentIdentity retained
+        , spelling <- take 1 $ detailedCandidateGroupVariants retained
+        ] of
+      retained : _ -> pure retained
+      [] -> assertFailure
+        ("one-input ranking fixture returned no identity: "
+          ++ show (map detailedCandidateGroupVariants groups))
+            >> error "unreachable"
+    other -> assertFailure
+      ("one-input ranking synthesis failed: " ++ show other)
+        >> error "unreachable"
+  batch <- verifyCandidateGroups 1
+    (\variant -> pure $ if detailedVerificationVariantText variant
+        == acceptedSpelling
+      then VariantAccepted
+      else VariantRejected LeanErrorDiagnostic)
+    [detailedCandidateGroupVerificationVariants group]
+  case verifiedCandidateReceipts batch of
+    [verified] -> pure verified
+    receipts -> assertFailure
+      ("one-input identity verification produced "
+        ++ show (length receipts) ++ " receipts") >> error "unreachable"
+ where
+  providerIndependentIdentity group = case
+      detailedCandidateGroupSemanticSidecar group of
+    Nothing -> False
+    Just semantic -> case typedCandidateTermGraph
+        $ typedCandidateSemanticCandidate semantic of
+      Left _ -> False
+      Right graph -> case eraseTermGraph graph of
+        Lambda [Bind parameter] (Local returned) -> parameter == returned
+        _ -> False
 
 -- The provider-backed Leant handoff fixtures are correctly zero-input.  This
 -- test-only dependency fixture supplies the smallest honest one-input basis:
@@ -6502,6 +6624,15 @@ runLengthRankingWithFake
   -> [Verified DetailedVerificationVariant]
   -> IO LengthRanking
 runLengthRankingWithFake mode policy contract candidates =
+  fst <$> runLengthRankingWithFakeTrace mode policy contract candidates
+
+runLengthRankingWithFakeTrace
+  :: String
+  -> Djex.LengthSMTLibArtifactPolicy
+  -> LeanLengthContract
+  -> [Verified DetailedVerificationVariant]
+  -> IO (LengthRanking, BS.ByteString)
+runLengthRankingWithFakeTrace mode policy contract candidates =
   withFakeLengthSolver mode $ \executable -> do
     execution <- expectRight $ Djex.mkLengthSMTLibExecutionConfig
       Djex.defaultLengthSMTLibExecutionLimits
@@ -6518,7 +6649,36 @@ runLengthRankingWithFake mode policy contract candidates =
     case bounded of
       Nothing -> assertFailure $ "Length ranking mode exceeded its bound: " ++
         mode
-      Just result -> expectRight result
+      Just result -> do
+        ranking <- expectRight result
+        events <- BS.readFile $ executable ++ ".events"
+        pure (ranking, events)
+
+assertFakeLengthQueryEvents :: [Int] -> [Int] -> BS.ByteString -> IO ()
+assertFakeLengthQueryEvents expectedChecks expectedValues events = do
+  byteStringOccurrenceCount (encoded "EVENT query-check ") events @?=
+    length expectedChecks
+  byteStringOccurrenceCount (encoded "EVENT query-get-value ") events @?=
+    length expectedValues
+  mapM_ (assertEventOrdinal events "query-check" (2 :: Int)) expectedChecks
+  mapM_ (assertEventOrdinal events "query-get-value" (3 :: Int)) expectedValues
+ where
+  encoded = BS.pack
+  assertEventOrdinal trace tag fieldCount ordinal =
+    let rendered = show ordinal
+        marker = encoded $ "EVENT " ++ tag ++ " " ++ show fieldCount
+          ++ "\nFIELD ordinal "
+          ++ show (length rendered) ++ "\n" ++ rendered ++ "\n"
+    in assertBool
+      ("fake Length trace lost " ++ tag ++ " ordinal " ++ rendered)
+      $ marker `BS.isInfixOf` trace
+
+byteStringOccurrenceCount :: BS.ByteString -> BS.ByteString -> Int
+byteStringOccurrenceCount needle = go 0
+ where
+  go count remaining = case BS.breakSubstring needle remaining of
+    (_, suffix) | BS.null suffix -> count
+    (_, suffix) -> go (count + 1) $ BS.drop (BS.length needle) suffix
 
 withFakeLengthSolver :: String -> (FilePath -> IO result) -> IO result
 withFakeLengthSolver mode action =

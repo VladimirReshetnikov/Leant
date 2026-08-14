@@ -5,16 +5,23 @@
 -- This module is the only Leant layer which opens Djex's public live Length
 -- session.  It first productively bounds the complete input, then prepares
 -- every checked problem and canonical query before launching a worker.
--- Eligible queries run serially in original order inside one rank-N scope.
+-- Eligible candidates are processed serially in original order inside one
+-- rank-N scope.  Before a later live call, the most recent exact
+-- counterexample input vector is independently validated and replayed against
+-- that candidate's checked query.  A replay hit avoids one live query; every
+-- miss follows the established live path.
 --
--- A solver status is heuristic only.  An optional counterexample is retained
--- only after Djex's public live replay gate checks the exact query fingerprint
--- and replays its evidence against the behavioral problem retained by that
--- query.  Even that receipt is finite-spine and model-relative: it is neither a
--- proof nor a claim about the source-level realization of a Lean term.
+-- A solver status is heuristic only.  A live observation can yield a
+-- counterexample only after Djex's public query-first gate checks its exact
+-- fingerprint and replays its evidence.  A seed hit can yield one only after
+-- the later query independently validates its rebuilt bindings and replays the
+-- resulting evidence against its own behavioral problem.  Even that receipt
+-- is finite-spine and model-relative: it is neither a proof nor a claim about
+-- the source-level realization of a Lean term.
 -- Ranking therefore never prunes.  It stably moves candidates with replayed
 -- counterexamples after every other candidate and preserves source order
--- within both partitions.
+-- within both partitions.  The seed is not a cached verdict, solver result,
+-- or proof, and it never crosses a ranking batch.
 --
 -- The private opener/finalizer budgets and the execution policy's per-query
 -- host budget remain separate; this function promises no batch-wide hard
@@ -54,11 +61,13 @@ module Leant.Synth.Length.Ranking.Internal
   ) where
 
 import Data.List (partition)
+import Data.Word (Word8)
 import Numeric.Natural (Natural)
 
 import Language.Haskell.Djex
   ( ExferenceLocal
   , LengthEvaluationLimits
+  , LengthSMTLibIntegerBinding (..)
   , LengthSMTLibExecutionConfig
   , LengthSMTLibQueryError (..)
   , LengthSMTLibLiveObservationReplayError (..)
@@ -71,13 +80,18 @@ import Language.Haskell.Djex
   , SolverStatus
   , ValidatedLengthCounterexample
   , defaultLengthSMTLibLiveSessionMaximumQueries
+  , lengthSMTLibQueryBehavioralProblem
+  , lengthSMTLibQueryInputSymbols
   , lengthSMTLibLiveQueryCleanupIncomplete
   , lengthSMTLibLiveQueryObservationSolverStatus
   , lengthSMTLibLiveQueryPrimaryFailure
   , lengthSMTLibLiveSessionCleanupIncomplete
   , lengthSMTLibLiveSessionPrimaryFailure
   , replayLengthSMTLibLiveQueryObservation
+  , replayBehavioralEvidence
   , runLengthSMTLibLiveQuery
+  , validateLengthSMTLibCounterexample
+  , validatedLengthCounterexampleInputs
   , withLengthSMTLibLiveSession
   )
 
@@ -410,7 +424,8 @@ data PreparedLengthCandidate association
 -- checked problem is transient until query sealing; prepared state retains
 -- only the caller-owned receipt association and query. An empty admitted batch
 -- opens no worker. Every nonempty eligible batch uses exactly one live session
--- and executes its pre-sealed queries serially in original order.
+-- and processes its pre-sealed queries serially in original order; a later
+-- seed-replay hit can avoid that query's live execution.
 rankVerifiedLengthCandidates
   :: LengthSMTLibExecutionConfig
   -> LengthEvaluationLimits
@@ -536,24 +551,87 @@ runPreparedCandidates
   -> IO
       (Either LengthRankingFailure
         [AssociatedRankedLengthCandidate association])
-runPreparedCandidates evaluation session = go []
+runPreparedCandidates evaluation session = go [] Nothing
  where
-  go reversed remaining = case remaining of
+  go reversed seed remaining = case remaining of
     [] -> pure $ Right $ reverse reversed
     PreparedLengthCandidateUnassessed
         index association refusal : rest ->
       go (AssociatedRankedLengthCandidate
-        index association
-          (LengthCandidatePreparationRefused refusal) : reversed) rest
+        index association (LengthCandidatePreparationRefused refusal) : reversed)
+        seed rest
     PreparedLengthCandidateEligible
-        index association query : rest -> do
-      observed <- runLengthSMTLibLiveQuery evaluation session query
-      case observed of
-        Left failure -> pure $ Left $ queryRankingFailure index failure
-        Right observation -> case
-            assessCandidate index association query observation of
-          Left failure -> pure $ Left failure
-          Right assessed -> go (assessed : reversed) rest
+        index association query : rest -> case
+          seed >>= replayCounterexampleSeed evaluation query of
+      Just receipt -> go
+        (assessedCounterexample index association receipt : reversed)
+        (Just $ validatedLengthCounterexampleInputs receipt)
+        rest
+      Nothing -> do
+        observed <- runLengthSMTLibLiveQuery evaluation session query
+        case observed of
+          Left failure -> pure $ Left $ queryRankingFailure index failure
+          Right observation -> case
+              assessCandidate index association query observation of
+            Left failure -> pure $ Left failure
+            Right assessed ->
+              let nextSeed = case counterexampleSeed assessed of
+                    Nothing -> seed
+                    Just retained -> Just retained
+              in go (assessed : reversed) nextSeed rest
+
+-- A seed is only an input vector from the most recent exact receipt.  The
+-- later checked query reconstructs symbol bindings and independently replays
+-- its own retained behavioral problem; no earlier verdict, provider basis,
+-- query identity, or solver observation crosses this edge.
+replayCounterexampleSeed
+  :: LengthEvaluationLimits
+  -> CheckedLengthQuery
+  -> [Natural]
+  -> Maybe ValidatedLengthCounterexample
+replayCounterexampleSeed evaluation query inputs = do
+  bindings <- exactInputBindings
+    (lengthSMTLibQueryInputSymbols query) inputs
+  evidence <- case
+      validateLengthSMTLibCounterexample evaluation query bindings of
+    Left _ -> Nothing
+    Right retained -> retained
+  case replayBehavioralEvidence
+      (lengthSMTLibQueryBehavioralProblem query) evidence of
+    Left _ -> Nothing
+    Right receipt -> Just receipt
+
+exactInputBindings
+  :: [[Word8]]
+  -> [Natural]
+  -> Maybe [LengthSMTLibIntegerBinding]
+exactInputBindings = go []
+ where
+  go reversed symbols inputs = case (symbols, inputs) of
+    ([], []) -> Just $ reverse reversed
+    (symbol : remainingSymbols, input : remainingInputs) ->
+      let binding = LengthSMTLibIntegerBinding symbol $ toInteger input
+      in binding `seq` go (binding : reversed)
+          remainingSymbols remainingInputs
+    _ -> Nothing
+
+assessedCounterexample
+  :: Natural
+  -> association
+  -> ValidatedLengthCounterexample
+  -> AssociatedRankedLengthCandidate association
+assessedCounterexample index association receipt =
+  AssociatedRankedLengthCandidate index association
+    $ LengthCandidateAssessed $ Counterexample receipt
+
+counterexampleSeed
+  :: AssociatedRankedLengthCandidate association
+  -> Maybe [Natural]
+counterexampleSeed (AssociatedRankedLengthCandidate _ _ state) = case
+    state of
+  LengthCandidateAssessed (Counterexample receipt) ->
+    Just $ validatedLengthCounterexampleInputs receipt
+  _ -> Nothing
 
 assessCandidate
   :: Natural

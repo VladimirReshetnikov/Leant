@@ -3,7 +3,10 @@
 -- This facade exposes complete association-free reports only.  The
 -- occurrence-associated plan used by the post-verification permutation seal
 -- is package-private, so ordinary ranking consumers cannot erase a
--- batch-scoped handle before that seal succeeds.
+-- batch-scoped handle before that seal succeeds.  Within one batch, a later
+-- checked problem may independently replay the most recent validated input
+-- vector before opening another live query; no earlier verdict or evidence
+-- receipt is reused.
 module Leant.Synth.Length.Ranking
   ( LengthRankingInputError (..)
   , LengthRankingAssessment (..)

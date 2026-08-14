@@ -1,5 +1,11 @@
 # Live Length ranking foundation
 
+> **2026-08-13 follow-up.** Later candidates now first try the most recent
+> validated input vector through their own exact checked query and behavioral
+> replay boundary. A hit avoids one live query; a miss follows the serial live
+> path described below. This batch-local orchestration change is detailed in
+> the [Length counterexample seed replay report](2026-08-13-length-counterexample-seed-replay.md).
+
 Date: 2026-08-11
 
 ## Outcome
@@ -140,12 +146,13 @@ candidate is eligible, no live session is opened.
 
 ## One scoped serial pass
 
-All eligible queries run in original input order inside one lexical
-`withLengthSMTLibLiveSession` rank-N scope. The ranking layer neither exposes nor
-retains Djex's process, workspace, barriers, ordinals, transcripts, or private
-run identities.
+All eligible candidates are processed in original input order inside one
+lexical `withLengthSMTLibLiveSession` rank-N scope. Queries whose batch-local
+seed replay misses run live in that same order. The ranking layer neither
+exposes nor retains Djex's process, workspace, barriers, ordinals, transcripts,
+or private run identities.
 
-For each successful query, Leant calls Djex's
+For each successful live query, Leant calls Djex's
 `replayLengthSMTLibLiveQueryObservation`. The gate checks that the observation
 carries the exact fingerprint of the already sealed query before inspecting
 its private whole status-indexed solver observation. Only the satisfiable
@@ -154,7 +161,10 @@ against the exact behavioral problem retained by the query. Only a successful
 replay releases the safe `ValidatedLengthCounterexample` receipt into the
 assessment stored by the opaque ranked-candidate association. The whole
 observation has no public projection, so this query-first gate remains the only
-semantic extraction edge and Djex's public Live API is unchanged.
+semantic extraction edge from a live observation and Djex's public Live API is
+unchanged. A seed hit has no observation: it rebuilds bindings for the later
+query, independently validates them, and replays any resulting evidence against
+that query's retained behavioral problem.
 
 The checked problem is transient until it is sealed into a canonical query.
 Each eligible prepared record retains only its caller-owned receipt association

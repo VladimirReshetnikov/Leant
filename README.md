@@ -571,12 +571,23 @@ caller must provide an explicit Djex live-execution policy,
 explicit replay limits, an explicit `LeanLengthContract`, and the complete list
 of callback-verified candidates. It productively admits at most Djex's public
 64-query session bound, attempts every candidate handoff and seals every
-eligible canonical query before opening one lexical live session, and runs
-those queries serially in original order. `unsat`, `unknown`, and status-only
-`sat` are neutral; only a satisfiable model accepted by Djex's query-first live
-replay gate is stably moved behind the other candidates. That gate checks the
-exact canonical query fingerprint before inspecting optional evidence and
-replays any evidence against the behavioral problem retained by the query.
+eligible canonical query before opening one lexical live session, and processes
+those candidates serially in original order. After one exact counterexample,
+the ranking pass retains only its bounded source-ordered input naturals as the
+single batch-local seed. Before a later live call it rebuilds that later
+query's exact symbol bindings, asks Djex to validate the inputs against the
+later checked query, and replays the resulting evidence against the later
+query's retained behavioral problem. A replay hit creates a fresh receipt for
+that later problem and avoids one Z3 call. Arity mismatch, validation refusal,
+a non-counterexample, or replay mismatch is only a seed miss and follows the
+established live path. The seed is never a cached solver result, verdict,
+provider-law basis, proof, or durable cache entry.
+
+`unsat`, `unknown`, and status-only `sat` remain neutral; only independently
+replayed counterexamples are stably moved behind the other candidates. Live
+observations still cross Djex's query-first gate, which checks the exact
+canonical query fingerprint before inspecting optional evidence and replays
+that evidence against the behavioral problem retained by the query.
 The checked problem is transient until query sealing; there is no separate
 runtime handoff wrapper, second callback receipt, or retained family binding.
 Prepared live state retains only the caller-owned receipt association and
@@ -609,6 +620,9 @@ this foundation only after the explicit startup opt-in described above; it
 never infers an executable path, contract, or policy. The foundation is
 detailed in the
 [live Length ranking foundation report](docs/reports/2026-08-11-live-length-ranking-foundation.md).
+The batch-local replay optimization and its unchanged trust and identity
+boundaries are recorded in the
+[Length counterexample seed replay report](docs/reports/2026-08-13-length-counterexample-seed-replay.md).
 
 `Leant.Synth.Length.Configuration` seals that call boundary without choosing
 any policy for the user. `LengthRankingPolicySource` carries the execution
