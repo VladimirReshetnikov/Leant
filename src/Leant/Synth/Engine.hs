@@ -245,10 +245,12 @@ data ExferenceRunAuthority = ExferenceRunAuthority
 -- | Checked Exference identity retained with one originating rendered group.
 --
 -- The opaque typed candidate keeps its compatibility projection inseparable
--- from the exact graph which produced the group and the full checked run which
--- admitted it.  The graph remains owned only by that checked candidate, and
--- Djex fingerprints it only while sealing an actual behavioral problem; rendering
--- retains no parallel fallible graph-key cache.
+-- from the exact graph and any checked certificate association which produced
+-- the group, together with the full checked run which admitted it.  Rendering
+-- may inspect the public bare-graph projection, but a stamped projection has
+-- discarded association authority and cannot be fingerprinted independently.
+-- Behavioral sealing instead consumes the whole candidate; rendering retains
+-- no parallel fallible graph-key cache.
 data TypedCandidateSemanticSidecar = TypedCandidateSemanticSidecar
   ExferenceTypedCandidate
   ExferenceRunAuthority

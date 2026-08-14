@@ -483,10 +483,14 @@ that historical field lazily, while the Length handoff performs the same
 checked conversion before it checks request contexts and the request goal.
 There is no post-search field-for-field preparation copy. The
 detailed Exference route retains an opaque checked candidate and that exact
-run authority beside the originating rendered group. The candidate
-remains the sole owner of its graph, and Djex fingerprints that graph only
-while sealing an actual behavioral problem; the rendering sidecar carries no
-parallel fallible graph-key cache. Filtering preserves a group sidecar only
+run authority beside the originating rendered group. The candidate remains the
+sole owner of its graph and any opaque checked certificate association.
+Rendering may inspect the public bare-graph projection, but a stamped
+projection has discarded that association and is rejected by Djex's public
+shared-graph fingerprint. The Length handoff instead passes the whole candidate
+to Djex so the domain can freshly reseal and authorize an exact,
+obligation-free associated provider. The rendering sidecar carries no parallel
+fallible graph-key cache. Filtering preserves a group sidecar only
 with its original candidate. During combined-engine exact-text deduplication,
 an earlier compatibility-only spelling may retain a private variant-scoped
 witness to the first later Exference candidate which rendered the identical bytes; display
@@ -526,11 +530,16 @@ session-owned `sealLengthSessionWithInterpretationPolicy`,
 `sealLengthTypedCandidateProblemInSession` path. The contract and candidate
 cannot be sealed under separately selected role or case modes, and Leant no
 longer calls the compatibility problem wrappers. Renderer selection continues
-to use the raw decoded case policy, while all historical legacy, explicit
-all-observed, mixed-target, and exact problem/query fingerprint projections
+to use the raw decoded case policy. Djex's associated-provider trust-boundary
+checkpoint deliberately advances its common Length session-policy versions to
+5/6/7, invalidating containing session, problem, query, and protocol keys from
+the prior policy versions. Contract grammar and signatures,
+legacy-versus-explicit-all-observed equivalence, and Leant's renderer selection
 remain unchanged.
 The authority migration and compatibility matrix are detailed in the
 [unified checked Length handoff policy report](docs/reports/2026-08-13-unified-length-handoff-policy.md).
+The opaque carrier handoff and its trust limits are recorded in the
+[Length certificate-carrier handoff report](docs/reports/2026-08-13-length-certificate-carrier-handoff.md).
 `Leant.Synth.Length.Adapter` then seals it into a bounded canonical QF_LIA
 query without exposing an arbitrary problem-taking entrance. Neither step
 launches a solver or grants authority

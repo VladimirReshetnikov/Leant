@@ -1509,9 +1509,15 @@ translationPreparationTests = testGroup "prepared synthesis translation"
                   , paiSourceArguments = sourceArguments
                   })
               $ zip (inspectedProviderAssignments binding) sourceAssignments
+            let binderNames = case provider of
+                  ProviderFrag{} -> Nothing
+                  ProviderFragWithBinders
+                    { providerTypeBinderNames = names } -> Just names
+                  ProviderFragWithEvidence
+                    { providerTypeBinderNames = names } -> Just names
             pure (providerInfo
               (providerLeanName provider)
-              (Just $ providerTypeBinderNames provider)
+              binderNames
               (providerTypeFrag provider))
               { piAssignments = renderAssignments }
       prepared <- expectRight $ inspectExferencePreparation
@@ -6929,6 +6935,34 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
             , not $ isNothing $ detailedCandidateGroupSemanticSidecar group
             ] of
           origin : _ -> do
+            semantic <- case detailedCandidateGroupSemanticSidecar origin of
+              Nothing -> assertFailure
+                "the polymorphic provider candidate lost its semantic sidecar"
+              Just retained -> pure retained
+            projected <- expectRight
+              $ typedCandidateTermGraph
+              $ typedCandidateSemanticCandidate semantic
+            let certificateHandles =
+                  [ handle
+                  | (_, Djex.TermNode _
+                        (Djex.TypedVisibleTypeApplication _ _ _ witness)) <-
+                      Djex.termGraphNodes projected
+                  , Just handle <-
+                      [Djex.typeApplicationCertificate witness]
+                  ]
+            case certificateHandles of
+              [(certificate, slot)] -> do
+                slot @?= 0
+                Djex.fingerprintSharedTermGraph
+                    Djex.defaultTermGraphLimits
+                    Djex.defaultTermGraphFingerprintByteLimit
+                    projected @?=
+                  Left
+                    (Djex.TermGraphFingerprintUnsupportedCertificate
+                      certificate)
+              other -> assertFailure $
+                "expected one slot-zero certificate handle, got: "
+                  ++ show other
             batch <- verifyCandidateGroups 1
               (const $ pure VariantAccepted)
               [detailedCandidateGroupVerificationVariants origin]

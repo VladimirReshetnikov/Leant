@@ -128,9 +128,9 @@ data LengthHandoffRefusal
 -- Once correspondence succeeds, exact family/provider bindings are resolved
 -- from retained translation provenance. Djex seals the inventory, spine, and
 -- provider laws once into an opaque session, revalidates the separately
--- supplied contract through that session, and then seals the typed graph,
--- semantic encoding, and problem identity. The returned problem is the direct
--- Djex authority; no additional Leant handoff wrapper is retained.
+-- supplied contract through that session, and then seals the whole typed
+-- candidate, semantic encoding, and problem identity. The returned problem is
+-- the direct Djex authority; no additional Leant handoff wrapper is retained.
 prepareCheckedLengthProblem
   :: LeanLengthContract
   -> Verified DetailedVerificationVariant

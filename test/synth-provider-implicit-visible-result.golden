@@ -73,8 +73,8 @@ synth engine: djinn
 λ> :set synth-engine exference
 synth engine: exference
 λ> :synth DomainCollision.Box (∀ {P : Prop} (A : Type), (P → A) → DomainCollision.Result)
-  it1  DomainCollision.selected
-  it2  DomainCollision.selected («a» := (∀ {a0_0 : Prop} (a0_1 : Type _), (a0_0 → a0_1) → (DomainCollision.Result)))
+  it1  DomainCollision.selected («a» := (∀ {a0_0 : Prop} (a0_1 : Type _), (a0_0 → a0_1) → (DomainCollision.Result)))
+  it2  DomainCollision.selected
 note: search truncated: step limit reached, queue limit pruned 22296
 λ> :set synth-engine both
 synth engine: both

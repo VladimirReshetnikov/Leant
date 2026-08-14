@@ -57,12 +57,15 @@ before:
 - v3 and v5 `cases-rejected` use explicit roles with rejected cases; and
 - v4 and v5 `exact-spine-zero-step-v1` use explicit roles with exact cases.
 
-Djex intentionally keeps historical target-mixedness and case-policy identity
-projections. Leant's legacy and explicit-all-observed checked problems and
-canonical queries therefore remain byte-identical, while genuinely mixed or
-exact policies retain their established distinct identities. The focused
-regression now compares both behavioral-problem and canonical-query
-fingerprints for that compatibility pair.
+At this checkpoint Djex kept the historical target-mixedness and case-policy
+identity projections, so Leant's legacy and explicit-all-observed checked
+problems and canonical queries were byte-identical while genuinely mixed or
+exact policies retained distinct identities. The later associated-provider
+trust-boundary checkpoint deliberately advances the common Djex Length session
+policy versions to 5/6/7. Legacy-versus-explicit-all-observed equivalence still
+holds under the current policy, but old containing session, problem, query, and
+protocol keys are invalidated. See the
+[certificate-carrier handoff report](2026-08-13-length-certificate-carrier-handoff.md).
 
 Existing production regressions also continue to cover the complete matrix:
 
