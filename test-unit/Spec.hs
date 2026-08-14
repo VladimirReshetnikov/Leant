@@ -7033,6 +7033,97 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
           other -> assertFailure $
             "expected direct List provider candidates, got: " ++ show other
   , testCase
+      "retain an exact constrained provider law around an unused identity" $
+      do
+        let element = FAtom False "Nat"
+            listKey = "List Nat"
+            list = FParamRec True "List" listKey [element]
+              [ ("List.nil", [])
+              , ("List.cons", [element, FAtom False listKey])
+              ]
+            provider = ProviderFrag "Demo.conditionalEmptyList"
+              $ FAll False "a"
+              $ FExactContext "Demo.Admitted"
+                  [ExactContextFragmentArgument 0 $ FVar "a"]
+                  list
+            goal = FArr list list
+            contract = LeanLengthContract
+              { leanLengthContractSpine = LeanLengthSpineIdentity
+                  { leanLengthSpineFamilyName = "List"
+                  , leanLengthSpineZeroConstructorName = "List.nil"
+                  , leanLengthSpineStepConstructorName = "List.cons"
+                  }
+              , leanLengthContractTargetArgumentRoles =
+                  Just [LengthTargetSpineInput]
+              , leanLengthContractCandidateCasePolicy =
+                  LeanLengthCasesRejected
+              , leanLengthContractSource = LengthContractSource
+                  { lengthContractPrecondition = LengthTruth True
+                  , lengthContractPostcondition = LengthEqual
+                      (LengthVariable LengthResult)
+                      (LengthVariable $ LengthInput 0)
+                  }
+              , leanLengthContractProviderLaws =
+                  [ LeanLengthProviderLaw
+                      { leanLengthProviderLawName =
+                          "Demo.conditionalEmptyList"
+                      , leanLengthProviderLawArgumentRoles = []
+                      , leanLengthProviderLawTransfer = LengthLiteral 0
+                      }
+                  ]
+              }
+        expected <- expectRight $ inspectExferencePreparation
+          [provider] [] goal goal
+        case inspectedProviderBindings expected of
+          [binding] -> case inspectedProviderScheme binding of
+            ForallType [binder]
+                [Constraint _ [TypeVariable occurrence]] _ ->
+              occurrence @?= binder
+            scheme -> assertFailure $
+              "the retained provider scheme lost its exact context: "
+                ++ show scheme
+          bindings -> assertFailure $
+            "expected one constrained provider binding, got: "
+              ++ show bindings
+        detailed <- expectRight $
+          synthesizeWithProvidersSkippingDetailedWithMultiConstructorPatterns
+            False EngineExference 128 Set.empty [provider] goal
+        origin <- case detailed of
+          DetailedSynthCandidates groups _ -> case
+              [ group
+              | group <- groups
+              , Just semantic <-
+                  [detailedCandidateGroupSemanticSidecar group]
+              , Right graph <-
+                  [typedCandidateTermGraph
+                    $ typedCandidateSemanticCandidate semantic]
+              , Lambda [Bind parameter] (Local returned) <-
+                  [eraseTermGraph graph]
+              , parameter == returned
+              ] of
+            identity : _ -> pure identity
+            [] -> assertFailure
+              ("the constrained inventory produced no typed identity: "
+                ++ show (map detailedCandidateGroupVariants groups))
+                >> error "unreachable"
+          other -> assertFailure
+            ("constrained-provider identity synthesis failed: " ++ show other)
+              >> error "unreachable"
+        batch <- verifyCandidateGroups 1
+          (const $ pure VariantAccepted)
+          [detailedCandidateGroupVerificationVariants origin]
+        case verifiedCandidateReceipts batch of
+          [verified] -> do
+            problem <- expectRight $
+              prepareCheckedLengthProblem contract verified
+            let candidate = checkedLengthProblemCandidate problem
+            checkedLengthCandidateResult candidate @?=
+              LengthVariable (LengthInput 0)
+            checkedLengthCandidateUsedProviders candidate @?= []
+          receipts -> assertFailure $
+            "constrained-provider identity produced unexpected receipts: "
+              ++ show receipts
+  , testCase
       "decode a direct Djex List model before exact evidence replay" $ do
       receipt <- buildProviderIndependentCounterexampleReceipt 3
       Djex.validatedLengthCounterexampleInputs receipt @?= [3]

@@ -42,6 +42,7 @@ import Language.Haskell.Djex
   , sealLengthContractInSession
   , sealLengthSessionWithInterpretationPolicy
   , sealLengthTypedCandidateProblemInSession
+  , splitLeadingForalls
   )
 
 import Leant.Synth.Engine
@@ -290,13 +291,27 @@ resolveProviderLaw authority origin law = case
   [binding] -> do
     scheme <- traverse convertProviderVariable
       $ inspectedProviderScheme binding
-    Right AssumedProviderSummary
-      { lengthProviderName = inspectedProviderPrivateName binding
-      , lengthProviderScheme = scheme
-      , lengthProviderArgumentRoles =
-          leanLengthProviderLawArgumentRoles law
-      , lengthProviderTransfer = leanLengthProviderLawTransfer law
-      }
+    -- The exact inventory scheme is the only trust discriminator. Keeping an
+    -- empty leading context on the historical constructor preserves its
+    -- provider/session identities, while a retained context merely selects
+    -- Djex's conditional law: this handoff neither resolves nor supplies its
+    -- dictionary evidence.
+    let providerSummary = case splitLeadingForalls scheme of
+          (_, [], _) -> AssumedProviderSummary
+            { lengthProviderName = inspectedProviderPrivateName binding
+            , lengthProviderScheme = scheme
+            , lengthProviderArgumentRoles =
+                leanLengthProviderLawArgumentRoles law
+            , lengthProviderTransfer = leanLengthProviderLawTransfer law
+            }
+          (_, _ : _, _) -> AssumedConstraintConditionalProviderSummary
+            { lengthProviderName = inspectedProviderPrivateName binding
+            , lengthProviderScheme = scheme
+            , lengthProviderArgumentRoles =
+                leanLengthProviderLawArgumentRoles law
+            , lengthProviderTransfer = leanLengthProviderLawTransfer law
+            }
+    Right providerSummary
    where
     convertProviderVariable providerVariable = case Map.lookup providerVariable
         $ inspectedAuthorityNameTable authority of
