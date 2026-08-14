@@ -10,7 +10,7 @@ startup seam. `Leant.Synth.Length.Integration` owns two opaque modes:
 - disabled mode is the historical non-strict identity projection of the exact
   callback-owned `VerificationBatch`;
 - configured mode contains one already admitted, decoded, and activated
-  version-1 `LengthRankingConfiguration` together with the exact closed
+  version-1 or version-2 Length ranking policy and contract together with the exact closed
   activation policy which released it.
 
 Main selects configured mode only with
@@ -40,7 +40,8 @@ permit-unpinned fact from the opaque mode rather than consulting the original
 CLI Boolean again. The mode exposes no path, timeout, digest bytes, contract
 projection, executable observation, or worker authority through that edge.
 
-The version-1 document intentionally bundles a contract. Main reads it once
+Both startup document versions intentionally bundle the same compatibility
+contract grammar. Main reads it once
 and treats the decoded contract as a fixed process-wide assertion for later
 synthesis requests. It does not reread or watch the source file, infer a new
 contract from a goal, or retarget the contract. The lower-level
@@ -71,17 +72,19 @@ rank-2 session authority enters `ReplState`. A reusable process policy and
 fixed contract are retained; live process authority is not.
 
 The only ordering change remains stable demotion of candidates carrying an
-independently replayed finite-list-spine counterexample. No candidate is
-pruned. `sat`, `unsat`, `unknown`, and status-only observations grant no proof
-or pruning authority.
+independently replayed finite-list-spine counterexample. Version-2 bounded
+positive assessments stay in the neutral partition. No candidate is pruned.
+`sat`, `unsat`, `unknown`, and status-only observations grant no proof or
+pruning authority; version 2 uses `unsat` only to schedule independent traversal.
 
 After the seal, the presentation layer traverses each whole materialized
 `RankedLengthCandidate`. Candidate text and any note therefore come from the
 same receipt rather than from detached lists joined by spelling or position.
-Only a replayed counterexample gets a bounded subordinate note. It is labeled
-model-relative, reports spine lengths, and reduces any provider-backed basis
-to the count of assumed laws; the note never projects or displays the
-receipt's private provider-name list.
+A replayed counterexample gets its bounded subordinate note. A completed
+version-2 finite box gets a distinct bounded-positive note with maxima,
+checked/applicable counts, and visible vacuity. Both are labeled
+model-relative and reduce any provider-backed basis to the count of assumed
+laws; neither projects or displays the receipt's private provider-name list.
 
 ## Failures and presentation
 
@@ -93,7 +96,7 @@ During assessment:
 
 - input or permutation rejection preserves the exact original verification
   batch and exposes neither a suspect ranking nor a sealed proposal;
-- a returned structured live failure yields the established original-order,
+- a returned structured live or input-box-validation failure yields the established original-order,
   all-`Unassessed` ranking, seals that identity order, and emits one sanitized
   warning;
 - synchronous and asynchronous exceptions retain the ranking layer's existing

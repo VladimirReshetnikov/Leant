@@ -1,9 +1,10 @@
 -- | Explicit ownership of live Length ranking policy.
 --
 -- Construction is pure and performs only Djex's bounded policy validation.
--- 'LengthRankingPolicy' owns reusable execution and replay policy, while a
+-- 'LengthRankingPolicy' owns reusable execution and replay policy plus an
+-- optional explicit finite input-box validation policy, while a
 -- 'LeanLengthContract' is supplied separately for each ranking request.  The
--- versioned compatibility-file grammar retains its fixed startup contract
+-- versioned configuration-file grammar retains its fixed startup contract
 -- beside this policy without introducing a second generic aggregate.
 --
 -- A successful value does not establish that the configured path resolves to
@@ -26,16 +27,20 @@ module Leant.Synth.Length.Configuration
   , LengthRankingPolicy
   , mkLengthRankingPolicy
   , lengthRankingPolicyFromValidatedComponents
+  , enableLengthRankingInputBoxValidation
   , lengthRankingPolicyExecutableDigestExpectation
   , LengthRankingConfigurationError (..)
   , assessVerifiedLengthCandidatesWithPolicy
   , rankVerifiedLengthCandidatesWithPolicy
   ) where
 
+import Numeric.Natural (Natural)
+
 import Language.Haskell.Djex
   ( LengthEvaluationLimitError
   , LengthEvaluationLimitSource
   , LengthEvaluationLimits
+  , LengthInputBoxLimits
   , LengthSMTLibExecutionConfig
   , LengthSMTLibExecutionConfigError
   , LengthSMTLibExecutionConfigSource
@@ -52,10 +57,12 @@ import Leant.Synth.Length.Ranking
   ( LengthRanking
   , LengthRankingInputError
   , rankVerifiedLengthCandidates
+  , rankVerifiedLengthCandidatesWithInputBoxValidation
   )
 import Leant.Synth.Length.Ranking.Internal
   ( AssociatedLengthRanking
   , rankPostVerificationLengthCandidates
+  , rankPostVerificationLengthCandidatesWithInputBoxValidation
   )
 import Leant.Synth.Length.PostVerification.Internal
   ( LengthPostVerificationResult
@@ -78,11 +85,20 @@ data LengthRankingPolicySource = LengthRankingPolicySource
   , lengthRankingPolicyEvaluationSource :: LengthEvaluationLimitSource
   }
 
--- | Validated reusable policy with no process, worker, or contract authority.
--- The constructor and all execution material remain private.
+-- | Validated reusable policy with no process, worker, contract, or behavioral
+-- verdict authority.  The constructor and all execution/validation material
+-- remain private.
 data LengthRankingPolicy = LengthRankingPolicy
   !LengthSMTLibExecutionConfig
   !LengthEvaluationLimits
+  !LengthRankingInputBoxValidation
+
+-- | Private optional orchestration policy.  It contains no solver status,
+-- query, receipt, or verdict; each enabled use must still pass Djex's exact
+-- query-owned finite-box validation after a live @unsat@ trigger.
+data LengthRankingInputBoxValidation
+  = LengthRankingInputBoxValidationDisabled
+  | LengthRankingInputBoxValidationEnabled !LengthInputBoxLimits [Natural]
 
 -- | Pure validation failure in fixed execution-before-evaluation order.
 data LengthRankingConfigurationError
@@ -92,7 +108,9 @@ data LengthRankingConfigurationError
       !LengthEvaluationLimitError
   deriving (Eq, Ord, Show)
 
--- | Validate execution before replay limits without performing IO.
+-- | Validate execution before replay limits without performing IO.  This
+-- established constructor leaves finite-box validation disabled; callers must
+-- derive a separate opt-in value explicitly.
 mkLengthRankingPolicy
   :: LengthRankingPolicySource
   -> Either LengthRankingConfigurationError LengthRankingPolicy
@@ -107,16 +125,37 @@ mkLengthRankingPolicy source = do
     Left failure -> Left $ LengthRankingEvaluationLimitsRejected failure
     Right validated -> Right validated
   pure $ LengthRankingPolicy execution evaluation
+    LengthRankingInputBoxValidationDisabled
 
 -- | Assemble one reusable policy from already validated Djex execution and
--- replay authorities.  No validation is repeated and no IO is performed.
+-- replay authorities with finite-box validation disabled.  No validation is
+-- repeated and no IO is performed.
 -- This bridge is used by the closed compatibility-file decoder after it has
 -- preserved the same execution-before-evaluation validation precedence.
 lengthRankingPolicyFromValidatedComponents
   :: LengthSMTLibExecutionConfig
   -> LengthEvaluationLimits
   -> LengthRankingPolicy
-lengthRankingPolicyFromValidatedComponents = LengthRankingPolicy
+lengthRankingPolicyFromValidatedComponents execution evaluation =
+  LengthRankingPolicy execution evaluation
+    LengthRankingInputBoxValidationDisabled
+
+-- | Derive an explicitly enabled finite-box policy without changing the
+-- already validated execution/evaluation authorities or the reusable base
+-- value.  The inclusive maxima remain caller-owned data until the exact query
+-- independently validates width, values, Cartesian size, and every assignment.
+-- A cyclic or mismatched vector therefore fails productively only if an
+-- @unsat@ observation reaches that exact candidate; it is never treated as a
+-- solver verdict or cached evidence.
+enableLengthRankingInputBoxValidation
+  :: LengthInputBoxLimits
+  -> [Natural]
+  -> LengthRankingPolicy
+  -> LengthRankingPolicy
+enableLengthRankingInputBoxValidation limits maximums
+    (LengthRankingPolicy execution evaluation _) =
+  LengthRankingPolicy execution evaluation
+    $ LengthRankingInputBoxValidationEnabled limits maximums
 
 -- | Classify only whether the sealed execution policy contains an executable
 -- digest expectation.  This reveals neither the digest bytes nor the path and
@@ -126,7 +165,7 @@ lengthRankingPolicyExecutableDigestExpectation
   :: LengthRankingPolicy
   -> LengthSMTLibExecutableDigestExpectation
 lengthRankingPolicyExecutableDigestExpectation
-    (LengthRankingPolicy execution _) =
+    (LengthRankingPolicy execution _ _) =
   lengthSMTLibExecutionExecutableDigestExpectation execution
 
 -- | Run a verified batch under one reusable policy and one explicitly supplied
@@ -137,8 +176,13 @@ rankVerifiedLengthCandidatesWithPolicy
   -> [Verified DetailedVerificationVariant]
   -> IO (Either LengthRankingInputError LengthRanking)
 rankVerifiedLengthCandidatesWithPolicy
-    (LengthRankingPolicy execution evaluation) =
-  rankVerifiedLengthCandidates execution evaluation
+    (LengthRankingPolicy execution evaluation inputBoxValidation) =
+  case inputBoxValidation of
+    LengthRankingInputBoxValidationDisabled ->
+      rankVerifiedLengthCandidates execution evaluation
+    LengthRankingInputBoxValidationEnabled limits maximums ->
+      rankVerifiedLengthCandidatesWithInputBoxValidation
+        execution evaluation limits maximums
 
 -- | Associated variant used by a batch-scoped post-verification adapter.
 -- Caller-owned occurrence handles remain attached until that adapter validates
@@ -152,8 +196,13 @@ rankPostVerificationLengthCandidatesWithPolicy
         (AssociatedLengthRanking
           (PostVerificationCandidate epoch DetailedVerificationVariant)))
 rankPostVerificationLengthCandidatesWithPolicy
-    (LengthRankingPolicy execution evaluation) =
-  rankPostVerificationLengthCandidates execution evaluation
+    (LengthRankingPolicy execution evaluation inputBoxValidation) =
+  case inputBoxValidation of
+    LengthRankingInputBoxValidationDisabled ->
+      rankPostVerificationLengthCandidates execution evaluation
+    LengthRankingInputBoxValidationEnabled limits maximums ->
+      rankPostVerificationLengthCandidatesWithInputBoxValidation
+        execution evaluation limits maximums
 
 -- | Assess one exact callback batch with an explicit reusable policy and
 -- request-owned contract, then expose a report only through the generative

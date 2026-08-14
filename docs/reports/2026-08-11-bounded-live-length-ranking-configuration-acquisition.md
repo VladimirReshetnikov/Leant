@@ -5,7 +5,9 @@ Date: 2026-08-11
 ## Outcome
 
 `Leant.Synth.Length.Configuration.File.Acquire` adds the filesystem boundary
-around the pure version-1 Length-ranking configuration decoder. The module
+around the pure versioned Length-ranking configuration decoder. It admits the
+literal version-1 compatibility grammar and the additive version-2 bounded-box
+grammar under the same byte, path, descriptor, and timeout policy. The module
 does not discover a file, activate a decoded policy, or start Z3. A successful
 load returns only the existing opaque `DisabledLengthRankingConfiguration`;
 Main's later integration composes this explicit boundary with activation.
@@ -139,9 +141,12 @@ that any later solver answer is sound.
 Activation remains a separate explicit pinned-only or permit-unpinned choice.
 Each eventual ranking invocation must still open a fresh Djex rank-N session,
 perform capability checks, associate each query exactly, and replay any model
-against the checked candidate problem.  `unsat`, `unknown`, and status-only
-`sat` remain neutral, and Lean verification remains the final acceptance
-boundary.
+against the checked candidate problem. Version 1 keeps `unsat` neutral. Version
+2 may use it only to schedule independent exact-query input-box traversal;
+`unknown` and status-only `sat` remain neutral under either version, and no
+status grants proof authority. Lean verification remains the final acceptance
+boundary. The bounded extension is detailed in the
+[unsat-triggered validation report](2026-08-14-unsat-triggered-length-input-box-validation.md).
 
 Main now loads exactly one caller-named absolute file at startup when the
 explicit option is present. It neither discovers nor watches the file, and it

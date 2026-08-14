@@ -1,5 +1,13 @@
 # Exact counterexample presentation
 
+> **2026-08-14 follow-up.** Presentation now also handles
+> `BoundedPositive !ValidatedLengthInputBox`. The associated
+> `renderLengthInputBoxValidationNote` reports the inclusive maxima with bounded
+> rendering, checked
+> and precondition-applicable assignment counts, provider-count-only basis, and
+> explicit zero-applicable vacuity under the same 384-character ceiling. See the
+> [unsat-triggered bounded validation report](2026-08-14-unsat-triggered-length-input-box-validation.md).
+
 ## Scope
 
 Leant already retained an independently replayed Length counterexample beside
@@ -25,9 +33,9 @@ presentation list for Lean bindings, splices, and `itN` output. It never zips a
 candidate list with a separately projected evidence list, so equal spellings
 and reordered occurrences cannot borrow one another's note.
 
-Only `Counterexample` produces a note. `Heuristic`, `Unassessed`, disabled
-assessment, rejected input, and the original-order atomic fallback produce no
-semantic claim.
+`Counterexample` and `BoundedPositive` produce their distinct associated notes.
+`Heuristic`, `Unassessed`, disabled assessment, rejected input, and the
+original-order atomic fallback produce no semantic claim.
 
 ## Sanitized bounded claim
 
@@ -39,17 +47,25 @@ never projects or renders the receipt's private Djex provider-name list.
 Provider-independent evidence is named
 explicitly.
 
-The version-1 file admits at most eight inputs, 256 provider laws, and
-4,096-bit evaluation values. Presentation renders at most eight inputs, shows
+The version-1 and version-2 files admit at most eight inputs, 256 provider laws,
+and 4,096-bit evaluation values. Presentation renders at most eight inputs, shows
 ordinary naturals exactly only through 24 decimal digits, and replaces larger
 ones with a bounded bit-length summary such as `<4096-bit natural>`. A valid
-configured note is bounded below the regression allowance of 360 characters.
+configured note is bounded by the hard 384-character terminal ceiling.
 This is presentation sanitization, not evidence erasure: the replayed receipt
 and its exact association remain available inside the ranking result.
 
-The note explains why an opted-in ranking demoted a candidate. It does not
-prove the other candidates, prune the demoted candidate, attest Z3, verify an
-assumed provider law, or establish concrete Lean behavior.
+The positive note is deliberately different. It calls the input box
+independently checked and bounded/model-relative, renders each configured
+inclusive maximum, the exact completed assignment count, and the count for which
+the precondition held. A zero applicable count is labeled vacuous within the
+box. It never mentions the `unsat` observation which merely scheduled the
+independent traversal, and it makes no claim outside the explicit box.
+
+The counterexample note explains stable demotion; the positive note records a
+neutral bounded assessment. Neither proves the other candidates, prunes a
+candidate, attests Z3, verifies an assumed provider law, or establishes concrete
+Lean behavior.
 
 ## Validation
 
@@ -60,6 +76,7 @@ Focused regressions cover:
 - equal candidate occurrences across stable demotion;
 - actual private provider-name non-disclosure;
 - provider-independent and provider-conditional wording;
+- non-vacuous and vacuous bounded-positive wording and exact counts;
 - status-only, rejected, and atomic-fallback no-note behavior;
 - 4,096-bit value summarization and the terminal note bound;
 - forbidden source-language, proof, correctness, and solver overclaims.

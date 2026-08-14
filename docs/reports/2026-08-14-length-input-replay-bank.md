@@ -2,6 +2,13 @@
 
 Date: 2026-08-14
 
+> **Later 2026-08-14 follow-up.** Explicit configuration version 2 can use a
+> live `unsat` only to trigger Djex's independent finite-box traversal. A
+> violation discovered there is an ordinary counterexample and inserts or
+> promotes its input vector in this same bank. A completed positive receipt is
+> neutral and never enters the bank. The extension is detailed in the
+> [unsat-triggered bounded validation report](2026-08-14-unsat-triggered-length-input-box-validation.md).
+
 ## Outcome and work bound
 
 Leant's batch-local Length ranking feedback edge now retains a fixed-capacity
@@ -12,13 +19,15 @@ none produces a counterexample, the candidate follows the unchanged live Z3
 path.
 
 The bank deduplicates by exact `[Natural]` equality. A successful replay hit
-promotes its vector to the newest position. A counterexample returned by an
-actual live call inserts or promotes its vector, and a fifth distinct vector
+promotes its vector to the newest position. A counterexample returned after an
+actual live call, including one found by independent post-`unsat` input-box
+traversal, inserts or promotes its vector, and a fifth distinct vector
 evicts the least recently used entry. An arity or evaluation rejection, an
 honest non-counterexample, or a behavioral association rejection is only a
 miss and continues with the next retained vector. If all vectors miss, their
 order is unchanged. A pure preparation refusal and a heuristic live status
-also leave the bank unchanged.
+also leave the bank unchanged. A completed `BoundedPositive` assessment
+likewise contains no counterexample vector and leaves the bank unchanged.
 
 The private implementation makes those bounds explicit:
 `counterexampleSeedBankMaximumEntries` is `4`,
@@ -68,8 +77,10 @@ and exact problem association, including its own provider-law qualifications.
 
 A replayed receipt remains finite-spine, model-relative evidence. It is not a
 Lean counterexample, proof, pruning permission, dictionary witness, universal
-behavioral claim, or Z3 soundness certificate. `unsat`, `unknown`, and
-status-only `sat` remain heuristic and cannot enter the bank as conclusions.
+behavioral claim, or Z3 soundness certificate. `unknown` and status-only `sat`
+remain heuristic. Under the explicit input-box policy, `unsat` may schedule
+independent traversal but cannot enter the bank as a conclusion; only a freshly
+discovered and associated counterexample vector can do so.
 
 ## Live ordering and failure behavior
 
@@ -91,11 +102,14 @@ Exceptions continue to propagate.
 The bank changes only Leant's bounded call orchestration. Djex's query-owned
 input entrance adds no field to the sealed query and neither component changes
 Length semantics, QF_LIA translation, canonical solver bytes for a given
-query, solver protocol, response interpretation, JSON configuration grammar,
+query, solver protocol, response interpretation, the then-current version-1
+JSON configuration grammar,
 checked-problem or query fingerprints, presentation schema or renderer,
 identity schemas or construction rules, or any semantic, solver, JSON, schema,
 or identity version number. The wider replay policy can nevertheless newly
 assess and stably demote a candidate that the former single-entry policy would
 have sent to Z3. Actual later live identity values and ordinals can compact
 when replay skips a solver call; only calls which actually occur receive those
-identities, under the unchanged identity schemas and construction rules.
+identities, under the unchanged identity schemas and construction rules. The
+later additive version-2 JSON grammar selects the bounded validation policy
+without changing any of those Djex identities or the bank's representation.

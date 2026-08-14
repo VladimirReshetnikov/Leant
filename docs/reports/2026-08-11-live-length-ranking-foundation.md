@@ -10,6 +10,13 @@
 > [Length counterexample seed replay report](2026-08-13-length-counterexample-seed-replay.md),
 > and the current bounded policy is detailed in the
 > [Length input replay bank report](2026-08-14-length-input-replay-bank.md).
+>
+> **Later 2026-08-14 follow-up.** An additive opt-in can use `unsat` only as a
+> trigger for independent exact-query finite-box validation. A discovered
+> counterexample follows the existing stable demotion and MRU rules; complete
+> traversal produces neutral `BoundedPositive` evidence, and traversal failure
+> activates the established atomic fallback. See the
+> [unsat-triggered bounded validation report](2026-08-14-unsat-triggered-length-input-box-validation.md).
 
 Date: 2026-08-11
 
@@ -382,27 +389,31 @@ provider-law assumptions. It is not a Lean source-level counterexample, an
 executable-realization claim, a solver-soundness certificate, or a kernel proof.
 After post-verification sealing, the presentation boundary traverses each
 whole materialized ranked receipt and produces one opaque text-plus-note
-value. Main never zips candidate text to a detached evidence list; only a
-counterexample receives a bounded, provider-name-free model summary.
+value. Main never zips candidate text to a detached evidence list; a
+counterexample receives a bounded, provider-name-free model summary and an
+explicitly enabled positive box receipt receives its distinct bounded summary.
 
 ## Ranking and failure policy
 
 The successful ordering rule is intentionally small:
 
-1. `Unassessed` candidates and candidates with heuristic statuses retain their
+1. `Unassessed`, heuristic, and bounded-positive candidates retain their
    original relative order;
-2. candidates with independently replayed satisfiable counterexamples follow,
+2. candidates with independently replayed counterexamples follow,
    also in their original relative order; and
 3. no candidate is removed.
 
-`unsat`, `unknown`, and status-only `sat` are therefore neutral. Their public
-statuses may be retained as `Heuristic SolverStatus`, but they provide neither
-proof nor pruning authority. The assessment type deliberately has no `Ord`
+`unknown` and status-only `sat` are neutral. `unsat` is also neutral on the
+historical disabled path; under the explicit finite-box policy it schedules
+independent traversal but supplies no evidence to that traversal. A completed
+box remains neutral, while only a discovered violation enters the
+counterexample partition. No status provides proof or pruning authority. The
+assessment type deliberately has no `Ord`
 instance, so constructor order cannot become an accidental solver-status
 ranking.
 
-Any returned structured live session, query, query-fingerprint association, or
-evidence-replay failure discards every partial assessment and partial
+Any returned structured live session, query, query-fingerprint association,
+evidence-replay, or input-box-validation failure discards every partial assessment and partial
 reordering. The returned ranking contains every original callback receipt in
 original order, all marked `Unassessed`, plus one sanitized failure. Pure
 candidate-local preparation classes already established before the worker was

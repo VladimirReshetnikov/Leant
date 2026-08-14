@@ -10,6 +10,7 @@ module Leant.Synth.Length.Presentation
   , lengthCandidatePresentationText
   , lengthCandidatePresentationNote
   , renderLengthCounterexampleNote
+  , renderLengthInputBoxValidationNote
   , maximumLengthCounterexampleNoteCharacters
   ) where
 
@@ -19,9 +20,14 @@ import Numeric.Natural (Natural)
 import Language.Haskell.Djex
   ( LengthCounterexampleBasis (..)
   , ValidatedLengthCounterexample
+  , ValidatedLengthInputBox
   , validatedLengthCounterexampleBasis
   , validatedLengthCounterexampleInputs
   , validatedLengthCounterexampleResult
+  , validatedLengthInputBoxApplicableAssignmentCount
+  , validatedLengthInputBoxAssignmentCount
+  , validatedLengthInputBoxBasis
+  , validatedLengthInputBoxInclusiveMaximums
   )
 
 import Leant.Synth.Engine
@@ -105,6 +111,8 @@ presentRankedCandidate ranked = LengthCandidatePresentation
   (verifiedText $ rankedLengthCandidateVerified ranked)
   $ case rankedLengthCandidateAssessment ranked of
       Counterexample receipt -> Just $ renderLengthCounterexampleNote receipt
+      BoundedPositive receipt -> Just
+        $ renderLengthInputBoxValidationNote receipt
       Heuristic _ -> Nothing
       Unassessed -> Nothing
 
@@ -134,6 +142,31 @@ renderLengthCounterexampleNote receipt =
     ++ renderInputs (validatedLengthCounterexampleInputs receipt)
     ++ "; result spine length = "
     ++ renderNatural (validatedLengthCounterexampleResult receipt)
+
+-- | Render one sanitized positive bounded claim.  The note names the exact
+-- finite box and checked/applicable counts while retaining the same explicit
+-- model/provider basis as replayed counterexamples.  It intentionally says
+-- nothing about the external status which merely triggered validation.
+renderLengthInputBoxValidationNote
+  :: ValidatedLengthInputBox
+  -> String
+renderLengthInputBoxValidationNote receipt =
+  take maximumLengthCounterexampleNoteCharacters $
+  "independently checked finite-list-spine Length input box "
+    ++ "(bounded/model-relative; "
+    ++ renderBasis (validatedLengthInputBoxBasis receipt)
+    ++ "): inclusive input maxima = "
+    ++ renderInputs (validatedLengthInputBoxInclusiveMaximums receipt)
+    ++ "; checked assignments = "
+    ++ renderNatural (validatedLengthInputBoxAssignmentCount receipt)
+    ++ "; applicable assignments = "
+    ++ renderNatural (validatedLengthInputBoxApplicableAssignmentCount receipt)
+    ++ vacuity
+ where
+  vacuity
+    | validatedLengthInputBoxApplicableAssignmentCount receipt == 0 =
+        "; vacuous within this box (no assignment met the precondition)"
+    | otherwise = ""
 
 -- | Hard terminal-output ceiling.  The supported file-format caps make a
 -- valid Main-path note fit below this limit; the final projection also keeps

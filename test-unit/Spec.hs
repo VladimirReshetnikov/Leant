@@ -3,7 +3,7 @@ module Main (main) where
 import Control.Exception (SomeException, evaluate, finally, try)
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as BS
-import Data.Char (isAlphaNum)
+import Data.Char (isAlphaNum, toLower)
 import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.List (isInfixOf)
 import Data.Maybe (isNothing)
@@ -211,6 +211,7 @@ import Leant.Synth.Length.Configuration
   ( LengthRankingConfigurationError (..)
   , LengthRankingPolicy
   , LengthRankingPolicySource (..)
+  , enableLengthRankingInputBoxValidation
   , mkLengthRankingPolicy
   , lengthRankingPolicyExecutableDigestExpectation
   , lengthRankingPolicyFromValidatedComponents
@@ -232,6 +233,7 @@ import Leant.Synth.Length.Configuration.File
   , decodeLengthRankingConfigurationFile
   , disableLengthRankingConfiguration
   , lengthRankingConfigurationFileFormat
+  , lengthRankingConfigurationFileInputBoxVersion
   , lengthRankingConfigurationFileJsonLimits
   , lengthRankingConfigurationFileVersion
   )
@@ -325,6 +327,7 @@ import Leant.Synth.Length.Presentation
   , presentLengthAssessment
   , presentLengthPostVerificationResult
   , renderLengthCounterexampleNote
+  , renderLengthInputBoxValidationNote
   )
 import Leant.Synth.Length.Ranking
   ( LengthRanking
@@ -341,6 +344,7 @@ import Leant.Synth.Length.Ranking
   , lengthRankingFailureCleanupIncomplete
   , lengthRankingFailureOriginalIndex
   , rankVerifiedLengthCandidates
+  , rankVerifiedLengthCandidatesWithInputBoxValidation
   , rankedLengthCandidateAssessment
   , rankedLengthCandidateOriginalIndex
   , rankedLengthCandidatePreparationRefusal
@@ -3067,6 +3071,15 @@ lengthRankingTests = testGroup "checked Length behavioral ranking"
       "reset earlier live and seed-hit assessments after a later live failure"
       assertLengthRankingAtomicFallback
   , testCase
+      "independently validate exact input boxes after unsat only"
+      assertLengthRankingInputBoxValidation
+  , testCase
+      "retain counterexample-only MRU state across bounded positives"
+      assertLengthRankingInputBoxSeedIsolation
+  , testCase
+      "atomically reset bounded evidence after an input-box rejection"
+      assertLengthRankingInputBoxAtomicFallback
+  , testCase
       "adapt ranking only through a validated post-verification permutation"
       assertLengthPostVerificationAdapter
   , lengthRankingConfigurationTests
@@ -3090,6 +3103,9 @@ lengthRankingConfigurationTests = testGroup "explicit ranking policy"
       assertLengthRankingPolicyLiveEquivalence
   , testCase "reuse one sealed solver policy with request-owned contracts"
       assertLengthRankingPolicyContractSeparation
+  , testCase
+      "keep legacy policy disabled and match explicit input-box policy"
+      assertLengthRankingInputBoxPolicyEquivalence
   , lengthRankingConfigurationFileTests
   ]
 
@@ -3098,6 +3114,10 @@ lengthRankingConfigurationFileTests = testGroup
   "versioned bounded ranking configuration file"
   [ testCase "decode order-invariant pinned and unpinned v1 files explicitly"
       assertLengthRankingConfigurationFileActivation
+  , testCase "decode exact opt-in v2 input-box policy without changing v1"
+      assertLengthRankingConfigurationFileInputBoxV2
+  , testCase "bound v2 input-box grammar in fixed validation order"
+      assertLengthRankingConfigurationFileInputBoxV2Bounds
   , testCase "apply format, version, schema, decimal, and digest precedence"
       assertLengthRankingConfigurationFileSchemaPrecedence
   , testCase "validate execution before evaluation before contract syntax"
@@ -5384,13 +5404,183 @@ assertLengthRankingConfigurationFileActivation =
       RequirePinnedExecutable reordered
     pure ()
 
+assertLengthRankingConfigurationFileInputBoxV2 :: IO ()
+assertLengthRankingConfigurationFileInputBoxV2 = do
+  fixture <- buildLengthRankingLiveFixture
+  withFakeLengthSolver "query-unsat" $ \executable -> do
+    let zero = lengthRankingFixtureZero fixture
+        contract = lengthRankingContract 0
+        contractValue = jsonLengthContract
+          (jsonLengthTruth True)
+          (jsonLengthEqual jsonLengthResult $ jsonLengthLiteral 0)
+          [ jsonLengthProviderLaw "Demo.zeroList" []
+              $ jsonLengthLiteral 0
+          , jsonLengthProviderLaw "Demo.oneList" []
+              $ jsonLengthLiteral 1
+          ]
+        version1Document = setJsonField ["contract"] contractValue
+          $ lengthRankingConfigurationFileFixture executable Nothing
+        version2Document = setJsonField ["contract"] contractValue
+          $ lengthRankingConfigurationFileInputBoxFixture
+              executable Nothing [] 1
+    lengthRankingConfigurationFileVersion @?= 1
+    lengthRankingConfigurationFileInputBoxVersion @?= 2
+    doesFileExist (executable ++ ".events") >>= (@?= False)
+
+    disabledV1 <- expectLengthRankingConfigurationFile version1Document
+    (policyV1, contractV1) <- expectLengthRankingConfigurationActivation
+      PermitUnpinnedExecutable disabledV1
+    contractV1 @?= contract
+    doesFileExist (executable ++ ".events") >>= (@?= False)
+    legacy <- expectLengthRankingWithin "decoded literal v1 unsat"
+      $ rankVerifiedLengthCandidatesWithPolicy policyV1 contractV1 [zero]
+    map rankedLengthCandidateAssessment
+        (lengthRankingCandidates legacy) @?=
+      [Heuristic Djex.SolverUnsatisfiable]
+
+    disabledV2 <- expectLengthRankingConfigurationFile version2Document
+    (policyV2, contractV2) <- expectLengthRankingConfigurationActivation
+      PermitUnpinnedExecutable disabledV2
+    contractV2 @?= contract
+    enabled <- expectLengthRankingWithin "decoded input-box v2 unsat"
+      $ rankVerifiedLengthCandidatesWithPolicy policyV2 contractV2 [zero]
+    case map rankedLengthCandidateAssessment
+        $ lengthRankingCandidates enabled of
+      [BoundedPositive receipt] -> do
+        Djex.validatedLengthInputBoxInclusiveMaximums receipt @?= []
+        Djex.validatedLengthInputBoxAssignmentCount receipt @?= 1
+        Djex.validatedLengthInputBoxApplicableAssignmentCount receipt @?= 1
+      assessments -> assertFailure
+        $ "decoded v2 retained unexpected assessments: " ++ show assessments
+    assertFakeLengthQueryEvents [0] [] =<<
+      BS.readFile (executable ++ ".events")
+
+    reordered <- expectLengthRankingConfigurationFile
+      $ reverseJsonObjectFields version2Document
+    (_, reorderedContract) <- expectLengthRankingConfigurationActivation
+      PermitUnpinnedExecutable reordered
+    reorderedContract @?= contract
+
+assertLengthRankingConfigurationFileInputBoxV2Bounds :: IO ()
+assertLengthRankingConfigurationFileInputBoxV2Bounds =
+  withTemporaryDirectory "leant-length-file-input-box-v2" $ \root -> do
+    let executable = root </> "missing-z3"
+        v1 = lengthRankingConfigurationFileFixture executable Nothing
+        base = lengthRankingConfigurationFileInputBoxFixture
+          executable Nothing [0] 1
+        inputBoxValue rawMaximums rawAssignments = Json.JObj
+          [ ( "inclusiveInputMaximums"
+            , Json.JArr $ map Json.JInt rawMaximums
+            )
+          , ("maximumAssignments", Json.JInt rawAssignments)
+          ]
+        withInputBox value = setJsonField ["inputBoxValidation"] value base
+        maximums values = setJsonField
+          ["inputBoxValidation", "inclusiveInputMaximums"]
+          (Json.JArr $ map Json.JInt values) base
+        assignments value = setJsonField
+          ["inputBoxValidation", "maximumAssignments"]
+          (Json.JInt value) base
+    _ <- expectLengthRankingConfigurationFile base
+    _ <- expectLengthRankingConfigurationFile
+      $ maximums $ replicate 8 0
+    _ <- expectLengthRankingConfigurationFile $ assignments 65536
+
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationUnexpectedField
+        LengthRankingConfigurationRootObject)
+      $ addJsonField []
+          ("inputBoxValidation", inputBoxValue [] 1) v1
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationMissingField
+        LengthRankingConfigurationRootObject
+        LengthRankingConfigurationInputBoxValidationField)
+      $ deleteJsonField ["inputBoxValidation"] base
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationExpectedObject
+        LengthRankingConfigurationInputBoxValidationObject)
+      $ withInputBox Json.JNull
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationUnexpectedField
+        LengthRankingConfigurationInputBoxValidationObject)
+      $ withInputBox $ addJsonField [] ("private-box-field", Json.JNull)
+          $ inputBoxValue [0] 1
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationMissingField
+        LengthRankingConfigurationInputBoxValidationObject
+        LengthRankingConfigurationInputBoxInclusiveMaximumsField)
+      $ withInputBox
+      $ deleteJsonField ["inclusiveInputMaximums"]
+      $ inputBoxValue [0] 1
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationMissingField
+        LengthRankingConfigurationInputBoxValidationObject
+        LengthRankingConfigurationInputBoxMaximumAssignmentsField)
+      $ withInputBox
+      $ deleteJsonField ["maximumAssignments"]
+      $ inputBoxValue [0] 1
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationFieldTypeMismatch
+        LengthRankingConfigurationInputBoxInclusiveMaximumsField
+        LengthRankingConfigurationArrayValue)
+      $ setJsonField ["inputBoxValidation", "inclusiveInputMaximums"]
+          (Json.JBool False) base
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationPolicyLimitExceeded
+        LengthRankingConfigurationInputBoxInclusiveMaximumsField 8 9)
+      $ maximums $ replicate 9 (-1)
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationFieldValueRejected
+        $ LengthRankingConfigurationInputBoxInclusiveMaximumField 0)
+      $ withInputBox $ inputBoxValue [-1] (-1)
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationFieldValueRejected
+        LengthRankingConfigurationInputBoxMaximumAssignmentsField)
+      $ assignments (-1)
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationPolicyLimitExceeded
+        LengthRankingConfigurationInputBoxMaximumAssignmentsField
+        65536 65537)
+      $ assignments 65537
+
+    let badContract = setJsonField ["contract", "precondition"]
+          $ Json.JArr [Json.JStr "private-unknown-formula"]
+        badInputBox = setJsonField
+          ["inputBoxValidation", "maximumAssignments"] (Json.JInt (-1))
+        badEvaluation = setJsonField
+          ["evaluation", "assignmentValueBits"] (Json.JInt (-1))
+        badExecution = setJsonField ["execution", "executablePath"]
+          $ Json.JStr "djex-fake-z3"
+        allBad = badExecution $ badEvaluation $ badInputBox
+          $ badContract base
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationExecutionRejected
+        Djex.LengthSMTLibExecutionExecutablePathNotAbsolute)
+      allBad
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationEvaluationRejected
+        $ Djex.NegativeLengthEvaluationLimit
+            Djex.LengthAssignmentValueBits (-1))
+      $ badEvaluation $ badInputBox $ badContract base
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationFieldValueRejected
+        LengthRankingConfigurationInputBoxMaximumAssignmentsField)
+      $ badInputBox $ badContract base
+    assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationSyntaxRejected
+        LengthRankingConfigurationPreconditionSyntax
+        LengthRankingConfigurationUnknownTag)
+      $ badContract base
+
 assertLengthRankingConfigurationFileSchemaPrecedence :: IO ()
 assertLengthRankingConfigurationFileSchemaPrecedence =
   withTemporaryDirectory "leant-length-file-schema" $ \root -> do
     let executable = root </> "missing-z3"
         base = lengthRankingConfigurationFileFixture executable Nothing
         badEnvelope = addJsonField [] ("private-root-field", Json.JNull)
-          $ setJsonField ["version"] (Json.JInt 2)
+          $ setJsonField ["version"]
+              (Json.JInt
+                $ toInteger lengthRankingConfigurationFileInputBoxVersion + 1)
           $ setJsonField ["format"] (Json.JStr "private-format") base
     assertLengthRankingConfigurationFileError
       LengthRankingConfigurationUnsupportedFormat badEnvelope
@@ -6113,6 +6303,27 @@ lengthRankingConfigurationFileFixture executable digest = Json.JObj
       ])
   ]
 
+lengthRankingConfigurationFileInputBoxFixture
+  :: FilePath
+  -> Maybe String
+  -> [Integer]
+  -> Integer
+  -> Json.JValue
+lengthRankingConfigurationFileInputBoxFixture executable digest maximums
+    maximumAssignments =
+  addJsonField []
+    ( "inputBoxValidation"
+    , Json.JObj
+        [ ( "inclusiveInputMaximums"
+          , Json.JArr $ map Json.JInt maximums
+          )
+        , ("maximumAssignments", Json.JInt maximumAssignments)
+        ]
+    )
+  $ setJsonField ["version"]
+      (Json.JInt $ toInteger lengthRankingConfigurationFileInputBoxVersion)
+  $ lengthRankingConfigurationFileFixture executable digest
+
 jsonLengthTruth :: Bool -> Json.JValue
 jsonLengthTruth value = Json.JArr
   [Json.JStr "truth", Json.JBool value]
@@ -6520,6 +6731,87 @@ assertLengthRankingPolicyContractSeparation = do
         rankedLengthPreparationRefusals ranking @?= [Nothing, Nothing]
         lengthRankingFailure ranking @?= Nothing)
       [first, second]
+
+assertLengthRankingInputBoxPolicyEquivalence :: IO ()
+assertLengthRankingInputBoxPolicyEquivalence = do
+  fixture <- buildLengthRankingLiveFixture
+  withFakeLengthSolver "query-unsat" $ \executable -> do
+    let zero = lengthRankingFixtureZero fixture
+        one = lengthRankingFixtureOne fixture
+        candidates = [one, zero]
+        contract = lengthRankingContract 0
+        executionSource = explicitLengthRankingExecutionSource
+          executable Nothing Djex.LengthSMTLibStatusOnly
+        policySource = explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits executionSource
+          Djex.defaultLengthEvaluationLimitSource
+    execution <- expectRight $ Djex.mkLengthSMTLibExecutionConfig
+      Djex.defaultLengthSMTLibExecutionLimits executionSource
+    evaluation <- expectRight $ Djex.mkLengthEvaluationLimits
+      Djex.defaultLengthEvaluationLimitSource
+    limits <- explicitLengthInputBoxLimits 0 1
+    basePolicy <- expectRight $ mkLengthRankingPolicy policySource
+    let enabledPolicy = enableLengthRankingInputBoxValidation
+          limits [] basePolicy
+
+    legacy <- expectLengthRankingWithin "legacy unsat policy"
+      $ rankVerifiedLengthCandidatesWithPolicy basePolicy contract candidates
+    rankedLengthVerifiedCandidates legacy @?= candidates
+    map rankedLengthCandidateAssessment
+        (lengthRankingCandidates legacy) @?=
+      replicate 2 (Heuristic Djex.SolverUnsatisfiable)
+    lengthRankingFailure legacy @?= Nothing
+
+    direct <- expectLengthRankingWithin "direct input-box policy"
+      $ rankVerifiedLengthCandidatesWithInputBoxValidation
+          execution evaluation limits [] contract candidates
+    configured <- expectLengthRankingWithin "opaque input-box policy"
+      $ rankVerifiedLengthCandidatesWithPolicy
+          enabledPolicy contract candidates
+    assertLengthRankingsEquivalent direct configured
+    rankedLengthVerifiedCandidates configured @?= [zero, one]
+    map rankedLengthCandidateOriginalIndex
+        (lengthRankingCandidates configured) @?= [1, 0]
+    case map rankedLengthCandidateAssessment
+        $ lengthRankingCandidates configured of
+      [BoundedPositive positive, Counterexample counterexample] -> do
+        Djex.validatedLengthInputBoxInclusiveMaximums positive @?= []
+        Djex.validatedLengthInputBoxAssignmentCount positive @?= 1
+        Djex.validatedLengthCounterexampleInputs counterexample @?= []
+        Djex.validatedLengthCounterexampleResult counterexample @?= 1
+      assessments -> assertFailure
+        $ "unexpected enabled-policy assessments: " ++ show assessments
+
+    -- Derivation is immutable: enabling the sibling policy cannot make the
+    -- reusable base reinterpret a later unsat observation.
+    legacyAgain <- expectLengthRankingWithin "reused legacy unsat policy"
+      $ rankVerifiedLengthCandidatesWithPolicy basePolicy contract [zero]
+    map rankedLengthCandidateAssessment
+        (lengthRankingCandidates legacyAgain) @?=
+      [Heuristic Djex.SolverUnsatisfiable]
+
+    verification <- verificationBatchFromReceipts candidates
+    associated <- expectLengthPostVerificationWithin
+      "input-box policy association"
+      $ assessVerifiedLengthCandidatesWithPolicy
+          enabledPolicy contract verification
+    assertLengthPostVerificationSealed associated
+    associatedRanking <- expectLengthPostVerificationRanking associated
+    map rankedLengthCandidateOriginalIndex
+        (lengthRankingCandidates associatedRanking) @?= [1, 0]
+    let presentations = presentLengthPostVerificationResult associated
+    map lengthCandidatePresentationText presentations @?=
+      map (detailedVerificationVariantText . verifiedCandidate) [zero, one]
+    case map lengthCandidatePresentationNote presentations of
+      [Just positiveNote, Just counterexampleNote] -> do
+        assertBool "bounded-positive note followed the wrong occurrence"
+          $ "checked assignments = 1" `isInfixOf` positiveNote
+        assertBool "counterexample note followed the wrong occurrence"
+          $ "result spine length = 1" `isInfixOf` counterexampleNote
+      notes -> assertFailure
+        $ "input-box policy lost presentation association: " ++ show notes
+    events <- BS.readFile $ executable ++ ".events"
+    assertFakeLengthQueryEvents [0, 1] [] events
 
 explicitLengthRankingPolicySource
   :: Djex.LengthSMTLibExecutionLimits
@@ -7174,6 +7466,222 @@ assertLengthRankingAtomicFallback = do
       Djex.LengthSMTLibLiveQueryCounterexampleRejected
   lengthRankingFailureCleanupIncomplete failure @?= False
   lengthRankingFailureOriginalIndex failure @?= Just 2
+  assertFakeLengthQueryEvents [0, 1] [] events
+
+assertLengthRankingInputBoxValidation :: IO ()
+assertLengthRankingInputBoxValidation = do
+  (contract, arityCandidates) <- buildLengthSeedBankArityFixture
+  (twoInput, threeInput) <- case arityCandidates of
+    [_, _, two, three, _] -> pure (two, three)
+    _ -> assertFailure "the input-box arity fixture changed cardinality"
+      >> error "unreachable"
+  let positiveContract = contract
+        { leanLengthContractSource = LengthContractSource
+            { lengthContractPrecondition = LengthTruth True
+            , lengthContractPostcondition = LengthTruth True
+            }
+        }
+  positiveProblem <- expectRight
+    $ prepareCheckedLengthProblem positiveContract threeInput
+  let expectedPositiveBasis =
+        Djex.FiniteSpineModelUnderAssumedProviderLaws
+          $ checkedLengthCandidateUsedProviders
+          $ checkedLengthProblemCandidate positiveProblem
+  positiveLimits <- explicitLengthInputBoxLimits 3 12
+  (positiveRanking, positiveEvents) <-
+    runLengthRankingWithFakeTraceWithInputBox
+      "query-unsat" Djex.LengthSMTLibStatusOnly
+      defaultLengthEvaluationLimits positiveLimits [2, 0, 3]
+      positiveContract [threeInput]
+  lengthRankingFailure positiveRanking @?= Nothing
+  positiveReceipt <- case map rankedLengthCandidateAssessment
+      $ lengthRankingCandidates positiveRanking of
+    [BoundedPositive receipt] -> pure receipt
+    assessments -> assertFailure
+      ("unexpected bounded-positive assessment: " ++ show assessments)
+        >> error "unreachable"
+  Djex.validatedLengthInputBoxInclusiveMaximums positiveReceipt @?=
+    [2, 0, 3]
+  Djex.validatedLengthInputBoxAssignmentCount positiveReceipt @?= 12
+  Djex.validatedLengthInputBoxApplicableAssignmentCount positiveReceipt @?= 12
+  Djex.validatedLengthInputBoxBasis positiveReceipt @?= expectedPositiveBasis
+  assertFakeLengthQueryEvents [0] [] positiveEvents
+  let positiveNote = renderLengthInputBoxValidationNote positiveReceipt
+      foldedPositiveNote = map toLower positiveNote
+  mapM_ (\fragment -> assertBool
+      ("bounded-positive note omitted " ++ show fragment)
+      $ fragment `isInfixOf` positiveNote)
+    [ "independently checked finite-list-spine Length input box"
+    , "bounded/model-relative"
+    , "inclusive input maxima = [2, 0, 3]"
+    , "checked assignments = 12"
+    , "applicable assignments = 12"
+    , "conditional on 1 assumed provider law"
+    ]
+  mapM_ (\provider -> assertBool
+      "bounded-positive note exposed a private provider name"
+      $ not $ renderCanonical provider `isInfixOf` positiveNote)
+    $ checkedLengthCandidateUsedProviders
+    $ checkedLengthProblemCandidate positiveProblem
+  mapM_ (\overclaim -> assertBool
+      ("bounded-positive note made an external or universal claim: "
+        ++ overclaim)
+      $ not $ overclaim `isInfixOf` foldedPositiveNote)
+    ["z3", "unsat", "proof", "proved", "universal", "lean-correct"]
+  assertBool "bounded-positive note exceeded the terminal cap"
+    $ length positiveNote <= maximumLengthCounterexampleNoteCharacters
+
+  vacuousLimits <- explicitLengthInputBoxLimits 3 1
+  let vacuousContract = positiveContract
+        { leanLengthContractSource = LengthContractSource
+            { lengthContractPrecondition = LengthTruth False
+            , lengthContractPostcondition = LengthTruth True
+            }
+        }
+  (vacuousRanking, vacuousEvents) <-
+    runLengthRankingWithFakeTraceWithInputBox
+      "query-unsat" Djex.LengthSMTLibStatusOnly
+      defaultLengthEvaluationLimits vacuousLimits [0, 0, 0]
+      vacuousContract [threeInput]
+  vacuousReceipt <- case map rankedLengthCandidateAssessment
+      $ lengthRankingCandidates vacuousRanking of
+    [BoundedPositive receipt] -> pure receipt
+    assessments -> assertFailure
+      ("unexpected vacuous input-box assessment: " ++ show assessments)
+        >> error "unreachable"
+  Djex.validatedLengthInputBoxAssignmentCount vacuousReceipt @?= 1
+  Djex.validatedLengthInputBoxApplicableAssignmentCount vacuousReceipt @?= 0
+  assertBool "vacuous positive note hid its empty applicable domain"
+    $ "vacuous within this box" `isInfixOf`
+        renderLengthInputBoxValidationNote vacuousReceipt
+  assertFakeLengthQueryEvents [0] [] vacuousEvents
+
+  counterexampleProblem <- expectRight
+    $ prepareCheckedLengthProblem contract twoInput
+  let expectedCounterexampleBasis =
+        Djex.FiniteSpineModelUnderAssumedProviderLaws
+          $ checkedLengthCandidateUsedProviders
+          $ checkedLengthProblemCandidate counterexampleProblem
+  counterexampleLimits <- explicitLengthInputBoxLimits 2 4
+  (counterexampleRanking, counterexampleEvents) <-
+    runLengthRankingWithFakeTraceWithInputBox
+      "query-unsat" Djex.LengthSMTLibStatusOnly
+      defaultLengthEvaluationLimits counterexampleLimits [1, 1]
+      contract [twoInput, twoInput]
+  lengthRankingFailure counterexampleRanking @?= Nothing
+  map rankedLengthCandidateOriginalIndex
+      (lengthRankingCandidates counterexampleRanking) @?= [0, 1]
+  case map rankedLengthCandidateAssessment
+      $ lengthRankingCandidates counterexampleRanking of
+    [Counterexample first, Counterexample second] -> do
+      map Djex.validatedLengthCounterexampleInputs [first, second] @?=
+        replicate 2 [0, 1]
+      map Djex.validatedLengthCounterexampleResult [first, second] @?=
+        [1, 1]
+      map Djex.validatedLengthCounterexampleBasis [first, second] @?=
+        replicate 2 expectedCounterexampleBasis
+    assessments -> assertFailure
+      $ "unexpected unsat-contradicting assessments: " ++ show assessments
+  -- The first independent box traversal contradicts the raw unsat status and
+  -- seeds [0,1].  The second occurrence replays that vector through its own
+  -- sealed query, so no second solver query or get-value request is needed.
+  assertFakeLengthQueryEvents [0] [] counterexampleEvents
+
+assertLengthRankingInputBoxSeedIsolation :: IO ()
+assertLengthRankingInputBoxSeedIsolation = do
+  fixture <- buildLengthRankingLiveFixture
+  limits <- explicitLengthInputBoxLimits 0 1
+  let zero = lengthRankingFixtureZero fixture
+      one = lengthRankingFixtureOne fixture
+      contract = lengthRankingContract 0
+  (positiveThenCounterexample, firstEvents) <-
+    runLengthRankingWithFakeTraceWithInputBox
+      "query-unsat" Djex.LengthSMTLibStatusOnly
+      defaultLengthEvaluationLimits limits [] contract [zero, one]
+  lengthRankingFailure positiveThenCounterexample @?= Nothing
+  case map rankedLengthCandidateAssessment
+      $ lengthRankingCandidates positiveThenCounterexample of
+    [BoundedPositive positive, Counterexample counterexample] -> do
+      Djex.validatedLengthInputBoxInclusiveMaximums positive @?= []
+      Djex.validatedLengthInputBoxAssignmentCount positive @?= 1
+      Djex.validatedLengthCounterexampleInputs counterexample @?= []
+      Djex.validatedLengthCounterexampleResult counterexample @?= 1
+    assessments -> assertFailure
+      $ "unexpected positive/CE isolation assessments: " ++ show assessments
+  -- A bounded positive has no counterexample vector to seed, so the second
+  -- candidate must still reach its own live unsat trigger.
+  assertFakeLengthQueryEvents [0, 1] [] firstEvents
+
+  (counterexampleAroundPositive, secondEvents) <-
+    runLengthRankingWithFakeTraceWithInputBox
+      "query-unsat" Djex.LengthSMTLibStatusOnly
+      defaultLengthEvaluationLimits limits [] contract [one, zero, one]
+  lengthRankingFailure counterexampleAroundPositive @?= Nothing
+  map rankedLengthCandidateOriginalIndex
+      (lengthRankingCandidates counterexampleAroundPositive) @?= [1, 0, 2]
+  case map rankedLengthCandidateAssessment
+      $ lengthRankingCandidates counterexampleAroundPositive of
+    [ BoundedPositive positive
+      , Counterexample first
+      , Counterexample second
+      ] -> do
+        Djex.validatedLengthInputBoxAssignmentCount positive @?= 1
+        map Djex.validatedLengthCounterexampleInputs [first, second] @?=
+          [[], []]
+        map Djex.validatedLengthCounterexampleResult [first, second] @?=
+          [1, 1]
+    assessments -> assertFailure
+      $ "unexpected CE/positive/CE assessments: " ++ show assessments
+  -- The positive middle candidate misses the retained [] seed, validates its
+  -- own box, and leaves the bank intact for the final counterexample replay.
+  assertFakeLengthQueryEvents [0, 1] [] secondEvents
+
+assertLengthRankingInputBoxAtomicFallback :: IO ()
+assertLengthRankingInputBoxAtomicFallback = do
+  (contract, arityCandidates) <- buildLengthSeedBankArityFixture
+  (zeroInput, oneInput) <- case arityCandidates of
+    zero : one : _ -> pure (zero, one)
+    _ -> assertFailure "the atomic input-box fixture changed cardinality"
+      >> error "unreachable"
+  trailing <- syntheticLengthRankingCandidate "input-box-fallback-trailing"
+  limits <- explicitLengthInputBoxLimits 1 2
+  let alwaysContract = contract
+        { leanLengthContractSource = LengthContractSource
+            { lengthContractPrecondition = LengthTruth True
+            , lengthContractPostcondition = LengthTruth True
+            }
+        }
+      assertNeutral mode expected = do
+        (ranking, events) <- runLengthRankingWithFakeTraceWithInputBox
+          mode Djex.LengthSMTLibStatusOnly defaultLengthEvaluationLimits
+          limits [1] alwaysContract [zeroInput]
+        lengthRankingFailure ranking @?= Nothing
+        map rankedLengthCandidateAssessment
+            (lengthRankingCandidates ranking) @?= [Heuristic expected]
+        assertFakeLengthQueryEvents [0] [] events
+  -- The deliberately mismatched maxima remain untouched for sat and unknown;
+  -- only raw unsat may trigger the independent validator.
+  assertNeutral "healthy" Djex.SolverSatisfiable
+  assertNeutral "query-unknown" Djex.SolverUnknown
+
+  let original = [oneInput, zeroInput, trailing]
+  (ranking, events) <- runLengthRankingWithFakeTraceWithInputBox
+    "query-unsat" Djex.LengthSMTLibStatusOnly defaultLengthEvaluationLimits
+    limits [1] alwaysContract original
+  rankedLengthVerifiedCandidates ranking @?= original
+  map rankedLengthCandidateAssessment (lengthRankingCandidates ranking) @?=
+    replicate 3 Unassessed
+  rankedLengthPreparationRefusals ranking @?=
+    [Nothing, Nothing, Just LengthPreparationTypedAuthorityUnavailable]
+  failure <- case lengthRankingFailure ranking of
+    Nothing -> assertFailure "input-box rejection did not fail atomically"
+      >> error "unreachable"
+    Just retained -> pure retained
+  lengthRankingFailureClass failure @?=
+    LengthRankingInputBoxValidationFailed
+      (Djex.LengthInputBoxBoundsArityMismatch 0 1)
+  lengthRankingFailureCleanupIncomplete failure @?= False
+  lengthRankingFailureOriginalIndex failure @?= Just 1
   assertFakeLengthQueryEvents [0, 1] [] events
 
 assertLengthPostVerificationAdapter :: IO ()
@@ -7889,6 +8397,51 @@ runLengthRankingWithFakeTraceWithEvaluation
     case bounded of
       Nothing -> assertFailure $ "Length ranking mode exceeded its bound: " ++
         mode
+      Just result -> do
+        ranking <- expectRight result
+        events <- BS.readFile $ executable ++ ".events"
+        pure (ranking, events)
+
+explicitLengthInputBoxLimits
+  :: Int
+  -> Natural
+  -> IO Djex.LengthInputBoxLimits
+explicitLengthInputBoxLimits maximumInputs maximumAssignments =
+  expectRight $ Djex.mkLengthInputBoxLimits Djex.LengthInputBoxLimitSource
+    { Djex.lengthInputBoxLimitSourceMaximumInputs = maximumInputs
+    , Djex.lengthInputBoxLimitSourceMaximumAssignments = maximumAssignments
+    }
+
+runLengthRankingWithFakeTraceWithInputBox
+  :: String
+  -> Djex.LengthSMTLibArtifactPolicy
+  -> Djex.LengthEvaluationLimits
+  -> Djex.LengthInputBoxLimits
+  -> [Natural]
+  -> LeanLengthContract
+  -> [Verified DetailedVerificationVariant]
+  -> IO (LengthRanking, BS.ByteString)
+runLengthRankingWithFakeTraceWithInputBox
+    mode artifactPolicy evaluation inputBoxLimits maximums contract candidates =
+  withFakeLengthSolver mode $ \executable -> do
+    execution <- expectRight $ Djex.mkLengthSMTLibExecutionConfig
+      Djex.defaultLengthSMTLibExecutionLimits
+      $ (Djex.defaultLengthSMTLibExecutionConfigSource executable Nothing)
+          { Djex.lengthSMTLibExecutionConfigSourceSolverTimeoutMilliseconds =
+              100
+          , Djex.lengthSMTLibExecutionConfigSourceSolverResourceLimit = 4242
+          , Djex.lengthSMTLibExecutionConfigSourceHostDeadlineMilliseconds =
+              1000
+          , Djex.lengthSMTLibExecutionConfigSourceArtifactPolicy =
+              artifactPolicy
+          }
+    bounded <- timeout 8000000
+      $ rankVerifiedLengthCandidatesWithInputBoxValidation
+          execution evaluation inputBoxLimits maximums contract candidates
+    case bounded of
+      Nothing -> assertFailure
+        ("Length input-box ranking mode exceeded its bound: " ++ mode)
+          >> error "unreachable"
       Just result -> do
         ranking <- expectRight result
         events <- BS.readFile $ executable ++ ".events"

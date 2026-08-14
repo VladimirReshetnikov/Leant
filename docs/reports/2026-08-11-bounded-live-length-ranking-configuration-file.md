@@ -4,11 +4,13 @@ Date: 2026-08-11
 
 ## Outcome
 
-`Leant.Synth.Length.Configuration.File` defines one closed JSON format for the
-explicit live Length-ranking policy:
+`Leant.Synth.Length.Configuration.File` defines one closed JSON format with two
+exact versions for the explicit live Length-ranking policy:
 
 - `format` is exactly `"leant-live-length-ranking-configuration"`;
-- `version` is the integral JSON number `1`; and
+- version 1 is the literal historical compatibility grammar;
+- version 2 is an additive opt-in for independent bounded input-box validation;
+  and
 - every object has exactly the fields listed below. All fields are required.
 
 The pure `decodeLengthRankingConfigurationFile` function accepts a strict
@@ -75,6 +77,34 @@ illustration, not defaults selected by Leant):
   }
 }
 ```
+
+## Version-2 input-box extension
+
+`lengthRankingConfigurationFileVersion` remains `1`, while the additive
+`lengthRankingConfigurationFileInputBoxVersion` is `2`. Version 1 follows its
+literal existing decoder and rejects an `inputBoxValidation` field. Version 2
+requires that field and otherwise retains the exact version-1 execution,
+evaluation, and embedded contract grammars.
+
+The version-2 root has exactly these fields, in semantic validation order:
+`format`, `version`, `executionAdmission`, `execution`, `evaluation`,
+`inputBoxValidation`, and `contract`. The `inputBoxValidation` field's value has
+exactly this shape:
+
+```json
+{
+  "inclusiveInputMaximums": [2, 3],
+  "maximumAssignments": 12
+}
+```
+
+The maxima array is source ordered, may contain zero through eight Naturals, and
+its exact width becomes Djex's sealed input-width limit. There is deliberately
+no redundant width field. `maximumAssignments` is a Natural no greater than
+65,536. The decoder checks array width before elements, decodes elements
+left-to-right, then decodes the assignment cap and seals the traversal limits.
+Candidate-specific arity, maximum-value, Cartesian-product, evaluation, and
+behavioral checks remain deferred to Djex's exact query-owned verifier.
 
 `expectedExecutableSha256` is either `null` or exactly 64 lowercase
 hexadecimal characters. `artifactPolicy` is exactly `"status-only"` or
@@ -225,8 +255,9 @@ The decoder has a deterministic fail-closed order:
 2. require a root object, then validate `format`, then integral `version`;
 3. once those two gates succeed, reject an unexpected root field before
    reporting any other missing root field;
-4. validate `executionAdmission`, then `execution`, then `evaluation`, then
-   `contract`;
+4. validate `executionAdmission`, then `execution`, then `evaluation`; version
+   1 then validates `contract`, while version 2 first validates
+   `inputBoxValidation` and only then validates `contract`;
 5. for each exact nested object, reject an unexpected field before a missing
    field, and establish the complete field set before decoding its values;
 6. within execution, schema-decode `responseLimits`, path, digest, timeout,
@@ -281,12 +312,14 @@ capabilities, remains the observed file at launch, or returns sound answers.
 They do not prove the behavioral contract, authorize raw `sat`/`unsat` status,
 or turn bounded model evidence into a Lean theorem.
 
-The configured runner's behavior is unchanged. Candidate-specific handoff and
-query association remain mandatory; only independently replayed input values
-can produce a model-relative counterexample receipt. `unsat`, `unknown`, and
-status-only `sat` stay neutral. No candidate is pruned, validated
-counterexamples are only stably demoted, and any returned structured live
-failure restores the original all-`Unassessed` ordering atomically. Exceptions
-continue to propagate. Main decodes, activates, and runs this policy only after
-the explicit startup option; the decoded contract then remains fixed for that
-process while every eligible batch opens a fresh lexical worker.
+Version 1's configured runner behavior is unchanged. Under version 2, `unsat`
+is only a trigger for Djex to traverse the explicit finite box; it grants no
+authority to the result. A discovered violation becomes the ordinary replayed
+counterexample and MRU seed. Complete traversal becomes neutral
+`BoundedPositive` evidence and does not seed. A validation or association
+rejection joins the existing indexed atomic-failure policy and restores the
+original all-`Unassessed` ordering. `unknown` and status-only `sat` remain
+neutral. No candidate is pruned and exceptions continue to propagate. Main
+decodes, activates, and runs either policy only after the explicit startup
+option; the decoded contract then remains fixed for that process while every
+eligible batch opens a fresh lexical worker.

@@ -11,6 +11,11 @@
 -- order against that candidate's checked query.  A replay hit avoids one live
 -- query and promotes that vector; every all-miss follows the established live
 -- path.
+-- An explicitly enabled policy may use a live @unsat@ only as the trigger for
+-- independent, query-owned exhaustive validation of one finite input box.  A
+-- validation counterexample enters the same exact receipt/MRU path; complete
+-- bounded success stays neutral and a validation failure atomically resets
+-- the batch.  The external status itself never becomes positive evidence.
 --
 -- A solver status is heuristic only.  A live observation can yield a
 -- counterexample only after Djex's public query-first gate checks its exact
@@ -61,6 +66,8 @@ module Leant.Synth.Length.Ranking.Internal
   , materializePostVerificationLengthRanking
   , rankPostVerificationLengthCandidates
   , rankVerifiedLengthCandidates
+  , rankPostVerificationLengthCandidatesWithInputBoxValidation
+  , rankVerifiedLengthCandidatesWithInputBoxValidation
   , promoteCounterexampleSeed
   , replayCounterexampleSeeds
   ) where
@@ -72,7 +79,11 @@ import Numeric.Natural (Natural)
 import Language.Haskell.Djex
   ( ExferenceLocal
   , LengthEvaluationLimits
+  , LengthInputBoxLimits
+  , LengthInputBoxValidation (..)
+  , LengthInputBoxValidationError
   , LengthSMTLibInputReplayError (..)
+  , LengthSMTLibInputBoxValidationError (..)
   , LengthSMTLibExecutionConfig
   , LengthSMTLibQueryError (..)
   , LengthSMTLibLiveObservationReplayError (..)
@@ -82,8 +93,9 @@ import Language.Haskell.Djex
   , LengthSMTLibLiveSession
   , LengthSMTLibLiveSessionError
   , LengthSMTLibLiveSessionFailure
-  , SolverStatus
+  , SolverStatus (..)
   , ValidatedLengthCounterexample
+  , ValidatedLengthInputBox
   , defaultLengthSMTLibLiveSessionMaximumQueries
   , lengthSMTLibLiveQueryCleanupIncomplete
   , lengthSMTLibLiveQueryObservationSolverStatus
@@ -93,6 +105,7 @@ import Language.Haskell.Djex
   , replayLengthSMTLibCounterexampleInputs
   , replayLengthSMTLibLiveQueryObservation
   , runLengthSMTLibLiveQuery
+  , validateLengthSMTLibQueryInputBox
   , validatedLengthCounterexampleInputs
   , withLengthSMTLibLiveSession
   )
@@ -123,13 +136,14 @@ data LengthRankingInputError = LengthRankingInputLimitExceeded
   }
   deriving (Eq, Ord, Show)
 
--- | The only three public assessment strengths.  A heuristic status is
--- deliberately neutral for ordering; only a replayed counterexample is
--- stably demoted.
+-- | The four public assessment strengths.  A heuristic status and an
+-- independently validated finite-box success are deliberately neutral for
+-- ordering; only a replayed counterexample is stably demoted.
 data LengthRankingAssessment
   = Unassessed
   | Heuristic !SolverStatus
   | Counterexample !ValidatedLengthCounterexample
+  | BoundedPositive !ValidatedLengthInputBox
   deriving (Eq, Show)
 
 -- | Stable, payload-free phase at which pure candidate preparation refused.
@@ -237,6 +251,7 @@ data LengthRankingFailureClass
   | LengthRankingLiveQueryFailed !LengthSMTLibLiveQueryFailure
   | LengthRankingQueryAssociationMismatch
   | LengthRankingEvidenceReplayMismatch
+  | LengthRankingInputBoxValidationFailed !LengthInputBoxValidationError
   deriving (Eq, Ord, Show)
 
 -- | One fail-closed ranking failure.  The optional index is the safe,
@@ -419,6 +434,14 @@ data PreparedLengthCandidate association
       !association
       !CheckedLengthQuery
 
+-- | Private orchestration policy.  The disabled constructor is the exact
+-- historical path.  The enabled constructor owns only an independently
+-- checked traversal limit and caller-supplied finite maxima; it carries no
+-- solver observation or behavioral verdict.
+data LengthInputBoxRankingPolicy
+  = LengthInputBoxRankingDisabled
+  | LengthInputBoxRankingEnabled !LengthInputBoxLimits [Natural]
+
 -- | Rank one already Lean-callback-verified batch under an explicit behavioral
 -- contract and explicit live/evaluation policies.
 --
@@ -436,7 +459,27 @@ rankVerifiedLengthCandidates
   -> IO (Either LengthRankingInputError LengthRanking)
 rankVerifiedLengthCandidates execution evaluation contract candidates = fmap
   (fmap $ projectAssociatedLengthRankingWith id)
-  $ rankAssociatedLengthCandidates execution evaluation contract id candidates
+  $ rankAssociatedLengthCandidates LengthInputBoxRankingDisabled
+      execution evaluation contract id candidates
+
+-- | Opt in to independently validating one exact finite input box after a
+-- live @unsat@ observation.  The solver status is only the trigger: Djex owns
+-- traversal, evaluation, and exact query/problem association.  Existing
+-- counterexample seed replay still runs first and can avoid the live call.
+rankVerifiedLengthCandidatesWithInputBoxValidation
+  :: LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LengthInputBoxLimits
+  -> [Natural]
+  -> LeanLengthContract
+  -> [Verified DetailedVerificationVariant]
+  -> IO (Either LengthRankingInputError LengthRanking)
+rankVerifiedLengthCandidatesWithInputBoxValidation execution evaluation
+    limits maximums contract candidates = fmap
+  (fmap $ projectAssociatedLengthRankingWith id)
+  $ rankAssociatedLengthCandidates
+      (LengthInputBoxRankingEnabled limits maximums)
+      execution evaluation contract id candidates
 
 -- | Safe associated entry point for the post-verification seam.  The receipt
 -- projection is fixed here so callers cannot rank one receipt while retaining
@@ -451,15 +494,37 @@ rankPostVerificationLengthCandidates
         (AssociatedLengthRanking
           (PostVerificationCandidate epoch DetailedVerificationVariant)))
 rankPostVerificationLengthCandidates execution evaluation contract =
-  rankAssociatedLengthCandidates execution evaluation contract
+  rankAssociatedLengthCandidates LengthInputBoxRankingDisabled
+    execution evaluation contract
     postVerificationCandidateVerified
+
+-- | Occurrence-associated opt-in used by the post-verification permutation
+-- seal.  The finite-box receipt remains attached to the exact occurrence until
+-- that seal deliberately erases the batch-scoped handle.
+rankPostVerificationLengthCandidatesWithInputBoxValidation
+  :: LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LengthInputBoxLimits
+  -> [Natural]
+  -> LeanLengthContract
+  -> [PostVerificationCandidate epoch DetailedVerificationVariant]
+  -> IO
+      (Either LengthRankingInputError
+        (AssociatedLengthRanking
+          (PostVerificationCandidate epoch DetailedVerificationVariant)))
+rankPostVerificationLengthCandidatesWithInputBoxValidation execution evaluation
+    limits maximums contract =
+  rankAssociatedLengthCandidates
+    (LengthInputBoxRankingEnabled limits maximums)
+    execution evaluation contract postVerificationCandidateVerified
 
 -- | Rank caller-owned occurrences while retaining each occurrence handle
 -- through preparation, live assessment, stable partitioning, and atomic
 -- fallback.  The projection is not touched until complete input admission has
 -- succeeded.
 rankAssociatedLengthCandidates
-  :: LengthSMTLibExecutionConfig
+  :: LengthInputBoxRankingPolicy
+  -> LengthSMTLibExecutionConfig
   -> LengthEvaluationLimits
   -> LeanLengthContract
   -> (association -> Verified DetailedVerificationVariant)
@@ -467,7 +532,7 @@ rankAssociatedLengthCandidates
   -> IO
       (Either LengthRankingInputError
         (AssociatedLengthRanking association))
-rankAssociatedLengthCandidates execution evaluation contract
+rankAssociatedLengthCandidates inputBoxPolicy execution evaluation contract
     verifiedFor associations =
   case admitCandidates defaultLengthSMTLibLiveSessionMaximumQueries
       associations of
@@ -480,7 +545,8 @@ rankAssociatedLengthCandidates execution evaluation contract
                 (map preparedCandidateUnassessed prepared) Nothing
         | otherwise -> do
             scoped <- withLengthSMTLibLiveSession execution
-              $ \session -> runPreparedCandidates evaluation session prepared
+              $ \session -> runPreparedCandidates
+                  evaluation inputBoxPolicy session prepared
             pure $ Right $ case scoped of
               Left failure -> unassessedRanking prepared
                 $ sessionRankingFailure failure
@@ -548,12 +614,13 @@ preparedCandidateUnassessed prepared = case prepared of
 
 runPreparedCandidates
   :: LengthEvaluationLimits
+  -> LengthInputBoxRankingPolicy
   -> LengthSMTLibLiveSession epoch
   -> [PreparedLengthCandidate association]
   -> IO
       (Either LengthRankingFailure
         [AssociatedRankedLengthCandidate association])
-runPreparedCandidates evaluation session = go [] []
+runPreparedCandidates evaluation inputBoxPolicy session = go [] []
  where
   go reversed seedBank remaining = case remaining of
     [] -> pure $ Right $ reverse reversed
@@ -575,7 +642,8 @@ runPreparedCandidates evaluation session = go [] []
         case observed of
           Left failure -> pure $ Left $ queryRankingFailure index failure
           Right observation -> case
-              assessCandidate index association query observation of
+              assessCandidate evaluation inputBoxPolicy
+                index association query observation of
             Left failure -> pure $ Left failure
             Right assessed ->
               let nextSeedBank = case counterexampleSeed assessed of
@@ -646,25 +714,45 @@ counterexampleSeed (AssociatedRankedLengthCandidate _ _ state) = case
   _ -> Nothing
 
 assessCandidate
-  :: Natural
+  :: LengthEvaluationLimits
+  -> LengthInputBoxRankingPolicy
+  -> Natural
   -> association
   -> CheckedLengthQuery
   -> LengthSMTLibLiveQueryObservation
       epoch ExferenceLocal ExferenceLocal
   -> Either LengthRankingFailure
       (AssociatedRankedLengthCandidate association)
-assessCandidate index association query observation = do
+assessCandidate evaluation inputBoxPolicy index association query observation =
+    do
   assessment <- case
       replayLengthSMTLibLiveQueryObservation query observation of
     Left LengthSMTLibLiveObservationQueryFingerprintMismatch ->
       Left $ localRankingFailure LengthRankingQueryAssociationMismatch index
     Left LengthSMTLibLiveObservationEvidenceProblemMismatch{} ->
       Left $ localRankingFailure LengthRankingEvidenceReplayMismatch index
-    Right Nothing -> Right $ Heuristic
+    Right Nothing -> assessStatus
       $ lengthSMTLibLiveQueryObservationSolverStatus observation
     Right (Just receipt) -> Right $ Counterexample receipt
   pure $ AssociatedRankedLengthCandidate index association
     $ LengthCandidateAssessed assessment
+ where
+  assessStatus status = case (status, inputBoxPolicy) of
+    (SolverUnsatisfiable,
+        LengthInputBoxRankingEnabled limits maximums) ->
+      case validateLengthSMTLibQueryInputBox
+          evaluation limits query maximums of
+        Left (LengthSMTLibInputBoxValidationRejected failure) ->
+          Left $ localRankingFailure
+            (LengthRankingInputBoxValidationFailed failure) index
+        Left (LengthSMTLibInputBoxValidationAssociationRejected _) ->
+          Left $ localRankingFailure
+            LengthRankingEvidenceReplayMismatch index
+        Right (LengthInputBoxCounterexample receipt) ->
+          Right $ Counterexample receipt
+        Right (LengthInputBoxValidated receipt) ->
+          Right $ BoundedPositive receipt
+    _ -> Right $ Heuristic status
 
 stableCounterexampleDemotion
   :: [AssociatedRankedLengthCandidate association]
@@ -676,6 +764,7 @@ stableCounterexampleDemotion candidates =
   hasCounterexample (AssociatedRankedLengthCandidate _ _ state) =
     case candidateAssessment state of
       Counterexample _ -> True
+      BoundedPositive _ -> False
       _ -> False
 
 unassessedRanking

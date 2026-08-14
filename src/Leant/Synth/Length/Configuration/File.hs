@@ -1,16 +1,21 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Closed, bounded v1 file grammar for explicit live Length ranking policy.
+-- | Closed, bounded versioned file grammar for explicit live Length ranking
+-- policy.
 --
--- Decoding performs no discovery, path normalization, environment lookup, or
--- IO.  Every field is required.  A successful decode returns a deliberately
--- disabled opaque value: callers must separately choose whether an absent
--- executable digest pin is acceptable before they can obtain the validated
--- policy and this file's fixed compatibility contract.
+-- Version 1 remains the exact compatibility grammar.  Version 2 adds one
+-- required, explicit finite input-box validation policy without widening the
+-- embedded version-1 contract grammar.  Decoding performs no discovery, path
+-- normalization, environment lookup, or IO.  Every field is required.  A
+-- successful decode returns a deliberately disabled opaque value: callers
+-- must separately choose whether an absent executable digest pin is
+-- acceptable before they can obtain the validated policy and this file's
+-- fixed compatibility contract.
 module Leant.Synth.Length.Configuration.File
   ( lengthRankingConfigurationFileFormat
   , lengthRankingConfigurationFileVersion
+  , lengthRankingConfigurationFileInputBoxVersion
   , lengthRankingConfigurationFileJsonLimits
   , LengthRankingConfigurationFileObject (..)
   , LengthRankingConfigurationFileField (..)
@@ -49,6 +54,9 @@ import Language.Haskell.Djex
   , LengthEvaluationLimits
   , LengthExpression (..)
   , LengthFormula (..)
+  , LengthInputBoxLimitError
+  , LengthInputBoxLimitSource (..)
+  , LengthInputBoxLimits
   , LengthProviderArgumentRole (..)
   , LengthProviderVariable (..)
   , LengthTargetArgumentRole (..)
@@ -63,6 +71,7 @@ import Language.Haskell.Djex
   , LengthSMTLibResponseLimitSource (..)
   , LengthSMTLibResponseLimits
   , mkLengthEvaluationLimits
+  , mkLengthInputBoxLimits
   , mkLengthSMTLibExecutionConfig
   , mkLengthSMTLibExecutionLimits
   , mkLengthSMTLibResponseLimits
@@ -82,6 +91,7 @@ import Leant.Synth.Length.Contract
   )
 import Leant.Synth.Length.Configuration
   ( LengthRankingPolicy
+  , enableLengthRankingInputBoxValidation
   , lengthRankingPolicyExecutableDigestExpectation
   , lengthRankingPolicyFromValidatedComponents
   )
@@ -92,6 +102,11 @@ lengthRankingConfigurationFileFormat =
 
 lengthRankingConfigurationFileVersion :: Natural
 lengthRankingConfigurationFileVersion = 1
+
+-- | Opt-in configuration grammar which adds exact finite input-box policy.
+-- The established version-1 constant above deliberately remains unchanged.
+lengthRankingConfigurationFileInputBoxVersion :: Natural
+lengthRankingConfigurationFileInputBoxVersion = 2
 
 -- | Fixed admission policy for the v1 document itself.  The array maximum is
 -- one greater than the widest typed collection so maximum-plus-one reaches the
@@ -115,6 +130,7 @@ data LengthRankingConfigurationFileObject
   | LengthRankingConfigurationExecutionObject
   | LengthRankingConfigurationResponseLimitsObject
   | LengthRankingConfigurationEvaluationObject
+  | LengthRankingConfigurationInputBoxValidationObject
   | LengthRankingConfigurationContractObject
   | LengthRankingConfigurationSpineObject
   | LengthRankingConfigurationProviderLawObject !Natural
@@ -126,6 +142,7 @@ data LengthRankingConfigurationFileField
   | LengthRankingConfigurationExecutionAdmissionField
   | LengthRankingConfigurationExecutionField
   | LengthRankingConfigurationEvaluationField
+  | LengthRankingConfigurationInputBoxValidationField
   | LengthRankingConfigurationContractField
   | LengthRankingConfigurationExecutablePathCharactersField
   | LengthRankingConfigurationPolicyFingerprintBytesField
@@ -143,6 +160,9 @@ data LengthRankingConfigurationFileField
   | LengthRankingConfigurationResponseIntegerBitsField
   | LengthRankingConfigurationAssignmentValueBitsField
   | LengthRankingConfigurationIntermediateValueBitsField
+  | LengthRankingConfigurationInputBoxInclusiveMaximumsField
+  | LengthRankingConfigurationInputBoxInclusiveMaximumField !Natural
+  | LengthRankingConfigurationInputBoxMaximumAssignmentsField
   | LengthRankingConfigurationSpineField
   | LengthRankingConfigurationPreconditionField
   | LengthRankingConfigurationPostconditionField
@@ -233,6 +253,8 @@ data LengthRankingConfigurationFileError
       !LengthSMTLibExecutionConfigError
   | LengthRankingConfigurationEvaluationRejected
       !LengthEvaluationLimitError
+  | LengthRankingConfigurationInputBoxLimitsRejected
+      !LengthInputBoxLimitError
   | LengthRankingConfigurationSyntaxRejected
       !LengthRankingConfigurationSyntaxPhase
       !LengthRankingConfigurationSyntaxError
@@ -313,8 +335,21 @@ decodeLengthRankingConfigurationFile bytes = do
     root
   version <- integerField LengthRankingConfigurationVersionField versionValue
   if version == toInteger lengthRankingConfigurationFileVersion
-    then pure ()
-    else Left LengthRankingConfigurationUnsupportedVersion
+    then decodeLengthRankingConfigurationFileV1 root
+    else if version ==
+        toInteger lengthRankingConfigurationFileInputBoxVersion
+      then decodeLengthRankingConfigurationFileInputBoxV2 root
+      else Left LengthRankingConfigurationUnsupportedVersion
+
+-- Keep the established version-1 path literal: its exact root, validation
+-- order, embedded contract grammar, and disabled policy construction do not
+-- pass through any version-2 input-box branch.
+decodeLengthRankingConfigurationFileV1
+  :: ObjectFields
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthRankingConfiguration
+decodeLengthRankingConfigurationFileV1 root = do
   exactFields LengthRankingConfigurationRootObject rootFields root
   executionAdmissionValue <- requiredField
     LengthRankingConfigurationRootObject
@@ -343,6 +378,50 @@ decodeLengthRankingConfigurationFile bytes = do
   let policy = lengthRankingPolicyFromValidatedComponents execution evaluation
   pure $ disableLengthRankingConfiguration policy contract
 
+decodeLengthRankingConfigurationFileInputBoxV2
+  :: ObjectFields
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthRankingConfiguration
+decodeLengthRankingConfigurationFileInputBoxV2 root = do
+  exactFields LengthRankingConfigurationRootObject rootFieldsInputBoxV2 root
+  executionAdmissionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationExecutionAdmissionField
+    "executionAdmission"
+    root
+  executionLimits <- decodeExecutionAdmission executionAdmissionValue
+  executionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationExecutionField
+    "execution"
+    root
+  execution <- decodeExecution executionLimits executionValue
+  evaluationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationEvaluationField
+    "evaluation"
+    root
+  evaluation <- decodeEvaluation evaluationValue
+  inputBoxValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationInputBoxValidationField
+    "inputBoxValidation"
+    root
+  (inputBoxLimits, inclusiveMaximums) <-
+    decodeInputBoxValidation inputBoxValue
+  contractValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationContractField
+    "contract"
+    root
+  contract <- decodeLeanLengthContractValue contractValue
+  let basePolicy =
+        lengthRankingPolicyFromValidatedComponents execution evaluation
+      policy = enableLengthRankingInputBoxValidation
+        inputBoxLimits inclusiveMaximums basePolicy
+  pure $ disableLengthRankingConfiguration policy contract
+
 rootFields :: [(Text, LengthRankingConfigurationFileField)]
 rootFields =
   [ ("format", LengthRankingConfigurationFormatField)
@@ -350,6 +429,19 @@ rootFields =
   , ("executionAdmission", LengthRankingConfigurationExecutionAdmissionField)
   , ("execution", LengthRankingConfigurationExecutionField)
   , ("evaluation", LengthRankingConfigurationEvaluationField)
+  , ("contract", LengthRankingConfigurationContractField)
+  ]
+
+rootFieldsInputBoxV2 :: [(Text, LengthRankingConfigurationFileField)]
+rootFieldsInputBoxV2 =
+  [ ("format", LengthRankingConfigurationFormatField)
+  , ("version", LengthRankingConfigurationVersionField)
+  , ("executionAdmission", LengthRankingConfigurationExecutionAdmissionField)
+  , ("execution", LengthRankingConfigurationExecutionField)
+  , ("evaluation", LengthRankingConfigurationEvaluationField)
+  , ( "inputBoxValidation"
+    , LengthRankingConfigurationInputBoxValidationField
+    )
   , ("contract", LengthRankingConfigurationContractField)
   ]
 
@@ -769,6 +861,80 @@ evaluationFields =
     , LengthRankingConfigurationIntermediateValueBitsField
     )
   ]
+
+-- | Decode version 2's explicit source-ordered inclusive input box.  Width is
+-- bounded before any element is decoded, element values are then decoded
+-- left-to-right, and the assignment cap is decoded last.  The vector's exact
+-- finite width supplies Djex's independent maximum-input admission limit, so
+-- the JSON grammar has no redundant width field which could disagree with the
+-- retained box.
+decodeInputBoxValidation
+  :: BoundedJsonValue
+  -> Either
+      LengthRankingConfigurationFileError
+      (LengthInputBoxLimits, [Natural])
+decodeInputBoxValidation value = do
+  object <- exactObject LengthRankingConfigurationInputBoxValidationObject
+    inputBoxValidationFields value
+  maximumsValue <- requiredField
+    LengthRankingConfigurationInputBoxValidationObject
+    LengthRankingConfigurationInputBoxInclusiveMaximumsField
+    "inclusiveInputMaximums"
+    object
+  rawMaximums <- arrayField
+    LengthRankingConfigurationInputBoxInclusiveMaximumsField maximumsValue
+  let observedMaximums = observedListLength
+        maximumInputBoxInputs rawMaximums
+  if observedMaximums <= maximumInputBoxInputs
+    then pure ()
+    else Left $ LengthRankingConfigurationPolicyLimitExceeded
+      LengthRankingConfigurationInputBoxInclusiveMaximumsField
+      maximumInputBoxInputs (maximumInputBoxInputs + 1)
+  inclusiveMaximums <- decodeMaximums 0 rawMaximums
+  assignmentsValue <- requiredField
+    LengthRankingConfigurationInputBoxValidationObject
+    LengthRankingConfigurationInputBoxMaximumAssignmentsField
+    "maximumAssignments"
+    object
+  maximumAssignments <- naturalField
+    LengthRankingConfigurationInputBoxMaximumAssignmentsField
+    assignmentsValue
+    >>= capNatural
+      LengthRankingConfigurationInputBoxMaximumAssignmentsField
+      maximumInputBoxAssignments
+  let source = LengthInputBoxLimitSource
+        { lengthInputBoxLimitSourceMaximumInputs =
+            fromIntegral observedMaximums
+        , lengthInputBoxLimitSourceMaximumAssignments = maximumAssignments
+        }
+  limits <- case mkLengthInputBoxLimits source of
+    Left failure -> Left
+      $ LengthRankingConfigurationInputBoxLimitsRejected failure
+    Right validated -> Right validated
+  pure (limits, inclusiveMaximums)
+ where
+  decodeMaximums _ [] = Right []
+  decodeMaximums index (rawMaximum : remaining) = do
+    maximumValue <- naturalField
+      (LengthRankingConfigurationInputBoxInclusiveMaximumField index)
+      rawMaximum
+    following <- decodeMaximums (index + 1) remaining
+    pure $ maximumValue : following
+
+inputBoxValidationFields
+  :: [(Text, LengthRankingConfigurationFileField)]
+inputBoxValidationFields =
+  [ ( "inclusiveInputMaximums"
+    , LengthRankingConfigurationInputBoxInclusiveMaximumsField
+    )
+  , ( "maximumAssignments"
+    , LengthRankingConfigurationInputBoxMaximumAssignmentsField
+    )
+  ]
+
+maximumInputBoxInputs, maximumInputBoxAssignments :: Natural
+maximumInputBoxInputs = 8
+maximumInputBoxAssignments = 65536
 
 -- | Decode exactly the contract object embedded by the compatibility file.
 -- Contract-only version 1 reuses this entrance. Later contract-only versions

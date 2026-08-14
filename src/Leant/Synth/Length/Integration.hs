@@ -2,8 +2,8 @@
 --
 -- This module owns the complete caller-facing transition from an explicitly
 -- named configuration file to one reusable, activated ranking policy and the
--- file's fixed compatibility contract.
--- The v1 file's contract is a fixed startup choice for the process: every
+-- file's fixed compatibility contract.  The configuration file's embedded
+-- compatibility contract is a fixed startup choice for the process: every
 -- later verified batch is checked against that same contract, while every
 -- eligible batch still gets a fresh worker scope.  This module also owns the
 -- disabled identity branch used by Main.  Loading performs
