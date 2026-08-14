@@ -932,26 +932,37 @@ than 32 provider/vector associations to Djex. Each vector has exact provider
 arity and at most six arguments. The command takes that aggregate prefix
 before an argument affects family planning, rigidity, or translation. Live
 provider metadata uses
-\code{(instantiations (args (kinded N ...) ...))}. Leant folds each bounded
-arrow count into a Djex \code{GroundKind}, pairs it with the translated type,
-and calls \code{runDjinnQueryWithKindedInstantiationAssignments} or
-\code{runExferenceQueryWithKindedInstantiationAssignments}. Live discovery,
-wire parsing, and engine filtering all admit at most 64 \code{Type}-arrow
-domains, whose simple right-associated kind has \code{2 * 64 + 1 = 129}
-constructors. After an assignment passes Djex's provider, scheme, context, and
-exact-arity checks, the pinned adapters productively preflight all of that
-assignment's supplied kinds before recursive kind inference, same-provider
-comparison, kind conversion, or paired type elaboration. Oversized and cyclic
-caller-built kinds therefore fail finitely. Metadata-free and
-binder-only inventories remain valid. Historical exact arguments stay in their
-original vectors and default each position to proper kind; the
-\code{(candidates ...)} form parses as proper-kind unary vectors only. A vector
-containing depth truncation (\code{FDepth}) or a legacy raw instance marker
-(\code{FInst}) is discarded in full. Dedicated exact-assignment serialization
-may instead retain a bounded \code{FExactContext}: the exact nominal Lean class
-head, every ordered argument's bounded ground-kind arity, and the contextual
-body. Positive-arity arguments retain only a canonical bare or partially
-applied nominal head with proper-type supplied arguments, serialized as
+\code{(instantiations (args (kinded N ...) ...))}. For context-free sources,
+Leant folds each bounded arrow count into a Djex \code{GroundKind}, pairs it
+with the translated type, and calls the checked kinded Djinn or Exference
+assignment adapter. An exact contextual Exference vector whose complete fact
+group survives the replayed inventory trial instead contributes ground facts
+and does not also enter that context-free adapter. If no group survives for an
+exact-evidence provider, its successfully translatable bounded vectors take
+the historical context-erased fallback. Djinn always uses that erased
+compatibility projection.
+
+Live discovery, wire parsing, and engine filtering all admit at most 64
+\code{Type}-arrow domains, whose simple right-associated kind has
+\code{2 * 64 + 1 = 129} constructors. After a context-free assignment passes
+Djex's provider, scheme, context, and exact-arity checks, the pinned adapters
+productively preflight all of that assignment's supplied kinds before
+recursive kind inference, same-provider comparison, kind conversion, or
+paired type elaboration. Oversized and cyclic caller-built kinds therefore
+fail finitely. Metadata-free and binder-only inventories remain valid.
+Historical exact arguments stay in their original vectors and default each
+position to proper kind; the \code{(candidates ...)} form parses as legacy
+proper-kind unary vectors and can never authorize a ground class fact.
+
+A vector containing depth truncation (\code{FDepth}) or a legacy raw instance
+marker (\code{FInst}) is discarded in full. Supported provider-source and
+exact-assignment serialization may instead retain a bounded
+\code{FExactContext}: the exact nominal Lean class head, every ordered
+argument's bounded first-order kind arity, and the contextual body. A
+positive-arity source argument may retain its enclosing \code{FAll} variable
+bare or partially applied only to proper-type arguments. A ground assignment
+instead retains a canonical bare or partially applied nominal head with
+proper-type supplied arguments, serialized as
 \code{(kinded N (nominal "Head" ...))}. Historical fragment arguments remain
 readable for compatible nonstructural heads, but carry no structural identity.
 Canonical nominal \code{Prod} and \code{Sum} heads are supported only at total
@@ -961,11 +972,12 @@ structural payloads and the other six structural heads remain fail-closed.
 Malformed, open, dictionary-dependent, term-indexed, and otherwise unsupported
 contexts still discard their complete vector. A bounded pre-scan
 also discards only assignment vectors that touch inconsistent class-kind or
-nominal-family arity claims. Provider-prefix fallback keeps metadata
-attached to its exact declaration. The checked runners validate provider identity, arity,
-supplied positional kinds, closure, and context before consuming each vector
-once without Cartesian reconstruction. Thus a later or alpha-identically typed
-provider cannot donate its assignment to an earlier one.
+nominal-family arity claims. Provider-prefix fallback keeps metadata attached
+to its exact declaration. The checked runners validate provider identity,
+arity, supplied positional kinds, closure, and context before consuming each
+vector once without Cartesian reconstruction. Thus a later or
+alpha-identically typed provider cannot donate its assignment to an earlier
+one.
 
 Leant also retains applications whose arguments are proper types. A bound
 first-order constructor remains a higher-kinded variable in Djex; an opaque
@@ -1514,19 +1526,24 @@ dictionaries or general instance resolution into Djex. A selected head is
 accepted only after its own subgoals and every remaining provider constraint
 close in one isolated metavariable context. Up to 32 heads are inspected and
 16 distinct complete vectors retained per provider, with at most 32 vectors
-passed in total. A closed contextual argument such as
+passed in total. A closed contextual assignment such as
 \code{\{a : Type\} → [Inhabited a] → a → a} may cross this exact-provider lane
 only when serialization records the nominal class application and its ordered
-ground-kinded arguments as \code{FExactContext}. Higher-kinded arguments such
-as \code{List} retain their canonical nominal head and residual kind arity;
-Djex checks the reconstructed class-parameter kind and rendering restores the
-exact Lean class head. The same contextual path supports canonical
-\code{Prod} and \code{Sum}; the direct path preserves their structural Djex
-identities. Open, incomplete,
+bounded-kinded arguments as \code{FExactContext}. Ground higher-kinded
+arguments such as \code{List} retain their canonical nominal head and residual
+kind arity. In a supported provider-source context, a lexically enclosing
+\code{FAll} variable may also occur bare or partially applied only to
+proper-type arguments. Djex checks the reconstructed class-parameter kind and
+rendering restores the exact Lean class head. The same contextual path
+supports canonical \code{Prod} and \code{Sum}; the direct path preserves their
+structural Djex identities. Open, incomplete,
 wrong-arity, depth-truncated, malformed, free, dictionary-dependent,
 term-indexed, and legacy raw \code{FInst} vectors fail closed. Ordinary goals retain render-only
-\code{FInst} slots and provider schemes continue to erase instance evidence;
-neither path gains contextual search. This provider-local channel can expose a
+\code{FInst} slots. Exference retains supported provider-source
+\code{FExactContext} nodes on its plain, binder-only, and accepted-fact lanes;
+Djinn and a no-group exact-evidence fallback erase them. Accepted contextual
+vectors contribute replay-isolated ground facts rather than entering the
+context-free assignment adapter. This provider-local channel can expose a
 polytype absent from the query, but it is bounded checked evidence rather than
 general impredicative inference. The fragment is bounded
 on purpose: inside it, answers are fast and verified. Refutations are complete

@@ -1,0 +1,23 @@
+namespace BoundContextHead
+
+axiom Token : Type
+axiom Pair : Type → Type → Type
+
+class Choice (F : Type → Type) : Prop where
+  witness : True
+
+instance : Choice (Pair Nat) := ⟨True.intro⟩
+
+axiom chosen {F : Type → Type → Type} [Choice (F Nat)] : Token
+
+end BoundContextHead
+
+:set synth-library off
+:set synth-steps 1024
+:set synth-engine djinn
+:synth BoundContextHead.Token
+:set synth-engine exference
+:synth BoundContextHead.Token
+:set synth-engine both
+:synth BoundContextHead.Token
+:quit

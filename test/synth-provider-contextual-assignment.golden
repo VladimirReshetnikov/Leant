@@ -84,7 +84,7 @@ synth engine: djinn
 synth engine: exference
 λ> :synth HigherContext.Token
   it1  HigherContext.chosen («a» := (∀ {a0_0 : Type _}, [@HigherContext.Mark List] → a0_0 → a0_0))
-note: search truncated: step limit reached, queue limit pruned 7082
+note: search truncated: step limit reached, queue limit pruned 6771
 λ> :set synth-engine both
 synth engine: both
 λ> :synth HigherContext.Token
@@ -95,17 +95,17 @@ synth steps: 256
 λ> :set synth-engine djinn
 synth engine: djinn
 λ> :synth DependentContext.Token
-the engine proposed 11 candidate(s) but none survived Lean verification
+no term found within the search bounds
 note: search truncated: candidate limit reached (60)
 λ> :set synth-engine exference
 synth engine: exference
 λ> :synth DependentContext.Token
-the engine proposed 10 candidate(s) but none survived Lean verification
-note: search truncated: step limit reached, queue limit pruned 2424
+no term found within the search bounds
+note: search truncated: step limit reached, queue limit pruned 1940
 λ> :set synth-engine both
 synth engine: both
 λ> :synth DependentContext.Token
-the engine proposed 13 candidate(s) but none survived Lean verification
+no term found within the search bounds
 note: search truncated: candidate limit reached (60)
-note: exference: search truncated: step limit reached, queue limit pruned 2424
+note: exference: search truncated: step limit reached, queue limit pruned 1940
 λ> :quit

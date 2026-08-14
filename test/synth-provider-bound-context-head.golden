@@ -1,0 +1,40 @@
+
+   __                  __
+  / /  ___ ___ ____   / /_
+ / /__/ -_) _ `/ _ \_/ __/
+/____/\__/\_,_/_//_/ \__/
+Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to exit.
+λ> namespace BoundContextHead
+λ>
+λ> axiom Token : Type
+λ> axiom Pair : Type → Type → Type
+λ>
+λ> class Choice (F : Type → Type) : Prop where
+…>   witness : True
+…>
+λ> instance : Choice (Pair Nat) := ⟨True.intro⟩
+λ>
+λ> axiom chosen {F : Type → Type → Type} [Choice (F Nat)] : Token
+λ>
+λ> end BoundContextHead
+λ>
+λ> :set synth-library off
+synth library: off
+λ> :set synth-steps 1024
+synth steps: 1024
+λ> :set synth-engine djinn
+synth engine: djinn
+λ> :synth BoundContextHead.Token
+preparing synthesis environment (session imports + Lean)...
+  it1  BoundContextHead.chosen («F» := BoundContextHead.Pair)
+λ> :set synth-engine exference
+synth engine: exference
+λ> :synth BoundContextHead.Token
+  it1  BoundContextHead.chosen («F» := BoundContextHead.Pair)
+note: search truncated: step limit reached, queue limit pruned 13153
+λ> :set synth-engine both
+synth engine: both
+λ> :synth BoundContextHead.Token
+  it1  BoundContextHead.chosen («F» := BoundContextHead.Pair)
+note: exference: search truncated: step limit reached, queue limit pruned 7374
+λ> :quit

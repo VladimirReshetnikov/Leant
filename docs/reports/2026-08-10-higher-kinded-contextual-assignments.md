@@ -2,6 +2,9 @@
 
 Date: 2026-08-10
 
+Extended: 2026-08-14, when live provider-source contexts gained lexically
+scoped higher-kinded variable heads, including partial applications.
+
 ## Outcome
 
 Leant now preserves a bounded higher-kinded nominal argument inside an exact
@@ -27,11 +30,12 @@ ground-kinded provider wire; it does not add general dictionary search.
 
 ## Producer and wire
 
-`FExactContext` distinguishes two forms of class argument. Proper arguments and
-historical payloads retain a `(kindArity, fragment)` representation. Canonical
-positive-arity nominal arguments instead carry their residual arity, exact Lean
-constant name, and supplied proper fragments. The live wire encodes the latter
-as `(kinded N (nominal "Head" ...))`. Historical `(kinded N FRAG)` payloads
+`FExactContext` distinguishes proper arguments from two positive-arity
+forms. A provider-source context may retain its enclosing `FAll` variable,
+bare or partially applied only to proper-type arguments. A ground assignment
+instead carries its residual arity, exact Lean constant name, and supplied
+proper fragments; the live wire encodes that form as
+`(kinded N (nominal "Head" ...))`. Historical `(kinded N FRAG)` payloads
 remain readable for nonstructural nominal heads, but cannot confer canonical
 authority on legacy `Prod` or `Sum` atoms.
 
@@ -39,14 +43,16 @@ The Lean producer classifies each argument with the same bounded
 `typeKindArity?` used for top-level provider assignments:
 
 - arity zero retains the complete exact proper-type fragment;
-- positive arity requires a Lean constant head and every supplied argument to
-  be a proper type;
+- positive arity requires either a lexically bound provider-source variable or
+  a Lean constant head, with every supplied argument a proper type;
 - canonical `Prod` and `Sum` are accepted only when supplied arguments plus
   residual arity total two;
 - `And`, `PProd`, `Or`, `PSum`, `Iff`, and `Not` remain excluded, as do legacy
   structural payloads;
-- a bare head is serialized with its canonical constant name;
-- a partial head retains `AppNominal`, its canonical name, and its supplied
+- a source variable is serialized as `FVar` when bare or as
+  `FApp (AppVariable ...)` when partially applied;
+- a ground bare head is serialized with its canonical constant name, while a
+  partial ground head retains `AppNominal`, that name, and its supplied
   proper arguments.
 
 Forall-domain collection uses the same classifier. A bare higher-kinded head
@@ -87,12 +93,14 @@ planning.
 ## Fail-closed boundary
 
 The complete assignment vector is still discarded for legacy `FInst`, depth
-truncation, dependent dictionary results, term-indexed arguments, open or
-variable higher-kinded heads, malformed or over-bound arities, unsupported
+truncation, dependent dictionary results, term-indexed arguments, free or
+unscoped variable heads, malformed or over-bound arities, unsupported
 structural heads, inconsistent class kind vectors, or any nested unsupported
 marker. Canonical `Prod` and `Sum` at total arity two are the structural
-exception; legacy structural payloads remain rejected. Ordinary goals and
-provider schemes keep their previous instance behavior.
+exception; legacy structural payloads remain rejected. Supported provider
+schemes now retain scoped exact contexts on the plain/binder-only and
+accepted-fact Exference lanes; Djinn and the zero-accepted-group exact-evidence
+fallback retain their documented context-erased compatibility behavior.
 
 Before family planning or translation, Leant pre-scans each bounded assignment
 for exact class-kind and nominal-family arity claims. An internally inconsistent
@@ -118,4 +126,7 @@ dictionary-dependent negative control. The live
 [`synth-provider-structural-assignment`](../../test/synth-provider-structural-assignment.txt)
 transcript then verifies direct `Prod`/partial-`Sum` saturation together with
 contextual `[Binary Prod]` and `[Unary (Sum Fixed)]` evidence in all three
-engine modes.
+engine modes. The later
+[`synth-provider-bound-context-head`](../../test/synth-provider-bound-context-head.txt)
+transcript exercises the live partial source head `Choice (F Nat)` through
+Djinn, Exference, and combined mode.

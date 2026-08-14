@@ -185,7 +185,12 @@ six-binder successor in `2026-08-10-six-binder-instantiation.md`:
   carry a quantified proper type justified by a richer source frontend.
 - **Lean-visible provider instantiation evidence (Leant bridge).** Live
   provider discovery records the original names of leading type
-  binders while erasing unused instance evidence only in the provider lane.
+  binders. The live wire preserves every supported non-dependent provider
+  instance context as a bounded exact nominal class binder. Exference retains
+  it for plain/binder-only providers and exact-evidence providers with at least
+  one accepted fact group; a no-group exact-evidence provider uses its
+  successfully translatable bounded vectors through the erased fallback.
+  Djinn keeps its historical context-erased provider compatibility projection.
   Djex can therefore retain a vacuous specialization as an explicit type
   application, and Leant restores it with a named Lean argument such as
   `global («a» := Nat)`. Intervening class binders remain implicit for Lean's
@@ -200,18 +205,20 @@ six-binder successor in `2026-08-10-six-binder-instantiation.md`:
   rendering. Each of the inferred, `Type _`, and `Prop` lanes retains its own
   12 site-and-style variants, so selective local instantiation sites remain
   reachable under a hard 36-spelling bound; domain-insensitive duplicates
-  collapse back to the historical group size. An exact-assignment-local
-  contextual argument may now retain a structured nominal Lean class head,
-  ordered proper-type arguments, and body. Djex therefore checks a semantic
+  collapse back to the historical group size. A provider scheme or an exact
+  assignment argument may retain a structured nominal Lean class head,
+  ordered bounded-kinded arguments, and body. Djex therefore checks a semantic
   class constraint and Leant renders the same Lean class application; it never
-  guesses source syntax from a Haskell constraint. Legacy raw `FInst`,
+  guesses source syntax from a Haskell constraint. Dependent or unsupported
+  provider contexts truncate and drop that provider instead of silently
+  strengthening it through erasure. Legacy raw `FInst`,
   malformed, free, dictionary-dependent, term-indexed, and otherwise
   unsupported contexts fail closed. Unused implicit term binders are not
-  misclassified as type quantifiers, and ordinary goal and provider-scheme
-  serialization keeps its established behavior.
+  misclassified as type quantifiers, and ordinary goal serialization keeps its
+  established render-only behavior.
 - **Correlated active-instance assignments (Leant bridge).** For each exact
   live provider independently, the generated Lean metaprogram opens at most
-  six leading type binders while retaining the erased instance
+  six leading type binders while retaining the source instance
   constraints which can determine them. It inspects at most 32 active instance
   heads per provider in Lean resolver order. Every selected head and its full
   constraint closure run under `Lean.withoutModifyingState`, so no attempt can
@@ -227,12 +234,18 @@ six-binder successor in `2026-08-10-six-binder-instantiation.md`:
   kind language `Type -> ... -> Type`. Discovery retains the arrow count next
   to that exact argument; zero is proper type, while a positive count preserves
   a bare or partially applied constructor. Serialization runs in a dedicated
-  exact-assignment mode. A genuine nominal class binder becomes
+  exact-assignment mode. In an admitted exact-context position, a genuine
+  nominal class binder in an assignment or provider scheme becomes
   `FExactContext`, which carries its exact Lean class name, bounded ordered
-  ground-kinded arguments, and body instead of pretty-printed binder text.
-  Arity-zero arguments retain their full fragment. Live positive-arity
-  arguments use `(kinded N (nominal "Head" ...))`, carrying an exact constant
-  head and only proper-type supplied arguments. Historical fragment payloads
+  kinded arguments, and body instead of pretty-printed binder text. A
+  positive-arity provider-scheme argument may retain the `FAll` variable that
+  binds it, either bare or partially applied only to proper-type arguments.
+  Arity-zero arguments retain their full fragment. Live ground
+  positive-arity assignment arguments use `(kinded N (nominal "Head" ...))`,
+  carrying an exact constant head and only proper-type supplied arguments. A class binder nested in one
+  of those supplied fragments remains an unsupported `FInst`; it drops that
+  vector locally rather than gaining recursive exact-context authority.
+  Historical fragment payloads
   remain readable for compatible nonstructural heads, but their opaque spelling
   has no structural authority. The Haskell bridge reconstructs every private
   class parameter kind, translates the structure to that checked class, and
@@ -245,8 +258,13 @@ six-binder successor in `2026-08-10-six-binder-instantiation.md`:
   otherwise unsupported contexts. A bounded pre-scan drops assignment vectors
   carrying inconsistent class-kind or nominal-family arity claims without
   poisoning unrelated sibling vectors.
-  Ordinary goal mode keeps its render-only `FInst`, and provider schemes keep
-  erasing instance evidence.
+  Ordinary goal mode keeps its render-only `FInst`. Exference retains a
+  supported provider scheme's semantic exact context on the plain/binder-only
+  or accepted-fact lane; a no-group exact-evidence provider takes the erased
+  fallback instead. A dependent or otherwise unsupported provider context
+  becomes depth truncation and the provider fails closed. Djinn preserves only
+  its historical positive-search compatibility projection and gains no Length
+  authority.
   The boundary is recorded in the
   [contextual provider-assignment report](reports/2026-08-09-contextual-provider-assignments.md).
 
@@ -266,17 +284,56 @@ six-binder successor in `2026-08-10-six-binder-instantiation.md`:
   six provider-binder positions. Historical metadata-free entries,
   binder-only entries, and explicit empty blocks still parse. Historical exact
   arguments without the wrapper remain in their original vectors and default
-  each position to proper kind. The legacy `(candidates ...)` form is read as
-  unary proper-kind vectors only; neither compatibility path recreates a
-  multi-binder product. Assignments stay inside the same `ProviderFrag` as
-  their declaration, so the 1/4/16/full provider-prefix schedule cannot expose
+  each position to proper kind. The legacy `(candidates ...)` form remains
+  readable as unary proper-kind search hints, but retains a distinct provenance
+  tag, has its provider context erased in both projections, and cannot authorize
+  an inventory class fact. Neither compatibility path recreates a multi-binder
+  product. Assignments stay inside the same `ProviderFrag` as their declaration,
+  so the 1/4/16/full provider-prefix schedule cannot expose
   a later provider's vector in an earlier lane. Leant caps the command-wide
   association list at 32 complete vectors before any argument participates in
   family planning, rigidity, or translation.
 
+  Exact live `(instantiations ...)` metadata has one additional checked use.
+  After Lean has fixed a top-level active instance head and closed that head's
+  subgoals plus every provider constraint in one isolated metavariable context,
+  Leant substitutes the complete closed vector into the source provider's
+  leading constraints. The whole specialized constraint group must be closed,
+  forall-free, ground, and accepted transactionally by a trial seal of the
+  complete production Exference inventory. Each novel member of an accepted
+  group becomes a Djex instance declaration with no binders or prerequisites;
+  duplicate facts are reused. The assignment
+  itself remains provider-local; the derived ground class fact is
+  inventory-global and may discharge a matching obligation on a
+  different provider, because the Lean evidence came from top-level global
+  instance resolution rather than a query given. Legacy `(candidates ...)`
+  payloads and incomplete or unsupported vectors contribute no such facts.
+  Accepted facts follow all provider values in stable
+  provider/vector/constraint order. In Exference, vectors with accepted
+  contextual facts do not also enter the historical context-free assignment
+  adapter. An exact-evidence provider with no accepted group recovers all
+  successfully translatable vectors from its bounded, filtered erased
+  fallback; an explicit empty exact evidence block emits no fact and has no
+  assignment to replay.
+  Djinn's erased projection keeps its historical assignment behavior.
+
+  Length consumes this declaration only through its independently sealed static
+  resolver. A contextual Exference certificate must retain the activated ground
+  obligation, Handoff must select the conditional provider summary, and Djex
+  must discharge every obligation and audit the complete protected provider
+  prefix before sealing a Length problem or query. The public graph projection
+  has lost that association and remains non-authoritative. There are no query
+  givens, and Z3 is downstream arithmetic evidence only; it cannot supply a
+  dictionary or discharge receipt. Conditional sessions use policies 8/9/10,
+  ground-discharged candidates use v3, and concrete encodings use 4/5/6;
+  conditional provider/semantic inventories use v3/v2 while every legacy
+  identity remains exact. The complete boundary is recorded in the
+  [live contextual-provider ground-discharge report](reports/2026-08-13-live-contextual-provider-ground-discharge.md).
+
   Live discovery, wire parsing, and engine filtering admit at most 64
-  `Type`-arrow domains in one argument kind. Leant reconstructs the resulting
-  at-most-129-node Djex `GroundKind` values and constructs
+  `Type`-arrow domains in one argument kind. For a context-free provider source,
+  Leant reconstructs the resulting at-most-129-node Djex `GroundKind` values
+  and constructs
   `KindedProviderInstantiationAssignment` records. The pinned Djex API exposes
   checked `runDjinnQueryWithKindedInstantiationAssignments` and
   `runExferenceQueryWithKindedInstantiationAssignments` runners. Each resolves
@@ -293,7 +350,12 @@ six-binder successor in `2026-08-10-six-binder-instantiation.md`:
   kind fact which an erased body cannot infer, both paths now accept
   constraint-only or otherwise vacuous higher-kinded binders as well as
   non-vacuous ones. Neither path donates a choice to an alpha-identically typed
-  sibling or rebuilds a Cartesian product. Empty kinded input is exactly inert.
+  sibling or rebuilds a Cartesian product. Exact contextual Exference vectors
+  with accepted fact groups instead take only the replay-isolated ground-fact
+  path above and never enter this context-free adapter; an exact-evidence
+  provider with no accepted group recovers all successfully translatable
+  vectors from its bounded, filtered erased assignment list. Empty kinded input
+  is exactly inert.
   The earlier scalar and unkinded assignment APIs remain compatibility paths;
   the unkinded route still defaults an unconstrained binder to `Type`. This is
   bounded caller-supplied evidence, not general rank-N subsumption or
@@ -725,12 +787,24 @@ Design rules, all inherited from Djex:
   exact fully-qualified Lean globals during rendering. It also retains the
   source names of engine-visible type binders, so visible Djex
   instantiations render as named Lean arguments without exposing intervening
-  instance binders. For a provider whose erased instance constraint can
-  determine those binders, discovery also records the bounded active-head
-  assignments described in §1.5, including each argument's bounded
-  `Type`-arrow kind. The metadata is provider-local and optional. Leant
-  reconstructs a Djex `GroundKind` for every argument, and both engine adapters
-  receive it only through Djex's checked kinded exact-vector runners.
+  instance binders. The live wire retains supported provider instance binders
+  as semantic exact class contexts. Exference preserves them on the
+  plain/binder-only and accepted-fact lanes, while a no-group exact-evidence
+  provider and Djinn use compatibility erasure. Dependent or unsupported
+  contexts drop that provider. When a provider constraint can determine the visible binders,
+  discovery also records the bounded active-head assignments described in
+  §1.5, including each
+  argument's bounded `Type`-arrow kind. Exact `(instantiations ...)` metadata is
+  provider-local and optional for specialization, while the closed class facts
+  it proves enter the exact Exference inventory and can be resolved globally by
+  Length. Legacy `(candidates ...)` hints never create those facts. Context-free
+  source vectors reach Djex's checked kinded exact-vector runners; contextual
+  Exference vectors instead authorize only the replay-isolated ground-fact
+  path: discovery commits no vector state, source-order trials rebuild the
+  previously accepted keys plus one candidate, and the final inventory is a
+  clean replay of the accepted keys. An all-rejected provider recovers all
+  successfully translatable vectors from its bounded, filtered context-erased
+  historical assignment lane.
   Exference assigns increasing positive rating penalties in discovery order so fallback
   constants do not drown the best match; Djinn instead uses the sparse-prefix
   schedule below. Exference remains subject to its explicit budgets
@@ -844,15 +918,26 @@ Design rules, all inherited from Djex:
   bounded `Type -> ... -> Type` chain; its arrow count crosses the bridge and
   is checked against the exact provider binder. This admits constraint-only or
   otherwise vacuous higher-kinded binders and closed quantified arguments with
-  structured exact-assignment-local nominal class contexts. It does not admit
-  legacy raw `FInst`, free, dictionary-dependent, or term-indexed contexts.
-  Canonical `Prod` and `Sum` are admitted at total arity two, both as direct
-  provider arguments and inside structured exact-assignment-local contexts.
+  structured exact nominal class contexts. The same bounded form retains a
+  supported context at a provider-scheme root; dependent or unsupported roots
+  drop the provider instead of being erased. It does not admit legacy raw
+  `FInst`, free, dictionary-dependent, or term-indexed contexts. Djinn keeps its
+  historical context-erased positive-search projection and never supplies the
+  opaque Length carrier. Canonical `Prod` and `Sum` are admitted at total arity
+  two, both as direct provider
+  arguments and inside structured exact contexts.
   Unsaturated `And`, `PProd`, `Or`, `PSum`, `Iff`, and `Not`, together with
   legacy structural payloads, remain excluded. A vacuous provider may mention
   ambient rigids opened from the query, but a free flexible variable still
-  disables this route. No ordinary goal or provider scheme gains contextual
-  search from this assignment-only representation.
+  disables this route. Ordinary goals gain no contextual search from this
+  representation. Only exact live `(instantiations ...)` closure on an
+  Exference contextual provider can create a zero-prerequisite ground inventory
+  fact, and only after the complete specialized constraint group passes a
+  transactional trial seal; legacy `(candidates ...)` metadata cannot. Such a
+  fact may serve another provider in the exact inventory because
+  its Lean evidence was top-level and global, but neither query givens nor Z3
+  participate. A conditional Length problem and query exist only after Djex's
+  independent static discharge and protected-prefix audit.
 - **Recursive elimination is bounded to one layer in Exference.** A
   recursive field exposed by a constructor match is available as a
   normal branch-local value, but is not eagerly decomposed again. The

@@ -69,10 +69,10 @@ synth engine: exference
   it3  fun x y => let _ := x; match y with | .inl _ => StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType))) x y | .inr z => StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType))) x (.inr z)
   it4  fun x y => let ⟨_, z⟩ := x; match y with | .inl _ => StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType))) x y | .inr _ => StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType))) x (.inr z)
   it5  fun x y => let _ := x; match y with | .inl z => StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType))) x (.inl z) | .inr _ => StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType))) x y
-note: search truncated: step limit reached, queue limit pruned 76156
+note: search truncated: step limit reached, queue limit pruned 46332
 λ> :synth StructuralContext.Token
   it1  StructuralContext.choose («selected» := (∀ {a0_0 : Type _}, [@StructuralContext.Binary Prod] → [@StructuralContext.Unary (Sum (StructuralContext.Fixed))] → a0_0 → a0_0))
-note: search truncated: step limit reached, queue limit pruned 18007
+note: search truncated: step limit reached, queue limit pruned 17029
 λ> :set synth-engine both
 synth engine: both
 λ> :synth StructuralDirect.Goal

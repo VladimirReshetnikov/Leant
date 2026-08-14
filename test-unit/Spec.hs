@@ -64,8 +64,10 @@ import Language.Haskell.Djex
   , Variable (FlexibleVariable)
   , inferredVisibleTypeArgument
   , checkedLengthCandidateResult
+  , checkedLengthCandidateFingerprint
   , checkedLengthCandidateUsedProviders
   , checkedLengthProblemCandidate
+  , checkedLengthProblemEncodingFingerprint
   , maximumProviderInstantiationArguments
   , maximumProviderInstantiationKindNodes
   , mkIdentifier
@@ -1022,24 +1024,31 @@ providerProgramTests = testGroup "provider discovery program"
         `isInfixOf` synthPrelude [] @?= True
       "              match \8592 appOf providerMode exactAssignmentMode fuel depth blocked e with"
         `isInfixOf` synthPrelude [] @?= True
-  , testCase "separate ordinary and exact-assignment instance serialization" $ do
+  , testCase "separate contextual provider, ordinary and exact-assignment serialization" $ do
       let instanceHandling = unlines
             [ "      else if bi.isInstImplicit then"
             , "        -- Typeclass evidence is reconstructed by Lean when a value is"
             , "        -- applied, so Djex never consumes it as a term premise. Providers"
-            , "        -- erase the binder completely. Exact assignment mode preserves a"
-            , "        -- bounded, semantic class application; ordinary goal mode retains"
-            , "        -- only the legacy render marker for backward compatibility."
-            , "        if providerMode then"
-            , "          go providerMode exactAssignmentMode fuel depth blocked b"
+            , "        -- and exact assignments preserve a bounded semantic class"
+            , "        -- application. Unsupported provider contexts fail closed; ordinary"
+            , "        -- goal mode retains only its legacy render marker."
+            , "        if providerMode then do"
+            , "          match \8592 exactContextFragment? true false fuel depth blocked t b with"
+            , "          | none => pure \"(depth)\""
+            , "          | some context => pure context"
             , "        else if exactAssignmentMode then do"
             , "          let legacy : MetaM String := do"
             ]
           exactContextHandling = unlines
-            [ "          match \8592 Meta.isClass? classType with"
-            , "          | none => legacy"
-            , "          | some className => do"
-            , "            let arguments := classType.getAppArgs"
+            [ "partial def exactContextFragment?"
+            , "    (bodyProviderMode bodyExactAssignmentMode : Bool)"
+            , "    (fuel depth : Nat) (blocked : List String)"
+            , "    (contextType body : Expr) : MetaM (Option String) := do"
+            , "  let classType \8592 whnfR contextType.consumeMData"
+            , "  match \8592 Meta.isClass? classType with"
+            , "  | none => pure none"
+            , "  | some className => do"
+            , "    let arguments := classType.getAppArgs"
             ]
           implicitScheme = unlines
             [ "      else do"
@@ -1051,7 +1060,7 @@ providerProgramTests = testGroup "provider discovery program"
             ]
       instanceHandling `isInfixOf` synthPrelude [] @?= True
       exactContextHandling `isInfixOf` synthPrelude [] @?= True
-      "pure (\"(exact-context \" ++ esc className.toString"
+      "pure (some (\"(exact-context \" ++ esc className.toString"
         `isInfixOf` synthPrelude [] @?= True
       "def exactContextArgumentKindArity? (fuel : Nat) (argument : Expr)"
         `isInfixOf` synthPrelude [] @?= True
@@ -1059,9 +1068,15 @@ providerProgramTests = testGroup "provider discovery program"
         `isInfixOf` synthPrelude [] @?= True
       isInfixOf "pure (some (arity, \"(nominal \" ++ esc name.toString"
         (synthPrelude []) @?= True
+      "let headPP \8592 Meta.ppExpr argument.getAppFn"
+        `isInfixOf` synthPrelude [] @?= True
+      "++ esc key ++ \" \" ++ head ++ rendered ++ \")\"))"
+        `isInfixOf` synthPrelude [] @?= True
       "++ toString arity ++ \" \" ++ fragment ++ \")\""
         `isInfixOf` synthPrelude [] @?= True
-      "if exactAssignmentMode && bi.isInstImplicit then pure \"(depth)\""
+      "if (providerMode || exactAssignmentMode) && bi.isInstImplicit"
+        `isInfixOf` synthPrelude [] @?= True
+      "match \8592 exactContextFragment? false true fuel depth blocked t b with"
         `isInfixOf` synthPrelude [] @?= True
       "let r \8592 go providerMode false fuel depth blocked b"
         `isInfixOf` synthPrelude [] @?= True
@@ -1120,6 +1135,13 @@ providerProgramTests = testGroup "provider discovery program"
       "if arity > 64 then" `isInfixOf` prelude @?= True
       "providerNominalCandidateFragment? fuel candidate"
         `isInfixOf` prelude @?= True
+      "let argument \8592 go false false fuel 0 [] arg"
+        `isInfixOf` prelude @?= True
+      assertBool
+        "nominal supplied evidence retained exact contextual authority"
+        $ not
+        $ "let argument \8592 go false true fuel 0 [] arg"
+            `isInfixOf` prelude
       "let mut assignments : Array (Array ProviderCandidateFragment) := #[]"
         `isInfixOf` prelude @?= True
       "candidate : Expr"
@@ -1515,6 +1537,8 @@ translationPreparationTests = testGroup "prepared synthesis translation"
                     { providerTypeBinderNames = names } -> Just names
                   ProviderFragWithEvidence
                     { providerTypeBinderNames = names } -> Just names
+                  ProviderFragWithLegacyCandidates
+                    { providerTypeBinderNames = names } -> Just names
             pure (providerInfo
               (providerLeanName provider)
               binderNames
@@ -1555,6 +1579,627 @@ translationPreparationTests = testGroup "prepared synthesis translation"
             (inspectedProviderPrivateSpelling binding)
             providerMap)
           bindings @?= [Just expectedFirst, Just expectedSecond]
+  , testCase
+      "separate exact contextual facts from legacy and malformed hints" $ do
+      let token = FAtom False "Demo.ContextToken"
+          natural = FParamRec True "Nat" "Nat" []
+            [ ("Nat.zero", [])
+            , ("Nat.succ", [FAtom False "Nat"])
+            ]
+          boolean = FParamInd "Bool" "Bool" []
+            [("Bool.false", []), ("Bool.true", [])]
+          contextualScheme className = FAll False "a"
+            $ FExactContext className
+                [ExactContextFragmentArgument 0 $ FVar "a"]
+                token
+          higherContextualScheme = FAll False "F"
+            $ FExactContext "Demo.HigherC"
+                [ExactContextFragmentArgument 1 $ FVar "F"]
+                token
+          partialHigherContextualScheme = FAll False "F" $ FAll False "a"
+            $ FExactContext "Demo.PartialHigherC"
+                [ ExactContextFragmentArgument 1 $
+                    FApp True "F a" (AppVariable "F") [FVar "a"]
+                ]
+                token
+          exact = ProviderFragWithEvidence "Demo.contextual"
+            (contextualScheme "Demo.C") ["a"]
+            [ [ProviderInstantiationArgument 0 natural]
+            , [ProviderInstantiationArgument 0 natural]
+            ]
+          exactSingle = ProviderFragWithEvidence "Demo.contextual"
+            (contextualScheme "Demo.C") ["a"]
+            [[ProviderInstantiationArgument 0 natural]]
+          exactOther = ProviderFragWithEvidence "Demo.otherContextual"
+            (contextualScheme "Demo.E") ["a"]
+            [[ProviderInstantiationArgument 0 natural]]
+          exactEmpty = ProviderFragWithEvidence "Demo.contextual"
+            (contextualScheme "Demo.C") ["a"] []
+          higherExact = ProviderFragWithEvidence "Demo.higherContextual"
+            higherContextualScheme ["F"]
+            [[ProviderInstantiationNominalArgument 1 "Demo.Higher" []]]
+          partialHigherExact = ProviderFragWithEvidence
+            "Demo.partialHigherContextual" partialHigherContextualScheme
+            ["F", "a"]
+            [ [ ProviderInstantiationNominalArgument 2 "Demo.Pair" []
+              , ProviderInstantiationArgument 0 natural
+              ]
+            ]
+          openHigher = ProviderFragWithBinders "Demo.openHigher"
+            (FExactContext "Demo.HigherC"
+              [ExactContextFragmentArgument 1 $ FVar "F"]
+              token)
+            ["F"]
+          higherWithNestedFallback = ProviderFragWithEvidence
+            "Demo.higherContextual" higherContextualScheme ["F"]
+            [ [ ProviderInstantiationNominalArgument 1 "Demo.BadHigher"
+                  [FInst "Demo.Nested Nat" natural]
+              ]
+            , [ProviderInstantiationNominalArgument 1 "Demo.Higher" []]
+            ]
+          trialRejected = ProviderFragWithEvidence "Demo.contextual"
+            (contextualScheme "Demo.C") ["a"]
+            [[ProviderInstantiationNominalArgument 1 "Demo.Higher" []]]
+          trialThenGood = ProviderFragWithEvidence "Demo.contextual"
+            (contextualScheme "Demo.C") ["a"]
+            [ [ProviderInstantiationNominalArgument 1 "Demo.Higher" []]
+            , [ProviderInstantiationArgument 0 natural]
+            ]
+          goodThenTrial = ProviderFragWithEvidence "Demo.contextual"
+            (contextualScheme "Demo.C") ["a"]
+            [ [ProviderInstantiationArgument 0 natural]
+            , [ProviderInstantiationNominalArgument 1 "Demo.Higher" []]
+            ]
+          multiContextualScheme = FAll False "a" $ FAll False "b"
+            $ FExactContext "Demo.C"
+                [ExactContextFragmentArgument 0 $ FVar "a"]
+            $ FExactContext "Demo.D"
+                [ExactContextFragmentArgument 0 $ FVar "b"]
+                token
+          multiAccepted = ProviderFragWithEvidence "Demo.multiContextual"
+            multiContextualScheme ["a", "b"]
+            [ [ ProviderInstantiationArgument 0 natural
+              , ProviderInstantiationArgument 0 boolean
+              ]
+            ]
+          multiRejected = ProviderFragWithEvidence "Demo.multiContextual"
+            multiContextualScheme ["a", "b"]
+            [ [ ProviderInstantiationArgument 0 natural
+              , ProviderInstantiationNominalArgument 1 "Demo.Higher" []
+              ]
+            ]
+          orderedVectors = ProviderFragWithEvidence "Demo.contextual"
+            (contextualScheme "Demo.C") ["a"]
+            [ [ProviderInstantiationArgument 0 natural]
+            , [ProviderInstantiationArgument 0 boolean]
+            ]
+          legacy = ProviderFragWithLegacyCandidates "Demo.contextual"
+            (contextualScheme "Demo.C") ["a"] [natural]
+          instanceConstraints prepared =
+            [ constraint
+            | InstanceDeclaration () [] [] constraint <-
+                inspectedDeclarations prepared
+            ]
+      exactPrepared <- expectRight $ inspectExferencePreparation
+        [exact] [] token token
+      (contextClass, groundArgument) <- case
+          ( inspectedProviderBindings exactPrepared
+          , instanceConstraints exactPrepared
+          ) of
+        ( [binding]
+          , [Constraint factClass [factArgument]]
+          ) -> case inspectedProviderScheme binding of
+            ForallType [binder]
+                [Constraint schemeClass [TypeVariable occurrence]] _ -> do
+              occurrence @?= binder
+              factClass @?= schemeClass
+              inspectedProviderAssignments binding @?= []
+              inspectedAllProviderAssignments exactPrepared @?= []
+              pure (schemeClass, factArgument)
+            scheme -> assertFailure
+              ("exact provider context was erased: " ++ show scheme)
+                >> error "unreachable"
+        (bindings, facts) -> assertFailure
+          ("exact contextual preparation retained unexpected bindings/facts: "
+            ++ show (bindings, facts)) >> error "unreachable"
+      assertBool "exact contextual evidence minted a quantified fact"
+        $ not $ Djex.containsForall groundArgument
+      assertBool "exact contextual evidence minted a non-ground fact"
+        $ Set.null $ Djex.freeVariables groundArgument
+
+      fragHasUnsupportedInstanceBinder higherContextualScheme @?= False
+      higherPrepared <- expectRight $ inspectExferencePreparation
+        [higherExact] [] token token
+      case ( inspectedProviderBindings higherPrepared
+           , instanceConstraints higherPrepared
+           ) of
+        ( [binding]
+          , [Constraint factClass [factArgument]]
+          ) -> case inspectedProviderScheme binding of
+            ForallType [binder]
+                [Constraint schemeClass [TypeVariable occurrence]] _ -> do
+              occurrence @?= binder
+              factClass @?= schemeClass
+              inspectedProviderAssignments binding @?= []
+              inspectedAllProviderAssignments higherPrepared @?= []
+              (Djex.nameSpelling factClass >>=
+                  (`Map.lookup` inspectedTypeMap higherPrepared)) @?=
+                Just "Demo.HigherC"
+              case factArgument of
+                TypeConstructor typeName ->
+                  (Djex.nameSpelling typeName >>=
+                      (`Map.lookup` inspectedTypeMap higherPrepared)) @?=
+                    Just "Demo.Higher"
+                other -> assertFailure $
+                  "higher-kinded fact lost its nominal head: " ++ show other
+              assertBool "higher-kinded fact retained a forall"
+                $ not $ Djex.containsForall factArgument
+              assertBool "higher-kinded fact retained a free variable"
+                $ Set.null $ Djex.freeVariables factArgument
+            scheme -> assertFailure $
+              "bound higher-kinded context was erased: " ++ show scheme
+        other -> assertFailure $
+          "bound higher-kinded evidence retained unexpected authority: "
+            ++ show other
+      higherWithNestedPrepared <- expectRight $ inspectExferencePreparation
+        [higherWithNestedFallback] [] token token
+      higherWithNestedPrepared @?= higherPrepared
+      partialHigherPrepared <- expectRight $ inspectExferencePreparation
+        [partialHigherExact] [] token token
+      case ( inspectedProviderBindings partialHigherPrepared
+           , instanceConstraints partialHigherPrepared
+           ) of
+        ( [binding]
+          , [Constraint factClass
+              [TypeApplication (TypeConstructor pairName) factElement]]
+          ) -> case inspectedProviderScheme binding of
+            ForallType [functionBinder, argumentBinder]
+                [ Constraint schemeClass
+                    [ TypeApplication
+                        (TypeVariable functionOccurrence)
+                        (TypeVariable argumentOccurrence)
+                    ]
+                ] _ -> do
+              functionOccurrence @?= functionBinder
+              argumentOccurrence @?= argumentBinder
+              factClass @?= schemeClass
+              inspectedProviderAssignments binding @?= []
+              inspectedAllProviderAssignments partialHigherPrepared @?= []
+              (Djex.nameSpelling factClass >>=
+                  (`Map.lookup` inspectedTypeMap partialHigherPrepared)) @?=
+                Just "Demo.PartialHigherC"
+              (Djex.nameSpelling pairName >>=
+                  (`Map.lookup` inspectedTypeMap partialHigherPrepared)) @?=
+                Just "Demo.Pair"
+              case factElement of
+                TypeConstructor elementName ->
+                  (Djex.nameSpelling elementName >>=
+                      (`Map.lookup`
+                        inspectedTypeMap partialHigherPrepared)) @?=
+                    Just "Nat"
+                other -> assertFailure $
+                  "partial higher-kinded fact lost its Nat argument: "
+                    ++ show other
+              assertBool "partial higher-kinded fact retained a forall"
+                $ not $ Djex.containsForall factElement
+              assertBool "partial higher-kinded fact retained a free variable"
+                $ Set.null $ Djex.freeVariables factElement
+            scheme -> assertFailure $
+              "partial bound higher-kinded context was erased: " ++ show scheme
+        other -> assertFailure $
+          "partial bound higher-kinded evidence retained unexpected authority: "
+            ++ show other
+
+      legacyPrepared <- expectRight $ inspectExferencePreparation
+        [legacy] [] token token
+      instanceConstraints legacyPrepared @?= []
+      case inspectedProviderBindings legacyPrepared of
+        [binding] -> do
+          case inspectedProviderScheme binding of
+            ForallType [_] [] _ -> pure ()
+            scheme -> assertFailure $
+              "legacy candidate provenance retained provider context: "
+                ++ show scheme
+          length (inspectedProviderAssignments binding) @?= 1
+        bindings -> assertFailure $
+          "legacy preparation retained unexpected bindings: " ++ show bindings
+      assertBool "legacy preparation accidentally retained a context class"
+        $ all (/= contextClass)
+        $ [ className
+          | ClassDeclaration () className _ _ _ <-
+              inspectedDeclarations legacyPrepared
+          ]
+      emptyPrepared <- expectRight $ inspectExferencePreparation
+        [exactEmpty] [] token token
+      instanceConstraints emptyPrepared @?= []
+      inspectedAllProviderAssignments emptyPrepared @?= []
+      case inspectedProviderBindings emptyPrepared of
+        [binding] -> case inspectedProviderScheme binding of
+          ForallType [_] [] _ -> pure ()
+          scheme -> assertFailure $
+            "empty exact evidence retained provider context: " ++ show scheme
+        bindings -> assertFailure $
+          "empty exact evidence retained unexpected bindings: "
+            ++ show bindings
+      trialRejectedPrepared <- expectRight $ inspectExferencePreparation
+        [trialRejected] [] token token
+      instanceConstraints trialRejectedPrepared @?= []
+      case inspectedProviderBindings trialRejectedPrepared of
+        [binding] -> do
+          case inspectedProviderScheme binding of
+            ForallType [_] [] _ -> pure ()
+            scheme -> assertFailure $
+              "rejected fact trial retained provider context: " ++ show scheme
+          length (inspectedProviderAssignments binding) @?= 1
+        bindings -> assertFailure $
+          "rejected fact trial lost its fallback binding: " ++ show bindings
+      multiAcceptedPrepared <- expectRight $ inspectExferencePreparation
+        [multiAccepted] [] token token
+      case ( inspectedProviderBindings multiAcceptedPrepared
+           , instanceConstraints multiAcceptedPrepared
+           ) of
+        ( [binding]
+          , [ Constraint firstFactClass [firstFactArgument]
+            , Constraint secondFactClass [secondFactArgument]
+            ]
+          ) -> case inspectedProviderScheme binding of
+            ForallType [firstBinder, secondBinder]
+                [ Constraint firstSchemeClass
+                    [TypeVariable firstOccurrence]
+                , Constraint secondSchemeClass
+                    [TypeVariable secondOccurrence]
+                ] _ -> do
+              (firstOccurrence, secondOccurrence) @?=
+                (firstBinder, secondBinder)
+              (firstFactClass, secondFactClass) @?=
+                (firstSchemeClass, secondSchemeClass)
+              map
+                  (\className -> Djex.nameSpelling className >>=
+                    (`Map.lookup` inspectedTypeMap multiAcceptedPrepared))
+                  [firstFactClass, secondFactClass] @?=
+                [Just "Demo.C", Just "Demo.D"]
+              assertBool "ordered contextual facts collapsed their classes"
+                $ firstFactClass /= secondFactClass
+              let leanFactType typeExpression = case typeExpression of
+                    TypeConstructor typeName -> Djex.nameSpelling typeName >>=
+                      (`Map.lookup` inspectedTypeMap multiAcceptedPrepared)
+                    _ -> Nothing
+              map leanFactType [firstFactArgument, secondFactArgument] @?=
+                [Just "Nat", Just "Bool"]
+            scheme -> assertFailure $
+              "multi-constraint provider lost its source context order: "
+                ++ show scheme
+        other -> assertFailure $
+          "multi-constraint fact group was not retained atomically: "
+            ++ show other
+      multiRejectedPrepared <- expectRight $ inspectExferencePreparation
+        [multiRejected] [] token token
+      instanceConstraints multiRejectedPrepared @?= []
+      assertBool "fallback did not commit its natural argument family"
+        $ "Nat" `elem` Map.elems (inspectedTypeMap multiRejectedPrepared)
+      assertBool "fallback did not commit its higher-kinded argument family"
+        $ "Demo.Higher" `elem`
+            Map.elems (inspectedTypeMap multiRejectedPrepared)
+      case inspectedProviderBindings multiRejectedPrepared of
+        [binding] -> do
+          case inspectedProviderScheme binding of
+            ForallType [_, _] [] _ -> pure ()
+            scheme -> assertFailure $
+              "partially rejected fact group retained a context: "
+                ++ show scheme
+          length (inspectedProviderAssignments binding) @?= 1
+        bindings -> assertFailure $
+          "partially rejected fact group lost its fallback binding: "
+            ++ show bindings
+      orderedPrepared <- expectRight $ inspectExferencePreparation
+        [orderedVectors] [] token token
+      case instanceConstraints orderedPrepared of
+        [ Constraint firstClass [firstArgument]
+          , Constraint secondClass [secondArgument]
+          ] -> do
+            firstClass @?= secondClass
+            let leanTypeName typeExpression = case typeExpression of
+                  TypeConstructor typeName -> Djex.nameSpelling typeName >>=
+                    (`Map.lookup` inspectedTypeMap orderedPrepared)
+                  _ -> Nothing
+            map leanTypeName [firstArgument, secondArgument] @?=
+              [Just "Nat", Just "Bool"]
+        facts -> assertFailure $
+          "distinct exact vectors lost source fact order: " ++ show facts
+      providerOrderedPrepared <- expectRight $ inspectExferencePreparation
+        [exactSingle, exactOther] [] token token
+      case instanceConstraints providerOrderedPrepared of
+        [Constraint firstClass _, Constraint secondClass _] ->
+          map
+              (\className -> Djex.nameSpelling className >>=
+                (`Map.lookup` inspectedTypeMap providerOrderedPrepared))
+              [firstClass, secondClass] @?=
+            [Just "Demo.C", Just "Demo.E"]
+        facts -> assertFailure $
+          "distinct providers lost source fact order: " ++ show facts
+      let exactDjinn = synthesizeWithProviders
+            EngineDjinn 1024 [exactSingle] token
+          legacyDjinn = synthesizeWithProviders
+            EngineDjinn 1024 [legacy] token
+      exactDjinn @?= legacyDjinn
+      case exactDjinn of
+        Right (SynthCandidates groups _) -> assertBool
+          ("context-erased Djinn compatibility found no provider: "
+            ++ show groups)
+          $ any ("Demo.contextual" `isInfixOf`) $ concat groups
+        outcome -> assertFailure $
+          "context-erased Djinn compatibility failed: " ++ show outcome
+
+      let recipient = ProviderFragWithBinders "Demo.contextRecipient"
+            (contextualScheme "Demo.C") ["a"]
+      crossPrepared <- expectRight $ inspectExferencePreparation
+        [exactSingle, recipient] [] token token
+      crossFact <- case instanceConstraints crossPrepared of
+        [fact] -> pure fact
+        facts -> assertFailure
+          ("cross-provider preparation retained unexpected facts: "
+            ++ show facts) >> error "unreachable"
+      case inspectedProviderBindings crossPrepared of
+        [donorBinding, recipientBinding] -> do
+          inspectedProviderAssignments donorBinding @?= []
+          inspectedProviderAssignments recipientBinding @?= []
+          case inspectedProviderScheme recipientBinding of
+            ForallType [_] [_] _ -> pure ()
+            scheme -> assertFailure $
+              "cross-provider recipient lost its context: " ++ show scheme
+          let declarations = inspectedDeclarations crossPrepared
+          drop (length declarations - 3) declarations @?=
+            [ ValueDeclaration $ ValueSignature ()
+                (inspectedProviderPrivateName donorBinding)
+                (inspectedProviderScheme donorBinding)
+            , ValueDeclaration $ ValueSignature ()
+                (inspectedProviderPrivateName recipientBinding)
+                (inspectedProviderScheme recipientBinding)
+            , InstanceDeclaration () [] [] crossFact
+            ]
+        bindings -> assertFailure $
+          "cross-provider preparation retained unexpected bindings: "
+            ++ show bindings
+      let recipientResiduals outcome = case outcome of
+            DetailedSynthCandidates groups _ ->
+              [ Djex.candidateResidualConstraints
+                  $ Djex.typedCandidateCompatibility
+                  $ typedCandidateSemanticCandidate semantic
+              | group <- groups
+              , any ("Demo.contextRecipient" `isInfixOf`)
+                  $ detailedCandidateGroupVariants group
+              , Just semantic <-
+                  [detailedCandidateGroupSemanticSidecar group]
+              ]
+            _ -> []
+      recipientOnly <- expectRight $
+        synthesizeWithProvidersSkippingDetailed
+          EngineExference 1024 Set.empty [recipient] token
+      assertBool
+        "the recipient resolved without the donor's global C Nat fact"
+        $ all (not . null) $ recipientResiduals recipientOnly
+      crossDetailed <- expectRight $
+        synthesizeWithProvidersSkippingDetailed
+          EngineExference 1024 Set.empty [exactSingle, recipient] token
+      assertBool
+        ("a global C Nat fact did not discharge the sibling provider: "
+          ++ show (recipientResiduals crossDetailed))
+        $ any null $ recipientResiduals crossDetailed
+
+      let quantified = FAll True "x"
+            $ FArr (FVar "x") (FVar "x")
+          malformed name className argument = ProviderFragWithEvidence name
+            (contextualScheme className) ["a"]
+            [[ProviderInstantiationArgument 0 argument]]
+          badForall = malformed "Demo.badForall" "Demo.ForallClass"
+            quantified
+          failingFallback = ProviderFragWithEvidence "Demo.badForall"
+            (contextualScheme "Demo.ForallClass") ["a"]
+            [ [ProviderInstantiationArgument 0 $ FVar "unbound"]
+            , [ProviderInstantiationArgument 0 quantified]
+            ]
+          mixedVector = ProviderFragWithEvidence "Demo.contextual"
+            (contextualScheme "Demo.C") ["a"]
+            [ [ProviderInstantiationArgument 0 quantified]
+            , [ProviderInstantiationArgument 0 natural]
+            ]
+      fallbackPrepared <- expectRight $ inspectExferencePreparation
+        [badForall] [] token token
+      instanceConstraints fallbackPrepared @?= []
+      case inspectedProviderBindings fallbackPrepared of
+        [binding] -> do
+          case inspectedProviderScheme binding of
+            ForallType [_] [] _ -> pure ()
+            scheme -> assertFailure $
+              "resolver-ineligible exact evidence kept its context: "
+                ++ show scheme
+          length (inspectedProviderAssignments binding) @?= 1
+        bindings -> assertFailure $
+          "context-erased exact fallback retained unexpected bindings: "
+            ++ show bindings
+      failingFallbackPrepared <- expectRight $ inspectExferencePreparation
+        [failingFallback] [] token token
+      failingFallbackPrepared @?= fallbackPrepared
+      exactSinglePrepared <- expectRight $ inspectExferencePreparation
+        [exactSingle] [] token token
+      openSiblingPrepared <- expectRight $ inspectExferencePreparation
+        [openHigher, exactSingle] [] token token
+      openSiblingPrepared @?= exactSinglePrepared
+      trialThenGoodPrepared <- expectRight $ inspectExferencePreparation
+        [trialThenGood] [] token token
+      trialThenGoodPrepared @?= exactSinglePrepared
+      goodThenTrialPrepared <- expectRight $ inspectExferencePreparation
+        [goodThenTrial] [] token token
+      goodThenTrialPrepared @?= exactSinglePrepared
+      mixedVectorPrepared <- expectRight $ inspectExferencePreparation
+        [mixedVector] [] token token
+      mixedVectorPrepared @?= exactSinglePrepared
+      mixedPrepared <- expectRight $ inspectExferencePreparation
+        [badForall, exact] [] token token
+      case instanceConstraints mixedPrepared of
+        [Constraint factClass [argument]] -> do
+          (Djex.nameSpelling factClass >>=
+              (`Map.lookup` inspectedTypeMap mixedPrepared)) @?=
+            Just "Demo.C"
+          argument @?= groundArgument
+          assertBool "a quantified evidence vector minted an instance"
+            $ not $ Djex.containsForall argument
+          assertBool "the good ground fact retained a free variable"
+            $ Set.null $ Djex.freeVariables argument
+        facts -> assertFailure $
+          "malformed evidence poisoned or expanded the good fact set: "
+            ++ show facts
+  , testCase "share alpha-renamed bound contextual family schemas" $ do
+      let token = FAtom False "Demo.ContextSchemaToken"
+          field functionBinder argumentBinder =
+            FAll False functionBinder $ FAll False argumentBinder $
+              FExactContext "Demo.ContextSchema"
+                [ ExactContextFragmentArgument 1 $
+                    FApp True
+                      (functionBinder ++ " " ++ argumentBinder)
+                      (AppVariable functionBinder)
+                      [FVar argumentBinder]
+                ]
+                token
+          family key parameter fixedField =
+            FParamInd "Demo.ContextBox" key [FVar parameter]
+              [("Demo.ContextBox.mk", [fixedField])]
+          left = family "Demo.ContextBox left" "left"
+            $ field "F" "a"
+          right = family "Demo.ContextBox right" "right"
+            $ field "G" "b"
+          goal = FAll False "left" $ FAll False "right" $
+            FArr left $ FArr right token
+      prepared <- expectRight $ inspectExferencePreparation [] [] goal goal
+      length (inspectedSemanticFamilyBindings prepared) @?= 1
+      let contextBoxDeclarations =
+            [ typeName
+            | DataTypeDeclaration _ typeName _ _ <-
+                inspectedDeclarations prepared
+            , (Djex.nameSpelling typeName >>=
+                (`Map.lookup` inspectedTypeMap prepared)) ==
+                Just "Demo.ContextBox"
+            ]
+      length contextBoxDeclarations @?= 1
+  , testCase
+      "drop downgraded nested contexts from nominal evidence locally" $ do
+      let token = FAtom False "Demo.ContextToken"
+          natural = FParamRec True "Nat" "Nat" []
+            [ ("Nat.zero", [])
+            , ("Nat.succ", [FAtom False "Nat"])
+            ]
+          naturalWire =
+            "(param-rec complete \"Nat\" \"Nat\" (params) "
+              ++ "(ctor \"Nat.zero\") "
+              ++ "(ctor \"Nat.succ\" (atom unsafe \"Nat\")))"
+          nestedWire =
+            "(inst \"Demo.Nested Nat\" " ++ naturalWire ++ ")"
+          badArgumentWire =
+            "(kinded 1 (nominal \"Demo.Higher\" "
+              ++ nestedWire ++ "))"
+          goodArgumentWire = "(kinded 0 " ++ naturalWire ++ ")"
+          providerScheme = FAll False "a"
+            $ FExactContext "Demo.C"
+                [ExactContextFragmentArgument 0 $ FVar "a"]
+                token
+          providerSchemeWire =
+            "(alli \"a\" (exact-context \"Demo.C\" (arguments "
+              ++ "(kinded 0 (var \"a\"))) "
+              ++ "(atom unsafe \"Demo.ContextToken\")))"
+          inventory =
+            "(providers (provider \"Demo.contextual\" (binders \"a\") "
+              ++ "(instantiations (args " ++ badArgumentWire ++ ") "
+              ++ "(args " ++ goodArgumentWire ++ ")) "
+              ++ providerSchemeWire ++ "))"
+          downgraded = ProviderFragWithEvidence "Demo.contextual"
+            providerScheme ["a"]
+            [ [ ProviderInstantiationNominalArgument 1 "Demo.Higher"
+                  [FInst "Demo.Nested Nat" natural]
+              ]
+            , [ProviderInstantiationArgument 0 natural]
+            ]
+          validOnly = ProviderFragWithEvidence "Demo.contextual"
+            providerScheme ["a"]
+            [[ProviderInstantiationArgument 0 natural]]
+          instanceConstraints prepared =
+            [ constraint
+            | InstanceDeclaration () [] [] constraint <-
+                inspectedDeclarations prepared
+            ]
+      parsed <- expectRight $ parseProviderSexp inventory
+      parsed @?= [downgraded]
+      expected <- expectRight $ inspectExferencePreparation
+        [validOnly] [] token token
+      actual <- expectRight $ inspectExferencePreparation
+        parsed [] token token
+      actual @?= expected
+      case ( inspectedProviderBindings actual
+           , instanceConstraints actual
+           ) of
+        ( [binding], [Constraint className [argument]] ) -> do
+          inspectedProviderAssignments binding @?= []
+          (Djex.nameSpelling className >>=
+              (`Map.lookup` inspectedTypeMap actual)) @?= Just "Demo.C"
+          case argument of
+            TypeConstructor typeName ->
+              (Djex.nameSpelling typeName >>=
+                  (`Map.lookup` inspectedTypeMap actual)) @?= Just "Nat"
+            other -> assertFailure $
+              "surviving exact fact lost Nat identity: " ++ show other
+        other -> assertFailure $
+          "nested nominal context changed surviving authority: " ++ show other
+  , testCase
+      "exclude visible-argument failures from fallback family planning" $ do
+      let token = FAtom False "Demo.PlanningToken"
+          quantified = FAll True "x"
+            $ FArr (FVar "x") (FVar "x")
+          planned argument = FParamInd
+            "Demo.Planned" "Demo.Planned argument" [argument]
+            [("Demo.Planned.mk", [argument])]
+          plannedFallbackArgument = planned quantified
+          planningFailureArgument = FApp False
+            "Demo.Planned unbound" (AppNominal "Demo.Planned")
+            [FVar "unbound"]
+          provider assignments = ProviderFragWithEvidence
+            "Demo.plannedContextual"
+            (FAll False "a"
+              $ FExactContext "Demo.PlanningC"
+                  [ExactContextFragmentArgument 0 $ FVar "a"]
+                  token)
+            ["a"] assignments
+          fallbackOnly = provider
+            [[ProviderInstantiationArgument 0 plannedFallbackArgument]]
+          failureThenFallback = provider
+            [ [ProviderInstantiationArgument 0 planningFailureArgument]
+            , [ProviderInstantiationArgument 0 plannedFallbackArgument]
+            ]
+          instanceConstraints prepared =
+            [ constraint
+            | InstanceDeclaration () [] [] constraint <-
+                inspectedDeclarations prepared
+            ]
+      fragHasDepth planningFailureArgument @?= False
+      fragHasInstanceBinder planningFailureArgument @?= False
+      fragHasUnsupportedInstanceBinder planningFailureArgument @?= False
+      expected <- expectRight $ inspectExferencePreparation
+        [fallbackOnly] [] token token
+      instanceConstraints expected @?= []
+      case inspectedProviderBindings expected of
+        [binding] -> length (inspectedProviderAssignments binding) @?= 1
+        bindings -> assertFailure $
+          "planned fallback retained unexpected bindings: " ++ show bindings
+      assertBool "planned fallback lost its structural family"
+        $ any
+          (\declaration -> case declaration of
+            DataTypeDeclaration () typeName [_] [_] ->
+              (Djex.nameSpelling typeName >>=
+                (`Map.lookup` inspectedTypeMap expected)) ==
+                  Just "Demo.Planned"
+            _ -> False)
+          (inspectedDeclarations expected)
+      actual <- expectRight $ inspectExferencePreparation
+        [failureThenFallback] [] token token
+      actual @?= expected
   , testCase "bind private providers, assignments, and exact family maps" $ do
       privateProvider <- expectRight $ mkIdentifier "leantProvider0"
       privateType <- expectRight $ mkIdentifier "LeantType0"
@@ -1666,7 +2311,7 @@ providerParserTests = testGroup "provider inventory parser"
           [ ProviderFragWithBinders "Demo.token"
               (FAtom False "Demo.Token") []
           ]
-  , testCase "read legacy provider candidates as unary assignments" $
+  , testCase "preserve legacy candidate provenance without exact authority" $
       parseProviderSexp
           "(providers (provider \"Gap.global\" (binders \"a\") \
           \(candidates \
@@ -1674,16 +2319,14 @@ providerParserTests = testGroup "provider inventory parser"
           \(atom unsafe \"Nat\")) \
           \(alli \"i0\" (atom unsafe \"Gap.Token\"))))"
         @?= Right
-          [ ProviderFragWithEvidence "Gap.global"
+          [ ProviderFragWithLegacyCandidates "Gap.global"
               (FAll False "i0" (FAtom False "Gap.Token"))
               ["a"]
-              [ [ ProviderInstantiationArgument 0
-                    (FAll True "s0" (FArr (FVar "s0") (FVar "s0")))
-                ]
-              , [ProviderInstantiationArgument 0 (FAtom False "Nat")]
+              [ FAll True "s0" (FArr (FVar "s0") (FVar "s0"))
+              , FAtom False "Nat"
               ]
           ]
-  , testCase "retain exact ordered provider instantiations" $
+  , testCase "distinguish exact ordered provider instantiations" $
       parseProviderSexp
           "(providers (provider \"Gap.global\" (binders \"a\" \"b\") \
           \(instantiations \
@@ -1829,19 +2472,29 @@ providerParserTests = testGroup "provider inventory parser"
                 ]
             ]
         fragHasUnsupportedInstanceBinder contextual @?= False
-  , testCase "reject structured contexts outside exact assignments" $ do
+  , testCase "retain provider contexts while rejecting ordinary contexts" $ do
       let contextual =
             "(exact-context \"Gap.C\" (arguments) "
               ++ "(atom unsafe \"Gap.Token\"))"
           expected = Left
-            "exact-context is only valid in an exact provider argument"
+            "exact-context is only valid in a provider scheme or exact provider argument"
       parseGoalSexp
           ("(goal type (query (roots \"Gap\") (head)) "
             ++ contextual ++ ")")
         @?= expected
       parseProviderSexp
-          ("(providers (provider \"Gap.bad\" " ++ contextual ++ "))")
-        @?= expected
+          ("(providers (provider \"Gap.conditional\" (binders \"a\") "
+            ++ "(alli \"a\" (exact-context \"Gap.C\" (arguments "
+            ++ "(kinded 0 (var \"a\"))) "
+            ++ "(atom unsafe \"Gap.Token\")))))")
+        @?= Right
+          [ ProviderFragWithBinders "Gap.conditional"
+              (FAll False "a"
+                (FExactContext "Gap.C"
+                  [ExactContextFragmentArgument 0 (FVar "a")]
+                  (FAtom False "Gap.Token")))
+              ["a"]
+          ]
       parseProviderSexp
           ("(providers (provider \"Gap.global\" (binders \"a\") "
             ++ "(instantiations (args (kinded 0 " ++ contextual ++ "))) "
@@ -1853,6 +2506,62 @@ providerParserTests = testGroup "provider inventory parser"
             ++ contextual ++ ")))) "
             ++ "(alli \"a\" (atom unsafe \"Gap.Token\"))))")
         @?= expected
+  , testCase "validate bound higher-kinded provider context variables" $ do
+      let token = FAtom False "Gap.Token"
+          natural = FAtom False "Nat"
+          context = FExactContext "Gap.HigherC"
+            [ExactContextFragmentArgument 1 $ FVar "F"] token
+          bound = FAll False "F" context
+          partialContext = FExactContext "Gap.HigherC"
+            [ ExactContextFragmentArgument 1 $
+                FApp True "F a" (AppVariable "F") [FVar "a"]
+            ]
+            token
+          partialBound = FAll False "F" $ FAll False "a" partialContext
+          contextWire =
+            "(exact-context \"Gap.HigherC\" (arguments "
+              ++ "(kinded 1 (var \"F\"))) "
+              ++ "(atom unsafe \"Gap.Token\"))"
+          partialContextWire =
+            "(exact-context \"Gap.HigherC\" (arguments "
+              ++ "(kinded 1 (app safe \"F a\" "
+              ++ "(app-variable \"F\") (var \"a\")))) "
+              ++ "(atom unsafe \"Gap.Token\"))"
+          inventory name body =
+            "(providers (provider \"" ++ name
+              ++ "\" (binders \"F\") " ++ body ++ "))"
+          partialInventory name body =
+            "(providers (provider \"" ++ name
+              ++ "\" (binders \"F\" \"a\") " ++ body ++ "))"
+      parseProviderSexp
+          (inventory "Gap.boundHigher" $ "(alli \"F\" "
+            ++ contextWire ++ ")") @?=
+        Right
+          [ ProviderFragWithBinders "Gap.boundHigher" bound ["F"] ]
+      fragHasInstanceBinder bound @?= True
+      fragHasUnsupportedInstanceBinder bound @?= False
+      parseProviderSexp (inventory "Gap.openHigher" contextWire) @?=
+        Right
+          [ ProviderFragWithBinders "Gap.openHigher" context ["F"] ]
+      fragHasInstanceBinder context @?= True
+      fragHasUnsupportedInstanceBinder context @?= True
+      parseProviderSexp
+          (partialInventory "Gap.boundPartial" $
+            "(alli \"F\" (alli \"a\" " ++ partialContextWire ++ "))") @?=
+        Right
+          [ ProviderFragWithBinders "Gap.boundPartial" partialBound ["F", "a"] ]
+      fragHasUnsupportedInstanceBinder partialBound @?= False
+      fragHasUnsupportedInstanceBinder
+        (FAll False "a" partialContext) @?= True
+      fragHasUnsupportedInstanceBinder
+        (FAll False "F" partialContext) @?= True
+      fragHasUnsupportedInstanceBinder
+        (FAll False "F" $ FAll False "a" $
+          FExactContext "Gap.HigherC"
+            [ ExactContextFragmentArgument 1 $
+                FApp True "F Nat" (AppVariable "F") [natural]
+            ]
+            (FArr (FVar "F") token)) @?= True
   , testCase "retain a general Sort provider forall domain" $
       parseProviderSexp
           ("(providers (provider \"Gap.sort\" (binders \"a\") "
@@ -1968,7 +2677,7 @@ providerParserTests = testGroup "provider inventory parser"
           "(providers (provider \"Gap.token\" (binders) (candidates) \
           \(atom unsafe \"Gap.Token\")))"
         @?= Right
-          [ ProviderFragWithEvidence "Gap.token"
+          [ ProviderFragWithLegacyCandidates "Gap.token"
               (FAtom False "Gap.Token") [] []
           ]
   , testCase "accept an explicit empty exact-instantiation block" $
@@ -1995,9 +2704,9 @@ providerParserTests = testGroup "provider inventory parser"
             \(inst \"Inhabited a\" (var \"a\")))) \
             \(alli \"a\" (atom unsafe \"Gap.Token\"))))"
           @?= Right
-            [ ProviderFragWithEvidence "Gap.global"
+            [ ProviderFragWithLegacyCandidates "Gap.global"
                 (FAll False "a" (FAtom False "Gap.Token"))
-                ["a"] [[ProviderInstantiationArgument 0 contextual]]
+                ["a"] [contextual]
             ]
         fragHasInstanceBinder contextual @?= True
         fragHasUnsupportedInstanceBinder contextual @?= True
@@ -7054,7 +7763,7 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                   , leanLengthSpineStepConstructorName = "List.cons"
                   }
               , leanLengthContractTargetArgumentRoles =
-                  Just [LengthTargetSpineInput]
+                  Just [LengthObservedSpine]
               , leanLengthContractCandidateCasePolicy =
                   LeanLengthCasesRejected
               , leanLengthContractSource = LengthContractSource
@@ -7239,6 +7948,301 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
               ++ show groups
         other -> assertFailure $
           "expected polymorphic provider candidates, got: " ++ show other
+  , testCase
+      "discharge one exact contextual List provider before Length/Z3" $ do
+      let parameter = FVar "a"
+          natural = FParamRec True "Nat" "Nat" []
+            [ ("Nat.zero", [])
+            , ("Nat.succ", [FAtom False "Nat"])
+            ]
+          list key element = FParamRec True "List" key [element]
+            [ ("List.nil", [])
+            , ("List.cons", [element, FAtom False key])
+            ]
+          genericList = list "List a" parameter
+          concreteList = list "List Nat" natural
+          provider = ProviderFragWithEvidence
+            "Demo.conditionalEmptyList"
+            (FAll False "a"
+              $ FExactContext "Demo.C"
+                  [ExactContextFragmentArgument 0 parameter]
+                  genericList)
+            ["a"]
+            [[ProviderInstantiationArgument 0 natural]]
+          goal = concreteList
+          contract = LeanLengthContract
+            { leanLengthContractSpine = LeanLengthSpineIdentity
+                { leanLengthSpineFamilyName = "List"
+                , leanLengthSpineZeroConstructorName = "List.nil"
+                , leanLengthSpineStepConstructorName = "List.cons"
+                }
+            , leanLengthContractTargetArgumentRoles = Nothing
+            , leanLengthContractCandidateCasePolicy = LeanLengthCasesRejected
+            , leanLengthContractSource = LengthContractSource
+                { lengthContractPrecondition = LengthTruth True
+                , lengthContractPostcondition = LengthEqual
+                    (LengthVariable LengthResult)
+                    (LengthLiteral 0)
+                }
+            , leanLengthContractProviderLaws =
+                [ LeanLengthProviderLaw
+                    { leanLengthProviderLawName =
+                        "Demo.conditionalEmptyList"
+                    , leanLengthProviderLawArgumentRoles = []
+                    , leanLengthProviderLawTransfer = LengthLiteral 0
+                    }
+                ]
+            }
+      prepared <- expectRight $ inspectExferencePreparation
+        [provider] [] goal goal
+      binding <- case inspectedProviderBindings prepared of
+        [retained] -> pure retained
+        bindings -> assertFailure
+          ("expected one contextual provider binding, got: "
+            ++ show bindings) >> error "unreachable"
+      contextClass <- case inspectedProviderScheme binding of
+        ForallType [binder]
+            [Constraint className [TypeVariable occurrence]] _ -> do
+          occurrence @?= binder
+          pure className
+        scheme -> assertFailure
+          ("contextual List scheme lost its exact constraint: "
+            ++ show scheme) >> error "unreachable"
+      inspectedProviderAssignments binding @?= []
+      inspectedAllProviderAssignments prepared @?= []
+      groundArgument <- case
+          [ argument
+          | InstanceDeclaration () [] []
+              (Constraint factClass [argument]) <-
+              inspectedDeclarations prepared
+          , factClass == contextClass
+          ] of
+        [argument] -> pure argument
+        arguments -> assertFailure
+          ("expected one stable C Nat fact, got: " ++ show arguments)
+            >> error "unreachable"
+      assertBool "C Nat retained a quantified argument"
+        $ not $ Djex.containsForall groundArgument
+      assertBool "C Nat retained a free engine variable"
+        $ Set.null $ Djex.freeVariables groundArgument
+      let declarations = inspectedDeclarations prepared
+      drop (length declarations - 2) declarations @?=
+        [ ValueDeclaration $ ValueSignature ()
+            (inspectedProviderPrivateName binding)
+            (inspectedProviderScheme binding)
+        , InstanceDeclaration () [] []
+            (Constraint contextClass [groundArgument])
+        ]
+
+      detailed <- expectRight $
+        synthesizeWithProvidersSkippingDetailed
+          EngineExference 1024 Set.empty [provider] goal
+      origin <- case detailed of
+        DetailedSynthCandidates groups _ -> case
+            [ group
+            | group <- groups
+            , any ("Demo.conditionalEmptyList" `isInfixOf`)
+                $ detailedCandidateGroupVariants group
+            , Just semantic <-
+                [detailedCandidateGroupSemanticSidecar group]
+            , null $ Djex.candidateResidualConstraints
+                $ Djex.typedCandidateCompatibility
+                $ typedCandidateSemanticCandidate semantic
+            , Right graph <-
+                [ typedCandidateTermGraph
+                    $ typedCandidateSemanticCandidate semantic
+                ]
+            , not $ null
+                [ ()
+                | (_, Djex.TermNode _
+                      (Djex.TypedVisibleTypeApplication _ _ _ witness)) <-
+                    Djex.termGraphNodes graph
+                , Just _ <- [Djex.typeApplicationCertificate witness]
+                ]
+            ] of
+          retained : _ -> pure retained
+          [] -> assertFailure
+            ("C Nat produced no residual-free associated candidate: "
+              ++ show (map detailedCandidateGroupVariants groups))
+              >> error "unreachable"
+        other -> assertFailure
+          ("contextual provider synthesis failed: " ++ show other)
+            >> error "unreachable"
+      semantic <- case detailedCandidateGroupSemanticSidecar origin of
+        Just retained -> pure retained
+        Nothing -> assertFailure
+          "residual-free contextual candidate lost its semantic sidecar"
+            >> error "unreachable"
+      projected <- expectRight
+        $ typedCandidateTermGraph
+        $ typedCandidateSemanticCandidate semantic
+      let certificates =
+            [ handle
+            | (_, Djex.TermNode _
+                  (Djex.TypedVisibleTypeApplication _ _ _ witness)) <-
+                Djex.termGraphNodes projected
+            , Just handle <- [Djex.typeApplicationCertificate witness]
+            ]
+      case certificates of
+        [(certificate, slot)] -> do
+          slot @?= 0
+          case Djex.fingerprintSharedTermGraph
+              Djex.defaultTermGraphLimits
+              Djex.defaultTermGraphFingerprintByteLimit projected of
+            Left (Djex.TermGraphFingerprintSharedResealError
+                (Djex.InvalidVisibleTypeApplicationWitness _ _ witness)) ->
+              Djex.typeApplicationCertificate witness @?=
+                Just (certificate, slot)
+            Left (Djex.TermGraphFingerprintUnsupportedCertificate
+                rejected) ->
+              rejected @?= certificate
+            other -> assertFailure $
+              "a detached contextual graph regained fingerprint authority: "
+                ++ show other
+        other -> assertFailure $
+          "expected one contextual type-application certificate, got: "
+            ++ show other
+      batch <- verifyCandidateGroups 1
+        (const $ pure VariantAccepted)
+        [detailedCandidateGroupVerificationVariants origin]
+      verified <- case verifiedCandidateReceipts batch of
+        [retained] -> pure retained
+        receipts -> assertFailure
+          ("contextual provider produced unexpected verification receipts: "
+            ++ show receipts) >> error "unreachable"
+      problem <- expectRight $ prepareCheckedLengthProblem contract verified
+      let candidate = checkedLengthProblemCandidate problem
+      checkedLengthCandidateResult candidate @?= LengthLiteral 0
+      checkedLengthCandidateUsedProviders candidate @?=
+        [inspectedProviderPrivateName binding]
+      take 10
+          (fingerprintCanonicalBytes
+            $ checkedLengthCandidateFingerprint candidate) @?=
+        fingerprintVersionPrefix 3
+      take 10
+          (fingerprintCanonicalBytes
+            $ checkedLengthProblemEncodingFingerprint problem) @?=
+        fingerprintVersionPrefix 4
+      _ <- expectRight (prepareCheckedLengthQuery contract verified)
+        >>= expectRight
+      let counterexampleContract = contract
+            { leanLengthContractSource =
+                (leanLengthContractSource contract)
+                  { lengthContractPostcondition = LengthEqual
+                      (LengthVariable LengthResult)
+                      (LengthLiteral 2)
+                  }
+            }
+      (ranking, events) <- runLengthRankingWithFakeTrace "healthy"
+        Djex.LengthSMTLibInputValuesAfterSatisfiable
+        counterexampleContract [verified]
+      lengthRankingFailure ranking @?= Nothing
+      rankedLengthVerifiedCandidates ranking @?= [verified]
+      case map rankedLengthCandidateAssessment
+          $ lengthRankingCandidates ranking of
+        [Counterexample receipt] -> do
+          Djex.validatedLengthCounterexampleInputs receipt @?= []
+          Djex.validatedLengthCounterexampleResult receipt @?= 0
+          Djex.validatedLengthCounterexampleBasis receipt @?=
+            Djex.FiniteSpineModelUnderAssumedProviderLaws
+              [inspectedProviderPrivateName binding]
+        assessments -> assertFailure $
+          "contextual provider escaped behavioral replay: "
+            ++ show assessments
+      assertFakeLengthQueryEvents [0] [] events
+  , testCase
+      "withhold contextual authority when exact ground evidence is missing" $
+      do
+        let parameter = FVar "a"
+            natural = FParamRec True "Nat" "Nat" []
+              [ ("Nat.zero", [])
+              , ("Nat.succ", [FAtom False "Nat"])
+              ]
+            list key element = FParamRec True "List" key [element]
+              [ ("List.nil", [])
+              , ("List.cons", [element, FAtom False key])
+              ]
+            genericList = list "List a" parameter
+            concreteList = list "List Nat" natural
+            provider = ProviderFragWithBinders
+              "Demo.missingConditionalEmptyList"
+              (FAll False "a"
+                $ FExactContext "Demo.MissingC"
+                    [ExactContextFragmentArgument 0 parameter]
+                    genericList)
+              ["a"]
+            goal = concreteList
+            contract = LeanLengthContract
+              { leanLengthContractSpine = LeanLengthSpineIdentity
+                  { leanLengthSpineFamilyName = "List"
+                  , leanLengthSpineZeroConstructorName = "List.nil"
+                  , leanLengthSpineStepConstructorName = "List.cons"
+                  }
+              , leanLengthContractTargetArgumentRoles = Nothing
+              , leanLengthContractCandidateCasePolicy =
+                  LeanLengthCasesRejected
+              , leanLengthContractSource = LengthContractSource
+                  { lengthContractPrecondition = LengthTruth True
+                  , lengthContractPostcondition = LengthEqual
+                      (LengthVariable LengthResult)
+                      (LengthLiteral 0)
+                  }
+              , leanLengthContractProviderLaws =
+                  [ LeanLengthProviderLaw
+                      { leanLengthProviderLawName =
+                          "Demo.missingConditionalEmptyList"
+                      , leanLengthProviderLawArgumentRoles = []
+                      , leanLengthProviderLawTransfer = LengthLiteral 0
+                      }
+                  ]
+              }
+        prepared <- expectRight $ inspectExferencePreparation
+          [provider] [] goal goal
+        ( [ constraint
+          | InstanceDeclaration () [] [] constraint <-
+              inspectedDeclarations prepared
+          ] ) @?= []
+        detailed <- expectRight $
+          synthesizeWithProvidersSkippingDetailed
+            EngineExference 1024 Set.empty [provider] goal
+        case detailed of
+          DetailedSynthCandidates groups _ -> do
+            let providerOrigins =
+                  [ (group, semantic)
+                  | group <- groups
+                  , any ("Demo.missingConditionalEmptyList" `isInfixOf`)
+                      $ detailedCandidateGroupVariants group
+                  , Just semantic <-
+                      [detailedCandidateGroupSemanticSidecar group]
+                  ]
+            assertBool
+              "missing C Nat evidence produced a residual-free candidate"
+              $ all
+                  (not . null . Djex.candidateResidualConstraints
+                    . Djex.typedCandidateCompatibility
+                    . typedCandidateSemanticCandidate . snd)
+                  providerOrigins
+            case providerOrigins of
+              [] -> pure ()
+              (origin, _) : _ -> do
+                batch <- verifyCandidateGroups 1
+                  (const $ pure VariantAccepted)
+                  [detailedCandidateGroupVerificationVariants origin]
+                case verifiedCandidateReceipts batch of
+                  [verified] -> case prepareCheckedLengthProblem contract
+                      verified of
+                    Left (LengthHandoffProblemRejected
+                        Djex.LengthProblemResidualConstraint{}) -> pure ()
+                    Left refusal -> assertFailure $
+                      "missing evidence failed at an unrelated boundary: "
+                        ++ show refusal
+                    Right _ -> assertFailure
+                      "missing C Nat evidence entered Length sealing"
+                  receipts -> assertFailure $
+                    "missing evidence produced unexpected receipts: "
+                      ++ show receipts
+          other -> assertFailure $
+            "missing-evidence synthesis failed globally: " ++ show other
   , testCase
       "share one exact preparation with strict request authority" $
       do
@@ -11298,6 +12302,12 @@ outcomeTag outcome = case outcome of
   SynthCandidates _ _ -> "candidates"
   SynthRefuted sound -> "refuted (sound=" ++ show sound ++ ")"
   SynthNoTerm notes -> "no term " ++ show notes
+
+fingerprintVersionPrefix :: Word8 -> [Word8]
+fingerprintVersionPrefix version =
+  [ 0x44, 0x4a, 0x45, 0x58, 0x46, 0x50
+  , 0x01, 0x01, 0x01, version
+  ]
 
 expectRight :: Show error => Either error value -> IO value
 expectRight result = case result of

@@ -53,17 +53,17 @@ note: search truncated: candidate limit reached (60)
 synth engine: exference
 λ> :synth (Higher.Wrap Bool → Higher.Pair Nat Bool → Higher.Token)
   it1  Higher.global («F» := Higher.Wrap) («G» := (@Higher.Pair Nat)) («a» := Bool) («hidden» := (∀ (a0_0 : Type _), a0_0 → a0_0))
-note: search truncated: step limit reached, queue limit pruned 121781
+note: search truncated: step limit reached, queue limit pruned 121301
 λ> :synth Higher.VacuousToken
   it1  Higher.vacuous («F» := Higher.Wrap)
-note: search truncated: step limit reached, queue limit pruned 76882
+note: search truncated: step limit reached, queue limit pruned 74691
 λ> :synth Higher.MultiVacuousToken
   it1  Higher.multiVacuous («F» := Higher.Wrap) («G» := (@Higher.Triple Nat))
-note: search truncated: step limit reached, queue limit pruned 76882
+note: search truncated: step limit reached, queue limit pruned 74691
 λ> :synth Higher.AlternativeToken
   it1  Higher.alternative («F» := (@Higher.Pair Nat))
   it2  Higher.alternative («F» := Higher.Wrap)
-note: search truncated: step limit reached, queue limit pruned 77673
+note: search truncated: step limit reached, queue limit pruned 73520
 λ> :set synth-engine both
 synth engine: both
 λ> :synth (Higher.Wrap Bool → Higher.Pair Nat Bool → Higher.Token)
@@ -72,12 +72,12 @@ note: search truncated: candidate limit reached (60)
 note: exference: search truncated: step limit reached, queue limit pruned 17438
 λ> :synth Higher.VacuousToken
   it1  Higher.vacuous («F» := Higher.Wrap)
-note: exference: search truncated: step limit reached, queue limit pruned 13547
+note: exference: search truncated: step limit reached, queue limit pruned 12439
 λ> :synth Higher.MultiVacuousToken
   it1  Higher.multiVacuous («F» := Higher.Wrap) («G» := (@Higher.Triple Nat))
-note: exference: search truncated: step limit reached, queue limit pruned 15508
+note: exference: search truncated: step limit reached, queue limit pruned 14974
 λ> :synth Higher.AlternativeToken
   it1  Higher.alternative («F» := Higher.Wrap)
   it2  Higher.alternative («F» := (@Higher.Pair Nat))
-note: exference: search truncated: step limit reached, queue limit pruned 16124
+note: exference: search truncated: step limit reached, queue limit pruned 15508
 λ> :quit

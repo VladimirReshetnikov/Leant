@@ -87,10 +87,11 @@ data AppHead
   deriving (Eq, Show)
 
 -- | One ordered argument of a retained exact class constraint.  Proper-kind
--- and historical payloads keep their complete fragment.  A canonical
--- higher-kinded payload instead retains the exact Lean constant head and only
--- its already supplied proper-type arguments.  Keeping these constructors
--- distinct prevents legacy opaque atoms from acquiring nominal authority.
+-- and historical payloads keep their complete fragment.  A higher-kinded
+-- payload retains either a lexically bound type-function variable or the exact
+-- Lean constant head and only its already supplied proper-type arguments.
+-- Keeping the nominal constructor distinct prevents legacy opaque atoms from
+-- acquiring nominal authority.
 data ExactContextArgument
   = ExactContextFragmentArgument Int Frag
   | ExactContextNominalArgument Int String [Frag]
@@ -137,12 +138,13 @@ data Frag
     -- wildcard at an introduction site.  The display key keeps Djinn
     -- exhaustion conservative because the hidden dictionary can carry data.
   | FExactContext String [ExactContextArgument] Frag
-    -- ^ An exact-assignment-only contextual binder: exact Lean class name,
-    -- ordered ground-kinded argument vector, and body.
+    -- ^ A provider-scheme or exact-assignment contextual binder: exact Lean
+    -- class name, ordered bounded first-order-kinded argument vector, and body.
     -- Unlike 'FInst', this node is semantic evidence rather than pretty text.
     -- A proper-kind argument retains its complete fragment; a positive arity
-    -- retains only a canonical bare or partially applied nominal head together
-    -- with its already supplied proper-type arguments.
+    -- retains either a scoped bare or partially applied source-bound variable,
+    -- or a canonical ground-nominal head with its already supplied proper-type
+    -- arguments.
   | FVar String         -- ^ opaque type variable (auto-implicit or opened binder)
   | FAtom Bool String   -- ^ opaque atom: safe-for-refutation flag, display key
   | FApp Bool String AppHead [Frag]
@@ -253,9 +255,9 @@ maximumProviderArgumentKindArity = 64
 maximumProviderExactForallDomains :: Int
 maximumProviderExactForallDomains = 128
 
--- | A contextual class application is auxiliary evidence inside one provider
--- argument, so keep its own positional width no larger than the public exact
--- provider vector.  This bounds both generated and caller-authored wire data.
+-- | A contextual class application is auxiliary evidence inside a provider
+-- scheme or exact argument, so keep its positional width no larger than the
+-- public exact provider vector. This bounds generated and caller-authored data.
 maximumProviderExactContextArguments :: Int
 maximumProviderExactContextArguments = maximumProviderInstantiationArguments
 
@@ -284,13 +286,33 @@ data ProviderFrag
       , providerInstantiationAssignments ::
           [[ProviderInstantiationArgument]]
         -- ^ Exact ordered, ground-kinded assignments learned from active
-        -- instance heads for this provider's erased instance binders.  Each
+        -- instance heads for this provider's source instance binders.  Each
         -- inner list follows the provider's leading FAll order. Evidence
         -- remains attached to the provider so staged inventories cannot donate
         -- an instantiation discovered for a later declaration to an earlier
-        -- one.
+        -- one. Live discovery runs as a top-level environment command, so this
+        -- is global Lean instance evidence rather than a query-local given.
+      }
+  | ProviderFragWithLegacyCandidates
+      { providerLeanName :: String
+      , providerTypeFrag :: Frag
+      , providerTypeBinderNames :: [String]
+      , providerLegacyInstantiationCandidates :: [Frag]
+        -- ^ Historical @(candidates ...)@ payload. Each fragment remains one
+        -- unary search hint for snapshot compatibility, but this constructor
+        -- deliberately carries no exact active-instance-closure provenance.
+        -- In particular it cannot retain a conditional provider scheme or
+        -- authorize global instance facts at the engine boundary.
       }
   deriving (Eq, Show)
+
+-- | Parser-local provenance for the two evidence wire generations. Keeping
+-- the tags distinct until the 'ProviderFrag' constructor is chosen prevents a
+-- historical candidate pool from acquiring exact closure authority merely by
+-- being reshaped into singleton vectors.
+data ProviderEvidenceMetadata
+  = ExactProviderInstantiations [[ProviderInstantiationArgument]]
+  | LegacyProviderCandidates [Frag]
 
 -- | Compiled once into the synthesis environment (session imports plus
 -- @Lean@): the goal serializer as ordinary definitions.  @run_tac@ runs
@@ -413,9 +435,10 @@ synthPrelude inventory = unlines
   , "    if !argType.isSort then return false"
   , "  pure true"
   , ""
-  , "-- Higher-kinded exact context arguments must retain a canonical"
-  , "-- nominal head. Prod and Sum have matching structural identities in"
-  , "-- Djex; the remaining logical or sort-polymorphic constructors do not."
+  , "-- Higher-kinded exact context arguments retain either an enclosing bound"
+  , "-- variable or a canonical nominal head. Prod and Sum have matching"
+  , "-- structural identities in Djex; the remaining logical or"
+  , "-- sort-polymorphic constructors do not."
   , "def unsupportedHigherKindNominalHead (name : Name) : Bool :="
   , "  name == ``And || name == ``PProd"
   , "    || name == ``Or || name == ``PSum"
@@ -431,6 +454,10 @@ synthPrelude inventory = unlines
       ++ " then pure none"
   , "    else if arity == 0 then pure (some 0)"
   , "    else match argument.getAppFn with"
+  , "      | Expr.fvar _ =>"
+  , "        if \8592 allProperTypeParams argument.getAppArgs then"
+  , "          pure (some arity)"
+  , "        else pure none"
   , "      | Expr.const name _ =>"
   , "        if unsupportedHigherKindNominalHead name then pure none"
   , "        else if \8592 allProperTypeParams argument.getAppArgs then"
@@ -459,9 +486,10 @@ synthPrelude inventory = unlines
   , "    | Expr.forallE _ t b bi =>"
   , "      if b.hasLooseBVars then do"
   , "        -- A dependent instance telescope cannot be represented by the"
-  , "        -- exact contextual wire. Mark only that assignment as truncated;"
-  , "        -- ordinary goal/provider behavior retains its established path."
-  , "        if exactAssignmentMode && bi.isInstImplicit then pure \"(depth)\""
+  , "        -- exact contextual wire. Mark that provider or assignment as"
+  , "        -- truncated; ordinary goal behavior retains its established path."
+  , "        if (providerMode || exactAssignmentMode) && bi.isInstImplicit"
+  , "          then pure \"(depth)\""
   , "        else if \8592 isTypeKind t then"
   , "          withLocalDeclD (Name.mkSimple (\"s\" ++ toString depth)) t"
   , "              fun fv => do"
@@ -475,39 +503,22 @@ synthPrelude inventory = unlines
   , "      else if bi.isInstImplicit then"
   , "        -- Typeclass evidence is reconstructed by Lean when a value is"
   , "        -- applied, so Djex never consumes it as a term premise. Providers"
-  , "        -- erase the binder completely. Exact assignment mode preserves a"
-  , "        -- bounded, semantic class application; ordinary goal mode retains"
-  , "        -- only the legacy render marker for backward compatibility."
-  , "        if providerMode then"
-  , "          go providerMode exactAssignmentMode fuel depth blocked b"
+  , "        -- and exact assignments preserve a bounded semantic class"
+  , "        -- application. Unsupported provider contexts fail closed; ordinary"
+  , "        -- goal mode retains only its legacy render marker."
+  , "        if providerMode then do"
+  , "          match \8592 exactContextFragment? true false fuel depth blocked t b with"
+  , "          | none => pure \"(depth)\""
+  , "          | some context => pure context"
   , "        else if exactAssignmentMode then do"
   , "          let legacy : MetaM String := do"
   , "            let instanceType \8592 Meta.ppExpr t"
   , "            let r \8592 go false false fuel depth blocked b"
   , "            pure (\"(inst \" ++ esc (toString instanceType) ++ \" \""
   , "              ++ r ++ \")\")"
-  , "          let classType \8592 whnfR t.consumeMData"
-  , "          match \8592 Meta.isClass? classType with"
+  , "          match \8592 exactContextFragment? false true fuel depth blocked t b with"
   , "          | none => legacy"
-  , "          | some className => do"
-  , "            let arguments := classType.getAppArgs"
-  , "            if arguments.size > "
-      ++ show maximumProviderExactContextArguments ++ " then legacy"
-  , "            else do"
-  , "              let mut supported := true"
-  , "              let mut rendered := \"\""
-  , "              for argument in arguments do"
-  , "                match \8592 exactContextArgumentFragment? fuel depth"
-  , "                    blocked argument with"
-  , "                | none => supported := false"
-  , "                | some (arity, fragment) =>"
-  , "                  rendered := rendered ++ \" (kinded \""
-  , "                    ++ toString arity ++ \" \" ++ fragment ++ \")\""
-  , "              if !supported then legacy"
-  , "              else do"
-  , "                let r \8592 go false true fuel depth blocked b"
-  , "                pure (\"(exact-context \" ++ esc className.toString"
-  , "                  ++ \" (arguments\" ++ rendered ++ \") \" ++ r ++ \")\")"
+  , "          | some context => pure context"
   , "        else do"
   , "          let instanceType \8592 Meta.ppExpr t"
   , "          let r \8592 go providerMode false fuel depth blocked b"
@@ -571,10 +582,39 @@ synthPrelude inventory = unlines
   , "        | some s => pure s"
   , "        | none => atomOf e"
   , ""
+  , "-- Render one supported class binder using the same bounded semantic wire"
+  , "-- for provider schemes and exact assignment payloads. The caller chooses"
+  , "-- how the body is serialized and whether an unsupported context may use a"
+  , "-- legacy fallback."
+  , "partial def exactContextFragment?"
+  , "    (bodyProviderMode bodyExactAssignmentMode : Bool)"
+  , "    (fuel depth : Nat) (blocked : List String)"
+  , "    (contextType body : Expr) : MetaM (Option String) := do"
+  , "  let classType \8592 whnfR contextType.consumeMData"
+  , "  match \8592 Meta.isClass? classType with"
+  , "  | none => pure none"
+  , "  | some className => do"
+  , "    let arguments := classType.getAppArgs"
+  , "    if arguments.size > "
+      ++ show maximumProviderExactContextArguments ++ " then pure none"
+  , "    else do"
+  , "      let mut rendered := \"\""
+  , "      for argument in arguments do"
+  , "        match \8592 exactContextArgumentFragment? fuel depth"
+  , "            blocked argument with"
+  , "        | none => return none"
+  , "        | some (arity, fragment) =>"
+  , "          rendered := rendered ++ \" (kinded \""
+  , "            ++ toString arity ++ \" \" ++ fragment ++ \")\""
+  , "      let r \8592 go bodyProviderMode bodyExactAssignmentMode"
+  , "        fuel depth blocked body"
+  , "      pure (some (\"(exact-context \" ++ esc className.toString"
+  , "        ++ \" (arguments\" ++ rendered ++ \") \" ++ r ++ \")\"))"
+  , ""
   , "-- Serialize one exact context argument together with the ground kind"
   , "-- arity checked above. Proper arguments keep their full exact fragment;"
-  , "-- higher-kinded arguments spell the constant head canonically and carry"
-  , "-- only already supplied proper-type arguments."
+  , "-- higher-kinded arguments retain an enclosing bound variable or spell"
+  , "-- the constant head canonically with only supplied proper arguments."
   , "partial def exactContextArgumentFragment? (fuel depth : Nat)"
   , "    (blocked : List String) (argument : Expr)"
   , "    : MetaM (Option (Nat \215 String)) := do"
@@ -584,17 +624,38 @@ synthPrelude inventory = unlines
   , "    let fragment \8592 go false true fuel depth blocked argument"
   , "    pure (some (0, fragment))"
   , "  | some arity =>"
-  , "    match argument.getAppFn with"
-  , "    | Expr.const name _ => do"
-  , "      let supplied := argument.getAppArgs"
-  , "      let mut rendered := \"\""
-  , "      for suppliedArgument in supplied do"
-  , "        let fragment \8592"
-  , "          go false true fuel depth blocked suppliedArgument"
-  , "        rendered := rendered ++ \" \" ++ fragment"
-  , "      pure (some (arity, \"(nominal \" ++ esc name.toString"
-  , "        ++ rendered ++ \")\"))"
-  , "    | _ => pure none"
+  , "    match argument with"
+  , "    | Expr.fvar _ => do"
+  , "      let variableText \8592 Meta.ppExpr argument"
+  , "      pure (some (arity, \"(var \" ++ esc (toString variableText)"
+  , "        ++ \")\"))"
+  , "    | _ => match argument.getAppFn with"
+  , "      | Expr.fvar _ => do"
+  , "        let pp \8592 Meta.ppExpr argument"
+  , "        let key := toString pp"
+  , "        if blocked.contains key then pure none"
+  , "        else do"
+  , "          let headPP \8592 Meta.ppExpr argument.getAppFn"
+  , "          let head := \"(app-variable \" ++ esc (toString headPP) ++ \")\""
+  , "          let safe := argument.getUsedConstants.isEmpty && !argument.isSort"
+  , "          let mut rendered := \"\""
+  , "          for suppliedArgument in argument.getAppArgs do"
+  , "            let fragment \8592"
+  , "              go false true fuel depth blocked suppliedArgument"
+  , "            rendered := rendered ++ \" \" ++ fragment"
+  , "          pure (some (arity, \"(app \""
+  , "            ++ (if safe then \"safe\" else \"unsafe\") ++ \" \""
+  , "            ++ esc key ++ \" \" ++ head ++ rendered ++ \")\"))"
+  , "      | Expr.const name _ => do"
+  , "        let supplied := argument.getAppArgs"
+  , "        let mut rendered := \"\""
+  , "        for suppliedArgument in supplied do"
+  , "          let fragment \8592"
+  , "            go false true fuel depth blocked suppliedArgument"
+  , "          rendered := rendered ++ \" \" ++ fragment"
+  , "        pure (some (arity, \"(nominal \" ++ esc name.toString"
+  , "          ++ rendered ++ \")\"))"
+  , "      | _ => pure none"
   , ""
   , "-- Preserve applications whose head is a bound type function or a rigid"
   , "-- Lean constant, whose result is a type, and whose arguments are all"
@@ -800,7 +861,10 @@ synthPrelude inventory = unlines
   , "      for arg in candidate.getAppArgs do"
   , "        let argType \8592 whnfR (\8592 inferType arg)"
   , "        if !argType.isSort then return none"
-  , "        let argument \8592 go false true fuel 0 [] arg"
+  , "        -- A nominal supplied argument has no exact-domain metadata."
+  , "        -- Preserve a nested class binder only as FInst so the parser"
+  , "        -- retains the vector and the engine can reject it locally."
+  , "        let argument \8592 go false false fuel 0 [] arg"
   , "        rendered := rendered ++ \" \" ++ argument"
   , "      pure (some (\"(nominal \" ++ esc n.toString ++ rendered ++ \")\"))"
   , "  | _ => pure none"
@@ -1481,16 +1545,23 @@ parseProviderSexp text = do
   providers (TR : rest) = Right ([], rest)
   providers (TL : TSym "provider" : TStr name : rest) = do
     (binderMetadata, evidenceMetadata, fragTokens) <- providerMetadata rest
-    (frag, rest') <- parseFrag fragTokens
+    (frag, rest') <- parseExactFrag fragTokens
     case rest' of
       TR : more -> do
         (tailProviders, final) <- providers more
         let provider = case evidenceMetadata of
-              Just evidence -> ProviderFragWithEvidence name frag
+              Just (ExactProviderInstantiations evidence) ->
+                ProviderFragWithEvidence name frag
                 (case binderMetadata of
                   Nothing -> []
                   Just names -> names)
                 evidence
+              Just (LegacyProviderCandidates candidates) ->
+                ProviderFragWithLegacyCandidates name frag
+                  (case binderMetadata of
+                    Nothing -> []
+                    Just names -> names)
+                  candidates
               Nothing -> case binderMetadata of
                 Nothing -> ProviderFrag name frag
                 Just names -> ProviderFragWithBinders name frag names
@@ -1521,21 +1592,15 @@ parseProviderSexp text = do
   binderNames _ = Left "malformed provider binder metadata"
 
   -- The exact protocol retains each active instance head's ordered argument
-  -- vector.  Historical snapshots carried a flat candidate pool; interpret
-  -- every old scalar as one unary assignment so they remain readable without
-  -- recreating cross-binder combinations.
+  -- vector. Historical snapshots carried a flat candidate pool; preserve that
+  -- distinct provenance while the engine continues to interpret every scalar
+  -- as one unary search hint.
   providerEvidence (TL : TSym "instantiations" : rest) = do
     (assignments, remaining) <- assignmentFrags rest
-    Right (Just assignments, remaining)
+    Right (Just (ExactProviderInstantiations assignments), remaining)
   providerEvidence (TL : TSym "candidates" : rest) = do
     (candidates, remaining) <- evidenceFrags rest
-    Right
-      ( Just
-          (map
-            ((: []) . ProviderInstantiationArgument 0)
-            candidates)
-      , remaining
-      )
+    Right (Just (LegacyProviderCandidates candidates), remaining)
   providerEvidence rest = Right (Nothing, rest)
 
   assignmentFrags (TR : rest) = Right ([], rest)
@@ -1626,10 +1691,10 @@ parseProviderSexp text = do
 parseFrag :: [Tok] -> Either String (Frag, [Tok])
 parseFrag = parseFragWith False
 
--- Structured class contexts are semantic evidence owned by one exact
--- provider-assignment payload. Keeping the permission in the recursive parser
--- lets nested proper-type class arguments retain contexts without admitting
--- the tag in ordinary goals, providers, premises, nominal arguments, or
+-- Structured class contexts are semantic evidence owned by either a provider
+-- scheme root or one exact provider-assignment payload. Keeping the permission
+-- in the recursive parser lets those fragments retain nested contexts without
+-- admitting the tag in ordinary goals, premises, nominal arguments, or
 -- historical structural arguments.
 parseExactFrag :: [Tok] -> Either String (Frag, [Tok])
 parseExactFrag = parseFragWith True
@@ -1668,7 +1733,8 @@ parseFragWith allowExactContext (TL : TSym tag : rest) = case tag of
     _ -> Left "malformed (inst ...)"
   "exact-context"
     | not allowExactContext ->
-        Left "exact-context is only valid in an exact provider argument"
+        Left
+          "exact-context is only valid in a provider scheme or exact provider argument"
     | otherwise -> case rest of
         TStr className : TL : TSym "arguments" : toks
           | not (null className) -> do
@@ -1864,8 +1930,7 @@ fragHasDepth frag = case frag of
   _ -> False
 
 -- | Whether a serialized type contains any contextual typeclass evidence.
--- Both the legacy display-only marker and the semantic exact-assignment node
--- count here.
+-- Both the legacy display-only marker and the semantic contextual node count.
 fragHasInstanceBinder :: Frag -> Bool
 fragHasInstanceBinder frag = case frag of
   FArr a b -> fragHasInstanceBinder a || fragHasInstanceBinder b
@@ -1890,60 +1955,146 @@ fragHasInstanceBinder frag = case frag of
 -- | Whether contextual evidence cannot be reconstructed from exact semantic
 -- data. Legacy 'FInst' stores only pretty text and therefore remains
 -- fail-closed. A structured exact context is supported only with the live
--- producer's nonempty class identity, bounded ground-kinded argument vector,
--- canonical nominal shape for every higher-kinded head, and no nested
+-- producer's nonempty class identity, bounded kinded argument vector, scoped
+-- bound variables or canonical nominal higher-kinded heads, and no nested
 -- unsupported marker.
 fragHasUnsupportedInstanceBinder :: Frag -> Bool
-fragHasUnsupportedInstanceBinder frag = case frag of
-  FArr a b ->
-    fragHasUnsupportedInstanceBinder a || fragHasUnsupportedInstanceBinder b
-  FProd a b ->
-    fragHasUnsupportedInstanceBinder a || fragHasUnsupportedInstanceBinder b
-  FSum a b ->
-    fragHasUnsupportedInstanceBinder a || fragHasUnsupportedInstanceBinder b
-  FAll _ _ b -> fragHasUnsupportedInstanceBinder b
-  FInst{} -> True
-  FExactContext className arguments body ->
-    null className
-      || length arguments > maximumProviderExactContextArguments
-      || any unsupportedExactContextArgument arguments
-      || any fragHasUnsupportedInstanceBinder
-        (concatMap exactContextArgumentPayloadFragments arguments)
-      || fragHasUnsupportedInstanceBinder body
-  FApp _ _ _ arguments -> any fragHasUnsupportedInstanceBinder arguments
-  FParamInd _ _ params ctors ->
-    any fragHasUnsupportedInstanceBinder params
-      || any (any fragHasUnsupportedInstanceBinder . snd) ctors
-  FInd _ ctors ->
-    any (any fragHasUnsupportedInstanceBinder . snd) ctors
-  FParamRec _ _ _ params ctors ->
-    any fragHasUnsupportedInstanceBinder params
-      || any (any fragHasUnsupportedInstanceBinder . snd) ctors
-  FRec _ _ params ctors ->
-    any fragHasUnsupportedInstanceBinder params
-      || any (any fragHasUnsupportedInstanceBinder . snd) ctors
-  _ -> False
+fragHasUnsupportedInstanceBinder = go []
  where
-  unsupportedExactContextArgument
+  go bound frag = case frag of
+    FArr a b -> go bound a || go bound b
+    FProd a b -> go bound a || go bound b
+    FSum a b -> go bound a || go bound b
+    FAll _ binder body ->
+      inconsistentBinderKinds binder body || go (binder : bound) body
+    FInst{} -> True
+    FExactContext className arguments body ->
+      null className
+        || length arguments > maximumProviderExactContextArguments
+        || any (unsupportedExactContextArgument bound) arguments
+        || any (go bound)
+          (concatMap exactContextArgumentPayloadFragments arguments)
+        || go bound body
+    FApp _ _ _ arguments -> any (go bound) arguments
+    FParamInd _ _ params ctors ->
+      any (go bound) params
+        || any (any (go bound) . snd) ctors
+    FInd _ ctors -> any (any (go bound) . snd) ctors
+    FParamRec _ _ _ params ctors ->
+      any (go bound) params
+        || any (any (go bound) . snd) ctors
+    FRec _ _ params ctors ->
+      any (go bound) params
+        || any (any (go bound) . snd) ctors
+    _ -> False
+
+  unsupportedExactContextArgument bound
       (ExactContextFragmentArgument remaining argument)
     | remaining < 0 || remaining > maximumProviderArgumentKindArity = True
-    | remaining == 0 = False
+    | remaining == 0 = not (payloadVariablesBound bound argument)
     | otherwise = case argument of
-        FAtom _ spelling ->
-          null spelling || reservedHigherKindHead spelling
-        FApp _ _ (AppNominal spelling) _ ->
-          null spelling || reservedHigherKindHead spelling
-        _ -> True
-  unsupportedExactContextArgument
+      FVar variable -> variable `notElem` bound
+      FAtom _ spelling ->
+        null spelling || reservedHigherKindHead spelling
+      FApp _ _ (AppVariable variable) supplied ->
+        null supplied || variable `notElem` bound
+          || any (not . payloadVariablesBound bound) supplied
+      FApp _ _ (AppNominal spelling) supplied ->
+        null spelling || reservedHigherKindHead spelling
+          || any (not . payloadVariablesBound bound) supplied
+      _ -> True
+  unsupportedExactContextArgument bound
       (ExactContextNominalArgument remaining spelling supplied)
     | remaining <= 0 || remaining > maximumProviderArgumentKindArity = True
     | null spelling = True
     | elem spelling ["Prod", "Sum"] =
         length supplied + remaining /= 2
+          || any (not . payloadVariablesBound bound) supplied
     | otherwise = reservedHigherKindHead spelling
+        || any (not . payloadVariablesBound bound) supplied
 
   reservedHigherKindHead spelling = spelling `elem`
     ["And", "Prod", "PProd", "Or", "Sum", "PSum", "Iff", "Not"]
+
+  payloadVariablesBound bound frag = case frag of
+    FArr parameter result -> descend [parameter, result]
+    FProd left right -> descend [left, right]
+    FSum left right -> descend [left, right]
+    FAll _ binder body -> payloadVariablesBound (binder : bound) body
+    FInst{} -> False
+    FExactContext _ arguments body ->
+      all (payloadVariablesBound bound)
+        (concatMap exactContextArgumentPayloadFragments arguments)
+        && payloadVariablesBound bound body
+    FVar variableName -> variableName `elem` bound
+    FAtom{} -> True
+    FApp _ _ head' arguments ->
+      (case head' of
+        AppVariable variableName -> variableName `elem` bound
+        AppNominal name -> not (null name))
+        && descend arguments
+    FParamInd name _ parameters constructors ->
+      not (null name) && descend (parameters ++ concatMap snd constructors)
+    FInd _ constructors -> descend (concatMap snd constructors)
+    FParamRec _ name _ parameters constructors ->
+      not (null name) && descend (parameters ++ concatMap snd constructors)
+    FRec _ _ parameters constructors ->
+      descend (parameters ++ concatMap snd constructors)
+    FDepth -> False
+    _ -> True
+   where
+    descend = all (payloadVariablesBound bound)
+
+  -- 'FAll' does not retain an explicit kind annotation.  Before admitting a
+  -- scoped variable as a positive-arity exact-context argument, conservatively
+  -- reconcile every syntactic use of that binder: an ordinary occurrence
+  -- demands kind Type, an application head demands one arrow per supplied
+  -- proper argument, and an exact-context occurrence additionally retains its
+  -- residual arity.  The checked Djex inventory remains the authoritative kind
+  -- boundary; this bounded preflight keeps one locally malformed live vector
+  -- from reaching and rejecting the whole provider-assignment batch.
+  inconsistentBinderKinds binder body =
+    length (nub (binderKindDemands binder body)) > 1
+
+  binderKindDemands binder frag = case frag of
+    FArr parameter result -> descendProper [parameter, result]
+    FProd left right -> descendProper [left, right]
+    FSum left right -> descendProper [left, right]
+    FAll _ nested body
+      | nested == binder -> []
+      | otherwise -> binderKindDemands binder body
+    FInst _ body -> binderKindDemands binder body
+    FExactContext _ arguments body ->
+      concatMap contextDemands arguments ++ binderKindDemands binder body
+    FVar variableName
+      | variableName == binder -> [0]
+      | otherwise -> []
+    FApp _ _ head' arguments ->
+      case head' of
+        AppVariable variableName
+          | variableName == binder ->
+              length arguments : descendProper arguments
+        _ -> descendProper arguments
+    FParamInd _ _ parameters constructors ->
+      descendProper (parameters ++ concatMap snd constructors)
+    FInd _ constructors -> descendProper (concatMap snd constructors)
+    FParamRec _ _ _ parameters constructors ->
+      descendProper (parameters ++ concatMap snd constructors)
+    FRec _ _ parameters constructors ->
+      descendProper (parameters ++ concatMap snd constructors)
+    _ -> []
+   where
+    descendProper = concatMap (binderKindDemands binder)
+
+    contextDemands source = case source of
+      ExactContextFragmentArgument remaining argument -> case argument of
+        FVar variableName
+          | variableName == binder -> [remaining]
+        FApp _ _ (AppVariable variableName) supplied
+          | variableName == binder ->
+              remaining + length supplied : descendProper supplied
+        _ -> binderKindDemands binder argument
+      ExactContextNominalArgument _ _ supplied -> descendProper supplied
 
 -- | Whether a foreign value may open an otherwise atomic goal.  Quantifier
 -- prefixes are transparent, but a depth-truncated fragment is never

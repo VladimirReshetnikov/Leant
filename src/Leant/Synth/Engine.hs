@@ -108,6 +108,7 @@ import Language.Haskell.Djex
       ( AbstractTypeDeclaration
       , ClassDeclaration
       , DataTypeDeclaration
+      , InstanceDeclaration
       , ValueDeclaration
       )
   , Diagnostic
@@ -138,7 +139,9 @@ import Language.Haskell.Djex
   , applyTypeArguments
   , batchCandidates
   , batchProgress
+  , canonicalizeType
   , candidateOutput
+  , containsForall
   , declarationTypeVariables
   , defaultExferenceOptions
   , defaultExferenceSessionPolicy
@@ -146,6 +149,7 @@ import Language.Haskell.Djex
   , djinnSessionEnvironment
   , environmentDeclarations
   , expressionSize
+  , freeVariables
   , functionClauseExpression
   , mapDeclarationTypeVariables
   , maximumProviderInstantiationAssignments
@@ -165,7 +169,9 @@ import Language.Haskell.Djex
   , runExferenceTypedQueryWithKindedInstantiationAssignments
   , selectQueryResults
   , specifiedVisibleTypeArgument
+  , splitLeadingForalls
   , standardDjinnSession
+  , substituteTypeVariablesBatch
   , tupleName
   , valueName
   , typedCandidateCompatibility
@@ -902,11 +908,10 @@ prepareSynthesis
   -> Frag
   -> Either String PreparedSynthesis
 prepareSynthesis recursiveProjection activeProviders extras engineFrag fitFrag = do
-  translation <-
-    fragToDjinn recursiveProjection activeProviders extras engineFrag
+  translation <- prepareProviderGroundFactTranslation
+    recursiveProjection activeProviders extras engineFrag
   let sourceGoal = translationSourceGoal translation
-      providerBindings = translationProviderBindings translation
-      providerMap = providerMapFromBindings providerBindings
+      draftProviderBindings = translationProviderBindings translation
       callerPremises = translationCallerPremises translation
       constructorPremises = translationConstructorPremises translation
       premiseLayout = PremiseLayout
@@ -929,9 +934,12 @@ prepareSynthesis recursiveProjection activeProviders extras engineFrag fitFrag =
           ForallType variables constraints (insertOuter body)
         body -> antecedents constructorPremises (insertInner body)
       searchGoal = insertOuter sourceGoal
-      declarations =
-        translationDeclarations translation
-          ++ providerDeclarationsFromBindings providerBindings
+  (providerBindings, providerDeclarations) <-
+    providerDeclarationsFromBindings
+      (translationDeclarations translation) draftProviderBindings
+  let declarations =
+        translationDeclarations translation ++ providerDeclarations
+      providerMap = providerMapFromBindings providerBindings
       semanticOrigin = PreparedSemanticOrigin
         { semanticOriginEngineFragment = engineFrag
         , semanticOriginFitFragment = fitFrag
@@ -971,6 +979,52 @@ prepareSynthesis recursiveProjection activeProviders extras engineFrag fitFrag =
     , preparedRenderExpression = render
     , preparedRenderTermGraph = renderGraph
     }
+
+-- | Resolve exact contextual provider fact groups as a replayed source-order
+-- subsequence. The discovery pass commits no assignment-local state. Every trial
+-- reruns the complete translation with only the previously accepted groups
+-- plus the candidate, and the final pass reruns once more with exactly the
+-- accepted set. Thus a rejected vector cannot leak declarations, names, maps,
+-- or planning state, while an all-rejected provider recovers every
+-- successfully translatable vector from its bounded, filtered historical
+-- context-erased assignment lane.
+prepareProviderGroundFactTranslation
+  :: RecursiveProjection
+  -> [ProviderFrag]
+  -> [(String, Frag)]
+  -> Frag
+  -> Either String SynthesisTranslation
+prepareProviderGroundFactTranslation recursiveProjection providers extras
+    engineFrag
+  | not discoveryRequired = fragToDjinn
+      (SelectProviderGroundFacts Set.empty)
+      recursiveProjection providers extras engineFrag
+  | otherwise = do
+      discovery <- fragToDjinn DiscoverProviderGroundFacts
+        recursiveProjection providers extras engineFrag
+      selected <- choose Set.empty $ providerGroundFactKeys discovery
+      fragToDjinn (SelectProviderGroundFacts selected)
+        recursiveProjection providers extras engineFrag
+ where
+  discoveryRequired = case providerContextProjection recursiveProjection of
+    EraseProviderContexts -> False
+    RetainProviderContexts -> any exactContextualEvidenceProvider
+      providers
+
+  exactContextualEvidenceProvider provider = case provider of
+    ProviderFragWithEvidence{} ->
+      providerFragmentContainsExactContext $ providerTypeFrag provider
+    _ -> False
+
+  choose selected [] = Right selected
+  choose selected (key : remaining) =
+    let candidate = Set.insert key selected
+    in case fragToDjinn (SelectProviderGroundFacts candidate)
+        recursiveProjection providers extras engineFrag of
+      Left _ -> choose selected remaining
+      Right replay -> do
+        accepted <- trialProviderGroundFactSelection candidate replay
+        choose (if accepted then candidate else selected) remaining
 
 -- | The complete LJT search: candidates, or a refutation whose
 -- soundness depends on the translation having hidden nothing.
@@ -1476,8 +1530,54 @@ data ProviderBinding = ProviderBinding
   , providerBindingRenderInfo :: ProviderInfo
   , providerBindingAssignments ::
       [KindedProviderInstantiationAssignment String]
+    -- ^ Context-free specialization hints passed to Djex's historical
+    -- provider-assignment adapter. Contextual Exference providers with an
+    -- accepted fact group keep this empty. With no accepted group, an exact-
+    -- evidence provider instead retains its successfully translated bounded
+    -- fallback vectors here under a context-erased scheme.
+  , providerBindingTranslatedAssignmentKeys :: [(Int, Int)]
+    -- ^ Source keys of exact contextual vectors whose complete assignment
+    -- translation succeeded in this pass. This internal replay witness keeps
+    -- later clean passes from allowing a failed vector to affect claims,
+    -- family planning, rigidity, or final renderer metadata.
+  , providerBindingGroundConstraintGroups ::
+      [ProviderGroundConstraintGroup]
+    -- ^ Resolver-ground facts projected only from exact active-instance-
+    -- closure vectors. They remain provider-local here solely to preserve
+    -- source order before the complete inventory projection deduplicates them.
   }
   deriving (Eq, Show)
+
+-- | One successfully translated exact vector, before deciding whether its
+-- leading contextual obligations are resolver facts or historical assignment
+-- hints. Translation failures never construct this value.
+data ProviderTranslatedAssignment = ProviderTranslatedAssignment
+  { providerTranslatedInstantiation ::
+      KindedProviderInstantiationAssignment String
+  , providerTranslatedRenderInfo :: ProviderAssignmentInfo
+  }
+  deriving (Eq, Show)
+
+-- | One structurally resolver-eligible vector and its all-or-none ground fact
+-- group. Keeping the translated assignment beside the group lets the final
+-- inventory seal retain rendering authority for exactly the vectors it
+-- accepted, including duplicate groups with distinct Lean-domain metadata.
+data ProviderGroundConstraintGroup = ProviderGroundConstraintGroup
+  { providerGroundConstraintKey :: (Int, Int)
+  , providerGroundConstraintAssignment :: ProviderTranslatedAssignment
+  , providerGroundConstraints :: [Constraint (Type String)]
+  }
+  deriving (Eq, Show)
+
+-- | Whether one complete translation is discovering structurally eligible
+-- fact groups or retaining an already trial-sealed subset. Discovery never
+-- commits assignment-local translation state. Selection reruns the complete
+-- translation so rejected vectors cannot leave declarations or renderer maps
+-- behind, while an exact-evidence provider with no selected group takes its
+-- exact historical context-erased assignment path.
+data ProviderGroundFactMode
+  = DiscoverProviderGroundFacts
+  | SelectProviderGroundFacts (Set.Set (Int, Int))
 
 -- | Exact source identity for one structurally declared Lean family.
 --
@@ -1559,8 +1659,111 @@ providerBindingDeclaration binding = ValueDeclaration
 
 -- | Derive the declaration projection in binding order. Provider bindings are
 -- the sole prepared owner of the private identity and translated scheme.
-providerDeclarationsFromBindings :: [ProviderBinding] -> [DjinnDecl]
-providerDeclarationsFromBindings = map providerBindingDeclaration
+-- Provider values retain their historical contiguous source order. Exact
+-- ground instance facts follow in first provider/vector/constraint order and
+-- are stably deduplicated. Once installed, those facts intentionally belong to
+-- the whole top-level Exference inventory: Lean discovered them in the global
+-- environment, so a fact first witnessed through one provider may discharge
+-- the same ground obligation on another provider in this bounded snapshot.
+providerDeclarationsFromBindings
+  :: [DjinnDecl]
+  -> [ProviderBinding]
+  -> Either String ([ProviderBinding], [DjinnDecl])
+providerDeclarationsFromBindings baseDeclarations bindings = do
+  standard <- case constraintGroups of
+    [] -> Right Nothing
+    _ -> Just <$> viaDiagnostic standardDjinnSession
+  let fixedDeclarations = maybe []
+        (environmentDeclarations . djinnSessionEnvironment) standard
+        ++ baseDeclarations ++ valueDeclarations
+      initiallySeen = Set.fromList
+        [ constraint
+        | InstanceDeclaration _ _ _ constraint <- fixedDeclarations
+        ]
+      acceptedConstraints = stableNovel initiallySeen
+        $ concatMap snd constraintGroups
+  pure (bindings, valueDeclarations
+    ++ [ InstanceDeclaration () [] [] constraint
+       | constraint <- acceptedConstraints
+       ])
+ where
+  valueDeclarations = map providerBindingDeclaration bindings
+  constraintGroups =
+    [ (providerGroundConstraintKey group, providerGroundConstraints group)
+    | binding <- bindings
+    , group <- providerBindingGroundConstraintGroups binding
+    ]
+
+  stableNovel = go
+   where
+    go _ [] = []
+    go seen (constraint : remaining)
+      | constraint `Set.member` seen = go seen remaining
+      | otherwise = constraint
+          : go (Set.insert constraint seen) remaining
+
+providerGroundFactKeys :: SynthesisTranslation -> [(Int, Int)]
+providerGroundFactKeys translation =
+  [ providerGroundConstraintKey group
+  | binding <- translationProviderBindings translation
+  , group <- providerBindingGroundConstraintGroups binding
+  ]
+
+-- | Exact contextual vector keys which survived complete assignment
+-- translation in one pass. Ground eligibility is deliberately independent:
+-- a successful non-ground vector still belongs to the historical fallback
+-- lane if this provider ultimately has no accepted fact group.
+providerSuccessfulExactContextualAssignmentKeys
+  :: SynthesisTranslation
+  -> Set.Set (Int, Int)
+providerSuccessfulExactContextualAssignmentKeys translation = Set.fromList
+  [ key
+  | binding <- translationProviderBindings translation
+  , exactContextualEvidenceSource $ providerBindingSource binding
+  , key <- providerBindingTranslatedAssignmentKeys binding
+  ]
+ where
+  exactContextualEvidenceSource provider = case provider of
+    ProviderFragWithEvidence{} ->
+      providerFragmentContainsExactContext $ providerTypeFrag provider
+    _ -> False
+
+-- | Check one replayed source-order subsequence selection through the exact
+-- Exference environment/session boundary. A selected vector must still be
+-- present after the clean replay; otherwise the trial fails closed. Ordinary
+-- environment or session rejection drops only the candidate group, while a
+-- failure to construct the package's standard session remains a preparation
+-- error as before.
+trialProviderGroundFactSelection
+  :: Set.Set (Int, Int)
+  -> SynthesisTranslation
+  -> Either String Bool
+trialProviderGroundFactSelection selected translation
+  | not (selected `Set.isSubsetOf` retainedKeys) = Right False
+  | otherwise = do
+      standard <- viaDiagnostic standardDjinnSession
+      (_, providerDeclarations) <- providerDeclarationsFromBindings
+        (translationDeclarations translation)
+        (translationProviderBindings translation)
+      let allDeclarations =
+            environmentDeclarations (djinnSessionEnvironment standard)
+              ++ translationDeclarations translation
+              ++ providerDeclarations
+          variables = nub
+            $ concatMap declarationTypeVariables allDeclarations
+          table = Map.fromList $ zip variables [0 :: Int ..]
+          convert sourceVariable = FlexibleVariable $ table Map.! sourceVariable
+          convertedDeclarations = map
+            (mapDeclarationTypeVariables convert) allDeclarations
+      pure $ case mkEnvironment convertedDeclarations of
+        Left _ -> False
+        Right environment -> case mkExferenceSessionWithPolicy
+            defaultExferenceSessionPolicy environment of
+          Left _ -> False
+          Right _ -> True
+ where
+  retainedKeys = Set.fromList $ providerGroundFactKeys translation
+
 
 -- | Derive the exact renderer index from its retained provider bindings.
 -- 'Map.fromList' preserves the historical ascending-key index and last-wins
@@ -2019,58 +2222,76 @@ claimFamilyArity spelling arity
 -- well as the occurrence surface therefore makes hand-written snapshots fail
 -- closed without changing valid discovery output.
 fragExactEvidenceClaims :: Frag -> ExactEvidenceClaims
-fragExactEvidenceClaims frag = case frag of
-  FArr parameter result -> descend [parameter, result]
-  FProd left right -> descend [left, right]
-  FSum left right -> descend [left, right]
-  FAll _ _ body -> fragExactEvidenceClaims body
-  FInst _ body -> fragExactEvidenceClaims body
-  FExactContext className arguments body ->
-    foldl mergeExactEvidenceClaims
-      (mergeExactEvidenceClaims
-        (claimContextKinds className
-          (map exactContextArgumentKindArity arguments))
-        (fragExactEvidenceClaims body))
-      (map exactContextClaim arguments)
-  FApp _ _ head' arguments ->
-    mergeExactEvidenceClaims
-      (case head' of
-        AppVariable _ -> emptyExactEvidenceClaims
-        AppNominal spelling -> claimFamilyArity spelling (length arguments))
-      (descend arguments)
-  FParamInd spelling _ parameters constructors ->
-    mergeExactEvidenceClaims
-      (claimFamilyArity spelling (length parameters))
-      (descend (parameters ++ concatMap snd constructors))
-  FInd _ constructors -> descend (concatMap snd constructors)
-  FParamRec _ spelling _ parameters constructors ->
-    mergeExactEvidenceClaims
-      (claimFamilyArity spelling (length parameters))
-      (descend (parameters ++ concatMap snd constructors))
-  FRec _ _ parameters constructors ->
-    descend (parameters ++ concatMap snd constructors)
-  FDepth -> malformedExactEvidenceClaims
-  _ -> emptyExactEvidenceClaims
+fragExactEvidenceClaims = go Set.empty
  where
-  descend = foldl
+  go bound frag = case frag of
+    FArr parameter result -> descend bound [parameter, result]
+    FProd left right -> descend bound [left, right]
+    FSum left right -> descend bound [left, right]
+    FAll _ binder body -> go (Set.insert binder bound) body
+    FInst _ body -> go bound body
+    FExactContext className arguments body ->
+      foldl mergeExactEvidenceClaims
+        (mergeExactEvidenceClaims
+          (claimContextKinds className
+            (map exactContextArgumentKindArity arguments))
+          (go bound body))
+        (map (exactContextClaim bound) arguments)
+    FApp _ _ head' arguments ->
+      mergeExactEvidenceClaims
+        (case head' of
+          AppVariable _ -> emptyExactEvidenceClaims
+          AppNominal spelling -> claimFamilyArity spelling (length arguments))
+        (descend bound arguments)
+    FParamInd spelling _ parameters constructors ->
+      mergeExactEvidenceClaims
+        (claimFamilyArity spelling (length parameters))
+        (descend bound (parameters ++ concatMap snd constructors))
+    FInd _ constructors -> descend bound (concatMap snd constructors)
+    FParamRec _ spelling _ parameters constructors ->
+      mergeExactEvidenceClaims
+        (claimFamilyArity spelling (length parameters))
+        (descend bound (parameters ++ concatMap snd constructors))
+    FRec _ _ parameters constructors ->
+      descend bound (parameters ++ concatMap snd constructors)
+    FDepth -> malformedExactEvidenceClaims
+    _ -> emptyExactEvidenceClaims
+
+  descend bound = foldl
     (\claims child -> mergeExactEvidenceClaims claims
-      (fragExactEvidenceClaims child))
+      (go bound child))
     emptyExactEvidenceClaims
 
-  exactContextClaim source
+  exactContextClaim bound source
     | remaining < 0 = malformedExactEvidenceClaims
     | remaining == 0 = case source of
         ExactContextFragmentArgument _ argument ->
-          fragExactEvidenceClaims argument
+          go bound argument
         ExactContextNominalArgument{} -> malformedExactEvidenceClaims
     | otherwise = case exactContextNominalUse source of
         Just (spelling, totalArity, supplied) ->
           mergeExactEvidenceClaims
             (claimFamilyArity spelling totalArity)
-            (descend supplied)
-        Nothing -> malformedExactEvidenceClaims
+            (descend bound supplied)
+        Nothing -> case source of
+          ExactContextFragmentArgument _ argument ->
+            case boundVariableSuppliedArguments bound argument of
+              Just supplied -> descend bound supplied
+              Nothing -> malformedExactEvidenceClaims
+          ExactContextNominalArgument{} -> malformedExactEvidenceClaims
    where
     remaining = exactContextArgumentKindArity source
+
+  -- A scoped type-function variable is not a nominal family identity. Its
+  -- already supplied proper arguments can still carry exact claims of their
+  -- own, while a free or malformed variable-headed application fails closed.
+  boundVariableSuppliedArguments bound argument = case argument of
+    FVar variableName
+      | variableName `Set.member` bound -> Just []
+    FApp _ _ (AppVariable variableName) supplied
+      | not (null supplied)
+      , variableName `Set.member` bound -> Just supplied
+    _ -> Nothing
 
 providerArgumentExactEvidenceClaims
   :: ProviderInstantiationArgument
@@ -2154,18 +2375,50 @@ data ExactFamilyPlan
 data RecursiveProjection = RecursiveProjection
   { exactRecursiveData :: Bool
   , legacyRecursiveData :: Bool
+  , providerContextProjection :: ProviderContextProjection
   }
+
+-- | Engine-specific treatment of the exact provider-scheme context wire.
+-- Djinn keeps its historical dictionary-erased provider schemes and assignment
+-- search. Exference retains exact contexts so its checked instance inventory
+-- can resolve them; legacy candidate snapshots are erased independently below
+-- because their provenance never authorizes a conditional scheme.
+data ProviderContextProjection
+  = EraseProviderContexts
+  | RetainProviderContexts
+
+providerFragmentContainsExactContext :: Frag -> Bool
+providerFragmentContainsExactContext source = case source of
+  FArr parameter result -> descend [parameter, result]
+  FProd left right -> descend [left, right]
+  FSum left right -> descend [left, right]
+  FAll _ _ body -> providerFragmentContainsExactContext body
+  FInst _ body -> providerFragmentContainsExactContext body
+  FExactContext{} -> True
+  FApp _ _ _ arguments -> descend arguments
+  FParamInd _ _ parameters constructors ->
+    descend $ parameters ++ concatMap snd constructors
+  FInd _ constructors -> descend $ concatMap snd constructors
+  FParamRec _ _ _ parameters constructors ->
+    descend $ parameters ++ concatMap snd constructors
+  FRec _ _ parameters constructors ->
+    descend $ parameters ++ concatMap snd constructors
+  _ -> False
+ where
+  descend = any providerFragmentContainsExactContext
 
 djinnRecursiveProjection :: RecursiveProjection
 djinnRecursiveProjection = RecursiveProjection
   { exactRecursiveData = True
   , legacyRecursiveData = False
+  , providerContextProjection = EraseProviderContexts
   }
 
 exferenceRecursiveProjection :: RecursiveProjection
 exferenceRecursiveProjection = RecursiveProjection
   { exactRecursiveData = True
   , legacyRecursiveData = True
+  , providerContextProjection = RetainProviderContexts
   }
 
 data ProjectionCompleteness = ProjectionCompleteness
@@ -2200,6 +2453,24 @@ instance Monad Trans where
 failT :: String -> Trans a
 failT msg = Trans (\_ -> Left msg)
 
+-- | Inspect one vector translation without committing any declarations,
+-- names, or variable-table entries it introduced.  Contextual providers use
+-- this only in discovery; every selected/fallback path is reconstructed by a
+-- later complete translation replay.
+probeMaybeT :: Trans a -> Trans (Maybe a)
+probeMaybeT (Trans action) = Trans $ \state -> case action state of
+  Left _ -> Right (Nothing, state)
+  Right (value, _) -> Right (Just value, state)
+
+-- | Retain one successful historical fallback vector, but restore the exact
+-- incoming state if its translation fails. This is deliberately narrower than
+-- discovery: a successful fallback must commit the declarations and renderer
+-- identities needed by the context-erased assignment it returns.
+transactionT :: Trans a -> Trans (Maybe a)
+transactionT (Trans action) = Trans $ \state -> case action state of
+  Left _ -> Right (Nothing, state)
+  Right (value, finalState) -> Right (Just value, finalState)
+
 getsT :: (TransState -> a) -> Trans a
 getsT f = Trans (\s -> Right (f s, s))
 
@@ -2225,17 +2496,81 @@ variable key = do
       pure v
 
 fragToDjinn
-  :: RecursiveProjection
+  :: ProviderGroundFactMode
+  -> RecursiveProjection
   -> [ProviderFrag]
   -> [(String, Frag)]
   -> Frag
   -> Either String SynthesisTranslation
-fragToDjinn recursiveProjection providers extras frag0 = do
+fragToDjinn groundFactMode recursiveProjection providers extras frag0
+  | not successfulKeyReplayRequired = fragToDjinnPass Nothing
+      groundFactMode recursiveProjection providers extras frag0
+  | otherwise = do
+      provisional <- fragToDjinnPass Nothing
+        groundFactMode recursiveProjection providers extras frag0
+      stabilize $ providerSuccessfulExactContextualAssignmentKeys provisional
+ where
+  -- Only exact-contextual Exference evidence needs this extra replay. Djinn,
+  -- legacy candidates, and every context-free provider retain their historical
+  -- single-pass translation and demand behavior.
+  successfulKeyReplayRequired = case
+      providerContextProjection recursiveProjection of
+    EraseProviderContexts -> False
+    RetainProviderContexts -> any exactContextualEvidenceProvider
+      $ filter (not . fragHasDepth . providerTypeFrag) providers
+
+  exactContextualEvidenceProvider provider = case provider of
+    ProviderFragWithEvidence{} ->
+      providerFragmentContainsExactContext $ providerTypeFrag provider
+    _ -> False
+
+  -- The whitelist can only shrink: every clean pass filters exact contextual
+  -- vectors before evidence claims and family planning, then reports the keys
+  -- whose complete assignment translation still succeeded. The fixed point is
+  -- therefore bounded by the already capped source vector set.
+  stabilize retained = do
+    replay <- fragToDjinnPass (Just retained)
+      groundFactMode recursiveProjection providers extras frag0
+    let surviving = providerSuccessfulExactContextualAssignmentKeys replay
+    if surviving == retained
+      then Right replay
+      else stabilize surviving
+
+fragToDjinnPass
+  :: Maybe (Set.Set (Int, Int))
+  -> ProviderGroundFactMode
+  -> RecursiveProjection
+  -> [ProviderFrag]
+  -> [(String, Frag)]
+  -> Frag
+  -> Either String SynthesisTranslation
+fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
+    providers extras frag0 = do
   eitherC <- viaShow (mkIdentifier "Either")
   voidC <- viaShow (mkIdentifier "Void")
   unitC <- viaShow (tupleName Boxed 0)
   pairC <- viaShow (tupleName Boxed 2)
   let usableProviders = filter usableProvider providers
+      indexedProviders = zip [0 :: Int ..] usableProviders
+      exactContextualProviderIndices = Set.fromList
+        [ index
+        | (index, provider) <- indexedProviders
+        , exactContextualProvider provider
+        ]
+      assignmentRetainedForPass providerIndex vectorIndex
+        | providerIndex `Set.notMember` exactContextualProviderIndices = True
+        | Just successfulKeys <- successfulKeyFilter
+        , (providerIndex, vectorIndex) `Set.notMember` successfulKeys = False
+        | otherwise = case groundFactMode of
+            DiscoverProviderGroundFacts -> True
+            SelectProviderGroundFacts selected
+              | selectedProviderHasGroundFacts providerIndex selected ->
+                  (providerIndex, vectorIndex) `Set.member` selected
+              | otherwise -> True
+      projectedProviderFrags =
+        [ projectedProviderFrag index provider
+        | (index, provider) <- indexedProviders
+        ]
       -- Bound the provider-indexed assignment list before any argument
       -- fragment participates in family planning, rigidity, or translation.
       -- Keeping the index beside each complete vector preserves exact provider
@@ -2243,23 +2578,30 @@ fragToDjinn recursiveProjection providers extras frag0 = do
       -- their declarations intact.
       rawBoundedProviderAssignments =
         take maximumProviderInstantiationAssignments
-          [ (index, assignment)
-          | (index, provider) <- zip [0 :: Int ..] usableProviders
-          , assignment <- usableProviderAssignments provider
+          [ (providerIndex, vectorIndex, assignment)
+          | (providerIndex, provider) <- indexedProviders
+          , (vectorIndex, assignment) <- zip [0 :: Int ..]
+              $ usableProviderAssignments provider
           ]
+      passProviderAssignments =
+        [ retained
+        | retained@(providerIndex, vectorIndex, _) <-
+            rawBoundedProviderAssignments
+        , assignmentRetainedForPass providerIndex vectorIndex
+        ]
       baselineEvidenceClaims = foldl
         (\claims source -> mergeExactEvidenceClaims claims
           (fragExactEvidenceClaims source))
         emptyExactEvidenceClaims
-        (map snd extras ++ [frag0] ++ map providerTypeFrag usableProviders)
+        (map snd extras ++ [frag0] ++ projectedProviderFrags)
       internallyConsistentProviderAssignments =
-        [ (index, assignment, claims)
-        | (index, assignment) <- rawBoundedProviderAssignments
+        [ (providerIndex, vectorIndex, assignment, claims)
+        | (providerIndex, vectorIndex, assignment) <- passProviderAssignments
         , let claims = providerAssignmentExactEvidenceClaims assignment
         , exactEvidenceClaimsConsistent claims
         ]
       combinedEvidenceClaims = foldl
-        (\claims (_, _, assignmentClaims) ->
+        (\claims (_, _, _, assignmentClaims) ->
           mergeExactEvidenceClaims claims assignmentClaims)
         baselineEvidenceClaims internallyConsistentProviderAssignments
       conflictingContextNames =
@@ -2270,13 +2612,15 @@ fragToDjinn recursiveProjection providers extras frag0 = do
       -- one vector and the query baseline. Drop every vector that touches that
       -- identity; unrelated vectors from the same provider remain eligible.
       boundedProviderAssignments =
-        [ (index, assignment)
-        | (index, assignment, claims) <-
+        [ (providerIndex, vectorIndex, assignment)
+        | (providerIndex, vectorIndex, assignment, claims) <-
             internallyConsistentProviderAssignments
         , not (claimsTouchConflicts conflictingContextNames
             conflictingFamilyNames claims)
         ]
-      providerArguments = concatMap snd boundedProviderAssignments
+      providerArguments = concatMap
+        (\(_, _, arguments) -> arguments)
+        boundedProviderAssignments
       providerAssignmentFragments =
         concatMap providerArgumentFragments providerArguments
       -- Residual higher-kinded nominal applications contribute a neutral
@@ -2288,12 +2632,12 @@ fragToDjinn recursiveProjection providers extras frag0 = do
       providerAssignmentFamilyUses =
         foldl collectProviderArgumentFamilyUse Map.empty providerArguments
       queryFragments =
-        map snd extras ++ [frag0] ++ map providerTypeFrag usableProviders
+        map snd extras ++ [frag0] ++ projectedProviderFrags
           ++ providerAssignmentFragments
       planningRoots =
         [ (True, frag) | frag <- map snd extras ++ [frag0] ]
-          ++ [ (False, providerTypeFrag provider)
-             | provider <- usableProviders
+          ++ [ (False, providerFrag)
+             | providerFrag <- projectedProviderFrags
              ]
           ++ [ (False, argument)
              | argument <- providerAssignmentPlanningFragments
@@ -2314,10 +2658,8 @@ fragToDjinn recursiveProjection providers extras frag0 = do
       (recursiveSelfKeys, recursiveFieldAtoms) =
         recursiveStructuralAtoms recursiveProjection plans
           (queryFragments ++ structuralTemplateFragments)
-      providerAtoms = foldl
-        (\atoms provider -> collectProviderSurfaceAtoms atoms $
-            providerTypeFrag provider)
-        Set.empty usableProviders
+      providerAtoms = foldl collectProviderSurfaceAtoms
+        Set.empty projectedProviderFrags
       providerAndEvidenceAtoms = foldl collectProviderSurfaceAtoms
         providerAtoms providerAssignmentFragments
       rigidAtoms = Set.difference
@@ -2390,10 +2732,10 @@ fragToDjinn recursiveProjection providers extras frag0 = do
         -- Lean reconstructs instance evidence at applications.  Keep it out
         -- of both engine type systems; Render retains the introduction slot.
         FInst _ body -> go premisesEnabled body
-        -- Exact provider-assignment contexts carry semantic class identity and
-        -- structured arguments. They occur only in the exact evidence wire;
-        -- unlike legacy render-only FInst markers, retain them for Djex's
-        -- closed contextual assignment checker.
+        -- Exact provider contexts carry semantic class identity and structured
+        -- arguments. They occur in supported provider-source schemes and exact
+        -- assignment payloads; unlike legacy render-only FInst markers, retain
+        -- them for Djex's closed contextual assignment checker.
         FExactContext className arguments body -> do
           context <- exactContextConstraint (className, arguments)
           body' <- go premisesEnabled body
@@ -2487,14 +2829,22 @@ fragToDjinn recursiveProjection providers extras frag0 = do
                 (length supplied + remaining)
               pure (applyTypeArguments headType translated)
             ExactContextFragmentArgument _ argument -> case argument of
+              FVar spelling ->
+                TypeVariable <$> variable ("v:" ++ spelling)
               FAtom _ spelling -> exactFamilyHead spelling remaining
+              FApp _ _ (AppVariable spelling) supplied
+                | not (null supplied) -> do
+                    translated <- mapM (go False) supplied
+                    headType <- TypeVariable <$> variable ("v:" ++ spelling)
+                    pure (applyTypeArguments headType translated)
               FApp _ _ (AppNominal spelling) supplied -> do
                 translated <- mapM (go False) supplied
                 headType <- exactFamilyHead spelling
                   (length supplied + remaining)
                 pure (applyTypeArguments headType translated)
               _ -> failT
-                "higher-kinded exact Lean context argument did not retain a nominal head"
+                "higher-kinded exact Lean context argument retained neither \
+                \a bound variable nor a nominal head"
        where
         remaining = exactContextArgumentKindArity source
 
@@ -2885,52 +3235,132 @@ fragToDjinn recursiveProjection providers extras frag0 = do
         translatedProviders <- mapM
           (\(index, provider) -> do
             let leanName = providerLeanName provider
-                providerFrag = providerTypeFrag provider
+                sourceProviderFrag = providerTypeFrag provider
+                providerFrag = projectedProviderFrag index provider
                 binderNames = case provider of
                   ProviderFrag{} -> Nothing
                   ProviderFragWithBinders
                       { providerTypeBinderNames = names } -> Just names
                   ProviderFragWithEvidence
                       { providerTypeBinderNames = names } -> Just names
+                  ProviderFragWithLegacyCandidates
+                      { providerTypeBinderNames = names } -> Just names
+                exactContextual = exactContextualProvider provider
+                providerHasSelectedFacts = case groundFactMode of
+                  DiscoverProviderGroundFacts -> False
+                  SelectProviderGroundFacts selected ->
+                    selectedProviderHasGroundFacts index selected
             privateName <- nameT ("leantProvider" ++ show index)
             providerType <- go False providerFrag
-            translatedAssignments <- mapM
-              (\arguments -> do
-                translatedArguments <- mapM
-                  (\argument -> do
-                    argumentType <- providerArgumentType argument
-                    visibleArgument <- case
-                        specifiedVisibleTypeArgument argumentType of
-                      Left failure -> failT $ show failure
-                      Right visible -> pure visible
-                    pure
-                      ( (providerArgumentKind argument, argumentType)
-                      , visibleArgument
-                      ))
-                  arguments
-                pure
-                  ( KindedProviderInstantiationAssignment
-                      { kindedProviderInstantiationAssignmentProvider =
-                          privateName
-                      , kindedProviderInstantiationAssignmentArguments =
-                          map fst translatedArguments
-                      }
-                  , ProviderAssignmentInfo
-                      { paiVisibleArguments = map snd translatedArguments
-                      , paiSourceArguments = arguments
-                      }
-                  ))
-              [ assignment
-              | (providerIndex, assignment) <- boundedProviderAssignments
-              , providerIndex == index
-              ]
+            let assignmentVectors =
+                  [ (vectorIndex, assignment)
+                  | (providerIndex, vectorIndex, assignment) <-
+                      boundedProviderAssignments
+                  , providerIndex == index
+                  ]
+                translateAssignment arguments = do
+                  translatedArguments <- mapM
+                    (\argument -> do
+                      argumentType <- providerArgumentType argument
+                      visibleArgument <- case
+                          specifiedVisibleTypeArgument argumentType of
+                        Left failure -> failT $ show failure
+                        Right visible -> pure visible
+                      pure
+                        ( (providerArgumentKind argument, argumentType)
+                        , visibleArgument
+                        ))
+                    arguments
+                  pure
+                    ( KindedProviderInstantiationAssignment
+                        { kindedProviderInstantiationAssignmentProvider =
+                            privateName
+                        , kindedProviderInstantiationAssignmentArguments =
+                            map fst translatedArguments
+                        }
+                    , ProviderAssignmentInfo
+                        { paiVisibleArguments = map snd translatedArguments
+                        , paiSourceArguments = arguments
+                        }
+                    , map (snd . fst) translatedArguments
+                    )
+            translatedAssignments <- case
+                (exactContextual, groundFactMode, providerHasSelectedFacts) of
+              (True, DiscoverProviderGroundFacts, _) -> do
+                discovered <- mapM
+                  (\(vectorIndex, arguments) -> do
+                    translated <- probeMaybeT $ translateAssignment arguments
+                    pure $ fmap
+                      (\retained@(_, _, argumentTypes) ->
+                        ( (index, vectorIndex)
+                        , retained
+                        , groundProviderConstraintGroup
+                            sourceProviderFrag providerType argumentTypes
+                        ))
+                      translated)
+                  assignmentVectors
+                pure [retained | Just retained <- discovered]
+              (True, SelectProviderGroundFacts _, True) -> mapM
+                (\(vectorIndex, arguments) -> do
+                  translated@(_, _, argumentTypes) <-
+                    translateAssignment arguments
+                  grounded <- case groundProviderConstraintGroup
+                      sourceProviderFrag providerType argumentTypes of
+                    Just constraints -> pure constraints
+                    Nothing -> failT
+                      "selected contextual provider fact became unavailable"
+                  pure
+                    ( (index, vectorIndex)
+                    , translated
+                    , Just grounded
+                    ))
+                assignmentVectors
+              (True, SelectProviderGroundFacts _, False) -> do
+                fallback <- mapM
+                  (\(vectorIndex, arguments) -> do
+                    translated <- transactionT
+                      $ translateAssignment arguments
+                    pure $ (\retained ->
+                      ((index, vectorIndex), retained, Nothing))
+                        <$> translated)
+                  assignmentVectors
+                pure [retained | Just retained <- fallback]
+              _ -> mapM
+                (\(vectorIndex, arguments) -> do
+                  translated <- translateAssignment arguments
+                  pure ((index, vectorIndex), translated, Nothing))
+                assignmentVectors
             -- Domain metadata can distinguish two Lean renderings which Djex
             -- intentionally collapses to the same canonical assignment. Keep
             -- every bounded rendering below, but search each canonical vector
             -- only once.
-            let instantiations = nub (map fst translatedAssignments)
-                info = (providerInfo leanName binderNames providerFrag)
-                  { piAssignments = map snd translatedAssignments }
+            let historicalAssignments =
+                  [ ProviderTranslatedAssignment instantiation assignmentInfo
+                  | (_, (instantiation, assignmentInfo, _), _) <-
+                      translatedAssignments
+                  ]
+                allInstantiations = nub
+                  $ map providerTranslatedInstantiation historicalAssignments
+                successfulContextualKeys
+                  | exactContextual =
+                      [ key | (key, _, _) <- translatedAssignments ]
+                  | otherwise = []
+                groundConstraintGroups =
+                  [ ProviderGroundConstraintGroup key historical grounded
+                  | (historical, (key, _, Just grounded)) <-
+                      zip historicalAssignments translatedAssignments
+                  ]
+                retainedAssignments
+                  | exactContextual
+                  , case groundFactMode of
+                      DiscoverProviderGroundFacts -> True
+                      SelectProviderGroundFacts _ -> providerHasSelectedFacts
+                      = []
+                  | otherwise = allInstantiations
+                info = (providerInfo leanName binderNames sourceProviderFrag)
+                  { piAssignments =
+                      map providerTranslatedRenderInfo historicalAssignments
+                  }
             pure ProviderBinding
               { providerBindingSource = provider
               , providerBindingPrivateName = privateName
@@ -2938,7 +3368,11 @@ fragToDjinn recursiveProjection providers extras frag0 = do
                   "leantProvider" ++ show index
               , providerBindingScheme = providerType
               , providerBindingRenderInfo = info
-              , providerBindingAssignments = instantiations
+              , providerBindingAssignments = retainedAssignments
+              , providerBindingTranslatedAssignmentKeys =
+                  successfulContextualKeys
+              , providerBindingGroundConstraintGroups =
+                  groundConstraintGroups
               })
           (zip [0 :: Int ..] usableProviders)
         pure TranslationProduct
@@ -2986,21 +3420,158 @@ fragToDjinn recursiveProjection providers extras frag0 = do
     , translationProjectionCompleteness = projection
     }
  where
-  usableProvider = not . fragHasDepth . providerTypeFrag
+  -- Djinn's compatibility projection erases every exact provider context.
+  -- Exference retains the semantic wire for live/plain, binder-only, and
+  -- exact-evidence providers. Historical candidate pools are context-erased
+  -- in both engines: reshaping a legacy unary hint must never create a
+  -- conditional provider declaration.
+  projectedProviderFrag index provider = case
+      (providerContextProjection recursiveProjection, provider) of
+    (RetainProviderContexts, ProviderFragWithLegacyCandidates{}) ->
+      eraseProviderExactContexts $ providerTypeFrag provider
+    (RetainProviderContexts, _)
+      | exactContextualProvider provider -> case groundFactMode of
+          DiscoverProviderGroundFacts -> providerTypeFrag provider
+          SelectProviderGroundFacts selected
+            | selectedProviderHasGroundFacts index selected ->
+                providerTypeFrag provider
+            | otherwise ->
+                eraseProviderExactContexts $ providerTypeFrag provider
+    (RetainProviderContexts, _) -> providerTypeFrag provider
+    (EraseProviderContexts, _) ->
+      eraseProviderExactContexts $ providerTypeFrag provider
 
-  usableProviderAssignments provider = case provider of
-    ProviderFragWithEvidence
-        { providerInstantiationAssignments = assignments } ->
-      let arity = providerInstantiationArity (providerTypeFrag provider)
-      in
-      filter
-        (\assignment ->
-          not (null assignment)
-            && length assignment == arity
-            && length assignment <= maximumProviderInstantiationArguments
-            && all usableProviderArgument assignment)
-        assignments
-    _ -> []
+  exactContextualProvider provider = case
+      (providerContextProjection recursiveProjection, provider) of
+    (RetainProviderContexts, ProviderFragWithEvidence{}) ->
+      providerFragmentContainsExactContext $ providerTypeFrag provider
+    _ -> False
+
+  selectedProviderHasGroundFacts index = any
+    ((== index) . fst) . Set.toList
+
+  eraseProviderExactContexts source = case source of
+    FArr parameter result -> FArr
+      (eraseProviderExactContexts parameter)
+      (eraseProviderExactContexts result)
+    FProd left right -> FProd
+      (eraseProviderExactContexts left)
+      (eraseProviderExactContexts right)
+    FSum left right -> FSum
+      (eraseProviderExactContexts left)
+      (eraseProviderExactContexts right)
+    FAll explicit binder body ->
+      FAll explicit binder (eraseProviderExactContexts body)
+    FInst key body -> FInst key (eraseProviderExactContexts body)
+    FExactContext _ _ body -> eraseProviderExactContexts body
+    FApp safe key head' arguments ->
+      FApp safe key head' $ map eraseProviderExactContexts arguments
+    FParamInd spelling key parameters constructors ->
+      FParamInd spelling key
+        (map eraseProviderExactContexts parameters)
+        [ (name, map eraseProviderExactContexts fields)
+        | (name, fields) <- constructors
+        ]
+    FInd key constructors -> FInd key
+      [ (name, map eraseProviderExactContexts fields)
+      | (name, fields) <- constructors
+      ]
+    FParamRec complete spelling key parameters constructors ->
+      FParamRec complete spelling key
+        (map eraseProviderExactContexts parameters)
+        [ (name, map eraseProviderExactContexts fields)
+        | (name, fields) <- constructors
+        ]
+    FRec complete key parameters constructors ->
+      FRec complete key
+        (map eraseProviderExactContexts parameters)
+        [ (name, map eraseProviderExactContexts fields)
+        | (name, fields) <- constructors
+        ]
+    _ -> source
+
+  -- One exact vector authorizes the complete leading constraint group or
+  -- nothing. The translated argument vector must be closed and forall-free;
+  -- this still admits ground higher-kinded arguments such as @Functor List@.
+  -- One capture-safe simultaneous substitution is then applied to the whole
+  -- group. The vector proves closure of these provider obligations only: no
+  -- original Lean instance head or prerequisite graph is reconstructed.
+  -- A later full-inventory trial seal owns nominal kind validation, so this
+  -- helper can fail closed without rejecting the provider itself.
+  groundProviderConstraintGroup sourceProviderFrag providerScheme
+      argumentTypes
+    | null binders || null constraints = Nothing
+    | length binders /= length argumentTypes = Nothing
+    | length (nub binders) /= length binders = Nothing
+    | length sourceContexts /= length constraints = Nothing
+    | not (all resolverGroundType argumentTypes) = Nothing
+    | otherwise = case substituteTypeVariablesBatch noFresh Set.empty
+        (Map.fromList $ zip binders argumentTypes)
+        (concatMap constraintArguments constraints) of
+      Left _ -> Nothing
+      Right groundedArguments -> do
+        grounded <- rebuildConstraints constraints groundedArguments
+        let canonical = map (fmap canonicalizeType) grounded
+        if all resolverGroundConstraint canonical
+          then Just canonical
+          else Nothing
+   where
+    (binders, constraints, _) = splitLeadingForalls providerScheme
+    sourceContexts = leadingSourceContexts sourceProviderFrag
+    noFresh _ _ = Nothing
+    resolverGroundType typeExpression =
+      not (containsForall typeExpression)
+        && Set.null (freeVariables typeExpression)
+    resolverGroundConstraint = all resolverGroundType . constraintArguments
+
+    leadingSourceContexts source = case source of
+      FAll _ _ body -> leadingSourceContexts body
+      FExactContext className arguments body ->
+        (className, arguments) : leadingSourceContexts body
+      _ -> []
+
+    rebuildConstraints [] [] = Just []
+    rebuildConstraints [] _ = Nothing
+    rebuildConstraints (constraint : remaining) arguments = do
+      let width = length $ constraintArguments constraint
+          (current, rest) = splitAt width arguments
+      if length current /= width
+        then Nothing
+        else do
+          tailConstraints <- rebuildConstraints remaining rest
+          pure
+            ( Constraint (constraintClass constraint) current
+                : tailConstraints
+            )
+
+  usableProvider provider =
+    not (fragHasDepth source)
+      && case providerContextProjection recursiveProjection of
+        EraseProviderContexts -> True
+        RetainProviderContexts ->
+          not (providerFragmentContainsExactContext source
+            && fragHasUnsupportedInstanceBinder source)
+   where
+    source = providerTypeFrag provider
+
+  usableProviderAssignments provider =
+    let arity = providerInstantiationArity $ providerTypeFrag provider
+        assignments = case provider of
+          ProviderFragWithEvidence
+              { providerInstantiationAssignments = exact } -> exact
+          ProviderFragWithLegacyCandidates
+              { providerLegacyInstantiationCandidates = candidates } ->
+                [ [ProviderInstantiationArgument 0 candidate]
+                | candidate <- candidates
+                ]
+          _ -> []
+    in filter
+      (\assignment ->
+        not (null assignment)
+          && length assignment == arity
+          && length assignment <= maximumProviderInstantiationArguments
+          && all usableProviderArgument assignment)
+      assignments
 
   usableProviderArgument argument =
     providerInstantiationArgumentKindArity argument >= 0
@@ -3614,9 +4185,10 @@ schemaEquivalent = go []
         FAll rightExplicit rightBinder rightBody) ->
       leftExplicit == rightExplicit
         && go ((leftBinder, rightBinder) : binders) leftBody rightBody
-    -- Instance evidence is erased before either engine sees a schema.  Pretty
-    -- keys retain only diagnostics and must not split alpha-equivalent family
-    -- templates whose enclosing binder spellings differ.
+    -- Legacy instance evidence is erased before either engine sees a schema.
+    -- Pretty keys retain only diagnostics and must not split alpha-equivalent
+    -- family templates whose enclosing binder spellings differ.  Semantic
+    -- FExactContext nodes are compared by the branch immediately below.
     (FInst _ leftBody, FInst _ rightBody) ->
       go binders leftBody rightBody
     (FExactContext leftClass leftArguments leftBody,
@@ -3660,11 +4232,29 @@ schemaEquivalent = go []
         ( ExactContextFragmentArgument leftArity leftFrag
           , ExactContextFragmentArgument rightArity rightFrag
           ) ->
-            leftArity == 0
-              && rightArity == 0
-              && go binders leftFrag rightFrag
+            leftArity == rightArity
+              && if leftArity == 0
+                then go binders leftFrag rightFrag
+                else leftArity > 0
+                  && leftArity <= maximumProviderArgumentKindArity
+                  && scopedVariableArgumentsEquivalent binders
+                    leftFrag rightFrag
         _ -> False
       _ -> False
+  scopedVariableArgumentsEquivalent binders left right = case (left, right) of
+    (FVar leftName, FVar rightName) ->
+      leftName `elem` map fst binders
+        && rightName `elem` map snd binders
+        && go binders left right
+    ( FApp _ _ (AppVariable leftName) leftSupplied
+      , FApp _ _ (AppVariable rightName) rightSupplied
+      ) ->
+        not (null leftSupplied)
+          && not (null rightSupplied)
+          && leftName `elem` map fst binders
+          && rightName `elem` map snd binders
+          && go binders left right
+    _ -> False
   equivalentHead binders leftHead rightHead = case (leftHead, rightHead) of
     (AppVariable leftName, AppVariable rightName) ->
       equivalentName binders leftName rightName

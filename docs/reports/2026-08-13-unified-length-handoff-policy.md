@@ -67,6 +67,14 @@ holds under the current policy, but old containing session, problem, query, and
 protocol keys are invalidated. See the
 [certificate-carrier handoff report](2026-08-13-length-certificate-carrier-handoff.md).
 
+The subsequent conditional-provider boundary preserves those exact 5/6/7
+identities for sessions containing only legacy summaries. A session retaining
+any constraint-conditional provider summary instead selects policies 8/9/10
+and concrete encodings 4/5/6; an actually ground-discharged associated
+candidate uses v3. This does not change the policy-source conversion described
+in this report. See the
+[live contextual-provider ground-discharge report](2026-08-13-live-contextual-provider-ground-discharge.md).
+
 Existing production regressions also continue to cover the complete matrix:
 
 - legacy startup/v1/v2 preparation and ranking;
