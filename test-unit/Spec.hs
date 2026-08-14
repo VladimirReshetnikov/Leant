@@ -21,6 +21,7 @@ import System.Directory
   , createFileLink
   , doesFileExist
   , findExecutable
+  , getCurrentDirectory
   , getPermissions
   , getTemporaryDirectory
   , removeFile
@@ -29,8 +30,17 @@ import System.Directory
   , setOwnerExecutable
   , setPermissions
   )
+import System.Environment (getArgs, getExecutablePath)
 import System.FilePath ((</>), normalise, takeDirectory)
-import System.IO (hClose, openBinaryTempFile)
+import System.IO
+  ( hClose
+  , hFlush
+  , hSetBinaryMode
+  , openBinaryTempFile
+  , stderr
+  , stdin
+  , stdout
+  )
 import System.Info (os)
 import System.Timeout (timeout)
 import Test.Tasty (TestTree, defaultMain, testGroup)
@@ -92,7 +102,14 @@ import Language.Haskell.Djex
   , validateLengthSMTLibCounterexample
   )
 
-import Leant.Backend (findBackendProject)
+import Leant.Backend
+  ( BackendConfig (..)
+  , RequestError (..)
+  , findBackendProject
+  , killBackend
+  , spawnBackend
+  )
+import qualified Leant.Backend as Backend
 import qualified Leant.Json as Json
 import Leant.Json.Bounded
   ( BoundedJsonError (..)
@@ -391,32 +408,37 @@ import Leant.Session.Snapshot
   )
 
 main :: IO ()
-main = defaultMain $ testGroup "Leant synthesis boundary"
-  [ commandLineTests
-  , backendDiscoveryTests
-  , boundedJsonTests
-  , snapshotMetadataTests
-  , sessionReplayTests
-  , providerCacheTests
-  , translationPreparationTests
-  , providerScheduleTests
-  , combinedEngineMergeTests
-  , typedCandidateRoutingTests
-  , lengthRankingTests
-  , replayPlanTests
-  , providerProgramTests
-  , candidateVerificationTests
-  , verificationObservabilityTests
-  , postVerificationTests
-  , providerParserTests
-  , instanceImplicitTests
-  , providerEngineTests
-  , typeApplicationTests
-  , parametricFamilyFragmentTests
-  , parametricFamilyEngineTests
-  , rankNFrontierTests
-  , visibleTypeApplicationTests
-  ]
+main = do
+  arguments <- getArgs
+  if arguments == ["env", backendStderrFloodMode]
+    then backendStderrFloodHelper
+    else defaultMain $ testGroup "Leant synthesis boundary"
+      [ commandLineTests
+      , backendDiscoveryTests
+      , backendLifecycleTests
+      , boundedJsonTests
+      , snapshotMetadataTests
+      , sessionReplayTests
+      , providerCacheTests
+      , translationPreparationTests
+      , providerScheduleTests
+      , combinedEngineMergeTests
+      , typedCandidateRoutingTests
+      , lengthRankingTests
+      , replayPlanTests
+      , providerProgramTests
+      , candidateVerificationTests
+      , verificationObservabilityTests
+      , postVerificationTests
+      , providerParserTests
+      , instanceImplicitTests
+      , providerEngineTests
+      , typeApplicationTests
+      , parametricFamilyFragmentTests
+      , parametricFamilyEngineTests
+      , rankNFrontierTests
+      , visibleTypeApplicationTests
+      ]
 
 commandLineTests :: TestTree
 commandLineTests = testGroup "command-line admission"
@@ -524,6 +546,69 @@ backendDiscoveryTests = testGroup "Lean backend discovery"
         found <- findBackendProject executable
         found @?= Nothing
   ]
+
+backendLifecycleTests :: TestTree
+backendLifecycleTests = testGroup "Lean backend lifecycle"
+  [ testCase "drain oversized stderr while awaiting a response" $ do
+      executable <- getExecutablePath
+      workingDirectory <- getCurrentDirectory
+      backend <- spawnBackend BackendConfig
+        { bcLakePath = executable
+        , bcReplExe = backendStderrFloodMode
+        , bcWorkingDir = workingDirectory
+        }
+      let cleanup = do
+            cleaned <- timeout 3000000 $ killBackend backend
+            case cleaned of
+              Just () -> pure ()
+              Nothing -> assertFailure
+                "backend cleanup blocked after the stderr pump completed"
+      flip finally cleanup $ do
+        response <- timeout 5000000
+          $ Backend.request backend Nothing (Json.JObj [])
+        case response of
+          Just (Right value) -> value @?=
+            Json.JObj [("ok", Json.JBool True)]
+          Just other -> assertFailure $ "live backend returned " ++ show other
+          Nothing -> assertFailure
+            "backend response blocked behind its oversized stderr"
+        closed <- timeout 2000000
+          $ Backend.request backend Nothing (Json.JObj [])
+        case closed of
+          Just (Left (ServerClosed diagnostic)) -> diagnostic @?=
+            backendStderrTruncationMarker
+              ++ replicate backendStderrTailBytes 'T'
+          Just other -> assertFailure $ "closed backend returned " ++ show other
+          Nothing -> assertFailure
+            "closed backend request blocked after stdout reached EOF"
+  ]
+
+backendStderrFloodMode :: String
+backendStderrFloodMode = "__leant_backend_stderr_flood__"
+
+backendStderrTailBytes :: Int
+backendStderrTailBytes = 64 * 1024
+
+backendStderrTruncationMarker :: String
+backendStderrTruncationMarker = "[earlier backend stderr truncated]\n"
+
+backendStderrFloodHelper :: IO ()
+backendStderrFloodHelper = do
+  hSetBinaryMode stderr True
+  ByteString.hPut stderr
+    $ ByteString.replicate (2 * backendStderrTailBytes) 80
+  ByteString.hPut stderr
+    $ ByteString.replicate backendStderrTailBytes 84
+  hFlush stderr
+  hClose stderr
+  putStr "{\"ok\":true}\n\n"
+  hFlush stdout
+  hClose stdout
+  consumeInput
+ where
+  consumeInput = do
+    bytes <- ByteString.hGetSome stdin 4096
+    if ByteString.null bytes then pure () else consumeInput
 
 withTemporaryDirectory :: String -> (FilePath -> IO a) -> IO a
 withTemporaryDirectory template action = do

@@ -5,7 +5,7 @@
 -- one JSON document followed by a blank line; responses are read until the
 -- blank-line delimiter.
 module Leant.Backend
-  ( Backend (..)
+  ( Backend
   , BackendConfig (..)
   , discoverReplExe
   , findBackendProject
@@ -17,11 +17,24 @@ module Leant.Backend
   , RequestError (..)
   ) where
 
-import Control.Exception (IOException, SomeException, try)
+import Control.Concurrent (ThreadId, forkIOWithUnmask, killThread)
+import Control.Concurrent.MVar
+  ( MVar
+  , modifyMVar_
+  , newEmptyMVar
+  , newMVar
+  , putMVar
+  , readMVar
+  )
+import Control.Exception (IOException, finally, mask, onException, try)
 import Control.Monad (filterM, forM)
+import qualified Data.ByteString as ByteString
 import Data.List (sortOn)
 import Data.Maybe (catMaybes, listToMaybe)
 import Data.Ord (Down (..))
+import qualified Data.Text as Text
+import qualified Data.Text.Encoding as TextEncoding
+import Data.Text.Encoding.Error (lenientDecode)
 import System.Directory
   ( canonicalizePath
   , doesDirectoryExist
@@ -40,6 +53,7 @@ import System.IO
   , hFlush
   , hGetLine
   , hPutStr
+  , hSetBinaryMode
   , hSetBuffering
   , hSetEncoding
   , hSetNewlineMode
@@ -71,10 +85,18 @@ data Backend = Backend
   , beOut :: Handle
   , beErr :: Handle
   , beProc :: ProcessHandle
+  , beErrCapture :: MVar CapturedStderr
+  , beErrDone :: MVar ()
+  , beErrThread :: ThreadId
+  }
+
+data CapturedStderr = CapturedStderr
+  { capturedStderrTruncated :: !Bool
+  , capturedStderrBytes :: !ByteString.ByteString
   }
 
 data RequestError
-  = ServerClosed String   -- ^ backend died; payload is captured stderr
+  = ServerClosed String   -- ^ backend died; payload is its bounded stderr tail
   | RequestTimeout
   | BadResponse String
   deriving (Show)
@@ -173,29 +195,89 @@ isBuiltProject dir =
 -- Process lifecycle ---------------------------------------------------------
 
 spawnBackend :: BackendConfig -> IO Backend
-spawnBackend config = do
-  (Just hIn, Just hOut, Just hErr, ph) <- createProcess
+spawnBackend config = mask $ \restore -> do
+  created <- createProcess
     (proc (bcLakePath config) ["env", bcReplExe config])
       { cwd = Just (bcWorkingDir config)
       , std_in = CreatePipe
       , std_out = CreatePipe
       , std_err = CreatePipe
       }
-  mapM_ prepare [hIn, hOut, hErr]
-  pure (Backend hIn hOut hErr ph)
+  case created of
+    (Just hIn, Just hOut, Just hErr, ph) ->
+      finish restore hIn hOut hErr ph
+        `onException` cleanupCreatedProcess hIn hOut hErr ph
+    (maybeIn, maybeOut, maybeErr, ph) -> do
+      cleanupIncompleteProcess maybeIn maybeOut maybeErr ph
+      ioError $ userError "backend process did not create all three pipes"
  where
-  prepare h = do
+  finish restore hIn hOut hErr ph = do
+    _ <- restore $ do
+      mapM_ prepareText [hIn, hOut]
+      hSetBinaryMode hErr True
+      hSetBuffering hErr NoBuffering
+    capture <- newMVar $ CapturedStderr False ByteString.empty
+    done <- newEmptyMVar
+    drainThread <- forkIOWithUnmask $ \unmask ->
+      unmask (captureStderr hErr capture) `finally` putMVar done ()
+    pure Backend
+      { beIn = hIn
+      , beOut = hOut
+      , beErr = hErr
+      , beProc = ph
+      , beErrCapture = capture
+      , beErrDone = done
+      , beErrThread = drainThread
+      }
+
+  prepareText h = do
     hSetEncoding h utf8
     hSetNewlineMode h universalNewlineMode
     hSetBuffering h LineBuffering
 
+cleanupCreatedProcess
+  :: Handle -> Handle -> Handle -> ProcessHandle -> IO ()
+cleanupCreatedProcess hIn hOut hErr process = do
+  closeQuietly hIn
+  terminateAndWait process
+  mapM_ closeQuietly [hOut, hErr]
+
+cleanupIncompleteProcess
+  :: Maybe Handle
+  -> Maybe Handle
+  -> Maybe Handle
+  -> ProcessHandle
+  -> IO ()
+cleanupIncompleteProcess maybeIn maybeOut maybeErr process = do
+  mapM_ closeQuietly maybeIn
+  terminateAndWait process
+  mapM_ closeQuietly maybeOut
+  mapM_ closeQuietly maybeErr
+
+terminateAndWait :: ProcessHandle -> IO ()
+terminateAndWait process = do
+  _ <- try (terminateProcess process) :: IO (Either IOException ())
+  _ <- try (waitForProcess process) :: IO (Either IOException ExitCode)
+  pure ()
+
+closeQuietly :: Handle -> IO ()
+closeQuietly handle = do
+  _ <- try (hClose handle) :: IO (Either IOException ())
+  pure ()
+
 killBackend :: Backend -> IO ()
 killBackend backend = do
-  _ <- try (hClose (beIn backend)) :: IO (Either IOException ())
-  terminateProcess (beProc backend)
-  _ <- try (waitForProcess (beProc backend))
-    :: IO (Either SomeException ExitCode)
-  pure ()
+  closeQuietly $ beIn backend
+  terminateAndWait $ beProc backend
+  drained <- timeout 1000000 $ readMVar (beErrDone backend)
+  case drained of
+    Just () -> pure ()
+    Nothing -> do
+      killThread (beErrThread backend)
+      _ <- timeout stderrCompletionWaitMicroseconds
+        $ readMVar (beErrDone backend)
+      pure ()
+  mapM_ closeQuietly [beOut backend, beErr backend]
 
 -- Request cycle -------------------------------------------------------------
 
@@ -234,12 +316,56 @@ readResponse backend = go []
         | otherwise -> go (l : acc)
 
 drainStderr :: Backend -> IO String
-drainStderr backend = go [] (200 :: Int)
+drainStderr backend = do
+  _ <- timeout stderrCompletionWaitMicroseconds
+    $ readMVar (beErrDone backend)
+  captured <- readMVar $ beErrCapture backend
+  let marker
+        | capturedStderrTruncated captured =
+            "[earlier backend stderr truncated]\n"
+        | otherwise = ""
+  pure $ marker ++ Text.unpack (TextEncoding.decodeUtf8With lenientDecode
+    $ capturedStderrBytes captured)
+
+maximumCapturedStderrBytes :: Int
+maximumCapturedStderrBytes = 64 * 1024
+
+stderrReadChunkBytes :: Int
+stderrReadChunkBytes = 4096
+
+stderrCompletionWaitMicroseconds :: Int
+stderrCompletionWaitMicroseconds = 1000000
+
+captureStderr :: Handle -> MVar CapturedStderr -> IO ()
+captureStderr handle capture = go
  where
-  go acc 0 = done acc
-  go acc n = do
-    line <- try (timeout 200000 (hGetLine (beErr backend)))
-    case (line :: Either IOException (Maybe String)) of
-      Right (Just l) -> go (l : acc) (n - 1)
-      _ -> done acc
-  done acc = pure (unlines (reverse acc))
+  go = do
+    observed <- try $ ByteString.hGetSome handle stderrReadChunkBytes
+    case (observed :: Either IOException ByteString.ByteString) of
+      Left _ -> pure ()
+      Right bytes
+        | ByteString.null bytes -> pure ()
+        | otherwise -> do
+            modifyMVar_ capture $ pure . appendCapturedStderr bytes
+            go
+
+appendCapturedStderr
+  :: ByteString.ByteString
+  -> CapturedStderr
+  -> CapturedStderr
+appendCapturedStderr incoming captured
+  | incomingLength >= maximumCapturedStderrBytes = CapturedStderr
+      (capturedStderrTruncated captured
+        || not (ByteString.null $ capturedStderrBytes captured)
+        || incomingLength > maximumCapturedStderrBytes)
+      (ByteString.drop
+        (incomingLength - maximumCapturedStderrBytes) incoming)
+  | otherwise = CapturedStderr truncated retained
+ where
+  incomingLength = ByteString.length incoming
+  previous = capturedStderrBytes captured
+  previousRoom = maximumCapturedStderrBytes - incomingLength
+  previousLength = ByteString.length previous
+  dropped = max 0 $ previousLength - previousRoom
+  retained = ByteString.drop dropped previous <> incoming
+  truncated = capturedStderrTruncated captured || dropped > 0
