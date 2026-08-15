@@ -45,6 +45,7 @@ module Leant.Synth.Length.Configuration
   , enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainValidation
   , enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainValidation
   , enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainValidation
+  , enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineApplicableDomainValidation
   , enableLengthRankingCounterexampleSimplification
   , enableLengthRankingNonVacuousInputBoxPreference
   , enableLengthRankingNonVacuousApplicableDomainPreference
@@ -215,6 +216,8 @@ data LengthRankingApplicableDomainValidation
   | LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionV1
       !LengthInputBoxLimits !LengthBooleanFiniteUnionLimits
   | LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingV1
+      !LengthInputBoxLimits !LengthBooleanFiniteUnionLimits
+  | LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineV1
       !LengthInputBoxLimits !LengthBooleanFiniteUnionLimits
 
 -- | Private permission to run Djex's query-owned canonical origin replay
@@ -612,6 +615,27 @@ enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBoolean
     originProbe simplification inputBoxPreference applicableDomainPreference
     liveSessionOpening usableWorkBudget
 
+-- | Select the nominal recursive piecewise-affine successor to the cumulative
+-- atomic-branching validator.  It retains the same independently sealed limits
+-- while recursively branching the additionally admitted extrema/monus
+-- piecewise-affine atoms.  All applicable-domain builders remain mutually
+-- exclusive, so the last one applied determines the retained strategy.
+enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineApplicableDomainValidation
+  :: LengthInputBoxLimits
+  -> LengthBooleanFiniteUnionLimits
+  -> LengthRankingPolicy
+  -> LengthRankingPolicy
+enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineApplicableDomainValidation
+    inputBoxLimits unionLimits
+    (LengthRankingPolicy execution evaluation inputBoxValidation _ originProbe
+      simplification inputBoxPreference applicableDomainPreference
+      liveSessionOpening usableWorkBudget) =
+  LengthRankingPolicy execution evaluation inputBoxValidation
+    (LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineV1
+      inputBoxLimits unionLimits)
+    originProbe simplification inputBoxPreference applicableDomainPreference
+    liveSessionOpening usableWorkBudget
+
 -- | Enable the same bounded, query-owned strict counterexample simplifier for
 -- every counterexample source without changing source order or enabling any
 -- source.  A bounded unavailability or absence of a strict improvement retains
@@ -827,6 +851,10 @@ scalarApplicableDomainRankingPolicy validation = case validation of
       inputBoxLimits unionLimits ->
     LengthApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingEnabled
       inputBoxLimits unionLimits
+  LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineV1
+      inputBoxLimits unionLimits ->
+    LengthApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineEnabled
+      inputBoxLimits unionLimits
 
 scalarOriginProbeRankingPolicy
   :: LengthRankingOriginProbe
@@ -888,6 +916,10 @@ spinePairApplicableDomainRankingPolicy validation = case validation of
   LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingV1
       inputBoxLimits unionLimits ->
     LengthSpinePairApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingEnabled
+      inputBoxLimits unionLimits
+  LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineV1
+      inputBoxLimits unionLimits ->
+    LengthSpinePairApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineEnabled
       inputBoxLimits unionLimits
 
 liveSessionOpeningPolicy

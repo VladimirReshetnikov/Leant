@@ -81,6 +81,8 @@ module Leant.Synth.Length.Configuration.File
   , lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionVersion
   , lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingVersion
   , lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingVersion
+  , lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineVersion
+  , lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineVersion
   , lengthRankingConfigurationFileJsonLimits
   , LengthRankingConfigurationFileObject (..)
   , LengthRankingConfigurationFileField (..)
@@ -191,6 +193,7 @@ import Leant.Synth.Length.Configuration
   , enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainValidation
   , enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainValidation
   , enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainValidation
+  , enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineApplicableDomainValidation
   , enableLengthRankingUsableWorkBudget
   , lengthRankingPolicyExecutableDigestExpectation
   , lengthRankingPolicyFromValidatedComponents
@@ -375,6 +378,19 @@ lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRoo
   :: Natural
 lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingVersion =
   32
+
+-- | Scalar execve-check/scoped successor selecting recursive piecewise-affine
+-- branching below the cumulative atomic-branching applicable domain.
+lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineVersion
+  :: Natural
+lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineVersion =
+  33
+
+-- | Nominal binary-product sibling of version 33.
+lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineVersion
+  :: Natural
+lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineVersion =
+  34
 
 -- | Fixed admission policy for the v1 document itself.  The array maximum is
 -- one greater than the widest typed collection so maximum-plus-one reaches the
@@ -755,9 +771,15 @@ decodeLengthAssessmentConfigurationFile bytes =
                                       bytes of
                                   Right booleanFiniteUnion ->
                                     Right booleanFiniteUnion
-                                  Left LengthRankingConfigurationUnsupportedVersion ->
-                                    decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranching
-                                      bytes
+                                  Left LengthRankingConfigurationUnsupportedVersion -> case
+                                      decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranching
+                                        bytes of
+                                    Right atomicBranching ->
+                                      Right atomicBranching
+                                    Left LengthRankingConfigurationUnsupportedVersion ->
+                                      decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffine
+                                        bytes
+                                    Left failure -> Left failure
                                   Left failure -> Left failure
                                 Left failure -> Left failure
                               Left failure -> Left failure
@@ -1230,6 +1252,39 @@ decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffineQuotientRoo
         lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingVersion
       then
         decodeLengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingV32
+          root
+      else Left LengthRankingConfigurationUnsupportedVersion
+
+-- | Decode only the recursive piecewise-affine scalar/product siblings after
+-- every version-1--version-32 entrance has returned its closed unsupported-
+-- version sentinel.  Both versions retain the complete v31/v32 root and
+-- limits and replace only the applicable-domain strategy and nominal receipt.
+decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffine
+  :: ByteString
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffine
+    bytes = do
+  document <- either (Left . LengthRankingConfigurationJsonRejected) Right
+    $ parseBoundedJson lengthRankingConfigurationFileJsonLimits bytes
+  root <- objectFields LengthRankingConfigurationRootObject document
+  formatValue <- rootField LengthRankingConfigurationFormatField "format" root
+  format <- stringField LengthRankingConfigurationFormatField formatValue
+  if format == lengthRankingConfigurationFileFormat
+    then pure ()
+    else Left LengthRankingConfigurationUnsupportedFormat
+  versionValue <- rootField LengthRankingConfigurationVersionField "version" root
+  version <- integerField LengthRankingConfigurationVersionField versionValue
+  if version == toInteger
+      lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineVersion
+    then
+      decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineV33
+        root
+    else if version == toInteger
+        lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineVersion
+      then
+        decodeLengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineV34
           root
       else Left LengthRankingConfigurationUnsupportedVersion
 
@@ -1741,6 +1796,35 @@ decodeLengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuoti
   contract <- decodeLeanLengthSpinePairContractValueV5 contractValue
   pure $ DisabledLengthSpinePairAssessmentConfiguration policy contract
 
+decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineV33
+  :: ObjectFields
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineV33
+    root = do
+  policy <-
+    decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffinePolicy
+      root
+  contractValue <- rootField LengthRankingConfigurationContractField "contract" root
+  contract <- decodeLeanLengthContractValueV5 contractValue
+  pure $ DisabledLengthScalarAssessmentConfiguration
+    $ disableLengthRankingConfiguration policy contract
+
+decodeLengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineV34
+  :: ObjectFields
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineV34
+    root = do
+  policy <-
+    decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffinePolicy
+      root
+  contractValue <- rootField LengthRankingConfigurationContractField "contract" root
+  contract <- decodeLeanLengthSpinePairContractValueV5 contractValue
+  pure $ DisabledLengthSpinePairAssessmentConfiguration policy contract
+
 decodeLengthRankingConfigurationFileUsableWorkBudgetPolicy
   :: ObjectFields
   -> Either LengthRankingConfigurationFileError LengthRankingPolicy
@@ -1930,6 +2014,25 @@ decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootEx
   let inheritedRoot = filter ((/= "usableWorkBudget") . fst) root
   advancedPolicy <-
     decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingBasePolicy
+      inheritedRoot
+  budgetValue <- rootField LengthRankingConfigurationUsableWorkBudgetField "usableWorkBudget" root
+  budget <- decodeScopedUsableWorkBudget budgetValue
+  pure $ enableLengthRankingScopedUsableWorkBudget budget advancedPolicy
+
+-- Versions 33 and 34 retain version 31/32's complete execve-check, Boolean
+-- finite-union, descriptor-bound root, validation order, and scoped-v2 usable-
+-- work owner.  Only the inherited applicable-domain strategy and its nominal
+-- receipt change.
+decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffinePolicy
+  :: ObjectFields
+  -> Either LengthRankingConfigurationFileError LengthRankingPolicy
+decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffinePolicy
+    root = do
+  exactFields LengthRankingConfigurationRootObject
+    rootFieldsUsableWorkBudget root
+  let inheritedRoot = filter ((/= "usableWorkBudget") . fst) root
+  advancedPolicy <-
+    decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineBasePolicy
       inheritedRoot
   budgetValue <- rootField LengthRankingConfigurationUsableWorkBudgetField "usableWorkBudget" root
   budget <- decodeScopedUsableWorkBudget budgetValue
@@ -2476,6 +2579,59 @@ decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootEx
         enableLengthRankingNonVacuousInputBoxPreference originProbePolicy
       applicableDomainPolicy =
         enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainValidation
+          applicableDomainInputBoxLimits booleanFiniteUnionLimits
+          inputBoxPreferencePolicy
+      applicableDomainPreferencePolicy =
+        enableLengthRankingNonVacuousApplicableDomainPreference
+          applicableDomainPolicy
+      simplificationPolicy = enableLengthRankingCounterexampleSimplification
+        counterexampleSimplificationLimits applicableDomainPreferencePolicy
+  pure $ enableLengthRankingDeferredLiveSessionOpening simplificationPolicy
+
+-- Versions 33 and 34 preserve version 31/32's complete root and policy demand
+-- order.  Only the applicable-domain decoder and mutually exclusive builder
+-- select the recursive piecewise-affine successor.
+decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineBasePolicy
+  :: ObjectFields
+  -> Either LengthRankingConfigurationFileError LengthRankingPolicy
+decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineBasePolicy
+    root = do
+  exactFields LengthRankingConfigurationRootObject
+    rootFieldsPositiveAffine root
+  executionAdmissionValue <- rootField LengthRankingConfigurationExecutionAdmissionField "executionAdmission" root
+  executionLimits <- decodeExecutionAdmission executionAdmissionValue
+  executionValue <- rootField LengthRankingConfigurationExecutionField "execution" root
+  execution <- decodeDescriptorBoundExecveCheckExecutableAccessExecution
+    executionLimits executionValue
+  evaluationValue <- rootField LengthRankingConfigurationEvaluationField "evaluation" root
+  evaluation <- decodeEvaluation evaluationValue
+  inputBoxValue <- rootField LengthRankingConfigurationInputBoxValidationField "inputBoxValidation" root
+  (inputBoxLimits, inclusiveMaximums) <-
+    decodeInputBoxValidation inputBoxValue
+  counterexampleProbeValue <- rootField LengthRankingConfigurationCounterexampleProbeField "counterexampleProbe" root
+  decodeCounterexampleProbe counterexampleProbeValue
+  boundedPositiveOrderingValue <- rootField LengthRankingConfigurationBoundedPositiveOrderingField "boundedPositiveOrdering" root
+  decodeBoundedPositiveOrdering boundedPositiveOrderingValue
+  applicableDomainValidationValue <- rootField LengthRankingConfigurationApplicableDomainValidationField "applicableDomainValidation" root
+  (applicableDomainInputBoxLimits, booleanFiniteUnionLimits) <-
+    decodeStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineApplicableDomainValidation
+      applicableDomainValidationValue
+  applicableDomainOrderingValue <- rootField LengthRankingConfigurationApplicableDomainOrderingField "applicableDomainOrdering" root
+  decodeApplicableDomainOrdering applicableDomainOrderingValue
+  counterexampleSimplificationValue <- rootField LengthRankingConfigurationCounterexampleSimplificationField "counterexampleSimplification" root
+  counterexampleSimplificationLimits <- decodeCounterexampleSimplification
+    counterexampleSimplificationValue
+  liveSessionOpeningValue <- rootField LengthRankingConfigurationLiveSessionOpeningField "liveSessionOpening" root
+  decodeLiveSessionOpening liveSessionOpeningValue
+  let basePolicy =
+        lengthRankingPolicyFromValidatedComponents execution evaluation
+      inputBoxPolicy = enableLengthRankingInputBoxValidation
+        inputBoxLimits inclusiveMaximums basePolicy
+      originProbePolicy = enableLengthRankingOriginProbe inputBoxPolicy
+      inputBoxPreferencePolicy =
+        enableLengthRankingNonVacuousInputBoxPreference originProbePolicy
+      applicableDomainPolicy =
+        enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineApplicableDomainValidation
           applicableDomainInputBoxLimits booleanFiniteUnionLimits
           inputBoxPreferencePolicy
       applicableDomainPreferencePolicy =
@@ -3792,6 +3948,118 @@ decodeStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAt
     strategyValue
   case strategy of
     "strict-relational-positive-affine-quotient-root-extrema-monus-boolean-finite-union-atomic-branching-v1" ->
+      pure ()
+    _ -> Left $ LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationApplicableDomainStrategyField
+  maximumInputsValue <- requiredField
+    LengthRankingConfigurationApplicableDomainValidationObject
+    LengthRankingConfigurationApplicableDomainMaximumInputsField
+    "maximumInputs"
+    object
+  maximumInputs <- naturalField
+    LengthRankingConfigurationApplicableDomainMaximumInputsField
+    maximumInputsValue
+    >>= capNatural
+      LengthRankingConfigurationApplicableDomainMaximumInputsField
+      maximumInputBoxInputs
+  maximumGeneratedBranchesValue <- requiredField
+    LengthRankingConfigurationApplicableDomainValidationObject
+    LengthRankingConfigurationApplicableDomainMaximumGeneratedBranchesField
+    "maximumGeneratedBranches"
+    object
+  maximumGeneratedBranches <- naturalField
+    LengthRankingConfigurationApplicableDomainMaximumGeneratedBranchesField
+    maximumGeneratedBranchesValue
+    >>= capNatural
+      LengthRankingConfigurationApplicableDomainMaximumGeneratedBranchesField
+      maximumBooleanFiniteUnionGeneratedBranches
+  maximumRulesPerBranchValue <- requiredField
+    LengthRankingConfigurationApplicableDomainValidationObject
+    LengthRankingConfigurationApplicableDomainMaximumRulesPerBranchField
+    "maximumRulesPerBranch"
+    object
+  maximumRulesPerBranch <- naturalField
+    LengthRankingConfigurationApplicableDomainMaximumRulesPerBranchField
+    maximumRulesPerBranchValue
+    >>= capNatural
+      LengthRankingConfigurationApplicableDomainMaximumRulesPerBranchField
+      maximumBooleanFiniteUnionRulesPerBranch
+  maximumClosureInspectionsPerBranchValue <- requiredField
+    LengthRankingConfigurationApplicableDomainValidationObject
+    LengthRankingConfigurationApplicableDomainMaximumClosureInspectionsPerBranchField
+    "maximumClosureInspectionsPerBranch"
+    object
+  maximumClosureInspectionsPerBranch <- naturalField
+    LengthRankingConfigurationApplicableDomainMaximumClosureInspectionsPerBranchField
+    maximumClosureInspectionsPerBranchValue
+    >>= capNatural
+      LengthRankingConfigurationApplicableDomainMaximumClosureInspectionsPerBranchField
+      maximumBooleanFiniteUnionClosureInspectionsPerBranch
+  maximumRetainedBoxesValue <- requiredField
+    LengthRankingConfigurationApplicableDomainValidationObject
+    LengthRankingConfigurationApplicableDomainMaximumRetainedBoxesField
+    "maximumRetainedBoxes"
+    object
+  maximumRetainedBoxes <- naturalField
+    LengthRankingConfigurationApplicableDomainMaximumRetainedBoxesField
+    maximumRetainedBoxesValue
+    >>= capNatural
+      LengthRankingConfigurationApplicableDomainMaximumRetainedBoxesField
+      maximumBooleanFiniteUnionRetainedBoxes
+  maximumAssignmentVisitsValue <- requiredField
+    LengthRankingConfigurationApplicableDomainValidationObject
+    LengthRankingConfigurationApplicableDomainMaximumAssignmentVisitsField
+    "maximumAssignmentVisits"
+    object
+  maximumAssignmentVisits <- naturalField
+    LengthRankingConfigurationApplicableDomainMaximumAssignmentVisitsField
+    maximumAssignmentVisitsValue
+    >>= capNatural
+      LengthRankingConfigurationApplicableDomainMaximumAssignmentVisitsField
+      maximumBooleanFiniteUnionAssignmentVisits
+  maximumAssignmentsValue <- requiredField
+    LengthRankingConfigurationApplicableDomainValidationObject
+    LengthRankingConfigurationApplicableDomainMaximumAssignmentsField
+    "maximumAssignments"
+    object
+  maximumAssignments <- naturalField
+    LengthRankingConfigurationApplicableDomainMaximumAssignmentsField
+    maximumAssignmentsValue
+    >>= capNatural
+      LengthRankingConfigurationApplicableDomainMaximumAssignmentsField
+      maximumInputBoxAssignments
+  inputBoxLimits <- checkedInputBoxLimits maximumInputs maximumAssignments
+  booleanFiniteUnionLimits <- checkedBooleanFiniteUnionLimits
+    maximumGeneratedBranches
+    maximumRulesPerBranch
+    maximumClosureInspectionsPerBranch
+    maximumRetainedBoxes
+    maximumAssignmentVisits
+  pure (inputBoxLimits, booleanFiniteUnionLimits)
+
+-- | Decode the recursive piecewise-affine successor with the exact same
+-- eight-field demand order and independently sealed Boolean limits as v31/v32.
+-- Only the closed strategy literal changes.
+decodeStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineApplicableDomainValidation
+  :: BoundedJsonValue
+  -> Either
+      LengthRankingConfigurationFileError
+      (LengthInputBoxLimits, LengthBooleanFiniteUnionLimits)
+decodeStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineApplicableDomainValidation
+    value = do
+  object <- exactObject
+    LengthRankingConfigurationApplicableDomainValidationObject
+    booleanFiniteUnionApplicableDomainValidationFields value
+  strategyValue <- requiredField
+    LengthRankingConfigurationApplicableDomainValidationObject
+    LengthRankingConfigurationApplicableDomainStrategyField
+    "strategy"
+    object
+  strategy <- stringField
+    LengthRankingConfigurationApplicableDomainStrategyField
+    strategyValue
+  case strategy of
+    "strict-relational-positive-affine-quotient-root-extrema-monus-boolean-finite-union-atomic-branching-recursive-piecewise-affine-v1" ->
       pure ()
     _ -> Left $ LengthRankingConfigurationFieldValueRejected
       LengthRankingConfigurationApplicableDomainStrategyField
