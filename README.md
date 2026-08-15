@@ -1345,8 +1345,10 @@ receipt, and skips origin and live execution. Its vacuous form remains neutral.
 Only the separate
 `enableLengthRankingNonVacuousApplicableDomainPreference` moves an established
 receipt with a positive applicable-assignment count into a stable preferred
-partition. Startup and contract-file versions 1--6 cannot enable either new
-policy, so all existing file behavior is exact.
+partition. Startup versions 1--6 cannot enable either policy, so their file
+behavior is exact. Startup v7/v8 enable that same preference with the nominal
+positive-affine validator; direct-v1 validation remains programmatic-only.
+Contract-only files select constraints rather than ranking policy.
 
 `enableLengthRankingPositiveAffineApplicableDomainValidation` is a separate,
 mutually exclusive extractor. It scans the precondition itself or immediate
@@ -1390,8 +1392,9 @@ stably demoted, and updates the MRU bank. Complete traversal becomes
 positive evidence. It stays in the neutral stable partition under the existing
 builder and startup versions 2--4. The explicit
 `enableLengthRankingNonVacuousInputBoxPreference` builder—or startup scalar v5
-or pair v6—moves only a receipt with a positive applicable-assignment count
-into a stable preferred partition. A zero-applicable receipt remains neutral.
+or v7, or pair v6 or v8—moves only a receipt with a positive
+applicable-assignment count into a stable preferred partition. A
+zero-applicable receipt remains neutral.
 A validation
 or association rejection is an indexed operational failure and activates the
 same original-order, all-`Unassessed` atomic fallback. `sat` and `unknown`
@@ -1521,8 +1524,8 @@ preserving the version-1 compatibility path.
 `Leant.Synth.Length.Configuration.File` keeps the exact version-1 JSON grammar
 for that policy and adds exact scalar opt-in versions 2 and 3. Its established
 `decodeLengthRankingConfigurationFile` remains an exact scalar-only entrance
-and rejects versions 4--6. The generalized
-`decodeLengthAssessmentConfigurationFile` additionally accepts versions 4--6
+and rejects versions 4--8. The generalized
+`decodeLengthAssessmentConfigurationFile` additionally accepts versions 4--8
 and returns an opaque `DisabledLengthAssessmentConfiguration` carrying the same
 checked process policy beside a lazy scalar-or-pair selection. The pure decoder consumes a caller-owned
 strict byte string through a separate bounded JSON parser, rejects malformed
