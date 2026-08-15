@@ -2464,7 +2464,7 @@ The integration corpus includes prove/suggest and synth/prove transcripts. These
 
 \section{Unit tests}
 
-\lpath{test-unit/Spec.hs} is a broad unit suite covering JSON, classifiers, snapshot metadata and publication, replay decisions, fragment parsing and analysis, provider queries and cache behavior, Djex translations, assignment fitting, rendering, candidate grouping, and many regressions around rank-N providers and recursive families. On the current branch the suite has grown to 27{,}987 lines and 478 \code{testCase} entries, and its single largest area is the Length/SpinePair behavioral-assessment layer: contract decoding, configuration-file versions, the checked handoff, ranking, post-verification sealing, presentation notes, and live execution against the \code{djex-fake-z3} fixture.
+\lpath{test-unit/Spec.hs} is a broad unit suite covering JSON, classifiers, snapshot metadata and publication, replay decisions, fragment parsing and analysis, provider queries and cache behavior, Djex translations, assignment fitting, rendering, candidate grouping, and many regressions around rank-N providers and recursive families. On the current branch the suite has grown to 27{,}925 lines and 478 \code{testCase} entries, and its single largest area is the Length/SpinePair behavioral-assessment layer: contract decoding, configuration-file versions, the checked handoff, ranking, post-verification sealing, presentation notes, and live execution against the \code{djex-fake-z3} fixture.
 
 Because several production modules are pure, tests can construct exact \code{Frag}, generated AST, provider metadata, and history values without launching Lean. This is where boundary invariants should be tested exhaustively.
 
