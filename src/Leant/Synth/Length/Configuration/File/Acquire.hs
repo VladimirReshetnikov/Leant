@@ -1,7 +1,6 @@
 -- | Bounded acquisition of one explicitly named Length-ranking policy file.
 --
--- This compatibility facade preserves the established configuration-specific
--- API and failure vocabulary while delegating path, descriptor, byte,
+-- This configuration-specific boundary delegates path, descriptor, byte,
 -- interruption, and cleanup ownership to the shared Length file boundary.
 -- The final path component is no-follow on POSIX; Windows fails closed.
 module Leant.Synth.Length.Configuration.File.Acquire
@@ -14,7 +13,6 @@ module Leant.Synth.Length.Configuration.File.Acquire
   , LengthRankingConfigurationFileLoadErrorClass (..)
   , LengthRankingConfigurationFileLoadError
   , mkLengthRankingConfigurationFileRequest
-  , loadLengthRankingConfigurationFile
   , loadLengthAssessmentConfigurationFile
   , lengthRankingConfigurationFileLoadErrorClass
   , lengthRankingConfigurationFileLoadCleanupIncomplete
@@ -24,11 +22,9 @@ import Numeric.Natural (Natural)
 
 import Leant.Json.Bounded (BoundedJsonLimits (..))
 import Leant.Synth.Length.Configuration.File
-  ( DisabledLengthRankingConfiguration
-  , DisabledLengthAssessmentConfiguration
+  ( DisabledLengthAssessmentConfiguration
   , LengthRankingConfigurationFileError
   , decodeLengthAssessmentConfigurationFile
-  , decodeLengthRankingConfigurationFile
   , lengthRankingConfigurationFileJsonLimits
   )
 import Leant.Synth.Length.File.Acquire
@@ -57,7 +53,7 @@ lengthRankingConfigurationFileLoadMaximumBytes :: Natural
 lengthRankingConfigurationFileLoadMaximumBytes =
   boundedJsonMaximumTotalBytes lengthRankingConfigurationFileJsonLimits
 
--- | Raw compatibility input.  Both fields remain lazy so productive path
+-- | Raw startup input.  Both fields remain lazy so productive path
 -- admission wins before timeout demand, exactly as at the shared boundary.
 data LengthRankingConfigurationFileSource =
   LengthRankingConfigurationFileSource
@@ -75,7 +71,7 @@ data LengthRankingConfigurationFileAdmissionError
   | LengthRankingConfigurationFileTimeoutLimitExceeded !Int !Int
   deriving (Eq, Ord, Show)
 
--- | Opaque admitted compatibility-file request.  The strict retained generic
+-- | Opaque admitted configuration-file request.  The strict retained generic
 -- request preserves the former finite-path and finite-timeout demand point.
 data LengthRankingConfigurationFileRequest =
   LengthRankingConfigurationFileRequest !LengthFileRequest
@@ -123,24 +119,8 @@ mkLengthRankingConfigurationFileRequest source =
     Left failure -> Left $ mapAdmissionError failure
     Right request -> Right $ LengthRankingConfigurationFileRequest request
 
-loadLengthRankingConfigurationFile
-  :: LengthRankingConfigurationFileRequest
-  -> IO
-      (Either
-        LengthRankingConfigurationFileLoadError
-        DisabledLengthRankingConfiguration)
-loadLengthRankingConfigurationFile
-    (LengthRankingConfigurationFileRequest request) = do
-  loaded <- loadLengthFile
-    lengthRankingConfigurationFileLoadMaximumBytes
-    decodeLengthRankingConfigurationFile
-    request
-  pure $ case loaded of
-    Left failure -> Left $ mapLoadError failure
-    Right value -> Right value
-
--- | Load the additive scalar-or-product startup selection through the exact
--- same admitted request and acquisition boundary as the scalar facade.
+-- | Load the scalar-or-product startup selection through the admitted request
+-- and shared bounded acquisition boundary.
 loadLengthAssessmentConfigurationFile
   :: LengthRankingConfigurationFileRequest
   -> IO

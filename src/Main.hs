@@ -140,7 +140,7 @@ import Leant.Synth.Length.Integration
   , LengthRankingConfigurationActivationPolicy (..)
   , assessLengthVerificationRequest
   , authorizeExplicitLengthAssessmentRequest
-  , compatibilityLengthAssessmentRequest
+  , startupLengthAssessmentRequest
   , disabledLengthAssessmentMode
   , explicitLengthAssessmentSelectionRequest
   , lengthAssessmentFailure
@@ -1893,7 +1893,7 @@ lengthAssessmentRequestForCommand
   -> IO (Either String LengthAssessmentRequest)
 lengthAssessmentRequestForCommand state command =
   case lengthSynthCommandContractPath command of
-    Nothing -> pure $ Right $ compatibilityLengthAssessmentRequest
+    Nothing -> pure $ Right $ startupLengthAssessmentRequest
       $ rsLengthAssessmentMode state
     Just path -> case authorizeExplicitLengthAssessmentRequest
         $ rsLengthAssessmentMode state of

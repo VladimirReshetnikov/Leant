@@ -4,9 +4,9 @@
 -- named configuration file to one reusable, activated ranking policy and the
 -- file's fixed nominal domain selection and contract.  That selection is a
 -- fixed startup choice for the process: every later verified batch is checked
--- against the same contract.  Eager policies still give every eligible batch
--- a fresh worker scope; an explicitly deferred policy may finish from pure
--- query-owned evidence and otherwise opens that scope at the first live miss.
+-- against the same contract.  The current policy may finish from pure query-
+-- owned evidence and otherwise gives the batch a fresh worker scope at its
+-- first live miss.
 -- This module also owns the disabled identity branch used by
 -- Main.  Loading performs
 -- bounded acquisition and closed activation only; no solver is launched until
@@ -23,7 +23,7 @@ module Leant.Synth.Length.Integration
   , LengthAssessmentRequestError (..)
   , ExplicitLengthAssessmentPermission
   , LengthAssessmentRequest
-  , compatibilityLengthAssessmentRequest
+  , startupLengthAssessmentRequest
   , authorizeExplicitLengthAssessmentRequest
   , explicitLengthAssessmentRequest
   , explicitLengthAssessmentSelectionRequest
@@ -132,7 +132,7 @@ data LengthAssessmentRequestError
 data ExplicitLengthAssessmentPermission =
   ExplicitLengthAssessmentPermission !LengthRankingPolicy
 
--- | One command's exact assessment choice.  Both the fixed compatibility path
+-- | One command's exact assessment choice.  Both the startup-fixed path
 -- and an explicit request enter the same enabled owner: one activated policy
 -- beside one lazy contract.  The origin and lifetime of that passive contract
 -- are not a second execution authority.  The disabled constructor preserves
@@ -146,19 +146,19 @@ data LengthAssessmentRequest
 disabledLengthAssessmentMode :: LengthAssessmentMode
 disabledLengthAssessmentMode = LengthAssessmentDisabled
 
--- | Select the established startup-fixed compatibility behavior without
--- inspecting the configured contract.  This is the exact no-option path.
-compatibilityLengthAssessmentRequest
+-- | Select the startup-fixed behavior without inspecting the configured
+-- contract.  This is the exact no-option path.
+startupLengthAssessmentRequest
   :: LengthAssessmentMode
   -> LengthAssessmentRequest
-compatibilityLengthAssessmentRequest mode = case mode of
+startupLengthAssessmentRequest mode = case mode of
   LengthAssessmentDisabled -> LengthAssessmentRequestDisabled
   LengthAssessmentConfigured _ policy selection ->
     LengthAssessmentEnabledRequest policy selection
 
 -- | Authorize one explicit request before its path is admitted or read.
--- Matching a configured mode does not inspect its fixed compatibility
--- contract; a disabled mode fails without accepting a contract value.
+-- Matching a configured mode does not inspect its fixed startup contract; a
+-- disabled mode fails without accepting a contract value.
 authorizeExplicitLengthAssessmentRequest
   :: LengthAssessmentMode
   -> Either
@@ -182,9 +182,9 @@ explicitLengthAssessmentRequest
     $ LeanLengthScalarContractSelection contract
 
 -- | Associate one successfully decoded passive domain selection with the
--- exact startup-activated policy.  This additive entrance is used by Main;
--- the established scalar wrapper above remains unchanged for callers which
--- intentionally accept only scalar contracts.
+-- exact startup-activated policy.  Main uses this domain-general entrance;
+-- the scalar wrapper above remains available to callers which intentionally
+-- accept only scalar contracts.
 explicitLengthAssessmentSelectionRequest
   :: ExplicitLengthAssessmentPermission
   -> LeanLengthContractSelection
@@ -263,15 +263,14 @@ data LengthAssessmentResult
 
 -- | Preserve callback order without IO when disabled.  When configured, check
 -- the exact verified batch against the startup-fixed contract through the
--- existing occurrence-sealed Length adapter.  Its ranking layer opens a fresh
--- lexical worker eagerly under compatibility policies, or only at the first
--- actual live miss under an explicitly deferred policy.
+-- existing occurrence-sealed Length adapter.  The current policy opens its
+-- fresh lexical worker only at the first live miss.
 assessLengthVerificationBatch
   :: LengthAssessmentMode
   -> VerificationBatch DetailedVerificationVariant
   -> IO LengthAssessmentResult
 assessLengthVerificationBatch mode = assessLengthVerificationRequest
-  $ compatibilityLengthAssessmentRequest mode
+  $ startupLengthAssessmentRequest mode
 
 -- | Assess one exact callback batch under the command-local contract choice.
 -- Both contract lifetimes use the same occurrence-sealed policy runner.  The
@@ -303,7 +302,7 @@ lengthAssessmentCandidates result = case result of
   LengthAssessmentSpinePairCompleted assessed ->
     lengthSpinePairPostVerificationCandidates assessed
 
--- | The receipt-associated compatibility ranking after the occurrence seal.
+-- | The receipt-associated scalar ranking after the occurrence seal.
 -- Disabled assessment and rejected configured input have no ranking.  The
 -- skipped branch deliberately does not inspect its retained batch, so callers
 -- may decide whether semantic presentation is available without traversing a
