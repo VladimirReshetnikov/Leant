@@ -30,9 +30,10 @@ Three rules make this safe to use:
 
 Everything below this line is the exact contract: configuration-file
 versions, contract-file versions, the binary-product extension, the replay
-bank, the origin probe, bounded validation, presentation notes, and the
-module ownership map. It is written as a specification and is dense by
-design; read the overview above first.
+bank, the origin probe, bounded validation, and presentation notes. (The
+module-by-module ownership map lives in
+[synth-internals.md](synth-internals.md).) It is written as a specification
+and is dense by design; read the overview above first.
 
 ---
 
