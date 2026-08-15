@@ -35,6 +35,9 @@
 -- Versions 25 and 26 retain that complete root-extrema/effective-ID/scoped
 -- profile and replace only the applicable-domain strategy with cumulative
 -- immediate root-monus consequences.
+-- Versions 27 and 28 retain that complete root-monus/effective-ID/scoped
+-- profile and replace only the executable-launch strategy with descriptor-
+-- bound execve-check executable-access admission.
 -- Decoding performs no discovery, path normalization, environment lookup, or
 -- IO.  Every field is required.  A successful decode returns a deliberately
 -- disabled opaque value: callers
@@ -69,6 +72,8 @@ module Leant.Synth.Length.Configuration.File
   , lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaVersion
   , lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusVersion
   , lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusVersion
+  , lengthRankingConfigurationFileDescriptorBoundExecveCheckExecutableAccessVersion
+  , lengthRankingConfigurationFileSpinePairDescriptorBoundExecveCheckExecutableAccessVersion
   , lengthRankingConfigurationFileJsonLimits
   , LengthRankingConfigurationFileObject (..)
   , LengthRankingConfigurationFileField (..)
@@ -137,6 +142,7 @@ import Language.Haskell.Djex
   , mkLengthInputBoxLimits
   , mkLengthSMTLibDescriptorBoundExecutionConfig
   , mkLengthSMTLibDescriptorBoundEffectiveIDExecutableAccessExecutionConfig
+  , mkLengthSMTLibDescriptorBoundExecveCheckExecutableAccessExecutionConfig
   , mkLengthSMTLibExecutionConfig
   , mkLengthSMTLibExecutionLimits
   , mkLengthSMTLibResponseLimits
@@ -317,6 +323,19 @@ lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRoo
   :: Natural
 lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusVersion =
   26
+
+-- | Scalar root-monus/scoped profile selecting descriptor-bound execve-check
+-- executable-access launch.
+lengthRankingConfigurationFileDescriptorBoundExecveCheckExecutableAccessVersion
+  :: Natural
+lengthRankingConfigurationFileDescriptorBoundExecveCheckExecutableAccessVersion =
+  27
+
+-- | Nominal binary-product sibling of version 27.
+lengthRankingConfigurationFileSpinePairDescriptorBoundExecveCheckExecutableAccessVersion
+  :: Natural
+lengthRankingConfigurationFileSpinePairDescriptorBoundExecveCheckExecutableAccessVersion =
+  28
 
 -- | Fixed admission policy for the v1 document itself.  The array maximum is
 -- one greater than the widest typed collection so maximum-plus-one reaches the
@@ -631,7 +650,9 @@ decodeLengthRankingConfigurationFile bytes = do
 -- version-20 decoder returns it in turn.  Root-extrema versions are reached
 -- only after the effective-ID version-21/version-22 decoder returns the same
 -- sentinel.  Root-monus versions are reached only after the root-extrema
--- version-23/version-24 decoder returns it in turn.
+-- version-23/version-24 decoder returns it in turn.  Execve-check executable-
+-- access versions are reached only after the root-monus version-25/version-26
+-- decoder returns the same sentinel.
 decodeLengthAssessmentConfigurationFile
   :: ByteString
   -> Either
@@ -681,9 +702,14 @@ decodeLengthAssessmentConfigurationFile bytes =
                               decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffineQuotientRootExtrema
                                 bytes of
                             Right rootExtrema -> Right rootExtrema
-                            Left LengthRankingConfigurationUnsupportedVersion ->
-                              decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonus
-                                bytes
+                            Left LengthRankingConfigurationUnsupportedVersion -> case
+                                decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonus
+                                  bytes of
+                              Right rootMonus -> Right rootMonus
+                              Left LengthRankingConfigurationUnsupportedVersion ->
+                                decodeLengthAssessmentConfigurationFileDescriptorBoundExecveCheckExecutableAccess
+                                  bytes
+                              Left failure -> Left failure
                             Left failure -> Left failure
                           Left failure -> Left failure
                         Left failure -> Left failure
@@ -1148,6 +1174,48 @@ decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffineQuotientRoo
         lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusVersion
       then
         decodeLengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusV26
+          root
+      else Left LengthRankingConfigurationUnsupportedVersion
+
+-- | Decode only the execve-check executable-access scalar/product siblings
+-- after every version-1--version-26 entrance has returned its closed
+-- unsupported-version sentinel.  Both versions retain the complete root-
+-- monus, effective-ID, scoped-budget profile and replace only the nested
+-- launch strategy.
+decodeLengthAssessmentConfigurationFileDescriptorBoundExecveCheckExecutableAccess
+  :: ByteString
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthAssessmentConfigurationFileDescriptorBoundExecveCheckExecutableAccess
+    bytes = do
+  document <- either (Left . LengthRankingConfigurationJsonRejected) Right
+    $ parseBoundedJson lengthRankingConfigurationFileJsonLimits bytes
+  root <- objectFields LengthRankingConfigurationRootObject document
+  formatValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationFormatField
+    "format"
+    root
+  format <- stringField LengthRankingConfigurationFormatField formatValue
+  if format == lengthRankingConfigurationFileFormat
+    then pure ()
+    else Left LengthRankingConfigurationUnsupportedFormat
+  versionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationVersionField
+    "version"
+    root
+  version <- integerField LengthRankingConfigurationVersionField versionValue
+  if version == toInteger
+      lengthRankingConfigurationFileDescriptorBoundExecveCheckExecutableAccessVersion
+    then
+      decodeLengthRankingConfigurationFileDescriptorBoundExecveCheckExecutableAccessV27
+        root
+    else if version == toInteger
+        lengthRankingConfigurationFileSpinePairDescriptorBoundExecveCheckExecutableAccessVersion
+      then
+        decodeLengthRankingConfigurationFileSpinePairDescriptorBoundExecveCheckExecutableAccessV28
           root
       else Left LengthRankingConfigurationUnsupportedVersion
 
@@ -1821,6 +1889,43 @@ decodeLengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuoti
   contract <- decodeLeanLengthSpinePairContractValueV5 contractValue
   pure $ DisabledLengthSpinePairAssessmentConfiguration policy contract
 
+decodeLengthRankingConfigurationFileDescriptorBoundExecveCheckExecutableAccessV27
+  :: ObjectFields
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthRankingConfigurationFileDescriptorBoundExecveCheckExecutableAccessV27
+    root = do
+  policy <-
+    decodeLengthRankingConfigurationFileDescriptorBoundExecveCheckExecutableAccessPolicy
+      root
+  contractValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationContractField
+    "contract"
+    root
+  contract <- decodeLeanLengthContractValueV5 contractValue
+  pure $ DisabledLengthScalarAssessmentConfiguration
+    $ disableLengthRankingConfiguration policy contract
+
+decodeLengthRankingConfigurationFileSpinePairDescriptorBoundExecveCheckExecutableAccessV28
+  :: ObjectFields
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthRankingConfigurationFileSpinePairDescriptorBoundExecveCheckExecutableAccessV28
+    root = do
+  policy <-
+    decodeLengthRankingConfigurationFileDescriptorBoundExecveCheckExecutableAccessPolicy
+      root
+  contractValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationContractField
+    "contract"
+    root
+  contract <- decodeLeanLengthSpinePairContractValueV5 contractValue
+  pure $ DisabledLengthSpinePairAssessmentConfiguration policy contract
+
 decodeLengthRankingConfigurationFileUsableWorkBudgetPolicy
   :: ObjectFields
   -> Either LengthRankingConfigurationFileError LengthRankingPolicy
@@ -1983,6 +2088,28 @@ decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootEx
   let inheritedRoot = filter ((/= "usableWorkBudget") . fst) root
   advancedPolicy <-
     decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBasePolicy
+      inheritedRoot
+  budgetValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationUsableWorkBudgetField
+    "usableWorkBudget"
+    root
+  budget <- decodeScopedUsableWorkBudget budgetValue
+  pure $ enableLengthRankingScopedUsableWorkBudget budget advancedPolicy
+
+-- Versions 27 and 28 retain version 25/26's complete root-monus,
+-- effective-ID, descriptor-bound root, validation order, and scoped-v2 usable-
+-- work owner.  Only the inherited executable-launch strategy changes.
+decodeLengthRankingConfigurationFileDescriptorBoundExecveCheckExecutableAccessPolicy
+  :: ObjectFields
+  -> Either LengthRankingConfigurationFileError LengthRankingPolicy
+decodeLengthRankingConfigurationFileDescriptorBoundExecveCheckExecutableAccessPolicy
+    root = do
+  exactFields LengthRankingConfigurationRootObject
+    rootFieldsUsableWorkBudget root
+  let inheritedRoot = filter ((/= "usableWorkBudget") . fst) root
+  advancedPolicy <-
+    decodeLengthRankingConfigurationFileDescriptorBoundExecveCheckExecutableAccessBasePolicy
       inheritedRoot
   budgetValue <- requiredField
     LengthRankingConfigurationRootObject
@@ -2719,6 +2846,98 @@ decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootEx
         counterexampleSimplificationLimits applicableDomainPreferencePolicy
   pure $ enableLengthRankingDeferredLiveSessionOpening simplificationPolicy
 
+-- Versions 27 and 28 preserve version 25/26's complete root-monus policy
+-- demand order and builders.  Only the execution decoder selects the
+-- descriptor-bound execve-check executable-access launch.
+decodeLengthRankingConfigurationFileDescriptorBoundExecveCheckExecutableAccessBasePolicy
+  :: ObjectFields
+  -> Either LengthRankingConfigurationFileError LengthRankingPolicy
+decodeLengthRankingConfigurationFileDescriptorBoundExecveCheckExecutableAccessBasePolicy
+    root = do
+  exactFields LengthRankingConfigurationRootObject
+    rootFieldsPositiveAffine root
+  executionAdmissionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationExecutionAdmissionField
+    "executionAdmission"
+    root
+  executionLimits <- decodeExecutionAdmission executionAdmissionValue
+  executionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationExecutionField
+    "execution"
+    root
+  execution <- decodeDescriptorBoundExecveCheckExecutableAccessExecution
+    executionLimits executionValue
+  evaluationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationEvaluationField
+    "evaluation"
+    root
+  evaluation <- decodeEvaluation evaluationValue
+  inputBoxValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationInputBoxValidationField
+    "inputBoxValidation"
+    root
+  (inputBoxLimits, inclusiveMaximums) <-
+    decodeInputBoxValidation inputBoxValue
+  counterexampleProbeValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationCounterexampleProbeField
+    "counterexampleProbe"
+    root
+  decodeCounterexampleProbe counterexampleProbeValue
+  boundedPositiveOrderingValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationBoundedPositiveOrderingField
+    "boundedPositiveOrdering"
+    root
+  decodeBoundedPositiveOrdering boundedPositiveOrderingValue
+  applicableDomainValidationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationApplicableDomainValidationField
+    "applicableDomainValidation"
+    root
+  applicableDomainLimits <-
+    decodeStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainValidation
+      applicableDomainValidationValue
+  applicableDomainOrderingValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationApplicableDomainOrderingField
+    "applicableDomainOrdering"
+    root
+  decodeApplicableDomainOrdering applicableDomainOrderingValue
+  counterexampleSimplificationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationCounterexampleSimplificationField
+    "counterexampleSimplification"
+    root
+  counterexampleSimplificationLimits <- decodeCounterexampleSimplification
+    counterexampleSimplificationValue
+  liveSessionOpeningValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationLiveSessionOpeningField
+    "liveSessionOpening"
+    root
+  decodeLiveSessionOpening liveSessionOpeningValue
+  let basePolicy =
+        lengthRankingPolicyFromValidatedComponents execution evaluation
+      inputBoxPolicy = enableLengthRankingInputBoxValidation
+        inputBoxLimits inclusiveMaximums basePolicy
+      originProbePolicy = enableLengthRankingOriginProbe inputBoxPolicy
+      inputBoxPreferencePolicy =
+        enableLengthRankingNonVacuousInputBoxPreference originProbePolicy
+      applicableDomainPolicy =
+        enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainValidation
+          applicableDomainLimits inputBoxPreferencePolicy
+      applicableDomainPreferencePolicy =
+        enableLengthRankingNonVacuousApplicableDomainPreference
+          applicableDomainPolicy
+      simplificationPolicy = enableLengthRankingCounterexampleSimplification
+        counterexampleSimplificationLimits applicableDomainPreferencePolicy
+  pure $ enableLengthRankingDeferredLiveSessionOpening simplificationPolicy
+
 rootFields :: [(Text, LengthRankingConfigurationFileField)]
 rootFields =
   [ ("format", LengthRankingConfigurationFormatField)
@@ -3294,6 +3513,101 @@ decodeDescriptorBoundEffectiveIDExecutableAccessExecution limits value = do
         }
   case
       mkLengthSMTLibDescriptorBoundEffectiveIDExecutableAccessExecutionConfig
+        limits source of
+    Left failure -> Left $ LengthRankingConfigurationExecutionRejected failure
+    Right validated -> Right validated
+
+-- | Decode the execve-check executable-access execution sibling in the exact
+-- established effective-ID descriptor-bound demand and validation order.
+-- Only the closed discriminator and mutually exclusive Djex sealer differ.
+decodeDescriptorBoundExecveCheckExecutableAccessExecution
+  :: LengthSMTLibExecutionLimits
+  -> BoundedJsonValue
+  -> Either
+      LengthRankingConfigurationFileError
+      LengthSMTLibExecutionConfig
+decodeDescriptorBoundExecveCheckExecutableAccessExecution limits value = do
+  object <- exactObject LengthRankingConfigurationExecutionObject
+    descriptorBoundExecutionFields value
+  responseLimitsValue <- requiredField
+    LengthRankingConfigurationExecutionObject
+    LengthRankingConfigurationResponseLimitsField
+    "responseLimits"
+    object
+  responses <- decodeResponseLimits responseLimitsValue
+  executableValue <- requiredField
+    LengthRankingConfigurationExecutionObject
+    LengthRankingConfigurationExecutablePathField
+    "executablePath"
+    object
+  executable <- Text.unpack <$> stringField
+    LengthRankingConfigurationExecutablePathField
+    executableValue
+  expectedDigestValue <- requiredField
+    LengthRankingConfigurationExecutionObject
+    LengthRankingConfigurationExpectedExecutableSha256Field
+    "expectedExecutableSha256"
+    object
+  expectedDigest <- decodeExpectedDigest expectedDigestValue
+  timeoutValue <- requiredField
+    LengthRankingConfigurationExecutionObject
+    LengthRankingConfigurationSolverTimeoutMillisecondsField
+    "solverTimeoutMilliseconds"
+    object
+  timeout <- intField
+    LengthRankingConfigurationSolverTimeoutMillisecondsField
+    timeoutValue
+    >>= capIntUpper
+      LengthRankingConfigurationSolverTimeoutMillisecondsField 60000
+  resourceValue <- requiredField
+    LengthRankingConfigurationExecutionObject
+    LengthRankingConfigurationSolverResourceLimitField
+    "solverResourceLimit"
+    object
+  resource <- intField
+    LengthRankingConfigurationSolverResourceLimitField
+    resourceValue
+    >>= capIntUpper
+      LengthRankingConfigurationSolverResourceLimitField 10000000
+  deadlineValue <- requiredField
+    LengthRankingConfigurationExecutionObject
+    LengthRankingConfigurationHostDeadlineMillisecondsField
+    "hostDeadlineMilliseconds"
+    object
+  deadline <- intField
+    LengthRankingConfigurationHostDeadlineMillisecondsField
+    deadlineValue
+    >>= capIntUpper
+      LengthRankingConfigurationHostDeadlineMillisecondsField 65000
+  artifactPolicyValue <- requiredField
+    LengthRankingConfigurationExecutionObject
+    LengthRankingConfigurationArtifactPolicyField
+    "artifactPolicy"
+    object
+  artifacts <- decodeArtifactPolicy artifactPolicyValue
+  launchValue <- requiredField
+    LengthRankingConfigurationExecutionObject
+    LengthRankingConfigurationExecutableLaunchField
+    "executableLaunch"
+    object
+  launch <- stringField
+    LengthRankingConfigurationExecutableLaunchField launchValue
+  case launch of
+    "descriptor-bound-execve-check-executable-access-v1" -> pure ()
+    _ -> Left $ LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationExecutableLaunchField
+  let source = LengthSMTLibExecutionConfigSource
+        { lengthSMTLibExecutionConfigSourceExecutablePath = executable
+        , lengthSMTLibExecutionConfigSourceExpectedExecutableSHA256 =
+            expectedDigest
+        , lengthSMTLibExecutionConfigSourceSolverTimeoutMilliseconds = timeout
+        , lengthSMTLibExecutionConfigSourceSolverResourceLimit = resource
+        , lengthSMTLibExecutionConfigSourceHostDeadlineMilliseconds = deadline
+        , lengthSMTLibExecutionConfigSourceArtifactPolicy = artifacts
+        , lengthSMTLibExecutionConfigSourceResponseLimits = responses
+        }
+  case
+      mkLengthSMTLibDescriptorBoundExecveCheckExecutableAccessExecutionConfig
         limits source of
     Left failure -> Left $ LengthRankingConfigurationExecutionRejected failure
     Right validated -> Right validated

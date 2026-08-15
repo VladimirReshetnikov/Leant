@@ -4480,6 +4480,17 @@ run opts = do
                   "effective filesystem credentials before copying and again " ++
                   "immediately before child allocation; any configured digest " ++
                   "is checked against the sealed staged main-image bytes.")
+            Just
+                LengthSMTLibDescriptorBoundExecveCheckExecutableAccessLaunch ->
+              emitLn st =<< cDim st
+                ("Descriptor-bound execve-check executable-access launch " ++
+                  "selected; the opened source must pass Linux faccessat2 X_OK " ++
+                  "under effective filesystem credentials and AT_EXECVE_CHECK " ++
+                  "before copying and again immediately before child " ++
+                  "allocation; the sealed staged image must pass " ++
+                  "AT_EXECVE_CHECK immediately before child allocation; any " ++
+                  "configured digest is checked against the sealed staged " ++
+                  "main-image bytes.")
             Just LengthSMTLibPathSnapshotThenDirectSpawn -> pure ()
             Nothing -> pure ()
           emitLn st =<< cDim st

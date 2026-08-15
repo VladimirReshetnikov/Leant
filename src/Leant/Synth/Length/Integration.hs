@@ -205,7 +205,7 @@ lengthAssessmentModeActivationPolicy mode = case mode of
   LengthAssessmentConfigured activation _ _ -> Just activation
 
 -- | Classify the closed executable-launch strategy retained by a configured
--- mode, including either descriptor-bound strategy, without exposing its
+-- mode, including every descriptor-bound strategy, without exposing its
 -- policy or inspecting the startup-fixed contract.  Disabled assessment owns
 -- no solver-launch authority.
 lengthAssessmentModeExecutableLaunchStrategy

@@ -32,6 +32,7 @@ module Leant.Synth.Length.Configuration
   , mkLengthRankingPolicy
   , mkLengthRankingPolicyWithDescriptorBoundExecutableLaunch
   , mkLengthRankingPolicyWithDescriptorBoundEffectiveIDExecutableAccessLaunch
+  , mkLengthRankingPolicyWithDescriptorBoundExecveCheckExecutableAccessLaunch
   , lengthRankingPolicyFromValidatedComponents
   , enableLengthRankingOriginProbe
   , enableLengthRankingInputBoxValidation
@@ -76,6 +77,7 @@ import Language.Haskell.Djex
   , mkLengthEvaluationLimits
   , mkLengthSMTLibDescriptorBoundExecutionConfig
   , mkLengthSMTLibDescriptorBoundEffectiveIDExecutableAccessExecutionConfig
+  , mkLengthSMTLibDescriptorBoundExecveCheckExecutableAccessExecutionConfig
   , mkLengthSMTLibExecutionConfig
   )
 
@@ -329,6 +331,29 @@ mkLengthRankingPolicyWithDescriptorBoundEffectiveIDExecutableAccessLaunch
     source = do
   execution <- case
       mkLengthSMTLibDescriptorBoundEffectiveIDExecutableAccessExecutionConfig
+        (lengthRankingPolicyExecutionLimits source)
+        (lengthRankingPolicyExecutionSource source) of
+    Left failure -> Left $ LengthRankingExecutionConfigurationRejected failure
+    Right validated -> Right validated
+  evaluation <- case mkLengthEvaluationLimits
+      (lengthRankingPolicyEvaluationSource source) of
+    Left failure -> Left $ LengthRankingEvaluationLimitsRejected failure
+    Right validated -> Right validated
+  pure $ lengthRankingPolicyFromValidatedComponents execution evaluation
+
+-- | Validate the same reusable policy while selecting Djex's additive
+-- descriptor-bound execve-check executable-access launch.  Construction
+-- remains pure and retains the established execution-before-evaluation
+-- failure order.  Effective-credential access checks, source and staged-image
+-- execve checks, source inspection, and sealed descriptor staging occur only
+-- in a later lexical live session.
+mkLengthRankingPolicyWithDescriptorBoundExecveCheckExecutableAccessLaunch
+  :: LengthRankingPolicySource
+  -> Either LengthRankingConfigurationError LengthRankingPolicy
+mkLengthRankingPolicyWithDescriptorBoundExecveCheckExecutableAccessLaunch
+    source = do
+  execution <- case
+      mkLengthSMTLibDescriptorBoundExecveCheckExecutableAccessExecutionConfig
         (lengthRankingPolicyExecutionLimits source)
         (lengthRankingPolicyExecutionSource source) of
     Left failure -> Left $ LengthRankingExecutionConfigurationRejected failure
