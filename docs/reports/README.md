@@ -60,6 +60,7 @@ Reports are listed oldest first.
 - 2026-08-15 — [Strict relational positive-affine Length ranking](2026-08-15-strict-relational-positive-affine-length-ranking.md)
 - 2026-08-15 — [Descriptor-bound Length/Z3 launch](2026-08-15-descriptor-bound-length-z3-launch.md)
 - 2026-08-15 — [Strict relational positive-affine quotient Length ranking](2026-08-15-strict-relational-positive-affine-quotient-length-ranking.md)
+- 2026-08-15 — [Effective-ID descriptor-bound Length/Z3 launch](2026-08-15-effective-id-descriptor-bound-length-z3-launch.md)
 
 ## Standalone PDF reports
 
