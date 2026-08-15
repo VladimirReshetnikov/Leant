@@ -226,6 +226,7 @@ import Leant.Synth.Length.Configuration
   , enableLengthRankingOriginProbe
   , enableLengthRankingPositiveAffineApplicableDomainValidation
   , enableLengthRankingRelationalPositiveAffineApplicableDomainValidation
+  , enableLengthRankingScopedUsableWorkBudget
   , enableLengthRankingUsableWorkBudget
   , mkLengthRankingPolicy
   , lengthRankingPolicyExecutableDigestExpectation
@@ -264,6 +265,8 @@ import Leant.Synth.Length.Configuration.File
   , lengthRankingConfigurationFileSpinePairUsableWorkBudgetVersion
   , lengthRankingConfigurationFileRelationalPositiveAffineVersion
   , lengthRankingConfigurationFileSpinePairRelationalPositiveAffineVersion
+  , lengthRankingConfigurationFileScopedUsableWorkBudgetVersion
+  , lengthRankingConfigurationFileSpinePairScopedUsableWorkBudgetVersion
   , lengthRankingConfigurationFileJsonLimits
   , lengthRankingConfigurationFileVersion
   )
@@ -520,6 +523,7 @@ main = do
       , lengthPositiveAffineDeferredTests
       , lengthUsableWorkBudgetTests
       , lengthRelationalPositiveAffineTests
+      , lengthScopedUsableWorkBudgetTests
       , replayPlanTests
       , providerProgramTests
       , candidateVerificationTests
@@ -4503,6 +4507,730 @@ assertLengthUsableWorkBudgetBuilderAndAdmission = do
           (error "budgeted pair admission forced preparation") pairInput
     assertRejected "budgeted pair admission" pair
     doesFileExist (executable ++ ".events") >>= (@?= False)
+
+lengthScopedUsableWorkBudgetTests :: TestTree
+lengthScopedUsableWorkBudgetTests = testGroup
+  "scoped usable-work v13/v14 Length ranking"
+  [ testCase
+      "close the exact v13/v14 relational scoped-budget schema"
+      assertLengthScopedUsableWorkBudgetSchema
+  , testCase
+      "keep every v1-v12 entrance literal and closed"
+      assertLengthScopedUsableWorkBudgetLegacySchema
+  , testCase
+      "compose a cross-strategy last-wins builder without dropping policies"
+      assertLengthScopedUsableWorkBudgetBuilderComposition
+  , testCase
+      "checkpoint all-pure scalar and pair batches atomically"
+      assertLengthScopedUsableWorkBudgetPureCheckpoints
+  , testCase
+      "match ample v11/v12 assessments and seal exact occurrences"
+      assertLengthScopedUsableWorkBudgetAmpleParityAndSeals
+  , testCase
+      "retain compact live ordinals through both scoped domain routes"
+      assertLengthScopedUsableWorkBudgetLiveRouting
+  , testCase
+      "classify opening, query, checkpoint, and finalization expiry"
+      assertLengthScopedUsableWorkBudgetFailurePrecedence
+  , testCase
+      "leave v1 and v9/v10 runtime behavior unchanged"
+      assertLengthScopedUsableWorkBudgetLegacyRuntime
+  ]
+
+scopedUsableWorkBudgetJson :: Integer -> Json.JValue
+scopedUsableWorkBudgetJson milliseconds = Json.JObj
+  [ ( "strategy"
+    , Json.JStr
+        "scoped-checkpointed-shared-usable-work-deadline-v2"
+    )
+  , ("milliseconds", Json.JInt milliseconds)
+  ]
+
+scopedUsableWorkBudgetScalarDocument
+  :: FilePath
+  -> Integer
+  -> Json.JValue
+scopedUsableWorkBudgetScalarDocument executable milliseconds =
+  addJsonField []
+    ("usableWorkBudget", scopedUsableWorkBudgetJson milliseconds)
+  $ setJsonField ["version"]
+      (Json.JInt $ toInteger
+        lengthRankingConfigurationFileScopedUsableWorkBudgetVersion)
+  $ relationalPositiveAffineScalarDocument executable
+
+scopedUsableWorkBudgetPairDocument
+  :: FilePath
+  -> Integer
+  -> Json.JValue
+scopedUsableWorkBudgetPairDocument executable milliseconds =
+  addJsonField []
+    ("usableWorkBudget", scopedUsableWorkBudgetJson milliseconds)
+  $ setJsonField ["version"]
+      (Json.JInt $ toInteger
+        lengthRankingConfigurationFileSpinePairScopedUsableWorkBudgetVersion)
+  $ relationalPositiveAffinePairDocument executable
+
+expectScopedUsableWorkBudgetPolicy
+  :: Json.JValue
+  -> IO (LengthRankingPolicy, LeanLengthContractSelection)
+expectScopedUsableWorkBudgetPolicy document = do
+  disabled <- expectLengthAssessmentConfigurationFile document
+  expectLengthAssessmentConfigurationActivation
+    PermitUnpinnedExecutable disabled
+
+assertLengthScopedUsableWorkBudgetSchema :: IO ()
+assertLengthScopedUsableWorkBudgetSchema =
+  withTemporaryDirectory "leant-length-scoped-budget-schema" $ \root -> do
+    let executable = root </> "missing-z3"
+        scalar = scopedUsableWorkBudgetScalarDocument executable 65000
+        pair = scopedUsableWorkBudgetPairDocument executable 65000
+        missing object field path document =
+          assertLengthAssessmentConfigurationFileError
+            (LengthRankingConfigurationMissingField object field)
+            $ deleteJsonField path document
+        wrongType field path expected document =
+          assertLengthAssessmentConfigurationFileError
+            (LengthRankingConfigurationFieldTypeMismatch field expected)
+            $ setJsonField path (Json.JBool False) document
+        unexpected object path document =
+          assertLengthAssessmentConfigurationFileError
+            (LengthRankingConfigurationUnexpectedField object)
+            $ addJsonField path ("private-field", Json.JNull) document
+        rootShape =
+          [ (LengthRankingConfigurationFormatField, "format")
+          , (LengthRankingConfigurationVersionField, "version")
+          , ( LengthRankingConfigurationExecutionAdmissionField
+            , "executionAdmission"
+            )
+          , (LengthRankingConfigurationExecutionField, "execution")
+          , (LengthRankingConfigurationEvaluationField, "evaluation")
+          , ( LengthRankingConfigurationInputBoxValidationField
+            , "inputBoxValidation"
+            )
+          , ( LengthRankingConfigurationCounterexampleProbeField
+            , "counterexampleProbe"
+            )
+          , ( LengthRankingConfigurationBoundedPositiveOrderingField
+            , "boundedPositiveOrdering"
+            )
+          , ( LengthRankingConfigurationApplicableDomainValidationField
+            , "applicableDomainValidation"
+            )
+          , ( LengthRankingConfigurationApplicableDomainOrderingField
+            , "applicableDomainOrdering"
+            )
+          , ( LengthRankingConfigurationCounterexampleSimplificationField
+            , "counterexampleSimplification"
+            )
+          , ( LengthRankingConfigurationLiveSessionOpeningField
+            , "liveSessionOpening"
+            )
+          , ( LengthRankingConfigurationUsableWorkBudgetField
+            , "usableWorkBudget"
+            )
+          , (LengthRankingConfigurationContractField, "contract")
+          ]
+        reject field document =
+          assertLengthAssessmentConfigurationFileError
+            (LengthRankingConfigurationFieldValueRejected field) document
+    lengthRankingConfigurationFileScopedUsableWorkBudgetVersion @?= 13
+    lengthRankingConfigurationFileSpinePairScopedUsableWorkBudgetVersion
+      @?= 14
+    mapM_ (\document -> do
+        _ <- expectLengthAssessmentConfigurationFile document
+        _ <- expectLengthAssessmentConfigurationFile
+          $ reverseJsonObjectFields document
+        assertLengthRankingConfigurationFileError
+          LengthRankingConfigurationUnsupportedVersion document)
+      [scalar, pair]
+
+    (_, scalarSelection) <- expectScopedUsableWorkBudgetPolicy scalar
+    case scalarSelection of
+      LeanLengthScalarContractSelection _ -> pure ()
+      LeanLengthSpinePairContractSelection _ -> assertFailure
+        "v13 selected the pair Length domain"
+    (_, pairSelection) <- expectScopedUsableWorkBudgetPolicy pair
+    case pairSelection of
+      LeanLengthSpinePairContractSelection _ -> pure ()
+      LeanLengthScalarContractSelection _ -> assertFailure
+        "v14 selected the scalar Length domain"
+
+    mapM_ (\document -> do
+        mapM_ (\(field, name) ->
+            missing LengthRankingConfigurationRootObject field [name]
+              document)
+          rootShape
+        unexpected LengthRankingConfigurationRootObject [] document
+        assertLengthAssessmentConfigurationFileError
+          (LengthRankingConfigurationExpectedObject
+            LengthRankingConfigurationUsableWorkBudgetObject)
+          $ setJsonField ["usableWorkBudget"] Json.JNull document
+        unexpected LengthRankingConfigurationUsableWorkBudgetObject
+          ["usableWorkBudget"] document
+        missing LengthRankingConfigurationUsableWorkBudgetObject
+          LengthRankingConfigurationUsableWorkBudgetStrategyField
+          ["usableWorkBudget", "strategy"] document
+        missing LengthRankingConfigurationUsableWorkBudgetObject
+          LengthRankingConfigurationUsableWorkBudgetMillisecondsField
+          ["usableWorkBudget", "milliseconds"] document
+        wrongType
+          LengthRankingConfigurationUsableWorkBudgetStrategyField
+          ["usableWorkBudget", "strategy"]
+          LengthRankingConfigurationStringValue document
+        wrongType
+          LengthRankingConfigurationUsableWorkBudgetMillisecondsField
+          ["usableWorkBudget", "milliseconds"]
+          LengthRankingConfigurationIntegerValue document
+        reject LengthRankingConfigurationUsableWorkBudgetStrategyField
+          $ setJsonField ["usableWorkBudget", "strategy"]
+              (Json.JStr "shared-usable-work-deadline-v1") document
+        assertLengthAssessmentConfigurationFileError
+          (LengthRankingConfigurationUsableWorkBudgetRejected
+            $ Djex.LengthSMTLibLiveUsableWorkBudgetNonPositive 0)
+          $ setJsonField ["usableWorkBudget", "milliseconds"]
+              (Json.JInt 0) document
+        assertLengthAssessmentConfigurationFileError
+          (LengthRankingConfigurationPolicyLimitExceeded
+            LengthRankingConfigurationUsableWorkBudgetMillisecondsField
+            65000 65001)
+          $ setJsonField ["usableWorkBudget", "milliseconds"]
+              (Json.JInt 65001) document
+        reject LengthRankingConfigurationApplicableDomainStrategyField
+          $ setJsonField ["applicableDomainValidation", "strategy"]
+              (Json.JStr "positive-affine-v1") document)
+      [scalar, pair]
+
+    -- The inherited relational policy is decoded before the additive budget,
+    -- and the nominal contract remains last.  Poison every later phase to
+    -- pin that order without relying on object member order.
+    let badApplicable = setJsonField
+          ["applicableDomainValidation", "strategy"]
+          (Json.JStr "private-applicable")
+        badBudget = setJsonField ["usableWorkBudget", "strategy"]
+          (Json.JStr "private-budget")
+        badContract = setJsonField ["contract", "precondition"]
+          (Json.JArr [Json.JStr "private-formula"])
+    reject LengthRankingConfigurationApplicableDomainStrategyField
+      $ badApplicable $ badBudget $ badContract scalar
+    reject LengthRankingConfigurationUsableWorkBudgetStrategyField
+      $ badBudget $ badContract scalar
+    assertLengthAssessmentConfigurationFileError
+      (LengthRankingConfigurationSyntaxRejected
+        LengthRankingConfigurationPreconditionSyntax
+        LengthRankingConfigurationUnknownTag)
+      $ badContract scalar
+
+    let future = setJsonField ["version"] (Json.JInt 15)
+          $ addJsonField [] ("private-v15", Json.JNull) scalar
+    assertLengthAssessmentConfigurationFileError
+      LengthRankingConfigurationUnsupportedVersion future
+    assertLengthRankingConfigurationFileError
+      LengthRankingConfigurationUnsupportedVersion future
+
+assertLengthScopedUsableWorkBudgetLegacySchema :: IO ()
+assertLengthScopedUsableWorkBudgetLegacySchema =
+  withTemporaryDirectory "leant-length-scoped-budget-legacy" $ \root -> do
+    let executable = root </> "missing-z3"
+        v1 = lengthRankingConfigurationFileFixture executable Nothing
+        v2 = lengthRankingConfigurationFileInputBoxFixture
+          executable Nothing [1] 2
+        v3 = lengthRankingConfigurationFileOriginProbeFixture
+          executable Nothing [1] 2
+        v4 = lengthAssessmentConfigurationFileSpinePairFixture
+          executable Nothing [1] 2 positiveAffinePairContractValue
+        v5 = lengthAssessmentConfigurationFilePositiveOrderingFixture
+          executable Nothing [1] 2 positiveAffineScalarContractValue
+        v6 = lengthAssessmentConfigurationFileSpinePairPositiveOrderingFixture
+          executable Nothing [1] 2 positiveAffinePairContractValue
+        v7 = positiveAffineScalarDocument executable
+        v8 = positiveAffinePairDocument executable
+        v9 = usableWorkBudgetScalarDocument executable 1000
+        v10 = usableWorkBudgetPairDocument executable 1000
+        v11 = relationalPositiveAffineScalarDocument executable
+        v12 = relationalPositiveAffinePairDocument executable
+        legacy = [v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12]
+        unexpected = LengthRankingConfigurationUnexpectedField
+          LengthRankingConfigurationRootObject
+        injectScoped = addJsonField []
+          ("privateScopedUsableWorkBudget", scopedUsableWorkBudgetJson 1000)
+    mapM_ (\document -> do
+        _ <- expectLengthAssessmentConfigurationFile document
+        assertLengthAssessmentConfigurationFileError unexpected
+          $ injectScoped document)
+      legacy
+    mapM_ (\document ->
+        assertLengthAssessmentConfigurationFileError unexpected
+          $ addJsonField []
+              ("usableWorkBudget", scopedUsableWorkBudgetJson 1000) document)
+      [v1, v2, v3, v4, v5, v6, v7, v8, v11, v12]
+    mapM_ (\document ->
+        assertLengthAssessmentConfigurationFileError
+          (LengthRankingConfigurationFieldValueRejected
+            LengthRankingConfigurationUsableWorkBudgetStrategyField)
+          $ setJsonField ["usableWorkBudget", "strategy"]
+              (Json.JStr
+                "scoped-checkpointed-shared-usable-work-deadline-v2")
+              document)
+      [v9, v10]
+
+assertLengthScopedUsableWorkBudgetBuilderComposition :: IO ()
+assertLengthScopedUsableWorkBudgetBuilderComposition = do
+  identity <- buildOneInputLengthRankingCandidate
+  limits <- explicitLengthInputBoxLimits 1 2
+  shortBudget <- expectLengthUsableWorkBudget 50
+  longBudget <- expectLengthUsableWorkBudget 1000
+  withTemporaryDirectory "leant-length-scoped-budget-builder" $ \root -> do
+    let executable = root </> "missing-z3"
+        safeContract = relationalPositiveAffineScalarContract
+          $ LengthTruth True
+        delayedContract microseconds = safeContract
+          { leanLengthContractSource = delayedLengthTestValue microseconds
+              $ leanLengthContractSource safeContract
+          }
+        run label policy contract = expectLengthRankingWithin label
+          $ rankVerifiedLengthCandidatesWithPolicy policy contract [identity]
+        expectEstablished label ranking = do
+          lengthRankingFailure ranking @?= Nothing
+          case map rankedLengthCandidateAssessment
+              $ lengthRankingCandidates ranking of
+            [RelationalPositiveAffineApplicableDomainEstablished _] ->
+              pure ()
+            assessments -> assertFailure
+              $ label ++ " lost the relational policy: " ++ show assessments
+    base <- expectRight $ mkLengthRankingPolicy
+      $ explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits
+          (explicitLengthRankingExecutionSource executable Nothing
+            Djex.LengthSMTLibStatusOnly)
+          Djex.defaultLengthEvaluationLimitSource
+    let advanced = enableLengthRankingNonVacuousApplicableDomainPreference
+          $ enableLengthRankingDeferredLiveSessionOpening
+          $ enableLengthRankingRelationalPositiveAffineApplicableDomainValidation
+              limits base
+        scopedShortLast = enableLengthRankingScopedUsableWorkBudget shortBudget
+          $ enableLengthRankingUsableWorkBudget longBudget advanced
+        v1LongLast = enableLengthRankingUsableWorkBudget longBudget
+          $ enableLengthRankingScopedUsableWorkBudget shortBudget advanced
+        v1ShortLast = enableLengthRankingUsableWorkBudget shortBudget
+          $ enableLengthRankingScopedUsableWorkBudget longBudget advanced
+        scopedLongLast =
+          enableLengthRankingScopedUsableWorkBudget longBudget
+          $ enableLengthRankingUsableWorkBudget shortBudget advanced
+        budgetThenDomain =
+          enableLengthRankingRelationalPositiveAffineApplicableDomainValidation
+            limits
+          $ enableLengthRankingScopedUsableWorkBudget longBudget
+          $ enableLengthRankingApplicableDomainValidation limits advanced
+        domainThenBudget =
+          enableLengthRankingScopedUsableWorkBudget longBudget
+          $ enableLengthRankingRelationalPositiveAffineApplicableDomainValidation
+              limits
+          $ enableLengthRankingApplicableDomainValidation limits advanced
+    run "scoped short budget last" scopedShortLast
+        (delayedContract 150000) >>=
+      assertScalarUsableWorkExpiry "scoped short budget last"
+    run "v1 short budget last" v1ShortLast (delayedContract 160000) >>=
+      assertScalarUsableWorkExpiry "v1 short budget last"
+    run "v1 long budget last" v1LongLast (delayedContract 170000) >>=
+      expectEstablished "v1 long budget last"
+    run "scoped long budget last" scopedLongLast
+        (delayedContract 180000) >>=
+      expectEstablished "scoped long budget last"
+    run "scoped budget then relational domain" budgetThenDomain safeContract
+      >>= expectEstablished "scoped budget then relational domain"
+    run "relational domain then scoped budget" domainThenBudget safeContract
+      >>= expectEstablished "relational domain then scoped budget"
+    doesFileExist (executable ++ ".events") >>= (@?= False)
+
+assertLengthScopedUsableWorkBudgetPureCheckpoints :: IO ()
+assertLengthScopedUsableWorkBudgetPureCheckpoints = do
+  (providerContract, scaled, independent) <-
+    buildScaledProviderReplayFixture
+  (pairCandidate, _) <- buildLengthSpinePairRankingFixture
+  domainLimits <- explicitLengthInputBoxLimits 1 65536
+  budget <- expectLengthUsableWorkBudget 25
+  ampleBudget <- expectLengthUsableWorkBudget 2000
+  let input = LengthVariable $ LengthInput 0
+      scalarContract = providerContract
+        { leanLengthContractSource = LengthContractSource
+            { lengthContractPrecondition = LengthAtMost input
+                (LengthLiteral 65535)
+            , lengthContractPostcondition = LengthAtMost
+                (LengthVariable LengthResult) (LengthLiteral 65535)
+            }
+        }
+      pairInput = LengthVariable $ Djex.LengthSpinePairInput 0
+      pairContract = lengthSpinePairRankingContract
+        { leanLengthSpinePairContractSource =
+            (leanLengthSpinePairContractSource
+              lengthSpinePairRankingContract)
+              { Djex.lengthSpinePairContractPrecondition = LengthAtMost
+                  pairInput (LengthLiteral 65535)
+              , Djex.lengthSpinePairContractPostcondition = LengthAll
+                  [ LengthEqual
+                      (LengthVariable
+                        $ Djex.LengthSpinePairResult
+                            Djex.LengthSpinePairFirst)
+                      pairInput
+                  , LengthEqual
+                      (LengthVariable
+                        $ Djex.LengthSpinePairResult
+                            Djex.LengthSpinePairSecond)
+                      pairInput
+                  ]
+              }
+        }
+      evaluationSource = Djex.defaultLengthEvaluationLimitSource
+        { Djex.lengthEvaluationLimitSourceIntermediateValueBits = 16 }
+      scalarOriginal = [independent, scaled]
+      pairOriginal = [pairCandidate, pairCandidate]
+  withTemporaryDirectory "leant-length-scoped-budget-pure" $ \root -> do
+    let executable = root </> "missing-z3"
+    base <- expectRight $ mkLengthRankingPolicy
+      $ explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits
+          (explicitLengthRankingExecutionSource executable Nothing
+            Djex.LengthSMTLibStatusOnly)
+          evaluationSource
+    let policy = enableLengthRankingScopedUsableWorkBudget budget
+          $ enableLengthRankingDeferredLiveSessionOpening
+          $ enableLengthRankingRelationalPositiveAffineApplicableDomainValidation
+              domainLimits base
+        amplePolicy = enableLengthRankingScopedUsableWorkBudget ampleBudget
+          $ enableLengthRankingDeferredLiveSessionOpening
+          $ enableLengthRankingRelationalPositiveAffineApplicableDomainValidation
+              domainLimits base
+    scalar <- expectLengthRankingWithin "scoped scalar pure checkpoint"
+      $ rankVerifiedLengthCandidatesWithPolicy policy scalarContract
+          scalarOriginal
+    rankedLengthVerifiedCandidates scalar @?= scalarOriginal
+    map rankedLengthCandidateOriginalIndex
+        (lengthRankingCandidates scalar) @?= [0, 1]
+    assertScalarUsableWorkExpiry "scoped scalar pure checkpoint" scalar
+
+    laterFailure <- expectLengthRankingWithin
+      "ample later scalar evaluation-limit control"
+      $ rankVerifiedLengthCandidatesWithPolicy amplePolicy scalarContract
+          scalarOriginal
+    rankedLengthVerifiedCandidates laterFailure @?= scalarOriginal
+    later <- case lengthRankingFailure laterFailure of
+      Nothing -> assertFailure
+        "the later scaled candidate did not reach its evaluation limit"
+          >> error "unreachable"
+      Just retained -> pure retained
+    case lengthRankingFailureClass later of
+      LengthRankingApplicableDomainValidationFailed _ -> pure ()
+      failureClass -> assertFailure
+        $ "the later scalar candidate failed in the wrong phase: "
+            ++ show failureClass
+    lengthRankingFailureOriginalIndex later @?= Just 1
+    lengthRankingFailureCleanupIncomplete later @?= False
+
+    pair <- expectRight =<<
+      rankVerifiedLengthSpinePairCandidatesWithPolicy policy pairContract
+        pairOriginal
+    rankedLengthSpinePairVerifiedCandidates pair @?= pairOriginal
+    map rankedLengthSpinePairCandidateOriginalIndex
+        (lengthSpinePairRankingCandidates pair) @?= [0, 1]
+    assertPairUsableWorkExpiry "scoped pair pure checkpoint" pair
+
+    -- Candidate 1 of the scalar batch would deterministically exceed the
+    -- sixteen-bit intermediate-value limit once its doubled result reaches
+    -- 65536.  The scope-level, index-free deadline and atomic reset therefore
+    -- remain authoritative over any later indexed validation failure.  The
+    -- product sibling likewise exposes neither a provisional first receipt
+    -- nor a live worker after its bounded pure quantum expires.
+    doesFileExist (executable ++ ".events") >>= (@?= False)
+
+assertLengthScopedUsableWorkBudgetAmpleParityAndSeals :: IO ()
+assertLengthScopedUsableWorkBudgetAmpleParityAndSeals = do
+  identity <- buildOneInputLengthRankingCandidate
+  (pairCandidate, _) <- buildLengthSpinePairRankingFixture
+  scalarNeutral <- syntheticLengthRankingCandidate
+    "scoped-ample-scalar-neutral"
+  pairNeutral <- syntheticLengthRankingCandidate
+    "scoped-ample-pair-neutral"
+  let scalarContract = relationalPositiveAffineScalarContract
+        $ LengthTruth True
+      pairContract = relationalPositiveAffinePairContract
+        $ LengthTruth True
+      scalarOriginal = [scalarNeutral, identity, identity]
+      pairOriginal = [pairNeutral, pairCandidate, pairCandidate]
+  withTemporaryDirectory "leant-length-scoped-budget-parity" $ \root -> do
+    let executable = root </> "missing-z3"
+    (v11, _) <- expectRelationalPositiveAffinePolicy
+      $ relationalPositiveAffineScalarDocument executable
+    (v13, _) <- expectScopedUsableWorkBudgetPolicy
+      $ scopedUsableWorkBudgetScalarDocument executable 2000
+    legacyScalar <- expectLengthRankingWithin "ample v11 scalar"
+      $ rankVerifiedLengthCandidatesWithPolicy v11 scalarContract
+          scalarOriginal
+    scopedScalar <- expectLengthRankingWithin "ample v13 scalar"
+      $ rankVerifiedLengthCandidatesWithPolicy v13 scalarContract
+          scalarOriginal
+    assertLengthRankingsEquivalent legacyScalar scopedScalar
+    map rankedLengthCandidateOriginalIndex
+        (lengthRankingCandidates scopedScalar) @?= [1, 2, 0]
+
+    scalarVerification <- verificationBatchFromReceipts scalarOriginal
+    scalarAssociated <- expectLengthPostVerificationWithin
+      "ample v13 scoped occurrence seal"
+      $ assessVerifiedLengthCandidatesWithPolicy v13 scalarContract
+          scalarVerification
+    assertLengthPostVerificationSealed scalarAssociated
+    scalarAssociatedRanking <-
+      expectLengthPostVerificationRanking scalarAssociated
+    map rankedLengthCandidateOriginalIndex
+        (lengthRankingCandidates scalarAssociatedRanking) @?= [1, 2, 0]
+    case map lengthCandidatePresentationNote
+        $ presentLengthPostVerificationResult scalarAssociated of
+      [Just _, Just _, Nothing] -> pure ()
+      notes -> assertFailure
+        $ "v13 scalar notes changed occurrence: " ++ show notes
+
+    (v12, _) <- expectRelationalPositiveAffinePolicy
+      $ relationalPositiveAffinePairDocument executable
+    (v14, _) <- expectScopedUsableWorkBudgetPolicy
+      $ scopedUsableWorkBudgetPairDocument executable 2000
+    legacyPair <- expectRight =<<
+      rankVerifiedLengthSpinePairCandidatesWithPolicy v12 pairContract
+        pairOriginal
+    scopedPair <- expectRight =<<
+      rankVerifiedLengthSpinePairCandidatesWithPolicy v14 pairContract
+        pairOriginal
+    lengthSpinePairRankingSnapshotByOriginalIndex scopedPair @?=
+      lengthSpinePairRankingSnapshotByOriginalIndex legacyPair
+    lengthSpinePairRankingFailure scopedPair @?=
+      lengthSpinePairRankingFailure legacyPair
+    map rankedLengthSpinePairCandidateOriginalIndex
+        (lengthSpinePairRankingCandidates scopedPair) @?= [1, 2, 0]
+
+    pairVerification <- verificationBatchFromReceipts pairOriginal
+    pairAssociated <- expectLengthSpinePairPostVerificationWithin
+      $ assessVerifiedLengthSpinePairCandidatesWithPolicy v14 pairContract
+          pairVerification
+    sealed <- case lengthSpinePairPostVerificationSealedBatch
+        pairAssociated of
+      Nothing -> assertFailure
+        "ample v14 output bypassed its occurrence seal"
+          >> error "unreachable"
+      Just retained -> pure retained
+    postVerificationBatchCandidates sealed @?=
+      lengthSpinePairPostVerificationCandidates pairAssociated
+    pairAssociatedRanking <-
+      expectLengthSpinePairPostVerificationRanking pairAssociated
+    map rankedLengthSpinePairCandidateOriginalIndex
+        (lengthSpinePairRankingCandidates pairAssociatedRanking) @?=
+      [1, 2, 0]
+    case map lengthCandidatePresentationNote
+        $ presentLengthSpinePairPostVerificationResult pairAssociated of
+      [Just _, Just _, Nothing] -> pure ()
+      notes -> assertFailure
+        $ "v14 pair notes changed occurrence: " ++ show notes
+    doesFileExist (executable ++ ".events") >>= (@?= False)
+
+assertLengthScopedUsableWorkBudgetLiveRouting :: IO ()
+assertLengthScopedUsableWorkBudgetLiveRouting = do
+  identity <- buildOneInputLengthRankingCandidate
+  (_, pairCandidate) <- buildLengthSpinePairRankingFixture
+  scalarRefused <- syntheticLengthRankingCandidate
+    "scoped-live-scalar-refused"
+  pairRefused <- syntheticLengthRankingCandidate
+    "scoped-live-pair-refused"
+  let scalarCandidates =
+        [scalarRefused, identity, scalarRefused, identity]
+      pairCandidates =
+        [pairRefused, pairCandidate, pairRefused, pairCandidate]
+      assertScalar label ranking = do
+        lengthRankingFailure ranking @?= Nothing
+        map rankedLengthCandidateOriginalIndex
+            (lengthRankingCandidates ranking) @?= [0, 1, 2, 3]
+        map rankedLengthCandidateAssessment
+            (lengthRankingCandidates ranking) @?=
+          [ Unassessed
+          , Heuristic Djex.SolverSatisfiable
+          , Unassessed
+          , Heuristic Djex.SolverSatisfiable
+          ]
+        assertBool (label ++ " changed preparation refusal placement")
+          $ rankedLengthPreparationRefusals ranking ==
+              [ Just LengthPreparationTypedAuthorityUnavailable
+              , Nothing
+              , Just LengthPreparationTypedAuthorityUnavailable
+              , Nothing
+              ]
+      assertPair _label ranking = do
+        lengthSpinePairRankingFailure ranking @?= Nothing
+        map rankedLengthSpinePairCandidateOriginalIndex
+            (lengthSpinePairRankingCandidates ranking) @?= [0, 1, 2, 3]
+        map rankedLengthSpinePairCandidateAssessment
+            (lengthSpinePairRankingCandidates ranking) @?=
+          [ LengthSpinePairUnassessed
+          , LengthSpinePairHeuristic Djex.SolverSatisfiable
+          , LengthSpinePairUnassessed
+          , LengthSpinePairHeuristic Djex.SolverSatisfiable
+          ]
+  withFakeLengthSolver "healthy" $ \executable -> do
+    (v9, _) <- expectUsableWorkBudgetPolicy
+      $ usableWorkBudgetScalarDocument executable 2000
+    legacyScalar <- expectLengthRankingWithin "v9 live routing control"
+      $ rankVerifiedLengthCandidatesWithPolicy v9 usableWorkScalarLiveContract
+          scalarCandidates
+    assertScalar "v9" legacyScalar
+    assertFakeLengthQueryEvents [0, 1] [] =<<
+      BS.readFile (executable ++ ".events")
+
+    (v13, _) <- expectScopedUsableWorkBudgetPolicy
+      $ scopedUsableWorkBudgetScalarDocument executable 2000
+    scopedScalar <- expectLengthRankingWithin "v13 compact live ordinals"
+      $ rankVerifiedLengthCandidatesWithPolicy v13
+          usableWorkScalarLiveContract scalarCandidates
+    assertScalar "v13" scopedScalar
+    assertFakeLengthQueryEvents [0, 1] [] =<<
+      BS.readFile (executable ++ ".events")
+
+    (v10, _) <- expectUsableWorkBudgetPolicy
+      $ usableWorkBudgetPairDocument executable 2000
+    legacyPair <- expectRight =<<
+      rankVerifiedLengthSpinePairCandidatesWithPolicy v10
+        usableWorkPairLiveContract pairCandidates
+    assertPair "v10" legacyPair
+    assertFakeLengthQueryEvents [0, 1] [] =<<
+      BS.readFile (executable ++ ".events")
+
+    (v14, _) <- expectScopedUsableWorkBudgetPolicy
+      $ scopedUsableWorkBudgetPairDocument executable 2000
+    scopedPair <- expectRight =<<
+      rankVerifiedLengthSpinePairCandidatesWithPolicy v14
+        usableWorkPairLiveContract pairCandidates
+    assertPair "v14" scopedPair
+    assertFakeLengthQueryEvents [0, 1] [] =<<
+      BS.readFile (executable ++ ".events")
+
+assertLengthScopedUsableWorkBudgetFailurePrecedence :: IO ()
+assertLengthScopedUsableWorkBudgetFailurePrecedence = do
+  identity <- buildOneInputLengthRankingCandidate
+  (_, pairCandidate) <- buildLengthSpinePairRankingFixture
+  withFakeLengthSolver "hang" $ \executable -> do
+    (policy, _) <- expectScopedUsableWorkBudgetPolicy
+      $ scopedUsableWorkBudgetScalarDocument executable 100
+    ranking <- expectLengthRankingWithin "v13 scoped opener expiry"
+      $ rankVerifiedLengthCandidatesWithPolicy policy
+          usableWorkScalarLiveContract [identity]
+    assertScalarUsableWorkExpiry "v13 scoped opener" ranking
+    events <- BS.readFile $ executable ++ ".events"
+    assertFakeLengthQueryEvents [] [] events
+    assertBool "the scoped opener never reached the hanging worker"
+      $ BS.pack "EVENT hang " `BS.isInfixOf` events
+
+  -- Query expiry returns to the cooperative owner, whose next checkpoint is
+  -- deliberately scope-level and index-free.  The trace still pins the exact
+  -- query phase and compact ordinal which consumed the deadline.
+  withFakeLengthSolver "query-hang-status" $ \executable -> do
+    (scalarPolicy, _) <- expectScopedUsableWorkBudgetPolicy
+      $ scopedUsableWorkBudgetScalarDocument executable 250
+    scalar <- expectLengthRankingWithin "v13 scoped query expiry"
+      $ rankVerifiedLengthCandidatesWithPolicy scalarPolicy
+          usableWorkScalarLiveContract [identity]
+    assertScalarUsableWorkExpiry "v13 scoped query" scalar
+    scalarEvents <- BS.readFile $ executable ++ ".events"
+    assertFakeLengthQueryEvents [0] [] scalarEvents
+    assertBool "the scalar query did not expire in its status phase"
+      $ BS.pack "EVENT query-hang " `BS.isInfixOf` scalarEvents
+
+    (pairPolicy, _) <- expectScopedUsableWorkBudgetPolicy
+      $ scopedUsableWorkBudgetPairDocument executable 250
+    pair <- expectRight =<<
+      rankVerifiedLengthSpinePairCandidatesWithPolicy pairPolicy
+        usableWorkPairLiveContract [pairCandidate]
+    assertPairUsableWorkExpiry "v14 scoped query" pair
+    pairEvents <- BS.readFile $ executable ++ ".events"
+    assertFakeLengthQueryEvents [0] [] pairEvents
+    assertBool "the pair query did not expire in its status phase"
+      $ BS.pack "EVENT query-hang " `BS.isInfixOf` pairEvents
+
+  -- A representative non-deadline protocol/session failure must retain its
+  -- established closed class rather than being relabeled as usable-work
+  -- expiry merely because the scoped owner is present.
+  withFakeLengthSolver "wrong-echo" $ \executable -> do
+    (policy, _) <- expectScopedUsableWorkBudgetPolicy
+      $ scopedUsableWorkBudgetScalarDocument executable 2000
+    ranking <- expectLengthRankingWithin "v13 non-deadline session failure"
+      $ rankVerifiedLengthCandidatesWithPolicy policy
+          usableWorkScalarLiveContract [identity]
+    rankedLengthVerifiedCandidates ranking @?= [identity]
+    map rankedLengthCandidateAssessment
+        (lengthRankingCandidates ranking) @?= [Unassessed]
+    failure <- case lengthRankingFailure ranking of
+      Nothing -> assertFailure
+        "the scoped session protocol failure was discarded"
+          >> error "unreachable"
+      Just retained -> pure retained
+    lengthRankingFailureClass failure @?=
+      LengthRankingLiveSessionFailed
+        Djex.LengthSMTLibLiveSessionCapabilityRejected
+    lengthRankingFailureOriginalIndex failure @?= Nothing
+    lengthRankingFailureCleanupIncomplete failure @?= False
+    assertFakeLengthQueryEvents [] [] =<<
+      BS.readFile (executable ++ ".events")
+
+  -- Fresh final readiness and cleanup remain durable.  The general Leant
+  -- owner observes its deadline after the stubborn worker has nevertheless
+  -- entered cleanup, so deadline stays primary and the successful escalation
+  -- does not invent an incomplete-cleanup bit.
+  withFakeLengthSolver "stubborn-eof" $ \executable -> do
+    (policy, _) <- expectScopedUsableWorkBudgetPolicy
+      $ scopedUsableWorkBudgetScalarDocument executable 500
+    let delayedContract = usableWorkScalarLiveContract
+          { leanLengthContractSource = delayedLengthTestValue 400000
+              $ leanLengthContractSource usableWorkScalarLiveContract
+          }
+    ranking <- expectLengthRankingWithin "v13 stubborn finalization expiry"
+      $ rankVerifiedLengthCandidatesWithPolicy policy
+          delayedContract [identity]
+    assertScalarUsableWorkExpiry "v13 stubborn finalization" ranking
+    events <- BS.readFile $ executable ++ ".events"
+    assertFakeLengthQueryEvents [0] [] events
+    assertBool "the stubborn scoped worker never entered final cleanup"
+      $ BS.pack "EVENT hang " `BS.isInfixOf` events
+
+assertLengthScopedUsableWorkBudgetLegacyRuntime :: IO ()
+assertLengthScopedUsableWorkBudgetLegacyRuntime = do
+  identity <- buildOneInputLengthRankingCandidate
+  (_, pairCandidate) <- buildLengthSpinePairRankingFixture
+  withFakeLengthSolver "query-delay-300ms" $ \executable -> do
+    disabledV1 <- expectLengthAssessmentConfigurationFile
+      $ lengthRankingConfigurationFileFixture executable Nothing
+    (v1, _) <- expectLengthAssessmentConfigurationActivation
+      PermitUnpinnedExecutable disabledV1
+    unbudgeted <- expectLengthRankingWithin "unchanged v1 live query"
+      $ rankVerifiedLengthCandidatesWithPolicy v1
+          usableWorkScalarLiveContract [identity]
+    lengthRankingFailure unbudgeted @?= Nothing
+    map rankedLengthCandidateAssessment
+        (lengthRankingCandidates unbudgeted) @?=
+      [Heuristic Djex.SolverSatisfiable]
+    assertFakeLengthQueryEvents [0] [] =<<
+      BS.readFile (executable ++ ".events")
+
+    (v9, _) <- expectUsableWorkBudgetPolicy
+      $ usableWorkBudgetScalarDocument executable 100
+    scalarExpired <- expectLengthRankingWithin
+      "unchanged v9 shared usable-work query"
+      $ rankVerifiedLengthCandidatesWithPolicy v9
+          usableWorkScalarLiveContract [identity]
+    assertScalarUsableWorkExpiry "unchanged v9 query" scalarExpired
+    assertFakeLengthQueryEvents [0] [] =<<
+      BS.readFile (executable ++ ".events")
+
+    (v10, _) <- expectUsableWorkBudgetPolicy
+      $ usableWorkBudgetPairDocument executable 100
+    pairExpired <- expectRight =<<
+      rankVerifiedLengthSpinePairCandidatesWithPolicy v10
+        usableWorkPairLiveContract [pairCandidate]
+    assertPairUsableWorkExpiry "unchanged v10 query" pairExpired
+    assertFakeLengthQueryEvents [0] [] =<<
+      BS.readFile (executable ++ ".events")
 
 assertLengthUsableWorkBudgetAllPure :: IO ()
 assertLengthUsableWorkBudgetAllPure = do
