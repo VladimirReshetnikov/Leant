@@ -29,25 +29,31 @@ data JValue
 
 -- Accessors -----------------------------------------------------------------
 
+-- | Look up a field of a JSON object; 'Nothing' on any other value shape.
 jLookup :: String -> JValue -> Maybe JValue
 jLookup key (JObj fields) = lookup key fields
 jLookup _ _ = Nothing
 
+-- | Project a JSON string.
 jString :: JValue -> Maybe String
 jString (JStr s) = Just s
 jString _ = Nothing
 
+-- | Project an integer, rounding a JSON float (the backend emits both).
 jInt :: JValue -> Maybe Integer
 jInt (JInt n) = Just n
 jInt (JNum d) = Just (round d)
 jInt _ = Nothing
 
+-- | Project a JSON array.
 jArray :: JValue -> Maybe [JValue]
 jArray (JArr xs) = Just xs
 jArray _ = Nothing
 
 -- Encoding ------------------------------------------------------------------
 
+-- | Render a value as compact single-line JSON (the framing the backend
+-- expects: one request per line).
 encodeJson :: JValue -> String
 encodeJson JNull = "null"
 encodeJson (JBool b) = if b then "true" else "false"
