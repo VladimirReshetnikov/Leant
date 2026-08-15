@@ -230,7 +230,9 @@ import Leant.Synth.Length.Configuration
   , enableLengthRankingStrictRelationalPositiveAffineApplicableDomainValidation
   , enableLengthRankingUsableWorkBudget
   , mkLengthRankingPolicy
+  , mkLengthRankingPolicyWithDescriptorBoundExecutableLaunch
   , lengthRankingPolicyExecutableDigestExpectation
+  , lengthRankingPolicyExecutableLaunchStrategy
   , lengthRankingPolicyFromValidatedComponents
   , assessVerifiedLengthSpinePairCandidatesWithPolicy
   , rankVerifiedLengthSpinePairCandidatesWithPolicy
@@ -270,6 +272,8 @@ import Leant.Synth.Length.Configuration.File
   , lengthRankingConfigurationFileSpinePairScopedUsableWorkBudgetVersion
   , lengthRankingConfigurationFileStrictRelationalPositiveAffineVersion
   , lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineVersion
+  , lengthRankingConfigurationFileDescriptorBoundExecutableLaunchVersion
+  , lengthRankingConfigurationFileSpinePairDescriptorBoundExecutableLaunchVersion
   , lengthRankingConfigurationFileJsonLimits
   , lengthRankingConfigurationFileVersion
   )
@@ -351,6 +355,7 @@ import Leant.Synth.Length.Integration
   , lengthAssessmentCandidates
   , lengthAssessmentFailure
   , lengthAssessmentModeActivationPolicy
+  , lengthAssessmentModeExecutableLaunchStrategy
   , lengthAssessmentPostVerificationResult
   , lengthAssessmentRanking
   , lengthAssessmentSpinePairPostVerificationResult
@@ -530,6 +535,7 @@ main = do
       , lengthRelationalPositiveAffineTests
       , lengthScopedUsableWorkBudgetTests
       , lengthStrictRelationalPositiveAffineTests
+      , lengthDescriptorBoundExecutableLaunchTests
       , replayPlanTests
       , providerProgramTests
       , candidateVerificationTests
@@ -9044,6 +9050,836 @@ assertLengthStrictRelationalPositiveAffineScopedRoutes = do
     lengthRankingFailureCleanupIncomplete failure @?= False
     assertFakeLengthQueryEvents [] [] =<<
       BS.readFile (executable ++ ".events")
+
+lengthDescriptorBoundExecutableLaunchTests :: TestTree
+lengthDescriptorBoundExecutableLaunchTests = testGroup
+  "descriptor-bound executable v17/v18 Length ranking"
+  [ testCase
+      "close the exact schema, launch literal, order, caps, and v19 sentinel"
+      assertLengthDescriptorBoundExecutableLaunchSchema
+  , testCase
+      "leave every v1-v16 execution object and launch classifier literal"
+      assertLengthDescriptorBoundExecutableLaunchCompatibility
+  , testCase
+      "preserve descriptor authority through policy and mode projections"
+      assertLengthDescriptorBoundExecutableLaunchPolicyProjections
+  , testCase
+      "finish deferred strict scalar and pair batches without a worker"
+      assertLengthDescriptorBoundExecutableLaunchPureRanking
+  , testCase
+      "match healthy scalar and pair behavior with compact live ordinals"
+      assertLengthDescriptorBoundExecutableLaunchHealthyParity
+  , testCase
+      "atomically reset pin, image, unsupported-platform, and session failures"
+      assertLengthDescriptorBoundExecutableLaunchFailures
+  , testCase
+      "retain scoped opener and query timeout ownership"
+      assertLengthDescriptorBoundExecutableLaunchScopedTimeouts
+  ]
+
+descriptorBoundExecutableLaunchLiteral :: String
+descriptorBoundExecutableLaunchLiteral = "descriptor-bound-executable-v1"
+
+appendJsonField
+  :: [String]
+  -> (String, Json.JValue)
+  -> Json.JValue
+  -> Json.JValue
+appendJsonField [] added (Json.JObj fields) = Json.JObj $ fields ++ [added]
+appendJsonField (field : remaining) added (Json.JObj fields) = Json.JObj
+  [ if name == field
+      then (name, appendJsonField remaining added value)
+      else (name, value)
+  | (name, value) <- fields
+  ]
+appendJsonField _ _ source = source
+
+descriptorBoundExecutableLaunchScalarDocument
+  :: FilePath
+  -> Integer
+  -> Json.JValue
+descriptorBoundExecutableLaunchScalarDocument executable milliseconds =
+  appendJsonField ["execution"]
+    ( "executableLaunch"
+    , Json.JStr descriptorBoundExecutableLaunchLiteral
+    )
+  $ setJsonField ["version"]
+      (Json.JInt $ toInteger
+        lengthRankingConfigurationFileDescriptorBoundExecutableLaunchVersion)
+  $ strictRelationalPositiveAffineScalarDocument executable milliseconds
+
+descriptorBoundExecutableLaunchPairDocument
+  :: FilePath
+  -> Integer
+  -> Json.JValue
+descriptorBoundExecutableLaunchPairDocument executable milliseconds =
+  appendJsonField ["execution"]
+    ( "executableLaunch"
+    , Json.JStr descriptorBoundExecutableLaunchLiteral
+    )
+  $ setJsonField ["version"]
+      (Json.JInt $ toInteger
+        lengthRankingConfigurationFileSpinePairDescriptorBoundExecutableLaunchVersion)
+  $ strictRelationalPositiveAffinePairDocument executable milliseconds
+
+expectDescriptorBoundExecutableLaunchPolicy
+  :: Json.JValue
+  -> IO (LengthRankingPolicy, LeanLengthContractSelection)
+expectDescriptorBoundExecutableLaunchPolicy document = do
+  disabled <- expectLengthAssessmentConfigurationFile document
+  expectLengthAssessmentConfigurationActivation
+    PermitUnpinnedExecutable disabled
+
+assertLengthDescriptorBoundExecutableLaunchSchema :: IO ()
+assertLengthDescriptorBoundExecutableLaunchSchema =
+  withTemporaryDirectory "leant-length-descriptor-schema" $ \root -> do
+    let executable = root </> "missing-z3"
+        scalar = descriptorBoundExecutableLaunchScalarDocument
+          executable 65000
+        pair = descriptorBoundExecutableLaunchPairDocument executable 65000
+        documents = [scalar, pair]
+        missing object field path document =
+          assertLengthAssessmentConfigurationFileError
+            (LengthRankingConfigurationMissingField object field)
+            $ deleteJsonField path document
+        wrongType field path expected document =
+          assertLengthAssessmentConfigurationFileError
+            (LengthRankingConfigurationFieldTypeMismatch field expected)
+            $ setJsonField path (Json.JBool False) document
+        reject field document =
+          assertLengthAssessmentConfigurationFileError
+            (LengthRankingConfigurationFieldValueRejected field) document
+        rootShape =
+          [ (LengthRankingConfigurationFormatField, "format")
+          , (LengthRankingConfigurationVersionField, "version")
+          , ( LengthRankingConfigurationExecutionAdmissionField
+            , "executionAdmission"
+            )
+          , (LengthRankingConfigurationExecutionField, "execution")
+          , (LengthRankingConfigurationEvaluationField, "evaluation")
+          , ( LengthRankingConfigurationInputBoxValidationField
+            , "inputBoxValidation"
+            )
+          , ( LengthRankingConfigurationCounterexampleProbeField
+            , "counterexampleProbe"
+            )
+          , ( LengthRankingConfigurationBoundedPositiveOrderingField
+            , "boundedPositiveOrdering"
+            )
+          , ( LengthRankingConfigurationApplicableDomainValidationField
+            , "applicableDomainValidation"
+            )
+          , ( LengthRankingConfigurationApplicableDomainOrderingField
+            , "applicableDomainOrdering"
+            )
+          , ( LengthRankingConfigurationCounterexampleSimplificationField
+            , "counterexampleSimplification"
+            )
+          , ( LengthRankingConfigurationLiveSessionOpeningField
+            , "liveSessionOpening"
+            )
+          , ( LengthRankingConfigurationUsableWorkBudgetField
+            , "usableWorkBudget"
+            )
+          , (LengthRankingConfigurationContractField, "contract")
+          ]
+        executionShape =
+          [ ( LengthRankingConfigurationExecutablePathField
+            , "executablePath"
+            )
+          , ( LengthRankingConfigurationExpectedExecutableSha256Field
+            , "expectedExecutableSha256"
+            )
+          , ( LengthRankingConfigurationSolverTimeoutMillisecondsField
+            , "solverTimeoutMilliseconds"
+            )
+          , ( LengthRankingConfigurationSolverResourceLimitField
+            , "solverResourceLimit"
+            )
+          , ( LengthRankingConfigurationHostDeadlineMillisecondsField
+            , "hostDeadlineMilliseconds"
+            )
+          , (LengthRankingConfigurationArtifactPolicyField, "artifactPolicy")
+          , (LengthRankingConfigurationResponseLimitsField, "responseLimits")
+          , ( LengthRankingConfigurationExecutableLaunchField
+            , "executableLaunch"
+            )
+          ]
+    lengthRankingConfigurationFileDescriptorBoundExecutableLaunchVersion
+      @?= 17
+    lengthRankingConfigurationFileSpinePairDescriptorBoundExecutableLaunchVersion
+      @?= 18
+    mapM_ (\document -> do
+        _ <- expectLengthAssessmentConfigurationFile document
+        _ <- expectLengthAssessmentConfigurationFile
+          $ reverseJsonObjectFields document
+        assertLengthRankingConfigurationFileError
+          LengthRankingConfigurationUnsupportedVersion document
+        mapM_ (\(field, name) -> missing
+            LengthRankingConfigurationRootObject field [name] document)
+          rootShape
+        assertLengthAssessmentConfigurationFileError
+          (LengthRankingConfigurationUnexpectedField
+            LengthRankingConfigurationRootObject)
+          $ addJsonField [] ("private-root", Json.JNull) document
+        assertLengthAssessmentConfigurationFileError
+          (LengthRankingConfigurationExpectedObject
+            LengthRankingConfigurationExecutionObject)
+          $ setJsonField ["execution"] Json.JNull document
+        assertLengthAssessmentConfigurationFileError
+          (LengthRankingConfigurationUnexpectedField
+            LengthRankingConfigurationExecutionObject)
+          $ addJsonField ["execution"] ("private-execution", Json.JNull)
+          $ deleteJsonField ["execution", "executableLaunch"] document
+        mapM_ (\(index, (field, _)) ->
+            assertLengthAssessmentConfigurationFileError
+              (LengthRankingConfigurationMissingField
+                LengthRankingConfigurationExecutionObject field)
+              $ foldr deleteJsonField document
+              $ map (\(_, laterName) -> ["execution", laterName])
+              $ drop index executionShape)
+          $ zip [0 :: Int ..] executionShape
+        wrongType LengthRankingConfigurationExecutableLaunchField
+          ["execution", "executableLaunch"]
+          LengthRankingConfigurationStringValue document
+        reject LengthRankingConfigurationExecutableLaunchField
+          $ setJsonField ["execution", "executableLaunch"]
+              (Json.JStr "descriptor-bound-executable-v2") document)
+      documents
+
+    (_, scalarSelection) <- expectDescriptorBoundExecutableLaunchPolicy scalar
+    case scalarSelection of
+      LeanLengthScalarContractSelection _ -> pure ()
+      LeanLengthSpinePairContractSelection _ -> assertFailure
+        "v17 selected the pair Length contract"
+    (_, pairSelection) <- expectDescriptorBoundExecutableLaunchPolicy pair
+    case pairSelection of
+      LeanLengthSpinePairContractSelection _ -> pure ()
+      LeanLengthScalarContractSelection _ -> assertFailure
+        "v18 selected the scalar Length contract"
+
+    assertDescriptorBoundExecutableLaunchCaps scalar
+    assertDescriptorBoundExecutableLaunchOrder scalar
+
+    let future = setJsonField ["version"] (Json.JInt 19)
+          $ addJsonField [] ("private-v19", Json.JNull) scalar
+    assertLengthAssessmentConfigurationFileError
+      LengthRankingConfigurationUnsupportedVersion future
+    assertLengthRankingConfigurationFileError
+      LengthRankingConfigurationUnsupportedVersion future
+
+assertDescriptorBoundExecutableLaunchCaps :: Json.JValue -> IO ()
+assertDescriptorBoundExecutableLaunchCaps base = do
+  let setInteger path value = setJsonField path $ Json.JInt value
+      direct path value = setInteger path value base
+      timeoutAt value = setInteger
+        ["execution", "solverTimeoutMilliseconds"] value
+        $ setInteger ["execution", "hostDeadlineMilliseconds"] 65000 base
+      cases =
+        [ ( LengthRankingConfigurationExecutablePathCharactersField
+          , 4096
+          , direct ["executionAdmission", "executablePathCharacters"]
+          )
+        , ( LengthRankingConfigurationPolicyFingerprintBytesField
+          , 262144
+          , direct ["executionAdmission", "policyFingerprintBytes"]
+          )
+        , ( LengthRankingConfigurationResponseBytesField
+          , 65536
+          , direct ["execution", "responseLimits", "bytes"]
+          )
+        , ( LengthRankingConfigurationResponseNestingDepthField
+          , 64
+          , direct ["execution", "responseLimits", "nestingDepth"]
+          )
+        , ( LengthRankingConfigurationResponseNodesField
+          , 4096
+          , direct ["execution", "responseLimits", "nodes"]
+          )
+        , ( LengthRankingConfigurationResponseTokenBytesField
+          , 4096
+          , direct ["execution", "responseLimits", "tokenBytes"]
+          )
+        , ( LengthRankingConfigurationResponseIntegerBitsField
+          , 4096
+          , direct ["execution", "responseLimits", "integerBits"]
+          )
+        , ( LengthRankingConfigurationSolverTimeoutMillisecondsField
+          , 60000
+          , timeoutAt
+          )
+        , ( LengthRankingConfigurationSolverResourceLimitField
+          , 10000000
+          , direct ["execution", "solverResourceLimit"]
+          )
+        , ( LengthRankingConfigurationHostDeadlineMillisecondsField
+          , 65000
+          , direct ["execution", "hostDeadlineMilliseconds"]
+          )
+        , ( LengthRankingConfigurationAssignmentValueBitsField
+          , 4096
+          , direct ["evaluation", "assignmentValueBits"]
+          )
+        , ( LengthRankingConfigurationIntermediateValueBitsField
+          , 4096
+          , direct ["evaluation", "intermediateValueBits"]
+          )
+        , ( LengthRankingConfigurationInputBoxMaximumAssignmentsField
+          , 65536
+          , direct ["inputBoxValidation", "maximumAssignments"]
+          )
+        , ( LengthRankingConfigurationApplicableDomainMaximumInputsField
+          , 8
+          , direct ["applicableDomainValidation", "maximumInputs"]
+          )
+        , ( LengthRankingConfigurationApplicableDomainMaximumAssignmentsField
+          , 65536
+          , direct ["applicableDomainValidation", "maximumAssignments"]
+          )
+        , ( LengthRankingConfigurationCounterexampleSimplificationMaximumInputsField
+          , 8
+          , direct ["counterexampleSimplification", "maximumInputs"]
+          )
+        , ( LengthRankingConfigurationCounterexampleSimplificationMaximumAssignmentsField
+          , 65536
+          , direct ["counterexampleSimplification", "maximumAssignments"]
+          )
+        , ( LengthRankingConfigurationUsableWorkBudgetMillisecondsField
+          , 65000
+          , direct ["usableWorkBudget", "milliseconds"]
+          )
+        ]
+  mapM_ (\(field, maximumValue, documentAt) -> do
+      _ <- expectLengthAssessmentConfigurationFile
+        $ documentAt maximumValue
+      assertLengthAssessmentConfigurationFileError
+        (LengthRankingConfigurationPolicyLimitExceeded field
+          (fromInteger maximumValue) (fromInteger maximumValue + 1))
+        $ documentAt $ maximumValue + 1)
+    cases
+  _ <- expectLengthAssessmentConfigurationFile
+    $ setJsonField ["inputBoxValidation", "inclusiveInputMaximums"]
+        (Json.JArr $ replicate 8 $ Json.JInt 0) base
+  assertLengthAssessmentConfigurationFileError
+    (LengthRankingConfigurationPolicyLimitExceeded
+      LengthRankingConfigurationInputBoxInclusiveMaximumsField 8 9)
+    $ setJsonField ["inputBoxValidation", "inclusiveInputMaximums"]
+        (Json.JArr $ replicate 9 $ Json.JInt 0) base
+
+assertDescriptorBoundExecutableLaunchOrder :: Json.JValue -> IO ()
+assertDescriptorBoundExecutableLaunchOrder base = do
+  let badAdmission = setJsonField
+        ["executionAdmission", "executablePathCharacters"] (Json.JInt (-1))
+      badResponse = setJsonField
+        ["execution", "responseLimits", "nestingDepth"] (Json.JInt (-1))
+      badPath = setJsonField ["execution", "executablePath"]
+        $ Json.JBool False
+      badSemanticPath = setJsonField ["execution", "executablePath"]
+        $ Json.JStr "relative-z3"
+      badDigest = setJsonField ["execution", "expectedExecutableSha256"]
+        $ Json.JStr $ replicate 64 'A'
+      badTimeout = setJsonField
+        ["execution", "solverTimeoutMilliseconds"] (Json.JInt 60001)
+      badResource = setJsonField ["execution", "solverResourceLimit"]
+        $ Json.JInt 10000001
+      badDeadline = setJsonField
+        ["execution", "hostDeadlineMilliseconds"] (Json.JInt 65001)
+      badArtifact = setJsonField ["execution", "artifactPolicy"]
+        $ Json.JStr "private-artifact"
+      badLaunch = setJsonField ["execution", "executableLaunch"]
+        $ Json.JStr "private-launch"
+      badEvaluation = setJsonField ["evaluation", "assignmentValueBits"]
+        $ Json.JInt (-1)
+      badInputBox = setJsonField
+        ["inputBoxValidation", "maximumAssignments"] (Json.JInt (-1))
+      badProbe = setJsonField ["counterexampleProbe"]
+        $ Json.JStr "private-probe"
+      badBoundedOrdering = setJsonField ["boundedPositiveOrdering"]
+        $ Json.JStr "private-bounded-order"
+      badApplicable = setJsonField
+        ["applicableDomainValidation", "strategy"]
+        $ Json.JStr "private-applicable"
+      badApplicableOrdering = setJsonField ["applicableDomainOrdering"]
+        $ Json.JStr "private-applicable-order"
+      badSimplification = setJsonField
+        ["counterexampleSimplification", "strategy"]
+        $ Json.JStr "private-simplification"
+      badOpening = setJsonField ["liveSessionOpening"]
+        $ Json.JStr "private-opening"
+      badBudget = setJsonField ["usableWorkBudget", "strategy"]
+        $ Json.JStr "private-budget"
+      badContract = setJsonField ["contract", "precondition"]
+        $ Json.JArr [Json.JStr "private-formula"]
+      reject expected document =
+        assertLengthAssessmentConfigurationFileError expected document
+      afterAdmission = badResponse $ badPath $ badDigest $ badTimeout
+        $ badResource $ badDeadline $ badArtifact $ badLaunch
+        $ badEvaluation $ badInputBox $ badProbe $ badBoundedOrdering
+        $ badApplicable $ badApplicableOrdering $ badSimplification
+        $ badOpening $ badBudget $ badContract base
+  reject
+    (LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationExecutablePathCharactersField)
+    $ badAdmission afterAdmission
+  reject
+    (LengthRankingConfigurationResponseLimitsRejected
+      $ Djex.NegativeLengthSMTLibResponseLimit
+          Djex.LengthSMTLibResponseNestingDepth (-1))
+    afterAdmission
+  reject
+    (LengthRankingConfigurationFieldTypeMismatch
+      LengthRankingConfigurationExecutablePathField
+      LengthRankingConfigurationStringValue)
+    $ badPath $ badDigest $ badTimeout $ badResource $ badDeadline
+    $ badArtifact $ badLaunch $ badEvaluation $ badInputBox $ badProbe
+    $ badBoundedOrdering $ badApplicable $ badApplicableOrdering
+    $ badSimplification $ badOpening $ badBudget $ badContract base
+  reject
+    (LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationExpectedExecutableSha256Field)
+    $ badDigest $ badTimeout $ badResource $ badDeadline $ badArtifact
+    $ badLaunch $ badEvaluation $ badInputBox $ badProbe
+    $ badBoundedOrdering $ badApplicable $ badApplicableOrdering
+    $ badSimplification $ badOpening $ badBudget $ badContract base
+  reject
+    (LengthRankingConfigurationPolicyLimitExceeded
+      LengthRankingConfigurationSolverTimeoutMillisecondsField 60000 60001)
+    $ badTimeout $ badResource $ badDeadline $ badArtifact $ badLaunch
+    $ badEvaluation $ badInputBox $ badProbe $ badBoundedOrdering
+    $ badApplicable $ badApplicableOrdering $ badSimplification
+    $ badOpening $ badBudget $ badContract base
+  reject
+    (LengthRankingConfigurationPolicyLimitExceeded
+      LengthRankingConfigurationSolverResourceLimitField 10000000 10000001)
+    $ badResource $ badDeadline $ badArtifact $ badLaunch $ badEvaluation
+    $ badInputBox $ badProbe $ badBoundedOrdering $ badApplicable
+    $ badApplicableOrdering $ badSimplification $ badOpening $ badBudget
+    $ badContract base
+  reject
+    (LengthRankingConfigurationPolicyLimitExceeded
+      LengthRankingConfigurationHostDeadlineMillisecondsField 65000 65001)
+    $ badDeadline $ badArtifact $ badLaunch $ badEvaluation $ badInputBox
+    $ badProbe $ badBoundedOrdering $ badApplicable $ badApplicableOrdering
+    $ badSimplification $ badOpening $ badBudget $ badContract base
+  reject
+    (LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationArtifactPolicyField)
+    $ badArtifact $ badLaunch $ badEvaluation $ badInputBox $ badProbe
+    $ badBoundedOrdering $ badApplicable $ badApplicableOrdering
+    $ badSimplification $ badOpening $ badBudget $ badContract base
+  reject
+    (LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationExecutableLaunchField)
+    $ badLaunch $ badEvaluation $ badInputBox $ badProbe
+    $ badBoundedOrdering $ badApplicable $ badApplicableOrdering
+    $ badSimplification $ badOpening $ badBudget $ badContract base
+  reject
+    (LengthRankingConfigurationExecutionRejected
+      Djex.LengthSMTLibExecutionExecutablePathNotAbsolute)
+    $ badSemanticPath $ badEvaluation $ badInputBox $ badProbe
+    $ badBoundedOrdering $ badApplicable $ badApplicableOrdering
+    $ badSimplification $ badOpening $ badBudget $ badContract base
+  reject
+    (LengthRankingConfigurationEvaluationRejected
+      $ Djex.NegativeLengthEvaluationLimit
+          Djex.LengthAssignmentValueBits (-1))
+    $ badEvaluation $ badInputBox $ badProbe $ badBoundedOrdering
+    $ badApplicable $ badApplicableOrdering $ badSimplification
+    $ badOpening $ badBudget $ badContract base
+  reject
+    (LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationInputBoxMaximumAssignmentsField)
+    $ badInputBox $ badProbe $ badBoundedOrdering $ badApplicable
+    $ badApplicableOrdering $ badSimplification $ badOpening $ badBudget
+    $ badContract base
+  reject
+    (LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationCounterexampleProbeField)
+    $ badProbe $ badBoundedOrdering $ badApplicable
+    $ badApplicableOrdering $ badSimplification $ badOpening $ badBudget
+    $ badContract base
+  reject
+    (LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationBoundedPositiveOrderingField)
+    $ badBoundedOrdering $ badApplicable $ badApplicableOrdering
+    $ badSimplification $ badOpening $ badBudget $ badContract base
+  reject
+    (LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationApplicableDomainStrategyField)
+    $ badApplicable $ badApplicableOrdering $ badSimplification
+    $ badOpening $ badBudget $ badContract base
+  reject
+    (LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationApplicableDomainOrderingField)
+    $ badApplicableOrdering $ badSimplification $ badOpening $ badBudget
+    $ badContract base
+  reject
+    (LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationCounterexampleSimplificationStrategyField)
+    $ badSimplification $ badOpening $ badBudget $ badContract base
+  reject
+    (LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationLiveSessionOpeningField)
+    $ badOpening $ badBudget $ badContract base
+  reject
+    (LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationUsableWorkBudgetStrategyField)
+    $ badBudget $ badContract base
+  reject
+    (LengthRankingConfigurationSyntaxRejected
+      LengthRankingConfigurationPreconditionSyntax
+      LengthRankingConfigurationUnknownTag)
+    $ badContract base
+
+assertLengthDescriptorBoundExecutableLaunchCompatibility :: IO ()
+assertLengthDescriptorBoundExecutableLaunchCompatibility =
+  withTemporaryDirectory "leant-length-descriptor-legacy" $ \root -> do
+    let executable = root </> "missing-z3"
+        v1 = lengthRankingConfigurationFileFixture executable Nothing
+        v2 = lengthRankingConfigurationFileInputBoxFixture
+          executable Nothing [1] 2
+        v3 = lengthRankingConfigurationFileOriginProbeFixture
+          executable Nothing [1] 2
+        v4 = lengthAssessmentConfigurationFileSpinePairFixture
+          executable Nothing [1] 2 positiveAffinePairContractValue
+        v5 = lengthAssessmentConfigurationFilePositiveOrderingFixture
+          executable Nothing [1] 2 positiveAffineScalarContractValue
+        v6 = lengthAssessmentConfigurationFileSpinePairPositiveOrderingFixture
+          executable Nothing [1] 2 positiveAffinePairContractValue
+        v7 = positiveAffineScalarDocument executable
+        v8 = positiveAffinePairDocument executable
+        v9 = usableWorkBudgetScalarDocument executable 1000
+        v10 = usableWorkBudgetPairDocument executable 1000
+        v11 = relationalPositiveAffineScalarDocument executable
+        v12 = relationalPositiveAffinePairDocument executable
+        v13 = scopedUsableWorkBudgetScalarDocument executable 1000
+        v14 = scopedUsableWorkBudgetPairDocument executable 1000
+        v15 = strictRelationalPositiveAffineScalarDocument executable 1000
+        v16 = strictRelationalPositiveAffinePairDocument executable 1000
+        legacy =
+          [ v1, v2, v3, v4, v5, v6, v7, v8
+          , v9, v10, v11, v12, v13, v14, v15, v16
+          ]
+        inject = appendJsonField ["execution"]
+          ( "executableLaunch"
+          , Json.JStr descriptorBoundExecutableLaunchLiteral
+          )
+        unexpected = LengthRankingConfigurationUnexpectedField
+          LengthRankingConfigurationExecutionObject
+    mapM_ (\document -> do
+        (policy, _) <- expectStrictOrLegacyPolicy document
+        lengthRankingPolicyExecutableLaunchStrategy policy @?=
+          Djex.LengthSMTLibPathSnapshotThenDirectSpawn
+        assertLengthAssessmentConfigurationFileError unexpected
+          $ inject document)
+      legacy
+    mapM_ (\document -> do
+        (policy, _) <- expectDescriptorBoundExecutableLaunchPolicy document
+        lengthRankingPolicyExecutableLaunchStrategy policy @?=
+          Djex.LengthSMTLibDescriptorBoundExecutableLaunch)
+      [ descriptorBoundExecutableLaunchScalarDocument executable 1000
+      , descriptorBoundExecutableLaunchPairDocument executable 1000
+      ]
+ where
+  expectStrictOrLegacyPolicy document = do
+    disabled <- expectLengthAssessmentConfigurationFile document
+    expectLengthAssessmentConfigurationActivation
+      PermitUnpinnedExecutable disabled
+
+assertLengthDescriptorBoundExecutableLaunchPolicyProjections :: IO ()
+assertLengthDescriptorBoundExecutableLaunchPolicyProjections =
+  withTemporaryDirectory "leant-length-descriptor-policy" $ \root -> do
+    let executable = root </> "missing-z3"
+        executionSource = explicitLengthRankingExecutionSource executable
+          Nothing Djex.LengthSMTLibStatusOnly
+        source = explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits executionSource
+          Djex.defaultLengthEvaluationLimitSource
+    legacy <- expectRight $ mkLengthRankingPolicy source
+    descriptor <- expectRight
+      $ mkLengthRankingPolicyWithDescriptorBoundExecutableLaunch source
+    lengthRankingPolicyExecutableLaunchStrategy legacy @?=
+      Djex.LengthSMTLibPathSnapshotThenDirectSpawn
+    lengthRankingPolicyExecutableLaunchStrategy descriptor @?=
+      Djex.LengthSMTLibDescriptorBoundExecutableLaunch
+    lengthRankingPolicyExecutableDigestExpectation descriptor @?=
+      Djex.LengthSMTLibExecutableDigestExpectationAbsent
+
+    descriptorExecution <- expectRight
+      $ Djex.mkLengthSMTLibDescriptorBoundExecutionConfig
+          Djex.defaultLengthSMTLibExecutionLimits executionSource
+    evaluation <- expectRight $ Djex.mkLengthEvaluationLimits
+      Djex.defaultLengthEvaluationLimitSource
+    let bridged = lengthRankingPolicyFromValidatedComponents
+          descriptorExecution evaluation
+    lengthRankingPolicyExecutableLaunchStrategy bridged @?=
+      Djex.LengthSMTLibDescriptorBoundExecutableLaunch
+
+    let invalidSource = explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits
+          (explicitLengthRankingExecutionSource "relative-z3" Nothing
+            Djex.LengthSMTLibStatusOnly)
+          (error "descriptor policy forced evaluation after execution failure")
+    case mkLengthRankingPolicyWithDescriptorBoundExecutableLaunch
+        invalidSource of
+      Left (LengthRankingExecutionConfigurationRejected
+          Djex.LengthSMTLibExecutionExecutablePathNotAbsolute) -> pure ()
+      Left failure -> assertFailure
+        $ "descriptor policy changed execution failure: " ++ show failure
+      Right _ -> assertFailure
+        "descriptor policy accepted a relative executable path"
+
+    let poisoned = disableLengthRankingConfiguration descriptor
+          (error "descriptor projection forced the passive contract")
+    activated <- case activateLengthRankingConfiguration
+        PermitUnpinnedExecutable poisoned of
+      Left failure -> assertFailure
+        ("descriptor policy activation failed: " ++ show failure)
+          >> error "unreachable"
+      Right retained -> pure retained
+    lengthRankingPolicyExecutableLaunchStrategy (fst activated) @?=
+      Djex.LengthSMTLibDescriptorBoundExecutableLaunch
+
+    lengthAssessmentModeExecutableLaunchStrategy
+      disabledLengthAssessmentMode @?= Nothing
+    let sourcePath = root </> "descriptor-assessment.json"
+        document = descriptorBoundExecutableLaunchScalarDocument
+          executable 2000
+    ByteString.writeFile sourcePath
+      $ encodeLengthRankingConfigurationFile document
+    loaded <- loadLengthAssessmentMode PermitUnpinnedExecutable
+      $ LengthRankingConfigurationFileSource sourcePath 1000
+    mode <- case loaded of
+      Left failure -> assertFailure
+        ("descriptor assessment setup failed: " ++ show failure)
+          >> error "unreachable"
+      Right configured -> pure configured
+    lengthAssessmentModeActivationPolicy mode @?=
+      Just PermitUnpinnedExecutable
+    lengthAssessmentModeExecutableLaunchStrategy mode @?=
+      Just Djex.LengthSMTLibDescriptorBoundExecutableLaunch
+    doesFileExist (executable ++ ".events") >>= (@?= False)
+
+assertLengthDescriptorBoundExecutableLaunchPureRanking :: IO ()
+assertLengthDescriptorBoundExecutableLaunchPureRanking = do
+  identity <- buildOneInputLengthRankingCandidate
+  (pairCandidate, _) <- buildLengthSpinePairRankingFixture
+  let scalarContract = strictRelationalPositiveAffineScalarContract
+        $ LengthTruth True
+      pairContract = strictRelationalPositiveAffinePairContract
+        $ LengthTruth True
+  withFakeLengthSolver "healthy" $ \executable -> do
+    (scalarPolicy, _) <- expectDescriptorBoundExecutableLaunchPolicy
+      $ withStrictApplicableDomainAssignmentLimit 5
+      $ descriptorBoundExecutableLaunchScalarDocument executable 2000
+    scalar <- expectLengthRankingWithin
+      "v17 descriptor deferred pure scalar"
+      $ rankVerifiedLengthCandidatesWithPolicy scalarPolicy scalarContract
+          [identity, identity]
+    lengthRankingFailure scalar @?= Nothing
+    case map rankedLengthCandidateAssessment
+        $ lengthRankingCandidates scalar of
+      [ StrictRelationalPositiveAffineApplicableDomainEstablished _
+        , StrictRelationalPositiveAffineApplicableDomainEstablished _
+        ] -> pure ()
+      assessments -> assertFailure
+        $ "v17 descriptor pure scalar opened or lost strict evidence: "
+            ++ show assessments
+    doesFileExist (executable ++ ".events") >>= (@?= False)
+
+    (pairPolicy, _) <- expectDescriptorBoundExecutableLaunchPolicy
+      $ withStrictApplicableDomainAssignmentLimit 3
+      $ descriptorBoundExecutableLaunchPairDocument executable 2000
+    pair <- expectRight =<<
+      rankVerifiedLengthSpinePairCandidatesWithPolicy pairPolicy pairContract
+        [pairCandidate, pairCandidate]
+    lengthSpinePairRankingFailure pair @?= Nothing
+    case map rankedLengthSpinePairCandidateAssessment
+        $ lengthSpinePairRankingCandidates pair of
+      [ LengthSpinePairStrictRelationalPositiveAffineApplicableDomainEstablished _
+        , LengthSpinePairStrictRelationalPositiveAffineApplicableDomainEstablished _
+        ] -> pure ()
+      assessments -> assertFailure
+        $ "v18 descriptor pure pair opened or lost strict evidence: "
+            ++ show assessments
+    doesFileExist (executable ++ ".events") >>= (@?= False)
+
+assertLengthDescriptorBoundExecutableLaunchHealthyParity :: IO ()
+assertLengthDescriptorBoundExecutableLaunchHealthyParity
+  | os /= "linux" = pure ()
+  | otherwise = do
+      identity <- buildOneInputLengthRankingCandidate
+      (_, pairCandidate) <- buildLengthSpinePairRankingFixture
+      scalarRefused <- syntheticLengthRankingCandidate
+        "descriptor-live-scalar-refused"
+      pairRefused <- syntheticLengthRankingCandidate
+        "descriptor-live-pair-refused"
+      let scalarCandidates =
+            [scalarRefused, identity, scalarRefused, identity]
+          pairCandidates =
+            [pairRefused, pairCandidate, pairRefused, pairCandidate]
+      withFakeLengthSolver "healthy" $ \executable -> do
+        (legacyScalarPolicy, _) <- expectStrictRelationalPositiveAffinePolicy
+          $ strictRelationalPositiveAffineScalarDocument executable 2000
+        legacyScalar <- expectLengthRankingWithin
+          "v15 direct-spawn scalar parity control"
+          $ rankVerifiedLengthCandidatesWithPolicy legacyScalarPolicy
+              usableWorkScalarLiveContract scalarCandidates
+        (descriptorScalarPolicy, _) <-
+          expectDescriptorBoundExecutableLaunchPolicy
+            $ descriptorBoundExecutableLaunchScalarDocument executable 2000
+        descriptorScalar <- expectLengthRankingWithin
+          "v17 descriptor scalar parity"
+          $ rankVerifiedLengthCandidatesWithPolicy descriptorScalarPolicy
+              usableWorkScalarLiveContract scalarCandidates
+        assertLengthRankingsEquivalent legacyScalar descriptorScalar
+        map rankedLengthCandidateAssessment
+            (lengthRankingCandidates descriptorScalar) @?=
+          [ Unassessed
+          , Heuristic Djex.SolverSatisfiable
+          , Unassessed
+          , Heuristic Djex.SolverSatisfiable
+          ]
+        assertFakeLengthQueryEvents [0, 1] [] =<<
+          BS.readFile (executable ++ ".events")
+
+        (legacyPairPolicy, _) <- expectStrictRelationalPositiveAffinePolicy
+          $ strictRelationalPositiveAffinePairDocument executable 2000
+        legacyPair <- expectRight =<<
+          rankVerifiedLengthSpinePairCandidatesWithPolicy legacyPairPolicy
+            usableWorkPairLiveContract pairCandidates
+        (descriptorPairPolicy, _) <-
+          expectDescriptorBoundExecutableLaunchPolicy
+            $ descriptorBoundExecutableLaunchPairDocument executable 2000
+        descriptorPair <- expectRight =<<
+          rankVerifiedLengthSpinePairCandidatesWithPolicy descriptorPairPolicy
+            usableWorkPairLiveContract pairCandidates
+        lengthSpinePairRankingSnapshotByOriginalIndex descriptorPair @?=
+          lengthSpinePairRankingSnapshotByOriginalIndex legacyPair
+        lengthSpinePairRankingFailure descriptorPair @?=
+          lengthSpinePairRankingFailure legacyPair
+        map rankedLengthSpinePairCandidateAssessment
+            (lengthSpinePairRankingCandidates descriptorPair) @?=
+          [ LengthSpinePairUnassessed
+          , LengthSpinePairHeuristic Djex.SolverSatisfiable
+          , LengthSpinePairUnassessed
+          , LengthSpinePairHeuristic Djex.SolverSatisfiable
+          ]
+        assertFakeLengthQueryEvents [0, 1] [] =<<
+          BS.readFile (executable ++ ".events")
+
+assertLengthDescriptorBoundExecutableLaunchFailures :: IO ()
+assertLengthDescriptorBoundExecutableLaunchFailures = do
+  identity <- buildOneInputLengthRankingCandidate
+  (_, pairCandidate) <- buildLengthSpinePairRankingFixture
+  let scalarCandidates = [identity, identity]
+      pairCandidates = [pairCandidate, pairCandidate]
+      runScalar label expected policy = do
+        ranking <- expectLengthRankingWithin label
+          $ rankVerifiedLengthCandidatesWithPolicy policy
+              usableWorkScalarLiveContract scalarCandidates
+        rankedLengthVerifiedCandidates ranking @?= scalarCandidates
+        map rankedLengthCandidateAssessment
+            (lengthRankingCandidates ranking) @?=
+          replicate (length scalarCandidates) Unassessed
+        failure <- case lengthRankingFailure ranking of
+          Nothing -> assertFailure (label ++ " retained no atomic failure")
+            >> error "unreachable"
+          Just retained -> pure retained
+        lengthRankingFailureClass failure @?=
+          LengthRankingLiveSessionFailed expected
+        lengthRankingFailureOriginalIndex failure @?= Nothing
+        lengthRankingFailureCleanupIncomplete failure @?= False
+      runPair _label expected policy = do
+        ranking <- expectRight =<<
+          rankVerifiedLengthSpinePairCandidatesWithPolicy policy
+            usableWorkPairLiveContract pairCandidates
+        assertLengthSpinePairAtomicReset pairCandidates ranking
+          $ replicate (length pairCandidates) Nothing
+        failure <- expectLengthSpinePairRankingFailure ranking
+        lengthSpinePairRankingFailureClass failure @?=
+          LengthSpinePairRankingLiveSessionFailed expected
+        lengthSpinePairRankingFailureOriginalIndex failure @?= Nothing
+        lengthSpinePairRankingFailureCleanupIncomplete failure @?= False
+
+  if os == "linux"
+    then do
+      withFakeLengthSolver "healthy" $ \executable -> do
+        let pinned = setJsonField
+              ["execution", "expectedExecutableSha256"]
+              (Json.JStr $ replicate 64 '0')
+              $ descriptorBoundExecutableLaunchScalarDocument
+                  executable 2000
+        disabled <- expectLengthAssessmentConfigurationFile pinned
+        (policy, _) <- expectLengthAssessmentConfigurationActivation
+          RequirePinnedExecutable disabled
+        runScalar "v17 descriptor pin mismatch"
+          Djex.LengthSMTLibLiveSessionExecutableRejected policy
+        doesFileExist (executable ++ ".events") >>= (@?= False)
+
+      withTemporaryDirectory "leant-length-descriptor-invalid-image"
+        $ \root -> do
+          let executable = root </> "invalid-z3-image"
+          ByteString.writeFile executable $ BS.pack "not an executable image"
+          permissions <- getPermissions executable
+          setPermissions executable $ setOwnerExecutable True permissions
+          (policy, _) <- expectDescriptorBoundExecutableLaunchPolicy
+            $ descriptorBoundExecutableLaunchPairDocument executable 2000
+          runPair "v18 descriptor invalid image"
+            Djex.LengthSMTLibLiveSessionLaunchFailed policy
+
+      withFakeLengthSolver "wrong-echo" $ \executable -> do
+        (scalarPolicy, _) <- expectDescriptorBoundExecutableLaunchPolicy
+          $ descriptorBoundExecutableLaunchScalarDocument executable 2000
+        runScalar "v17 descriptor capability failure"
+          Djex.LengthSMTLibLiveSessionCapabilityRejected scalarPolicy
+        assertFakeLengthQueryEvents [] [] =<<
+          BS.readFile (executable ++ ".events")
+
+        (pairPolicy, _) <- expectDescriptorBoundExecutableLaunchPolicy
+          $ descriptorBoundExecutableLaunchPairDocument executable 2000
+        runPair "v18 descriptor capability failure"
+          Djex.LengthSMTLibLiveSessionCapabilityRejected pairPolicy
+        assertFakeLengthQueryEvents [] [] =<<
+          BS.readFile (executable ++ ".events")
+    else withTemporaryDirectory "leant-length-descriptor-unsupported"
+      $ \root -> do
+        (policy, _) <- expectDescriptorBoundExecutableLaunchPolicy
+          $ descriptorBoundExecutableLaunchScalarDocument
+              (root </> "never-opened-z3") 2000
+        runScalar "unsupported descriptor launcher"
+          Djex.LengthSMTLibLiveSessionLaunchFailed policy
+
+assertLengthDescriptorBoundExecutableLaunchScopedTimeouts :: IO ()
+assertLengthDescriptorBoundExecutableLaunchScopedTimeouts
+  | os /= "linux" = pure ()
+  | otherwise = do
+      identity <- buildOneInputLengthRankingCandidate
+      (_, pairCandidate) <- buildLengthSpinePairRankingFixture
+      withFakeLengthSolver "hang" $ \executable -> do
+        (policy, _) <- expectDescriptorBoundExecutableLaunchPolicy
+          $ descriptorBoundExecutableLaunchScalarDocument executable 400
+        ranking <- expectLengthRankingWithin
+          "v17 descriptor scoped opener timeout"
+          $ rankVerifiedLengthCandidatesWithPolicy policy
+              usableWorkScalarLiveContract [identity]
+        assertScalarUsableWorkExpiry "v17 descriptor scoped opener" ranking
+        events <- BS.readFile $ executable ++ ".events"
+        assertFakeLengthQueryEvents [] [] events
+        assertBool "v17 descriptor timeout did not reach the hanging image"
+          $ BS.pack "EVENT hang " `BS.isInfixOf` events
+
+      withFakeLengthSolver "query-hang-status" $ \executable -> do
+        (policy, _) <- expectDescriptorBoundExecutableLaunchPolicy
+          $ descriptorBoundExecutableLaunchPairDocument executable 600
+        ranking <- expectRight =<<
+          rankVerifiedLengthSpinePairCandidatesWithPolicy policy
+            usableWorkPairLiveContract [pairCandidate]
+        assertPairUsableWorkExpiry "v18 descriptor scoped query" ranking
+        events <- BS.readFile $ executable ++ ".events"
+        assertFakeLengthQueryEvents [0] [] events
+        assertBool "v18 descriptor query did not expire in status phase"
+          $ BS.pack "EVENT query-hang " `BS.isInfixOf` events
 
 lengthRankingTests :: TestTree
 lengthRankingTests = testGroup "checked Length behavioral ranking"
