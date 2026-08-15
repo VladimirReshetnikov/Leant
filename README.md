@@ -129,7 +129,7 @@ session environment; `#`-commands pass straight through.
 
 Finite-list-spine Length counterexample ranking is disabled by default. To opt
 in, pass `--length-ranking-config` with an explicitly chosen absolute path to
-a version-1 through version-12 configuration file. Versions 1--3 select scalar
+a version-1 through version-14 configuration file. Versions 1--3 select scalar
 finite-list-spine Length ranking. Version 1 preserves the established
 counterexample-only behavior. Version 2 additionally requires an explicit
 per-input finite box and enables independent bounded validation after a live
@@ -160,9 +160,15 @@ is its nominal product sibling. They branch from the exact v7/v8 operational
 root, replace only the applicable-domain strategy with
 `"relational-positive-affine-v1"`, and deliberately have no
 `"usableWorkBudget"` field. Their deferred live lifecycle therefore retains
-the historical separate opener/finalizer and fresh per-query deadlines. Version
-numbers are closed schema selections rather than cumulative feature levels;
-versions 1--10 remain literal.
+the historical separate opener/finalizer and fresh per-query deadlines.
+Version 13 is the scalar scoped-usable-work successor and version 14 is its
+nominal product sibling. They retain v11/v12's relational validator, restore
+the exact v9/v10 root field set, and require
+`"scoped-checkpointed-shared-usable-work-deadline-v2"`. This additive owner is
+valid only on its creating thread and within its callback's dynamic extent,
+and Leant cooperatively checks its one absolute deadline between bounded
+candidate phases. Version numbers are closed schema selections rather than
+cumulative feature levels; versions 1--12 remain literal.
 Leant admits and reads that file
 once at startup, requires the configuration to contain an executable SHA-256
 expectation by default, and retains the decoded contract selection as a fixed
@@ -174,7 +180,7 @@ an eligible batch later opens a worker.
 budget (default 5,000 ms, maximum 60,000 ms). No option discovers a file or
 solver. POSIX descriptor acquisition is implemented; Windows currently fails
 closed. Versions 1--6 and the established direct runners open one fresh lexical
-solver worker for every eligible batch. Versions 7--12 instead complete all
+solver worker for every eligible batch. Versions 7--14 instead complete all
 admission and preparation, then run each candidate's pure MRU, selected
 positive-affine domain, and origin prefix before IO: an all-pure batch opens no
 process, while
@@ -182,8 +188,10 @@ the first live miss opens one lexical session for that query and the remaining
 suffix. V9/v10 additionally capture one shared usable-work deadline after the
 64-candidate admission gate and before full preparation, so deferred pure work,
 opening, and every live query consume one window instead of receiving a fresh
-batch allowance per query. Any structured failure preserves callback order
-through the established atomic fallback.
+batch allowance per query. V13/v14 capture the corresponding dynamically scoped
+v2 owner at the same boundary and add cooperative checkpoints after preparation,
+each complete candidate chain, and result materialization. Any structured
+failure preserves callback order through the established atomic fallback.
 The opaque activated mode retains the exact require-pin or permit-unpinned
 decision that released it, and Main derives its startup notice from that mode
 rather than reinterpreting the raw command-line flag.
@@ -569,9 +577,9 @@ Presentation uses
 Those notes describe bounded, model/provider-relative evidence; selecting the
 policy itself produces no evidence or pruning authority.
 
-The shared usable-work policy is a further orthogonal programmatic opt-in. Its
-builder accepts only an already validated opaque Djex budget and works for both
-the scalar and nominal product assessors:
+The runtime-unscoped v1 shared usable-work policy is a further orthogonal
+programmatic opt-in. Its builder accepts only an already validated opaque Djex
+budget and works for both the scalar and nominal product assessors:
 
 ```haskell
 usableWorkBudget <- either (fail . show) pure $
@@ -590,12 +598,19 @@ pairAssessment <- assessVerifiedLengthSpinePairCandidatesWithPolicy
   budgetedAdvancedPolicy pairPositiveAffineContract verificationBatch
 ```
 
-Leant first productively admits at most 64 candidates, then enters Djex's
-rank-N deadline owner before forcing complete preparation and the deferred pure
-prefix. An all-pure batch opens no worker but still reaches the owner's normal-
-return expiry check. A live miss opens the one session beneath the same token;
-opening, serial-gate waiting, scalar or pair transactions, independent replay,
-and run-identity work use the minimum of that shared absolute deadline and the
+`enableLengthRankingUsableWorkBudget` deliberately retains Djex's established
+v1 owner. Its rank-N phantom separates independently captured tokens at the type
+level, but does not enforce a dynamic non-escape boundary; v1 is retained for
+source, runtime, and identity compatibility. Leant does not expose that token,
+yet callers choosing this builder should understand which underlying policy it
+selects.
+
+Leant first productively admits at most 64 candidates, then enters that v1
+deadline owner before forcing complete preparation and the deferred pure prefix.
+An all-pure batch opens no worker but still reaches the owner's normal-return
+expiry check. A live miss opens the one session beneath the same token; opening,
+serial-gate waiting, scalar or pair transactions, independent replay, and run-
+identity work use the minimum of that shared absolute deadline and the
 established fresh local deadline, with the shared deadline winning a tie.
 
 This is a usable-work boundary rather than an asynchronous watchdog. It does
@@ -616,6 +631,68 @@ authority. The budgeted Djex ready-worker and nominal scalar/product query-run
 identities bind the shared selection and effective deadline cause; v1--v8 and
 startup v11/v12 keep the unbudgeted worker/run identities. See the
 [shared usable-work Length ranking report](docs/reports/2026-08-15-shared-usable-work-length-ranking.md).
+
+New code can instead select Djex's owner-thread-affine, dynamically scoped v2
+lease. The duration value is shared with v1, but the policy builder and runtime
+strategy are distinct:
+
+```haskell
+let scopedRelationalPolicy =
+      enableLengthRankingScopedUsableWorkBudget
+        usableWorkBudget relationalPolicy
+
+scalarAssessment <- assessVerifiedLengthCandidatesWithPolicy
+  scopedRelationalPolicy scalarRelationalContract verificationBatch
+
+pairAssessment <- assessVerifiedLengthSpinePairCandidatesWithPolicy
+  scopedRelationalPolicy pairRelationalContract verificationBatch
+```
+
+`enableLengthRankingScopedUsableWorkBudget` is pure: it reads no clock, opens no
+worker, and grants no evidence. Applying either budget builder again is last-
+wins across v1 and v2 while every non-budget policy component is retained. At
+each scalar or pair run, Leant admits the at-most-64 input outside the clock,
+captures a fresh v2 owner before preparation, and keeps complete preparation,
+the deferred MRU/applicable-domain/origin prefix, worker opening, and the live
+suffix beneath that one absolute deadline. It checkpoints initially, after
+forced preparation, after each complete bounded candidate chain, immediately
+before a pure miss can demand its first live session, after live candidates,
+and before and after forcing the ranking-owned result. A pure candidate chain's
+independently bounded replay, domain, origin, and simplification operations stay
+one indivisible checkpoint quantum.
+
+The v2 token is accepted only on its creating thread while the owner callback is
+open. Wrong-thread or escaped use is the byte-free sanitized session failure
+`LengthSMTLibLiveSessionUsableWorkScopeUnavailable`, checked before clock,
+configuration, workspace, or process demand; the owner closes admission on
+normal and exceptional exit. Leant's structured owner/checkpoint failure is an
+original-order atomic fallback: occurrences whose preparation already failed
+retain `LengthCandidatePreparationRefused`, while every eligible prepared
+candidate becomes `Unassessed`. Its safe original index is `Nothing`, and it
+preserves any nested cleanup-incomplete bit. A non-shared-deadline query failure
+may retain that candidate's safe original index only when the shared lease is
+still live at the following checkpoint. Shared-v2 expiry is instead observed by
+that checkpoint or the outer owner and produces the owner failure with index
+`Nothing`. Exceptions still propagate after owned cleanup instead of becoming a
+ranking result.
+
+V2 remains cooperative, not a watchdog: it cannot interrupt arbitrary callback
+IO, a nonterminating pure chain, or any work which never reaches a controlled
+boundary. Nested final readiness and cleanup retain their fresh private windows,
+but Leant deliberately uses the general two-step owner. Its final normal-return
+observation occurs only after the nested session and ranking-owned result have
+finished, so it can truthfully notice expiry during those finalizer stages. The
+shorter Djex convenience entrance has a different exclusion boundary; Leant's
+ranking path does not use it.
+
+Scoped ready-worker, scalar-run, and pair-run identities are distinct additive
+v2 envelopes. They bind the duration, captured deadline, shared-on-tie minimum
+selection, lifecycle/admission and coverage policy, but omit the owner thread,
+mutable lease state, and checkpoint outcomes. Canonical queries, protocol bytes,
+observations, and replay authority are unchanged. A checkpoint or deadline
+asserts only process/session timing association: it supplies no solver proof,
+behavioral receipt, assessment, presentation note, or pruning authority. See the
+[scoped usable-work Length ranking report](docs/reports/2026-08-15-scoped-usable-work-length-ranking.md).
 
 Counterexample simplification is another orthogonal, programmatic opt-in.  It
 uses the same checked Djex input-box limits for scalar and canonical-`Prod`
@@ -1370,6 +1447,178 @@ established order, and demands the contract last. Both examples are unpinned
 and therefore require the separate explicit
 `--length-ranking-allow-unpinned` activation choice.
 
+Startup v13 and v14 combine the relational scalar/product choices with Djex's
+dynamically scoped v2 usable-work lease. Their exported constants are
+`lengthRankingConfigurationFileScopedUsableWorkBudgetVersion` (13) and
+`lengthRankingConfigurationFileSpinePairScopedUsableWorkBudgetVersion` (14).
+This complete scalar v13 document retains the v11 relation and adds the budget
+after `liveSessionOpening`:
+
+```json
+{
+  "format": "leant-live-length-ranking-configuration",
+  "version": 13,
+  "executionAdmission": {
+    "executablePathCharacters": 4096,
+    "policyFingerprintBytes": 262144
+  },
+  "execution": {
+    "executablePath": "/absolute/path/to/z3",
+    "expectedExecutableSha256": null,
+    "solverTimeoutMilliseconds": 1000,
+    "solverResourceLimit": 100000,
+    "hostDeadlineMilliseconds": 1500,
+    "artifactPolicy": "input-values-after-satisfiable",
+    "responseLimits": {
+      "bytes": 65536,
+      "nestingDepth": 64,
+      "nodes": 4096,
+      "tokenBytes": 4096,
+      "integerBits": 4096
+    }
+  },
+  "evaluation": {
+    "assignmentValueBits": 4096,
+    "intermediateValueBits": 4096
+  },
+  "inputBoxValidation": {
+    "inclusiveInputMaximums": [5, 5],
+    "maximumAssignments": 36
+  },
+  "counterexampleProbe": "origin-before-live",
+  "boundedPositiveOrdering": "prefer-non-vacuous",
+  "applicableDomainValidation": {
+    "strategy": "relational-positive-affine-v1",
+    "maximumInputs": 2,
+    "maximumAssignments": 36
+  },
+  "applicableDomainOrdering": "prefer-non-vacuous",
+  "counterexampleSimplification": {
+    "strategy": "componentwise-lexicographic-v1",
+    "maximumInputs": 2,
+    "maximumAssignments": 36
+  },
+  "liveSessionOpening": "defer-until-live-query",
+  "usableWorkBudget": {
+    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
+    "milliseconds": 30000
+  },
+  "contract": {
+    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
+    "targetArgumentRoles": ["observed-spine", "observed-spine"],
+    "candidateCasePolicy": "cases-rejected",
+    "precondition": [
+      "all",
+      [
+        ["equal", ["input", 0], ["input", 1]],
+        ["at-most", ["input", 1], ["literal", 5]]
+      ]
+    ],
+    "postcondition": ["equal", ["result"], ["input", 0]],
+    "providerLaws": []
+  }
+}
+```
+
+The nominal product v14 sibling uses the complete pair-v5 contract and exact
+coefficient cancellation from the v12 example:
+
+```json
+{
+  "format": "leant-live-length-ranking-configuration",
+  "version": 14,
+  "executionAdmission": {
+    "executablePathCharacters": 4096,
+    "policyFingerprintBytes": 262144
+  },
+  "execution": {
+    "executablePath": "/absolute/path/to/z3",
+    "expectedExecutableSha256": null,
+    "solverTimeoutMilliseconds": 1000,
+    "solverResourceLimit": 100000,
+    "hostDeadlineMilliseconds": 1500,
+    "artifactPolicy": "input-values-after-satisfiable",
+    "responseLimits": {
+      "bytes": 65536,
+      "nestingDepth": 64,
+      "nodes": 4096,
+      "tokenBytes": 4096,
+      "integerBits": 4096
+    }
+  },
+  "evaluation": {
+    "assignmentValueBits": 4096,
+    "intermediateValueBits": 4096
+  },
+  "inputBoxValidation": {
+    "inclusiveInputMaximums": [4],
+    "maximumAssignments": 5
+  },
+  "counterexampleProbe": "origin-before-live",
+  "boundedPositiveOrdering": "prefer-non-vacuous",
+  "applicableDomainValidation": {
+    "strategy": "relational-positive-affine-v1",
+    "maximumInputs": 1,
+    "maximumAssignments": 8
+  },
+  "applicableDomainOrdering": "prefer-non-vacuous",
+  "counterexampleSimplification": {
+    "strategy": "componentwise-lexicographic-v1",
+    "maximumInputs": 1,
+    "maximumAssignments": 9
+  },
+  "liveSessionOpening": "defer-until-live-query",
+  "usableWorkBudget": {
+    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
+    "milliseconds": 30000
+  },
+  "contract": {
+    "resultShape": "binary-prod-spines-v1",
+    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
+    "targetArgumentRoles": ["observed-spine"],
+    "candidateCasePolicy": "cases-rejected",
+    "precondition": [
+      "at-most",
+      ["scale", 2, ["input", 0]],
+      ["sum", [["input", 0], ["literal", 1]]]
+    ],
+    "postcondition": [
+      "all",
+      [
+        ["equal", ["result", "first"], ["input", 0]],
+        ["equal", ["result", "second"],
+          ["quotient", 2, ["input", 0]]]
+      ]
+    ],
+    "providerLaws": []
+  }
+}
+```
+
+V13/v14 have exactly the v9/v10 root fields, but they require the relational
+applicable-domain strategy and the scoped-v2 budget strategy. After bounded JSON
+and `format`/`version` routing, their fixed semantic validation order is exact
+root admission; `executionAdmission`; `execution`; `evaluation`;
+`inputBoxValidation`; `counterexampleProbe`; `boundedPositiveOrdering`; the
+relational `applicableDomainValidation` object's exact fields, strategy, width,
+cardinality, and Djex limit validation; `applicableDomainOrdering`;
+`counterexampleSimplification`; `liveSessionOpening`; the `usableWorkBudget`
+object's exact fields, strategy, integer type, 65,000-ms cap, and Djex
+representability validation; then the scalar-v5 or pair-v5 contract. A later
+contract error cannot preempt an earlier operational, domain, or budget error.
+JSON object member order remains immaterial.
+
+The generalized dispatcher attempts this final parser only after the complete
+v1--v12 chain returns its closed unsupported-version sentinel. The compatibility
+matrix is therefore literal: v1--v8 have no shared budget; v9/v10 select the
+runtime-unscoped `shared-usable-work-deadline-v1`; v11/v12 select relational
+positive-affine validation with no budget; and v13/v14 select that relational
+validator with `scoped-checkpointed-shared-usable-work-deadline-v2`. V13/v14
+reuse the existing budget object, field, type, value, cap, and Djex-rejection
+diagnostic identities rather than introducing evidence-bearing schema. These
+examples are also unpinned and require the explicit
+`--length-ranking-allow-unpinned` activation choice.
+
 Then select a typed Exference-producing engine and synthesize normally. A
 contract-only v6 document can replace the startup-fixed contract for one
 command without changing the CLI grammar:
@@ -1396,9 +1645,9 @@ required, and its case policy is exactly `"cases-rejected"` or
 `"exact-spine-zero-step-v1"`.
 
 The old scalar decoders remain exact compatibility entrances: the startup
-decoder for versions 1--3 rejects v4--v12, and the contract-only decoder for
+decoder for versions 1--3 rejects v4--v14, and the contract-only decoder for
 versions 1--5 rejects v6. The generalized decoders delegate those old versions
-to their unchanged scalar paths and add startup v4--v12 or contract-only v6. A
+to their unchanged scalar paths and add startup v4--v14 or contract-only v6. A
 product file selects which nominal runner Main calls; it does not infer a
 contract from the Lean type, bypass the exact canonical-`Prod` handoff, turn
 solver status into evidence, or grant pruning authority. See the
@@ -1420,6 +1669,9 @@ are recorded in the
 The v11/v12 relational rule, exact v7/v8-shaped schema, nominal evidence, and
 deliberate absence of the shared budget are recorded in the
 [relational positive-affine Length ranking report](docs/reports/2026-08-15-relational-positive-affine-length-ranking.md).
+The v13/v14 scoped owner, cooperative checkpoints, closed schema, failure
+boundary, and additive identities are recorded in the
+[scoped usable-work Length ranking report](docs/reports/2026-08-15-scoped-usable-work-length-ranking.md).
 
 After a successful occurrence seal, Main dispatches presentation through the
 selected scalar or pair domain and prints a subordinate note only for a
@@ -1439,7 +1691,7 @@ model/provider-relative basis, and explicit vacuity. Relational assessments use
 `renderLengthSpinePairRelationalPositiveAffineApplicableDomainValidationNote`
 with the same bounded projections and a distinct rule label. Main's v7--v10
 path can produce only the literal-ceiling positive-affine receipt family;
-v11/v12 can produce only the relational family; v1--v6 cannot produce any
+v11--v14 can produce only the relational family; v1--v6 cannot produce any
 applicable-domain family. The semantic note
 never projects the receipt's private provider-name list. Disabled assessment,
 rejected input, heuristic status,
@@ -1785,7 +2037,7 @@ Only the separate
 `enableLengthRankingNonVacuousApplicableDomainPreference` moves an established
 receipt with a positive applicable-assignment count into a stable preferred
 partition. Startup versions 1--6 cannot enable either policy, so their file
-behavior is exact. Startup v7--v12 enable that same preference with their
+behavior is exact. Startup v7--v14 enable that same preference with their
 nominal literal-ceiling or relational positive-affine validator; direct-v1
 validation remains programmatic-only.
 Contract-only files select constraints rather than ranking policy.
@@ -1815,9 +2067,10 @@ immutable synchronous snapshots, and every eligible rule fires at most once;
 the sound result is deliberately not a numeric least fixed point. Unsupported
 clauses grant no coverage rule, unresolved inputs remain ordinary
 inapplicability, and the actual normalized precondition is still replayed over
-the complete derived box. Startup v11/v12 select only this relational rule and
+the complete derived box. Startup v11--v14 select only this relational rule and
 its nominal scalar/product receipt family. They retain every v7/v8 operational
-selection but deliberately omit v9/v10's usable-work budget.
+selection; v11/v12 deliberately omit a usable-work budget, while v13/v14 add
+the dynamically scoped/checkpointed v2 owner.
 
 Configuration version 3 inserts one query-owned origin probe after all four
 bank entries—and after an enabled applicable-domain pass is inapplicable—before
@@ -1877,18 +2130,18 @@ Djex errors are neither evaluated nor retained in the refusal diagnostic, and
 the class makes no behavioral-evidence claim. The exact verified receipt and
 its semantic sidecar remain attached to the candidate. Any returned structured
 live session, query, association, replay, applicable-domain, origin-probe, or
-finite-box failure
-atomically restores every original candidate in original order as
-`Unassessed`, together with only a
-sanitized batch failure class, cleanup bit, and optional safe original index.
-Candidate-local pure preparation classes survive that fallback; candidates
-whose preparation succeeded have no invented refusal reason. Exceptions
-propagate instead of producing a ranking. Legacy v1--v8 and relational startup
-v11/v12 retain separate lifecycle and per-query budgets. An explicitly
-budgeted programmatic policy or startup v9/v10 instead places admitted
-preparation and deferred ranking
-beneath one shared usable-work owner, without claiming asynchronous
-interruption of arbitrary callback code. Main invokes
+finite-box failure atomically restores every original candidate in original
+order: eligible prepared candidates become `Unassessed`, while candidate-local
+pure preparation refusals retain their bounded refusal class. The result carries
+only one sanitized batch failure class, cleanup bit, and optional safe original
+index; a successfully prepared candidate gains no invented refusal reason.
+Exceptions propagate instead of producing a ranking. Legacy v1--v8 and
+relational startup v11/v12 retain separate lifecycle and per-query budgets. An
+explicitly v1-budgeted programmatic policy or startup v9/v10 instead places
+admitted preparation and deferred ranking beneath one runtime-unscoped shared
+owner. Startup v13/v14 and the scoped programmatic builder use the additive
+owner-thread-affine v2 lease and cooperative phase checkpoints. Neither owner
+claims asynchronous interruption of arbitrary callback code. Main invokes
 this foundation only after the explicit startup opt-in described above; it
 never infers an executable path, contract, or policy. The foundation is
 detailed in the
@@ -1947,11 +2200,13 @@ Versions 5 and 6 also enable only the explicit box-receipt preference. Versions
 7 and 8 require the positive-affine pass, both non-vacuous preferences,
 simplification, and deferred opening; they cannot select direct v1. Versions 9
 and 10 retain those respective scalar/product bundles and additionally enable
-the required validated budget. Versions 11 and 12 instead retain the v7/v8
-root bundle, select relational positive-affine validation, and leave the
-usable-work budget disabled. Programmatic callers opt in with
-`enableLengthRankingUsableWorkBudget`; the builder neither reads a clock nor
-creates evidence.
+the required validated runtime-unscoped v1 budget. Versions 11 and 12 instead
+retain the v7/v8 root bundle, select relational positive-affine validation, and
+leave the usable-work budget disabled. Versions 13 and 14 retain that relational
+bundle and enable the scoped/checkpointed v2 strategy. Programmatic callers opt
+in with `enableLengthRankingUsableWorkBudget` or
+`enableLengthRankingScopedUsableWorkBudget`; both builders are pure and create
+no evidence, and the last budget builder applied determines the strategy.
 A scalar `LeanLengthContract` or nominal
 `LeanLengthSpinePairContract` is supplied separately to its domain-specific
 runner, so a request assertion no longer has to share the lifetime of reusable
@@ -1976,10 +2231,11 @@ preparation pass. The no-option command deliberately reuses that decoded
 contract for the process. Lower-level policy APIs and the one-shot Main path
 can instead associate the same activated policy with a request-owned contract.
 Legacy v1--v8 and startup v11/v12 lifecycle and per-query budgets remain
-separate. A policy derived with
-`enableLengthRankingUsableWorkBudget`, including startup v9/v10, instead owns
-one additive shared usable-work window with the callback-return boundary
-described above. There are no
+separate. A policy derived with `enableLengthRankingUsableWorkBudget`, including
+startup v9/v10, instead owns one additive runtime-unscoped v1 usable-work
+window. A policy derived with `enableLengthRankingScopedUsableWorkBudget`,
+including startup v13/v14, owns the owner-thread-affine v2 lease, cooperative
+checkpoints, and outer post-finalizer observation described above. There are no
 execution defaults, executable discovery, path normalization, or environment
 reads. The digest is only an optional expectation for Djex's
 pre-spawn executable-file observation, not attestation of the image ultimately
@@ -1993,8 +2249,8 @@ preserving the version-1 compatibility path.
 `Leant.Synth.Length.Configuration.File` keeps the exact version-1 JSON grammar
 for that policy and adds exact scalar opt-in versions 2 and 3. Its established
 `decodeLengthRankingConfigurationFile` remains an exact scalar-only entrance
-and rejects versions 4--12. The generalized
-`decodeLengthAssessmentConfigurationFile` additionally accepts versions 4--12
+and rejects versions 4--14. The generalized
+`decodeLengthAssessmentConfigurationFile` additionally accepts versions 4--14
 and returns an opaque `DisabledLengthAssessmentConfiguration` carrying the same
 checked process policy beside a lazy scalar-or-pair selection. The pure decoder consumes a caller-owned
 strict byte string through a separate bounded JSON parser, rejects malformed
@@ -2103,6 +2359,19 @@ generalized dispatcher reaches them only after the literal v1--v10 chain has
 returned its closed unsupported-version sentinel. The distinct scalar and
 product assessments and renderers expose only independently replayed bounded,
 model/provider-relative evidence and grant no proof or pruning authority.
+
+Versions 13 and 14 are the scoped-usable-work scalar and product successors.
+They reuse v9/v10's exact root field set and budget diagnostic identities,
+select v11/v12's relational positive-affine builder for the applicable-domain
+field, and require the distinct budget strategy
+`"scoped-checkpointed-shared-usable-work-deadline-v2"`. Validation performs
+exact-root admission and the complete relational operational prefix first,
+then the budget object's exact fields, strategy, positive integer and 65,000-ms
+cap, then Djex validation, and finally the scalar-v5 or pair-v5 contract. The
+generalized dispatcher reaches this parser only after v1--v12 have returned
+their closed unsupported-version sentinel. The resulting policy uses
+`enableLengthRankingScopedUsableWorkBudget`; file decoding and activation still
+read no clock, launch no worker, and create no behavioral evidence.
 
 `Leant.Synth.Length.Configuration.File.Acquire` is the compatibility facade
 over the shared bounded `Leant.Synth.Length.File.Acquire` filesystem boundary.
