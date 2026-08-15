@@ -199,6 +199,20 @@
   This report is pinned to exact repository revisions listed in \cref{sec:snapshot}.
   It proposes compatible incremental changes, concrete APIs, algorithms, encodings,
   soundness labels, tests, and an implementation sequence.}
+
+  \vspace{4mm}
+  {\small\color{Muted}
+  \emph{Status, 14 August 2026:} the level-1 layer proposed here has since been
+  implemented in Djex and Leant as the finite-list-spine \code{Length} contract
+  dialect: checked contracts and assumed provider laws, canonical
+  \code{QF\_LIA} queries, a capability-probed live Z3 worker, independent
+  counterexample replay, bounded input-box validation, and a binary-product
+  extension, reachable from \code{:synth} behind the explicit
+  \code{--length-ranking-config} opt-in.  One deliberate divergence from the
+  proposal: verified candidates are stably reordered, never pruned, and raw
+  solver status carries no authority.  Levels 2 and 3 remain future work; the
+  dated reports under \code{docs/reports/} in both repositories record the
+  exact boundaries.}
 \end{titlepage}
 
 \pagenumbering{roman}
