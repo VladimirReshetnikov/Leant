@@ -61,11 +61,13 @@ module Leant.Synth.Length.Ranking.Internal
   , lengthRankingCandidates
   , lengthRankingFailure
   , preferNonVacuousBoundedPositiveLengthRanking
+  , preferNonVacuousApplicableDomainLengthRanking
   , AssociatedRankedLengthCandidate
   , associatedRankedLengthCandidateAssociation
   , AssociatedLengthRanking
   , associatedLengthRankingCandidates
   , preferNonVacuousBoundedPositiveAssociatedLengthRanking
+  , preferNonVacuousApplicableDomainAssociatedLengthRanking
   , PostVerificationLengthRanking
   , sealPostVerificationLengthRanking
   , postVerificationLengthRankingBatch
@@ -79,6 +81,11 @@ module Leant.Synth.Length.Ranking.Internal
   , rankVerifiedLengthCandidatesWithInputBoxValidation
   , rankPostVerificationLengthCandidatesWithInputBoxValidationAndOriginProbe
   , rankVerifiedLengthCandidatesWithInputBoxValidationAndOriginProbe
+  , LengthInputBoxRankingPolicy (..)
+  , LengthApplicableDomainRankingPolicy (..)
+  , LengthOriginProbeRankingPolicy (..)
+  , rankVerifiedLengthCandidatesWithRankingPolicies
+  , rankPostVerificationLengthCandidatesWithRankingPolicies
   , promoteCounterexampleSeed
   , replayCounterexampleSeeds
   ) where
@@ -89,11 +96,14 @@ import Numeric.Natural (Natural)
 
 import Language.Haskell.Djex
   ( ExferenceLocal
+  , LengthApplicableDomainValidation (..)
+  , LengthApplicableDomainValidationError (..)
   , LengthEvaluationError
   , LengthEvaluationLimits
   , LengthInputBoxLimits
   , LengthInputBoxValidation (..)
-  , LengthInputBoxValidationError
+  , LengthInputBoxValidationError (..)
+  , LengthSMTLibApplicableDomainValidationError (..)
   , LengthSMTLibInputReplayError (..)
   , LengthSMTLibInputBoxValidationError (..)
   , LengthSMTLibExecutionConfig
@@ -106,6 +116,7 @@ import Language.Haskell.Djex
   , LengthSMTLibLiveSessionError
   , LengthSMTLibLiveSessionFailure
   , SolverStatus (..)
+  , ValidatedLengthApplicableDomain
   , ValidatedLengthCounterexample
   , ValidatedLengthInputBox
   , defaultLengthSMTLibLiveSessionMaximumQueries
@@ -118,7 +129,9 @@ import Language.Haskell.Djex
   , replayLengthSMTLibCounterexampleInputs
   , replayLengthSMTLibLiveQueryObservation
   , runLengthSMTLibLiveQuery
+  , validateLengthSMTLibQueryApplicableDomain
   , validateLengthSMTLibQueryInputBox
+  , validatedLengthApplicableDomainApplicableAssignmentCount
   , validatedLengthCounterexampleInputs
   , validatedLengthInputBoxApplicableAssignmentCount
   , withLengthSMTLibLiveSession
@@ -150,14 +163,16 @@ data LengthRankingInputError = LengthRankingInputLimitExceeded
   }
   deriving (Eq, Ord, Show)
 
--- | The four public assessment strengths.  A heuristic status and an
--- independently validated finite-box success are deliberately neutral for
--- ordering; only a replayed counterexample is stably demoted.
+-- | The public assessment strengths.  Heuristic status, finite-box success,
+-- and complete applicable-domain establishment are neutral unless their
+-- corresponding additive preference is explicitly enabled; every replayed
+-- counterexample remains stably demoted.
 data LengthRankingAssessment
   = Unassessed
   | Heuristic !SolverStatus
   | Counterexample !ValidatedLengthCounterexample
   | BoundedPositive !ValidatedLengthInputBox
+  | ApplicableDomainEstablished !ValidatedLengthApplicableDomain
   deriving (Eq, Show)
 
 -- | Stable, payload-free phase at which pure candidate preparation refused.
@@ -272,6 +287,8 @@ data LengthRankingFailureClass
   | LengthRankingEvidenceReplayMismatch
   | LengthRankingOriginProbeEvaluationFailed !LengthEvaluationError
   | LengthRankingInputBoxValidationFailed !LengthInputBoxValidationError
+  | LengthRankingApplicableDomainValidationFailed
+      !LengthInputBoxValidationError
   deriving (Eq, Ord, Show)
 
 -- | One fail-closed ranking failure.  The optional index is the safe,
@@ -467,6 +484,14 @@ data LengthInputBoxRankingPolicy
   = LengthInputBoxRankingDisabled
   | LengthInputBoxRankingEnabled !LengthInputBoxLimits [Natural]
 
+-- | Private permission to attempt complete query-owned validation of the
+-- precondition-applicable input domain after every MRU miss.  Djex alone
+-- derives tight maxima from direct checked precondition bounds.  Admission
+-- limits remain an ordinary miss; no solver observation is retained here.
+data LengthApplicableDomainRankingPolicy
+  = LengthApplicableDomainRankingDisabled
+  | LengthApplicableDomainRankingEnabled !LengthInputBoxLimits
+
 -- | Private query-owned pre-live probe policy.  The enabled constructor is
 -- only permission to run Djex's canonical origin replay after every MRU miss;
 -- it carries no arity, input vector, query, receipt, or verdict.
@@ -492,6 +517,7 @@ rankVerifiedLengthCandidates
 rankVerifiedLengthCandidates execution evaluation contract candidates = fmap
   (fmap $ projectAssociatedLengthRankingWith id)
   $ rankAssociatedLengthCandidates LengthInputBoxRankingDisabled
+      LengthApplicableDomainRankingDisabled
       LengthOriginProbeRankingDisabled
       execution evaluation contract id candidates
 
@@ -508,6 +534,7 @@ rankVerifiedLengthCandidatesWithOriginProbe execution evaluation contract
     candidates = fmap
   (fmap $ projectAssociatedLengthRankingWith id)
   $ rankAssociatedLengthCandidates LengthInputBoxRankingDisabled
+      LengthApplicableDomainRankingDisabled
       LengthOriginProbeRankingEnabled
       execution evaluation contract id candidates
 
@@ -528,6 +555,7 @@ rankVerifiedLengthCandidatesWithInputBoxValidation execution evaluation
   (fmap $ projectAssociatedLengthRankingWith id)
   $ rankAssociatedLengthCandidates
       (LengthInputBoxRankingEnabled limits maximums)
+      LengthApplicableDomainRankingDisabled
       LengthOriginProbeRankingDisabled
       execution evaluation contract id candidates
 
@@ -547,6 +575,7 @@ rankVerifiedLengthCandidatesWithInputBoxValidationAndOriginProbe
   (fmap $ projectAssociatedLengthRankingWith id)
   $ rankAssociatedLengthCandidates
       (LengthInputBoxRankingEnabled limits maximums)
+      LengthApplicableDomainRankingDisabled
       LengthOriginProbeRankingEnabled
       execution evaluation contract id candidates
 
@@ -564,6 +593,7 @@ rankPostVerificationLengthCandidates
           (PostVerificationCandidate epoch DetailedVerificationVariant)))
 rankPostVerificationLengthCandidates execution evaluation contract =
   rankAssociatedLengthCandidates LengthInputBoxRankingDisabled
+    LengthApplicableDomainRankingDisabled
     LengthOriginProbeRankingDisabled
     execution evaluation contract
     postVerificationCandidateVerified
@@ -582,6 +612,7 @@ rankPostVerificationLengthCandidatesWithOriginProbe
 rankPostVerificationLengthCandidatesWithOriginProbe execution evaluation
     contract =
   rankAssociatedLengthCandidates LengthInputBoxRankingDisabled
+    LengthApplicableDomainRankingDisabled
     LengthOriginProbeRankingEnabled
     execution evaluation contract postVerificationCandidateVerified
 
@@ -603,6 +634,7 @@ rankPostVerificationLengthCandidatesWithInputBoxValidation execution evaluation
     limits maximums contract =
   rankAssociatedLengthCandidates
     (LengthInputBoxRankingEnabled limits maximums)
+    LengthApplicableDomainRankingDisabled
     LengthOriginProbeRankingDisabled
     execution evaluation contract postVerificationCandidateVerified
 
@@ -623,8 +655,46 @@ rankPostVerificationLengthCandidatesWithInputBoxValidationAndOriginProbe
     execution evaluation limits maximums contract =
   rankAssociatedLengthCandidates
     (LengthInputBoxRankingEnabled limits maximums)
+    LengthApplicableDomainRankingDisabled
     LengthOriginProbeRankingEnabled
     execution evaluation contract postVerificationCandidateVerified
+
+-- | Package-private complete policy entrance used by the opaque reusable
+-- configuration owner.  The established public runners above keep passing
+-- the literal disabled applicable-domain policy.
+rankVerifiedLengthCandidatesWithRankingPolicies
+  :: LengthInputBoxRankingPolicy
+  -> LengthApplicableDomainRankingPolicy
+  -> LengthOriginProbeRankingPolicy
+  -> LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LeanLengthContract
+  -> [Verified DetailedVerificationVariant]
+  -> IO (Either LengthRankingInputError LengthRanking)
+rankVerifiedLengthCandidatesWithRankingPolicies inputBoxPolicy
+    applicableDomainPolicy originProbePolicy execution evaluation contract
+    candidates = fmap (fmap $ projectAssociatedLengthRankingWith id)
+  $ rankAssociatedLengthCandidates inputBoxPolicy applicableDomainPolicy
+      originProbePolicy execution evaluation contract id candidates
+
+-- | Occurrence-associated sibling of the complete private policy entrance.
+rankPostVerificationLengthCandidatesWithRankingPolicies
+  :: LengthInputBoxRankingPolicy
+  -> LengthApplicableDomainRankingPolicy
+  -> LengthOriginProbeRankingPolicy
+  -> LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LeanLengthContract
+  -> [PostVerificationCandidate epoch DetailedVerificationVariant]
+  -> IO
+      (Either LengthRankingInputError
+        (AssociatedLengthRanking
+          (PostVerificationCandidate epoch DetailedVerificationVariant)))
+rankPostVerificationLengthCandidatesWithRankingPolicies inputBoxPolicy
+    applicableDomainPolicy originProbePolicy execution evaluation contract =
+  rankAssociatedLengthCandidates inputBoxPolicy applicableDomainPolicy
+    originProbePolicy execution evaluation contract
+    postVerificationCandidateVerified
 
 -- | Rank caller-owned occurrences while retaining each occurrence handle
 -- through preparation, live assessment, stable partitioning, and atomic
@@ -632,6 +702,7 @@ rankPostVerificationLengthCandidatesWithInputBoxValidationAndOriginProbe
 -- succeeded.
 rankAssociatedLengthCandidates
   :: LengthInputBoxRankingPolicy
+  -> LengthApplicableDomainRankingPolicy
   -> LengthOriginProbeRankingPolicy
   -> LengthSMTLibExecutionConfig
   -> LengthEvaluationLimits
@@ -641,8 +712,8 @@ rankAssociatedLengthCandidates
   -> IO
       (Either LengthRankingInputError
         (AssociatedLengthRanking association))
-rankAssociatedLengthCandidates inputBoxPolicy originProbePolicy execution
-    evaluation contract verifiedFor associations =
+rankAssociatedLengthCandidates inputBoxPolicy applicableDomainPolicy
+    originProbePolicy execution evaluation contract verifiedFor associations =
   case admitCandidates defaultLengthSMTLibLiveSessionMaximumQueries
       associations of
     Left failure -> pure $ Left failure
@@ -655,7 +726,8 @@ rankAssociatedLengthCandidates inputBoxPolicy originProbePolicy execution
         | otherwise -> do
             scoped <- withLengthSMTLibLiveSession execution
               $ \session -> runPreparedCandidates
-                  evaluation inputBoxPolicy originProbePolicy session prepared
+                  evaluation inputBoxPolicy applicableDomainPolicy
+                    originProbePolicy session prepared
             pure $ Right $ case scoped of
               Left failure -> unassessedRanking prepared
                 $ sessionRankingFailure failure
@@ -724,14 +796,15 @@ preparedCandidateUnassessed prepared = case prepared of
 runPreparedCandidates
   :: LengthEvaluationLimits
   -> LengthInputBoxRankingPolicy
+  -> LengthApplicableDomainRankingPolicy
   -> LengthOriginProbeRankingPolicy
   -> LengthSMTLibLiveSession epoch
   -> [PreparedLengthCandidate association]
   -> IO
       (Either LengthRankingFailure
         [AssociatedRankedLengthCandidate association])
-runPreparedCandidates evaluation inputBoxPolicy originProbePolicy session =
-  go [] []
+runPreparedCandidates evaluation inputBoxPolicy applicableDomainPolicy
+    originProbePolicy session = go [] []
  where
   go reversed seedBank remaining = case remaining of
     [] -> pure $ Right $ reverse reversed
@@ -748,35 +821,82 @@ runPreparedCandidates evaluation inputBoxPolicy originProbePolicy session =
         in promoted `seq` go
             (assessedCounterexample index association receipt : reversed)
             promoted rest
-      Nothing -> case probeOriginCounterexample evaluation originProbePolicy
-          query of
-        Left (LengthSMTLibInputReplayEvaluationRejected failure) -> pure
-          $ Left $ localRankingFailure
-              (LengthRankingOriginProbeEvaluationFailed failure) index
-        Left (LengthSMTLibInputReplayAssociationRejected _) -> pure
-          $ Left $ localRankingFailure
-              LengthRankingEvidenceReplayMismatch index
-        Right (Just receipt) ->
-          let inputs = validatedLengthCounterexampleInputs receipt
-              promoted = promoteCounterexampleSeed inputs seedBank
-          in promoted `seq` go
-              (assessedCounterexample index association receipt : reversed)
-              promoted rest
-        Right Nothing -> do
-          observed <- runLengthSMTLibLiveQuery evaluation session query
-          case observed of
-            Left failure -> pure $ Left $ queryRankingFailure index failure
-            Right observation -> case
-                assessCandidate evaluation inputBoxPolicy
-                  index association query observation of
-              Left failure -> pure $ Left failure
-              Right assessed ->
-                let nextSeedBank = case counterexampleSeed assessed of
-                      Nothing -> seedBank
-                      Just retained ->
-                        promoteCounterexampleSeed retained seedBank
-                in nextSeedBank `seq`
-                    go (assessed : reversed) nextSeedBank rest
+      Nothing -> case assessApplicableDomainCandidate evaluation
+          applicableDomainPolicy index association query of
+        Left failure -> pure $ Left failure
+        Right (Just assessed) -> continueAssessed
+          reversed seedBank rest assessed
+        Right Nothing -> case probeOriginCounterexample evaluation
+            originProbePolicy query of
+          Left (LengthSMTLibInputReplayEvaluationRejected failure) -> pure
+            $ Left $ localRankingFailure
+                (LengthRankingOriginProbeEvaluationFailed failure) index
+          Left (LengthSMTLibInputReplayAssociationRejected _) -> pure
+            $ Left $ localRankingFailure
+                LengthRankingEvidenceReplayMismatch index
+          Right (Just receipt) ->
+            let inputs = validatedLengthCounterexampleInputs receipt
+                promoted = promoteCounterexampleSeed inputs seedBank
+            in promoted `seq` go
+                (assessedCounterexample index association receipt : reversed)
+                promoted rest
+          Right Nothing -> do
+            observed <- runLengthSMTLibLiveQuery evaluation session query
+            case observed of
+              Left failure -> pure $ Left $ queryRankingFailure index failure
+              Right observation -> case
+                  assessCandidate evaluation inputBoxPolicy
+                    index association query observation of
+                Left failure -> pure $ Left failure
+                Right assessed -> continueAssessed
+                  reversed seedBank rest assessed
+
+  continueAssessed reversed seedBank rest assessed =
+    let nextSeedBank = case counterexampleSeed assessed of
+          Nothing -> seedBank
+          Just retained -> promoteCounterexampleSeed retained seedBank
+    in nextSeedBank `seq`
+        go (assessed : reversed) nextSeedBank rest
+
+-- | Attempt the optional complete applicable-domain traversal.  A missing
+-- direct bound and failures which prevent bounded traversal admission are
+-- ordinary misses.  Once admission succeeds, evaluation/internal failures or
+-- an evidence association mismatch atomically fail the indexed batch.
+assessApplicableDomainCandidate
+  :: LengthEvaluationLimits
+  -> LengthApplicableDomainRankingPolicy
+  -> Natural
+  -> association
+  -> CheckedLengthQuery
+  -> Either LengthRankingFailure
+      (Maybe (AssociatedRankedLengthCandidate association))
+assessApplicableDomainCandidate evaluation policy index association query =
+  case policy of
+    LengthApplicableDomainRankingDisabled -> Right Nothing
+    LengthApplicableDomainRankingEnabled limits -> case
+        validateLengthSMTLibQueryApplicableDomain evaluation limits query of
+      Left (LengthSMTLibApplicableDomainValidationAssociationRejected _) ->
+        Left $ localRankingFailure LengthRankingEvidenceReplayMismatch index
+      Left (LengthSMTLibApplicableDomainValidationRejected
+          (LengthApplicableDomainInputBoxValidationRejected failure))
+        | applicableDomainAdmissionFailure failure -> Right Nothing
+        | otherwise -> Left $ localRankingFailure
+            (LengthRankingApplicableDomainValidationFailed failure) index
+      Right (LengthApplicableDomainInapplicable _) -> Right Nothing
+      Right (LengthApplicableDomainCounterexample receipt) -> Right $ Just
+        $ assessedCounterexample index association receipt
+      Right (LengthApplicableDomainEstablished receipt) -> Right $ Just
+        $ AssociatedRankedLengthCandidate index association
+        $ LengthCandidateAssessed $ ApplicableDomainEstablished receipt
+
+applicableDomainAdmissionFailure :: LengthInputBoxValidationError -> Bool
+applicableDomainAdmissionFailure failure = case failure of
+  LengthInputBoxProblemInputLimitExceeded {} -> True
+  LengthInputBoxMaximumValueRejected {} -> True
+  LengthInputBoxAssignmentLimitExceeded {} -> True
+  LengthInputBoxBoundsArityMismatch {} -> False
+  LengthInputBoxAssignmentEvaluationRejected {} -> False
+  LengthInputBoxInternalEnumerationInvariant -> False
 
 -- | Run no replay at all on the compatibility path.  The enabled path
 -- delegates arity and zero construction to the exact sealed query; Leant never
@@ -968,6 +1088,54 @@ isNonVacuousBoundedPositive :: LengthRankingAssessment -> Bool
 isNonVacuousBoundedPositive assessment = case assessment of
   BoundedPositive receipt ->
     validatedLengthInputBoxApplicableAssignmentCount receipt > 0
+  _ -> False
+
+-- | Prefer only complete applicable-domain receipts with at least one
+-- assignment satisfying the precondition.  This transform is intended to run
+-- after the established bounded-box preference, so composing both policies
+-- yields domain-positive, box-positive, neutral, then counterexample order.
+preferNonVacuousApplicableDomainLengthRanking
+  :: LengthRanking
+  -> LengthRanking
+preferNonVacuousApplicableDomainLengthRanking ranking = case ranking of
+  LengthRanking _ (Just _) -> ranking
+  LengthRanking candidates Nothing -> LengthRanking
+    (preferNonVacuousApplicableDomainCandidates candidates) Nothing
+
+-- | Occurrence-associated sibling of the complete-domain preference.
+preferNonVacuousApplicableDomainAssociatedLengthRanking
+  :: AssociatedLengthRanking association
+  -> AssociatedLengthRanking association
+preferNonVacuousApplicableDomainAssociatedLengthRanking ranking = case
+    ranking of
+  AssociatedLengthRanking _ (Just _) -> ranking
+  AssociatedLengthRanking candidates Nothing -> AssociatedLengthRanking
+    (preferNonVacuousApplicableDomainAssociatedCandidates candidates) Nothing
+
+preferNonVacuousApplicableDomainCandidates
+  :: [RankedLengthCandidate]
+  -> [RankedLengthCandidate]
+preferNonVacuousApplicableDomainCandidates candidates =
+  let (positive, retained) = partition hasApplicableDomain candidates
+  in positive ++ stableRankedLengthCounterexampleDemotion retained
+ where
+  hasApplicableDomain (RankedLengthCandidate _ _ state) =
+    isNonVacuousApplicableDomain $ candidateAssessment state
+
+preferNonVacuousApplicableDomainAssociatedCandidates
+  :: [AssociatedRankedLengthCandidate association]
+  -> [AssociatedRankedLengthCandidate association]
+preferNonVacuousApplicableDomainAssociatedCandidates candidates =
+  let (positive, retained) = partition hasApplicableDomain candidates
+  in positive ++ stableCounterexampleDemotion retained
+ where
+  hasApplicableDomain (AssociatedRankedLengthCandidate _ _ state) =
+    isNonVacuousApplicableDomain $ candidateAssessment state
+
+isNonVacuousApplicableDomain :: LengthRankingAssessment -> Bool
+isNonVacuousApplicableDomain assessment = case assessment of
+  ApplicableDomainEstablished receipt ->
+    validatedLengthApplicableDomainApplicableAssignmentCount receipt > 0
   _ -> False
 
 unassessedRanking

@@ -2,8 +2,9 @@
 --
 -- Construction is pure and performs only Djex's bounded policy validation.
 -- 'LengthRankingPolicy' owns reusable execution and replay policy plus
--- independent optional origin-probe, finite input-box, and non-vacuous
--- positive-ordering policies, while a 'LeanLengthContract' is supplied
+-- independent optional origin-probe, finite input-box, complete applicable-
+-- domain, and non-vacuous positive-ordering policies, while a
+-- 'LeanLengthContract' is supplied
 -- separately for each ranking request.  The
 -- versioned configuration-file grammar retains its fixed startup contract
 -- beside this policy without introducing a second generic aggregate.
@@ -30,7 +31,9 @@ module Leant.Synth.Length.Configuration
   , lengthRankingPolicyFromValidatedComponents
   , enableLengthRankingOriginProbe
   , enableLengthRankingInputBoxValidation
+  , enableLengthRankingApplicableDomainValidation
   , enableLengthRankingNonVacuousInputBoxPreference
+  , enableLengthRankingNonVacuousApplicableDomainPreference
   , lengthRankingPolicyExecutableDigestExpectation
   , LengthRankingConfigurationError (..)
   , assessVerifiedLengthCandidatesWithPolicy
@@ -69,6 +72,11 @@ import Leant.Synth.Length.Ranking
   )
 import Leant.Synth.Length.Ranking.Internal
   ( AssociatedLengthRanking
+  , LengthApplicableDomainRankingPolicy (..)
+  , LengthInputBoxRankingPolicy (..)
+  , LengthOriginProbeRankingPolicy (..)
+  , preferNonVacuousApplicableDomainAssociatedLengthRanking
+  , preferNonVacuousApplicableDomainLengthRanking
   , preferNonVacuousBoundedPositiveAssociatedLengthRanking
   , preferNonVacuousBoundedPositiveLengthRanking
   , rankPostVerificationLengthCandidates
@@ -77,6 +85,8 @@ import Leant.Synth.Length.Ranking.Internal
   , rankPostVerificationLengthCandidatesWithInputBoxValidationAndOriginProbe
   , rankVerifiedLengthCandidatesWithOriginProbe
   , rankVerifiedLengthCandidatesWithInputBoxValidationAndOriginProbe
+  , rankPostVerificationLengthCandidatesWithRankingPolicies
+  , rankVerifiedLengthCandidatesWithRankingPolicies
   )
 import Leant.Synth.Length.PostVerification.Internal
   ( LengthPostVerificationResult
@@ -93,6 +103,11 @@ import Leant.Synth.Length.SpinePair.Ranking
   )
 import Leant.Synth.Length.SpinePair.Ranking.Internal
   ( AssociatedLengthSpinePairRanking
+  , LengthSpinePairApplicableDomainRankingPolicy (..)
+  , LengthSpinePairInputBoxRankingPolicy (..)
+  , LengthSpinePairOriginProbeRankingPolicy (..)
+  , preferNonVacuousApplicableDomainAssociatedLengthSpinePairRanking
+  , preferNonVacuousApplicableDomainLengthSpinePairRanking
   , preferNonVacuousBoundedPositiveAssociatedLengthSpinePairRanking
   , preferNonVacuousBoundedPositiveLengthSpinePairRanking
   , rankPostVerificationLengthSpinePairCandidates
@@ -101,6 +116,8 @@ import Leant.Synth.Length.SpinePair.Ranking.Internal
   , rankPostVerificationLengthSpinePairCandidatesWithOriginProbe
   , rankVerifiedLengthSpinePairCandidatesWithInputBoxValidationAndOriginProbe
   , rankVerifiedLengthSpinePairCandidatesWithOriginProbe
+  , rankPostVerificationLengthSpinePairCandidatesWithRankingPolicies
+  , rankVerifiedLengthSpinePairCandidatesWithRankingPolicies
   )
 import Leant.Synth.PostVerification (PostVerificationCandidate)
 import Leant.Synth.Verification
@@ -126,8 +143,10 @@ data LengthRankingPolicy = LengthRankingPolicy
   !LengthSMTLibExecutionConfig
   !LengthEvaluationLimits
   !LengthRankingInputBoxValidation
+  !LengthRankingApplicableDomainValidation
   !LengthRankingOriginProbe
   !LengthRankingNonVacuousInputBoxPreference
+  !LengthRankingNonVacuousApplicableDomainPreference
 
 -- | Private optional orchestration policy.  It contains no solver status,
 -- query, receipt, or verdict; each enabled use must still pass Djex's exact
@@ -135,6 +154,13 @@ data LengthRankingPolicy = LengthRankingPolicy
 data LengthRankingInputBoxValidation
   = LengthRankingInputBoxValidationDisabled
   | LengthRankingInputBoxValidationEnabled !LengthInputBoxLimits [Natural]
+
+-- | Private permission to attempt complete traversal of the query-owned
+-- applicable domain derived from direct precondition upper bounds.  Missing
+-- bounds and bounded-admission refusals remain ordinary misses.
+data LengthRankingApplicableDomainValidation
+  = LengthRankingApplicableDomainValidationDisabled
+  | LengthRankingApplicableDomainValidationEnabled !LengthInputBoxLimits
 
 -- | Private permission to run Djex's query-owned canonical origin replay
 -- after the MRU bank misses and before a live query.  This retains no input
@@ -151,6 +177,13 @@ data LengthRankingOriginProbe
 data LengthRankingNonVacuousInputBoxPreference
   = LengthRankingNonVacuousInputBoxPreferenceDisabled
   | LengthRankingNonVacuousInputBoxPreferenceEnabled
+
+-- | Private ranking-only authority for independently established complete
+-- applicable domains.  It neither enables traversal nor changes evidence
+-- acquisition, and vacuous receipts remain neutral.
+data LengthRankingNonVacuousApplicableDomainPreference
+  = LengthRankingNonVacuousApplicableDomainPreferenceDisabled
+  | LengthRankingNonVacuousApplicableDomainPreferenceEnabled
 
 -- | Pure validation failure in fixed execution-before-evaluation order.
 data LengthRankingConfigurationError
@@ -177,8 +210,11 @@ mkLengthRankingPolicy source = do
     Left failure -> Left $ LengthRankingEvaluationLimitsRejected failure
     Right validated -> Right validated
   pure $ LengthRankingPolicy execution evaluation
-    LengthRankingInputBoxValidationDisabled LengthRankingOriginProbeDisabled
+    LengthRankingInputBoxValidationDisabled
+    LengthRankingApplicableDomainValidationDisabled
+    LengthRankingOriginProbeDisabled
     LengthRankingNonVacuousInputBoxPreferenceDisabled
+    LengthRankingNonVacuousApplicableDomainPreferenceDisabled
 
 -- | Assemble one reusable policy from already validated Djex execution and
 -- replay authorities with the origin probe and finite-box validation disabled.
@@ -191,8 +227,11 @@ lengthRankingPolicyFromValidatedComponents
   -> LengthRankingPolicy
 lengthRankingPolicyFromValidatedComponents execution evaluation =
   LengthRankingPolicy execution evaluation
-    LengthRankingInputBoxValidationDisabled LengthRankingOriginProbeDisabled
+    LengthRankingInputBoxValidationDisabled
+    LengthRankingApplicableDomainValidationDisabled
+    LengthRankingOriginProbeDisabled
     LengthRankingNonVacuousInputBoxPreferenceDisabled
+    LengthRankingNonVacuousApplicableDomainPreferenceDisabled
 
 -- | Derive an origin-probing sibling without changing the validated
 -- execution/evaluation authorities or any independently selected finite box.
@@ -203,9 +242,12 @@ enableLengthRankingOriginProbe
   :: LengthRankingPolicy
   -> LengthRankingPolicy
 enableLengthRankingOriginProbe
-    (LengthRankingPolicy execution evaluation inputBoxValidation _ preference) =
+    (LengthRankingPolicy execution evaluation inputBoxValidation
+      applicableDomainValidation _ inputBoxPreference
+      applicableDomainPreference) =
   LengthRankingPolicy execution evaluation inputBoxValidation
-    LengthRankingOriginProbeEnabled preference
+    applicableDomainValidation LengthRankingOriginProbeEnabled
+    inputBoxPreference applicableDomainPreference
 
 -- | Derive an explicitly enabled finite-box policy without changing the
 -- already validated execution/evaluation authorities or the reusable base
@@ -220,10 +262,29 @@ enableLengthRankingInputBoxValidation
   -> LengthRankingPolicy
   -> LengthRankingPolicy
 enableLengthRankingInputBoxValidation limits maximums
-    (LengthRankingPolicy execution evaluation _ originProbe preference) =
+    (LengthRankingPolicy execution evaluation _ applicableDomainValidation
+      originProbe inputBoxPreference applicableDomainPreference) =
   LengthRankingPolicy execution evaluation
-    (LengthRankingInputBoxValidationEnabled limits maximums) originProbe
-    preference
+    (LengthRankingInputBoxValidationEnabled limits maximums)
+    applicableDomainValidation originProbe inputBoxPreference
+    applicableDomainPreference
+
+-- | Derive an explicitly enabled complete applicable-domain traversal without
+-- changing execution, evaluation, origin probing, the optional caller-owned
+-- finite box, or either ranking preference.  Each candidate derives inclusive
+-- maxima only from direct precondition bounds retained by its exact checked
+-- query.  A missing bound or bounded-admission refusal falls through to the
+-- established origin/live path.
+enableLengthRankingApplicableDomainValidation
+  :: LengthInputBoxLimits
+  -> LengthRankingPolicy
+  -> LengthRankingPolicy
+enableLengthRankingApplicableDomainValidation limits
+    (LengthRankingPolicy execution evaluation inputBoxValidation _ originProbe
+      inputBoxPreference applicableDomainPreference) =
+  LengthRankingPolicy execution evaluation inputBoxValidation
+    (LengthRankingApplicableDomainValidationEnabled limits) originProbe
+    inputBoxPreference applicableDomainPreference
 
 -- | Derive an explicit evidence-ordering sibling without enabling or changing
 -- finite-box validation, origin probing, execution, evaluation, or contract
@@ -234,10 +295,25 @@ enableLengthRankingNonVacuousInputBoxPreference
   :: LengthRankingPolicy
   -> LengthRankingPolicy
 enableLengthRankingNonVacuousInputBoxPreference
-    (LengthRankingPolicy execution evaluation inputBoxValidation originProbe
-      _) =
-  LengthRankingPolicy execution evaluation inputBoxValidation originProbe
-    LengthRankingNonVacuousInputBoxPreferenceEnabled
+    (LengthRankingPolicy execution evaluation inputBoxValidation
+      applicableDomainValidation originProbe _ applicableDomainPreference) =
+  LengthRankingPolicy execution evaluation inputBoxValidation
+    applicableDomainValidation originProbe
+    LengthRankingNonVacuousInputBoxPreferenceEnabled applicableDomainPreference
+
+-- | Derive an independent ordering preference for non-vacuous complete-domain
+-- receipts.  This does not enable traversal.  When composed with the existing
+-- box preference it is applied afterward, yielding complete-domain positive,
+-- finite-box positive, neutral, then counterexample partitions.
+enableLengthRankingNonVacuousApplicableDomainPreference
+  :: LengthRankingPolicy
+  -> LengthRankingPolicy
+enableLengthRankingNonVacuousApplicableDomainPreference
+    (LengthRankingPolicy execution evaluation inputBoxValidation
+      applicableDomainValidation originProbe inputBoxPreference _) =
+  LengthRankingPolicy execution evaluation inputBoxValidation
+    applicableDomainValidation originProbe inputBoxPreference
+    LengthRankingNonVacuousApplicableDomainPreferenceEnabled
 
 -- | Classify only whether the sealed execution policy contains an executable
 -- digest expectation.  This reveals neither the digest bytes nor the path and
@@ -247,7 +323,7 @@ lengthRankingPolicyExecutableDigestExpectation
   :: LengthRankingPolicy
   -> LengthSMTLibExecutableDigestExpectation
 lengthRankingPolicyExecutableDigestExpectation
-    (LengthRankingPolicy execution _ _ _ _) =
+    (LengthRankingPolicy execution _ _ _ _ _ _) =
   lengthSMTLibExecutionExecutableDigestExpectation execution
 
 -- Apply the ranking-only preference after all behavioral acquisition has
@@ -264,6 +340,52 @@ applyLengthRankingNonVacuousInputBoxPreference preference prefer action =
     LengthRankingNonVacuousInputBoxPreferenceEnabled ->
       fmap (fmap prefer) action
 
+-- Applied outside the existing box transform so that, when both are enabled,
+-- the complete-domain partition is selected after the box partition.
+applyLengthRankingNonVacuousApplicableDomainPreference
+  :: LengthRankingNonVacuousApplicableDomainPreference
+  -> (ranking -> ranking)
+  -> IO (Either failure ranking)
+  -> IO (Either failure ranking)
+applyLengthRankingNonVacuousApplicableDomainPreference preference prefer action =
+  case preference of
+    LengthRankingNonVacuousApplicableDomainPreferenceDisabled -> action
+    LengthRankingNonVacuousApplicableDomainPreferenceEnabled ->
+      fmap (fmap prefer) action
+
+scalarInputBoxRankingPolicy
+  :: LengthRankingInputBoxValidation
+  -> LengthInputBoxRankingPolicy
+scalarInputBoxRankingPolicy validation = case validation of
+  LengthRankingInputBoxValidationDisabled -> LengthInputBoxRankingDisabled
+  LengthRankingInputBoxValidationEnabled limits maximums ->
+    LengthInputBoxRankingEnabled limits maximums
+
+scalarOriginProbeRankingPolicy
+  :: LengthRankingOriginProbe
+  -> LengthOriginProbeRankingPolicy
+scalarOriginProbeRankingPolicy policy = case policy of
+  LengthRankingOriginProbeDisabled -> LengthOriginProbeRankingDisabled
+  LengthRankingOriginProbeEnabled -> LengthOriginProbeRankingEnabled
+
+spinePairInputBoxRankingPolicy
+  :: LengthRankingInputBoxValidation
+  -> LengthSpinePairInputBoxRankingPolicy
+spinePairInputBoxRankingPolicy validation = case validation of
+  LengthRankingInputBoxValidationDisabled ->
+    LengthSpinePairInputBoxRankingDisabled
+  LengthRankingInputBoxValidationEnabled limits maximums ->
+    LengthSpinePairInputBoxRankingEnabled limits maximums
+
+spinePairOriginProbeRankingPolicy
+  :: LengthRankingOriginProbe
+  -> LengthSpinePairOriginProbeRankingPolicy
+spinePairOriginProbeRankingPolicy policy = case policy of
+  LengthRankingOriginProbeDisabled ->
+    LengthSpinePairOriginProbeRankingDisabled
+  LengthRankingOriginProbeEnabled ->
+    LengthSpinePairOriginProbeRankingEnabled
+
 -- | Run a verified batch under one reusable policy and one explicitly supplied
 -- request contract.  Every eligible call still owns a fresh lexical worker.
 rankVerifiedLengthCandidatesWithPolicy
@@ -273,25 +395,37 @@ rankVerifiedLengthCandidatesWithPolicy
   -> IO (Either LengthRankingInputError LengthRanking)
 rankVerifiedLengthCandidatesWithPolicy
     (LengthRankingPolicy execution evaluation inputBoxValidation
-      originProbe preference) contract candidates =
-  applyLengthRankingNonVacuousInputBoxPreference preference
-    preferNonVacuousBoundedPositiveLengthRanking
-    $ case (inputBoxValidation, originProbe) of
-        (LengthRankingInputBoxValidationDisabled,
-            LengthRankingOriginProbeDisabled) ->
-          rankVerifiedLengthCandidates execution evaluation contract candidates
-        (LengthRankingInputBoxValidationDisabled,
-            LengthRankingOriginProbeEnabled) ->
-          rankVerifiedLengthCandidatesWithOriginProbe
+      applicableDomainValidation originProbe inputBoxPreference
+      applicableDomainPreference) contract candidates =
+  applyLengthRankingNonVacuousApplicableDomainPreference
+    applicableDomainPreference preferNonVacuousApplicableDomainLengthRanking
+    $ applyLengthRankingNonVacuousInputBoxPreference inputBoxPreference
+        preferNonVacuousBoundedPositiveLengthRanking
+    $ case applicableDomainValidation of
+        LengthRankingApplicableDomainValidationDisabled ->
+          case (inputBoxValidation, originProbe) of
+            (LengthRankingInputBoxValidationDisabled,
+                LengthRankingOriginProbeDisabled) ->
+              rankVerifiedLengthCandidates
+                execution evaluation contract candidates
+            (LengthRankingInputBoxValidationDisabled,
+                LengthRankingOriginProbeEnabled) ->
+              rankVerifiedLengthCandidatesWithOriginProbe
+                execution evaluation contract candidates
+            (LengthRankingInputBoxValidationEnabled limits maximums,
+                LengthRankingOriginProbeDisabled) ->
+              rankVerifiedLengthCandidatesWithInputBoxValidation
+                execution evaluation limits maximums contract candidates
+            (LengthRankingInputBoxValidationEnabled limits maximums,
+                LengthRankingOriginProbeEnabled) ->
+              rankVerifiedLengthCandidatesWithInputBoxValidationAndOriginProbe
+                execution evaluation limits maximums contract candidates
+        LengthRankingApplicableDomainValidationEnabled limits ->
+          rankVerifiedLengthCandidatesWithRankingPolicies
+            (scalarInputBoxRankingPolicy inputBoxValidation)
+            (LengthApplicableDomainRankingEnabled limits)
+            (scalarOriginProbeRankingPolicy originProbe)
             execution evaluation contract candidates
-        (LengthRankingInputBoxValidationEnabled limits maximums,
-            LengthRankingOriginProbeDisabled) ->
-          rankVerifiedLengthCandidatesWithInputBoxValidation
-            execution evaluation limits maximums contract candidates
-        (LengthRankingInputBoxValidationEnabled limits maximums,
-            LengthRankingOriginProbeEnabled) ->
-          rankVerifiedLengthCandidatesWithInputBoxValidationAndOriginProbe
-            execution evaluation limits maximums contract candidates
 
 -- | Associated variant used by a batch-scoped post-verification adapter.
 -- Caller-owned occurrence handles remain attached until that adapter validates
@@ -306,26 +440,38 @@ rankPostVerificationLengthCandidatesWithPolicy
           (PostVerificationCandidate epoch DetailedVerificationVariant)))
 rankPostVerificationLengthCandidatesWithPolicy
     (LengthRankingPolicy execution evaluation inputBoxValidation
-      originProbe preference) contract candidates =
-  applyLengthRankingNonVacuousInputBoxPreference preference
-    preferNonVacuousBoundedPositiveAssociatedLengthRanking
-    $ case (inputBoxValidation, originProbe) of
-        (LengthRankingInputBoxValidationDisabled,
-            LengthRankingOriginProbeDisabled) ->
-          rankPostVerificationLengthCandidates
+      applicableDomainValidation originProbe inputBoxPreference
+      applicableDomainPreference) contract candidates =
+  applyLengthRankingNonVacuousApplicableDomainPreference
+    applicableDomainPreference
+    preferNonVacuousApplicableDomainAssociatedLengthRanking
+    $ applyLengthRankingNonVacuousInputBoxPreference inputBoxPreference
+        preferNonVacuousBoundedPositiveAssociatedLengthRanking
+    $ case applicableDomainValidation of
+        LengthRankingApplicableDomainValidationDisabled ->
+          case (inputBoxValidation, originProbe) of
+            (LengthRankingInputBoxValidationDisabled,
+                LengthRankingOriginProbeDisabled) ->
+              rankPostVerificationLengthCandidates
+                execution evaluation contract candidates
+            (LengthRankingInputBoxValidationDisabled,
+                LengthRankingOriginProbeEnabled) ->
+              rankPostVerificationLengthCandidatesWithOriginProbe
+                execution evaluation contract candidates
+            (LengthRankingInputBoxValidationEnabled limits maximums,
+                LengthRankingOriginProbeDisabled) ->
+              rankPostVerificationLengthCandidatesWithInputBoxValidation
+                execution evaluation limits maximums contract candidates
+            (LengthRankingInputBoxValidationEnabled limits maximums,
+                LengthRankingOriginProbeEnabled) ->
+              rankPostVerificationLengthCandidatesWithInputBoxValidationAndOriginProbe
+                execution evaluation limits maximums contract candidates
+        LengthRankingApplicableDomainValidationEnabled limits ->
+          rankPostVerificationLengthCandidatesWithRankingPolicies
+            (scalarInputBoxRankingPolicy inputBoxValidation)
+            (LengthApplicableDomainRankingEnabled limits)
+            (scalarOriginProbeRankingPolicy originProbe)
             execution evaluation contract candidates
-        (LengthRankingInputBoxValidationDisabled,
-            LengthRankingOriginProbeEnabled) ->
-          rankPostVerificationLengthCandidatesWithOriginProbe
-            execution evaluation contract candidates
-        (LengthRankingInputBoxValidationEnabled limits maximums,
-            LengthRankingOriginProbeDisabled) ->
-          rankPostVerificationLengthCandidatesWithInputBoxValidation
-            execution evaluation limits maximums contract candidates
-        (LengthRankingInputBoxValidationEnabled limits maximums,
-            LengthRankingOriginProbeEnabled) ->
-          rankPostVerificationLengthCandidatesWithInputBoxValidationAndOriginProbe
-            execution evaluation limits maximums contract candidates
 
 -- | Assess one exact callback batch with an explicit reusable policy and
 -- request-owned contract, then expose a report only through the generative
@@ -349,26 +495,38 @@ rankVerifiedLengthSpinePairCandidatesWithPolicy
   -> IO (Either LengthRankingInputError LengthSpinePairRanking)
 rankVerifiedLengthSpinePairCandidatesWithPolicy
     (LengthRankingPolicy execution evaluation inputBoxValidation
-      originProbe preference) contract candidates =
-  applyLengthRankingNonVacuousInputBoxPreference preference
-    preferNonVacuousBoundedPositiveLengthSpinePairRanking
-    $ case (inputBoxValidation, originProbe) of
-        (LengthRankingInputBoxValidationDisabled,
-            LengthRankingOriginProbeDisabled) ->
-          rankVerifiedLengthSpinePairCandidates
+      applicableDomainValidation originProbe inputBoxPreference
+      applicableDomainPreference) contract candidates =
+  applyLengthRankingNonVacuousApplicableDomainPreference
+    applicableDomainPreference
+    preferNonVacuousApplicableDomainLengthSpinePairRanking
+    $ applyLengthRankingNonVacuousInputBoxPreference inputBoxPreference
+        preferNonVacuousBoundedPositiveLengthSpinePairRanking
+    $ case applicableDomainValidation of
+        LengthRankingApplicableDomainValidationDisabled ->
+          case (inputBoxValidation, originProbe) of
+            (LengthRankingInputBoxValidationDisabled,
+                LengthRankingOriginProbeDisabled) ->
+              rankVerifiedLengthSpinePairCandidates
+                execution evaluation contract candidates
+            (LengthRankingInputBoxValidationDisabled,
+                LengthRankingOriginProbeEnabled) ->
+              rankVerifiedLengthSpinePairCandidatesWithOriginProbe
+                execution evaluation contract candidates
+            (LengthRankingInputBoxValidationEnabled limits maximums,
+                LengthRankingOriginProbeDisabled) ->
+              rankVerifiedLengthSpinePairCandidatesWithInputBoxValidation
+                execution evaluation limits maximums contract candidates
+            (LengthRankingInputBoxValidationEnabled limits maximums,
+                LengthRankingOriginProbeEnabled) ->
+              rankVerifiedLengthSpinePairCandidatesWithInputBoxValidationAndOriginProbe
+                execution evaluation limits maximums contract candidates
+        LengthRankingApplicableDomainValidationEnabled limits ->
+          rankVerifiedLengthSpinePairCandidatesWithRankingPolicies
+            (spinePairInputBoxRankingPolicy inputBoxValidation)
+            (LengthSpinePairApplicableDomainRankingEnabled limits)
+            (spinePairOriginProbeRankingPolicy originProbe)
             execution evaluation contract candidates
-        (LengthRankingInputBoxValidationDisabled,
-            LengthRankingOriginProbeEnabled) ->
-          rankVerifiedLengthSpinePairCandidatesWithOriginProbe
-            execution evaluation contract candidates
-        (LengthRankingInputBoxValidationEnabled limits maximums,
-            LengthRankingOriginProbeDisabled) ->
-          rankVerifiedLengthSpinePairCandidatesWithInputBoxValidation
-            execution evaluation limits maximums contract candidates
-        (LengthRankingInputBoxValidationEnabled limits maximums,
-            LengthRankingOriginProbeEnabled) ->
-          rankVerifiedLengthSpinePairCandidatesWithInputBoxValidationAndOriginProbe
-            execution evaluation limits maximums contract candidates
 
 rankPostVerificationLengthSpinePairCandidatesWithPolicy
   :: LengthRankingPolicy
@@ -380,26 +538,38 @@ rankPostVerificationLengthSpinePairCandidatesWithPolicy
           (PostVerificationCandidate epoch DetailedVerificationVariant)))
 rankPostVerificationLengthSpinePairCandidatesWithPolicy
     (LengthRankingPolicy execution evaluation inputBoxValidation
-      originProbe preference) contract candidates =
-  applyLengthRankingNonVacuousInputBoxPreference preference
-    preferNonVacuousBoundedPositiveAssociatedLengthSpinePairRanking
-    $ case (inputBoxValidation, originProbe) of
-        (LengthRankingInputBoxValidationDisabled,
-            LengthRankingOriginProbeDisabled) ->
-          rankPostVerificationLengthSpinePairCandidates
+      applicableDomainValidation originProbe inputBoxPreference
+      applicableDomainPreference) contract candidates =
+  applyLengthRankingNonVacuousApplicableDomainPreference
+    applicableDomainPreference
+    preferNonVacuousApplicableDomainAssociatedLengthSpinePairRanking
+    $ applyLengthRankingNonVacuousInputBoxPreference inputBoxPreference
+        preferNonVacuousBoundedPositiveAssociatedLengthSpinePairRanking
+    $ case applicableDomainValidation of
+        LengthRankingApplicableDomainValidationDisabled ->
+          case (inputBoxValidation, originProbe) of
+            (LengthRankingInputBoxValidationDisabled,
+                LengthRankingOriginProbeDisabled) ->
+              rankPostVerificationLengthSpinePairCandidates
+                execution evaluation contract candidates
+            (LengthRankingInputBoxValidationDisabled,
+                LengthRankingOriginProbeEnabled) ->
+              rankPostVerificationLengthSpinePairCandidatesWithOriginProbe
+                execution evaluation contract candidates
+            (LengthRankingInputBoxValidationEnabled limits maximums,
+                LengthRankingOriginProbeDisabled) ->
+              rankPostVerificationLengthSpinePairCandidatesWithInputBoxValidation
+                execution evaluation limits maximums contract candidates
+            (LengthRankingInputBoxValidationEnabled limits maximums,
+                LengthRankingOriginProbeEnabled) ->
+              rankPostVerificationLengthSpinePairCandidatesWithInputBoxValidationAndOriginProbe
+                execution evaluation limits maximums contract candidates
+        LengthRankingApplicableDomainValidationEnabled limits ->
+          rankPostVerificationLengthSpinePairCandidatesWithRankingPolicies
+            (spinePairInputBoxRankingPolicy inputBoxValidation)
+            (LengthSpinePairApplicableDomainRankingEnabled limits)
+            (spinePairOriginProbeRankingPolicy originProbe)
             execution evaluation contract candidates
-        (LengthRankingInputBoxValidationDisabled,
-            LengthRankingOriginProbeEnabled) ->
-          rankPostVerificationLengthSpinePairCandidatesWithOriginProbe
-            execution evaluation contract candidates
-        (LengthRankingInputBoxValidationEnabled limits maximums,
-            LengthRankingOriginProbeDisabled) ->
-          rankPostVerificationLengthSpinePairCandidatesWithInputBoxValidation
-            execution evaluation limits maximums contract candidates
-        (LengthRankingInputBoxValidationEnabled limits maximums,
-            LengthRankingOriginProbeEnabled) ->
-          rankPostVerificationLengthSpinePairCandidatesWithInputBoxValidationAndOriginProbe
-            execution evaluation limits maximums contract candidates
 
 -- | Assess one callback batch through the pair-specific occurrence seal.
 assessVerifiedLengthSpinePairCandidatesWithPolicy

@@ -12,8 +12,10 @@ module Leant.Synth.Length.Presentation
   , lengthCandidatePresentationNote
   , renderLengthCounterexampleNote
   , renderLengthInputBoxValidationNote
+  , renderLengthApplicableDomainValidationNote
   , renderLengthSpinePairCounterexampleNote
   , renderLengthSpinePairInputBoxValidationNote
+  , renderLengthSpinePairApplicableDomainValidationNote
   , maximumLengthCounterexampleNoteCharacters
   ) where
 
@@ -23,8 +25,10 @@ import Numeric.Natural (Natural)
 import Language.Haskell.Djex
   ( LengthCounterexampleBasis (..)
   , LengthSpinePair
+  , ValidatedLengthApplicableDomain
   , ValidatedLengthCounterexample
   , ValidatedLengthInputBox
+  , ValidatedLengthSpinePairApplicableDomain
   , ValidatedLengthSpinePairCounterexample
   , ValidatedLengthSpinePairInputBox
   , lengthSpinePairFirst
@@ -32,6 +36,10 @@ import Language.Haskell.Djex
   , validatedLengthCounterexampleBasis
   , validatedLengthCounterexampleInputs
   , validatedLengthCounterexampleResult
+  , validatedLengthApplicableDomainApplicableAssignmentCount
+  , validatedLengthApplicableDomainAssignmentCount
+  , validatedLengthApplicableDomainBasis
+  , validatedLengthApplicableDomainInclusiveMaximums
   , validatedLengthInputBoxApplicableAssignmentCount
   , validatedLengthInputBoxAssignmentCount
   , validatedLengthInputBoxBasis
@@ -39,6 +47,10 @@ import Language.Haskell.Djex
   , validatedLengthSpinePairCounterexampleBasis
   , validatedLengthSpinePairCounterexampleInputs
   , validatedLengthSpinePairCounterexampleResult
+  , validatedLengthSpinePairApplicableDomainApplicableAssignmentCount
+  , validatedLengthSpinePairApplicableDomainAssignmentCount
+  , validatedLengthSpinePairApplicableDomainBasis
+  , validatedLengthSpinePairApplicableDomainInclusiveMaximums
   , validatedLengthSpinePairInputBoxApplicableAssignmentCount
   , validatedLengthSpinePairInputBoxAssignmentCount
   , validatedLengthSpinePairInputBoxBasis
@@ -155,6 +167,8 @@ presentRankedCandidate ranked = LengthCandidatePresentation
       Counterexample receipt -> Just $ renderLengthCounterexampleNote receipt
       BoundedPositive receipt -> Just
         $ renderLengthInputBoxValidationNote receipt
+      ApplicableDomainEstablished receipt -> Just
+        $ renderLengthApplicableDomainValidationNote receipt
       Heuristic _ -> Nothing
       Unassessed -> Nothing
 
@@ -174,6 +188,8 @@ presentRankedLengthSpinePairCandidate ranked = LengthCandidatePresentation
         $ renderLengthSpinePairCounterexampleNote receipt
       LengthSpinePairBoundedPositive receipt -> Just
         $ renderLengthSpinePairInputBoxValidationNote receipt
+      LengthSpinePairApplicableDomainEstablished receipt -> Just
+        $ renderLengthSpinePairApplicableDomainValidationNote receipt
       LengthSpinePairHeuristic _ -> Nothing
       LengthSpinePairUnassessed -> Nothing
 
@@ -229,6 +245,31 @@ renderLengthInputBoxValidationNote receipt =
         "; vacuous within this box (no assignment met the precondition)"
     | otherwise = ""
 
+-- | Render a complete query-owned applicable-domain traversal.  Direct
+-- precondition bounds establish that the finite maxima cover every applicable
+-- assignment; the claim remains explicitly model-relative.
+renderLengthApplicableDomainValidationNote
+  :: ValidatedLengthApplicableDomain
+  -> String
+renderLengthApplicableDomainValidationNote receipt =
+  take maximumLengthCounterexampleNoteCharacters $
+  "independently established the complete precondition-applicable "
+    ++ "finite-list-spine Length domain (model-relative; "
+    ++ renderBasis (validatedLengthApplicableDomainBasis receipt)
+    ++ "): inclusive input maxima = "
+    ++ renderInputs (validatedLengthApplicableDomainInclusiveMaximums receipt)
+    ++ "; checked assignments = "
+    ++ renderNatural (validatedLengthApplicableDomainAssignmentCount receipt)
+    ++ "; applicable assignments = "
+    ++ renderNatural
+        (validatedLengthApplicableDomainApplicableAssignmentCount receipt)
+    ++ vacuity
+ where
+  vacuity
+    | validatedLengthApplicableDomainApplicableAssignmentCount receipt == 0 =
+        "; vacuous (no assignment met the precondition)"
+    | otherwise = ""
+
 -- | Render both source-ordered result components of one independently replayed
 -- product-domain counterexample.  The note remains model-relative and bounded.
 renderLengthSpinePairCounterexampleNote
@@ -271,6 +312,33 @@ renderLengthSpinePairInputBoxValidationNote receipt =
   vacuity
     | validatedLengthSpinePairInputBoxApplicableAssignmentCount receipt == 0 =
         "; vacuous within this box (no assignment met the precondition)"
+    | otherwise = ""
+
+-- | Product-domain sibling of the complete applicable-domain note.
+renderLengthSpinePairApplicableDomainValidationNote
+  :: ValidatedLengthSpinePairApplicableDomain
+  -> String
+renderLengthSpinePairApplicableDomainValidationNote receipt =
+  take maximumLengthCounterexampleNoteCharacters $
+  "independently established the complete precondition-applicable "
+    ++ "binary-product finite-spine Length domain (model-relative; "
+    ++ renderBasis (validatedLengthSpinePairApplicableDomainBasis receipt)
+    ++ "): inclusive input maxima = "
+    ++ renderInputs
+        (validatedLengthSpinePairApplicableDomainInclusiveMaximums receipt)
+    ++ "; checked assignments = "
+    ++ renderNatural
+        (validatedLengthSpinePairApplicableDomainAssignmentCount receipt)
+    ++ "; applicable assignments = "
+    ++ renderNatural
+        (validatedLengthSpinePairApplicableDomainApplicableAssignmentCount
+          receipt)
+    ++ vacuity
+ where
+  vacuity
+    | validatedLengthSpinePairApplicableDomainApplicableAssignmentCount
+        receipt == 0 =
+          "; vacuous (no assignment met the precondition)"
     | otherwise = ""
 
 -- | Hard terminal-output ceiling.  The supported file-format caps make a
