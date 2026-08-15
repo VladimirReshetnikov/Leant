@@ -215,7 +215,9 @@ import Leant.Synth.Length.Configuration
   ( LengthRankingConfigurationError (..)
   , LengthRankingPolicy
   , LengthRankingPolicySource (..)
+  , enableLengthRankingApplicableDomainValidation
   , enableLengthRankingInputBoxValidation
+  , enableLengthRankingNonVacuousApplicableDomainPreference
   , enableLengthRankingNonVacuousInputBoxPreference
   , enableLengthRankingOriginProbe
   , mkLengthRankingPolicy
@@ -354,8 +356,10 @@ import Leant.Synth.Length.Presentation
   , presentLengthAssessment
   , presentLengthPostVerificationResult
   , presentLengthSpinePairPostVerificationResult
+  , renderLengthApplicableDomainValidationNote
   , renderLengthCounterexampleNote
   , renderLengthInputBoxValidationNote
+  , renderLengthSpinePairApplicableDomainValidationNote
   , renderLengthSpinePairInputBoxValidationNote
   )
 import Leant.Synth.Length.Ranking
@@ -3398,6 +3402,9 @@ lengthSpinePairRankingTests = testGroup
       "use pair unsat only to trigger independent finite-box validation"
       assertLengthSpinePairRankingInputBox
   , testCase
+      "establish and present directly bounded pair domains before Z3"
+      assertLengthSpinePairApplicableDomain
+  , testCase
       "prefer non-vacuous pair positives after unchanged serial assessment"
       assertLengthSpinePairNonVacuousPositivePreference
   , testCase
@@ -3692,6 +3699,159 @@ assertLengthSpinePairRankingInputBox = do
   -- The positive does not seed.  The box counterexample does, so the third
   -- occurrence avoids a third solver transaction.
   assertFakeLengthQueryEvents [0, 1] [] events
+
+assertLengthSpinePairApplicableDomain :: IO ()
+assertLengthSpinePairApplicableDomain = do
+  (counterexampleCandidate, positiveCandidate) <-
+    buildLengthSpinePairRankingFixture
+  retained <- syntheticLengthRankingCandidate
+    "pair-applicable-domain-retained"
+  limits <- explicitLengthInputBoxLimits 1 2
+  let input = Djex.LengthVariable $ Djex.LengthSpinePairInput 0
+      boundedContract = lengthSpinePairRankingContract
+        { leanLengthSpinePairContractSource =
+            (leanLengthSpinePairContractSource
+              lengthSpinePairRankingContract)
+              { Djex.lengthSpinePairContractPrecondition =
+                  Djex.LengthAtMost input $ Djex.LengthLiteral 1
+              }
+        }
+      original =
+        [retained, positiveCandidate, counterexampleCandidate,
+          counterexampleCandidate]
+  withFakeLengthSolver "query-unsat" $ \executable -> do
+    base <- expectRight $ mkLengthRankingPolicy
+      $ explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits
+          (explicitLengthRankingExecutionSource executable Nothing
+            Djex.LengthSMTLibStatusOnly)
+          Djex.defaultLengthEvaluationLimitSource
+    let domainThenPreference =
+          enableLengthRankingNonVacuousApplicableDomainPreference
+          $ enableLengthRankingOriginProbe
+          $ enableLengthRankingApplicableDomainValidation limits base
+        preferenceThenDomain =
+          enableLengthRankingApplicableDomainValidation limits
+          $ enableLengthRankingOriginProbe
+          $ enableLengthRankingNonVacuousApplicableDomainPreference base
+        run policy = expectRight =<<
+          rankVerifiedLengthSpinePairCandidatesWithPolicy
+            policy boundedContract original
+
+    first <- run domainThenPreference
+    second <- run preferenceThenDomain
+    map rankedLengthSpinePairCandidateOriginalIndex
+        (lengthSpinePairRankingCandidates first) @?= [1, 0, 2, 3]
+    lengthSpinePairRankingSnapshotByOriginalIndex first @?=
+      lengthSpinePairRankingSnapshotByOriginalIndex second
+    case map rankedLengthSpinePairCandidateAssessment
+        $ lengthSpinePairRankingCandidates first of
+      [ LengthSpinePairApplicableDomainEstablished positive
+        , LengthSpinePairUnassessed
+        , LengthSpinePairCounterexample firstCounterexample
+        , LengthSpinePairCounterexample secondCounterexample
+        ] -> do
+          Djex.validatedLengthSpinePairApplicableDomainInclusiveMaximums
+            positive @?= [1]
+          Djex.validatedLengthSpinePairApplicableDomainAssignmentCount
+            positive @?= 2
+          Djex.validatedLengthSpinePairApplicableDomainApplicableAssignmentCount
+            positive @?= 2
+          Djex.validatedLengthSpinePairApplicableDomainBasis positive @?=
+            Djex.FiniteSpineModelUnderAssumedProviderLaws
+              (pairRankingUsedProviders positiveCandidate boundedContract)
+          map Djex.validatedLengthSpinePairCounterexampleInputs
+              [firstCounterexample, secondCounterexample] @?=
+            replicate 2 [1]
+          map Djex.validatedLengthSpinePairCounterexampleResult
+              [firstCounterexample, secondCounterexample] @?=
+            replicate 2 (Djex.LengthSpinePair 1 1)
+      assessments -> assertFailure
+        $ "unexpected pair applicable-domain assessments: "
+            ++ show assessments
+    -- The positive receipt contributes no MRU vector.  The following first
+    -- source-ordered violation does, so its duplicate is replayed without a
+    -- solver transaction.  The lexical worker may still have been opened.
+    assertFakeLengthQueryEvents [] [] =<<
+      BS.readFile (executable ++ ".events")
+
+    verification <- verificationBatchFromReceipts original
+    associated <- expectLengthSpinePairPostVerificationWithin
+      $ assessVerifiedLengthSpinePairCandidatesWithPolicy
+          domainThenPreference boundedContract verification
+    sealed <- case lengthSpinePairPostVerificationSealedBatch associated of
+      Nothing -> assertFailure
+        "pair applicable-domain output bypassed its occurrence seal"
+          >> error "unreachable"
+      Just batch -> pure batch
+    lengthSpinePairPostVerificationCandidates associated @?=
+      postVerificationBatchCandidates sealed
+    associatedRanking <-
+      expectLengthSpinePairPostVerificationRanking associated
+    map rankedLengthSpinePairCandidateOriginalIndex
+        (lengthSpinePairRankingCandidates associatedRanking) @?=
+      [1, 0, 2, 3]
+    positive <- case map rankedLengthSpinePairCandidateAssessment
+        $ lengthSpinePairRankingCandidates associatedRanking of
+      LengthSpinePairApplicableDomainEstablished receipt : _ -> pure receipt
+      assessments -> assertFailure
+        ("associated pair domain lost its positive receipt: "
+          ++ show assessments) >> error "unreachable"
+    let positiveNote =
+          renderLengthSpinePairApplicableDomainValidationNote positive
+        presentations = presentLengthSpinePairPostVerificationResult associated
+    map lengthCandidatePresentationText presentations @?=
+      map (detailedVerificationVariantText . verifiedCandidate)
+        (lengthSpinePairPostVerificationCandidates associated)
+    case map lengthCandidatePresentationNote presentations of
+      [Just directNote, Nothing, Just firstNote, Just secondNote] -> do
+        directNote @?= positiveNote
+        mapM_ (assertBool "pair domain note lost its occurrence" .
+            isInfixOf "second result spine length = 1")
+          [firstNote, secondNote]
+      notes -> assertFailure
+        $ "pair domain presentation reassociated notes: " ++ show notes
+    mapM_ (\fragment -> assertBool
+        ("pair applicable-domain note omitted " ++ show fragment)
+        $ fragment `isInfixOf` positiveNote)
+      [ "complete precondition-applicable binary-product finite-spine Length domain"
+      , "conditional on 1 assumed provider law"
+      , "inclusive input maxima = [1]"
+      , "checked assignments = 2"
+      , "applicable assignments = 2"
+      ]
+
+    let vacuousContract = boundedContract
+          { leanLengthSpinePairContractSource =
+              (leanLengthSpinePairContractSource boundedContract)
+                { Djex.lengthSpinePairContractPrecondition = Djex.LengthAll
+                    [ Djex.LengthAtMost input $ Djex.LengthLiteral 1
+                    , Djex.LengthAtMost (Djex.LengthLiteral 2) input
+                    ]
+                , Djex.lengthSpinePairContractPostcondition =
+                    Djex.LengthTruth True
+                }
+          }
+        vacuousOriginal =
+          [counterexampleCandidate, retained, positiveCandidate]
+    vacuous <- expectRight =<<
+      rankVerifiedLengthSpinePairCandidatesWithPolicy
+        domainThenPreference vacuousContract vacuousOriginal
+    map rankedLengthSpinePairCandidateOriginalIndex
+        (lengthSpinePairRankingCandidates vacuous) @?= [0, 1, 2]
+    case map rankedLengthSpinePairCandidateAssessment
+        $ lengthSpinePairRankingCandidates vacuous of
+      [ LengthSpinePairApplicableDomainEstablished firstVacuous
+        , LengthSpinePairUnassessed
+        , LengthSpinePairApplicableDomainEstablished secondVacuous
+        ] -> map
+          Djex.validatedLengthSpinePairApplicableDomainApplicableAssignmentCount
+          [firstVacuous, secondVacuous] @?= [0, 0]
+      assessments -> assertFailure
+        $ "vacuous pair domains left the neutral partition: "
+            ++ show assessments
+    assertFakeLengthQueryEvents [] [] =<<
+      BS.readFile (executable ++ ".events")
 
 assertLengthSpinePairNonVacuousPositivePreference :: IO ()
 assertLengthSpinePairNonVacuousPositivePreference = do
@@ -4379,6 +4539,12 @@ lengthRankingTests = testGroup "checked Length behavioral ranking"
   , testCase
       "independently validate exact input boxes after unsat only"
       assertLengthRankingInputBoxValidation
+  , testCase
+      "compose and present directly bounded applicable domains before Z3"
+      assertLengthRankingApplicableDomainComposition
+  , testCase
+      "atomically reset an indexed admitted applicable-domain failure"
+      assertLengthRankingApplicableDomainAtomicFailure
   , testCase
       "retain counterexample-only MRU state across bounded positives"
       assertLengthRankingInputBoxSeedIsolation
@@ -10526,6 +10692,191 @@ assertLengthRankingInputBoxValidation = do
   -- seeds [0,1].  The second occurrence replays that vector through its own
   -- sealed query, so no second solver query or get-value request is needed.
   assertFakeLengthQueryEvents [0] [] counterexampleEvents
+
+assertLengthRankingApplicableDomainComposition :: IO ()
+assertLengthRankingApplicableDomainComposition = do
+  fixture <- buildLengthRankingLiveFixture
+  identity <- buildOneInputLengthRankingCandidate
+  retained <- syntheticLengthRankingCandidate
+    "applicable-domain-composition-retained"
+  applicableLimits <- explicitLengthInputBoxLimits 0 1
+  inputBoxLimits <- explicitLengthInputBoxLimits 1 1
+  let zero = lengthRankingFixtureZero fixture
+      one = lengthRankingFixtureOne fixture
+      contract = lengthRankingContract 0
+      original = [retained, identity, zero, one]
+  withFakeLengthSolver "query-unsat" $ \executable -> do
+    base <- expectRight $ mkLengthRankingPolicy
+      $ explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits
+          (explicitLengthRankingExecutionSource executable Nothing
+            Djex.LengthSMTLibStatusOnly)
+          Djex.defaultLengthEvaluationLimitSource
+    let forward = enableLengthRankingNonVacuousApplicableDomainPreference
+          $ enableLengthRankingNonVacuousInputBoxPreference
+          $ enableLengthRankingApplicableDomainValidation applicableLimits
+          $ enableLengthRankingInputBoxValidation inputBoxLimits [0]
+          $ enableLengthRankingOriginProbe base
+        reverseOrder = enableLengthRankingOriginProbe
+          $ enableLengthRankingInputBoxValidation inputBoxLimits [0]
+          $ enableLengthRankingApplicableDomainValidation applicableLimits
+          $ enableLengthRankingNonVacuousInputBoxPreference
+          $ enableLengthRankingNonVacuousApplicableDomainPreference base
+        boxPreferenceOnly = enableLengthRankingNonVacuousInputBoxPreference
+          $ enableLengthRankingApplicableDomainValidation applicableLimits
+          $ enableLengthRankingInputBoxValidation inputBoxLimits [0]
+          $ enableLengthRankingOriginProbe base
+        run label policy = expectLengthRankingWithin label
+          $ rankVerifiedLengthCandidatesWithPolicy policy contract original
+
+    ranked <- run "applicable-domain composed ordering" forward
+    reversed <- run "reverse applicable-domain builder ordering" reverseOrder
+    assertLengthRankingsEquivalent ranked reversed
+    map rankedLengthCandidateOriginalIndex
+        (lengthRankingCandidates ranked) @?= [2, 1, 0, 3]
+    (domainReceipt, boxReceipt) <- case
+        map rankedLengthCandidateAssessment $ lengthRankingCandidates ranked of
+      [ ApplicableDomainEstablished domainPositive
+        , BoundedPositive boxPositive
+        , Unassessed
+        , Counterexample counterexample
+        ] -> do
+          Djex.validatedLengthCounterexampleInputs counterexample @?= []
+          Djex.validatedLengthCounterexampleResult counterexample @?= 1
+          pure (domainPositive, boxPositive)
+      assessments -> assertFailure
+        ("unexpected composed applicable-domain assessments: "
+          ++ show assessments) >> error "unreachable"
+    Djex.validatedLengthApplicableDomainInclusiveMaximums domainReceipt @?= []
+    Djex.validatedLengthApplicableDomainAssignmentCount domainReceipt @?= 1
+    Djex.validatedLengthApplicableDomainApplicableAssignmentCount
+      domainReceipt @?= 1
+    zeroProblem <- expectRight $ prepareCheckedLengthProblem contract zero
+    Djex.validatedLengthApplicableDomainBasis domainReceipt @?=
+      Djex.FiniteSpineModelUnderAssumedProviderLaws
+        (checkedLengthCandidateUsedProviders
+          $ checkedLengthProblemCandidate zeroProblem)
+    Djex.validatedLengthInputBoxInclusiveMaximums boxReceipt @?= [0]
+    Djex.validatedLengthInputBoxAssignmentCount boxReceipt @?= 1
+    Djex.validatedLengthInputBoxApplicableAssignmentCount boxReceipt @?= 1
+    Djex.validatedLengthInputBoxBasis boxReceipt @?=
+      Djex.ProviderIndependentFiniteSpineModel
+    -- The unary domain is rejected only by bounded admission, then misses the
+    -- origin and consumes the sole live unsat transaction which triggers its
+    -- independent box.  Both nullary candidates finish before Z3.
+    assertFakeLengthQueryEvents [0] [] =<<
+      BS.readFile (executable ++ ".events")
+
+    boxFirst <- run "box-only positive ordering" boxPreferenceOnly
+    map rankedLengthCandidateOriginalIndex
+        (lengthRankingCandidates boxFirst) @?= [1, 0, 2, 3]
+    assertFakeLengthQueryEvents [0] [] =<<
+      BS.readFile (executable ++ ".events")
+
+    -- Every builder is persistent.  Reusing the common base leaves the new
+    -- traversal and both ordering authorities disabled, including for a
+    -- contract whose nullary domain is complete.
+    legacy <- run "immutable applicable-domain base" base
+    map rankedLengthCandidateOriginalIndex
+        (lengthRankingCandidates legacy) @?= [0, 1, 2, 3]
+    map rankedLengthCandidateAssessment
+        (lengthRankingCandidates legacy) @?=
+      [ Unassessed
+      , Heuristic Djex.SolverUnsatisfiable
+      , Heuristic Djex.SolverUnsatisfiable
+      , Heuristic Djex.SolverUnsatisfiable
+      ]
+    assertFakeLengthQueryEvents [0, 1, 2] [] =<<
+      BS.readFile (executable ++ ".events")
+
+    verification <- verificationBatchFromReceipts original
+    associated <- expectLengthPostVerificationWithin
+      "applicable-domain occurrence association"
+      $ assessVerifiedLengthCandidatesWithPolicy forward contract verification
+    assertLengthPostVerificationSealed associated
+    associatedRanking <- expectLengthPostVerificationRanking associated
+    map rankedLengthCandidateOriginalIndex
+        (lengthRankingCandidates associatedRanking) @?= [2, 1, 0, 3]
+    (associatedDomain, associatedBox) <- case
+        map rankedLengthCandidateAssessment
+          $ lengthRankingCandidates associatedRanking of
+      ApplicableDomainEstablished directDomain
+          : BoundedPositive directBox : _ -> pure (directDomain, directBox)
+      assessments -> assertFailure
+        ("associated applicable-domain ranking changed: "
+          ++ show assessments) >> error "unreachable"
+    let domainNote = renderLengthApplicableDomainValidationNote
+          associatedDomain
+        boxNote = renderLengthInputBoxValidationNote associatedBox
+        presentations = presentLengthPostVerificationResult associated
+    map lengthCandidatePresentationText presentations @?=
+      map (detailedVerificationVariantText . verifiedCandidate)
+        (lengthPostVerificationCandidates associated)
+    case map lengthCandidatePresentationNote presentations of
+      [Just directDomain, Just directBox, Nothing, Just counterexampleNote] -> do
+        directDomain @?= domainNote
+        directBox @?= boxNote
+        assertBool "domain counterexample followed the wrong occurrence"
+          $ "result spine length = 1" `isInfixOf` counterexampleNote
+      notes -> assertFailure
+        $ "applicable-domain presentation reassociated notes: " ++ show notes
+    mapM_ (\fragment -> assertBool
+        ("scalar applicable-domain note omitted " ++ show fragment)
+        $ fragment `isInfixOf` domainNote)
+      [ "complete precondition-applicable finite-list-spine Length domain"
+      , "conditional on 1 assumed provider law"
+      , "inclusive input maxima = []"
+      , "checked assignments = 1"
+      , "applicable assignments = 1"
+      ]
+    assertFakeLengthQueryEvents [0] [] =<<
+      BS.readFile (executable ++ ".events")
+
+assertLengthRankingApplicableDomainAtomicFailure :: IO ()
+assertLengthRankingApplicableDomainAtomicFailure = do
+  fixture <- buildLengthRankingLiveFixture
+  trailing <- syntheticLengthRankingCandidate
+    "applicable-domain-atomic-failure-trailing"
+  limits <- explicitLengthInputBoxLimits 0 1
+  let zero = lengthRankingFixtureZero fixture
+      one = lengthRankingFixtureOne fixture
+      original = [zero, one, trailing]
+      evaluationSource = Djex.defaultLengthEvaluationLimitSource
+        { Djex.lengthEvaluationLimitSourceIntermediateValueBits = 0 }
+  withFakeLengthSolver "query-unsat" $ \executable -> do
+    base <- expectRight $ mkLengthRankingPolicy
+      $ explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits
+          (explicitLengthRankingExecutionSource executable Nothing
+            Djex.LengthSMTLibStatusOnly)
+          evaluationSource
+    ranking <- expectLengthRankingWithin
+      "admitted applicable-domain evaluation failure"
+      $ rankVerifiedLengthCandidatesWithPolicy
+          (enableLengthRankingApplicableDomainValidation limits base)
+          (lengthRankingContract 0) original
+    rankedLengthVerifiedCandidates ranking @?= original
+    map rankedLengthCandidateAssessment
+        (lengthRankingCandidates ranking) @?= replicate 3 Unassessed
+    rankedLengthPreparationRefusals ranking @?=
+      [Nothing, Nothing, Just LengthPreparationTypedAuthorityUnavailable]
+    failure <- case lengthRankingFailure ranking of
+      Nothing -> assertFailure
+        "admitted applicable-domain evaluation failure was discarded"
+          >> error "unreachable"
+      Just retained -> pure retained
+    lengthRankingFailureClass failure @?=
+      LengthRankingApplicableDomainValidationFailed
+        (Djex.LengthInputBoxAssignmentEvaluationRejected 0
+          $ Djex.LengthEvaluationValueBitLimitExceeded
+              Djex.LengthIntermediateValue 0 1)
+    lengthRankingFailureOriginalIndex failure @?= Just 1
+    lengthRankingFailureCleanupIncomplete failure @?= False
+    -- The first nullary candidate established its singleton domain, but the
+    -- later admitted traversal failed before either candidate could consume a
+    -- live ordinal.  Atomic fallback discards that earlier receipt as well.
+    assertFakeLengthQueryEvents [] [] =<<
+      BS.readFile (executable ++ ".events")
 
 assertLengthRankingInputBoxSeedIsolation :: IO ()
 assertLengthRankingInputBoxSeedIsolation = do
