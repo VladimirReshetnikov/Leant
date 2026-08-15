@@ -136,7 +136,7 @@ Finite-list-spine **Length counterexample ranking** is an optional last
 stage that consults Z3 about the behavior of verified candidates and stably
 reorders them; it is off unless you pass `--length-ranking-config`, it never
 prunes, and raw solver status carries no authority. The complete reference —
-configuration versions 1–28, contract-file versions 1–6, the binary-product
+every configuration-file and contract-file version, the binary-product
 extension, replay bank, origin probe, bounded validation, and presentation
 notes — is [docs/length-ranking.md](docs/length-ranking.md).
 
@@ -1031,96 +1031,24 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   without binder metadata retain the positional `@` fallback. Inventory
   extraction is deliberately best-effort: if it cannot be produced, each
   engine still runs with the structural declarations it already has.
-- For an exact polymorphic provider whose source constraints can determine its
-  visible type arguments, discovery may attach active-instance-head evidence.
-  It opens at most six type binders and inspects at most 32 heads in
-  resolver order under isolated metavariable state. A selected head is retained
-  only after its own subgoals and every remaining provider constraint close;
-  one success yields one ordered vector of kind/type pairs, and incomplete
-  heads yield nothing. Each argument retains a bounded `Type`-arrow kind. For a
-  context-free provider source, Leant reconstructs the corresponding Djex
-  `GroundKind` and sends the vector through the checked kinded Djinn or
-  Exference assignment entry point; contextual Exference vectors with accepted
-  fact groups instead authorize only the replay-isolated ground-fact path
-  below, while a no-group exact-evidence provider takes its successfully
-  translatable bounded vectors through the erased fallback. Leant
-  rejects residual kind arities above 64 before that bridge, and pinned Djex
-  independently rejects a supplied `GroundKind` above 129 constructor nodes
-  before recursive operations on that assignment. At most
-  16 distinct vectors survive per provider. `FDepth` and legacy raw `FInst`
-  fragments reject their complete vector after parsing. The live wire retains
-  provider-scheme and exact-assignment `FExactContext` nodes only for bounded,
-  closed nominal class applications. Exference preserves them on the
-  plain/binder-only and accepted-fact lanes; a no-group exact-evidence provider
-  and Djinn use context-erased compatibility projections. Class arguments may
-  have a bounded first-order kind; a positive-arity source argument may be its
-  enclosing provider variable either bare or partially applied only to
-  proper-type arguments, while ground assignments require a canonical nominal
-  head and proper-type supplied arguments. Malformed, free,
-  dictionary-dependent, term-indexed, unsupported
-  structural forms, and other unsupported forms remain fail-closed. The
-  command-wide vector list is capped at 32 before planning or translation, and
-  provider-prefix fallback carries each vector only with its source
-  declaration. The checked runners
-  verify exact provider identity, arity, supplied positional kinds, closure,
-  and context before consuming a vector once without Cartesian reconstruction.
-  Proper-kind live arguments additionally retain a bounded structural fragment
-  plus semantic forall-domain tags. This metadata is render-only, selected only
-  by a complete canonical vector, and preserves implicit/explicit binders plus
-  mixed `Prop`/`Type`/`Sort` domains without transporting executable Lean text;
-  the mandatory Lean verifier remains the acceptance boundary.
-  This includes constraint-only or otherwise vacuous higher-kinded binders.
-  Canonical `Prod` and `Sum` are accepted at total arity two and translated to
-  their structural Djex identities; the other unsaturated structural heads and
-  every legacy structural payload remain conservatively excluded.
-  A dependent or unsupported provider context truncates the entire provider;
-  it is never erased into a stronger context-free scheme. Only current exact
-  `(instantiations ...)` vectors on an Exference contextual provider can turn
-  their source scheme's specialized constraints into deduplicated
-  zero-prerequisite ground declarations after the complete constraint group
-  passes a clean replayed trial inventory seal. Discovery commits no
-  vector-local translation state; every trial replays the previously accepted
-  source-order keys plus the candidate, and the final inventory replays only
-  accepted keys. An all-rejected provider restores all successfully
-  translatable vectors from its bounded, filtered context-erased fallback.
-  Legacy `(candidates ...)`
-  metadata cannot. The resulting class facts are global to the exact
-  Exference/Length inventory and may serve another provider because
-  top-level Lean instance search closed them without query givens. Djex still
-  independently discharges each activated conditional-certificate obligation
-  before Length problem or query sealing, and Z3 supplies no dictionary
-  authority.
+- Exact polymorphic providers whose class constraints pin down their type
+  arguments can be discovered together with the instance-head evidence that
+  determines those arguments, within fixed bounds (six binders, 32 heads, 16
+  vectors per provider); the exact vectors, kinds, wire format, and ground-fact
+  rules are specified in
+  [docs/synth-internals.md](docs/synth-internals.md#provider-instantiation-evidence).
 - Non-dependent instance-implicit binders in a goal are serialized as
   render-only slots. They are erased before either engine searches, reserve a
   wildcard in an introduced Lean lambda, stay implicit at hypothesis and
   provider applications, and poison complete negative evidence. This keeps
   dictionary reconstruction with Lean without shifting later synthesized
   term arguments.
-- Proper-type applications headed by a bound constructor variable or an
-  opaque/non-inductive Lean constant retain their ordered arguments. Private
-  abstract declarations keep constant heads rigid, and rendering restores
-  their exact Lean names. Qualifying non-recursive inductives add a query-wide
-  exact-head plan: compatible `Option`, `Except`, and user-family occurrences
-  share one parameterized data declaration while preserving constructor
-  introduction and case elimination. Recursive `FParamRec` occurrences now
-  use a parallel exact-head plan with recursive-knot normalization. Both
-  engines receive a shared native recursive declaration only for a complete,
-  compatible schema: Djinn gains bounded positive introduction and Exference
-  its one-layer eliminator. A pairwise-distinct structured parameter vector may
-  seed a positive candidate plan when its closed template specializes back to
-  every observed occurrence; this remains speculative until Lean verification
-  because occurrence inventories do not retain parameter provenance. Every
-  recursive fallback uses one abstract exact family plus occurrence constructor
-  premises. Repeated, partial, incompatible, or nominally colliding schemas
-  disable negative evidence; term/dependent parameters retain the
-  occurrence-local path.
-  Planning reaches nested inventories through a fixed point, but only when a
-  selected structural declaration or an active constructor premise consumes
-  them. Fixed opaque fields are seeded as private rigid proper types, while
-  recursive self keys are subtracted so the knot resolves through the shared
-  datatype rather than an unrelated atom. Thus unused metadata cannot poison
-  a plan, and a zero-parameter type such as `Std.Format` cannot acquire an
-  accidental free variable through its `String` field.
+- Applications of type constructors — bound variables, opaque Lean
+  constants, and qualifying inductive families such as `Option`, `Except`,
+  and user declarations — keep their arguments and, for families, share one
+  parameterized declaration across the whole goal; the plan rules and the
+  refutation-safety consequences are specified in
+  [docs/synth-internals.md](docs/synth-internals.md#proper-type-applications-and-family-plans).
 - Where a term's shape is ambiguous in Lean (a quantified hypothesis
   may be transported whole or instantiated), the renderer offers the
   alternatives and verification picks the one that elaborates.

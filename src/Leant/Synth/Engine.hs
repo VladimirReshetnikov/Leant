@@ -72,7 +72,6 @@ module Leant.Synth.Engine
   , synthesizeWith
   , synthesizeTuned
   , synthesizeTunedDetailed
-  , forceOutcome
   , forceDetailedOutcome
   , synthMaxShown
   , synthMaxTried
@@ -666,23 +665,12 @@ takeDistinctOn key limit =
 -- run: the verdict itself, plus the first @n@ candidate groups.  The
 -- caller runs this under a wall-clock guard - the engine is pure and
 -- lazy, so without forcing, the search would instead happen later,
--- outside the guard.
-forceOutcome :: Int -> Either String SynthOutcome -> Int
-forceOutcome n outcome = case outcome of
-  Left err -> length err
-  Right (SynthCandidates groups notes) ->
-    sum (map (sum . map length) (take n groups)) + noteSize notes
-  Right (SynthRefuted sound) -> if sound then 1 else 0
-  Right (SynthNoTerm notes) -> noteSize notes
- where
-  noteSize = sum . map length
-
--- | 'forceOutcome' for the internal route-preserving stream.  Forcing the
--- route alongside each bounded group keeps search and observation provenance
--- under the same caller-owned deadline without inspecting the tail.  Exact
--- duplicate origins stay deliberately lazy: opt-in behavioral preparation
--- pays their locally 'candidateWindow'-bounded lookup instead of widening
--- Main's established synthesis work.
+-- outside the guard.  Forcing the route alongside each bounded group keeps
+-- search and observation provenance under the same caller-owned deadline
+-- without inspecting the tail.  Exact duplicate origins stay deliberately
+-- lazy: opt-in behavioral preparation pays their locally
+-- 'candidateWindow'-bounded lookup instead of widening Main's established
+-- synthesis work.
 forceDetailedOutcome :: Int -> Either String DetailedSynthOutcome -> Int
 forceDetailedOutcome n outcome = case outcome of
   Left err -> length err
@@ -1386,7 +1374,7 @@ mergeOutcomesSkipping checked djinn exference =
 
 -- | Remove spellings already sent to Lean by an earlier structural/provider
 -- lane.  Empty groups do not consume the next lane's verification budget, and
--- the transformation stays lazy so 'forceOutcome' can pull the first bounded
+-- the transformation stays lazy so 'forceDetailedOutcome' can pull the first bounded
 -- /fresh/ prefix while it is still under the command deadline.
 withoutCheckedCandidates :: Set.Set String -> SynthOutcome -> SynthOutcome
 withoutCheckedCandidates checked =
