@@ -54,6 +54,7 @@ Reports are listed oldest first.
 - 2026-08-14 — [Directly bounded Length applicable-domain orchestration](2026-08-14-directly-bounded-length-applicable-domain.md)
 - 2026-08-14 — [Bounded Length counterexample simplification](2026-08-14-bounded-length-counterexample-simplification.md)
 - 2026-08-14 — [Positive-affine deferred Length ranking](2026-08-14-positive-affine-deferred-length-ranking.md)
+- 2026-08-15 — [Shared usable-work budget for Length ranking](2026-08-15-shared-usable-work-length-ranking.md)
 
 ## Standalone PDF reports
 
