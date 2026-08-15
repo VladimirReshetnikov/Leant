@@ -136,7 +136,7 @@ Finite-list-spine **Length counterexample ranking** is an optional last
 stage that consults Z3 about the behavior of verified candidates and stably
 reorders them; it is off unless you pass `--length-ranking-config`, it never
 prunes, and raw solver status carries no authority. The complete reference —
-configuration versions 1–24, contract-file versions 1–6, the binary-product
+configuration versions 1–26, contract-file versions 1–6, the binary-product
 extension, replay bank, origin probe, bounded validation, and presentation
 notes — is [docs/length-ranking.md](docs/length-ranking.md).
 
