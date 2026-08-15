@@ -2,6 +2,15 @@
 
 Date: 2026-08-13
 
+> **Later 2026-08-14 follow-up.** The same opaque `LengthRankingPolicy` now
+> drives either scalar or canonical-`Prod` library ranking. That reuse is
+> limited to process/evaluation and optional origin/box orchestration policy;
+> the request supplies a nominal pair contract and all resulting query,
+> evidence, failure, assessment, and presentation authority remains pair-
+> specific. Product startup version 4 and contract-only version 6 remain
+> deferred. See the
+> [live binary-product Length ranking report](2026-08-14-live-binary-product-length-ranking.md).
+
 ## Outcome
 
 Leant no longer retains a second generic `LengthRankingConfiguration` beside

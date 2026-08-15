@@ -2,6 +2,15 @@
 
 Date: 2026-08-14
 
+> **Later 2026-08-14 follow-up.** The offline query boundary described here is
+> now consumed by a nominal product-specific live ranking, post-verification,
+> and presentation path. It reuses only the domain-neutral execution policy
+> and common Djex session limits; product contracts, observations, evidence,
+> failures, MRU state, and assessments remain distinct from scalar Length.
+> Product startup configuration version 4 and contract-only version 6 remain
+> deferred. See the
+> [live binary-product Length ranking report](2026-08-14-live-binary-product-length-ranking.md).
+
 ## Outcome
 
 Leant now has an additive checked entrance for the Djex
@@ -155,14 +164,15 @@ and independently replayed violating model is heuristic only; `unsat` without
 query-owned bounded validation proves nothing at this boundary; and `unknown`
 is likewise not evidence.
 
-## Compatibility and deferred work
+## Compatibility and work deferred at this checkpoint
 
 This checkpoint makes no scalar protocol or identity change. Existing scalar
 Length query bytes, live session/worker types, MRU input bank, origin-before-
 live orchestration, unsat-triggered scalar box validation, presentation, and
 stable ranking remain as they were.
 
-The following product work remains deliberately deferred:
+At the time of this offline checkpoint, the following product work remained
+deliberately deferred:
 
 - a separately versioned live product worker/session protocol;
 - product ranking and presentation semantics;
@@ -174,3 +184,11 @@ The following product work remains deliberately deferred:
 Product queries must not be routed through the existing scalar live envelope
 merely because their low-level check/request bytes can share QF_LIA shapes.
 Their checked domain, problem association, and fingerprint are different.
+
+The later live-ranking checkpoint resolves the live execution, ranking,
+replay-bank, origin, input-box, and presentation items through nominal
+product-specific APIs. It deliberately reuses the common capability-probed
+Djex live session instead of introducing a second worker type; the common
+session budget grants no scalar-to-product evidence conversion. Product
+startup/command configuration and automatic contract inference remain
+deferred.

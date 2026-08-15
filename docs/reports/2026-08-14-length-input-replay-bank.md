@@ -16,6 +16,13 @@ Date: 2026-08-14
 > evidence, while evaluation or association failure activates indexed atomic
 > fallback. See the
 > [origin-probe orchestration report](2026-08-14-length-origin-probe-orchestration.md).
+>
+> **Later 2026-08-14 follow-up.** Canonical-`Prod` ranking has the same bounded
+> four-entry MRU policy, but its bank is a separate pair-batch value and every
+> attempted vector passes through the pair query's own replay and association
+> gate. No scalar receipt, query, status, authority, or bank entry crosses that
+> nominal domain boundary. See the
+> [live binary-product Length ranking report](2026-08-14-live-binary-product-length-ranking.md).
 
 ## Outcome and work bound
 

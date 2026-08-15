@@ -290,7 +290,7 @@ ordinal-zero renderer rule, while choosing `"exact-spine-zero-step-v1"`
 retains the accepted typed renderer ordinal just as version 4 does. Versions
 1--4 and startup continue to reject the quotient tag.
 
-### Offline binary-product Length queries
+### Binary-product Length queries
 
 Leant also has a library-level, fail-closed handoff for a result whose root,
 after the serializer's existing `whnfR` normalization, is saturated canonical
@@ -353,15 +353,76 @@ replay remain pure query-owned operations, and only independently evaluated
 and associated values can become model-relative counterexample evidence. Raw
 `sat`, `unsat`, or `unknown` status has no authority.
 
-This checkpoint is deliberately offline. It adds no product form to the
-startup or `--length-contract` JSON grammars and does not route product queries
-through the scalar live worker, ranking pass, MRU bank, or presentation path.
-Live product ranking and its configuration grammar remain deferred; scalar
-live behavior and scalar query bytes are unchanged. See the
-[canonical `Prod` Length handoff report](docs/reports/2026-08-14-canonical-prod-length-handoff.md)
-for the exact boundary and compatibility details.
+That first checkpoint was deliberately offline. The library now also exposes
+the product-specific live runner, ranking, post-verification, and presentation
+path. For example, an integration which already owns a checked reusable policy,
+an explicit finite-box limit, and the callback batch can opt into both bounded
+validation and the query-owned origin probe without converting the pair
+contract to a scalar contract:
 
-After a successful occurrence seal, Main prints a subordinate note only for a
+```haskell
+let pairPolicy =
+      enableLengthRankingOriginProbe
+        $ enableLengthRankingInputBoxValidation
+            inputBoxLimits [3] basePolicy
+
+assessment <- assessVerifiedLengthSpinePairCandidatesWithPolicy
+  pairPolicy pairContract verificationBatch
+
+let present candidate = do
+      putStrLn $ lengthCandidatePresentationText candidate
+      mapM_ putStrLn $ lengthCandidatePresentationNote candidate
+
+mapM_ present
+  $ presentLengthSpinePairPostVerificationResult assessment
+```
+
+Here `basePolicy` is a `LengthRankingPolicy` returned by
+`mkLengthRankingPolicy`, `inputBoxLimits` is a checked Djex
+`LengthInputBoxLimits`, `[3]` is the source-ordered inclusive maximum for this
+example's one modeled input, and `verificationBatch` is Leant's occurrence-
+sealed callback batch. A caller which already owns a plain list of verified
+receipts can instead call
+`rankVerifiedLengthSpinePairCandidatesWithPolicy`; the post-verification form
+keeps each reordered receipt attached to its exact occurrence through the
+permutation seal.
+
+For each eligible product query, the exact order is the product batch's
+newest-first four-entry MRU input replay bank, the optional query-owned origin
+probe, a live pair query, query-first observation replay, and—only when that
+live observation has no counterexample and reports `unsat`—the optional exact
+input-box traversal. A freshly replayed and associated pair counterexample is
+the only assessment which moves: it enters the stable demoted partition and
+can supply an MRU input vector. Complete box traversal is the neutral
+`LengthSpinePairBoundedPositive`; status-only `sat`, `unsat`, and `unknown`
+remain neutral heuristics. Any structured session or live-query failure,
+live-observation association or replay failure, query-owned origin failure, or
+input-box failure atomically restores the admitted batch in original order as
+unassessed. Candidate-local pure preparation refusals stay local, and no result
+grants pruning authority.
+
+The opaque execution/evaluation policy and Djex live-session limits are
+domain-neutral and reused by the scalar and product runners. Each Leant call
+still opens one fresh lexical worker for its eligible batch, productively
+admits no more than the shared 64-query maximum, and consumes that session's
+single total query budget. Behavioral authority is not shared: product
+contracts, queries, live observations, replay receipts, failures, assessments,
+MRU state, and presentation remain product-specific and cannot be cast from
+their scalar siblings. The existing scalar path, public scalar types, query
+bytes, ranking behavior, and presentation are unchanged.
+
+Product selection remains a library-level opt-in. The existing startup
+`--length-ranking-config` and command-local `--length-contract` JSON grammars
+still select only scalar ranking. Their prospective product versions (startup
+version 4 and contract-only version 6) are explicitly deferred and are not
+accepted by this checkpoint. See the
+[canonical `Prod` Length handoff report](docs/reports/2026-08-14-canonical-prod-length-handoff.md)
+for the exact handoff boundary and the
+[live binary-product Length ranking report](docs/reports/2026-08-14-live-binary-product-length-ranking.md)
+for the live orchestration, authority, and compatibility details.
+
+On the existing scalar Main path, after a successful occurrence seal, Main
+prints a subordinate note only for a
 candidate carrying an independently replayed counterexample. The note calls it
 a replayed, model-relative finite-list-spine Length counterexample, gives a
 bounded summary of observed input and result spine lengths, and reports only the number
@@ -764,6 +825,19 @@ identity boundaries are detailed in the
 The opt-in finite-box policy, its unsat-as-trigger-only boundary, positive
 receipt, and additive configuration grammar are detailed in the
 [unsat-triggered bounded Length validation report](docs/reports/2026-08-14-unsat-triggered-length-input-box-validation.md).
+
+`Leant.Synth.Length.SpinePair.Ranking` and
+`Leant.Synth.Length.SpinePair.PostVerification` supply the nominal
+canonical-`Prod` sibling of this orchestration. The pair path reuses the same
+bounded execution policy and lexical Djex session capability, but prepares
+only pair queries and releases only pair-domain assessments and receipts. Its
+own four-entry batch-local MRU bank, optional origin probe, live pair call,
+query-first replay, and optional post-`unsat` pair input box preserve the same
+stable-demotion and atomic-fallback rules without transferring scalar
+authority. Pair-safe terminal projection lives in
+`presentLengthSpinePairPostVerificationResult`; the complete checkpoint is
+recorded in the
+[live binary-product Length ranking report](docs/reports/2026-08-14-live-binary-product-length-ranking.md).
 
 `Leant.Synth.Length.Configuration` seals that call boundary without choosing
 any policy for the user. `LengthRankingPolicySource` carries the execution

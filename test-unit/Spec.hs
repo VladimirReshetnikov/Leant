@@ -220,6 +220,8 @@ import Leant.Synth.Length.Configuration
   , mkLengthRankingPolicy
   , lengthRankingPolicyExecutableDigestExpectation
   , lengthRankingPolicyFromValidatedComponents
+  , assessVerifiedLengthSpinePairCandidatesWithPolicy
+  , rankVerifiedLengthSpinePairCandidatesWithPolicy
   , rankVerifiedLengthCandidatesWithPolicy
   )
 import Leant.Synth.Length.Configuration.File
@@ -335,8 +337,10 @@ import Leant.Synth.Length.Presentation
   , maximumLengthCounterexampleNoteCharacters
   , presentLengthAssessment
   , presentLengthPostVerificationResult
+  , presentLengthSpinePairPostVerificationResult
   , renderLengthCounterexampleNote
   , renderLengthInputBoxValidationNote
+  , renderLengthSpinePairInputBoxValidationNote
   )
 import Leant.Synth.Length.Ranking
   ( LengthRanking
@@ -360,6 +364,33 @@ import Leant.Synth.Length.Ranking
   , rankedLengthCandidateVerified
   )
 import qualified Leant.Synth.Length.Ranking.Internal as LengthRankingInternal
+import Leant.Synth.Length.SpinePair.Ranking
+  ( LengthSpinePairRanking
+  , LengthSpinePairRankingAssessment (..)
+  , LengthSpinePairRankingFailure
+  , LengthSpinePairRankingFailureClass (..)
+  , lengthSpinePairRankingCandidates
+  , lengthSpinePairRankingFailure
+  , lengthSpinePairRankingFailureClass
+  , lengthSpinePairRankingFailureCleanupIncomplete
+  , lengthSpinePairRankingFailureOriginalIndex
+  , rankVerifiedLengthSpinePairCandidates
+  , rankVerifiedLengthSpinePairCandidatesWithInputBoxValidation
+  , rankedLengthSpinePairCandidateAssessment
+  , rankedLengthSpinePairCandidateOriginalIndex
+  , rankedLengthSpinePairCandidatePreparationRefusal
+  , rankedLengthSpinePairCandidateVerified
+  )
+import qualified Leant.Synth.Length.SpinePair.Ranking.Internal
+  as LengthSpinePairRankingInternal
+import Leant.Synth.Length.SpinePair.PostVerification
+  ( LengthSpinePairPostVerificationResult
+  , lengthSpinePairPostVerificationAdapterFailure
+  , lengthSpinePairPostVerificationCandidates
+  , lengthSpinePairPostVerificationRanking
+  , lengthSpinePairPostVerificationRankingFailure
+  , lengthSpinePairPostVerificationSealedBatch
+  )
 import Leant.Synth.Observability
   ( CandidateRenderingRoute (..)
   , LeantSynthesisMetric (..)
@@ -440,6 +471,7 @@ main = do
       , combinedEngineMergeTests
       , typedCandidateRoutingTests
       , lengthSpinePairBoundaryTests
+      , lengthSpinePairRankingTests
       , lengthRankingTests
       , replayPlanTests
       , providerProgramTests
@@ -3330,6 +3362,760 @@ assertLengthSpinePairRefusal label expected contract verified =
 
 spinePairBytes :: String -> [Word8]
 spinePairBytes = map $ fromIntegral . fromEnum
+
+lengthSpinePairRankingTests :: TestTree
+lengthSpinePairRankingTests = testGroup
+  "canonical Prod live Length ranking"
+  [ testCase "avoid a session when no exact product candidate is eligible"
+      assertLengthSpinePairRankingNoSession
+  , testCase "keep pair sat, unsat, and unknown statuses heuristic"
+      assertLengthSpinePairRankingNeutralStatuses
+  , testCase
+      "demote exact pair counterexamples and keep a four-vector fresh MRU"
+      assertLengthSpinePairRankingCounterexamples
+  , testCase "probe a pair origin before assigning a compact live ordinal"
+      assertLengthSpinePairRankingOriginOrdering
+  , testCase "exercise every enabled pair policy branch through Configuration"
+      assertLengthSpinePairRankingPolicyBranches
+  , testCase
+      "use pair unsat only to trigger independent finite-box validation"
+      assertLengthSpinePairRankingInputBox
+  , testCase
+      "seal duplicate pair occurrences and present both result components"
+      assertLengthSpinePairPostVerificationPresentation
+  , testCase "atomically reset pair live, session, and box failures"
+      assertLengthSpinePairRankingAtomicFailures
+  , testCase "leave scalar query bytes and terminal wording unchanged"
+      assertLengthSpinePairScalarRegression
+  ]
+
+assertLengthSpinePairRankingNoSession :: IO ()
+assertLengthSpinePairRankingNoSession = do
+  refused <- syntheticLengthRankingCandidate "pair-no-session-refusal"
+  result <- rankVerifiedLengthSpinePairCandidates
+    (error "ineligible product ranking opened a solver session")
+    defaultLengthEvaluationLimits
+    (error "ineligible product ranking forced its contract") [refused]
+  ranking <- expectRight result
+  lengthSpinePairRankingFailure ranking @?= Nothing
+  rankedLengthSpinePairVerifiedCandidates ranking @?= [refused]
+  map rankedLengthSpinePairCandidateAssessment
+      (lengthSpinePairRankingCandidates ranking) @?=
+    [LengthSpinePairUnassessed]
+  rankedLengthSpinePairPreparationRefusals ranking @?=
+    [Just LengthPreparationTypedAuthorityUnavailable]
+
+  let maximumCandidates =
+        Djex.defaultLengthSMTLibLiveSessionMaximumQueries
+      exact = replicate (fromIntegral maximumCandidates) refused
+      unopened = error "bounded product admission opened a solver session"
+      unprepared = error "bounded product admission forced its contract"
+  exactResult <- rankVerifiedLengthSpinePairCandidates unopened
+    defaultLengthEvaluationLimits unprepared exact
+  exactRanking <- expectRight exactResult
+  length (lengthSpinePairRankingCandidates exactRanking) @?=
+    fromIntegral maximumCandidates
+  bounded <- timeout 1000000
+    $ rankVerifiedLengthSpinePairCandidates unopened
+        defaultLengthEvaluationLimits unprepared $ repeat refused
+  case bounded of
+    Just (Left (LengthRankingInputLimitExceeded retainedMaximum observed)) -> do
+      retainedMaximum @?= maximumCandidates
+      observed @?= maximumCandidates + 1
+    Just (Right _) -> assertFailure
+      "cyclic product maximum-plus-one input was admitted"
+    Nothing -> assertFailure
+      "cyclic product maximum-plus-one input was not rejected productively"
+
+assertLengthSpinePairRankingNeutralStatuses :: IO ()
+assertLengthSpinePairRankingNeutralStatuses = do
+  (duplicatedInput, _) <- buildLengthSpinePairRankingFixture
+  let cases =
+        [ ( "healthy"
+          , Djex.LengthSMTLibStatusOnly
+          , Djex.SolverSatisfiable
+          )
+        , ( "query-unsat"
+          , Djex.LengthSMTLibInputValuesAfterSatisfiable
+          , Djex.SolverUnsatisfiable
+          )
+        , ( "query-unknown"
+          , Djex.LengthSMTLibInputValuesAfterSatisfiable
+          , Djex.SolverUnknown
+          )
+        ]
+  mapM_ (assertStatus duplicatedInput) cases
+ where
+  assertStatus candidate (mode, policy, expected) = do
+    (ranking, events) <- runLengthSpinePairRankingWithFakeTrace
+      mode policy defaultLengthEvaluationLimits
+      lengthSpinePairRankingContract [candidate]
+    lengthSpinePairRankingFailure ranking @?= Nothing
+    map rankedLengthSpinePairCandidateAssessment
+        (lengthSpinePairRankingCandidates ranking) @?=
+      [LengthSpinePairHeuristic expected]
+    assertFakeLengthQueryEvents [0] [] events
+
+assertLengthSpinePairRankingCounterexamples :: IO ()
+assertLengthSpinePairRankingCounterexamples = do
+  (duplicatedInput, inputAndZero) <- buildLengthSpinePairRankingFixture
+  refused <- syntheticLengthRankingCandidate "pair-counterexample-retained"
+  let original = [duplicatedInput, refused, duplicatedInput]
+  (ranking, events) <- runLengthSpinePairRankingWithFakeTrace
+    "healthy" Djex.LengthSMTLibInputValuesAfterSatisfiable
+    defaultLengthEvaluationLimits lengthSpinePairRankingContract original
+  lengthSpinePairRankingFailure ranking @?= Nothing
+  map rankedLengthSpinePairCandidateOriginalIndex
+      (lengthSpinePairRankingCandidates ranking) @?= [1, 0, 2]
+  rankedLengthSpinePairVerifiedCandidates ranking @?=
+    [refused, duplicatedInput, duplicatedInput]
+  rankedLengthSpinePairPreparationRefusals ranking @?=
+    [Just LengthPreparationTypedAuthorityUnavailable, Nothing, Nothing]
+  receipts <- case map rankedLengthSpinePairCandidateAssessment
+      $ lengthSpinePairRankingCandidates ranking of
+    [ LengthSpinePairUnassessed
+      , LengthSpinePairCounterexample first
+      , LengthSpinePairCounterexample second
+      ] -> pure [first, second]
+    assessments -> assertFailure
+      ("unexpected product counterexample partition: " ++ show assessments)
+        >> error "unreachable"
+  map Djex.validatedLengthSpinePairCounterexampleInputs receipts @?=
+    replicate 2 [3]
+  map Djex.validatedLengthSpinePairCounterexampleResult receipts @?=
+    replicate 2 (Djex.LengthSpinePair 3 3)
+  map Djex.validatedLengthSpinePairCounterexampleBasis receipts @?=
+    replicate 2 Djex.ProviderIndependentFiniteSpineModel
+  -- Only the first occurrence is live.  The second occurrence independently
+  -- replays [3] through its own sealed product query.
+  assertFakeLengthQueryEvents [0] [0] events
+
+  let fullBank = [[1], [2], [3], [4]] :: [[Natural]]
+  LengthSpinePairRankingInternal.promoteLengthSpinePairCounterexampleSeed
+      [2] fullBank @?= [[2], [1], [3], [4]]
+  LengthSpinePairRankingInternal.promoteLengthSpinePairCounterexampleSeed
+      [5] fullBank @?= [[5], [1], [2], [3]]
+
+  duplicatedQuery <- expectRight
+      (prepareCheckedLengthSpinePairQuery
+        lengthSpinePairRankingContract duplicatedInput)
+    >>= expectRight
+  inputAndZeroQuery <- expectRight
+      (prepareCheckedLengthSpinePairQuery
+        lengthSpinePairSecondOneContract inputAndZero)
+    >>= expectRight
+  duplicatedReceipt <- expectPairSeedReplay duplicatedQuery [[3]]
+  freshReceipt <- expectPairSeedReplay inputAndZeroQuery [[3]]
+  Djex.validatedLengthSpinePairCounterexampleResult duplicatedReceipt @?=
+    Djex.LengthSpinePair 3 3
+  Djex.validatedLengthSpinePairCounterexampleResult freshReceipt @?=
+    Djex.LengthSpinePair 3 0
+  Djex.validatedLengthSpinePairCounterexampleBasis freshReceipt @?=
+    Djex.FiniteSpineModelUnderAssumedProviderLaws
+      (pairRankingUsedProviders inputAndZero lengthSpinePairSecondOneContract)
+ where
+  expectPairSeedReplay query seeds = case
+      LengthSpinePairRankingInternal.replayLengthSpinePairCounterexampleSeeds
+        defaultLengthEvaluationLimits query seeds of
+    Just ([3], receipt) -> pure receipt
+    other -> assertFailure
+      ("unexpected product seed replay: " ++ show other)
+        >> error "unreachable"
+
+assertLengthSpinePairRankingOriginOrdering :: IO ()
+assertLengthSpinePairRankingOriginOrdering = do
+  (duplicatedInput, inputAndZero) <- buildLengthSpinePairRankingFixture
+  (originRanking, originEvents) <-
+    runLengthSpinePairRankingWithFakeTraceWithOriginProbe
+      "healthy" Djex.LengthSMTLibInputValuesAfterSatisfiable
+      defaultLengthEvaluationLimits lengthSpinePairSecondOneContract
+      [inputAndZero]
+  originReceipt <- expectOnlyLengthSpinePairCounterexample originRanking
+  Djex.validatedLengthSpinePairCounterexampleInputs originReceipt @?= [0]
+  Djex.validatedLengthSpinePairCounterexampleResult originReceipt @?=
+    Djex.LengthSpinePair 0 0
+  assertFakeLengthQueryEvents [] [] originEvents
+
+  (liveRanking, liveEvents) <-
+    runLengthSpinePairRankingWithFakeTraceWithOriginProbe
+      "healthy" Djex.LengthSMTLibInputValuesAfterSatisfiable
+      defaultLengthEvaluationLimits lengthSpinePairRankingContract
+      [duplicatedInput]
+  liveReceipt <- expectOnlyLengthSpinePairCounterexample liveRanking
+  Djex.validatedLengthSpinePairCounterexampleInputs liveReceipt @?= [3]
+  Djex.validatedLengthSpinePairCounterexampleResult liveReceipt @?=
+    Djex.LengthSpinePair 3 3
+  assertFakeLengthQueryEvents [0] [0] liveEvents
+
+assertLengthSpinePairRankingPolicyBranches :: IO ()
+assertLengthSpinePairRankingPolicyBranches = do
+  (duplicatedInput, inputAndZero) <- buildLengthSpinePairRankingFixture
+  withFakeLengthSolver "healthy" $ \executable -> do
+    let source = explicitLengthRankingExecutionSource executable Nothing
+          Djex.LengthSMTLibInputValuesAfterSatisfiable
+    base <- expectRight $ mkLengthRankingPolicy
+      $ explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits source
+          Djex.defaultLengthEvaluationLimitSource
+    ranking <- expectRight =<<
+      rankVerifiedLengthSpinePairCandidatesWithPolicy
+        (enableLengthRankingOriginProbe base)
+        lengthSpinePairSecondOneContract [inputAndZero]
+    receipt <- expectOnlyLengthSpinePairCounterexample ranking
+    Djex.validatedLengthSpinePairCounterexampleInputs receipt @?= [0]
+    Djex.validatedLengthSpinePairCounterexampleResult receipt @?=
+      Djex.LengthSpinePair 0 0
+    assertFakeLengthQueryEvents [] [] =<<
+      BS.readFile (executable ++ ".events")
+
+  limits <- explicitLengthInputBoxLimits 1 2
+  withFakeLengthSolver "query-unsat" $ \executable -> do
+    let source = explicitLengthRankingExecutionSource executable Nothing
+          Djex.LengthSMTLibStatusOnly
+    base <- expectRight $ mkLengthRankingPolicy
+      $ explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits source
+          Djex.defaultLengthEvaluationLimitSource
+    let combined = enableLengthRankingOriginProbe
+          $ enableLengthRankingInputBoxValidation limits [1] base
+    ranking <- expectRight =<<
+      rankVerifiedLengthSpinePairCandidatesWithPolicy combined
+        lengthSpinePairRankingContract [inputAndZero]
+    case map rankedLengthSpinePairCandidateAssessment
+        $ lengthSpinePairRankingCandidates ranking of
+      [LengthSpinePairBoundedPositive positive] -> do
+        Djex.validatedLengthSpinePairInputBoxInclusiveMaximums positive @?=
+          [1]
+        Djex.validatedLengthSpinePairInputBoxAssignmentCount positive @?= 2
+      assessments -> assertFailure
+        $ "combined product policy changed branch: " ++ show assessments
+    assertFakeLengthQueryEvents [0] [] =<<
+      BS.readFile (executable ++ ".events")
+
+  refused <- syntheticLengthRankingCandidate "pair-origin-failure-refusal"
+  let lowEvaluation = Djex.defaultLengthEvaluationLimitSource
+        { Djex.lengthEvaluationLimitSourceIntermediateValueBits = 1 }
+      original = [duplicatedInput, refused]
+  withFakeLengthSolver "healthy" $ \executable -> do
+    let source = explicitLengthRankingExecutionSource executable Nothing
+          Djex.LengthSMTLibStatusOnly
+    base <- expectRight $ mkLengthRankingPolicy
+      $ explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits source lowEvaluation
+    ranking <- expectRight =<<
+      rankVerifiedLengthSpinePairCandidatesWithPolicy
+        (enableLengthRankingOriginProbe base)
+        lengthSpinePairSecondTwoContract original
+    assertLengthSpinePairAtomicReset original ranking
+      [Nothing, Just LengthPreparationTypedAuthorityUnavailable]
+    failure <- expectLengthSpinePairRankingFailure ranking
+    lengthSpinePairRankingFailureClass failure @?=
+      LengthSpinePairRankingOriginProbeEvaluationFailed
+        (Djex.LengthSpinePairEvaluationValueBitLimitExceeded
+          Djex.LengthSpinePairIntermediateValue 1 2)
+    lengthSpinePairRankingFailureOriginalIndex failure @?= Just 0
+    lengthSpinePairRankingFailureCleanupIncomplete failure @?= False
+    assertFakeLengthQueryEvents [] [] =<<
+      BS.readFile (executable ++ ".events")
+
+assertLengthSpinePairRankingInputBox :: IO ()
+assertLengthSpinePairRankingInputBox = do
+  (duplicatedInput, inputAndZero) <- buildLengthSpinePairRankingFixture
+  limits <- explicitLengthInputBoxLimits 1 2
+  let assertNoBox mode expected = do
+        (ranking, events) <-
+          runLengthSpinePairRankingWithFakeTraceWithInputBox
+            mode Djex.LengthSMTLibStatusOnly defaultLengthEvaluationLimits
+            limits [] lengthSpinePairRankingContract [inputAndZero]
+        lengthSpinePairRankingFailure ranking @?= Nothing
+        map rankedLengthSpinePairCandidateAssessment
+            (lengthSpinePairRankingCandidates ranking) @?=
+          [LengthSpinePairHeuristic expected]
+        assertFakeLengthQueryEvents [0] [] events
+  -- The deliberately wrong bounds are never inspected for sat or unknown.
+  assertNoBox "healthy" Djex.SolverSatisfiable
+  assertNoBox "query-unknown" Djex.SolverUnknown
+
+  (ranking, events) <- runLengthSpinePairRankingWithFakeTraceWithInputBox
+    "query-unsat" Djex.LengthSMTLibStatusOnly
+    defaultLengthEvaluationLimits limits [1]
+    lengthSpinePairRankingContract
+    [inputAndZero, duplicatedInput, duplicatedInput]
+  lengthSpinePairRankingFailure ranking @?= Nothing
+  map rankedLengthSpinePairCandidateOriginalIndex
+      (lengthSpinePairRankingCandidates ranking) @?= [0, 1, 2]
+  case map rankedLengthSpinePairCandidateAssessment
+      $ lengthSpinePairRankingCandidates ranking of
+    [ LengthSpinePairBoundedPositive positive
+      , LengthSpinePairCounterexample first
+      , LengthSpinePairCounterexample second
+      ] -> do
+        Djex.validatedLengthSpinePairInputBoxInclusiveMaximums positive @?=
+          [1]
+        Djex.validatedLengthSpinePairInputBoxAssignmentCount positive @?= 2
+        Djex.validatedLengthSpinePairInputBoxApplicableAssignmentCount
+          positive @?= 2
+        Djex.validatedLengthSpinePairInputBoxBasis positive @?=
+          Djex.FiniteSpineModelUnderAssumedProviderLaws
+            (pairRankingUsedProviders inputAndZero
+              lengthSpinePairRankingContract)
+        map Djex.validatedLengthSpinePairCounterexampleInputs
+            [first, second] @?= replicate 2 [1]
+        map Djex.validatedLengthSpinePairCounterexampleResult
+            [first, second] @?=
+          replicate 2 (Djex.LengthSpinePair 1 1)
+    assessments -> assertFailure
+      ("unexpected product input-box assessments: " ++ show assessments)
+  -- The positive does not seed.  The box counterexample does, so the third
+  -- occurrence avoids a third solver transaction.
+  assertFakeLengthQueryEvents [0, 1] [] events
+
+assertLengthSpinePairPostVerificationPresentation :: IO ()
+assertLengthSpinePairPostVerificationPresentation = do
+  (duplicatedInput, inputAndZero) <- buildLengthSpinePairRankingFixture
+  refused <- syntheticLengthRankingCandidate "pair-presentation-retained"
+  let raw = [duplicatedInput, duplicatedInput, refused]
+      expected = [refused, duplicatedInput, duplicatedInput]
+  verification <- verificationBatchFromReceipts raw
+  withFakeLengthSolver "healthy" $ \executable -> do
+    let source = explicitLengthRankingExecutionSource executable Nothing
+          Djex.LengthSMTLibInputValuesAfterSatisfiable
+    policy <- expectRight $ mkLengthRankingPolicy
+      $ explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits source
+          Djex.defaultLengthEvaluationLimitSource
+    result <- expectLengthSpinePairPostVerificationWithin
+      $ assessVerifiedLengthSpinePairCandidatesWithPolicy policy
+          lengthSpinePairRankingContract verification
+    lengthSpinePairPostVerificationAdapterFailure result @?= Nothing
+    lengthSpinePairPostVerificationRankingFailure result @?= Nothing
+    lengthSpinePairPostVerificationCandidates result @?= expected
+    sealed <- case lengthSpinePairPostVerificationSealedBatch result of
+      Nothing -> assertFailure
+        "product post-verification bypassed its occurrence seal"
+          >> error "unreachable"
+      Just retained -> pure retained
+    postVerificationBatchCandidates sealed @?= expected
+    ranking <- expectLengthSpinePairPostVerificationRanking result
+    map rankedLengthSpinePairCandidateOriginalIndex
+        (lengthSpinePairRankingCandidates ranking) @?= [2, 0, 1]
+    let presentations = presentLengthSpinePairPostVerificationResult result
+    map lengthCandidatePresentationText presentations @?=
+      map (detailedVerificationVariantText . verifiedCandidate) expected
+    case map lengthCandidatePresentationNote presentations of
+      [Nothing, Just first, Just second] -> mapM_ assertCounterexampleNote
+        [first, second]
+      notes -> assertFailure
+        $ "duplicate product occurrence notes were reassociated: "
+          ++ show notes
+    assertFakeLengthQueryEvents [0] [0] =<<
+      BS.readFile (executable ++ ".events")
+
+  unequalVerification <- verificationBatchFromReceipts [inputAndZero]
+  withFakeLengthSolver "healthy" $ \executable -> do
+    let source = explicitLengthRankingExecutionSource executable Nothing
+          Djex.LengthSMTLibInputValuesAfterSatisfiable
+    policy <- expectRight $ mkLengthRankingPolicy
+      $ explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits source
+          Djex.defaultLengthEvaluationLimitSource
+    result <- expectLengthSpinePairPostVerificationWithin
+      $ assessVerifiedLengthSpinePairCandidatesWithPolicy policy
+          lengthSpinePairSecondOneContract unequalVerification
+    case map lengthCandidatePresentationNote
+        $ presentLengthSpinePairPostVerificationResult result of
+      [Just note] -> mapM_ (\fragment -> assertBool
+          ("unequal product presentation omitted " ++ show fragment)
+          $ fragment `isInfixOf` note)
+        [ "conditional on 1 assumed provider law used by this candidate"
+        , "observed input spine lengths = [3]"
+        , "first result spine length = 3"
+        , "second result spine length = 0"
+        ]
+      notes -> assertFailure
+        $ "unequal product presentation changed association: " ++ show notes
+    assertFakeLengthQueryEvents [0] [0] =<<
+      BS.readFile (executable ++ ".events")
+
+  limits <- explicitLengthInputBoxLimits 1 2
+  positiveVerification <- verificationBatchFromReceipts [inputAndZero]
+  withFakeLengthSolver "query-unsat" $ \executable -> do
+    let source = explicitLengthRankingExecutionSource executable Nothing
+          Djex.LengthSMTLibStatusOnly
+        policySource = explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits source
+          Djex.defaultLengthEvaluationLimitSource
+    base <- expectRight $ mkLengthRankingPolicy policySource
+    let policy = enableLengthRankingInputBoxValidation limits [1] base
+    result <- expectLengthSpinePairPostVerificationWithin
+      $ assessVerifiedLengthSpinePairCandidatesWithPolicy policy
+          lengthSpinePairRankingContract positiveVerification
+    ranking <- expectLengthSpinePairPostVerificationRanking result
+    positive <- case map rankedLengthSpinePairCandidateAssessment
+        $ lengthSpinePairRankingCandidates ranking of
+      [LengthSpinePairBoundedPositive receipt] -> pure receipt
+      assessments -> assertFailure
+        ("product positive post-verification changed: " ++ show assessments)
+          >> error "unreachable"
+    let directNote = renderLengthSpinePairInputBoxValidationNote positive
+        presentations = presentLengthSpinePairPostVerificationResult result
+    map lengthCandidatePresentationNote presentations @?= [Just directNote]
+    mapM_ (\fragment -> assertBool
+        ("product input-box note omitted " ++ show fragment)
+        $ fragment `isInfixOf` directNote)
+      [ "independently checked binary-product finite-spine Length input box"
+      , "conditional on 1 assumed provider law used by this candidate"
+      , "inclusive input maxima = [1]"
+      , "checked assignments = 2"
+      , "applicable assignments = 2"
+      ]
+    assertBool "product input-box note exceeded the terminal bound"
+      $ length directNote <= maximumLengthCounterexampleNoteCharacters
+ where
+  assertCounterexampleNote note = do
+    mapM_ (\fragment -> assertBool
+        ("product counterexample note omitted " ++ show fragment)
+        $ fragment `isInfixOf` note)
+      [ "replayed binary-product finite-spine Length counterexample"
+      , "model-relative; provider-independent"
+      , "observed input spine lengths = [3]"
+      , "first result spine length = 3"
+      , "second result spine length = 3"
+      ]
+    mapM_ (\overclaim -> assertBool
+        ("product counterexample note made an unsupported claim: "
+          ++ overclaim)
+        $ not $ overclaim `isInfixOf` map toLower note)
+      ["z3", "proved", "universal", "lean-correct"]
+    assertBool "product counterexample note exceeded the terminal bound"
+      $ length note <= maximumLengthCounterexampleNoteCharacters
+
+assertLengthSpinePairRankingAtomicFailures :: IO ()
+assertLengthSpinePairRankingAtomicFailures = do
+  (duplicatedInput, inputAndZero) <- buildLengthSpinePairRankingFixture
+  refused <- syntheticLengthRankingCandidate "pair-atomic-refusal"
+  let original = [duplicatedInput, inputAndZero, refused]
+  (liveRanking, liveEvents) <- runLengthSpinePairRankingWithFakeTrace
+    "healthy" Djex.LengthSMTLibInputValuesAfterSatisfiable
+    defaultLengthEvaluationLimits lengthSpinePairRankingContract original
+  assertLengthSpinePairAtomicReset original liveRanking
+    [Nothing, Nothing, Just LengthPreparationTypedAuthorityUnavailable]
+  liveFailure <- expectLengthSpinePairRankingFailure liveRanking
+  lengthSpinePairRankingFailureClass liveFailure @?=
+    LengthSpinePairRankingLiveQueryFailed
+      Djex.LengthSpinePairSMTLibLiveQueryCounterexampleRejected
+  lengthSpinePairRankingFailureCleanupIncomplete liveFailure @?= False
+  lengthSpinePairRankingFailureOriginalIndex liveFailure @?= Just 1
+  assertFakeLengthQueryEvents [0, 1] [0, 1] liveEvents
+
+  (sessionRanking, sessionEvents) <- runLengthSpinePairRankingWithFakeTrace
+    "wrong-echo" Djex.LengthSMTLibStatusOnly defaultLengthEvaluationLimits
+    lengthSpinePairRankingContract [duplicatedInput, inputAndZero]
+  assertLengthSpinePairAtomicReset [duplicatedInput, inputAndZero]
+    sessionRanking [Nothing, Nothing]
+  sessionFailure <- expectLengthSpinePairRankingFailure sessionRanking
+  case lengthSpinePairRankingFailureClass sessionFailure of
+    LengthSpinePairRankingLiveSessionFailed _ -> pure ()
+    failure -> assertFailure
+      $ "unexpected product session failure: " ++ show failure
+  lengthSpinePairRankingFailureOriginalIndex sessionFailure @?= Nothing
+  assertFakeLengthQueryEvents [] [] sessionEvents
+
+  limits <- explicitLengthInputBoxLimits 1 2
+  (boxRanking, boxEvents) <-
+    runLengthSpinePairRankingWithFakeTraceWithInputBox
+      "query-unsat" Djex.LengthSMTLibStatusOnly
+      defaultLengthEvaluationLimits limits []
+      lengthSpinePairRankingContract [inputAndZero]
+  assertLengthSpinePairAtomicReset [inputAndZero] boxRanking [Nothing]
+  boxFailure <- expectLengthSpinePairRankingFailure boxRanking
+  lengthSpinePairRankingFailureClass boxFailure @?=
+    LengthSpinePairRankingInputBoxValidationFailed
+      (Djex.LengthSpinePairInputBoxBoundsArityMismatch 1 0)
+  lengthSpinePairRankingFailureOriginalIndex boxFailure @?= Just 0
+  assertFakeLengthQueryEvents [0] [] boxEvents
+
+assertLengthSpinePairScalarRegression :: IO ()
+assertLengthSpinePairScalarRegression = do
+  scalarFixture <- buildLengthRankingLiveFixture
+  (duplicatedInput, _) <- buildLengthSpinePairRankingFixture
+  let scalarCandidate = lengthRankingFixtureZero scalarFixture
+      scalarContract = lengthRankingContract 2
+      prepareScalar = expectRight
+          (prepareCheckedLengthQuery scalarContract scalarCandidate)
+        >>= expectRight
+  before <- prepareScalar
+  _ <- expectRight
+      (prepareCheckedLengthSpinePairQuery
+        lengthSpinePairRankingContract duplicatedInput)
+    >>= expectRight
+  after <- prepareScalar
+  fingerprintCanonicalBytes (lengthSMTLibQueryFingerprint before) @?=
+    fingerprintCanonicalBytes (lengthSMTLibQueryFingerprint after)
+  lengthSMTLibQueryCheckBytes before @?= lengthSMTLibQueryCheckBytes after
+  lengthSMTLibQueryInputSymbols before @?=
+    lengthSMTLibQueryInputSymbols after
+  lengthSMTLibQueryInputValueRequestBytes before @?=
+    lengthSMTLibQueryInputValueRequestBytes after
+  lengthSMTLibQuerySchemaTag @?=
+    spinePairBytes "djex-length-z3-qf-lia-smtlib2/v2"
+
+  scalarRanking <- runLengthRankingWithFake "healthy"
+    Djex.LengthSMTLibInputValuesAfterSatisfiable scalarContract
+    [scalarCandidate]
+  scalarReceipt <- case map rankedLengthCandidateAssessment
+      $ lengthRankingCandidates scalarRanking of
+    [Counterexample receipt] -> pure receipt
+    assessments -> assertFailure
+      ("scalar regression lost its counterexample: " ++ show assessments)
+        >> error "unreachable"
+  renderLengthCounterexampleNote scalarReceipt @?=
+    "replayed finite-list-spine Length counterexample (model-relative; "
+      ++ "conditional on 1 assumed provider law used by this candidate): "
+      ++ "observed input spine lengths = []; result spine length = 0"
+
+buildLengthSpinePairRankingFixture
+  :: IO
+      ( Verified DetailedVerificationVariant
+      , Verified DetailedVerificationVariant
+      )
+buildLengthSpinePairRankingFixture = do
+  detailed <- expectRight $
+    synthesizeWithProvidersSkippingDetailedWithMultiConstructorPatterns
+      False EngineExference 512 Set.empty
+        [ProviderFrag "Demo.zeroList" lengthSpinePairFixtureList]
+        lengthSpinePairFixtureGoal
+  groups <- case detailed of
+    DetailedSynthCandidates retained _ -> pure retained
+    other -> assertFailure
+      ("product ranking fixture synthesis failed: " ++ show other)
+        >> error "unreachable"
+  batch <- verifyCandidateGroups 512 (const $ pure VariantAccepted)
+    $ map detailedCandidateGroupVerificationVariants groups
+  let receipts = verifiedCandidateReceipts batch
+      prepared =
+        [ (verified, result)
+        | verified <- receipts
+        , Right problem <-
+            [prepareCheckedLengthSpinePairProblem
+              lengthSpinePairRankingContract verified]
+        , let result = Djex.checkedLengthSpinePairCandidateResult
+                $ Djex.checkedLengthSpinePairProblemCandidate problem
+        ]
+      input = LengthVariable $ LengthInput 0
+      duplicatedResult = Djex.LengthSpinePair input input
+      inputAndZeroResult = Djex.LengthSpinePair input $ LengthLiteral 0
+  duplicated <- chooseResult "(input,input)" duplicatedResult prepared
+  inputAndZero <- chooseResult "(input,zero)" inputAndZeroResult prepared
+  pure (duplicated, inputAndZero)
+ where
+  chooseResult label expected prepared = case
+      [verified | (verified, actual) <- prepared, actual == expected] of
+    verified : _ -> pure verified
+    [] -> assertFailure
+      ("product ranking fixture lacked " ++ label ++ ": "
+        ++ show (map snd prepared)) >> error "unreachable"
+
+lengthSpinePairRankingContract :: LeanLengthSpinePairContract
+lengthSpinePairRankingContract = lengthSpinePairFixtureContract
+  { leanLengthSpinePairContractProviderLaws =
+      [ LeanLengthProviderLaw
+          { leanLengthProviderLawName = "Demo.zeroList"
+          , leanLengthProviderLawArgumentRoles = []
+          , leanLengthProviderLawTransfer = LengthLiteral 0
+          }
+      ]
+  }
+
+pairRankingUsedProviders
+  :: Verified DetailedVerificationVariant
+  -> LeanLengthSpinePairContract
+  -> [Djex.Name]
+pairRankingUsedProviders verified contract = case
+    prepareCheckedLengthSpinePairProblem contract verified of
+  Left failure -> error
+    $ "product ranking provider fixture stopped preparing: " ++ show failure
+  Right problem -> Djex.checkedLengthSpinePairCandidateUsedProviders
+    $ Djex.checkedLengthSpinePairProblemCandidate problem
+
+lengthSpinePairSecondOneContract :: LeanLengthSpinePairContract
+lengthSpinePairSecondOneContract = lengthSpinePairSecondLiteralContract 1
+
+lengthSpinePairSecondTwoContract :: LeanLengthSpinePairContract
+lengthSpinePairSecondTwoContract = lengthSpinePairSecondLiteralContract 2
+
+lengthSpinePairSecondLiteralContract
+  :: Natural
+  -> LeanLengthSpinePairContract
+lengthSpinePairSecondLiteralContract expected = lengthSpinePairRankingContract
+  { leanLengthSpinePairContractSource = Djex.LengthSpinePairContractSource
+      { Djex.lengthSpinePairContractPrecondition = Djex.LengthTruth True
+      , Djex.lengthSpinePairContractPostcondition = Djex.LengthAll
+          [ Djex.LengthEqual
+              (Djex.LengthVariable $ Djex.LengthSpinePairResult
+                Djex.LengthSpinePairFirst)
+              (Djex.LengthVariable $ Djex.LengthSpinePairInput 0)
+          , Djex.LengthEqual
+              (Djex.LengthVariable $ Djex.LengthSpinePairResult
+                Djex.LengthSpinePairSecond)
+              (Djex.LengthLiteral expected)
+          ]
+      }
+  }
+
+rankedLengthSpinePairVerifiedCandidates
+  :: LengthSpinePairRanking
+  -> [Verified DetailedVerificationVariant]
+rankedLengthSpinePairVerifiedCandidates =
+  map rankedLengthSpinePairCandidateVerified
+    . lengthSpinePairRankingCandidates
+
+rankedLengthSpinePairPreparationRefusals
+  :: LengthSpinePairRanking
+  -> [Maybe LengthPreparationRefusalClass]
+rankedLengthSpinePairPreparationRefusals =
+  map rankedLengthSpinePairCandidatePreparationRefusal
+    . lengthSpinePairRankingCandidates
+
+expectOnlyLengthSpinePairCounterexample
+  :: LengthSpinePairRanking
+  -> IO Djex.ValidatedLengthSpinePairCounterexample
+expectOnlyLengthSpinePairCounterexample ranking = do
+  lengthSpinePairRankingFailure ranking @?= Nothing
+  case map rankedLengthSpinePairCandidateAssessment
+      $ lengthSpinePairRankingCandidates ranking of
+    [LengthSpinePairCounterexample receipt] -> pure receipt
+    assessments -> assertFailure
+      ("expected one product counterexample: " ++ show assessments)
+        >> error "unreachable"
+
+expectLengthSpinePairRankingFailure
+  :: LengthSpinePairRanking
+  -> IO LengthSpinePairRankingFailure
+expectLengthSpinePairRankingFailure ranking = case
+    lengthSpinePairRankingFailure ranking of
+  Nothing -> assertFailure "product ranking retained no atomic failure"
+    >> error "unreachable"
+  Just failure -> pure failure
+
+expectLengthSpinePairPostVerificationWithin
+  :: IO LengthSpinePairPostVerificationResult
+  -> IO LengthSpinePairPostVerificationResult
+expectLengthSpinePairPostVerificationWithin action = do
+  bounded <- timeout 8000000 action
+  case bounded of
+    Nothing -> assertFailure
+      "product post-verification exceeded its outer bound"
+        >> error "unreachable"
+    Just result -> pure result
+
+expectLengthSpinePairPostVerificationRanking
+  :: LengthSpinePairPostVerificationResult
+  -> IO LengthSpinePairRanking
+expectLengthSpinePairPostVerificationRanking result = case
+    lengthSpinePairPostVerificationRanking result of
+  Nothing -> assertFailure
+    "product post-verification discarded its ranking report"
+      >> error "unreachable"
+  Just ranking -> pure ranking
+
+assertLengthSpinePairAtomicReset
+  :: [Verified DetailedVerificationVariant]
+  -> LengthSpinePairRanking
+  -> [Maybe LengthPreparationRefusalClass]
+  -> IO ()
+assertLengthSpinePairAtomicReset original ranking refusals = do
+  rankedLengthSpinePairVerifiedCandidates ranking @?= original
+  map rankedLengthSpinePairCandidateAssessment
+      (lengthSpinePairRankingCandidates ranking) @?=
+    replicate (length original) LengthSpinePairUnassessed
+  rankedLengthSpinePairPreparationRefusals ranking @?= refusals
+
+runLengthSpinePairRankingWithFakeTrace
+  :: String
+  -> Djex.LengthSMTLibArtifactPolicy
+  -> Djex.LengthEvaluationLimits
+  -> LeanLengthSpinePairContract
+  -> [Verified DetailedVerificationVariant]
+  -> IO (LengthSpinePairRanking, BS.ByteString)
+runLengthSpinePairRankingWithFakeTrace
+    mode policy evaluation contract candidates =
+  withFakeLengthSolver mode $ \executable -> do
+    execution <- lengthSpinePairRankingExecution executable policy
+    bounded <- timeout 8000000 $ rankVerifiedLengthSpinePairCandidates
+      execution evaluation contract candidates
+    case bounded of
+      Nothing -> assertFailure
+        ("product Length ranking mode exceeded its bound: " ++ mode)
+          >> error "unreachable"
+      Just result -> do
+        ranking <- expectRight result
+        events <- BS.readFile $ executable ++ ".events"
+        pure (ranking, events)
+
+runLengthSpinePairRankingWithFakeTraceWithOriginProbe
+  :: String
+  -> Djex.LengthSMTLibArtifactPolicy
+  -> Djex.LengthEvaluationLimits
+  -> LeanLengthSpinePairContract
+  -> [Verified DetailedVerificationVariant]
+  -> IO (LengthSpinePairRanking, BS.ByteString)
+runLengthSpinePairRankingWithFakeTraceWithOriginProbe
+    mode policy evaluation contract candidates =
+  withFakeLengthSolver mode $ \executable -> do
+    execution <- lengthSpinePairRankingExecution executable policy
+    bounded <- timeout 8000000
+      $ LengthSpinePairRankingInternal.rankVerifiedLengthSpinePairCandidatesWithOriginProbe
+          execution evaluation contract candidates
+    case bounded of
+      Nothing -> assertFailure
+        ("product origin ranking mode exceeded its bound: " ++ mode)
+          >> error "unreachable"
+      Just result -> do
+        ranking <- expectRight result
+        events <- BS.readFile $ executable ++ ".events"
+        pure (ranking, events)
+
+runLengthSpinePairRankingWithFakeTraceWithInputBox
+  :: String
+  -> Djex.LengthSMTLibArtifactPolicy
+  -> Djex.LengthEvaluationLimits
+  -> Djex.LengthInputBoxLimits
+  -> [Natural]
+  -> LeanLengthSpinePairContract
+  -> [Verified DetailedVerificationVariant]
+  -> IO (LengthSpinePairRanking, BS.ByteString)
+runLengthSpinePairRankingWithFakeTraceWithInputBox
+    mode policy evaluation limits maximums contract candidates =
+  withFakeLengthSolver mode $ \executable -> do
+    execution <- lengthSpinePairRankingExecution executable policy
+    bounded <- timeout 8000000
+      $ rankVerifiedLengthSpinePairCandidatesWithInputBoxValidation
+          execution evaluation limits maximums contract candidates
+    case bounded of
+      Nothing -> assertFailure
+        ("product input-box ranking mode exceeded its bound: " ++ mode)
+          >> error "unreachable"
+      Just result -> do
+        ranking <- expectRight result
+        events <- BS.readFile $ executable ++ ".events"
+        pure (ranking, events)
+
+lengthSpinePairRankingExecution
+  :: FilePath
+  -> Djex.LengthSMTLibArtifactPolicy
+  -> IO Djex.LengthSMTLibExecutionConfig
+lengthSpinePairRankingExecution executable policy = expectRight
+  $ Djex.mkLengthSMTLibExecutionConfig
+      Djex.defaultLengthSMTLibExecutionLimits
+      $ (Djex.defaultLengthSMTLibExecutionConfigSource executable Nothing)
+          { Djex.lengthSMTLibExecutionConfigSourceSolverTimeoutMilliseconds =
+              100
+          , Djex.lengthSMTLibExecutionConfigSourceSolverResourceLimit = 4242
+          , Djex.lengthSMTLibExecutionConfigSourceHostDeadlineMilliseconds =
+              1000
+          , Djex.lengthSMTLibExecutionConfigSourceArtifactPolicy = policy
+          }
 
 lengthRankingTests :: TestTree
 lengthRankingTests = testGroup "checked Length behavioral ranking"

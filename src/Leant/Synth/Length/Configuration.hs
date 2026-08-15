@@ -33,6 +33,8 @@ module Leant.Synth.Length.Configuration
   , LengthRankingConfigurationError (..)
   , assessVerifiedLengthCandidatesWithPolicy
   , rankVerifiedLengthCandidatesWithPolicy
+  , assessVerifiedLengthSpinePairCandidatesWithPolicy
+  , rankVerifiedLengthSpinePairCandidatesWithPolicy
   ) where
 
 import Numeric.Natural (Natural)
@@ -53,7 +55,10 @@ import Language.Haskell.Djex
   )
 
 import Leant.Synth.Engine (DetailedVerificationVariant)
-import Leant.Synth.Length.Contract (LeanLengthContract)
+import Leant.Synth.Length.Contract
+  ( LeanLengthContract
+  , LeanLengthSpinePairContract
+  )
 import Leant.Synth.Length.Ranking
   ( LengthRanking
   , LengthRankingInputError
@@ -72,6 +77,24 @@ import Leant.Synth.Length.Ranking.Internal
 import Leant.Synth.Length.PostVerification.Internal
   ( LengthPostVerificationResult
   , assessVerifiedLengthCandidatesWith
+  )
+import Leant.Synth.Length.SpinePair.PostVerification.Internal
+  ( LengthSpinePairPostVerificationResult
+  , assessVerifiedLengthSpinePairCandidatesWith
+  )
+import Leant.Synth.Length.SpinePair.Ranking
+  ( LengthSpinePairRanking
+  , rankVerifiedLengthSpinePairCandidates
+  , rankVerifiedLengthSpinePairCandidatesWithInputBoxValidation
+  )
+import Leant.Synth.Length.SpinePair.Ranking.Internal
+  ( AssociatedLengthSpinePairRanking
+  , rankPostVerificationLengthSpinePairCandidates
+  , rankPostVerificationLengthSpinePairCandidatesWithInputBoxValidation
+  , rankPostVerificationLengthSpinePairCandidatesWithInputBoxValidationAndOriginProbe
+  , rankPostVerificationLengthSpinePairCandidatesWithOriginProbe
+  , rankVerifiedLengthSpinePairCandidatesWithInputBoxValidationAndOriginProbe
+  , rankVerifiedLengthSpinePairCandidatesWithOriginProbe
   )
 import Leant.Synth.PostVerification (PostVerificationCandidate)
 import Leant.Synth.Verification
@@ -261,3 +284,68 @@ assessVerifiedLengthCandidatesWithPolicy
 assessVerifiedLengthCandidatesWithPolicy policy contract =
   assessVerifiedLengthCandidatesWith
     $ rankPostVerificationLengthCandidatesWithPolicy policy contract
+
+-- | Run the nominal binary-product sibling under the same process/evaluation
+-- policy.  The policy contains no scalar contract, query, or evidence
+-- authority; all four branches enter pair-specific runners and receipts.
+rankVerifiedLengthSpinePairCandidatesWithPolicy
+  :: LengthRankingPolicy
+  -> LeanLengthSpinePairContract
+  -> [Verified DetailedVerificationVariant]
+  -> IO (Either LengthRankingInputError LengthSpinePairRanking)
+rankVerifiedLengthSpinePairCandidatesWithPolicy
+    (LengthRankingPolicy execution evaluation inputBoxValidation
+      originProbe) =
+  case (inputBoxValidation, originProbe) of
+    (LengthRankingInputBoxValidationDisabled,
+        LengthRankingOriginProbeDisabled) ->
+      rankVerifiedLengthSpinePairCandidates execution evaluation
+    (LengthRankingInputBoxValidationDisabled,
+        LengthRankingOriginProbeEnabled) ->
+      rankVerifiedLengthSpinePairCandidatesWithOriginProbe execution evaluation
+    (LengthRankingInputBoxValidationEnabled limits maximums,
+        LengthRankingOriginProbeDisabled) ->
+      rankVerifiedLengthSpinePairCandidatesWithInputBoxValidation
+        execution evaluation limits maximums
+    (LengthRankingInputBoxValidationEnabled limits maximums,
+        LengthRankingOriginProbeEnabled) ->
+      rankVerifiedLengthSpinePairCandidatesWithInputBoxValidationAndOriginProbe
+        execution evaluation limits maximums
+
+rankPostVerificationLengthSpinePairCandidatesWithPolicy
+  :: LengthRankingPolicy
+  -> LeanLengthSpinePairContract
+  -> [PostVerificationCandidate epoch DetailedVerificationVariant]
+  -> IO
+      (Either LengthRankingInputError
+        (AssociatedLengthSpinePairRanking
+          (PostVerificationCandidate epoch DetailedVerificationVariant)))
+rankPostVerificationLengthSpinePairCandidatesWithPolicy
+    (LengthRankingPolicy execution evaluation inputBoxValidation
+      originProbe) =
+  case (inputBoxValidation, originProbe) of
+    (LengthRankingInputBoxValidationDisabled,
+        LengthRankingOriginProbeDisabled) ->
+      rankPostVerificationLengthSpinePairCandidates execution evaluation
+    (LengthRankingInputBoxValidationDisabled,
+        LengthRankingOriginProbeEnabled) ->
+      rankPostVerificationLengthSpinePairCandidatesWithOriginProbe
+        execution evaluation
+    (LengthRankingInputBoxValidationEnabled limits maximums,
+        LengthRankingOriginProbeDisabled) ->
+      rankPostVerificationLengthSpinePairCandidatesWithInputBoxValidation
+        execution evaluation limits maximums
+    (LengthRankingInputBoxValidationEnabled limits maximums,
+        LengthRankingOriginProbeEnabled) ->
+      rankPostVerificationLengthSpinePairCandidatesWithInputBoxValidationAndOriginProbe
+        execution evaluation limits maximums
+
+-- | Assess one callback batch through the pair-specific occurrence seal.
+assessVerifiedLengthSpinePairCandidatesWithPolicy
+  :: LengthRankingPolicy
+  -> LeanLengthSpinePairContract
+  -> VerificationBatch DetailedVerificationVariant
+  -> IO LengthSpinePairPostVerificationResult
+assessVerifiedLengthSpinePairCandidatesWithPolicy policy contract =
+  assessVerifiedLengthSpinePairCandidatesWith
+    $ rankPostVerificationLengthSpinePairCandidatesWithPolicy policy contract

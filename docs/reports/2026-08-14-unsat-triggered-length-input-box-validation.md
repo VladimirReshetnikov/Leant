@@ -8,6 +8,14 @@ Date: 2026-08-14
 > `unsat`; an origin hit creates no solver status and therefore cannot schedule
 > this traversal. See the
 > [origin-probe orchestration report](2026-08-14-length-origin-probe-orchestration.md).
+>
+> **Later 2026-08-14 follow-up.** Canonical-`Prod` ranking now has the nominal
+> pair equivalent: only a live pair `unsat` with no replayed counterexample can
+> schedule the pair query-owned box, and only independent pair evaluation can
+> produce either a product counterexample or a bounded product-positive
+> receipt. The reusable execution policy is shared; behavioral authority is
+> not. See the
+> [live binary-product Length ranking report](2026-08-14-live-binary-product-length-ranking.md).
 
 ## Outcome
 

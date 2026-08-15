@@ -7,10 +7,13 @@ module Leant.Synth.Length.Presentation
   ( LengthCandidatePresentation
   , presentLengthAssessment
   , presentLengthPostVerificationResult
+  , presentLengthSpinePairPostVerificationResult
   , lengthCandidatePresentationText
   , lengthCandidatePresentationNote
   , renderLengthCounterexampleNote
   , renderLengthInputBoxValidationNote
+  , renderLengthSpinePairCounterexampleNote
+  , renderLengthSpinePairInputBoxValidationNote
   , maximumLengthCounterexampleNoteCharacters
   ) where
 
@@ -19,8 +22,13 @@ import Numeric.Natural (Natural)
 
 import Language.Haskell.Djex
   ( LengthCounterexampleBasis (..)
+  , LengthSpinePair
   , ValidatedLengthCounterexample
   , ValidatedLengthInputBox
+  , ValidatedLengthSpinePairCounterexample
+  , ValidatedLengthSpinePairInputBox
+  , lengthSpinePairFirst
+  , lengthSpinePairSecond
   , validatedLengthCounterexampleBasis
   , validatedLengthCounterexampleInputs
   , validatedLengthCounterexampleResult
@@ -28,6 +36,13 @@ import Language.Haskell.Djex
   , validatedLengthInputBoxAssignmentCount
   , validatedLengthInputBoxBasis
   , validatedLengthInputBoxInclusiveMaximums
+  , validatedLengthSpinePairCounterexampleBasis
+  , validatedLengthSpinePairCounterexampleInputs
+  , validatedLengthSpinePairCounterexampleResult
+  , validatedLengthSpinePairInputBoxApplicableAssignmentCount
+  , validatedLengthSpinePairInputBoxAssignmentCount
+  , validatedLengthSpinePairInputBoxBasis
+  , validatedLengthSpinePairInputBoxInclusiveMaximums
   )
 
 import Leant.Synth.Engine
@@ -51,6 +66,19 @@ import Leant.Synth.Length.Ranking
   , lengthRankingCandidates
   , rankedLengthCandidateAssessment
   , rankedLengthCandidateVerified
+  )
+import Leant.Synth.Length.SpinePair.PostVerification
+  ( LengthSpinePairPostVerificationResult
+  , lengthSpinePairPostVerificationCandidates
+  , lengthSpinePairPostVerificationRanking
+  )
+import Leant.Synth.Length.SpinePair.Ranking
+  ( LengthSpinePairRanking
+  , LengthSpinePairRankingAssessment (..)
+  , RankedLengthSpinePairCandidate
+  , lengthSpinePairRankingCandidates
+  , rankedLengthSpinePairCandidateAssessment
+  , rankedLengthSpinePairCandidateVerified
   )
 import Leant.Synth.Verification
   ( Verified
@@ -97,6 +125,17 @@ presentLengthPostVerificationResult result = case
   Nothing -> map presentUnassessedCandidate
     $ lengthPostVerificationCandidates result
 
+-- | Present one occurrence-sealed binary-product result without detaching a
+-- pair receipt from the candidate which produced it.
+presentLengthSpinePairPostVerificationResult
+  :: LengthSpinePairPostVerificationResult
+  -> [LengthCandidatePresentation]
+presentLengthSpinePairPostVerificationResult result = case
+    lengthSpinePairPostVerificationRanking result of
+  Just ranking -> presentLengthSpinePairRanking ranking
+  Nothing -> map presentUnassessedCandidate
+    $ lengthSpinePairPostVerificationCandidates result
+
 -- | Present a complete association-free ranking without separating any
 -- candidate from the assessment retained by its opaque ranked receipt.
 presentLengthRanking
@@ -115,6 +154,25 @@ presentRankedCandidate ranked = LengthCandidatePresentation
         $ renderLengthInputBoxValidationNote receipt
       Heuristic _ -> Nothing
       Unassessed -> Nothing
+
+presentLengthSpinePairRanking
+  :: LengthSpinePairRanking
+  -> [LengthCandidatePresentation]
+presentLengthSpinePairRanking = map presentRankedLengthSpinePairCandidate
+  . lengthSpinePairRankingCandidates
+
+presentRankedLengthSpinePairCandidate
+  :: RankedLengthSpinePairCandidate
+  -> LengthCandidatePresentation
+presentRankedLengthSpinePairCandidate ranked = LengthCandidatePresentation
+  (verifiedText $ rankedLengthSpinePairCandidateVerified ranked)
+  $ case rankedLengthSpinePairCandidateAssessment ranked of
+      LengthSpinePairCounterexample receipt -> Just
+        $ renderLengthSpinePairCounterexampleNote receipt
+      LengthSpinePairBoundedPositive receipt -> Just
+        $ renderLengthSpinePairInputBoxValidationNote receipt
+      LengthSpinePairHeuristic _ -> Nothing
+      LengthSpinePairUnassessed -> Nothing
 
 presentUnassessedCandidate
   :: Verified DetailedVerificationVariant
@@ -165,6 +223,50 @@ renderLengthInputBoxValidationNote receipt =
  where
   vacuity
     | validatedLengthInputBoxApplicableAssignmentCount receipt == 0 =
+        "; vacuous within this box (no assignment met the precondition)"
+    | otherwise = ""
+
+-- | Render both source-ordered result components of one independently replayed
+-- product-domain counterexample.  The note remains model-relative and bounded.
+renderLengthSpinePairCounterexampleNote
+  :: ValidatedLengthSpinePairCounterexample
+  -> String
+renderLengthSpinePairCounterexampleNote receipt =
+  let result :: LengthSpinePair Natural
+      result = validatedLengthSpinePairCounterexampleResult receipt
+  in take maximumLengthCounterexampleNoteCharacters $
+    "replayed binary-product finite-spine Length counterexample "
+      ++ "(model-relative; "
+      ++ renderBasis (validatedLengthSpinePairCounterexampleBasis receipt)
+      ++ "): observed input spine lengths = "
+      ++ renderInputs (validatedLengthSpinePairCounterexampleInputs receipt)
+      ++ "; first result spine length = "
+      ++ renderNatural (lengthSpinePairFirst result)
+      ++ "; second result spine length = "
+      ++ renderNatural (lengthSpinePairSecond result)
+
+-- | Render one independently checked finite box for the product domain.
+renderLengthSpinePairInputBoxValidationNote
+  :: ValidatedLengthSpinePairInputBox
+  -> String
+renderLengthSpinePairInputBoxValidationNote receipt =
+  take maximumLengthCounterexampleNoteCharacters $
+  "independently checked binary-product finite-spine Length input box "
+    ++ "(bounded/model-relative; "
+    ++ renderBasis (validatedLengthSpinePairInputBoxBasis receipt)
+    ++ "): inclusive input maxima = "
+    ++ renderInputs
+        (validatedLengthSpinePairInputBoxInclusiveMaximums receipt)
+    ++ "; checked assignments = "
+    ++ renderNatural
+        (validatedLengthSpinePairInputBoxAssignmentCount receipt)
+    ++ "; applicable assignments = "
+    ++ renderNatural
+        (validatedLengthSpinePairInputBoxApplicableAssignmentCount receipt)
+    ++ vacuity
+ where
+  vacuity
+    | validatedLengthSpinePairInputBoxApplicableAssignmentCount receipt == 0 =
         "; vacuous within this box (no assignment met the precondition)"
     | otherwise = ""
 

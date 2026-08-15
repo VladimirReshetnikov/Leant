@@ -26,6 +26,14 @@
 > already open and capability-probed before candidate processing, so a hit
 > skips a query transaction and ordinal, not process launch. See the
 > [origin-probe orchestration report](2026-08-14-length-origin-probe-orchestration.md).
+>
+> **Later 2026-08-14 follow-up.** A nominal canonical-`Prod` sibling now
+> consumes Djex's live pair facade under the same domain-neutral execution
+> policy and common session limits. It has product-specific query-first replay,
+> evidence, assessments, fallback diagnostics, presentation, and batch-local
+> MRU state; scalar definitions and behavior remain unchanged. The library
+> checkpoint is detailed in the
+> [live binary-product Length ranking report](2026-08-14-live-binary-product-length-ranking.md).
 
 Date: 2026-08-11
 
