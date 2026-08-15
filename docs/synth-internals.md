@@ -12,6 +12,39 @@ who wants the *what* can stop at the paragraph.
 
 ---
 
+## Contents
+
+- [Design and report index](#design-and-report-index)
+- [The Djex engine](#the-djex-engine)
+- [The semantic-origin record and provider bindings](#the-semantic-origin-record-and-provider-bindings)
+  - [Candidate authority, sidecars, and exact-text deduplication](#candidate-authority-sidecars-and-exact-text-deduplication)
+- [Length handoff and problem sealing](#length-handoff-and-problem-sealing)
+  - [Interpretation policy and session-owned sealing](#interpretation-policy-and-session-owned-sealing)
+  - [Adapter and canonical query sealing](#adapter-and-canonical-query-sealing)
+- [Ranking foundation](#ranking-foundation)
+  - [Direct applicable-domain validation](#direct-applicable-domain-validation)
+  - [Positive-affine, relational, strict, and quotient extractors](#positive-affine-relational-strict-and-quotient-extractors)
+  - [The version-3 origin probe](#the-version-3-origin-probe)
+  - [Live input-box validation and query-first replay](#live-input-box-validation-and-query-first-replay)
+  - [Refusals, atomic fallback, and lifecycle owners](#refusals-atomic-fallback-and-lifecycle-owners)
+- [SpinePair ranking and post-verification](#spinepair-ranking-and-post-verification)
+- [Configuration and its file grammar](#configuration-and-its-file-grammar)
+  - [Version-1 compatibility and usable-work budgets](#version-1-compatibility-and-usable-work-budgets)
+  - [`Configuration.File`: the versioned JSON grammar](#configurationfile-the-versioned-json-grammar)
+  - [File versions 1 through 4](#file-versions-1-through-4)
+  - [File versions 5 through 10](#file-versions-5-through-10)
+  - [File versions 11 through 20](#file-versions-11-through-20)
+  - [File acquisition](#file-acquisition)
+  - [Contract-only files and the length-contract command](#contract-only-files-and-the-length-contract-command)
+  - [Integration and one-shot contracts](#integration-and-one-shot-contracts)
+- [Contract vocabulary and module ownership](#contract-vocabulary-and-module-ownership)
+- [Post-verification sealing](#post-verification-sealing)
+  - [The Length domain adapter](#the-length-domain-adapter)
+- [Provider instantiation evidence](#provider-instantiation-evidence)
+- [Rank-N plan families and bounds](#rank-n-plan-families-and-bounds)
+
+## Design and report index
+
 The implementation invariants are recorded in the dated reports for
 [finite families](reports/2026-08-01-query-wide-parametric-inductive-families.md)
 and
@@ -39,6 +72,8 @@ Exact render-only retention of implicit forall visibility and mixed sort
 domains is recorded in the
 [implicit provider visible-result report](reports/2026-08-09-exact-implicit-provider-visible-results.md).
 
+## The Djex engine
+
 The engine is the vendored [Djex](../lib/Djex) library, linked in-process.
 Djex began as a merger of two classic Haskell synthesizers — **Djinn**
 (complete, terminating proof search for intuitionistic propositional
@@ -54,6 +89,8 @@ polarity-aware plan families, quantified hypotheses and context-free loaded
 schemes are instantiated at a bounded set of query and environment types, and
 impredicative instantiation is admitted under a guard that never invents a
 polytype the checked input did not supply.
+
+## The semantic-origin record and provider bindings
 
 Leant's synthesis preparation now builds one semantic-origin record whose
 source and search goals, declarations, provider bindings, constructor and type
@@ -85,6 +122,9 @@ field lazily. The authority likewise does not cache a converted source goal
 beside the prepared source goal and name table. Its inspection view derives
 that historical field lazily, while the Length handoff performs the same
 checked conversion before it checks request contexts and the request goal.
+
+### Candidate authority, sidecars, and exact-text deduplication
+
 There is no post-search field-for-field preparation copy. The
 detailed Exference route retains an opaque checked candidate and that exact
 run authority beside the originating rendered group. The candidate remains the
@@ -109,6 +149,9 @@ Wrappers such as
 `Classical.byContradiction` discard both direct and recovered authority because
 they denote a new term.
 This is deliberately a solver-neutral identity seam, not behavioral evidence.
+
+## Length handoff and problem sealing
+
 `Leant.Synth.Length.Handoff` binds callback-accepted text back to its exact
 typed origin, original Exference renderer ordinal and exact re-rendered variant,
 family provenance, an opaque Djex session which owns the exact inventory and
@@ -123,6 +166,9 @@ The exact policy in version 4 or 5 instead owns selection of the retained
 original ordinal and equality with the callback-accepted text; other valid
 renderer alternatives neither replace that retained variant nor make its exact
 association ambiguous.
+
+### Interpretation policy and session-owned sealing
+
 Only after renderer correspondence and exact family/provider resolution,
 Handoff converts the contract's `(candidate case policy, target roles)` pair
 once into Djex's closed `LengthInterpretationPolicySource`. Legacy
@@ -153,6 +199,9 @@ The opaque carrier handoff and its trust limits are recorded in the
 The live exact-context wire, active-instance provenance, and inventory-wide
 ground-fact bridge are recorded in the
 [contextual-provider ground-discharge report](reports/2026-08-13-live-contextual-provider-ground-discharge.md).
+
+### Adapter and canonical query sealing
+
 `Leant.Synth.Length.Adapter` then seals it into a bounded canonical QF_LIA
 query without exposing an arbitrary problem-taking entrance. Neither step
 launches a solver or grants authority
@@ -178,6 +227,8 @@ fingerprinted during sealing; the unchanged structural fingerprint still binds
 the full typed plan.
 The collision boundary is detailed in the
 [exact-duplicate typed-provenance report](reports/2026-08-11-exact-duplicate-typed-provenance.md).
+
+## Ranking foundation
 
 `Leant.Synth.Length.Ranking` supplies the checked ranking foundation. Its
 caller must provide an explicit Djex live-execution policy,
@@ -207,6 +258,8 @@ and preparation refusals do not mutate the bank. The bank never contains a
 cached solver result, verdict, query, receipt, provider-law basis, proof,
 solver status, or durable cache entry.
 
+### Direct applicable-domain validation
+
 The programmatic
 `enableLengthRankingApplicableDomainValidation inputBoxLimits` policy inserts
 Djex's directly bounded pass after those MRU misses. Djex scans only the exact
@@ -230,6 +283,8 @@ nominal literal-ceiling, relational, strict-relational, or strict-relational
 root-quotient positive-affine validator; direct-v1 validation remains
 programmatic-only.
 Contract-only files select constraints rather than ranking policy.
+
+### Positive-affine, relational, strict, and quotient extractors
 
 `enableLengthRankingPositiveAffineApplicableDomainValidation` is a separate,
 mutually exclusive extractor. It scans the precondition itself or immediate
@@ -283,6 +338,8 @@ partial rule, and actual precondition replay remains authoritative. Startup
 v19/v20 select its nominal scalar/product receipt families while retaining the
 complete v17/v18 descriptor-bound, scoped/checkpointed, and deferred profile.
 
+### The version-3 origin probe
+
 Configuration version 3 inserts one query-owned origin probe after all four
 bank entries—and after an enabled applicable-domain pass is inapplicable—before
 that candidate's live Z3 query. Leant supplies no
@@ -298,6 +355,8 @@ finite box. Under eager policy the worker has already opened and an origin hit
 avoids only a live transaction and ordinal. Under deferred policy the origin
 probe runs before IO, so an all-pure batch can avoid process launch and its
 capability probe entirely.
+
+### Live input-box validation and query-first replay
 
 With the version-1 historical path, `unsat`, `unknown`, and status-only `sat`
 remain neutral. The explicit input-box paths instead use a live `unsat` only to
@@ -332,6 +391,9 @@ package-private presentation layer traverses each whole materialized ranked
 receipt and projects one opaque text-plus-note value. Main uses that single
 ordered list for bindings, splices, and `itN` output; it never zips candidate
 text with a detached evidence list.
+
+### Refusals, atomic fallback, and lifecycle owners
+
 Nothing is pruned. A candidate-local handoff or query-construction refusal
 still projects through the compatible `Unassessed` assessment, but now also
 retains one bounded payload-free `LengthPreparationRefusalClass` with a fixed
@@ -376,6 +438,8 @@ The directly bounded pre-live pass, separate non-vacuous preference, and
 unchanged configuration boundary are recorded in the
 [directly bounded applicable-domain report](reports/2026-08-14-directly-bounded-length-applicable-domain.md).
 
+## SpinePair ranking and post-verification
+
 `Leant.Synth.Length.SpinePair.Ranking` and
 `Leant.Synth.Length.SpinePair.PostVerification` supply the nominal
 canonical-`Prod` sibling of this orchestration. The pair path reuses the same
@@ -389,6 +453,8 @@ authority. Pair-safe terminal projection lives in
 `presentLengthSpinePairPostVerificationResult`; the complete checkpoint is
 recorded in the
 [live binary-product Length ranking report](reports/2026-08-14-live-binary-product-length-ranking.md).
+
+## Configuration and its file grammar
 
 `Leant.Synth.Length.Configuration` seals that call boundary without choosing
 any policy for the user. `LengthRankingPolicySource` carries the execution
@@ -461,6 +527,8 @@ contract remains a passive assertion. An eager eligible call opens a fresh
 lexical session; a deferred all-pure call opens none, and a deferred live miss
 opens exactly one for the remaining dynamic scope.
 
+### Version-1 compatibility and usable-work budgets
+
 The version-1 file format remains compatible without a second generic
 policy-plus-contract aggregate. Its disabled value retains one strict validated
 policy beside the decoded contract, which stays lazy. Activation checks only
@@ -489,6 +557,8 @@ The later
 [single-owner policy checkpoint](reports/2026-08-13-length-ranking-policy-single-ownership.md)
 records removal of the redundant generic configuration aggregate while
 preserving the version-1 compatibility path.
+
+### `Configuration.File`: the versioned JSON grammar
 
 `Leant.Synth.Length.Configuration.File` keeps the exact version-1 JSON grammar
 for that policy and adds exact scalar opt-in versions 2 and 3. Its established
@@ -520,6 +590,8 @@ staged main image, still without loader, library, or solver attestation. The
 complete schema and budgets are recorded in the
 [bounded live Length ranking configuration-file report](reports/2026-08-11-bounded-live-length-ranking-configuration-file.md).
 
+### File versions 1 through 4
+
 The file decoder retains the sealed Djex execution configuration and evaluation
 limits produced by their first validation pass. It assembles the reusable
 opaque Leant policy directly from those authorities and retains the lazy fixed
@@ -549,6 +621,8 @@ to their established decoder and wraps the resulting scalar contract without
 changing old failure precedence. `activateLengthAssessmentConfiguration`
 performs the same separate digest-policy decision for either domain and still
 does not inspect the lazy contract or launch Z3.
+
+### File versions 5 through 10
 
 Versions 5 and 6 are the scalar and pair positive-ordering successors. They
 repeat versions 3 and 4's operational root and add the required exact field
@@ -592,6 +666,8 @@ then the contract. It constructs the final opaque policy with
 this additive parser only after the unchanged v1--v8 chain reports its closed
 unsupported-version sentinel, so every old success, diagnostic, schema and
 identity stays literal.
+
+### File versions 11 through 20
 
 Versions 11 and 12 are the relational positive-affine scalar and product
 siblings of v7/v8. They reuse that exact root, field identities, caps, and
@@ -653,6 +729,8 @@ cascade returns UnsupportedVersion; version 21 is the next unsupported
 sentinel. The new nominal assessment and renderer branches require complete
 query-owned finite-box replay and add no solver, proof, or pruning authority.
 
+### File acquisition
+
 `Leant.Synth.Length.Configuration.File.Acquire` is the compatibility facade
 over the shared bounded `Leant.Synth.Length.File.Acquire` filesystem boundary.
 Callers must explicitly
@@ -672,6 +750,8 @@ compatibility entrance. There is
 still no discovery or default path, and loading/activation alone never launches
 a solver. See the
 [bounded acquisition report](reports/2026-08-11-bounded-live-length-ranking-configuration-acquisition.md).
+
+### Contract-only files and the length-contract command
 
 `Leant.Synth.Length.Contract.File` adds the separate contract-only versioned
 root with format `leant-finite-list-spine-length-contract` for a command-owned
@@ -699,6 +779,8 @@ vocabulary. `Leant.Synth.Length.Command` recognizes only the exact
 `--length-contract` spelling and requires a standalone `--`, so malformed
 request syntax cannot disappear into Lean goal text.
 
+### Integration and one-shot contracts
+
 `Leant.Synth.Length.Integration` authorizes an explicit request from the
 already activated policy before Main admits or opens its contract path. The
 result is an opaque command-local choice containing either the historical
@@ -723,6 +805,8 @@ The positive-literal quotient grammar, policy-orthogonal case choice, shared
 QF_LIA witness lowering, and production replay checks are recorded in the
 [contract-only v5 quotient report](reports/2026-08-13-contract-only-v5-quotient.md).
 
+## Contract vocabulary and module ownership
+
 The passive finite-spine source vocabulary now lives in
 `Leant.Synth.Length.Contract`. Modules that need only those assertions no
 longer depend on the full synthesis engine. `Leant.Synth.Engine` owns neutral
@@ -733,6 +817,8 @@ reaches that preparation through `Leant.Synth.Length.Adapter` and imports the
 handoff refusal taxonomy only for closed classification. This gives contract
 assertions, candidate authority, checked domain preparation, and live
 execution policy distinct source owners.
+
+## Post-verification sealing
 
 `Leant.Synth.PostVerification` makes the boundary after callback acceptance
 explicit. Without the startup opt-in, Main sends the opaque, nominal
@@ -749,6 +835,8 @@ or over-limit tail without comparing or forcing candidate payloads. Only
 success can construct the opaque `PostVerificationBatch`, which therefore
 carries a complete occurrence permutation rather than a pruned, duplicated,
 manufactured, substituted, or reassociated candidate batch.
+
+### The Length domain adapter
 
 `Leant.Synth.Length.PostVerification` is the first domain adapter for that
 boundary. The Length ranker now retains each receipt's safe original index;
