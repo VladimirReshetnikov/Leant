@@ -4349,18 +4349,9 @@ assertLengthUsableWorkBudgetConfigurationSchema =
     let executable = root </> "missing-z3"
         scalar = usableWorkBudgetScalarDocument executable 65000
         pair = usableWorkBudgetPairDocument executable 65000
-        missing object field path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationMissingField object field)
-            $ deleteJsonField path document
-        wrongType field path expected document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationFieldTypeMismatch field expected)
-            $ setJsonField path (Json.JBool False) document
-        unexpected object path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationUnexpectedField object)
-            $ addJsonField path ("private-field", Json.JNull) document
+        missing = assertConfigurationFieldMissing
+        wrongType = assertConfigurationFieldWrongType
+        unexpected = assertConfigurationFieldUnexpected
     lengthRankingConfigurationFileUsableWorkBudgetVersion @?= 9
     lengthRankingConfigurationFileSpinePairUsableWorkBudgetVersion @?= 10
     mapM_ (\document -> do
@@ -4753,52 +4744,10 @@ assertLengthScopedUsableWorkBudgetSchema =
     let executable = root </> "missing-z3"
         scalar = scopedUsableWorkBudgetScalarDocument executable 65000
         pair = scopedUsableWorkBudgetPairDocument executable 65000
-        missing object field path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationMissingField object field)
-            $ deleteJsonField path document
-        wrongType field path expected document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationFieldTypeMismatch field expected)
-            $ setJsonField path (Json.JBool False) document
-        unexpected object path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationUnexpectedField object)
-            $ addJsonField path ("private-field", Json.JNull) document
-        rootShape =
-          [ (LengthRankingConfigurationFormatField, "format")
-          , (LengthRankingConfigurationVersionField, "version")
-          , ( LengthRankingConfigurationExecutionAdmissionField
-            , "executionAdmission"
-            )
-          , (LengthRankingConfigurationExecutionField, "execution")
-          , (LengthRankingConfigurationEvaluationField, "evaluation")
-          , ( LengthRankingConfigurationInputBoxValidationField
-            , "inputBoxValidation"
-            )
-          , ( LengthRankingConfigurationCounterexampleProbeField
-            , "counterexampleProbe"
-            )
-          , ( LengthRankingConfigurationBoundedPositiveOrderingField
-            , "boundedPositiveOrdering"
-            )
-          , ( LengthRankingConfigurationApplicableDomainValidationField
-            , "applicableDomainValidation"
-            )
-          , ( LengthRankingConfigurationApplicableDomainOrderingField
-            , "applicableDomainOrdering"
-            )
-          , ( LengthRankingConfigurationCounterexampleSimplificationField
-            , "counterexampleSimplification"
-            )
-          , ( LengthRankingConfigurationLiveSessionOpeningField
-            , "liveSessionOpening"
-            )
-          , ( LengthRankingConfigurationUsableWorkBudgetField
-            , "usableWorkBudget"
-            )
-          , (LengthRankingConfigurationContractField, "contract")
-          ]
+        missing = assertConfigurationFieldMissing
+        wrongType = assertConfigurationFieldWrongType
+        unexpected = assertConfigurationFieldUnexpected
+        rootShape = lengthRankingConfigurationRootShape
         reject field document =
           assertLengthAssessmentConfigurationFileError
             (LengthRankingConfigurationFieldValueRejected field) document
@@ -6826,18 +6775,9 @@ assertLengthPositiveAffineConfigurationSchema =
             (LengthRankingConfigurationMissingField
               LengthRankingConfigurationRootObject field)
             $ deleteJsonField [name] document
-        unexpected object path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationUnexpectedField object)
-            $ addJsonField path ("private-field", Json.JNull) document
-        missing object field path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationMissingField object field)
-            $ deleteJsonField path document
-        wrongType field path expected document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationFieldTypeMismatch field expected)
-            $ setJsonField path (Json.JBool False) document
+        unexpected = assertConfigurationFieldUnexpected
+        missing = assertConfigurationFieldMissing
+        wrongType = assertConfigurationFieldWrongType
         rejected field path document =
           assertLengthAssessmentConfigurationFileError
             (LengthRankingConfigurationFieldValueRejected field)
@@ -7683,37 +7623,9 @@ assertLengthRelationalPositiveAffineSchema =
             (LengthRankingConfigurationFieldTypeMismatch field expected)
             $ setJsonField ["applicableDomainValidation", name]
                 (Json.JBool False) document
-        rootShape =
-          [ (LengthRankingConfigurationFormatField, "format")
-          , (LengthRankingConfigurationVersionField, "version")
-          , ( LengthRankingConfigurationExecutionAdmissionField
-            , "executionAdmission"
-            )
-          , (LengthRankingConfigurationExecutionField, "execution")
-          , (LengthRankingConfigurationEvaluationField, "evaluation")
-          , ( LengthRankingConfigurationInputBoxValidationField
-            , "inputBoxValidation"
-            )
-          , ( LengthRankingConfigurationCounterexampleProbeField
-            , "counterexampleProbe"
-            )
-          , ( LengthRankingConfigurationBoundedPositiveOrderingField
-            , "boundedPositiveOrdering"
-            )
-          , ( LengthRankingConfigurationApplicableDomainValidationField
-            , "applicableDomainValidation"
-            )
-          , ( LengthRankingConfigurationApplicableDomainOrderingField
-            , "applicableDomainOrdering"
-            )
-          , ( LengthRankingConfigurationCounterexampleSimplificationField
-            , "counterexampleSimplification"
-            )
-          , ( LengthRankingConfigurationLiveSessionOpeningField
-            , "liveSessionOpening"
-            )
-          , (LengthRankingConfigurationContractField, "contract")
-          ]
+        rootShape = filter
+          ((/= LengthRankingConfigurationUsableWorkBudgetField) . fst)
+          lengthRankingConfigurationRootShape
     lengthRankingConfigurationFileRelationalPositiveAffineVersion @?= 11
     lengthRankingConfigurationFileSpinePairRelationalPositiveAffineVersion
       @?= 12
@@ -8300,55 +8212,13 @@ assertLengthStrictRelationalPositiveAffineSchema =
         scalar = strictRelationalPositiveAffineScalarDocument
           executable 65000
         pair = strictRelationalPositiveAffinePairDocument executable 65000
-        missing object field path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationMissingField object field)
-            $ deleteJsonField path document
-        wrongType field path expected document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationFieldTypeMismatch field expected)
-            $ setJsonField path (Json.JBool False) document
-        unexpected object path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationUnexpectedField object)
-            $ addJsonField path ("private-field", Json.JNull) document
+        missing = assertConfigurationFieldMissing
+        wrongType = assertConfigurationFieldWrongType
+        unexpected = assertConfigurationFieldUnexpected
         reject field document =
           assertLengthAssessmentConfigurationFileError
             (LengthRankingConfigurationFieldValueRejected field) document
-        rootShape =
-          [ (LengthRankingConfigurationFormatField, "format")
-          , (LengthRankingConfigurationVersionField, "version")
-          , ( LengthRankingConfigurationExecutionAdmissionField
-            , "executionAdmission"
-            )
-          , (LengthRankingConfigurationExecutionField, "execution")
-          , (LengthRankingConfigurationEvaluationField, "evaluation")
-          , ( LengthRankingConfigurationInputBoxValidationField
-            , "inputBoxValidation"
-            )
-          , ( LengthRankingConfigurationCounterexampleProbeField
-            , "counterexampleProbe"
-            )
-          , ( LengthRankingConfigurationBoundedPositiveOrderingField
-            , "boundedPositiveOrdering"
-            )
-          , ( LengthRankingConfigurationApplicableDomainValidationField
-            , "applicableDomainValidation"
-            )
-          , ( LengthRankingConfigurationApplicableDomainOrderingField
-            , "applicableDomainOrdering"
-            )
-          , ( LengthRankingConfigurationCounterexampleSimplificationField
-            , "counterexampleSimplification"
-            )
-          , ( LengthRankingConfigurationLiveSessionOpeningField
-            , "liveSessionOpening"
-            )
-          , ( LengthRankingConfigurationUsableWorkBudgetField
-            , "usableWorkBudget"
-            )
-          , (LengthRankingConfigurationContractField, "contract")
-          ]
+        rootShape = lengthRankingConfigurationRootShape
         applicableShape =
           [ ( LengthRankingConfigurationApplicableDomainStrategyField
             , "strategy"
@@ -9129,51 +8999,12 @@ assertLengthDescriptorBoundExecutableLaunchSchema =
           executable 65000
         pair = descriptorBoundExecutableLaunchPairDocument executable 65000
         documents = [scalar, pair]
-        missing object field path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationMissingField object field)
-            $ deleteJsonField path document
-        wrongType field path expected document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationFieldTypeMismatch field expected)
-            $ setJsonField path (Json.JBool False) document
+        missing = assertConfigurationFieldMissing
+        wrongType = assertConfigurationFieldWrongType
         reject field document =
           assertLengthAssessmentConfigurationFileError
             (LengthRankingConfigurationFieldValueRejected field) document
-        rootShape =
-          [ (LengthRankingConfigurationFormatField, "format")
-          , (LengthRankingConfigurationVersionField, "version")
-          , ( LengthRankingConfigurationExecutionAdmissionField
-            , "executionAdmission"
-            )
-          , (LengthRankingConfigurationExecutionField, "execution")
-          , (LengthRankingConfigurationEvaluationField, "evaluation")
-          , ( LengthRankingConfigurationInputBoxValidationField
-            , "inputBoxValidation"
-            )
-          , ( LengthRankingConfigurationCounterexampleProbeField
-            , "counterexampleProbe"
-            )
-          , ( LengthRankingConfigurationBoundedPositiveOrderingField
-            , "boundedPositiveOrdering"
-            )
-          , ( LengthRankingConfigurationApplicableDomainValidationField
-            , "applicableDomainValidation"
-            )
-          , ( LengthRankingConfigurationApplicableDomainOrderingField
-            , "applicableDomainOrdering"
-            )
-          , ( LengthRankingConfigurationCounterexampleSimplificationField
-            , "counterexampleSimplification"
-            )
-          , ( LengthRankingConfigurationLiveSessionOpeningField
-            , "liveSessionOpening"
-            )
-          , ( LengthRankingConfigurationUsableWorkBudgetField
-            , "usableWorkBudget"
-            )
-          , (LengthRankingConfigurationContractField, "contract")
-          ]
+        rootShape = lengthRankingConfigurationRootShape
         executionShape =
           [ ( LengthRankingConfigurationExecutablePathField
             , "executablePath"
@@ -9914,48 +9745,9 @@ assertLengthDescriptorBoundEffectiveIDExecutableAccessSchema =
         pair = descriptorBoundEffectiveIDExecutableAccessPairDocument
           executable 65000
         documents = [scalar, pair]
-        missing object field path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationMissingField object field)
-            $ deleteJsonField path document
-        unexpected object path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationUnexpectedField object)
-            $ addJsonField path ("private-field", Json.JNull) document
-        rootShape =
-          [ (LengthRankingConfigurationFormatField, "format")
-          , (LengthRankingConfigurationVersionField, "version")
-          , ( LengthRankingConfigurationExecutionAdmissionField
-            , "executionAdmission"
-            )
-          , (LengthRankingConfigurationExecutionField, "execution")
-          , (LengthRankingConfigurationEvaluationField, "evaluation")
-          , ( LengthRankingConfigurationInputBoxValidationField
-            , "inputBoxValidation"
-            )
-          , ( LengthRankingConfigurationCounterexampleProbeField
-            , "counterexampleProbe"
-            )
-          , ( LengthRankingConfigurationBoundedPositiveOrderingField
-            , "boundedPositiveOrdering"
-            )
-          , ( LengthRankingConfigurationApplicableDomainValidationField
-            , "applicableDomainValidation"
-            )
-          , ( LengthRankingConfigurationApplicableDomainOrderingField
-            , "applicableDomainOrdering"
-            )
-          , ( LengthRankingConfigurationCounterexampleSimplificationField
-            , "counterexampleSimplification"
-            )
-          , ( LengthRankingConfigurationLiveSessionOpeningField
-            , "liveSessionOpening"
-            )
-          , ( LengthRankingConfigurationUsableWorkBudgetField
-            , "usableWorkBudget"
-            )
-          , (LengthRankingConfigurationContractField, "contract")
-          ]
+        missing = assertConfigurationFieldMissing
+        unexpected = assertConfigurationFieldUnexpected
+        rootShape = lengthRankingConfigurationRootShape
         executionShape =
           [ (LengthRankingConfigurationResponseLimitsField, "responseLimits")
           , (LengthRankingConfigurationExecutablePathField, "executablePath")
@@ -10726,51 +10518,12 @@ assertLengthStrictRelationalPositiveAffineQuotientSchema =
         pair = strictRelationalPositiveAffineQuotientPairDocument
           executable 65000
         documents = [scalar, pair]
-        missing object field path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationMissingField object field)
-            $ deleteJsonField path document
-        unexpected object path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationUnexpectedField object)
-            $ addJsonField path ("private-field", Json.JNull) document
+        missing = assertConfigurationFieldMissing
+        unexpected = assertConfigurationFieldUnexpected
         reject field document =
           assertLengthAssessmentConfigurationFileError
             (LengthRankingConfigurationFieldValueRejected field) document
-        rootShape =
-          [ (LengthRankingConfigurationFormatField, "format")
-          , (LengthRankingConfigurationVersionField, "version")
-          , ( LengthRankingConfigurationExecutionAdmissionField
-            , "executionAdmission"
-            )
-          , (LengthRankingConfigurationExecutionField, "execution")
-          , (LengthRankingConfigurationEvaluationField, "evaluation")
-          , ( LengthRankingConfigurationInputBoxValidationField
-            , "inputBoxValidation"
-            )
-          , ( LengthRankingConfigurationCounterexampleProbeField
-            , "counterexampleProbe"
-            )
-          , ( LengthRankingConfigurationBoundedPositiveOrderingField
-            , "boundedPositiveOrdering"
-            )
-          , ( LengthRankingConfigurationApplicableDomainValidationField
-            , "applicableDomainValidation"
-            )
-          , ( LengthRankingConfigurationApplicableDomainOrderingField
-            , "applicableDomainOrdering"
-            )
-          , ( LengthRankingConfigurationCounterexampleSimplificationField
-            , "counterexampleSimplification"
-            )
-          , ( LengthRankingConfigurationLiveSessionOpeningField
-            , "liveSessionOpening"
-            )
-          , ( LengthRankingConfigurationUsableWorkBudgetField
-            , "usableWorkBudget"
-            )
-          , (LengthRankingConfigurationContractField, "contract")
-          ]
+        rootShape = lengthRankingConfigurationRootShape
         applicableShape =
           [ ( LengthRankingConfigurationApplicableDomainStrategyField
             , "strategy"
@@ -11641,48 +11394,9 @@ assertLengthStrictRelationalPositiveAffineQuotientRootExtremaSchema =
         pair = strictRelationalPositiveAffineQuotientRootExtremaPairDocument
           executable 65000
         documents = [scalar, pair]
-        missing object field path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationMissingField object field)
-            $ deleteJsonField path document
-        unexpected object path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationUnexpectedField object)
-            $ addJsonField path ("private-field", Json.JNull) document
-        rootShape =
-          [ (LengthRankingConfigurationFormatField, "format")
-          , (LengthRankingConfigurationVersionField, "version")
-          , ( LengthRankingConfigurationExecutionAdmissionField
-            , "executionAdmission"
-            )
-          , (LengthRankingConfigurationExecutionField, "execution")
-          , (LengthRankingConfigurationEvaluationField, "evaluation")
-          , ( LengthRankingConfigurationInputBoxValidationField
-            , "inputBoxValidation"
-            )
-          , ( LengthRankingConfigurationCounterexampleProbeField
-            , "counterexampleProbe"
-            )
-          , ( LengthRankingConfigurationBoundedPositiveOrderingField
-            , "boundedPositiveOrdering"
-            )
-          , ( LengthRankingConfigurationApplicableDomainValidationField
-            , "applicableDomainValidation"
-            )
-          , ( LengthRankingConfigurationApplicableDomainOrderingField
-            , "applicableDomainOrdering"
-            )
-          , ( LengthRankingConfigurationCounterexampleSimplificationField
-            , "counterexampleSimplification"
-            )
-          , ( LengthRankingConfigurationLiveSessionOpeningField
-            , "liveSessionOpening"
-            )
-          , ( LengthRankingConfigurationUsableWorkBudgetField
-            , "usableWorkBudget"
-            )
-          , (LengthRankingConfigurationContractField, "contract")
-          ]
+        missing = assertConfigurationFieldMissing
+        unexpected = assertConfigurationFieldUnexpected
+        rootShape = lengthRankingConfigurationRootShape
         applicableShape =
           [ ( LengthRankingConfigurationApplicableDomainStrategyField
             , "strategy"
@@ -12506,48 +12220,9 @@ assertLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusSchema =
         pair = strictRelationalPositiveAffineQuotientRootExtremaMonusPairDocument
           executable 65000
         documents = [scalar, pair]
-        missing object field path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationMissingField object field)
-            $ deleteJsonField path document
-        unexpected object path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationUnexpectedField object)
-            $ addJsonField path ("private-field", Json.JNull) document
-        rootShape =
-          [ (LengthRankingConfigurationFormatField, "format")
-          , (LengthRankingConfigurationVersionField, "version")
-          , ( LengthRankingConfigurationExecutionAdmissionField
-            , "executionAdmission"
-            )
-          , (LengthRankingConfigurationExecutionField, "execution")
-          , (LengthRankingConfigurationEvaluationField, "evaluation")
-          , ( LengthRankingConfigurationInputBoxValidationField
-            , "inputBoxValidation"
-            )
-          , ( LengthRankingConfigurationCounterexampleProbeField
-            , "counterexampleProbe"
-            )
-          , ( LengthRankingConfigurationBoundedPositiveOrderingField
-            , "boundedPositiveOrdering"
-            )
-          , ( LengthRankingConfigurationApplicableDomainValidationField
-            , "applicableDomainValidation"
-            )
-          , ( LengthRankingConfigurationApplicableDomainOrderingField
-            , "applicableDomainOrdering"
-            )
-          , ( LengthRankingConfigurationCounterexampleSimplificationField
-            , "counterexampleSimplification"
-            )
-          , ( LengthRankingConfigurationLiveSessionOpeningField
-            , "liveSessionOpening"
-            )
-          , ( LengthRankingConfigurationUsableWorkBudgetField
-            , "usableWorkBudget"
-            )
-          , (LengthRankingConfigurationContractField, "contract")
-          ]
+        missing = assertConfigurationFieldMissing
+        unexpected = assertConfigurationFieldUnexpected
+        rootShape = lengthRankingConfigurationRootShape
         applicableShape =
           [ ( LengthRankingConfigurationApplicableDomainStrategyField
             , "strategy"
@@ -13415,48 +13090,9 @@ assertLengthDescriptorBoundExecveCheckExecutableAccessSchema =
         pair = descriptorBoundExecveCheckExecutableAccessPairDocument
           executable 65000
         documents = [scalar, pair]
-        missing object field path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationMissingField object field)
-            $ deleteJsonField path document
-        unexpected object path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationUnexpectedField object)
-            $ addJsonField path ("private-field", Json.JNull) document
-        rootShape =
-          [ (LengthRankingConfigurationFormatField, "format")
-          , (LengthRankingConfigurationVersionField, "version")
-          , ( LengthRankingConfigurationExecutionAdmissionField
-            , "executionAdmission"
-            )
-          , (LengthRankingConfigurationExecutionField, "execution")
-          , (LengthRankingConfigurationEvaluationField, "evaluation")
-          , ( LengthRankingConfigurationInputBoxValidationField
-            , "inputBoxValidation"
-            )
-          , ( LengthRankingConfigurationCounterexampleProbeField
-            , "counterexampleProbe"
-            )
-          , ( LengthRankingConfigurationBoundedPositiveOrderingField
-            , "boundedPositiveOrdering"
-            )
-          , ( LengthRankingConfigurationApplicableDomainValidationField
-            , "applicableDomainValidation"
-            )
-          , ( LengthRankingConfigurationApplicableDomainOrderingField
-            , "applicableDomainOrdering"
-            )
-          , ( LengthRankingConfigurationCounterexampleSimplificationField
-            , "counterexampleSimplification"
-            )
-          , ( LengthRankingConfigurationLiveSessionOpeningField
-            , "liveSessionOpening"
-            )
-          , ( LengthRankingConfigurationUsableWorkBudgetField
-            , "usableWorkBudget"
-            )
-          , (LengthRankingConfigurationContractField, "contract")
-          ]
+        missing = assertConfigurationFieldMissing
+        unexpected = assertConfigurationFieldUnexpected
+        rootShape = lengthRankingConfigurationRootShape
         executionShape =
           [ (LengthRankingConfigurationResponseLimitsField, "responseLimits")
           , (LengthRankingConfigurationExecutablePathField, "executablePath")
@@ -14279,48 +13915,9 @@ assertLengthBooleanFiniteUnionSchema =
           strictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionPairDocument
             executable 65000
         documents = [scalar, pair]
-        missing object field path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationMissingField object field)
-            $ deleteJsonField path document
-        unexpected object path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationUnexpectedField object)
-            $ addJsonField path ("private-field", Json.JNull) document
-        rootShape =
-          [ (LengthRankingConfigurationFormatField, "format")
-          , (LengthRankingConfigurationVersionField, "version")
-          , ( LengthRankingConfigurationExecutionAdmissionField
-            , "executionAdmission"
-            )
-          , (LengthRankingConfigurationExecutionField, "execution")
-          , (LengthRankingConfigurationEvaluationField, "evaluation")
-          , ( LengthRankingConfigurationInputBoxValidationField
-            , "inputBoxValidation"
-            )
-          , ( LengthRankingConfigurationCounterexampleProbeField
-            , "counterexampleProbe"
-            )
-          , ( LengthRankingConfigurationBoundedPositiveOrderingField
-            , "boundedPositiveOrdering"
-            )
-          , ( LengthRankingConfigurationApplicableDomainValidationField
-            , "applicableDomainValidation"
-            )
-          , ( LengthRankingConfigurationApplicableDomainOrderingField
-            , "applicableDomainOrdering"
-            )
-          , ( LengthRankingConfigurationCounterexampleSimplificationField
-            , "counterexampleSimplification"
-            )
-          , ( LengthRankingConfigurationLiveSessionOpeningField
-            , "liveSessionOpening"
-            )
-          , ( LengthRankingConfigurationUsableWorkBudgetField
-            , "usableWorkBudget"
-            )
-          , (LengthRankingConfigurationContractField, "contract")
-          ]
+        missing = assertConfigurationFieldMissing
+        unexpected = assertConfigurationFieldUnexpected
+        rootShape = lengthRankingConfigurationRootShape
         applicableShape =
           [ ( LengthRankingConfigurationApplicableDomainStrategyField
             , "strategy"
@@ -15534,48 +15131,9 @@ assertLengthBooleanFiniteUnionAtomicBranchingSchema =
             strictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingPairDocument
               executable 65000
           documents = [scalar, pair]
-          missing object field path document =
-            assertLengthAssessmentConfigurationFileError
-              (LengthRankingConfigurationMissingField object field)
-              $ deleteJsonField path document
-          unexpected object path document =
-            assertLengthAssessmentConfigurationFileError
-              (LengthRankingConfigurationUnexpectedField object)
-              $ addJsonField path ("private-field", Json.JNull) document
-          rootShape =
-            [ (LengthRankingConfigurationFormatField, "format")
-            , (LengthRankingConfigurationVersionField, "version")
-            , ( LengthRankingConfigurationExecutionAdmissionField
-              , "executionAdmission"
-              )
-            , (LengthRankingConfigurationExecutionField, "execution")
-            , (LengthRankingConfigurationEvaluationField, "evaluation")
-            , ( LengthRankingConfigurationInputBoxValidationField
-              , "inputBoxValidation"
-              )
-            , ( LengthRankingConfigurationCounterexampleProbeField
-              , "counterexampleProbe"
-              )
-            , ( LengthRankingConfigurationBoundedPositiveOrderingField
-              , "boundedPositiveOrdering"
-              )
-            , ( LengthRankingConfigurationApplicableDomainValidationField
-              , "applicableDomainValidation"
-              )
-            , ( LengthRankingConfigurationApplicableDomainOrderingField
-              , "applicableDomainOrdering"
-              )
-            , ( LengthRankingConfigurationCounterexampleSimplificationField
-              , "counterexampleSimplification"
-              )
-            , ( LengthRankingConfigurationLiveSessionOpeningField
-              , "liveSessionOpening"
-              )
-            , ( LengthRankingConfigurationUsableWorkBudgetField
-              , "usableWorkBudget"
-              )
-            , (LengthRankingConfigurationContractField, "contract")
-            ]
+          missing = assertConfigurationFieldMissing
+          unexpected = assertConfigurationFieldUnexpected
+          rootShape = lengthRankingConfigurationRootShape
           applicableShape =
             [ ( LengthRankingConfigurationApplicableDomainStrategyField
               , "strategy"
@@ -22756,6 +22314,42 @@ assertLengthRankingConfigurationFileError expected document =
     Right _ -> assertFailure $ "expected configuration-file failure: " ++
       show expected
 
+-- | The three schema-shape assertions every configuration test repeats:
+-- delete a required field, replace one with the wrong JSON type, or add an
+-- unknown field, and expect the decoder's exact closed error.
+assertConfigurationFieldMissing
+  :: LengthRankingConfigurationFileObject
+  -> LengthRankingConfigurationFileField
+  -> [String]
+  -> Json.JValue
+  -> IO ()
+assertConfigurationFieldMissing object field path document =
+  assertLengthAssessmentConfigurationFileError
+    (LengthRankingConfigurationMissingField object field)
+    $ deleteJsonField path document
+
+assertConfigurationFieldWrongType
+  :: LengthRankingConfigurationFileField
+  -> [String]
+  -> LengthRankingConfigurationFileValueType
+  -> Json.JValue
+  -> IO ()
+assertConfigurationFieldWrongType field path expected document =
+  assertLengthAssessmentConfigurationFileError
+    (LengthRankingConfigurationFieldTypeMismatch field expected)
+    $ setJsonField path (Json.JBool False) document
+
+assertConfigurationFieldUnexpected
+  :: LengthRankingConfigurationFileObject
+  -> [String]
+  -> Json.JValue
+  -> IO ()
+assertConfigurationFieldUnexpected object path document =
+  assertLengthAssessmentConfigurationFileError
+    (LengthRankingConfigurationUnexpectedField object)
+    $ addJsonField path ("private-field", Json.JNull) document
+
+
 assertLengthAssessmentConfigurationFileError
   :: LengthRankingConfigurationFileError
   -> Json.JValue
@@ -25182,6 +24776,47 @@ ineligibleLengthRankingContract = LeanLengthContract
       }
   , leanLengthContractProviderLaws = []
   }
+
+-- | Every root-level field of the current startup configuration grammar,
+-- paired with its JSON spelling, in the decoder's validation order.  The
+-- schema tests share this one table; a version that predates a field
+-- filters it out rather than restating the list.
+lengthRankingConfigurationRootShape
+  :: [(LengthRankingConfigurationFileField, String)]
+lengthRankingConfigurationRootShape =
+  [ (LengthRankingConfigurationFormatField, "format")
+  , (LengthRankingConfigurationVersionField, "version")
+  , ( LengthRankingConfigurationExecutionAdmissionField
+    , "executionAdmission"
+    )
+  , (LengthRankingConfigurationExecutionField, "execution")
+  , (LengthRankingConfigurationEvaluationField, "evaluation")
+  , ( LengthRankingConfigurationInputBoxValidationField
+    , "inputBoxValidation"
+    )
+  , ( LengthRankingConfigurationCounterexampleProbeField
+    , "counterexampleProbe"
+    )
+  , ( LengthRankingConfigurationBoundedPositiveOrderingField
+    , "boundedPositiveOrdering"
+    )
+  , ( LengthRankingConfigurationApplicableDomainValidationField
+    , "applicableDomainValidation"
+    )
+  , ( LengthRankingConfigurationApplicableDomainOrderingField
+    , "applicableDomainOrdering"
+    )
+  , ( LengthRankingConfigurationCounterexampleSimplificationField
+    , "counterexampleSimplification"
+    )
+  , ( LengthRankingConfigurationLiveSessionOpeningField
+    , "liveSessionOpening"
+    )
+  , ( LengthRankingConfigurationUsableWorkBudgetField
+    , "usableWorkBudget"
+    )
+  , (LengthRankingConfigurationContractField, "contract")
+  ]
 
 lengthRankingContract :: Natural -> LeanLengthContract
 lengthRankingContract expectedResult = LeanLengthContract
