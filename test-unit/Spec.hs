@@ -7,7 +7,7 @@ import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as BS
 import Data.Char (isAlphaNum, toLower)
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef)
-import Data.List (isInfixOf, sortOn)
+import Data.List (isInfixOf, isPrefixOf, sortOn)
 import Data.Maybe (isNothing)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -45,7 +45,7 @@ import System.IO
   )
 import System.Info (os)
 import System.IO.Unsafe (unsafePerformIO)
-import System.Process (callProcess)
+import System.Process (callProcess, readProcess)
 import System.Timeout (timeout)
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.HUnit ((@?=), assertBool, assertFailure, testCase)
@@ -237,6 +237,7 @@ import Leant.Synth.Length.Configuration
   , mkLengthRankingPolicy
   , mkLengthRankingPolicyWithDescriptorBoundExecutableLaunch
   , mkLengthRankingPolicyWithDescriptorBoundEffectiveIDExecutableAccessLaunch
+  , mkLengthRankingPolicyWithDescriptorBoundExecveCheckExecutableAccessLaunch
   , lengthRankingPolicyExecutableDigestExpectation
   , lengthRankingPolicyExecutableLaunchStrategy
   , lengthRankingPolicyFromValidatedComponents
@@ -288,6 +289,8 @@ import Leant.Synth.Length.Configuration.File
   , lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaVersion
   , lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusVersion
   , lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusVersion
+  , lengthRankingConfigurationFileDescriptorBoundExecveCheckExecutableAccessVersion
+  , lengthRankingConfigurationFileSpinePairDescriptorBoundExecveCheckExecutableAccessVersion
   , lengthRankingConfigurationFileJsonLimits
   , lengthRankingConfigurationFileVersion
   )
@@ -560,6 +563,7 @@ main = do
       , lengthDescriptorBoundEffectiveIDExecutableAccessTests
       , lengthStrictRelationalPositiveAffineQuotientRootExtremaTests
       , lengthStrictRelationalPositiveAffineQuotientRootExtremaMonusTests
+      , lengthDescriptorBoundExecveCheckExecutableAccessTests
       , replayPlanTests
       , providerProgramTests
       , candidateVerificationTests
@@ -4481,8 +4485,8 @@ assertLengthUsableWorkBudgetConfigurationSchema =
       $ badContract scalar
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion
-      $ setJsonField ["version"] (Json.JInt 27)
-      $ addJsonField [] ("private-v27", Json.JNull) scalar
+      $ setJsonField ["version"] (Json.JInt 29)
+      $ addJsonField [] ("private-v29", Json.JNull) scalar
 
 assertLengthUsableWorkBudgetLegacySchema :: IO ()
 assertLengthUsableWorkBudgetLegacySchema =
@@ -4897,8 +4901,8 @@ assertLengthScopedUsableWorkBudgetSchema =
         LengthRankingConfigurationUnknownTag)
       $ badContract scalar
 
-    let future = setJsonField ["version"] (Json.JInt 27)
-          $ addJsonField [] ("private-v27", Json.JNull) scalar
+    let future = setJsonField ["version"] (Json.JInt 29)
+          $ addJsonField [] ("private-v29", Json.JNull) scalar
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion future
     assertLengthRankingConfigurationFileError
@@ -7035,8 +7039,8 @@ assertLengthPositiveAffineConfigurationSchema =
       $ badContract scalar
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion
-      $ setJsonField ["version"] (Json.JInt 27)
-      $ addJsonField [] ("private-v27", Json.JNull) scalar
+      $ setJsonField ["version"] (Json.JInt 29)
+      $ addJsonField [] ("private-v29", Json.JNull) scalar
 
 assertLengthPositiveAffineLegacyCompatibility :: IO ()
 assertLengthPositiveAffineLegacyCompatibility = do
@@ -7831,8 +7835,8 @@ assertLengthRelationalPositiveAffineSchema =
       $ badContract v11
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion
-      $ setJsonField ["version"] (Json.JInt 27)
-      $ addJsonField [] ("private-v27", Json.JNull) v11
+      $ setJsonField ["version"] (Json.JInt 29)
+      $ addJsonField [] ("private-v29", Json.JNull) v11
 
 relationalPositiveAffineScalarContract
   :: LengthFormula LengthContractVariable
@@ -8259,7 +8263,7 @@ lengthStrictRelationalPositiveAffineTests :: TestTree
 lengthStrictRelationalPositiveAffineTests = testGroup
   "strict relational positive-affine v15/v16 Length ranking"
   [ testCase
-      "close the exact v15/v16 scoped schema, order, caps, and v27 sentinel"
+      "close the exact v15/v16 scoped schema, order, caps, and v29 sentinel"
       assertLengthStrictRelationalPositiveAffineSchema
   , testCase
       "keep v1-v14 literal and separate every file strategy"
@@ -8544,8 +8548,8 @@ assertLengthStrictRelationalPositiveAffineSchema =
         LengthRankingConfigurationUnknownTag)
       $ badContract scalar
 
-    let future = setJsonField ["version"] (Json.JInt 27)
-          $ addJsonField [] ("private-v27", Json.JNull) scalar
+    let future = setJsonField ["version"] (Json.JInt 29)
+          $ addJsonField [] ("private-v29", Json.JNull) scalar
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion future
     assertLengthRankingConfigurationFileError
@@ -9079,7 +9083,7 @@ lengthDescriptorBoundExecutableLaunchTests :: TestTree
 lengthDescriptorBoundExecutableLaunchTests = testGroup
   "descriptor-bound executable v17/v18 Length ranking"
   [ testCase
-      "close the exact schema, launch literal, order, caps, and v27 sentinel"
+      "close the exact schema, launch literal, order, caps, and v29 sentinel"
       assertLengthDescriptorBoundExecutableLaunchSchema
   , testCase
       "leave every v1-v16 execution object and launch classifier literal"
@@ -9285,8 +9289,8 @@ assertLengthDescriptorBoundExecutableLaunchSchema =
     assertDescriptorBoundExecutableLaunchCaps scalar
     assertDescriptorBoundExecutableLaunchOrder scalar
 
-    let future = setJsonField ["version"] (Json.JInt 27)
-          $ addJsonField [] ("private-v27", Json.JNull) scalar
+    let future = setJsonField ["version"] (Json.JInt 29)
+          $ addJsonField [] ("private-v29", Json.JNull) scalar
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion future
     assertLengthRankingConfigurationFileError
@@ -9878,7 +9882,7 @@ lengthDescriptorBoundEffectiveIDExecutableAccessTests :: TestTree
 lengthDescriptorBoundEffectiveIDExecutableAccessTests = testGroup
   "effective-ID executable-access v21/v22 Length ranking"
   [ testCase
-      "close exact schemas, order, caps, launch literal, and v27 sentinel"
+      "close exact schemas, order, caps, launch literal, and v29 sentinel"
       assertLengthDescriptorBoundEffectiveIDExecutableAccessSchema
   , testCase
       "accept v1-v20 literally and keep all three launch families disjoint"
@@ -10103,8 +10107,8 @@ assertLengthDescriptorBoundEffectiveIDExecutableAccessSchema =
     assertDescriptorBoundExecutableLaunchCaps scalar
     assertDescriptorBoundExecutableLaunchOrder scalar
 
-    let future = setJsonField ["version"] (Json.JInt 27)
-          $ addJsonField [] ("private-v27", Json.JNull) scalar
+    let future = setJsonField ["version"] (Json.JInt 29)
+          $ addJsonField [] ("private-v29", Json.JNull) scalar
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion future
     assertLengthRankingConfigurationFileError
@@ -10198,6 +10202,7 @@ assertLengthDescriptorBoundEffectiveIDExecutableAccessCompatibility =
         [ Djex.LengthSMTLibPathSnapshotThenDirectSpawn
         , Djex.LengthSMTLibDescriptorBoundExecutableLaunch
         , Djex.LengthSMTLibDescriptorBoundEffectiveIDExecutableAccessLaunch
+        , Djex.LengthSMTLibDescriptorBoundExecveCheckExecutableAccessLaunch
         ]
 
 assertLengthDescriptorBoundEffectiveIDExecutableAccessProjections :: IO ()
@@ -10632,7 +10637,7 @@ lengthStrictRelationalPositiveAffineQuotientTests :: TestTree
 lengthStrictRelationalPositiveAffineQuotientTests = testGroup
   "quotient-consequence v19/v20 Length ranking"
   [ testCase
-      "close exact descriptor/scoped schemas, order, caps, and v27 sentinel"
+      "close exact descriptor/scoped schemas, order, caps, and v29 sentinel"
       assertLengthStrictRelationalPositiveAffineQuotientSchema
   , testCase
       "keep v1-v18 literal and separate every applicable-domain strategy"
@@ -10882,8 +10887,8 @@ assertLengthStrictRelationalPositiveAffineQuotientSchema =
     assertDescriptorBoundExecutableLaunchCaps scalar
     assertDescriptorBoundExecutableLaunchOrder scalar
 
-    let future = setJsonField ["version"] (Json.JInt 27)
-          $ addJsonField [] ("private-v27", Json.JNull) scalar
+    let future = setJsonField ["version"] (Json.JInt 29)
+          $ addJsonField [] ("private-v29", Json.JNull) scalar
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion future
     assertLengthRankingConfigurationFileError
@@ -11562,7 +11567,7 @@ lengthStrictRelationalPositiveAffineQuotientRootExtremaTests :: TestTree
 lengthStrictRelationalPositiveAffineQuotientRootExtremaTests = testGroup
   "root-extrema v23/v24 Length ranking"
   [ testCase
-      "close exact inherited schemas, order, caps, and the v27 sentinel"
+      "close exact inherited schemas, order, caps, and the v29 sentinel"
       assertLengthStrictRelationalPositiveAffineQuotientRootExtremaSchema
   , testCase
       "decode v1-v22 literally and keep all six domain strategies disjoint"
@@ -11794,8 +11799,8 @@ assertLengthStrictRelationalPositiveAffineQuotientRootExtremaSchema =
     assertDescriptorBoundExecutableLaunchCaps scalar
     assertDescriptorBoundExecutableLaunchOrder scalar
 
-    let future = setJsonField ["version"] (Json.JInt 27)
-          $ addJsonField [] ("private-v27", Json.JNull) scalar
+    let future = setJsonField ["version"] (Json.JInt 29)
+          $ addJsonField [] ("private-v29", Json.JNull) scalar
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion future
     assertLengthRankingConfigurationFileError
@@ -12416,7 +12421,7 @@ lengthStrictRelationalPositiveAffineQuotientRootExtremaMonusTests :: TestTree
 lengthStrictRelationalPositiveAffineQuotientRootExtremaMonusTests = testGroup
   "root-monus v25/v26 Length ranking"
   [ testCase
-      "close exact inherited schemas, order, caps, and the v27 sentinel"
+      "close exact inherited schemas, order, caps, and the v29 sentinel"
       assertLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusSchema
   , testCase
       "decode v1-v24 literally and keep all seven domain strategies disjoint"
@@ -12659,8 +12664,8 @@ assertLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusSchema =
     assertDescriptorBoundExecutableLaunchCaps scalar
     assertDescriptorBoundExecutableLaunchOrder scalar
 
-    let future = setJsonField ["version"] (Json.JInt 27)
-          $ addJsonField [] ("private-v27", Json.JNull) scalar
+    let future = setJsonField ["version"] (Json.JInt 29)
+          $ addJsonField [] ("private-v29", Json.JNull) scalar
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion future
     assertLengthRankingConfigurationFileError
@@ -13360,6 +13365,841 @@ assertLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusScopedRoutes =
         failure <- case lengthRankingFailure scalar of
           Nothing -> assertFailure
             "v25 root-monus discarded its query failure"
+              >> error "unreachable"
+          Just retained -> pure retained
+        lengthRankingFailureClass failure @?=
+          LengthRankingLiveQueryFailed
+            Djex.LengthSMTLibLiveQueryProtocolRejected
+        lengthRankingFailureOriginalIndex failure @?= Just 0
+        lengthRankingFailureCleanupIncomplete failure @?= False
+        assertFakeLengthQueryEvents [0] [] =<<
+          BS.readFile (executable ++ ".events")
+
+lengthDescriptorBoundExecveCheckExecutableAccessTests :: TestTree
+lengthDescriptorBoundExecveCheckExecutableAccessTests = testGroup
+  "execve-check executable-access v27/v28 Length ranking"
+  [ testCase
+      "close exact scalar and product schemas, demand order, and v29 sentinel"
+      assertLengthDescriptorBoundExecveCheckExecutableAccessSchema
+  , testCase
+      "accept v1-v26 literally and isolate all four launch strategies"
+      assertLengthDescriptorBoundExecveCheckExecutableAccessCompatibility
+  , testCase
+      "preserve execve-check authority through maker, bridge, and mode"
+      assertLengthDescriptorBoundExecveCheckExecutableAccessProjections
+  , testCase
+      "establish scalar and product root-monus receipts without a worker"
+      assertLengthDescriptorBoundExecveCheckExecutableAccessPureRanking
+  , testCase
+      "map stock Linux 5.15 native unavailability to atomic session failure"
+      assertLengthDescriptorBoundExecveCheckExecutableAccessNativeUnavailable
+  , testCase
+      "match healthy scalar and product parity with compact live ordinals"
+      assertLengthDescriptorBoundExecveCheckExecutableAccessHealthyParity
+  , testCase
+      "retain pure, opener, query deadlines and nondeadline failures"
+      assertLengthDescriptorBoundExecveCheckExecutableAccessRoutes
+  ]
+
+descriptorBoundExecveCheckExecutableAccessLiteral :: String
+descriptorBoundExecveCheckExecutableAccessLiteral =
+  "descriptor-bound-execve-check-executable-access-v1"
+
+descriptorBoundExecveCheckExecutableAccessScalarDocument
+  :: FilePath
+  -> Integer
+  -> Json.JValue
+descriptorBoundExecveCheckExecutableAccessScalarDocument
+    executable milliseconds =
+  setJsonField ["execution", "executableLaunch"]
+    (Json.JStr descriptorBoundExecveCheckExecutableAccessLiteral)
+  $ setJsonField ["version"]
+      (Json.JInt $ toInteger
+        lengthRankingConfigurationFileDescriptorBoundExecveCheckExecutableAccessVersion)
+  $ strictRelationalPositiveAffineQuotientRootExtremaMonusScalarDocument
+      executable milliseconds
+
+descriptorBoundExecveCheckExecutableAccessPairDocument
+  :: FilePath
+  -> Integer
+  -> Json.JValue
+descriptorBoundExecveCheckExecutableAccessPairDocument executable milliseconds =
+  setJsonField ["execution", "executableLaunch"]
+    (Json.JStr descriptorBoundExecveCheckExecutableAccessLiteral)
+  $ setJsonField ["version"]
+      (Json.JInt $ toInteger
+        lengthRankingConfigurationFileSpinePairDescriptorBoundExecveCheckExecutableAccessVersion)
+  $ strictRelationalPositiveAffineQuotientRootExtremaMonusPairDocument
+      executable milliseconds
+
+expectDescriptorBoundExecveCheckExecutableAccessPolicy
+  :: Json.JValue
+  -> IO (LengthRankingPolicy, LeanLengthContractSelection)
+expectDescriptorBoundExecveCheckExecutableAccessPolicy document = do
+  disabled <- expectLengthAssessmentConfigurationFile document
+  activated <- expectLengthAssessmentConfigurationActivation
+    PermitUnpinnedExecutable disabled
+  lengthRankingPolicyExecutableLaunchStrategy (fst activated) @?=
+    Djex.LengthSMTLibDescriptorBoundExecveCheckExecutableAccessLaunch
+  pure activated
+
+assertLengthDescriptorBoundExecveCheckExecutableAccessSchema :: IO ()
+assertLengthDescriptorBoundExecveCheckExecutableAccessSchema =
+  withTemporaryDirectory "leant-length-execve-check-schema" $ \root -> do
+    let executable = root </> "missing-z3"
+        scalar = descriptorBoundExecveCheckExecutableAccessScalarDocument
+          executable 65000
+        pair = descriptorBoundExecveCheckExecutableAccessPairDocument
+          executable 65000
+        documents = [scalar, pair]
+        missing object field path document =
+          assertLengthAssessmentConfigurationFileError
+            (LengthRankingConfigurationMissingField object field)
+            $ deleteJsonField path document
+        unexpected object path document =
+          assertLengthAssessmentConfigurationFileError
+            (LengthRankingConfigurationUnexpectedField object)
+            $ addJsonField path ("private-field", Json.JNull) document
+        rootShape =
+          [ (LengthRankingConfigurationFormatField, "format")
+          , (LengthRankingConfigurationVersionField, "version")
+          , ( LengthRankingConfigurationExecutionAdmissionField
+            , "executionAdmission"
+            )
+          , (LengthRankingConfigurationExecutionField, "execution")
+          , (LengthRankingConfigurationEvaluationField, "evaluation")
+          , ( LengthRankingConfigurationInputBoxValidationField
+            , "inputBoxValidation"
+            )
+          , ( LengthRankingConfigurationCounterexampleProbeField
+            , "counterexampleProbe"
+            )
+          , ( LengthRankingConfigurationBoundedPositiveOrderingField
+            , "boundedPositiveOrdering"
+            )
+          , ( LengthRankingConfigurationApplicableDomainValidationField
+            , "applicableDomainValidation"
+            )
+          , ( LengthRankingConfigurationApplicableDomainOrderingField
+            , "applicableDomainOrdering"
+            )
+          , ( LengthRankingConfigurationCounterexampleSimplificationField
+            , "counterexampleSimplification"
+            )
+          , ( LengthRankingConfigurationLiveSessionOpeningField
+            , "liveSessionOpening"
+            )
+          , ( LengthRankingConfigurationUsableWorkBudgetField
+            , "usableWorkBudget"
+            )
+          , (LengthRankingConfigurationContractField, "contract")
+          ]
+        executionShape =
+          [ (LengthRankingConfigurationResponseLimitsField, "responseLimits")
+          , (LengthRankingConfigurationExecutablePathField, "executablePath")
+          , ( LengthRankingConfigurationExpectedExecutableSha256Field
+            , "expectedExecutableSha256"
+            )
+          , ( LengthRankingConfigurationSolverTimeoutMillisecondsField
+            , "solverTimeoutMilliseconds"
+            )
+          , ( LengthRankingConfigurationSolverResourceLimitField
+            , "solverResourceLimit"
+            )
+          , ( LengthRankingConfigurationHostDeadlineMillisecondsField
+            , "hostDeadlineMilliseconds"
+            )
+          , (LengthRankingConfigurationArtifactPolicyField, "artifactPolicy")
+          , ( LengthRankingConfigurationExecutableLaunchField
+            , "executableLaunch"
+            )
+          ]
+        applicableShape =
+          [ (LengthRankingConfigurationApplicableDomainStrategyField, "strategy")
+          , ( LengthRankingConfigurationApplicableDomainMaximumInputsField
+            , "maximumInputs"
+            )
+          , ( LengthRankingConfigurationApplicableDomainMaximumAssignmentsField
+            , "maximumAssignments"
+            )
+          ]
+        budgetShape =
+          [ ( LengthRankingConfigurationUsableWorkBudgetStrategyField
+            , "strategy"
+            )
+          , ( LengthRankingConfigurationUsableWorkBudgetMillisecondsField
+            , "milliseconds"
+            )
+          ]
+    lengthRankingConfigurationFileDescriptorBoundExecveCheckExecutableAccessVersion
+      @?= 27
+    lengthRankingConfigurationFileSpinePairDescriptorBoundExecveCheckExecutableAccessVersion
+      @?= 28
+    mapM_ (\document -> do
+        _ <- expectLengthAssessmentConfigurationFile document
+        _ <- expectLengthAssessmentConfigurationFile
+          $ reverseJsonObjectFields document
+        assertLengthRankingConfigurationFileError
+          LengthRankingConfigurationUnsupportedVersion document
+        mapM_ (\(field, name) -> missing
+            LengthRankingConfigurationRootObject field [name] document)
+          rootShape
+        unexpected LengthRankingConfigurationRootObject [] document
+        assertLengthAssessmentConfigurationFileError
+          (LengthRankingConfigurationExpectedObject
+            LengthRankingConfigurationExecutionObject)
+          $ setJsonField ["execution"] Json.JNull document
+        mapM_ (\(field, name) -> missing
+            LengthRankingConfigurationExecutionObject field
+            ["execution", name] document)
+          executionShape
+        unexpected LengthRankingConfigurationExecutionObject
+          ["execution"] document
+        assertLengthAssessmentConfigurationFileError
+          (LengthRankingConfigurationExpectedObject
+            LengthRankingConfigurationApplicableDomainValidationObject)
+          $ setJsonField ["applicableDomainValidation"] Json.JNull document
+        mapM_ (\(field, name) -> missing
+            LengthRankingConfigurationApplicableDomainValidationObject field
+            ["applicableDomainValidation", name] document)
+          applicableShape
+        unexpected
+          LengthRankingConfigurationApplicableDomainValidationObject
+          ["applicableDomainValidation"] document
+        mapM_ (\(field, name) -> missing
+            LengthRankingConfigurationUsableWorkBudgetObject field
+            ["usableWorkBudget", name] document)
+          budgetShape
+        unexpected LengthRankingConfigurationUsableWorkBudgetObject
+          ["usableWorkBudget"] document
+        assertLengthAssessmentConfigurationFileError
+          (LengthRankingConfigurationFieldTypeMismatch
+            LengthRankingConfigurationExecutableLaunchField
+            LengthRankingConfigurationStringValue)
+          $ setJsonField ["execution", "executableLaunch"]
+              (Json.JBool False) document
+        mapM_ (\literal ->
+            assertLengthAssessmentConfigurationFileError
+              (LengthRankingConfigurationFieldValueRejected
+                LengthRankingConfigurationExecutableLaunchField)
+              $ setJsonField ["execution", "executableLaunch"]
+                  (Json.JStr literal) document)
+          [ "path-snapshot-direct-v1"
+          , descriptorBoundExecutableLaunchLiteral
+          , descriptorBoundEffectiveIDExecutableAccessLiteral
+          ]
+        assertLengthAssessmentConfigurationFileError
+          (LengthRankingConfigurationFieldValueRejected
+            LengthRankingConfigurationApplicableDomainStrategyField)
+          $ setJsonField ["applicableDomainValidation", "strategy"]
+              (Json.JStr
+                strictRelationalPositiveAffineQuotientRootExtremaLiteral)
+              document)
+      documents
+
+    (_, scalarSelection) <-
+      expectDescriptorBoundExecveCheckExecutableAccessPolicy scalar
+    case scalarSelection of
+      LeanLengthScalarContractSelection _ -> pure ()
+      LeanLengthSpinePairContractSelection _ -> assertFailure
+        "v27 selected the product Length contract"
+    (_, pairSelection) <-
+      expectDescriptorBoundExecveCheckExecutableAccessPolicy pair
+    case pairSelection of
+      LeanLengthSpinePairContractSelection _ -> pure ()
+      LeanLengthScalarContractSelection _ -> assertFailure
+        "v28 selected the scalar Length contract"
+
+    assertDescriptorBoundExecutableLaunchCaps scalar
+    assertDescriptorBoundExecutableLaunchOrder scalar
+
+    let future = setJsonField ["version"] (Json.JInt 29)
+          $ addJsonField [] ("private-v29", Json.JNull) scalar
+    assertLengthAssessmentConfigurationFileError
+      LengthRankingConfigurationUnsupportedVersion future
+    assertLengthRankingConfigurationFileError
+      LengthRankingConfigurationUnsupportedVersion future
+
+assertLengthDescriptorBoundExecveCheckExecutableAccessCompatibility :: IO ()
+assertLengthDescriptorBoundExecveCheckExecutableAccessCompatibility =
+  withTemporaryDirectory "leant-length-execve-check-compatibility"
+    $ \root -> do
+      let executable = root </> "missing-z3"
+          v1 = lengthRankingConfigurationFileFixture executable Nothing
+          v2 = lengthRankingConfigurationFileInputBoxFixture
+            executable Nothing [1] 2
+          v3 = lengthRankingConfigurationFileOriginProbeFixture
+            executable Nothing [1] 2
+          v4 = lengthAssessmentConfigurationFileSpinePairFixture
+            executable Nothing [1] 2 positiveAffinePairContractValue
+          v5 = lengthAssessmentConfigurationFilePositiveOrderingFixture
+            executable Nothing [1] 2 positiveAffineScalarContractValue
+          v6 = lengthAssessmentConfigurationFileSpinePairPositiveOrderingFixture
+            executable Nothing [1] 2 positiveAffinePairContractValue
+          v7 = positiveAffineScalarDocument executable
+          v8 = positiveAffinePairDocument executable
+          v9 = usableWorkBudgetScalarDocument executable 1000
+          v10 = usableWorkBudgetPairDocument executable 1000
+          v11 = relationalPositiveAffineScalarDocument executable
+          v12 = relationalPositiveAffinePairDocument executable
+          v13 = scopedUsableWorkBudgetScalarDocument executable 1000
+          v14 = scopedUsableWorkBudgetPairDocument executable 1000
+          v15 = strictRelationalPositiveAffineScalarDocument executable 1000
+          v16 = strictRelationalPositiveAffinePairDocument executable 1000
+          v17 = descriptorBoundExecutableLaunchScalarDocument executable 1000
+          v18 = descriptorBoundExecutableLaunchPairDocument executable 1000
+          v19 = strictRelationalPositiveAffineQuotientScalarDocument
+            executable 1000
+          v20 = strictRelationalPositiveAffineQuotientPairDocument
+            executable 1000
+          v21 = descriptorBoundEffectiveIDExecutableAccessScalarDocument
+            executable 1000
+          v22 = descriptorBoundEffectiveIDExecutableAccessPairDocument
+            executable 1000
+          v23 =
+            strictRelationalPositiveAffineQuotientRootExtremaScalarDocument
+              executable 1000
+          v24 =
+            strictRelationalPositiveAffineQuotientRootExtremaPairDocument
+              executable 1000
+          v25 =
+            strictRelationalPositiveAffineQuotientRootExtremaMonusScalarDocument
+              executable 1000
+          v26 =
+            strictRelationalPositiveAffineQuotientRootExtremaMonusPairDocument
+              executable 1000
+          v27 = descriptorBoundExecveCheckExecutableAccessScalarDocument
+            executable 1000
+          v28 = descriptorBoundExecveCheckExecutableAccessPairDocument
+            executable 1000
+          legacy =
+            [ v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12
+            , v13, v14, v15, v16, v17, v18, v19, v20, v21, v22
+            , v23, v24, v25, v26
+            ]
+          direct = take 16 legacy
+          descriptor = take 4 $ drop 16 legacy
+          effectiveAccess = drop 20 legacy
+          execveCheck = [v27, v28]
+          activate document = do
+            disabled <- expectLengthAssessmentConfigurationFile document
+            expectLengthAssessmentConfigurationActivation
+              PermitUnpinnedExecutable disabled
+          rejectLaunch literal document =
+            assertLengthAssessmentConfigurationFileError
+              (LengthRankingConfigurationFieldValueRejected
+                LengthRankingConfigurationExecutableLaunchField)
+              $ setJsonField ["execution", "executableLaunch"]
+                  (Json.JStr literal) document
+          setStrategy strategy = setJsonField
+            ["applicableDomainValidation", "strategy"]
+            (Json.JStr strategy)
+      mapM_ (\document -> do
+          (policy, _) <- activate document
+          lengthRankingPolicyExecutableLaunchStrategy policy @?=
+            Djex.LengthSMTLibPathSnapshotThenDirectSpawn)
+        direct
+      mapM_ (\document -> do
+          (policy, _) <- activate document
+          lengthRankingPolicyExecutableLaunchStrategy policy @?=
+            Djex.LengthSMTLibDescriptorBoundExecutableLaunch)
+        descriptor
+      mapM_ (\document -> do
+          (policy, _) <- activate document
+          lengthRankingPolicyExecutableLaunchStrategy policy @?=
+            Djex.LengthSMTLibDescriptorBoundEffectiveIDExecutableAccessLaunch)
+        effectiveAccess
+      mapM_ (\document -> do
+          (policy, _) <- activate document
+          lengthRankingPolicyExecutableLaunchStrategy policy @?=
+            Djex.LengthSMTLibDescriptorBoundExecveCheckExecutableAccessLaunch)
+        execveCheck
+
+      mapM_ (\document ->
+          assertLengthAssessmentConfigurationFileError
+            (LengthRankingConfigurationUnexpectedField
+              LengthRankingConfigurationExecutionObject)
+            $ appendJsonField ["execution"]
+                ( "executableLaunch"
+                , Json.JStr
+                    descriptorBoundExecveCheckExecutableAccessLiteral
+                ) document)
+        direct
+      mapM_ (rejectLaunch
+          descriptorBoundExecveCheckExecutableAccessLiteral)
+        $ drop 16 legacy
+      mapM_ (\literal -> mapM_ (rejectLaunch literal) execveCheck)
+        [ "path-snapshot-direct-v1"
+        , descriptorBoundExecutableLaunchLiteral
+        , descriptorBoundEffectiveIDExecutableAccessLiteral
+        ]
+      mapM_ (\strategy -> mapM_
+          (\document ->
+            assertLengthAssessmentConfigurationFileError
+              (LengthRankingConfigurationFieldValueRejected
+                LengthRankingConfigurationApplicableDomainStrategyField)
+              $ setStrategy strategy document)
+          execveCheck)
+        [ "direct-v1"
+        , "positive-affine-v1"
+        , "relational-positive-affine-v1"
+        , "strict-relational-positive-affine-v1"
+        , strictRelationalPositiveAffineQuotientLiteral
+        , strictRelationalPositiveAffineQuotientRootExtremaLiteral
+        ]
+
+assertLengthDescriptorBoundExecveCheckExecutableAccessProjections :: IO ()
+assertLengthDescriptorBoundExecveCheckExecutableAccessProjections =
+  withTemporaryDirectory "leant-length-execve-check-policy" $ \root -> do
+    let executable = root </> "missing-z3"
+        executionSource = explicitLengthRankingExecutionSource executable
+          Nothing Djex.LengthSMTLibStatusOnly
+        source = explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits executionSource
+          Djex.defaultLengthEvaluationLimitSource
+    direct <- expectRight $ mkLengthRankingPolicy source
+    descriptor <- expectRight
+      $ mkLengthRankingPolicyWithDescriptorBoundExecutableLaunch source
+    effectiveAccess <- expectRight
+      $ mkLengthRankingPolicyWithDescriptorBoundEffectiveIDExecutableAccessLaunch
+          source
+    execveCheck <- expectRight
+      $ mkLengthRankingPolicyWithDescriptorBoundExecveCheckExecutableAccessLaunch
+          source
+    map lengthRankingPolicyExecutableLaunchStrategy
+        [direct, descriptor, effectiveAccess, execveCheck] @?=
+      [ Djex.LengthSMTLibPathSnapshotThenDirectSpawn
+      , Djex.LengthSMTLibDescriptorBoundExecutableLaunch
+      , Djex.LengthSMTLibDescriptorBoundEffectiveIDExecutableAccessLaunch
+      , Djex.LengthSMTLibDescriptorBoundExecveCheckExecutableAccessLaunch
+      ]
+    lengthRankingPolicyExecutableDigestExpectation execveCheck @?=
+      Djex.LengthSMTLibExecutableDigestExpectationAbsent
+
+    execution <- expectRight
+      $ Djex.mkLengthSMTLibDescriptorBoundExecveCheckExecutableAccessExecutionConfig
+          Djex.defaultLengthSMTLibExecutionLimits executionSource
+    evaluation <- expectRight $ Djex.mkLengthEvaluationLimits
+      Djex.defaultLengthEvaluationLimitSource
+    let bridged = lengthRankingPolicyFromValidatedComponents
+          execution evaluation
+    lengthRankingPolicyExecutableLaunchStrategy bridged @?=
+      Djex.LengthSMTLibDescriptorBoundExecveCheckExecutableAccessLaunch
+
+    let invalidSource = explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits
+          (explicitLengthRankingExecutionSource "relative-z3" Nothing
+            Djex.LengthSMTLibStatusOnly)
+          (error "execve-check maker forced evaluation after execution")
+    case
+        mkLengthRankingPolicyWithDescriptorBoundExecveCheckExecutableAccessLaunch
+          invalidSource of
+      Left (LengthRankingExecutionConfigurationRejected
+          Djex.LengthSMTLibExecutionExecutablePathNotAbsolute) -> pure ()
+      Left failure -> assertFailure
+        $ "execve-check maker changed execution failure: " ++ show failure
+      Right _ -> assertFailure
+        "execve-check maker accepted a relative executable path"
+
+    let poisoned = disableLengthRankingConfiguration execveCheck
+          (error "execve-check projection forced the passive contract")
+    activated <- case activateLengthRankingConfiguration
+        PermitUnpinnedExecutable poisoned of
+      Left failure -> assertFailure
+        ("execve-check policy activation failed: " ++ show failure)
+          >> error "unreachable"
+      Right retained -> pure retained
+    lengthRankingPolicyExecutableLaunchStrategy (fst activated) @?=
+      Djex.LengthSMTLibDescriptorBoundExecveCheckExecutableAccessLaunch
+    lengthAssessmentModeExecutableLaunchStrategy
+      disabledLengthAssessmentMode @?= Nothing
+
+    let sourcePath = root </> "execve-check-assessment.json"
+        document = descriptorBoundExecveCheckExecutableAccessScalarDocument
+          executable 2000
+    ByteString.writeFile sourcePath
+      $ encodeLengthRankingConfigurationFile document
+    loaded <- loadLengthAssessmentMode PermitUnpinnedExecutable
+      $ LengthRankingConfigurationFileSource sourcePath 1000
+    mode <- case loaded of
+      Left failure -> assertFailure
+        ("execve-check assessment setup failed: " ++ show failure)
+          >> error "unreachable"
+      Right configured -> pure configured
+    lengthAssessmentModeActivationPolicy mode @?=
+      Just PermitUnpinnedExecutable
+    lengthAssessmentModeExecutableLaunchStrategy mode @?=
+      Just Djex.LengthSMTLibDescriptorBoundExecveCheckExecutableAccessLaunch
+    doesFileExist (executable ++ ".events") >>= (@?= False)
+
+assertLengthDescriptorBoundExecveCheckExecutableAccessPureRanking :: IO ()
+assertLengthDescriptorBoundExecveCheckExecutableAccessPureRanking = do
+  identity <- buildOneInputLengthRankingCandidate
+  (pairCandidate, _) <- buildLengthSpinePairRankingFixture
+  let scalarContract = strictRelationalPositiveAffineQuotientScalarContract
+        scalarRootMonusPrecondition $ LengthTruth True
+      pairContract = strictRelationalPositiveAffineQuotientPairContract
+        pairRootMonusEqualityPrecondition $ LengthTruth True
+  withTemporaryDirectory "leant-length-execve-check-pure" $ \root -> do
+    let executable = root </> "missing-z3"
+    (scalarPolicy, _) <-
+      expectDescriptorBoundExecveCheckExecutableAccessPolicy
+      $ withRootExtremaMonusApplicableDomainAssignmentLimit 3
+      $ descriptorBoundExecveCheckExecutableAccessScalarDocument
+          executable 2000
+    scalar <- expectLengthRankingWithin
+      "v27 execve-check deferred pure scalar"
+      $ rankVerifiedLengthCandidatesWithPolicy scalarPolicy scalarContract
+          [identity]
+    lengthRankingFailure scalar @?= Nothing
+    scalarReceipt <- case map rankedLengthCandidateAssessment
+        $ lengthRankingCandidates scalar of
+      [ StrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainEstablished
+          receipt
+        ] -> pure receipt
+      assessments -> assertFailure
+        ("v27 execve-check pure scalar opened or lost monus evidence: "
+          ++ show assessments) >> error "unreachable"
+    Djex.validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainInclusiveMaximums
+        scalarReceipt @?= [2]
+    Djex.validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainAssignmentCount
+        scalarReceipt @?= 3
+    Djex.validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainApplicableAssignmentCount
+        scalarReceipt @?= 3
+
+    (pairPolicy, _) <-
+      expectDescriptorBoundExecveCheckExecutableAccessPolicy
+      $ withRootExtremaMonusApplicableDomainAssignmentLimit 5
+      $ descriptorBoundExecveCheckExecutableAccessPairDocument
+          executable 2000
+    pair <- expectRight =<<
+      rankVerifiedLengthSpinePairCandidatesWithPolicy pairPolicy pairContract
+        [pairCandidate]
+    lengthSpinePairRankingFailure pair @?= Nothing
+    pairReceipt <- case map rankedLengthSpinePairCandidateAssessment
+        $ lengthSpinePairRankingCandidates pair of
+      [ LengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainEstablished
+          receipt
+        ] -> pure receipt
+      assessments -> assertFailure
+        ("v28 execve-check pure pair opened or lost monus evidence: "
+          ++ show assessments) >> error "unreachable"
+    Djex.validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainInclusiveMaximums
+        pairReceipt @?= [4]
+    Djex.validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainAssignmentCount
+        pairReceipt @?= 5
+    Djex.validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainApplicableAssignmentCount
+        pairReceipt @?= 1
+    doesFileExist (executable ++ ".events") >>= (@?= False)
+
+assertLengthDescriptorBoundExecveCheckExecutableAccessNativeUnavailable
+  :: IO ()
+assertLengthDescriptorBoundExecveCheckExecutableAccessNativeUnavailable
+  | os /= "linux" = pure ()
+  | otherwise = do
+      release <- readProcess "uname" ["-r"] ""
+      if not $ "5.15." `isPrefixOf` release
+        then pure ()
+        else do
+          identity <- buildOneInputLengthRankingCandidate
+          let candidates = [identity, identity]
+          withFakeLengthSolver "healthy" $ \executable -> do
+            (policy, _) <-
+              expectDescriptorBoundExecveCheckExecutableAccessPolicy
+              $ descriptorBoundExecveCheckExecutableAccessScalarDocument
+                  executable 2000
+            ranking <- expectLengthRankingWithin
+              "v27 stock-5.15 execve-check unavailable"
+              $ rankVerifiedLengthCandidatesWithPolicy policy
+                  usableWorkScalarLiveContract candidates
+            rankedLengthVerifiedCandidates ranking @?= candidates
+            map rankedLengthCandidateAssessment
+                (lengthRankingCandidates ranking) @?=
+              replicate (length candidates) Unassessed
+            failure <- case lengthRankingFailure ranking of
+              Nothing -> assertFailure
+                "stock Linux 5.15 unexpectedly admitted AT_EXECVE_CHECK"
+                  >> error "unreachable"
+              Just retained -> pure retained
+            lengthRankingFailureClass failure @?=
+              LengthRankingLiveSessionFailed
+                Djex.LengthSMTLibLiveSessionLaunchFailed
+            lengthRankingFailureOriginalIndex failure @?= Nothing
+            lengthRankingFailureCleanupIncomplete failure @?= False
+            doesFileExist (executable ++ ".events") >>= (@?= False)
+
+-- Leant intentionally uses only public launch behavior.  Djex retains the
+-- package-private deterministic matrix for the source-before-copy,
+-- source-before-child, and staged-before-child injected observation sites.
+descriptorBoundExecveCheckLaunchPubliclyReachable :: IO Bool
+descriptorBoundExecveCheckLaunchPubliclyReachable
+  | os /= "linux" = pure False
+  | otherwise = do
+      identity <- buildOneInputLengthRankingCandidate
+      withFakeLengthSolver "healthy" $ \executable -> do
+        (policy, _) <-
+          expectDescriptorBoundExecveCheckExecutableAccessPolicy
+          $ descriptorBoundExecveCheckExecutableAccessScalarDocument
+              executable 2000
+        ranking <- expectLengthRankingWithin
+          "public execve-check support probe"
+          $ rankVerifiedLengthCandidatesWithPolicy policy
+              usableWorkScalarLiveContract [identity]
+        case lengthRankingFailure ranking of
+          Nothing -> do
+            map rankedLengthCandidateAssessment
+                (lengthRankingCandidates ranking) @?=
+              [Heuristic Djex.SolverSatisfiable]
+            assertFakeLengthQueryEvents [0] [] =<<
+              BS.readFile (executable ++ ".events")
+            pure True
+          Just failure -> do
+            map rankedLengthCandidateAssessment
+                (lengthRankingCandidates ranking) @?= [Unassessed]
+            lengthRankingFailureOriginalIndex failure @?= Nothing
+            lengthRankingFailureCleanupIncomplete failure @?= False
+            case lengthRankingFailureClass failure of
+              LengthRankingLiveSessionFailed liveFailure
+                | liveFailure == Djex.LengthSMTLibLiveSessionLaunchFailed
+                    || liveFailure ==
+                      Djex.LengthSMTLibLiveSessionExecutableRejected ->
+                    pure False
+              failureClass -> assertFailure
+                ("public execve-check support probe produced "
+                  ++ show failureClass) >> error "unreachable"
+
+assertLengthDescriptorBoundExecveCheckExecutableAccessHealthyParity :: IO ()
+assertLengthDescriptorBoundExecveCheckExecutableAccessHealthyParity = do
+  supported <- descriptorBoundExecveCheckLaunchPubliclyReachable
+  if not supported
+    then pure ()
+    else do
+      identity <- buildOneInputLengthRankingCandidate
+      (_, pairCandidate) <- buildLengthSpinePairRankingFixture
+      scalarRefused <- syntheticLengthRankingCandidate
+        "execve-check-live-scalar-refused"
+      pairRefused <- syntheticLengthRankingCandidate
+        "execve-check-live-pair-refused"
+      let scalarCandidates =
+            [scalarRefused, identity, scalarRefused, identity]
+          pairCandidates =
+            [pairRefused, pairCandidate, pairRefused, pairCandidate]
+
+      predecessorScalar <- withFakeLengthSolver "healthy" $ \executable -> do
+        (policy, _) <-
+          expectStrictRelationalPositiveAffineQuotientRootExtremaMonusPolicy
+          $ strictRelationalPositiveAffineQuotientRootExtremaMonusScalarDocument
+              executable 2000
+        expectLengthRankingWithin "v25 scalar live parity control"
+          $ rankVerifiedLengthCandidatesWithPolicy policy
+              usableWorkScalarLiveContract scalarCandidates
+      currentScalar <- withFakeLengthSolver "healthy" $ \executable -> do
+        (policy, _) <-
+          expectDescriptorBoundExecveCheckExecutableAccessPolicy
+          $ descriptorBoundExecveCheckExecutableAccessScalarDocument
+              executable 2000
+        ranking <- expectLengthRankingWithin
+          "v27 execve-check scalar live parity"
+          $ rankVerifiedLengthCandidatesWithPolicy policy
+              usableWorkScalarLiveContract scalarCandidates
+        assertFakeLengthQueryEvents [0, 1] [] =<<
+          BS.readFile (executable ++ ".events")
+        pure ranking
+      assertLengthRankingsEquivalent predecessorScalar currentScalar
+      map rankedLengthCandidateOriginalIndex
+          (lengthRankingCandidates currentScalar) @?= [0, 1, 2, 3]
+      map rankedLengthCandidateAssessment
+          (lengthRankingCandidates currentScalar) @?=
+        [ Unassessed
+        , Heuristic Djex.SolverSatisfiable
+        , Unassessed
+        , Heuristic Djex.SolverSatisfiable
+        ]
+      rankedLengthPreparationRefusals currentScalar @?=
+        [ Just LengthPreparationTypedAuthorityUnavailable
+        , Nothing
+        , Just LengthPreparationTypedAuthorityUnavailable
+        , Nothing
+        ]
+
+      predecessorPair <- withFakeLengthSolver "healthy" $ \executable -> do
+        (policy, _) <-
+          expectStrictRelationalPositiveAffineQuotientRootExtremaMonusPolicy
+          $ strictRelationalPositiveAffineQuotientRootExtremaMonusPairDocument
+              executable 2000
+        expectRight =<<
+          rankVerifiedLengthSpinePairCandidatesWithPolicy policy
+            usableWorkPairLiveContract pairCandidates
+      currentPair <- withFakeLengthSolver "healthy" $ \executable -> do
+        (policy, _) <-
+          expectDescriptorBoundExecveCheckExecutableAccessPolicy
+          $ descriptorBoundExecveCheckExecutableAccessPairDocument
+              executable 2000
+        ranking <- expectRight =<<
+          rankVerifiedLengthSpinePairCandidatesWithPolicy policy
+            usableWorkPairLiveContract pairCandidates
+        assertFakeLengthQueryEvents [0, 1] [] =<<
+          BS.readFile (executable ++ ".events")
+        pure ranking
+      lengthSpinePairRankingSnapshotByOriginalIndex currentPair @?=
+        lengthSpinePairRankingSnapshotByOriginalIndex predecessorPair
+      lengthSpinePairRankingFailure currentPair @?=
+        lengthSpinePairRankingFailure predecessorPair
+      map rankedLengthSpinePairCandidateOriginalIndex
+          (lengthSpinePairRankingCandidates currentPair) @?= [0, 1, 2, 3]
+      map rankedLengthSpinePairCandidateAssessment
+          (lengthSpinePairRankingCandidates currentPair) @?=
+        [ LengthSpinePairUnassessed
+        , LengthSpinePairHeuristic Djex.SolverSatisfiable
+        , LengthSpinePairUnassessed
+        , LengthSpinePairHeuristic Djex.SolverSatisfiable
+        ]
+
+assertLengthDescriptorBoundExecveCheckExecutableAccessRoutes :: IO ()
+assertLengthDescriptorBoundExecveCheckExecutableAccessRoutes = do
+  identity <- buildOneInputLengthRankingCandidate
+  (_, pairCandidate) <- buildLengthSpinePairRankingFixture
+  pureGate <- newIORef 0
+  let pureContract = strictRelationalPositiveAffineQuotientScalarContract
+        scalarRootMonusPrecondition $ LengthTruth True
+      delayedPure = pureContract
+        { leanLengthContractSource =
+            delayedLengthTestValueWithGate pureGate 150000
+            $ leanLengthContractSource pureContract
+        }
+      scalarCandidates = [identity, identity]
+      expectScalarSessionFailure label expected ranking = do
+        rankedLengthVerifiedCandidates ranking @?= scalarCandidates
+        map rankedLengthCandidateAssessment
+            (lengthRankingCandidates ranking) @?=
+          replicate (length scalarCandidates) Unassessed
+        failure <- case lengthRankingFailure ranking of
+          Nothing -> assertFailure (label ++ " retained no atomic failure")
+            >> error "unreachable"
+          Just retained -> pure retained
+        lengthRankingFailureClass failure @?=
+          LengthRankingLiveSessionFailed expected
+        lengthRankingFailureOriginalIndex failure @?= Nothing
+        lengthRankingFailureCleanupIncomplete failure @?= False
+
+  withTemporaryDirectory "leant-length-execve-check-scoped-pure"
+    $ \root -> do
+      let executable = root </> "missing-z3"
+      (policy, _) <-
+        expectDescriptorBoundExecveCheckExecutableAccessPolicy
+        $ withRootExtremaMonusApplicableDomainAssignmentLimit 5
+        $ descriptorBoundExecveCheckExecutableAccessScalarDocument
+            executable 50
+      ranking <- expectLengthRankingWithin
+        "v27 execve-check pure scoped deadline"
+        $ rankVerifiedLengthCandidatesWithPolicy policy delayedPure [identity]
+      assertScalarUsableWorkExpiry
+        "v27 execve-check pure scoped deadline" ranking
+      doesFileExist (executable ++ ".events") >>= (@?= False)
+  readIORef pureGate >>= (@?= 1)
+
+  withTemporaryDirectory "leant-length-execve-check-missing" $ \root -> do
+    let executable = root </> "never-created-z3"
+    (policy, _) <- expectDescriptorBoundExecveCheckExecutableAccessPolicy
+      $ descriptorBoundExecveCheckExecutableAccessScalarDocument
+          executable 2000
+    ranking <- expectLengthRankingWithin
+      "v27 execve-check unavailable executable"
+      $ rankVerifiedLengthCandidatesWithPolicy policy
+          usableWorkScalarLiveContract scalarCandidates
+    expectScalarSessionFailure
+      "v27 execve-check unavailable executable"
+      Djex.LengthSMTLibLiveSessionExecutableUnavailable ranking
+    doesFileExist (executable ++ ".events") >>= (@?= False)
+
+  supported <- descriptorBoundExecveCheckLaunchPubliclyReachable
+  if not supported
+    then pure ()
+    else do
+      withFakeLengthSolver "healthy" $ \executable -> do
+        let pinned = setJsonField
+              ["execution", "expectedExecutableSha256"]
+              (Json.JStr $ replicate 64 '0')
+              $ descriptorBoundExecveCheckExecutableAccessScalarDocument
+                  executable 2000
+        disabled <- expectLengthAssessmentConfigurationFile pinned
+        (policy, _) <- expectLengthAssessmentConfigurationActivation
+          RequirePinnedExecutable disabled
+        ranking <- expectLengthRankingWithin
+          "v27 execve-check pin mismatch"
+          $ rankVerifiedLengthCandidatesWithPolicy policy
+              usableWorkScalarLiveContract scalarCandidates
+        expectScalarSessionFailure
+          "v27 execve-check pin mismatch"
+          Djex.LengthSMTLibLiveSessionExecutableRejected ranking
+        doesFileExist (executable ++ ".events") >>= (@?= False)
+
+      withFakeLengthSolver "hang" $ \executable -> do
+        (policy, _) <-
+          expectDescriptorBoundExecveCheckExecutableAccessPolicy
+          $ descriptorBoundExecveCheckExecutableAccessScalarDocument
+              executable 400
+        ranking <- expectLengthRankingWithin
+          "v27 execve-check scoped opener timeout"
+          $ rankVerifiedLengthCandidatesWithPolicy policy
+              usableWorkScalarLiveContract [identity]
+        assertScalarUsableWorkExpiry
+          "v27 execve-check scoped opener" ranking
+        events <- BS.readFile $ executable ++ ".events"
+        assertFakeLengthQueryEvents [] [] events
+        assertBool
+          "v27 execve-check timeout did not reach the hanging image"
+          $ BS.pack "EVENT hang " `BS.isInfixOf` events
+
+      withFakeLengthSolver "query-hang-status" $ \executable -> do
+        (policy, _) <-
+          expectDescriptorBoundExecveCheckExecutableAccessPolicy
+          $ descriptorBoundExecveCheckExecutableAccessPairDocument
+              executable 600
+        ranking <- expectRight =<<
+          rankVerifiedLengthSpinePairCandidatesWithPolicy policy
+            usableWorkPairLiveContract [pairCandidate]
+        assertPairUsableWorkExpiry
+          "v28 execve-check scoped query" ranking
+        events <- BS.readFile $ executable ++ ".events"
+        assertFakeLengthQueryEvents [0] [] events
+        assertBool
+          "v28 execve-check query did not expire in status phase"
+          $ BS.pack "EVENT query-hang " `BS.isInfixOf` events
+
+      withFakeLengthSolver "wrong-echo" $ \executable -> do
+        (policy, _) <-
+          expectDescriptorBoundExecveCheckExecutableAccessPolicy
+          $ descriptorBoundExecveCheckExecutableAccessScalarDocument
+              executable 2000
+        ranking <- expectLengthRankingWithin
+          "v27 execve-check capability failure"
+          $ rankVerifiedLengthCandidatesWithPolicy policy
+              usableWorkScalarLiveContract scalarCandidates
+        expectScalarSessionFailure
+          "v27 execve-check capability failure"
+          Djex.LengthSMTLibLiveSessionCapabilityRejected ranking
+        assertFakeLengthQueryEvents [] [] =<<
+          BS.readFile (executable ++ ".events")
+
+      withFakeLengthSolver "query-stale-prewrite" $ \executable -> do
+        let document = setJsonField ["execution", "artifactPolicy"]
+              (Json.JStr "input-values-after-satisfiable")
+              $ descriptorBoundExecveCheckExecutableAccessScalarDocument
+                  executable 2000
+        (policy, _) <-
+          expectDescriptorBoundExecveCheckExecutableAccessPolicy document
+        ranking <- expectLengthRankingWithin
+          "v27 execve-check atomic query failure"
+          $ rankVerifiedLengthCandidatesWithPolicy policy
+              usableWorkScalarLiveContract scalarCandidates
+        rankedLengthVerifiedCandidates ranking @?= scalarCandidates
+        map rankedLengthCandidateAssessment
+            (lengthRankingCandidates ranking) @?=
+          replicate (length scalarCandidates) Unassessed
+        failure <- case lengthRankingFailure ranking of
+          Nothing -> assertFailure
+            "v27 execve-check query failure was discarded"
               >> error "unreachable"
           Just retained -> pure retained
         lengthRankingFailureClass failure @?=
@@ -16887,7 +17727,7 @@ assertLengthAssessmentConfigurationFileSpinePairV4Precedence =
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion
       $ setJsonField ["version"]
-          (Json.JInt 27)
+          (Json.JInt 29)
       $ addJsonField [] ("private-root", Json.JNull) base
     let badLegacy = setJsonField ["execution", "executablePath"]
           (Json.JStr "private-relative-z3")
@@ -17113,8 +17953,8 @@ assertLengthAssessmentConfigurationFilePositiveOrderingPrecedence =
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion
       $ setJsonField ["version"]
-          (Json.JInt 27)
-      $ addJsonField [] ("private-v27", Json.JNull) pairBase
+          (Json.JInt 29)
+      $ addJsonField [] ("private-v29", Json.JNull) pairBase
 
     -- New-version precedence repeats the established operational sequence and
     -- inserts the closed ordering choice immediately before the contract.
