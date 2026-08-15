@@ -3658,7 +3658,7 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
   -- itself: self fields must still resolve through the shared structural knot
   -- rather than becoming unrelated rigid atoms.  Legacy FRec inventories keep
   -- their established occurrence-local scan below.
-  recursiveStructuralAtoms projectionPolicy plans =
+  recursiveStructuralAtoms projectionPolicy structuralPlans =
     foldl collect (Set.empty, Set.empty)
    where
     collect accum frag = case frag of
@@ -3679,7 +3679,7 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
       FParamInd _ _ parameters _ -> descend accum parameters
       FInd _ constructors -> descend accum (concatMap snd constructors)
       FParamRec _ spelling key parameters _ ->
-        let structural = case Map.lookup spelling plans of
+        let structural = case Map.lookup spelling structuralPlans of
               Just RecursiveStructuralFamily{} ->
                 exactRecursiveData projectionPolicy
               _ -> False
