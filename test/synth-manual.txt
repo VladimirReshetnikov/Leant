@@ -1,0 +1,44 @@
+2 + 2
+it * 10
+def double (n : Nat) : Nat := n + n
+double 21
+:type double
+:synth ((a → b → c) → b → a → c)
+:synth ((b → c) → (a → b) → a → c)
+:synth ((A × B → C) → A → B → C)
+:synth ((A → B → C) → A × B → C)
+:synth (((A × B) × C) → A × (B × C))
+:synth (a → a → a)
+#eval it2 "left" "right"
+:synth (∀ p q : Prop, ¬(p ∨ q) ↔ ¬p ∧ ¬q)
+:synth (∀ p q : Prop, p ∧ (p ∨ q) ↔ p)
+:synth (∀ p q : Prop, (p ↔ q) → (q ↔ p))
+:synth (∀ p q : Prop, ¬(p ∧ q) ↔ (p → ¬q))
+:synth (∀ p : Prop, (p ↔ ¬p) → False)
+:synth ((S → A) → (A → S → B) → S → B)
+:synth ((S → A × S) → (A → S → B × S) → S → B × S)
+:synth ((A → R) → R) → (A → (B → R) → R) → (B → R) → R
+:synth (∀ a b : Type, Option a → (a → Option b) → Option b)
+:synth ((∀ p : Prop, p → p) → Q → Q)
+:synth (∀ p q : Prop, (∀ r : Prop, (p → q → r) → r) → p ∧ q)
+axiom Wrap : Type 1 → Type
+:synth ((∀ a : Type 1, Wrap a) → Wrap (∀ b : Type, b → b))
+:set synth-engine exference
+:synth (∀ (F : Type 1 → Type), (∀ a : Type 1, F a) → F (∀ b : Type, b → b))
+:set synth-engine djinn
+:synth (∀ p q : Prop, Decidable p → Decidable q → Decidable (p ∧ q))
+:synth (∀ p q : Prop, Decidable p → Decidable q → Decidable (p → q))
+:synth (Nat → a → List a)
+:synth (∀ p : Prop, ¬¬¬p → ¬p)
+:synth (∀ p q : Prop, (p → q) → ¬q → ¬p)
+:synth (∀ p q : Prop, ((p → q) → p) → p)
+:synth (∀ p : Prop, ¬¬p → p)
+:synth (∀ p q : Prop, ¬(¬p ∧ ¬q) → p ∨ q)
+:synth (∀ p : Prop, ¬p ∨ ¬¬p)
+:synth (∀ p q : Prop, (p → q) ∨ (q → p))
+opaque P : Nat → Prop
+opaque Q : Prop
+:synth ((∀ n : Nat, P n) ∧ Q → Q ∧ (∀ n : Nat, P n))
+:set synth-engine both
+:synth ((A → B → C) → (A → B) → A → C)
+:quit

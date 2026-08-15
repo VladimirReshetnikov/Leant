@@ -709,9 +709,9 @@ of the reader monad, then the bind of the state monad:
 λ> :synth ((S → A) → (A → S → B) → S → B)
   it1  fun f g x => g (f x) x
 λ> :synth ((S → A × S) → (A → S → B × S) → S → B × S)
-  it1  fun f g x => match f x with | ⟨a, b⟩ => g a b
-  it2  fun f g x => match f x with | ⟨a, _⟩ => g a x
-  it3  fun f g x => match f x with | ⟨a, b⟩ => (match g a x with | ⟨c, _⟩ => ⟨c, b⟩)
+  it1  fun f g x => match f x with | ⟨y, z⟩ => g y z
+  it2  fun f g x => match f x with | ⟨y, _⟩ => g y x
+  it3  fun f g x => match f x with | ⟨y, z⟩ => (match g y x with | ⟨w, _⟩ => ⟨w, z⟩)
 \end{session}
 
 The first candidate threads the state correctly. Now look at the
@@ -750,7 +750,6 @@ instantiation:
 λ> :synth ((∀ p : Prop, p → p) → Q → Q)
   it1  fun f => f _
   it2  fun _ x => x
-  it3  fun f x => f _ x
 \end{session}
 
 And a Church-encoded pair converts into a real conjunction --- the
@@ -1472,7 +1471,7 @@ reported:
 synth engine: both
 λ> :synth ((A → B → C) → (A → B) → A → C)
   it1  fun f g x => f x (g x)
-note: exference: search truncated: step limit reached, queue limit pruned 31990
+note: exference: search truncated: step limit reached, queue limit pruned 36194
 \end{session}
 
 Every engine mode first gives a structurally accepted goal a

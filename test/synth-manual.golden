@@ -1,0 +1,119 @@
+
+   __                  __
+  / /  ___ ___ ____   / /_
+ / /__/ -_) _ `/ _ \_/ __/
+/____/\__/\_,_/_//_/ \__/
+Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to exit.
+λ> 2 + 2
+4
+λ> it * 10
+40
+λ> def double (n : Nat) : Nat := n + n
+λ> double 21
+42
+λ> :type double
+double : Nat → Nat
+λ> :synth ((a → b → c) → b → a → c)
+preparing synthesis environment (session imports + Lean)...
+  it1  fun f x y => f y x
+λ> :synth ((b → c) → (a → b) → a → c)
+  it1  fun f g x => f (g x)
+λ> :synth ((A × B → C) → A → B → C)
+  it1  fun f x y => f ⟨x, y⟩
+λ> :synth ((A → B → C) → A × B → C)
+  it1  fun f ⟨x, y⟩ => f x y
+λ> :synth (((A × B) × C) → A × (B × C))
+  it1  fun ⟨⟨x, y⟩, z⟩ => ⟨x, ⟨y, z⟩⟩
+λ> :synth (a → a → a)
+  it1  fun _ x => x
+  it2  fun x _ => x
+λ> #eval it2 "left" "right"
+"left"
+λ> :synth (∀ p q : Prop, ¬(p ∨ q) ↔ ¬p ∧ ¬q)
+  it1  fun _ _ => ⟨fun k => ⟨fun x => k (.inl x), fun y => k (.inr y)⟩, fun ⟨k1, k2⟩ z => match z with | .inl w => k1 w | .inr x1 => k2 x1⟩
+λ> :synth (∀ p q : Prop, p ∧ (p ∨ q) ↔ p)
+  it1  fun _ _ => ⟨fun ⟨x, _⟩ => x, fun y => ⟨y, .inl y⟩⟩
+  it2  fun _ _ => ⟨fun ⟨x, y⟩ => match y with | .inl z => z | .inr _ => x, fun w => ⟨w, .inl w⟩⟩
+λ> :synth (∀ p q : Prop, (p ↔ q) → (q ↔ p))
+  it1  fun _ _ ⟨f, g⟩ => ⟨g, f⟩
+λ> :synth (∀ p q : Prop, ¬(p ∧ q) ↔ (p → ¬q))
+  it1  fun _ _ => ⟨fun k x y => k ⟨x, y⟩, fun k1 ⟨z, w⟩ => k1 z w⟩
+λ> :synth (∀ p : Prop, (p ↔ ¬p) → False)
+  it1  fun _ ⟨k, f⟩ => k (f (fun x => k x x)) (f (fun y => k y y))
+λ> :synth ((S → A) → (A → S → B) → S → B)
+  it1  fun f g x => g (f x) x
+λ> :synth ((S → A × S) → (A → S → B × S) → S → B × S)
+  it1  fun f g x => match f x with | ⟨y, z⟩ => g y z
+  it2  fun f g x => match f x with | ⟨y, _⟩ => g y x
+  it3  fun f g x => match f x with | ⟨y, z⟩ => (match g y x with | ⟨w, _⟩ => ⟨w, z⟩)
+  it4  fun f g x => match f x with | ⟨y, z⟩ => (match g y z with | ⟨w, _⟩ => ⟨w, x⟩)
+  it5  fun f g x => match f x with | ⟨y, z⟩ => (match g y z with | ⟨w, _⟩ => ⟨w, z⟩)
+λ> :synth ((A → R) → R) → (A → (B → R) → R) → (B → R) → R
+  it1  fun f g h => f (fun x => g x h)
+  it2  fun f g h => f (fun x => f (fun _ => g x h))
+  it3  fun f g h => f (fun x => g x (fun y => f (fun _ => h y)))
+  it4  fun f g h => f (fun x => g x (fun y => g x (fun _ => h y)))
+  it5  fun f g h => f (fun x => f (fun _ => g x (fun y => f (fun _ => h y))))
+λ> :synth (∀ a b : Type, Option a → (a → Option b) → Option b)
+  it1  fun _ _ _ _ => .none
+  it2  fun _ _ x f => match x with | .none => (.none) | .some y => f y
+λ> :synth ((∀ p : Prop, p → p) → Q → Q)
+  it1  fun f => f _
+  it2  fun _ x => x
+λ> :synth (∀ p q : Prop, (∀ r : Prop, (p → q → r) → r) → p ∧ q)
+  it1  fun _ _ f => ⟨f _ (fun x _ => x), f _ (fun _ y => y)⟩
+  it2  fun _ _ f => ⟨f _ (fun x _ => x), f _ (fun _ _ => f _ (fun _ y => y))⟩
+  it3  fun _ _ f => ⟨f _ (fun x _ => x), f _ (fun _ y => f _ (fun _ _ => y))⟩
+  it4  fun _ _ f => ⟨f _ (fun x _ => x), f _ (fun _ _ => f _ (fun _ y => f _ (fun _ _ => y)))⟩
+  it5  fun _ _ f => ⟨f _ (fun x _ => x), f _ (fun _ y => f _ (fun _ _ => f _ (fun _ _ => y)))⟩
+note: search truncated: candidate limit reached (60)
+λ> axiom Wrap : Type 1 → Type
+λ> :synth ((∀ a : Type 1, Wrap a) → Wrap (∀ b : Type, b → b))
+  it1  fun x => x _
+λ> :set synth-engine exference
+synth engine: exference
+λ> :synth (∀ (F : Type 1 → Type), (∀ a : Type 1, F a) → F (∀ b : Type, b → b))
+  it1  fun _ x => x _
+note: search truncated: step limit reached, queue limit pruned 23355
+λ> :set synth-engine djinn
+synth engine: djinn
+λ> :synth (∀ p q : Prop, Decidable p → Decidable q → Decidable (p ∧ q))
+  it1  fun _ _ x y => match x with | .isFalse k => .isFalse (fun ⟨z, _⟩ => k z) | .isTrue w => (match y with | .isFalse k1 => .isFalse (fun ⟨_, x1⟩ => k1 x1) | .isTrue x2 => .isTrue ⟨w, x2⟩)
+λ> :synth (∀ p q : Prop, Decidable p → Decidable q → Decidable (p → q))
+  it1  fun _ _ x y => match x with | .isFalse k => .isTrue (fun z => absurd z k) | .isTrue w => (match y with | .isFalse k1 => .isFalse (fun f => k1 (f w)) | .isTrue x1 => .isTrue (fun _ => x1))
+note: search truncated: candidate limit reached (60)
+λ> :synth (Nat → a → List a)
+  it1  fun x y => List.replicate x y
+  it2  fun x y => List.reverse (List.replicate x y)
+  it3  fun x y => List.map (fun z => z) (List.replicate x y)
+  it4  fun x y => List.append (List.replicate x y) (List.replicate x y)
+  it5  fun x y => List.flatMap (fun _ => List.replicate x y) (List.replicate x y)
+note: search truncated: candidate limit reached (60)
+λ> :synth (∀ p : Prop, ¬¬¬p → ¬p)
+  it1  fun _ k x => k (fun k1 => k1 x)
+λ> :synth (∀ p q : Prop, (p → q) → ¬q → ¬p)
+  it1  fun _ _ f k x => k (f x)
+λ> :synth (∀ p q : Prop, ((p → q) → p) → p)
+  it1  fun _ _ f => match Classical.em _ with | .inl x => x | .inr k => f (fun y => absurd y k)
+  it2  fun _ _ f => match Classical.em _ with | .inl x => x | .inr k => absurd (f (fun y => absurd y k)) k
+  it3  fun _ _ f => match Classical.em _ with | .inl x => x | .inr k => (match Classical.em _ with | .inl y => f (absurd (f (fun _ => y)) k) | .inr _ => f (fun z => absurd z k))
+  it4  fun _ _ f => match Classical.em _ with | .inl x => x | .inr k => (match Classical.em _ with | .inl y => f (absurd (f (fun _ => y)) k) | .inr _ => absurd (f (fun z => absurd z k)) k)
+λ> :synth (∀ p : Prop, ¬¬p → p)
+  it1  fun _ k => match Classical.em _ with | .inl x => x | .inr k1 => absurd k1 k
+λ> :synth (∀ p q : Prop, ¬(¬p ∧ ¬q) → p ∨ q)
+  it1  fun _ _ k => match Classical.em _ with | .inl x => .inl x | .inr k1 => (match Classical.em _ with | .inl y => .inr y | .inr k2 => absurd ⟨k1, k2⟩ k)
+λ> :synth (∀ p : Prop, ¬p ∨ ¬¬p)
+  it1  fun _ => match Classical.em _ with | .inl x => .inr (fun k => k x) | .inr k1 => .inl k1
+λ> :synth (∀ p q : Prop, (p → q) ∨ (q → p))
+  it1  fun _ _ => match Classical.em _ with | .inl _ => (match Classical.em _ with | .inl x => .inl (fun _ => x) | .inr k => .inr (fun y => absurd y k)) | .inr k1 => .inl (fun z => absurd z k1)
+  it2  fun _ _ => match Classical.em _ with | .inl _ => (match Classical.em _ with | .inl x => .inl (fun _ => x) | .inr k => .inr (fun y => absurd y k)) | .inr k1 => (match Classical.em _ with | .inl _ => .inl (fun z => absurd z k1) | .inr k2 => .inr (fun w => absurd w k2))
+λ> opaque P : Nat → Prop
+λ> opaque Q : Prop
+λ> :synth ((∀ n : Nat, P n) ∧ Q → Q ∧ (∀ n : Nat, P n))
+  it1  fun ⟨x, y⟩ => ⟨y, x⟩
+λ> :set synth-engine both
+synth engine: both
+λ> :synth ((A → B → C) → (A → B) → A → C)
+  it1  fun f g x => f x (g x)
+note: exference: search truncated: step limit reached, queue limit pruned 36194
+λ> :quit
