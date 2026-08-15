@@ -1,17 +1,20 @@
 # Leant — proposed improvements and new features
 
 Ordered by expected value-for-effort within each tier. Effort: S
-(< half a day), M (a day or two), L (several days).
+(< half a day), M (a day or two), L (several days). Items whose heading
+ends in *(implemented)* have since shipped; their text is kept as the
+original proposal, and the README documents the actual behavior.
 
 Term-synthesis (`:synth`) proposals live in
-[SYNTHESIS_PROPOSAL.md §7](SYNTHESIS_PROPOSAL.md#7-post-phase-2-proposals):
-prove-mode hypotheses as premises, a Glivenko classical fallback,
-golden transcript tests, recursive-inductive constructors as premises,
-rendering polish, and the Exference engine on-ramp.
+[SYNTHESIS_PROPOSAL.md §7](SYNTHESIS_PROPOSAL.md#7-post-phase-2-proposals);
+all of the increments proposed there — prove-mode hypotheses as
+premises, a Glivenko classical fallback, golden transcript tests,
+recursive-inductive constructors as premises, rendering polish, and the
+Exference engine on-ramp — are now implemented.
 
 ## Tier 1 — high value, backend already supports it
 
-### 1. Interactive proof mode (`:prove`) — L, flagship
+### 1. Interactive proof mode (`:prove`) — L, flagship (implemented)
 The backend's tactic mode is completely unused. `sorry` responses already
 carry `proof_state` ids, and a `{"tactic": ..., "proofState": N}` request
 applies one tactic and returns the new goals and a `proof_status`
@@ -40,20 +43,20 @@ theorem recorded as `prove_1` (:name to rename); :qed to return
   into the session env, so the result is *usable* afterwards.
 - Also entered via `:prove NAME` on an existing `sorry` in the session.
 
-### 2. Identifier tab-completion — M
+### 2. Identifier tab-completion — M (implemented)
 We already build a cached "browse environment". Reuse it for completion:
 on TAB over a partial dotted name, run a (cached, prefix-filtered) variant
-of the `:browse` metaprogram and feed the candidates to Haskeline /
-prompt_toolkit. Session-declared names come from history parsing (already
+of the `:browse` metaprogram and feed the candidates to the line
+editor. Session-declared names come from history parsing (already
 implemented for `:browse`). Cache per (browse-env, first-component) to
 keep it snappy. This is the single biggest day-to-day ergonomics win.
 
-### 3. `:doc NAME` — S
+### 3. `:doc NAME` — S (implemented)
 Print a declaration's docstring: metaprogram in the browse env,
 `findDocString? env name`, falling back to signature via `#check @NAME`.
 Pairs naturally with `:info`.
 
-### 4. `:search` (name and type search) — M
+### 4. `:search` (name and type search) — M (implemented)
 - `:search foo` — substring/fuzzy match over constant names (same
   fold over `env.constants` as `:browse`).
 - `:search? TYPE` — proof search for a goal: elaborate
@@ -68,7 +71,7 @@ transcript of REPL inputs. Makes the REPL usable from Makefiles, CI
 checks, and editor keybindings. The non-tty path already does 90% of
 this — it needs only flag plumbing and quieter output.
 
-### 6. `it` binding — S
+### 6. `it` binding — S (implemented)
 GHCi-style: after a successful expression evaluation, bind the value as
 `it` (`def it := (<expr>)` threaded into the env, replacing prior `it`).
 Enables `double 21` … `it + 1`. Cheap because env threading is already
@@ -87,8 +90,8 @@ binary and toolchain-bound.
 ### 8. Config file (`~/.leantrc` / project `.leantrc`) — S
 Default imports, default `set_option`s, timeout, color and timestamp
 preferences, default transcript directory. Project-level file overrides
-user-level. Removes per-invocation flag noise for the ProveIt workflow
-(e.g. always `-i Mathlib.Tactic.Ring` in this repo).
+user-level. Removes per-invocation flag noise for a project that always
+wants the same setup (e.g. always `-i Mathlib.Tactic.Ring`).
 
 ### 9. `:undo N` and `:redo` — S
 `:undo 3` pops three states; `:redo` restores the last undone entry
@@ -104,7 +107,8 @@ already exists; this is bookkeeping.
 `--warm Mathlib` (or config default): start importing in a second
 backend process at launch; swap it in when ready. Hides the ~1-3 min
 Mathlib import behind the user's first few plain-stdlib interactions.
-On this machine (13 GB RAM) it must be opt-in.
+Because a second backend roughly doubles peak memory use, it must be
+opt-in on memory-constrained machines.
 
 ### 12. Goal pretty-printing — S
 Colorize goal displays: hypothesis names dim, `⊢` bold, error underlines

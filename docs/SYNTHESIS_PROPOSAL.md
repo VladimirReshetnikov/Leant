@@ -575,7 +575,7 @@ tilts the cost/benefit further toward doing this.
 | Tool | What it does | What it does not do |
 | --- | --- | --- |
 | `exact?` / `apply?` | Finds an **existing** lemma closing the goal | Cannot *compose* a new term; fails on `(A → B → C) → (A → B) → A → C` unless that exact lemma exists |
-| `tauto` / `itauto` (Mathlib) | Decides propositional goals (`itauto` is intuitionistic-complete) | `Prop`-only tactics; need Mathlib imported (minutes on this machine); no term display culture, no negative verdicts, nothing for `Type` |
+| `tauto` / `itauto` (Mathlib) | Decides propositional goals (`itauto` is intuitionistic-complete) | `Prop`-only tactics; need Mathlib imported (typically minutes of first-use latency); no term display culture, no negative verdicts, nothing for `Type` |
 | `aesop` | General proof search | Heuristic, Mathlib, `Prop`-oriented, no non-inhabitation answers |
 | `decide` | Decidable ground propositions | Nothing polymorphic or data-level |
 | **`:synth`** | **Constructs** programs/proofs in the structural fragment, in `Type` *and* `Prop`, with core Lean only, multiple ranked candidates, and trustworthy "no closed term exists" verdicts | No dependent elimination, induction, or invented recursive definitions; Exference's recursive case analysis is deliberately one layer (see §5) |
@@ -984,8 +984,8 @@ Design rules, all inherited from Djex:
   providers; the first Lean-verified provider term wins, while provider
   failure or exhaustion restores the refutation.
 - **Performance**: LJT on interactive-size goals is microseconds; the
-  cost center is the backend verification round-trip (~100–300 ms per
-  candidate on this machine), so batches should verify lazily, top
+  cost center is the backend verification round-trip (on the order of
+  100–300 ms per candidate), so batches should verify lazily, top
   candidate first. The live inventory is capped at 80 serialized
   providers. Its bounded semantic LRU avoids repeated discovery for the
   same canonical roots/result head and provider world, while suffix-only
