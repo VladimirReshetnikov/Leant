@@ -1159,20 +1159,12 @@ decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffineQuotientRoo
   document <- either (Left . LengthRankingConfigurationJsonRejected) Right
     $ parseBoundedJson lengthRankingConfigurationFileJsonLimits bytes
   root <- objectFields LengthRankingConfigurationRootObject document
-  formatValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationFormatField
-    "format"
-    root
+  formatValue <- rootField LengthRankingConfigurationFormatField "format" root
   format <- stringField LengthRankingConfigurationFormatField formatValue
   if format == lengthRankingConfigurationFileFormat
     then pure ()
     else Left LengthRankingConfigurationUnsupportedFormat
-  versionValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationVersionField
-    "version"
-    root
+  versionValue <- rootField LengthRankingConfigurationVersionField "version" root
   version <- integerField LengthRankingConfigurationVersionField versionValue
   if version == toInteger
       lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionVersion
@@ -1646,11 +1638,7 @@ decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootEx
   policy <-
     decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionPolicy
       root
-  contractValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationContractField
-    "contract"
-    root
+  contractValue <- rootField LengthRankingConfigurationContractField "contract" root
   contract <- decodeLeanLengthContractValueV5 contractValue
   pure $ DisabledLengthScalarAssessmentConfiguration
     $ disableLengthRankingConfiguration policy contract
@@ -1665,11 +1653,7 @@ decodeLengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuoti
   policy <-
     decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionPolicy
       root
-  contractValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationContractField
-    "contract"
-    root
+  contractValue <- rootField LengthRankingConfigurationContractField "contract" root
   contract <- decodeLeanLengthSpinePairContractValueV5 contractValue
   pure $ DisabledLengthSpinePairAssessmentConfiguration policy contract
 
@@ -1844,11 +1828,7 @@ decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootEx
   advancedPolicy <-
     decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionBasePolicy
       inheritedRoot
-  budgetValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationUsableWorkBudgetField
-    "usableWorkBudget"
-    root
+  budgetValue <- rootField LengthRankingConfigurationUsableWorkBudgetField "usableWorkBudget" root
   budget <- decodeScopedUsableWorkBudget budgetValue
   pure $ enableLengthRankingScopedUsableWorkBudget budget advancedPolicy
 
@@ -2306,70 +2286,30 @@ decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootEx
     root = do
   exactFields LengthRankingConfigurationRootObject
     rootFieldsPositiveAffine root
-  executionAdmissionValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationExecutionAdmissionField
-    "executionAdmission"
-    root
+  executionAdmissionValue <- rootField LengthRankingConfigurationExecutionAdmissionField "executionAdmission" root
   executionLimits <- decodeExecutionAdmission executionAdmissionValue
-  executionValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationExecutionField
-    "execution"
-    root
+  executionValue <- rootField LengthRankingConfigurationExecutionField "execution" root
   execution <- decodeDescriptorBoundExecveCheckExecutableAccessExecution
     executionLimits executionValue
-  evaluationValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationEvaluationField
-    "evaluation"
-    root
+  evaluationValue <- rootField LengthRankingConfigurationEvaluationField "evaluation" root
   evaluation <- decodeEvaluation evaluationValue
-  inputBoxValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationInputBoxValidationField
-    "inputBoxValidation"
-    root
+  inputBoxValue <- rootField LengthRankingConfigurationInputBoxValidationField "inputBoxValidation" root
   (inputBoxLimits, inclusiveMaximums) <-
     decodeInputBoxValidation inputBoxValue
-  counterexampleProbeValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationCounterexampleProbeField
-    "counterexampleProbe"
-    root
+  counterexampleProbeValue <- rootField LengthRankingConfigurationCounterexampleProbeField "counterexampleProbe" root
   decodeCounterexampleProbe counterexampleProbeValue
-  boundedPositiveOrderingValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationBoundedPositiveOrderingField
-    "boundedPositiveOrdering"
-    root
+  boundedPositiveOrderingValue <- rootField LengthRankingConfigurationBoundedPositiveOrderingField "boundedPositiveOrdering" root
   decodeBoundedPositiveOrdering boundedPositiveOrderingValue
-  applicableDomainValidationValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationApplicableDomainValidationField
-    "applicableDomainValidation"
-    root
+  applicableDomainValidationValue <- rootField LengthRankingConfigurationApplicableDomainValidationField "applicableDomainValidation" root
   (applicableDomainInputBoxLimits, booleanFiniteUnionLimits) <-
     decodeStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainValidation
       applicableDomainValidationValue
-  applicableDomainOrderingValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationApplicableDomainOrderingField
-    "applicableDomainOrdering"
-    root
+  applicableDomainOrderingValue <- rootField LengthRankingConfigurationApplicableDomainOrderingField "applicableDomainOrdering" root
   decodeApplicableDomainOrdering applicableDomainOrderingValue
-  counterexampleSimplificationValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationCounterexampleSimplificationField
-    "counterexampleSimplification"
-    root
+  counterexampleSimplificationValue <- rootField LengthRankingConfigurationCounterexampleSimplificationField "counterexampleSimplification" root
   counterexampleSimplificationLimits <- decodeCounterexampleSimplification
     counterexampleSimplificationValue
-  liveSessionOpeningValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationLiveSessionOpeningField
-    "liveSessionOpening"
-    root
+  liveSessionOpeningValue <- rootField LengthRankingConfigurationLiveSessionOpeningField "liveSessionOpening" root
   decodeLiveSessionOpening liveSessionOpeningValue
   let basePolicy =
         lengthRankingPolicyFromValidatedComponents execution evaluation
