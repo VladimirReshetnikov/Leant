@@ -1828,8 +1828,8 @@ of the reader and state monads:
 λ> :synth ((S → A) → (A → S → B) → S → B)
   it1  fun f g x => g (f x) x
 λ> :synth ((S → A × S) → (A → S → B × S) → S → B × S)
-  it1  fun f g x => match f x with | ⟨a, b⟩ => g a b
-  it2  fun f g x => match f x with | ⟨a, _⟩ => g a x
+  it1  fun f g x => match f x with | ⟨y, z⟩ => g y z
+  it2  fun f g x => match f x with | ⟨y, _⟩ => g y x
   ⋯
 ```
 
@@ -1858,7 +1858,6 @@ hypothesis to the whole goal `Q → Q`, an impredicative instantiation:
 λ> :synth ((∀ p : Prop, p → p) → Q → Q)
   it1  fun f => f _
   it2  fun _ x => x
-  it3  fun f x => f _ x
 ```
 
 A vacuous local provider can retain that closed quantified choice explicitly.

@@ -123,8 +123,9 @@ six-binder successor in `2026-08-10-six-binder-instantiation.md`:
   hypothesis-instantiation guard. Standalone Exference admits the direct,
   independently checked candidate at step 30 under the unchanged
   4096-step/1024-queue bounds. Its live transcript still reports a step-limited
-  tail with 36,475 queue prunes because search continues after that candidate;
-  the note is not a claim of exhaustive completion.
+  tail with 39,308 queue prunes because search continues after that candidate;
+  the note is not a claim of exhaustive completion. (The prune count tracks
+  the regenerated `test/synth-quartic-rankn.golden` and moves with it.)
 - **Bounded hypothesis-side instantiation (Djinn).** A quantified
   hypothesis generates bounded premise axioms
   `Opaque(∀ as. t) → t[as := ss]` whose instantiation candidates are

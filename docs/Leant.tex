@@ -248,6 +248,31 @@ project it runs against the plain Lean~4 standard library, which is
 also the least memorable thing about it: no imports, subsecond
 startup.
 
+\subsection*{The command line}
+
+\begin{session}
+leant [FILE] [--project DIR] [--plain] [-i MOD] [--timeout N] [--time]
+      [--transcript [FILE]] [--timestamps] [--repl-exe PATH] [--lake PATH]
+      [--length-ranking-config ABSOLUTE-PATH]
+      [--length-ranking-config-timeout MS] [--length-ranking-allow-unpinned]
+\end{session}
+
+A positional \code{FILE} is loaded as by \code{:load}.
+\code{-{}-project DIR} runs inside a Lake project (auto-detected from the
+working directory without the flag), and \code{-{}-plain} forces the
+bare-stdlib session shown above.  \code{-i MOD} (also
+\code{-{}-import}, repeatable, comma-splitting) adds startup imports;
+\code{-{}-timeout N} sets the per-command budget in seconds (0 disables
+it, default 300); \code{-{}-time} shows per-command timing;
+\code{-{}-transcript [FILE]} and \code{-{}-timestamps} start transcript
+recording; \code{-{}-lake PATH} selects the lake executable.  The three
+\code{-{}-length-ranking} options opt into finite-list-spine Length
+counterexample ranking (\S\ref{sec:engines}): the configuration file is
+admitted once at startup from an explicitly chosen absolute path, the
+timeout bounds only the file-load interruption budget (default
+5{,}000\,ms, at most 60{,}000\,ms), and both auxiliary options are
+rejected without the configuration option itself.
+
 A session begins as a calculator and escalates quietly:
 
 \begin{session}
@@ -269,7 +294,10 @@ GHCi-style. Declarations (\code{def}, \code{theorem},
 \code{\#}-command (\code{\#eval}, \code{\#check}, \code{\#print
 axioms}) passes straight through. Multi-line input opens automatically
 when a line is syntactically incomplete (type a \code{structure}
-header and just keep going), and an empty line submits it.
+header and just keep going), and an empty line submits it; an explicit
+\code{:\{}~\dots~\code{:\}} block delimits one by hand, as in GHCi.
+TAB completes \code{:commands} and dotted identifiers against the live
+environment.
 
 %==============================================================================
 \section{The commands}\label{sec:commands}
@@ -279,7 +307,8 @@ header and just keep going), and an empty line submits it.
 \cmdrow{:help, :h, :?}{show the command summary}
 \cmdrow{:quit, :q}{exit}
 \cmdrow{:type EXPR, :t}{show the type of \code{EXPR} (\code{\#check})}
-\cmdrow{:info NAME, :i}{show the definition of \code{NAME} (\code{\#print})}
+\cmdrow{:info NAME, :i}{show the definition of \code{NAME}
+  (\code{\#print}, rendered as a valid declaration)}
 \cmdrow{:load FILE, :l}{reset the session and load a \code{.lean} file}
 \cmdrow{:reload, :r}{reload the last loaded file}
 \cmdrow{:import MOD}{add an import (rebuilds the session; unavailable over an opaque snapshot)}
@@ -306,6 +335,10 @@ header and just keep going), and an empty line submits it.
 \cmdrow{:synth TYPE}{synthesize verified terms of \code{TYPE};
   candidates are bound as \code{it1} (= \code{it}), \code{it2}, \dots
   (\S\ref{sec:synth})}
+\cmdrow{:synth --length-contract P -- TYPE}{use one passive Length
+  contract file for this command only; the standalone \code{-{}-} is
+  mandatory and requires the startup ranking opt-in
+  (\S\ref{sec:engines})}
 \cmdrow{:set synth-engine E}{\code{djinn} (default) $\mid$
   \code{exference} $\mid$ \code{both}}
 \cmdrow{:set synth-steps N}{Exference's step budget (default 4096)}
@@ -331,10 +364,15 @@ header and just keep going), and an empty line submits it.
 \section{Interactive proving}\label{sec:prove}
 
 \code{:prove} turns the prompt into a tactic loop against the
-backend's proof-state protocol. Every line is a tactic; \code{:undo}
-pops one step; \code{:qed NAME} assembles the accumulated script into
-a theorem and replays it into the session, so the result is usable
-afterwards.  Each displayed proof state is followed by an automatically
+backend's proof-state protocol. Every line is a tactic; \code{:undo
+[N]} takes back the last $N$ tactics (default one, without limit);
+\code{:goals} reprints the goals; \code{:script} shows the accumulated
+proof; \code{:auto} tries a battery of common finishers; \code{:abort}
+leaves the mode without saving; and \code{:qed NAME} assembles the
+accumulated script into a theorem and replays it into the session, so
+the result is usable afterwards.  A \code{?}-tactic such as
+\code{exact?} records the tactic it \emph{found} rather than the
+question-mark form.  Each displayed proof state is followed by an automatically
 discovered tactic suggestion that Lean has already checked.  The
 candidate probes are shaped by the goal and its hypotheses: an
 \code{intro} suggestion names the binders it would introduce, a
@@ -564,8 +602,12 @@ Three rules run through the design:
 \end{itemize}
 
 Transcripts in this section are lightly abridged: trailing candidates
-beyond the ones shown, and trailing truncation notes, are elided.
-Every line that does appear is a verbatim record of a live session.
+beyond the ones shown, and trailing truncation notes, are elided, as is
+the \code{preparing synthesis environment \dots} line that precedes a
+session's first \code{:synth}.  The celebration emoji that follows
+\code{All goals accomplished} is omitted for the benefit of the
+document fonts.  Every other line that does appear is a verbatim record
+of a live session.
 
 \subsection{Higher-order plumbing}\label{sec:plumbing}
 
@@ -667,9 +709,9 @@ of the reader monad, then the bind of the state monad:
 λ> :synth ((S → A) → (A → S → B) → S → B)
   it1  fun f g x => g (f x) x
 λ> :synth ((S → A × S) → (A → S → B × S) → S → B × S)
-  it1  fun f g x => match f x with | ⟨a, b⟩ => g a b
-  it2  fun f g x => match f x with | ⟨a, _⟩ => g a x
-  it3  fun f g x => match f x with | ⟨a, b⟩ => (match g a x with | ⟨c, _⟩ => ⟨c, b⟩)
+  it1  fun f g x => match f x with | ⟨y, z⟩ => g y z
+  it2  fun f g x => match f x with | ⟨y, _⟩ => g y x
+  it3  fun f g x => match f x with | ⟨y, z⟩ => (match g y x with | ⟨w, _⟩ => ⟨w, z⟩)
 \end{session}
 
 The first candidate threads the state correctly. Now look at the
@@ -708,7 +750,6 @@ instantiation:
 λ> :synth ((∀ p : Prop, p → p) → Q → Q)
   it1  fun f => f _
   it2  fun _ x => x
-  it3  fun f x => f _ x
 \end{session}
 
 And a Church-encoded pair converts into a real conjunction --- the
@@ -809,8 +850,9 @@ shallow. Equivalent recursive structural histories are suppressed without
 losing scoped or environment product reuse at depth. Exference admits the
 direct, independently checked candidate at search step 30. The unchanged
 4096-step/1024-queue live run still ends with a bounded-tail note recording
-36{,}475 queue prunes: search continued after the successful candidate and did
-not exhaust its ranked tail.
+39{,}308 queue prunes (the exact figure tracks the regenerated
+\code{synth-quartic-rankn} golden): search continued after the successful
+candidate and did not exhaust its ranked tail.
 
 The live \code{synth-quintic-rankn} regression supplies the missing exact
 bridge case. It defines
@@ -868,15 +910,15 @@ argument of the exact provider:
 λ> :set synth-engine djinn
 synth engine: djinn
 λ> :synth Gap.Token
-  it1  Gap.polyGlobal («a» := (∀ (a0_0 : _), a0_0 → a0_0))
+  it1  Gap.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
 λ> :set synth-engine exference
 synth engine: exference
 λ> :synth Gap.Token
-  it1  Gap.polyGlobal («a» := (∀ (a0_0 : _), a0_0 → a0_0))
+  it1  Gap.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
 λ> :set synth-engine both
 synth engine: both
 λ> :synth Gap.Token
-  it1  Gap.polyGlobal («a» := (∀ (a0_0 : _), a0_0 → a0_0))
+  it1  Gap.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
 \end{session}
 
 An active head can also determine a higher-kinded binder which is absent from
@@ -1135,11 +1177,14 @@ analysis is not:
 
 \begin{session}
 λ> :synth Nat
-  it1  Nat.zero
-  it2  Nat.succ Nat.zero
+  it1  .zero
+λ> :synth (Nat → Nat)
+  it1  fun x => x
+  it2  fun x => Nat.add x x
+  it3  .succ
+  it4  fun _ => .zero
 λ> :synth (∀ a : Type, a → List a)
-  it1  fun _ _ => List.nil
-  it2  fun _ x => List.cons x List.nil
+  it1  fun _ _ => .nil
 \end{session}
 
 \subsection{Recursion from the library}\label{sec:synth-library}
@@ -1168,10 +1213,10 @@ same-typed arguments:
   it2  fun x y => List.reverse (List.replicate x y)
 λ> :synth (List a → List b → List (a × b))
   it1  fun x y => List.zip x y
-  it2  fun _ _ => List.nil
+  it2  fun _ _ => .nil
 λ> :synth ((a → b → c) → List a → List b → List c)
   it1  fun f x y => List.zipWith f x y
-  it2  fun _ _ _ => List.nil
+  it2  fun _ _ _ => .nil
 λ> :synth (List a → List a → List a)
   it1  fun x _ => x
   it2  fun _ x => x
@@ -1413,7 +1458,10 @@ alternating tails. Within each Exference invocation, Leant
 stable-deduplicates rendered groups before applying the internal 60-candidate
 collection window. The first spelling remains authoritative, while repeated
 backend histories cannot hide later distinct terms behind the bound; the
-outer 12- and 24-group verification frontiers then apply. Exference runs under
+outer 12- and 24-group verification frontiers then apply.  Whatever the
+frontier verifies, at most five candidates are ever displayed and bound;
+the rest of the frontier exists to survive Lean's rejections.  Exference
+runs under
 explicit budgets
 (\code{:set synth-steps}, default 4096), and truncation is always
 reported:
@@ -1423,7 +1471,7 @@ reported:
 synth engine: both
 λ> :synth ((A → B → C) → (A → B) → A → C)
   it1  fun f g x => f x (g x)
-note: exference: search truncated: step limit reached, queue limit pruned 31990
+note: exference: search truncated: step limit reached, queue limit pruned 36194
 \end{session}
 
 Every engine mode first gives a structurally accepted goal a
@@ -1448,7 +1496,9 @@ public fallbacks, while session declarations bypass that naming
 heuristic. Exference searches the ranked inventory directly; Djinn
 tries discovery-order prefixes of 1, 4, and 16 providers before the full
 bounded inventory, and may specialize a loaded scheme at a closed
-monotype or guarded rank-N polytype. The serializer derives a canonical
+monotype or guarded rank-N polytype.  In combined mode both engines run
+the singleton and full lanes, while the intermediate prefixes are
+Djinn-only. The serializer derives a canonical
 query from the
 sorted, deduplicated namespace roots and final result head, rather than
 from the goal's raw spelling. Successful inventories --- including an
@@ -1479,6 +1529,23 @@ are removed from each engine's source stream and newly empty groups are
 dropped. Rediscovered failures therefore spend none of that lane's 12- or
 24-group fresh frontier.
 
+An entirely optional last stage can consult Z3.  Passing
+\code{-{}-length-ranking-config} at startup (\S\ref{sec:start}) opts
+into finite-list-spine \emph{Length} counterexample ranking: a passive
+JSON contract states a law over the lengths of list-spine arguments and
+results, eligible verified candidates are translated into canonical
+\code{QF\_LIA} queries, and a scoped Z3 worker is consulted once per
+batch.  Only a counterexample that Leant's vendored Djex engine has
+independently replayed against the exact checked problem can move a
+candidate --- such candidates are stably demoted, never pruned --- and a
+raw \code{sat}, \code{unsat}, or \code{unknown} has no authority at
+all.  A per-command variant, \code{:synth -{}-length-contract PATH
+-{}- TYPE}, swaps in one contract file for a single command.  The
+configuration and contract grammars are versioned and strict; the
+README documents every version, and the dated reports under
+\code{docs/reports/} record the design.  Everything in this paragraph
+is off by default and leaves no trace when disabled.
+
 The pure searches answer in microseconds to milliseconds; the cost
 center is backend verification, a few hundred milliseconds per
 candidate. A wall-clock guard (default 20\,s,
@@ -1491,7 +1558,10 @@ bounded instantiation can widen the space; hitting it is reported as
 Some plain statements of present limits. It will not synthesize recursion or
 induction. Complete compatible recursive families contribute bounded positive
 construction to Djinn and one constructor layer of elimination to Exference;
-recursive fields are never opened again. It will not analyze dependent
+recursive fields are never opened again.  When the usual all-inputs-used
+Exference search has no candidate, Leant retries the same query with
+omissions allowed, which can project an impredicative payload while
+rendering the unopened recursive tail as \code{\_}. It will not analyze dependent
 structure; atoms are transported, never opened. Opaque and bound-variable
 proper-type applications retain their ordered arguments, and qualifying
 inductives share one exact parametric family across distinct
