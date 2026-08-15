@@ -73,6 +73,7 @@ import Numeric.Natural (Natural)
 
 import Language.Haskell.Djex
   ( ExferenceLocal
+  , LengthBooleanFiniteUnionLimits
   , LengthApplicableDomainValidation (..)
   , LengthEvaluationLimits
   , LengthInputBoxLimits
@@ -87,8 +88,10 @@ import Language.Haskell.Djex
   , LengthSpinePairEvaluationError
   , LengthSpinePairCounterexampleSimplificationError (..)
   , LengthSpinePairApplicableDomainValidationError (..)
+  , LengthSpinePairBooleanFiniteUnionApplicableDomainValidationError (..)
   , LengthSpinePairInputBoxValidationError (..)
   , LengthSpinePairSMTLibApplicableDomainValidationError (..)
+  , LengthSpinePairSMTLibBooleanFiniteUnionApplicableDomainValidationError (..)
   , LengthSpinePairSMTLibCounterexampleSimplificationError (..)
   , LengthSpinePairSMTLibInputBoxValidationError (..)
   , LengthSpinePairSMTLibInputReplayError (..)
@@ -108,6 +111,7 @@ import Language.Haskell.Djex
   , ValidatedLengthSpinePairStrictRelationalPositiveAffineQuotientApplicableDomain
   , ValidatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomain
   , ValidatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomain
+  , ValidatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomain
   , defaultLengthSMTLibLiveSessionMaximumQueries
   , lengthSMTLibLiveSessionCleanupIncomplete
   , lengthSMTLibLiveSessionPrimaryFailure
@@ -126,6 +130,7 @@ import Language.Haskell.Djex
   , validateLengthSpinePairSMTLibQueryStrictRelationalPositiveAffineQuotientApplicableDomain
   , validateLengthSpinePairSMTLibQueryStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomain
   , validateLengthSpinePairSMTLibQueryStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomain
+  , validateLengthSpinePairSMTLibQueryStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomain
   , validateLengthSpinePairSMTLibQueryInputBox
   , validatedLengthSpinePairApplicableDomainApplicableAssignmentCount
   , validatedLengthSpinePairCounterexampleInputs
@@ -137,6 +142,7 @@ import Language.Haskell.Djex
   , validatedLengthSpinePairStrictRelationalPositiveAffineQuotientApplicableDomainApplicableAssignmentCount
   , validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainApplicableAssignmentCount
   , validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainApplicableAssignmentCount
+  , validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainApplicableAssignmentCount
   , checkLengthSMTLibLiveScopedUsableWorkDeadline
   , withLengthSMTLibLiveSession
   , withLengthSMTLibLiveSessionUnderScopedDeadline
@@ -193,6 +199,8 @@ data LengthSpinePairRankingAssessment
       !ValidatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomain
   | LengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainEstablished
       !ValidatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomain
+  | LengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainEstablished
+      !ValidatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomain
   deriving (Eq, Show)
 
 data LengthSpinePairCandidateAssessment
@@ -269,6 +277,8 @@ data LengthSpinePairRankingFailureClass
       !LengthSpinePairInputBoxValidationError
   | LengthSpinePairRankingApplicableDomainValidationFailed
       !LengthSpinePairInputBoxValidationError
+  | LengthSpinePairRankingBooleanFiniteUnionApplicableDomainValidationFailed
+      !LengthSpinePairBooleanFiniteUnionApplicableDomainValidationError
   | LengthSpinePairRankingCounterexampleSimplificationFailed
       !LengthSpinePairCounterexampleSimplificationError
   deriving (Eq, Ord, Show)
@@ -457,6 +467,8 @@ data LengthSpinePairApplicableDomainRankingPolicy
       !LengthInputBoxLimits
   | LengthSpinePairApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusEnabled
       !LengthInputBoxLimits
+  | LengthSpinePairApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionEnabled
+      !LengthInputBoxLimits !LengthBooleanFiniteUnionLimits
 
 data LengthSpinePairOriginProbeRankingPolicy
   = LengthSpinePairOriginProbeRankingDisabled
@@ -1827,6 +1839,34 @@ assessLengthSpinePairApplicableDomainCandidate evaluation policy
           (LengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainEstablished
             receipt)
           Nothing
+  LengthSpinePairApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionEnabled
+      inputBoxLimits unionLimits -> case
+        validateLengthSpinePairSMTLibQueryStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomain
+          evaluation inputBoxLimits unionLimits query of
+    Left
+        (LengthSpinePairSMTLibBooleanFiniteUnionApplicableDomainValidationAssociationRejected
+          _) ->
+      Left $ localLengthSpinePairRankingFailure
+        LengthSpinePairRankingEvidenceReplayMismatch index
+    Left
+        (LengthSpinePairSMTLibBooleanFiniteUnionApplicableDomainValidationRejected
+          failure)
+      | lengthSpinePairBooleanFiniteUnionApplicableDomainAdmissionFailure
+          failure -> Right Nothing
+      | otherwise -> Left $ localLengthSpinePairRankingFailure
+          (LengthSpinePairRankingBooleanFiniteUnionApplicableDomainValidationFailed
+            failure)
+          index
+    Right (LengthApplicableDomainInapplicable _) -> Right Nothing
+    Right (LengthApplicableDomainCounterexample receipt) -> Just <$>
+      simplifyLengthSpinePairCounterexampleAssessment evaluation
+        simplificationPolicy index association query receipt
+    Right (LengthApplicableDomainEstablished receipt) -> Right $ Just
+      $ AssociatedRankedLengthSpinePairCandidate index association
+      $ LengthSpinePairCandidateAssessed
+          (LengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainEstablished
+            receipt)
+          Nothing
 
 lengthSpinePairApplicableDomainAdmissionFailure
   :: LengthSpinePairInputBoxValidationError
@@ -1838,6 +1878,22 @@ lengthSpinePairApplicableDomainAdmissionFailure failure = case failure of
   LengthSpinePairInputBoxBoundsArityMismatch {} -> False
   LengthSpinePairInputBoxAssignmentEvaluationRejected {} -> False
   LengthSpinePairInputBoxInternalEnumerationInvariant -> False
+
+lengthSpinePairBooleanFiniteUnionApplicableDomainAdmissionFailure
+  :: LengthSpinePairBooleanFiniteUnionApplicableDomainValidationError
+  -> Bool
+lengthSpinePairBooleanFiniteUnionApplicableDomainAdmissionFailure failure =
+  case failure of
+    LengthSpinePairBooleanFiniteUnionProblemInputLimitExceeded {} -> True
+    LengthSpinePairBooleanFiniteUnionGeneratedBranchLimitExceeded {} -> True
+    LengthSpinePairBooleanFiniteUnionRuleLimitExceeded {} -> True
+    LengthSpinePairBooleanFiniteUnionClosureInspectionLimitExceeded {} -> True
+    LengthSpinePairBooleanFiniteUnionRetainedBoxLimitExceeded {} -> True
+    LengthSpinePairBooleanFiniteUnionMaximumValueRejected {} -> True
+    LengthSpinePairBooleanFiniteUnionAssignmentVisitLimitExceeded {} -> True
+    LengthSpinePairBooleanFiniteUnionAssignmentLimitExceeded {} -> True
+    LengthSpinePairBooleanFiniteUnionAssignmentEvaluationRejected {} -> False
+    LengthSpinePairBooleanFiniteUnionInternalEnumerationInvariant -> False
 
 probeLengthSpinePairOriginCounterexample
   :: LengthEvaluationLimits
@@ -2154,6 +2210,10 @@ isNonVacuousLengthSpinePairApplicableDomain assessment = case assessment of
       receipt ->
     validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainApplicableAssignmentCount
       receipt > 0
+  LengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainEstablished
+      receipt ->
+    validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainApplicableAssignmentCount
+      receipt > 0
   _ -> False
 
 unassessedLengthSpinePairRanking
@@ -2275,6 +2335,8 @@ forceLengthSpinePairRankingAssessment assessment = case assessment of
       receipt -> rnf receipt
   LengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainEstablished
       receipt -> rnf receipt
+  LengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainEstablished
+      receipt -> rnf receipt
 
 forceLengthSpinePairRankingFailure
   :: Maybe LengthSpinePairRankingFailure
@@ -2301,6 +2363,8 @@ forceLengthSpinePairRankingFailureClass failure = case failure of
   LengthSpinePairRankingOriginProbeEvaluationFailed nested -> rnf nested
   LengthSpinePairRankingInputBoxValidationFailed nested -> rnf nested
   LengthSpinePairRankingApplicableDomainValidationFailed nested -> rnf nested
+  LengthSpinePairRankingBooleanFiniteUnionApplicableDomainValidationFailed
+      nested -> rnf nested
   LengthSpinePairRankingCounterexampleSimplificationFailed nested -> rnf nested
 
 forcePreparedLengthSpinePairCandidates

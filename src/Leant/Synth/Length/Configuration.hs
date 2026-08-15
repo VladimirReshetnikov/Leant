@@ -43,6 +43,7 @@ module Leant.Synth.Length.Configuration
   , enableLengthRankingStrictRelationalPositiveAffineQuotientApplicableDomainValidation
   , enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidation
   , enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainValidation
+  , enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainValidation
   , enableLengthRankingCounterexampleSimplification
   , enableLengthRankingNonVacuousInputBoxPreference
   , enableLengthRankingNonVacuousApplicableDomainPreference
@@ -61,7 +62,8 @@ module Leant.Synth.Length.Configuration
 import Numeric.Natural (Natural)
 
 import Language.Haskell.Djex
-  ( LengthEvaluationLimitError
+  ( LengthBooleanFiniteUnionLimits
+  , LengthEvaluationLimitError
   , LengthEvaluationLimitSource
   , LengthEvaluationLimits
   , LengthInputBoxLimits
@@ -209,6 +211,8 @@ data LengthRankingApplicableDomainValidation
       !LengthInputBoxLimits
   | LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusV1
       !LengthInputBoxLimits
+  | LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionV1
+      !LengthInputBoxLimits !LengthBooleanFiniteUnionLimits
 
 -- | Private permission to run Djex's query-owned canonical origin replay
 -- after the MRU bank misses and before a live query.  This retains no input
@@ -559,6 +563,30 @@ enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusApplica
     originProbe simplification inputBoxPreference applicableDomainPreference
     liveSessionOpening usableWorkBudget
 
+-- | Select the bounded Boolean finite-union successor to cumulative root-
+-- monus applicable-domain extraction.  The independent union limits bound
+-- normalized branch generation, rules and immutable-snapshot closure
+-- inspections per branch, retained canonical boxes, and raw assignment
+-- visits; the existing input-box limits continue to bound input width and the
+-- deduplicated assignment set.  All applicable-domain builders remain
+-- mutually exclusive, so the last one applied determines the retained
+-- strategy.
+enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainValidation
+  :: LengthInputBoxLimits
+  -> LengthBooleanFiniteUnionLimits
+  -> LengthRankingPolicy
+  -> LengthRankingPolicy
+enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainValidation
+    inputBoxLimits unionLimits
+    (LengthRankingPolicy execution evaluation inputBoxValidation _ originProbe
+      simplification inputBoxPreference applicableDomainPreference
+      liveSessionOpening usableWorkBudget) =
+  LengthRankingPolicy execution evaluation inputBoxValidation
+    (LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionV1
+      inputBoxLimits unionLimits)
+    originProbe simplification inputBoxPreference applicableDomainPreference
+    liveSessionOpening usableWorkBudget
+
 -- | Enable the same bounded, query-owned strict counterexample simplifier for
 -- every counterexample source without changing source order or enabling any
 -- source.  A bounded unavailability or absence of a strict improvement retains
@@ -766,6 +794,10 @@ scalarApplicableDomainRankingPolicy validation = case validation of
       limits ->
     LengthApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusEnabled
       limits
+  LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionV1
+      inputBoxLimits unionLimits ->
+    LengthApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionEnabled
+      inputBoxLimits unionLimits
 
 scalarOriginProbeRankingPolicy
   :: LengthRankingOriginProbe
@@ -820,6 +852,10 @@ spinePairApplicableDomainRankingPolicy validation = case validation of
       limits ->
     LengthSpinePairApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusEnabled
       limits
+  LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionV1
+      inputBoxLimits unionLimits ->
+    LengthSpinePairApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionEnabled
+      inputBoxLimits unionLimits
 
 liveSessionOpeningPolicy
   :: LengthRankingLiveSessionOpening

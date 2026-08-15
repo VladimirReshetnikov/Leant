@@ -113,6 +113,8 @@ import Numeric.Natural (Natural)
 
 import Language.Haskell.Djex
   ( ExferenceLocal
+  , LengthBooleanFiniteUnionApplicableDomainValidationError (..)
+  , LengthBooleanFiniteUnionLimits
   , LengthApplicableDomainValidation (..)
   , LengthApplicableDomainValidationError (..)
   , LengthCounterexampleSimplificationError (..)
@@ -122,6 +124,7 @@ import Language.Haskell.Djex
   , LengthInputBoxValidation (..)
   , LengthInputBoxValidationError (..)
   , LengthSMTLibApplicableDomainValidationError (..)
+  , LengthSMTLibBooleanFiniteUnionApplicableDomainValidationError (..)
   , LengthSMTLibCounterexampleSimplificationError (..)
   , LengthSMTLibInputReplayError (..)
   , LengthSMTLibInputBoxValidationError (..)
@@ -148,6 +151,7 @@ import Language.Haskell.Djex
   , ValidatedLengthStrictRelationalPositiveAffineQuotientApplicableDomain
   , ValidatedLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomain
   , ValidatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomain
+  , ValidatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomain
   , defaultLengthSMTLibLiveSessionMaximumQueries
   , lengthSMTLibLiveQueryCleanupIncomplete
   , lengthSMTLibLiveQueryObservationSolverStatus
@@ -166,6 +170,7 @@ import Language.Haskell.Djex
   , validateLengthSMTLibQueryStrictRelationalPositiveAffineQuotientApplicableDomain
   , validateLengthSMTLibQueryStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomain
   , validateLengthSMTLibQueryStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomain
+  , validateLengthSMTLibQueryStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomain
   , validateLengthSMTLibQueryInputBox
   , validatedLengthApplicableDomainApplicableAssignmentCount
   , validatedLengthCounterexampleInputs
@@ -177,6 +182,7 @@ import Language.Haskell.Djex
   , validatedLengthStrictRelationalPositiveAffineQuotientApplicableDomainApplicableAssignmentCount
   , validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainApplicableAssignmentCount
   , validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainApplicableAssignmentCount
+  , validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainApplicableAssignmentCount
   , checkLengthSMTLibLiveScopedUsableWorkDeadline
   , withLengthSMTLibLiveSession
   , withLengthSMTLibLiveSessionUnderScopedDeadline
@@ -233,6 +239,8 @@ data LengthRankingAssessment
       !ValidatedLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomain
   | StrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainEstablished
       !ValidatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomain
+  | StrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainEstablished
+      !ValidatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomain
   deriving (Eq, Show)
 
 -- | Stable, payload-free phase at which pure candidate preparation refused.
@@ -362,6 +370,8 @@ data LengthRankingFailureClass
   | LengthRankingInputBoxValidationFailed !LengthInputBoxValidationError
   | LengthRankingApplicableDomainValidationFailed
       !LengthInputBoxValidationError
+  | LengthRankingBooleanFiniteUnionApplicableDomainValidationFailed
+      !LengthBooleanFiniteUnionApplicableDomainValidationError
   | LengthRankingCounterexampleSimplificationFailed
       !LengthCounterexampleSimplificationError
   deriving (Eq, Ord, Show)
@@ -579,6 +589,8 @@ data LengthApplicableDomainRankingPolicy
       !LengthInputBoxLimits
   | LengthApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusEnabled
       !LengthInputBoxLimits
+  | LengthApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionEnabled
+      !LengthInputBoxLimits !LengthBooleanFiniteUnionLimits
 
 -- | Private query-owned pre-live probe policy.  The enabled constructor is
 -- only permission to run Djex's canonical origin replay after every MRU miss;
@@ -1932,6 +1944,32 @@ assessApplicableDomainCandidate evaluation policy simplificationPolicy index
             (StrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainEstablished
               receipt)
             Nothing
+    LengthApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionEnabled
+        inputBoxLimits unionLimits -> case
+          validateLengthSMTLibQueryStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomain
+            evaluation inputBoxLimits unionLimits query of
+      Left
+          (LengthSMTLibBooleanFiniteUnionApplicableDomainValidationAssociationRejected
+            _) ->
+        Left $ localRankingFailure LengthRankingEvidenceReplayMismatch index
+      Left (LengthSMTLibBooleanFiniteUnionApplicableDomainValidationRejected
+          failure)
+        | booleanFiniteUnionApplicableDomainAdmissionFailure failure ->
+            Right Nothing
+        | otherwise -> Left $ localRankingFailure
+            (LengthRankingBooleanFiniteUnionApplicableDomainValidationFailed
+              failure)
+            index
+      Right (LengthApplicableDomainInapplicable _) -> Right Nothing
+      Right (LengthApplicableDomainCounterexample receipt) -> Just <$>
+        simplifyCounterexampleAssessment evaluation simplificationPolicy
+          index association query receipt
+      Right (LengthApplicableDomainEstablished receipt) -> Right $ Just
+        $ AssociatedRankedLengthCandidate index association
+        $ LengthCandidateAssessed
+            (StrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainEstablished
+              receipt)
+            Nothing
 
 applicableDomainAdmissionFailure :: LengthInputBoxValidationError -> Bool
 applicableDomainAdmissionFailure failure = case failure of
@@ -1941,6 +1979,21 @@ applicableDomainAdmissionFailure failure = case failure of
   LengthInputBoxBoundsArityMismatch {} -> False
   LengthInputBoxAssignmentEvaluationRejected {} -> False
   LengthInputBoxInternalEnumerationInvariant -> False
+
+booleanFiniteUnionApplicableDomainAdmissionFailure
+  :: LengthBooleanFiniteUnionApplicableDomainValidationError
+  -> Bool
+booleanFiniteUnionApplicableDomainAdmissionFailure failure = case failure of
+  LengthBooleanFiniteUnionProblemInputLimitExceeded {} -> True
+  LengthBooleanFiniteUnionGeneratedBranchLimitExceeded {} -> True
+  LengthBooleanFiniteUnionRuleLimitExceeded {} -> True
+  LengthBooleanFiniteUnionClosureInspectionLimitExceeded {} -> True
+  LengthBooleanFiniteUnionRetainedBoxLimitExceeded {} -> True
+  LengthBooleanFiniteUnionMaximumValueRejected {} -> True
+  LengthBooleanFiniteUnionAssignmentVisitLimitExceeded {} -> True
+  LengthBooleanFiniteUnionAssignmentLimitExceeded {} -> True
+  LengthBooleanFiniteUnionAssignmentEvaluationRejected {} -> False
+  LengthBooleanFiniteUnionInternalEnumerationInvariant -> False
 
 -- | Run no replay at all on the compatibility path.  The enabled path
 -- delegates arity and zero construction to the exact sealed query; Leant never
@@ -2243,6 +2296,10 @@ isNonVacuousApplicableDomain assessment = case assessment of
       receipt ->
     validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainApplicableAssignmentCount
       receipt > 0
+  StrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainEstablished
+      receipt ->
+    validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainApplicableAssignmentCount
+      receipt > 0
   _ -> False
 
 unassessedRanking
@@ -2354,6 +2411,8 @@ forceLengthRankingAssessment assessment = case assessment of
       receipt -> rnf receipt
   StrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainEstablished
       receipt -> rnf receipt
+  StrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainEstablished
+      receipt -> rnf receipt
 
 forceLengthRankingFailure :: Maybe LengthRankingFailure -> ()
 forceLengthRankingFailure failure = case failure of
@@ -2376,6 +2435,8 @@ forceLengthRankingFailureClass failure = case failure of
   LengthRankingOriginProbeEvaluationFailed nested -> rnf nested
   LengthRankingInputBoxValidationFailed nested -> rnf nested
   LengthRankingApplicableDomainValidationFailed nested -> rnf nested
+  LengthRankingBooleanFiniteUnionApplicableDomainValidationFailed nested ->
+    rnf nested
   LengthRankingCounterexampleSimplificationFailed nested -> rnf nested
 
 forcePreparedLengthCandidates

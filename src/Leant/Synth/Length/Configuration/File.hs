@@ -38,6 +38,9 @@
 -- Versions 27 and 28 retain that complete root-monus/effective-ID/scoped
 -- profile and replace only the executable-launch strategy with descriptor-
 -- bound execve-check executable-access admission.
+-- Versions 29 and 30 retain that complete execve-check/scoped profile and
+-- replace only the applicable-domain strategy with bounded Boolean finite-
+-- union closure and enumeration.
 -- Decoding performs no discovery, path normalization, environment lookup, or
 -- IO.  Every field is required.  A successful decode returns a deliberately
 -- disabled opaque value: callers
@@ -74,6 +77,8 @@ module Leant.Synth.Length.Configuration.File
   , lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusVersion
   , lengthRankingConfigurationFileDescriptorBoundExecveCheckExecutableAccessVersion
   , lengthRankingConfigurationFileSpinePairDescriptorBoundExecveCheckExecutableAccessVersion
+  , lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionVersion
+  , lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionVersion
   , lengthRankingConfigurationFileJsonLimits
   , LengthRankingConfigurationFileObject (..)
   , LengthRankingConfigurationFileField (..)
@@ -109,7 +114,10 @@ import Data.Word (Word8)
 import Numeric.Natural (Natural)
 
 import Language.Haskell.Djex
-  ( LengthContractSource (..)
+  ( LengthBooleanFiniteUnionLimitError
+  , LengthBooleanFiniteUnionLimitSource (..)
+  , LengthBooleanFiniteUnionLimits
+  , LengthContractSource (..)
   , LengthContractVariable (..)
   , LengthEvaluationLimitError
   , LengthEvaluationLimitSource (..)
@@ -139,6 +147,7 @@ import Language.Haskell.Djex
   , LengthSMTLibLiveUsableWorkBudgetError
   , LengthSMTLibLiveUsableWorkBudgetSource (..)
   , mkLengthEvaluationLimits
+  , mkLengthBooleanFiniteUnionLimits
   , mkLengthInputBoxLimits
   , mkLengthSMTLibDescriptorBoundExecutionConfig
   , mkLengthSMTLibDescriptorBoundEffectiveIDExecutableAccessExecutionConfig
@@ -178,6 +187,7 @@ import Leant.Synth.Length.Configuration
   , enableLengthRankingStrictRelationalPositiveAffineQuotientApplicableDomainValidation
   , enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidation
   , enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainValidation
+  , enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainValidation
   , enableLengthRankingUsableWorkBudget
   , lengthRankingPolicyExecutableDigestExpectation
   , lengthRankingPolicyFromValidatedComponents
@@ -337,6 +347,19 @@ lengthRankingConfigurationFileSpinePairDescriptorBoundExecveCheckExecutableAcces
 lengthRankingConfigurationFileSpinePairDescriptorBoundExecveCheckExecutableAccessVersion =
   28
 
+-- | Scalar execve-check/scoped profile selecting bounded Boolean finite-union
+-- closure and enumeration for the cumulative root-monus applicable domain.
+lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionVersion
+  :: Natural
+lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionVersion =
+  29
+
+-- | Nominal binary-product sibling of version 29.
+lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionVersion
+  :: Natural
+lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionVersion =
+  30
+
 -- | Fixed admission policy for the v1 document itself.  The array maximum is
 -- one greater than the widest typed collection so maximum-plus-one reaches the
 -- more specific schema diagnostic.
@@ -413,6 +436,11 @@ data LengthRankingConfigurationFileField
   | LengthRankingConfigurationApplicableDomainValidationField
   | LengthRankingConfigurationApplicableDomainStrategyField
   | LengthRankingConfigurationApplicableDomainMaximumInputsField
+  | LengthRankingConfigurationApplicableDomainMaximumGeneratedBranchesField
+  | LengthRankingConfigurationApplicableDomainMaximumRulesPerBranchField
+  | LengthRankingConfigurationApplicableDomainMaximumClosureInspectionsPerBranchField
+  | LengthRankingConfigurationApplicableDomainMaximumRetainedBoxesField
+  | LengthRankingConfigurationApplicableDomainMaximumAssignmentVisitsField
   | LengthRankingConfigurationApplicableDomainMaximumAssignmentsField
   | LengthRankingConfigurationApplicableDomainOrderingField
   | LengthRankingConfigurationCounterexampleSimplificationField
@@ -504,6 +532,8 @@ data LengthRankingConfigurationFileError
       !LengthEvaluationLimitError
   | LengthRankingConfigurationInputBoxLimitsRejected
       !LengthInputBoxLimitError
+  | LengthRankingConfigurationBooleanFiniteUnionLimitsRejected
+      !LengthBooleanFiniteUnionLimitError
   | LengthRankingConfigurationUsableWorkBudgetRejected
       !LengthSMTLibLiveUsableWorkBudgetError
   | LengthRankingConfigurationSyntaxRejected
@@ -652,7 +682,9 @@ decodeLengthRankingConfigurationFile bytes = do
 -- sentinel.  Root-monus versions are reached only after the root-extrema
 -- version-23/version-24 decoder returns it in turn.  Execve-check executable-
 -- access versions are reached only after the root-monus version-25/version-26
--- decoder returns the same sentinel.
+-- decoder returns the same sentinel.  Boolean finite-union versions are
+-- reached only after the execve-check version-27/version-28 decoder returns
+-- it in turn.
 decodeLengthAssessmentConfigurationFile
   :: ByteString
   -> Either
@@ -706,9 +738,14 @@ decodeLengthAssessmentConfigurationFile bytes =
                                 decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonus
                                   bytes of
                               Right rootMonus -> Right rootMonus
-                              Left LengthRankingConfigurationUnsupportedVersion ->
-                                decodeLengthAssessmentConfigurationFileDescriptorBoundExecveCheckExecutableAccess
-                                  bytes
+                              Left LengthRankingConfigurationUnsupportedVersion -> case
+                                  decodeLengthAssessmentConfigurationFileDescriptorBoundExecveCheckExecutableAccess
+                                    bytes of
+                                Right execveCheck -> Right execveCheck
+                                Left LengthRankingConfigurationUnsupportedVersion ->
+                                  decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnion
+                                    bytes
+                                Left failure -> Left failure
                               Left failure -> Left failure
                             Left failure -> Left failure
                           Left failure -> Left failure
@@ -1216,6 +1253,48 @@ decodeLengthAssessmentConfigurationFileDescriptorBoundExecveCheckExecutableAcces
         lengthRankingConfigurationFileSpinePairDescriptorBoundExecveCheckExecutableAccessVersion
       then
         decodeLengthRankingConfigurationFileSpinePairDescriptorBoundExecveCheckExecutableAccessV28
+          root
+      else Left LengthRankingConfigurationUnsupportedVersion
+
+-- | Decode only the bounded Boolean finite-union scalar/product siblings
+-- after every version-1--version-28 entrance has returned its closed
+-- unsupported-version sentinel.  Both versions retain the complete execve-
+-- check, root-monus, scoped-budget profile and replace only the applicable-
+-- domain strategy and its independently bounded closure/enumeration limits.
+decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnion
+  :: ByteString
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnion
+    bytes = do
+  document <- either (Left . LengthRankingConfigurationJsonRejected) Right
+    $ parseBoundedJson lengthRankingConfigurationFileJsonLimits bytes
+  root <- objectFields LengthRankingConfigurationRootObject document
+  formatValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationFormatField
+    "format"
+    root
+  format <- stringField LengthRankingConfigurationFormatField formatValue
+  if format == lengthRankingConfigurationFileFormat
+    then pure ()
+    else Left LengthRankingConfigurationUnsupportedFormat
+  versionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationVersionField
+    "version"
+    root
+  version <- integerField LengthRankingConfigurationVersionField versionValue
+  if version == toInteger
+      lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionVersion
+    then
+      decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionV29
+        root
+    else if version == toInteger
+        lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionVersion
+      then
+        decodeLengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionV30
           root
       else Left LengthRankingConfigurationUnsupportedVersion
 
@@ -1926,6 +2005,43 @@ decodeLengthRankingConfigurationFileSpinePairDescriptorBoundExecveCheckExecutabl
   contract <- decodeLeanLengthSpinePairContractValueV5 contractValue
   pure $ DisabledLengthSpinePairAssessmentConfiguration policy contract
 
+decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionV29
+  :: ObjectFields
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionV29
+    root = do
+  policy <-
+    decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionPolicy
+      root
+  contractValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationContractField
+    "contract"
+    root
+  contract <- decodeLeanLengthContractValueV5 contractValue
+  pure $ DisabledLengthScalarAssessmentConfiguration
+    $ disableLengthRankingConfiguration policy contract
+
+decodeLengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionV30
+  :: ObjectFields
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionV30
+    root = do
+  policy <-
+    decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionPolicy
+      root
+  contractValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationContractField
+    "contract"
+    root
+  contract <- decodeLeanLengthSpinePairContractValueV5 contractValue
+  pure $ DisabledLengthSpinePairAssessmentConfiguration policy contract
+
 decodeLengthRankingConfigurationFileUsableWorkBudgetPolicy
   :: ObjectFields
   -> Either LengthRankingConfigurationFileError LengthRankingPolicy
@@ -2110,6 +2226,28 @@ decodeLengthRankingConfigurationFileDescriptorBoundExecveCheckExecutableAccessPo
   let inheritedRoot = filter ((/= "usableWorkBudget") . fst) root
   advancedPolicy <-
     decodeLengthRankingConfigurationFileDescriptorBoundExecveCheckExecutableAccessBasePolicy
+      inheritedRoot
+  budgetValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationUsableWorkBudgetField
+    "usableWorkBudget"
+    root
+  budget <- decodeScopedUsableWorkBudget budgetValue
+  pure $ enableLengthRankingScopedUsableWorkBudget budget advancedPolicy
+
+-- Versions 29 and 30 retain version 27/28's complete execve-check,
+-- root-monus, descriptor-bound root, validation order, and scoped-v2 usable-
+-- work owner.  Only the inherited applicable-domain strategy changes.
+decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionPolicy
+  :: ObjectFields
+  -> Either LengthRankingConfigurationFileError LengthRankingPolicy
+decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionPolicy
+    root = do
+  exactFields LengthRankingConfigurationRootObject
+    rootFieldsUsableWorkBudget root
+  let inheritedRoot = filter ((/= "usableWorkBudget") . fst) root
+  advancedPolicy <-
+    decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionBasePolicy
       inheritedRoot
   budgetValue <- requiredField
     LengthRankingConfigurationRootObject
@@ -2931,6 +3069,99 @@ decodeLengthRankingConfigurationFileDescriptorBoundExecveCheckExecutableAccessBa
       applicableDomainPolicy =
         enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainValidation
           applicableDomainLimits inputBoxPreferencePolicy
+      applicableDomainPreferencePolicy =
+        enableLengthRankingNonVacuousApplicableDomainPreference
+          applicableDomainPolicy
+      simplificationPolicy = enableLengthRankingCounterexampleSimplification
+        counterexampleSimplificationLimits applicableDomainPreferencePolicy
+  pure $ enableLengthRankingDeferredLiveSessionOpening simplificationPolicy
+
+-- Versions 29 and 30 preserve version 27/28's complete execve-check launch
+-- and policy demand order.  Only the applicable-domain decoder and mutually
+-- exclusive builder select bounded Boolean finite-union closure/enumeration.
+decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionBasePolicy
+  :: ObjectFields
+  -> Either LengthRankingConfigurationFileError LengthRankingPolicy
+decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionBasePolicy
+    root = do
+  exactFields LengthRankingConfigurationRootObject
+    rootFieldsPositiveAffine root
+  executionAdmissionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationExecutionAdmissionField
+    "executionAdmission"
+    root
+  executionLimits <- decodeExecutionAdmission executionAdmissionValue
+  executionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationExecutionField
+    "execution"
+    root
+  execution <- decodeDescriptorBoundExecveCheckExecutableAccessExecution
+    executionLimits executionValue
+  evaluationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationEvaluationField
+    "evaluation"
+    root
+  evaluation <- decodeEvaluation evaluationValue
+  inputBoxValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationInputBoxValidationField
+    "inputBoxValidation"
+    root
+  (inputBoxLimits, inclusiveMaximums) <-
+    decodeInputBoxValidation inputBoxValue
+  counterexampleProbeValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationCounterexampleProbeField
+    "counterexampleProbe"
+    root
+  decodeCounterexampleProbe counterexampleProbeValue
+  boundedPositiveOrderingValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationBoundedPositiveOrderingField
+    "boundedPositiveOrdering"
+    root
+  decodeBoundedPositiveOrdering boundedPositiveOrderingValue
+  applicableDomainValidationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationApplicableDomainValidationField
+    "applicableDomainValidation"
+    root
+  (applicableDomainInputBoxLimits, booleanFiniteUnionLimits) <-
+    decodeStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainValidation
+      applicableDomainValidationValue
+  applicableDomainOrderingValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationApplicableDomainOrderingField
+    "applicableDomainOrdering"
+    root
+  decodeApplicableDomainOrdering applicableDomainOrderingValue
+  counterexampleSimplificationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationCounterexampleSimplificationField
+    "counterexampleSimplification"
+    root
+  counterexampleSimplificationLimits <- decodeCounterexampleSimplification
+    counterexampleSimplificationValue
+  liveSessionOpeningValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationLiveSessionOpeningField
+    "liveSessionOpening"
+    root
+  decodeLiveSessionOpening liveSessionOpeningValue
+  let basePolicy =
+        lengthRankingPolicyFromValidatedComponents execution evaluation
+      inputBoxPolicy = enableLengthRankingInputBoxValidation
+        inputBoxLimits inclusiveMaximums basePolicy
+      originProbePolicy = enableLengthRankingOriginProbe inputBoxPolicy
+      inputBoxPreferencePolicy =
+        enableLengthRankingNonVacuousInputBoxPreference originProbePolicy
+      applicableDomainPolicy =
+        enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainValidation
+          applicableDomainInputBoxLimits booleanFiniteUnionLimits
+          inputBoxPreferencePolicy
       applicableDomainPreferencePolicy =
         enableLengthRankingNonVacuousApplicableDomainPreference
           applicableDomainPolicy
@@ -4081,6 +4312,148 @@ decodeStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainVali
       maximumInputBoxAssignments
   checkedInputBoxLimits maximumInputs maximumAssignments
 
+-- | Decode the cumulative root-monus Boolean finite-union sibling.  Each
+-- closure/enumeration authority is independently explicit and bounded; the
+-- inherited input-box limits continue to bound input width and the unique
+-- assignment set.
+decodeStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainValidation
+  :: BoundedJsonValue
+  -> Either
+      LengthRankingConfigurationFileError
+      (LengthInputBoxLimits, LengthBooleanFiniteUnionLimits)
+decodeStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainValidation
+    value = do
+  object <- exactObject
+    LengthRankingConfigurationApplicableDomainValidationObject
+    booleanFiniteUnionApplicableDomainValidationFields value
+  strategyValue <- requiredField
+    LengthRankingConfigurationApplicableDomainValidationObject
+    LengthRankingConfigurationApplicableDomainStrategyField
+    "strategy"
+    object
+  strategy <- stringField
+    LengthRankingConfigurationApplicableDomainStrategyField
+    strategyValue
+  case strategy of
+    "strict-relational-positive-affine-quotient-root-extrema-monus-boolean-finite-union-v1" ->
+      pure ()
+    _ -> Left $ LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationApplicableDomainStrategyField
+  maximumInputsValue <- requiredField
+    LengthRankingConfigurationApplicableDomainValidationObject
+    LengthRankingConfigurationApplicableDomainMaximumInputsField
+    "maximumInputs"
+    object
+  maximumInputs <- naturalField
+    LengthRankingConfigurationApplicableDomainMaximumInputsField
+    maximumInputsValue
+    >>= capNatural
+      LengthRankingConfigurationApplicableDomainMaximumInputsField
+      maximumInputBoxInputs
+  maximumGeneratedBranchesValue <- requiredField
+    LengthRankingConfigurationApplicableDomainValidationObject
+    LengthRankingConfigurationApplicableDomainMaximumGeneratedBranchesField
+    "maximumGeneratedBranches"
+    object
+  maximumGeneratedBranches <- naturalField
+    LengthRankingConfigurationApplicableDomainMaximumGeneratedBranchesField
+    maximumGeneratedBranchesValue
+    >>= capNatural
+      LengthRankingConfigurationApplicableDomainMaximumGeneratedBranchesField
+      maximumBooleanFiniteUnionGeneratedBranches
+  maximumRulesPerBranchValue <- requiredField
+    LengthRankingConfigurationApplicableDomainValidationObject
+    LengthRankingConfigurationApplicableDomainMaximumRulesPerBranchField
+    "maximumRulesPerBranch"
+    object
+  maximumRulesPerBranch <- naturalField
+    LengthRankingConfigurationApplicableDomainMaximumRulesPerBranchField
+    maximumRulesPerBranchValue
+    >>= capNatural
+      LengthRankingConfigurationApplicableDomainMaximumRulesPerBranchField
+      maximumBooleanFiniteUnionRulesPerBranch
+  maximumClosureInspectionsPerBranchValue <- requiredField
+    LengthRankingConfigurationApplicableDomainValidationObject
+    LengthRankingConfigurationApplicableDomainMaximumClosureInspectionsPerBranchField
+    "maximumClosureInspectionsPerBranch"
+    object
+  maximumClosureInspectionsPerBranch <- naturalField
+    LengthRankingConfigurationApplicableDomainMaximumClosureInspectionsPerBranchField
+    maximumClosureInspectionsPerBranchValue
+    >>= capNatural
+      LengthRankingConfigurationApplicableDomainMaximumClosureInspectionsPerBranchField
+      maximumBooleanFiniteUnionClosureInspectionsPerBranch
+  maximumRetainedBoxesValue <- requiredField
+    LengthRankingConfigurationApplicableDomainValidationObject
+    LengthRankingConfigurationApplicableDomainMaximumRetainedBoxesField
+    "maximumRetainedBoxes"
+    object
+  maximumRetainedBoxes <- naturalField
+    LengthRankingConfigurationApplicableDomainMaximumRetainedBoxesField
+    maximumRetainedBoxesValue
+    >>= capNatural
+      LengthRankingConfigurationApplicableDomainMaximumRetainedBoxesField
+      maximumBooleanFiniteUnionRetainedBoxes
+  maximumAssignmentVisitsValue <- requiredField
+    LengthRankingConfigurationApplicableDomainValidationObject
+    LengthRankingConfigurationApplicableDomainMaximumAssignmentVisitsField
+    "maximumAssignmentVisits"
+    object
+  maximumAssignmentVisits <- naturalField
+    LengthRankingConfigurationApplicableDomainMaximumAssignmentVisitsField
+    maximumAssignmentVisitsValue
+    >>= capNatural
+      LengthRankingConfigurationApplicableDomainMaximumAssignmentVisitsField
+      maximumBooleanFiniteUnionAssignmentVisits
+  maximumAssignmentsValue <- requiredField
+    LengthRankingConfigurationApplicableDomainValidationObject
+    LengthRankingConfigurationApplicableDomainMaximumAssignmentsField
+    "maximumAssignments"
+    object
+  maximumAssignments <- naturalField
+    LengthRankingConfigurationApplicableDomainMaximumAssignmentsField
+    maximumAssignmentsValue
+    >>= capNatural
+      LengthRankingConfigurationApplicableDomainMaximumAssignmentsField
+      maximumInputBoxAssignments
+  inputBoxLimits <- checkedInputBoxLimits maximumInputs maximumAssignments
+  booleanFiniteUnionLimits <- checkedBooleanFiniteUnionLimits
+    maximumGeneratedBranches
+    maximumRulesPerBranch
+    maximumClosureInspectionsPerBranch
+    maximumRetainedBoxes
+    maximumAssignmentVisits
+  pure (inputBoxLimits, booleanFiniteUnionLimits)
+
+booleanFiniteUnionApplicableDomainValidationFields
+  :: [(Text, LengthRankingConfigurationFileField)]
+booleanFiniteUnionApplicableDomainValidationFields =
+  [ ( "strategy"
+    , LengthRankingConfigurationApplicableDomainStrategyField
+    )
+  , ( "maximumInputs"
+    , LengthRankingConfigurationApplicableDomainMaximumInputsField
+    )
+  , ( "maximumGeneratedBranches"
+    , LengthRankingConfigurationApplicableDomainMaximumGeneratedBranchesField
+    )
+  , ( "maximumRulesPerBranch"
+    , LengthRankingConfigurationApplicableDomainMaximumRulesPerBranchField
+    )
+  , ( "maximumClosureInspectionsPerBranch"
+    , LengthRankingConfigurationApplicableDomainMaximumClosureInspectionsPerBranchField
+    )
+  , ( "maximumRetainedBoxes"
+    , LengthRankingConfigurationApplicableDomainMaximumRetainedBoxesField
+    )
+  , ( "maximumAssignmentVisits"
+    , LengthRankingConfigurationApplicableDomainMaximumAssignmentVisitsField
+    )
+  , ( "maximumAssignments"
+    , LengthRankingConfigurationApplicableDomainMaximumAssignmentsField
+    )
+  ]
+
 applicableDomainValidationFields
   :: [(Text, LengthRankingConfigurationFileField)]
 applicableDomainValidationFields =
@@ -4176,6 +4549,34 @@ checkedInputBoxLimits maximumInputs maximumAssignments =
       } of
     Left failure -> Left
       $ LengthRankingConfigurationInputBoxLimitsRejected failure
+    Right validated -> Right validated
+
+checkedBooleanFiniteUnionLimits
+  :: Natural
+  -> Natural
+  -> Natural
+  -> Natural
+  -> Natural
+  -> Either
+      LengthRankingConfigurationFileError
+      LengthBooleanFiniteUnionLimits
+checkedBooleanFiniteUnionLimits maximumGeneratedBranches maximumRulesPerBranch
+    maximumClosureInspectionsPerBranch maximumRetainedBoxes
+    maximumAssignmentVisits =
+  case mkLengthBooleanFiniteUnionLimits LengthBooleanFiniteUnionLimitSource
+      { lengthBooleanFiniteUnionLimitSourceMaximumGeneratedBranches =
+          fromIntegral maximumGeneratedBranches
+      , lengthBooleanFiniteUnionLimitSourceMaximumRulesPerBranch =
+          fromIntegral maximumRulesPerBranch
+      , lengthBooleanFiniteUnionLimitSourceMaximumClosureInspectionsPerBranch =
+          fromIntegral maximumClosureInspectionsPerBranch
+      , lengthBooleanFiniteUnionLimitSourceMaximumRetainedBoxes =
+          fromIntegral maximumRetainedBoxes
+      , lengthBooleanFiniteUnionLimitSourceMaximumAssignmentVisits =
+          fromIntegral maximumAssignmentVisits
+      } of
+    Left failure -> Left
+      $ LengthRankingConfigurationBooleanFiniteUnionLimitsRejected failure
     Right validated -> Right validated
 
 decodeLiveSessionOpening
@@ -4347,6 +4748,17 @@ inputBoxValidationFields =
 maximumInputBoxInputs, maximumInputBoxAssignments :: Natural
 maximumInputBoxInputs = 8
 maximumInputBoxAssignments = 65536
+
+maximumBooleanFiniteUnionGeneratedBranches,
+  maximumBooleanFiniteUnionRulesPerBranch,
+  maximumBooleanFiniteUnionClosureInspectionsPerBranch,
+  maximumBooleanFiniteUnionRetainedBoxes,
+  maximumBooleanFiniteUnionAssignmentVisits :: Natural
+maximumBooleanFiniteUnionGeneratedBranches = 256
+maximumBooleanFiniteUnionRulesPerBranch = 64
+maximumBooleanFiniteUnionClosureInspectionsPerBranch = 4096
+maximumBooleanFiniteUnionRetainedBoxes = 256
+maximumBooleanFiniteUnionAssignmentVisits = 262144
 
 -- | Decode exactly the contract object embedded by the compatibility file.
 -- Contract-only version 1 reuses this entrance. Later contract-only versions
