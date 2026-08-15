@@ -18,6 +18,7 @@ module Leant.Synth.Length.Presentation
   , renderLengthRelationalPositiveAffineApplicableDomainValidationNote
   , renderLengthStrictRelationalPositiveAffineApplicableDomainValidationNote
   , renderLengthStrictRelationalPositiveAffineQuotientApplicableDomainValidationNote
+  , renderLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidationNote
   , renderLengthSpinePairCounterexampleNote
   , renderLengthSpinePairCounterexampleSimplificationNote
   , renderLengthSpinePairInputBoxValidationNote
@@ -26,6 +27,7 @@ module Leant.Synth.Length.Presentation
   , renderLengthSpinePairRelationalPositiveAffineApplicableDomainValidationNote
   , renderLengthSpinePairStrictRelationalPositiveAffineApplicableDomainValidationNote
   , renderLengthSpinePairStrictRelationalPositiveAffineQuotientApplicableDomainValidationNote
+  , renderLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidationNote
   , maximumLengthCounterexampleNoteCharacters
   ) where
 
@@ -43,6 +45,7 @@ import Language.Haskell.Djex
   , ValidatedLengthRelationalPositiveAffineApplicableDomain
   , ValidatedLengthStrictRelationalPositiveAffineApplicableDomain
   , ValidatedLengthStrictRelationalPositiveAffineQuotientApplicableDomain
+  , ValidatedLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomain
   , ValidatedLengthSpinePairApplicableDomain
   , ValidatedLengthSpinePairCounterexample
   , ValidatedLengthSpinePairCounterexampleSimplification
@@ -51,6 +54,7 @@ import Language.Haskell.Djex
   , ValidatedLengthSpinePairRelationalPositiveAffineApplicableDomain
   , ValidatedLengthSpinePairStrictRelationalPositiveAffineApplicableDomain
   , ValidatedLengthSpinePairStrictRelationalPositiveAffineQuotientApplicableDomain
+  , ValidatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomain
   , lengthSpinePairFirst
   , lengthSpinePairSecond
   , validatedLengthCounterexampleBasis
@@ -85,6 +89,10 @@ import Language.Haskell.Djex
   , validatedLengthStrictRelationalPositiveAffineQuotientApplicableDomainAssignmentCount
   , validatedLengthStrictRelationalPositiveAffineQuotientApplicableDomainBasis
   , validatedLengthStrictRelationalPositiveAffineQuotientApplicableDomainInclusiveMaximums
+  , validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainApplicableAssignmentCount
+  , validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainAssignmentCount
+  , validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainBasis
+  , validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainInclusiveMaximums
   , validatedLengthSpinePairCounterexampleBasis
   , validatedLengthSpinePairCounterexampleInputs
   , validatedLengthSpinePairCounterexampleResult
@@ -117,6 +125,10 @@ import Language.Haskell.Djex
   , validatedLengthSpinePairStrictRelationalPositiveAffineQuotientApplicableDomainAssignmentCount
   , validatedLengthSpinePairStrictRelationalPositiveAffineQuotientApplicableDomainBasis
   , validatedLengthSpinePairStrictRelationalPositiveAffineQuotientApplicableDomainInclusiveMaximums
+  , validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainApplicableAssignmentCount
+  , validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainAssignmentCount
+  , validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainBasis
+  , validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainInclusiveMaximums
   )
 
 import Leant.Synth.Engine
@@ -249,6 +261,10 @@ presentRankedCandidate ranked = LengthCandidatePresentation
           receipt -> Just
         $ renderLengthStrictRelationalPositiveAffineQuotientApplicableDomainValidationNote
             receipt
+      StrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainEstablished
+          receipt -> Just
+        $ renderLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidationNote
+            receipt
       Heuristic _ -> Nothing
       Unassessed -> Nothing
 
@@ -289,6 +305,10 @@ presentRankedLengthSpinePairCandidate ranked = LengthCandidatePresentation
       LengthSpinePairStrictRelationalPositiveAffineQuotientApplicableDomainEstablished
           receipt -> Just
         $ renderLengthSpinePairStrictRelationalPositiveAffineQuotientApplicableDomainValidationNote
+            receipt
+      LengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainEstablished
+          receipt -> Just
+        $ renderLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidationNote
             receipt
       LengthSpinePairHeuristic _ -> Nothing
       LengthSpinePairUnassessed -> Nothing
@@ -532,6 +552,41 @@ renderLengthStrictRelationalPositiveAffineQuotientApplicableDomainValidationNote
           "; vacuous (no assignment met the precondition)"
     | otherwise = ""
 
+-- | Render the cumulative root-extrema coverage receipt without implying
+-- authority over nested extrema syntax, source execution, or the external
+-- solver.
+renderLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidationNote
+  :: ValidatedLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomain
+  -> String
+renderLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidationNote
+    receipt =
+  take maximumLengthCounterexampleNoteCharacters $
+  "complete finite-spine Length domain under strict relational "
+    ++ "positive-affine quotient/root-extrema precondition coverage rule "
+    ++ "within admitted bounds (model/provider-relative; "
+    ++ renderBasis
+        (validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainBasis
+          receipt)
+    ++ "; no global proof or solver authority): derived maxima = "
+    ++ renderPositiveAffineMaximums
+        (validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainInclusiveMaximums
+          receipt)
+    ++ "; checked = "
+    ++ renderNatural
+        (validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainAssignmentCount
+          receipt)
+    ++ "; applicable = "
+    ++ renderNatural
+        (validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainApplicableAssignmentCount
+          receipt)
+    ++ vacuity
+ where
+  vacuity
+    | validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainApplicableAssignmentCount
+        receipt == 0 =
+          "; vacuous (no assignment met the precondition)"
+    | otherwise = ""
+
 -- | Render both source-ordered result components of one independently replayed
 -- product-domain counterexample.  The note remains model-relative and bounded.
 renderLengthSpinePairCounterexampleNote
@@ -764,6 +819,40 @@ renderLengthSpinePairStrictRelationalPositiveAffineQuotientApplicableDomainValid
  where
   vacuity
     | validatedLengthSpinePairStrictRelationalPositiveAffineQuotientApplicableDomainApplicableAssignmentCount
+        receipt == 0 =
+          "; vacuous (no assignment met the precondition)"
+    | otherwise = ""
+
+-- | Nominal binary-product sibling of the cumulative root-extrema coverage
+-- note.
+renderLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidationNote
+  :: ValidatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomain
+  -> String
+renderLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidationNote
+    receipt =
+  take maximumLengthCounterexampleNoteCharacters $
+  "complete binary-product finite-spine Length domain under strict relational "
+    ++ "positive-affine quotient/root-extrema precondition coverage rule "
+    ++ "within admitted bounds (model/provider-relative; "
+    ++ renderBasis
+        (validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainBasis
+          receipt)
+    ++ "; no global proof or solver authority): derived maxima = "
+    ++ renderPositiveAffineMaximums
+        (validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainInclusiveMaximums
+          receipt)
+    ++ "; checked = "
+    ++ renderNatural
+        (validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainAssignmentCount
+          receipt)
+    ++ "; applicable = "
+    ++ renderNatural
+        (validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainApplicableAssignmentCount
+          receipt)
+    ++ vacuity
+ where
+  vacuity
+    | validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainApplicableAssignmentCount
         receipt == 0 =
           "; vacuous (no assignment met the precondition)"
     | otherwise = ""
