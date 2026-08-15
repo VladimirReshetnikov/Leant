@@ -112,6 +112,7 @@ import Language.Haskell.Djex
   , ValidatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomain
   , ValidatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomain
   , ValidatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomain
+  , ValidatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomain
   , defaultLengthSMTLibLiveSessionMaximumQueries
   , lengthSMTLibLiveSessionCleanupIncomplete
   , lengthSMTLibLiveSessionPrimaryFailure
@@ -131,6 +132,7 @@ import Language.Haskell.Djex
   , validateLengthSpinePairSMTLibQueryStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomain
   , validateLengthSpinePairSMTLibQueryStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomain
   , validateLengthSpinePairSMTLibQueryStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomain
+  , validateLengthSpinePairSMTLibQueryStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomain
   , validateLengthSpinePairSMTLibQueryInputBox
   , validatedLengthSpinePairApplicableDomainApplicableAssignmentCount
   , validatedLengthSpinePairCounterexampleInputs
@@ -143,6 +145,7 @@ import Language.Haskell.Djex
   , validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainApplicableAssignmentCount
   , validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainApplicableAssignmentCount
   , validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainApplicableAssignmentCount
+  , validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainApplicableAssignmentCount
   , checkLengthSMTLibLiveScopedUsableWorkDeadline
   , withLengthSMTLibLiveSession
   , withLengthSMTLibLiveSessionUnderScopedDeadline
@@ -201,6 +204,8 @@ data LengthSpinePairRankingAssessment
       !ValidatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomain
   | LengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainEstablished
       !ValidatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomain
+  | LengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainEstablished
+      !ValidatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomain
   deriving (Eq, Show)
 
 data LengthSpinePairCandidateAssessment
@@ -468,6 +473,8 @@ data LengthSpinePairApplicableDomainRankingPolicy
   | LengthSpinePairApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusEnabled
       !LengthInputBoxLimits
   | LengthSpinePairApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionEnabled
+      !LengthInputBoxLimits !LengthBooleanFiniteUnionLimits
+  | LengthSpinePairApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingEnabled
       !LengthInputBoxLimits !LengthBooleanFiniteUnionLimits
 
 data LengthSpinePairOriginProbeRankingPolicy
@@ -1867,6 +1874,34 @@ assessLengthSpinePairApplicableDomainCandidate evaluation policy
           (LengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainEstablished
             receipt)
           Nothing
+  LengthSpinePairApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingEnabled
+      inputBoxLimits unionLimits -> case
+        validateLengthSpinePairSMTLibQueryStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomain
+          evaluation inputBoxLimits unionLimits query of
+    Left
+        (LengthSpinePairSMTLibBooleanFiniteUnionApplicableDomainValidationAssociationRejected
+          _) ->
+      Left $ localLengthSpinePairRankingFailure
+        LengthSpinePairRankingEvidenceReplayMismatch index
+    Left
+        (LengthSpinePairSMTLibBooleanFiniteUnionApplicableDomainValidationRejected
+          failure)
+      | lengthSpinePairBooleanFiniteUnionApplicableDomainAdmissionFailure
+          failure -> Right Nothing
+      | otherwise -> Left $ localLengthSpinePairRankingFailure
+          (LengthSpinePairRankingBooleanFiniteUnionApplicableDomainValidationFailed
+            failure)
+          index
+    Right (LengthApplicableDomainInapplicable _) -> Right Nothing
+    Right (LengthApplicableDomainCounterexample receipt) -> Just <$>
+      simplifyLengthSpinePairCounterexampleAssessment evaluation
+        simplificationPolicy index association query receipt
+    Right (LengthApplicableDomainEstablished receipt) -> Right $ Just
+      $ AssociatedRankedLengthSpinePairCandidate index association
+      $ LengthSpinePairCandidateAssessed
+          (LengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainEstablished
+            receipt)
+          Nothing
 
 lengthSpinePairApplicableDomainAdmissionFailure
   :: LengthSpinePairInputBoxValidationError
@@ -2214,6 +2249,10 @@ isNonVacuousLengthSpinePairApplicableDomain assessment = case assessment of
       receipt ->
     validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainApplicableAssignmentCount
       receipt > 0
+  LengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainEstablished
+      receipt ->
+    validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainApplicableAssignmentCount
+      receipt > 0
   _ -> False
 
 unassessedLengthSpinePairRanking
@@ -2336,6 +2375,8 @@ forceLengthSpinePairRankingAssessment assessment = case assessment of
   LengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainEstablished
       receipt -> rnf receipt
   LengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainEstablished
+      receipt -> rnf receipt
+  LengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainEstablished
       receipt -> rnf receipt
 
 forceLengthSpinePairRankingFailure

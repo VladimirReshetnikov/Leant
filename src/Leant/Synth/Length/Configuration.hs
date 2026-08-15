@@ -44,6 +44,7 @@ module Leant.Synth.Length.Configuration
   , enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidation
   , enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainValidation
   , enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainValidation
+  , enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainValidation
   , enableLengthRankingCounterexampleSimplification
   , enableLengthRankingNonVacuousInputBoxPreference
   , enableLengthRankingNonVacuousApplicableDomainPreference
@@ -212,6 +213,8 @@ data LengthRankingApplicableDomainValidation
   | LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusV1
       !LengthInputBoxLimits
   | LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionV1
+      !LengthInputBoxLimits !LengthBooleanFiniteUnionLimits
+  | LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingV1
       !LengthInputBoxLimits !LengthBooleanFiniteUnionLimits
 
 -- | Private permission to run Djex's query-owned canonical origin replay
@@ -587,6 +590,28 @@ enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBoolean
     originProbe simplification inputBoxPreference applicableDomainPreference
     liveSessionOpening usableWorkBudget
 
+-- | Select the cumulative atomic-branching successor to the bounded Boolean
+-- finite-union validator.  It retains the same independently sealed limits
+-- while opening the admitted root-extrema and may-zero-monus atomic
+-- alternatives before per-branch closure.  All applicable-domain builders
+-- remain mutually exclusive, so the last one applied determines the retained
+-- strategy.
+enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainValidation
+  :: LengthInputBoxLimits
+  -> LengthBooleanFiniteUnionLimits
+  -> LengthRankingPolicy
+  -> LengthRankingPolicy
+enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainValidation
+    inputBoxLimits unionLimits
+    (LengthRankingPolicy execution evaluation inputBoxValidation _ originProbe
+      simplification inputBoxPreference applicableDomainPreference
+      liveSessionOpening usableWorkBudget) =
+  LengthRankingPolicy execution evaluation inputBoxValidation
+    (LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingV1
+      inputBoxLimits unionLimits)
+    originProbe simplification inputBoxPreference applicableDomainPreference
+    liveSessionOpening usableWorkBudget
+
 -- | Enable the same bounded, query-owned strict counterexample simplifier for
 -- every counterexample source without changing source order or enabling any
 -- source.  A bounded unavailability or absence of a strict improvement retains
@@ -798,6 +823,10 @@ scalarApplicableDomainRankingPolicy validation = case validation of
       inputBoxLimits unionLimits ->
     LengthApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionEnabled
       inputBoxLimits unionLimits
+  LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingV1
+      inputBoxLimits unionLimits ->
+    LengthApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingEnabled
+      inputBoxLimits unionLimits
 
 scalarOriginProbeRankingPolicy
   :: LengthRankingOriginProbe
@@ -855,6 +884,10 @@ spinePairApplicableDomainRankingPolicy validation = case validation of
   LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionV1
       inputBoxLimits unionLimits ->
     LengthSpinePairApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionEnabled
+      inputBoxLimits unionLimits
+  LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingV1
+      inputBoxLimits unionLimits ->
+    LengthSpinePairApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingEnabled
       inputBoxLimits unionLimits
 
 liveSessionOpeningPolicy

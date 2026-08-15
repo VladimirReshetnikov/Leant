@@ -21,6 +21,7 @@ module Leant.Synth.Length.Presentation
   , renderLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidationNote
   , renderLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainValidationNote
   , renderLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainValidationNote
+  , renderLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainValidationNote
   , renderLengthSpinePairCounterexampleNote
   , renderLengthSpinePairCounterexampleSimplificationNote
   , renderLengthSpinePairInputBoxValidationNote
@@ -32,6 +33,7 @@ module Leant.Synth.Length.Presentation
   , renderLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidationNote
   , renderLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainValidationNote
   , renderLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainValidationNote
+  , renderLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainValidationNote
   , maximumLengthCounterexampleNoteCharacters
   ) where
 
@@ -52,6 +54,7 @@ import Language.Haskell.Djex
   , ValidatedLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomain
   , ValidatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomain
   , ValidatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomain
+  , ValidatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomain
   , ValidatedLengthSpinePairApplicableDomain
   , ValidatedLengthSpinePairCounterexample
   , ValidatedLengthSpinePairCounterexampleSimplification
@@ -63,6 +66,7 @@ import Language.Haskell.Djex
   , ValidatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomain
   , ValidatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomain
   , ValidatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomain
+  , ValidatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomain
   , lengthSpinePairFirst
   , lengthSpinePairSecond
   , validatedLengthCounterexampleBasis
@@ -111,6 +115,12 @@ import Language.Haskell.Djex
   , validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainBasis
   , validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainBoxCount
   , validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainInclusiveMaximumBoxes
+  , validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainApplicableAssignmentCount
+  , validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainAssignmentCount
+  , validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainAssignmentVisitCount
+  , validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainBasis
+  , validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainBoxCount
+  , validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainInclusiveMaximumBoxes
   , validatedLengthSpinePairCounterexampleBasis
   , validatedLengthSpinePairCounterexampleInputs
   , validatedLengthSpinePairCounterexampleResult
@@ -157,6 +167,12 @@ import Language.Haskell.Djex
   , validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainBasis
   , validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainBoxCount
   , validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainInclusiveMaximumBoxes
+  , validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainApplicableAssignmentCount
+  , validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainAssignmentCount
+  , validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainAssignmentVisitCount
+  , validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainBasis
+  , validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainBoxCount
+  , validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainInclusiveMaximumBoxes
   )
 
 import Leant.Synth.Engine
@@ -301,6 +317,10 @@ presentRankedCandidate ranked = LengthCandidatePresentation
           receipt -> Just
         $ renderLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainValidationNote
             receipt
+      StrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainEstablished
+          receipt -> Just
+        $ renderLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainValidationNote
+            receipt
       Heuristic _ -> Nothing
       Unassessed -> Nothing
 
@@ -353,6 +373,10 @@ presentRankedLengthSpinePairCandidate ranked = LengthCandidatePresentation
       LengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainEstablished
           receipt -> Just
         $ renderLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainValidationNote
+            receipt
+      LengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainEstablished
+          receipt -> Just
+        $ renderLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainValidationNote
             receipt
       LengthSpinePairHeuristic _ -> Nothing
       LengthSpinePairUnassessed -> Nothing
@@ -709,6 +733,49 @@ renderLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteU
           "; vacuous (no assignment met the precondition)"
     | otherwise = ""
 
+-- | Render the nominal atomic-branching successor without collapsing its
+-- canonical box antichain.  Counts retain the predecessor order and remain
+-- visible before the bounded maxima prefix.
+renderLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainValidationNote
+  :: ValidatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomain
+  -> String
+renderLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainValidationNote
+    receipt =
+  take maximumLengthCounterexampleNoteCharacters $
+  "complete finite-spine Length Boolean finite-union atomic-branching domain "
+    ++ "under strict relational positive-affine quotient/root-extrema/monus "
+    ++ "coverage within admitted bounds (model/provider-relative; "
+    ++ renderBasis
+        (validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainBasis
+          receipt)
+    ++ "; no global proof or solver authority): boxes = "
+    ++ renderNatural
+        (validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainBoxCount
+          receipt)
+    ++ "; visits = "
+    ++ renderNatural
+        (validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainAssignmentVisitCount
+          receipt)
+    ++ "; unique = "
+    ++ renderNatural
+        (validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainAssignmentCount
+          receipt)
+    ++ "; applicable = "
+    ++ renderNatural
+        (validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainApplicableAssignmentCount
+          receipt)
+    ++ vacuity
+    ++ "; maxima = "
+    ++ renderBooleanFiniteUnionMaximumBoxes
+        (validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainInclusiveMaximumBoxes
+          receipt)
+ where
+  vacuity
+    | validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainApplicableAssignmentCount
+        receipt == 0 =
+          "; vacuous (no assignment met the precondition)"
+    | otherwise = ""
+
 -- | Render both source-ordered result components of one independently replayed
 -- product-domain counterexample.  The note remains model-relative and bounded.
 renderLengthSpinePairCounterexampleNote
@@ -1050,6 +1117,48 @@ renderLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBoole
  where
   vacuity
     | validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainApplicableAssignmentCount
+        receipt == 0 =
+          "; vacuous (no assignment met the precondition)"
+    | otherwise = ""
+
+-- | Nominal product presentation of the atomic-branching finite union.
+renderLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainValidationNote
+  :: ValidatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomain
+  -> String
+renderLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainValidationNote
+    receipt =
+  take maximumLengthCounterexampleNoteCharacters $
+  "complete binary-product finite-spine Length Boolean finite-union "
+    ++ "atomic-branching domain under strict relational positive-affine "
+    ++ "quotient/root-extrema/monus coverage within admitted bounds "
+    ++ "(model/provider-relative; "
+    ++ renderBasis
+        (validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainBasis
+          receipt)
+    ++ "; no global proof or solver authority): boxes = "
+    ++ renderNatural
+        (validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainBoxCount
+          receipt)
+    ++ "; visits = "
+    ++ renderNatural
+        (validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainAssignmentVisitCount
+          receipt)
+    ++ "; unique = "
+    ++ renderNatural
+        (validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainAssignmentCount
+          receipt)
+    ++ "; applicable = "
+    ++ renderNatural
+        (validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainApplicableAssignmentCount
+          receipt)
+    ++ vacuity
+    ++ "; maxima = "
+    ++ renderBooleanFiniteUnionMaximumBoxes
+        (validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainInclusiveMaximumBoxes
+          receipt)
+ where
+  vacuity
+    | validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainApplicableAssignmentCount
         receipt == 0 =
           "; vacuous (no assignment met the precondition)"
     | otherwise = ""
