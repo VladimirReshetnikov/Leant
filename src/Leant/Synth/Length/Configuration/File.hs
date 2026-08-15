@@ -26,6 +26,9 @@
 -- Versions 19 and 20 retain that complete descriptor-bound/scoped profile and
 -- replace only the applicable-domain strategy with strict relational positive-
 -- affine root-quotient consequences.
+-- Versions 21 and 22 retain that complete quotient/descriptor/scoped profile
+-- and replace only the executable-launch strategy with descriptor-bound
+-- effective-ID executable-access admission.
 -- Decoding performs no discovery, path normalization, environment lookup, or
 -- IO.  Every field is required.  A successful decode returns a deliberately
 -- disabled opaque value: callers
@@ -54,6 +57,8 @@ module Leant.Synth.Length.Configuration.File
   , lengthRankingConfigurationFileSpinePairDescriptorBoundExecutableLaunchVersion
   , lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientVersion
   , lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientVersion
+  , lengthRankingConfigurationFileDescriptorBoundEffectiveIDExecutableAccessVersion
+  , lengthRankingConfigurationFileSpinePairDescriptorBoundEffectiveIDExecutableAccessVersion
   , lengthRankingConfigurationFileJsonLimits
   , LengthRankingConfigurationFileObject (..)
   , LengthRankingConfigurationFileField (..)
@@ -121,6 +126,7 @@ import Language.Haskell.Djex
   , mkLengthEvaluationLimits
   , mkLengthInputBoxLimits
   , mkLengthSMTLibDescriptorBoundExecutionConfig
+  , mkLengthSMTLibDescriptorBoundEffectiveIDExecutableAccessExecutionConfig
   , mkLengthSMTLibExecutionConfig
   , mkLengthSMTLibExecutionLimits
   , mkLengthSMTLibResponseLimits
@@ -260,6 +266,19 @@ lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientVer
   :: Natural
 lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientVersion =
   20
+
+-- | Scalar quotient/scoped profile selecting descriptor-bound effective-ID
+-- executable-access launch.
+lengthRankingConfigurationFileDescriptorBoundEffectiveIDExecutableAccessVersion
+  :: Natural
+lengthRankingConfigurationFileDescriptorBoundEffectiveIDExecutableAccessVersion =
+  21
+
+-- | Nominal binary-product sibling of version 21.
+lengthRankingConfigurationFileSpinePairDescriptorBoundEffectiveIDExecutableAccessVersion
+  :: Natural
+lengthRankingConfigurationFileSpinePairDescriptorBoundEffectiveIDExecutableAccessVersion =
+  22
 
 -- | Fixed admission policy for the v1 document itself.  The array maximum is
 -- one greater than the widest typed collection so maximum-plus-one reaches the
@@ -569,7 +588,9 @@ decodeLengthRankingConfigurationFile bytes = do
 -- cascade has returned the sentinel.  Descriptor-bound versions are reached
 -- only after the strict version-15/version-16 decoder returns it as well.  The
 -- quotient-consequence versions are reached only after the descriptor-bound
--- version-17/version-18 decoder returns the same sentinel.
+-- version-17/version-18 decoder returns the same sentinel.  Effective-ID
+-- executable-access versions are reached only after the quotient version-19/
+-- version-20 decoder returns it in turn.
 decodeLengthAssessmentConfigurationFile
   :: ByteString
   -> Either
@@ -607,9 +628,14 @@ decodeLengthAssessmentConfigurationFile bytes =
                         decodeLengthAssessmentConfigurationFileDescriptorBoundExecutableLaunch
                           bytes of
                       Right descriptor -> Right descriptor
-                      Left LengthRankingConfigurationUnsupportedVersion ->
-                        decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffineQuotient
-                          bytes
+                      Left LengthRankingConfigurationUnsupportedVersion -> case
+                          decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffineQuotient
+                            bytes of
+                        Right quotient -> Right quotient
+                        Left LengthRankingConfigurationUnsupportedVersion ->
+                          decodeLengthAssessmentConfigurationFileDescriptorBoundEffectiveIDExecutableAccess
+                            bytes
+                        Left failure -> Left failure
                       Left failure -> Left failure
                     Left failure -> Left failure
                   Left failure -> Left failure
@@ -945,6 +971,48 @@ decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffineQuotient
         lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientVersion
       then
         decodeLengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientV20
+          root
+      else Left LengthRankingConfigurationUnsupportedVersion
+
+-- | Decode only the effective-ID executable-access scalar/product siblings
+-- after every version-1--version-20 entrance has returned its closed
+-- unsupported-version sentinel.  Both versions retain the complete quotient,
+-- descriptor-bound, scoped-budget profile and replace only the nested launch
+-- strategy.
+decodeLengthAssessmentConfigurationFileDescriptorBoundEffectiveIDExecutableAccess
+  :: ByteString
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthAssessmentConfigurationFileDescriptorBoundEffectiveIDExecutableAccess
+    bytes = do
+  document <- either (Left . LengthRankingConfigurationJsonRejected) Right
+    $ parseBoundedJson lengthRankingConfigurationFileJsonLimits bytes
+  root <- objectFields LengthRankingConfigurationRootObject document
+  formatValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationFormatField
+    "format"
+    root
+  format <- stringField LengthRankingConfigurationFormatField formatValue
+  if format == lengthRankingConfigurationFileFormat
+    then pure ()
+    else Left LengthRankingConfigurationUnsupportedFormat
+  versionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationVersionField
+    "version"
+    root
+  version <- integerField LengthRankingConfigurationVersionField versionValue
+  if version == toInteger
+      lengthRankingConfigurationFileDescriptorBoundEffectiveIDExecutableAccessVersion
+    then
+      decodeLengthRankingConfigurationFileDescriptorBoundEffectiveIDExecutableAccessV21
+        root
+    else if version == toInteger
+        lengthRankingConfigurationFileSpinePairDescriptorBoundEffectiveIDExecutableAccessVersion
+      then
+        decodeLengthRankingConfigurationFileSpinePairDescriptorBoundEffectiveIDExecutableAccessV22
           root
       else Left LengthRankingConfigurationUnsupportedVersion
 
@@ -1507,6 +1575,43 @@ decodeLengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuoti
   contract <- decodeLeanLengthSpinePairContractValueV5 contractValue
   pure $ DisabledLengthSpinePairAssessmentConfiguration policy contract
 
+decodeLengthRankingConfigurationFileDescriptorBoundEffectiveIDExecutableAccessV21
+  :: ObjectFields
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthRankingConfigurationFileDescriptorBoundEffectiveIDExecutableAccessV21
+    root = do
+  policy <-
+    decodeLengthRankingConfigurationFileDescriptorBoundEffectiveIDExecutableAccessPolicy
+      root
+  contractValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationContractField
+    "contract"
+    root
+  contract <- decodeLeanLengthContractValueV5 contractValue
+  pure $ DisabledLengthScalarAssessmentConfiguration
+    $ disableLengthRankingConfiguration policy contract
+
+decodeLengthRankingConfigurationFileSpinePairDescriptorBoundEffectiveIDExecutableAccessV22
+  :: ObjectFields
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthRankingConfigurationFileSpinePairDescriptorBoundEffectiveIDExecutableAccessV22
+    root = do
+  policy <-
+    decodeLengthRankingConfigurationFileDescriptorBoundEffectiveIDExecutableAccessPolicy
+      root
+  contractValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationContractField
+    "contract"
+    root
+  contract <- decodeLeanLengthSpinePairContractValueV5 contractValue
+  pure $ DisabledLengthSpinePairAssessmentConfiguration policy contract
+
 decodeLengthRankingConfigurationFileUsableWorkBudgetPolicy
   :: ObjectFields
   -> Either LengthRankingConfigurationFileError LengthRankingPolicy
@@ -1603,6 +1708,28 @@ decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientPolicy
   let inheritedRoot = filter ((/= "usableWorkBudget") . fst) root
   advancedPolicy <-
     decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientBasePolicy
+      inheritedRoot
+  budgetValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationUsableWorkBudgetField
+    "usableWorkBudget"
+    root
+  budget <- decodeScopedUsableWorkBudget budgetValue
+  pure $ enableLengthRankingScopedUsableWorkBudget budget advancedPolicy
+
+-- Versions 21 and 22 retain version 19/20's complete quotient,
+-- descriptor-bound root, validation order, and scoped-v2 usable-work owner.
+-- Only the inherited executable-launch strategy changes.
+decodeLengthRankingConfigurationFileDescriptorBoundEffectiveIDExecutableAccessPolicy
+  :: ObjectFields
+  -> Either LengthRankingConfigurationFileError LengthRankingPolicy
+decodeLengthRankingConfigurationFileDescriptorBoundEffectiveIDExecutableAccessPolicy
+    root = do
+  exactFields LengthRankingConfigurationRootObject
+    rootFieldsUsableWorkBudget root
+  let inheritedRoot = filter ((/= "usableWorkBudget") . fst) root
+  advancedPolicy <-
+    decodeLengthRankingConfigurationFileDescriptorBoundEffectiveIDExecutableAccessBasePolicy
       inheritedRoot
   budgetValue <- requiredField
     LengthRankingConfigurationRootObject
@@ -1994,6 +2121,98 @@ decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientBasePo
     "execution"
     root
   execution <- decodeDescriptorBoundExecution executionLimits executionValue
+  evaluationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationEvaluationField
+    "evaluation"
+    root
+  evaluation <- decodeEvaluation evaluationValue
+  inputBoxValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationInputBoxValidationField
+    "inputBoxValidation"
+    root
+  (inputBoxLimits, inclusiveMaximums) <-
+    decodeInputBoxValidation inputBoxValue
+  counterexampleProbeValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationCounterexampleProbeField
+    "counterexampleProbe"
+    root
+  decodeCounterexampleProbe counterexampleProbeValue
+  boundedPositiveOrderingValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationBoundedPositiveOrderingField
+    "boundedPositiveOrdering"
+    root
+  decodeBoundedPositiveOrdering boundedPositiveOrderingValue
+  applicableDomainValidationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationApplicableDomainValidationField
+    "applicableDomainValidation"
+    root
+  applicableDomainLimits <-
+    decodeStrictRelationalPositiveAffineQuotientApplicableDomainValidation
+      applicableDomainValidationValue
+  applicableDomainOrderingValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationApplicableDomainOrderingField
+    "applicableDomainOrdering"
+    root
+  decodeApplicableDomainOrdering applicableDomainOrderingValue
+  counterexampleSimplificationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationCounterexampleSimplificationField
+    "counterexampleSimplification"
+    root
+  counterexampleSimplificationLimits <- decodeCounterexampleSimplification
+    counterexampleSimplificationValue
+  liveSessionOpeningValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationLiveSessionOpeningField
+    "liveSessionOpening"
+    root
+  decodeLiveSessionOpening liveSessionOpeningValue
+  let basePolicy =
+        lengthRankingPolicyFromValidatedComponents execution evaluation
+      inputBoxPolicy = enableLengthRankingInputBoxValidation
+        inputBoxLimits inclusiveMaximums basePolicy
+      originProbePolicy = enableLengthRankingOriginProbe inputBoxPolicy
+      inputBoxPreferencePolicy =
+        enableLengthRankingNonVacuousInputBoxPreference originProbePolicy
+      applicableDomainPolicy =
+        enableLengthRankingStrictRelationalPositiveAffineQuotientApplicableDomainValidation
+          applicableDomainLimits inputBoxPreferencePolicy
+      applicableDomainPreferencePolicy =
+        enableLengthRankingNonVacuousApplicableDomainPreference
+          applicableDomainPolicy
+      simplificationPolicy = enableLengthRankingCounterexampleSimplification
+        counterexampleSimplificationLimits applicableDomainPreferencePolicy
+  pure $ enableLengthRankingDeferredLiveSessionOpening simplificationPolicy
+
+-- Versions 21 and 22 preserve version 19/20's complete quotient policy
+-- demand order and builders.  Only the execution decoder selects the
+-- effective-ID executable-access descriptor launch.
+decodeLengthRankingConfigurationFileDescriptorBoundEffectiveIDExecutableAccessBasePolicy
+  :: ObjectFields
+  -> Either LengthRankingConfigurationFileError LengthRankingPolicy
+decodeLengthRankingConfigurationFileDescriptorBoundEffectiveIDExecutableAccessBasePolicy
+    root = do
+  exactFields LengthRankingConfigurationRootObject
+    rootFieldsPositiveAffine root
+  executionAdmissionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationExecutionAdmissionField
+    "executionAdmission"
+    root
+  executionLimits <- decodeExecutionAdmission executionAdmissionValue
+  executionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationExecutionField
+    "execution"
+    root
+  execution <- decodeDescriptorBoundEffectiveIDExecutableAccessExecution
+    executionLimits executionValue
   evaluationValue <- requiredField
     LengthRankingConfigurationRootObject
     LengthRankingConfigurationEvaluationField
@@ -2544,6 +2763,101 @@ decodeDescriptorBoundExecution limits value = do
         , lengthSMTLibExecutionConfigSourceResponseLimits = responses
         }
   case mkLengthSMTLibDescriptorBoundExecutionConfig limits source of
+    Left failure -> Left $ LengthRankingConfigurationExecutionRejected failure
+    Right validated -> Right validated
+
+-- | Decode the effective-ID executable-access execution sibling in the exact
+-- established descriptor-bound demand and validation order.  Only the closed
+-- discriminator and mutually exclusive Djex sealer differ.
+decodeDescriptorBoundEffectiveIDExecutableAccessExecution
+  :: LengthSMTLibExecutionLimits
+  -> BoundedJsonValue
+  -> Either
+      LengthRankingConfigurationFileError
+      LengthSMTLibExecutionConfig
+decodeDescriptorBoundEffectiveIDExecutableAccessExecution limits value = do
+  object <- exactObject LengthRankingConfigurationExecutionObject
+    descriptorBoundExecutionFields value
+  responseLimitsValue <- requiredField
+    LengthRankingConfigurationExecutionObject
+    LengthRankingConfigurationResponseLimitsField
+    "responseLimits"
+    object
+  responses <- decodeResponseLimits responseLimitsValue
+  executableValue <- requiredField
+    LengthRankingConfigurationExecutionObject
+    LengthRankingConfigurationExecutablePathField
+    "executablePath"
+    object
+  executable <- Text.unpack <$> stringField
+    LengthRankingConfigurationExecutablePathField
+    executableValue
+  expectedDigestValue <- requiredField
+    LengthRankingConfigurationExecutionObject
+    LengthRankingConfigurationExpectedExecutableSha256Field
+    "expectedExecutableSha256"
+    object
+  expectedDigest <- decodeExpectedDigest expectedDigestValue
+  timeoutValue <- requiredField
+    LengthRankingConfigurationExecutionObject
+    LengthRankingConfigurationSolverTimeoutMillisecondsField
+    "solverTimeoutMilliseconds"
+    object
+  timeout <- intField
+    LengthRankingConfigurationSolverTimeoutMillisecondsField
+    timeoutValue
+    >>= capIntUpper
+      LengthRankingConfigurationSolverTimeoutMillisecondsField 60000
+  resourceValue <- requiredField
+    LengthRankingConfigurationExecutionObject
+    LengthRankingConfigurationSolverResourceLimitField
+    "solverResourceLimit"
+    object
+  resource <- intField
+    LengthRankingConfigurationSolverResourceLimitField
+    resourceValue
+    >>= capIntUpper
+      LengthRankingConfigurationSolverResourceLimitField 10000000
+  deadlineValue <- requiredField
+    LengthRankingConfigurationExecutionObject
+    LengthRankingConfigurationHostDeadlineMillisecondsField
+    "hostDeadlineMilliseconds"
+    object
+  deadline <- intField
+    LengthRankingConfigurationHostDeadlineMillisecondsField
+    deadlineValue
+    >>= capIntUpper
+      LengthRankingConfigurationHostDeadlineMillisecondsField 65000
+  artifactPolicyValue <- requiredField
+    LengthRankingConfigurationExecutionObject
+    LengthRankingConfigurationArtifactPolicyField
+    "artifactPolicy"
+    object
+  artifacts <- decodeArtifactPolicy artifactPolicyValue
+  launchValue <- requiredField
+    LengthRankingConfigurationExecutionObject
+    LengthRankingConfigurationExecutableLaunchField
+    "executableLaunch"
+    object
+  launch <- stringField
+    LengthRankingConfigurationExecutableLaunchField launchValue
+  case launch of
+    "descriptor-bound-effective-id-executable-access-v1" -> pure ()
+    _ -> Left $ LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationExecutableLaunchField
+  let source = LengthSMTLibExecutionConfigSource
+        { lengthSMTLibExecutionConfigSourceExecutablePath = executable
+        , lengthSMTLibExecutionConfigSourceExpectedExecutableSHA256 =
+            expectedDigest
+        , lengthSMTLibExecutionConfigSourceSolverTimeoutMilliseconds = timeout
+        , lengthSMTLibExecutionConfigSourceSolverResourceLimit = resource
+        , lengthSMTLibExecutionConfigSourceHostDeadlineMilliseconds = deadline
+        , lengthSMTLibExecutionConfigSourceArtifactPolicy = artifacts
+        , lengthSMTLibExecutionConfigSourceResponseLimits = responses
+        }
+  case
+      mkLengthSMTLibDescriptorBoundEffectiveIDExecutableAccessExecutionConfig
+        limits source of
     Left failure -> Left $ LengthRankingConfigurationExecutionRejected failure
     Right validated -> Right validated
 

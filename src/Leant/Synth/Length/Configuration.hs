@@ -31,6 +31,7 @@ module Leant.Synth.Length.Configuration
   , LengthRankingPolicy
   , mkLengthRankingPolicy
   , mkLengthRankingPolicyWithDescriptorBoundExecutableLaunch
+  , mkLengthRankingPolicyWithDescriptorBoundEffectiveIDExecutableAccessLaunch
   , lengthRankingPolicyFromValidatedComponents
   , enableLengthRankingOriginProbe
   , enableLengthRankingInputBoxValidation
@@ -72,6 +73,7 @@ import Language.Haskell.Djex
   , lengthSMTLibExecutionExecutableLaunchStrategy
   , mkLengthEvaluationLimits
   , mkLengthSMTLibDescriptorBoundExecutionConfig
+  , mkLengthSMTLibDescriptorBoundEffectiveIDExecutableAccessExecutionConfig
   , mkLengthSMTLibExecutionConfig
   )
 
@@ -301,6 +303,28 @@ mkLengthRankingPolicyWithDescriptorBoundExecutableLaunch source = do
   execution <- case mkLengthSMTLibDescriptorBoundExecutionConfig
       (lengthRankingPolicyExecutionLimits source)
       (lengthRankingPolicyExecutionSource source) of
+    Left failure -> Left $ LengthRankingExecutionConfigurationRejected failure
+    Right validated -> Right validated
+  evaluation <- case mkLengthEvaluationLimits
+      (lengthRankingPolicyEvaluationSource source) of
+    Left failure -> Left $ LengthRankingEvaluationLimitsRejected failure
+    Right validated -> Right validated
+  pure $ lengthRankingPolicyFromValidatedComponents execution evaluation
+
+-- | Validate the same reusable policy while selecting Djex's additive
+-- descriptor-bound effective-ID executable-access launch.  Construction
+-- remains pure and retains the established execution-before-evaluation
+-- failure order.  Effective-credential access checks, source inspection, and
+-- sealed descriptor staging occur only in a later lexical live session.
+mkLengthRankingPolicyWithDescriptorBoundEffectiveIDExecutableAccessLaunch
+  :: LengthRankingPolicySource
+  -> Either LengthRankingConfigurationError LengthRankingPolicy
+mkLengthRankingPolicyWithDescriptorBoundEffectiveIDExecutableAccessLaunch
+    source = do
+  execution <- case
+      mkLengthSMTLibDescriptorBoundEffectiveIDExecutableAccessExecutionConfig
+        (lengthRankingPolicyExecutionLimits source)
+        (lengthRankingPolicyExecutionSource source) of
     Left failure -> Left $ LengthRankingExecutionConfigurationRejected failure
     Right validated -> Right validated
   evaluation <- case mkLengthEvaluationLimits

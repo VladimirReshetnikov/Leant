@@ -4472,6 +4472,14 @@ run opts = do
                 ("Descriptor-bound solver executable launch selected; any " ++
                   "configured digest will be checked against the sealed " ++
                   "staged main-image bytes used for descriptor launch.")
+            Just
+                LengthSMTLibDescriptorBoundEffectiveIDExecutableAccessLaunch ->
+              emitLn st =<< cDim st
+                ("Effective-ID executable-access descriptor launch selected; " ++
+                  "the opened source must pass Linux faccessat2 X_OK under " ++
+                  "effective filesystem credentials before copying and again " ++
+                  "immediately before child allocation; any configured digest " ++
+                  "is checked against the sealed staged main-image bytes.")
             Just LengthSMTLibPathSnapshotThenDirectSpawn -> pure ()
             Nothing -> pure ()
           emitLn st =<< cDim st
