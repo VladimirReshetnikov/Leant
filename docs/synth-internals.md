@@ -23,7 +23,7 @@ who wants the *what* can stop at the paragraph.
   - [Adapter and canonical query sealing](#adapter-and-canonical-query-sealing)
 - [Ranking foundation](#ranking-foundation)
   - [Direct applicable-domain validation](#direct-applicable-domain-validation)
-  - [Positive-affine, relational, strict, and quotient extractors](#positive-affine-relational-strict-and-quotient-extractors)
+  - [Positive-affine, relational, strict, quotient, and root-extrema extractors](#positive-affine-relational-strict-quotient-and-root-extrema-extractors)
   - [The version-3 origin probe](#the-version-3-origin-probe)
   - [Live input-box validation and query-first replay](#live-input-box-validation-and-query-first-replay)
   - [Refusals, atomic fallback, and lifecycle owners](#refusals-atomic-fallback-and-lifecycle-owners)
@@ -33,7 +33,7 @@ who wants the *what* can stop at the paragraph.
   - [`Configuration.File`: the versioned JSON grammar](#configurationfile-the-versioned-json-grammar)
   - [File versions 1 through 4](#file-versions-1-through-4)
   - [File versions 5 through 10](#file-versions-5-through-10)
-  - [File versions 11 through 22](#file-versions-11-through-22)
+  - [File versions 11 through 24](#file-versions-11-through-24)
   - [File acquisition](#file-acquisition)
   - [Contract-only files and the length-contract command](#contract-only-files-and-the-length-contract-command)
   - [Integration and one-shot contracts](#integration-and-one-shot-contracts)
@@ -278,13 +278,13 @@ Only the separate
 `enableLengthRankingNonVacuousApplicableDomainPreference` moves an established
 receipt with a positive applicable-assignment count into a stable preferred
 partition. Startup versions 1--6 cannot enable either policy, so their file
-behavior is exact. Startup v7--v22 enable that same preference with their
+behavior is exact. Startup v7--v24 enable that same preference with their
 nominal literal-ceiling, relational, strict-relational, or strict-relational
-root-quotient positive-affine validator; direct-v1 validation remains
+root-quotient or root-extrema positive-affine validator; direct-v1 validation remains
 programmatic-only.
 Contract-only files select constraints rather than ranking policy.
 
-### Positive-affine, relational, strict, and quotient extractors
+### Positive-affine, relational, strict, quotient, and root-extrema extractors
 
 `enableLengthRankingPositiveAffineApplicableDomainValidation` is a separate,
 mutually exclusive extractor. It scans the precondition itself or immediate
@@ -338,6 +338,43 @@ partial rule, and actual precondition replay remains authoritative. Startup
 v19--v22 select its nominal scalar/product receipt families while retaining
 the complete descriptor-bound, scoped/checkpointed, and deferred profile;
 v21/v22 change only the executable-launch authority.
+
+`enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidation`
+is the sixth mutually exclusive extractor. It delegates every root-extrema-free
+clause literally to the quotient predecessor. For positive-affine `A`, `B`,
+and `C`, it adds only these atomic rule pairs:
+
+```text
+max(A,B) <= C        => A <= C       and B <= C
+C <= min(A,B)        => C <= A       and C <= B
+not (min(A,B) <= C)  => C + 1 <= A   and C + 1 <= B
+not (C <= max(A,B))  => A + 1 <= C   and B + 1 <= C
+```
+
+Equality in either source orientation emits only the corresponding necessary
+pair: maximum equality emits the first pair and minimum equality the second.
+There is no converse direction. Exactly one relation side may contain one
+immediate binary extremum at its operand root. Nested or effectively n-ary
+extrema, extrema at both roots, mixed roots, embedded extrema, wrong or
+disjunctive orientations, negated equality, unsupported operands, and
+unsupported whole formulas grant no partial rule. Both rules are emitted or
+the entire clause is ignored. Accepted clauses and operands retain normalized
+canonical order through the immutable-snapshot, merge-after-pass rule-once
+closure. Contradiction precedes missing coverage; otherwise the first compact
+missing input wins. The original normalized formula remains replay authority.
+Startup v23/v24 select only this new scalar/product receipt family while
+retaining v21/v22's effective-ID launch, scoped lifecycle, deferred opening,
+preferences, simplification, and contracts. Only complete query-owned replay
+can release
+`StrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainEstablished`
+or
+`LengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainEstablished`;
+their notes use
+`renderLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidationNote`
+and its `LengthSpinePair` sibling. The Leant boundary is recorded in the
+[root-extrema Length ranking report](reports/2026-08-15-root-extrema-length-ranking.md);
+Djex's extraction and receipt authority are recorded in its
+[root-extrema applicable-domain report](../lib/Djex/docs/reports/2026-08-15-root-extrema-length-applicable-domain.md).
 
 ### The version-3 origin probe
 
@@ -413,7 +450,7 @@ Exceptions propagate instead of producing a ranking. Legacy v1--v8 and
 relational startup v11/v12 retain separate lifecycle and per-query budgets. An
 explicitly v1-budgeted programmatic policy or startup v9/v10 instead places
 admitted preparation and deferred ranking beneath one runtime-unscoped shared
-owner. Startup v13--v22 and the scoped programmatic builder use the additive
+owner. Startup v13--v24 and the scoped programmatic builder use the additive
 owner-thread-affine v2 lease and cooperative phase checkpoints. Neither owner
 claims asynchronous interruption of arbitrary callback code. Main invokes
 this foundation only after the explicit startup opt-in described above; it
@@ -464,8 +501,9 @@ expectation, solver/host budgets, artifact policy, and response limits), and
 replay-limit source. After validation, `LengthRankingPolicy` retains the
 opaque sealed Djex execution configuration and evaluation limits plus a
 private selected direct-v1, positive-affine-v1,
-relational-positive-affine-v1, strict-relational-positive-affine-v1, or
-strict-relational-positive-affine-quotient-v1
+relational-positive-affine-v1, strict-relational-positive-affine-v1,
+strict-relational-positive-affine-quotient-v1, or
+strict-relational-positive-affine-quotient-root-extrema-v1
 applicable-domain pass,
 optional origin probe, independent optional finite-input-box orchestration,
 optional counterexample simplification, orthogonal non-vacuous ordering
@@ -542,7 +580,9 @@ launch authority. Versions 19 and 20 retain those descriptor/scoped bundles
 and replace only the applicable-domain strategy with the root-quotient
 successor. Versions 21 and 22 retain those quotient/scoped bundles and replace
 only the executable-launch strategy with the effective-ID executable-access
-sibling. Programmatic callers opt
+sibling. Versions 23 and 24 retain those complete effective-ID/scoped bundles
+and replace only the applicable-domain strategy with the root-extrema
+successor. Programmatic callers opt
 in with `enableLengthRankingUsableWorkBudget` or
 `enableLengthRankingScopedUsableWorkBudget`; both builders are pure and create
 no evidence, and the last budget builder applied determines the strategy.
@@ -576,13 +616,13 @@ Legacy v1--v8 and startup v11/v12 lifecycle and per-query budgets remain
 separate. A policy derived with `enableLengthRankingUsableWorkBudget`, including
 startup v9/v10, instead owns one additive runtime-unscoped v1 usable-work
 window. A policy derived with `enableLengthRankingScopedUsableWorkBudget`,
-including startup v13--v22, owns the owner-thread-affine v2 lease, cooperative
+including startup v13--v24, owns the owner-thread-affine v2 lease, cooperative
 checkpoints, and outer post-finalizer observation described above. There are no
 execution defaults, executable discovery, path normalization, or environment
 reads. The digest is only an optional expectation for Djex's
 live executable observation. V1--v16 retain the explicitly weaker pathname
-snapshot; v17--v22 compare the expectation with the sealed staged main image.
-V21/v22 additionally require the two point-in-time effective-ID source-access
+snapshot; v17--v24 compare the expectation with the sealed staged main image.
+V21--v24 additionally require the two point-in-time effective-ID source-access
 checks described above. Neither choice attests loaders, libraries, or solver
 semantics. See the
 [explicit live Length ranking configuration report](reports/2026-08-11-explicit-live-length-ranking-configuration.md).
@@ -596,8 +636,8 @@ preserving the version-1 compatibility path.
 `Leant.Synth.Length.Configuration.File` keeps the exact version-1 JSON grammar
 for that policy and adds exact scalar opt-in versions 2 and 3. Its established
 `decodeLengthRankingConfigurationFile` remains an exact scalar-only entrance
-and rejects versions 4--22. The generalized
-`decodeLengthAssessmentConfigurationFile` additionally accepts versions 4--22
+and rejects versions 4--24. The generalized
+`decodeLengthAssessmentConfigurationFile` additionally accepts versions 4--24
 and returns an opaque `DisabledLengthAssessmentConfiguration` carrying the same
 checked process policy beside a lazy scalar-or-pair selection. The pure decoder consumes a caller-owned
 strict byte string through a separate bounded JSON parser, rejects malformed
@@ -618,9 +658,9 @@ Z3. Neither grants proof, solver-status, or contract authority. There is no
 automatic path, environment or executable discovery, or autoload behavior.
 The explicit CLI loader uses the same 256-KiB bound before activation. The
 optional digest remains only an expectation until live opening. V1--v16 compare
-it with the pre-spawn pathname snapshot; v17--v22 compare it with the sealed
+it with the pre-spawn pathname snapshot; v17--v24 compare it with the sealed
 staged main image, still without loader, library, or solver attestation.
-V21/v22 add only the point-in-time effective-ID source VFS access policy. The
+V21--v24 add only the point-in-time effective-ID source VFS access policy. The
 complete schema and budgets are recorded in the
 [bounded live Length ranking configuration-file report](reports/2026-08-11-bounded-live-length-ranking-configuration-file.md).
 
@@ -701,7 +741,7 @@ this additive parser only after the unchanged v1--v8 chain reports its closed
 unsupported-version sentinel, so every old success, diagnostic, schema and
 identity stays literal.
 
-### File versions 11 through 22
+### File versions 11 through 24
 
 Versions 11 and 12 are the relational positive-affine scalar and product
 siblings of v7/v8. They reuse that exact root, field identities, caps, and
@@ -749,7 +789,8 @@ policies, scoped budget, and nominal scalar-v5/pair-v5 contract follow in the
 same order as v15/v16. The generalized dispatcher reaches these versions only
 after the complete v1--v16 cascade returns UnsupportedVersion; v19/v20 are
 handled only by the later quotient-consequence decoder, and v21/v22 by its
-effective-ID launch successor. Decoding and activation
+effective-ID launch successor; v23/v24 are handled by the still later
+root-extrema decoder. Decoding and activation
 remain pure, and an all-pure deferred batch still opens no executable
 descriptor or worker.
 
@@ -761,7 +802,8 @@ with
 `enableLengthRankingStrictRelationalPositiveAffineQuotientApplicableDomainValidation`.
 The generalized dispatcher reaches them only after the complete v1--v18
 cascade returns UnsupportedVersion; v21/v22 are handled only by their later
-effective-ID executable-access decoder. The new nominal assessment and
+effective-ID executable-access decoder, and v23/v24 by its root-extrema
+successor. The new nominal assessment and
 renderer branches require complete
 query-owned finite-box replay and add no solver, proof, or pruning authority.
 
@@ -774,8 +816,8 @@ the required launch literal with
 Inherited execution fields retain their exact response-limits-first validation
 order before the launch type/literal check; every later field remains in
 v19/v20 order. The generalized dispatcher reaches them only after the complete
-v1--v20 cascade returns UnsupportedVersion; version 23 is the next unsupported
-sentinel.
+v1--v20 cascade returns UnsupportedVersion; v23/v24 are handled only by their
+later root-extrema decoder. Every v1--v22 schema remains literal.
 
 At a demanded live open the source must pass Linux
 `faccessat2(fd, "", X_OK, AT_EMPTY_PATH | AT_EACCESS)` before copy and again
@@ -787,6 +829,34 @@ scoped deadline/cancellation owner. Loading, activation, and an all-pure
 deferred batch perform no executable, access-check, or worker IO. The complete
 boundary is recorded in the
 [effective-ID descriptor-bound Length/Z3 launch report](reports/2026-08-15-effective-id-descriptor-bound-length-z3-launch.md).
+
+Versions 23 and 24 retain v21/v22's exact effective-ID execution object,
+quotient/scoped root, deferred lifecycle, preferences, simplification, budget,
+and scalar-v5/pair-v5 contract grammars. They replace only the
+applicable-domain literal with
+`"strict-relational-positive-affine-quotient-root-extrema-v1"` and construct
+that dimension with
+`enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidation`.
+The version constants are
+`lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaVersion`
+(23) and
+`lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaVersion`
+(24). The generalized dispatcher reaches them only after the complete v1--v22
+cascade returns `UnsupportedVersion`; version 25 is the next unsupported
+sentinel.
+
+Validation retains v21/v22's exact field and diagnostic order. Only the
+selected Djex applicable-domain validator and nominal scalar or pair receipt
+change. Query-owned replay, the non-vacuous preference, effective-ID access,
+sealed-image launch, deferred opening, one scoped-v2 absolute deadline,
+cooperative checkpoints, and Leant-owned deep forcing remain unchanged. An
+all-pure batch performs no executable or access-check IO. Any existing access,
+staging, live, replay, forcing, or finalization failure discards partial live
+assessments and restores original order through the same closed failure class;
+there is no fallback to an older validator or launcher. The additive receipt
+tags do not revise problem, wire, query, fingerprint, association, executable,
+or scoped-owner identity. The complete boundary is recorded in the
+[root-extrema Length ranking report](reports/2026-08-15-root-extrema-length-ranking.md).
 
 ### File acquisition
 
