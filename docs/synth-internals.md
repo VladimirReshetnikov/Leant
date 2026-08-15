@@ -23,7 +23,7 @@ who wants the *what* can stop at the paragraph.
   - [Adapter and canonical query sealing](#adapter-and-canonical-query-sealing)
 - [Ranking foundation](#ranking-foundation)
   - [Direct applicable-domain validation](#direct-applicable-domain-validation)
-  - [Positive-affine, relational, strict, quotient, root-extrema, and root-monus extractors](#positive-affine-relational-strict-quotient-root-extrema-and-root-monus-extractors)
+  - [Positive-affine through Boolean finite-union extractors](#positive-affine-through-boolean-finite-union-extractors)
   - [The version-3 origin probe](#the-version-3-origin-probe)
   - [Live input-box validation and query-first replay](#live-input-box-validation-and-query-first-replay)
   - [Refusals, atomic fallback, and lifecycle owners](#refusals-atomic-fallback-and-lifecycle-owners)
@@ -33,7 +33,7 @@ who wants the *what* can stop at the paragraph.
   - [`Configuration.File`: the versioned JSON grammar](#configurationfile-the-versioned-json-grammar)
   - [File versions 1 through 4](#file-versions-1-through-4)
   - [File versions 5 through 10](#file-versions-5-through-10)
-  - [File versions 11 through 28](#file-versions-11-through-28)
+  - [File versions 11 through 30](#file-versions-11-through-30)
   - [File acquisition](#file-acquisition)
   - [Contract-only files and the length-contract command](#contract-only-files-and-the-length-contract-command)
   - [Integration and one-shot contracts](#integration-and-one-shot-contracts)
@@ -280,13 +280,13 @@ Only the separate
 `enableLengthRankingNonVacuousApplicableDomainPreference` moves an established
 receipt with a positive applicable-assignment count into a stable preferred
 partition. Startup versions 1--6 cannot enable either policy, so their file
-behavior is exact. Startup v7--v28 enable that same preference with their
-nominal literal-ceiling, relational, strict-relational, or strict-relational
-root-quotient, root-extrema, or root-monus positive-affine validator; direct-v1
-validation remains programmatic-only.
+behavior is exact. Startup v7--v30 enable that same preference with their
+nominal literal-ceiling, relational, strict-relational, strict-relational
+root-quotient, root-extrema, root-monus, or Boolean finite-union successor
+validator; direct-v1 validation remains programmatic-only.
 Contract-only files select constraints rather than ranking policy.
 
-### Positive-affine, relational, strict, quotient, root-extrema, and root-monus extractors
+### Positive-affine through Boolean finite-union extractors
 
 `enableLengthRankingPositiveAffineApplicableDomainValidation` is a separate,
 mutually exclusive extractor. It scans the precondition itself or immediate
@@ -427,6 +427,49 @@ and its `LengthSpinePair` sibling. The Leant boundary is recorded in the
 Djex's extraction and receipt authority are recorded in its
 [root-monus applicable-domain report](../lib/Djex/docs/reports/2026-08-15-root-monus-length-applicable-domain.md).
 
+`enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainValidation`
+is the eighth mutually exclusive extractor. It keeps the root-monus scanner as
+the exact signed-leaf authority and adds bounded proof-polarity DNF. Positive
+conjunction forms a Cartesian conjunction, negative conjunction forms a union,
+`not` flips polarity, and negative equality splits exactly into
+`not (A<=B)` or `not (B<=A)`. It does not descend into expression-level
+conditionals or treat an arithmetic disjunction as general Boolean syntax.
+
+The raw generated-branch cap precedes cleanup. Canonicalization sorts and
+deduplicates signed literals, removes literal/complement branches, deduplicates
+branches, and drops strict literal-set supersets. Each retained branch then has
+independent rule and immutable-snapshot closure-inspection caps and delegates
+every leaf to the predecessor scanner. Contradictory branches are discarded;
+every live branch must bound every compact input or the complete attempt is an
+ordinary miss. Resulting zero-origin boxes are deduplicated and reduced only by
+componentwise containment. Incomparable boxes such as `[1,3]` and `[3,1]`
+remain separate and are never widened to `[3,3]`.
+
+The receipt distinguishes raw assignment visits from the deduplicated global
+assignment count. Enumeration inserts every retained box into one `Set` and
+replays `Set.toAscList` once, so overlaps run once and the first failure is
+globally lexicographic. Empty unions have no boxes and zero visits or
+assignments; nullary truth has the singleton box `[[]]`. The original checked
+formula remains the replay authority. Width, branch, rule, closure, retained-
+box, maximum-value, visit, and unique-assignment caps are ordinary candidate
+misses in Leant. Assignment-evaluation and internal-enumeration failures and
+association mismatch remain indexed atomic failures.
+
+Startup v29/v30 select this nominal scalar/product receipt family while
+retaining v27/v28's execve-check launcher, scoped-v2 owner, deferred opening,
+preferences, simplification, and contracts. A pure establishment or
+counterexample can complete before a worker is demanded. The scoped owner
+still captures and checks its deadline clock, while an all-pure batch performs
+no executable, access-check, staging, or worker IO. Only complete query-owned
+replay can release
+`StrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainEstablished`
+or its `LengthSpinePair` sibling. Their bounded renderers report box, visit,
+unique, and applicable counts plus a two-box/two-maximum prefix without
+claiming a hull, proof, solver status, or pruning authority. See the
+[Boolean finite-union Length ranking report](reports/2026-08-15-boolean-finite-union-length-ranking.md)
+and Djex's
+[Boolean finite-union applicable-domain report](../lib/Djex/docs/reports/2026-08-15-boolean-finite-union-length-applicable-domain.md).
+
 ### The version-3 origin probe
 
 Configuration version 3 inserts one query-owned origin probe after all four
@@ -501,7 +544,7 @@ Exceptions propagate instead of producing a ranking. Legacy v1--v8 and
 relational startup v11/v12 retain separate lifecycle and per-query budgets. An
 explicitly v1-budgeted programmatic policy or startup v9/v10 instead places
 admitted preparation and deferred ranking beneath one runtime-unscoped shared
-owner. Startup v13--v28 and the scoped programmatic builder use the additive
+owner. Startup v13--v30 and the scoped programmatic builder use the additive
 owner-thread-affine v2 lease and cooperative phase checkpoints. Neither owner
 claims asynchronous interruption of arbitrary callback code. Main invokes
 this foundation only after the explicit startup opt-in described above; it
@@ -555,7 +598,8 @@ private selected direct-v1, positive-affine-v1,
 relational-positive-affine-v1, strict-relational-positive-affine-v1,
 strict-relational-positive-affine-quotient-v1,
 strict-relational-positive-affine-quotient-root-extrema-v1, or
-strict-relational-positive-affine-quotient-root-extrema-monus-v1
+strict-relational-positive-affine-quotient-root-extrema-monus-v1, or
+strict-relational-positive-affine-quotient-root-extrema-monus-boolean-finite-union-v1
 applicable-domain pass,
 optional origin probe, independent optional finite-input-box orchestration,
 optional counterexample simplification, orthogonal non-vacuous ordering
@@ -673,8 +717,10 @@ and replace only the applicable-domain strategy with the root-extrema
 successor. Versions 25 and 26 retain the v23/v24 bundle and replace only that
 strategy with the cumulative root-monus successor. Versions 27 and 28 retain
 the complete v25/v26 behavioral/scoped bundle and replace only the executable-
-launch strategy with the execve-check executable-access sibling. Programmatic
-callers opt
+launch strategy with the execve-check executable-access sibling. Versions 29
+and 30 retain the complete v27/v28 launch/scoped bundle and replace
+only the applicable-domain strategy with the bounded Boolean finite-union
+successor. Programmatic callers opt
 in with `enableLengthRankingUsableWorkBudget` or
 `enableLengthRankingScopedUsableWorkBudget`; both builders are pure and create
 no evidence, and the last budget builder applied determines the strategy.
@@ -708,14 +754,14 @@ Legacy v1--v8 and startup v11/v12 lifecycle and per-query budgets remain
 separate. A policy derived with `enableLengthRankingUsableWorkBudget`, including
 startup v9/v10, instead owns one additive runtime-unscoped v1 usable-work
 window. A policy derived with `enableLengthRankingScopedUsableWorkBudget`,
-including startup v13--v28, owns the owner-thread-affine v2 lease, cooperative
+including startup v13--v30, owns the owner-thread-affine v2 lease, cooperative
 checkpoints, and outer post-finalizer observation described above. There are no
 execution defaults, executable discovery, path normalization, or environment
 reads. The digest is only an optional expectation for Djex's
 live executable observation. V1--v16 retain the explicitly weaker pathname
-snapshot; v17--v28 compare the expectation with the sealed staged main image.
-V21--v28 additionally require the two point-in-time effective-ID source-access
-checks described above. V27/v28 also require two source and one staged
+snapshot; v17--v30 compare the expectation with the sealed staged main image.
+V21--v30 additionally require the two point-in-time effective-ID source-access
+checks described above. V27--v30 also require two source and one staged
 `AT_EXECVE_CHECK` observations. None attests loaders, libraries, or solver
 semantics. See the
 [explicit live Length ranking configuration report](reports/2026-08-11-explicit-live-length-ranking-configuration.md).
@@ -729,8 +775,8 @@ preserving the version-1 compatibility path.
 `Leant.Synth.Length.Configuration.File` keeps the exact version-1 JSON grammar
 for that policy and adds exact scalar opt-in versions 2 and 3. Its established
 `decodeLengthRankingConfigurationFile` remains an exact scalar-only entrance
-and rejects versions 4--28. The generalized
-`decodeLengthAssessmentConfigurationFile` additionally accepts versions 4--28
+and rejects versions 4--30. The generalized
+`decodeLengthAssessmentConfigurationFile` additionally accepts versions 4--30
 and returns an opaque `DisabledLengthAssessmentConfiguration` carrying the same
 checked process policy beside a lazy scalar-or-pair selection. The pure decoder consumes a caller-owned
 strict byte string through a separate bounded JSON parser, rejects malformed
@@ -751,9 +797,9 @@ Z3. Neither grants proof, solver-status, or contract authority. There is no
 automatic path, environment or executable discovery, or autoload behavior.
 The explicit CLI loader uses the same 256-KiB bound before activation. The
 optional digest remains only an expectation until live opening. V1--v16 compare
-it with the pre-spawn pathname snapshot; v17--v28 compare it with the sealed
+it with the pre-spawn pathname snapshot; v17--v30 compare it with the sealed
 staged main image, still without loader, library, or solver attestation.
-V21--v28 add the point-in-time effective-ID source VFS access policy; v27/v28
+V21--v30 add the point-in-time effective-ID source VFS access policy; v27--v30
 also select the separately versioned source/staged kernel exec-check policy. The
 complete schema and budgets are recorded in the
 [bounded live Length ranking configuration-file report](reports/2026-08-11-bounded-live-length-ranking-configuration-file.md).
@@ -835,7 +881,7 @@ this additive parser only after the unchanged v1--v8 chain reports its closed
 unsupported-version sentinel, so every old success, diagnostic, schema and
 identity stays literal.
 
-### File versions 11 through 28
+### File versions 11 through 30
 
 Versions 11 and 12 are the relational positive-affine scalar and product
 siblings of v7/v8. They reuse that exact root, field identities, caps, and
@@ -885,7 +931,8 @@ after the complete v1--v16 cascade returns UnsupportedVersion; v19/v20 are
 handled only by the later quotient-consequence decoder, and v21/v22 by its
 effective-ID launch successor; v23/v24 are handled by the still later
 root-extrema decoder, v25/v26 by its root-monus successor, and v27/v28 by the
-execve-check launch successor. Decoding and activation remain pure, and an
+execve-check launch successor; v29/v30 are handled only by the Boolean finite-
+union decoder. Decoding and activation remain pure, and an
 all-pure deferred batch still opens no executable descriptor or worker.
 
 Versions 19 and 20 retain that exact descriptor/scoped root, execution object,
@@ -898,7 +945,8 @@ The generalized dispatcher reaches them only after the complete v1--v18
 cascade returns UnsupportedVersion; v21/v22 are handled only by their later
 effective-ID executable-access decoder, and v23/v24 by its root-extrema
 successor; v25/v26 are handled by the later root-monus decoder and v27/v28 by
-the execve-check launch decoder. The new nominal assessment and renderer
+the execve-check launch decoder; v29/v30 are handled by the later Boolean
+finite-union decoder. The new nominal assessment and renderer
 branches require complete
 query-owned finite-box replay and add no solver, proof, or pruning authority.
 
@@ -914,7 +962,8 @@ v19/v20 order. The generalized dispatcher reaches them only after the complete
 v1--v20 cascade returns UnsupportedVersion; v23/v24 are handled only by their
 later root-extrema decoder, and v25/v26 by its root-monus successor. Every
 v1--v22 schema remains literal. V27/v28 are handled only by their later
-execve-check launch successor.
+execve-check launch successor, and v29/v30 only by its Boolean finite-union
+successor.
 
 At a demanded live open the source must pass Linux
 `faccessat2(fd, "", X_OK, AT_EMPTY_PATH | AT_EACCESS)` before copy and again
@@ -940,7 +989,8 @@ The version constants are
 `lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaVersion`
 (24). The generalized dispatcher reaches them only after the complete v1--v22
 cascade returns `UnsupportedVersion`; v25/v26 are handled only by the later
-root-monus decoder, and v27/v28 only by its execve-check launch successor.
+root-monus decoder, v27/v28 only by its execve-check launch successor, and
+v29/v30 only by the later Boolean finite-union decoder.
 
 Validation retains v21/v22's exact field and diagnostic order. Only the
 selected Djex applicable-domain validator and nominal scalar or pair receipt
@@ -968,7 +1018,8 @@ The version constants are
 `lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusVersion`
 (26). The generalized dispatcher reaches them only after the complete v1--v24
 cascade returns `UnsupportedVersion`; v27/v28 are handled only by the later
-execve-check launch decoder. Every v1--v24 entrance remains literal.
+execve-check launch decoder, and v29/v30 only by the later Boolean finite-union
+decoder. Every v1--v24 entrance remains literal.
 
 Validation retains v23/v24's exact root, nested field, and diagnostic order.
 Only the selected Djex validator and nominal scalar or pair receipt change.
@@ -999,8 +1050,8 @@ Their public constants are
 (27) and
 `lengthRankingConfigurationFileSpinePairDescriptorBoundExecveCheckExecutableAccessVersion`
 (28). The generalized dispatcher reaches them only after the complete v1--v26
-cascade returns `UnsupportedVersion`; version 29 is the next unsupported
-sentinel. Every v1--v26 entrance remains literal.
+cascade returns `UnsupportedVersion`; v29/v30 are reached only by the later
+Boolean finite-union decoder. Every v1--v26 entrance remains literal.
 
 Validation retains v25/v26's exact root, nested field, cap, and diagnostic
 order. In the execution object, response limits, path, digest, timeout,
@@ -1029,6 +1080,78 @@ authority, proof, or pruning authority. The complete Leant boundary is in the
 [execve-check descriptor-bound Length/Z3 launch report](reports/2026-08-15-execve-check-descriptor-bound-length-z3-launch.md),
 with Djex's lower-level lifecycle and exact identities in the
 [execve-check descriptor-bound Z3 launch report](../lib/Djex/docs/reports/2026-08-15-execve-check-descriptor-bound-z3-launch.md).
+
+Versions 29 and 30 retain v27/v28's exact execve-check execution object,
+root fields, scoped-v2 owner, deferred lifecycle, preferences, simplification,
+budget, and scalar-v5/pair-v5 contract grammars. They replace only the
+applicable-domain literal with
+`"strict-relational-positive-affine-quotient-root-extrema-monus-boolean-finite-union-v1"`
+and construct that dimension with
+`enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainValidation`.
+Their public constants are
+`lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionVersion`
+(29) and
+`lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionVersion`
+(30).
+
+The closed `applicableDomainValidation` object has exactly eight fields in
+this diagnostic order:
+
+```text
+strategy
+maximumInputs
+maximumGeneratedBranches
+maximumRulesPerBranch
+maximumClosureInspectionsPerBranch
+maximumRetainedBoxes
+maximumAssignmentVisits
+maximumAssignments
+```
+
+Unknown members precede missing-member diagnostics; missing members follow
+that order. The numeric file caps are 8, 256, 64, 4096, 256, 262144, and
+65536. `maximumInputs` and `maximumAssignments` seal the existing
+`LengthInputBoxLimits`; the five intervening values independently seal
+`LengthBooleanFiniteUnionLimits`. A negative JSON integer fails at
+`naturalField` as `LengthRankingConfigurationFieldValueRejected`; cap plus one
+fails at `capNatural` as `LengthRankingConfigurationPolicyLimitExceeded`.
+`LengthRankingConfigurationBooleanFiniteUnionLimitsRejected` is only the
+defensive sealed-builder mapping after those file caps, not the ordinary
+negative-file route.
+
+The full policy order remains exact root, execution admission, execve-check
+execution, evaluation, post-`unsat` input box, origin probe, bounded-positive
+preference, the eight-field Boolean object, applicable-domain preference,
+simplification, deferred opening, scoped-v2 budget, then scalar-v5 or pair-v5
+contract. The generalized dispatcher reaches v29/v30 only after v1--v28 return
+their closed `UnsupportedVersion` sentinel; version 31 remains unsupported.
+Every older route and literal is unchanged.
+
+The scalar and product validators return their nominal Boolean finite-union
+assessment only after complete query-owned replay. Branch/closure/box/value/
+visit/unique cap failures are ordinary per-candidate admission misses. An
+assignment-evaluation rejection or internal enumeration invariant maps to
+`LengthRankingBooleanFiniteUnionApplicableDomainValidationFailed` or
+`LengthSpinePairRankingBooleanFiniteUnionApplicableDomainValidationFailed` at
+the exact candidate index and restores batch order atomically; association
+mismatch retains the established evidence-replay failure class. Successful
+non-vacuous receipts join the applicable-domain preferred partition, vacuous
+receipts remain neutral, counterexamples pass through simplification, and only
+the final counterexample vector enters the MRU bank. Leant deeply forces every
+new assessment and failure before leaving the scoped owner.
+
+Loading, activation, and policy construction are pure. Every configured batch
+still captures and checks its scoped deadline clock. If all candidates finish
+through pure replay, no executable descriptor is opened, no access checker is
+invoked, no staged image is created, and no worker is launched. A later live
+miss retains v27/v28's exact kernel checks, failures, and operational
+identities. V29/v30 add only nominal receipt schema identities and evidence/
+presentation distinctions; they revise no contract, problem, query, wire,
+fingerprint, association, executable, ready-worker, query-run, or scoped-owner
+identity. The complete boundary is in the
+[Boolean finite-union Length ranking report](reports/2026-08-15-boolean-finite-union-length-ranking.md),
+with Djex's DNF, antichain, enumeration, and receipt authority in the
+[Boolean finite-union applicable-domain report](../lib/Djex/docs/reports/2026-08-15-boolean-finite-union-length-applicable-domain.md).
 
 ### File acquisition
 
