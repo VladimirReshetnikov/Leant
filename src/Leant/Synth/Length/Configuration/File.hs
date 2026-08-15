@@ -13,7 +13,9 @@
 -- versions 7 and 8 add positive-affine applicable-domain validation, its
 -- independent ordering grant, bounded counterexample simplification, and
 -- deferred live-session opening.  Versions 9 and 10 retain those exact scalar
--- and product policies and add one required shared usable-work budget.  Older
+-- and product policies and add one required shared usable-work budget.
+-- Versions 11 and 12 return to the exact version-7/version-8 root shape while
+-- selecting relational positive-affine applicable-domain validation.  Older
 -- decoders and grammars remain literal.
 -- Decoding performs no discovery, path normalization, environment lookup, or
 -- IO.  Every field is required.  A successful decode returns a deliberately
@@ -33,6 +35,8 @@ module Leant.Synth.Length.Configuration.File
   , lengthRankingConfigurationFileSpinePairPositiveAffineVersion
   , lengthRankingConfigurationFileUsableWorkBudgetVersion
   , lengthRankingConfigurationFileSpinePairUsableWorkBudgetVersion
+  , lengthRankingConfigurationFileRelationalPositiveAffineVersion
+  , lengthRankingConfigurationFileSpinePairRelationalPositiveAffineVersion
   , lengthRankingConfigurationFileJsonLimits
   , LengthRankingConfigurationFileObject (..)
   , LengthRankingConfigurationFileField (..)
@@ -128,6 +132,7 @@ import Leant.Synth.Length.Configuration
   , enableLengthRankingOriginProbe
   , enableLengthRankingInputBoxValidation
   , enableLengthRankingPositiveAffineApplicableDomainValidation
+  , enableLengthRankingRelationalPositiveAffineApplicableDomainValidation
   , enableLengthRankingUsableWorkBudget
   , lengthRankingPolicyExecutableDigestExpectation
   , lengthRankingPolicyFromValidatedComponents
@@ -179,6 +184,16 @@ lengthRankingConfigurationFileUsableWorkBudgetVersion = 9
 
 lengthRankingConfigurationFileSpinePairUsableWorkBudgetVersion :: Natural
 lengthRankingConfigurationFileSpinePairUsableWorkBudgetVersion = 10
+
+-- | Scalar sibling of version 7 which selects relational positive-affine
+-- applicable-domain closure and deliberately carries no usable-work budget.
+lengthRankingConfigurationFileRelationalPositiveAffineVersion :: Natural
+lengthRankingConfigurationFileRelationalPositiveAffineVersion = 11
+
+-- | Nominal binary-product sibling of the relational scalar grammar.
+lengthRankingConfigurationFileSpinePairRelationalPositiveAffineVersion
+  :: Natural
+lengthRankingConfigurationFileSpinePairRelationalPositiveAffineVersion = 12
 
 -- | Fixed admission policy for the v1 document itself.  The array maximum is
 -- one greater than the widest typed collection so maximum-plus-one reaches the
@@ -480,7 +495,8 @@ decodeLengthRankingConfigurationFile bytes = do
 -- permits the literal version-4 parse and, only after its own unsupported-
 -- version sentinel, the additive version-5/version-6 parse.  The advanced
 -- version-7/version-8 parser is reached only after that parser returns the
--- same closed sentinel.
+-- same closed sentinel.  Relational versions are considered only after the
+-- version-9/version-10 decoder also returns that sentinel.
 decodeLengthAssessmentConfigurationFile
   :: ByteString
   -> Either
@@ -499,8 +515,13 @@ decodeLengthAssessmentConfigurationFile bytes =
           Left LengthRankingConfigurationUnsupportedVersion -> case
               decodeLengthAssessmentConfigurationFilePositiveAffine bytes of
             Right positiveAffine -> Right positiveAffine
-            Left LengthRankingConfigurationUnsupportedVersion ->
-              decodeLengthAssessmentConfigurationFileUsableWorkBudget bytes
+            Left LengthRankingConfigurationUnsupportedVersion -> case
+                decodeLengthAssessmentConfigurationFileUsableWorkBudget bytes of
+              Right usableWorkBudget -> Right usableWorkBudget
+              Left LengthRankingConfigurationUnsupportedVersion ->
+                decodeLengthAssessmentConfigurationFileRelationalPositiveAffine
+                  bytes
+              Left failure -> Left failure
             Left failure -> Left failure
           Left failure -> Left failure
       Left failure -> Left failure
@@ -633,6 +654,44 @@ decodeLengthAssessmentConfigurationFileUsableWorkBudget bytes = do
     else if version == toInteger
         lengthRankingConfigurationFileSpinePairUsableWorkBudgetVersion
       then decodeLengthRankingConfigurationFileSpinePairUsableWorkBudgetV10 root
+      else Left LengthRankingConfigurationUnsupportedVersion
+
+-- | Decode only the scalar/product relational positive-affine siblings after
+-- every version-1--version-10 entrance has returned its unsupported-version
+-- sentinel.  The accepted root remains byte-for-byte the version-7/version-8
+-- field set and therefore has no usable-work-budget member.
+decodeLengthAssessmentConfigurationFileRelationalPositiveAffine
+  :: ByteString
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthAssessmentConfigurationFileRelationalPositiveAffine bytes = do
+  document <- either (Left . LengthRankingConfigurationJsonRejected) Right
+    $ parseBoundedJson lengthRankingConfigurationFileJsonLimits bytes
+  root <- objectFields LengthRankingConfigurationRootObject document
+  formatValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationFormatField
+    "format"
+    root
+  format <- stringField LengthRankingConfigurationFormatField formatValue
+  if format == lengthRankingConfigurationFileFormat
+    then pure ()
+    else Left LengthRankingConfigurationUnsupportedFormat
+  versionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationVersionField
+    "version"
+    root
+  version <- integerField LengthRankingConfigurationVersionField versionValue
+  if version == toInteger
+      lengthRankingConfigurationFileRelationalPositiveAffineVersion
+    then decodeLengthRankingConfigurationFileRelationalPositiveAffineV11 root
+    else if version == toInteger
+        lengthRankingConfigurationFileSpinePairRelationalPositiveAffineVersion
+      then
+        decodeLengthRankingConfigurationFileSpinePairRelationalPositiveAffineV12
+          root
       else Left LengthRankingConfigurationUnsupportedVersion
 
 -- Keep the established version-1 path literal: its exact root, validation
@@ -1015,6 +1074,40 @@ decodeLengthRankingConfigurationFileSpinePairUsableWorkBudgetV10 root = do
   contract <- decodeLeanLengthSpinePairContractValueV5 contractValue
   pure $ DisabledLengthSpinePairAssessmentConfiguration policy contract
 
+decodeLengthRankingConfigurationFileRelationalPositiveAffineV11
+  :: ObjectFields
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthRankingConfigurationFileRelationalPositiveAffineV11 root = do
+  policy <-
+    decodeLengthRankingConfigurationFileRelationalPositiveAffinePolicy root
+  contractValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationContractField
+    "contract"
+    root
+  contract <- decodeLeanLengthContractValueV5 contractValue
+  pure $ DisabledLengthScalarAssessmentConfiguration
+    $ disableLengthRankingConfiguration policy contract
+
+decodeLengthRankingConfigurationFileSpinePairRelationalPositiveAffineV12
+  :: ObjectFields
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthRankingConfigurationFileSpinePairRelationalPositiveAffineV12
+    root = do
+  policy <-
+    decodeLengthRankingConfigurationFileRelationalPositiveAffinePolicy root
+  contractValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationContractField
+    "contract"
+    root
+  contract <- decodeLeanLengthSpinePairContractValueV5 contractValue
+  pure $ DisabledLengthSpinePairAssessmentConfiguration policy contract
+
 decodeLengthRankingConfigurationFileUsableWorkBudgetPolicy
   :: ObjectFields
   -> Either LengthRankingConfigurationFileError LengthRankingPolicy
@@ -1112,6 +1205,96 @@ decodeLengthRankingConfigurationFilePositiveAffinePolicy root = do
         enableLengthRankingNonVacuousInputBoxPreference originProbePolicy
       applicableDomainPolicy =
         enableLengthRankingPositiveAffineApplicableDomainValidation
+          applicableDomainLimits inputBoxPreferencePolicy
+      applicableDomainPreferencePolicy =
+        enableLengthRankingNonVacuousApplicableDomainPreference
+          applicableDomainPolicy
+      simplificationPolicy = enableLengthRankingCounterexampleSimplification
+        counterexampleSimplificationLimits applicableDomainPreferencePolicy
+  pure $ enableLengthRankingDeferredLiveSessionOpening simplificationPolicy
+
+-- Versions 11 and 12 intentionally duplicate version 7/8's policy demand
+-- order while replacing only the applicable-domain strategy.  Keeping this
+-- entrance separate prevents later changes from altering versions 1--10.
+decodeLengthRankingConfigurationFileRelationalPositiveAffinePolicy
+  :: ObjectFields
+  -> Either LengthRankingConfigurationFileError LengthRankingPolicy
+decodeLengthRankingConfigurationFileRelationalPositiveAffinePolicy root = do
+  exactFields LengthRankingConfigurationRootObject
+    rootFieldsPositiveAffine root
+  executionAdmissionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationExecutionAdmissionField
+    "executionAdmission"
+    root
+  executionLimits <- decodeExecutionAdmission executionAdmissionValue
+  executionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationExecutionField
+    "execution"
+    root
+  execution <- decodeExecution executionLimits executionValue
+  evaluationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationEvaluationField
+    "evaluation"
+    root
+  evaluation <- decodeEvaluation evaluationValue
+  inputBoxValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationInputBoxValidationField
+    "inputBoxValidation"
+    root
+  (inputBoxLimits, inclusiveMaximums) <-
+    decodeInputBoxValidation inputBoxValue
+  counterexampleProbeValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationCounterexampleProbeField
+    "counterexampleProbe"
+    root
+  decodeCounterexampleProbe counterexampleProbeValue
+  boundedPositiveOrderingValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationBoundedPositiveOrderingField
+    "boundedPositiveOrdering"
+    root
+  decodeBoundedPositiveOrdering boundedPositiveOrderingValue
+  applicableDomainValidationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationApplicableDomainValidationField
+    "applicableDomainValidation"
+    root
+  applicableDomainLimits <-
+    decodeRelationalPositiveAffineApplicableDomainValidation
+      applicableDomainValidationValue
+  applicableDomainOrderingValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationApplicableDomainOrderingField
+    "applicableDomainOrdering"
+    root
+  decodeApplicableDomainOrdering applicableDomainOrderingValue
+  counterexampleSimplificationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationCounterexampleSimplificationField
+    "counterexampleSimplification"
+    root
+  counterexampleSimplificationLimits <- decodeCounterexampleSimplification
+    counterexampleSimplificationValue
+  liveSessionOpeningValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationLiveSessionOpeningField
+    "liveSessionOpening"
+    root
+  decodeLiveSessionOpening liveSessionOpeningValue
+  let basePolicy =
+        lengthRankingPolicyFromValidatedComponents execution evaluation
+      inputBoxPolicy = enableLengthRankingInputBoxValidation
+        inputBoxLimits inclusiveMaximums basePolicy
+      originProbePolicy = enableLengthRankingOriginProbe inputBoxPolicy
+      inputBoxPreferencePolicy =
+        enableLengthRankingNonVacuousInputBoxPreference originProbePolicy
+      applicableDomainPolicy =
+        enableLengthRankingRelationalPositiveAffineApplicableDomainValidation
           applicableDomainLimits inputBoxPreferencePolicy
       applicableDomainPreferencePolicy =
         enableLengthRankingNonVacuousApplicableDomainPreference
@@ -1711,6 +1894,52 @@ decodeApplicableDomainValidation value = do
     strategyValue
   case strategy of
     "positive-affine-v1" -> pure ()
+    _ -> Left $ LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationApplicableDomainStrategyField
+  maximumInputsValue <- requiredField
+    LengthRankingConfigurationApplicableDomainValidationObject
+    LengthRankingConfigurationApplicableDomainMaximumInputsField
+    "maximumInputs"
+    object
+  maximumInputs <- naturalField
+    LengthRankingConfigurationApplicableDomainMaximumInputsField
+    maximumInputsValue
+    >>= capNatural
+      LengthRankingConfigurationApplicableDomainMaximumInputsField
+      maximumInputBoxInputs
+  maximumAssignmentsValue <- requiredField
+    LengthRankingConfigurationApplicableDomainValidationObject
+    LengthRankingConfigurationApplicableDomainMaximumAssignmentsField
+    "maximumAssignments"
+    object
+  maximumAssignments <- naturalField
+    LengthRankingConfigurationApplicableDomainMaximumAssignmentsField
+    maximumAssignmentsValue
+    >>= capNatural
+      LengthRankingConfigurationApplicableDomainMaximumAssignmentsField
+      maximumInputBoxAssignments
+  checkedInputBoxLimits maximumInputs maximumAssignments
+
+-- | Decode the relational positive-affine sibling using the established
+-- applicable-domain object and bounded-limit diagnostics.  Only the closed
+-- strategy literal differs from versions 7 and 8.
+decodeRelationalPositiveAffineApplicableDomainValidation
+  :: BoundedJsonValue
+  -> Either LengthRankingConfigurationFileError LengthInputBoxLimits
+decodeRelationalPositiveAffineApplicableDomainValidation value = do
+  object <- exactObject
+    LengthRankingConfigurationApplicableDomainValidationObject
+    applicableDomainValidationFields value
+  strategyValue <- requiredField
+    LengthRankingConfigurationApplicableDomainValidationObject
+    LengthRankingConfigurationApplicableDomainStrategyField
+    "strategy"
+    object
+  strategy <- stringField
+    LengthRankingConfigurationApplicableDomainStrategyField
+    strategyValue
+  case strategy of
+    "relational-positive-affine-v1" -> pure ()
     _ -> Left $ LengthRankingConfigurationFieldValueRejected
       LengthRankingConfigurationApplicableDomainStrategyField
   maximumInputsValue <- requiredField

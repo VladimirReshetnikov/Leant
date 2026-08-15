@@ -34,6 +34,7 @@ module Leant.Synth.Length.Configuration
   , enableLengthRankingInputBoxValidation
   , enableLengthRankingApplicableDomainValidation
   , enableLengthRankingPositiveAffineApplicableDomainValidation
+  , enableLengthRankingRelationalPositiveAffineApplicableDomainValidation
   , enableLengthRankingCounterexampleSimplification
   , enableLengthRankingNonVacuousInputBoxPreference
   , enableLengthRankingNonVacuousApplicableDomainPreference
@@ -178,6 +179,8 @@ data LengthRankingApplicableDomainValidation
   = LengthRankingApplicableDomainValidationDisabled
   | LengthRankingApplicableDomainValidationDirectV1 !LengthInputBoxLimits
   | LengthRankingApplicableDomainValidationPositiveAffineV1
+      !LengthInputBoxLimits
+  | LengthRankingApplicableDomainValidationRelationalPositiveAffineV1
       !LengthInputBoxLimits
 
 -- | Private permission to run Djex's query-owned canonical origin replay
@@ -352,6 +355,22 @@ enableLengthRankingPositiveAffineApplicableDomainValidation limits
     simplification inputBoxPreference applicableDomainPreference
     liveSessionOpening usableWorkBudget
 
+-- | Select relational-positive-affine-v1 complete applicable-domain
+-- extraction.  This is mutually exclusive with the historical direct-v1 and
+-- positive-affine-v1 extractors, so the last applicable-domain builder wins.
+enableLengthRankingRelationalPositiveAffineApplicableDomainValidation
+  :: LengthInputBoxLimits
+  -> LengthRankingPolicy
+  -> LengthRankingPolicy
+enableLengthRankingRelationalPositiveAffineApplicableDomainValidation limits
+    (LengthRankingPolicy execution evaluation inputBoxValidation _ originProbe
+      simplification inputBoxPreference applicableDomainPreference
+      liveSessionOpening usableWorkBudget) =
+  LengthRankingPolicy execution evaluation inputBoxValidation
+    (LengthRankingApplicableDomainValidationRelationalPositiveAffineV1 limits)
+    originProbe simplification inputBoxPreference applicableDomainPreference
+    liveSessionOpening usableWorkBudget
+
 -- | Enable the same bounded, query-owned strict counterexample simplifier for
 -- every counterexample source without changing source order or enabling any
 -- source.  A bounded unavailability or absence of a strict improvement retains
@@ -512,6 +531,8 @@ scalarApplicableDomainRankingPolicy validation = case validation of
     LengthApplicableDomainRankingEnabled limits
   LengthRankingApplicableDomainValidationPositiveAffineV1 limits ->
     LengthApplicableDomainRankingPositiveAffineEnabled limits
+  LengthRankingApplicableDomainValidationRelationalPositiveAffineV1 limits ->
+    LengthApplicableDomainRankingRelationalPositiveAffineEnabled limits
 
 scalarOriginProbeRankingPolicy
   :: LengthRankingOriginProbe
@@ -548,6 +569,8 @@ spinePairApplicableDomainRankingPolicy validation = case validation of
     LengthSpinePairApplicableDomainRankingEnabled limits
   LengthRankingApplicableDomainValidationPositiveAffineV1 limits ->
     LengthSpinePairApplicableDomainRankingPositiveAffineEnabled limits
+  LengthRankingApplicableDomainValidationRelationalPositiveAffineV1 limits ->
+    LengthSpinePairApplicableDomainRankingRelationalPositiveAffineEnabled limits
 
 liveSessionOpeningPolicy
   :: LengthRankingLiveSessionOpening

@@ -140,6 +140,7 @@ import Language.Haskell.Djex
   , ValidatedLengthCounterexampleSimplification
   , ValidatedLengthInputBox
   , ValidatedLengthPositiveAffineApplicableDomain
+  , ValidatedLengthRelationalPositiveAffineApplicableDomain
   , defaultLengthSMTLibLiveSessionMaximumQueries
   , lengthSMTLibLiveQueryCleanupIncomplete
   , lengthSMTLibLiveQueryObservationSolverStatus
@@ -153,12 +154,14 @@ import Language.Haskell.Djex
   , simplifyLengthSMTLibQueryCounterexample
   , validateLengthSMTLibQueryApplicableDomain
   , validateLengthSMTLibQueryPositiveAffineApplicableDomain
+  , validateLengthSMTLibQueryRelationalPositiveAffineApplicableDomain
   , validateLengthSMTLibQueryInputBox
   , validatedLengthApplicableDomainApplicableAssignmentCount
   , validatedLengthCounterexampleInputs
   , validatedLengthCounterexampleSimplificationCounterexample
   , validatedLengthInputBoxApplicableAssignmentCount
   , validatedLengthPositiveAffineApplicableDomainApplicableAssignmentCount
+  , validatedLengthRelationalPositiveAffineApplicableDomainApplicableAssignmentCount
   , withLengthSMTLibLiveSession
   , withLengthSMTLibLiveSessionUnderDeadline
   , withLengthSMTLibLiveUsableWorkDeadline
@@ -202,6 +205,8 @@ data LengthRankingAssessment
   | ApplicableDomainEstablished !ValidatedLengthApplicableDomain
   | PositiveAffineApplicableDomainEstablished
       !ValidatedLengthPositiveAffineApplicableDomain
+  | RelationalPositiveAffineApplicableDomainEstablished
+      !ValidatedLengthRelationalPositiveAffineApplicableDomain
   deriving (Eq, Show)
 
 -- | Stable, payload-free phase at which pure candidate preparation refused.
@@ -537,6 +542,8 @@ data LengthApplicableDomainRankingPolicy
   = LengthApplicableDomainRankingDisabled
   | LengthApplicableDomainRankingEnabled !LengthInputBoxLimits
   | LengthApplicableDomainRankingPositiveAffineEnabled !LengthInputBoxLimits
+  | LengthApplicableDomainRankingRelationalPositiveAffineEnabled
+      !LengthInputBoxLimits
 
 -- | Private query-owned pre-live probe policy.  The enabled constructor is
 -- only permission to run Djex's canonical origin replay after every MRU miss;
@@ -1392,6 +1399,25 @@ assessApplicableDomainCandidate evaluation policy simplificationPolicy index
         $ AssociatedRankedLengthCandidate index association
         $ LengthCandidateAssessed
             (PositiveAffineApplicableDomainEstablished receipt) Nothing
+    LengthApplicableDomainRankingRelationalPositiveAffineEnabled limits -> case
+        validateLengthSMTLibQueryRelationalPositiveAffineApplicableDomain
+          evaluation limits query of
+      Left (LengthSMTLibApplicableDomainValidationAssociationRejected _) ->
+        Left $ localRankingFailure LengthRankingEvidenceReplayMismatch index
+      Left (LengthSMTLibApplicableDomainValidationRejected
+          (LengthApplicableDomainInputBoxValidationRejected failure))
+        | applicableDomainAdmissionFailure failure -> Right Nothing
+        | otherwise -> Left $ localRankingFailure
+            (LengthRankingApplicableDomainValidationFailed failure) index
+      Right (LengthApplicableDomainInapplicable _) -> Right Nothing
+      Right (LengthApplicableDomainCounterexample receipt) -> Just <$>
+        simplifyCounterexampleAssessment evaluation simplificationPolicy
+          index association query receipt
+      Right (LengthApplicableDomainEstablished receipt) -> Right $ Just
+        $ AssociatedRankedLengthCandidate index association
+        $ LengthCandidateAssessed
+            (RelationalPositiveAffineApplicableDomainEstablished receipt)
+            Nothing
 
 applicableDomainAdmissionFailure :: LengthInputBoxValidationError -> Bool
 applicableDomainAdmissionFailure failure = case failure of
@@ -1686,6 +1712,9 @@ isNonVacuousApplicableDomain assessment = case assessment of
   PositiveAffineApplicableDomainEstablished receipt ->
     validatedLengthPositiveAffineApplicableDomainApplicableAssignmentCount
       receipt > 0
+  RelationalPositiveAffineApplicableDomainEstablished receipt ->
+    validatedLengthRelationalPositiveAffineApplicableDomainApplicableAssignmentCount
+      receipt > 0
   _ -> False
 
 unassessedRanking
@@ -1788,6 +1817,7 @@ forceLengthRankingAssessment assessment = case assessment of
   BoundedPositive receipt -> rnf receipt
   ApplicableDomainEstablished receipt -> rnf receipt
   PositiveAffineApplicableDomainEstablished receipt -> rnf receipt
+  RelationalPositiveAffineApplicableDomainEstablished receipt -> rnf receipt
 
 forceLengthRankingFailure :: Maybe LengthRankingFailure -> ()
 forceLengthRankingFailure failure = case failure of
