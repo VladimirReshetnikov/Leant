@@ -66,6 +66,7 @@ Reports are listed oldest first.
 - 2026-08-15 — [Execve-check descriptor-bound Length/Z3 launch](2026-08-15-execve-check-descriptor-bound-length-z3-launch.md)
 - 2026-08-15 — [Boolean finite-union Length ranking](2026-08-15-boolean-finite-union-length-ranking.md)
 - 2026-08-15 — [Boolean finite-union root-extrema/may-zero-monus atomic branching for Length ranking](2026-08-15-atomic-branching-length-ranking.md)
+- 2026-08-15 — [Recursive piecewise-affine branching for Length ranking](2026-08-15-recursive-piecewise-affine-length-ranking.md)
 
 ## Standalone PDF reports
 

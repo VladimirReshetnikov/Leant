@@ -5,7 +5,12 @@ provider bindings, the Length handoff, and the invariants each dated report
 pins. The [README](../README.md) keeps the user-facing tour of `:synth`; this
 document holds the design detail that used to sit inline there.*
 
-The material below is a specification of internal boundaries. Each paragraph
+The material below is a current-tree specification of internal boundaries.
+Leant is experimental and makes no public stability or backward-compatibility
+promise: numeric configuration selectors, JSON shapes, tags, names,
+diagnostics, and output may be revised before a stable release. Historical
+comparisons below are regression descriptions, not commitments to preserve
+earlier design decisions. Each paragraph
 names the module that owns a boundary and links the report that recorded it,
 so a reader who wants the *why* of a rule can follow the link, and a reader
 who wants the *what* can stop at the paragraph.
@@ -23,17 +28,17 @@ who wants the *what* can stop at the paragraph.
   - [Adapter and canonical query sealing](#adapter-and-canonical-query-sealing)
 - [Ranking foundation](#ranking-foundation)
   - [Direct applicable-domain validation](#direct-applicable-domain-validation)
-  - [Positive-affine through Boolean finite-union extractors](#positive-affine-through-boolean-finite-union-extractors)
+  - [Positive-affine through recursive piecewise-affine extractors](#positive-affine-through-recursive-piecewise-affine-extractors)
   - [The version-3 origin probe](#the-version-3-origin-probe)
   - [Live input-box validation and query-first replay](#live-input-box-validation-and-query-first-replay)
   - [Refusals, atomic fallback, and lifecycle owners](#refusals-atomic-fallback-and-lifecycle-owners)
 - [SpinePair ranking and post-verification](#spinepair-ranking-and-post-verification)
 - [Configuration and its file grammar](#configuration-and-its-file-grammar)
-  - [Version-1 compatibility and usable-work budgets](#version-1-compatibility-and-usable-work-budgets)
+  - [Version-1 route and usable-work budgets](#version-1-route-and-usable-work-budgets)
   - [`Configuration.File`: the versioned JSON grammar](#configurationfile-the-versioned-json-grammar)
   - [File versions 1 through 4](#file-versions-1-through-4)
   - [File versions 5 through 10](#file-versions-5-through-10)
-  - [File versions 11 through 32](#file-versions-11-through-32)
+  - [File versions 11 through 34](#file-versions-11-through-34)
   - [File acquisition](#file-acquisition)
   - [Contract-only files and the length-contract command](#contract-only-files-and-the-length-contract-command)
   - [Integration and one-shot contracts](#integration-and-one-shot-contracts)
@@ -280,13 +285,14 @@ Only the separate
 `enableLengthRankingNonVacuousApplicableDomainPreference` moves an established
 receipt with a positive applicable-assignment count into a stable preferred
 partition. Startup versions 1--6 cannot enable either policy, so their file
-behavior is exact. Startup v7--v32 enable that same preference with their
+behavior is exact. Startup v7--v34 enable that same preference with their
 nominal literal-ceiling, relational, strict-relational, strict-relational
-root-quotient, root-extrema, root-monus, or Boolean finite-union successor
-validator; direct-v1 validation remains programmatic-only.
+root-quotient, root-extrema, root-monus, Boolean finite-union,
+atomic-branching, or recursive piecewise-affine successor validator; direct-v1
+validation remains programmatic-only.
 Contract-only files select constraints rather than ranking policy.
 
-### Positive-affine through Boolean finite-union extractors
+### Positive-affine through recursive piecewise-affine extractors
 
 `enableLengthRankingPositiveAffineApplicableDomainValidation` is a separate,
 mutually exclusive extractor. It scans the precondition itself or immediate
@@ -522,6 +528,63 @@ association, executable, worker, run, or scoped-owner identity. See the
 and Djex's
 [atomic-branching applicable-domain report](../lib/Djex/docs/reports/2026-08-15-atomic-branching-length-applicable-domain.md).
 
+`enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineApplicableDomainValidation`
+is the tenth mutually exclusive extractor. Each signed relation leaf first
+uses the complete atomic predecessor. Only an exact singleton ignored result
+which still contains an extremum or monus enters the recursive fallback, so
+every already supported predecessor rule stream remains the current parity
+reference.
+
+The fallback recursively expands compact inputs, literals, normalized sums,
+positive scales, binary minimum, binary maximum, and binary monus into ordered
+guarded signed-affine values. Descendant guards precede each node's selector:
+
+```text
+min(L,R) -> [L<=R; L] | [R+1<=L; R]
+max(L,R) -> [R<=L; L] | [L+1<=R; R]
+L monus R -> [L<=R; 0] | [R+1<=L; L-R]
+```
+
+The first choice owns equality. Left-child cases precede right-child cases,
+and the final relation appends at-most, strict-complement, or two equality
+rules after all guards. Signed coefficients are transferred exactly across
+each inequality into the established natural positive-sided rule type. No
+checked formula is manufactured and no selector or relation rule is
+deduplicated.
+
+Any required quotient, modulo, conditional, result reference, out-of-range
+variable, retained zero scale, or other unsupported child rejects the whole
+recursive fallback atom. Within the admitted grammar the successor handles
+nested, embedded, both-root, mixed, and normalized effectively n-ary extrema/
+monus shapes.
+
+Raw admission still counts the complete formula-DNF by recursive-alternative
+Cartesian product before formula cleanup, guard contradiction, proof-rule
+collection, closure, or box cleanup. Original literal sets are then
+canonicalized and re-expanded in `Set` order. The same per-branch closure,
+zero-origin box antichain, raw visits, globally deduplicated lexicographic
+assignment set, and original-formula replay remain authoritative.
+
+The scalar discriminator retains `[[2,3],[3,2]]` with two boxes, 24 visits,
+15 unique assignments, and 10 applicable assignments; its atomic control
+retains `[[3,3]]` with 1/16/16/10. The product discriminator retains
+`[[2,2]]` with 1/9/9/9; its atomic control retains `[[3,3]]` with
+1/16/16/9. The nested product has 32 raw cases, distinguishing branch caps 31
+and 32 before contradictory-case cleanup.
+
+Startup v33/v34 select fresh nominal scalar/product recursive receipts while
+retaining v31/v32's complete execve-check, scoped-v2, deferred, preference,
+simplification, and contract profile. They reuse the Boolean finite-union
+limits, admission classifiers, and ranking failures. Complete replay alone
+releases
+`StrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineApplicableDomainEstablished`
+or its `LengthSpinePair` sibling; the two recursive renderers preserve the
+384-character bounded presentation seam. The exact Leant boundary is in the
+[recursive piecewise-affine Length ranking report](reports/2026-08-15-recursive-piecewise-affine-length-ranking.md),
+and Djex's grammar, ordering, signed transfer, precedence, and receipt
+authority are in the
+[recursive piecewise-affine applicable-domain report](../lib/Djex/docs/reports/2026-08-15-recursive-piecewise-affine-length-applicable-domain.md).
+
 ### The version-3 origin probe
 
 Configuration version 3 inserts one query-owned origin probe after all four
@@ -596,7 +659,7 @@ Exceptions propagate instead of producing a ranking. Legacy v1--v8 and
 relational startup v11/v12 retain separate lifecycle and per-query budgets. An
 explicitly v1-budgeted programmatic policy or startup v9/v10 instead places
 admitted preparation and deferred ranking beneath one runtime-unscoped shared
-owner. Startup v13--v32 and the scoped programmatic builder use the additive
+owner. Startup v13--v34 and the scoped programmatic builder use the additive
 owner-thread-affine v2 lease and cooperative phase checkpoints. Neither owner
 claims asynchronous interruption of arbitrary callback code. Main invokes
 this foundation only after the explicit startup opt-in described above; it
@@ -649,9 +712,11 @@ opaque sealed Djex execution configuration and evaluation limits plus a
 private selected direct-v1, positive-affine-v1,
 relational-positive-affine-v1, strict-relational-positive-affine-v1,
 strict-relational-positive-affine-quotient-v1,
-strict-relational-positive-affine-quotient-root-extrema-v1, or
-strict-relational-positive-affine-quotient-root-extrema-monus-v1, or
-strict-relational-positive-affine-quotient-root-extrema-monus-boolean-finite-union-v1
+strict-relational-positive-affine-quotient-root-extrema-v1,
+strict-relational-positive-affine-quotient-root-extrema-monus-v1,
+strict-relational-positive-affine-quotient-root-extrema-monus-boolean-finite-union-v1,
+strict-relational-positive-affine-quotient-root-extrema-monus-boolean-finite-union-atomic-branching-v1,
+or strict-relational-positive-affine-quotient-root-extrema-monus-boolean-finite-union-atomic-branching-recursive-piecewise-affine-v1
 applicable-domain pass,
 optional origin probe, independent optional finite-input-box orchestration,
 optional counterexample simplification, orthogonal non-vacuous ordering
@@ -773,7 +838,9 @@ launch strategy with the execve-check executable-access sibling. Versions 29
 and 30 retain the complete v27/v28 launch/scoped bundle and replace
 only the applicable-domain strategy with the bounded Boolean finite-union
 successor. Versions 31 and 32 retain the complete v29/v30 bundle and replace
-only that strategy with its atomic-branching successor. Programmatic callers opt
+only that strategy with its atomic-branching successor. Versions 33 and 34
+retain the complete v31/v32 bundle and replace only that strategy with its
+recursive piecewise-affine successor. Programmatic callers opt
 in with `enableLengthRankingUsableWorkBudget` or
 `enableLengthRankingScopedUsableWorkBudget`; both builders are pure and create
 no evidence, and the last budget builder applied determines the strategy.
@@ -789,9 +856,9 @@ contract remains a passive assertion. An eager eligible call opens a fresh
 lexical session; a deferred all-pure call opens none, and a deferred live miss
 opens exactly one for the remaining dynamic scope.
 
-### Version-1 compatibility and usable-work budgets
+### Version-1 route and usable-work budgets
 
-The version-1 file format remains compatible without a second generic
+The current version-1 file route uses no second generic
 policy-plus-contract aggregate. Its disabled value retains one strict validated
 policy beside the decoded contract, which stays lazy. Activation checks only
 the policy's digest-expectation presence and releases that fixed compatibility
@@ -807,14 +874,14 @@ Legacy v1--v8 and startup v11/v12 lifecycle and per-query budgets remain
 separate. A policy derived with `enableLengthRankingUsableWorkBudget`, including
 startup v9/v10, instead owns one additive runtime-unscoped v1 usable-work
 window. A policy derived with `enableLengthRankingScopedUsableWorkBudget`,
-including startup v13--v32, owns the owner-thread-affine v2 lease, cooperative
+including startup v13--v34, owns the owner-thread-affine v2 lease, cooperative
 checkpoints, and outer post-finalizer observation described above. There are no
 execution defaults, executable discovery, path normalization, or environment
 reads. The digest is only an optional expectation for Djex's
 live executable observation. V1--v16 retain the explicitly weaker pathname
-snapshot; v17--v32 compare the expectation with the sealed staged main image.
-V21--v32 additionally require the two point-in-time effective-ID source-access
-checks described above. V27--v32 also require two source and one staged
+snapshot; v17--v34 compare the expectation with the sealed staged main image.
+V21--v34 additionally require the two point-in-time effective-ID source-access
+checks described above. V27--v34 also require two source and one staged
 `AT_EXECVE_CHECK` observations. None attests loaders, libraries, or solver
 semantics. See the
 [explicit live Length ranking configuration report](reports/2026-08-11-explicit-live-length-ranking-configuration.md).
@@ -828,8 +895,8 @@ preserving the version-1 compatibility path.
 `Leant.Synth.Length.Configuration.File` keeps the exact version-1 JSON grammar
 for that policy and adds exact scalar opt-in versions 2 and 3. Its established
 `decodeLengthRankingConfigurationFile` remains an exact scalar-only entrance
-and rejects versions 4--32. The generalized
-`decodeLengthAssessmentConfigurationFile` additionally accepts versions 4--32
+and rejects versions 4--34. The generalized
+`decodeLengthAssessmentConfigurationFile` additionally accepts versions 4--34
 and returns an opaque `DisabledLengthAssessmentConfiguration` carrying the same
 checked process policy beside a lazy scalar-or-pair selection. The pure decoder consumes a caller-owned
 strict byte string through a separate bounded JSON parser, rejects malformed
@@ -850,9 +917,9 @@ Z3. Neither grants proof, solver-status, or contract authority. There is no
 automatic path, environment or executable discovery, or autoload behavior.
 The explicit CLI loader uses the same 256-KiB bound before activation. The
 optional digest remains only an expectation until live opening. V1--v16 compare
-it with the pre-spawn pathname snapshot; v17--v32 compare it with the sealed
+it with the pre-spawn pathname snapshot; v17--v34 compare it with the sealed
 staged main image, still without loader, library, or solver attestation.
-V21--v32 add the point-in-time effective-ID source VFS access policy; v27--v32
+V21--v34 add the point-in-time effective-ID source VFS access policy; v27--v34
 also select the separately versioned source/staged kernel exec-check policy. The
 complete schema and budgets are recorded in the
 [bounded live Length ranking configuration-file report](reports/2026-08-11-bounded-live-length-ranking-configuration-file.md).
@@ -934,7 +1001,7 @@ this additive parser only after the unchanged v1--v8 chain reports its closed
 unsupported-version sentinel, so every old success, diagnostic, schema and
 identity stays literal.
 
-### File versions 11 through 32
+### File versions 11 through 34
 
 Versions 11 and 12 are the relational positive-affine scalar and product
 siblings of v7/v8. They reuse that exact root, field identities, caps, and
@@ -985,7 +1052,8 @@ handled only by the later quotient-consequence decoder, and v21/v22 by its
 effective-ID launch successor; v23/v24 are handled by the still later
 root-extrema decoder, v25/v26 by its root-monus successor, and v27/v28 by the
 execve-check launch successor; v29/v30 are handled only by the Boolean finite-
-union decoder, and v31/v32 only by its atomic-branching successor. Decoding
+union decoder, v31/v32 only by its atomic-branching successor, and v33/v34 only
+by the recursive piecewise-affine successor. Decoding
 and activation remain pure, and an
 all-pure deferred batch still opens no executable descriptor or worker.
 
@@ -1000,7 +1068,8 @@ cascade returns UnsupportedVersion; v21/v22 are handled only by their later
 effective-ID executable-access decoder, and v23/v24 by its root-extrema
 successor; v25/v26 are handled by the later root-monus decoder and v27/v28 by
 the execve-check launch decoder; v29/v30 are handled by the later Boolean
-finite-union decoder, and v31/v32 by its atomic-branching successor. The new
+finite-union decoder, v31/v32 by its atomic-branching successor, and v33/v34 by
+the recursive piecewise-affine successor. The new
 nominal assessment and renderer
 branches require complete
 query-owned finite-box replay and add no solver, proof, or pruning authority.
@@ -1018,7 +1087,8 @@ v1--v20 cascade returns UnsupportedVersion; v23/v24 are handled only by their
 later root-extrema decoder, and v25/v26 by its root-monus successor. Every
 v1--v22 schema remains literal. V27/v28 are handled only by their later
 execve-check launch successor, and v29/v30 only by its Boolean finite-union
-successor; v31/v32 are handled only by the later atomic-branching successor.
+successor; v31/v32 are handled only by the later atomic-branching successor,
+and v33/v34 only by the recursive piecewise-affine successor.
 
 At a demanded live open the source must pass Linux
 `faccessat2(fd, "", X_OK, AT_EMPTY_PATH | AT_EACCESS)` before copy and again
@@ -1046,7 +1116,8 @@ The version constants are
 cascade returns `UnsupportedVersion`; v25/v26 are handled only by the later
 root-monus decoder, v27/v28 only by its execve-check launch successor, and
 v29/v30 only by the later Boolean finite-union decoder; v31/v32 are handled
-only by its atomic-branching successor.
+only by its atomic-branching successor, and v33/v34 only by the recursive
+piecewise-affine successor.
 
 Validation retains v21/v22's exact field and diagnostic order. Only the
 selected Djex applicable-domain validator and nominal scalar or pair receipt
@@ -1075,7 +1146,8 @@ The version constants are
 (26). The generalized dispatcher reaches them only after the complete v1--v24
 cascade returns `UnsupportedVersion`; v27/v28 are handled only by the later
 execve-check launch decoder, and v29/v30 only by the later Boolean finite-union
-decoder; v31/v32 are handled only by its atomic-branching successor. Every
+decoder; v31/v32 are handled only by its atomic-branching successor, and
+v33/v34 only by the recursive piecewise-affine successor. Every
 v1--v24 entrance remains literal.
 
 Validation retains v23/v24's exact root, nested field, and diagnostic order.
@@ -1108,8 +1180,9 @@ Their public constants are
 `lengthRankingConfigurationFileSpinePairDescriptorBoundExecveCheckExecutableAccessVersion`
 (28). The generalized dispatcher reaches them only after the complete v1--v26
 cascade returns `UnsupportedVersion`; v29/v30 are reached only by the later
-Boolean finite-union decoder, and v31/v32 only by its atomic-branching
-successor. Every v1--v26 entrance remains literal.
+Boolean finite-union decoder, v31/v32 only by its atomic-branching successor,
+and v33/v34 only by the recursive piecewise-affine successor. Every v1--v26
+entrance remains literal.
 
 Validation retains v25/v26's exact root, nested field, cap, and diagnostic
 order. In the execution object, response limits, path, digest, timeout,
@@ -1183,7 +1256,8 @@ preference, the eight-field Boolean object, applicable-domain preference,
 simplification, deferred opening, scoped-v2 budget, then scalar-v5 or pair-v5
 contract. The generalized dispatcher reaches v29/v30 only after v1--v28 return
 their closed `UnsupportedVersion` sentinel; v31/v32 are reached only by the
-later atomic-branching decoder, and version 33 remains unsupported. Every
+later atomic-branching decoder, v33/v34 only by the recursive piecewise-affine
+decoder, and v35 is the current next unsupported sentinel. Every
 older route and literal is unchanged.
 
 The scalar and product validators return their nominal Boolean finite-union
@@ -1234,8 +1308,9 @@ same numeric caps 8, 256, 64, 4096, 256, 262144, and 65536. Negative values,
 cap-plus-one values, unknown/missing members, and the defensive checked-builder
 mapping retain the predecessor's exact diagnostics. The complete root demand
 order is likewise unchanged. The generalized dispatcher reaches v31/v32 only
-after the v1--v30 cascade returns `UnsupportedVersion`; version 33 is the next
-unsupported sentinel, and every earlier decoder remains literal.
+after the v1--v30 cascade returns `UnsupportedVersion`; v33/v34 are handled by
+the recursive piecewise-affine successor, and v35 is the current next
+unsupported sentinel. Every earlier decoder is a current regression route.
 
 The validators return the fresh atomic-branching scalar/product assessments
 only after complete original-formula replay. All ordinary Boolean finite-union
@@ -1255,6 +1330,53 @@ owner identity. The complete Leant boundary is in the
 with Djex's alternative laws, raw-product admission, ordered expansion,
 no-hull replay, receipt tags, and exact precedence in the
 [atomic-branching applicable-domain report](../lib/Djex/docs/reports/2026-08-15-atomic-branching-length-applicable-domain.md).
+
+Versions 33 and 34 are the current scalar and product recursive piecewise-
+affine selectors. They retain v31/v32's exact root, eight-field applicable-
+domain object, execve-check execution object, scoped-v2 owner, deferred
+lifecycle, preferences, simplification, budget, and scalar-v5/pair-v5 contract
+grammars. They replace only the applicable-domain literal with
+`"strict-relational-positive-affine-quotient-root-extrema-monus-boolean-finite-union-atomic-branching-recursive-piecewise-affine-v1"`
+and construct that dimension with
+`enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineApplicableDomainValidation`.
+Their current constants are
+`lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineVersion`
+(33) and its `LengthSpinePair` sibling (34).
+
+The complete v33/v34 documents are v31/v32 clones except for version and
+strategy. Their applicable-domain demand order remains strategy, inputs,
+generated branches, rules per branch, closure inspections per branch, retained
+boxes, visits, and unique assignments. The numeric caps remain 8, 256, 64,
+4096, 256, 262144, and 65536. Unknown/missing members, negative values,
+cap-plus-one values, and the defensive checked-builder mapping retain the
+current predecessor diagnostics. The complete root demand order likewise
+remains unchanged. The generalized dispatcher reaches v33/v34 only after the
+current v1--v32 cascade returns `UnsupportedVersion`; v35 is the current next
+unsupported sentinel.
+
+Version 33 selects the scalar-v5 contract path and version 34 the nominal
+pair-v5 path. Both require the execve-check launch literal and scoped-v2 budget
+literal inherited from v31/v32. Decoding, activation, builder composition, and
+recursive validation are pure and create no evidence. A batch captures and
+checks its scoped clock; an all-pure batch performs no executable or access-
+check IO, while a live miss inherits the complete v31/v32 descriptor launch.
+
+The validators return the fresh recursive scalar/product assessments only
+after complete original-formula replay. Ordinary Boolean finite-union
+admission misses, indexed assignment/invariant failures, association failure,
+non-vacuous preference, vacuous neutrality, simplification/MRU behavior, deep
+forcing, and original-order atomic fallback are reused without a new error or
+limit. V33/v34 add nominal receipt schemas and evidence/presentation branches;
+they revise no contract, problem, query, SMT-LIB, fingerprint, association,
+execution, process, worker, run, or scoped-owner identity.
+
+These numeric selectors and exact routes characterize this experimental tree;
+they are not a stability or backward-compatibility promise. The full boundary
+is in the
+[recursive piecewise-affine Length ranking report](reports/2026-08-15-recursive-piecewise-affine-length-ranking.md),
+with Djex's recursive grammar, selector order, raw admission, closure,
+no-hull replay, and receipt authority in the
+[recursive piecewise-affine applicable-domain report](../lib/Djex/docs/reports/2026-08-15-recursive-piecewise-affine-length-applicable-domain.md).
 
 ### File acquisition
 

@@ -59,7 +59,9 @@ lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRoo
 
 Both require the exact strategy literal
 `"strict-relational-positive-affine-quotient-root-extrema-monus-boolean-finite-union-atomic-branching-v1"`.
-Version 33 is the next unsupported sentinel.
+At this historical checkpoint, version 33 was the next unsupported sentinel.
+The current tree subsequently assigned v33/v34 to the separately selected
+[recursive piecewise-affine successor](2026-08-15-recursive-piecewise-affine-length-ranking.md).
 
 ## Exact atomic alternatives
 
@@ -364,14 +366,17 @@ execution, evaluation, post-`unsat` input box, origin probe, bounded-positive
 preference, applicable-domain object, applicable-domain preference,
 simplification, deferred opening, scoped-v2 budget, then contract.
 
-The generalized decoder reaches v31/v32 only after the complete v1--v30
-cascade returns `UnsupportedVersion`. Every older schema and strategy literal
-remains closed and unchanged; version 33 remains unsupported.
+At this checkpoint, the generalized decoder reached v31/v32 only after the
+complete v1--v30 cascade returned `UnsupportedVersion`; version 33 was then
+unsupported. This is a historical regression snapshot, not a stability
+promise. The current tree's v33/v34 recursive successor is documented in the
+[recursive piecewise-affine Length ranking report](2026-08-15-recursive-piecewise-affine-length-ranking.md).
 
-## Compatibility matrix
+## Checkpoint routing matrix
 
-Startup versions are closed strategy selections rather than cumulative feature
-levels:
+At this checkpoint, startup versions were exact strategy selections rather
+than cumulative feature levels. This table records that historical routing;
+it does not promise future availability:
 
 | Versions | Applicable-domain strategy | Launch/lifecycle |
 |---|---|---|
@@ -420,13 +425,14 @@ applicable assignments; the v30 control retains `[[3,3]]`, one box, 16 visits,
 16 unique assignments, and four applicable assignments.
 
 - `Leant.Synth.Length.Configuration` owns the pure last-wins builder.
-- `Leant.Synth.Length.Configuration.File` owns v31/v32, the exact eight-field
-  object, the v1--v30 cascade, and the v33 sentinel.
+- At this checkpoint, `Leant.Synth.Length.Configuration.File` owned v31/v32,
+  the exact eight-field object, the v1--v30 cascade, and the then-unsupported
+  v33 sentinel. The current tree assigns v33/v34 to the recursive successor.
 - Scalar and pair `Ranking.Internal` modules own routing, reused ordinary
   admission misses, indexed failure, preference, MRU, scoped forcing, and the
   fresh nominal assessments.
 - `Leant.Synth.Length.Presentation` owns the two bounded renderers.
-- The unit suite characterizes exact schemas and caps, compatibility and
+- The unit suite characterizes exact schemas and caps, decoder isolation and
   last-wins selection, pure scalar/pair receipts and no-hull counts,
   simplification/MRU, preference and presentation, scoped live/failure routes,
   forcing, and ordinary admission misses.
