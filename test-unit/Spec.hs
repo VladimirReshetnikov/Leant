@@ -9599,7 +9599,11 @@ assertLengthAssessmentConfigurationFileSpinePairV4Precedence =
 
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion
-      $ setJsonField ["version"] (Json.JInt 7)
+      $ setJsonField ["version"]
+          (Json.JInt
+            $ toInteger
+                lengthRankingConfigurationFileSpinePairPositiveAffineVersion
+            + 1)
       $ addJsonField [] ("private-root", Json.JNull) base
     let badLegacy = setJsonField ["execution", "executablePath"]
           (Json.JStr "private-relative-z3")
@@ -9824,7 +9828,11 @@ assertLengthAssessmentConfigurationFilePositiveOrderingPrecedence =
       LengthRankingConfigurationUnsupportedVersion) [scalarBase, pairBase]
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion
-      $ setJsonField ["version"] (Json.JInt 7)
+      $ setJsonField ["version"]
+          (Json.JInt
+            $ toInteger
+                lengthRankingConfigurationFileSpinePairPositiveAffineVersion
+            + 1)
       $ addJsonField [] ("private-v7", Json.JNull) pairBase
 
     -- New-version precedence repeats the established operational sequence and
