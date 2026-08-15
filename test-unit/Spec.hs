@@ -8235,7 +8235,7 @@ lengthStrictRelationalPositiveAffineTests :: TestTree
 lengthStrictRelationalPositiveAffineTests = testGroup
   "strict relational positive-affine v15/v16 Length ranking"
   [ testCase
-      "close the exact v15/v16 scoped schema, order, caps, and v17 sentinel"
+      "close the exact v15/v16 scoped schema, order, caps, and v19 sentinel"
       assertLengthStrictRelationalPositiveAffineSchema
   , testCase
       "keep v1-v14 literal and separate every file strategy"
