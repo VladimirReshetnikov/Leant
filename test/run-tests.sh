@@ -13,8 +13,10 @@
 set -u
 cd "$(dirname "$0")"
 
-EXE=../dist-newstyle/build/x86_64-windows/ghc-9.12.4/leant-0.1.0/x/leant/build/leant/leant.exe
-if [ ! -x "$EXE" ]; then
+# Resolve the built binary through cabal (toolchain-agnostic), falling
+# back to a dist-newstyle scan when cabal is unavailable.
+EXE=$(cd .. && cabal list-bin exe:leant 2>/dev/null | tr -d '\r')
+if [ -z "${EXE:-}" ] || [ ! -x "$EXE" ]; then
   EXE=$(find ../dist-newstyle -name leant.exe -o -name leant -type f 2>/dev/null \
         | head -1)
 fi
