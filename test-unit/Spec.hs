@@ -5,7 +5,7 @@ import Control.Exception (SomeException, evaluate, finally, try)
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as BS
 import Data.Char (isAlphaNum, toLower)
-import Data.IORef (modifyIORef', newIORef, readIORef)
+import Data.IORef (IORef, modifyIORef', newIORef, readIORef)
 import Data.List (isInfixOf, sortOn)
 import Data.Maybe (isNothing)
 import qualified Data.Map.Strict as Map
@@ -4314,8 +4314,8 @@ assertLengthUsableWorkBudgetConfigurationSchema =
       $ badContract scalar
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion
-      $ setJsonField ["version"] (Json.JInt 13)
-      $ addJsonField [] ("private-v13", Json.JNull) scalar
+      $ setJsonField ["version"] (Json.JInt 15)
+      $ addJsonField [] ("private-v15", Json.JNull) scalar
 
 assertLengthUsableWorkBudgetLegacySchema :: IO ()
 assertLengthUsableWorkBudgetLegacySchema =
@@ -4406,6 +4406,16 @@ delayedLengthTestValue microseconds value = unsafePerformIO $ do
   threadDelay microseconds
   pure value
 {-# NOINLINE delayedLengthTestValue #-}
+
+-- Tie a delay thunk to a test-owned runtime allocation.  This prevents GHC's
+-- full-laziness/CSE from sharing an already-forced static delay with another
+-- test which happens to use the same duration and value.
+delayedLengthTestValueWithGate :: IORef Int -> Int -> value -> value
+delayedLengthTestValueWithGate gate microseconds value = unsafePerformIO $ do
+  modifyIORef' gate (+ 1)
+  threadDelay microseconds
+  pure value
+{-# NOINLINE delayedLengthTestValueWithGate #-}
 
 assertScalarUsableWorkExpiry :: String -> LengthRanking -> IO ()
 assertScalarUsableWorkExpiry label ranking = do
@@ -4779,12 +4789,14 @@ assertLengthScopedUsableWorkBudgetBuilderComposition = do
   limits <- explicitLengthInputBoxLimits 1 2
   shortBudget <- expectLengthUsableWorkBudget 50
   longBudget <- expectLengthUsableWorkBudget 1000
+  delayGate <- newIORef 0
   withTemporaryDirectory "leant-length-scoped-budget-builder" $ \root -> do
     let executable = root </> "missing-z3"
         safeContract = relationalPositiveAffineScalarContract
           $ LengthTruth True
         delayedContract microseconds = safeContract
-          { leanLengthContractSource = delayedLengthTestValue microseconds
+          { leanLengthContractSource =
+              delayedLengthTestValueWithGate delayGate microseconds
               $ leanLengthContractSource safeContract
           }
         run label policy contract = expectLengthRankingWithin label
@@ -4841,6 +4853,7 @@ assertLengthScopedUsableWorkBudgetBuilderComposition = do
     run "relational domain then scoped budget" domainThenBudget safeContract
       >>= expectEstablished "relational domain then scoped budget"
     doesFileExist (executable ++ ".events") >>= (@?= False)
+  readIORef delayGate >>= (@?= 4)
 
 assertLengthScopedUsableWorkBudgetPureCheckpoints :: IO ()
 assertLengthScopedUsableWorkBudgetPureCheckpoints = do
@@ -5178,11 +5191,13 @@ assertLengthScopedUsableWorkBudgetFailurePrecedence = do
   -- owner observes its deadline after the stubborn worker has nevertheless
   -- entered cleanup, so deadline stays primary and the successful escalation
   -- does not invent an incomplete-cleanup bit.
+  finalizationGate <- newIORef 0
   withFakeLengthSolver "stubborn-eof" $ \executable -> do
     (policy, _) <- expectScopedUsableWorkBudgetPolicy
       $ scopedUsableWorkBudgetScalarDocument executable 500
     let delayedContract = usableWorkScalarLiveContract
-          { leanLengthContractSource = delayedLengthTestValue 400000
+          { leanLengthContractSource =
+              delayedLengthTestValueWithGate finalizationGate 400000
               $ leanLengthContractSource usableWorkScalarLiveContract
           }
     ranking <- expectLengthRankingWithin "v13 stubborn finalization expiry"
@@ -5193,6 +5208,7 @@ assertLengthScopedUsableWorkBudgetFailurePrecedence = do
     assertFakeLengthQueryEvents [0] [] events
     assertBool "the stubborn scoped worker never entered final cleanup"
       $ BS.pack "EVENT hang " `BS.isInfixOf` events
+  readIORef finalizationGate >>= (@?= 1)
 
 assertLengthScopedUsableWorkBudgetLegacyRuntime :: IO ()
 assertLengthScopedUsableWorkBudgetLegacyRuntime = do
@@ -6852,8 +6868,8 @@ assertLengthPositiveAffineConfigurationSchema =
       $ badContract scalar
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion
-      $ setJsonField ["version"] (Json.JInt 13)
-      $ addJsonField [] ("private-v13", Json.JNull) scalar
+      $ setJsonField ["version"] (Json.JInt 15)
+      $ addJsonField [] ("private-v15", Json.JNull) scalar
 
 assertLengthPositiveAffineLegacyCompatibility :: IO ()
 assertLengthPositiveAffineLegacyCompatibility = do
@@ -7648,8 +7664,8 @@ assertLengthRelationalPositiveAffineSchema =
       $ badContract v11
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion
-      $ setJsonField ["version"] (Json.JInt 13)
-      $ addJsonField [] ("private-v13", Json.JNull) v11
+      $ setJsonField ["version"] (Json.JInt 15)
+      $ addJsonField [] ("private-v15", Json.JNull) v11
 
 relationalPositiveAffineScalarContract
   :: LengthFormula LengthContractVariable
@@ -11588,7 +11604,7 @@ assertLengthAssessmentConfigurationFileSpinePairV4Precedence =
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion
       $ setJsonField ["version"]
-          (Json.JInt 13)
+          (Json.JInt 15)
       $ addJsonField [] ("private-root", Json.JNull) base
     let badLegacy = setJsonField ["execution", "executablePath"]
           (Json.JStr "private-relative-z3")
@@ -11814,8 +11830,8 @@ assertLengthAssessmentConfigurationFilePositiveOrderingPrecedence =
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion
       $ setJsonField ["version"]
-          (Json.JInt 13)
-      $ addJsonField [] ("private-v13", Json.JNull) pairBase
+          (Json.JInt 15)
+      $ addJsonField [] ("private-v15", Json.JNull) pairBase
 
     -- New-version precedence repeats the established operational sequence and
     -- inserts the closed ordering choice immediately before the contract.
