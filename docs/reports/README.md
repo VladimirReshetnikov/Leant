@@ -57,6 +57,7 @@ Reports are listed oldest first.
 - 2026-08-15 — [Shared usable-work budget for Length ranking](2026-08-15-shared-usable-work-length-ranking.md)
 - 2026-08-15 — [Relational positive-affine Length ranking](2026-08-15-relational-positive-affine-length-ranking.md)
 - 2026-08-15 — [Scoped usable-work budget for Length ranking](2026-08-15-scoped-usable-work-length-ranking.md)
+- 2026-08-15 — [Strict relational positive-affine Length ranking](2026-08-15-strict-relational-positive-affine-length-ranking.md)
 
 ## Standalone PDF reports
 
