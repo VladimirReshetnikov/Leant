@@ -1,13 +1,28 @@
 \documentclass[11pt,oneside]{article}
 
 \usepackage[a4paper,top=22mm,bottom=24mm,left=23mm,right=23mm,headheight=15pt]{geometry}
-\usepackage{fontspec}
-\setmainfont{TeXGyrePagella}
-\setsansfont{Inter}
-\setmonofont{DejaVu Sans Mono}[Scale=0.82]
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{mathpazo}
+  \usepackage[scaled=0.92]{helvet}
+  \usepackage{courier}
+\else
+  \usepackage{fontspec}
+  \setmainfont{TeXGyrePagella}
+  \setsansfont{Inter}
+  \setmonofont{DejaVu Sans Mono}[Scale=0.82]
+\fi
 \usepackage{microtype}
 \usepackage[table]{xcolor}
-\usepackage{amsmath,amssymb,mathtools,stmaryrd}
+\usepackage{amsmath,amssymb,mathtools}
+\IfFileExists{stmaryrd.sty}{
+  \usepackage{stmaryrd}
+}{
+  \providecommand{\llbracket}{\mathopen{[\mkern-3mu[}}
+  \providecommand{\rrbracket}{\mathclose{]\mkern-3mu]}}
+}
 \usepackage{booktabs,longtable,tabularx,array,multirow}
 \usepackage{enumitem}
 \usepackage{listings}
@@ -17,6 +32,9 @@
 \usepackage{fancyhdr}
 \usepackage{titlesec}
 \usepackage{hyperref}
+\makeatletter
+\g@addto@macro\UrlBreaks{\do-}
+\makeatother
 \usepackage{bookmark}
 \usepackage[capitalise,noabbrev]{cleveref}
 \usepackage{ragged2e}
@@ -51,7 +69,7 @@
 \fancyhf{}
 \fancyhead[L]{\small\sffamily\color{Muted}Z3 + Djex + Leant integration}
 \fancyhead[R]{\small\sffamily\color{Muted}Technical design report}
-\fancyfoot[L]{\small\sffamily\color{Muted}10 August 2026}
+\fancyfoot[L]{\small\sffamily\color{Muted}Updated 15 August 2026}
 \fancyfoot[R]{\small\sffamily\color{Muted}\thepage\ / \pageref*{LastPage}}
 \renewcommand{\headrulewidth}{0.4pt}
 \renewcommand{\footrulewidth}{0pt}
@@ -188,7 +206,7 @@
   \vfill
   \begin{tabular}{@{}ll@{}}
     \textsf{Prepared for:} & Vladimir Reshetnikov \\
-    \textsf{Date:} & 10 August 2026 \\
+    \textsf{Date:} & 10 August 2026; updated 15 August 2026 \\
     \textsf{Repositories:} & \repo{VladimirReshetnikov/Djex} \\
                            & \repo{VladimirReshetnikov/Leant} \\
                            & \repo{z3prover/z3}
@@ -202,12 +220,14 @@
 
   \vspace{4mm}
   {\small\color{Muted}
-  \emph{Status, 14 August 2026:} the level-1 layer proposed here has since been
+  \emph{Status, 15 August 2026:} the level-1 layer proposed here has since been
   implemented in Djex and Leant as the finite-list-spine \code{Length} contract
   dialect: checked contracts and assumed provider laws, canonical
   \code{QF\_LIA} queries, a capability-probed live Z3 worker, independent
   counterexample replay, bounded input-box validation, and a binary-product
-  extension, reachable from \code{:synth} behind the explicit
+  extension, exact derived-domain ranking through strict relational Natural
+  quotient consequences, and sealed descriptor-bound Z3 launch, reachable from
+  \code{:synth} behind the explicit
   \code{--length-ranking-config} opt-in.  One deliberate divergence from the
   proposal: verified candidates are stably reordered, never pruned, and raw
   solver status carries no authority.  Levels 2 and 3 remain future work; the
@@ -287,6 +307,126 @@ Leant can synthesize both a term and a theorem, then ask Lean's kernel to check 
   \item A staged path from filtering to CEGIS, Optimize-based minimization, and
         Fixedpoint/Spacer-based recursive invariant synthesis.
 \end{itemize}
+
+\section{Implementation addendum: exact root-quotient domains}
+\label{sec:quotient-addendum}
+
+The current implemented checkpoint advances Leant's closed live Length-ranking
+configuration through scalar v19 and product v20.  These versions retain the complete
+v17/v18 sealed descriptor launch, owner-thread-scoped usable-work deadline,
+cooperative checkpoints, deferred worker opening, non-vacuous preferences,
+counterexample simplification, and scalar-v5 or pair-v5 contract grammar.  They replace
+only the applicable-domain strategy with
+\code{strict-relational-positive-affine-quotient-v1}.
+
+\begin{lstlisting}[language=HaskellExt,basicstyle=\ttfamily\scriptsize,
+  caption={Public Leant root-quotient surface}]
+enableLengthRankingStrictRelationalPositiveAffineQuotientApplicableDomainValidation
+  :: LengthInputBoxLimits
+  -> LengthRankingPolicy
+  -> LengthRankingPolicy
+
+StrictRelationalPositiveAffineQuotientApplicableDomainEstablished
+LengthSpinePairStrictRelationalPositiveAffineQuotientApplicableDomainEstablished
+
+renderLengthStrictRelationalPositiveAffineQuotientApplicableDomainValidationNote
+renderLengthSpinePairStrictRelationalPositiveAffineQuotientApplicableDomainValidationNote
+
+lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientVersion
+  == 19
+lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientVersion
+  == 20
+\end{lstlisting}
+
+Write $q_d(E)$ for Natural floor quotient $E\mathbin{\mathrm{quot}}d$, with
+$d>0$.  Djex adds exactly four proof-only implications for positive-affine operands:
+
+\begin{align*}
+q_d(A) \leq B &\Longrightarrow A \leq dB+(d-1), \\
+A \leq q_d(B) &\Longrightarrow dA \leq B, \\
+\neg(q_d(A) \leq B) &\Longrightarrow d(B+1) \leq A, \\
+\neg(A \leq q_d(B)) &\Longrightarrow B+1 \leq dA.
+\end{align*}
+
+A top-level equality contributes the two directed non-strict rules in source order.
+The inherited synchronous rule-once closure can therefore propagate a later literal
+ceiling through either orientation.  For example, $x\leq q_3(y)$ together with
+$y\leq8$ derives source-ordered maxima $[2,8]$; $q_3(x)=y$ together with
+$x\leq1$ derives $y\leq0$.
+
+\begin{warningbox}[title=Deliberately narrow authority]
+Exactly one relation side may contain a quotient, and that quotient must be at the
+operand root.  A nested quotient, a quotient embedded below a sum, scale, monus,
+minimum, maximum, modulo, or conditional, quotients at both relation roots, an
+unsupported dividend or opposite operand, and an unsupported whole formula grant no
+coverage rule or partial bound.  Quotient-free clauses delegate to the strict
+predecessor exactly.  Unsupported clauses remain in the actual precondition replay if
+other clauses establish a complete box.
+\end{warningbox}
+
+Validation retains the predecessor's precedence: reject input width before demanding
+the precondition or evaluation limits; scan clauses and close rules; report the first
+compact missing input; validate maxima and Cartesian cardinality; then replay
+assignments canonically.  Only complete query-owned replay releases an establishment
+receipt.  The runtime route remains newest-first four-entry MRU replay, derived-domain
+replay, canonical origin replay, live Z3 query, and optional post-unsat explicit box.
+An inapplicable quotient pass is a pure miss; a counterexample crosses the existing
+query-owned simplification and MRU seams.
+
+\begin{small}
+\begin{longtable}{@{}L{0.12\textwidth}L{0.32\textwidth}L{0.27\textwidth}L{0.20\textwidth}@{}}
+\toprule
+\textbf{Versions} & \textbf{Applicable-domain rule} & \textbf{Usable work} &
+\textbf{Launch} \\
+\midrule
+\endhead
+v1--v6 & none & none; eager historical route & pathname/direct \\
+v7/v8 & positive affine & none; deferred historical route & pathname/direct \\
+v9/v10 & positive affine & runtime-unscoped v1 & pathname/direct \\
+v11/v12 & relational positive affine & none; deferred historical route & pathname/direct \\
+v13/v14 & relational positive affine & owner-thread scoped/checkpointed v2 & pathname/direct \\
+v15/v16 & strict relational positive affine & owner-thread scoped/checkpointed v2 & pathname/direct \\
+v17/v18 & strict relational positive affine & owner-thread scoped/checkpointed v2 & sealed descriptor \\
+v19/v20 & strict relational root quotient & owner-thread scoped/checkpointed v2 & sealed descriptor \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+The scalar-only compatibility decoder still rejects v4--v20.  The generalized decoder
+reaches v19/v20 only after the exact v1--v18 cascade returns its closed unsupported-
+version sentinel; v21 is unsupported.  Complete scalar-v19 and pair-v20 JSON documents,
+including the inherited descriptor execution member
+\code{executableLaunch = descriptor-bound-executable-v1}, scoped-v2 budget, deferred
+opening, and contract grammars, are recorded in
+\filepath{README.md} and
+\filepath{docs/reports/2026-08-15-strict-relational-positive-affine-quotient-length-ranking.md}.
+
+\begin{soundbox}[title=Evidence and identity remain separate]
+The four rewrites emit no SMT-LIB command and consume no solver status.  They do not
+alter normalized contract bytes, checked problem identity, sealed query fingerprints or
+wire bytes, protocol, process, ready-worker, scalar-run, or pair-run identity.  Djex
+adds only nominal scalar and product quotient-establishment receipt tags; Leant adds
+the matching nominal assessments and renderers, with no canonical evidence bytes of
+its own.  The receipt remains model/provider-relative finite-spine evidence: it is not
+a Lean theorem, source-language totality or effect claim, solver-soundness claim, or
+pruning authority.
+\end{soundbox}
+
+The descriptor guarantee remains main-image-only.  It binds the configured digest to
+the sealed staged executable bytes, not to an interpreter, dynamic loader, shared
+library, file capability, solver semantics, or solver result.  An all-pure deferred
+batch still opens no executable descriptor and no worker.
+
+At the quiescent v19/v20 characterization checkpoint,
+\filepath{test-unit/Spec.hs} contains 23,334 lines and 443 exact
+\code{testCase} occurrences.  The focused quotient-consequence group contains seven
+passing cases under the strict test build.  These counts describe this dated snapshot,
+not a stable API contract.
+
+The corresponding Djex extraction report is
+\filepath{lib/Djex/docs/reports/2026-08-15-strict-relational-positive-affine-quotient-length-applicable-domain.md}.
+This checkpoint does not declare Boolean/DNF extraction, or any other behavioral
+extension, to be definitively next.
 
 \section{Repository snapshot and architectural findings}
 \label{sec:snapshot}

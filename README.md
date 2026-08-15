@@ -129,7 +129,7 @@ session environment; `#`-commands pass straight through.
 
 Finite-list-spine Length counterexample ranking is disabled by default. To opt
 in, pass `--length-ranking-config` with an explicitly chosen absolute path to
-a version-1 through version-18 configuration file. Versions 1--3 select scalar
+a version-1 through version-20 configuration file. Versions 1--3 select scalar
 finite-list-spine Length ranking. Version 1 preserves the established
 counterexample-only behavior. Version 2 additionally requires an explicit
 per-input finite box and enables independent bounded validation after a live
@@ -180,22 +180,31 @@ behavioral and scoped profile but require the additional closed execution
 member `"executableLaunch": "descriptor-bound-executable-v1"`. At the first
 live miss, Djex hashes and copies the source bytes into a sealed anonymous main
 image and launches that descriptor without resolving the pathname again.
+Version 19 is the scalar root-quotient-consequence successor and version 20 is
+its nominal product sibling. They retain the complete v17/v18 descriptor,
+scoped-v2, deferred-opening, simplification, preference, and contract profiles
+and replace only the applicable-domain strategy with
+`"strict-relational-positive-affine-quotient-v1"`. That closed fifth extractor
+delegates quotient-free clauses to the strict predecessor and adds exact
+Natural consequences for one positive-literal quotient at the root of exactly
+one side of a top-level inequality, equality, or immediate negated inequality.
+It is not general quotient reasoning.
 Version numbers are closed schema selections rather than cumulative feature
-levels; versions 1--16 remain literal.
+levels; versions 1--18 remain literal.
 Leant admits and reads that file
 once at startup, requires the configuration to contain an executable SHA-256
 expectation by default, and retains the decoded contract selection as a fixed
 process-wide assertion. Presence at activation is not a digest match; Djex
 compares the expectation only when an eligible batch later opens a worker.
-V1--v16 use the bounded pre-spawn pathname observation; v17/v18 compare it with
-the sealed staged main image selected for descriptor execution.
+V1--v16 use the bounded pre-spawn pathname observation; v17--v20 compare it
+with the sealed staged main image selected for descriptor execution.
 `--length-ranking-allow-unpinned` is a separate explicit relaxation;
 `--length-ranking-config-timeout` sets only the bounded file-load interruption
 budget (default 5,000 ms, maximum 60,000 ms). No option discovers a file or
 solver. POSIX configuration-file descriptor acquisition is implemented;
 Windows currently fails
 closed. Versions 1--6 and the established direct runners open one fresh lexical
-solver worker for every eligible batch. Versions 7--18 instead complete all
+solver worker for every eligible batch. Versions 7--20 instead complete all
 admission and preparation, then run each candidate's pure MRU, selected
 positive-affine domain, and origin prefix before IO: an all-pure batch opens no
 process, while
@@ -203,7 +212,7 @@ the first live miss opens one lexical session for that query and the remaining
 suffix. V9/v10 additionally capture one shared usable-work deadline after the
 64-candidate admission gate and before full preparation, so deferred pure work,
 opening, and every live query consume one window instead of receiving a fresh
-batch allowance per query. V13--v18 capture the corresponding dynamically
+batch allowance per query. V13--v20 capture the corresponding dynamically
 scoped v2 owner at the same boundary and add cooperative checkpoints after
 preparation, each complete candidate chain, and result materialization. Any
 structured failure preserves callback order through the established atomic
@@ -634,7 +643,7 @@ and a negated comparison containing monus, minimum, maximum, quotient, modulo,
 or a conditional grant no bound. Unsupported clauses remain part of actual
 precondition replay when another clause supplies complete coverage.
 
-All four applicable-domain builders are mutually exclusive and last-wins; the
+All five applicable-domain builders are mutually exclusive and last-wins; the
 budget builder is orthogonal and last-wins only within the v1/v2 budget
 dimension. The strict pass retains the same MRU-before-domain order,
 query-owned counterexample simplification, non-vacuous stable preference,
@@ -642,6 +651,47 @@ deferred lifecycle, atomic fallback, and model/provider-relative authority as
 the relational pass. Here *strict* means natural strict comparison, not source
 evaluation strictness. See the
 [strict relational positive-affine Length ranking report](docs/reports/2026-08-15-strict-relational-positive-affine-length-ranking.md).
+
+The additive root-quotient successor replaces only that policy dimension:
+
+```haskell
+let quotientPolicy =
+      enableLengthRankingStrictRelationalPositiveAffineQuotientApplicableDomainValidation
+        applicableDomainLimits strictScopedPolicy
+
+scalarAssessment <- assessVerifiedLengthCandidatesWithPolicy
+  quotientPolicy scalarQuotientContract verificationBatch
+
+pairAssessment <- assessVerifiedLengthSpinePairCandidatesWithPolicy
+  quotientPolicy pairQuotientContract verificationBatch
+```
+
+For positive `d`, positive-affine `A` and `B`, and Natural values, the only
+new proof rules are:
+
+```text
+q_d(A) <= B        => A <= d*B + (d - 1)
+A <= q_d(B)        => d*A <= B
+not (q_d(A) <= B)  => d*(B + 1) <= A
+not (A <= q_d(B))  => B + 1 <= d*A
+```
+
+Top-level equality contributes both directed non-strict rules in source
+orientation. Exactly one relation side may have a quotient at its operand
+root. A quotient nested below another quotient or embedded in a sum, scale,
+minimum, maximum, monus, modulo, or conditional; quotients at both relation
+roots; and unsupported whole formulas grant no coverage rule. Quotient-free
+clauses delegate to the strict predecessor byte-for-byte. Extracted rules use
+the established source-ordered, synchronous rule-once closure, and only a
+complete query-owned replay can release either
+`StrictRelationalPositiveAffineQuotientApplicableDomainEstablished` or
+`LengthSpinePairStrictRelationalPositiveAffineQuotientApplicableDomainEstablished`.
+Their public notes are rendered by
+`renderLengthStrictRelationalPositiveAffineQuotientApplicableDomainValidationNote`
+and
+`renderLengthSpinePairStrictRelationalPositiveAffineQuotientApplicableDomainValidationNote`.
+See the
+[strict relational positive-affine quotient Length ranking report](docs/reports/2026-08-15-strict-relational-positive-affine-quotient-length-ranking.md).
 
 The runtime-unscoped v1 shared usable-work policy is a further orthogonal
 programmatic opt-in. Its builder accepts only an already validated opaque Djex
@@ -794,7 +844,7 @@ violation, retains the original receipt and makes no simplification claim.  A
 bounded evaluation rejection during an optional earlier trial does the same;
 structural, anchor, internal, and association failures remain indexed atomic
 failures. This policy is disabled by every established direct runner and
-startup version 1 through 6, while startup versions 7 through 18 require it.
+startup version 1 through 6, while startup versions 7 through 20 require it.
 It is bounded componentwise-lexicographic
 simplification, not global minimality, pruning authority, or a new conclusion
 from Z3.
@@ -2039,7 +2089,183 @@ order is the v15/v16 order with the execution object's required launch literal
 checked after every inherited execution member and before Djex descriptor
 policy sealing. Contract validation remains last. The generalized dispatcher
 reaches v17/v18 only after the exact v1--v16 cascade returns UnsupportedVersion;
-future version 19 remains unsupported.
+v19/v20 are handled only by their later quotient-consequence decoder.
+
+Startup v19 and v20 retain the complete descriptor-bound/scoped profiles and
+replace only the applicable-domain strategy selection. Their exported
+constants are
+`lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientVersion`
+(19) and
+`lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientVersion`
+(20). This complete scalar v19 document is the scalar v17 example with only
+the version and applicable-domain strategy selections advanced:
+
+```json
+{
+  "format": "leant-live-length-ranking-configuration",
+  "version": 19,
+  "executionAdmission": {
+    "executablePathCharacters": 4096,
+    "policyFingerprintBytes": 262144
+  },
+  "execution": {
+    "executablePath": "/absolute/path/to/z3",
+    "expectedExecutableSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "solverTimeoutMilliseconds": 1000,
+    "solverResourceLimit": 100000,
+    "hostDeadlineMilliseconds": 1500,
+    "artifactPolicy": "input-values-after-satisfiable",
+    "responseLimits": {
+      "bytes": 65536,
+      "nestingDepth": 64,
+      "nodes": 4096,
+      "tokenBytes": 4096,
+      "integerBits": 4096
+    },
+    "executableLaunch": "descriptor-bound-executable-v1"
+  },
+  "evaluation": {
+    "assignmentValueBits": 4096,
+    "intermediateValueBits": 4096
+  },
+  "inputBoxValidation": {
+    "inclusiveInputMaximums": [5, 5],
+    "maximumAssignments": 36
+  },
+  "counterexampleProbe": "origin-before-live",
+  "boundedPositiveOrdering": "prefer-non-vacuous",
+  "applicableDomainValidation": {
+    "strategy": "strict-relational-positive-affine-quotient-v1",
+    "maximumInputs": 2,
+    "maximumAssignments": 20
+  },
+  "applicableDomainOrdering": "prefer-non-vacuous",
+  "counterexampleSimplification": {
+    "strategy": "componentwise-lexicographic-v1",
+    "maximumInputs": 2,
+    "maximumAssignments": 36
+  },
+  "liveSessionOpening": "defer-until-live-query",
+  "usableWorkBudget": {
+    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
+    "milliseconds": 30000
+  },
+  "contract": {
+    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
+    "targetArgumentRoles": ["observed-spine", "observed-spine"],
+    "candidateCasePolicy": "cases-rejected",
+    "precondition": [
+      "all",
+      [
+        ["not", ["at-most", ["literal", 5], ["input", 0]]],
+        ["not", ["at-most", ["input", 0], ["input", 1]]]
+      ]
+    ],
+    "postcondition": ["equal", ["result"], ["input", 0]],
+    "providerLaws": []
+  }
+}
+```
+
+The complete nominal pair v20 document advances the pair v18 selections in
+the same way:
+
+```json
+{
+  "format": "leant-live-length-ranking-configuration",
+  "version": 20,
+  "executionAdmission": {
+    "executablePathCharacters": 4096,
+    "policyFingerprintBytes": 262144
+  },
+  "execution": {
+    "executablePath": "/absolute/path/to/z3",
+    "expectedExecutableSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "solverTimeoutMilliseconds": 1000,
+    "solverResourceLimit": 100000,
+    "hostDeadlineMilliseconds": 1500,
+    "artifactPolicy": "input-values-after-satisfiable",
+    "responseLimits": {
+      "bytes": 65536,
+      "nestingDepth": 64,
+      "nodes": 4096,
+      "tokenBytes": 4096,
+      "integerBits": 4096
+    },
+    "executableLaunch": "descriptor-bound-executable-v1"
+  },
+  "evaluation": {
+    "assignmentValueBits": 4096,
+    "intermediateValueBits": 4096
+  },
+  "inputBoxValidation": {
+    "inclusiveInputMaximums": [4],
+    "maximumAssignments": 5
+  },
+  "counterexampleProbe": "origin-before-live",
+  "boundedPositiveOrdering": "prefer-non-vacuous",
+  "applicableDomainValidation": {
+    "strategy": "strict-relational-positive-affine-quotient-v1",
+    "maximumInputs": 1,
+    "maximumAssignments": 3
+  },
+  "applicableDomainOrdering": "prefer-non-vacuous",
+  "counterexampleSimplification": {
+    "strategy": "componentwise-lexicographic-v1",
+    "maximumInputs": 1,
+    "maximumAssignments": 9
+  },
+  "liveSessionOpening": "defer-until-live-query",
+  "usableWorkBudget": {
+    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
+    "milliseconds": 30000
+  },
+  "contract": {
+    "resultShape": "binary-prod-spines-v1",
+    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
+    "targetArgumentRoles": ["observed-spine"],
+    "candidateCasePolicy": "cases-rejected",
+    "precondition": [
+      "not",
+      [
+        "at-most",
+        ["sum", [["input", 0], ["literal", 3]]],
+        ["scale", 2, ["input", 0]]
+      ]
+    ],
+    "postcondition": [
+      "all",
+      [
+        ["equal", ["result", "first"], ["input", 0]],
+        ["equal", ["result", "second"],
+          ["quotient", 2, ["input", 0]]]
+      ]
+    ],
+    "providerLaws": []
+  }
+}
+```
+
+The unchanged example contracts make the schema delta explicit: the fifth
+extractor is an additive strict superset, so both established strict-only
+examples retain their prior derived boxes. A quotient-bearing precondition can
+instead use, for example, `q_3(input0) <= 2` to derive `input0 <= 8`, or combine
+`input0 <= q_3(input1)` with `input1 <= 8` to derive source-ordered maxima
+`[2, 8]`. Equality contributes both directions and can therefore propagate a
+bound through either source orientation.
+
+V19/v20 preserve v17/v18's exact root fields, descriptor execution object,
+scoped-v2 budget, deferred lifecycle, caps, diagnostics, and scalar-v5/pair-v5
+contract grammars. Validation order remains exact root admission;
+`executionAdmission`; inherited execution fields; the required launch
+discriminator; descriptor policy sealing; `evaluation`; `inputBoxValidation`;
+`counterexampleProbe`; `boundedPositiveOrdering`; the quotient applicable-
+domain object's exact fields, literal, width, cardinality, and Djex limits;
+`applicableDomainOrdering`; `counterexampleSimplification`;
+`liveSessionOpening`; scoped budget; then contract. The dispatcher reaches
+v19/v20 only after the exact v1--v18 cascade returns UnsupportedVersion;
+version 21 remains unsupported. Loading and activation remain pure, and an
+all-pure deferred batch opens neither an executable descriptor nor a worker.
 
 Then select a typed Exference-producing engine and synthesize normally. A
 contract-only v6 document can replace the startup-fixed contract for one
@@ -2067,9 +2293,9 @@ required, and its case policy is exactly `"cases-rejected"` or
 `"exact-spine-zero-step-v1"`.
 
 The old scalar decoders remain exact compatibility entrances: the startup
-decoder for versions 1--3 rejects v4--v18, and the contract-only decoder for
+decoder for versions 1--3 rejects v4--v20, and the contract-only decoder for
 versions 1--5 rejects v6. The generalized decoders delegate those old versions
-to their unchanged scalar paths and add startup v4--v18 or contract-only v6. A
+to their unchanged scalar paths and add startup v4--v20 or contract-only v6. A
 product file selects which nominal runner Main calls; it does not infer a
 contract from the Lean type, bypass the exact canonical-`Prod` handoff, turn
 solver status into evidence, or grant pruning authority. See the
@@ -2101,8 +2327,14 @@ The v17/v18 sealed main-image selection, closed execution discriminator,
 startup notice, compatibility boundary, and unchanged evidence are recorded in
 the
 [descriptor-bound Length/Z3 launch report](docs/reports/2026-08-15-descriptor-bound-length-z3-launch.md).
-Djex's underlying extraction, closure, receipt, and identity boundary is in its
+The v19/v20 root-quotient laws, inherited descriptor/scoped profile, nominal
+assessments and notes, and unchanged older routes are recorded in the
+[strict relational positive-affine quotient Length ranking report](docs/reports/2026-08-15-strict-relational-positive-affine-quotient-length-ranking.md).
+Djex's underlying strict extraction boundary is in its
 [strict relational positive-affine applicable-domain report](lib/Djex/docs/reports/2026-08-15-strict-relational-positive-affine-length-applicable-domain.md).
+The quotient-consequence extraction, receipt, authority, and identity boundary
+is in Djex's
+[strict relational positive-affine quotient applicable-domain report](lib/Djex/docs/reports/2026-08-15-strict-relational-positive-affine-quotient-length-applicable-domain.md).
 
 After a successful occurrence seal, Main dispatches presentation through the
 selected scalar or pair domain and prints a subordinate note only for a
@@ -2124,10 +2356,14 @@ with the same bounded projections and a distinct rule label. Strict-relational
 assessments use
 `renderLengthStrictRelationalPositiveAffineApplicableDomainValidationNote` or
 `renderLengthSpinePairStrictRelationalPositiveAffineApplicableDomainValidationNote`.
+Root-quotient-consequence assessments use
+`renderLengthStrictRelationalPositiveAffineQuotientApplicableDomainValidationNote`
+or
+`renderLengthSpinePairStrictRelationalPositiveAffineQuotientApplicableDomainValidationNote`.
 Main's v7--v10 path can produce only the literal-ceiling positive-affine receipt
 family; v11--v14 can produce only the relational family; v15--v18 can produce
-only the strict-relational family; v1--v6 cannot produce any applicable-domain
-family. The semantic note
+only the strict-relational family; v19/v20 can produce only the root-quotient
+successor family; v1--v6 cannot produce any applicable-domain family. The semantic note
 never projects the receipt's private provider-name list. Disabled assessment,
 rejected input, heuristic status,
 and atomic operational fallback add no semantic note. The note can explain a
@@ -2472,9 +2708,10 @@ Only the separate
 `enableLengthRankingNonVacuousApplicableDomainPreference` moves an established
 receipt with a positive applicable-assignment count into a stable preferred
 partition. Startup versions 1--6 cannot enable either policy, so their file
-behavior is exact. Startup v7--v18 enable that same preference with their
-nominal literal-ceiling, relational, or strict-relational positive-affine
-validator; direct-v1 validation remains programmatic-only.
+behavior is exact. Startup v7--v20 enable that same preference with their
+nominal literal-ceiling, relational, strict-relational, or strict-relational
+root-quotient positive-affine validator; direct-v1 validation remains
+programmatic-only.
 Contract-only files select constraints rather than ranking policy.
 
 `enableLengthRankingPositiveAffineApplicableDomainValidation` is a separate,
@@ -2516,6 +2753,18 @@ negated equality, nested logical structure, and unsupported positive-affine
 subtrees contribute no rule or partial bound. Startup v15--v18 select its
 nominal scalar/product receipt family and otherwise retain v13/v14's complete
 scoped/checkpointed policy.
+
+`enableLengthRankingStrictRelationalPositiveAffineQuotientApplicableDomainValidation`
+is the fifth mutually exclusive extractor. It delegates every quotient-free
+clause to that strict predecessor and recognizes only one positive-literal
+Natural quotient at the root of exactly one relation operand. The four exact
+directed laws are the two non-strict and two immediate-negated implications
+shown above; equality emits the two non-strict directions in source order.
+The inherited synchronous rule-once closure handles propagation. Nested,
+embedded, and two-root quotient shapes and unsupported whole clauses grant no
+partial rule, and actual precondition replay remains authoritative. Startup
+v19/v20 select its nominal scalar/product receipt families while retaining the
+complete v17/v18 descriptor-bound, scoped/checkpointed, and deferred profile.
 
 Configuration version 3 inserts one query-owned origin probe after all four
 bank entries—and after an enabled applicable-domain pass is inapplicable—before
@@ -2584,7 +2833,7 @@ Exceptions propagate instead of producing a ranking. Legacy v1--v8 and
 relational startup v11/v12 retain separate lifecycle and per-query budgets. An
 explicitly v1-budgeted programmatic policy or startup v9/v10 instead places
 admitted preparation and deferred ranking beneath one runtime-unscoped shared
-owner. Startup v13--v18 and the scoped programmatic builder use the additive
+owner. Startup v13--v20 and the scoped programmatic builder use the additive
 owner-thread-affine v2 lease and cooperative phase checkpoints. Neither owner
 claims asynchronous interruption of arbitrary callback code. Main invokes
 this foundation only after the explicit startup opt-in described above; it
@@ -2631,7 +2880,8 @@ expectation, solver/host budgets, artifact policy, and response limits), and
 replay-limit source. After validation, `LengthRankingPolicy` retains the
 opaque sealed Djex execution configuration and evaluation limits plus a
 private selected direct-v1, positive-affine-v1,
-relational-positive-affine-v1, or strict-relational-positive-affine-v1
+relational-positive-affine-v1, strict-relational-positive-affine-v1, or
+strict-relational-positive-affine-quotient-v1
 applicable-domain pass,
 optional origin probe, independent optional finite-input-box orchestration,
 optional counterexample simplification, orthogonal non-vacuous ordering
@@ -2676,7 +2926,9 @@ bundle and enable the scoped/checkpointed v2 strategy. Versions 15 and 16
 retain that complete scoped bundle and replace only the applicable-domain
 strategy with the strict-relational selector. Versions 17 and 18 retain the
 strict/scoped scalar and product bundles and change only the sealed executable
-launch authority. Programmatic callers opt
+launch authority. Versions 19 and 20 retain those descriptor/scoped bundles
+and replace only the applicable-domain strategy with the root-quotient
+successor. Programmatic callers opt
 in with `enableLengthRankingUsableWorkBudget` or
 `enableLengthRankingScopedUsableWorkBudget`; both builders are pure and create
 no evidence, and the last budget builder applied determines the strategy.
@@ -2708,12 +2960,12 @@ Legacy v1--v8 and startup v11/v12 lifecycle and per-query budgets remain
 separate. A policy derived with `enableLengthRankingUsableWorkBudget`, including
 startup v9/v10, instead owns one additive runtime-unscoped v1 usable-work
 window. A policy derived with `enableLengthRankingScopedUsableWorkBudget`,
-including startup v13--v18, owns the owner-thread-affine v2 lease, cooperative
+including startup v13--v20, owns the owner-thread-affine v2 lease, cooperative
 checkpoints, and outer post-finalizer observation described above. There are no
 execution defaults, executable discovery, path normalization, or environment
 reads. The digest is only an optional expectation for Djex's
 live executable observation. V1--v16 retain the explicitly weaker pathname
-snapshot; v17/v18 compare the expectation with the sealed staged main image.
+snapshot; v17--v20 compare the expectation with the sealed staged main image.
 Neither choice attests loaders, libraries, or solver semantics. See the
 [explicit live Length ranking configuration report](docs/reports/2026-08-11-explicit-live-length-ranking-configuration.md).
 The later
@@ -2724,8 +2976,8 @@ preserving the version-1 compatibility path.
 `Leant.Synth.Length.Configuration.File` keeps the exact version-1 JSON grammar
 for that policy and adds exact scalar opt-in versions 2 and 3. Its established
 `decodeLengthRankingConfigurationFile` remains an exact scalar-only entrance
-and rejects versions 4--18. The generalized
-`decodeLengthAssessmentConfigurationFile` additionally accepts versions 4--18
+and rejects versions 4--20. The generalized
+`decodeLengthAssessmentConfigurationFile` additionally accepts versions 4--20
 and returns an opaque `DisabledLengthAssessmentConfiguration` carrying the same
 checked process policy beside a lazy scalar-or-pair selection. The pure decoder consumes a caller-owned
 strict byte string through a separate bounded JSON parser, rejects malformed
@@ -2746,7 +2998,7 @@ Z3. Neither grants proof, solver-status, or contract authority. There is no
 automatic path, environment or executable discovery, or autoload behavior.
 The explicit CLI loader uses the same 256-KiB bound before activation. The
 optional digest remains only an expectation until live opening. V1--v16 compare
-it with the pre-spawn pathname snapshot; v17/v18 compare it with the sealed
+it with the pre-spawn pathname snapshot; v17--v20 compare it with the sealed
 staged main image, still without loader, library, or solver attestation. The
 complete schema and budgets are recorded in the
 [bounded live Length ranking configuration-file report](docs/reports/2026-08-11-bounded-live-length-ranking-configuration-file.md).
@@ -2868,9 +3120,21 @@ their established order, then the launch literal is checked and Djex's
 descriptor-bound execution constructor seals the policy. Evaluation, behavioral
 policies, scoped budget, and nominal scalar-v5/pair-v5 contract follow in the
 same order as v15/v16. The generalized dispatcher reaches these versions only
-after the complete v1--v16 cascade returns UnsupportedVersion; version 19 is
-still unsupported. Decoding and activation remain pure, and an all-pure
-deferred batch still opens no executable descriptor or worker.
+after the complete v1--v16 cascade returns UnsupportedVersion; v19/v20 are
+handled only by the later quotient-consequence decoder. Decoding and activation
+remain pure, and an all-pure deferred batch still opens no executable
+descriptor or worker.
+
+Versions 19 and 20 retain that exact descriptor/scoped root, execution object,
+deferred lifecycle, preference and simplification policies, budget, and
+contract grammars. They replace only the applicable-domain literal with
+`"strict-relational-positive-affine-quotient-v1"` and construct that dimension
+with
+`enableLengthRankingStrictRelationalPositiveAffineQuotientApplicableDomainValidation`.
+The generalized dispatcher reaches them only after the complete v1--v18
+cascade returns UnsupportedVersion; version 21 is the next unsupported
+sentinel. The new nominal assessment and renderer branches require complete
+query-owned finite-box replay and add no solver, proof, or pruning authority.
 
 `Leant.Synth.Length.Configuration.File.Acquire` is the compatibility facade
 over the shared bounded `Leant.Synth.Length.File.Acquire` filesystem boundary.
