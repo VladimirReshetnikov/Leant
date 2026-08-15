@@ -9,8 +9,10 @@
 -- that exact box and additionally requires a closed query-owned origin-probe
 -- selection.  Version 4 is the nominal binary-product sibling.  Generalized-
 -- only versions 5 and 6 add a required non-vacuous bounded-positive ordering
--- grant for the scalar and product domains respectively.  Older decoders and
--- grammars remain literal.
+-- grant for the scalar and product domains respectively.  Generalized-only
+-- versions 7 and 8 add positive-affine applicable-domain validation, its
+-- independent ordering grant, bounded counterexample simplification, and
+-- deferred live-session opening.  Older decoders and grammars remain literal.
 -- Decoding performs no discovery, path normalization, environment lookup, or
 -- IO.  Every field is required.  A successful decode returns a deliberately
 -- disabled opaque value: callers
@@ -25,6 +27,8 @@ module Leant.Synth.Length.Configuration.File
   , lengthRankingConfigurationFileSpinePairVersion
   , lengthRankingConfigurationFilePositiveOrderingVersion
   , lengthRankingConfigurationFileSpinePairPositiveOrderingVersion
+  , lengthRankingConfigurationFilePositiveAffineVersion
+  , lengthRankingConfigurationFileSpinePairPositiveAffineVersion
   , lengthRankingConfigurationFileJsonLimits
   , LengthRankingConfigurationFileObject (..)
   , LengthRankingConfigurationFileField (..)
@@ -109,9 +113,13 @@ import Leant.Synth.Length.Contract
   )
 import Leant.Synth.Length.Configuration
   ( LengthRankingPolicy
+  , enableLengthRankingCounterexampleSimplification
+  , enableLengthRankingDeferredLiveSessionOpening
+  , enableLengthRankingNonVacuousApplicableDomainPreference
   , enableLengthRankingNonVacuousInputBoxPreference
   , enableLengthRankingOriginProbe
   , enableLengthRankingInputBoxValidation
+  , enableLengthRankingPositiveAffineApplicableDomainValidation
   , lengthRankingPolicyExecutableDigestExpectation
   , lengthRankingPolicyFromValidatedComponents
   )
@@ -148,6 +156,15 @@ lengthRankingConfigurationFilePositiveOrderingVersion = 5
 lengthRankingConfigurationFileSpinePairPositiveOrderingVersion :: Natural
 lengthRankingConfigurationFileSpinePairPositiveOrderingVersion = 6
 
+-- | Advanced scalar policy bundle with positive-affine domain extraction,
+-- strict counterexample simplification, and deferred worker opening.
+lengthRankingConfigurationFilePositiveAffineVersion :: Natural
+lengthRankingConfigurationFilePositiveAffineVersion = 7
+
+-- | Nominal binary-product sibling of the advanced scalar policy bundle.
+lengthRankingConfigurationFileSpinePairPositiveAffineVersion :: Natural
+lengthRankingConfigurationFileSpinePairPositiveAffineVersion = 8
+
 -- | Fixed admission policy for the v1 document itself.  The array maximum is
 -- one greater than the widest typed collection so maximum-plus-one reaches the
 -- more specific schema diagnostic.
@@ -171,6 +188,8 @@ data LengthRankingConfigurationFileObject
   | LengthRankingConfigurationResponseLimitsObject
   | LengthRankingConfigurationEvaluationObject
   | LengthRankingConfigurationInputBoxValidationObject
+  | LengthRankingConfigurationApplicableDomainValidationObject
+  | LengthRankingConfigurationCounterexampleSimplificationObject
   | LengthRankingConfigurationContractObject
   | LengthRankingConfigurationSpineObject
   | LengthRankingConfigurationProviderLawObject !Natural
@@ -218,6 +237,16 @@ data LengthRankingConfigurationFileField
   | LengthRankingConfigurationCandidateCasePolicyField
   | LengthRankingConfigurationResultShapeField
   | LengthRankingConfigurationBoundedPositiveOrderingField
+  | LengthRankingConfigurationApplicableDomainValidationField
+  | LengthRankingConfigurationApplicableDomainStrategyField
+  | LengthRankingConfigurationApplicableDomainMaximumInputsField
+  | LengthRankingConfigurationApplicableDomainMaximumAssignmentsField
+  | LengthRankingConfigurationApplicableDomainOrderingField
+  | LengthRankingConfigurationCounterexampleSimplificationField
+  | LengthRankingConfigurationCounterexampleSimplificationStrategyField
+  | LengthRankingConfigurationCounterexampleSimplificationMaximumInputsField
+  | LengthRankingConfigurationCounterexampleSimplificationMaximumAssignmentsField
+  | LengthRankingConfigurationLiveSessionOpeningField
   deriving (Eq, Ord, Show)
 
 data LengthRankingConfigurationFileValueType
@@ -428,7 +457,9 @@ decodeLengthRankingConfigurationFile bytes = do
 -- scalar success and every scalar diagnostic except the closed unsupported-
 -- version sentinel is returned by the old decoder itself.  Only that sentinel
 -- permits the literal version-4 parse and, only after its own unsupported-
--- version sentinel, the additive version-5/version-6 parse.
+-- version sentinel, the additive version-5/version-6 parse.  The advanced
+-- version-7/version-8 parser is reached only after that parser returns the
+-- same closed sentinel.
 decodeLengthAssessmentConfigurationFile
   :: ByteString
   -> Either
@@ -442,7 +473,11 @@ decodeLengthAssessmentConfigurationFile bytes =
         decodeLengthAssessmentConfigurationFileSpinePairV4 bytes of
       Right pair -> Right pair
       Left LengthRankingConfigurationUnsupportedVersion ->
-        decodeLengthAssessmentConfigurationFilePositiveOrdering bytes
+        case decodeLengthAssessmentConfigurationFilePositiveOrdering bytes of
+          Right positiveOrdering -> Right positiveOrdering
+          Left LengthRankingConfigurationUnsupportedVersion ->
+            decodeLengthAssessmentConfigurationFilePositiveAffine bytes
+          Left failure -> Left failure
       Left failure -> Left failure
     Left failure -> Left failure
 
@@ -508,6 +543,39 @@ decodeLengthAssessmentConfigurationFilePositiveOrdering bytes = do
     else if version == toInteger
         lengthRankingConfigurationFileSpinePairPositiveOrderingVersion
       then decodeLengthRankingConfigurationFileSpinePairPositiveOrderingV6 root
+      else Left LengthRankingConfigurationUnsupportedVersion
+
+-- | Decode only the advanced scalar and product bundles, after every older
+-- generalized entrance has returned its unsupported-version sentinel.
+decodeLengthAssessmentConfigurationFilePositiveAffine
+  :: ByteString
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthAssessmentConfigurationFilePositiveAffine bytes = do
+  document <- either (Left . LengthRankingConfigurationJsonRejected) Right
+    $ parseBoundedJson lengthRankingConfigurationFileJsonLimits bytes
+  root <- objectFields LengthRankingConfigurationRootObject document
+  formatValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationFormatField
+    "format"
+    root
+  format <- stringField LengthRankingConfigurationFormatField formatValue
+  if format == lengthRankingConfigurationFileFormat
+    then pure ()
+    else Left LengthRankingConfigurationUnsupportedFormat
+  versionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationVersionField
+    "version"
+    root
+  version <- integerField LengthRankingConfigurationVersionField versionValue
+  if version == toInteger lengthRankingConfigurationFilePositiveAffineVersion
+    then decodeLengthRankingConfigurationFilePositiveAffineV7 root
+    else if version == toInteger
+        lengthRankingConfigurationFileSpinePairPositiveAffineVersion
+      then decodeLengthRankingConfigurationFileSpinePairPositiveAffineV8 root
       else Left LengthRankingConfigurationUnsupportedVersion
 
 -- Keep the established version-1 path literal: its exact root, validation
@@ -826,6 +894,127 @@ decodeLengthRankingConfigurationFileSpinePairPositiveOrderingV6 root = do
         originProbePolicy
   pure $ DisabledLengthSpinePairAssessmentConfiguration policy contract
 
+-- Versions 7 and 8 share one exact advanced policy prefix.  Their only
+-- distinction remains the nominal scalar/product contract decoded last.
+decodeLengthRankingConfigurationFilePositiveAffineV7
+  :: ObjectFields
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthRankingConfigurationFilePositiveAffineV7 root = do
+  policy <- decodeLengthRankingConfigurationFilePositiveAffinePolicy root
+  contractValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationContractField
+    "contract"
+    root
+  contract <- decodeLeanLengthContractValueV5 contractValue
+  pure $ DisabledLengthScalarAssessmentConfiguration
+    $ disableLengthRankingConfiguration policy contract
+
+decodeLengthRankingConfigurationFileSpinePairPositiveAffineV8
+  :: ObjectFields
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthRankingConfigurationFileSpinePairPositiveAffineV8 root = do
+  policy <- decodeLengthRankingConfigurationFilePositiveAffinePolicy root
+  contractValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationContractField
+    "contract"
+    root
+  contract <- decodeLeanLengthSpinePairContractValueV5 contractValue
+  pure $ DisabledLengthSpinePairAssessmentConfiguration policy contract
+
+-- Decode the advanced policy in its frozen diagnostic order.  The two bounded
+-- objects are decoded independently and retain distinct validated limits.
+decodeLengthRankingConfigurationFilePositiveAffinePolicy
+  :: ObjectFields
+  -> Either LengthRankingConfigurationFileError LengthRankingPolicy
+decodeLengthRankingConfigurationFilePositiveAffinePolicy root = do
+  exactFields LengthRankingConfigurationRootObject
+    rootFieldsPositiveAffine root
+  executionAdmissionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationExecutionAdmissionField
+    "executionAdmission"
+    root
+  executionLimits <- decodeExecutionAdmission executionAdmissionValue
+  executionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationExecutionField
+    "execution"
+    root
+  execution <- decodeExecution executionLimits executionValue
+  evaluationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationEvaluationField
+    "evaluation"
+    root
+  evaluation <- decodeEvaluation evaluationValue
+  inputBoxValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationInputBoxValidationField
+    "inputBoxValidation"
+    root
+  (inputBoxLimits, inclusiveMaximums) <-
+    decodeInputBoxValidation inputBoxValue
+  counterexampleProbeValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationCounterexampleProbeField
+    "counterexampleProbe"
+    root
+  decodeCounterexampleProbe counterexampleProbeValue
+  boundedPositiveOrderingValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationBoundedPositiveOrderingField
+    "boundedPositiveOrdering"
+    root
+  decodeBoundedPositiveOrdering boundedPositiveOrderingValue
+  applicableDomainValidationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationApplicableDomainValidationField
+    "applicableDomainValidation"
+    root
+  applicableDomainLimits <- decodeApplicableDomainValidation
+    applicableDomainValidationValue
+  applicableDomainOrderingValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationApplicableDomainOrderingField
+    "applicableDomainOrdering"
+    root
+  decodeApplicableDomainOrdering applicableDomainOrderingValue
+  counterexampleSimplificationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationCounterexampleSimplificationField
+    "counterexampleSimplification"
+    root
+  counterexampleSimplificationLimits <- decodeCounterexampleSimplification
+    counterexampleSimplificationValue
+  liveSessionOpeningValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationLiveSessionOpeningField
+    "liveSessionOpening"
+    root
+  decodeLiveSessionOpening liveSessionOpeningValue
+  let basePolicy =
+        lengthRankingPolicyFromValidatedComponents execution evaluation
+      inputBoxPolicy = enableLengthRankingInputBoxValidation
+        inputBoxLimits inclusiveMaximums basePolicy
+      originProbePolicy = enableLengthRankingOriginProbe inputBoxPolicy
+      inputBoxPreferencePolicy =
+        enableLengthRankingNonVacuousInputBoxPreference originProbePolicy
+      applicableDomainPolicy =
+        enableLengthRankingPositiveAffineApplicableDomainValidation
+          applicableDomainLimits inputBoxPreferencePolicy
+      applicableDomainPreferencePolicy =
+        enableLengthRankingNonVacuousApplicableDomainPreference
+          applicableDomainPolicy
+      simplificationPolicy = enableLengthRankingCounterexampleSimplification
+        counterexampleSimplificationLimits applicableDomainPreferencePolicy
+  pure $ enableLengthRankingDeferredLiveSessionOpening simplificationPolicy
+
 rootFields :: [(Text, LengthRankingConfigurationFileField)]
 rootFields =
   [ ("format", LengthRankingConfigurationFormatField)
@@ -882,6 +1071,38 @@ rootFieldsPositiveOrdering =
     )
   , ( "boundedPositiveOrdering"
     , LengthRankingConfigurationBoundedPositiveOrderingField
+    )
+  , ("contract", LengthRankingConfigurationContractField)
+  ]
+
+rootFieldsPositiveAffine
+  :: [(Text, LengthRankingConfigurationFileField)]
+rootFieldsPositiveAffine =
+  [ ("format", LengthRankingConfigurationFormatField)
+  , ("version", LengthRankingConfigurationVersionField)
+  , ("executionAdmission", LengthRankingConfigurationExecutionAdmissionField)
+  , ("execution", LengthRankingConfigurationExecutionField)
+  , ("evaluation", LengthRankingConfigurationEvaluationField)
+  , ( "inputBoxValidation"
+    , LengthRankingConfigurationInputBoxValidationField
+    )
+  , ( "counterexampleProbe"
+    , LengthRankingConfigurationCounterexampleProbeField
+    )
+  , ( "boundedPositiveOrdering"
+    , LengthRankingConfigurationBoundedPositiveOrderingField
+    )
+  , ( "applicableDomainValidation"
+    , LengthRankingConfigurationApplicableDomainValidationField
+    )
+  , ( "applicableDomainOrdering"
+    , LengthRankingConfigurationApplicableDomainOrderingField
+    )
+  , ( "counterexampleSimplification"
+    , LengthRankingConfigurationCounterexampleSimplificationField
+    )
+  , ( "liveSessionOpening"
+    , LengthRankingConfigurationLiveSessionOpeningField
     )
   , ("contract", LengthRankingConfigurationContractField)
   ]
@@ -1330,6 +1551,158 @@ decodeBoundedPositiveOrdering value = do
     "prefer-non-vacuous" -> Right ()
     _ -> Left $ LengthRankingConfigurationFieldValueRejected
       LengthRankingConfigurationBoundedPositiveOrderingField
+
+-- | Decode the independent positive-affine applicable-domain authority.  The
+-- strategy is closed before either bounded limit is admitted.
+decodeApplicableDomainValidation
+  :: BoundedJsonValue
+  -> Either LengthRankingConfigurationFileError LengthInputBoxLimits
+decodeApplicableDomainValidation value = do
+  object <- exactObject
+    LengthRankingConfigurationApplicableDomainValidationObject
+    applicableDomainValidationFields value
+  strategyValue <- requiredField
+    LengthRankingConfigurationApplicableDomainValidationObject
+    LengthRankingConfigurationApplicableDomainStrategyField
+    "strategy"
+    object
+  strategy <- stringField
+    LengthRankingConfigurationApplicableDomainStrategyField
+    strategyValue
+  case strategy of
+    "positive-affine-v1" -> pure ()
+    _ -> Left $ LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationApplicableDomainStrategyField
+  maximumInputsValue <- requiredField
+    LengthRankingConfigurationApplicableDomainValidationObject
+    LengthRankingConfigurationApplicableDomainMaximumInputsField
+    "maximumInputs"
+    object
+  maximumInputs <- naturalField
+    LengthRankingConfigurationApplicableDomainMaximumInputsField
+    maximumInputsValue
+    >>= capNatural
+      LengthRankingConfigurationApplicableDomainMaximumInputsField
+      maximumInputBoxInputs
+  maximumAssignmentsValue <- requiredField
+    LengthRankingConfigurationApplicableDomainValidationObject
+    LengthRankingConfigurationApplicableDomainMaximumAssignmentsField
+    "maximumAssignments"
+    object
+  maximumAssignments <- naturalField
+    LengthRankingConfigurationApplicableDomainMaximumAssignmentsField
+    maximumAssignmentsValue
+    >>= capNatural
+      LengthRankingConfigurationApplicableDomainMaximumAssignmentsField
+      maximumInputBoxAssignments
+  checkedInputBoxLimits maximumInputs maximumAssignments
+
+applicableDomainValidationFields
+  :: [(Text, LengthRankingConfigurationFileField)]
+applicableDomainValidationFields =
+  [ ( "strategy"
+    , LengthRankingConfigurationApplicableDomainStrategyField
+    )
+  , ( "maximumInputs"
+    , LengthRankingConfigurationApplicableDomainMaximumInputsField
+    )
+  , ( "maximumAssignments"
+    , LengthRankingConfigurationApplicableDomainMaximumAssignmentsField
+    )
+  ]
+
+decodeApplicableDomainOrdering
+  :: BoundedJsonValue
+  -> Either LengthRankingConfigurationFileError ()
+decodeApplicableDomainOrdering value = do
+  mode <- stringField
+    LengthRankingConfigurationApplicableDomainOrderingField value
+  case mode of
+    "prefer-non-vacuous" -> Right ()
+    _ -> Left $ LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationApplicableDomainOrderingField
+
+-- | Decode a second, independent bounded authority for strict
+-- componentwise-lexicographic counterexample simplification.
+decodeCounterexampleSimplification
+  :: BoundedJsonValue
+  -> Either LengthRankingConfigurationFileError LengthInputBoxLimits
+decodeCounterexampleSimplification value = do
+  object <- exactObject
+    LengthRankingConfigurationCounterexampleSimplificationObject
+    counterexampleSimplificationFields value
+  strategyValue <- requiredField
+    LengthRankingConfigurationCounterexampleSimplificationObject
+    LengthRankingConfigurationCounterexampleSimplificationStrategyField
+    "strategy"
+    object
+  strategy <- stringField
+    LengthRankingConfigurationCounterexampleSimplificationStrategyField
+    strategyValue
+  case strategy of
+    "componentwise-lexicographic-v1" -> pure ()
+    _ -> Left $ LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationCounterexampleSimplificationStrategyField
+  maximumInputsValue <- requiredField
+    LengthRankingConfigurationCounterexampleSimplificationObject
+    LengthRankingConfigurationCounterexampleSimplificationMaximumInputsField
+    "maximumInputs"
+    object
+  maximumInputs <- naturalField
+    LengthRankingConfigurationCounterexampleSimplificationMaximumInputsField
+    maximumInputsValue
+    >>= capNatural
+      LengthRankingConfigurationCounterexampleSimplificationMaximumInputsField
+      maximumInputBoxInputs
+  maximumAssignmentsValue <- requiredField
+    LengthRankingConfigurationCounterexampleSimplificationObject
+    LengthRankingConfigurationCounterexampleSimplificationMaximumAssignmentsField
+    "maximumAssignments"
+    object
+  maximumAssignments <- naturalField
+    LengthRankingConfigurationCounterexampleSimplificationMaximumAssignmentsField
+    maximumAssignmentsValue
+    >>= capNatural
+      LengthRankingConfigurationCounterexampleSimplificationMaximumAssignmentsField
+      maximumInputBoxAssignments
+  checkedInputBoxLimits maximumInputs maximumAssignments
+
+counterexampleSimplificationFields
+  :: [(Text, LengthRankingConfigurationFileField)]
+counterexampleSimplificationFields =
+  [ ( "strategy"
+    , LengthRankingConfigurationCounterexampleSimplificationStrategyField
+    )
+  , ( "maximumInputs"
+    , LengthRankingConfigurationCounterexampleSimplificationMaximumInputsField
+    )
+  , ( "maximumAssignments"
+    , LengthRankingConfigurationCounterexampleSimplificationMaximumAssignmentsField
+    )
+  ]
+
+checkedInputBoxLimits
+  :: Natural
+  -> Natural
+  -> Either LengthRankingConfigurationFileError LengthInputBoxLimits
+checkedInputBoxLimits maximumInputs maximumAssignments =
+  case mkLengthInputBoxLimits LengthInputBoxLimitSource
+      { lengthInputBoxLimitSourceMaximumInputs = fromIntegral maximumInputs
+      , lengthInputBoxLimitSourceMaximumAssignments = maximumAssignments
+      } of
+    Left failure -> Left
+      $ LengthRankingConfigurationInputBoxLimitsRejected failure
+    Right validated -> Right validated
+
+decodeLiveSessionOpening
+  :: BoundedJsonValue
+  -> Either LengthRankingConfigurationFileError ()
+decodeLiveSessionOpening value = do
+  mode <- stringField LengthRankingConfigurationLiveSessionOpeningField value
+  case mode of
+    "defer-until-live-query" -> Right ()
+    _ -> Left $ LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationLiveSessionOpeningField
 
 -- | Decode version 2's explicit source-ordered inclusive input box.  Width is
 -- bounded before any element is decoded, element values are then decoded
