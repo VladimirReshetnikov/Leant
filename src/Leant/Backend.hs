@@ -188,12 +188,18 @@ hasLakefile dir = do
   lean <- doesFileExist (dir </> "lakefile.lean")
   pure (toml || lean)
 
+-- | Whether a Lake project has already been built (its .lake build
+-- library directory exists), so imports will resolve without a fresh
+-- lake build.
 isBuiltProject :: FilePath -> IO Bool
 isBuiltProject dir =
   doesDirectoryExist (dir </> ".lake" </> "build" </> "lib" </> "lean")
 
 -- Process lifecycle ---------------------------------------------------------
 
+-- | Launch the Lean REPL backend under lake env with piped handles and
+-- a dedicated stderr-capture thread.  Exceptions during startup tear the
+-- partially created process down before propagating.
 spawnBackend :: BackendConfig -> IO Backend
 spawnBackend config = mask $ \restore -> do
   created <- createProcess
@@ -265,6 +271,9 @@ closeQuietly handle = do
   _ <- try (hClose handle) :: IO (Either IOException ())
   pure ()
 
+-- | Shut the backend down: close stdin, terminate and reap the process,
+-- give the stderr-capture thread a bounded window to finish, then close
+-- the remaining handles.
 killBackend :: Backend -> IO ()
 killBackend backend = do
   closeQuietly $ beIn backend
