@@ -4343,18 +4343,9 @@ assertLengthUsableWorkBudgetConfigurationSchema =
     let executable = root </> "missing-z3"
         scalar = usableWorkBudgetScalarDocument executable 65000
         pair = usableWorkBudgetPairDocument executable 65000
-        missing object field path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationMissingField object field)
-            $ deleteJsonField path document
-        wrongType field path expected document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationFieldTypeMismatch field expected)
-            $ setJsonField path (Json.JBool False) document
-        unexpected object path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationUnexpectedField object)
-            $ addJsonField path ("private-field", Json.JNull) document
+        missing = assertConfigurationFieldMissing
+        wrongType = assertConfigurationFieldWrongType
+        unexpected = assertConfigurationFieldUnexpected
     lengthRankingConfigurationFileUsableWorkBudgetVersion @?= 9
     lengthRankingConfigurationFileSpinePairUsableWorkBudgetVersion @?= 10
     mapM_ (\document -> do
@@ -4747,18 +4738,9 @@ assertLengthScopedUsableWorkBudgetSchema =
     let executable = root </> "missing-z3"
         scalar = scopedUsableWorkBudgetScalarDocument executable 65000
         pair = scopedUsableWorkBudgetPairDocument executable 65000
-        missing object field path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationMissingField object field)
-            $ deleteJsonField path document
-        wrongType field path expected document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationFieldTypeMismatch field expected)
-            $ setJsonField path (Json.JBool False) document
-        unexpected object path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationUnexpectedField object)
-            $ addJsonField path ("private-field", Json.JNull) document
+        missing = assertConfigurationFieldMissing
+        wrongType = assertConfigurationFieldWrongType
+        unexpected = assertConfigurationFieldUnexpected
         rootShape = lengthRankingConfigurationRootShape
         reject field document =
           assertLengthAssessmentConfigurationFileError
@@ -6787,18 +6769,9 @@ assertLengthPositiveAffineConfigurationSchema =
             (LengthRankingConfigurationMissingField
               LengthRankingConfigurationRootObject field)
             $ deleteJsonField [name] document
-        unexpected object path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationUnexpectedField object)
-            $ addJsonField path ("private-field", Json.JNull) document
-        missing object field path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationMissingField object field)
-            $ deleteJsonField path document
-        wrongType field path expected document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationFieldTypeMismatch field expected)
-            $ setJsonField path (Json.JBool False) document
+        unexpected = assertConfigurationFieldUnexpected
+        missing = assertConfigurationFieldMissing
+        wrongType = assertConfigurationFieldWrongType
         rejected field path document =
           assertLengthAssessmentConfigurationFileError
             (LengthRankingConfigurationFieldValueRejected field)
@@ -8233,18 +8206,9 @@ assertLengthStrictRelationalPositiveAffineSchema =
         scalar = strictRelationalPositiveAffineScalarDocument
           executable 65000
         pair = strictRelationalPositiveAffinePairDocument executable 65000
-        missing object field path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationMissingField object field)
-            $ deleteJsonField path document
-        wrongType field path expected document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationFieldTypeMismatch field expected)
-            $ setJsonField path (Json.JBool False) document
-        unexpected object path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationUnexpectedField object)
-            $ addJsonField path ("private-field", Json.JNull) document
+        missing = assertConfigurationFieldMissing
+        wrongType = assertConfigurationFieldWrongType
+        unexpected = assertConfigurationFieldUnexpected
         reject field document =
           assertLengthAssessmentConfigurationFileError
             (LengthRankingConfigurationFieldValueRejected field) document
@@ -9029,14 +8993,8 @@ assertLengthDescriptorBoundExecutableLaunchSchema =
           executable 65000
         pair = descriptorBoundExecutableLaunchPairDocument executable 65000
         documents = [scalar, pair]
-        missing object field path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationMissingField object field)
-            $ deleteJsonField path document
-        wrongType field path expected document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationFieldTypeMismatch field expected)
-            $ setJsonField path (Json.JBool False) document
+        missing = assertConfigurationFieldMissing
+        wrongType = assertConfigurationFieldWrongType
         reject field document =
           assertLengthAssessmentConfigurationFileError
             (LengthRankingConfigurationFieldValueRejected field) document
@@ -9781,14 +9739,8 @@ assertLengthDescriptorBoundEffectiveIDExecutableAccessSchema =
         pair = descriptorBoundEffectiveIDExecutableAccessPairDocument
           executable 65000
         documents = [scalar, pair]
-        missing object field path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationMissingField object field)
-            $ deleteJsonField path document
-        unexpected object path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationUnexpectedField object)
-            $ addJsonField path ("private-field", Json.JNull) document
+        missing = assertConfigurationFieldMissing
+        unexpected = assertConfigurationFieldUnexpected
         rootShape = lengthRankingConfigurationRootShape
         executionShape =
           [ (LengthRankingConfigurationResponseLimitsField, "responseLimits")
@@ -10560,14 +10512,8 @@ assertLengthStrictRelationalPositiveAffineQuotientSchema =
         pair = strictRelationalPositiveAffineQuotientPairDocument
           executable 65000
         documents = [scalar, pair]
-        missing object field path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationMissingField object field)
-            $ deleteJsonField path document
-        unexpected object path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationUnexpectedField object)
-            $ addJsonField path ("private-field", Json.JNull) document
+        missing = assertConfigurationFieldMissing
+        unexpected = assertConfigurationFieldUnexpected
         reject field document =
           assertLengthAssessmentConfigurationFileError
             (LengthRankingConfigurationFieldValueRejected field) document
@@ -11442,14 +11388,8 @@ assertLengthStrictRelationalPositiveAffineQuotientRootExtremaSchema =
         pair = strictRelationalPositiveAffineQuotientRootExtremaPairDocument
           executable 65000
         documents = [scalar, pair]
-        missing object field path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationMissingField object field)
-            $ deleteJsonField path document
-        unexpected object path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationUnexpectedField object)
-            $ addJsonField path ("private-field", Json.JNull) document
+        missing = assertConfigurationFieldMissing
+        unexpected = assertConfigurationFieldUnexpected
         rootShape = lengthRankingConfigurationRootShape
         applicableShape =
           [ ( LengthRankingConfigurationApplicableDomainStrategyField
@@ -12274,14 +12214,8 @@ assertLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusSchema =
         pair = strictRelationalPositiveAffineQuotientRootExtremaMonusPairDocument
           executable 65000
         documents = [scalar, pair]
-        missing object field path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationMissingField object field)
-            $ deleteJsonField path document
-        unexpected object path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationUnexpectedField object)
-            $ addJsonField path ("private-field", Json.JNull) document
+        missing = assertConfigurationFieldMissing
+        unexpected = assertConfigurationFieldUnexpected
         rootShape = lengthRankingConfigurationRootShape
         applicableShape =
           [ ( LengthRankingConfigurationApplicableDomainStrategyField
@@ -13150,14 +13084,8 @@ assertLengthDescriptorBoundExecveCheckExecutableAccessSchema =
         pair = descriptorBoundExecveCheckExecutableAccessPairDocument
           executable 65000
         documents = [scalar, pair]
-        missing object field path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationMissingField object field)
-            $ deleteJsonField path document
-        unexpected object path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationUnexpectedField object)
-            $ addJsonField path ("private-field", Json.JNull) document
+        missing = assertConfigurationFieldMissing
+        unexpected = assertConfigurationFieldUnexpected
         rootShape = lengthRankingConfigurationRootShape
         executionShape =
           [ (LengthRankingConfigurationResponseLimitsField, "responseLimits")
@@ -13981,14 +13909,8 @@ assertLengthBooleanFiniteUnionSchema =
           strictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionPairDocument
             executable 65000
         documents = [scalar, pair]
-        missing object field path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationMissingField object field)
-            $ deleteJsonField path document
-        unexpected object path document =
-          assertLengthAssessmentConfigurationFileError
-            (LengthRankingConfigurationUnexpectedField object)
-            $ addJsonField path ("private-field", Json.JNull) document
+        missing = assertConfigurationFieldMissing
+        unexpected = assertConfigurationFieldUnexpected
         rootShape = lengthRankingConfigurationRootShape
         applicableShape =
           [ ( LengthRankingConfigurationApplicableDomainStrategyField
@@ -15203,14 +15125,8 @@ assertLengthBooleanFiniteUnionAtomicBranchingSchema =
             strictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingPairDocument
               executable 65000
           documents = [scalar, pair]
-          missing object field path document =
-            assertLengthAssessmentConfigurationFileError
-              (LengthRankingConfigurationMissingField object field)
-              $ deleteJsonField path document
-          unexpected object path document =
-            assertLengthAssessmentConfigurationFileError
-              (LengthRankingConfigurationUnexpectedField object)
-              $ addJsonField path ("private-field", Json.JNull) document
+          missing = assertConfigurationFieldMissing
+          unexpected = assertConfigurationFieldUnexpected
           rootShape = lengthRankingConfigurationRootShape
           applicableShape =
             [ ( LengthRankingConfigurationApplicableDomainStrategyField
@@ -21117,6 +21033,42 @@ assertLengthRankingConfigurationFileError expected document =
     Left failure -> failure @?= expected
     Right _ -> assertFailure $ "expected configuration-file failure: " ++
       show expected
+
+-- | The three schema-shape assertions every configuration test repeats:
+-- delete a required field, replace one with the wrong JSON type, or add an
+-- unknown field, and expect the decoder's exact closed error.
+assertConfigurationFieldMissing
+  :: LengthRankingConfigurationFileObject
+  -> LengthRankingConfigurationFileField
+  -> [String]
+  -> Json.JValue
+  -> IO ()
+assertConfigurationFieldMissing object field path document =
+  assertLengthAssessmentConfigurationFileError
+    (LengthRankingConfigurationMissingField object field)
+    $ deleteJsonField path document
+
+assertConfigurationFieldWrongType
+  :: LengthRankingConfigurationFileField
+  -> [String]
+  -> LengthRankingConfigurationFileValueType
+  -> Json.JValue
+  -> IO ()
+assertConfigurationFieldWrongType field path expected document =
+  assertLengthAssessmentConfigurationFileError
+    (LengthRankingConfigurationFieldTypeMismatch field expected)
+    $ setJsonField path (Json.JBool False) document
+
+assertConfigurationFieldUnexpected
+  :: LengthRankingConfigurationFileObject
+  -> [String]
+  -> Json.JValue
+  -> IO ()
+assertConfigurationFieldUnexpected object path document =
+  assertLengthAssessmentConfigurationFileError
+    (LengthRankingConfigurationUnexpectedField object)
+    $ addJsonField path ("private-field", Json.JNull) document
+
 
 assertLengthAssessmentConfigurationFileError
   :: LengthRankingConfigurationFileError
