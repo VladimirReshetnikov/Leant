@@ -40,7 +40,7 @@ and is dense by design; read the overview above first.
 ## Contents
 
 - [Startup configuration file](#startup-configuration-file)
-  - [Versions 1 to 26 at a glance](#versions-1-to-26-at-a-glance)
+  - [Versions 1 to 28 at a glance](#versions-1-to-28-at-a-glance)
   - [Activation, pinning, and worker lifecycle](#activation-pinning-and-worker-lifecycle)
   - [Candidate eligibility](#candidate-eligibility)
 - [One-shot contract-only files](#one-shot-contract-only-files)
@@ -80,6 +80,7 @@ and is dense by design; read the overview above first.
   - [Startup versions 21 and 22: effective-ID executable access](#startup-versions-21-and-22-effective-id-executable-access)
   - [Startup versions 23 and 24: root-extrema consequences](#startup-versions-23-and-24-root-extrema-consequences)
   - [Startup versions 25 and 26: root-monus consequences](#startup-versions-25-and-26-root-monus-consequences)
+  - [Startup versions 27 and 28: execve-check executable access](#startup-versions-27-and-28-execve-check-executable-access)
 - [Pair contracts, decoders, and reports](#pair-contracts-decoders-and-reports)
   - [Using a contract-only version 6 document with `:synth`](#using-a-contract-only-version-6-document-with-synth)
   - [Pair contract grammar and validation order](#pair-contract-grammar-and-validation-order)
@@ -88,11 +89,11 @@ and is dense by design; read the overview above first.
 
 ## Startup configuration file
 
-### Versions 1 to 26 at a glance
+### Versions 1 to 28 at a glance
 
 Finite-list-spine Length counterexample ranking is disabled by default. To opt
 in, pass `--length-ranking-config` with an explicitly chosen absolute path to
-a version-1 through version-26 configuration file. Versions 1--3 select scalar
+a version-1 through version-28 configuration file. Versions 1--3 select scalar
 finite-list-spine Length ranking. Version 1 preserves the established
 counterexample-only behavior. Version 2 additionally requires an explicit
 per-input finite box and enables independent bounded validation after a live
@@ -179,8 +180,17 @@ predecessor and adds exact or necessary Natural consequences for one immediate
 binary monus at exactly one relation operand root. Its reverse orientation and
 equality distinguish a uniformly positive, identically zero, or may-zero
 opposite affine expression; it is not general monus or Boolean-union solving.
-Version numbers are closed schema selections rather than cumulative feature
-levels; versions 1--24 remain literal.
+Version 27 is the scalar execve-check executable-access successor and version
+28 is its nominal product sibling. They retain the complete v25/v26 root-monus,
+scoped-v2, deferred-opening, simplification, preference, and contract profiles
+and replace only the closed execution member with
+`"executableLaunch": "descriptor-bound-execve-check-executable-access-v1"`.
+At a demanded live open, Djex retains both effective-credential source VFS
+checks and additionally requires descriptor-bound Linux `AT_EXECVE_CHECK`
+before and after staging, creates the image with `MFD_EXEC`, fixed mode `0500`,
+and the complete executable seal set, and checks that sealed staged descriptor
+once before child allocation. Version numbers are closed schema selections
+rather than cumulative feature levels; versions 1--26 remain literal.
 
 ### Activation, pinning, and worker lifecycle
 
@@ -189,17 +199,18 @@ once at startup, requires the configuration to contain an executable SHA-256
 expectation by default, and retains the decoded contract selection as a fixed
 process-wide assertion. Presence at activation is not a digest match; Djex
 compares the expectation only when an eligible batch later opens a worker.
-V1--v16 use the bounded pre-spawn pathname observation; v17--v26 compare it
-with the sealed staged main image selected for descriptor execution. V21--v26
-add the two point-in-time source VFS execute-access observations; they do not
-claim a complete source exec security decision.
+V1--v16 use the bounded pre-spawn pathname observation; v17--v28 compare it
+with the sealed staged main image selected for descriptor execution. V21--v28
+add the two point-in-time source VFS execute-access observations. V27/v28 also
+add two point-in-time source kernel executable checks and one staged-image
+check; none is a reservation or complete future execution decision.
 `--length-ranking-allow-unpinned` is a separate explicit relaxation;
 `--length-ranking-config-timeout` sets only the bounded file-load interruption
 budget (default 5,000 ms, maximum 60,000 ms). No option discovers a file or
 solver. POSIX configuration-file descriptor acquisition is implemented;
 Windows currently fails
 closed. Versions 1--6 and the established direct runners open one fresh lexical
-solver worker for every eligible batch. Versions 7--26 instead complete all
+solver worker for every eligible batch. Versions 7--28 instead complete all
 admission and preparation, then run each candidate's pure MRU, selected
 positive-affine domain, and origin prefix before IO: an all-pure batch opens no
 process, while
@@ -207,7 +218,7 @@ the first live miss opens one lexical session for that query and the remaining
 suffix. V9/v10 additionally capture one shared usable-work deadline after the
 64-candidate admission gate and before full preparation, so deferred pure work,
 opening, and every live query consume one window instead of receiving a fresh
-batch allowance per query. V13--v26 capture the corresponding dynamically
+batch allowance per query. V13--v28 capture the corresponding dynamically
 scoped v2 owner at the same boundary and add cooperative checkpoints after
 preparation, each complete candidate chain, and result materialization. Any
 structured failure preserves callback order through the established atomic
@@ -1010,7 +1021,7 @@ violation, retains the original receipt and makes no simplification claim.  A
 bounded evaluation rejection during an optional earlier trial does the same;
 structural, anchor, internal, and association failures remain indexed atomic
 failures. This policy is disabled by every established direct runner and
-startup version 1 through 6, while startup versions 7 through 26 require it.
+startup version 1 through 6, while startup versions 7 through 28 require it.
 It is bounded componentwise-lexicographic
 simplification, not global minimality, pruning authority, or a new conclusion
 from Z3.
@@ -2984,9 +2995,10 @@ Validation retains v23/v24's exact root and nested field order, caps, effective-
 ID execution constructor, scoped owner, and scalar/pair contract decoder.
 Only the selected applicable-domain validator and nominal receipt change. The
 generalized dispatcher reaches v25/v26 only after the complete v1--v24 cascade
-returns `UnsupportedVersion`; version 27 is the next unsupported sentinel.
-Every v1--v24 decoder remains literal and rejects the new version or strategy
-wherever its own closed schema does not admit it.
+returns `UnsupportedVersion`; v27/v28 are reached only by the later execve-
+check executable-access decoder. Every v1--v24 decoder remains literal and
+rejects the new version or strategy wherever its own closed schema does not
+admit it.
 
 V25/v26 retain query-owned replay, both non-vacuous preferences,
 counterexample simplification and final-vector MRU promotion, deferred opening,
@@ -3001,6 +3013,217 @@ inherit the same launch strategy. New scalar and pair receipt tags are additive
 evidence identities only: contract, problem, query, wire, fingerprint,
 association, executable, worker, run, and scoped-owner identities remain
 unchanged.
+
+### Startup versions 27 and 28: execve-check executable access
+
+Startup v27 and v28 preserve the complete v25/v26 root-monus applicable-
+domain, scoped-v2 budget, deferred lifecycle, preference, simplification, and
+scalar-v5 or pair-v5 contract roots. They replace only the executable-launch
+selection. Their exported constants are
+`lengthRankingConfigurationFileDescriptorBoundExecveCheckExecutableAccessVersion`
+(27) and
+`lengthRankingConfigurationFileSpinePairDescriptorBoundExecveCheckExecutableAccessVersion`
+(28). Programmatic callers select the same launch with
+`mkLengthRankingPolicyWithDescriptorBoundExecveCheckExecutableAccessLaunch`.
+The complete scalar v27 document is therefore the scalar v25 document
+with only its version and launch literal advanced:
+
+```json
+{
+  "format": "leant-live-length-ranking-configuration",
+  "version": 27,
+  "executionAdmission": {
+    "executablePathCharacters": 4096,
+    "policyFingerprintBytes": 262144
+  },
+  "execution": {
+    "executablePath": "/absolute/path/to/z3",
+    "expectedExecutableSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "solverTimeoutMilliseconds": 1000,
+    "solverResourceLimit": 100000,
+    "hostDeadlineMilliseconds": 1500,
+    "artifactPolicy": "input-values-after-satisfiable",
+    "responseLimits": {
+      "bytes": 65536,
+      "nestingDepth": 64,
+      "nodes": 4096,
+      "tokenBytes": 4096,
+      "integerBits": 4096
+    },
+    "executableLaunch": "descriptor-bound-execve-check-executable-access-v1"
+  },
+  "evaluation": {
+    "assignmentValueBits": 4096,
+    "intermediateValueBits": 4096
+  },
+  "inputBoxValidation": {
+    "inclusiveInputMaximums": [5, 5],
+    "maximumAssignments": 36
+  },
+  "counterexampleProbe": "origin-before-live",
+  "boundedPositiveOrdering": "prefer-non-vacuous",
+  "applicableDomainValidation": {
+    "strategy": "strict-relational-positive-affine-quotient-root-extrema-monus-v1",
+    "maximumInputs": 2,
+    "maximumAssignments": 20
+  },
+  "applicableDomainOrdering": "prefer-non-vacuous",
+  "counterexampleSimplification": {
+    "strategy": "componentwise-lexicographic-v1",
+    "maximumInputs": 2,
+    "maximumAssignments": 36
+  },
+  "liveSessionOpening": "defer-until-live-query",
+  "usableWorkBudget": {
+    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
+    "milliseconds": 30000
+  },
+  "contract": {
+    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
+    "targetArgumentRoles": ["observed-spine", "observed-spine"],
+    "candidateCasePolicy": "cases-rejected",
+    "precondition": [
+      "all",
+      [
+        ["not", ["at-most", ["literal", 5], ["input", 0]]],
+        ["not", ["at-most", ["input", 0], ["input", 1]]]
+      ]
+    ],
+    "postcondition": ["equal", ["result"], ["input", 0]],
+    "providerLaws": []
+  }
+}
+```
+
+The complete nominal pair v28 document is likewise the pair v26 document with
+only the same two selections advanced:
+
+```json
+{
+  "format": "leant-live-length-ranking-configuration",
+  "version": 28,
+  "executionAdmission": {
+    "executablePathCharacters": 4096,
+    "policyFingerprintBytes": 262144
+  },
+  "execution": {
+    "executablePath": "/absolute/path/to/z3",
+    "expectedExecutableSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "solverTimeoutMilliseconds": 1000,
+    "solverResourceLimit": 100000,
+    "hostDeadlineMilliseconds": 1500,
+    "artifactPolicy": "input-values-after-satisfiable",
+    "responseLimits": {
+      "bytes": 65536,
+      "nestingDepth": 64,
+      "nodes": 4096,
+      "tokenBytes": 4096,
+      "integerBits": 4096
+    },
+    "executableLaunch": "descriptor-bound-execve-check-executable-access-v1"
+  },
+  "evaluation": {
+    "assignmentValueBits": 4096,
+    "intermediateValueBits": 4096
+  },
+  "inputBoxValidation": {
+    "inclusiveInputMaximums": [4],
+    "maximumAssignments": 5
+  },
+  "counterexampleProbe": "origin-before-live",
+  "boundedPositiveOrdering": "prefer-non-vacuous",
+  "applicableDomainValidation": {
+    "strategy": "strict-relational-positive-affine-quotient-root-extrema-monus-v1",
+    "maximumInputs": 1,
+    "maximumAssignments": 3
+  },
+  "applicableDomainOrdering": "prefer-non-vacuous",
+  "counterexampleSimplification": {
+    "strategy": "componentwise-lexicographic-v1",
+    "maximumInputs": 1,
+    "maximumAssignments": 9
+  },
+  "liveSessionOpening": "defer-until-live-query",
+  "usableWorkBudget": {
+    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
+    "milliseconds": 30000
+  },
+  "contract": {
+    "resultShape": "binary-prod-spines-v1",
+    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
+    "targetArgumentRoles": ["observed-spine"],
+    "candidateCasePolicy": "cases-rejected",
+    "precondition": [
+      "not",
+      [
+        "at-most",
+        ["sum", [["input", 0], ["literal", 3]]],
+        ["scale", 2, ["input", 0]]
+      ]
+    ],
+    "postcondition": [
+      "all",
+      [
+        ["equal", ["result", "first"], ["input", 0]],
+        ["equal", ["result", "second"],
+          ["quotient", 2, ["input", 0]]]
+      ]
+    ],
+    "providerLaws": []
+  }
+}
+```
+
+The required launch literal is exactly
+`"descriptor-bound-execve-check-executable-access-v1"`. V27/v28 retain
+v25/v26's exact root and nested field sets, caps, and demand order. The
+execution decoder checks response limits first, then executable path, digest,
+the 60,000-ms solver-timeout cap, the 10,000,000 resource cap, the 65,000-ms
+host-deadline cap, and artifact policy before requiring the launch field's
+string type and exact literal and sealing the Djex policy. Evaluation, input
+box, origin probe, bounded-positive preference, root-monus applicable-domain
+limits, applicable-domain preference, simplification, deferred opening,
+scoped-v2 budget, and scalar-v5 or pair-v5 contract retain their v25/v26
+order. The generalized dispatcher reaches v27/v28 only after the complete
+v1--v26 cascade returns `UnsupportedVersion`; version 29 is the next
+unsupported sentinel. Every v1--v26 entrance remains literal and rejects the
+new version, member, or launch literal wherever its closed schema does not
+admit it.
+
+Loading, activation, and policy construction remain pure. An all-pure deferred
+batch opens no source descriptor, invokes no access checker, creates no staged
+image, and launches no worker. At the first demanded live miss, the Linux
+opener performs source `faccessat2(..., X_OK, AT_EMPTY_PATH | AT_EACCESS)` and
+source `execveat(..., AT_EMPTY_PATH | AT_EXECVE_CHECK)` before copying. It
+creates the staged image with `MFD_EXEC`, hashes and pins the copied bytes,
+sets mode `0500`, and adds and verifies the write, grow, shrink, future-write,
+exec, and final-seal prohibitions. After its deterministic hook it repeats
+both source checks and checks the sealed staged descriptor once before child
+allocation. Only then may the established descriptor-only spawn path run.
+There is no pathname, older-launch, non-`MFD_EXEC`, reduced-seal, or unchecked
+fallback. On a stock Linux 5.15 kernel the first source exec check fails closed
+as unavailable before staging or child allocation; Linux 6.14 or later is
+necessary but not sufficient for live admission.
+
+Source or staged denial maps through Djex to the existing executable-rejected
+Leant session path; checker unavailable or failed maps through the existing launch-
+failed path. Leant introduces no failure class, and any access, staging, live,
+replay, forcing, or finalization failure still atomically restores literal
+original order. The new execution-policy, raw-process, ready-worker, and
+fresh/shared/scoped scalar and pair run identities are operationally domain-
+separated. Contract, root-monus problem, query, wire, receipt, replay,
+association, presentation, and scoped-owner semantics remain unchanged.
+
+The checks are point-in-time observations, not reservations or source-
+authorization transfers. `AT_EXECVE_CHECK` deliberately ignores file-format
+and interpreter dependencies, and this profile does not attest every later
+`bprm` decision, credential transition, source metadata, loader, interpreter,
+library, solver behavior, result, proof, or pruning authority. Main emits the
+following fixed classifier-derived notice without claiming completed IO:
+
+```text
+Descriptor-bound execve-check executable-access launch selected; the opened source must pass Linux faccessat2 X_OK under effective filesystem credentials and AT_EXECVE_CHECK before copying and again immediately before child allocation; the sealed staged image must pass AT_EXECVE_CHECK immediately before child allocation; any configured digest is checked against the sealed staged main-image bytes.
+```
 
 ## Pair contracts, decoders, and reports
 
@@ -3036,9 +3259,9 @@ required, and its case policy is exactly `"cases-rejected"` or
 ### Decoder compatibility and reports
 
 The old scalar decoders remain exact compatibility entrances: the startup
-decoder for versions 1--3 rejects v4--v26, and the contract-only decoder for
+decoder for versions 1--3 rejects v4--v28, and the contract-only decoder for
 versions 1--5 rejects v6. The generalized decoders delegate those old versions
-to their unchanged scalar paths and add startup v4--v26 or contract-only v6. A
+to their unchanged scalar paths and add startup v4--v28 or contract-only v6. A
 product file selects which nominal runner Main calls; it does not infer a
 contract from the Lean type, bypass the exact canonical-`Prod` handoff, turn
 solver status into evidence, or grant pruning authority. See the
@@ -3085,6 +3308,10 @@ The v25/v26 root-monus laws, zero-boundary admission, inherited lifecycle,
 nominal receipts, presentation, and unchanged older identities are recorded in
 the
 [root-monus Length ranking report](reports/2026-08-15-root-monus-length-ranking.md).
+The v27/v28 descriptor-bound kernel executable checks, inherited root-monus/
+scoped profile, closed schema, failure mapping, and unchanged behavioral
+authority are recorded in the
+[execve-check descriptor-bound Length/Z3 launch report](reports/2026-08-15-execve-check-descriptor-bound-length-z3-launch.md).
 Djex's underlying strict extraction boundary is in its
 [strict relational positive-affine applicable-domain report](../lib/Djex/docs/reports/2026-08-15-strict-relational-positive-affine-length-applicable-domain.md).
 The quotient-consequence extraction, receipt, authority, and identity boundary
@@ -3099,6 +3326,9 @@ replay precedence, receipt authority, and identity boundary are in Djex's
 Djex's underlying two-point source-access and sealed-image execution authority
 is recorded in the
 [effective-ID descriptor-bound Z3 launch report](../lib/Djex/docs/reports/2026-08-15-effective-id-descriptor-bound-z3-launch.md).
+Djex's lower-level source/staged exec-check lifecycle, identities, and narrow
+kernel authority are recorded in the
+[execve-check descriptor-bound Z3 launch report](../lib/Djex/docs/reports/2026-08-15-execve-check-descriptor-bound-z3-launch.md).
 
 ## Presentation notes on the Main path
 
@@ -3138,7 +3368,7 @@ Main's v7--v10 path can produce only the literal-ceiling positive-affine receipt
 family; v11--v14 can produce only the relational family; v15--v18 can produce
 only the strict-relational family; v19--v22 can produce only the root-quotient
 successor family; v23/v24 can produce only the root-extrema successor family;
-v25/v26 can produce only the root-monus successor family; v1--v6 cannot produce
+v25--v28 can produce only the root-monus successor family; v1--v6 cannot produce
 any applicable-domain family. The semantic note
 never projects the receipt's private provider-name list. Disabled assessment,
 rejected input, heuristic status,

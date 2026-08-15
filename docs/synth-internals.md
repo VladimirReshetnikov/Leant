@@ -33,7 +33,7 @@ who wants the *what* can stop at the paragraph.
   - [`Configuration.File`: the versioned JSON grammar](#configurationfile-the-versioned-json-grammar)
   - [File versions 1 through 4](#file-versions-1-through-4)
   - [File versions 5 through 10](#file-versions-5-through-10)
-  - [File versions 11 through 26](#file-versions-11-through-26)
+  - [File versions 11 through 28](#file-versions-11-through-28)
   - [File acquisition](#file-acquisition)
   - [Contract-only files and the length-contract command](#contract-only-files-and-the-length-contract-command)
   - [Integration and one-shot contracts](#integration-and-one-shot-contracts)
@@ -278,7 +278,7 @@ Only the separate
 `enableLengthRankingNonVacuousApplicableDomainPreference` moves an established
 receipt with a positive applicable-assignment count into a stable preferred
 partition. Startup versions 1--6 cannot enable either policy, so their file
-behavior is exact. Startup v7--v26 enable that same preference with their
+behavior is exact. Startup v7--v28 enable that same preference with their
 nominal literal-ceiling, relational, strict-relational, or strict-relational
 root-quotient, root-extrema, or root-monus positive-affine validator; direct-v1
 validation remains programmatic-only.
@@ -411,8 +411,10 @@ normalized formula remains exhaustive replay authority.
 
 Startup v25/v26 select only the new scalar/product receipt family while
 retaining v23/v24's effective-ID launch, scoped lifecycle, deferred opening,
-preferences, simplification, and contracts. Only complete query-owned replay
-can release
+preferences, simplification, and contracts. Startup v27/v28 retain that same
+receipt family and behavioral bundle but replace only the launcher with the
+execve-check successor described below. Only complete query-owned replay can
+release
 `StrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainEstablished`
 or
 `LengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainEstablished`;
@@ -497,7 +499,7 @@ Exceptions propagate instead of producing a ranking. Legacy v1--v8 and
 relational startup v11/v12 retain separate lifecycle and per-query budgets. An
 explicitly v1-budgeted programmatic policy or startup v9/v10 instead places
 admitted preparation and deferred ranking beneath one runtime-unscoped shared
-owner. Startup v13--v26 and the scoped programmatic builder use the additive
+owner. Startup v13--v28 and the scoped programmatic builder use the additive
 owner-thread-affine v2 lease and cooperative phase checkpoints. Neither owner
 claims asynchronous interruption of arbitrary callback code. Main invokes
 this foundation only after the explicit startup opt-in described above; it
@@ -575,6 +577,8 @@ case lengthRankingPolicyExecutableLaunchStrategy descriptorPolicy of
     error "impossible for this constructor"
   LengthSMTLibDescriptorBoundEffectiveIDExecutableAccessLaunch ->
     error "impossible for this constructor"
+  LengthSMTLibDescriptorBoundExecveCheckExecutableAccessLaunch ->
+    error "impossible for this constructor"
 ```
 
 This construction is pure. It does not open, hash, copy, seal, or launch the
@@ -598,6 +602,8 @@ case lengthRankingPolicyExecutableLaunchStrategy effectiveAccessPolicy of
     error "impossible for this constructor"
   LengthSMTLibDescriptorBoundExecutableLaunch ->
     error "impossible for this constructor"
+  LengthSMTLibDescriptorBoundExecveCheckExecutableAccessLaunch ->
+    error "impossible for this constructor"
 ```
 
 This maker is equally pure and retains the same execution-before-evaluation
@@ -609,6 +615,38 @@ staged memfd has fixed mode `0500`, and unsupported checks fail closed without
 falling back to either established strategy. The policy and configured-mode
 projections expose only the third closed classifier, never credentials,
 access results, descriptors, or source metadata.
+
+The execve-check executable-access sibling is the fourth pure selection:
+
+```haskell
+execveCheckPolicy <-
+  mkLengthRankingPolicyWithDescriptorBoundExecveCheckExecutableAccessLaunch
+    policySource
+
+case lengthRankingPolicyExecutableLaunchStrategy execveCheckPolicy of
+  LengthSMTLibDescriptorBoundExecveCheckExecutableAccessLaunch ->
+    assessVerifiedLengthCandidatesWithPolicy
+      execveCheckPolicy scalarContract verificationBatch
+  LengthSMTLibPathSnapshotThenDirectSpawn ->
+    error "impossible for this constructor"
+  LengthSMTLibDescriptorBoundExecutableLaunch ->
+    error "impossible for this constructor"
+  LengthSMTLibDescriptorBoundEffectiveIDExecutableAccessLaunch ->
+    error "impossible for this constructor"
+```
+
+Construction preserves the same execution-before-evaluation failure order and
+does no IO. At a demanded Linux live open, Djex pairs each of the two source
+`faccessat2` observations with descriptor-bound `AT_EXECVE_CHECK`, creates the
+staged image with `MFD_EXEC`, fixes mode `0500`, adds and verifies write, grow,
+shrink, future-write, exec, and final seals, then checks the sealed staged image
+once before child allocation. The compiled-backend classifier is not a runtime
+kernel probe: a stock 5.15 kernel fails closed at the first source exec check,
+while 6.14 or later remains conditional on active kernel policy. There is no
+path, older-maker, non-`MFD_EXEC`, reduced-seal, or unchecked fallback. The
+policy and configured-mode projections reveal only the fourth closed
+classifier, not descriptors, credentials, check results, requested staging
+flags, or runtime admission.
 
 The finite box is
 enabled by its explicit builder or the version-2 decoder; versions 3 and 4
@@ -631,7 +669,10 @@ only the executable-launch strategy with the effective-ID executable-access
 sibling. Versions 23 and 24 retain those complete effective-ID/scoped bundles
 and replace only the applicable-domain strategy with the root-extrema
 successor. Versions 25 and 26 retain the v23/v24 bundle and replace only that
-strategy with the cumulative root-monus successor. Programmatic callers opt
+strategy with the cumulative root-monus successor. Versions 27 and 28 retain
+the complete v25/v26 behavioral/scoped bundle and replace only the executable-
+launch strategy with the execve-check executable-access sibling. Programmatic
+callers opt
 in with `enableLengthRankingUsableWorkBudget` or
 `enableLengthRankingScopedUsableWorkBudget`; both builders are pure and create
 no evidence, and the last budget builder applied determines the strategy.
@@ -665,14 +706,15 @@ Legacy v1--v8 and startup v11/v12 lifecycle and per-query budgets remain
 separate. A policy derived with `enableLengthRankingUsableWorkBudget`, including
 startup v9/v10, instead owns one additive runtime-unscoped v1 usable-work
 window. A policy derived with `enableLengthRankingScopedUsableWorkBudget`,
-including startup v13--v26, owns the owner-thread-affine v2 lease, cooperative
+including startup v13--v28, owns the owner-thread-affine v2 lease, cooperative
 checkpoints, and outer post-finalizer observation described above. There are no
 execution defaults, executable discovery, path normalization, or environment
 reads. The digest is only an optional expectation for Djex's
 live executable observation. V1--v16 retain the explicitly weaker pathname
-snapshot; v17--v26 compare the expectation with the sealed staged main image.
-V21--v26 additionally require the two point-in-time effective-ID source-access
-checks described above. Neither choice attests loaders, libraries, or solver
+snapshot; v17--v28 compare the expectation with the sealed staged main image.
+V21--v28 additionally require the two point-in-time effective-ID source-access
+checks described above. V27/v28 also require two source and one staged
+`AT_EXECVE_CHECK` observations. None attests loaders, libraries, or solver
 semantics. See the
 [explicit live Length ranking configuration report](reports/2026-08-11-explicit-live-length-ranking-configuration.md).
 The later
@@ -685,8 +727,8 @@ preserving the version-1 compatibility path.
 `Leant.Synth.Length.Configuration.File` keeps the exact version-1 JSON grammar
 for that policy and adds exact scalar opt-in versions 2 and 3. Its established
 `decodeLengthRankingConfigurationFile` remains an exact scalar-only entrance
-and rejects versions 4--26. The generalized
-`decodeLengthAssessmentConfigurationFile` additionally accepts versions 4--26
+and rejects versions 4--28. The generalized
+`decodeLengthAssessmentConfigurationFile` additionally accepts versions 4--28
 and returns an opaque `DisabledLengthAssessmentConfiguration` carrying the same
 checked process policy beside a lazy scalar-or-pair selection. The pure decoder consumes a caller-owned
 strict byte string through a separate bounded JSON parser, rejects malformed
@@ -707,9 +749,10 @@ Z3. Neither grants proof, solver-status, or contract authority. There is no
 automatic path, environment or executable discovery, or autoload behavior.
 The explicit CLI loader uses the same 256-KiB bound before activation. The
 optional digest remains only an expectation until live opening. V1--v16 compare
-it with the pre-spawn pathname snapshot; v17--v26 compare it with the sealed
+it with the pre-spawn pathname snapshot; v17--v28 compare it with the sealed
 staged main image, still without loader, library, or solver attestation.
-V21--v26 add only the point-in-time effective-ID source VFS access policy. The
+V21--v28 add the point-in-time effective-ID source VFS access policy; v27/v28
+also select the separately versioned source/staged kernel exec-check policy. The
 complete schema and budgets are recorded in the
 [bounded live Length ranking configuration-file report](reports/2026-08-11-bounded-live-length-ranking-configuration-file.md).
 
@@ -790,7 +833,7 @@ this additive parser only after the unchanged v1--v8 chain reports its closed
 unsupported-version sentinel, so every old success, diagnostic, schema and
 identity stays literal.
 
-### File versions 11 through 26
+### File versions 11 through 28
 
 Versions 11 and 12 are the relational positive-affine scalar and product
 siblings of v7/v8. They reuse that exact root, field identities, caps, and
@@ -839,9 +882,9 @@ same order as v15/v16. The generalized dispatcher reaches these versions only
 after the complete v1--v16 cascade returns UnsupportedVersion; v19/v20 are
 handled only by the later quotient-consequence decoder, and v21/v22 by its
 effective-ID launch successor; v23/v24 are handled by the still later
-root-extrema decoder, and v25/v26 by its root-monus successor. Decoding and activation
-remain pure, and an all-pure deferred batch still opens no executable
-descriptor or worker.
+root-extrema decoder, v25/v26 by its root-monus successor, and v27/v28 by the
+execve-check launch successor. Decoding and activation remain pure, and an
+all-pure deferred batch still opens no executable descriptor or worker.
 
 Versions 19 and 20 retain that exact descriptor/scoped root, execution object,
 deferred lifecycle, preference and simplification policies, budget, and
@@ -852,8 +895,9 @@ with
 The generalized dispatcher reaches them only after the complete v1--v18
 cascade returns UnsupportedVersion; v21/v22 are handled only by their later
 effective-ID executable-access decoder, and v23/v24 by its root-extrema
-successor; v25/v26 are handled by the later root-monus decoder. The new nominal assessment and
-renderer branches require complete
+successor; v25/v26 are handled by the later root-monus decoder and v27/v28 by
+the execve-check launch decoder. The new nominal assessment and renderer
+branches require complete
 query-owned finite-box replay and add no solver, proof, or pruning authority.
 
 Versions 21 and 22 retain v19/v20's exact quotient/scoped root, execution
@@ -867,7 +911,8 @@ order before the launch type/literal check; every later field remains in
 v19/v20 order. The generalized dispatcher reaches them only after the complete
 v1--v20 cascade returns UnsupportedVersion; v23/v24 are handled only by their
 later root-extrema decoder, and v25/v26 by its root-monus successor. Every
-v1--v22 schema remains literal.
+v1--v22 schema remains literal. V27/v28 are handled only by their later
+execve-check launch successor.
 
 At a demanded live open the source must pass Linux
 `faccessat2(fd, "", X_OK, AT_EMPTY_PATH | AT_EACCESS)` before copy and again
@@ -893,7 +938,7 @@ The version constants are
 `lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaVersion`
 (24). The generalized dispatcher reaches them only after the complete v1--v22
 cascade returns `UnsupportedVersion`; v25/v26 are handled only by the later
-root-monus decoder.
+root-monus decoder, and v27/v28 only by its execve-check launch successor.
 
 Validation retains v21/v22's exact field and diagnostic order. Only the
 selected Djex applicable-domain validator and nominal scalar or pair receipt
@@ -920,8 +965,8 @@ The version constants are
 (25) and
 `lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusVersion`
 (26). The generalized dispatcher reaches them only after the complete v1--v24
-cascade returns `UnsupportedVersion`; version 27 is the next unsupported
-sentinel. Every v1--v24 entrance remains literal.
+cascade returns `UnsupportedVersion`; v27/v28 are handled only by the later
+execve-check launch decoder. Every v1--v24 entrance remains literal.
 
 Validation retains v23/v24's exact root, nested field, and diagnostic order.
 Only the selected Djex validator and nominal scalar or pair receipt change.
@@ -939,6 +984,49 @@ matching nominal assessment. The complete boundary is recorded in the
 [root-monus Length ranking report](reports/2026-08-15-root-monus-length-ranking.md),
 with Djex's proof and receipt boundary in the
 [root-monus applicable-domain report](../lib/Djex/docs/reports/2026-08-15-root-monus-length-applicable-domain.md).
+
+Versions 27 and 28 retain v25/v26's exact root-monus applicable-domain policy,
+root fields, scoped-v2 owner, deferred lifecycle, preferences, simplification,
+budget, and scalar-v5/pair-v5 contract grammars. They replace only the required
+launch literal with
+`"descriptor-bound-execve-check-executable-access-v1"` and seal execution
+with
+`mkLengthSMTLibDescriptorBoundExecveCheckExecutableAccessExecutionConfig`.
+Their public constants are
+`lengthRankingConfigurationFileDescriptorBoundExecveCheckExecutableAccessVersion`
+(27) and
+`lengthRankingConfigurationFileSpinePairDescriptorBoundExecveCheckExecutableAccessVersion`
+(28). The generalized dispatcher reaches them only after the complete v1--v26
+cascade returns `UnsupportedVersion`; version 29 is the next unsupported
+sentinel. Every v1--v26 entrance remains literal.
+
+Validation retains v25/v26's exact root, nested field, cap, and diagnostic
+order. In the execution object, response limits, path, digest, timeout,
+resource, deadline, and artifact policy precede the launch type/literal and
+Djex sealing; every behavioral, budget, and contract field follows in the
+unchanged v25/v26 order. Loading and activation are pure, and an all-pure
+deferred batch opens no descriptor, invokes no access checker, stages no image,
+and launches no worker. A demanded live open retains both source `faccessat2`
+checks, pairs them with two source `AT_EXECVE_CHECK` observations, creates an
+`MFD_EXEC` image with fixed `0500` and verified write/grow/shrink/future-write/
+exec/final seals, then checks the sealed staged image once before child
+allocation. A stock 5.15 kernel fails closed at the first source exec check;
+6.14 or later is necessary but not sufficient. There is no pathname, older-
+strategy, non-`MFD_EXEC`, reduced-seal, or unchecked fallback.
+
+Denial maps through the existing executable-rejected path; unavailable or
+failed checks map through the existing launch-failed path. Leant adds no
+failure class, and any operational failure preserves batch-wide original-order
+atomic fallback. Djex selects new execution-policy, process, ready-worker, and
+fresh/shared/scoped scalar/product run identities. The inherited root-monus
+contract, problem, query, wire, receipt, replay, association, and presentation
+identities remain literal. `AT_EXECVE_CHECK` is point-in-time and deliberately
+ignores format and interpreter dependencies; it grants no source-authorization
+transfer, later `bprm` or credential-transition claim, loader/library/solver
+authority, proof, or pruning authority. The complete Leant boundary is in the
+[execve-check descriptor-bound Length/Z3 launch report](reports/2026-08-15-execve-check-descriptor-bound-length-z3-launch.md),
+with Djex's lower-level lifecycle and exact identities in the
+[execve-check descriptor-bound Z3 launch report](../lib/Djex/docs/reports/2026-08-15-execve-check-descriptor-bound-z3-launch.md).
 
 ### File acquisition
 
