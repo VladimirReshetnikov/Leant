@@ -4572,6 +4572,7 @@ assertLengthUsableWorkBudgetLiveAggregate :: IO ()
 assertLengthUsableWorkBudgetLiveAggregate = do
   identity <- buildOneInputLengthRankingCandidate
   (_, pairCandidate) <- buildLengthSpinePairRankingFixture
+  let aggregateCandidateCount = 12
   withFakeLengthSolver "query-delay-300ms" $ \executable -> do
     (legacy, _) <- expectPositiveAffinePolicy
       $ positiveAffineScalarDocument executable
@@ -4587,14 +4588,16 @@ assertLengthUsableWorkBudgetLiveAggregate = do
       BS.readFile (executable ++ ".events")
 
     (budgeted, _) <- expectUsableWorkBudgetPolicy
-      $ usableWorkBudgetScalarDocument executable 500
+      $ usableWorkBudgetScalarDocument executable 3000
     expired <- expectLengthRankingWithin "v9 aggregate scalar usable work"
       $ rankVerifiedLengthCandidatesWithPolicy budgeted
-          usableWorkScalarLiveContract [identity, identity]
+          usableWorkScalarLiveContract
+          (replicate aggregateCandidateCount identity)
     map rankedLengthCandidateOriginalIndex
-        (lengthRankingCandidates expired) @?= [0, 1]
+        (lengthRankingCandidates expired) @?=
+      take aggregateCandidateCount [0 ..]
     assertScalarUsableWorkExpiry "aggregate scalar" expired
-    assertFakeLengthQueryEvents [0, 1] [] =<<
+    assertCompactBudgetedLiveOrdinals "scalar" aggregateCandidateCount =<<
       BS.readFile (executable ++ ".events")
 
   withFakeLengthSolver "query-delay-300ms" $ \executable -> do
@@ -4611,15 +4614,28 @@ assertLengthUsableWorkBudgetLiveAggregate = do
       BS.readFile (executable ++ ".events")
 
     (budgeted, _) <- expectUsableWorkBudgetPolicy
-      $ usableWorkBudgetPairDocument executable 500
+      $ usableWorkBudgetPairDocument executable 3000
     expired <- expectRight =<<
       rankVerifiedLengthSpinePairCandidatesWithPolicy budgeted
-        usableWorkPairLiveContract [pairCandidate, pairCandidate]
+        usableWorkPairLiveContract
+        (replicate aggregateCandidateCount pairCandidate)
     map rankedLengthSpinePairCandidateOriginalIndex
-        (lengthSpinePairRankingCandidates expired) @?= [0, 1]
+        (lengthSpinePairRankingCandidates expired) @?=
+      take aggregateCandidateCount [0 ..]
     assertPairUsableWorkExpiry "aggregate pair" expired
-    assertFakeLengthQueryEvents [0, 1] [] =<<
+    assertCompactBudgetedLiveOrdinals "pair" aggregateCandidateCount =<<
       BS.readFile (executable ++ ".events")
+ where
+  assertCompactBudgetedLiveOrdinals label maximumChecks events = do
+    let checks = byteStringOccurrenceCount
+          (BS.pack "EVENT query-check ") events
+    assertBool
+      (label ++ " aggregate budget expired before two live ordinals")
+      $ checks >= 2
+    assertBool
+      (label ++ " aggregate budget exceeded the admitted batch")
+      $ checks <= maximumChecks
+    assertFakeLengthQueryEvents [0 .. checks - 1] [] events
 
 assertLengthUsableWorkBudgetStrictResults :: IO ()
 assertLengthUsableWorkBudgetStrictResults = do
@@ -10844,10 +10860,7 @@ assertLengthAssessmentConfigurationFileSpinePairV4Precedence =
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion
       $ setJsonField ["version"]
-          (Json.JInt
-            $ toInteger
-                lengthRankingConfigurationFileSpinePairPositiveAffineVersion
-            + 1)
+          (Json.JInt 13)
       $ addJsonField [] ("private-root", Json.JNull) base
     let badLegacy = setJsonField ["execution", "executablePath"]
           (Json.JStr "private-relative-z3")
@@ -11073,11 +11086,8 @@ assertLengthAssessmentConfigurationFilePositiveOrderingPrecedence =
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion
       $ setJsonField ["version"]
-          (Json.JInt
-            $ toInteger
-                lengthRankingConfigurationFileSpinePairPositiveAffineVersion
-            + 1)
-      $ addJsonField [] ("private-v7", Json.JNull) pairBase
+          (Json.JInt 13)
+      $ addJsonField [] ("private-v13", Json.JNull) pairBase
 
     -- New-version precedence repeats the established operational sequence and
     -- inserts the closed ordering choice immediately before the contract.
