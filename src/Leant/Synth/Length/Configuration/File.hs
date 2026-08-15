@@ -4,7 +4,7 @@
 -- | Closed, bounded versioned file grammar for explicit live Length ranking
 -- policy.
 --
--- Version 1 remains the exact compatibility grammar.  Version 2 adds one
+-- Version 1 is this revision's baseline grammar.  Version 2 adds one
 -- required, explicit finite input-box validation policy.  Version 3 retains
 -- that exact box and additionally requires a closed query-owned origin-probe
 -- selection.  Version 4 is the nominal binary-product sibling.  Generalized-
@@ -19,8 +19,9 @@
 -- Versions 13 and 14 compose that relational validator with the version-9/
 -- version-10 root shape and select the scoped, checkpointed shared usable-work
 -- owner.  Versions 15 and 16 retain that latest scoped root and select the
--- strict relational positive-affine validator.  Older decoders and grammars
--- remain literal.  Versions 17 and 18 retain the complete version-15/version-
+-- strict relational positive-affine validator.  In this revision, the older
+-- decoder branches retain those specified shapes.  Versions 17 and 18 retain
+-- the complete version-15/version-
 -- 16 policy while selecting descriptor-bound executable launch through one
 -- required nested execution discriminator.
 -- Versions 19 and 20 retain that complete descriptor-bound/scoped profile and
@@ -41,12 +42,17 @@
 -- Versions 29 and 30 retain that complete execve-check/scoped profile and
 -- replace only the applicable-domain strategy with bounded Boolean finite-
 -- union closure and enumeration.
+-- Versions 31 and 32 retain that profile and add bounded atomic alternatives
+-- for immediate root extrema and may-zero monus.  Versions 33 and 34 retain
+-- it again and add recursive piecewise-affine extrema/monus decomposition.
+-- These numbers discriminate schemas in the current experimental revision;
+-- they are not a stability or backward-compatibility promise.
 -- Decoding performs no discovery, path normalization, environment lookup, or
 -- IO.  Every field is required.  A successful decode returns a deliberately
 -- disabled opaque value: callers
 -- must separately choose whether an absent executable digest pin is
--- acceptable before they can obtain the validated policy and this file's
--- fixed compatibility contract.
+-- acceptable before they can obtain the validated policy and this revision's
+-- decoded contract.
 module Leant.Synth.Length.Configuration.File
   ( lengthRankingConfigurationFileFormat
   , lengthRankingConfigurationFileVersion
