@@ -6,8 +6,8 @@
 -- session.  It first productively bounds the complete input, then prepares
 -- every checked problem and canonical query before launching a worker.
 -- Eligible candidates are processed serially in original order.  The
--- compatibility path opens one rank-N scope before the first candidate; the
--- additive deferred path enters that one scope only at the first actual live
+-- eager programmatic path opens one rank-N scope before the first candidate;
+-- the additive deferred path enters that one scope only at the first actual live
 -- miss, and an all-pure batch opens none.  Before a later live call, at most
 -- four exact counterexample
 -- input vectors are independently validated and replayed in newest-first
@@ -840,8 +840,8 @@ rankVerifiedLengthCandidatesWithRankingPolicies
 
 
 -- | Complete policy entrance with an explicit worker-opening strategy.  This
--- is package-private so configuration versions can opt in without widening
--- the established public ranking surface.
+-- is package-private so programmatic policies and the current startup decoder
+-- can opt in without widening the established public ranking surface.
 rankVerifiedLengthCandidatesWithRankingPoliciesAndLiveSessionOpening
   :: LengthInputBoxRankingPolicy
   -> LengthApplicableDomainRankingPolicy

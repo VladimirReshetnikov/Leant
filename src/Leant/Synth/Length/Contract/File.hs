@@ -3,7 +3,7 @@
 -- | Closed, bounded contract-only grammar for one synthesis request.
 --
 -- This document contains no executable, solver, replay, activation, or
--- process policy. Version 1 reuses the exact compatibility grammar; version 2
+-- process policy. Version 1 is the baseline scalar grammar; version 2
 -- adds positive-literal Natural modulo; version 3 additionally requires an
 -- exact source-ordered target-role vector; version 4 requires the exact-case
 -- policy; version 5 adds positive-literal Natural quotient while requiring
@@ -55,19 +55,17 @@ import Leant.Synth.Length.Contract
 lengthContractFileFormat :: Text
 lengthContractFileFormat = "leant-finite-list-spine-length-contract"
 
--- | The preserved base version, identical to the startup compatibility
--- contract grammar.
+-- | The preserved base contract-only scalar grammar.
 lengthContractFileVersion :: Natural
 lengthContractFileVersion = 1
 
--- | Contract-only version 2 adds positive-literal Natural modulo while the
--- startup compatibility configuration remains fixed at version 1.
+-- | Contract-only version 2 adds positive-literal Natural modulo.
 lengthContractFileModuloVersion :: Natural
 lengthContractFileModuloVersion = 2
 
 -- | Contract-only version 3 retains the version-2 expression grammar and
 -- requires explicit observed-spine/unobserved-target roles for every physical
--- target argument. The startup compatibility configuration remains version 1.
+-- target argument.
 lengthContractFileTargetRolesVersion :: Natural
 lengthContractFileTargetRolesVersion = 3
 
@@ -79,7 +77,7 @@ lengthContractFileExactCaseVersion = 4
 
 -- | Contract-only version 5 retains roles, modulo, and an explicit case
 -- policy, and adds positive-literal Natural quotient. It accepts either the
--- case-rejecting or exact zero/step policy without changing startup version 1.
+-- case-rejecting or exact zero/step policy.
 lengthContractFileQuotientVersion :: Natural
 lengthContractFileQuotientVersion = 5
 
@@ -89,7 +87,7 @@ lengthContractFileQuotientVersion = 5
 lengthContractFileSpinePairVersion :: Natural
 lengthContractFileSpinePairVersion = 6
 
--- | The contract-only format deliberately uses the compatibility grammar's
+-- | The contract-only format deliberately uses the baseline grammar's
 -- complete parser ceiling.  More specific contract limits still win at their
 -- established maximum-plus-one observations.
 lengthContractFileJsonLimits :: BoundedJsonLimits

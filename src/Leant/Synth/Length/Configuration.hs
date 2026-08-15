@@ -5,9 +5,9 @@
 -- independent optional origin-probe, finite input-box, complete applicable-
 -- domain, and non-vacuous positive-ordering policies, while a
 -- 'LeanLengthContract' is supplied
--- separately for each ranking request.  The
--- versioned configuration-file grammar retains its fixed startup contract
--- beside this policy without introducing a second generic aggregate.
+-- separately for each ranking request.  The versionless startup-file grammar
+-- retains its explicitly selected scalar or binary-product contract beside
+-- this policy without introducing a second generic aggregate.
 --
 -- A successful value does not establish that the configured path resolves to
 -- a usable executable, that a later live-session executable inspection matches
@@ -377,8 +377,8 @@ mkLengthRankingPolicyWithDescriptorBoundExecveCheckExecutableAccessLaunch
 -- | Assemble one reusable policy from already validated Djex execution and
 -- replay authorities with the origin probe and finite-box validation disabled.
 -- No validation is repeated and no IO is performed.
--- This bridge is used by the closed compatibility-file decoder after it has
--- preserved the same execution-before-evaluation validation precedence.
+-- The current startup decoder uses this bridge after preserving
+-- execution-before-evaluation validation precedence.
 lengthRankingPolicyFromValidatedComponents
   :: LengthSMTLibExecutionConfig
   -> LengthEvaluationLimits

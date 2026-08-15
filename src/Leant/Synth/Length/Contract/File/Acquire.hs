@@ -1,8 +1,8 @@
 -- | Bounded acquisition of one explicit one-shot Length contract file.
 --
 -- Admission and transport reuse the same single-owner descriptor boundary as
--- the startup compatibility file.  This facade exposes only contract-file
--- vocabulary and can never decode or retain execution policy.
+-- the versionless startup configuration file.  This facade exposes only
+-- contract-file vocabulary and can never decode or retain execution policy.
 module Leant.Synth.Length.Contract.File.Acquire
   ( lengthContractFileDefaultTimeoutMilliseconds
   , lengthContractFileMaximumPathCharacters

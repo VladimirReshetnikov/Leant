@@ -4749,7 +4749,7 @@ lengthCounterexampleSimplificationTests = testGroup
       "clear strict metadata when a later indexed failure resets the batch"
       assertLengthCounterexampleSimplificationAtomicReset
   , testCase
-      "keep the builder persistent and every established file schema closed"
+      "keep the builder persistent and the base policy immutable"
       assertLengthCounterexampleSimplificationPolicyIsolation
   ]
 
