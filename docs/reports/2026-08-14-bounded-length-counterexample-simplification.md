@@ -110,7 +110,9 @@ Focused scalar and product regressions pin:
 - strict live-model reductions and exact inspected counts;
 - final-vector MRU reuse and compact live transactions;
 - ordinary fallback for unavailable, unchanged, and trial-evaluation cases;
-- indexed atomic handling for structural and association failures;
+- later indexed operational failure clearing earlier strict metadata, while
+  Djex's closed tests and Leant's exhaustive mapping pin the structurally
+  unforgeable simplification and association failures;
 - builder composition, base-policy immutability, and disabled compatibility;
 - exact occurrence association and bounded scalar/product presentation; and
 - unchanged query bytes, fingerprints, protocol, and live ordering.

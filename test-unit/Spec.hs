@@ -216,6 +216,7 @@ import Leant.Synth.Length.Configuration
   , LengthRankingPolicy
   , LengthRankingPolicySource (..)
   , enableLengthRankingApplicableDomainValidation
+  , enableLengthRankingCounterexampleSimplification
   , enableLengthRankingInputBoxValidation
   , enableLengthRankingNonVacuousApplicableDomainPreference
   , enableLengthRankingNonVacuousInputBoxPreference
@@ -358,8 +359,11 @@ import Leant.Synth.Length.Presentation
   , presentLengthSpinePairPostVerificationResult
   , renderLengthApplicableDomainValidationNote
   , renderLengthCounterexampleNote
+  , renderLengthCounterexampleSimplificationNote
   , renderLengthInputBoxValidationNote
   , renderLengthSpinePairApplicableDomainValidationNote
+  , renderLengthSpinePairCounterexampleNote
+  , renderLengthSpinePairCounterexampleSimplificationNote
   , renderLengthSpinePairInputBoxValidationNote
   )
 import Leant.Synth.Length.Ranking
@@ -379,6 +383,7 @@ import Leant.Synth.Length.Ranking
   , rankVerifiedLengthCandidates
   , rankVerifiedLengthCandidatesWithInputBoxValidation
   , rankedLengthCandidateAssessment
+  , rankedLengthCandidateCounterexampleSimplification
   , rankedLengthCandidateOriginalIndex
   , rankedLengthCandidatePreparationRefusal
   , rankedLengthCandidateVerified
@@ -397,6 +402,7 @@ import Leant.Synth.Length.SpinePair.Ranking
   , rankVerifiedLengthSpinePairCandidates
   , rankVerifiedLengthSpinePairCandidatesWithInputBoxValidation
   , rankedLengthSpinePairCandidateAssessment
+  , rankedLengthSpinePairCandidateCounterexampleSimplification
   , rankedLengthSpinePairCandidateOriginalIndex
   , rankedLengthSpinePairCandidatePreparationRefusal
   , rankedLengthSpinePairCandidateVerified
@@ -494,6 +500,7 @@ main = do
       , lengthSpinePairBoundaryTests
       , lengthSpinePairRankingTests
       , lengthRankingTests
+      , lengthCounterexampleSimplificationTests
       , replayPlanTests
       , providerProgramTests
       , candidateVerificationTests
@@ -4492,6 +4499,612 @@ lengthSpinePairRankingExecution executable policy = expectRight
               1000
           , Djex.lengthSMTLibExecutionConfigSourceArtifactPolicy = policy
           }
+
+lengthCounterexampleSimplificationTests :: TestTree
+lengthCounterexampleSimplificationTests = testGroup
+  "bounded counterexample simplification"
+  [ testCase
+      "reduce scalar live evidence, reuse only the final MRU vector, and seal occurrences"
+      assertLengthCounterexampleSimplificationLive
+  , testCase
+      "reduce pair live evidence and preserve nominal metadata and presentation"
+      assertLengthSpinePairCounterexampleSimplificationLive
+  , testCase
+      "route every scalar and pair counterexample source through one optional seam"
+      assertLengthCounterexampleSimplificationSources
+  , testCase
+      "retain authoritative anchors on bounded unavailability and failed search trials"
+      assertLengthCounterexampleSimplificationFallbacks
+  , testCase
+      "clear strict metadata when a later indexed failure resets the batch"
+      assertLengthCounterexampleSimplificationAtomicReset
+  , testCase
+      "keep the builder persistent and every established file schema closed"
+      assertLengthCounterexampleSimplificationPolicyIsolation
+  ]
+
+assertLengthCounterexampleSimplificationLive :: IO ()
+assertLengthCounterexampleSimplificationLive = do
+  identity <- buildOneInputLengthRankingCandidate
+  limits <- explicitLengthInputBoxLimits 1 4
+  verification <- verificationBatchFromReceipts [identity, identity]
+  let contract = lengthRankingContract 2
+      queryIdentity query =
+        ( fingerprintCanonicalBytes $ lengthSMTLibQueryFingerprint query
+        , lengthSMTLibQueryCheckBytes query
+        , lengthSMTLibQueryInputSymbols query
+        , lengthSMTLibQueryInputValueRequestBytes query
+        )
+  before <- expectRight (prepareCheckedLengthQuery contract identity)
+    >>= expectRight
+  withFakeLengthSolver "healthy" $ \executable -> do
+    let source = explicitLengthRankingExecutionSource executable Nothing
+          Djex.LengthSMTLibInputValuesAfterSatisfiable
+    base <- expectRight $ mkLengthRankingPolicy
+      $ explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits source
+          Djex.defaultLengthEvaluationLimitSource
+    let enabled = enableLengthRankingCounterexampleSimplification limits base
+    ranking <- expectLengthRankingWithin "scalar live simplification"
+      $ rankVerifiedLengthCandidatesWithPolicy enabled contract
+          [identity, identity]
+    lengthRankingFailure ranking @?= Nothing
+    map rankedLengthCandidateOriginalIndex
+        (lengthRankingCandidates ranking) @?= [0, 1]
+    (firstRanked, secondRanked, firstReceipt, secondReceipt) <- case
+        lengthRankingCandidates ranking of
+      [first, second] -> case
+          (rankedLengthCandidateAssessment first,
+            rankedLengthCandidateAssessment second) of
+        (Counterexample firstCounterexample,
+            Counterexample secondCounterexample) -> pure
+          (first, second, firstCounterexample, secondCounterexample)
+        assessments -> assertFailure
+          ("scalar simplification changed assessments: "
+            ++ show assessments) >> error "unreachable"
+      ranked -> assertFailure
+        ("scalar simplification changed cardinality: "
+          ++ show (length ranked)) >> error "unreachable"
+    map Djex.validatedLengthCounterexampleInputs
+        [firstReceipt, secondReceipt] @?= [[0], [0]]
+    map Djex.validatedLengthCounterexampleResult
+        [firstReceipt, secondReceipt] @?= [0, 0]
+    simplification <- case
+        rankedLengthCandidateCounterexampleSimplification firstRanked of
+      Nothing -> assertFailure "the strict scalar reduction lost its metadata"
+        >> error "unreachable"
+      Just retained -> pure retained
+    rankedLengthCandidateCounterexampleSimplification secondRanked @?= Nothing
+    Djex.validatedLengthCounterexampleSimplificationOriginalInputs
+        simplification @?= [3]
+    Djex.validatedLengthCounterexampleSimplificationInspectedAssignmentCount
+        simplification @?= 1
+    Djex.validatedLengthCounterexampleSimplificationInputs simplification @?=
+      [0]
+    Djex.validatedLengthCounterexampleSimplificationResult simplification @?=
+      0
+    Djex.validatedLengthCounterexampleSimplificationBasis simplification @?=
+      Djex.ProviderIndependentFiniteSpineModel
+    Djex.validatedLengthCounterexampleSimplificationChanged simplification @?=
+      True
+    let simplificationNote =
+          renderLengthCounterexampleSimplificationNote simplification
+        replayNote = renderLengthCounterexampleNote secondReceipt
+    simplificationNote @?=
+      "replayed bounded query-owned componentwise-lexicographic finite-list-spine Length counterexample (model-relative; provider-independent): inspected lower-box assignments = 1; input spine lengths reduced from [3] to [0]; result spine length = 0"
+    replayNote @?=
+      "replayed finite-list-spine Length counterexample (model-relative; provider-independent): observed input spine lengths = [0]; result spine length = 0"
+    -- The first live receipt is reduced before promotion.  The duplicate can
+    -- therefore replay [0], carries no second strict-change receipt, and
+    -- consumes no live transaction or compact ordinal.
+    assertFakeLengthQueryEvents [0] [0] =<<
+      BS.readFile (executable ++ ".events")
+
+    associated <- expectLengthPostVerificationWithin
+      "scalar simplification occurrence seal"
+      $ assessVerifiedLengthCandidatesWithPolicy enabled contract verification
+    assertLengthPostVerificationSealed associated
+    associatedRanking <- expectLengthPostVerificationRanking associated
+    map rankedLengthCandidateOriginalIndex
+        (lengthRankingCandidates associatedRanking) @?= [0, 1]
+    case lengthRankingCandidates associatedRanking of
+      [first, second] -> do
+        assertBool "the first sealed occurrence lost strict metadata"
+          $ case rankedLengthCandidateCounterexampleSimplification first of
+              Just _ -> True
+              Nothing -> False
+        rankedLengthCandidateCounterexampleSimplification second @?= Nothing
+      ranked -> assertFailure
+        $ "scalar occurrence seal changed cardinality: "
+            ++ show (length ranked)
+    map lengthCandidatePresentationNote
+        (presentLengthPostVerificationResult associated) @?=
+      [Just simplificationNote, Just replayNote]
+    assertFakeLengthQueryEvents [0] [0] =<<
+      BS.readFile (executable ++ ".events")
+
+    after <- expectRight (prepareCheckedLengthQuery contract identity)
+      >>= expectRight
+    queryIdentity after @?= queryIdentity before
+
+assertLengthSpinePairCounterexampleSimplificationLive :: IO ()
+assertLengthSpinePairCounterexampleSimplificationLive = do
+  (duplicatedInput, _) <- buildLengthSpinePairRankingFixture
+  limits <- explicitLengthInputBoxLimits 1 4
+  verification <- verificationBatchFromReceipts
+    [duplicatedInput, duplicatedInput]
+  let contract = lengthSpinePairRankingContract
+      queryIdentity query =
+        ( fingerprintCanonicalBytes
+            $ Djex.lengthSpinePairSMTLibQueryFingerprint query
+        , Djex.lengthSpinePairSMTLibQueryCheckBytes query
+        , Djex.lengthSpinePairSMTLibQueryInputSymbols query
+        , Djex.lengthSpinePairSMTLibQueryInputValueRequestBytes query
+        )
+  before <- expectRight
+      (prepareCheckedLengthSpinePairQuery contract duplicatedInput)
+    >>= expectRight
+  withFakeLengthSolver "healthy" $ \executable -> do
+    let source = explicitLengthRankingExecutionSource executable Nothing
+          Djex.LengthSMTLibInputValuesAfterSatisfiable
+    base <- expectRight $ mkLengthRankingPolicy
+      $ explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits source
+          Djex.defaultLengthEvaluationLimitSource
+    let simplificationThenBox = enableLengthRankingInputBoxValidation
+          limits [3]
+          $ enableLengthRankingCounterexampleSimplification limits base
+        boxThenSimplification =
+          enableLengthRankingCounterexampleSimplification limits
+          $ enableLengthRankingInputBoxValidation limits [3] base
+        run label policy = expectRight =<< timeoutResult label
+          (rankVerifiedLengthSpinePairCandidatesWithPolicy policy contract
+            [duplicatedInput, duplicatedInput])
+    forward <- run "pair simplification then box" simplificationThenBox
+    reversed <- run "pair box then simplification" boxThenSimplification
+    map rankedLengthSpinePairCandidateAssessment
+        (lengthSpinePairRankingCandidates reversed) @?=
+      map rankedLengthSpinePairCandidateAssessment
+        (lengthSpinePairRankingCandidates forward)
+    map rankedLengthSpinePairCandidateCounterexampleSimplification
+        (lengthSpinePairRankingCandidates reversed) @?=
+      map rankedLengthSpinePairCandidateCounterexampleSimplification
+        (lengthSpinePairRankingCandidates forward)
+    lengthSpinePairRankingFailure forward @?= Nothing
+    (firstRanked, secondRanked, firstReceipt, secondReceipt) <- case
+        lengthSpinePairRankingCandidates forward of
+      [first, second] -> case
+          (rankedLengthSpinePairCandidateAssessment first,
+            rankedLengthSpinePairCandidateAssessment second) of
+        (LengthSpinePairCounterexample firstCounterexample,
+            LengthSpinePairCounterexample secondCounterexample) -> pure
+          (first, second, firstCounterexample, secondCounterexample)
+        assessments -> assertFailure
+          ("pair simplification changed assessments: "
+            ++ show assessments) >> error "unreachable"
+      ranked -> assertFailure
+        ("pair simplification changed cardinality: "
+          ++ show (length ranked)) >> error "unreachable"
+    map Djex.validatedLengthSpinePairCounterexampleInputs
+        [firstReceipt, secondReceipt] @?= [[1], [1]]
+    map Djex.validatedLengthSpinePairCounterexampleResult
+        [firstReceipt, secondReceipt] @?=
+      replicate 2 (Djex.LengthSpinePair 1 1)
+    simplification <- case
+        rankedLengthSpinePairCandidateCounterexampleSimplification
+          firstRanked of
+      Nothing -> assertFailure "the strict pair reduction lost its metadata"
+        >> error "unreachable"
+      Just retained -> pure retained
+    rankedLengthSpinePairCandidateCounterexampleSimplification secondRanked
+      @?= Nothing
+    Djex.validatedLengthSpinePairCounterexampleSimplificationOriginalInputs
+        simplification @?= [3]
+    Djex.validatedLengthSpinePairCounterexampleSimplificationInspectedAssignmentCount
+        simplification @?= 2
+    Djex.validatedLengthSpinePairCounterexampleSimplificationInputs
+        simplification @?= [1]
+    Djex.validatedLengthSpinePairCounterexampleSimplificationResult
+        simplification @?= Djex.LengthSpinePair 1 1
+    Djex.validatedLengthSpinePairCounterexampleSimplificationBasis
+        simplification @?= Djex.ProviderIndependentFiniteSpineModel
+    Djex.validatedLengthSpinePairCounterexampleSimplificationChanged
+        simplification @?= True
+    let simplificationNote =
+          renderLengthSpinePairCounterexampleSimplificationNote simplification
+        replayNote = renderLengthSpinePairCounterexampleNote secondReceipt
+    simplificationNote @?=
+      "replayed bounded query-owned componentwise-lexicographic binary-product finite-spine Length counterexample (model-relative; provider-independent): inspected lower-box assignments = 2; input spine lengths reduced from [3] to [1]; result spine lengths = [1, 1]"
+    replayNote @?=
+      "replayed binary-product finite-spine Length counterexample (model-relative; provider-independent): observed input spine lengths = [1]; first result spine length = 1; second result spine length = 1"
+    assertFakeLengthQueryEvents [0] [0] =<<
+      BS.readFile (executable ++ ".events")
+
+    associated <- expectLengthSpinePairPostVerificationWithin
+      $ assessVerifiedLengthSpinePairCandidatesWithPolicy
+          boxThenSimplification contract verification
+    sealed <- case lengthSpinePairPostVerificationSealedBatch associated of
+      Nothing -> assertFailure "pair simplification bypassed occurrence sealing"
+        >> error "unreachable"
+      Just retained -> pure retained
+    postVerificationBatchCandidates sealed @?=
+      lengthSpinePairPostVerificationCandidates associated
+    associatedRanking <- expectLengthSpinePairPostVerificationRanking associated
+    case lengthSpinePairRankingCandidates associatedRanking of
+      [first, second] -> do
+        assertBool "the first pair occurrence lost strict metadata"
+          $ case
+              rankedLengthSpinePairCandidateCounterexampleSimplification first of
+                Just _ -> True
+                Nothing -> False
+        rankedLengthSpinePairCandidateCounterexampleSimplification second
+          @?= Nothing
+      ranked -> assertFailure
+        $ "pair occurrence seal changed cardinality: " ++ show (length ranked)
+    map lengthCandidatePresentationNote
+        (presentLengthSpinePairPostVerificationResult associated) @?=
+      [Just simplificationNote, Just replayNote]
+    assertFakeLengthQueryEvents [0] [0] =<<
+      BS.readFile (executable ++ ".events")
+
+    after <- expectRight
+        (prepareCheckedLengthSpinePairQuery contract duplicatedInput)
+      >>= expectRight
+    queryIdentity after @?= queryIdentity before
+ where
+  timeoutResult label action = do
+    bounded <- timeout 8000000 action
+    case bounded of
+      Nothing -> assertFailure (label ++ " exceeded its outer bound")
+        >> error "unreachable"
+      Just result -> pure result
+
+assertLengthCounterexampleSimplificationSources :: IO ()
+assertLengthCounterexampleSimplificationSources = do
+  identity <- buildOneInputLengthRankingCandidate
+  (_, pairCandidate) <- buildLengthSpinePairRankingFixture
+  limits <- explicitLengthInputBoxLimits 1 4
+  let contract = lengthRankingContract 2
+      boundedContract = contract
+        { leanLengthContractSource =
+            (leanLengthContractSource contract)
+              { lengthContractPrecondition = LengthAtMost
+                  (LengthVariable $ LengthInput 0) (LengthLiteral 3)
+              }
+        }
+      expectCanonical label ranking = do
+        lengthRankingFailure ranking @?= Nothing
+        case lengthRankingCandidates ranking of
+          [ranked] -> case rankedLengthCandidateAssessment ranked of
+            Counterexample receipt -> do
+              Djex.validatedLengthCounterexampleInputs receipt @?= [0]
+              Djex.validatedLengthCounterexampleResult receipt @?= 0
+              rankedLengthCandidateCounterexampleSimplification ranked @?=
+                Nothing
+            assessment -> assertFailure
+              $ label ++ " did not produce a counterexample: "
+                  ++ show assessment
+          ranked -> assertFailure
+            $ label ++ " changed cardinality: " ++ show (length ranked)
+      pairContract = lengthSpinePairSecondOneContract
+      boundedPairContract = pairContract
+        { leanLengthSpinePairContractSource =
+            (leanLengthSpinePairContractSource pairContract)
+              { Djex.lengthSpinePairContractPrecondition = LengthAtMost
+                  (LengthVariable $ Djex.LengthSpinePairInput 0)
+                  (LengthLiteral 3)
+              }
+        }
+      expectPairCanonical label ranking = do
+        lengthSpinePairRankingFailure ranking @?= Nothing
+        case lengthSpinePairRankingCandidates ranking of
+          [ranked] -> case
+              rankedLengthSpinePairCandidateAssessment ranked of
+            LengthSpinePairCounterexample receipt -> do
+              Djex.validatedLengthSpinePairCounterexampleInputs receipt @?=
+                [0]
+              Djex.validatedLengthSpinePairCounterexampleResult receipt @?=
+                Djex.LengthSpinePair 0 0
+              rankedLengthSpinePairCandidateCounterexampleSimplification
+                ranked @?= Nothing
+            assessment -> assertFailure
+              $ label ++ " did not produce a pair counterexample: "
+                  ++ show assessment
+          ranked -> assertFailure
+            $ label ++ " changed pair cardinality: " ++ show (length ranked)
+
+  withFakeLengthSolver "healthy" $ \executable -> do
+    base <- counterexampleSimplificationBasePolicy executable
+      Djex.LengthSMTLibInputValuesAfterSatisfiable
+      Djex.defaultLengthEvaluationLimitSource
+    origin <- expectLengthRankingWithin "canonical origin simplification"
+      $ rankVerifiedLengthCandidatesWithPolicy
+          (enableLengthRankingCounterexampleSimplification limits
+            $ enableLengthRankingOriginProbe base)
+          contract [identity]
+    expectCanonical "origin" origin
+    assertFakeLengthQueryEvents [] [] =<<
+      BS.readFile (executable ++ ".events")
+
+    pairOrigin <- expectRight =<<
+      rankVerifiedLengthSpinePairCandidatesWithPolicy
+        (enableLengthRankingCounterexampleSimplification limits
+          $ enableLengthRankingOriginProbe base)
+        pairContract [pairCandidate]
+    expectPairCanonical "pair origin" pairOrigin
+    assertFakeLengthQueryEvents [] [] =<<
+      BS.readFile (executable ++ ".events")
+
+    pairDomain <- expectRight =<<
+      rankVerifiedLengthSpinePairCandidatesWithPolicy
+        (enableLengthRankingCounterexampleSimplification limits
+          $ enableLengthRankingApplicableDomainValidation limits base)
+        boundedPairContract [pairCandidate]
+    expectPairCanonical "pair applicable domain" pairDomain
+    assertFakeLengthQueryEvents [] [] =<<
+      BS.readFile (executable ++ ".events")
+
+    domain <- expectLengthRankingWithin
+      "canonical applicable-domain simplification"
+      $ rankVerifiedLengthCandidatesWithPolicy
+          (enableLengthRankingCounterexampleSimplification limits
+            $ enableLengthRankingApplicableDomainValidation limits base)
+          boundedContract [identity]
+    expectCanonical "applicable domain" domain
+    assertFakeLengthQueryEvents [] [] =<<
+      BS.readFile (executable ++ ".events")
+
+  withFakeLengthSolver "query-unsat" $ \executable -> do
+    base <- counterexampleSimplificationBasePolicy executable
+      Djex.LengthSMTLibStatusOnly Djex.defaultLengthEvaluationLimitSource
+    box <- expectLengthRankingWithin "canonical input-box simplification"
+      $ rankVerifiedLengthCandidatesWithPolicy
+          (enableLengthRankingCounterexampleSimplification limits
+            $ enableLengthRankingInputBoxValidation limits [3] base)
+          contract [identity]
+    expectCanonical "input box" box
+    assertFakeLengthQueryEvents [0] [] =<<
+      BS.readFile (executable ++ ".events")
+
+    pairBox <- expectRight =<<
+      rankVerifiedLengthSpinePairCandidatesWithPolicy
+        (enableLengthRankingCounterexampleSimplification limits
+          $ enableLengthRankingInputBoxValidation limits [3] base)
+        pairContract [pairCandidate]
+    expectPairCanonical "pair input box" pairBox
+    assertFakeLengthQueryEvents [0] [] =<<
+      BS.readFile (executable ++ ".events")
+
+assertLengthCounterexampleSimplificationFallbacks :: IO ()
+assertLengthCounterexampleSimplificationFallbacks = do
+  identity <- buildOneInputLengthRankingCandidate
+  widthLimits <- explicitLengthInputBoxLimits 0 1
+  productLimits <- explicitLengthInputBoxLimits 1 3
+  fullLimits <- explicitLengthInputBoxLimits 1 4
+  let contract = lengthRankingContract 2
+      anchoredContract = contract
+        { leanLengthContractSource =
+            (leanLengthContractSource contract)
+              { lengthContractPrecondition = LengthAtMost
+                  (LengthLiteral 3) (LengthVariable $ LengthInput 0)
+              }
+        }
+      assertRetained label ranking = do
+        lengthRankingFailure ranking @?= Nothing
+        case lengthRankingCandidates ranking of
+          [ranked] -> case rankedLengthCandidateAssessment ranked of
+            Counterexample receipt -> do
+              Djex.validatedLengthCounterexampleInputs receipt @?= [3]
+              Djex.validatedLengthCounterexampleResult receipt @?= 3
+              rankedLengthCandidateCounterexampleSimplification ranked @?=
+                Nothing
+            assessment -> assertFailure
+              $ label ++ " lost its starting receipt: " ++ show assessment
+          ranked -> assertFailure
+            $ label ++ " changed cardinality: " ++ show (length ranked)
+  withFakeLengthSolver "healthy" $ \executable -> do
+    base <- counterexampleSimplificationBasePolicy executable
+      Djex.LengthSMTLibInputValuesAfterSatisfiable
+      Djex.defaultLengthEvaluationLimitSource
+    mapM_ (\(label, limits, retainedContract) -> do
+        ranking <- expectLengthRankingWithin label
+          $ rankVerifiedLengthCandidatesWithPolicy
+              (enableLengthRankingCounterexampleSimplification limits base)
+              retainedContract [identity]
+        assertRetained label ranking
+        assertFakeLengthQueryEvents [0] [0] =<<
+          BS.readFile (executable ++ ".events"))
+      [ ("simplification width miss", widthLimits, contract)
+      , ("simplification Cartesian-product miss", productLimits, contract)
+      , ("simplification without a strict change", fullLimits,
+          anchoredContract)
+      ]
+
+  let evaluationSource = Djex.defaultLengthEvaluationLimitSource
+        { Djex.lengthEvaluationLimitSourceIntermediateValueBits = 1 }
+      trialFailureContract = contract
+        { leanLengthContractSource = LengthContractSource
+            { lengthContractPrecondition = LengthTruth True
+            , lengthContractPostcondition = LengthEqual
+                (LengthVariable LengthResult)
+                (LengthModulo 3 $ LengthVariable $ LengthInput 0)
+            }
+        }
+  evaluation <- expectRight $ Djex.mkLengthEvaluationLimits evaluationSource
+  query <- expectRight
+      (prepareCheckedLengthQuery trialFailureContract identity)
+    >>= expectRight
+  anchor <- case Djex.replayLengthSMTLibCounterexampleInputs
+      evaluation query [3] of
+    Right (Just receipt) -> pure receipt
+    other -> assertFailure
+      ("the search-rejection fixture produced no anchor: " ++ show other)
+        >> error "unreachable"
+  Djex.simplifyLengthSMTLibQueryCounterexample
+      evaluation fullLimits query anchor @?=
+    Left (Djex.LengthSMTLibCounterexampleSimplificationRejected
+      $ Djex.LengthCounterexampleSimplificationInputBoxValidationRejected
+      $ Djex.LengthInputBoxAssignmentEvaluationRejected 2
+      $ Djex.LengthEvaluationValueBitLimitExceeded
+          Djex.LengthIntermediateValue 1 2)
+  withFakeLengthSolver "healthy" $ \executable -> do
+    base <- counterexampleSimplificationBasePolicy executable
+      Djex.LengthSMTLibInputValuesAfterSatisfiable evaluationSource
+    ranking <- expectLengthRankingWithin
+      "simplification search evaluation rejection"
+      $ rankVerifiedLengthCandidatesWithPolicy
+          (enableLengthRankingCounterexampleSimplification fullLimits base)
+          trialFailureContract [identity]
+    assertRetained "search assignment evaluation rejection" ranking
+    assertFakeLengthQueryEvents [0] [0] =<<
+      BS.readFile (executable ++ ".events")
+
+assertLengthCounterexampleSimplificationAtomicReset :: IO ()
+assertLengthCounterexampleSimplificationAtomicReset = do
+  identity <- buildOneInputLengthRankingCandidate
+  scalarFixture <- buildLengthRankingLiveFixture
+  (pairCounterexample, pairSatisfying) <-
+    buildLengthSpinePairRankingFixture
+  limits <- explicitLengthInputBoxLimits 1 4
+  withFakeLengthSolver "healthy" $ \executable -> do
+    base <- counterexampleSimplificationBasePolicy executable
+      Djex.LengthSMTLibInputValuesAfterSatisfiable
+      Djex.defaultLengthEvaluationLimitSource
+    scalar <- expectLengthRankingWithin
+      "atomic reset after a strict scalar simplification"
+      $ rankVerifiedLengthCandidatesWithPolicy
+          (enableLengthRankingCounterexampleSimplification limits base)
+          (lengthRankingContract 0)
+          [identity, lengthRankingFixtureZero scalarFixture]
+    map rankedLengthCandidateAssessment
+        (lengthRankingCandidates scalar) @?= [Unassessed, Unassessed]
+    map rankedLengthCandidateCounterexampleSimplification
+        (lengthRankingCandidates scalar) @?= [Nothing, Nothing]
+    scalarFailure <- case lengthRankingFailure scalar of
+      Nothing -> assertFailure
+        "the later scalar live rejection did not reset the batch"
+          >> error "unreachable"
+      Just retained -> pure retained
+    lengthRankingFailureClass scalarFailure @?=
+      LengthRankingLiveQueryFailed
+        Djex.LengthSMTLibLiveQueryCounterexampleRejected
+    lengthRankingFailureOriginalIndex scalarFailure @?= Just 1
+    lengthRankingFailureCleanupIncomplete scalarFailure @?= False
+    assertFakeLengthQueryEvents [0, 1] [0] =<<
+      BS.readFile (executable ++ ".events")
+
+    pair <- expectRight =<<
+      rankVerifiedLengthSpinePairCandidatesWithPolicy
+        (enableLengthRankingCounterexampleSimplification limits base)
+        lengthSpinePairRankingContract
+        [pairCounterexample, pairSatisfying]
+    map rankedLengthSpinePairCandidateAssessment
+        (lengthSpinePairRankingCandidates pair) @?=
+      [LengthSpinePairUnassessed, LengthSpinePairUnassessed]
+    map rankedLengthSpinePairCandidateCounterexampleSimplification
+        (lengthSpinePairRankingCandidates pair) @?= [Nothing, Nothing]
+    pairFailure <- expectLengthSpinePairRankingFailure pair
+    lengthSpinePairRankingFailureClass pairFailure @?=
+      LengthSpinePairRankingLiveQueryFailed
+        Djex.LengthSpinePairSMTLibLiveQueryCounterexampleRejected
+    lengthSpinePairRankingFailureOriginalIndex pairFailure @?= Just 1
+    lengthSpinePairRankingFailureCleanupIncomplete pairFailure @?= False
+    assertFakeLengthQueryEvents [0, 1] [0, 1] =<<
+      BS.readFile (executable ++ ".events")
+
+assertLengthCounterexampleSimplificationPolicyIsolation :: IO ()
+assertLengthCounterexampleSimplificationPolicyIsolation = do
+  identity <- buildOneInputLengthRankingCandidate
+  limits <- explicitLengthInputBoxLimits 1 4
+  withFakeLengthSolver "healthy" $ \executable -> do
+    base <- counterexampleSimplificationBasePolicy executable
+      Djex.LengthSMTLibInputValuesAfterSatisfiable
+      Djex.defaultLengthEvaluationLimitSource
+    let boxThenSimplification =
+          enableLengthRankingCounterexampleSimplification limits
+          $ enableLengthRankingInputBoxValidation limits [3] base
+        simplificationThenBox = enableLengthRankingInputBoxValidation limits [3]
+          $ enableLengthRankingCounterexampleSimplification limits base
+        run label policy = expectLengthRankingWithin label
+          $ rankVerifiedLengthCandidatesWithPolicy policy
+              (lengthRankingContract 2) [identity, identity]
+    first <- run "box then scalar simplification" boxThenSimplification
+    second <- run "scalar simplification then box" simplificationThenBox
+    map rankedLengthCandidateAssessment
+        (lengthRankingCandidates second) @?=
+      map rankedLengthCandidateAssessment (lengthRankingCandidates first)
+    map rankedLengthCandidateCounterexampleSimplification
+        (lengthRankingCandidates second) @?=
+      map rankedLengthCandidateCounterexampleSimplification
+        (lengthRankingCandidates first)
+
+    legacy <- run "immutable simplification base" base
+    lengthRankingFailure legacy @?= Nothing
+    case lengthRankingCandidates legacy of
+      [firstLegacy, secondLegacy] -> do
+        map rankedLengthCandidateCounterexampleSimplification
+          [firstLegacy, secondLegacy] @?= [Nothing, Nothing]
+        case map rankedLengthCandidateAssessment
+            [firstLegacy, secondLegacy] of
+          [Counterexample firstReceipt, Counterexample secondReceipt] ->
+            map Djex.validatedLengthCounterexampleInputs
+              [firstReceipt, secondReceipt] @?= [[3], [3]]
+          assessments -> assertFailure
+            $ "the immutable base changed assessments: " ++ show assessments
+      ranked -> assertFailure
+        $ "the immutable base changed cardinality: " ++ show (length ranked)
+
+    execution <- expectRight $ Djex.mkLengthSMTLibExecutionConfig
+      Djex.defaultLengthSMTLibExecutionLimits
+      $ explicitLengthRankingExecutionSource executable Nothing
+          Djex.LengthSMTLibInputValuesAfterSatisfiable
+    evaluation <- expectRight $ Djex.mkLengthEvaluationLimits
+      Djex.defaultLengthEvaluationLimitSource
+    direct <- expectLengthRankingWithin "direct disabled simplification"
+      $ rankVerifiedLengthCandidates execution evaluation
+          (lengthRankingContract 2) [identity, identity]
+    assertLengthRankingsEquivalent direct legacy
+    map rankedLengthCandidateCounterexampleSimplification
+        (lengthRankingCandidates direct) @?= [Nothing, Nothing]
+
+  let pairContract = jsonLengthSpinePairContract ["observed-spine"]
+        "cases-rejected" (jsonLengthTruth True) (jsonLengthTruth True) []
+      scalarContract = addJsonField []
+        ("candidateCasePolicy", Json.JStr "cases-rejected")
+        $ jsonRoleAwareLengthContract []
+            (jsonLengthTruth True) (jsonLengthTruth True) []
+      executable = "/tmp/leant-unused-counterexample-simplification-z3"
+      v1 = lengthRankingConfigurationFileFixture executable Nothing
+      v2 = lengthRankingConfigurationFileInputBoxFixture
+        executable Nothing [] 1
+      v3 = lengthRankingConfigurationFileOriginProbeFixture
+        executable Nothing [] 1
+      v4 = lengthAssessmentConfigurationFileSpinePairFixture
+        executable Nothing [1] 2 pairContract
+      v5 = lengthAssessmentConfigurationFilePositiveOrderingFixture
+        executable Nothing [] 1 scalarContract
+      v6 = lengthAssessmentConfigurationFileSpinePairPositiveOrderingFixture
+        executable Nothing [1] 2 pairContract
+      inject = addJsonField []
+        ("counterexampleSimplification", Json.JObj [])
+      expected = LengthRankingConfigurationUnexpectedField
+        LengthRankingConfigurationRootObject
+  mapM_ (assertLengthRankingConfigurationFileError expected . inject)
+    [v1, v2, v3]
+  mapM_ (assertLengthAssessmentConfigurationFileError expected . inject)
+    [v4, v5, v6]
+
+counterexampleSimplificationBasePolicy
+  :: FilePath
+  -> Djex.LengthSMTLibArtifactPolicy
+  -> Djex.LengthEvaluationLimitSource
+  -> IO LengthRankingPolicy
+counterexampleSimplificationBasePolicy executable artifact evaluation =
+  expectRight $ mkLengthRankingPolicy
+    $ explicitLengthRankingPolicySource
+        Djex.defaultLengthSMTLibExecutionLimits
+        (explicitLengthRankingExecutionSource executable Nothing artifact)
+        evaluation
 
 lengthRankingTests :: TestTree
 lengthRankingTests = testGroup "checked Length behavioral ranking"
