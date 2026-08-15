@@ -1221,7 +1221,8 @@ decodeLengthAssessmentConfigurationFileDescriptorBoundExecveCheckExecutableAcces
 
 -- Keep the established version-1 path literal: its exact root, validation
 -- order, embedded contract grammar, and disabled policy construction do not
--- pass through any version-2 input-box branch.
+-- pass through any version-2 input-box branch.  The shared
+-- execution/evaluation prefix preserves that order field for field.
 decodeLengthRankingConfigurationFileV1
   :: ObjectFields
   -> Either
@@ -1229,24 +1230,7 @@ decodeLengthRankingConfigurationFileV1
       DisabledLengthRankingConfiguration
 decodeLengthRankingConfigurationFileV1 root = do
   exactFields LengthRankingConfigurationRootObject rootFields root
-  executionAdmissionValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationExecutionAdmissionField
-    "executionAdmission"
-    root
-  executionLimits <- decodeExecutionAdmission executionAdmissionValue
-  executionValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationExecutionField
-    "execution"
-    root
-  execution <- decodeExecution executionLimits executionValue
-  evaluationValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationEvaluationField
-    "evaluation"
-    root
-  evaluation <- decodeEvaluation evaluationValue
+  (execution, evaluation) <- decodeExecutionAndEvaluation root
   contractValue <- requiredField
     LengthRankingConfigurationRootObject
     LengthRankingConfigurationContractField
@@ -1263,24 +1247,7 @@ decodeLengthRankingConfigurationFileInputBoxV2
       DisabledLengthRankingConfiguration
 decodeLengthRankingConfigurationFileInputBoxV2 root = do
   exactFields LengthRankingConfigurationRootObject rootFieldsInputBoxV2 root
-  executionAdmissionValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationExecutionAdmissionField
-    "executionAdmission"
-    root
-  executionLimits <- decodeExecutionAdmission executionAdmissionValue
-  executionValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationExecutionField
-    "execution"
-    root
-  execution <- decodeExecution executionLimits executionValue
-  evaluationValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationEvaluationField
-    "evaluation"
-    root
-  evaluation <- decodeEvaluation evaluationValue
+  (execution, evaluation) <- decodeExecutionAndEvaluation root
   inputBoxValue <- requiredField
     LengthRankingConfigurationRootObject
     LengthRankingConfigurationInputBoxValidationField
@@ -1310,24 +1277,7 @@ decodeLengthRankingConfigurationFileOriginProbeV3
       DisabledLengthRankingConfiguration
 decodeLengthRankingConfigurationFileOriginProbeV3 root = do
   exactFields LengthRankingConfigurationRootObject rootFieldsOriginProbeV3 root
-  executionAdmissionValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationExecutionAdmissionField
-    "executionAdmission"
-    root
-  executionLimits <- decodeExecutionAdmission executionAdmissionValue
-  executionValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationExecutionField
-    "execution"
-    root
-  execution <- decodeExecution executionLimits executionValue
-  evaluationValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationEvaluationField
-    "evaluation"
-    root
-  evaluation <- decodeEvaluation evaluationValue
+  (execution, evaluation) <- decodeExecutionAndEvaluation root
   inputBoxValue <- requiredField
     LengthRankingConfigurationRootObject
     LengthRankingConfigurationInputBoxValidationField
@@ -1363,24 +1313,7 @@ decodeLengthRankingConfigurationFileSpinePairV4
       DisabledLengthAssessmentConfiguration
 decodeLengthRankingConfigurationFileSpinePairV4 root = do
   exactFields LengthRankingConfigurationRootObject rootFieldsOriginProbeV3 root
-  executionAdmissionValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationExecutionAdmissionField
-    "executionAdmission"
-    root
-  executionLimits <- decodeExecutionAdmission executionAdmissionValue
-  executionValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationExecutionField
-    "execution"
-    root
-  execution <- decodeExecution executionLimits executionValue
-  evaluationValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationEvaluationField
-    "evaluation"
-    root
-  evaluation <- decodeEvaluation evaluationValue
+  (execution, evaluation) <- decodeExecutionAndEvaluation root
   inputBoxValue <- requiredField
     LengthRankingConfigurationRootObject
     LengthRankingConfigurationInputBoxValidationField
@@ -1419,24 +1352,7 @@ decodeLengthRankingConfigurationFilePositiveOrderingV5
 decodeLengthRankingConfigurationFilePositiveOrderingV5 root = do
   exactFields LengthRankingConfigurationRootObject
     rootFieldsPositiveOrdering root
-  executionAdmissionValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationExecutionAdmissionField
-    "executionAdmission"
-    root
-  executionLimits <- decodeExecutionAdmission executionAdmissionValue
-  executionValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationExecutionField
-    "execution"
-    root
-  execution <- decodeExecution executionLimits executionValue
-  evaluationValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationEvaluationField
-    "evaluation"
-    root
-  evaluation <- decodeEvaluation evaluationValue
+  (execution, evaluation) <- decodeExecutionAndEvaluation root
   inputBoxValue <- requiredField
     LengthRankingConfigurationRootObject
     LengthRankingConfigurationInputBoxValidationField
@@ -1483,24 +1399,7 @@ decodeLengthRankingConfigurationFileSpinePairPositiveOrderingV6
 decodeLengthRankingConfigurationFileSpinePairPositiveOrderingV6 root = do
   exactFields LengthRankingConfigurationRootObject
     rootFieldsPositiveOrdering root
-  executionAdmissionValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationExecutionAdmissionField
-    "executionAdmission"
-    root
-  executionLimits <- decodeExecutionAdmission executionAdmissionValue
-  executionValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationExecutionField
-    "execution"
-    root
-  execution <- decodeExecution executionLimits executionValue
-  evaluationValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationEvaluationField
-    "evaluation"
-    root
-  evaluation <- decodeEvaluation evaluationValue
+  (execution, evaluation) <- decodeExecutionAndEvaluation root
   inputBoxValue <- requiredField
     LengthRankingConfigurationRootObject
     LengthRankingConfigurationInputBoxValidationField
@@ -2127,24 +2026,7 @@ decodeLengthRankingConfigurationFilePositiveAffinePolicy
 decodeLengthRankingConfigurationFilePositiveAffinePolicy root = do
   exactFields LengthRankingConfigurationRootObject
     rootFieldsPositiveAffine root
-  executionAdmissionValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationExecutionAdmissionField
-    "executionAdmission"
-    root
-  executionLimits <- decodeExecutionAdmission executionAdmissionValue
-  executionValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationExecutionField
-    "execution"
-    root
-  execution <- decodeExecution executionLimits executionValue
-  evaluationValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationEvaluationField
-    "evaluation"
-    root
-  evaluation <- decodeEvaluation evaluationValue
+  (execution, evaluation) <- decodeExecutionAndEvaluation root
   inputBoxValue <- requiredField
     LengthRankingConfigurationRootObject
     LengthRankingConfigurationInputBoxValidationField
@@ -2216,24 +2098,7 @@ decodeLengthRankingConfigurationFileRelationalPositiveAffinePolicy
 decodeLengthRankingConfigurationFileRelationalPositiveAffinePolicy root = do
   exactFields LengthRankingConfigurationRootObject
     rootFieldsPositiveAffine root
-  executionAdmissionValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationExecutionAdmissionField
-    "executionAdmission"
-    root
-  executionLimits <- decodeExecutionAdmission executionAdmissionValue
-  executionValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationExecutionField
-    "execution"
-    root
-  execution <- decodeExecution executionLimits executionValue
-  evaluationValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationEvaluationField
-    "evaluation"
-    root
-  evaluation <- decodeEvaluation evaluationValue
+  (execution, evaluation) <- decodeExecutionAndEvaluation root
   inputBoxValue <- requiredField
     LengthRankingConfigurationRootObject
     LengthRankingConfigurationInputBoxValidationField
@@ -2307,24 +2172,7 @@ decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineBasePolicy
     root = do
   exactFields LengthRankingConfigurationRootObject
     rootFieldsPositiveAffine root
-  executionAdmissionValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationExecutionAdmissionField
-    "executionAdmission"
-    root
-  executionLimits <- decodeExecutionAdmission executionAdmissionValue
-  executionValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationExecutionField
-    "execution"
-    root
-  execution <- decodeExecution executionLimits executionValue
-  evaluationValue <- requiredField
-    LengthRankingConfigurationRootObject
-    LengthRankingConfigurationEvaluationField
-    "evaluation"
-    root
-  evaluation <- decodeEvaluation evaluationValue
+  (execution, evaluation) <- decodeExecutionAndEvaluation root
   inputBoxValue <- requiredField
     LengthRankingConfigurationRootObject
     LengthRankingConfigurationInputBoxValidationField
@@ -3178,6 +3026,37 @@ capIntUpper field maximumValue value
   | value <= maximumValue = Right value
   | otherwise = Left $ LengthRankingConfigurationPolicyLimitExceeded
       field (fromIntegral maximumValue) (fromIntegral maximumValue + 1)
+
+-- | The root-level prefix every startup configuration version shares:
+-- @executionAdmission@ is decoded first, then @execution@ under those admitted
+-- limits, then @evaluation@.  The order is part of each version's contract
+-- (the first missing or invalid field wins), so every decoder consumes this
+-- one helper rather than restating the sequence.
+decodeExecutionAndEvaluation
+  :: ObjectFields
+  -> Either
+      LengthRankingConfigurationFileError
+      (LengthSMTLibExecutionConfig, LengthEvaluationLimits)
+decodeExecutionAndEvaluation root = do
+  executionAdmissionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationExecutionAdmissionField
+    "executionAdmission"
+    root
+  executionLimits <- decodeExecutionAdmission executionAdmissionValue
+  executionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationExecutionField
+    "execution"
+    root
+  execution <- decodeExecution executionLimits executionValue
+  evaluationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationEvaluationField
+    "evaluation"
+    root
+  evaluation <- decodeEvaluation evaluationValue
+  pure (execution, evaluation)
 
 decodeExecutionAdmission
   :: BoundedJsonValue
