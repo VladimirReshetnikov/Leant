@@ -615,6 +615,19 @@ data LengthCounterexampleSimplificationRankingPolicy
   = LengthCounterexampleSimplificationRankingDisabled
   | LengthCounterexampleSimplificationRankingEnabled !LengthInputBoxLimits
 
+-- | The four assessment policies that every internal ranking runner threads
+-- together unchanged: bounded input-box validation, applicable-domain
+-- validation, the origin probe, and counterexample simplification.  The
+-- exported entry points still take the four positionally; they pack them
+-- once here so the runner family below can pass one value.  The worker
+-- opening policy stays separate because the deferred-opening runners omit it.
+data LengthRankingPolicies = LengthRankingPolicies
+  { inputBoxPolicyOf :: !LengthInputBoxRankingPolicy
+  , applicableDomainPolicyOf :: !LengthApplicableDomainRankingPolicy
+  , originProbePolicyOf :: !LengthOriginProbeRankingPolicy
+  , simplificationPolicyOf :: !LengthCounterexampleSimplificationRankingPolicy
+  }
+
 -- | Package-private worker-opening policy shared by the scalar and binary
 -- product ranking implementations.  The eager constructor is the literal
 -- historical behavior.  Deferred opening still admits and prepares the full
@@ -642,10 +655,11 @@ rankVerifiedLengthCandidates
   -> IO (Either LengthRankingInputError LengthRanking)
 rankVerifiedLengthCandidates execution evaluation contract candidates = fmap
   (fmap $ projectAssociatedLengthRankingWith id)
-  $ rankAssociatedLengthCandidates LengthInputBoxRankingDisabled
-      LengthApplicableDomainRankingDisabled
-      LengthOriginProbeRankingDisabled
-      LengthCounterexampleSimplificationRankingDisabled
+  $ rankAssociatedLengthCandidates
+      (LengthRankingPolicies LengthInputBoxRankingDisabled
+        LengthApplicableDomainRankingDisabled
+        LengthOriginProbeRankingDisabled
+        LengthCounterexampleSimplificationRankingDisabled)
       execution evaluation contract id candidates
 
 -- | Opt in to one query-owned all-zero replay after the bounded MRU bank
@@ -660,10 +674,11 @@ rankVerifiedLengthCandidatesWithOriginProbe
 rankVerifiedLengthCandidatesWithOriginProbe execution evaluation contract
     candidates = fmap
   (fmap $ projectAssociatedLengthRankingWith id)
-  $ rankAssociatedLengthCandidates LengthInputBoxRankingDisabled
-      LengthApplicableDomainRankingDisabled
-      LengthOriginProbeRankingEnabled
-      LengthCounterexampleSimplificationRankingDisabled
+  $ rankAssociatedLengthCandidates
+      (LengthRankingPolicies LengthInputBoxRankingDisabled
+        LengthApplicableDomainRankingDisabled
+        LengthOriginProbeRankingEnabled
+        LengthCounterexampleSimplificationRankingDisabled)
       execution evaluation contract id candidates
 
 -- | Opt in to independently validating one exact finite input box after a
@@ -682,10 +697,10 @@ rankVerifiedLengthCandidatesWithInputBoxValidation execution evaluation
     limits maximums contract candidates = fmap
   (fmap $ projectAssociatedLengthRankingWith id)
   $ rankAssociatedLengthCandidates
-      (LengthInputBoxRankingEnabled limits maximums)
-      LengthApplicableDomainRankingDisabled
-      LengthOriginProbeRankingDisabled
-      LengthCounterexampleSimplificationRankingDisabled
+      (LengthRankingPolicies (LengthInputBoxRankingEnabled limits maximums)
+        LengthApplicableDomainRankingDisabled
+        LengthOriginProbeRankingDisabled
+        LengthCounterexampleSimplificationRankingDisabled)
       execution evaluation contract id candidates
 
 -- | Compose the independent pre-live origin probe with the established
@@ -703,10 +718,10 @@ rankVerifiedLengthCandidatesWithInputBoxValidationAndOriginProbe
     execution evaluation limits maximums contract candidates = fmap
   (fmap $ projectAssociatedLengthRankingWith id)
   $ rankAssociatedLengthCandidates
-      (LengthInputBoxRankingEnabled limits maximums)
-      LengthApplicableDomainRankingDisabled
-      LengthOriginProbeRankingEnabled
-      LengthCounterexampleSimplificationRankingDisabled
+      (LengthRankingPolicies (LengthInputBoxRankingEnabled limits maximums)
+        LengthApplicableDomainRankingDisabled
+        LengthOriginProbeRankingEnabled
+        LengthCounterexampleSimplificationRankingDisabled)
       execution evaluation contract id candidates
 
 -- | Safe associated entry point for the post-verification seam.  The receipt
@@ -722,10 +737,11 @@ rankPostVerificationLengthCandidates
         (AssociatedLengthRanking
           (PostVerificationCandidate epoch DetailedVerificationVariant)))
 rankPostVerificationLengthCandidates execution evaluation contract =
-  rankAssociatedLengthCandidates LengthInputBoxRankingDisabled
-    LengthApplicableDomainRankingDisabled
-    LengthOriginProbeRankingDisabled
-    LengthCounterexampleSimplificationRankingDisabled
+  rankAssociatedLengthCandidates
+      (LengthRankingPolicies LengthInputBoxRankingDisabled
+        LengthApplicableDomainRankingDisabled
+        LengthOriginProbeRankingDisabled
+        LengthCounterexampleSimplificationRankingDisabled)
     execution evaluation contract
     postVerificationCandidateVerified
 
@@ -742,10 +758,11 @@ rankPostVerificationLengthCandidatesWithOriginProbe
           (PostVerificationCandidate epoch DetailedVerificationVariant)))
 rankPostVerificationLengthCandidatesWithOriginProbe execution evaluation
     contract =
-  rankAssociatedLengthCandidates LengthInputBoxRankingDisabled
-    LengthApplicableDomainRankingDisabled
-    LengthOriginProbeRankingEnabled
-    LengthCounterexampleSimplificationRankingDisabled
+  rankAssociatedLengthCandidates
+      (LengthRankingPolicies LengthInputBoxRankingDisabled
+        LengthApplicableDomainRankingDisabled
+        LengthOriginProbeRankingEnabled
+        LengthCounterexampleSimplificationRankingDisabled)
     execution evaluation contract postVerificationCandidateVerified
 
 -- | Occurrence-associated opt-in used by the post-verification permutation
@@ -765,10 +782,10 @@ rankPostVerificationLengthCandidatesWithInputBoxValidation
 rankPostVerificationLengthCandidatesWithInputBoxValidation execution evaluation
     limits maximums contract =
   rankAssociatedLengthCandidates
-    (LengthInputBoxRankingEnabled limits maximums)
-    LengthApplicableDomainRankingDisabled
-    LengthOriginProbeRankingDisabled
-    LengthCounterexampleSimplificationRankingDisabled
+    (LengthRankingPolicies (LengthInputBoxRankingEnabled limits maximums)
+        LengthApplicableDomainRankingDisabled
+        LengthOriginProbeRankingDisabled
+        LengthCounterexampleSimplificationRankingDisabled)
     execution evaluation contract postVerificationCandidateVerified
 
 -- | Occurrence-associated composition of the pre-live origin probe and the
@@ -787,10 +804,10 @@ rankPostVerificationLengthCandidatesWithInputBoxValidationAndOriginProbe
 rankPostVerificationLengthCandidatesWithInputBoxValidationAndOriginProbe
     execution evaluation limits maximums contract =
   rankAssociatedLengthCandidates
-    (LengthInputBoxRankingEnabled limits maximums)
-    LengthApplicableDomainRankingDisabled
-    LengthOriginProbeRankingEnabled
-    LengthCounterexampleSimplificationRankingDisabled
+    (LengthRankingPolicies (LengthInputBoxRankingEnabled limits maximums)
+        LengthApplicableDomainRankingDisabled
+        LengthOriginProbeRankingEnabled
+        LengthCounterexampleSimplificationRankingDisabled)
     execution evaluation contract postVerificationCandidateVerified
 
 -- | Package-private complete policy entrance used by the opaque reusable
@@ -806,12 +823,14 @@ rankVerifiedLengthCandidatesWithRankingPolicies
   -> LeanLengthContract
   -> [Verified DetailedVerificationVariant]
   -> IO (Either LengthRankingInputError LengthRanking)
-rankVerifiedLengthCandidatesWithRankingPolicies inputBoxPolicy
-    applicableDomainPolicy originProbePolicy simplificationPolicy execution
-    evaluation contract candidates =
+rankVerifiedLengthCandidatesWithRankingPolicies
+    inputBoxPolicy applicableDomainPolicy originProbePolicy
+    simplificationPolicy execution evaluation contract candidates =
   rankVerifiedLengthCandidatesWithRankingPoliciesAndLiveSessionOpening
-    inputBoxPolicy applicableDomainPolicy originProbePolicy simplificationPolicy
-    LengthLiveSessionOpeningEager execution evaluation contract candidates
+    inputBoxPolicy applicableDomainPolicy originProbePolicy
+    simplificationPolicy LengthLiveSessionOpeningEager execution evaluation
+    contract candidates
+
 
 -- | Complete policy entrance with an explicit worker-opening strategy.  This
 -- is package-private so configuration versions can opt in without widening
@@ -828,12 +847,17 @@ rankVerifiedLengthCandidatesWithRankingPoliciesAndLiveSessionOpening
   -> [Verified DetailedVerificationVariant]
   -> IO (Either LengthRankingInputError LengthRanking)
 rankVerifiedLengthCandidatesWithRankingPoliciesAndLiveSessionOpening
-    inputBoxPolicy applicableDomainPolicy originProbePolicy simplificationPolicy
+    inputBoxPolicy applicableDomainPolicy originProbePolicy
+    simplificationPolicy
     openingPolicy execution evaluation contract candidates = fmap
       (fmap $ projectAssociatedLengthRankingWith id)
-  $ rankAssociatedLengthCandidatesWithLiveSessionOpening inputBoxPolicy
-      applicableDomainPolicy originProbePolicy simplificationPolicy openingPolicy
+  $ rankAssociatedLengthCandidatesWithLiveSessionOpening policies openingPolicy
       execution evaluation contract id candidates
+ where
+  policies = LengthRankingPolicies
+    inputBoxPolicy applicableDomainPolicy originProbePolicy
+    simplificationPolicy
+
 
 -- | Occurrence-associated sibling of the complete private policy entrance.
 rankPostVerificationLengthCandidatesWithRankingPolicies
@@ -849,12 +873,14 @@ rankPostVerificationLengthCandidatesWithRankingPolicies
       (Either LengthRankingInputError
         (AssociatedLengthRanking
           (PostVerificationCandidate epoch DetailedVerificationVariant)))
-rankPostVerificationLengthCandidatesWithRankingPolicies inputBoxPolicy
-    applicableDomainPolicy originProbePolicy simplificationPolicy execution
-    evaluation contract =
+rankPostVerificationLengthCandidatesWithRankingPolicies
+    inputBoxPolicy applicableDomainPolicy originProbePolicy
+    simplificationPolicy execution evaluation contract =
   rankPostVerificationLengthCandidatesWithRankingPoliciesAndLiveSessionOpening
-    inputBoxPolicy applicableDomainPolicy originProbePolicy simplificationPolicy
-    LengthLiveSessionOpeningEager execution evaluation contract
+    inputBoxPolicy applicableDomainPolicy originProbePolicy
+    simplificationPolicy LengthLiveSessionOpeningEager execution evaluation
+    contract
+
 
 -- | Occurrence-associated sibling of the opening-aware complete entrance.
 rankPostVerificationLengthCandidatesWithRankingPoliciesAndLiveSessionOpening
@@ -872,11 +898,16 @@ rankPostVerificationLengthCandidatesWithRankingPoliciesAndLiveSessionOpening
         (AssociatedLengthRanking
           (PostVerificationCandidate epoch DetailedVerificationVariant)))
 rankPostVerificationLengthCandidatesWithRankingPoliciesAndLiveSessionOpening
-    inputBoxPolicy applicableDomainPolicy originProbePolicy simplificationPolicy
+    inputBoxPolicy applicableDomainPolicy originProbePolicy
+    simplificationPolicy
     openingPolicy execution evaluation contract =
-  rankAssociatedLengthCandidatesWithLiveSessionOpening inputBoxPolicy
-    applicableDomainPolicy originProbePolicy simplificationPolicy openingPolicy
+  rankAssociatedLengthCandidatesWithLiveSessionOpening policies openingPolicy
     execution evaluation contract postVerificationCandidateVerified
+ where
+  policies = LengthRankingPolicies
+    inputBoxPolicy applicableDomainPolicy originProbePolicy
+    simplificationPolicy
+
 
 -- | Budgeted complete-policy entrance.  Admission remains outside the shared
 -- owner; every preparation, pure evidence pass, live operation, final ranking
@@ -901,9 +932,13 @@ rankVerifiedLengthCandidatesWithRankingPoliciesAndUsableWorkBudget finalize
     candidates =
   rankAssociatedLengthCandidatesWithUsableWorkBudget budget
     (finalize . projectAssociatedLengthRankingWith id)
-    forceLengthRankingOwnedResult inputBoxPolicy applicableDomainPolicy
-    originProbePolicy simplificationPolicy openingPolicy execution evaluation
+    forceLengthRankingOwnedResult policies openingPolicy execution evaluation
     contract id candidates
+ where
+  policies = LengthRankingPolicies
+    inputBoxPolicy applicableDomainPolicy originProbePolicy
+    simplificationPolicy
+
 
 -- | Occurrence-associated budgeted sibling.  The caller supplies only the
 -- closed stable ranking transform; occurrence associations retain their
@@ -932,9 +967,13 @@ rankPostVerificationLengthCandidatesWithRankingPoliciesAndUsableWorkBudget
     simplificationPolicy openingPolicy execution evaluation contract
     candidates =
   rankAssociatedLengthCandidatesWithUsableWorkBudget budget finalize
-    forceAssociatedLengthRankingOwnedResult inputBoxPolicy
-    applicableDomainPolicy originProbePolicy simplificationPolicy openingPolicy
+    forceAssociatedLengthRankingOwnedResult policies openingPolicy
     execution evaluation contract postVerificationCandidateVerified candidates
+ where
+  policies = LengthRankingPolicies
+    inputBoxPolicy applicableDomainPolicy originProbePolicy
+    simplificationPolicy
+
 
 -- | Scoped/checkpointed complete-policy entrance.  It retains the v1
 -- admission and atomic-result contract while selecting the additive
@@ -958,9 +997,13 @@ rankVerifiedLengthCandidatesWithRankingPoliciesAndScopedUsableWorkBudget
     candidates =
   rankAssociatedLengthCandidatesWithScopedUsableWorkBudget budget
     (finalize . projectAssociatedLengthRankingWith id)
-    forceLengthRankingOwnedResult inputBoxPolicy applicableDomainPolicy
-    originProbePolicy simplificationPolicy openingPolicy execution evaluation
+    forceLengthRankingOwnedResult policies openingPolicy execution evaluation
     contract id candidates
+ where
+  policies = LengthRankingPolicies
+    inputBoxPolicy applicableDomainPolicy originProbePolicy
+    simplificationPolicy
+
 
 -- | Occurrence-associated scoped/checkpointed sibling.  Checkpointing never
 -- projects or forces caller-owned occurrence handles beyond their established
@@ -989,9 +1032,13 @@ rankPostVerificationLengthCandidatesWithRankingPoliciesAndScopedUsableWorkBudget
     simplificationPolicy openingPolicy execution evaluation contract
     candidates =
   rankAssociatedLengthCandidatesWithScopedUsableWorkBudget budget finalize
-    forceAssociatedLengthRankingOwnedResult inputBoxPolicy
-    applicableDomainPolicy originProbePolicy simplificationPolicy openingPolicy
+    forceAssociatedLengthRankingOwnedResult policies openingPolicy
     execution evaluation contract postVerificationCandidateVerified candidates
+ where
+  policies = LengthRankingPolicies
+    inputBoxPolicy applicableDomainPolicy originProbePolicy
+    simplificationPolicy
+
 
 data LengthUsableWorkSnapshot association = LengthUsableWorkSnapshot
   ![PreparedLengthCandidate association]
@@ -1003,10 +1050,7 @@ rankAssociatedLengthCandidatesWithUsableWorkBudget
   :: LengthSMTLibLiveUsableWorkBudget
   -> (AssociatedLengthRanking association -> result)
   -> (result -> ())
-  -> LengthInputBoxRankingPolicy
-  -> LengthApplicableDomainRankingPolicy
-  -> LengthOriginProbeRankingPolicy
-  -> LengthCounterexampleSimplificationRankingPolicy
+  -> LengthRankingPolicies
   -> LengthLiveSessionOpeningPolicy
   -> LengthSMTLibExecutionConfig
   -> LengthEvaluationLimits
@@ -1015,8 +1059,7 @@ rankAssociatedLengthCandidatesWithUsableWorkBudget
   -> [association]
   -> IO (Either LengthRankingInputError result)
 rankAssociatedLengthCandidatesWithUsableWorkBudget budget finish forceResult
-    inputBoxPolicy applicableDomainPolicy originProbePolicy
-    simplificationPolicy openingPolicy execution evaluation contract
+    policies openingPolicy execution evaluation contract
     verifiedFor associations =
   case admitCandidates defaultLengthSMTLibLiveSessionMaximumQueries
       associations of
@@ -1029,8 +1072,7 @@ rankAssociatedLengthCandidatesWithUsableWorkBudget budget finish forceResult
         _ <- evaluate $ forcePreparedLengthCandidates prepared
         snapshot `seq` writeIORef snapshotRef (Just snapshot)
         ranking <- runPreparedCandidatesUnderUsableWorkDeadline deadline
-          execution evaluation inputBoxPolicy applicableDomainPolicy
-          originProbePolicy simplificationPolicy openingPolicy prepared
+          execution evaluation policies openingPolicy prepared
         let cleanupIncomplete = associatedLengthRankingCleanupIncomplete ranking
             completedSnapshot = LengthUsableWorkSnapshot
               prepared cleanupIncomplete
@@ -1060,10 +1102,7 @@ rankAssociatedLengthCandidatesWithScopedUsableWorkBudget
   :: LengthSMTLibLiveUsableWorkBudget
   -> (AssociatedLengthRanking association -> result)
   -> (result -> ())
-  -> LengthInputBoxRankingPolicy
-  -> LengthApplicableDomainRankingPolicy
-  -> LengthOriginProbeRankingPolicy
-  -> LengthCounterexampleSimplificationRankingPolicy
+  -> LengthRankingPolicies
   -> LengthLiveSessionOpeningPolicy
   -> LengthSMTLibExecutionConfig
   -> LengthEvaluationLimits
@@ -1072,8 +1111,7 @@ rankAssociatedLengthCandidatesWithScopedUsableWorkBudget
   -> [association]
   -> IO (Either LengthRankingInputError result)
 rankAssociatedLengthCandidatesWithScopedUsableWorkBudget budget finish
-    forceResult inputBoxPolicy applicableDomainPolicy originProbePolicy
-    simplificationPolicy openingPolicy execution evaluation contract
+    forceResult policies openingPolicy execution evaluation contract
     verifiedFor associations =
   case admitCandidates defaultLengthSMTLibLiveSessionMaximumQueries
       associations of
@@ -1097,9 +1135,8 @@ rankAssociatedLengthCandidatesWithScopedUsableWorkBudget budget finish
                 Right () -> do
                   ranked <-
                     runPreparedCandidatesUnderScopedUsableWorkDeadline
-                      deadline execution evaluation inputBoxPolicy
-                      applicableDomainPolicy originProbePolicy
-                      simplificationPolicy openingPolicy prepared
+                      deadline execution evaluation policies openingPolicy
+                      prepared
                   case ranked of
                     Left failure -> pure $ Left failure
                     Right ranking -> do
@@ -1146,24 +1183,19 @@ runPreparedCandidatesUnderUsableWorkDeadline
   :: LengthSMTLibLiveUsableWorkDeadline budget
   -> LengthSMTLibExecutionConfig
   -> LengthEvaluationLimits
-  -> LengthInputBoxRankingPolicy
-  -> LengthApplicableDomainRankingPolicy
-  -> LengthOriginProbeRankingPolicy
-  -> LengthCounterexampleSimplificationRankingPolicy
+  -> LengthRankingPolicies
   -> LengthLiveSessionOpeningPolicy
   -> [PreparedLengthCandidate association]
   -> IO (AssociatedLengthRanking association)
 runPreparedCandidatesUnderUsableWorkDeadline deadline execution evaluation
-    inputBoxPolicy applicableDomainPolicy originProbePolicy
-    simplificationPolicy openingPolicy prepared = case prepared of
+    policies openingPolicy prepared = case prepared of
   [] -> pure $ AssociatedLengthRanking [] Nothing
   _ | not (hasEligibleCandidate prepared) -> pure $ AssociatedLengthRanking
         (map preparedCandidateUnassessed prepared) Nothing
     | otherwise -> case openingPolicy of
         LengthLiveSessionOpeningEager -> do
           scoped <- withLengthSMTLibLiveSessionUnderDeadline deadline execution
-            $ \session -> runPreparedCandidates evaluation inputBoxPolicy
-                applicableDomainPolicy originProbePolicy simplificationPolicy
+            $ \session -> runPreparedCandidates evaluation policies
                 session prepared
           pure $ case scoped of
             Left failure -> unassessedRanking prepared
@@ -1173,22 +1205,18 @@ runPreparedCandidatesUnderUsableWorkDeadline deadline execution evaluation
               (stableCounterexampleDemotion assessed) Nothing
         LengthLiveSessionOpeningDeferredUntilLiveQuery ->
           runPreparedCandidatesWithDeferredLiveSessionOpeningUnderDeadline
-            deadline execution evaluation inputBoxPolicy applicableDomainPolicy
-            originProbePolicy simplificationPolicy prepared
+            deadline execution evaluation policies prepared
 
 runPreparedCandidatesWithDeferredLiveSessionOpeningUnderDeadline
   :: LengthSMTLibLiveUsableWorkDeadline budget
   -> LengthSMTLibExecutionConfig
   -> LengthEvaluationLimits
-  -> LengthInputBoxRankingPolicy
-  -> LengthApplicableDomainRankingPolicy
-  -> LengthOriginProbeRankingPolicy
-  -> LengthCounterexampleSimplificationRankingPolicy
+  -> LengthRankingPolicies
   -> [PreparedLengthCandidate association]
   -> IO (AssociatedLengthRanking association)
 runPreparedCandidatesWithDeferredLiveSessionOpeningUnderDeadline deadline
-    execution evaluation inputBoxPolicy applicableDomainPolicy originProbePolicy
-    simplificationPolicy prepared = case runPreparedCandidatesBeforeLive
+    execution evaluation policies prepared =
+  case runPreparedCandidatesBeforeLive
         evaluation applicableDomainPolicy originProbePolicy simplificationPolicy
         prepared of
   PreparedLengthCandidatesCompleted assessed -> pure
@@ -1210,8 +1238,7 @@ runPreparedCandidatesWithDeferredLiveSessionOpeningUnderDeadline deadline
                     Nothing -> seedBank
                     Just retained -> promoteCounterexampleSeed retained seedBank
               in nextSeedBank `seq` runPreparedCandidatesFrom evaluation
-                  inputBoxPolicy applicableDomainPolicy originProbePolicy
-                  simplificationPolicy session (assessed : reversed)
+                  policies session (assessed : reversed)
                   nextSeedBank rest
     pure $ case scoped of
       Left failure -> unassessedRanking prepared
@@ -1219,23 +1246,25 @@ runPreparedCandidatesWithDeferredLiveSessionOpeningUnderDeadline deadline
       Right (Left failure) -> unassessedRanking prepared failure
       Right (Right assessed) -> AssociatedLengthRanking
         (stableCounterexampleDemotion assessed) Nothing
+ where
+  inputBoxPolicy = inputBoxPolicyOf policies
+  applicableDomainPolicy = applicableDomainPolicyOf policies
+  originProbePolicy = originProbePolicyOf policies
+  simplificationPolicy = simplificationPolicyOf policies
+
 
 runPreparedCandidatesUnderScopedUsableWorkDeadline
   :: LengthSMTLibLiveScopedUsableWorkDeadline budget
   -> LengthSMTLibExecutionConfig
   -> LengthEvaluationLimits
-  -> LengthInputBoxRankingPolicy
-  -> LengthApplicableDomainRankingPolicy
-  -> LengthOriginProbeRankingPolicy
-  -> LengthCounterexampleSimplificationRankingPolicy
+  -> LengthRankingPolicies
   -> LengthLiveSessionOpeningPolicy
   -> [PreparedLengthCandidate association]
   -> IO
       (Either LengthSMTLibLiveSessionError
         (AssociatedLengthRanking association))
 runPreparedCandidatesUnderScopedUsableWorkDeadline deadline execution
-    evaluation inputBoxPolicy applicableDomainPolicy originProbePolicy
-    simplificationPolicy openingPolicy prepared = case prepared of
+    evaluation policies openingPolicy prepared = case prepared of
   [] -> pure $ Right $ AssociatedLengthRanking [] Nothing
   _ | not (hasEligibleCandidate prepared) -> pure $ Right
         $ AssociatedLengthRanking
@@ -1245,8 +1274,7 @@ runPreparedCandidatesUnderScopedUsableWorkDeadline deadline execution
           scoped <- withLengthSMTLibLiveSessionUnderScopedDeadline
             deadline execution $ \session ->
               runPreparedCandidatesFromUnderScopedUsableWorkDeadline
-                deadline evaluation inputBoxPolicy applicableDomainPolicy
-                originProbePolicy simplificationPolicy session [] [] prepared
+                deadline evaluation policies session [] [] prepared
           pure $ case scoped of
             Left failure -> Right $ unassessedRanking prepared
               $ sessionRankingFailure failure
@@ -1258,24 +1286,19 @@ runPreparedCandidatesUnderScopedUsableWorkDeadline deadline execution
                   (stableCounterexampleDemotion assessed) Nothing
         LengthLiveSessionOpeningDeferredUntilLiveQuery ->
           runPreparedCandidatesWithDeferredLiveSessionOpeningUnderScopedDeadline
-            deadline execution evaluation inputBoxPolicy applicableDomainPolicy
-            originProbePolicy simplificationPolicy prepared
+            deadline execution evaluation policies prepared
 
 runPreparedCandidatesWithDeferredLiveSessionOpeningUnderScopedDeadline
   :: LengthSMTLibLiveScopedUsableWorkDeadline budget
   -> LengthSMTLibExecutionConfig
   -> LengthEvaluationLimits
-  -> LengthInputBoxRankingPolicy
-  -> LengthApplicableDomainRankingPolicy
-  -> LengthOriginProbeRankingPolicy
-  -> LengthCounterexampleSimplificationRankingPolicy
+  -> LengthRankingPolicies
   -> [PreparedLengthCandidate association]
   -> IO
       (Either LengthSMTLibLiveSessionError
         (AssociatedLengthRanking association))
 runPreparedCandidatesWithDeferredLiveSessionOpeningUnderScopedDeadline
-    deadline execution evaluation inputBoxPolicy applicableDomainPolicy
-    originProbePolicy simplificationPolicy prepared = do
+    deadline execution evaluation policies prepared = do
   beforeLive <- runPreparedCandidatesBeforeLiveUnderScopedUsableWorkDeadline
     deadline evaluation applicableDomainPolicy originProbePolicy
     simplificationPolicy prepared
@@ -1309,8 +1332,7 @@ runPreparedCandidatesWithDeferredLiveSessionOpeningUnderScopedDeadline
                   Left failure -> pure $ Left failure
                   Right () ->
                     runPreparedCandidatesFromUnderScopedUsableWorkDeadline
-                      deadline evaluation inputBoxPolicy applicableDomainPolicy
-                      originProbePolicy simplificationPolicy session
+                      deadline evaluation policies session
                       (assessed : reversed) nextSeedBank rest
       pure $ case scoped of
         Left failure -> Right $ unassessedRanking prepared
@@ -1321,6 +1343,12 @@ runPreparedCandidatesWithDeferredLiveSessionOpeningUnderScopedDeadline
         Right (Right (Right assessed)) -> Right
           $ AssociatedLengthRanking
               (stableCounterexampleDemotion assessed) Nothing
+ where
+  inputBoxPolicy = inputBoxPolicyOf policies
+  applicableDomainPolicy = applicableDomainPolicyOf policies
+  originProbePolicy = originProbePolicyOf policies
+  simplificationPolicy = simplificationPolicyOf policies
+
 
 -- | Check after each complete pure candidate chain.  The individual MRU,
 -- applicable-domain, origin, and simplification operations are independently
@@ -1401,10 +1429,7 @@ runPreparedCandidatesBeforeLiveUnderScopedUsableWorkDeadline deadline
 runPreparedCandidatesFromUnderScopedUsableWorkDeadline
   :: LengthSMTLibLiveScopedUsableWorkDeadline budget
   -> LengthEvaluationLimits
-  -> LengthInputBoxRankingPolicy
-  -> LengthApplicableDomainRankingPolicy
-  -> LengthOriginProbeRankingPolicy
-  -> LengthCounterexampleSimplificationRankingPolicy
+  -> LengthRankingPolicies
   -> LengthSMTLibLiveSession epoch
   -> [AssociatedRankedLengthCandidate association]
   -> [[Natural]]
@@ -1414,9 +1439,13 @@ runPreparedCandidatesFromUnderScopedUsableWorkDeadline
         (Either LengthRankingFailure
           [AssociatedRankedLengthCandidate association]))
 runPreparedCandidatesFromUnderScopedUsableWorkDeadline deadline evaluation
-    inputBoxPolicy applicableDomainPolicy originProbePolicy simplificationPolicy
+    policies
     session = go
  where
+  inputBoxPolicy = inputBoxPolicyOf policies
+  applicableDomainPolicy = applicableDomainPolicyOf policies
+  originProbePolicy = originProbePolicyOf policies
+  simplificationPolicy = simplificationPolicyOf policies
   go reversed seedBank remaining = case remaining of
     [] -> pure $ Right $ Right $ reverse reversed
     PreparedLengthCandidateUnassessed index association refusal : rest ->
@@ -1478,10 +1507,7 @@ runPreparedCandidatesFromUnderScopedUsableWorkDeadline deadline evaluation
 -- fallback.  The projection is not touched until complete input admission has
 -- succeeded.
 rankAssociatedLengthCandidates
-  :: LengthInputBoxRankingPolicy
-  -> LengthApplicableDomainRankingPolicy
-  -> LengthOriginProbeRankingPolicy
-  -> LengthCounterexampleSimplificationRankingPolicy
+  :: LengthRankingPolicies
   -> LengthSMTLibExecutionConfig
   -> LengthEvaluationLimits
   -> LeanLengthContract
@@ -1490,19 +1516,14 @@ rankAssociatedLengthCandidates
   -> IO
       (Either LengthRankingInputError
         (AssociatedLengthRanking association))
-rankAssociatedLengthCandidates inputBoxPolicy applicableDomainPolicy
-    originProbePolicy simplificationPolicy execution evaluation contract
+rankAssociatedLengthCandidates policies execution evaluation contract
     verifiedFor associations =
-  rankAssociatedLengthCandidatesWithLiveSessionOpening inputBoxPolicy
-    applicableDomainPolicy originProbePolicy simplificationPolicy
+  rankAssociatedLengthCandidatesWithLiveSessionOpening policies
     LengthLiveSessionOpeningEager execution evaluation contract verifiedFor
     associations
 
 rankAssociatedLengthCandidatesWithLiveSessionOpening
-  :: LengthInputBoxRankingPolicy
-  -> LengthApplicableDomainRankingPolicy
-  -> LengthOriginProbeRankingPolicy
-  -> LengthCounterexampleSimplificationRankingPolicy
+  :: LengthRankingPolicies
   -> LengthLiveSessionOpeningPolicy
   -> LengthSMTLibExecutionConfig
   -> LengthEvaluationLimits
@@ -1512,8 +1533,7 @@ rankAssociatedLengthCandidatesWithLiveSessionOpening
   -> IO
       (Either LengthRankingInputError
         (AssociatedLengthRanking association))
-rankAssociatedLengthCandidatesWithLiveSessionOpening inputBoxPolicy
-    applicableDomainPolicy originProbePolicy simplificationPolicy openingPolicy
+rankAssociatedLengthCandidatesWithLiveSessionOpening policies openingPolicy
     execution evaluation contract verifiedFor associations =
   case admitCandidates defaultLengthSMTLibLiveSessionMaximumQueries
       associations of
@@ -1528,8 +1548,7 @@ rankAssociatedLengthCandidatesWithLiveSessionOpening inputBoxPolicy
             LengthLiveSessionOpeningEager -> do
               scoped <- withLengthSMTLibLiveSession execution
                 $ \session -> runPreparedCandidates
-                    evaluation inputBoxPolicy applicableDomainPolicy
-                      originProbePolicy simplificationPolicy session prepared
+                    evaluation policies session prepared
               pure $ Right $ case scoped of
                 Left failure -> unassessedRanking prepared
                   $ sessionRankingFailure failure
@@ -1539,8 +1558,7 @@ rankAssociatedLengthCandidatesWithLiveSessionOpening inputBoxPolicy
                   (stableCounterexampleDemotion assessed) Nothing
             LengthLiveSessionOpeningDeferredUntilLiveQuery -> Right <$>
               runPreparedCandidatesWithDeferredLiveSessionOpening execution
-                evaluation inputBoxPolicy applicableDomainPolicy
-                  originProbePolicy simplificationPolicy prepared
+                evaluation policies prepared
 
 admitCandidates
   :: Natural
@@ -1619,14 +1637,11 @@ type role PreparedLengthCandidatesBeforeLive nominal
 runPreparedCandidatesWithDeferredLiveSessionOpening
   :: LengthSMTLibExecutionConfig
   -> LengthEvaluationLimits
-  -> LengthInputBoxRankingPolicy
-  -> LengthApplicableDomainRankingPolicy
-  -> LengthOriginProbeRankingPolicy
-  -> LengthCounterexampleSimplificationRankingPolicy
+  -> LengthRankingPolicies
   -> [PreparedLengthCandidate association]
   -> IO (AssociatedLengthRanking association)
 runPreparedCandidatesWithDeferredLiveSessionOpening execution evaluation
-    inputBoxPolicy applicableDomainPolicy originProbePolicy simplificationPolicy
+    policies
     prepared = case runPreparedCandidatesBeforeLive evaluation
         applicableDomainPolicy originProbePolicy simplificationPolicy prepared of
   PreparedLengthCandidatesCompleted assessed -> pure
@@ -1647,8 +1662,7 @@ runPreparedCandidatesWithDeferredLiveSessionOpening execution evaluation
                   Nothing -> seedBank
                   Just retained -> promoteCounterexampleSeed retained seedBank
             in nextSeedBank `seq` runPreparedCandidatesFrom evaluation
-                inputBoxPolicy applicableDomainPolicy originProbePolicy
-                simplificationPolicy session (assessed : reversed)
+                policies session (assessed : reversed)
                 nextSeedBank rest
     pure $ case scoped of
       Left failure -> unassessedRanking prepared
@@ -1656,6 +1670,12 @@ runPreparedCandidatesWithDeferredLiveSessionOpening execution evaluation
       Right (Left failure) -> unassessedRanking prepared failure
       Right (Right assessed) -> AssociatedLengthRanking
         (stableCounterexampleDemotion assessed) Nothing
+ where
+  inputBoxPolicy = inputBoxPolicyOf policies
+  applicableDomainPolicy = applicableDomainPolicyOf policies
+  originProbePolicy = originProbePolicyOf policies
+  simplificationPolicy = simplificationPolicyOf policies
+
 
 -- | Traverse only query-owned, solver-free sources.  A need-live continuation
 -- records the triggering candidate after its pure chain has missed, so opening
@@ -1713,26 +1733,18 @@ runPreparedCandidatesBeforeLive evaluation applicableDomainPolicy
 
 runPreparedCandidates
   :: LengthEvaluationLimits
-  -> LengthInputBoxRankingPolicy
-  -> LengthApplicableDomainRankingPolicy
-  -> LengthOriginProbeRankingPolicy
-  -> LengthCounterexampleSimplificationRankingPolicy
+  -> LengthRankingPolicies
   -> LengthSMTLibLiveSession epoch
   -> [PreparedLengthCandidate association]
   -> IO
       (Either LengthRankingFailure
         [AssociatedRankedLengthCandidate association])
-runPreparedCandidates evaluation inputBoxPolicy applicableDomainPolicy
-    originProbePolicy simplificationPolicy session =
-  runPreparedCandidatesFrom evaluation inputBoxPolicy applicableDomainPolicy
-    originProbePolicy simplificationPolicy session [] []
+runPreparedCandidates evaluation policies session =
+  runPreparedCandidatesFrom evaluation policies session [] []
 
 runPreparedCandidatesFrom
   :: LengthEvaluationLimits
-  -> LengthInputBoxRankingPolicy
-  -> LengthApplicableDomainRankingPolicy
-  -> LengthOriginProbeRankingPolicy
-  -> LengthCounterexampleSimplificationRankingPolicy
+  -> LengthRankingPolicies
   -> LengthSMTLibLiveSession epoch
   -> [AssociatedRankedLengthCandidate association]
   -> [[Natural]]
@@ -1740,9 +1752,12 @@ runPreparedCandidatesFrom
   -> IO
       (Either LengthRankingFailure
         [AssociatedRankedLengthCandidate association])
-runPreparedCandidatesFrom evaluation inputBoxPolicy applicableDomainPolicy
-    originProbePolicy simplificationPolicy session = go
+runPreparedCandidatesFrom evaluation policies session = go
  where
+  inputBoxPolicy = inputBoxPolicyOf policies
+  applicableDomainPolicy = applicableDomainPolicyOf policies
+  originProbePolicy = originProbePolicyOf policies
+  simplificationPolicy = simplificationPolicyOf policies
   go reversed seedBank remaining = case remaining of
     [] -> pure $ Right $ reverse reversed
     PreparedLengthCandidateUnassessed
