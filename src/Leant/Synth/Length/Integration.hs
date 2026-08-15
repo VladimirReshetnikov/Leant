@@ -4,12 +4,13 @@
 -- named configuration file to one reusable, activated ranking policy and the
 -- file's fixed nominal domain selection and contract.  That selection is a
 -- fixed startup choice for the process: every later verified batch is checked
--- against the same contract, while every eligible batch still gets a fresh
--- worker scope.  This module also owns the disabled identity branch used by
+-- against the same contract.  Eager policies still give every eligible batch
+-- a fresh worker scope; an explicitly deferred policy may finish from pure
+-- query-owned evidence and otherwise opens that scope at the first live miss.
+-- This module also owns the disabled identity branch used by
 -- Main.  Loading performs
 -- bounded acquisition and closed activation only; no solver is launched until
--- an eligible verified batch is assessed, and every such batch still receives
--- a fresh lexical worker scope from the ranking layer.
+-- the ranking policy actually requests its fresh lexical worker scope.
 module Leant.Synth.Length.Integration
   ( LengthRankingConfigurationActivationPolicy (..)
   , LengthRankingConfigurationFileSource (..)
@@ -246,7 +247,8 @@ data LengthAssessmentResult
 -- | Preserve callback order without IO when disabled.  When configured, check
 -- the exact verified batch against the startup-fixed contract through the
 -- existing occurrence-sealed Length adapter.  Its ranking layer opens a fresh
--- lexical worker only if pure preparation produced an eligible query.
+-- lexical worker eagerly under compatibility policies, or only at the first
+-- actual live miss under an explicitly deferred policy.
 assessLengthVerificationBatch
   :: LengthAssessmentMode
   -> VerificationBatch DetailedVerificationVariant

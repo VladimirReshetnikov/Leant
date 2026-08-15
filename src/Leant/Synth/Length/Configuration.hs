@@ -21,9 +21,10 @@
 -- digest bytes from the opaque sealed value.  A closed classifier reports
 -- only whether the retained execution policy contains a digest expectation.
 -- Callers must provide the complete execution and replay policy plus each
--- contract explicitly.  No runner retains a worker: every eligible batch
--- delegates to the rank-N live scope owned by
--- 'rankVerifiedLengthCandidates'.
+-- contract explicitly.  No runner retains a worker: established eager
+-- policies delegate each eligible batch to the ranking layer's rank-N live
+-- scope, while an explicitly deferred policy creates that scope only at the
+-- first candidate which actually needs a live query.
 module Leant.Synth.Length.Configuration
   ( LengthRankingPolicySource (..)
   , LengthRankingPolicy
@@ -521,7 +522,10 @@ spinePairCounterexampleSimplificationRankingPolicy policy = case policy of
     LengthSpinePairCounterexampleSimplificationRankingEnabled limits
 
 -- | Run a verified batch under one reusable policy and one explicitly supplied
--- request contract.  Every eligible call still owns a fresh lexical worker.
+-- request contract.  Eager policies still open one fresh lexical worker for
+-- every eligible call; an explicitly deferred policy may complete from
+-- query-owned pure evidence without a process and otherwise opens once at the
+-- first live miss.
 rankVerifiedLengthCandidatesWithPolicy
   :: LengthRankingPolicy
   -> LeanLengthContract
