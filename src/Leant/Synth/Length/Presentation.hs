@@ -14,10 +14,12 @@ module Leant.Synth.Length.Presentation
   , renderLengthCounterexampleSimplificationNote
   , renderLengthInputBoxValidationNote
   , renderLengthApplicableDomainValidationNote
+  , renderLengthPositiveAffineApplicableDomainValidationNote
   , renderLengthSpinePairCounterexampleNote
   , renderLengthSpinePairCounterexampleSimplificationNote
   , renderLengthSpinePairInputBoxValidationNote
   , renderLengthSpinePairApplicableDomainValidationNote
+  , renderLengthSpinePairPositiveAffineApplicableDomainValidationNote
   , maximumLengthCounterexampleNoteCharacters
   ) where
 
@@ -31,10 +33,12 @@ import Language.Haskell.Djex
   , ValidatedLengthCounterexample
   , ValidatedLengthCounterexampleSimplification
   , ValidatedLengthInputBox
+  , ValidatedLengthPositiveAffineApplicableDomain
   , ValidatedLengthSpinePairApplicableDomain
   , ValidatedLengthSpinePairCounterexample
   , ValidatedLengthSpinePairCounterexampleSimplification
   , ValidatedLengthSpinePairInputBox
+  , ValidatedLengthSpinePairPositiveAffineApplicableDomain
   , lengthSpinePairFirst
   , lengthSpinePairSecond
   , validatedLengthCounterexampleBasis
@@ -53,6 +57,10 @@ import Language.Haskell.Djex
   , validatedLengthInputBoxAssignmentCount
   , validatedLengthInputBoxBasis
   , validatedLengthInputBoxInclusiveMaximums
+  , validatedLengthPositiveAffineApplicableDomainApplicableAssignmentCount
+  , validatedLengthPositiveAffineApplicableDomainAssignmentCount
+  , validatedLengthPositiveAffineApplicableDomainBasis
+  , validatedLengthPositiveAffineApplicableDomainInclusiveMaximums
   , validatedLengthSpinePairCounterexampleBasis
   , validatedLengthSpinePairCounterexampleInputs
   , validatedLengthSpinePairCounterexampleResult
@@ -69,6 +77,10 @@ import Language.Haskell.Djex
   , validatedLengthSpinePairInputBoxAssignmentCount
   , validatedLengthSpinePairInputBoxBasis
   , validatedLengthSpinePairInputBoxInclusiveMaximums
+  , validatedLengthSpinePairPositiveAffineApplicableDomainApplicableAssignmentCount
+  , validatedLengthSpinePairPositiveAffineApplicableDomainAssignmentCount
+  , validatedLengthSpinePairPositiveAffineApplicableDomainBasis
+  , validatedLengthSpinePairPositiveAffineApplicableDomainInclusiveMaximums
   )
 
 import Leant.Synth.Engine
@@ -189,6 +201,8 @@ presentRankedCandidate ranked = LengthCandidatePresentation
         $ renderLengthInputBoxValidationNote receipt
       ApplicableDomainEstablished receipt -> Just
         $ renderLengthApplicableDomainValidationNote receipt
+      PositiveAffineApplicableDomainEstablished receipt -> Just
+        $ renderLengthPositiveAffineApplicableDomainValidationNote receipt
       Heuristic _ -> Nothing
       Unassessed -> Nothing
 
@@ -215,6 +229,9 @@ presentRankedLengthSpinePairCandidate ranked = LengthCandidatePresentation
         $ renderLengthSpinePairInputBoxValidationNote receipt
       LengthSpinePairApplicableDomainEstablished receipt -> Just
         $ renderLengthSpinePairApplicableDomainValidationNote receipt
+      LengthSpinePairPositiveAffineApplicableDomainEstablished receipt -> Just
+        $ renderLengthSpinePairPositiveAffineApplicableDomainValidationNote
+            receipt
       LengthSpinePairHeuristic _ -> Nothing
       LengthSpinePairUnassessed -> Nothing
 
@@ -322,6 +339,37 @@ renderLengthApplicableDomainValidationNote receipt =
         "; vacuous (no assignment met the precondition)"
     | otherwise = ""
 
+-- | Render the additive positive-affine coverage receipt without promoting it
+-- to solver or source-language proof authority.  All values remain bounded by
+-- the same terminal ceiling and provider-name redaction as existing notes.
+renderLengthPositiveAffineApplicableDomainValidationNote
+  :: ValidatedLengthPositiveAffineApplicableDomain
+  -> String
+renderLengthPositiveAffineApplicableDomainValidationNote receipt =
+  take maximumLengthCounterexampleNoteCharacters $
+  "complete finite-spine Length domain under positive-affine "
+    ++ "precondition coverage rule within admitted bounds "
+    ++ "(model/provider-relative; "
+    ++ renderBasis
+        (validatedLengthPositiveAffineApplicableDomainBasis receipt)
+    ++ "; no global proof or solver authority): derived maxima = "
+    ++ renderPositiveAffineMaximums
+        (validatedLengthPositiveAffineApplicableDomainInclusiveMaximums receipt)
+    ++ "; checked = "
+    ++ renderNatural
+        (validatedLengthPositiveAffineApplicableDomainAssignmentCount receipt)
+    ++ "; applicable = "
+    ++ renderNatural
+        (validatedLengthPositiveAffineApplicableDomainApplicableAssignmentCount
+          receipt)
+    ++ vacuity
+ where
+  vacuity
+    | validatedLengthPositiveAffineApplicableDomainApplicableAssignmentCount
+        receipt == 0 =
+          "; vacuous (no assignment met the precondition)"
+    | otherwise = ""
+
 -- | Render both source-ordered result components of one independently replayed
 -- product-domain counterexample.  The note remains model-relative and bounded.
 renderLengthSpinePairCounterexampleNote
@@ -425,6 +473,37 @@ renderLengthSpinePairApplicableDomainValidationNote receipt =
           "; vacuous (no assignment met the precondition)"
     | otherwise = ""
 
+-- | Nominal binary-product sibling of the positive-affine coverage note.
+renderLengthSpinePairPositiveAffineApplicableDomainValidationNote
+  :: ValidatedLengthSpinePairPositiveAffineApplicableDomain
+  -> String
+renderLengthSpinePairPositiveAffineApplicableDomainValidationNote receipt =
+  take maximumLengthCounterexampleNoteCharacters $
+  "complete binary-product finite-spine Length domain under "
+    ++ "positive-affine precondition coverage rule within admitted bounds "
+    ++ "(model/provider-relative; "
+    ++ renderBasis
+        (validatedLengthSpinePairPositiveAffineApplicableDomainBasis receipt)
+    ++ "; no global proof or solver authority): derived maxima = "
+    ++ renderPositiveAffineMaximums
+        (validatedLengthSpinePairPositiveAffineApplicableDomainInclusiveMaximums
+          receipt)
+    ++ "; checked = "
+    ++ renderNatural
+        (validatedLengthSpinePairPositiveAffineApplicableDomainAssignmentCount
+          receipt)
+    ++ "; applicable = "
+    ++ renderNatural
+        (validatedLengthSpinePairPositiveAffineApplicableDomainApplicableAssignmentCount
+          receipt)
+    ++ vacuity
+ where
+  vacuity
+    | validatedLengthSpinePairPositiveAffineApplicableDomainApplicableAssignmentCount
+        receipt == 0 =
+          "; vacuous (no assignment met the precondition)"
+    | otherwise = ""
+
 -- | Hard terminal-output ceiling.  The supported file-format caps make a
 -- valid Main-path note fit below this limit; the final projection also keeps
 -- custom lower-level receipts from expanding terminal output past it.
@@ -454,6 +533,19 @@ renderInputs values =
         [] -> []
         _ : _ -> ["..."]
   in "[" ++ intercalate ", " (map renderNatural prefix ++ suffix) ++ "]"
+
+-- Positive-affine notes carry more authority qualifiers and counts than the
+-- older notes.  Showing one source-ordered maximum plus an explicit ellipsis
+-- keeps even the configured eight-input, 4,096-bit, vacuous product case below
+-- the shared 384-character terminal ceiling without dropping the count tail.
+renderPositiveAffineMaximums :: [Natural] -> String
+renderPositiveAffineMaximums values = case values of
+  [] -> "[]"
+  value : remaining -> "[" ++ renderNatural value ++ suffix remaining ++ "]"
+ where
+  suffix remaining = case remaining of
+    [] -> ""
+    _ : _ -> ", ..."
 
 -- Twenty-four decimal digits are enough to identify ordinary examples while
 -- preventing the configured 4,096-bit ceiling from producing kilobyte lines.
