@@ -29,7 +29,7 @@ Three rules make this safe to use:
   none of this code runs and no worker is ever launched.
 
 Everything below this line describes the exact behavior of the current tree:
-configuration-file selectors, contract-file selectors, the binary-product
+the startup-configuration schema, contract-file selectors, the binary-product
 extension, the replay bank, the origin probe, bounded validation, and
 presentation notes. (The module-by-module ownership map lives in
 [synth-internals.md](synth-internals.md).) Leant is experimental and makes no
@@ -44,15 +44,16 @@ first.
 ## Contents
 
 - [Startup configuration file](#startup-configuration-file)
-  - [Versions 1 to 34 at a glance](#versions-1-to-34-at-a-glance)
+  - [One current schema and fixed policy](#one-current-schema-and-fixed-policy)
   - [Activation, pinning, and worker lifecycle](#activation-pinning-and-worker-lifecycle)
   - [Candidate eligibility](#candidate-eligibility)
 - [One-shot contract-only files](#one-shot-contract-only-files)
   - [Command syntax, admission, and lifetime](#command-syntax-admission-and-lifetime)
-  - [Contract-only versions 1 and 2: compatibility grammar and modulo](#contract-only-versions-1-and-2-compatibility-grammar-and-modulo)
+  - [Contract-only versions 1 and 2: baseline scalar grammar and modulo](#contract-only-versions-1-and-2-baseline-scalar-grammar-and-modulo)
   - [Contract-only version 3: explicit target-argument roles](#contract-only-version-3-explicit-target-argument-roles)
   - [Contract-only version 4: exact-spine zero-step case policy](#contract-only-version-4-exact-spine-zero-step-case-policy)
   - [Contract-only version 5: positive-literal quotient](#contract-only-version-5-positive-literal-quotient)
+  - [Contract-only version 6: binary-product pair contract](#contract-only-version-6-binary-product-pair-contract)
 - [Binary-product Length queries](#binary-product-length-queries)
   - [Canonical `Prod` eligibility and the serializer boundary](#canonical-prod-eligibility-and-the-serializer-boundary)
   - [Library-level pair query handoff](#library-level-pair-query-handoff)
@@ -72,171 +73,58 @@ first.
   - [Counterexample simplification](#counterexample-simplification)
   - [Per-candidate execution order and stable ordering](#per-candidate-execution-order-and-stable-ordering)
   - [Domain-neutral limits and product-specific authority](#domain-neutral-limits-and-product-specific-authority)
-- [Startup configuration examples by version](#startup-configuration-examples-by-version)
-  - [Startup version 5: scalar bounded-positive ordering](#startup-version-5-scalar-bounded-positive-ordering)
-  - [Contract-only version 6: binary-product pair contract](#contract-only-version-6-binary-product-pair-contract)
-  - [Startup versions 4 and 6: pair ranking](#startup-versions-4-and-6-pair-ranking)
-  - [Startup versions 7 and 8: positive-affine deferred opening](#startup-versions-7-and-8-positive-affine-deferred-opening)
-  - [Startup versions 9 and 10: shared usable-work budget](#startup-versions-9-and-10-shared-usable-work-budget)
-  - [Root fields and validation order for versions 7 to 10](#root-fields-and-validation-order-for-versions-7-to-10)
-  - [Startup versions 11 and 12: relational positive-affine](#startup-versions-11-and-12-relational-positive-affine)
-  - [Startup versions 13 and 14: scoped usable-work lease](#startup-versions-13-and-14-scoped-usable-work-lease)
-  - [Startup versions 15 and 16: strict relational positive-affine](#startup-versions-15-and-16-strict-relational-positive-affine)
-  - [Startup versions 17 and 18: descriptor-bound executable launch](#startup-versions-17-and-18-descriptor-bound-executable-launch)
-  - [Startup versions 19 and 20: root-quotient consequences](#startup-versions-19-and-20-root-quotient-consequences)
-  - [Startup versions 21 and 22: effective-ID executable access](#startup-versions-21-and-22-effective-id-executable-access)
-  - [Startup versions 23 and 24: root-extrema consequences](#startup-versions-23-and-24-root-extrema-consequences)
-  - [Startup versions 25 and 26: root-monus consequences](#startup-versions-25-and-26-root-monus-consequences)
-  - [Startup versions 27 and 28: execve-check executable access](#startup-versions-27-and-28-execve-check-executable-access)
-  - [Startup versions 29 and 30: Boolean finite-union applicable domains](#startup-versions-29-and-30-boolean-finite-union-applicable-domains)
-  - [Startup versions 31 and 32: atomic-branching finite unions](#startup-versions-31-and-32-atomic-branching-finite-unions)
-  - [Startup versions 33 and 34: recursive piecewise-affine branching](#startup-versions-33-and-34-recursive-piecewise-affine-branching)
+- [Current startup configuration examples](#current-startup-configuration-examples)
+  - [Scalar startup configuration](#scalar-startup-configuration)
+  - [Binary-product startup configuration](#binary-product-startup-configuration)
+  - [Schema and validation order](#schema-and-validation-order)
 - [Pair contracts, decoders, and reports](#pair-contracts-decoders-and-reports)
   - [Using a contract-only version 6 document with `:synth`](#using-a-contract-only-version-6-document-with-synth)
   - [Pair contract grammar and validation order](#pair-contract-grammar-and-validation-order)
-  - [Decoder routing and reports](#decoder-routing-and-reports)
+  - [Decoder separation and reports](#decoder-separation-and-reports)
 - [Presentation notes on the Main path](#presentation-notes-on-the-main-path)
 
 ## Startup configuration file
 
-### Versions 1 to 34 at a glance
+### One current schema and fixed policy
 
 Finite-list-spine Length counterexample ranking is disabled by default. To opt
 in, pass `--length-ranking-config` with an explicitly chosen absolute path to
-a version-1 through version-34 configuration file. The required integer
-`version` member is a current-tree decoder discriminator: it selects one exact
-JSON shape and scalar-or-product policy branch. It is not Leant's release
-version, a SemVer component, a negotiated protocol, or a cumulative feature
-level. In the current tree, versions 1--3 select scalar
-finite-list-spine Length ranking. Version 1 preserves the established
-counterexample-only behavior. Version 2 additionally requires an explicit
-per-input finite box and enables independent bounded validation after a live
-`unsat` trigger. Version 3 retains that exact box and requires
-`"counterexampleProbe": "origin-before-live"`; after the four-entry MRU bank
-misses, each exact query asks Djex to replay its canonical all-zero input before
-Leant issues that candidate's live Z3 query. Version 4 retains version 3's
-operational policy but selects the nominal canonical-`Prod` domain through a
-required binary-product-spine contract. Version 5 is the scalar successor and
-version 6 is the pair successor: both additionally require
-`"boundedPositiveOrdering": "prefer-non-vacuous"`, which explicitly promotes
-only candidates carrying a completed finite-box receipt with at least one
-precondition-applicable assignment. Version 7 is the scalar advanced successor
-and version 8 is its nominal binary-product sibling. Both require the distinct
-`"positive-affine-v1"` applicable-domain rule and its non-vacuous preference,
-bounded componentwise-lexicographic counterexample simplification, and
-`"defer-until-live-query"` session opening. The three bounded authorities in a
-v7/v8 file are deliberately independent: its caller-selected post-`unsat` input
-box, applicable-domain limits, and simplification limits cannot substitute for
-one another. Version 9 is the scalar usable-work successor and version 10 is
-its nominal product sibling. They retain their v7/v8 domain policy and require
-one additional `"usableWorkBudget"` object selecting
-`"shared-usable-work-deadline-v1"`. Versions 1--8 remain literal: versions
-1--6 keep eager opening, while v7/v8 keep deferred opening with the historical
-separate opener and fresh-per-query deadlines.
-Version 11 is the scalar relational positive-affine successor and version 12
-is its nominal product sibling. They branch from the exact v7/v8 operational
-root, replace only the applicable-domain strategy with
-`"relational-positive-affine-v1"`, and deliberately have no
-`"usableWorkBudget"` field. Their deferred live lifecycle therefore retains
-the historical separate opener/finalizer and fresh per-query deadlines.
-Version 13 is the scalar scoped-usable-work successor and version 14 is its
-nominal product sibling. They retain v11/v12's relational validator, restore
-the exact v9/v10 root field set, and require
-`"scoped-checkpointed-shared-usable-work-deadline-v2"`. This additive owner is
-valid only on its creating thread and within its callback's dynamic extent,
-and Leant cooperatively checks its one absolute deadline between bounded
-candidate phases. Version 15 is the scalar strict-relational successor and
-version 16 is its nominal product sibling. They preserve the complete v13/v14
-root, scoped owner, checkpoint, and contract choices and replace only the
-applicable-domain literal with
-`"strict-relational-positive-affine-v1"`. That fourth extractor recognizes the
-ordinary relational grammar plus exactly one immediate top-level natural
-complement, `not (L <= R)`, as `R + 1 <= L`; it is not general negation
-normalization. Version 17 is the scalar descriptor-launch successor and version
-18 is its nominal product sibling. They preserve the complete v15/v16
-behavioral and scoped profile but require the additional closed execution
-member `"executableLaunch": "descriptor-bound-executable-v1"`. At the first
-live miss, Djex hashes and copies the source bytes into a sealed anonymous main
-image and launches that descriptor without resolving the pathname again.
-Version 19 is the scalar root-quotient-consequence successor and version 20 is
-its nominal product sibling. They retain the complete v17/v18 descriptor,
-scoped-v2, deferred-opening, simplification, preference, and contract profiles
-and replace only the applicable-domain strategy with
-`"strict-relational-positive-affine-quotient-v1"`. That closed fifth extractor
-delegates quotient-free clauses to the strict predecessor and adds exact
-Natural consequences for one positive-literal quotient at the root of exactly
-one side of a top-level inequality, equality, or immediate negated inequality.
-It is not general quotient reasoning.
-Version 21 is the scalar effective-ID executable-access successor and version
-22 is its nominal product sibling. They retain the complete v19/v20 quotient,
-scoped-v2, deferred-opening, simplification, preference, and contract profiles
-and replace only the closed execution member with
-`"executableLaunch": "descriptor-bound-effective-id-executable-access-v1"`.
-At a demanded live open, the opened source must pass Linux descriptor-based
-`faccessat2` `X_OK` under effective filesystem credentials before copying and
-again immediately before child allocation; the staged main image is fixed to
-mode `0500`, sealed, and executed without pathname or older-strategy fallback.
-Version 23 is the scalar root-extrema-consequence successor and version 24 is
-its nominal product sibling. They retain the complete v21/v22 effective-ID
-launch, scoped-v2 budget, deferred-opening, simplification, preference, and
-contract profiles and replace only the applicable-domain strategy with
-`"strict-relational-positive-affine-quotient-root-extrema-v1"`. That closed
-sixth extractor delegates root-extrema-free clauses to the quotient predecessor
-and adds four necessary Natural consequences for one immediate binary `min` or
-`max` at exactly one relation operand root. It is not general extrema solving.
-Version 25 is the scalar root-monus-consequence successor and version 26 is its
-nominal product sibling. They retain the complete v23/v24 effective-ID launch,
-scoped-v2 budget, deferred-opening, simplification, preference, and contract
-profiles and replace only the applicable-domain strategy with
-`"strict-relational-positive-affine-quotient-root-extrema-monus-v1"`. That
-closed seventh extractor delegates root-monus-free clauses to the root-extrema
-predecessor and adds exact or necessary Natural consequences for one immediate
-binary monus at exactly one relation operand root. Its reverse orientation and
-equality distinguish a uniformly positive, identically zero, or may-zero
-opposite affine expression; it is not general monus or Boolean-union solving.
-Version 27 is the scalar execve-check executable-access successor and version
-28 is its nominal product sibling. They retain the complete v25/v26 root-monus,
-scoped-v2, deferred-opening, simplification, preference, and contract profiles
-and replace only the closed execution member with
-`"executableLaunch": "descriptor-bound-execve-check-executable-access-v1"`.
-At a demanded live open, Djex retains both effective-credential source VFS
-checks and additionally requires descriptor-bound Linux `AT_EXECVE_CHECK`
-before and after staging, creates the image with `MFD_EXEC`, fixed mode `0500`,
-and the complete executable seal set, and checks that sealed staged descriptor
-once before child allocation. Version numbers are closed schema selections
-rather than cumulative feature levels; versions 1--26 remain literal.
-Version 29 is the scalar Boolean finite-union successor and version 30 is its
-nominal product sibling. They retain the complete v27/v28 execve-check launch,
-scoped-v2, deferred-opening, simplification, preference, and contract profiles
-and replace only the applicable-domain strategy with
-`"strict-relational-positive-affine-quotient-root-extrema-monus-boolean-finite-union-v1"`.
-The new closed eight-field object independently caps raw DNF branches,
-per-branch rules and closure inspections, retained canonical boxes, raw box
-visits, input width, and the deduplicated assignment set. It represents an
-exact antichain of zero-origin boxes and never substitutes a componentwise
-hull.
-Version 31 is the scalar atomic-branching finite-union successor and version
-32 is its nominal product sibling. They retain the complete v29/v30 JSON and
-operational profile and replace only the applicable-domain strategy with
-`"strict-relational-positive-affine-quotient-root-extrema-monus-boolean-finite-union-atomic-branching-v1"`.
-The same eight-field object is retained; its generated-branch limit now counts
-the Cartesian product of formula-DNF branches and exact alternatives for one
-immediate binary root extremum or may-zero root monus before Boolean cleanup.
-Surviving incomparable boxes remain an exact union; the strategy never
-manufactures a hull or rewrites the checked precondition.
-Version 33 is the scalar recursive piecewise-affine successor and version 34
-is its nominal product sibling. They retain the complete v31/v32 JSON and
-operational profile and replace only the applicable-domain strategy with
-`"strict-relational-positive-affine-quotient-root-extrema-monus-boolean-finite-union-atomic-branching-recursive-piecewise-affine-v1"`.
-The same eight-field object is retained. Every relational leaf first uses the
-atomic predecessor; only an otherwise ignored leaf containing an extremum or
-monus recursively expands through supported sums, positive scales, binary
-minimum, maximum, and monus. Its exact disjoint selector cases feed the same
-bounded rule closure, box antichain, and original-formula replay. Quotient,
-modulo, conditional, result-reference, zero-scale, and other unsupported
-descendants reject the complete recursive fallback atom. V33/v34 are simply
-the numbers assigned to these two decoder branches in this revision; their
-continued availability or numbering is not promised.
+one current, versionless configuration file. The root contains no `version`
+member. Its required `rankingDomain` member is exactly `"scalar"` or
+`"binary-product"`; that choice selects the nominal result domain and the
+corresponding contract grammar.
+
+The file configures numeric limits, the executable and its budgets, and the
+passive contract. It does not expose one-member strategy switches. Every
+accepted startup file selects the current policy bundle:
+
+- descriptor-bound execve-check executable access;
+- the four-entry MRU replay bank followed by the all-zero origin probe;
+- independent post-`unsat` input-box validation;
+- recursive piecewise-affine Boolean finite-union applicable-domain
+  validation;
+- non-vacuous preference for both applicable-domain and input-box receipts;
+- componentwise-lexicographic counterexample simplification;
+- deferred session opening; and
+- one owner-thread-affine, cooperatively checkpointed scoped usable-work
+  deadline.
+
+The three bounded traversal authorities remain independent: input-box,
+applicable-domain, and simplification limits cannot substitute for one another.
+The recursive applicable-domain strategy first uses its complete atomic
+predecessor and recursively expands only otherwise ignored relational leaves
+whose supported signed-affine summaries contain minimum, maximum, or monus.
+Quotient, modulo, conditional, result-reference, zero-scale, and other
+unsupported descendants reject the complete recursive fallback atom.
+
+This reset deliberately removed the historical startup selectors and their
+parallel schemas. A historical file is not migrated or dispatched through an
+older decoder. An untouched old root fails first because it has no required
+`rankingDomain`; if a valid `rankingDomain` is added while `version` or another
+removed member remains, exact-root validation rejects that member as
+unexpected. Leant is experimental, so Git history and the dated reports record
+the old shapes without obliging the executable to continue accepting them. The
+separate contract-only format remains versioned and is described below.
 
 ### Activation, pinning, and worker lifecycle
 
@@ -244,31 +132,26 @@ Leant admits and reads that file
 once at startup, requires the configuration to contain an executable SHA-256
 expectation by default, and retains the decoded contract selection as a fixed
 process-wide assertion. Presence at activation is not a digest match; Djex
-compares the expectation only when an eligible batch later opens a worker.
-V1--v16 use the bounded pre-spawn pathname observation; v17--v34 compare it
-with the sealed staged main image selected for descriptor execution. V21--v34
-add the two point-in-time source VFS execute-access observations. V27--v34 also
-add two point-in-time source kernel executable checks and one staged-image
-check; none is a reservation or complete future execution decision.
+compares the expectation only when an eligible batch later opens a worker. The
+current launcher opens the source once, requires two point-in-time effective-ID
+VFS execute-access observations and two descriptor-bound source
+`AT_EXECVE_CHECK` observations, copies the bytes into a sealed `MFD_EXEC` main
+image, and checks that staged descriptor once before child allocation. None of
+those observations is a reservation or complete future execution decision.
 `--length-ranking-allow-unpinned` is a separate explicit relaxation;
 `--length-ranking-config-timeout` sets only the bounded file-load interruption
 budget (default 5,000 ms, maximum 60,000 ms). No option discovers a file or
 solver. POSIX configuration-file descriptor acquisition is implemented;
 Windows currently fails
-closed. Versions 1--6 and the established direct runners open one fresh lexical
-solver worker for every eligible batch. Versions 7--34 instead complete all
-admission and preparation, then run each candidate's pure MRU, selected
-positive-affine domain, and origin prefix before IO: an all-pure batch opens no
-process, while
-the first live miss opens one lexical session for that query and the remaining
-suffix. V9/v10 additionally capture one shared usable-work deadline after the
-64-candidate admission gate and before full preparation, so deferred pure work,
-opening, and every live query consume one window instead of receiving a fresh
-batch allowance per query. V13--v34 capture the corresponding dynamically
-scoped v2 owner at the same boundary and add cooperative checkpoints after
-preparation, each complete candidate chain, and result materialization. Any
-structured failure preserves callback order through the established atomic
-fallback.
+closed. The current route completes admission and preparation, then runs each
+candidate's pure MRU, recursive applicable-domain, and origin prefix before IO.
+An all-pure batch opens no process; the first live miss opens one lexical
+session for that query and the remaining suffix. The batch captures one
+dynamically scoped usable-work owner after the 64-candidate admission gate and
+before full preparation. Preparation, deferred pure work, opening, every live
+query, result materialization, and cooperative phase checkpoints consume that
+one absolute deadline. Any structured failure preserves callback order through
+the established atomic fallback.
 The opaque activated mode retains the exact require-pin or permit-unpinned
 decision that released it, and Main derives its startup notice from that mode
 rather than reinterpreting the raw command-line flag.
@@ -299,9 +182,9 @@ reserved as the delimiter. Leant first requires an activated startup policy;
 when ranking is disabled it rejects the option before path admission or file
 IO. Otherwise it admits and reads that absolute POSIX path once, before goal
 translation, using a fixed 5,000-ms interruption budget and the same 256-KiB
-JSON ceiling as the compatibility file. The separate contract-only root has
-format `leant-finite-list-spine-length-contract`. Version 1 preserves the
-existing bounded compatibility grammar; version 2 adds the exact expression
+JSON ceiling as the startup file. The separate contract-only root has
+format `leant-finite-list-spine-length-contract`. Version 1 uses the baseline
+bounded scalar grammar; version 2 adds the exact expression
 form `["modulo", positiveLiteral, expression]` in preconditions,
 postconditions, and provider transfers. Version 3 retains that modulo grammar
 and requires an exact source-ordered `targetArgumentRoles` array containing
@@ -316,12 +199,10 @@ Version 6 is the separately typed binary-product-spine form: its required
 `"resultShape": "binary-prod-spines-v1"` selects a pair contract whose result
 variables are `["result", "first"]` and `["result", "second"]`. It retains
 version 5's arithmetic, explicit target roles, and explicit case-policy
-vocabulary. Startup versions 1--3 retain the scalar compatibility contract
-grammar from contract-only version 1 and reject roles, candidate-case policy,
-modulo, quotient, and product-only fields. Startup version 4 requires the pair
-grammar. The positive-ordering successors use the complete existing grammars:
-startup version 5 embeds scalar contract grammar v5, while startup version 6
-embeds the same pair grammar as startup v4 and contract-only v6.
+vocabulary. The current startup schema is separate: `rankingDomain: "scalar"`
+requires the full scalar contract grammar represented by contract-only version
+5, while `rankingDomain: "binary-product"` requires the pair grammar represented
+by contract-only version 6. The startup root itself remains versionless.
 No contract-only version can
 replace the executable, pin choice, solver limits, artifact policy, or replay
 limits. The decoded contract selection is carried only through
@@ -331,7 +212,7 @@ cache, and later commands return to the startup-fixed contract unless they name
 their own file. Malformed option syntax is rejected rather than silently
 treated as a goal.
 
-### Contract-only versions 1 and 2: compatibility grammar and modulo
+### Contract-only versions 1 and 2: baseline scalar grammar and modulo
 
 The contract-only document has exactly three root fields; for example:
 
@@ -353,8 +234,8 @@ divisor must be nonzero and no wider than 256 bits. Leant preserves the passive
 AST; Djex normalization and sealing own its semantics and lower every surviving
 modulo occurrence to private quotient/remainder witness equations using only
 QF_LIA. No SMT-LIB `mod` term is emitted, and private witnesses never enter
-`get-value` or counterexample presentation. Old one-shot version-1 documents
-and version-2 documents retain their exact grammar and behavior.
+`get-value` or counterexample presentation. In the current tree, contract-only
+versions 1 and 2 continue to select those respective grammars.
 
 ### Contract-only version 3: explicit target-argument roles
 
@@ -404,8 +285,8 @@ laws, not a theorem about Lean execution.
 Version 3 changes no contract lifetime. Its file is still read once for that
 `:synth` command, the decoded request is shared by every retry and synthesis
 lane, and neither it nor its roles enter `ReplState`, history, snapshots, or a
-cache. A later command returns to the startup-fixed version-1 compatibility
-contract unless it explicitly names another contract-only file.
+cache. A later command returns to the startup-fixed current contract unless it
+explicitly names another contract-only file.
 
 ### Contract-only version 4: exact-spine zero-step case policy
 
@@ -454,7 +335,42 @@ original input. Version 5 requires both `targetArgumentRoles` and
 `candidateCasePolicy`. Choosing `"cases-rejected"` preserves the singleton,
 ordinal-zero renderer rule, while choosing `"exact-spine-zero-step-v1"`
 retains the accepted typed renderer ordinal just as version 4 does. Versions
-1--4 and startup continue to reject the quotient tag.
+1--4 continue to reject the quotient tag.
+
+### Contract-only version 6: binary-product pair contract
+
+Contract-only version 6 keeps the exact three-field contract-only root but
+selects the nominal binary-product domain. Its contract object requires
+`"resultShape": "binary-prod-spines-v1"` and otherwise retains version 5's
+arithmetic, target-role, case-policy, and provider-law grammar. For example:
+
+```json
+{
+  "format": "leant-finite-list-spine-length-contract",
+  "version": 6,
+  "contract": {
+    "resultShape": "binary-prod-spines-v1",
+    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
+    "targetArgumentRoles": ["observed-spine"],
+    "candidateCasePolicy": "cases-rejected",
+    "precondition": ["truth", true],
+    "postcondition": [
+      "all",
+      [
+        ["equal", ["result", "first"], ["input", 0]],
+        ["equal", ["result", "second"],
+          ["quotient", 2, ["input", 0]]]
+      ]
+    ],
+    "providerLaws": []
+  }
+}
+```
+
+Only pair result references `["result", "first"]` and
+`["result", "second"]` are admitted in that domain. Version 6 remains a
+command-local contract selection; it contains no execution, ranking, replay,
+or budget policy.
 
 ## Binary-product Length queries
 
@@ -1196,9 +1112,9 @@ The bounded notes report basis, boxes, visits, unique/applicable counts,
 vacuity, and a maxima prefix without claiming a hull, proof, or solver
 authority.
 
-Startup v33/v34 select these nominal scalar/product receipt families while
-retaining v31/v32's complete execve-check, scoped-v2, deferred, preference,
-simplification, and contract profile. The Leant boundary is recorded in the
+The current startup policy selects these nominal scalar/product receipt
+families together with execve-check launch, the scoped-v2 owner, deferred
+opening, both preferences, and simplification. The Leant boundary is recorded in the
 [recursive piecewise-affine Length ranking report](reports/2026-08-15-recursive-piecewise-affine-length-ranking.md),
 and Djex's exact grammar, selector laws, signed transfer, raw accounting, and
 authority are in the
@@ -1257,8 +1173,9 @@ Budget expiry is the existing sanitized session deadline failure with safe
 original index `Nothing` and the established original-order atomic fallback.
 It creates no assessment, evidence, presentation note, proof, or pruning
 authority. The budgeted Djex ready-worker and nominal scalar/product query-run
-identities bind the shared selection and effective deadline cause; v1--v8 and
-startup v11/v12 keep the unbudgeted worker/run identities. See the
+identities bind the shared selection and effective deadline cause. The current
+startup file always selects the scoped-v2 owner instead; v1 remains available
+only to explicit programmatic policy construction. See the
 [shared usable-work Length ranking report](reports/2026-08-15-shared-usable-work-length-ranking.md).
 
 ### Scoped usable-work lease (v2)
@@ -1360,9 +1277,8 @@ Width or Cartesian-product refusal, or an anchor which is already the first
 violation, retains the original receipt and makes no simplification claim.  A
 bounded evaluation rejection during an optional earlier trial does the same;
 structural, anchor, internal, and association failures remain indexed atomic
-failures. This policy is disabled by every established direct runner and
-startup version 1 through 6, while startup versions 7 through 34 require it.
-It is bounded componentwise-lexicographic
+failures. This policy is disabled by the established direct runner and enabled
+by the current startup configuration. It is bounded componentwise-lexicographic
 simplification, not global minimality, pruning authority, or a new conclusion
 from Z3.
 
@@ -1388,8 +1304,8 @@ receipt whose applicable-assignment count is positive enters a stable preferred
 partition; a zero-applicable, vacuous receipt remains neutral. Under eager
 opening, the eligible batch's lexical worker is opened and capability-probed
 before this per-candidate sequence, so either applicable-domain evidence arm
-avoids only a live transaction and ordinal. Under the v7/v8 deferred policy,
-the pure prefix runs before IO, so an all-pure batch opens no process at all.
+avoids only a live transaction and ordinal. Under the current startup policy's
+deferred opening, the pure prefix runs before IO, so an all-pure batch opens no process at all.
 The first miss opens exactly one lexical session, executes that triggering
 candidate once without rerunning its MRU/domain/origin prefix, and processes the
 remaining suffix through the same session. A pure indexed failure before that
@@ -1404,8 +1320,9 @@ origin failure, or input-box failure atomically restores the
 admitted batch in original order as unassessed. Candidate-local pure preparation
 refusals stay local, and no result grants pruning authority.
 
-V7/v8 therefore fix the source order as MRU → positive-affine applicable
-domain → origin → live replay → post-`unsat` explicit box. Every counterexample
+The current startup route therefore fixes the source order as MRU → recursive
+piecewise-affine applicable domain → origin → live replay → post-`unsat`
+explicit box. Every counterexample
 from any of those five sources crosses the same simplification seam before
 assessment. A strict receipt's final vector, never its original anchor, enters
 the domain-local MRU bank. Stable ordering is non-vacuous applicable-domain
@@ -1417,541 +1334,39 @@ each receipt and optional simplification metadata through that ordering.
 
 The opaque execution/evaluation policy and Djex live-session limits are
 domain-neutral and reused by the scalar and product runners. Each Leant call
-productively admits no more than the shared 64-query maximum. Eager calls open
-one fresh lexical worker for an eligible batch; deferred calls open at most one
-fresh session, only at the first live miss, and then consume that session's
+productively admits no more than the shared 64-query maximum. Programmatic
+eager calls open one fresh lexical worker for an eligible batch. The current
+startup route is deferred: it opens at most one fresh session, only at the
+first live miss, and then consumes that session's
 single total query budget. Behavioral authority is not shared: product
 contracts, queries, live observations, replay receipts, failures, assessments,
 MRU state, and presentation remain product-specific and cannot be cast from
 their scalar siblings. The existing/default scalar path, public scalar types,
 query bytes, neutral ranking behavior, and presentation are unchanged.
 
-## Startup configuration examples by version
+## Current startup configuration examples
 
-### Startup version 5: scalar bounded-positive ordering
+The startup format has one current shape. The examples below differ in their
+`rankingDomain`, input limits, and contract, not in an operational strategy
+selector. A pinned digest is shown because activation requires one unless the
+caller separately supplies `--length-ranking-allow-unpinned`.
 
-Startup version 5 is the concrete scalar file opt-in. This complete unpinned
-example checks input lengths 0 through 3 and prefers a candidate only after the
-independent traversal finds no violation and at least one assignment satisfies
-the precondition:
+### Scalar startup configuration
+
+This scalar example checks two compact Length inputs and asserts that the
+result length equals the first input length:
 
 ```json
 {
   "format": "leant-live-length-ranking-configuration",
-  "version": 5,
+  "rankingDomain": "scalar",
   "executionAdmission": {
     "executablePathCharacters": 4096,
     "policyFingerprintBytes": 262144
   },
   "execution": {
     "executablePath": "/absolute/path/to/z3",
-    "expectedExecutableSha256": null,
-    "solverTimeoutMilliseconds": 1000,
-    "solverResourceLimit": 100000,
-    "hostDeadlineMilliseconds": 1500,
-    "artifactPolicy": "input-values-after-satisfiable",
-    "responseLimits": {
-      "bytes": 65536,
-      "nestingDepth": 64,
-      "nodes": 4096,
-      "tokenBytes": 4096,
-      "integerBits": 4096
-    }
-  },
-  "evaluation": {
-    "assignmentValueBits": 4096,
-    "intermediateValueBits": 4096
-  },
-  "inputBoxValidation": {
-    "inclusiveInputMaximums": [3],
-    "maximumAssignments": 4
-  },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
-  "contract": {
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["observed-spine"],
-    "candidateCasePolicy": "cases-rejected",
-    "precondition": ["truth", true],
-    "postcondition": ["equal", ["result"], ["input", 0]],
-    "providerLaws": []
-  }
-}
-```
-
-Version 5 embeds the full scalar v5 contract grammar, including explicit target
-roles and case policy plus positive-literal modulo and quotient. Versions 1--3
-retain their older embedded compatibility grammar and neutral positive ordering.
-Because the example is unpinned, run it with the explicit relaxation:
-
-```text
-leant --length-ranking-config /absolute/path/scalar-ranking-v5.json \
-  --length-ranking-allow-unpinned
-```
-
-### Contract-only version 6: binary-product pair contract
-
-Main now exposes that same product path through closed, separately typed file
-versions. Contract-only version 6 has the same three-field root as versions
-1--5, but its version selects a pair contract and requires the closed result
-shape. For example, `/absolute/path/pair-contract-v6.json` can state that the
-first result length equals the input length and the second equals half of it:
-
-```json
-{
-  "format": "leant-finite-list-spine-length-contract",
-  "version": 6,
-  "contract": {
-    "resultShape": "binary-prod-spines-v1",
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["observed-spine"],
-    "candidateCasePolicy": "cases-rejected",
-    "precondition": ["truth", true],
-    "postcondition": [
-      "all",
-      [
-        ["equal", ["result", "first"], ["input", 0]],
-        ["equal", ["result", "second"],
-          ["quotient", 2, ["input", 0]]]
-      ]
-    ],
-    "providerLaws": []
-  }
-}
-```
-
-### Startup versions 4 and 6: pair ranking
-
-Startup version 4 selects pair ranking process-wide and retains version 3's
-required input box and origin-before-live policy while leaving positive receipts
-neutral. Startup version 6 is its explicit preferred-positive successor. A
-complete unpinned example is:
-
-```json
-{
-  "format": "leant-live-length-ranking-configuration",
-  "version": 6,
-  "executionAdmission": {
-    "executablePathCharacters": 4096,
-    "policyFingerprintBytes": 262144
-  },
-  "execution": {
-    "executablePath": "/absolute/path/to/z3",
-    "expectedExecutableSha256": null,
-    "solverTimeoutMilliseconds": 1000,
-    "solverResourceLimit": 100000,
-    "hostDeadlineMilliseconds": 1500,
-    "artifactPolicy": "input-values-after-satisfiable",
-    "responseLimits": {
-      "bytes": 65536,
-      "nestingDepth": 64,
-      "nodes": 4096,
-      "tokenBytes": 4096,
-      "integerBits": 4096
-    }
-  },
-  "evaluation": {
-    "assignmentValueBits": 4096,
-    "intermediateValueBits": 4096
-  },
-  "inputBoxValidation": {
-    "inclusiveInputMaximums": [3],
-    "maximumAssignments": 4
-  },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
-  "contract": {
-    "resultShape": "binary-prod-spines-v1",
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["observed-spine"],
-    "candidateCasePolicy": "cases-rejected",
-    "precondition": ["truth", true],
-    "postcondition": [
-      "all",
-      [
-        ["equal", ["result", "first"], ["input", 0]],
-        ["equal", ["result", "second"],
-          ["quotient", 2, ["input", 0]]]
-      ]
-    ],
-    "providerLaws": []
-  }
-}
-```
-
-Because that example intentionally has no executable digest expectation, start
-it only with the separate explicit relaxation:
-
-```text
-leant --length-ranking-config /absolute/path/pair-ranking-v6.json \
-  --length-ranking-allow-unpinned
-```
-
-### Startup versions 7 and 8: positive-affine deferred opening
-
-Startup v7 and v8 are the advanced scalar and pair successors. They keep the
-same CLI and add no discovery or inferred defaults. This complete scalar v7
-example uses distinct post-`unsat`, positive-affine, and simplification bounds:
-
-```json
-{
-  "format": "leant-live-length-ranking-configuration",
-  "version": 7,
-  "executionAdmission": {
-    "executablePathCharacters": 4096,
-    "policyFingerprintBytes": 262144
-  },
-  "execution": {
-    "executablePath": "/absolute/path/to/z3",
-    "expectedExecutableSha256": null,
-    "solverTimeoutMilliseconds": 1000,
-    "solverResourceLimit": 100000,
-    "hostDeadlineMilliseconds": 1500,
-    "artifactPolicy": "input-values-after-satisfiable",
-    "responseLimits": {
-      "bytes": 65536,
-      "nestingDepth": 64,
-      "nodes": 4096,
-      "tokenBytes": 4096,
-      "integerBits": 4096
-    }
-  },
-  "evaluation": {
-    "assignmentValueBits": 4096,
-    "intermediateValueBits": 4096
-  },
-  "inputBoxValidation": {
-    "inclusiveInputMaximums": [5],
-    "maximumAssignments": 6
-  },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
-  "applicableDomainValidation": {
-    "strategy": "positive-affine-v1",
-    "maximumInputs": 2,
-    "maximumAssignments": 16
-  },
-  "applicableDomainOrdering": "prefer-non-vacuous",
-  "counterexampleSimplification": {
-    "strategy": "componentwise-lexicographic-v1",
-    "maximumInputs": 1,
-    "maximumAssignments": 8
-  },
-  "liveSessionOpening": "defer-until-live-query",
-  "contract": {
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["observed-spine"],
-    "candidateCasePolicy": "cases-rejected",
-    "precondition": [
-      "at-most",
-      ["sum", [["input", 0], ["literal", 1]]],
-      ["literal", 4]
-    ],
-    "postcondition": ["equal", ["result"], ["input", 0]],
-    "providerLaws": []
-  }
-}
-```
-
-Here the positive-affine rule derives the tight maximum `3` from
-`input0 + 1 <= 4`. It still evaluates the complete precondition on every
-assignment in `[0..3]`; the explicit `[0..5]` post-`unsat` box and the
-simplifier's own limits are independent authorities. Because the executable is
-intentionally unpinned, the unchanged startup command is:
-
-```text
-leant --length-ranking-config /absolute/path/scalar-ranking-v7.json \
-  --length-ranking-allow-unpinned
-```
-
-The nominal pair v8 root has the same operational fields and embeds the pair v5
-contract grammar. This complete example deliberately chooses three different
-bounded objects as well:
-
-```json
-{
-  "format": "leant-live-length-ranking-configuration",
-  "version": 8,
-  "executionAdmission": {
-    "executablePathCharacters": 4096,
-    "policyFingerprintBytes": 262144
-  },
-  "execution": {
-    "executablePath": "/absolute/path/to/z3",
-    "expectedExecutableSha256": null,
-    "solverTimeoutMilliseconds": 1000,
-    "solverResourceLimit": 100000,
-    "hostDeadlineMilliseconds": 1500,
-    "artifactPolicy": "input-values-after-satisfiable",
-    "responseLimits": {
-      "bytes": 65536,
-      "nestingDepth": 64,
-      "nodes": 4096,
-      "tokenBytes": 4096,
-      "integerBits": 4096
-    }
-  },
-  "evaluation": {
-    "assignmentValueBits": 4096,
-    "intermediateValueBits": 4096
-  },
-  "inputBoxValidation": {
-    "inclusiveInputMaximums": [4],
-    "maximumAssignments": 5
-  },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
-  "applicableDomainValidation": {
-    "strategy": "positive-affine-v1",
-    "maximumInputs": 3,
-    "maximumAssignments": 32
-  },
-  "applicableDomainOrdering": "prefer-non-vacuous",
-  "counterexampleSimplification": {
-    "strategy": "componentwise-lexicographic-v1",
-    "maximumInputs": 1,
-    "maximumAssignments": 9
-  },
-  "liveSessionOpening": "defer-until-live-query",
-  "contract": {
-    "resultShape": "binary-prod-spines-v1",
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["observed-spine"],
-    "candidateCasePolicy": "cases-rejected",
-    "precondition": [
-      "equal",
-      ["sum", [["input", 0], ["literal", 1]]],
-      ["literal", 4]
-    ],
-    "postcondition": [
-      "all",
-      [
-        ["equal", ["result", "first"], ["input", 0]],
-        ["equal", ["result", "second"],
-          ["quotient", 2, ["input", 0]]]
-      ]
-    ],
-    "providerLaws": []
-  }
-}
-```
-
-The equality derives maximum `3` but remains the actual filter, so only input
-`3` is applicable. Start it through the same unchanged option grammar:
-
-```text
-leant --length-ranking-config /absolute/path/pair-ranking-v8.json \
-  --length-ranking-allow-unpinned
-```
-
-### Startup versions 9 and 10: shared usable-work budget
-
-Startup v9 and v10 retain those complete scalar and product policy bundles and
-add only the required shared usable-work object. The exported version constants
-are
-`lengthRankingConfigurationFileUsableWorkBudgetVersion` (9) and
-`lengthRankingConfigurationFileSpinePairUsableWorkBudgetVersion` (10).
-This full scalar v9 example keeps the established 1,500-ms fresh local query
-deadline while placing the whole admitted ranking callback beneath one
-30,000-ms shared window:
-
-```json
-{
-  "format": "leant-live-length-ranking-configuration",
-  "version": 9,
-  "executionAdmission": {
-    "executablePathCharacters": 4096,
-    "policyFingerprintBytes": 262144
-  },
-  "execution": {
-    "executablePath": "/absolute/path/to/z3",
-    "expectedExecutableSha256": null,
-    "solverTimeoutMilliseconds": 1000,
-    "solverResourceLimit": 100000,
-    "hostDeadlineMilliseconds": 1500,
-    "artifactPolicy": "input-values-after-satisfiable",
-    "responseLimits": {
-      "bytes": 65536,
-      "nestingDepth": 64,
-      "nodes": 4096,
-      "tokenBytes": 4096,
-      "integerBits": 4096
-    }
-  },
-  "evaluation": {
-    "assignmentValueBits": 4096,
-    "intermediateValueBits": 4096
-  },
-  "inputBoxValidation": {
-    "inclusiveInputMaximums": [5],
-    "maximumAssignments": 6
-  },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
-  "applicableDomainValidation": {
-    "strategy": "positive-affine-v1",
-    "maximumInputs": 2,
-    "maximumAssignments": 16
-  },
-  "applicableDomainOrdering": "prefer-non-vacuous",
-  "counterexampleSimplification": {
-    "strategy": "componentwise-lexicographic-v1",
-    "maximumInputs": 1,
-    "maximumAssignments": 8
-  },
-  "liveSessionOpening": "defer-until-live-query",
-  "usableWorkBudget": {
-    "strategy": "shared-usable-work-deadline-v1",
-    "milliseconds": 30000
-  },
-  "contract": {
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["observed-spine"],
-    "candidateCasePolicy": "cases-rejected",
-    "precondition": [
-      "at-most",
-      ["sum", [["input", 0], ["literal", 1]]],
-      ["literal", 4]
-    ],
-    "postcondition": ["equal", ["result"], ["input", 0]],
-    "providerLaws": []
-  }
-}
-```
-
-The nominal product v10 sibling uses the same root policy and the complete pair
-contract grammar:
-
-```json
-{
-  "format": "leant-live-length-ranking-configuration",
-  "version": 10,
-  "executionAdmission": {
-    "executablePathCharacters": 4096,
-    "policyFingerprintBytes": 262144
-  },
-  "execution": {
-    "executablePath": "/absolute/path/to/z3",
-    "expectedExecutableSha256": null,
-    "solverTimeoutMilliseconds": 1000,
-    "solverResourceLimit": 100000,
-    "hostDeadlineMilliseconds": 1500,
-    "artifactPolicy": "input-values-after-satisfiable",
-    "responseLimits": {
-      "bytes": 65536,
-      "nestingDepth": 64,
-      "nodes": 4096,
-      "tokenBytes": 4096,
-      "integerBits": 4096
-    }
-  },
-  "evaluation": {
-    "assignmentValueBits": 4096,
-    "intermediateValueBits": 4096
-  },
-  "inputBoxValidation": {
-    "inclusiveInputMaximums": [4],
-    "maximumAssignments": 5
-  },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
-  "applicableDomainValidation": {
-    "strategy": "positive-affine-v1",
-    "maximumInputs": 3,
-    "maximumAssignments": 32
-  },
-  "applicableDomainOrdering": "prefer-non-vacuous",
-  "counterexampleSimplification": {
-    "strategy": "componentwise-lexicographic-v1",
-    "maximumInputs": 1,
-    "maximumAssignments": 9
-  },
-  "liveSessionOpening": "defer-until-live-query",
-  "usableWorkBudget": {
-    "strategy": "shared-usable-work-deadline-v1",
-    "milliseconds": 30000
-  },
-  "contract": {
-    "resultShape": "binary-prod-spines-v1",
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["observed-spine"],
-    "candidateCasePolicy": "cases-rejected",
-    "precondition": [
-      "equal",
-      ["sum", [["input", 0], ["literal", 1]]],
-      ["literal", 4]
-    ],
-    "postcondition": [
-      "all",
-      [
-        ["equal", ["result", "first"], ["input", 0]],
-        ["equal", ["result", "second"],
-          ["quotient", 2, ["input", 0]]]
-      ]
-    ],
-    "providerLaws": []
-  }
-}
-```
-
-Both examples are deliberately unpinned and therefore require the same
-separate `--length-ranking-allow-unpinned` activation choice as v7/v8. The
-usable-work object has exactly `strategy` followed semantically by
-`milliseconds`; JSON member order is immaterial. Its strategy literal is exact,
-the duration must be positive, and the file grammar caps it at 65,000 ms before
-delegating to Djex's representability validator.
-
-### Root fields and validation order for versions 7 to 10
-
-The v7/v8 advanced roots have exactly these fields in semantic validation order:
-`format`, `version`, `executionAdmission`, `execution`, `evaluation`,
-`inputBoxValidation`, `counterexampleProbe`, `boundedPositiveOrdering`,
-`applicableDomainValidation`, `applicableDomainOrdering`,
-`counterexampleSimplification`, `liveSessionOpening`, and `contract`. JSON
-member order is immaterial. The two strategy objects have exactly `strategy`,
-`maximumInputs`, and `maximumAssignments`; their caps are 8 inputs and 65,536
-assignments. The exact literals are `positive-affine-v1`,
-`prefer-non-vacuous`, `componentwise-lexicographic-v1`, and
-`defer-until-live-query`. The explicit input-box vector is independently capped
-at eight entries and 65,536 assignments. The existing 256-KiB JSON,
-4,096-character executable path, 64-KiB response, 60,000-ms solver timeout,
-10,000,000 resource limit, 65,000-ms host deadline, and 4,096-bit evaluation
-and response-integer ceilings remain unchanged. Missing, extra, mistyped, or
-over-cap content fails closed in that demand order before the later
-contract can preempt an earlier operational error.
-
-V9/v10 retain that exact order and insert `usableWorkBudget` only after
-`liveSessionOpening` and before `contract`. The generalized dispatcher reaches
-their parser only after every literal v1--v8 decoder has returned the closed
-unsupported-version sentinel. Once v9 or v10 is selected from its already
-decoded `format` and `version`, exact-root admission precedes every operational
-field. The established fields are then validated in their old order, followed
-by the exact budget object, strategy, milliseconds cap and Djex budget
-validation, and only then the scalar-v5 or pair-v5 contract. An earlier
-operational or budget error therefore cannot be preempted by a later malformed
-contract.
-
-### Startup versions 11 and 12: relational positive-affine
-
-Startup v11 and v12 select relational positive-affine applicable-domain
-validation without selecting the v9/v10 shared usable-work owner. The exported
-version constants are
-`lengthRankingConfigurationFileRelationalPositiveAffineVersion` (11) and
-`lengthRankingConfigurationFileSpinePairRelationalPositiveAffineVersion`
-(12). This complete scalar v11 document lets the bound on input 1 flow through
-an equality to input 0:
-
-```json
-{
-  "format": "leant-live-length-ranking-configuration",
-  "version": 11,
-  "executionAdmission": {
-    "executablePathCharacters": 4096,
-    "policyFingerprintBytes": 262144
-  },
-  "execution": {
-    "executablePath": "/absolute/path/to/z3",
-    "expectedExecutableSha256": null,
+    "expectedExecutableSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
     "solverTimeoutMilliseconds": 1000,
     "solverResourceLimit": 100000,
     "hostDeadlineMilliseconds": 1500,
@@ -1972,1650 +1387,7 @@ an equality to input 0:
     "inclusiveInputMaximums": [5, 5],
     "maximumAssignments": 36
   },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
   "applicableDomainValidation": {
-    "strategy": "relational-positive-affine-v1",
-    "maximumInputs": 2,
-    "maximumAssignments": 36
-  },
-  "applicableDomainOrdering": "prefer-non-vacuous",
-  "counterexampleSimplification": {
-    "strategy": "componentwise-lexicographic-v1",
-    "maximumInputs": 2,
-    "maximumAssignments": 36
-  },
-  "liveSessionOpening": "defer-until-live-query",
-  "contract": {
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["observed-spine", "observed-spine"],
-    "candidateCasePolicy": "cases-rejected",
-    "precondition": [
-      "all",
-      [
-        ["equal", ["input", 0], ["input", 1]],
-        ["at-most", ["input", 1], ["literal", 5]]
-      ]
-    ],
-    "postcondition": ["equal", ["result"], ["input", 0]],
-    "providerLaws": []
-  }
-}
-```
-
-The relational rule derives maxima `[5, 5]`, then the existing finite-box
-verifier checks all 36 assignments. Exactly six diagonal assignments satisfy
-the precondition. The independent post-`unsat` box happens to use the same
-maxima in this example; it remains a separate authority and is not used to
-derive the applicable domain.
-
-The nominal product v12 document uses exact coefficient cancellation to reduce
-`2 * input0 <= input0 + 1` to `input0 <= 1`:
-
-```json
-{
-  "format": "leant-live-length-ranking-configuration",
-  "version": 12,
-  "executionAdmission": {
-    "executablePathCharacters": 4096,
-    "policyFingerprintBytes": 262144
-  },
-  "execution": {
-    "executablePath": "/absolute/path/to/z3",
-    "expectedExecutableSha256": null,
-    "solverTimeoutMilliseconds": 1000,
-    "solverResourceLimit": 100000,
-    "hostDeadlineMilliseconds": 1500,
-    "artifactPolicy": "input-values-after-satisfiable",
-    "responseLimits": {
-      "bytes": 65536,
-      "nestingDepth": 64,
-      "nodes": 4096,
-      "tokenBytes": 4096,
-      "integerBits": 4096
-    }
-  },
-  "evaluation": {
-    "assignmentValueBits": 4096,
-    "intermediateValueBits": 4096
-  },
-  "inputBoxValidation": {
-    "inclusiveInputMaximums": [4],
-    "maximumAssignments": 5
-  },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
-  "applicableDomainValidation": {
-    "strategy": "relational-positive-affine-v1",
-    "maximumInputs": 1,
-    "maximumAssignments": 8
-  },
-  "applicableDomainOrdering": "prefer-non-vacuous",
-  "counterexampleSimplification": {
-    "strategy": "componentwise-lexicographic-v1",
-    "maximumInputs": 1,
-    "maximumAssignments": 9
-  },
-  "liveSessionOpening": "defer-until-live-query",
-  "contract": {
-    "resultShape": "binary-prod-spines-v1",
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["observed-spine"],
-    "candidateCasePolicy": "cases-rejected",
-    "precondition": [
-      "at-most",
-      ["scale", 2, ["input", 0]],
-      ["sum", [["input", 0], ["literal", 1]]]
-    ],
-    "postcondition": [
-      "all",
-      [
-        ["equal", ["result", "first"], ["input", 0]],
-        ["equal", ["result", "second"],
-          ["quotient", 2, ["input", 0]]]
-      ]
-    ],
-    "providerLaws": []
-  }
-}
-```
-
-Both documents intentionally have the exact v7/v8 root fields and validation
-order. Their `applicableDomainValidation` object still has exactly `strategy`,
-`maximumInputs`, and `maximumAssignments`; only the strategy literal is the new
-`relational-positive-affine-v1`. The existing width cap of 8 and assignment
-cap of 65,536 apply. The scalar-v5 or pair-v5 contract remains last.
-`usableWorkBudget` is not optional here: it is an unknown extra root field and
-is rejected. Consequently startup v11/v12 retain deferred opening but use the
-historical separate opener/finalizer and fresh per-query host deadlines rather
-than a shared ranking owner. A programmatic caller may independently compose
-the relational builder with a validated budget, but the versioned schemas do
-not infer that composition.
-
-The generalized decoder reaches the v11/v12 parser only after the literal
-v1--v10 chain returns its closed unsupported-version sentinel. The relational
-parser reuses the established applicable-domain object, field, limit, and
-validation-error identities, validates the exact operational root in its
-established order, and demands the contract last. Both examples are unpinned
-and therefore require the separate explicit
-`--length-ranking-allow-unpinned` activation choice.
-
-### Startup versions 13 and 14: scoped usable-work lease
-
-Startup v13 and v14 combine the relational scalar/product choices with Djex's
-dynamically scoped v2 usable-work lease. Their exported constants are
-`lengthRankingConfigurationFileScopedUsableWorkBudgetVersion` (13) and
-`lengthRankingConfigurationFileSpinePairScopedUsableWorkBudgetVersion` (14).
-This complete scalar v13 document retains the v11 relation and adds the budget
-after `liveSessionOpening`:
-
-```json
-{
-  "format": "leant-live-length-ranking-configuration",
-  "version": 13,
-  "executionAdmission": {
-    "executablePathCharacters": 4096,
-    "policyFingerprintBytes": 262144
-  },
-  "execution": {
-    "executablePath": "/absolute/path/to/z3",
-    "expectedExecutableSha256": null,
-    "solverTimeoutMilliseconds": 1000,
-    "solverResourceLimit": 100000,
-    "hostDeadlineMilliseconds": 1500,
-    "artifactPolicy": "input-values-after-satisfiable",
-    "responseLimits": {
-      "bytes": 65536,
-      "nestingDepth": 64,
-      "nodes": 4096,
-      "tokenBytes": 4096,
-      "integerBits": 4096
-    }
-  },
-  "evaluation": {
-    "assignmentValueBits": 4096,
-    "intermediateValueBits": 4096
-  },
-  "inputBoxValidation": {
-    "inclusiveInputMaximums": [5, 5],
-    "maximumAssignments": 36
-  },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
-  "applicableDomainValidation": {
-    "strategy": "relational-positive-affine-v1",
-    "maximumInputs": 2,
-    "maximumAssignments": 36
-  },
-  "applicableDomainOrdering": "prefer-non-vacuous",
-  "counterexampleSimplification": {
-    "strategy": "componentwise-lexicographic-v1",
-    "maximumInputs": 2,
-    "maximumAssignments": 36
-  },
-  "liveSessionOpening": "defer-until-live-query",
-  "usableWorkBudget": {
-    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
-    "milliseconds": 30000
-  },
-  "contract": {
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["observed-spine", "observed-spine"],
-    "candidateCasePolicy": "cases-rejected",
-    "precondition": [
-      "all",
-      [
-        ["equal", ["input", 0], ["input", 1]],
-        ["at-most", ["input", 1], ["literal", 5]]
-      ]
-    ],
-    "postcondition": ["equal", ["result"], ["input", 0]],
-    "providerLaws": []
-  }
-}
-```
-
-The nominal product v14 sibling uses the complete pair-v5 contract and exact
-coefficient cancellation from the v12 example:
-
-```json
-{
-  "format": "leant-live-length-ranking-configuration",
-  "version": 14,
-  "executionAdmission": {
-    "executablePathCharacters": 4096,
-    "policyFingerprintBytes": 262144
-  },
-  "execution": {
-    "executablePath": "/absolute/path/to/z3",
-    "expectedExecutableSha256": null,
-    "solverTimeoutMilliseconds": 1000,
-    "solverResourceLimit": 100000,
-    "hostDeadlineMilliseconds": 1500,
-    "artifactPolicy": "input-values-after-satisfiable",
-    "responseLimits": {
-      "bytes": 65536,
-      "nestingDepth": 64,
-      "nodes": 4096,
-      "tokenBytes": 4096,
-      "integerBits": 4096
-    }
-  },
-  "evaluation": {
-    "assignmentValueBits": 4096,
-    "intermediateValueBits": 4096
-  },
-  "inputBoxValidation": {
-    "inclusiveInputMaximums": [4],
-    "maximumAssignments": 5
-  },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
-  "applicableDomainValidation": {
-    "strategy": "relational-positive-affine-v1",
-    "maximumInputs": 1,
-    "maximumAssignments": 8
-  },
-  "applicableDomainOrdering": "prefer-non-vacuous",
-  "counterexampleSimplification": {
-    "strategy": "componentwise-lexicographic-v1",
-    "maximumInputs": 1,
-    "maximumAssignments": 9
-  },
-  "liveSessionOpening": "defer-until-live-query",
-  "usableWorkBudget": {
-    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
-    "milliseconds": 30000
-  },
-  "contract": {
-    "resultShape": "binary-prod-spines-v1",
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["observed-spine"],
-    "candidateCasePolicy": "cases-rejected",
-    "precondition": [
-      "at-most",
-      ["scale", 2, ["input", 0]],
-      ["sum", [["input", 0], ["literal", 1]]]
-    ],
-    "postcondition": [
-      "all",
-      [
-        ["equal", ["result", "first"], ["input", 0]],
-        ["equal", ["result", "second"],
-          ["quotient", 2, ["input", 0]]]
-      ]
-    ],
-    "providerLaws": []
-  }
-}
-```
-
-V13/v14 have exactly the v9/v10 root fields, but they require the relational
-applicable-domain strategy and the scoped-v2 budget strategy. After bounded JSON
-and `format`/`version` routing, their fixed semantic validation order is exact
-root admission; `executionAdmission`; `execution`; `evaluation`;
-`inputBoxValidation`; `counterexampleProbe`; `boundedPositiveOrdering`; the
-relational `applicableDomainValidation` object's exact fields, strategy, width,
-cardinality, and Djex limit validation; `applicableDomainOrdering`;
-`counterexampleSimplification`; `liveSessionOpening`; the `usableWorkBudget`
-object's exact fields, strategy, integer type, 65,000-ms cap, and Djex
-representability validation; then the scalar-v5 or pair-v5 contract. A later
-contract error cannot preempt an earlier operational, domain, or budget error.
-JSON object member order remains immaterial.
-
-The generalized dispatcher attempts this final parser only after the complete
-v1--v12 chain returns its closed unsupported-version sentinel. The compatibility
-matrix is therefore literal: v1--v8 have no shared budget; v9/v10 select the
-runtime-unscoped `shared-usable-work-deadline-v1`; v11/v12 select relational
-positive-affine validation with no budget; and v13/v14 select that relational
-validator with `scoped-checkpointed-shared-usable-work-deadline-v2`. V13/v14
-reuse the existing budget object, field, type, value, cap, and Djex-rejection
-diagnostic identities rather than introducing evidence-bearing schema. These
-examples are also unpinned and require the explicit
-`--length-ranking-allow-unpinned` activation choice.
-
-### Startup versions 15 and 16: strict relational positive-affine
-
-Startup v15 and v16 preserve that complete scoped root and runtime route while
-selecting Djex's strict relational rule. Their exported constants are
-`lengthRankingConfigurationFileStrictRelationalPositiveAffineVersion` (15) and
-`lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineVersion`
-(16). This complete scalar v15 document uses strict-only clauses to derive
-maxima `[4, 3]`:
-
-```json
-{
-  "format": "leant-live-length-ranking-configuration",
-  "version": 15,
-  "executionAdmission": {
-    "executablePathCharacters": 4096,
-    "policyFingerprintBytes": 262144
-  },
-  "execution": {
-    "executablePath": "/absolute/path/to/z3",
-    "expectedExecutableSha256": null,
-    "solverTimeoutMilliseconds": 1000,
-    "solverResourceLimit": 100000,
-    "hostDeadlineMilliseconds": 1500,
-    "artifactPolicy": "input-values-after-satisfiable",
-    "responseLimits": {
-      "bytes": 65536,
-      "nestingDepth": 64,
-      "nodes": 4096,
-      "tokenBytes": 4096,
-      "integerBits": 4096
-    }
-  },
-  "evaluation": {
-    "assignmentValueBits": 4096,
-    "intermediateValueBits": 4096
-  },
-  "inputBoxValidation": {
-    "inclusiveInputMaximums": [5, 5],
-    "maximumAssignments": 36
-  },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
-  "applicableDomainValidation": {
-    "strategy": "strict-relational-positive-affine-v1",
-    "maximumInputs": 2,
-    "maximumAssignments": 20
-  },
-  "applicableDomainOrdering": "prefer-non-vacuous",
-  "counterexampleSimplification": {
-    "strategy": "componentwise-lexicographic-v1",
-    "maximumInputs": 2,
-    "maximumAssignments": 36
-  },
-  "liveSessionOpening": "defer-until-live-query",
-  "usableWorkBudget": {
-    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
-    "milliseconds": 30000
-  },
-  "contract": {
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["observed-spine", "observed-spine"],
-    "candidateCasePolicy": "cases-rejected",
-    "precondition": [
-      "all",
-      [
-        ["not", ["at-most", ["literal", 5], ["input", 0]]],
-        ["not", ["at-most", ["input", 0], ["input", 1]]]
-      ]
-    ],
-    "postcondition": ["equal", ["result"], ["input", 0]],
-    "providerLaws": []
-  }
-}
-```
-
-The first clause is `not (5 <= input0)`, which becomes
-`input0 + 1 <= 5`; the second is `not (input0 <= input1)`, which becomes
-`input1 + 1 <= input0`. Synchronous rule-once propagation therefore derives
-`[4, 3]`, and the applicable-domain traversal admits its 20-assignment box.
-
-The nominal product v16 sibling uses the complete pair-v5 contract. Its strict
-clause exercises successor-before-coefficient-cancellation and derives maximum
-`[2]`:
-
-```json
-{
-  "format": "leant-live-length-ranking-configuration",
-  "version": 16,
-  "executionAdmission": {
-    "executablePathCharacters": 4096,
-    "policyFingerprintBytes": 262144
-  },
-  "execution": {
-    "executablePath": "/absolute/path/to/z3",
-    "expectedExecutableSha256": null,
-    "solverTimeoutMilliseconds": 1000,
-    "solverResourceLimit": 100000,
-    "hostDeadlineMilliseconds": 1500,
-    "artifactPolicy": "input-values-after-satisfiable",
-    "responseLimits": {
-      "bytes": 65536,
-      "nestingDepth": 64,
-      "nodes": 4096,
-      "tokenBytes": 4096,
-      "integerBits": 4096
-    }
-  },
-  "evaluation": {
-    "assignmentValueBits": 4096,
-    "intermediateValueBits": 4096
-  },
-  "inputBoxValidation": {
-    "inclusiveInputMaximums": [4],
-    "maximumAssignments": 5
-  },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
-  "applicableDomainValidation": {
-    "strategy": "strict-relational-positive-affine-v1",
-    "maximumInputs": 1,
-    "maximumAssignments": 3
-  },
-  "applicableDomainOrdering": "prefer-non-vacuous",
-  "counterexampleSimplification": {
-    "strategy": "componentwise-lexicographic-v1",
-    "maximumInputs": 1,
-    "maximumAssignments": 9
-  },
-  "liveSessionOpening": "defer-until-live-query",
-  "usableWorkBudget": {
-    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
-    "milliseconds": 30000
-  },
-  "contract": {
-    "resultShape": "binary-prod-spines-v1",
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["observed-spine"],
-    "candidateCasePolicy": "cases-rejected",
-    "precondition": [
-      "not",
-      [
-        "at-most",
-        ["sum", [["input", 0], ["literal", 3]]],
-        ["scale", 2, ["input", 0]]
-      ]
-    ],
-    "postcondition": [
-      "all",
-      [
-        ["equal", ["result", "first"], ["input", 0]],
-        ["equal", ["result", "second"],
-          ["quotient", 2, ["input", 0]]]
-      ]
-    ],
-    "providerLaws": []
-  }
-}
-```
-
-Here `not (input0 + 3 <= 2 * input0)` becomes
-`2 * input0 + 1 <= input0 + 3`. Exact cancellation leaves
-`input0 + 1 <= 3`, so the three assignments `[0]`, `[1]`, and `[2]` form the
-complete derived box.
-
-V15/v16 have exactly the v13/v14 root fields, scoped-v2 budget object, scalar-
-v5/pair-v5 contract grammars, semantic demand order, caps, and diagnostics.
-Only the applicable-domain strategy literal and resulting nominal assessment
-family differ. The generalized dispatcher reaches them only after every
-v1--v14 entrance returns its closed unsupported-version sentinel. The strict
-extractor accepts the ordinary relational rules plus immediate normalized
-top-level `not (L <= R)` as `R + 1 <= L`; negated equality, nested logical
-structure, and unsupported expression subtrees grant no partial bound. These
-examples are unpinned and require the explicit
-`--length-ranking-allow-unpinned` activation choice.
-
-### Startup versions 17 and 18: descriptor-bound executable launch
-
-Startup v17 and v18 retain that exact strict/scoped behavioral profile and
-change only executable-launch authority. Their exported constants are
-`lengthRankingConfigurationFileDescriptorBoundExecutableLaunchVersion` (17)
-and
-`lengthRankingConfigurationFileSpinePairDescriptorBoundExecutableLaunchVersion`
-(18). The execution object has the complete inherited fields plus the
-additional required member `"executableLaunch": "descriptor-bound-executable-v1"`. This is a
-complete scalar v17 document:
-
-```json
-{
-  "format": "leant-live-length-ranking-configuration",
-  "version": 17,
-  "executionAdmission": {
-    "executablePathCharacters": 4096,
-    "policyFingerprintBytes": 262144
-  },
-  "execution": {
-    "executablePath": "/absolute/path/to/z3",
-    "expectedExecutableSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "solverTimeoutMilliseconds": 1000,
-    "solverResourceLimit": 100000,
-    "hostDeadlineMilliseconds": 1500,
-    "artifactPolicy": "input-values-after-satisfiable",
-    "responseLimits": {
-      "bytes": 65536,
-      "nestingDepth": 64,
-      "nodes": 4096,
-      "tokenBytes": 4096,
-      "integerBits": 4096
-    },
-    "executableLaunch": "descriptor-bound-executable-v1"
-  },
-  "evaluation": {
-    "assignmentValueBits": 4096,
-    "intermediateValueBits": 4096
-  },
-  "inputBoxValidation": {
-    "inclusiveInputMaximums": [5, 5],
-    "maximumAssignments": 36
-  },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
-  "applicableDomainValidation": {
-    "strategy": "strict-relational-positive-affine-v1",
-    "maximumInputs": 2,
-    "maximumAssignments": 20
-  },
-  "applicableDomainOrdering": "prefer-non-vacuous",
-  "counterexampleSimplification": {
-    "strategy": "componentwise-lexicographic-v1",
-    "maximumInputs": 2,
-    "maximumAssignments": 36
-  },
-  "liveSessionOpening": "defer-until-live-query",
-  "usableWorkBudget": {
-    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
-    "milliseconds": 30000
-  },
-  "contract": {
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["observed-spine", "observed-spine"],
-    "candidateCasePolicy": "cases-rejected",
-    "precondition": [
-      "all",
-      [
-        ["not", ["at-most", ["literal", 5], ["input", 0]]],
-        ["not", ["at-most", ["input", 0], ["input", 1]]]
-      ]
-    ],
-    "postcondition": ["equal", ["result"], ["input", 0]],
-    "providerLaws": []
-  }
-}
-```
-
-The nominal product v18 sibling retains the complete pair-v5 contract and
-strict successor-before-cancellation example:
-
-```json
-{
-  "format": "leant-live-length-ranking-configuration",
-  "version": 18,
-  "executionAdmission": {
-    "executablePathCharacters": 4096,
-    "policyFingerprintBytes": 262144
-  },
-  "execution": {
-    "executablePath": "/absolute/path/to/z3",
-    "expectedExecutableSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "solverTimeoutMilliseconds": 1000,
-    "solverResourceLimit": 100000,
-    "hostDeadlineMilliseconds": 1500,
-    "artifactPolicy": "input-values-after-satisfiable",
-    "responseLimits": {
-      "bytes": 65536,
-      "nestingDepth": 64,
-      "nodes": 4096,
-      "tokenBytes": 4096,
-      "integerBits": 4096
-    },
-    "executableLaunch": "descriptor-bound-executable-v1"
-  },
-  "evaluation": {
-    "assignmentValueBits": 4096,
-    "intermediateValueBits": 4096
-  },
-  "inputBoxValidation": {
-    "inclusiveInputMaximums": [4],
-    "maximumAssignments": 5
-  },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
-  "applicableDomainValidation": {
-    "strategy": "strict-relational-positive-affine-v1",
-    "maximumInputs": 1,
-    "maximumAssignments": 3
-  },
-  "applicableDomainOrdering": "prefer-non-vacuous",
-  "counterexampleSimplification": {
-    "strategy": "componentwise-lexicographic-v1",
-    "maximumInputs": 1,
-    "maximumAssignments": 9
-  },
-  "liveSessionOpening": "defer-until-live-query",
-  "usableWorkBudget": {
-    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
-    "milliseconds": 30000
-  },
-  "contract": {
-    "resultShape": "binary-prod-spines-v1",
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["observed-spine"],
-    "candidateCasePolicy": "cases-rejected",
-    "precondition": [
-      "not",
-      [
-        "at-most",
-        ["sum", [["input", 0], ["literal", 3]]],
-        ["scale", 2, ["input", 0]]
-      ]
-    ],
-    "postcondition": [
-      "all",
-      [
-        ["equal", ["result", "first"], ["input", 0]],
-        ["equal", ["result", "second"],
-          ["quotient", 2, ["input", 0]]]
-      ]
-    ],
-    "providerLaws": []
-  }
-}
-```
-
-Replace the illustrative 64-hex-digit expectation in either document with the
-digest of the intended Z3 image. Activation checks only that the expectation is
-present; matching occurs at the first live open. Djex then opens the source
-without following the final component, hashes each bounded chunk while copying
-the same bytes into an anonymous image, compares the pin, seals writes and size
-changes, and invokes `execveat` only on that sealed descriptor. No worker or
-executable IO occurs if the deferred pure prefix settles the batch. A namespace
-swap or in-place source rewrite after sealing cannot alter the staged main
-image, and any unavailable primitive or failure is terminal rather than a
-fallback to v15/v16 path launch.
-
-The child requires Linux `close_range` to close every unrelated inherited
-descriptor before `execveat`. If the primitive is unavailable or rejects a
-required segment, descriptor launch fails closed; Djex does not substitute a
-scan capped by the current soft `RLIMIT_NOFILE`, which may lie below a
-descriptor opened before the limit was lowered.
-
-The guarantee is main-image-only: it does not attest an ELF interpreter,
-dynamic loader, shared library, file capability, set-id metadata, Z3 semantics,
-or solver result. V17/v18 add no assessment constructor, ranking tier, or
-candidate presentation note. Their startup notice reports only that descriptor
-launch was selected; it never says the pin matched. Their fixed validation
-order is the v15/v16 order with the execution object's required launch literal
-checked after every inherited execution member and before Djex descriptor
-policy sealing. Contract validation remains last. The generalized dispatcher
-reaches v17/v18 only after the exact v1--v16 cascade returns UnsupportedVersion;
-v19/v20 are handled only by their later quotient-consequence decoder, and
-v21/v22 only by the subsequent effective-ID launch successor.
-
-### Startup versions 19 and 20: root-quotient consequences
-
-Startup v19 and v20 retain the complete descriptor-bound/scoped profiles and
-replace only the applicable-domain strategy selection. Their exported
-constants are
-`lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientVersion`
-(19) and
-`lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientVersion`
-(20). This complete scalar v19 document is the scalar v17 example with only
-the version and applicable-domain strategy selections advanced:
-
-```json
-{
-  "format": "leant-live-length-ranking-configuration",
-  "version": 19,
-  "executionAdmission": {
-    "executablePathCharacters": 4096,
-    "policyFingerprintBytes": 262144
-  },
-  "execution": {
-    "executablePath": "/absolute/path/to/z3",
-    "expectedExecutableSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "solverTimeoutMilliseconds": 1000,
-    "solverResourceLimit": 100000,
-    "hostDeadlineMilliseconds": 1500,
-    "artifactPolicy": "input-values-after-satisfiable",
-    "responseLimits": {
-      "bytes": 65536,
-      "nestingDepth": 64,
-      "nodes": 4096,
-      "tokenBytes": 4096,
-      "integerBits": 4096
-    },
-    "executableLaunch": "descriptor-bound-executable-v1"
-  },
-  "evaluation": {
-    "assignmentValueBits": 4096,
-    "intermediateValueBits": 4096
-  },
-  "inputBoxValidation": {
-    "inclusiveInputMaximums": [5, 5],
-    "maximumAssignments": 36
-  },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
-  "applicableDomainValidation": {
-    "strategy": "strict-relational-positive-affine-quotient-v1",
-    "maximumInputs": 2,
-    "maximumAssignments": 20
-  },
-  "applicableDomainOrdering": "prefer-non-vacuous",
-  "counterexampleSimplification": {
-    "strategy": "componentwise-lexicographic-v1",
-    "maximumInputs": 2,
-    "maximumAssignments": 36
-  },
-  "liveSessionOpening": "defer-until-live-query",
-  "usableWorkBudget": {
-    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
-    "milliseconds": 30000
-  },
-  "contract": {
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["observed-spine", "observed-spine"],
-    "candidateCasePolicy": "cases-rejected",
-    "precondition": [
-      "all",
-      [
-        ["not", ["at-most", ["literal", 5], ["input", 0]]],
-        ["not", ["at-most", ["input", 0], ["input", 1]]]
-      ]
-    ],
-    "postcondition": ["equal", ["result"], ["input", 0]],
-    "providerLaws": []
-  }
-}
-```
-
-The complete nominal pair v20 document advances the pair v18 selections in
-the same way:
-
-```json
-{
-  "format": "leant-live-length-ranking-configuration",
-  "version": 20,
-  "executionAdmission": {
-    "executablePathCharacters": 4096,
-    "policyFingerprintBytes": 262144
-  },
-  "execution": {
-    "executablePath": "/absolute/path/to/z3",
-    "expectedExecutableSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "solverTimeoutMilliseconds": 1000,
-    "solverResourceLimit": 100000,
-    "hostDeadlineMilliseconds": 1500,
-    "artifactPolicy": "input-values-after-satisfiable",
-    "responseLimits": {
-      "bytes": 65536,
-      "nestingDepth": 64,
-      "nodes": 4096,
-      "tokenBytes": 4096,
-      "integerBits": 4096
-    },
-    "executableLaunch": "descriptor-bound-executable-v1"
-  },
-  "evaluation": {
-    "assignmentValueBits": 4096,
-    "intermediateValueBits": 4096
-  },
-  "inputBoxValidation": {
-    "inclusiveInputMaximums": [4],
-    "maximumAssignments": 5
-  },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
-  "applicableDomainValidation": {
-    "strategy": "strict-relational-positive-affine-quotient-v1",
-    "maximumInputs": 1,
-    "maximumAssignments": 3
-  },
-  "applicableDomainOrdering": "prefer-non-vacuous",
-  "counterexampleSimplification": {
-    "strategy": "componentwise-lexicographic-v1",
-    "maximumInputs": 1,
-    "maximumAssignments": 9
-  },
-  "liveSessionOpening": "defer-until-live-query",
-  "usableWorkBudget": {
-    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
-    "milliseconds": 30000
-  },
-  "contract": {
-    "resultShape": "binary-prod-spines-v1",
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["observed-spine"],
-    "candidateCasePolicy": "cases-rejected",
-    "precondition": [
-      "not",
-      [
-        "at-most",
-        ["sum", [["input", 0], ["literal", 3]]],
-        ["scale", 2, ["input", 0]]
-      ]
-    ],
-    "postcondition": [
-      "all",
-      [
-        ["equal", ["result", "first"], ["input", 0]],
-        ["equal", ["result", "second"],
-          ["quotient", 2, ["input", 0]]]
-      ]
-    ],
-    "providerLaws": []
-  }
-}
-```
-
-The unchanged example contracts make the schema delta explicit: the fifth
-extractor is an additive strict superset, so both established strict-only
-examples retain their prior derived boxes. A quotient-bearing precondition can
-instead use, for example, `q_3(input0) <= 2` to derive `input0 <= 8`, or combine
-`input0 <= q_3(input1)` with `input1 <= 8` to derive source-ordered maxima
-`[2, 8]`. Equality contributes both directions and can therefore propagate a
-bound through either source orientation.
-
-V19/v20 preserve v17/v18's exact root fields, descriptor execution object,
-scoped-v2 budget, deferred lifecycle, caps, diagnostics, and scalar-v5/pair-v5
-contract grammars. Validation order remains exact root admission;
-`executionAdmission`; inherited execution fields; the required launch
-discriminator; descriptor policy sealing; `evaluation`; `inputBoxValidation`;
-`counterexampleProbe`; `boundedPositiveOrdering`; the quotient applicable-
-domain object's exact fields, literal, width, cardinality, and Djex limits;
-`applicableDomainOrdering`; `counterexampleSimplification`;
-`liveSessionOpening`; scoped budget; then contract. The dispatcher reaches
-v19/v20 only after the exact v1--v18 cascade returns UnsupportedVersion;
-v21/v22 are handled only by their later effective-ID executable-access
-decoder. Loading and activation remain pure, and an all-pure deferred batch
-opens neither an executable descriptor, an access checker, nor a worker.
-
-### Startup versions 21 and 22: effective-ID executable access
-
-Startup v21 and v22 retain that complete quotient/scoped profile and replace
-only the executable-launch selection. Their exported constants are
-`lengthRankingConfigurationFileDescriptorBoundEffectiveIDExecutableAccessVersion`
-(21) and
-`lengthRankingConfigurationFileSpinePairDescriptorBoundEffectiveIDExecutableAccessVersion`
-(22). The complete scalar v21 document is the scalar v19 example with only
-the version and launch literal advanced:
-
-```json
-{
-  "format": "leant-live-length-ranking-configuration",
-  "version": 21,
-  "executionAdmission": {
-    "executablePathCharacters": 4096,
-    "policyFingerprintBytes": 262144
-  },
-  "execution": {
-    "executablePath": "/absolute/path/to/z3",
-    "expectedExecutableSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "solverTimeoutMilliseconds": 1000,
-    "solverResourceLimit": 100000,
-    "hostDeadlineMilliseconds": 1500,
-    "artifactPolicy": "input-values-after-satisfiable",
-    "responseLimits": {
-      "bytes": 65536,
-      "nestingDepth": 64,
-      "nodes": 4096,
-      "tokenBytes": 4096,
-      "integerBits": 4096
-    },
-    "executableLaunch": "descriptor-bound-effective-id-executable-access-v1"
-  },
-  "evaluation": {
-    "assignmentValueBits": 4096,
-    "intermediateValueBits": 4096
-  },
-  "inputBoxValidation": {
-    "inclusiveInputMaximums": [5, 5],
-    "maximumAssignments": 36
-  },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
-  "applicableDomainValidation": {
-    "strategy": "strict-relational-positive-affine-quotient-v1",
-    "maximumInputs": 2,
-    "maximumAssignments": 20
-  },
-  "applicableDomainOrdering": "prefer-non-vacuous",
-  "counterexampleSimplification": {
-    "strategy": "componentwise-lexicographic-v1",
-    "maximumInputs": 2,
-    "maximumAssignments": 36
-  },
-  "liveSessionOpening": "defer-until-live-query",
-  "usableWorkBudget": {
-    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
-    "milliseconds": 30000
-  },
-  "contract": {
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["observed-spine", "observed-spine"],
-    "candidateCasePolicy": "cases-rejected",
-    "precondition": [
-      "all",
-      [
-        ["not", ["at-most", ["literal", 5], ["input", 0]]],
-        ["not", ["at-most", ["input", 0], ["input", 1]]]
-      ]
-    ],
-    "postcondition": ["equal", ["result"], ["input", 0]],
-    "providerLaws": []
-  }
-}
-```
-
-The complete nominal pair v22 document changes those same two selections in
-the pair v20 example:
-
-```json
-{
-  "format": "leant-live-length-ranking-configuration",
-  "version": 22,
-  "executionAdmission": {
-    "executablePathCharacters": 4096,
-    "policyFingerprintBytes": 262144
-  },
-  "execution": {
-    "executablePath": "/absolute/path/to/z3",
-    "expectedExecutableSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "solverTimeoutMilliseconds": 1000,
-    "solverResourceLimit": 100000,
-    "hostDeadlineMilliseconds": 1500,
-    "artifactPolicy": "input-values-after-satisfiable",
-    "responseLimits": {
-      "bytes": 65536,
-      "nestingDepth": 64,
-      "nodes": 4096,
-      "tokenBytes": 4096,
-      "integerBits": 4096
-    },
-    "executableLaunch": "descriptor-bound-effective-id-executable-access-v1"
-  },
-  "evaluation": {
-    "assignmentValueBits": 4096,
-    "intermediateValueBits": 4096
-  },
-  "inputBoxValidation": {
-    "inclusiveInputMaximums": [4],
-    "maximumAssignments": 5
-  },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
-  "applicableDomainValidation": {
-    "strategy": "strict-relational-positive-affine-quotient-v1",
-    "maximumInputs": 1,
-    "maximumAssignments": 3
-  },
-  "applicableDomainOrdering": "prefer-non-vacuous",
-  "counterexampleSimplification": {
-    "strategy": "componentwise-lexicographic-v1",
-    "maximumInputs": 1,
-    "maximumAssignments": 9
-  },
-  "liveSessionOpening": "defer-until-live-query",
-  "usableWorkBudget": {
-    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
-    "milliseconds": 30000
-  },
-  "contract": {
-    "resultShape": "binary-prod-spines-v1",
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["observed-spine"],
-    "candidateCasePolicy": "cases-rejected",
-    "precondition": [
-      "not",
-      [
-        "at-most",
-        ["sum", [["input", 0], ["literal", 3]]],
-        ["scale", 2, ["input", 0]]
-      ]
-    ],
-    "postcondition": [
-      "all",
-      [
-        ["equal", ["result", "first"], ["input", 0]],
-        ["equal", ["result", "second"],
-          ["quotient", 2, ["input", 0]]]
-      ]
-    ],
-    "providerLaws": []
-  }
-}
-```
-
-The required launch literal is exactly
-`"descriptor-bound-effective-id-executable-access-v1"`. The inherited
-execution fields are validated in their established order before that final
-discriminator and Djex policy sealing; evaluation, input box, probe,
-preferences, quotient-domain limits, simplification, deferred opening,
-scoped-v2 budget, and contract then retain v19/v20 order and caps. The
-dispatcher reaches v21/v22 only after the exact v1--v20 cascade returns
-UnsupportedVersion. V1--v20 remain exact and reject the new member or literal
-wherever their own closed schema does not admit it; v23/v24 are reached only by
-the later root-extrema decoder.
-
-At the first live miss, Djex checks the opened source descriptor with
-`faccessat2(fd, "", X_OK, AT_EMPTY_PATH | AT_EACCESS)` before copying and
-again after pin/sealed-image admission immediately before child allocation.
-The staged memfd is fixed to mode `0500`, sealed, verified, and executed by
-descriptor. These are point-in-time effective-filesystem-credential VFS
-observations, not a reservation or full `exec`/`bprm`/LSM/IMA/binfmt check.
-Source ownership, group, ACLs, set-id bits, capabilities, extended attributes,
-security labels, and mount identity are not copied; loaders, interpreters,
-libraries, solver semantics, and results remain unbound. No unsupported
-platform, syscall, flag, access, staging, or exec failure falls back to v19/v20
-descriptor launch or the pathname launcher.
-
-### Startup versions 23 and 24: root-extrema consequences
-
-Startup v23 and v24 preserve the complete v21/v22 effective-ID launch,
-scoped-v2 budget, deferred lifecycle, preference, simplification, and scalar-v5
-or pair-v5 contract roots. They replace only the applicable-domain strategy.
-Their exported constants are
-`lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaVersion`
-(23) and
-`lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaVersion`
-(24). The complete scalar v23 document is therefore the scalar v21 document
-with only those two closed selections advanced:
-
-```json
-{
-  "format": "leant-live-length-ranking-configuration",
-  "version": 23,
-  "executionAdmission": {
-    "executablePathCharacters": 4096,
-    "policyFingerprintBytes": 262144
-  },
-  "execution": {
-    "executablePath": "/absolute/path/to/z3",
-    "expectedExecutableSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "solverTimeoutMilliseconds": 1000,
-    "solverResourceLimit": 100000,
-    "hostDeadlineMilliseconds": 1500,
-    "artifactPolicy": "input-values-after-satisfiable",
-    "responseLimits": {
-      "bytes": 65536,
-      "nestingDepth": 64,
-      "nodes": 4096,
-      "tokenBytes": 4096,
-      "integerBits": 4096
-    },
-    "executableLaunch": "descriptor-bound-effective-id-executable-access-v1"
-  },
-  "evaluation": {
-    "assignmentValueBits": 4096,
-    "intermediateValueBits": 4096
-  },
-  "inputBoxValidation": {
-    "inclusiveInputMaximums": [5, 5],
-    "maximumAssignments": 36
-  },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
-  "applicableDomainValidation": {
-    "strategy": "strict-relational-positive-affine-quotient-root-extrema-v1",
-    "maximumInputs": 2,
-    "maximumAssignments": 20
-  },
-  "applicableDomainOrdering": "prefer-non-vacuous",
-  "counterexampleSimplification": {
-    "strategy": "componentwise-lexicographic-v1",
-    "maximumInputs": 2,
-    "maximumAssignments": 36
-  },
-  "liveSessionOpening": "defer-until-live-query",
-  "usableWorkBudget": {
-    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
-    "milliseconds": 30000
-  },
-  "contract": {
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["observed-spine", "observed-spine"],
-    "candidateCasePolicy": "cases-rejected",
-    "precondition": [
-      "all",
-      [
-        ["not", ["at-most", ["literal", 5], ["input", 0]]],
-        ["not", ["at-most", ["input", 0], ["input", 1]]]
-      ]
-    ],
-    "postcondition": ["equal", ["result"], ["input", 0]],
-    "providerLaws": []
-  }
-}
-```
-
-The complete nominal pair v24 document is likewise the pair v22 document with
-only the version and strategy literal changed:
-
-```json
-{
-  "format": "leant-live-length-ranking-configuration",
-  "version": 24,
-  "executionAdmission": {
-    "executablePathCharacters": 4096,
-    "policyFingerprintBytes": 262144
-  },
-  "execution": {
-    "executablePath": "/absolute/path/to/z3",
-    "expectedExecutableSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "solverTimeoutMilliseconds": 1000,
-    "solverResourceLimit": 100000,
-    "hostDeadlineMilliseconds": 1500,
-    "artifactPolicy": "input-values-after-satisfiable",
-    "responseLimits": {
-      "bytes": 65536,
-      "nestingDepth": 64,
-      "nodes": 4096,
-      "tokenBytes": 4096,
-      "integerBits": 4096
-    },
-    "executableLaunch": "descriptor-bound-effective-id-executable-access-v1"
-  },
-  "evaluation": {
-    "assignmentValueBits": 4096,
-    "intermediateValueBits": 4096
-  },
-  "inputBoxValidation": {
-    "inclusiveInputMaximums": [4],
-    "maximumAssignments": 5
-  },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
-  "applicableDomainValidation": {
-    "strategy": "strict-relational-positive-affine-quotient-root-extrema-v1",
-    "maximumInputs": 1,
-    "maximumAssignments": 3
-  },
-  "applicableDomainOrdering": "prefer-non-vacuous",
-  "counterexampleSimplification": {
-    "strategy": "componentwise-lexicographic-v1",
-    "maximumInputs": 1,
-    "maximumAssignments": 9
-  },
-  "liveSessionOpening": "defer-until-live-query",
-  "usableWorkBudget": {
-    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
-    "milliseconds": 30000
-  },
-  "contract": {
-    "resultShape": "binary-prod-spines-v1",
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["observed-spine"],
-    "candidateCasePolicy": "cases-rejected",
-    "precondition": [
-      "not",
-      [
-        "at-most",
-        ["sum", [["input", 0], ["literal", 3]]],
-        ["scale", 2, ["input", 0]]
-      ]
-    ],
-    "postcondition": [
-      "all",
-      [
-        ["equal", ["result", "first"], ["input", 0]],
-        ["equal", ["result", "second"],
-          ["quotient", 2, ["input", 0]]]
-      ]
-    ],
-    "providerLaws": []
-  }
-}
-```
-
-The required strategy literal is exactly
-`"strict-relational-positive-affine-quotient-root-extrema-v1"`. Validation
-retains v21/v22's exact field order and caps, changing only the selected
-applicable-domain validator and nominal receipt. The dispatcher reaches v23/v24
-only after the complete v1--v22 cascade returns `UnsupportedVersion`; v25/v26
-are reached only by the still later root-monus decoder. Every v1--v22 decoder
-remains literal and rejects the new version or strategy wherever its own closed
-schema does not admit it.
-
-V23/v24 retain query-owned replay, the non-vacuous applicable-domain
-preference, deferred live opening, one owner-thread-affine scoped-v2 absolute
-deadline, cooperative phase checkpoints, and Leant-owned deep result forcing.
-An all-pure batch still performs no executable or access-check IO. Failure at
-access checking, staging, opening, live assessment, replay, forcing, or scope
-finalization maps through the existing closed failure classes and atomically
-restores original order; it creates no partial receipt and never falls back to
-an older launch or domain validator. The new nominal receipt tags are evidence
-and presentation distinctions only: query, wire, problem, fingerprint,
-association, executable, and scoped-owner identities remain unchanged.
-
-### Startup versions 25 and 26: root-monus consequences
-
-Startup v25 and v26 preserve the complete v23/v24 effective-ID launch,
-scoped-v2 budget, deferred lifecycle, preference, simplification, and scalar-v5
-or pair-v5 contract roots. They replace only the applicable-domain strategy.
-Their exported constants are
-`lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusVersion`
-(25) and
-`lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusVersion`
-(26). The complete scalar v25 document is therefore the scalar v23 document
-with only those two closed selections advanced:
-
-```json
-{
-  "format": "leant-live-length-ranking-configuration",
-  "version": 25,
-  "executionAdmission": {
-    "executablePathCharacters": 4096,
-    "policyFingerprintBytes": 262144
-  },
-  "execution": {
-    "executablePath": "/absolute/path/to/z3",
-    "expectedExecutableSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "solverTimeoutMilliseconds": 1000,
-    "solverResourceLimit": 100000,
-    "hostDeadlineMilliseconds": 1500,
-    "artifactPolicy": "input-values-after-satisfiable",
-    "responseLimits": {
-      "bytes": 65536,
-      "nestingDepth": 64,
-      "nodes": 4096,
-      "tokenBytes": 4096,
-      "integerBits": 4096
-    },
-    "executableLaunch": "descriptor-bound-effective-id-executable-access-v1"
-  },
-  "evaluation": {
-    "assignmentValueBits": 4096,
-    "intermediateValueBits": 4096
-  },
-  "inputBoxValidation": {
-    "inclusiveInputMaximums": [5, 5],
-    "maximumAssignments": 36
-  },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
-  "applicableDomainValidation": {
-    "strategy": "strict-relational-positive-affine-quotient-root-extrema-monus-v1",
-    "maximumInputs": 2,
-    "maximumAssignments": 20
-  },
-  "applicableDomainOrdering": "prefer-non-vacuous",
-  "counterexampleSimplification": {
-    "strategy": "componentwise-lexicographic-v1",
-    "maximumInputs": 2,
-    "maximumAssignments": 36
-  },
-  "liveSessionOpening": "defer-until-live-query",
-  "usableWorkBudget": {
-    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
-    "milliseconds": 30000
-  },
-  "contract": {
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["observed-spine", "observed-spine"],
-    "candidateCasePolicy": "cases-rejected",
-    "precondition": [
-      "all",
-      [
-        ["not", ["at-most", ["literal", 5], ["input", 0]]],
-        ["not", ["at-most", ["input", 0], ["input", 1]]]
-      ]
-    ],
-    "postcondition": ["equal", ["result"], ["input", 0]],
-    "providerLaws": []
-  }
-}
-```
-
-The complete nominal pair v26 document is likewise the pair v24 document with
-only the version and strategy literal changed:
-
-```json
-{
-  "format": "leant-live-length-ranking-configuration",
-  "version": 26,
-  "executionAdmission": {
-    "executablePathCharacters": 4096,
-    "policyFingerprintBytes": 262144
-  },
-  "execution": {
-    "executablePath": "/absolute/path/to/z3",
-    "expectedExecutableSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "solverTimeoutMilliseconds": 1000,
-    "solverResourceLimit": 100000,
-    "hostDeadlineMilliseconds": 1500,
-    "artifactPolicy": "input-values-after-satisfiable",
-    "responseLimits": {
-      "bytes": 65536,
-      "nestingDepth": 64,
-      "nodes": 4096,
-      "tokenBytes": 4096,
-      "integerBits": 4096
-    },
-    "executableLaunch": "descriptor-bound-effective-id-executable-access-v1"
-  },
-  "evaluation": {
-    "assignmentValueBits": 4096,
-    "intermediateValueBits": 4096
-  },
-  "inputBoxValidation": {
-    "inclusiveInputMaximums": [4],
-    "maximumAssignments": 5
-  },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
-  "applicableDomainValidation": {
-    "strategy": "strict-relational-positive-affine-quotient-root-extrema-monus-v1",
-    "maximumInputs": 1,
-    "maximumAssignments": 3
-  },
-  "applicableDomainOrdering": "prefer-non-vacuous",
-  "counterexampleSimplification": {
-    "strategy": "componentwise-lexicographic-v1",
-    "maximumInputs": 1,
-    "maximumAssignments": 9
-  },
-  "liveSessionOpening": "defer-until-live-query",
-  "usableWorkBudget": {
-    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
-    "milliseconds": 30000
-  },
-  "contract": {
-    "resultShape": "binary-prod-spines-v1",
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["observed-spine"],
-    "candidateCasePolicy": "cases-rejected",
-    "precondition": [
-      "not",
-      [
-        "at-most",
-        ["sum", [["input", 0], ["literal", 3]]],
-        ["scale", 2, ["input", 0]]
-      ]
-    ],
-    "postcondition": [
-      "all",
-      [
-        ["equal", ["result", "first"], ["input", 0]],
-        ["equal", ["result", "second"],
-          ["quotient", 2, ["input", 0]]]
-      ]
-    ],
-    "providerLaws": []
-  }
-}
-```
-
-The required strategy literal is exactly
-`"strict-relational-positive-affine-quotient-root-extrema-monus-v1"`.
-Validation retains v23/v24's exact root and nested field order, caps, effective-
-ID execution constructor, scoped owner, and scalar/pair contract decoder.
-Only the selected applicable-domain validator and nominal receipt change. The
-generalized dispatcher reaches v25/v26 only after the complete v1--v24 cascade
-returns `UnsupportedVersion`; v27/v28 are reached only by the later execve-
-check executable-access decoder. Every v1--v24 decoder remains literal and
-rejects the new version or strategy wherever its own closed schema does not
-admit it.
-
-V25/v26 retain query-owned replay, both non-vacuous preferences,
-counterexample simplification and final-vector MRU promotion, deferred opening,
-one owner-thread-affine scoped-v2 absolute deadline, cooperative phase
-checkpoints, and Leant-owned deep result forcing. An all-pure batch still
-performs no executable or access-check IO. Failure at access checking, staging,
-opening, live assessment, replay, forcing, or scope finalization maps through
-the existing closed failure classes and atomically restores original order; it
-creates no partial receipt and never falls back to an older launch or domain
-validator. The effective-ID launch startup notice is unchanged because v25/v26
-inherit the same launch strategy. New scalar and pair receipt tags are additive
-evidence identities only: contract, problem, query, wire, fingerprint,
-association, executable, worker, run, and scoped-owner identities remain
-unchanged.
-
-### Startup versions 27 and 28: execve-check executable access
-
-Startup v27 and v28 preserve the complete v25/v26 root-monus applicable-
-domain, scoped-v2 budget, deferred lifecycle, preference, simplification, and
-scalar-v5 or pair-v5 contract roots. They replace only the executable-launch
-selection. Their exported constants are
-`lengthRankingConfigurationFileDescriptorBoundExecveCheckExecutableAccessVersion`
-(27) and
-`lengthRankingConfigurationFileSpinePairDescriptorBoundExecveCheckExecutableAccessVersion`
-(28). Programmatic callers select the same launch with
-`mkLengthRankingPolicyWithDescriptorBoundExecveCheckExecutableAccessLaunch`.
-The complete scalar v27 document is therefore the scalar v25 document
-with only its version and launch literal advanced:
-
-```json
-{
-  "format": "leant-live-length-ranking-configuration",
-  "version": 27,
-  "executionAdmission": {
-    "executablePathCharacters": 4096,
-    "policyFingerprintBytes": 262144
-  },
-  "execution": {
-    "executablePath": "/absolute/path/to/z3",
-    "expectedExecutableSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "solverTimeoutMilliseconds": 1000,
-    "solverResourceLimit": 100000,
-    "hostDeadlineMilliseconds": 1500,
-    "artifactPolicy": "input-values-after-satisfiable",
-    "responseLimits": {
-      "bytes": 65536,
-      "nestingDepth": 64,
-      "nodes": 4096,
-      "tokenBytes": 4096,
-      "integerBits": 4096
-    },
-    "executableLaunch": "descriptor-bound-execve-check-executable-access-v1"
-  },
-  "evaluation": {
-    "assignmentValueBits": 4096,
-    "intermediateValueBits": 4096
-  },
-  "inputBoxValidation": {
-    "inclusiveInputMaximums": [5, 5],
-    "maximumAssignments": 36
-  },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
-  "applicableDomainValidation": {
-    "strategy": "strict-relational-positive-affine-quotient-root-extrema-monus-v1",
-    "maximumInputs": 2,
-    "maximumAssignments": 20
-  },
-  "applicableDomainOrdering": "prefer-non-vacuous",
-  "counterexampleSimplification": {
-    "strategy": "componentwise-lexicographic-v1",
-    "maximumInputs": 2,
-    "maximumAssignments": 36
-  },
-  "liveSessionOpening": "defer-until-live-query",
-  "usableWorkBudget": {
-    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
-    "milliseconds": 30000
-  },
-  "contract": {
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["observed-spine", "observed-spine"],
-    "candidateCasePolicy": "cases-rejected",
-    "precondition": [
-      "all",
-      [
-        ["not", ["at-most", ["literal", 5], ["input", 0]]],
-        ["not", ["at-most", ["input", 0], ["input", 1]]]
-      ]
-    ],
-    "postcondition": ["equal", ["result"], ["input", 0]],
-    "providerLaws": []
-  }
-}
-```
-
-The complete nominal pair v28 document is likewise the pair v26 document with
-only the same two selections advanced:
-
-```json
-{
-  "format": "leant-live-length-ranking-configuration",
-  "version": 28,
-  "executionAdmission": {
-    "executablePathCharacters": 4096,
-    "policyFingerprintBytes": 262144
-  },
-  "execution": {
-    "executablePath": "/absolute/path/to/z3",
-    "expectedExecutableSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "solverTimeoutMilliseconds": 1000,
-    "solverResourceLimit": 100000,
-    "hostDeadlineMilliseconds": 1500,
-    "artifactPolicy": "input-values-after-satisfiable",
-    "responseLimits": {
-      "bytes": 65536,
-      "nestingDepth": 64,
-      "nodes": 4096,
-      "tokenBytes": 4096,
-      "integerBits": 4096
-    },
-    "executableLaunch": "descriptor-bound-execve-check-executable-access-v1"
-  },
-  "evaluation": {
-    "assignmentValueBits": 4096,
-    "intermediateValueBits": 4096
-  },
-  "inputBoxValidation": {
-    "inclusiveInputMaximums": [4],
-    "maximumAssignments": 5
-  },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
-  "applicableDomainValidation": {
-    "strategy": "strict-relational-positive-affine-quotient-root-extrema-monus-v1",
-    "maximumInputs": 1,
-    "maximumAssignments": 3
-  },
-  "applicableDomainOrdering": "prefer-non-vacuous",
-  "counterexampleSimplification": {
-    "strategy": "componentwise-lexicographic-v1",
-    "maximumInputs": 1,
-    "maximumAssignments": 9
-  },
-  "liveSessionOpening": "defer-until-live-query",
-  "usableWorkBudget": {
-    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
-    "milliseconds": 30000
-  },
-  "contract": {
-    "resultShape": "binary-prod-spines-v1",
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["observed-spine"],
-    "candidateCasePolicy": "cases-rejected",
-    "precondition": [
-      "not",
-      [
-        "at-most",
-        ["sum", [["input", 0], ["literal", 3]]],
-        ["scale", 2, ["input", 0]]
-      ]
-    ],
-    "postcondition": [
-      "all",
-      [
-        ["equal", ["result", "first"], ["input", 0]],
-        ["equal", ["result", "second"],
-          ["quotient", 2, ["input", 0]]]
-      ]
-    ],
-    "providerLaws": []
-  }
-}
-```
-
-The required launch literal is exactly
-`"descriptor-bound-execve-check-executable-access-v1"`. V27/v28 retain
-v25/v26's exact root and nested field sets, caps, and demand order. The
-execution decoder checks response limits first, then executable path, digest,
-the 60,000-ms solver-timeout cap, the 10,000,000 resource cap, the 65,000-ms
-host-deadline cap, and artifact policy before requiring the launch field's
-string type and exact literal and sealing the Djex policy. Evaluation, input
-box, origin probe, bounded-positive preference, root-monus applicable-domain
-limits, applicable-domain preference, simplification, deferred opening,
-scoped-v2 budget, and scalar-v5 or pair-v5 contract retain their v25/v26
-order. The generalized dispatcher reaches v27/v28 only after the complete
-v1--v26 cascade returns `UnsupportedVersion`; v29/v30 are reached only by the
-later Boolean finite-union decoder, and v31/v32 only by its atomic-branching
-successor; v33/v34 are handled only by the recursive piecewise-affine
-successor. Every v1--v26 entrance remains literal and rejects the new version,
-member, or launch literal wherever its closed schema does not admit it.
-
-Loading, activation, and policy construction remain pure. An all-pure deferred
-batch opens no source descriptor, invokes no access checker, creates no staged
-image, and launches no worker. At the first demanded live miss, the Linux
-opener performs source `faccessat2(..., X_OK, AT_EMPTY_PATH | AT_EACCESS)` and
-source `execveat(..., AT_EMPTY_PATH | AT_EXECVE_CHECK)` before copying. It
-creates the staged image with `MFD_EXEC`, hashes and pins the copied bytes,
-sets mode `0500`, and adds and verifies the write, grow, shrink, future-write,
-exec, and final-seal prohibitions. After its deterministic hook it repeats
-both source checks and checks the sealed staged descriptor once before child
-allocation. Only then may the established descriptor-only spawn path run.
-There is no pathname, older-launch, non-`MFD_EXEC`, reduced-seal, or unchecked
-fallback. On a stock Linux 5.15 kernel the first source exec check fails closed
-as unavailable before staging or child allocation; Linux 6.14 or later is
-necessary but not sufficient for live admission.
-
-Source or staged denial maps through Djex to the existing executable-rejected
-Leant session path; checker unavailable or failed maps through the existing launch-
-failed path. Leant introduces no failure class, and any access, staging, live,
-replay, forcing, or finalization failure still atomically restores literal
-original order. The new execution-policy, raw-process, ready-worker, and
-fresh/shared/scoped scalar and pair run identities are operationally domain-
-separated. Contract, root-monus problem, query, wire, receipt, replay,
-association, presentation, and scoped-owner semantics remain unchanged.
-
-The checks are point-in-time observations, not reservations or source-
-authorization transfers. `AT_EXECVE_CHECK` deliberately ignores file-format
-and interpreter dependencies, and this profile does not attest every later
-`bprm` decision, credential transition, source metadata, loader, interpreter,
-library, solver behavior, result, proof, or pruning authority. Main emits the
-following fixed classifier-derived notice without claiming completed IO:
-
-```text
-Descriptor-bound execve-check executable-access launch selected; the opened source must pass Linux faccessat2 X_OK under effective filesystem credentials and AT_EXECVE_CHECK before copying and again immediately before child allocation; the sealed staged image must pass AT_EXECVE_CHECK immediately before child allocation; any configured digest is checked against the sealed staged main-image bytes.
-```
-
-### Startup versions 29 and 30: Boolean finite-union applicable domains
-
-Startup v29 and v30 preserve the complete v27/v28 execve-check launch,
-scoped-v2 budget, deferred lifecycle, preference, simplification, and
-scalar-v5 or pair-v5 contract roots. They replace only the applicable-domain
-selection. Their exported constants are
-`lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionVersion`
-(29) and
-`lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionVersion`
-(30). Programmatic callers make the same selection with
-`enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainValidation`.
-
-The complete scalar v29 document is:
-
-```json
-{
-  "format": "leant-live-length-ranking-configuration",
-  "version": 29,
-  "executionAdmission": {
-    "executablePathCharacters": 4096,
-    "policyFingerprintBytes": 262144
-  },
-  "execution": {
-    "executablePath": "/absolute/path/to/z3",
-    "expectedExecutableSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "solverTimeoutMilliseconds": 1000,
-    "solverResourceLimit": 100000,
-    "hostDeadlineMilliseconds": 1500,
-    "artifactPolicy": "input-values-after-satisfiable",
-    "responseLimits": {
-      "bytes": 65536,
-      "nestingDepth": 64,
-      "nodes": 4096,
-      "tokenBytes": 4096,
-      "integerBits": 4096
-    },
-    "executableLaunch": "descriptor-bound-execve-check-executable-access-v1"
-  },
-  "evaluation": {
-    "assignmentValueBits": 4096,
-    "intermediateValueBits": 4096
-  },
-  "inputBoxValidation": {
-    "inclusiveInputMaximums": [5, 5],
-    "maximumAssignments": 36
-  },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
-  "applicableDomainValidation": {
-    "strategy": "strict-relational-positive-affine-quotient-root-extrema-monus-boolean-finite-union-v1",
     "maximumInputs": 2,
     "maximumGeneratedBranches": 4,
     "maximumRulesPerBranch": 4,
@@ -3624,15 +1396,11 @@ The complete scalar v29 document is:
     "maximumAssignmentVisits": 20,
     "maximumAssignments": 20
   },
-  "applicableDomainOrdering": "prefer-non-vacuous",
   "counterexampleSimplification": {
-    "strategy": "componentwise-lexicographic-v1",
     "maximumInputs": 2,
     "maximumAssignments": 36
   },
-  "liveSessionOpening": "defer-until-live-query",
   "usableWorkBudget": {
-    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
     "milliseconds": 30000
   },
   "contract": {
@@ -3652,12 +1420,16 @@ The complete scalar v29 document is:
 }
 ```
 
-The complete nominal pair v30 document is:
+### Binary-product startup configuration
+
+The binary-product root selects a nominally distinct contract and assessment
+path. Its contract must include the closed result shape, and expressions refer
+to the two result components explicitly:
 
 ```json
 {
   "format": "leant-live-length-ranking-configuration",
-  "version": 30,
+  "rankingDomain": "binary-product",
   "executionAdmission": {
     "executablePathCharacters": 4096,
     "policyFingerprintBytes": 262144
@@ -3675,8 +1447,7 @@ The complete nominal pair v30 document is:
       "nodes": 4096,
       "tokenBytes": 4096,
       "integerBits": 4096
-    },
-    "executableLaunch": "descriptor-bound-execve-check-executable-access-v1"
+    }
   },
   "evaluation": {
     "assignmentValueBits": 4096,
@@ -3686,10 +1457,7 @@ The complete nominal pair v30 document is:
     "inclusiveInputMaximums": [4],
     "maximumAssignments": 5
   },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
   "applicableDomainValidation": {
-    "strategy": "strict-relational-positive-affine-quotient-root-extrema-monus-boolean-finite-union-v1",
     "maximumInputs": 1,
     "maximumGeneratedBranches": 2,
     "maximumRulesPerBranch": 2,
@@ -3698,15 +1466,11 @@ The complete nominal pair v30 document is:
     "maximumAssignmentVisits": 4,
     "maximumAssignments": 3
   },
-  "applicableDomainOrdering": "prefer-non-vacuous",
   "counterexampleSimplification": {
-    "strategy": "componentwise-lexicographic-v1",
     "maximumInputs": 1,
     "maximumAssignments": 9
   },
-  "liveSessionOpening": "defer-until-live-query",
   "usableWorkBudget": {
-    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
     "milliseconds": 30000
   },
   "contract": {
@@ -3735,478 +1499,61 @@ The complete nominal pair v30 document is:
 }
 ```
 
-The `applicableDomainValidation` object is closed and contains exactly eight
-members in its diagnostic order: `strategy`, `maximumInputs`,
-`maximumGeneratedBranches`, `maximumRulesPerBranch`,
-`maximumClosureInspectionsPerBranch`, `maximumRetainedBoxes`,
-`maximumAssignmentVisits`, and `maximumAssignments`. Their required strategy
-literal and numeric file caps are respectively the exact literal above, 8,
-256, 64, 4096, 256, 262144, and 65536. The first and last numeric fields create
-the existing input-box width and unique-assignment authority; the five middle
-fields create the independent Boolean finite-union authority. Unknown members
-are rejected before missing members, and missing members follow that listed
-order.
+The domain tag never infers a contract from the Lean goal. A scalar root with a
+pair-only `resultShape` or pair result reference fails in the selected scalar
+contract decoder; a binary-product root without the required result shape, or
+with a scalar result reference, fails in the selected pair decoder.
 
-The inherited full policy demand order is root schema, execution admission,
-execve-check execution, evaluation, post-`unsat` input box, origin probe,
-bounded-positive preference, the eight-field applicable-domain object,
-applicable-domain preference, simplification, deferred opening, scoped-v2
-budget, then scalar-v5 or pair-v5 contract. The generalized dispatcher reaches
-v29/v30 only after the complete v1--v28 cascade returns
-`UnsupportedVersion`; v31/v32 are reached only by the later atomic-branching
-decoder, v33/v34 only by the recursive piecewise-affine decoder, and v35 is
-the current next unsupported sentinel. Every v1--v28 route
-remains literal and rejects the new versions or strategies where its closed
-schema does not admit them.
+### Schema and validation order
 
-Configuration loading, activation, and policy construction remain pure. An
-all-pure deferred batch still captures and checks its scoped deadline clock,
-but performs no executable, access-check, staging, or worker IO. An actual
-live miss retains v27/v28's exact execve-check launch
-and scoped deadline. The new strategy can complete before that miss, so a pure
-finite-union establishment or counterexample opens no worker. Non-vacuous
-finite-union establishment participates in the existing applicable-domain
-preference; vacuous establishment remains neutral. A replayed counterexample
-still enters the common simplification path and only the final vector enters
-the four-entry newest-first MRU bank.
+The startup root has exactly ten required members:
 
-The public scalar assessment is
-`StrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainEstablished`;
-the pair assessment is
-`LengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainEstablished`.
-Their renderers are the two Boolean finite-union renderers named above. Leant's
-closed scalar and pair failure classes are
-`LengthRankingBooleanFiniteUnionApplicableDomainValidationFailed` and
-`LengthSpinePairRankingBooleanFiniteUnionApplicableDomainValidationFailed`.
-Admission-limit failures are ordinary absence of this assessment. Assignment-
-evaluation or internal-enumeration failure, association mismatch, live
-failure, deep forcing failure, or finalization failure is atomic and restores
-literal original order. No partial receipt or fallback to root-monus is
-exposed.
-
-V29/v30 add only nominal receipt schema identities and the corresponding
-evidence and presentation distinctions. They do not revise contract, problem,
-query, SMT-LIB bytes, fingerprint, association, execve-check execution,
-ready-worker, fresh/shared/scoped query-run, or scoped-owner identities. Their
-authority is exactly the canonical finite union replayed under the checked
-contract; it is neither a componentwise hull, a general Boolean solver, a Z3
-proof, a global theorem, nor pruning authority.
-
-### Startup versions 31 and 32: atomic-branching finite unions
-
-Startup v31 and v32 retain the complete v29/v30 root, eight-field applicable-
-domain object,
-execve-check launch, scoped-v2 budget, deferred lifecycle, preference,
-simplification, and scalar-v5 or pair-v5 contract. They replace only the
-applicable-domain strategy. Their constants are
-`lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingVersion`
-(31) and
-`lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingVersion`
-(32). Programmatic callers select the same strategy with
-`enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainValidation`.
-
-The complete scalar v31 document is the v29 document with only `version` and
-`strategy` changed:
-
-```json
-{
-  "format": "leant-live-length-ranking-configuration",
-  "version": 31,
-  "executionAdmission": {
-    "executablePathCharacters": 4096,
-    "policyFingerprintBytes": 262144
-  },
-  "execution": {
-    "executablePath": "/absolute/path/to/z3",
-    "expectedExecutableSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "solverTimeoutMilliseconds": 1000,
-    "solverResourceLimit": 100000,
-    "hostDeadlineMilliseconds": 1500,
-    "artifactPolicy": "input-values-after-satisfiable",
-    "responseLimits": {
-      "bytes": 65536,
-      "nestingDepth": 64,
-      "nodes": 4096,
-      "tokenBytes": 4096,
-      "integerBits": 4096
-    },
-    "executableLaunch": "descriptor-bound-execve-check-executable-access-v1"
-  },
-  "evaluation": {
-    "assignmentValueBits": 4096,
-    "intermediateValueBits": 4096
-  },
-  "inputBoxValidation": {
-    "inclusiveInputMaximums": [5, 5],
-    "maximumAssignments": 36
-  },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
-  "applicableDomainValidation": {
-    "strategy": "strict-relational-positive-affine-quotient-root-extrema-monus-boolean-finite-union-atomic-branching-v1",
-    "maximumInputs": 2,
-    "maximumGeneratedBranches": 4,
-    "maximumRulesPerBranch": 4,
-    "maximumClosureInspectionsPerBranch": 4,
-    "maximumRetainedBoxes": 2,
-    "maximumAssignmentVisits": 20,
-    "maximumAssignments": 20
-  },
-  "applicableDomainOrdering": "prefer-non-vacuous",
-  "counterexampleSimplification": {
-    "strategy": "componentwise-lexicographic-v1",
-    "maximumInputs": 2,
-    "maximumAssignments": 36
-  },
-  "liveSessionOpening": "defer-until-live-query",
-  "usableWorkBudget": {
-    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
-    "milliseconds": 30000
-  },
-  "contract": {
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["observed-spine", "observed-spine"],
-    "candidateCasePolicy": "cases-rejected",
-    "precondition": [
-      "all",
-      [
-        ["not", ["at-most", ["literal", 5], ["input", 0]]],
-        ["not", ["at-most", ["input", 0], ["input", 1]]]
-      ]
-    ],
-    "postcondition": ["equal", ["result"], ["input", 0]],
-    "providerLaws": []
-  }
-}
+```text
+format
+rankingDomain
+executionAdmission
+execution
+evaluation
+inputBoxValidation
+applicableDomainValidation
+counterexampleSimplification
+usableWorkBudget
+contract
 ```
 
-The complete nominal pair v32 document is the v30 document with only those
-same two values changed:
+Unknown members are rejected; object member order in the input is immaterial.
+After bounded UTF-8 JSON parsing and root-object admission, semantic validation
+checks `format`, then `rankingDomain`, then the exact ten-member root.
+Operational validation proceeds through execution admission, execution,
+evaluation, the post-`unsat` input box, applicable-domain limits,
+counterexample simplification, and the scoped usable-work budget. The selected
+scalar or binary-product contract is validated last. Policy construction is
+pure and launches no worker.
 
-```json
-{
-  "format": "leant-live-length-ranking-configuration",
-  "version": 32,
-  "executionAdmission": {
-    "executablePathCharacters": 4096,
-    "policyFingerprintBytes": 262144
-  },
-  "execution": {
-    "executablePath": "/absolute/path/to/z3",
-    "expectedExecutableSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "solverTimeoutMilliseconds": 1000,
-    "solverResourceLimit": 100000,
-    "hostDeadlineMilliseconds": 1500,
-    "artifactPolicy": "input-values-after-satisfiable",
-    "responseLimits": {
-      "bytes": 65536,
-      "nestingDepth": 64,
-      "nodes": 4096,
-      "tokenBytes": 4096,
-      "integerBits": 4096
-    },
-    "executableLaunch": "descriptor-bound-execve-check-executable-access-v1"
-  },
-  "evaluation": {
-    "assignmentValueBits": 4096,
-    "intermediateValueBits": 4096
-  },
-  "inputBoxValidation": {
-    "inclusiveInputMaximums": [4],
-    "maximumAssignments": 5
-  },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
-  "applicableDomainValidation": {
-    "strategy": "strict-relational-positive-affine-quotient-root-extrema-monus-boolean-finite-union-atomic-branching-v1",
-    "maximumInputs": 1,
-    "maximumGeneratedBranches": 2,
-    "maximumRulesPerBranch": 2,
-    "maximumClosureInspectionsPerBranch": 2,
-    "maximumRetainedBoxes": 1,
-    "maximumAssignmentVisits": 4,
-    "maximumAssignments": 3
-  },
-  "applicableDomainOrdering": "prefer-non-vacuous",
-  "counterexampleSimplification": {
-    "strategy": "componentwise-lexicographic-v1",
-    "maximumInputs": 1,
-    "maximumAssignments": 9
-  },
-  "liveSessionOpening": "defer-until-live-query",
-  "usableWorkBudget": {
-    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
-    "milliseconds": 30000
-  },
-  "contract": {
-    "resultShape": "binary-prod-spines-v1",
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["observed-spine"],
-    "candidateCasePolicy": "cases-rejected",
-    "precondition": [
-      "not",
-      [
-        "at-most",
-        ["sum", [["input", 0], ["literal", 3]]],
-        ["scale", 2, ["input", 0]]
-      ]
-    ],
-    "postcondition": [
-      "all",
-      [
-        ["equal", ["result", "first"], ["input", 0]],
-        ["equal", ["result", "second"],
-          ["quotient", 2, ["input", 0]]]
-      ]
-    ],
-    "providerLaws": []
-  }
-}
-```
+The operational objects expose numeric parameters and genuine choices only:
 
-The applicable-domain object still has exactly eight members in this demand
-order: strategy, maximum inputs, generated branches, rules per branch, closure
-inspections per branch, retained boxes, assignment visits, and unique
-assignments. The numeric caps remain 8, 256, 64, 4096, 256, 262144, and
-65536, with the same negative and cap-plus-one diagnostics and the same
-defensive checked-builder error. The full root and nested validation order is
-literal v29/v30. The generalized decoder reaches v31/v32 only after the
-complete v1--v30 cascade returns `UnsupportedVersion`; v33/v34 are handled by
-the later recursive piecewise-affine decoder, and v35 is the current next
-unsupported sentinel. Every v1--v30 decoder and closed strategy literal is a
-current regression reference, not a promised compatibility surface.
+- `execution` fixes the current descriptor-bound execve-check launcher; there
+  is no `executableLaunch` field.
+- `applicableDomainValidation` fixes recursive piecewise-affine atomic
+  branching; there is no `strategy` field. Its limits are, in order,
+  maximum inputs, generated branches, rules per branch, closure inspections per
+  branch, retained boxes, assignment visits, and unique assignments. Their
+  file caps remain 8, 256, 64, 4096, 256, 262144, and 65536.
+- `counterexampleSimplification` fixes componentwise-lexicographic
+  simplification and contains only `maximumInputs` and
+  `maximumAssignments`.
+- `usableWorkBudget` fixes the scoped, checkpointed v2 owner and contains only
+  `milliseconds`, capped at 65,000.
 
-The scalar assessment is
-`StrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainEstablished`;
-the pair assessment is
-`LengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainEstablished`.
-They use the two matching atomic-branching renderers. The strategy reuses
-`LengthRankingBooleanFiniteUnionApplicableDomainValidationFailed` and
-`LengthSpinePairRankingBooleanFiniteUnionApplicableDomainValidationFailed`,
-including the predecessor's ordinary-admission and indexed atomic-failure
-classification.
+The origin probe, both non-vacuous preferences, and deferred opening are also
+fixed by the current decoder rather than represented by
+`counterexampleProbe`, `boundedPositiveOrdering`,
+`applicableDomainOrdering`, or `liveSessionOpening` members.
 
-Loading, activation, builder composition, and the new finite-union validation
-remain pure. Every all-pure v31/v32 batch still captures and checks the
-scoped-v2 deadline clock but opens no descriptor, performs no source or staged
-access check, stages no image, and launches no worker. A later live miss
-inherits v29/v30's complete execve-check launch and scoped lifecycle.
-Non-vacuous receipts enter the existing preferred partition, vacuous receipts
-remain neutral, counterexamples use the common simplification/MRU path, and
-any operational or forcing failure restores literal original order.
-
-V31/v32 add only fresh scalar/product receipt schema identities and their
-evidence/presentation branches. They change no checked contract, behavioral
-problem, query, SMT-LIB bytes, fingerprint, association, executable policy,
-process, ready worker, fresh/shared/scoped run, or scoped-owner identity. Their
-authority is exact bounded replay of the canonical union under the original
-formula—not a hull, solver proof, global theorem, or pruning grant. See the
-[atomic-branching Length ranking report](reports/2026-08-15-atomic-branching-length-ranking.md)
-and Djex's
-[atomic-branching applicable-domain report](../lib/Djex/docs/reports/2026-08-15-atomic-branching-length-applicable-domain.md).
-
-### Startup versions 33 and 34: recursive piecewise-affine branching
-
-Startup v33 and v34 are current-tree scalar/product selectors. They retain the
-complete v31/v32 root, eight-field applicable-domain object, execve-check
-launch, scoped-v2 budget, deferred lifecycle, both preferences,
-simplification, and scalar-v5 or pair-v5 contract. They replace only the
-applicable-domain strategy. Their constants are
-`lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineVersion`
-(33) and
-`lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineVersion`
-(34). Programmatic callers select the same strategy with
-`enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineApplicableDomainValidation`.
-
-The complete scalar v33 document is a v31 clone with only `version` and
-`strategy` changed:
-
-```json
-{
-  "format": "leant-live-length-ranking-configuration",
-  "version": 33,
-  "executionAdmission": {
-    "executablePathCharacters": 4096,
-    "policyFingerprintBytes": 262144
-  },
-  "execution": {
-    "executablePath": "/absolute/path/to/z3",
-    "expectedExecutableSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "solverTimeoutMilliseconds": 1000,
-    "solverResourceLimit": 100000,
-    "hostDeadlineMilliseconds": 1500,
-    "artifactPolicy": "input-values-after-satisfiable",
-    "responseLimits": {
-      "bytes": 65536,
-      "nestingDepth": 64,
-      "nodes": 4096,
-      "tokenBytes": 4096,
-      "integerBits": 4096
-    },
-    "executableLaunch": "descriptor-bound-execve-check-executable-access-v1"
-  },
-  "evaluation": {
-    "assignmentValueBits": 4096,
-    "intermediateValueBits": 4096
-  },
-  "inputBoxValidation": {
-    "inclusiveInputMaximums": [5, 5],
-    "maximumAssignments": 36
-  },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
-  "applicableDomainValidation": {
-    "strategy": "strict-relational-positive-affine-quotient-root-extrema-monus-boolean-finite-union-atomic-branching-recursive-piecewise-affine-v1",
-    "maximumInputs": 2,
-    "maximumGeneratedBranches": 4,
-    "maximumRulesPerBranch": 4,
-    "maximumClosureInspectionsPerBranch": 4,
-    "maximumRetainedBoxes": 2,
-    "maximumAssignmentVisits": 20,
-    "maximumAssignments": 20
-  },
-  "applicableDomainOrdering": "prefer-non-vacuous",
-  "counterexampleSimplification": {
-    "strategy": "componentwise-lexicographic-v1",
-    "maximumInputs": 2,
-    "maximumAssignments": 36
-  },
-  "liveSessionOpening": "defer-until-live-query",
-  "usableWorkBudget": {
-    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
-    "milliseconds": 30000
-  },
-  "contract": {
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["observed-spine", "observed-spine"],
-    "candidateCasePolicy": "cases-rejected",
-    "precondition": [
-      "all",
-      [
-        ["not", ["at-most", ["literal", 5], ["input", 0]]],
-        ["not", ["at-most", ["input", 0], ["input", 1]]]
-      ]
-    ],
-    "postcondition": ["equal", ["result"], ["input", 0]],
-    "providerLaws": []
-  }
-}
-```
-
-The complete nominal pair v34 document is a v32 clone with the same two
-selection changes:
-
-```json
-{
-  "format": "leant-live-length-ranking-configuration",
-  "version": 34,
-  "executionAdmission": {
-    "executablePathCharacters": 4096,
-    "policyFingerprintBytes": 262144
-  },
-  "execution": {
-    "executablePath": "/absolute/path/to/z3",
-    "expectedExecutableSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "solverTimeoutMilliseconds": 1000,
-    "solverResourceLimit": 100000,
-    "hostDeadlineMilliseconds": 1500,
-    "artifactPolicy": "input-values-after-satisfiable",
-    "responseLimits": {
-      "bytes": 65536,
-      "nestingDepth": 64,
-      "nodes": 4096,
-      "tokenBytes": 4096,
-      "integerBits": 4096
-    },
-    "executableLaunch": "descriptor-bound-execve-check-executable-access-v1"
-  },
-  "evaluation": {
-    "assignmentValueBits": 4096,
-    "intermediateValueBits": 4096
-  },
-  "inputBoxValidation": {
-    "inclusiveInputMaximums": [4],
-    "maximumAssignments": 5
-  },
-  "counterexampleProbe": "origin-before-live",
-  "boundedPositiveOrdering": "prefer-non-vacuous",
-  "applicableDomainValidation": {
-    "strategy": "strict-relational-positive-affine-quotient-root-extrema-monus-boolean-finite-union-atomic-branching-recursive-piecewise-affine-v1",
-    "maximumInputs": 1,
-    "maximumGeneratedBranches": 2,
-    "maximumRulesPerBranch": 2,
-    "maximumClosureInspectionsPerBranch": 2,
-    "maximumRetainedBoxes": 1,
-    "maximumAssignmentVisits": 4,
-    "maximumAssignments": 3
-  },
-  "applicableDomainOrdering": "prefer-non-vacuous",
-  "counterexampleSimplification": {
-    "strategy": "componentwise-lexicographic-v1",
-    "maximumInputs": 1,
-    "maximumAssignments": 9
-  },
-  "liveSessionOpening": "defer-until-live-query",
-  "usableWorkBudget": {
-    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
-    "milliseconds": 30000
-  },
-  "contract": {
-    "resultShape": "binary-prod-spines-v1",
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["observed-spine"],
-    "candidateCasePolicy": "cases-rejected",
-    "precondition": [
-      "not",
-      [
-        "at-most",
-        ["sum", [["input", 0], ["literal", 3]]],
-        ["scale", 2, ["input", 0]]
-      ]
-    ],
-    "postcondition": [
-      "all",
-      [
-        ["equal", ["result", "first"], ["input", 0]],
-        ["equal", ["result", "second"],
-          ["quotient", 2, ["input", 0]]]
-      ]
-    ],
-    "providerLaws": []
-  }
-}
-```
-
-These examples deliberately keep the v31/v32 contract fixtures so the
-normalized documents differ only in `version` and `strategy`; the recursive
-characterization formulas appear in the semantic section above. The decoder
-requires the existing scalar-v5 or pair-v5 contract grammar, not a particular
-formula. The applicable-domain object still has
-exactly eight members in the predecessor demand order and the same numeric
-caps: 8, 256, 64, 4096, 256, 262144, and 65536. The complete root and nested
-demand order is unchanged on this tree. The generalized dispatcher reaches
-v33/v34 only after the current v1--v32 cascade returns
-`UnsupportedVersion`; v35 is the current unsupported sentinel.
-
-The scalar assessment is
-`StrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineApplicableDomainEstablished`;
-the pair assessment is its nominal `LengthSpinePair` sibling. They use the two
-matching recursive renderers and reuse the Boolean finite-union failures.
-
-Loading, activation, builder composition, and recursive validation remain
-pure. An all-pure v33/v34 batch captures and checks the scoped-v2 deadline but
-opens no descriptor, runs no access check, stages no image, and launches no
-worker. A live miss inherits v31/v32's complete execve-check launch and scoped
-lifecycle. Non-vacuous receipts join the established preferred partition,
-vacuous receipts remain neutral, counterexamples use simplification/MRU, and
-any operational or forcing failure restores original order.
-
-The terms “v33” and “v34” throughout this section are current implementation
-shorthand only. They do not imply a compatibility commitment to retain these
-numbers, fields, literals, or behavior. See the
-[recursive piecewise-affine Length ranking report](reports/2026-08-15-recursive-piecewise-affine-length-ranking.md)
-and Djex's
-[recursive piecewise-affine applicable-domain report](../lib/Djex/docs/reports/2026-08-15-recursive-piecewise-affine-length-applicable-domain.md).
+Historical startup documents with a `version` member or any removed strategy
+member are outside this schema. They are rejected rather than migrated, and
+there is no startup unsupported-version sentinel. This statement does not
+apply to the separately versioned contract-only format.
 
 ## Pair contracts, decoders, and reports
 
@@ -4224,117 +1571,63 @@ command without changing the CLI grammar:
 
 ### Pair contract grammar and validation order
 
-Versions, not a redundant domain field, choose the grammar. Pair contract
-objects have exactly `resultShape`, `spine`, `targetArgumentRoles`,
-`candidateCasePolicy`, `precondition`, `postcondition`, and `providerLaws`.
-After the bounded root/schema gates, contract-only v6 validates those fields in
-that order. Startup v4 first validates execution admission, execution,
-evaluation, input-box validation, and the closed origin-probe selection, then
-validates the pair contract in the same order. Startup v5 and v6 validate the
-new bounded-positive ordering literal after the origin-probe selection and
-before their scalar or pair contract. JSON object member order is immaterial.
-The pair grammar retains v5's modulo, positive-literal quotient, formulas, and
-provider laws, but admits only `["input", n]`, `["result", "first"]`, and
-`["result", "second"]` as contract variables. Its target-role vector is
-required, and its case policy is exactly `"cases-rejected"` or
+The two file formats select domains differently. Contract-only root versions
+1--5 select the scalar grammar and version 6 selects the pair grammar. The
+versionless startup root instead uses `rankingDomain`: `"scalar"` selects
+the full scalar grammar, while `"binary-product"` selects the pair grammar.
+
+Pair contract objects have exactly `resultShape`, `spine`,
+`targetArgumentRoles`, `candidateCasePolicy`, `precondition`,
+`postcondition`, and `providerLaws`. After the bounded root/schema gates,
+contract-only version 6 validates those fields in that order. The startup
+decoder validates all operational objects first and the domain-selected
+contract last. JSON object member order is immaterial.
+
+The pair grammar retains the scalar grammar's modulo, positive-literal
+quotient, formulas, and provider laws, but admits only `["input", n]`,
+`["result", "first"]`, and `["result", "second"]` as variables. Its
+`resultShape` is exactly `"binary-prod-spines-v1"`, its target-role vector
+is required, and its case policy is exactly `"cases-rejected"` or
 `"exact-spine-zero-step-v1"`.
 
-### Decoder routing and reports
+### Decoder separation and reports
 
-In the current tree, the narrower scalar decoders remain exact entrances: the
-startup decoder for versions 1--3 rejects v4--v34, and the contract-only decoder for
-versions 1--5 rejects v6. The generalized decoders delegate those old versions
-to their current scalar paths and add startup v4--v34 or contract-only v6. This
-routing is regression-characterized but is not a backward-compatibility
-promise. A
-product file selects which nominal runner Main calls; it does not infer a
-contract from the Lean type, bypass the exact canonical-`Prod` handoff, turn
-solver status into evidence, or grant pruning authority. See the
+The startup and contract-only roots are deliberately separate contracts. The
+startup decoder accepts one exact, versionless
+`leant-live-length-ranking-configuration` root and chooses the nominal runner
+from `rankingDomain`. The contract-only decoder continues to accept the
+separately versioned `leant-finite-list-spine-length-contract` root. A
+startup `version` member is outside the exact root (and is reported as
+unexpected once the earlier `rankingDomain` gate succeeds); a contract-only
+`version` member is required. Neither decoder delegates to the other.
+
+A binary-product startup file selects which nominal runner Main calls. It does
+not infer a contract from the Lean type, bypass the exact canonical-`Prod`
+handoff, turn solver status into evidence, or grant pruning authority. The
+current startup reset is recorded in the
+[versionless startup configuration report](reports/2026-08-15-versionless-length-ranking-configuration.md).
+The exact handoff and live pair boundaries are recorded in the historical
 [canonical `Prod` Length handoff report](reports/2026-08-14-canonical-prod-length-handoff.md)
-for the exact handoff boundary and the
-[live binary-product Length ranking report](reports/2026-08-14-live-binary-product-length-ranking.md)
-for the live orchestration, authority, and compatibility details. The closed
-v4/v6 file boundary is recorded in the
-[binary-product Length configuration report](reports/2026-08-14-binary-product-length-configuration.md).
-The explicit v5/v6 preference and its unchanged evidence and identity
-boundaries are recorded in the
-[non-vacuous bounded-positive ordering report](reports/2026-08-14-non-vacuous-bounded-positive-ordering.md).
-The exact v7/v8 schema, positive-affine receipts, deferred state machine, and
-compatibility boundary are recorded in the
-[positive-affine deferred Length ranking report](reports/2026-08-14-positive-affine-deferred-length-ranking.md).
-The additive v9/v10 shared usable-work owner and unchanged behavioral authority
-are recorded in the
-[shared usable-work Length ranking report](reports/2026-08-15-shared-usable-work-length-ranking.md).
-The v11/v12 relational rule, exact v7/v8-shaped schema, nominal evidence, and
-deliberate absence of the shared budget are recorded in the
-[relational positive-affine Length ranking report](reports/2026-08-15-relational-positive-affine-length-ranking.md).
-The v13/v14 scoped owner, cooperative checkpoints, closed schema, failure
-boundary, and additive identities are recorded in the
-[scoped usable-work Length ranking report](reports/2026-08-15-scoped-usable-work-length-ranking.md).
-The v15/v16 strict-natural rule, inherited scoped lifecycle, nominal evidence,
-closed schema, and unchanged older routes are recorded in the
-[strict relational positive-affine Length ranking report](reports/2026-08-15-strict-relational-positive-affine-length-ranking.md).
-The v17/v18 sealed main-image selection, closed execution discriminator,
-startup notice, compatibility boundary, and unchanged evidence are recorded in
-the
-[descriptor-bound Length/Z3 launch report](reports/2026-08-15-descriptor-bound-length-z3-launch.md).
-The v19/v20 root-quotient laws, inherited descriptor/scoped profile, nominal
-assessments and notes, and unchanged older routes are recorded in the
-[strict relational positive-affine quotient Length ranking report](reports/2026-08-15-strict-relational-positive-affine-quotient-length-ranking.md).
-The v21/v22 effective-ID source-access selection, exact closed schema,
-deferred/scoped lifecycle, failure mapping, startup notice, and unchanged
-behavioral authority are recorded in the
-[effective-ID descriptor-bound Length/Z3 launch report](reports/2026-08-15-effective-id-descriptor-bound-length-z3-launch.md).
-The v23/v24 root-extrema laws, inherited effective-ID/scoped lifecycle,
-all-or-nothing extraction, nominal receipts, and unchanged identity boundary
-are recorded in the
-[root-extrema Length ranking report](reports/2026-08-15-root-extrema-length-ranking.md).
-The v25/v26 root-monus laws, zero-boundary admission, inherited lifecycle,
-nominal receipts, presentation, and unchanged older identities are recorded in
-the
-[root-monus Length ranking report](reports/2026-08-15-root-monus-length-ranking.md).
-The v27/v28 descriptor-bound kernel executable checks, inherited root-monus/
-scoped profile, closed schema, failure mapping, and unchanged behavioral
-authority are recorded in the
-[execve-check descriptor-bound Length/Z3 launch report](reports/2026-08-15-execve-check-descriptor-bound-length-z3-launch.md).
-The v29/v30 bounded Boolean DNF, canonical box union, admission and atomic
-failure routes, nominal assessments, and no-hull authority are recorded in the
-[Boolean finite-union Length ranking report](reports/2026-08-15-boolean-finite-union-length-ranking.md).
-The v31/v32 atomic alternative laws, complete raw-product cap, reused limits
-and errors, nominal receipts, inherited lifecycle, and identity-only extension
-are recorded in the
-[atomic-branching Length ranking report](reports/2026-08-15-atomic-branching-length-ranking.md).
-The v33/v34 recursive grammar, selector order, signed-affine transfer,
-raw-product caps, current schemas, nominal receipts, and inherited lifecycle
-are recorded in the
+and
+[live binary-product Length ranking report](reports/2026-08-14-live-binary-product-length-ranking.md).
+Their startup-version discussions describe the checkpoints at which those
+reports landed and are not current file documentation.
+
+The current recursive validator and its inherited lifecycle are recorded in the
 [recursive piecewise-affine Length ranking report](reports/2026-08-15-recursive-piecewise-affine-length-ranking.md).
-Djex's underlying strict extraction boundary is in its
-[strict relational positive-affine applicable-domain report](../lib/Djex/docs/reports/2026-08-15-strict-relational-positive-affine-length-applicable-domain.md).
-The quotient-consequence extraction, receipt, authority, and identity boundary
-is in Djex's
-[strict relational positive-affine quotient applicable-domain report](../lib/Djex/docs/reports/2026-08-15-strict-relational-positive-affine-quotient-length-applicable-domain.md).
-The root-extrema extraction, all-or-nothing clause boundary, canonical order,
-receipt authority, and identity boundary are in Djex's
-[root-extrema applicable-domain report](../lib/Djex/docs/reports/2026-08-15-root-extrema-length-applicable-domain.md).
-The root-monus extraction, zero-boundary countermodels, proof-summary order,
-replay precedence, receipt authority, and identity boundary are in Djex's
-[root-monus applicable-domain report](../lib/Djex/docs/reports/2026-08-15-root-monus-length-applicable-domain.md).
-Djex's signed DNF, branch and box antichains, bounded closure, exact union
-replay, and receipt authority are recorded in the
-[Boolean finite-union applicable-domain report](../lib/Djex/docs/reports/2026-08-15-boolean-finite-union-length-applicable-domain.md).
-Djex's exact root-extrema and may-zero-monus alternatives, raw-product
-admission, ordered original-literal expansion, no-hull replay, and fresh
-receipt tags are recorded in the
-[atomic-branching applicable-domain report](../lib/Djex/docs/reports/2026-08-15-atomic-branching-length-applicable-domain.md).
-Djex's recursive grammar, selector guards, signed-affine transfer, raw-case
-accounting, exact union replay, and fresh receipt tags are recorded in the
+That report also predates the schema reset; its v33/v34 routing discussion is
+historical, while its semantic examples and authority boundary remain useful.
+Djex's current recursive grammar, selector guards, signed-affine transfer,
+raw-case accounting, exact union replay, and receipt authority are recorded in
+the
 [recursive piecewise-affine applicable-domain report](../lib/Djex/docs/reports/2026-08-15-recursive-piecewise-affine-length-applicable-domain.md).
-Djex's underlying two-point source-access and sealed-image execution authority
-is recorded in the
-[effective-ID descriptor-bound Z3 launch report](../lib/Djex/docs/reports/2026-08-15-effective-id-descriptor-bound-z3-launch.md).
-Djex's lower-level source/staged exec-check lifecycle, identities, and narrow
-kernel authority are recorded in the
+The inherited source/staged executable-check lifecycle and its narrow authority
+are in the
 [execve-check descriptor-bound Z3 launch report](../lib/Djex/docs/reports/2026-08-15-execve-check-descriptor-bound-z3-launch.md).
+
+All dated Leant reports are historical engineering records, not normative
+startup grammar. The [report index](reports/README.md) states the precedence
+explicitly.
 
 ## Presentation notes on the Main path
 
@@ -4381,15 +1674,12 @@ or
 Recursive piecewise-affine assessments use
 `renderLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineApplicableDomainValidationNote`
 or its `LengthSpinePair` sibling.
-Main's v7--v10 path can produce only the literal-ceiling positive-affine receipt
-family; v11--v14 can produce only the relational family; v15--v18 can produce
-only the strict-relational family; v19--v22 can produce only the root-quotient
-successor family; v23/v24 can produce only the root-extrema successor family;
-v25--v28 can produce only the root-monus successor family; v29/v30 can produce
-only the Boolean finite-union successor family; v31/v32 can produce only the
-atomic-branching finite-union successor family; v33/v34 can produce only the
-recursive piecewise-affine successor family; v1--v6 cannot produce
-any applicable-domain family. The semantic note
+The current startup path can produce only the recursive piecewise-affine
+applicable-domain receipt family selected by its scalar or binary-product
+domain. Lower-level programmatic policy builders can still construct the
+earlier direct, positive-affine, relational, strict, quotient, extrema, monus,
+Boolean-union, or atomic-branching policies, so their renderers remain part of
+the library surface. The semantic note
 never projects the receipt's private provider-name list. Disabled assessment,
 rejected input, heuristic status,
 and atomic operational fallback add no semantic note. The note can explain a

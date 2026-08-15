@@ -3,8 +3,13 @@
 Each dated file below records one review or feature checkpoint at the
 time it landed. Read these as historical review notes: they explain how
 the repository reached its current shape, and earlier reports are
-routinely superseded by later ones. The [README](../../README.md) links
-the reports that document each still-current invariant.
+routinely superseded by later ones. No dated report is a normative API,
+configuration grammar, compatibility promise, or substitute for the current
+source and current reference documentation. In particular, reports describing
+startup configuration versions 1 through 34 preserve their landing checkpoints;
+those roots are no longer accepted by the current versionless startup decoder.
+The [README](../../README.md) and
+[Length ranking reference](../length-ranking.md) describe the current tree.
 
 Reports are listed oldest first.
 
@@ -67,6 +72,7 @@ Reports are listed oldest first.
 - 2026-08-15 — [Boolean finite-union Length ranking](2026-08-15-boolean-finite-union-length-ranking.md)
 - 2026-08-15 — [Boolean finite-union root-extrema/may-zero-monus atomic branching for Length ranking](2026-08-15-atomic-branching-length-ranking.md)
 - 2026-08-15 — [Recursive piecewise-affine branching for Length ranking](2026-08-15-recursive-piecewise-affine-length-ranking.md)
+- 2026-08-15 — [Versionless live Length ranking configuration](2026-08-15-versionless-length-ranking-configuration.md)
 
 ## Standalone PDF reports
 

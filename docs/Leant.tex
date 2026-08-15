@@ -271,7 +271,10 @@ counterexample ranking (\S\ref{sec:engines}): the configuration file is
 admitted once at startup from an explicitly chosen absolute path, the
 timeout bounds only the file-load interruption budget (default
 5{,}000\,ms, at most 60{,}000\,ms), and both auxiliary options are
-rejected without the configuration option itself.
+rejected without the configuration option itself. The current startup file is
+versionless and requires \code{rankingDomain} to be exactly \code{scalar} or
+\code{binary-product}; the separate one-command contract-file grammar remains
+versioned.
 
 A session begins as a calculator and escalates quietly:
 
@@ -1541,9 +1544,11 @@ candidate --- such candidates are stably demoted, never pruned --- and a
 raw \code{sat}, \code{unsat}, or \code{unknown} has no authority at
 all.  A per-command variant, \code{:synth -{}-length-contract PATH
 -{}- TYPE}, swaps in one contract file for a single command.  The
-configuration and contract grammars are versioned and strict; the
-README documents every version, and the dated reports under
-\code{docs/reports/} record the design.  Everything in this paragraph
+startup grammar is one current strict, versionless shape selected by
+\code{rankingDomain}; the separate contract-only grammar remains strict and
+versioned. The current reference is \code{docs/length-ranking.md}; dated
+reports under \code{docs/reports/} are historical engineering records rather
+than current file contracts. Everything in this paragraph
 is off by default and leaves no trace when disabled.
 
 The pure searches answer in microseconds to milliseconds; the cost
