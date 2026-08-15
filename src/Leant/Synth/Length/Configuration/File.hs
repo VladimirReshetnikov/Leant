@@ -20,7 +20,9 @@
 -- version-10 root shape and select the scoped, checkpointed shared usable-work
 -- owner.  Versions 15 and 16 retain that latest scoped root and select the
 -- strict relational positive-affine validator.  Older decoders and grammars
--- remain literal.
+-- remain literal.  Versions 17 and 18 retain the complete version-15/version-
+-- 16 policy while selecting descriptor-bound executable launch through one
+-- required nested execution discriminator.
 -- Decoding performs no discovery, path normalization, environment lookup, or
 -- IO.  Every field is required.  A successful decode returns a deliberately
 -- disabled opaque value: callers
@@ -45,6 +47,8 @@ module Leant.Synth.Length.Configuration.File
   , lengthRankingConfigurationFileSpinePairScopedUsableWorkBudgetVersion
   , lengthRankingConfigurationFileStrictRelationalPositiveAffineVersion
   , lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineVersion
+  , lengthRankingConfigurationFileDescriptorBoundExecutableLaunchVersion
+  , lengthRankingConfigurationFileSpinePairDescriptorBoundExecutableLaunchVersion
   , lengthRankingConfigurationFileJsonLimits
   , LengthRankingConfigurationFileObject (..)
   , LengthRankingConfigurationFileField (..)
@@ -111,6 +115,7 @@ import Language.Haskell.Djex
   , LengthSMTLibLiveUsableWorkBudgetSource (..)
   , mkLengthEvaluationLimits
   , mkLengthInputBoxLimits
+  , mkLengthSMTLibDescriptorBoundExecutionConfig
   , mkLengthSMTLibExecutionConfig
   , mkLengthSMTLibExecutionLimits
   , mkLengthSMTLibResponseLimits
@@ -227,6 +232,16 @@ lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineVersion
 lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineVersion =
   16
 
+-- | Scalar strict/scoped profile selecting descriptor-bound executable launch.
+lengthRankingConfigurationFileDescriptorBoundExecutableLaunchVersion :: Natural
+lengthRankingConfigurationFileDescriptorBoundExecutableLaunchVersion = 17
+
+-- | Nominal binary-product sibling of version 17.
+lengthRankingConfigurationFileSpinePairDescriptorBoundExecutableLaunchVersion
+  :: Natural
+lengthRankingConfigurationFileSpinePairDescriptorBoundExecutableLaunchVersion =
+  18
+
 -- | Fixed admission policy for the v1 document itself.  The array maximum is
 -- one greater than the widest typed collection so maximum-plus-one reaches the
 -- more specific schema diagnostic.
@@ -313,6 +328,7 @@ data LengthRankingConfigurationFileField
   | LengthRankingConfigurationUsableWorkBudgetField
   | LengthRankingConfigurationUsableWorkBudgetStrategyField
   | LengthRankingConfigurationUsableWorkBudgetMillisecondsField
+  | LengthRankingConfigurationExecutableLaunchField
   deriving (Eq, Ord, Show)
 
 data LengthRankingConfigurationFileValueType
@@ -531,7 +547,8 @@ decodeLengthRankingConfigurationFile bytes = do
 -- version-9/version-10 decoder also returns that sentinel, and scoped budget
 -- versions only after the relational decoder returns it in turn.  Strict
 -- relational versions are considered only after that complete version-1--14
--- cascade has returned the sentinel.
+-- cascade has returned the sentinel.  Descriptor-bound versions are reached
+-- only after the strict version-15/version-16 decoder returns it as well.
 decodeLengthAssessmentConfigurationFile
   :: ByteString
   -> Either
@@ -561,9 +578,14 @@ decodeLengthAssessmentConfigurationFile bytes =
                     decodeLengthAssessmentConfigurationFileScopedUsableWorkBudget
                       bytes of
                   Right scoped -> Right scoped
-                  Left LengthRankingConfigurationUnsupportedVersion ->
-                    decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffine
-                      bytes
+                  Left LengthRankingConfigurationUnsupportedVersion -> case
+                      decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffine
+                        bytes of
+                    Right strict -> Right strict
+                    Left LengthRankingConfigurationUnsupportedVersion ->
+                      decodeLengthAssessmentConfigurationFileDescriptorBoundExecutableLaunch
+                        bytes
+                    Left failure -> Left failure
                   Left failure -> Left failure
                 Left failure -> Left failure
               Left failure -> Left failure
@@ -815,6 +837,47 @@ decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffine
         lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineVersion
       then
         decodeLengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineV16
+          root
+      else Left LengthRankingConfigurationUnsupportedVersion
+
+-- | Decode only the descriptor-bound scalar/product siblings after every
+-- version-1--version-16 entrance has returned its closed unsupported-version
+-- sentinel.  Both versions retain the complete strict/scoped root while their
+-- nested execution object carries the additive launch discriminator.
+decodeLengthAssessmentConfigurationFileDescriptorBoundExecutableLaunch
+  :: ByteString
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthAssessmentConfigurationFileDescriptorBoundExecutableLaunch
+    bytes = do
+  document <- either (Left . LengthRankingConfigurationJsonRejected) Right
+    $ parseBoundedJson lengthRankingConfigurationFileJsonLimits bytes
+  root <- objectFields LengthRankingConfigurationRootObject document
+  formatValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationFormatField
+    "format"
+    root
+  format <- stringField LengthRankingConfigurationFormatField formatValue
+  if format == lengthRankingConfigurationFileFormat
+    then pure ()
+    else Left LengthRankingConfigurationUnsupportedFormat
+  versionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationVersionField
+    "version"
+    root
+  version <- integerField LengthRankingConfigurationVersionField versionValue
+  if version == toInteger
+      lengthRankingConfigurationFileDescriptorBoundExecutableLaunchVersion
+    then
+      decodeLengthRankingConfigurationFileDescriptorBoundExecutableLaunchV17
+        root
+    else if version == toInteger
+        lengthRankingConfigurationFileSpinePairDescriptorBoundExecutableLaunchVersion
+      then
+        decodeLengthRankingConfigurationFileSpinePairDescriptorBoundExecutableLaunchV18
           root
       else Left LengthRankingConfigurationUnsupportedVersion
 
@@ -1303,6 +1366,43 @@ decodeLengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineV16
   contract <- decodeLeanLengthSpinePairContractValueV5 contractValue
   pure $ DisabledLengthSpinePairAssessmentConfiguration policy contract
 
+decodeLengthRankingConfigurationFileDescriptorBoundExecutableLaunchV17
+  :: ObjectFields
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthRankingConfigurationFileDescriptorBoundExecutableLaunchV17
+    root = do
+  policy <-
+    decodeLengthRankingConfigurationFileDescriptorBoundExecutableLaunchPolicy
+      root
+  contractValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationContractField
+    "contract"
+    root
+  contract <- decodeLeanLengthContractValueV5 contractValue
+  pure $ DisabledLengthScalarAssessmentConfiguration
+    $ disableLengthRankingConfiguration policy contract
+
+decodeLengthRankingConfigurationFileSpinePairDescriptorBoundExecutableLaunchV18
+  :: ObjectFields
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthRankingConfigurationFileSpinePairDescriptorBoundExecutableLaunchV18
+    root = do
+  policy <-
+    decodeLengthRankingConfigurationFileDescriptorBoundExecutableLaunchPolicy
+      root
+  contractValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationContractField
+    "contract"
+    root
+  contract <- decodeLeanLengthSpinePairContractValueV5 contractValue
+  pure $ DisabledLengthSpinePairAssessmentConfiguration policy contract
+
 decodeLengthRankingConfigurationFileUsableWorkBudgetPolicy
   :: ObjectFields
   -> Either LengthRankingConfigurationFileError LengthRankingPolicy
@@ -1355,6 +1455,28 @@ decodeLengthRankingConfigurationFileStrictRelationalPositiveAffinePolicy
   let inheritedRoot = filter ((/= "usableWorkBudget") . fst) root
   advancedPolicy <-
     decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineBasePolicy
+      inheritedRoot
+  budgetValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationUsableWorkBudgetField
+    "usableWorkBudget"
+    root
+  budget <- decodeScopedUsableWorkBudget budgetValue
+  pure $ enableLengthRankingScopedUsableWorkBudget budget advancedPolicy
+
+-- Versions 17 and 18 retain version 15/16's complete root and diagnostic
+-- order.  Their base policy differs only in the closed nested executable-
+-- launch discriminator and the Djex execution-config sealer it selects.
+decodeLengthRankingConfigurationFileDescriptorBoundExecutableLaunchPolicy
+  :: ObjectFields
+  -> Either LengthRankingConfigurationFileError LengthRankingPolicy
+decodeLengthRankingConfigurationFileDescriptorBoundExecutableLaunchPolicy
+    root = do
+  exactFields LengthRankingConfigurationRootObject
+    rootFieldsUsableWorkBudget root
+  let inheritedRoot = filter ((/= "usableWorkBudget") . fst) root
+  advancedPolicy <-
+    decodeLengthRankingConfigurationFileDescriptorBoundExecutableLaunchBasePolicy
       inheritedRoot
   budgetValue <- requiredField
     LengthRankingConfigurationRootObject
@@ -1564,6 +1686,97 @@ decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineBasePolicy
     "execution"
     root
   execution <- decodeExecution executionLimits executionValue
+  evaluationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationEvaluationField
+    "evaluation"
+    root
+  evaluation <- decodeEvaluation evaluationValue
+  inputBoxValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationInputBoxValidationField
+    "inputBoxValidation"
+    root
+  (inputBoxLimits, inclusiveMaximums) <-
+    decodeInputBoxValidation inputBoxValue
+  counterexampleProbeValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationCounterexampleProbeField
+    "counterexampleProbe"
+    root
+  decodeCounterexampleProbe counterexampleProbeValue
+  boundedPositiveOrderingValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationBoundedPositiveOrderingField
+    "boundedPositiveOrdering"
+    root
+  decodeBoundedPositiveOrdering boundedPositiveOrderingValue
+  applicableDomainValidationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationApplicableDomainValidationField
+    "applicableDomainValidation"
+    root
+  applicableDomainLimits <-
+    decodeStrictRelationalPositiveAffineApplicableDomainValidation
+      applicableDomainValidationValue
+  applicableDomainOrderingValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationApplicableDomainOrderingField
+    "applicableDomainOrdering"
+    root
+  decodeApplicableDomainOrdering applicableDomainOrderingValue
+  counterexampleSimplificationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationCounterexampleSimplificationField
+    "counterexampleSimplification"
+    root
+  counterexampleSimplificationLimits <- decodeCounterexampleSimplification
+    counterexampleSimplificationValue
+  liveSessionOpeningValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationLiveSessionOpeningField
+    "liveSessionOpening"
+    root
+  decodeLiveSessionOpening liveSessionOpeningValue
+  let basePolicy =
+        lengthRankingPolicyFromValidatedComponents execution evaluation
+      inputBoxPolicy = enableLengthRankingInputBoxValidation
+        inputBoxLimits inclusiveMaximums basePolicy
+      originProbePolicy = enableLengthRankingOriginProbe inputBoxPolicy
+      inputBoxPreferencePolicy =
+        enableLengthRankingNonVacuousInputBoxPreference originProbePolicy
+      applicableDomainPolicy =
+        enableLengthRankingStrictRelationalPositiveAffineApplicableDomainValidation
+          applicableDomainLimits inputBoxPreferencePolicy
+      applicableDomainPreferencePolicy =
+        enableLengthRankingNonVacuousApplicableDomainPreference
+          applicableDomainPolicy
+      simplificationPolicy = enableLengthRankingCounterexampleSimplification
+        counterexampleSimplificationLimits applicableDomainPreferencePolicy
+  pure $ enableLengthRankingDeferredLiveSessionOpening simplificationPolicy
+
+-- Versions 17 and 18 preserve the complete strict-relational policy demand
+-- order.  Only the nested execution decoder selects descriptor-bound launch;
+-- every behavioral and orchestration builder is identical to version 15/16.
+decodeLengthRankingConfigurationFileDescriptorBoundExecutableLaunchBasePolicy
+  :: ObjectFields
+  -> Either LengthRankingConfigurationFileError LengthRankingPolicy
+decodeLengthRankingConfigurationFileDescriptorBoundExecutableLaunchBasePolicy
+    root = do
+  exactFields LengthRankingConfigurationRootObject
+    rootFieldsPositiveAffine root
+  executionAdmissionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationExecutionAdmissionField
+    "executionAdmission"
+    root
+  executionLimits <- decodeExecutionAdmission executionAdmissionValue
+  executionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationExecutionField
+    "execution"
+    root
+  execution <- decodeDescriptorBoundExecution executionLimits executionValue
   evaluationValue <- requiredField
     LengthRankingConfigurationRootObject
     LengthRankingConfigurationEvaluationField
@@ -2022,6 +2235,105 @@ executionFields =
   , ("artifactPolicy", LengthRankingConfigurationArtifactPolicyField)
   , ("responseLimits", LengthRankingConfigurationResponseLimitsField)
   ]
+
+-- | Decode the additive execution object without routing any older version
+-- through it.  Inherited values retain their established demand and
+-- validation order; the required launch discriminator is decoded last before
+-- the descriptor-bound Djex sealer is selected.
+decodeDescriptorBoundExecution
+  :: LengthSMTLibExecutionLimits
+  -> BoundedJsonValue
+  -> Either
+      LengthRankingConfigurationFileError
+      LengthSMTLibExecutionConfig
+decodeDescriptorBoundExecution limits value = do
+  object <- exactObject LengthRankingConfigurationExecutionObject
+    descriptorBoundExecutionFields value
+  responseLimitsValue <- requiredField
+    LengthRankingConfigurationExecutionObject
+    LengthRankingConfigurationResponseLimitsField
+    "responseLimits"
+    object
+  responses <- decodeResponseLimits responseLimitsValue
+  executableValue <- requiredField
+    LengthRankingConfigurationExecutionObject
+    LengthRankingConfigurationExecutablePathField
+    "executablePath"
+    object
+  executable <- Text.unpack <$> stringField
+    LengthRankingConfigurationExecutablePathField
+    executableValue
+  expectedDigestValue <- requiredField
+    LengthRankingConfigurationExecutionObject
+    LengthRankingConfigurationExpectedExecutableSha256Field
+    "expectedExecutableSha256"
+    object
+  expectedDigest <- decodeExpectedDigest expectedDigestValue
+  timeoutValue <- requiredField
+    LengthRankingConfigurationExecutionObject
+    LengthRankingConfigurationSolverTimeoutMillisecondsField
+    "solverTimeoutMilliseconds"
+    object
+  timeout <- intField
+    LengthRankingConfigurationSolverTimeoutMillisecondsField
+    timeoutValue
+    >>= capIntUpper
+      LengthRankingConfigurationSolverTimeoutMillisecondsField 60000
+  resourceValue <- requiredField
+    LengthRankingConfigurationExecutionObject
+    LengthRankingConfigurationSolverResourceLimitField
+    "solverResourceLimit"
+    object
+  resource <- intField
+    LengthRankingConfigurationSolverResourceLimitField
+    resourceValue
+    >>= capIntUpper
+      LengthRankingConfigurationSolverResourceLimitField 10000000
+  deadlineValue <- requiredField
+    LengthRankingConfigurationExecutionObject
+    LengthRankingConfigurationHostDeadlineMillisecondsField
+    "hostDeadlineMilliseconds"
+    object
+  deadline <- intField
+    LengthRankingConfigurationHostDeadlineMillisecondsField
+    deadlineValue
+    >>= capIntUpper
+      LengthRankingConfigurationHostDeadlineMillisecondsField 65000
+  artifactPolicyValue <- requiredField
+    LengthRankingConfigurationExecutionObject
+    LengthRankingConfigurationArtifactPolicyField
+    "artifactPolicy"
+    object
+  artifacts <- decodeArtifactPolicy artifactPolicyValue
+  launchValue <- requiredField
+    LengthRankingConfigurationExecutionObject
+    LengthRankingConfigurationExecutableLaunchField
+    "executableLaunch"
+    object
+  launch <- stringField
+    LengthRankingConfigurationExecutableLaunchField launchValue
+  case launch of
+    "descriptor-bound-executable-v1" -> pure ()
+    _ -> Left $ LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationExecutableLaunchField
+  let source = LengthSMTLibExecutionConfigSource
+        { lengthSMTLibExecutionConfigSourceExecutablePath = executable
+        , lengthSMTLibExecutionConfigSourceExpectedExecutableSHA256 =
+            expectedDigest
+        , lengthSMTLibExecutionConfigSourceSolverTimeoutMilliseconds = timeout
+        , lengthSMTLibExecutionConfigSourceSolverResourceLimit = resource
+        , lengthSMTLibExecutionConfigSourceHostDeadlineMilliseconds = deadline
+        , lengthSMTLibExecutionConfigSourceArtifactPolicy = artifacts
+        , lengthSMTLibExecutionConfigSourceResponseLimits = responses
+        }
+  case mkLengthSMTLibDescriptorBoundExecutionConfig limits source of
+    Left failure -> Left $ LengthRankingConfigurationExecutionRejected failure
+    Right validated -> Right validated
+
+descriptorBoundExecutionFields
+  :: [(Text, LengthRankingConfigurationFileField)]
+descriptorBoundExecutionFields = executionFields ++
+  [("executableLaunch", LengthRankingConfigurationExecutableLaunchField)]
 
 decodeResponseLimits
   :: BoundedJsonValue

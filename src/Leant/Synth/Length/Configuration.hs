@@ -10,7 +10,7 @@
 -- beside this policy without introducing a second generic aggregate.
 --
 -- A successful value does not establish that the configured path resolves to
--- a usable executable, that a later pre-spawn executable-file snapshot matches
+-- a usable executable, that a later live-session executable inspection matches
 -- an optional SHA-256 expectation, or that the child has the required Z3
 -- capability; those observations belong to the lexical live session opened by
 -- each ranking run.  A caller-supplied contract likewise remains an assertion
@@ -18,8 +18,9 @@
 --
 -- There is deliberately no default source, executable discovery, path
 -- normalization, environment lookup, or projection of executable paths or
--- digest bytes from the opaque sealed value.  A closed classifier reports
--- only whether the retained execution policy contains a digest expectation.
+-- digest bytes from the opaque sealed value.  Closed classifiers report only
+-- whether the retained execution policy contains a digest expectation and
+-- which launch strategy it selects.
 -- Callers must provide the complete execution and replay policy plus each
 -- contract explicitly.  No runner retains a worker: established eager
 -- policies delegate each eligible batch to the ranking layer's rank-N live
@@ -29,6 +30,7 @@ module Leant.Synth.Length.Configuration
   ( LengthRankingPolicySource (..)
   , LengthRankingPolicy
   , mkLengthRankingPolicy
+  , mkLengthRankingPolicyWithDescriptorBoundExecutableLaunch
   , lengthRankingPolicyFromValidatedComponents
   , enableLengthRankingOriginProbe
   , enableLengthRankingInputBoxValidation
@@ -43,6 +45,7 @@ module Leant.Synth.Length.Configuration
   , enableLengthRankingUsableWorkBudget
   , enableLengthRankingScopedUsableWorkBudget
   , lengthRankingPolicyExecutableDigestExpectation
+  , lengthRankingPolicyExecutableLaunchStrategy
   , LengthRankingConfigurationError (..)
   , assessVerifiedLengthCandidatesWithPolicy
   , rankVerifiedLengthCandidatesWithPolicy
@@ -62,9 +65,12 @@ import Language.Haskell.Djex
   , LengthSMTLibExecutionConfigSource
   , LengthSMTLibExecutionLimits
   , LengthSMTLibExecutableDigestExpectation
+  , LengthSMTLibExecutableLaunchStrategy
   , LengthSMTLibLiveUsableWorkBudget
   , lengthSMTLibExecutionExecutableDigestExpectation
+  , lengthSMTLibExecutionExecutableLaunchStrategy
   , mkLengthEvaluationLimits
+  , mkLengthSMTLibDescriptorBoundExecutionConfig
   , mkLengthSMTLibExecutionConfig
   )
 
@@ -279,6 +285,26 @@ mkLengthRankingPolicy source = do
     LengthRankingNonVacuousApplicableDomainPreferenceDisabled
     LengthRankingLiveSessionOpeningEager
     LengthRankingUsableWorkBudgetDisabled
+
+-- | Validate the same reusable policy while selecting Djex's additive
+-- descriptor-bound executable launch.  Construction remains pure and retains
+-- the established execution-before-evaluation failure order.  Source
+-- inspection and sealed descriptor staging occur only in a later lexical live
+-- session.
+mkLengthRankingPolicyWithDescriptorBoundExecutableLaunch
+  :: LengthRankingPolicySource
+  -> Either LengthRankingConfigurationError LengthRankingPolicy
+mkLengthRankingPolicyWithDescriptorBoundExecutableLaunch source = do
+  execution <- case mkLengthSMTLibDescriptorBoundExecutionConfig
+      (lengthRankingPolicyExecutionLimits source)
+      (lengthRankingPolicyExecutionSource source) of
+    Left failure -> Left $ LengthRankingExecutionConfigurationRejected failure
+    Right validated -> Right validated
+  evaluation <- case mkLengthEvaluationLimits
+      (lengthRankingPolicyEvaluationSource source) of
+    Left failure -> Left $ LengthRankingEvaluationLimitsRejected failure
+    Right validated -> Right validated
+  pure $ lengthRankingPolicyFromValidatedComponents execution evaluation
 
 -- | Assemble one reusable policy from already validated Djex execution and
 -- replay authorities with the origin probe and finite-box validation disabled.
@@ -523,6 +549,16 @@ lengthRankingPolicyExecutableDigestExpectation
 lengthRankingPolicyExecutableDigestExpectation
     (LengthRankingPolicy execution _ _ _ _ _ _ _ _ _) =
   lengthSMTLibExecutionExecutableDigestExpectation execution
+
+-- | Classify the executable-launch strategy retained by the sealed Djex
+-- execution policy.  This reveals no path, descriptor, digest bytes, or live
+-- launch observation and does not inspect a separately retained contract.
+lengthRankingPolicyExecutableLaunchStrategy
+  :: LengthRankingPolicy
+  -> LengthSMTLibExecutableLaunchStrategy
+lengthRankingPolicyExecutableLaunchStrategy
+    (LengthRankingPolicy execution _ _ _ _ _ _ _ _ _) =
+  lengthSMTLibExecutionExecutableLaunchStrategy execution
 
 -- Apply the ranking-only preference after all behavioral acquisition has
 -- completed.  The disabled branch returns the original action literally;

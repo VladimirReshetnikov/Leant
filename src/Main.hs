@@ -60,6 +60,10 @@ import System.IO.Error
 import System.Process (callCommand)
 import System.Timeout (timeout)
 
+import Language.Haskell.Djex
+  ( LengthSMTLibExecutableLaunchStrategy (..)
+  )
+
 import Leant.Backend
 import Leant.Builtins (builtinInfo)
 import Leant.Classify
@@ -141,6 +145,7 @@ import Leant.Synth.Length.Integration
   , explicitLengthAssessmentSelectionRequest
   , lengthAssessmentFailure
   , lengthAssessmentModeActivationPolicy
+  , lengthAssessmentModeExecutableLaunchStrategy
   , loadLengthAssessmentMode
   )
 import Leant.Synth.Length.Command
@@ -4460,6 +4465,15 @@ run opts = do
               "Finite-spine Length counterexample ranking enabled for " ++
                 "eligible typed Exference origins with a startup-fixed " ++
                 "contract; unpinned solver execution was explicitly permitted.")
+          case lengthAssessmentModeExecutableLaunchStrategy
+              lengthAssessmentMode of
+            Just LengthSMTLibDescriptorBoundExecutableLaunch ->
+              emitLn st =<< cDim st
+                ("Descriptor-bound solver executable launch selected; any " ++
+                  "configured digest will be checked against the sealed " ++
+                  "staged main-image bytes used for descriptor launch.")
+            Just LengthSMTLibPathSnapshotThenDirectSpawn -> pure ()
+            Nothing -> pure ()
           emitLn st =<< cDim st
             "Select synth-engine exference or both to produce graph-eligible candidates."
 

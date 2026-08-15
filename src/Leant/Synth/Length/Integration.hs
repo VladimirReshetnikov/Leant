@@ -19,6 +19,7 @@ module Leant.Synth.Length.Integration
   , disabledLengthAssessmentMode
   , loadLengthAssessmentMode
   , lengthAssessmentModeActivationPolicy
+  , lengthAssessmentModeExecutableLaunchStrategy
   , LengthAssessmentRequestError (..)
   , ExplicitLengthAssessmentPermission
   , LengthAssessmentRequest
@@ -38,11 +39,15 @@ module Leant.Synth.Length.Integration
   , lengthAssessmentSpinePairPostVerificationResult
   ) where
 
+import Language.Haskell.Djex
+  ( LengthSMTLibExecutableLaunchStrategy )
+
 import Leant.Synth.Engine (DetailedVerificationVariant)
 import Leant.Synth.Length.Configuration
   ( LengthRankingPolicy
   , assessVerifiedLengthCandidatesWithPolicy
   , assessVerifiedLengthSpinePairCandidatesWithPolicy
+  , lengthRankingPolicyExecutableLaunchStrategy
   )
 import Leant.Synth.Length.Configuration.File
   ( LengthRankingConfigurationActivationError
@@ -198,6 +203,17 @@ lengthAssessmentModeActivationPolicy
 lengthAssessmentModeActivationPolicy mode = case mode of
   LengthAssessmentDisabled -> Nothing
   LengthAssessmentConfigured activation _ _ -> Just activation
+
+-- | Classify the executable-launch strategy retained by a configured mode
+-- without exposing its policy or inspecting the startup-fixed contract.
+-- Disabled assessment owns no solver-launch authority.
+lengthAssessmentModeExecutableLaunchStrategy
+  :: LengthAssessmentMode
+  -> Maybe LengthSMTLibExecutableLaunchStrategy
+lengthAssessmentModeExecutableLaunchStrategy mode = case mode of
+  LengthAssessmentDisabled -> Nothing
+  LengthAssessmentConfigured _ policy _ -> Just
+    $ lengthRankingPolicyExecutableLaunchStrategy policy
 
 -- | Admit and acquire exactly one caller-named file, then apply the explicit
 -- pin policy.  Request admission happens before any IO.  Loading and activation
