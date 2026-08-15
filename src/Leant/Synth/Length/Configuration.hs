@@ -40,6 +40,7 @@ module Leant.Synth.Length.Configuration
   , enableLengthRankingNonVacuousApplicableDomainPreference
   , enableLengthRankingDeferredLiveSessionOpening
   , enableLengthRankingUsableWorkBudget
+  , enableLengthRankingScopedUsableWorkBudget
   , lengthRankingPolicyExecutableDigestExpectation
   , LengthRankingConfigurationError (..)
   , assessVerifiedLengthCandidatesWithPolicy
@@ -96,8 +97,10 @@ import Leant.Synth.Length.Ranking.Internal
   , rankVerifiedLengthCandidatesWithInputBoxValidationAndOriginProbe
   , rankPostVerificationLengthCandidatesWithRankingPoliciesAndLiveSessionOpening
   , rankPostVerificationLengthCandidatesWithRankingPoliciesAndUsableWorkBudget
+  , rankPostVerificationLengthCandidatesWithRankingPoliciesAndScopedUsableWorkBudget
   , rankVerifiedLengthCandidatesWithRankingPoliciesAndLiveSessionOpening
   , rankVerifiedLengthCandidatesWithRankingPoliciesAndUsableWorkBudget
+  , rankVerifiedLengthCandidatesWithRankingPoliciesAndScopedUsableWorkBudget
   )
 import Leant.Synth.Length.PostVerification.Internal
   ( LengthPostVerificationResult
@@ -130,8 +133,10 @@ import Leant.Synth.Length.SpinePair.Ranking.Internal
   , rankVerifiedLengthSpinePairCandidatesWithOriginProbe
   , rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndLiveSessionOpening
   , rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndUsableWorkBudget
+  , rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndScopedUsableWorkBudget
   , rankVerifiedLengthSpinePairCandidatesWithRankingPoliciesAndLiveSessionOpening
   , rankVerifiedLengthSpinePairCandidatesWithRankingPoliciesAndUsableWorkBudget
+  , rankVerifiedLengthSpinePairCandidatesWithRankingPoliciesAndScopedUsableWorkBudget
   )
 import Leant.Synth.PostVerification (PostVerificationCandidate)
 import Leant.Synth.Verification
@@ -226,7 +231,17 @@ data LengthRankingLiveSessionOpening
 -- admitted ranking batch.
 data LengthRankingUsableWorkBudget
   = LengthRankingUsableWorkBudgetDisabled
-  | LengthRankingUsableWorkBudgetEnabled !LengthSMTLibLiveUsableWorkBudget
+  | LengthRankingUsableWorkBudgetEnabled
+      !LengthRankingUsableWorkBudgetStrategy
+      !LengthSMTLibLiveUsableWorkBudget
+
+-- | Private selection between the established outer-observation owner and
+-- the additive same-thread scoped/checkpointed owner.  Keeping the choice
+-- inside the opaque ranking policy prevents a duration alone from granting
+-- either orchestration strategy.
+data LengthRankingUsableWorkBudgetStrategy
+  = LengthRankingUsableWorkBudgetV1
+  | LengthRankingUsableWorkBudgetScopedV2
 
 -- | Pure validation failure in fixed execution-before-evaluation order.
 data LengthRankingConfigurationError
@@ -453,7 +468,27 @@ enableLengthRankingUsableWorkBudget budget
   LengthRankingPolicy execution evaluation inputBoxValidation
     applicableDomainValidation originProbe simplification inputBoxPreference
     applicableDomainPreference liveSessionOpening
-    (LengthRankingUsableWorkBudgetEnabled budget)
+    (LengthRankingUsableWorkBudgetEnabled
+      LengthRankingUsableWorkBudgetV1 budget)
+
+-- | Derive a sibling whose admitted scalar or product batch owns Djex's
+-- same-thread scoped usable-work token.  The duration is already validated;
+-- capture still occurs independently for every run after input admission and
+-- before candidate preparation.  Applying either budget builder again is
+-- last-wins across both strategies.
+enableLengthRankingScopedUsableWorkBudget
+  :: LengthSMTLibLiveUsableWorkBudget
+  -> LengthRankingPolicy
+  -> LengthRankingPolicy
+enableLengthRankingScopedUsableWorkBudget budget
+    (LengthRankingPolicy execution evaluation inputBoxValidation
+      applicableDomainValidation originProbe simplification inputBoxPreference
+      applicableDomainPreference liveSessionOpening _) =
+  LengthRankingPolicy execution evaluation inputBoxValidation
+    applicableDomainValidation originProbe simplification inputBoxPreference
+    applicableDomainPreference liveSessionOpening
+    (LengthRankingUsableWorkBudgetEnabled
+      LengthRankingUsableWorkBudgetScopedV2 budget)
 
 -- | Classify only whether the sealed execution policy contains an executable
 -- digest expectation.  This reveals neither the digest bytes nor the path and
@@ -648,8 +683,24 @@ rankVerifiedLengthCandidatesWithPolicy
             (scalarCounterexampleSimplificationRankingPolicy simplification)
             (liveSessionOpeningPolicy liveSessionOpening)
             execution evaluation contract candidates
-  LengthRankingUsableWorkBudgetEnabled budget ->
+  LengthRankingUsableWorkBudgetEnabled LengthRankingUsableWorkBudgetV1
+      budget ->
     rankVerifiedLengthCandidatesWithRankingPoliciesAndUsableWorkBudget
+      (applyLengthRankingNonVacuousApplicableDomainPreferenceValue
+        applicableDomainPreference
+        preferNonVacuousApplicableDomainLengthRanking
+        . applyLengthRankingNonVacuousInputBoxPreferenceValue
+            inputBoxPreference preferNonVacuousBoundedPositiveLengthRanking)
+      budget
+      (scalarInputBoxRankingPolicy inputBoxValidation)
+      (scalarApplicableDomainRankingPolicy applicableDomainValidation)
+      (scalarOriginProbeRankingPolicy originProbe)
+      (scalarCounterexampleSimplificationRankingPolicy simplification)
+      (liveSessionOpeningPolicy liveSessionOpening)
+      execution evaluation contract candidates
+  LengthRankingUsableWorkBudgetEnabled
+      LengthRankingUsableWorkBudgetScopedV2 budget ->
+    rankVerifiedLengthCandidatesWithRankingPoliciesAndScopedUsableWorkBudget
       (applyLengthRankingNonVacuousApplicableDomainPreferenceValue
         applicableDomainPreference
         preferNonVacuousApplicableDomainLengthRanking
@@ -715,8 +766,25 @@ rankPostVerificationLengthCandidatesWithPolicy
             (scalarCounterexampleSimplificationRankingPolicy simplification)
             (liveSessionOpeningPolicy liveSessionOpening)
             execution evaluation contract candidates
-  LengthRankingUsableWorkBudgetEnabled budget ->
+  LengthRankingUsableWorkBudgetEnabled LengthRankingUsableWorkBudgetV1
+      budget ->
     rankPostVerificationLengthCandidatesWithRankingPoliciesAndUsableWorkBudget
+      (applyLengthRankingNonVacuousApplicableDomainPreferenceValue
+        applicableDomainPreference
+        preferNonVacuousApplicableDomainAssociatedLengthRanking
+        . applyLengthRankingNonVacuousInputBoxPreferenceValue
+            inputBoxPreference
+            preferNonVacuousBoundedPositiveAssociatedLengthRanking)
+      budget
+      (scalarInputBoxRankingPolicy inputBoxValidation)
+      (scalarApplicableDomainRankingPolicy applicableDomainValidation)
+      (scalarOriginProbeRankingPolicy originProbe)
+      (scalarCounterexampleSimplificationRankingPolicy simplification)
+      (liveSessionOpeningPolicy liveSessionOpening)
+      execution evaluation contract candidates
+  LengthRankingUsableWorkBudgetEnabled
+      LengthRankingUsableWorkBudgetScopedV2 budget ->
+    rankPostVerificationLengthCandidatesWithRankingPoliciesAndScopedUsableWorkBudget
       (applyLengthRankingNonVacuousApplicableDomainPreferenceValue
         applicableDomainPreference
         preferNonVacuousApplicableDomainAssociatedLengthRanking
@@ -794,8 +862,25 @@ rankVerifiedLengthSpinePairCandidatesWithPolicy
               simplification)
             (liveSessionOpeningPolicy liveSessionOpening)
             execution evaluation contract candidates
-  LengthRankingUsableWorkBudgetEnabled budget ->
+  LengthRankingUsableWorkBudgetEnabled LengthRankingUsableWorkBudgetV1
+      budget ->
     rankVerifiedLengthSpinePairCandidatesWithRankingPoliciesAndUsableWorkBudget
+      (applyLengthRankingNonVacuousApplicableDomainPreferenceValue
+        applicableDomainPreference
+        preferNonVacuousApplicableDomainLengthSpinePairRanking
+        . applyLengthRankingNonVacuousInputBoxPreferenceValue
+            inputBoxPreference
+            preferNonVacuousBoundedPositiveLengthSpinePairRanking)
+      budget
+      (spinePairInputBoxRankingPolicy inputBoxValidation)
+      (spinePairApplicableDomainRankingPolicy applicableDomainValidation)
+      (spinePairOriginProbeRankingPolicy originProbe)
+      (spinePairCounterexampleSimplificationRankingPolicy simplification)
+      (liveSessionOpeningPolicy liveSessionOpening)
+      execution evaluation contract candidates
+  LengthRankingUsableWorkBudgetEnabled
+      LengthRankingUsableWorkBudgetScopedV2 budget ->
+    rankVerifiedLengthSpinePairCandidatesWithRankingPoliciesAndScopedUsableWorkBudget
       (applyLengthRankingNonVacuousApplicableDomainPreferenceValue
         applicableDomainPreference
         preferNonVacuousApplicableDomainLengthSpinePairRanking
@@ -861,8 +946,25 @@ rankPostVerificationLengthSpinePairCandidatesWithPolicy
               simplification)
             (liveSessionOpeningPolicy liveSessionOpening)
             execution evaluation contract candidates
-  LengthRankingUsableWorkBudgetEnabled budget ->
+  LengthRankingUsableWorkBudgetEnabled LengthRankingUsableWorkBudgetV1
+      budget ->
     rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndUsableWorkBudget
+      (applyLengthRankingNonVacuousApplicableDomainPreferenceValue
+        applicableDomainPreference
+        preferNonVacuousApplicableDomainAssociatedLengthSpinePairRanking
+        . applyLengthRankingNonVacuousInputBoxPreferenceValue
+            inputBoxPreference
+            preferNonVacuousBoundedPositiveAssociatedLengthSpinePairRanking)
+      budget
+      (spinePairInputBoxRankingPolicy inputBoxValidation)
+      (spinePairApplicableDomainRankingPolicy applicableDomainValidation)
+      (spinePairOriginProbeRankingPolicy originProbe)
+      (spinePairCounterexampleSimplificationRankingPolicy simplification)
+      (liveSessionOpeningPolicy liveSessionOpening)
+      execution evaluation contract candidates
+  LengthRankingUsableWorkBudgetEnabled
+      LengthRankingUsableWorkBudgetScopedV2 budget ->
+    rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndScopedUsableWorkBudget
       (applyLengthRankingNonVacuousApplicableDomainPreferenceValue
         applicableDomainPreference
         preferNonVacuousApplicableDomainAssociatedLengthSpinePairRanking

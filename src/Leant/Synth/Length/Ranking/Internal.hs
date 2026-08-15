@@ -99,6 +99,8 @@ module Leant.Synth.Length.Ranking.Internal
   , rankPostVerificationLengthCandidatesWithRankingPoliciesAndLiveSessionOpening
   , rankVerifiedLengthCandidatesWithRankingPoliciesAndUsableWorkBudget
   , rankPostVerificationLengthCandidatesWithRankingPoliciesAndUsableWorkBudget
+  , rankVerifiedLengthCandidatesWithRankingPoliciesAndScopedUsableWorkBudget
+  , rankPostVerificationLengthCandidatesWithRankingPoliciesAndScopedUsableWorkBudget
   , promoteCounterexampleSeed
   , replayCounterexampleSeeds
   ) where
@@ -132,6 +134,7 @@ import Language.Haskell.Djex
   , LengthSMTLibLiveSession
   , LengthSMTLibLiveSessionError
   , LengthSMTLibLiveSessionFailure
+  , LengthSMTLibLiveScopedUsableWorkDeadline
   , LengthSMTLibLiveUsableWorkBudget
   , LengthSMTLibLiveUsableWorkDeadline
   , SolverStatus (..)
@@ -162,8 +165,11 @@ import Language.Haskell.Djex
   , validatedLengthInputBoxApplicableAssignmentCount
   , validatedLengthPositiveAffineApplicableDomainApplicableAssignmentCount
   , validatedLengthRelationalPositiveAffineApplicableDomainApplicableAssignmentCount
+  , checkLengthSMTLibLiveScopedUsableWorkDeadline
   , withLengthSMTLibLiveSession
+  , withLengthSMTLibLiveSessionUnderScopedDeadline
   , withLengthSMTLibLiveSessionUnderDeadline
+  , withLengthSMTLibLiveScopedUsableWorkDeadline
   , withLengthSMTLibLiveUsableWorkDeadline
   )
 
@@ -882,6 +888,63 @@ rankPostVerificationLengthCandidatesWithRankingPoliciesAndUsableWorkBudget
     applicableDomainPolicy originProbePolicy simplificationPolicy openingPolicy
     execution evaluation contract postVerificationCandidateVerified candidates
 
+-- | Scoped/checkpointed complete-policy entrance.  It retains the v1
+-- admission and atomic-result contract while selecting the additive
+-- same-thread owner and explicit bounded-phase checkpoints.
+rankVerifiedLengthCandidatesWithRankingPoliciesAndScopedUsableWorkBudget
+  :: (LengthRanking -> LengthRanking)
+  -> LengthSMTLibLiveUsableWorkBudget
+  -> LengthInputBoxRankingPolicy
+  -> LengthApplicableDomainRankingPolicy
+  -> LengthOriginProbeRankingPolicy
+  -> LengthCounterexampleSimplificationRankingPolicy
+  -> LengthLiveSessionOpeningPolicy
+  -> LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LeanLengthContract
+  -> [Verified DetailedVerificationVariant]
+  -> IO (Either LengthRankingInputError LengthRanking)
+rankVerifiedLengthCandidatesWithRankingPoliciesAndScopedUsableWorkBudget
+    finalize budget inputBoxPolicy applicableDomainPolicy originProbePolicy
+    simplificationPolicy openingPolicy execution evaluation contract
+    candidates =
+  rankAssociatedLengthCandidatesWithScopedUsableWorkBudget budget
+    (finalize . projectAssociatedLengthRankingWith id)
+    forceLengthRankingOwnedResult inputBoxPolicy applicableDomainPolicy
+    originProbePolicy simplificationPolicy openingPolicy execution evaluation
+    contract id candidates
+
+-- | Occurrence-associated scoped/checkpointed sibling.  Checkpointing never
+-- projects or forces caller-owned occurrence handles beyond their established
+-- weak-head boundary.
+rankPostVerificationLengthCandidatesWithRankingPoliciesAndScopedUsableWorkBudget
+  :: (AssociatedLengthRanking
+        (PostVerificationCandidate epoch DetailedVerificationVariant)
+      -> AssociatedLengthRanking
+        (PostVerificationCandidate epoch DetailedVerificationVariant))
+  -> LengthSMTLibLiveUsableWorkBudget
+  -> LengthInputBoxRankingPolicy
+  -> LengthApplicableDomainRankingPolicy
+  -> LengthOriginProbeRankingPolicy
+  -> LengthCounterexampleSimplificationRankingPolicy
+  -> LengthLiveSessionOpeningPolicy
+  -> LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LeanLengthContract
+  -> [PostVerificationCandidate epoch DetailedVerificationVariant]
+  -> IO
+      (Either LengthRankingInputError
+        (AssociatedLengthRanking
+          (PostVerificationCandidate epoch DetailedVerificationVariant)))
+rankPostVerificationLengthCandidatesWithRankingPoliciesAndScopedUsableWorkBudget
+    finalize budget inputBoxPolicy applicableDomainPolicy originProbePolicy
+    simplificationPolicy openingPolicy execution evaluation contract
+    candidates =
+  rankAssociatedLengthCandidatesWithScopedUsableWorkBudget budget finalize
+    forceAssociatedLengthRankingOwnedResult inputBoxPolicy
+    applicableDomainPolicy originProbePolicy simplificationPolicy openingPolicy
+    execution evaluation contract postVerificationCandidateVerified candidates
+
 data LengthUsableWorkSnapshot association = LengthUsableWorkSnapshot
   ![PreparedLengthCandidate association]
   !Bool
@@ -944,6 +1007,92 @@ rankAssociatedLengthCandidatesWithUsableWorkBudget budget finish forceResult
               result = finish ranking
           _ <- evaluate $ forceResult result
           pure $ Right result
+
+rankAssociatedLengthCandidatesWithScopedUsableWorkBudget
+  :: LengthSMTLibLiveUsableWorkBudget
+  -> (AssociatedLengthRanking association -> result)
+  -> (result -> ())
+  -> LengthInputBoxRankingPolicy
+  -> LengthApplicableDomainRankingPolicy
+  -> LengthOriginProbeRankingPolicy
+  -> LengthCounterexampleSimplificationRankingPolicy
+  -> LengthLiveSessionOpeningPolicy
+  -> LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LeanLengthContract
+  -> (association -> Verified DetailedVerificationVariant)
+  -> [association]
+  -> IO (Either LengthRankingInputError result)
+rankAssociatedLengthCandidatesWithScopedUsableWorkBudget budget finish
+    forceResult inputBoxPolicy applicableDomainPolicy originProbePolicy
+    simplificationPolicy openingPolicy execution evaluation contract
+    verifiedFor associations =
+  case admitCandidates defaultLengthSMTLibLiveSessionMaximumQueries
+      associations of
+    Left failure -> pure $ Left failure
+    Right admitted -> do
+      snapshotRef <- newIORef Nothing
+      owned <- withLengthSMTLibLiveScopedUsableWorkDeadline budget
+        $ \deadline -> do
+          initial <- checkLengthSMTLibLiveScopedUsableWorkDeadline deadline
+          case initial of
+            Left failure -> pure $ Left failure
+            Right () -> do
+              let prepared = prepareCandidates contract verifiedFor admitted
+                  snapshot = LengthUsableWorkSnapshot prepared False
+              _ <- evaluate $ forcePreparedLengthCandidates prepared
+              snapshot `seq` writeIORef snapshotRef (Just snapshot)
+              afterPreparation <-
+                checkLengthSMTLibLiveScopedUsableWorkDeadline deadline
+              case afterPreparation of
+                Left failure -> pure $ Left failure
+                Right () -> do
+                  ranked <-
+                    runPreparedCandidatesUnderScopedUsableWorkDeadline
+                      deadline execution evaluation inputBoxPolicy
+                      applicableDomainPolicy originProbePolicy
+                      simplificationPolicy openingPolicy prepared
+                  case ranked of
+                    Left failure -> pure $ Left failure
+                    Right ranking -> do
+                      let cleanupIncomplete =
+                            associatedLengthRankingCleanupIncomplete ranking
+                          completedSnapshot = LengthUsableWorkSnapshot
+                            prepared cleanupIncomplete
+                      completedSnapshot `seq`
+                        writeIORef snapshotRef (Just completedSnapshot)
+                      beforeResult <-
+                        checkLengthSMTLibLiveScopedUsableWorkDeadline deadline
+                      case beforeResult of
+                        Left failure -> pure $ Left failure
+                        Right () -> do
+                          let result = finish ranking
+                          _ <- evaluate $ forceResult result
+                          afterResult <-
+                            checkLengthSMTLibLiveScopedUsableWorkDeadline
+                              deadline
+                          case afterResult of
+                            Left failure -> pure $ Left failure
+                            Right () -> pure $ Right result
+      case owned of
+        Left ownerFailure -> fallback snapshotRef admitted ownerFailure
+        Right (Left checkpointFailure) ->
+          fallback snapshotRef admitted checkpointFailure
+        Right (Right result) -> pure $ Right result
+ where
+  fallback snapshotRef admitted failure = do
+    snapshot <- readIORef snapshotRef
+    let cleanupIncomplete = case snapshot of
+          Nothing -> False
+          Just (LengthUsableWorkSnapshot _ incomplete) -> incomplete
+        rankingFailure = ownerLengthRankingFailure cleanupIncomplete failure
+        ranking = case snapshot of
+          Nothing -> unpreparedUnassessedRanking admitted rankingFailure
+          Just (LengthUsableWorkSnapshot prepared _) ->
+            unassessedRanking prepared rankingFailure
+        result = finish ranking
+    _ <- evaluate $ forceResult result
+    pure $ Right result
 
 runPreparedCandidatesUnderUsableWorkDeadline
   :: LengthSMTLibLiveUsableWorkDeadline budget
@@ -1022,6 +1171,259 @@ runPreparedCandidatesWithDeferredLiveSessionOpeningUnderDeadline deadline
       Right (Left failure) -> unassessedRanking prepared failure
       Right (Right assessed) -> AssociatedLengthRanking
         (stableCounterexampleDemotion assessed) Nothing
+
+runPreparedCandidatesUnderScopedUsableWorkDeadline
+  :: LengthSMTLibLiveScopedUsableWorkDeadline budget
+  -> LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LengthInputBoxRankingPolicy
+  -> LengthApplicableDomainRankingPolicy
+  -> LengthOriginProbeRankingPolicy
+  -> LengthCounterexampleSimplificationRankingPolicy
+  -> LengthLiveSessionOpeningPolicy
+  -> [PreparedLengthCandidate association]
+  -> IO
+      (Either LengthSMTLibLiveSessionError
+        (AssociatedLengthRanking association))
+runPreparedCandidatesUnderScopedUsableWorkDeadline deadline execution
+    evaluation inputBoxPolicy applicableDomainPolicy originProbePolicy
+    simplificationPolicy openingPolicy prepared = case prepared of
+  [] -> pure $ Right $ AssociatedLengthRanking [] Nothing
+  _ | not (hasEligibleCandidate prepared) -> pure $ Right
+        $ AssociatedLengthRanking
+            (map preparedCandidateUnassessed prepared) Nothing
+    | otherwise -> case openingPolicy of
+        LengthLiveSessionOpeningEager -> do
+          scoped <- withLengthSMTLibLiveSessionUnderScopedDeadline
+            deadline execution $ \session ->
+              runPreparedCandidatesFromUnderScopedUsableWorkDeadline
+                deadline evaluation inputBoxPolicy applicableDomainPolicy
+                originProbePolicy simplificationPolicy session [] [] prepared
+          pure $ case scoped of
+            Left failure -> Right $ unassessedRanking prepared
+              $ sessionRankingFailure failure
+            Right (Left failure) -> Left failure
+            Right (Right (Left failure)) -> Right
+              $ unassessedRanking prepared failure
+            Right (Right (Right assessed)) -> Right
+              $ AssociatedLengthRanking
+                  (stableCounterexampleDemotion assessed) Nothing
+        LengthLiveSessionOpeningDeferredUntilLiveQuery ->
+          runPreparedCandidatesWithDeferredLiveSessionOpeningUnderScopedDeadline
+            deadline execution evaluation inputBoxPolicy applicableDomainPolicy
+            originProbePolicy simplificationPolicy prepared
+
+runPreparedCandidatesWithDeferredLiveSessionOpeningUnderScopedDeadline
+  :: LengthSMTLibLiveScopedUsableWorkDeadline budget
+  -> LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LengthInputBoxRankingPolicy
+  -> LengthApplicableDomainRankingPolicy
+  -> LengthOriginProbeRankingPolicy
+  -> LengthCounterexampleSimplificationRankingPolicy
+  -> [PreparedLengthCandidate association]
+  -> IO
+      (Either LengthSMTLibLiveSessionError
+        (AssociatedLengthRanking association))
+runPreparedCandidatesWithDeferredLiveSessionOpeningUnderScopedDeadline
+    deadline execution evaluation inputBoxPolicy applicableDomainPolicy
+    originProbePolicy simplificationPolicy prepared = do
+  beforeLive <- runPreparedCandidatesBeforeLiveUnderScopedUsableWorkDeadline
+    deadline evaluation applicableDomainPolicy originProbePolicy
+    simplificationPolicy prepared
+  case beforeLive of
+    Left failure -> pure $ Left failure
+    Right (PreparedLengthCandidatesCompleted assessed) -> pure $ Right
+      $ AssociatedLengthRanking
+          (stableCounterexampleDemotion assessed) Nothing
+    Right (PreparedLengthCandidatesFailed failure) -> pure $ Right
+      $ unassessedRanking prepared failure
+    Right (PreparedLengthCandidatesNeedLive reversed seedBank index
+        association query rest) -> do
+      scoped <- withLengthSMTLibLiveSessionUnderScopedDeadline
+        deadline execution $ \session -> do
+          observed <- runLengthSMTLibLiveQuery evaluation session query
+          case observed of
+            Left failure -> pure $ Right $ Left
+              $ queryRankingFailure index failure
+            Right observation -> case assessCandidate evaluation inputBoxPolicy
+                simplificationPolicy index association query observation of
+              Left failure -> pure $ Right $ Left failure
+              Right assessed -> do
+                let nextSeedBank = case counterexampleSeed assessed of
+                      Nothing -> seedBank
+                      Just retained ->
+                        promoteCounterexampleSeed retained seedBank
+                nextSeedBank `seq` pure ()
+                checkpoint <-
+                  checkLengthSMTLibLiveScopedUsableWorkDeadline deadline
+                case checkpoint of
+                  Left failure -> pure $ Left failure
+                  Right () ->
+                    runPreparedCandidatesFromUnderScopedUsableWorkDeadline
+                      deadline evaluation inputBoxPolicy applicableDomainPolicy
+                      originProbePolicy simplificationPolicy session
+                      (assessed : reversed) nextSeedBank rest
+      pure $ case scoped of
+        Left failure -> Right $ unassessedRanking prepared
+          $ sessionRankingFailure failure
+        Right (Left failure) -> Left failure
+        Right (Right (Left failure)) -> Right
+          $ unassessedRanking prepared failure
+        Right (Right (Right assessed)) -> Right
+          $ AssociatedLengthRanking
+              (stableCounterexampleDemotion assessed) Nothing
+
+-- | Check after each complete pure candidate chain.  The individual MRU,
+-- applicable-domain, origin, and simplification operations are independently
+-- bounded and deliberately remain one indivisible checkpoint quantum.
+runPreparedCandidatesBeforeLiveUnderScopedUsableWorkDeadline
+  :: LengthSMTLibLiveScopedUsableWorkDeadline budget
+  -> LengthEvaluationLimits
+  -> LengthApplicableDomainRankingPolicy
+  -> LengthOriginProbeRankingPolicy
+  -> LengthCounterexampleSimplificationRankingPolicy
+  -> [PreparedLengthCandidate association]
+  -> IO
+      (Either LengthSMTLibLiveSessionError
+        (PreparedLengthCandidatesBeforeLive association))
+runPreparedCandidatesBeforeLiveUnderScopedUsableWorkDeadline deadline
+    evaluation applicableDomainPolicy originProbePolicy simplificationPolicy =
+  go [] []
+ where
+  go reversed seedBank remaining = case remaining of
+    [] -> pure $ Right
+      $ PreparedLengthCandidatesCompleted $ reverse reversed
+    PreparedLengthCandidateUnassessed index association refusal : rest ->
+      continue
+        (AssociatedRankedLengthCandidate index association
+          (LengthCandidatePreparationRefused refusal) : reversed)
+        seedBank rest
+    PreparedLengthCandidateEligible index association query : rest -> case
+        replayCounterexampleSeeds evaluation query seedBank of
+      Just (inputs, receipt) ->
+        inputs `seq` case simplifyCounterexampleAssessment evaluation
+            simplificationPolicy index association query receipt of
+          Left failure -> pure $ Right
+            $ PreparedLengthCandidatesFailed failure
+          Right assessed -> continueAssessed reversed seedBank rest assessed
+      Nothing -> case assessApplicableDomainCandidate evaluation
+          applicableDomainPolicy simplificationPolicy index association query of
+        Left failure -> pure $ Right
+          $ PreparedLengthCandidatesFailed failure
+        Right (Just assessed) ->
+          continueAssessed reversed seedBank rest assessed
+        Right Nothing -> case probeOriginCounterexample evaluation
+            originProbePolicy query of
+          Left (LengthSMTLibInputReplayEvaluationRejected failure) -> pure
+            $ Right $ PreparedLengthCandidatesFailed $ localRankingFailure
+                (LengthRankingOriginProbeEvaluationFailed failure) index
+          Left (LengthSMTLibInputReplayAssociationRejected _) -> pure
+            $ Right $ PreparedLengthCandidatesFailed $ localRankingFailure
+                LengthRankingEvidenceReplayMismatch index
+          Right (Just receipt) -> case simplifyCounterexampleAssessment
+              evaluation simplificationPolicy index association query receipt of
+            Left failure -> pure $ Right
+              $ PreparedLengthCandidatesFailed failure
+            Right assessed ->
+              continueAssessed reversed seedBank rest assessed
+          Right Nothing -> do
+            checkpoint <-
+              checkLengthSMTLibLiveScopedUsableWorkDeadline deadline
+            pure $ case checkpoint of
+              Left failure -> Left failure
+              Right () -> Right $ PreparedLengthCandidatesNeedLive
+                reversed seedBank index association query rest
+
+  continueAssessed reversed seedBank rest assessed =
+    let nextSeedBank = case counterexampleSeed assessed of
+          Nothing -> seedBank
+          Just retained -> promoteCounterexampleSeed retained seedBank
+    in nextSeedBank `seq`
+        continue (assessed : reversed) nextSeedBank rest
+
+  continue reversed seedBank rest = do
+    checkpoint <- checkLengthSMTLibLiveScopedUsableWorkDeadline deadline
+    case checkpoint of
+      Left failure -> pure $ Left failure
+      Right () -> go reversed seedBank rest
+
+-- | Live sibling which checks after every completed candidate before any
+-- following candidate can demand pure replay or another live transaction.
+runPreparedCandidatesFromUnderScopedUsableWorkDeadline
+  :: LengthSMTLibLiveScopedUsableWorkDeadline budget
+  -> LengthEvaluationLimits
+  -> LengthInputBoxRankingPolicy
+  -> LengthApplicableDomainRankingPolicy
+  -> LengthOriginProbeRankingPolicy
+  -> LengthCounterexampleSimplificationRankingPolicy
+  -> LengthSMTLibLiveSession epoch
+  -> [AssociatedRankedLengthCandidate association]
+  -> [[Natural]]
+  -> [PreparedLengthCandidate association]
+  -> IO
+      (Either LengthSMTLibLiveSessionError
+        (Either LengthRankingFailure
+          [AssociatedRankedLengthCandidate association]))
+runPreparedCandidatesFromUnderScopedUsableWorkDeadline deadline evaluation
+    inputBoxPolicy applicableDomainPolicy originProbePolicy simplificationPolicy
+    session = go
+ where
+  go reversed seedBank remaining = case remaining of
+    [] -> pure $ Right $ Right $ reverse reversed
+    PreparedLengthCandidateUnassessed index association refusal : rest ->
+      continue
+        (AssociatedRankedLengthCandidate index association
+          (LengthCandidatePreparationRefused refusal) : reversed)
+        seedBank rest
+    PreparedLengthCandidateEligible index association query : rest -> case
+        replayCounterexampleSeeds evaluation query seedBank of
+      Just (inputs, receipt) ->
+        inputs `seq` case simplifyCounterexampleAssessment evaluation
+            simplificationPolicy index association query receipt of
+          Left failure -> pure $ Right $ Left failure
+          Right assessed -> continueAssessed reversed seedBank rest assessed
+      Nothing -> case assessApplicableDomainCandidate evaluation
+          applicableDomainPolicy simplificationPolicy index association query of
+        Left failure -> pure $ Right $ Left failure
+        Right (Just assessed) ->
+          continueAssessed reversed seedBank rest assessed
+        Right Nothing -> case probeOriginCounterexample evaluation
+            originProbePolicy query of
+          Left (LengthSMTLibInputReplayEvaluationRejected failure) -> pure
+            $ Right $ Left $ localRankingFailure
+                (LengthRankingOriginProbeEvaluationFailed failure) index
+          Left (LengthSMTLibInputReplayAssociationRejected _) -> pure
+            $ Right $ Left $ localRankingFailure
+                LengthRankingEvidenceReplayMismatch index
+          Right (Just receipt) -> case simplifyCounterexampleAssessment
+              evaluation simplificationPolicy index association query receipt of
+            Left failure -> pure $ Right $ Left failure
+            Right assessed ->
+              continueAssessed reversed seedBank rest assessed
+          Right Nothing -> do
+            observed <- runLengthSMTLibLiveQuery evaluation session query
+            case observed of
+              Left failure -> pure $ Right $ Left
+                $ queryRankingFailure index failure
+              Right observation -> case assessCandidate evaluation inputBoxPolicy
+                  simplificationPolicy index association query observation of
+                Left failure -> pure $ Right $ Left failure
+                Right assessed ->
+                  continueAssessed reversed seedBank rest assessed
+
+  continueAssessed reversed seedBank rest assessed =
+    let nextSeedBank = case counterexampleSeed assessed of
+          Nothing -> seedBank
+          Just retained -> promoteCounterexampleSeed retained seedBank
+    in nextSeedBank `seq`
+        continue (assessed : reversed) nextSeedBank rest
+
+  continue reversed seedBank rest = do
+    checkpoint <- checkLengthSMTLibLiveScopedUsableWorkDeadline deadline
+    case checkpoint of
+      Left failure -> pure $ Left failure
+      Right () -> go reversed seedBank rest
 
 -- | Rank caller-owned occurrences while retaining each occurrence handle
 -- through preparation, live assessment, stable partitioning, and atomic

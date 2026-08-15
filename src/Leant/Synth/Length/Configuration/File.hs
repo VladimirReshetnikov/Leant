@@ -15,8 +15,10 @@
 -- deferred live-session opening.  Versions 9 and 10 retain those exact scalar
 -- and product policies and add one required shared usable-work budget.
 -- Versions 11 and 12 return to the exact version-7/version-8 root shape while
--- selecting relational positive-affine applicable-domain validation.  Older
--- decoders and grammars remain literal.
+-- selecting relational positive-affine applicable-domain validation.
+-- Versions 13 and 14 compose that relational validator with the version-9/
+-- version-10 root shape and select the scoped, checkpointed shared usable-work
+-- owner.  Older decoders and grammars remain literal.
 -- Decoding performs no discovery, path normalization, environment lookup, or
 -- IO.  Every field is required.  A successful decode returns a deliberately
 -- disabled opaque value: callers
@@ -37,6 +39,8 @@ module Leant.Synth.Length.Configuration.File
   , lengthRankingConfigurationFileSpinePairUsableWorkBudgetVersion
   , lengthRankingConfigurationFileRelationalPositiveAffineVersion
   , lengthRankingConfigurationFileSpinePairRelationalPositiveAffineVersion
+  , lengthRankingConfigurationFileScopedUsableWorkBudgetVersion
+  , lengthRankingConfigurationFileSpinePairScopedUsableWorkBudgetVersion
   , lengthRankingConfigurationFileJsonLimits
   , LengthRankingConfigurationFileObject (..)
   , LengthRankingConfigurationFileField (..)
@@ -133,6 +137,7 @@ import Leant.Synth.Length.Configuration
   , enableLengthRankingInputBoxValidation
   , enableLengthRankingPositiveAffineApplicableDomainValidation
   , enableLengthRankingRelationalPositiveAffineApplicableDomainValidation
+  , enableLengthRankingScopedUsableWorkBudget
   , enableLengthRankingUsableWorkBudget
   , lengthRankingPolicyExecutableDigestExpectation
   , lengthRankingPolicyFromValidatedComponents
@@ -194,6 +199,16 @@ lengthRankingConfigurationFileRelationalPositiveAffineVersion = 11
 lengthRankingConfigurationFileSpinePairRelationalPositiveAffineVersion
   :: Natural
 lengthRankingConfigurationFileSpinePairRelationalPositiveAffineVersion = 12
+
+-- | Scalar advanced bundle selecting relational positive-affine applicable-
+-- domain validation and the scoped/checkpointed shared usable-work owner.
+lengthRankingConfigurationFileScopedUsableWorkBudgetVersion :: Natural
+lengthRankingConfigurationFileScopedUsableWorkBudgetVersion = 13
+
+-- | Nominal binary-product sibling of version 13.
+lengthRankingConfigurationFileSpinePairScopedUsableWorkBudgetVersion
+  :: Natural
+lengthRankingConfigurationFileSpinePairScopedUsableWorkBudgetVersion = 14
 
 -- | Fixed admission policy for the v1 document itself.  The array maximum is
 -- one greater than the widest typed collection so maximum-plus-one reaches the
@@ -496,7 +511,8 @@ decodeLengthRankingConfigurationFile bytes = do
 -- version sentinel, the additive version-5/version-6 parse.  The advanced
 -- version-7/version-8 parser is reached only after that parser returns the
 -- same closed sentinel.  Relational versions are considered only after the
--- version-9/version-10 decoder also returns that sentinel.
+-- version-9/version-10 decoder also returns that sentinel, and scoped budget
+-- versions only after the relational decoder returns it in turn.
 decodeLengthAssessmentConfigurationFile
   :: ByteString
   -> Either
@@ -518,9 +534,14 @@ decodeLengthAssessmentConfigurationFile bytes =
             Left LengthRankingConfigurationUnsupportedVersion -> case
                 decodeLengthAssessmentConfigurationFileUsableWorkBudget bytes of
               Right usableWorkBudget -> Right usableWorkBudget
-              Left LengthRankingConfigurationUnsupportedVersion ->
-                decodeLengthAssessmentConfigurationFileRelationalPositiveAffine
-                  bytes
+              Left LengthRankingConfigurationUnsupportedVersion -> case
+                  decodeLengthAssessmentConfigurationFileRelationalPositiveAffine
+                    bytes of
+                Right relational -> Right relational
+                Left LengthRankingConfigurationUnsupportedVersion ->
+                  decodeLengthAssessmentConfigurationFileScopedUsableWorkBudget
+                    bytes
+                Left failure -> Left failure
               Left failure -> Left failure
             Left failure -> Left failure
           Left failure -> Left failure
@@ -691,6 +712,45 @@ decodeLengthAssessmentConfigurationFileRelationalPositiveAffine bytes = do
         lengthRankingConfigurationFileSpinePairRelationalPositiveAffineVersion
       then
         decodeLengthRankingConfigurationFileSpinePairRelationalPositiveAffineV12
+          root
+      else Left LengthRankingConfigurationUnsupportedVersion
+
+-- | Decode only the scalar/product scoped usable-work siblings after every
+-- version-1--version-12 entrance has returned its closed unsupported-version
+-- sentinel.  Both versions use the version-9/version-10 root field set while
+-- selecting relational positive-affine domain validation and the scoped-v2
+-- budget strategy.
+decodeLengthAssessmentConfigurationFileScopedUsableWorkBudget
+  :: ByteString
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthAssessmentConfigurationFileScopedUsableWorkBudget bytes = do
+  document <- either (Left . LengthRankingConfigurationJsonRejected) Right
+    $ parseBoundedJson lengthRankingConfigurationFileJsonLimits bytes
+  root <- objectFields LengthRankingConfigurationRootObject document
+  formatValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationFormatField
+    "format"
+    root
+  format <- stringField LengthRankingConfigurationFormatField formatValue
+  if format == lengthRankingConfigurationFileFormat
+    then pure ()
+    else Left LengthRankingConfigurationUnsupportedFormat
+  versionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationVersionField
+    "version"
+    root
+  version <- integerField LengthRankingConfigurationVersionField versionValue
+  if version == toInteger
+      lengthRankingConfigurationFileScopedUsableWorkBudgetVersion
+    then decodeLengthRankingConfigurationFileScopedUsableWorkBudgetV13 root
+    else if version == toInteger
+        lengthRankingConfigurationFileSpinePairScopedUsableWorkBudgetVersion
+      then
+        decodeLengthRankingConfigurationFileSpinePairScopedUsableWorkBudgetV14
           root
       else Left LengthRankingConfigurationUnsupportedVersion
 
@@ -1108,6 +1168,40 @@ decodeLengthRankingConfigurationFileSpinePairRelationalPositiveAffineV12
   contract <- decodeLeanLengthSpinePairContractValueV5 contractValue
   pure $ DisabledLengthSpinePairAssessmentConfiguration policy contract
 
+decodeLengthRankingConfigurationFileScopedUsableWorkBudgetV13
+  :: ObjectFields
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthRankingConfigurationFileScopedUsableWorkBudgetV13 root = do
+  policy <- decodeLengthRankingConfigurationFileScopedUsableWorkBudgetPolicy
+    root
+  contractValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationContractField
+    "contract"
+    root
+  contract <- decodeLeanLengthContractValueV5 contractValue
+  pure $ DisabledLengthScalarAssessmentConfiguration
+    $ disableLengthRankingConfiguration policy contract
+
+decodeLengthRankingConfigurationFileSpinePairScopedUsableWorkBudgetV14
+  :: ObjectFields
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthRankingConfigurationFileSpinePairScopedUsableWorkBudgetV14
+    root = do
+  policy <- decodeLengthRankingConfigurationFileScopedUsableWorkBudgetPolicy
+    root
+  contractValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationContractField
+    "contract"
+    root
+  contract <- decodeLeanLengthSpinePairContractValueV5 contractValue
+  pure $ DisabledLengthSpinePairAssessmentConfiguration policy contract
+
 decodeLengthRankingConfigurationFileUsableWorkBudgetPolicy
   :: ObjectFields
   -> Either LengthRankingConfigurationFileError LengthRankingPolicy
@@ -1124,6 +1218,28 @@ decodeLengthRankingConfigurationFileUsableWorkBudgetPolicy root = do
     root
   budget <- decodeUsableWorkBudget budgetValue
   pure $ enableLengthRankingUsableWorkBudget budget advancedPolicy
+
+-- Versions 13 and 14 retain the exact version-9/version-10 root set and
+-- budget-after-live-opening, contract-last diagnostic order.  The inherited
+-- advanced policy selects relational positive-affine extraction, while the
+-- budget object admits only the scoped-v2 strategy.
+decodeLengthRankingConfigurationFileScopedUsableWorkBudgetPolicy
+  :: ObjectFields
+  -> Either LengthRankingConfigurationFileError LengthRankingPolicy
+decodeLengthRankingConfigurationFileScopedUsableWorkBudgetPolicy root = do
+  exactFields LengthRankingConfigurationRootObject
+    rootFieldsUsableWorkBudget root
+  let inheritedRoot = filter ((/= "usableWorkBudget") . fst) root
+  advancedPolicy <-
+    decodeLengthRankingConfigurationFileRelationalPositiveAffinePolicy
+      inheritedRoot
+  budgetValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationUsableWorkBudgetField
+    "usableWorkBudget"
+    root
+  budget <- decodeScopedUsableWorkBudget budgetValue
+  pure $ enableLengthRankingScopedUsableWorkBudget budget advancedPolicy
 
 -- Decode the advanced policy in its frozen diagnostic order.  The two bounded
 -- objects are decoded independently and retain distinct validated limits.
@@ -2090,6 +2206,45 @@ decodeUsableWorkBudget value = do
     LengthRankingConfigurationUsableWorkBudgetStrategyField strategyValue
   case strategy of
     "shared-usable-work-deadline-v1" -> pure ()
+    _ -> Left $ LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationUsableWorkBudgetStrategyField
+  millisecondsValue <- requiredField
+    LengthRankingConfigurationUsableWorkBudgetObject
+    LengthRankingConfigurationUsableWorkBudgetMillisecondsField
+    "milliseconds"
+    object
+  milliseconds <- intField
+    LengthRankingConfigurationUsableWorkBudgetMillisecondsField
+    millisecondsValue
+    >>= capIntUpper
+      LengthRankingConfigurationUsableWorkBudgetMillisecondsField 65000
+  case mkLengthSMTLibLiveUsableWorkBudget
+      LengthSMTLibLiveUsableWorkBudgetSource
+        { lengthSMTLibLiveUsableWorkBudgetSourceMilliseconds = milliseconds } of
+    Left failure -> Left
+      $ LengthRankingConfigurationUsableWorkBudgetRejected failure
+    Right validated -> Right validated
+
+-- Keep the established v9/v10 decoder above literal.  This sibling has the
+-- same closed object, field order, caps, and Djex validation, but admits only
+-- the scoped/checkpointed strategy selected by versions 13 and 14.
+decodeScopedUsableWorkBudget
+  :: BoundedJsonValue
+  -> Either
+      LengthRankingConfigurationFileError
+      LengthSMTLibLiveUsableWorkBudget
+decodeScopedUsableWorkBudget value = do
+  object <- exactObject LengthRankingConfigurationUsableWorkBudgetObject
+    usableWorkBudgetFields value
+  strategyValue <- requiredField
+    LengthRankingConfigurationUsableWorkBudgetObject
+    LengthRankingConfigurationUsableWorkBudgetStrategyField
+    "strategy"
+    object
+  strategy <- stringField
+    LengthRankingConfigurationUsableWorkBudgetStrategyField strategyValue
+  case strategy of
+    "scoped-checkpointed-shared-usable-work-deadline-v2" -> pure ()
     _ -> Left $ LengthRankingConfigurationFieldValueRejected
       LengthRankingConfigurationUsableWorkBudgetStrategyField
   millisecondsValue <- requiredField
