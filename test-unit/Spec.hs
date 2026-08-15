@@ -5,7 +5,7 @@ import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as BS
 import Data.Char (isAlphaNum, toLower)
 import Data.IORef (modifyIORef', newIORef, readIORef)
-import Data.List (isInfixOf)
+import Data.List (isInfixOf, sortOn)
 import Data.Maybe (isNothing)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -216,6 +216,7 @@ import Leant.Synth.Length.Configuration
   , LengthRankingPolicy
   , LengthRankingPolicySource (..)
   , enableLengthRankingInputBoxValidation
+  , enableLengthRankingNonVacuousInputBoxPreference
   , enableLengthRankingOriginProbe
   , mkLengthRankingPolicy
   , lengthRankingPolicyExecutableDigestExpectation
@@ -245,7 +246,9 @@ import Leant.Synth.Length.Configuration.File
   , lengthRankingConfigurationFileFormat
   , lengthRankingConfigurationFileInputBoxVersion
   , lengthRankingConfigurationFileOriginProbeVersion
+  , lengthRankingConfigurationFilePositiveOrderingVersion
   , lengthRankingConfigurationFileSpinePairVersion
+  , lengthRankingConfigurationFileSpinePairPositiveOrderingVersion
   , lengthRankingConfigurationFileJsonLimits
   , lengthRankingConfigurationFileVersion
   )
@@ -3395,6 +3398,12 @@ lengthSpinePairRankingTests = testGroup
       "use pair unsat only to trigger independent finite-box validation"
       assertLengthSpinePairRankingInputBox
   , testCase
+      "prefer non-vacuous pair positives after unchanged serial assessment"
+      assertLengthSpinePairNonVacuousPositivePreference
+  , testCase
+      "keep vacuous pair positives neutral and preserve fallback associations"
+      assertLengthSpinePairPositivePreferenceSafety
+  , testCase
       "seal duplicate pair occurrences and present both result components"
       assertLengthSpinePairPostVerificationPresentation
   , testCase "atomically reset pair live, session, and box failures"
@@ -3683,6 +3692,199 @@ assertLengthSpinePairRankingInputBox = do
   -- The positive does not seed.  The box counterexample does, so the third
   -- occurrence avoids a third solver transaction.
   assertFakeLengthQueryEvents [0, 1] [] events
+
+assertLengthSpinePairNonVacuousPositivePreference :: IO ()
+assertLengthSpinePairNonVacuousPositivePreference = do
+  (counterexampleCandidate, positiveCandidate) <-
+    buildLengthSpinePairRankingFixture
+  retainedFirst <- syntheticLengthRankingCandidate
+    "pair-positive-preference-retained-first"
+  retainedSecond <- syntheticLengthRankingCandidate
+    "pair-positive-preference-retained-second"
+  limits <- explicitLengthInputBoxLimits 1 2
+  let original =
+        [ retainedFirst, counterexampleCandidate, positiveCandidate
+        , retainedSecond, positiveCandidate, counterexampleCandidate
+        ]
+  withFakeLengthSolver "query-unsat" $ \executable -> do
+    base <- expectRight $ mkLengthRankingPolicy
+      $ explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits
+          (explicitLengthRankingExecutionSource executable Nothing
+            Djex.LengthSMTLibStatusOnly)
+          Djex.defaultLengthEvaluationLimitSource
+    let bounded = enableLengthRankingInputBoxValidation limits [1] base
+        preferred = enableLengthRankingNonVacuousInputBoxPreference bounded
+        run label policy = do
+          ranking <- expectRight =<< timeoutResult label
+            (rankVerifiedLengthSpinePairCandidatesWithPolicy policy
+              lengthSpinePairRankingContract original)
+          events <- BS.readFile $ executable ++ ".events"
+          pure (ranking, events)
+    (legacy, legacyEvents) <- run "legacy pair positive ordering" bounded
+    (ranked, rankedEvents) <- run
+      "preferred pair positive ordering" preferred
+    map rankedLengthSpinePairCandidateOriginalIndex
+        (lengthSpinePairRankingCandidates legacy) @?= [0, 2, 3, 4, 1, 5]
+    map rankedLengthSpinePairCandidateOriginalIndex
+        (lengthSpinePairRankingCandidates ranked) @?= [2, 4, 0, 3, 1, 5]
+    case map rankedLengthSpinePairCandidateAssessment
+        $ lengthSpinePairRankingCandidates ranked of
+      [ LengthSpinePairBoundedPositive first
+        , LengthSpinePairBoundedPositive second
+        , LengthSpinePairUnassessed, LengthSpinePairUnassessed
+        , LengthSpinePairCounterexample firstCounterexample
+        , LengthSpinePairCounterexample secondCounterexample
+        ] -> do
+          map Djex.validatedLengthSpinePairInputBoxApplicableAssignmentCount
+            [first, second] @?= [2, 2]
+          map Djex.validatedLengthSpinePairCounterexampleInputs
+            [firstCounterexample, secondCounterexample] @?= [[1], [1]]
+      assessments -> assertFailure
+        $ "unexpected pair positive/neutral/counterexample partition: "
+            ++ show assessments
+    lengthSpinePairRankingSnapshotByOriginalIndex ranked @?=
+      lengthSpinePairRankingSnapshotByOriginalIndex legacy
+    assertFakeLengthQueryEvents [0, 1, 2] [] legacyEvents
+    assertFakeLengthQueryEvents [0, 1, 2] [] rankedEvents
+ where
+  timeoutResult label action = do
+    bounded <- timeout 8000000 action
+    case bounded of
+      Nothing -> assertFailure (label ++ " exceeded its outer bound")
+        >> error "unreachable"
+      Just result -> pure result
+
+assertLengthSpinePairPositivePreferenceSafety :: IO ()
+assertLengthSpinePairPositivePreferenceSafety = do
+  (counterexampleCandidate, positiveCandidate) <-
+    buildLengthSpinePairRankingFixture
+  retained <- syntheticLengthRankingCandidate
+    "pair-vacuous-positive-preference-retained"
+  limits <- explicitLengthInputBoxLimits 1 2
+  let vacuousContract = lengthSpinePairRankingContract
+        { leanLengthSpinePairContractSource =
+            Djex.LengthSpinePairContractSource
+              { Djex.lengthSpinePairContractPrecondition =
+                  Djex.LengthTruth False
+              , Djex.lengthSpinePairContractPostcondition =
+                  Djex.LengthTruth True
+              }
+        }
+      vacuousInput =
+        [positiveCandidate, retained, counterexampleCandidate,
+          positiveCandidate]
+  withFakeLengthSolver "query-unsat" $ \executable -> do
+    base <- expectRight $ mkLengthRankingPolicy
+      $ explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits
+          (explicitLengthRankingExecutionSource executable Nothing
+            Djex.LengthSMTLibStatusOnly)
+          Djex.defaultLengthEvaluationLimitSource
+    let preferred = enableLengthRankingNonVacuousInputBoxPreference
+          $ enableLengthRankingInputBoxValidation limits [1] base
+    vacuous <- expectRight =<<
+      rankVerifiedLengthSpinePairCandidatesWithPolicy
+        preferred vacuousContract vacuousInput
+    map rankedLengthSpinePairCandidateOriginalIndex
+        (lengthSpinePairRankingCandidates vacuous) @?= [0, 1, 2, 3]
+    case map rankedLengthSpinePairCandidateAssessment
+        $ lengthSpinePairRankingCandidates vacuous of
+      [ LengthSpinePairBoundedPositive first
+        , LengthSpinePairUnassessed
+        , LengthSpinePairBoundedPositive second
+        , LengthSpinePairBoundedPositive third
+        ] -> map
+          Djex.validatedLengthSpinePairInputBoxApplicableAssignmentCount
+          [first, second, third] @?= [0, 0, 0]
+      assessments -> assertFailure
+        $ "vacuous pair positives left the neutral partition: "
+            ++ show assessments
+
+    verification <- verificationBatchFromReceipts
+      [retained, counterexampleCandidate, positiveCandidate,
+        positiveCandidate, counterexampleCandidate]
+    associated <- expectLengthSpinePairPostVerificationWithin
+      $ assessVerifiedLengthSpinePairCandidatesWithPolicy preferred
+          lengthSpinePairRankingContract verification
+    sealed <- case lengthSpinePairPostVerificationSealedBatch associated of
+      Nothing -> assertFailure "preferred pair output bypassed its seal"
+        >> error "unreachable"
+      Just batch -> pure batch
+    lengthSpinePairPostVerificationCandidates associated @?=
+      postVerificationBatchCandidates sealed
+    associatedRanking <- expectLengthSpinePairPostVerificationRanking associated
+    map rankedLengthSpinePairCandidateOriginalIndex
+        (lengthSpinePairRankingCandidates associatedRanking) @?=
+      [2, 3, 0, 1, 4]
+    case map lengthCandidatePresentationNote
+        $ presentLengthSpinePairPostVerificationResult associated of
+      [Just firstPositive, Just secondPositive, Nothing,
+          Just firstCounterexample, Just secondCounterexample] -> do
+        mapM_ (assertBool "pair positive note followed the wrong occurrence" .
+            isInfixOf "applicable assignments = 2")
+          [firstPositive, secondPositive]
+        mapM_ (assertBool
+            "pair counterexample note followed the wrong occurrence" .
+            isInfixOf "second result spine length = 1")
+          [firstCounterexample, secondCounterexample]
+      notes -> assertFailure
+        $ "pair positive preference reassociated notes: " ++ show notes
+
+  -- Reuse the fixture's stably selected unary product.  Deliberately empty
+  -- bounds make the completed ranking fail before the preference is allowed
+  -- to permute it, so the failed value must retain every original occurrence.
+  trailing <- syntheticLengthRankingCandidate
+    "pair-positive-preference-fallback-trailing"
+  let alwaysContract = lengthSpinePairRankingContract
+        { leanLengthSpinePairContractSource =
+            Djex.LengthSpinePairContractSource
+              { Djex.lengthSpinePairContractPrecondition =
+                  Djex.LengthTruth True
+              , Djex.lengthSpinePairContractPostcondition =
+                  Djex.LengthTruth True
+              }
+        }
+      original = [positiveCandidate, counterexampleCandidate, trailing]
+  withFakeLengthSolver "query-unsat" $ \executable -> do
+    base <- expectRight $ mkLengthRankingPolicy
+      $ explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits
+          (explicitLengthRankingExecutionSource executable Nothing
+            Djex.LengthSMTLibStatusOnly)
+          Djex.defaultLengthEvaluationLimitSource
+    let preferred = enableLengthRankingNonVacuousInputBoxPreference
+          $ enableLengthRankingInputBoxValidation limits [] base
+    fallback <- expectRight =<<
+      rankVerifiedLengthSpinePairCandidatesWithPolicy
+        preferred alwaysContract original
+    assertLengthSpinePairAtomicReset original fallback
+      [Nothing, Nothing, Just LengthPreparationTypedAuthorityUnavailable]
+    failure <- expectLengthSpinePairRankingFailure fallback
+    lengthSpinePairRankingFailureClass failure @?=
+      LengthSpinePairRankingInputBoxValidationFailed
+        (Djex.LengthSpinePairInputBoxBoundsArityMismatch 1 0)
+    lengthSpinePairRankingFailureOriginalIndex failure @?= Just 0
+    assertFakeLengthQueryEvents [0] [] =<<
+      BS.readFile (executable ++ ".events")
+
+lengthSpinePairRankingSnapshotByOriginalIndex
+  :: LengthSpinePairRanking
+  -> [ ( Natural
+       , LengthSpinePairRankingAssessment
+       , Maybe LengthPreparationRefusalClass
+       )
+     ]
+lengthSpinePairRankingSnapshotByOriginalIndex =
+  sortOn (\(index, _, _) -> index)
+  . map snapshot
+  . lengthSpinePairRankingCandidates
+ where
+  snapshot ranked =
+    ( rankedLengthSpinePairCandidateOriginalIndex ranked
+    , rankedLengthSpinePairCandidateAssessment ranked
+    , rankedLengthSpinePairCandidatePreparationRefusal ranked
+    )
 
 assertLengthSpinePairPostVerificationPresentation :: IO ()
 assertLengthSpinePairPostVerificationPresentation = do
@@ -4181,6 +4383,12 @@ lengthRankingTests = testGroup "checked Length behavioral ranking"
       "retain counterexample-only MRU state across bounded positives"
       assertLengthRankingInputBoxSeedIsolation
   , testCase
+      "prefer non-vacuous positives after unchanged serial assessment"
+      assertLengthRankingNonVacuousPositivePreference
+  , testCase
+      "keep vacuous positives neutral and preserve fallback associations"
+      assertLengthRankingPositivePreferenceSafety
+  , testCase
       "atomically reset bounded evidence after an input-box rejection"
       assertLengthRankingInputBoxAtomicFallback
   , testCase
@@ -4211,6 +4419,9 @@ lengthRankingConfigurationTests = testGroup "explicit ranking policy"
       "compose origin and input-box builders commutatively without mutation"
       assertLengthRankingOriginProbePolicyComposition
   , testCase
+      "compose positive ordering independently and leave the base immutable"
+      assertLengthRankingPositivePreferencePolicyComposition
+  , testCase
       "keep legacy policy disabled and match explicit input-box policy"
       assertLengthRankingInputBoxPolicyEquivalence
   , lengthRankingConfigurationFileTests
@@ -4236,6 +4447,12 @@ lengthRankingConfigurationFileTests = testGroup
   , testCase
       "validate the v4 product root and contract in a closed fixed order"
       assertLengthAssessmentConfigurationFileSpinePairV4Precedence
+  , testCase
+      "decode exact v5 scalar and v6 pair positive-ordering policies"
+      assertLengthAssessmentConfigurationFilePositiveOrdering
+  , testCase
+      "preserve old schemas and validate positive ordering before contracts"
+      assertLengthAssessmentConfigurationFilePositiveOrderingPrecedence
   , testCase "apply format, version, schema, decimal, and digest precedence"
       assertLengthRankingConfigurationFileSchemaPrecedence
   , testCase "validate execution before evaluation before contract syntax"
@@ -7625,7 +7842,7 @@ assertLengthAssessmentConfigurationFileSpinePairV4Precedence =
 
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion
-      $ setJsonField ["version"] (Json.JInt 5)
+      $ setJsonField ["version"] (Json.JInt 7)
       $ addJsonField [] ("private-root", Json.JNull) base
     let badLegacy = setJsonField ["execution", "executablePath"]
           (Json.JStr "private-relative-z3")
@@ -7635,6 +7852,266 @@ assertLengthAssessmentConfigurationFileSpinePairV4Precedence =
       (LengthRankingConfigurationExecutionRejected
         Djex.LengthSMTLibExecutionExecutablePathNotAbsolute)
       badLegacy
+
+assertLengthAssessmentConfigurationFilePositiveOrdering :: IO ()
+assertLengthAssessmentConfigurationFilePositiveOrdering = do
+  lengthRankingConfigurationFilePositiveOrderingVersion @?= 5
+  lengthRankingConfigurationFileSpinePairPositiveOrderingVersion @?= 6
+  scalarFixture <- buildLengthRankingLiveFixture
+  (pairCounterexample, pairPositive) <- buildLengthSpinePairRankingFixture
+  scalarRetained <- syntheticLengthRankingCandidate
+    "decoded-positive-ordering-scalar-retained"
+  pairRetained <- syntheticLengthRankingCandidate
+    "decoded-positive-ordering-pair-retained"
+  withFakeLengthSolver "query-unsat" $ \executable -> do
+    let scalarContractValue = addJsonField []
+          ("candidateCasePolicy", Json.JStr "cases-rejected")
+          $ jsonRoleAwareLengthContract []
+              (jsonLengthTruth True)
+              (jsonLengthEqual jsonLengthResult
+                $ jsonLengthQuotient 1 $ jsonLengthLiteral 0)
+              [ jsonLengthProviderLaw "Demo.zeroList" []
+                  $ jsonLengthModulo 2 $ jsonLengthLiteral 0
+              , jsonLengthProviderLaw "Demo.oneList" []
+                  $ jsonLengthQuotient 1 $ jsonLengthLiteral 1
+              ]
+        scalarDocument =
+          lengthAssessmentConfigurationFilePositiveOrderingFixture
+            executable Nothing [] 1 scalarContractValue
+        pairContractValue = jsonLengthSpinePairContract ["observed-spine"]
+          "cases-rejected" (jsonLengthTruth True)
+          (jsonLengthAll
+            [ jsonLengthEqual jsonLengthSpinePairResultFirst
+                $ jsonLengthQuotient 1 $ jsonLengthInput 0
+            , jsonLengthEqual jsonLengthSpinePairResultSecond
+                $ jsonLengthModulo 2 $ jsonLengthLiteral 0
+            ])
+          [ jsonLengthProviderLaw "Demo.zeroList" []
+              $ jsonLengthQuotient 1 $ jsonLengthLiteral 0
+          ]
+        pairDocument =
+          lengthAssessmentConfigurationFileSpinePairPositiveOrderingFixture
+            executable Nothing [1] 2 pairContractValue
+
+    assertLengthRankingConfigurationFileError
+      LengthRankingConfigurationUnsupportedVersion scalarDocument
+    assertLengthRankingConfigurationFileError
+      LengthRankingConfigurationUnsupportedVersion pairDocument
+
+    scalarDisabled <- expectLengthAssessmentConfigurationFile scalarDocument
+    (scalarPolicy, scalarSelection) <-
+      expectLengthAssessmentConfigurationActivation
+        PermitUnpinnedExecutable scalarDisabled
+    scalarContract <- case scalarSelection of
+      LeanLengthScalarContractSelection contract -> pure contract
+      LeanLengthSpinePairContractSelection _ -> assertFailure
+        "v5 positive ordering selected the pair domain" >> error "unreachable"
+    leanLengthContractTargetArgumentRoles scalarContract @?= Just []
+    leanLengthContractCandidateCasePolicy scalarContract @?=
+      LeanLengthCasesRejected
+    scalarRanking <- expectLengthRankingWithin
+      "decoded v5 positive ordering"
+      $ rankVerifiedLengthCandidatesWithPolicy scalarPolicy scalarContract
+          [ scalarRetained
+          , lengthRankingFixtureZero scalarFixture
+          , lengthRankingFixtureOne scalarFixture
+          ]
+    map rankedLengthCandidateOriginalIndex
+        (lengthRankingCandidates scalarRanking) @?= [1, 0, 2]
+    case map rankedLengthCandidateAssessment
+        $ lengthRankingCandidates scalarRanking of
+      [BoundedPositive positive, Unassessed, Counterexample _] ->
+        Djex.validatedLengthInputBoxApplicableAssignmentCount positive @?= 1
+      assessments -> assertFailure
+        $ "decoded v5 did not enable positive ordering: " ++ show assessments
+    -- The counterexample is found by the configured origin probe; only the
+    -- positive consumes a live ordinal.
+    assertFakeLengthQueryEvents [0] [] =<<
+      BS.readFile (executable ++ ".events")
+
+    pairDisabled <- expectLengthAssessmentConfigurationFile pairDocument
+    (pairPolicy, pairSelection) <-
+      expectLengthAssessmentConfigurationActivation
+        PermitUnpinnedExecutable pairDisabled
+    pairContract <- case pairSelection of
+      LeanLengthSpinePairContractSelection contract -> pure contract
+      LeanLengthScalarContractSelection _ -> assertFailure
+        "v6 positive ordering selected the scalar domain" >> error "unreachable"
+    leanLengthSpinePairContractTargetArgumentRoles pairContract @?=
+      Just [LengthObservedSpine]
+    pairRanking <- expectRight =<<
+      rankVerifiedLengthSpinePairCandidatesWithPolicy pairPolicy pairContract
+        [pairRetained, pairCounterexample, pairPositive]
+    map rankedLengthSpinePairCandidateOriginalIndex
+        (lengthSpinePairRankingCandidates pairRanking) @?= [2, 0, 1]
+    case map rankedLengthSpinePairCandidateAssessment
+        $ lengthSpinePairRankingCandidates pairRanking of
+      [LengthSpinePairBoundedPositive positive,
+          LengthSpinePairUnassessed, LengthSpinePairCounterexample _] ->
+        Djex.validatedLengthSpinePairInputBoxApplicableAssignmentCount
+          positive @?= 2
+      assessments -> assertFailure
+        $ "decoded v6 did not enable pair positive ordering: "
+            ++ show assessments
+
+    reorderedScalar <- expectLengthAssessmentConfigurationFile
+      $ reverseJsonObjectFields scalarDocument
+    (_, reorderedScalarSelection) <-
+      expectLengthAssessmentConfigurationActivation
+        PermitUnpinnedExecutable reorderedScalar
+    reorderedScalarSelection @?= scalarSelection
+    reorderedPair <- expectLengthAssessmentConfigurationFile
+      $ reverseJsonObjectFields pairDocument
+    (_, reorderedPairSelection) <-
+      expectLengthAssessmentConfigurationActivation
+        PermitUnpinnedExecutable reorderedPair
+    reorderedPairSelection @?= pairSelection
+
+assertLengthAssessmentConfigurationFilePositiveOrderingPrecedence :: IO ()
+assertLengthAssessmentConfigurationFilePositiveOrderingPrecedence =
+  withTemporaryDirectory "leant-length-positive-ordering" $ \root -> do
+    let executable = root </> "missing-z3"
+        scalarContract = addJsonField []
+          ("candidateCasePolicy", Json.JStr "cases-rejected")
+          $ jsonRoleAwareLengthContract ["observed-spine"]
+              (jsonLengthEqual
+                (jsonLengthModulo 2 $ jsonLengthInput 0)
+                (jsonLengthLiteral 0))
+              (jsonLengthEqual jsonLengthResult
+                $ jsonLengthQuotient 2 $ jsonLengthInput 0)
+              [ jsonLengthProviderLaw "Demo.provider" ["spine"]
+                  $ jsonLengthQuotient 3 $ jsonLengthArgument 0
+              ]
+        pairContract = jsonLengthSpinePairContract ["observed-spine"]
+          "exact-spine-zero-step-v1"
+          (jsonLengthTruth True)
+          (jsonLengthAll
+            [ jsonLengthEqual jsonLengthSpinePairResultFirst
+                $ jsonLengthModulo 2 $ jsonLengthInput 0
+            , jsonLengthEqual jsonLengthSpinePairResultSecond
+                $ jsonLengthQuotient 2 $ jsonLengthInput 0
+            ]) []
+        scalarBase =
+          lengthAssessmentConfigurationFilePositiveOrderingFixture
+            executable Nothing [0] 1 scalarContract
+        pairBase =
+          lengthAssessmentConfigurationFileSpinePairPositiveOrderingFixture
+            executable Nothing [0] 1 pairContract
+        badAdmission = setJsonField
+          ["executionAdmission", "executablePathCharacters"] (Json.JInt (-1))
+        badExecution = setJsonField ["execution", "executablePath"]
+          (Json.JStr "private-relative-z3")
+        badEvaluation = setJsonField
+          ["evaluation", "assignmentValueBits"] (Json.JInt (-1))
+        badInputBox = setJsonField
+          ["inputBoxValidation", "maximumAssignments"] (Json.JInt (-1))
+        badProbe = setJsonField ["counterexampleProbe"]
+          (Json.JStr "private-probe")
+        badOrdering = setJsonField ["boundedPositiveOrdering"]
+          (Json.JStr "private-ordering")
+        badScalarContract = setJsonField ["contract", "precondition"]
+          (Json.JArr [Json.JStr "private-contract"])
+        badPairContract = deleteJsonField ["contract", "resultShape"]
+        assertOrderingSchema base = do
+          assertLengthAssessmentConfigurationFileError
+            (LengthRankingConfigurationMissingField
+              LengthRankingConfigurationRootObject
+              LengthRankingConfigurationBoundedPositiveOrderingField)
+            $ deleteJsonField ["boundedPositiveOrdering"] base
+          assertLengthAssessmentConfigurationFileError
+            (LengthRankingConfigurationFieldTypeMismatch
+              LengthRankingConfigurationBoundedPositiveOrderingField
+              LengthRankingConfigurationStringValue)
+            $ setJsonField ["boundedPositiveOrdering"] (Json.JBool False) base
+          assertLengthAssessmentConfigurationFileError
+            (LengthRankingConfigurationFieldValueRejected
+              LengthRankingConfigurationBoundedPositiveOrderingField)
+            $ badOrdering base
+          assertLengthAssessmentConfigurationFileError
+            (LengthRankingConfigurationUnexpectedField
+              LengthRankingConfigurationRootObject)
+            $ addJsonField [] ("private-ordering-field", Json.JNull) base
+    _ <- expectLengthAssessmentConfigurationFile scalarBase
+    _ <- expectLengthAssessmentConfigurationFile pairBase
+    assertOrderingSchema scalarBase
+    assertOrderingSchema pairBase
+
+    -- Old exact schemas neither default nor silently accept the new choice.
+    let v1 = lengthRankingConfigurationFileFixture executable Nothing
+        v2 = lengthRankingConfigurationFileInputBoxFixture
+          executable Nothing [0] 1
+        v3 = lengthRankingConfigurationFileOriginProbeFixture
+          executable Nothing [0] 1
+        v4 = lengthAssessmentConfigurationFileSpinePairFixture
+          executable Nothing [0] 1 pairContract
+        withOrdering = addJsonField []
+          ("boundedPositiveOrdering", Json.JStr "prefer-non-vacuous")
+    mapM_ (assertLengthRankingConfigurationFileError
+      (LengthRankingConfigurationUnexpectedField
+        LengthRankingConfigurationRootObject) . withOrdering) [v1, v2, v3]
+    assertLengthAssessmentConfigurationFileError
+      (LengthRankingConfigurationUnexpectedField
+        LengthRankingConfigurationRootObject)
+      $ withOrdering v4
+    mapM_ (\document -> do
+        disabled <- expectLengthRankingConfigurationFile document
+        _ <- expectLengthRankingConfigurationActivation
+          PermitUnpinnedExecutable disabled
+        generalized <- expectLengthAssessmentConfigurationFile document
+        _ <- expectLengthAssessmentConfigurationActivation
+          PermitUnpinnedExecutable generalized
+        pure ()) [v1, v2, v3]
+    _ <- expectLengthAssessmentConfigurationFile v4
+
+    mapM_ (assertLengthRankingConfigurationFileError
+      LengthRankingConfigurationUnsupportedVersion) [scalarBase, pairBase]
+    assertLengthAssessmentConfigurationFileError
+      LengthRankingConfigurationUnsupportedVersion
+      $ setJsonField ["version"] (Json.JInt 7)
+      $ addJsonField [] ("private-v7", Json.JNull) pairBase
+
+    -- New-version precedence repeats the established operational sequence and
+    -- inserts the closed ordering choice immediately before the contract.
+    let allBadScalar = badAdmission $ badExecution $ badEvaluation
+          $ badInputBox $ badProbe $ badOrdering
+          $ badScalarContract scalarBase
+    assertLengthAssessmentConfigurationFileError
+      (LengthRankingConfigurationFieldValueRejected
+        LengthRankingConfigurationExecutablePathCharactersField)
+      allBadScalar
+    assertLengthAssessmentConfigurationFileError
+      (LengthRankingConfigurationExecutionRejected
+        Djex.LengthSMTLibExecutionExecutablePathNotAbsolute)
+      $ badExecution $ badEvaluation $ badInputBox $ badProbe
+      $ badOrdering $ badScalarContract scalarBase
+    assertLengthAssessmentConfigurationFileError
+      (LengthRankingConfigurationEvaluationRejected
+        $ Djex.NegativeLengthEvaluationLimit
+            Djex.LengthAssignmentValueBits (-1))
+      $ badEvaluation $ badInputBox $ badProbe $ badOrdering
+      $ badScalarContract scalarBase
+    assertLengthAssessmentConfigurationFileError
+      (LengthRankingConfigurationFieldValueRejected
+        LengthRankingConfigurationInputBoxMaximumAssignmentsField)
+      $ badInputBox $ badProbe $ badOrdering $ badScalarContract scalarBase
+    assertLengthAssessmentConfigurationFileError
+      (LengthRankingConfigurationFieldValueRejected
+        LengthRankingConfigurationCounterexampleProbeField)
+      $ badProbe $ badOrdering $ badScalarContract scalarBase
+    assertLengthAssessmentConfigurationFileError
+      (LengthRankingConfigurationFieldValueRejected
+        LengthRankingConfigurationBoundedPositiveOrderingField)
+      $ badOrdering $ badScalarContract scalarBase
+    assertLengthAssessmentConfigurationFileError
+      (LengthRankingConfigurationSyntaxRejected
+        LengthRankingConfigurationPreconditionSyntax
+        LengthRankingConfigurationUnknownTag)
+      $ badScalarContract scalarBase
+    assertLengthAssessmentConfigurationFileError
+      (LengthRankingConfigurationMissingField
+        LengthRankingConfigurationContractObject
+        LengthRankingConfigurationResultShapeField)
+      $ badPairContract pairBase
 
 assertLengthRankingConfigurationFileSchemaPrecedence :: IO ()
 assertLengthRankingConfigurationFileSchemaPrecedence =
@@ -8418,6 +8895,41 @@ lengthAssessmentConfigurationFileSpinePairFixture executable digest maximums
   $ lengthRankingConfigurationFileOriginProbeFixture
       executable digest maximums maximumAssignments
 
+lengthAssessmentConfigurationFilePositiveOrderingFixture
+  :: FilePath
+  -> Maybe String
+  -> [Integer]
+  -> Integer
+  -> Json.JValue
+  -> Json.JValue
+lengthAssessmentConfigurationFilePositiveOrderingFixture executable digest
+    maximums maximumAssignments contract =
+  addJsonField []
+    ("boundedPositiveOrdering", Json.JStr "prefer-non-vacuous")
+  $ setJsonField ["contract"] contract
+  $ setJsonField ["version"]
+      (Json.JInt
+        $ toInteger lengthRankingConfigurationFilePositiveOrderingVersion)
+  $ lengthRankingConfigurationFileOriginProbeFixture
+      executable digest maximums maximumAssignments
+
+lengthAssessmentConfigurationFileSpinePairPositiveOrderingFixture
+  :: FilePath
+  -> Maybe String
+  -> [Integer]
+  -> Integer
+  -> Json.JValue
+  -> Json.JValue
+lengthAssessmentConfigurationFileSpinePairPositiveOrderingFixture executable
+    digest maximums maximumAssignments contract =
+  addJsonField []
+    ("boundedPositiveOrdering", Json.JStr "prefer-non-vacuous")
+  $ setJsonField ["version"]
+      (Json.JInt $ toInteger
+        lengthRankingConfigurationFileSpinePairPositiveOrderingVersion)
+  $ lengthAssessmentConfigurationFileSpinePairFixture
+      executable digest maximums maximumAssignments contract
+
 jsonLengthTruth :: Bool -> Json.JValue
 jsonLengthTruth value = Json.JArr
   [Json.JStr "truth", Json.JBool value]
@@ -8973,6 +9485,56 @@ assertLengthRankingOriginProbePolicyComposition = do
         Djex.validatedLengthCounterexampleResult counterexample @?= 1
       assessments -> assertFailure
         $ "unexpected composed origin/box assessments: " ++ show assessments
+
+assertLengthRankingPositivePreferencePolicyComposition :: IO ()
+assertLengthRankingPositivePreferencePolicyComposition = do
+  fixture <- buildLengthRankingLiveFixture
+  retained <- syntheticLengthRankingCandidate
+    "positive-policy-composition-retained"
+  limits <- explicitLengthInputBoxLimits 0 1
+  withFakeLengthSolver "query-unsat" $ \executable -> do
+    let zero = lengthRankingFixtureZero fixture
+        one = lengthRankingFixtureOne fixture
+        original = [retained, zero, one]
+        contract = lengthRankingContract 0
+        source = explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits
+          (explicitLengthRankingExecutionSource executable Nothing
+            Djex.LengthSMTLibStatusOnly)
+          Djex.defaultLengthEvaluationLimitSource
+        run label policy = expectLengthRankingWithin label
+          $ rankVerifiedLengthCandidatesWithPolicy policy contract original
+    base <- expectRight $ mkLengthRankingPolicy source
+    let boxThenPreference = enableLengthRankingNonVacuousInputBoxPreference
+          $ enableLengthRankingInputBoxValidation limits [] base
+        preferenceThenBox = enableLengthRankingInputBoxValidation limits []
+          $ enableLengthRankingNonVacuousInputBoxPreference base
+
+    first <- run "box then positive preference" boxThenPreference
+    map rankedLengthCandidateOriginalIndex
+        (lengthRankingCandidates first) @?= [1, 0, 2]
+    firstEvents <- BS.readFile $ executable ++ ".events"
+    second <- run "positive preference then box" preferenceThenBox
+    assertLengthRankingsEquivalent first second
+    secondEvents <- BS.readFile $ executable ++ ".events"
+    assertFakeLengthQueryEvents [0, 1] [] firstEvents
+    assertFakeLengthQueryEvents [0, 1] [] secondEvents
+
+    -- The builder is a persistent independent derivation. Preference without
+    -- bounded-positive receipts is a no-op, and neither derivation mutates the
+    -- common base's historical heuristic ordering.
+    preferenceOnly <- run "preference without input box"
+      $ enableLengthRankingNonVacuousInputBoxPreference base
+    baseAgain <- run "base after positive preference derivations" base
+    map rankedLengthCandidateOriginalIndex
+        (lengthRankingCandidates preferenceOnly) @?= [0, 1, 2]
+    map rankedLengthCandidateAssessment
+        (lengthRankingCandidates preferenceOnly) @?=
+      [ Unassessed
+      , Heuristic Djex.SolverUnsatisfiable
+      , Heuristic Djex.SolverUnsatisfiable
+      ]
+    assertLengthRankingsEquivalent preferenceOnly baseAgain
 
 assertLengthRankingInputBoxPolicyEquivalence :: IO ()
 assertLengthRankingInputBoxPolicyEquivalence = do
@@ -10013,6 +10575,190 @@ assertLengthRankingInputBoxSeedIsolation = do
   -- The positive middle candidate misses the retained [] seed, validates its
   -- own box, and leaves the bank intact for the final counterexample replay.
   assertFakeLengthQueryEvents [0, 1] [] secondEvents
+
+assertLengthRankingNonVacuousPositivePreference :: IO ()
+assertLengthRankingNonVacuousPositivePreference = do
+  fixture <- buildLengthRankingLiveFixture
+  retainedFirst <- syntheticLengthRankingCandidate
+    "positive-preference-retained-first"
+  retainedSecond <- syntheticLengthRankingCandidate
+    "positive-preference-retained-second"
+  limits <- explicitLengthInputBoxLimits 0 1
+  let zero = lengthRankingFixtureZero fixture
+      one = lengthRankingFixtureOne fixture
+      original = [retainedFirst, one, zero, retainedSecond, zero, one]
+      contract = lengthRankingContract 0
+  withFakeLengthSolver "query-unsat" $ \executable -> do
+    base <- expectRight $ mkLengthRankingPolicy
+      $ explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits
+          (explicitLengthRankingExecutionSource executable Nothing
+            Djex.LengthSMTLibStatusOnly)
+          Djex.defaultLengthEvaluationLimitSource
+    let bounded = enableLengthRankingInputBoxValidation limits [] base
+        preferred = enableLengthRankingNonVacuousInputBoxPreference bounded
+        run label policy = do
+          ranking <- expectLengthRankingWithin label
+            $ rankVerifiedLengthCandidatesWithPolicy
+                policy contract original
+          events <- BS.readFile $ executable ++ ".events"
+          pure (ranking, events)
+    (legacy, legacyEvents) <- run "legacy bounded-positive ordering" bounded
+    (ranked, rankedEvents) <- run
+      "non-vacuous bounded-positive ordering" preferred
+
+    map rankedLengthCandidateOriginalIndex
+        (lengthRankingCandidates legacy) @?= [0, 2, 3, 4, 1, 5]
+    map rankedLengthCandidateOriginalIndex
+        (lengthRankingCandidates ranked) @?= [2, 4, 0, 3, 1, 5]
+    assertPreferredAssessment $ map rankedLengthCandidateAssessment
+      $ lengthRankingCandidates ranked
+    rankedLengthPreparationRefusals ranked @?=
+      [ Nothing, Nothing
+      , Just LengthPreparationTypedAuthorityUnavailable
+      , Just LengthPreparationTypedAuthorityUnavailable
+      , Nothing, Nothing
+      ]
+    scalarRankingSnapshotByOriginalIndex ranked @?=
+      scalarRankingSnapshotByOriginalIndex legacy
+    -- The preference is applied only after the serial assessment loop. The
+    -- first counterexample seeds [], both positives miss that vector and run
+    -- live, and the final duplicate counterexample is still an MRU hit.
+    assertFakeLengthQueryEvents [0, 1, 2] [] legacyEvents
+    assertFakeLengthQueryEvents [0, 1, 2] [] rankedEvents
+ where
+  assertPreferredAssessment assessments = case assessments of
+    [ BoundedPositive first
+      , BoundedPositive second
+      , Unassessed, Unassessed
+      , Counterexample firstCounterexample
+      , Counterexample secondCounterexample
+      ] -> do
+        map Djex.validatedLengthInputBoxApplicableAssignmentCount
+          [first, second] @?= [1, 1]
+        map Djex.validatedLengthCounterexampleInputs
+          [firstCounterexample, secondCounterexample] @?= [[], []]
+    other -> assertFailure
+      $ "unexpected positive/neutral/counterexample partition: " ++ show other
+
+assertLengthRankingPositivePreferenceSafety :: IO ()
+assertLengthRankingPositivePreferenceSafety = do
+  fixture <- buildLengthRankingLiveFixture
+  retained <- syntheticLengthRankingCandidate
+    "vacuous-positive-preference-retained"
+  limits <- explicitLengthInputBoxLimits 0 1
+  let zero = lengthRankingFixtureZero fixture
+      one = lengthRankingFixtureOne fixture
+      vacuousContract = (lengthRankingContract 0)
+        { leanLengthContractSource = LengthContractSource
+            { lengthContractPrecondition = LengthTruth False
+            , lengthContractPostcondition = LengthTruth True
+            }
+        }
+      vacuousInput = [zero, retained, one, zero]
+  withFakeLengthSolver "query-unsat" $ \executable -> do
+    base <- expectRight $ mkLengthRankingPolicy
+      $ explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits
+          (explicitLengthRankingExecutionSource executable Nothing
+            Djex.LengthSMTLibStatusOnly)
+          Djex.defaultLengthEvaluationLimitSource
+    let preferred = enableLengthRankingNonVacuousInputBoxPreference
+          $ enableLengthRankingInputBoxValidation limits [] base
+    vacuous <- expectLengthRankingWithin "vacuous positive ordering"
+      $ rankVerifiedLengthCandidatesWithPolicy
+          preferred vacuousContract vacuousInput
+    map rankedLengthCandidateOriginalIndex
+        (lengthRankingCandidates vacuous) @?= [0, 1, 2, 3]
+    case map rankedLengthCandidateAssessment
+        $ lengthRankingCandidates vacuous of
+      [BoundedPositive first, Unassessed,
+          BoundedPositive second, BoundedPositive third] ->
+        map Djex.validatedLengthInputBoxApplicableAssignmentCount
+          [first, second, third] @?= [0, 0, 0]
+      assessments -> assertFailure
+        $ "vacuous positives left the neutral partition: " ++ show assessments
+    assertFakeLengthQueryEvents [0, 1, 2] [] =<<
+      BS.readFile (executable ++ ".events")
+
+    verification <- verificationBatchFromReceipts
+      [retained, one, zero, zero, one]
+    associated <- expectLengthPostVerificationWithin
+      "positive preference occurrence association"
+      $ assessVerifiedLengthCandidatesWithPolicy preferred
+          (lengthRankingContract 0) verification
+    assertLengthPostVerificationSealed associated
+    ranking <- expectLengthPostVerificationRanking associated
+    map rankedLengthCandidateOriginalIndex
+        (lengthRankingCandidates ranking) @?= [2, 3, 0, 1, 4]
+    let presentations = presentLengthPostVerificationResult associated
+    case map lengthCandidatePresentationNote presentations of
+      [Just firstPositive, Just secondPositive, Nothing,
+          Just firstCounterexample, Just secondCounterexample] -> do
+        mapM_ (assertBool "positive note lost its exact occurrence" .
+            isInfixOf "applicable assignments = 1")
+          [firstPositive, secondPositive]
+        mapM_ (assertBool "counterexample note lost its exact occurrence" .
+            isInfixOf "result spine length = 1")
+          [firstCounterexample, secondCounterexample]
+      notes -> assertFailure
+        $ "positive preference presentation reassociated notes: " ++ show notes
+
+  -- A later validation failure must discard an earlier positive and the
+  -- preference's prospective permutation together.
+  (contract, arityCandidates) <- buildLengthSeedBankArityFixture
+  (zeroInput, oneInput) <- case arityCandidates of
+    zeroCandidate : oneCandidate : _ -> pure (zeroCandidate, oneCandidate)
+    _ -> assertFailure "positive fallback fixture changed cardinality"
+      >> error "unreachable"
+  trailing <- syntheticLengthRankingCandidate
+    "positive-preference-fallback-trailing"
+  mismatchLimits <- explicitLengthInputBoxLimits 1 2
+  let alwaysContract = contract
+        { leanLengthContractSource = LengthContractSource
+            { lengthContractPrecondition = LengthTruth True
+            , lengthContractPostcondition = LengthTruth True
+            }
+        }
+      original = [oneInput, zeroInput, trailing]
+  withFakeLengthSolver "query-unsat" $ \executable -> do
+    base <- expectRight $ mkLengthRankingPolicy
+      $ explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits
+          (explicitLengthRankingExecutionSource executable Nothing
+            Djex.LengthSMTLibStatusOnly)
+          Djex.defaultLengthEvaluationLimitSource
+    let preferred = enableLengthRankingNonVacuousInputBoxPreference
+          $ enableLengthRankingInputBoxValidation mismatchLimits [1] base
+    fallback <- expectLengthRankingWithin "positive preference fallback"
+      $ rankVerifiedLengthCandidatesWithPolicy
+          preferred alwaysContract original
+    rankedLengthVerifiedCandidates fallback @?= original
+    map rankedLengthCandidateAssessment
+        (lengthRankingCandidates fallback) @?= replicate 3 Unassessed
+    failure <- case lengthRankingFailure fallback of
+      Nothing -> assertFailure "positive preference swallowed box failure"
+        >> error "unreachable"
+      Just retainedFailure -> pure retainedFailure
+    lengthRankingFailureClass failure @?=
+      LengthRankingInputBoxValidationFailed
+        (Djex.LengthInputBoxBoundsArityMismatch 0 1)
+    lengthRankingFailureOriginalIndex failure @?= Just 1
+    assertFakeLengthQueryEvents [0, 1] [] =<<
+      BS.readFile (executable ++ ".events")
+
+scalarRankingSnapshotByOriginalIndex
+  :: LengthRanking
+  -> [(Natural, LengthRankingAssessment, Maybe LengthPreparationRefusalClass)]
+scalarRankingSnapshotByOriginalIndex = sortOn (\(index, _, _) -> index)
+  . map snapshot
+  . lengthRankingCandidates
+ where
+  snapshot ranked =
+    ( rankedLengthCandidateOriginalIndex ranked
+    , rankedLengthCandidateAssessment ranked
+    , rankedLengthCandidatePreparationRefusal ranked
+    )
 
 assertLengthRankingInputBoxAtomicFallback :: IO ()
 assertLengthRankingInputBoxAtomicFallback = do

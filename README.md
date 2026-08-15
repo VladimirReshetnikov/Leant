@@ -107,16 +107,20 @@ session environment; `#`-commands pass straight through.
 
 Finite-list-spine Length counterexample ranking is disabled by default. To opt
 in, pass `--length-ranking-config` with an explicitly chosen absolute path to
-a version-1, version-2, version-3, or version-4 configuration file. Versions
-1--3 select scalar finite-list-spine Length ranking. Version 1 preserves
-the established counterexample-only behavior. Version 2 additionally requires
-an explicit per-input finite box and enables independent bounded validation
-after a live `unsat` trigger. Version 3 retains that exact box and requires
+a version-1 through version-6 configuration file. Versions 1--3 select scalar
+finite-list-spine Length ranking. Version 1 preserves the established
+counterexample-only behavior. Version 2 additionally requires an explicit
+per-input finite box and enables independent bounded validation after a live
+`unsat` trigger. Version 3 retains that exact box and requires
 `"counterexampleProbe": "origin-before-live"`; after the four-entry MRU bank
 misses, each exact query asks Djex to replay its canonical all-zero input before
 Leant issues that candidate's live Z3 query. Version 4 retains version 3's
 operational policy but selects the nominal canonical-`Prod` domain through a
-required binary-product-spine contract. Leant admits and reads that file
+required binary-product-spine contract. Version 5 is the scalar successor and
+version 6 is the pair successor: both additionally require
+`"boundedPositiveOrdering": "prefer-non-vacuous"`, which explicitly promotes
+only candidates carrying a completed finite-box receipt with at least one
+precondition-applicable assignment. Leant admits and reads that file
 once at startup, requires the configuration to contain an executable SHA-256
 expectation by default, and retains the decoded contract selection as a fixed
 process-wide assertion. Presence at activation is not a digest match; Djex
@@ -169,9 +173,11 @@ Version 6 is the separately typed binary-product-spine form: its required
 variables are `["result", "first"]` and `["result", "second"]`. It retains
 version 5's arithmetic, explicit target roles, and explicit case-policy
 vocabulary. Startup versions 1--3 retain the scalar compatibility contract
-grammar from version 1 and reject roles, candidate-case policy, modulo,
-quotient, and product-only fields. Startup version 4 requires the version-6
-pair contract grammar.
+grammar from contract-only version 1 and reject roles, candidate-case policy,
+modulo, quotient, and product-only fields. Startup version 4 requires the pair
+grammar. The positive-ordering successors use the complete existing grammars:
+startup version 5 embeds scalar contract grammar v5, while startup version 6
+embeds the same pair grammar as startup v4 and contract-only v6.
 No contract-only version can
 replace the executable, pin choice, solver limits, artifact policy, or replay
 limits. The decoded contract selection is carried only through
@@ -363,19 +369,23 @@ and associated values can become model-relative counterexample evidence. Raw
 
 That first checkpoint was deliberately offline. The library now also exposes
 the product-specific live runner, ranking, post-verification, and presentation
-path. For example, an integration which already owns a checked reusable policy,
-an explicit finite-box limit, and the callback batch can opt into both bounded
-validation and the query-owned origin probe without converting the pair
-contract to a scalar contract:
+path. The bounded-positive ordering choice is an orthogonal, explicit policy
+derivation. For example, integrations for either domain can enable the same
+finite box and origin probe, then opt into preferring only non-vacuous positive
+receipts:
 
 ```haskell
-let pairPolicy =
-      enableLengthRankingOriginProbe
+let preferredPolicy =
+      enableLengthRankingNonVacuousInputBoxPreference
+        $ enableLengthRankingOriginProbe
         $ enableLengthRankingInputBoxValidation
             inputBoxLimits [3] basePolicy
 
+scalarAssessment <- assessVerifiedLengthCandidatesWithPolicy
+  preferredPolicy scalarContract verificationBatch
+
 assessment <- assessVerifiedLengthSpinePairCandidatesWithPolicy
-  pairPolicy pairContract verificationBatch
+  preferredPolicy pairContract verificationBatch
 
 let present candidate = do
       putStrLn $ lengthCandidatePresentationText candidate
@@ -393,21 +403,27 @@ sealed callback batch. A caller which already owns a plain list of verified
 receipts can instead call
 `rankVerifiedLengthSpinePairCandidatesWithPolicy`; the post-verification form
 keeps each reordered receipt attached to its exact occurrence through the
-permutation seal.
+permutation seal. The three policy builders are persistent and order
+independent. Without
+`enableLengthRankingNonVacuousInputBoxPreference`, completed positive receipts
+retain their historical neutral ordering.
 
-For each eligible product query, the exact order is the product batch's
-newest-first four-entry MRU input replay bank, the optional query-owned origin
-probe, a live pair query, query-first observation replay, and—only when that
-live observation has no counterexample and reports `unsat`—the optional exact
-input-box traversal. A freshly replayed and associated pair counterexample is
-the only assessment which moves: it enters the stable demoted partition and
-can supply an MRU input vector. Complete box traversal is the neutral
-`LengthSpinePairBoundedPositive`; status-only `sat`, `unsat`, and `unknown`
-remain neutral heuristics. Any structured session or live-query failure,
-live-observation association or replay failure, query-owned origin failure, or
-input-box failure atomically restores the admitted batch in original order as
-unassessed. Candidate-local pure preparation refusals stay local, and no result
-grants pruning authority.
+For each eligible product query, the exact execution order is the product
+batch's newest-first four-entry MRU input replay bank, the optional query-owned
+origin probe, a live pair query, query-first observation replay, and—only when
+that live observation has no counterexample and reports `unsat`—the optional
+exact input-box traversal. Under the historical/default policy, a freshly replayed
+and associated pair counterexample is the only assessment which moves: it
+enters the stable demoted partition and can supply an MRU input vector.
+Complete box traversal is `LengthSpinePairBoundedPositive` and remains neutral
+unless the new preference is explicitly enabled. With that preference, a
+receipt whose applicable-assignment count is positive enters a stable preferred
+partition; a zero-applicable, vacuous receipt remains neutral. Status-only
+`sat`, `unsat`, and `unknown` remain neutral heuristics. Any structured session
+or live-query failure, live-observation association or replay failure,
+query-owned origin failure, or input-box failure atomically restores the
+admitted batch in original order as unassessed. Candidate-local pure preparation
+refusals stay local, and no result grants pruning authority.
 
 The opaque execution/evaluation policy and Djex live-session limits are
 domain-neutral and reused by the scalar and product runners. Each Leant call
@@ -416,8 +432,67 @@ admits no more than the shared 64-query maximum, and consumes that session's
 single total query budget. Behavioral authority is not shared: product
 contracts, queries, live observations, replay receipts, failures, assessments,
 MRU state, and presentation remain product-specific and cannot be cast from
-their scalar siblings. The existing scalar path, public scalar types, query
-bytes, ranking behavior, and presentation are unchanged.
+their scalar siblings. The existing/default scalar path, public scalar types,
+query bytes, neutral ranking behavior, and presentation are unchanged.
+
+Startup version 5 is the concrete scalar file opt-in. This complete unpinned
+example checks input lengths 0 through 3 and prefers a candidate only after the
+independent traversal finds no violation and at least one assignment satisfies
+the precondition:
+
+```json
+{
+  "format": "leant-live-length-ranking-configuration",
+  "version": 5,
+  "executionAdmission": {
+    "executablePathCharacters": 4096,
+    "policyFingerprintBytes": 262144
+  },
+  "execution": {
+    "executablePath": "/absolute/path/to/z3",
+    "expectedExecutableSha256": null,
+    "solverTimeoutMilliseconds": 1000,
+    "solverResourceLimit": 100000,
+    "hostDeadlineMilliseconds": 1500,
+    "artifactPolicy": "input-values-after-satisfiable",
+    "responseLimits": {
+      "bytes": 65536,
+      "nestingDepth": 64,
+      "nodes": 4096,
+      "tokenBytes": 4096,
+      "integerBits": 4096
+    }
+  },
+  "evaluation": {
+    "assignmentValueBits": 4096,
+    "intermediateValueBits": 4096
+  },
+  "inputBoxValidation": {
+    "inclusiveInputMaximums": [3],
+    "maximumAssignments": 4
+  },
+  "counterexampleProbe": "origin-before-live",
+  "boundedPositiveOrdering": "prefer-non-vacuous",
+  "contract": {
+    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
+    "targetArgumentRoles": ["observed-spine"],
+    "candidateCasePolicy": "cases-rejected",
+    "precondition": ["truth", true],
+    "postcondition": ["equal", ["result"], ["input", 0]],
+    "providerLaws": []
+  }
+}
+```
+
+Version 5 embeds the full scalar v5 contract grammar, including explicit target
+roles and case policy plus positive-literal modulo and quotient. Versions 1--3
+retain their older embedded compatibility grammar and neutral positive ordering.
+Because the example is unpinned, run it with the explicit relaxation:
+
+```text
+leant --length-ranking-config /absolute/path/scalar-ranking-v5.json \
+  --length-ranking-allow-unpinned
+```
 
 Main now exposes that same product path through closed, separately typed file
 versions. Contract-only version 6 has the same three-field root as versions
@@ -449,13 +524,14 @@ first result length equals the input length and the second equals half of it:
 ```
 
 Startup version 4 selects pair ranking process-wide and retains version 3's
-required input box and origin-before-live policy. A complete unpinned example
-is:
+required input box and origin-before-live policy while leaving positive receipts
+neutral. Startup version 6 is its explicit preferred-positive successor. A
+complete unpinned example is:
 
 ```json
 {
   "format": "leant-live-length-ranking-configuration",
-  "version": 4,
+  "version": 6,
   "executionAdmission": {
     "executablePathCharacters": 4096,
     "policyFingerprintBytes": 262144
@@ -484,6 +560,7 @@ is:
     "maximumAssignments": 4
   },
   "counterexampleProbe": "origin-before-live",
+  "boundedPositiveOrdering": "prefer-non-vacuous",
   "contract": {
     "resultShape": "binary-prod-spines-v1",
     "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
@@ -507,7 +584,7 @@ Because that example intentionally has no executable digest expectation, start
 it only with the separate explicit relaxation:
 
 ```text
-leant --length-ranking-config /absolute/path/pair-ranking-v4.json \
+leant --length-ranking-config /absolute/path/pair-ranking-v6.json \
   --length-ranking-allow-unpinned
 ```
 
@@ -524,29 +601,34 @@ command without changing the CLI grammar:
 Versions, not a redundant domain field, choose the grammar. Pair contract
 objects have exactly `resultShape`, `spine`, `targetArgumentRoles`,
 `candidateCasePolicy`, `precondition`, `postcondition`, and `providerLaws`.
-After the bounded root/schema gates, v6 validates those fields in that order;
-v4 first validates execution admission, execution, evaluation, input-box
-validation, and the closed origin-probe selection, then validates the pair
-contract in the same order. JSON object member order is immaterial. The pair
-grammar retains v5's modulo, positive-literal quotient, formulas, and provider
-laws, but admits only `["input", n]`, `["result", "first"]`, and
+After the bounded root/schema gates, contract-only v6 validates those fields in
+that order. Startup v4 first validates execution admission, execution,
+evaluation, input-box validation, and the closed origin-probe selection, then
+validates the pair contract in the same order. Startup v5 and v6 validate the
+new bounded-positive ordering literal after the origin-probe selection and
+before their scalar or pair contract. JSON object member order is immaterial.
+The pair grammar retains v5's modulo, positive-literal quotient, formulas, and
+provider laws, but admits only `["input", n]`, `["result", "first"]`, and
 `["result", "second"]` as contract variables. Its target-role vector is
 required, and its case policy is exactly `"cases-rejected"` or
 `"exact-spine-zero-step-v1"`.
 
 The old scalar decoders remain exact compatibility entrances: the startup
-decoder for versions 1--3 rejects v4, and the contract-only decoder for
+decoder for versions 1--3 rejects v4--v6, and the contract-only decoder for
 versions 1--5 rejects v6. The generalized decoders delegate those old versions
-to their unchanged scalar paths. A product file selects which nominal runner
-Main calls; it does not infer a contract from the Lean type, bypass the exact
-canonical-`Prod` handoff, turn solver status into evidence, or grant pruning
-authority. See the
+to their unchanged scalar paths and add startup v4--v6 or contract-only v6. A
+product file selects which nominal runner Main calls; it does not infer a
+contract from the Lean type, bypass the exact canonical-`Prod` handoff, turn
+solver status into evidence, or grant pruning authority. See the
 [canonical `Prod` Length handoff report](docs/reports/2026-08-14-canonical-prod-length-handoff.md)
 for the exact handoff boundary and the
 [live binary-product Length ranking report](docs/reports/2026-08-14-live-binary-product-length-ranking.md)
 for the live orchestration, authority, and compatibility details. The closed
 v4/v6 file boundary is recorded in the
 [binary-product Length configuration report](docs/reports/2026-08-14-binary-product-length-configuration.md).
+The explicit v5/v6 preference and its unchanged evidence and identity
+boundaries are recorded in the
+[non-vacuous bounded-positive ordering report](docs/reports/2026-08-14-non-vacuous-bounded-positive-ordering.md).
 
 After a successful occurrence seal, Main dispatches presentation through the
 selected scalar or pair domain and prints a subordinate note only for a
@@ -896,13 +978,18 @@ hit avoids a live query transaction and ordinal, not process launch or a prior
 session-open failure.
 
 With the version-1 historical path, `unsat`, `unknown`, and status-only `sat`
-remain neutral. The explicit input-box path in versions 2 and 3 instead uses a
-live `unsat` only to trigger Djex's independent exhaustive replay of
+remain neutral. The explicit input-box paths instead use a live `unsat` only to
+trigger Djex's independent exhaustive replay of
 caller-selected per-input inclusive maxima. A discovered violation becomes the
 ordinary `Counterexample`, is
 stably demoted, and updates the MRU bank. Complete traversal becomes
-`BoundedPositive`: it stays in the neutral stable partition, contributes no
-seed, and records only bounded/model-relative positive evidence. A validation
+`BoundedPositive`, contributes no seed, and records only bounded/model-relative
+positive evidence. It stays in the neutral stable partition under the existing
+builder and startup versions 2--4. The explicit
+`enableLengthRankingNonVacuousInputBoxPreference` builder—or startup scalar v5
+or pair v6—moves only a receipt with a positive applicable-assignment count
+into a stable preferred partition. A zero-applicable receipt remains neutral.
+A validation
 or association rejection is an indexed operational failure and activates the
 same original-order, all-`Unassessed` atomic fallback. `sat` and `unknown`
 remain heuristic. Live
@@ -954,6 +1041,9 @@ identity boundaries are detailed in the
 The opt-in finite-box policy, its unsat-as-trigger-only boundary, positive
 receipt, and additive configuration grammar are detailed in the
 [unsat-triggered bounded Length validation report](docs/reports/2026-08-14-unsat-triggered-length-input-box-validation.md).
+The separately enabled stable preference for non-vacuous positive receipts is
+detailed in the
+[non-vacuous bounded-positive ordering report](docs/reports/2026-08-14-non-vacuous-bounded-positive-ordering.md).
 
 `Leant.Synth.Length.SpinePair.Ranking` and
 `Leant.Synth.Length.SpinePair.PostVerification` supply the nominal
@@ -975,9 +1065,11 @@ expectation, solver/host budgets, artifact policy, and response limits), and
 replay-limit source. After validation, `LengthRankingPolicy` retains the
 opaque sealed Djex execution configuration and evaluation limits plus a
 private optional origin probe and an independent optional finite-input-box
-orchestration policy. `mkLengthRankingPolicy` leaves both disabled. The finite
-box is enabled by its explicit builder or the version-2 decoder; versions 3
-and 4 enable both policies. A scalar `LeanLengthContract` or nominal
+orchestration policy, plus an orthogonal optional non-vacuous-positive ordering
+preference. `mkLengthRankingPolicy` leaves all three disabled. The finite box is
+enabled by its explicit builder or the version-2 decoder; versions 3 and 4
+enable the box and origin probe while retaining neutral positive ordering.
+Versions 5 and 6 also enable the explicit preference. A scalar `LeanLengthContract` or nominal
 `LeanLengthSpinePairContract` is supplied separately to its domain-specific
 runner, so a request assertion no longer has to share the lifetime of reusable
 process policy. Execution validation
@@ -1013,10 +1105,10 @@ preserving the version-1 compatibility path.
 `Leant.Synth.Length.Configuration.File` keeps the exact version-1 JSON grammar
 for that policy and adds exact scalar opt-in versions 2 and 3. Its established
 `decodeLengthRankingConfigurationFile` remains an exact scalar-only entrance
-and rejects version 4. The generalized
-`decodeLengthAssessmentConfigurationFile` additionally accepts version 4 and
-returns an opaque `DisabledLengthAssessmentConfiguration` carrying the same
-checked process policy beside a lazy pair selection. The pure decoder consumes a caller-owned
+and rejects versions 4--6. The generalized
+`decodeLengthAssessmentConfigurationFile` additionally accepts versions 4--6
+and returns an opaque `DisabledLengthAssessmentConfiguration` carrying the same
+checked process policy beside a lazy scalar-or-pair selection. The pure decoder consumes a caller-owned
 strict byte string through a separate bounded JSON parser, rejects malformed
 UTF-8, duplicate keys, unknown or missing fields, non-integral policy numbers,
 and any parser, contract, or operational value above its hard ceiling. Every
@@ -1069,6 +1161,18 @@ changing old failure precedence. `activateLengthAssessmentConfiguration`
 performs the same separate digest-policy decision for either domain and still
 does not inspect the lazy contract or launch Z3.
 
+Versions 5 and 6 are the scalar and pair positive-ordering successors. They
+repeat versions 3 and 4's operational root and add the required exact field
+`"boundedPositiveOrdering": "prefer-non-vacuous"`. Their fixed decode order is
+exact root, execution admission, execution, evaluation, input box, origin
+probe, bounded-positive ordering, then contract. Version 5 embeds the complete
+scalar v5 contract grammar; version 6 embeds the same pair v5 grammar as
+startup v4. The literal derives the opaque policy with
+`enableLengthRankingNonVacuousInputBoxPreference`; it is permission for one
+post-assessment stable ordering rule, not evidence, validation, or solver
+authority. Existing versions reject the new field and retain their exact
+ordering.
+
 `Leant.Synth.Length.Configuration.File.Acquire` is the compatibility facade
 over the shared bounded `Leant.Synth.Length.File.Acquire` filesystem boundary.
 Callers must explicitly
@@ -1106,8 +1210,9 @@ exactly those scalar versions 1--5 and rejects version 6. The generalized
 `decodeLengthContractSelectionFile` additionally admits v6's nominal pair
 contract, while delegating every older version to that unchanged scalar
 decoder. Execution and evaluation fields remain unknown and rejected. Startup
-versions 1--3 retain scalar contract grammar version 1; startup v4 alone
-selects the pair grammar.
+versions 1--3 retain scalar contract grammar version 1; startup v4 selects the
+pair grammar, v5 selects full scalar grammar v5, and v6 selects the pair
+grammar together with the explicit ordering preference.
 Its `Contract.File.Acquire` facade uses the same path, descriptor, and timeout
 owner as startup acquisition, but maps failures into contract-only closed
 vocabulary. `Leant.Synth.Length.Command` recognizes only the exact

@@ -2,6 +2,13 @@
 
 Date: 2026-08-14
 
+> **Later 2026-08-14 follow-up.** Complete traversal remains neutral by default.
+> A separately enabled policy can now stably prefer its receipt only when at
+> least one checked assignment met the precondition; zero-applicable receipts
+> remain vacuous and neutral. Z3 `unsat` is still only the traversal trigger.
+> See the
+> [non-vacuous bounded-positive ordering report](2026-08-14-non-vacuous-bounded-positive-ordering.md).
+>
 > **Later 2026-08-14 follow-up.** Startup configuration version 3 retains this
 > exact required box and adds a query-owned origin probe between the four-entry
 > MRU bank and live Z3. The finite box still runs only after an actual live

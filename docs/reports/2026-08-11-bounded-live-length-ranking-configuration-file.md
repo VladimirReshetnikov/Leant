@@ -2,6 +2,14 @@
 
 Date: 2026-08-11
 
+> **Later 2026-08-14 follow-up.** The established scalar-only decoder still
+> accepts exactly the three versions recorded below. The generalized assessment
+> decoder now additionally accepts pair v4 and the explicit preferred-positive
+> successors: scalar v5 and pair v6. Only v5/v6 require
+> `"boundedPositiveOrdering": "prefer-non-vacuous"`; older versions retain their
+> exact neutral ordering. See the
+> [non-vacuous bounded-positive ordering report](2026-08-14-non-vacuous-bounded-positive-ordering.md).
+
 ## Outcome
 
 `Leant.Synth.Length.Configuration.File` defines one closed JSON format with three

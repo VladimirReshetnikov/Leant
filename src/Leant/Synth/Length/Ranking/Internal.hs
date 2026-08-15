@@ -27,9 +27,12 @@
 -- to its own behavioral problem.  Even that receipt is finite-spine and
 -- model-relative: it is neither a proof nor a claim about the source-level
 -- realization of a Lean term.
--- Ranking therefore never prunes.  It stably moves candidates with replayed
--- counterexamples after every other candidate and preserves source order
--- within both partitions.  The seed bank contains only input vectors, not
+-- Ranking therefore never prunes.  The established runners stably move
+-- candidates with replayed counterexamples after every other candidate.  A
+-- separate post-assessment opt-in may first prefer non-vacuous bounded-positive
+-- receipts while leaving vacuous receipts neutral and counterexamples last;
+-- source order is preserved within every partition.  The seed bank contains
+-- only input vectors, not
 -- cached verdicts, solver results, receipts, or proofs, and it never crosses a
 -- ranking batch.
 --
@@ -57,10 +60,12 @@ module Leant.Synth.Length.Ranking.Internal
   , LengthRanking
   , lengthRankingCandidates
   , lengthRankingFailure
+  , preferNonVacuousBoundedPositiveLengthRanking
   , AssociatedRankedLengthCandidate
   , associatedRankedLengthCandidateAssociation
   , AssociatedLengthRanking
   , associatedLengthRankingCandidates
+  , preferNonVacuousBoundedPositiveAssociatedLengthRanking
   , PostVerificationLengthRanking
   , sealPostVerificationLengthRanking
   , postVerificationLengthRankingBatch
@@ -115,6 +120,7 @@ import Language.Haskell.Djex
   , runLengthSMTLibLiveQuery
   , validateLengthSMTLibQueryInputBox
   , validatedLengthCounterexampleInputs
+  , validatedLengthInputBoxApplicableAssignmentCount
   , withLengthSMTLibLiveSession
   )
 
@@ -899,6 +905,70 @@ stableCounterexampleDemotion candidates =
       Counterexample _ -> True
       BoundedPositive _ -> False
       _ -> False
+
+-- | Additive evidence-ordering opt-in for an association-free successful
+-- ranking.  A positive finite-box receipt is preferred only when at least one
+-- checked assignment satisfied the contract precondition.  Vacuous positive
+-- receipts remain in the neutral partition, counterexamples remain last, and
+-- relative order is stable within all three partitions.  Operational fallback
+-- is returned literally so it cannot be mistaken for a successful preference.
+preferNonVacuousBoundedPositiveLengthRanking
+  :: LengthRanking
+  -> LengthRanking
+preferNonVacuousBoundedPositiveLengthRanking ranking = case ranking of
+  LengthRanking _ (Just _) -> ranking
+  LengthRanking candidates Nothing -> LengthRanking
+    (preferNonVacuousBoundedPositiveCandidates candidates) Nothing
+
+-- | Occurrence-associated sibling applied before the post-verification
+-- permutation seal.  The exact occurrence handle remains inseparable from its
+-- assessment through the stable trichotomy.
+preferNonVacuousBoundedPositiveAssociatedLengthRanking
+  :: AssociatedLengthRanking association
+  -> AssociatedLengthRanking association
+preferNonVacuousBoundedPositiveAssociatedLengthRanking ranking = case ranking of
+  AssociatedLengthRanking _ (Just _) -> ranking
+  AssociatedLengthRanking candidates Nothing -> AssociatedLengthRanking
+    (preferNonVacuousBoundedPositiveAssociatedCandidates candidates) Nothing
+
+preferNonVacuousBoundedPositiveCandidates
+  :: [RankedLengthCandidate]
+  -> [RankedLengthCandidate]
+preferNonVacuousBoundedPositiveCandidates candidates =
+  let (positive, retained) = partition hasNonVacuousBoundedPositive candidates
+  in positive ++ stableRankedLengthCounterexampleDemotion retained
+ where
+  hasNonVacuousBoundedPositive (RankedLengthCandidate _ _ state) =
+    isNonVacuousBoundedPositive $ candidateAssessment state
+
+preferNonVacuousBoundedPositiveAssociatedCandidates
+  :: [AssociatedRankedLengthCandidate association]
+  -> [AssociatedRankedLengthCandidate association]
+preferNonVacuousBoundedPositiveAssociatedCandidates candidates =
+  let (positive, retained) = partition hasNonVacuousBoundedPositive candidates
+  in positive ++ stableCounterexampleDemotion retained
+ where
+  hasNonVacuousBoundedPositive
+      (AssociatedRankedLengthCandidate _ _ state) =
+    isNonVacuousBoundedPositive $ candidateAssessment state
+
+stableRankedLengthCounterexampleDemotion
+  :: [RankedLengthCandidate]
+  -> [RankedLengthCandidate]
+stableRankedLengthCounterexampleDemotion candidates =
+  let (counterexamples, retained) = partition hasCounterexample candidates
+  in retained ++ counterexamples
+ where
+  hasCounterexample (RankedLengthCandidate _ _ state) = case
+      candidateAssessment state of
+    Counterexample _ -> True
+    _ -> False
+
+isNonVacuousBoundedPositive :: LengthRankingAssessment -> Bool
+isNonVacuousBoundedPositive assessment = case assessment of
+  BoundedPositive receipt ->
+    validatedLengthInputBoxApplicableAssignmentCount receipt > 0
+  _ -> False
 
 unassessedRanking
   :: [PreparedLengthCandidate association]

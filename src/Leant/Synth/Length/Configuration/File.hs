@@ -7,7 +7,10 @@
 -- Version 1 remains the exact compatibility grammar.  Version 2 adds one
 -- required, explicit finite input-box validation policy.  Version 3 retains
 -- that exact box and additionally requires a closed query-owned origin-probe
--- selection.  Neither widens the embedded version-1 contract grammar.
+-- selection.  Version 4 is the nominal binary-product sibling.  Generalized-
+-- only versions 5 and 6 add a required non-vacuous bounded-positive ordering
+-- grant for the scalar and product domains respectively.  Older decoders and
+-- grammars remain literal.
 -- Decoding performs no discovery, path normalization, environment lookup, or
 -- IO.  Every field is required.  A successful decode returns a deliberately
 -- disabled opaque value: callers
@@ -20,6 +23,8 @@ module Leant.Synth.Length.Configuration.File
   , lengthRankingConfigurationFileInputBoxVersion
   , lengthRankingConfigurationFileOriginProbeVersion
   , lengthRankingConfigurationFileSpinePairVersion
+  , lengthRankingConfigurationFilePositiveOrderingVersion
+  , lengthRankingConfigurationFileSpinePairPositiveOrderingVersion
   , lengthRankingConfigurationFileJsonLimits
   , LengthRankingConfigurationFileObject (..)
   , LengthRankingConfigurationFileField (..)
@@ -104,6 +109,7 @@ import Leant.Synth.Length.Contract
   )
 import Leant.Synth.Length.Configuration
   ( LengthRankingPolicy
+  , enableLengthRankingNonVacuousInputBoxPreference
   , enableLengthRankingOriginProbe
   , enableLengthRankingInputBoxValidation
   , lengthRankingPolicyExecutableDigestExpectation
@@ -131,6 +137,16 @@ lengthRankingConfigurationFileOriginProbeVersion = 3
 -- results.  Versions 1--3 retain their literal scalar-only decoder.
 lengthRankingConfigurationFileSpinePairVersion :: Natural
 lengthRankingConfigurationFileSpinePairVersion = 4
+
+-- | Additive scalar startup grammar which retains the complete v3
+-- orchestration, selects non-vacuous finite-box evidence preference, and uses
+-- the already established scalar contract-v5 grammar.
+lengthRankingConfigurationFilePositiveOrderingVersion :: Natural
+lengthRankingConfigurationFilePositiveOrderingVersion = 5
+
+-- | Nominal binary-product sibling of the scalar positive-ordering grammar.
+lengthRankingConfigurationFileSpinePairPositiveOrderingVersion :: Natural
+lengthRankingConfigurationFileSpinePairPositiveOrderingVersion = 6
 
 -- | Fixed admission policy for the v1 document itself.  The array maximum is
 -- one greater than the widest typed collection so maximum-plus-one reaches the
@@ -201,6 +217,7 @@ data LengthRankingConfigurationFileField
   | LengthRankingConfigurationTargetArgumentRolesField
   | LengthRankingConfigurationCandidateCasePolicyField
   | LengthRankingConfigurationResultShapeField
+  | LengthRankingConfigurationBoundedPositiveOrderingField
   deriving (Eq, Ord, Show)
 
 data LengthRankingConfigurationFileValueType
@@ -410,7 +427,8 @@ decodeLengthRankingConfigurationFile bytes = do
 -- | Decode the additive domain-selecting startup grammar.  Every established
 -- scalar success and every scalar diagnostic except the closed unsupported-
 -- version sentinel is returned by the old decoder itself.  Only that sentinel
--- permits a second bounded parse, which accepts exactly version 4.
+-- permits the literal version-4 parse and, only after its own unsupported-
+-- version sentinel, the additive version-5/version-6 parse.
 decodeLengthAssessmentConfigurationFile
   :: ByteString
   -> Either
@@ -420,8 +438,12 @@ decodeLengthAssessmentConfigurationFile bytes =
   case decodeLengthRankingConfigurationFile bytes of
     Right scalar -> Right
       $ DisabledLengthScalarAssessmentConfiguration scalar
-    Left LengthRankingConfigurationUnsupportedVersion ->
-      decodeLengthAssessmentConfigurationFileSpinePairV4 bytes
+    Left LengthRankingConfigurationUnsupportedVersion -> case
+        decodeLengthAssessmentConfigurationFileSpinePairV4 bytes of
+      Right pair -> Right pair
+      Left LengthRankingConfigurationUnsupportedVersion ->
+        decodeLengthAssessmentConfigurationFilePositiveOrdering bytes
+      Left failure -> Left failure
     Left failure -> Left failure
 
 decodeLengthAssessmentConfigurationFileSpinePairV4
@@ -451,6 +473,42 @@ decodeLengthAssessmentConfigurationFileSpinePairV4 bytes = do
   if version == toInteger lengthRankingConfigurationFileSpinePairVersion
     then decodeLengthRankingConfigurationFileSpinePairV4 root
     else Left LengthRankingConfigurationUnsupportedVersion
+
+-- | Decode only the two additive positive-ordering versions after both the
+-- scalar v1--v3 decoder and the literal pair-v4 decoder have returned their
+-- closed unsupported-version sentinel.  This preserves every established
+-- success and diagnostic at those older entrances.
+decodeLengthAssessmentConfigurationFilePositiveOrdering
+  :: ByteString
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthAssessmentConfigurationFilePositiveOrdering bytes = do
+  document <- either (Left . LengthRankingConfigurationJsonRejected) Right
+    $ parseBoundedJson lengthRankingConfigurationFileJsonLimits bytes
+  root <- objectFields LengthRankingConfigurationRootObject document
+  formatValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationFormatField
+    "format"
+    root
+  format <- stringField LengthRankingConfigurationFormatField formatValue
+  if format == lengthRankingConfigurationFileFormat
+    then pure ()
+    else Left LengthRankingConfigurationUnsupportedFormat
+  versionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationVersionField
+    "version"
+    root
+  version <- integerField LengthRankingConfigurationVersionField versionValue
+  if version ==
+      toInteger lengthRankingConfigurationFilePositiveOrderingVersion
+    then decodeLengthRankingConfigurationFilePositiveOrderingV5 root
+    else if version == toInteger
+        lengthRankingConfigurationFileSpinePairPositiveOrderingVersion
+      then decodeLengthRankingConfigurationFileSpinePairPositiveOrderingV6 root
+      else Left LengthRankingConfigurationUnsupportedVersion
 
 -- Keep the established version-1 path literal: its exact root, validation
 -- order, embedded contract grammar, and disabled policy construction do not
@@ -640,6 +698,134 @@ decodeLengthRankingConfigurationFileSpinePairV4 root = do
       policy = enableLengthRankingOriginProbe inputBoxPolicy
   pure $ DisabledLengthSpinePairAssessmentConfiguration policy contract
 
+-- Version 5 is generalized-only and scalar.  It repeats version 3's complete
+-- operational precedence, requires the new ordering grant, then decodes the
+-- established full scalar contract-v5 grammar.  No older decoder reaches this
+-- function.
+decodeLengthRankingConfigurationFilePositiveOrderingV5
+  :: ObjectFields
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthRankingConfigurationFilePositiveOrderingV5 root = do
+  exactFields LengthRankingConfigurationRootObject
+    rootFieldsPositiveOrdering root
+  executionAdmissionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationExecutionAdmissionField
+    "executionAdmission"
+    root
+  executionLimits <- decodeExecutionAdmission executionAdmissionValue
+  executionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationExecutionField
+    "execution"
+    root
+  execution <- decodeExecution executionLimits executionValue
+  evaluationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationEvaluationField
+    "evaluation"
+    root
+  evaluation <- decodeEvaluation evaluationValue
+  inputBoxValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationInputBoxValidationField
+    "inputBoxValidation"
+    root
+  (inputBoxLimits, inclusiveMaximums) <-
+    decodeInputBoxValidation inputBoxValue
+  counterexampleProbeValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationCounterexampleProbeField
+    "counterexampleProbe"
+    root
+  decodeCounterexampleProbe counterexampleProbeValue
+  boundedPositiveOrderingValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationBoundedPositiveOrderingField
+    "boundedPositiveOrdering"
+    root
+  decodeBoundedPositiveOrdering boundedPositiveOrderingValue
+  contractValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationContractField
+    "contract"
+    root
+  contract <- decodeLeanLengthContractValueV5 contractValue
+  let basePolicy =
+        lengthRankingPolicyFromValidatedComponents execution evaluation
+      inputBoxPolicy = enableLengthRankingInputBoxValidation
+        inputBoxLimits inclusiveMaximums basePolicy
+      originProbePolicy = enableLengthRankingOriginProbe inputBoxPolicy
+      policy = enableLengthRankingNonVacuousInputBoxPreference
+        originProbePolicy
+  pure $ DisabledLengthScalarAssessmentConfiguration
+    $ disableLengthRankingConfiguration policy contract
+
+-- Version 6 is the nominal pair sibling.  Its operational and ordering fields
+-- have the same fixed precedence as version 5, while the passive contract is
+-- decoded only by the pair-specific v5 grammar used by startup version 4.
+decodeLengthRankingConfigurationFileSpinePairPositiveOrderingV6
+  :: ObjectFields
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthRankingConfigurationFileSpinePairPositiveOrderingV6 root = do
+  exactFields LengthRankingConfigurationRootObject
+    rootFieldsPositiveOrdering root
+  executionAdmissionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationExecutionAdmissionField
+    "executionAdmission"
+    root
+  executionLimits <- decodeExecutionAdmission executionAdmissionValue
+  executionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationExecutionField
+    "execution"
+    root
+  execution <- decodeExecution executionLimits executionValue
+  evaluationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationEvaluationField
+    "evaluation"
+    root
+  evaluation <- decodeEvaluation evaluationValue
+  inputBoxValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationInputBoxValidationField
+    "inputBoxValidation"
+    root
+  (inputBoxLimits, inclusiveMaximums) <-
+    decodeInputBoxValidation inputBoxValue
+  counterexampleProbeValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationCounterexampleProbeField
+    "counterexampleProbe"
+    root
+  decodeCounterexampleProbe counterexampleProbeValue
+  boundedPositiveOrderingValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationBoundedPositiveOrderingField
+    "boundedPositiveOrdering"
+    root
+  decodeBoundedPositiveOrdering boundedPositiveOrderingValue
+  contractValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationContractField
+    "contract"
+    root
+  contract <- decodeLeanLengthSpinePairContractValueV5 contractValue
+  let basePolicy =
+        lengthRankingPolicyFromValidatedComponents execution evaluation
+      inputBoxPolicy = enableLengthRankingInputBoxValidation
+        inputBoxLimits inclusiveMaximums basePolicy
+      originProbePolicy = enableLengthRankingOriginProbe inputBoxPolicy
+      policy = enableLengthRankingNonVacuousInputBoxPreference
+        originProbePolicy
+  pure $ DisabledLengthSpinePairAssessmentConfiguration policy contract
+
 rootFields :: [(Text, LengthRankingConfigurationFileField)]
 rootFields =
   [ ("format", LengthRankingConfigurationFormatField)
@@ -676,6 +862,26 @@ rootFieldsOriginProbeV3 =
     )
   , ( "counterexampleProbe"
     , LengthRankingConfigurationCounterexampleProbeField
+    )
+  , ("contract", LengthRankingConfigurationContractField)
+  ]
+
+rootFieldsPositiveOrdering
+  :: [(Text, LengthRankingConfigurationFileField)]
+rootFieldsPositiveOrdering =
+  [ ("format", LengthRankingConfigurationFormatField)
+  , ("version", LengthRankingConfigurationVersionField)
+  , ("executionAdmission", LengthRankingConfigurationExecutionAdmissionField)
+  , ("execution", LengthRankingConfigurationExecutionField)
+  , ("evaluation", LengthRankingConfigurationEvaluationField)
+  , ( "inputBoxValidation"
+    , LengthRankingConfigurationInputBoxValidationField
+    )
+  , ( "counterexampleProbe"
+    , LengthRankingConfigurationCounterexampleProbeField
+    )
+  , ( "boundedPositiveOrdering"
+    , LengthRankingConfigurationBoundedPositiveOrderingField
     )
   , ("contract", LengthRankingConfigurationContractField)
   ]
@@ -1109,6 +1315,21 @@ decodeCounterexampleProbe value = do
     "origin-before-live" -> Right ()
     _ -> Left $ LengthRankingConfigurationFieldValueRejected
       LengthRankingConfigurationCounterexampleProbeField
+
+-- | Decode the sole additive evidence-ordering grant.  The literal does not
+-- enable finite-box traversal or assert that any applicable assignment will
+-- exist; it only permits an independently acquired non-vacuous receipt to
+-- enter the preferred stable partition.
+decodeBoundedPositiveOrdering
+  :: BoundedJsonValue
+  -> Either LengthRankingConfigurationFileError ()
+decodeBoundedPositiveOrdering value = do
+  mode <- stringField
+    LengthRankingConfigurationBoundedPositiveOrderingField value
+  case mode of
+    "prefer-non-vacuous" -> Right ()
+    _ -> Left $ LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationBoundedPositiveOrderingField
 
 -- | Decode version 2's explicit source-ordered inclusive input box.  Width is
 -- bounded before any element is decoded, element values are then decoded

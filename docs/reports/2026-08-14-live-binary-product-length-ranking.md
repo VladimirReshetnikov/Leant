@@ -2,6 +2,13 @@
 
 Date: 2026-08-14
 
+> **Later 2026-08-14 follow-up.** Pair bounded-positive receipts remain neutral
+> under startup v4 and the established API. Startup v6 or the explicit policy
+> builder now stably prefers only a pair receipt with a positive applicable
+> count; vacuous positives remain neutral and pair counterexamples remain
+> demoted. See the
+> [non-vacuous bounded-positive ordering report](2026-08-14-non-vacuous-bounded-positive-ordering.md).
+>
 > **Later 2026-08-14 follow-up.** Main now exposes this nominal pair runner
 > through startup configuration version 4 and contract-only version 6. The new
 > generalized decoders dispatch a passive scalar-or-pair selection while the

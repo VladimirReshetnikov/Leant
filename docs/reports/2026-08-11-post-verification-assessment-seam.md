@@ -2,6 +2,13 @@
 
 Date: 2026-08-11
 
+> **Later 2026-08-14 follow-up.** The occurrence seal is unchanged. An explicit
+> scalar-or-pair policy can now propose the stable order non-vacuous positive,
+> neutral, counterexample before that same seal validates the complete
+> permutation. Historical/default paths retain counterexample-only demotion.
+> See the
+> [non-vacuous bounded-positive ordering report](2026-08-14-non-vacuous-bounded-positive-ordering.md).
+
 ## Outcome
 
 Leant now has one explicit, domain-neutral boundary between callback

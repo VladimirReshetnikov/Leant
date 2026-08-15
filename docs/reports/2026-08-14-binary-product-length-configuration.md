@@ -2,6 +2,14 @@
 
 Date: 2026-08-14
 
+> **Later 2026-08-14 follow-up.** Startup v6 is the pair successor which retains
+> v4's operational and contract grammar and additionally requires
+> `"boundedPositiveOrdering": "prefer-non-vacuous"`. Scalar v5 supplies the same
+> preference with full scalar contract grammar v5. Existing versions remain
+> exact and neutral. The opaque policy now retains that preference orthogonally
+> to its execution, evaluation, input-box, and origin-probe fields. See the
+> [non-vacuous bounded-positive ordering report](2026-08-14-non-vacuous-bounded-positive-ordering.md).
+
 ## Outcome
 
 Leant now exposes its nominal canonical-`Prod` Length runner through Main's

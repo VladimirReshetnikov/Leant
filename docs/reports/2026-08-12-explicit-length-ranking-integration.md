@@ -2,6 +2,12 @@
 
 Date: 2026-08-12
 
+> **Later 2026-08-14 follow-up.** The configured policy now has an orthogonal
+> explicit preference for non-vacuous bounded-positive receipts. Startup scalar
+> v5 and pair v6 enable it; versions 1--4 and the established policy builders
+> retain the neutral ordering described in this historical report. See the
+> [non-vacuous bounded-positive ordering report](2026-08-14-non-vacuous-bounded-positive-ordering.md).
+>
 > **2026-08-14 follow-up.** Configured mode now also admits exact startup
 > version 3. It retains version 2's required finite box and selects the
 > query-owned all-zero probe after four MRU misses and before live Z3. The

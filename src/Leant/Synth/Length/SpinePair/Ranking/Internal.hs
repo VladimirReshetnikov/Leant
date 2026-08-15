@@ -3,7 +3,9 @@
 -- | Package-private implementation of conservative live binary-product
 -- finite-spine Length ranking.  This is a nominal sibling of the scalar
 -- ranking implementation: it shares only domain-neutral policy, admission,
--- and diagnostic vocabulary.
+-- and diagnostic vocabulary.  Its additive post-assessment preference keeps
+-- pair receipts and occurrence handles nominal throughout the stable
+-- non-vacuous-positive/neutral/counterexample trichotomy.
 module Leant.Synth.Length.SpinePair.Ranking.Internal
   ( LengthSpinePairRankingAssessment (..)
   , lengthSpinePairHandoffPreparationRefusalClass
@@ -21,10 +23,12 @@ module Leant.Synth.Length.SpinePair.Ranking.Internal
   , LengthSpinePairRanking
   , lengthSpinePairRankingCandidates
   , lengthSpinePairRankingFailure
+  , preferNonVacuousBoundedPositiveLengthSpinePairRanking
   , AssociatedRankedLengthSpinePairCandidate
   , associatedRankedLengthSpinePairCandidateAssociation
   , AssociatedLengthSpinePairRanking
   , associatedLengthSpinePairRankingCandidates
+  , preferNonVacuousBoundedPositiveAssociatedLengthSpinePairRanking
   , PostVerificationLengthSpinePairRanking
   , sealPostVerificationLengthSpinePairRanking
   , postVerificationLengthSpinePairRankingBatch
@@ -79,6 +83,7 @@ import Language.Haskell.Djex
   , runLengthSpinePairSMTLibLiveQuery
   , validateLengthSpinePairSMTLibQueryInputBox
   , validatedLengthSpinePairCounterexampleInputs
+  , validatedLengthSpinePairInputBoxApplicableAssignmentCount
   , withLengthSMTLibLiveSession
   )
 
@@ -759,6 +764,78 @@ stableLengthSpinePairCounterexampleDemotion candidates =
       LengthSpinePairCounterexample _ -> True
       LengthSpinePairBoundedPositive _ -> False
       _ -> False
+
+-- | Additive evidence-ordering opt-in for an association-free successful
+-- product ranking.  Only a finite-box receipt with at least one applicable
+-- assignment enters the preferred partition.  Vacuous receipts stay neutral,
+-- counterexamples stay last, and every partition remains stable.
+preferNonVacuousBoundedPositiveLengthSpinePairRanking
+  :: LengthSpinePairRanking
+  -> LengthSpinePairRanking
+preferNonVacuousBoundedPositiveLengthSpinePairRanking ranking = case ranking of
+  LengthSpinePairRanking _ (Just _) -> ranking
+  LengthSpinePairRanking candidates Nothing -> LengthSpinePairRanking
+    (preferNonVacuousBoundedPositiveLengthSpinePairCandidates candidates)
+    Nothing
+
+-- | Occurrence-associated product sibling applied before the generative
+-- permutation seal.  No candidate/evidence association is projected or
+-- reconstructed while the stable trichotomy is selected.
+preferNonVacuousBoundedPositiveAssociatedLengthSpinePairRanking
+  :: AssociatedLengthSpinePairRanking association
+  -> AssociatedLengthSpinePairRanking association
+preferNonVacuousBoundedPositiveAssociatedLengthSpinePairRanking ranking =
+  case ranking of
+    AssociatedLengthSpinePairRanking _ (Just _) -> ranking
+    AssociatedLengthSpinePairRanking candidates Nothing ->
+      AssociatedLengthSpinePairRanking
+        (preferNonVacuousBoundedPositiveAssociatedLengthSpinePairCandidates
+          candidates)
+        Nothing
+
+preferNonVacuousBoundedPositiveLengthSpinePairCandidates
+  :: [RankedLengthSpinePairCandidate]
+  -> [RankedLengthSpinePairCandidate]
+preferNonVacuousBoundedPositiveLengthSpinePairCandidates candidates =
+  let (positive, retained) = partition hasNonVacuousBoundedPositive candidates
+  in positive ++ stableRankedLengthSpinePairCounterexampleDemotion retained
+ where
+  hasNonVacuousBoundedPositive
+      (RankedLengthSpinePairCandidate _ _ state) =
+    isNonVacuousLengthSpinePairBoundedPositive
+      $ spinePairCandidateAssessment state
+
+preferNonVacuousBoundedPositiveAssociatedLengthSpinePairCandidates
+  :: [AssociatedRankedLengthSpinePairCandidate association]
+  -> [AssociatedRankedLengthSpinePairCandidate association]
+preferNonVacuousBoundedPositiveAssociatedLengthSpinePairCandidates candidates =
+  let (positive, retained) = partition hasNonVacuousBoundedPositive candidates
+  in positive ++ stableLengthSpinePairCounterexampleDemotion retained
+ where
+  hasNonVacuousBoundedPositive
+      (AssociatedRankedLengthSpinePairCandidate _ _ state) =
+    isNonVacuousLengthSpinePairBoundedPositive
+      $ spinePairCandidateAssessment state
+
+stableRankedLengthSpinePairCounterexampleDemotion
+  :: [RankedLengthSpinePairCandidate]
+  -> [RankedLengthSpinePairCandidate]
+stableRankedLengthSpinePairCounterexampleDemotion candidates =
+  let (counterexamples, retained) = partition hasCounterexample candidates
+  in retained ++ counterexamples
+ where
+  hasCounterexample (RankedLengthSpinePairCandidate _ _ state) = case
+      spinePairCandidateAssessment state of
+    LengthSpinePairCounterexample _ -> True
+    _ -> False
+
+isNonVacuousLengthSpinePairBoundedPositive
+  :: LengthSpinePairRankingAssessment
+  -> Bool
+isNonVacuousLengthSpinePairBoundedPositive assessment = case assessment of
+  LengthSpinePairBoundedPositive receipt ->
+    validatedLengthSpinePairInputBoxApplicableAssignmentCount receipt > 0
+  _ -> False
 
 unassessedLengthSpinePairRanking
   :: [PreparedLengthSpinePairCandidate association]

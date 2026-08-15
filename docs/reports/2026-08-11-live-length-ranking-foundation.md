@@ -1,5 +1,12 @@
 # Live Length ranking foundation
 
+> **Later 2026-08-14 follow-up.** Bounded-positive receipts remain neutral on
+> every historical/default path, but a new explicit policy may stably prefer
+> only receipts whose independently checked applicable-assignment count is
+> positive. Vacuous receipts stay neutral and counterexamples stay in the final
+> demoted partition. See the
+> [non-vacuous bounded-positive ordering report](2026-08-14-non-vacuous-bounded-positive-ordering.md).
+>
 > **2026-08-14 follow-up.** Later eligible candidates now try at most four
 > distinct prior input vectors from a fixed newest-first MRU bank. Each attempt
 > calls Djex's query-owned `replayLengthSMTLibCounterexampleInputs` boundary, so
