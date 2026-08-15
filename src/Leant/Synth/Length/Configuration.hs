@@ -165,8 +165,8 @@ data LengthRankingInputBoxValidation
   | LengthRankingInputBoxValidationEnabled !LengthInputBoxLimits [Natural]
 
 -- | Private permission to attempt complete traversal of the query-owned
--- applicable domain derived from direct precondition upper bounds.  Missing
--- bounds and bounded-admission refusals remain ordinary misses.
+-- applicable domain under the selected checked-precondition extraction rule.
+-- Missing bounds and bounded-admission refusals remain ordinary misses.
 data LengthRankingApplicableDomainValidation
   = LengthRankingApplicableDomainValidationDisabled
   | LengthRankingApplicableDomainValidationDirectV1 !LengthInputBoxLimits

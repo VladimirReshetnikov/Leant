@@ -311,9 +311,9 @@ data ReplState = ReplState
   , rsLengthAssessmentMode :: LengthAssessmentMode
     -- ^ Explicitly disabled by default. Enabled values come only from one
     -- bounded, activated configuration-file setup at process startup. Its
-    -- finite-spine domain selection and contract remain fixed for this process,
-    -- while each
-    -- eligible batch still owns a fresh lexical solver session.
+    -- finite-spine domain selection and contract remain fixed for this process.
+    -- Eager policies give each eligible batch a fresh lexical solver session;
+    -- deferred policies create it only at the first actual live miss.
   , rsRatings :: [(String, Double)]
     -- ^ the library inventory with ratings (lower is better), best
     -- first: the defaults merged with the project's `leant.ratings`
