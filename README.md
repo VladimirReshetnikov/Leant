@@ -1,6 +1,6 @@
 # Leant — a Djex-based synthesis REPL for Lean 4
 
-Leant brings [Djex](lib/Djex)-powered program and proof synthesis to
+Leant brings [Djex](https://github.com/VladimirReshetnikov/Djex)-powered program and proof synthesis to
 Lean 4, wrapped in an interactive read-eval-print loop. The centerpiece
 is `:synth`: give it a type and it constructs terms of that type —
 ranked, bound into the session, and every candidate re-elaborated by
