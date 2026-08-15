@@ -2556,131 +2556,205 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
   voidC <- viaShow (mkIdentifier "Void")
   unitC <- viaShow (tupleName Boxed 0)
   pairC <- viaShow (tupleName Boxed 2)
-  let usableProviders = filter usableProvider providers
-      indexedProviders = zip [0 :: Int ..] usableProviders
-      exactContextualProviderIndices = Set.fromList
-        [ index
-        | (index, provider) <- indexedProviders
-        , exactContextualProvider provider
-        ]
-      assignmentRetainedForPass providerIndex vectorIndex
-        | providerIndex `Set.notMember` exactContextualProviderIndices = True
-        | Just successfulKeys <- successfulKeyFilter
-        , (providerIndex, vectorIndex) `Set.notMember` successfulKeys = False
-        | otherwise = case groundFactMode of
-            DiscoverProviderGroundFacts -> True
-            SelectProviderGroundFacts selected
-              | selectedProviderHasGroundFacts providerIndex selected ->
-                  (providerIndex, vectorIndex) `Set.member` selected
-              | otherwise -> True
-      projectedProviderFrags =
-        [ projectedProviderFrag index provider
-        | (index, provider) <- indexedProviders
-        ]
-      -- Bound the provider-indexed assignment list before any argument
-      -- fragment participates in family planning, rigidity, or translation.
-      -- Keeping the index beside each complete vector preserves exact provider
-      -- locality and source argument order while leaving later providers and
-      -- their declarations intact.
-      rawBoundedProviderAssignments =
-        take maximumProviderInstantiationAssignments
-          [ (providerIndex, vectorIndex, assignment)
-          | (providerIndex, provider) <- indexedProviders
-          , (vectorIndex, assignment) <- zip [0 :: Int ..]
-              $ usableProviderAssignments provider
-          ]
-      passProviderAssignments =
-        [ retained
-        | retained@(providerIndex, vectorIndex, _) <-
-            rawBoundedProviderAssignments
-        , assignmentRetainedForPass providerIndex vectorIndex
-        ]
-      baselineEvidenceClaims = foldl
-        (\claims source -> mergeExactEvidenceClaims claims
-          (fragExactEvidenceClaims source))
-        emptyExactEvidenceClaims
-        (map snd extras ++ [frag0] ++ projectedProviderFrags)
-      internallyConsistentProviderAssignments =
-        [ (providerIndex, vectorIndex, assignment, claims)
-        | (providerIndex, vectorIndex, assignment) <- passProviderAssignments
-        , let claims = providerAssignmentExactEvidenceClaims assignment
-        , exactEvidenceClaimsConsistent claims
-        ]
-      combinedEvidenceClaims = foldl
-        (\claims (_, _, _, assignmentClaims) ->
-          mergeExactEvidenceClaims claims assignmentClaims)
-        baselineEvidenceClaims internallyConsistentProviderAssignments
-      conflictingContextNames =
-        conflictingClaimNames (claimedContextKinds combinedEvidenceClaims)
-      conflictingFamilyNames =
-        conflictingClaimNames (claimedFamilyArities combinedEvidenceClaims)
-      -- A conflict may span two individually well-formed assignment vectors or
-      -- one vector and the query baseline. Drop every vector that touches that
-      -- identity; unrelated vectors from the same provider remain eligible.
-      boundedProviderAssignments =
-        [ (providerIndex, vectorIndex, assignment)
-        | (providerIndex, vectorIndex, assignment, claims) <-
-            internallyConsistentProviderAssignments
-        , not (claimsTouchConflicts conflictingContextNames
-            conflictingFamilyNames claims)
-        ]
-      providerArguments = concatMap
-        (\(_, _, arguments) -> arguments)
-        boundedProviderAssignments
-      providerAssignmentFragments =
-        concatMap providerArgumentFragments providerArguments
-      -- Residual higher-kinded nominal applications contribute a neutral
-      -- exact-head arity fact while only their already supplied arguments are
-      -- ordinary planning roots. This lets @Pair Nat@ share @Pair@ at arity
-      -- two without forcing a saturated structural occurrence opaque.
-      providerAssignmentPlanningFragments =
-        concatMap providerArgumentPlanningFragments providerArguments
-      providerAssignmentFamilyUses =
-        foldl collectProviderArgumentFamilyUse Map.empty providerArguments
-      queryFragments =
-        map snd extras ++ [frag0] ++ projectedProviderFrags
-          ++ providerAssignmentFragments
-      planningRoots =
-        [ (True, frag) | frag <- map snd extras ++ [frag0] ]
-          ++ [ (False, providerFrag)
-             | providerFrag <- projectedProviderFrags
-             ]
-          ++ [ (False, argument)
-             | argument <- providerAssignmentPlanningFragments
-             ]
-      plans = exactFamilyPlans recursiveProjection
-        providerAssignmentFamilyUses planningRoots
-      structuralTemplateFragments =
-        [ field
-        | plan <- Map.elems plans
-        , template <- case plan of
-            StructuralFamily selected -> [selected]
-            RecursiveStructuralFamily selected
-              | exactRecursiveData recursiveProjection -> [selected]
-            _ -> []
-        , (_, fields) <- templateConstructors template
-        , field <- fields
-        ]
-      (recursiveSelfKeys, recursiveFieldAtoms) =
-        recursiveStructuralAtoms recursiveProjection plans
-          (queryFragments ++ structuralTemplateFragments)
-      providerAtoms = foldl collectProviderSurfaceAtoms
-        Set.empty projectedProviderFrags
-      providerAndEvidenceAtoms = foldl collectProviderSurfaceAtoms
-        providerAtoms providerAssignmentFragments
-      rigidAtoms = Set.difference
-        (Set.unions
-          [ structuralAtomKeys recursiveProjection plans
-          , recursiveFieldAtoms
-          , providerAndEvidenceAtoms
-          ])
-        recursiveSelfKeys
-      projection = ProjectionCompleteness
-        { projectionFamiliesComplete =
-            exactFamilyProjectionComplete recursiveProjection plans
-        , projectionFragmentsComplete =
-            all fragmentProjectionComplete (frag0 : map snd extras)
-        }
+  (translatedProduct, finalState) <- runTrans
+    (translateSession eitherC voidC unitC pairC)
+    TransState
+    { tsTable = Map.empty
+    , tsNext = 0
+    , tsInds = Map.empty
+    , tsDecls = []
+    , tsIndNext = 0
+    , tsCtorMap = Map.empty
+    , tsRecs = Map.empty
+    , tsRecFamilies = Map.empty
+    , tsPrems = []
+    , tsAppFamilies = Map.empty
+    , tsFamilyPlans = plans
+    , tsAppNext = 0
+    , tsRigidAtoms = rigidAtoms
+    , tsAtomFamilies = Map.empty
+    , tsAtomNext = 0
+    , tsContextClasses = Map.empty
+    , tsContextNext = 0
+    , tsTypeMap = Map.empty
+    }
+  let providerBindings = translationProductProviderBindings translatedProduct
+      constructorPremises = tsPrems finalState
+      familyBindings = semanticFamilyBindings
+        (tsDecls finalState)
+        (tsCtorMap finalState)
+        (tsTypeMap finalState)
+  Right SynthesisTranslation
+    { translationSourceGoal = translationProductSourceGoal translatedProduct
+    , translationDeclarations = tsDecls finalState
+    , translationProviderBindings = providerBindings
+    , translationSemanticFamilyBindings = familyBindings
+    , translationConstructorMap = tsCtorMap finalState
+    , translationTypeMap = tsTypeMap finalState
+    , translationCallerPremises =
+        translationProductCallerPremises translatedProduct
+    , translationConstructorPremises = constructorPremises
+    , translationProjectionCompleteness = projection
+    }
+ where
+  -- The pure pre-translation pipeline: bound and filter provider
+  -- assignment vectors, merge exact evidence claims, select query-wide
+  -- family plans, and fix the rigid-atom and completeness facts that
+  -- seed the translation state.
+  usableProviders = filter usableProvider providers
+
+  indexedProviders = zip [0 :: Int ..] usableProviders
+
+  exactContextualProviderIndices = Set.fromList
+    [ index
+    | (index, provider) <- indexedProviders
+    , exactContextualProvider provider
+    ]
+
+  assignmentRetainedForPass providerIndex vectorIndex
+    | providerIndex `Set.notMember` exactContextualProviderIndices = True
+    | Just successfulKeys <- successfulKeyFilter
+    , (providerIndex, vectorIndex) `Set.notMember` successfulKeys = False
+    | otherwise = case groundFactMode of
+        DiscoverProviderGroundFacts -> True
+        SelectProviderGroundFacts selected
+          | selectedProviderHasGroundFacts providerIndex selected ->
+              (providerIndex, vectorIndex) `Set.member` selected
+          | otherwise -> True
+
+  projectedProviderFrags =
+    [ projectedProviderFrag index provider
+    | (index, provider) <- indexedProviders
+    ]
+  -- Bound the provider-indexed assignment list before any argument
+  -- fragment participates in family planning, rigidity, or translation.
+  -- Keeping the index beside each complete vector preserves exact provider
+  -- locality and source argument order while leaving later providers and
+  -- their declarations intact.
+  rawBoundedProviderAssignments =
+    take maximumProviderInstantiationAssignments
+      [ (providerIndex, vectorIndex, assignment)
+      | (providerIndex, provider) <- indexedProviders
+      , (vectorIndex, assignment) <- zip [0 :: Int ..]
+          $ usableProviderAssignments provider
+      ]
+
+  passProviderAssignments =
+    [ retained
+    | retained@(providerIndex, vectorIndex, _) <-
+        rawBoundedProviderAssignments
+    , assignmentRetainedForPass providerIndex vectorIndex
+    ]
+
+  baselineEvidenceClaims = foldl
+    (\claims source -> mergeExactEvidenceClaims claims
+      (fragExactEvidenceClaims source))
+    emptyExactEvidenceClaims
+    (map snd extras ++ [frag0] ++ projectedProviderFrags)
+
+  internallyConsistentProviderAssignments =
+    [ (providerIndex, vectorIndex, assignment, claims)
+    | (providerIndex, vectorIndex, assignment) <- passProviderAssignments
+    , let claims = providerAssignmentExactEvidenceClaims assignment
+    , exactEvidenceClaimsConsistent claims
+    ]
+
+  combinedEvidenceClaims = foldl
+    (\claims (_, _, _, assignmentClaims) ->
+      mergeExactEvidenceClaims claims assignmentClaims)
+    baselineEvidenceClaims internallyConsistentProviderAssignments
+
+  conflictingContextNames =
+    conflictingClaimNames (claimedContextKinds combinedEvidenceClaims)
+
+  conflictingFamilyNames =
+    conflictingClaimNames (claimedFamilyArities combinedEvidenceClaims)
+  -- A conflict may span two individually well-formed assignment vectors or
+  -- one vector and the query baseline. Drop every vector that touches that
+  -- identity; unrelated vectors from the same provider remain eligible.
+  boundedProviderAssignments =
+    [ (providerIndex, vectorIndex, assignment)
+    | (providerIndex, vectorIndex, assignment, claims) <-
+        internallyConsistentProviderAssignments
+    , not (claimsTouchConflicts conflictingContextNames
+        conflictingFamilyNames claims)
+    ]
+
+  providerArguments = concatMap
+    (\(_, _, arguments) -> arguments)
+    boundedProviderAssignments
+
+  providerAssignmentFragments =
+    concatMap providerArgumentFragments providerArguments
+  -- Residual higher-kinded nominal applications contribute a neutral
+  -- exact-head arity fact while only their already supplied arguments are
+  -- ordinary planning roots. This lets @Pair Nat@ share @Pair@ at arity
+  -- two without forcing a saturated structural occurrence opaque.
+  providerAssignmentPlanningFragments =
+    concatMap providerArgumentPlanningFragments providerArguments
+
+  providerAssignmentFamilyUses =
+    foldl collectProviderArgumentFamilyUse Map.empty providerArguments
+
+  queryFragments =
+    map snd extras ++ [frag0] ++ projectedProviderFrags
+      ++ providerAssignmentFragments
+
+  planningRoots =
+    [ (True, frag) | frag <- map snd extras ++ [frag0] ]
+      ++ [ (False, providerFrag)
+         | providerFrag <- projectedProviderFrags
+         ]
+      ++ [ (False, argument)
+         | argument <- providerAssignmentPlanningFragments
+         ]
+
+  plans = exactFamilyPlans recursiveProjection
+    providerAssignmentFamilyUses planningRoots
+
+  structuralTemplateFragments =
+    [ field
+    | plan <- Map.elems plans
+    , template <- case plan of
+        StructuralFamily selected -> [selected]
+        RecursiveStructuralFamily selected
+          | exactRecursiveData recursiveProjection -> [selected]
+        _ -> []
+    , (_, fields) <- templateConstructors template
+    , field <- fields
+    ]
+
+  (recursiveSelfKeys, recursiveFieldAtoms) =
+    recursiveStructuralAtoms recursiveProjection plans
+      (queryFragments ++ structuralTemplateFragments)
+
+  providerAtoms = foldl collectProviderSurfaceAtoms
+    Set.empty projectedProviderFrags
+
+  providerAndEvidenceAtoms = foldl collectProviderSurfaceAtoms
+    providerAtoms providerAssignmentFragments
+
+  rigidAtoms = Set.difference
+    (Set.unions
+      [ structuralAtomKeys recursiveProjection plans
+      , recursiveFieldAtoms
+      , providerAndEvidenceAtoms
+      ])
+    recursiveSelfKeys
+
+  projection = ProjectionCompleteness
+    { projectionFamiliesComplete =
+        exactFamilyProjectionComplete recursiveProjection plans
+    , projectionFragmentsComplete =
+        all fragmentProjectionComplete (frag0 : map snd extras)
+    }
+
+  -- The complete monadic translation session.  The four engine-side
+  -- constants are threaded in because they are extracted in the Either
+  -- monad before the session starts; everything else the workers need
+  -- is a function argument or a sibling binding above.
+  translateSession eitherC voidC unitC pairC = translate
+   where
       providerArgumentType argument = case argument of
         ProviderInstantiationNominalArgument remaining spelling supplied ->
           nominalArgumentType remaining spelling supplied
@@ -2766,27 +2840,6 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
               recDataOccurrence key parameterKeys ctors
           | otherwise -> recOccurrence premisesEnabled key ctors
         FDepth -> failT "internal: depth marker survived refusal check"
-
-      -- One Lean binder group is serialized as adjacent FAll nodes because
-      -- rendering retains each explicitness slot independently. Djex instead
-      -- models one source scheme with a binder list. Coalescing only the
-      -- uninterrupted spine preserves scope and rendering while preventing a
-      -- bounded multi-binder scheme from becoming independent occurrence sites.
-      adjacentForallSpine = collect []
-        where
-          collect binders (FAll _ binder body) =
-            collect (binder : binders) body
-          collect binders body = (reverse binders, body)
-
-      -- Preserve an exact instance telescope at its source position. A later
-      -- FAll starts a nested scheme rather than being floated ahead of the
-      -- context, so rendering consumes forall-domain metadata in the same
-      -- preorder that the Lean serializer recorded.
-      adjacentExactContextSpine = collect []
-        where
-          collect contexts (FExactContext className arguments body) =
-            collect ((className, arguments) : contexts) body
-          collect contexts body = (reverse contexts, body)
 
       exactContextConstraint (leanClassName, arguments) = do
         translatedArguments <- mapM exactContextArgument arguments
@@ -2937,19 +2990,6 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
               else arityFailure spelling arity [2]
         | otherwise = exactFamilyHead spelling arity
 
-      arityFailure spelling arity arities = failT
-        ("internal: exact Lean family " ++ show spelling
-          ++ " has incompatible proper-type arities "
-          ++ show (nub (arity : arities)))
-
-      declareAbstractFamily spelling arity = do
-        (_, _, typeName) <- freshExactFamily spelling arity
-        let kind = foldr FunctionKind ProperTypeKind
-              (replicate arity ProperTypeKind)
-            declaration = AbstractTypeDeclaration () typeName kind
-        modifyT (\s -> s { tsDecls = tsDecls s ++ [declaration] })
-        pure (TypeConstructor typeName)
-
       declareParametricFamily spelling template = do
         (index, _, typeName) <-
           freshExactFamily spelling (templateArity template)
@@ -2975,49 +3015,6 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
         modifyT (\s -> s { tsDecls = tsDecls s ++ [declaration] })
         pure (TypeConstructor typeName)
 
-      freshExactFamily spelling arity = do
-        index <- getsT tsAppNext
-        let privateSpelling = "LeantType" ++ show index
-        typeName <- nameT privateSpelling
-        let family = AppFamily typeName arity
-        modifyT (\s -> s
-          { tsAppFamilies = Map.insert spelling family (tsAppFamilies s)
-          , tsAppNext = index + 1
-          , tsTypeMap = Map.insert privateSpelling spelling (tsTypeMap s)
-          })
-        pure (index, privateSpelling, typeName)
-
-      -- A fixed opaque field such as @Secret@ is not one of the Lean
-      -- inductive's parameters.  Modeling it as an engine type variable would
-      -- make the generated data declaration ill scoped, so give every such
-      -- exact field one shared private proper-type declaration.  Other atoms
-      -- retain the established flexible transport representation.
-      rigidAtom key = do
-        atoms <- getsT tsAtomFamilies
-        case Map.lookup key atoms of
-          Just typeName -> pure (TypeConstructor typeName)
-          Nothing -> do
-            index <- getsT tsAtomNext
-            let privateSpelling = "LeantAtom" ++ show index
-            typeName <- nameT privateSpelling
-            let declaration =
-                  AbstractTypeDeclaration () typeName ProperTypeKind
-            modifyT (\s -> s
-              { tsAtomFamilies = Map.insert key typeName (tsAtomFamilies s)
-              , tsAtomNext = index + 1
-              -- Parenthesize the full pretty-printed type: the renderer adds
-              -- Lean's @ prefix, and keys may themselves be applications or
-              -- arrows rather than a single identifier.
-              , tsTypeMap = Map.insert privateSpelling ("(" ++ key ++ ")")
-                  (tsTypeMap s)
-              , tsDecls = tsDecls s ++ [declaration]
-              })
-            pure (TypeConstructor typeName)
-
-      -- One declaration per display key: translate the fields first
-      -- (declaring any nested inductives before this one), parameterize
-      -- over the type variables the translated fields mention, cache the
-      -- applied occurrence.
       indOccurrence premisesEnabled key ctors = do
         existing <- getsT (Map.lookup key . tsInds)
         case existing of
@@ -3227,7 +3224,7 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
               ctors
             pure ()
 
-  let translate = do
+      translate = do
         -- caller-supplied premises share the goal's variable table and
         -- come first, so their binders are the candidate's first
         extrasT <- mapM
@@ -3388,46 +3385,7 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
           , translationProductSourceGoal = goal
           , translationProductProviderBindings = translatedProviders
           }
-  (translatedProduct, finalState) <-
-    runTrans translate TransState
-    { tsTable = Map.empty
-    , tsNext = 0
-    , tsInds = Map.empty
-    , tsDecls = []
-    , tsIndNext = 0
-    , tsCtorMap = Map.empty
-    , tsRecs = Map.empty
-    , tsRecFamilies = Map.empty
-    , tsPrems = []
-    , tsAppFamilies = Map.empty
-    , tsFamilyPlans = plans
-    , tsAppNext = 0
-    , tsRigidAtoms = rigidAtoms
-    , tsAtomFamilies = Map.empty
-    , tsAtomNext = 0
-    , tsContextClasses = Map.empty
-    , tsContextNext = 0
-    , tsTypeMap = Map.empty
-    }
-  let providerBindings = translationProductProviderBindings translatedProduct
-      constructorPremises = tsPrems finalState
-      familyBindings = semanticFamilyBindings
-        (tsDecls finalState)
-        (tsCtorMap finalState)
-        (tsTypeMap finalState)
-  Right SynthesisTranslation
-    { translationSourceGoal = translationProductSourceGoal translatedProduct
-    , translationDeclarations = tsDecls finalState
-    , translationProviderBindings = providerBindings
-    , translationSemanticFamilyBindings = familyBindings
-    , translationConstructorMap = tsCtorMap finalState
-    , translationTypeMap = tsTypeMap finalState
-    , translationCallerPremises =
-        translationProductCallerPremises translatedProduct
-    , translationConstructorPremises = constructorPremises
-    , translationProjectionCompleteness = projection
-    }
- where
+
   -- Djinn's compatibility projection erases every exact provider context.
   -- Exference retains the semantic wire for live/plain, binder-only, and
   -- exact-evidence providers. Historical candidate pools are context-erased
@@ -3750,6 +3708,97 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
                 )
             | otherwise = accum
       in descend accum' (parameters ++ fields)
+
+-- | One Lean binder group is serialized as adjacent FAll nodes because
+-- rendering retains each explicitness slot independently. Djex instead
+-- models one source scheme with a binder list. Coalescing only the
+-- uninterrupted spine preserves scope and rendering while preventing a
+-- bounded multi-binder scheme from becoming independent occurrence sites.
+adjacentForallSpine :: Frag -> ([String], Frag)
+adjacentForallSpine = collect []
+  where
+    collect binders (FAll _ binder body) =
+      collect (binder : binders) body
+    collect binders body = (reverse binders, body)
+
+-- | Preserve an exact instance telescope at its source position. A later
+-- FAll starts a nested scheme rather than being floated ahead of the
+-- context, so rendering consumes forall-domain metadata in the same
+-- preorder that the Lean serializer recorded.
+adjacentExactContextSpine
+  :: Frag -> ([(String, [ExactContextArgument])], Frag)
+adjacentExactContextSpine = collect []
+  where
+    collect contexts (FExactContext className arguments body) =
+      collect ((className, arguments) : contexts) body
+    collect contexts body = (reverse contexts, body)
+
+-- | Report one exact Lean family observed at incompatible proper-type
+-- arities.
+arityFailure :: String -> Int -> [Int] -> Trans a
+arityFailure spelling arity arities = failT
+  ("internal: exact Lean family " ++ show spelling
+    ++ " has incompatible proper-type arities "
+    ++ show (nub (arity : arities)))
+
+-- | Declare one shared abstract engine constructor for an exact Lean
+-- family whose structure stays hidden.
+declareAbstractFamily :: String -> Int -> Trans (Type String)
+declareAbstractFamily spelling arity = do
+  (_, _, typeName) <- freshExactFamily spelling arity
+  let kind = foldr FunctionKind ProperTypeKind
+        (replicate arity ProperTypeKind)
+      declaration = AbstractTypeDeclaration () typeName kind
+  modifyT (\s -> s { tsDecls = tsDecls s ++ [declaration] })
+  pure (TypeConstructor typeName)
+
+-- | Allocate the next private engine spelling for one exact Lean family
+-- and record its name-map entry.
+freshExactFamily :: String -> Int -> Trans (Int, String, Name)
+freshExactFamily spelling arity = do
+  index <- getsT tsAppNext
+  let privateSpelling = "LeantType" ++ show index
+  typeName <- nameT privateSpelling
+  let family = AppFamily typeName arity
+  modifyT (\s -> s
+    { tsAppFamilies = Map.insert spelling family (tsAppFamilies s)
+    , tsAppNext = index + 1
+    , tsTypeMap = Map.insert privateSpelling spelling (tsTypeMap s)
+    })
+  pure (index, privateSpelling, typeName)
+
+-- | A fixed opaque field such as @Secret@ is not one of the Lean
+-- inductive's parameters.  Modeling it as an engine type variable would
+-- make the generated data declaration ill scoped, so give every such
+-- exact field one shared private proper-type declaration.  Other atoms
+-- retain the established flexible transport representation.
+rigidAtom :: String -> Trans (Type String)
+rigidAtom key = do
+  atoms <- getsT tsAtomFamilies
+  case Map.lookup key atoms of
+    Just typeName -> pure (TypeConstructor typeName)
+    Nothing -> do
+      index <- getsT tsAtomNext
+      let privateSpelling = "LeantAtom" ++ show index
+      typeName <- nameT privateSpelling
+      let declaration =
+            AbstractTypeDeclaration () typeName ProperTypeKind
+      modifyT (\s -> s
+        { tsAtomFamilies = Map.insert key typeName (tsAtomFamilies s)
+        , tsAtomNext = index + 1
+        -- Parenthesize the full pretty-printed type: the renderer adds
+        -- Lean's @ prefix, and keys may themselves be applications or
+        -- arrows rather than a single identifier.
+        , tsTypeMap = Map.insert privateSpelling ("(" ++ key ++ ")")
+            (tsTypeMap s)
+        , tsDecls = tsDecls s ++ [declaration]
+        })
+      pure (TypeConstructor typeName)
+
+-- One declaration per display key: translate the fields first
+-- (declaring any nested inductives before this one), parameterize
+-- over the type variables the translated fields mention, cache the
+-- applied occurrence.
 
 fragmentProjectionComplete :: Frag -> Bool
 fragmentProjectionComplete frag =
