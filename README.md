@@ -129,7 +129,7 @@ session environment; `#`-commands pass straight through.
 
 Finite-list-spine Length counterexample ranking is disabled by default. To opt
 in, pass `--length-ranking-config` with an explicitly chosen absolute path to
-a version-1 through version-16 configuration file. Versions 1--3 select scalar
+a version-1 through version-18 configuration file. Versions 1--3 select scalar
 finite-list-spine Length ranking. Version 1 preserves the established
 counterexample-only behavior. Version 2 additionally requires an explicit
 per-input finite box and enables independent bounded validation after a live
@@ -174,20 +174,28 @@ applicable-domain literal with
 `"strict-relational-positive-affine-v1"`. That fourth extractor recognizes the
 ordinary relational grammar plus exactly one immediate top-level natural
 complement, `not (L <= R)`, as `R + 1 <= L`; it is not general negation
-normalization. Version numbers are closed schema selections rather than
-cumulative feature levels; versions 1--14 remain literal.
+normalization. Version 17 is the scalar descriptor-launch successor and version
+18 is its nominal product sibling. They preserve the complete v15/v16
+behavioral and scoped profile but require the additional closed execution
+member `"executableLaunch": "descriptor-bound-executable-v1"`. At the first
+live miss, Djex hashes and copies the source bytes into a sealed anonymous main
+image and launches that descriptor without resolving the pathname again.
+Version numbers are closed schema selections rather than cumulative feature
+levels; versions 1--16 remain literal.
 Leant admits and reads that file
 once at startup, requires the configuration to contain an executable SHA-256
 expectation by default, and retains the decoded contract selection as a fixed
 process-wide assertion. Presence at activation is not a digest match; Djex
-compares the expectation with its bounded pre-spawn file observation only when
-an eligible batch later opens a worker.
+compares the expectation only when an eligible batch later opens a worker.
+V1--v16 use the bounded pre-spawn pathname observation; v17/v18 compare it with
+the sealed staged main image selected for descriptor execution.
 `--length-ranking-allow-unpinned` is a separate explicit relaxation;
 `--length-ranking-config-timeout` sets only the bounded file-load interruption
 budget (default 5,000 ms, maximum 60,000 ms). No option discovers a file or
-solver. POSIX descriptor acquisition is implemented; Windows currently fails
+solver. POSIX configuration-file descriptor acquisition is implemented;
+Windows currently fails
 closed. Versions 1--6 and the established direct runners open one fresh lexical
-solver worker for every eligible batch. Versions 7--16 instead complete all
+solver worker for every eligible batch. Versions 7--18 instead complete all
 admission and preparation, then run each candidate's pure MRU, selected
 positive-affine domain, and origin prefix before IO: an all-pure batch opens no
 process, while
@@ -195,7 +203,7 @@ the first live miss opens one lexical session for that query and the remaining
 suffix. V9/v10 additionally capture one shared usable-work deadline after the
 64-candidate admission gate and before full preparation, so deferred pure work,
 opening, and every live query consume one window instead of receiving a fresh
-batch allowance per query. V13--v16 capture the corresponding dynamically
+batch allowance per query. V13--v18 capture the corresponding dynamically
 scoped v2 owner at the same boundary and add cooperative checkpoints after
 preparation, each complete candidate chain, and result materialization. Any
 structured failure preserves callback order through the established atomic
@@ -786,7 +794,7 @@ violation, retains the original receipt and makes no simplification claim.  A
 bounded evaluation rejection during an optional earlier trial does the same;
 structural, anchor, internal, and association failures remain indexed atomic
 failures. This policy is disabled by every established direct runner and
-startup version 1 through 6, while startup versions 7 through 16 require it.
+startup version 1 through 6, while startup versions 7 through 18 require it.
 It is bounded componentwise-lexicographic
 simplification, not global minimality, pruning authority, or a new conclusion
 from Z3.
@@ -1850,6 +1858,189 @@ structure, and unsupported expression subtrees grant no partial bound. These
 examples are unpinned and require the explicit
 `--length-ranking-allow-unpinned` activation choice.
 
+Startup v17 and v18 retain that exact strict/scoped behavioral profile and
+change only executable-launch authority. Their exported constants are
+`lengthRankingConfigurationFileDescriptorBoundExecutableLaunchVersion` (17)
+and
+`lengthRankingConfigurationFileSpinePairDescriptorBoundExecutableLaunchVersion`
+(18). The execution object has the complete inherited fields plus the
+additional required member `"executableLaunch": "descriptor-bound-executable-v1"`. This is a
+complete scalar v17 document:
+
+```json
+{
+  "format": "leant-live-length-ranking-configuration",
+  "version": 17,
+  "executionAdmission": {
+    "executablePathCharacters": 4096,
+    "policyFingerprintBytes": 262144
+  },
+  "execution": {
+    "executablePath": "/absolute/path/to/z3",
+    "expectedExecutableSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "solverTimeoutMilliseconds": 1000,
+    "solverResourceLimit": 100000,
+    "hostDeadlineMilliseconds": 1500,
+    "artifactPolicy": "input-values-after-satisfiable",
+    "responseLimits": {
+      "bytes": 65536,
+      "nestingDepth": 64,
+      "nodes": 4096,
+      "tokenBytes": 4096,
+      "integerBits": 4096
+    },
+    "executableLaunch": "descriptor-bound-executable-v1"
+  },
+  "evaluation": {
+    "assignmentValueBits": 4096,
+    "intermediateValueBits": 4096
+  },
+  "inputBoxValidation": {
+    "inclusiveInputMaximums": [5, 5],
+    "maximumAssignments": 36
+  },
+  "counterexampleProbe": "origin-before-live",
+  "boundedPositiveOrdering": "prefer-non-vacuous",
+  "applicableDomainValidation": {
+    "strategy": "strict-relational-positive-affine-v1",
+    "maximumInputs": 2,
+    "maximumAssignments": 20
+  },
+  "applicableDomainOrdering": "prefer-non-vacuous",
+  "counterexampleSimplification": {
+    "strategy": "componentwise-lexicographic-v1",
+    "maximumInputs": 2,
+    "maximumAssignments": 36
+  },
+  "liveSessionOpening": "defer-until-live-query",
+  "usableWorkBudget": {
+    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
+    "milliseconds": 30000
+  },
+  "contract": {
+    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
+    "targetArgumentRoles": ["observed-spine", "observed-spine"],
+    "candidateCasePolicy": "cases-rejected",
+    "precondition": [
+      "all",
+      [
+        ["not", ["at-most", ["literal", 5], ["input", 0]]],
+        ["not", ["at-most", ["input", 0], ["input", 1]]]
+      ]
+    ],
+    "postcondition": ["equal", ["result"], ["input", 0]],
+    "providerLaws": []
+  }
+}
+```
+
+The nominal product v18 sibling retains the complete pair-v5 contract and
+strict successor-before-cancellation example:
+
+```json
+{
+  "format": "leant-live-length-ranking-configuration",
+  "version": 18,
+  "executionAdmission": {
+    "executablePathCharacters": 4096,
+    "policyFingerprintBytes": 262144
+  },
+  "execution": {
+    "executablePath": "/absolute/path/to/z3",
+    "expectedExecutableSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "solverTimeoutMilliseconds": 1000,
+    "solverResourceLimit": 100000,
+    "hostDeadlineMilliseconds": 1500,
+    "artifactPolicy": "input-values-after-satisfiable",
+    "responseLimits": {
+      "bytes": 65536,
+      "nestingDepth": 64,
+      "nodes": 4096,
+      "tokenBytes": 4096,
+      "integerBits": 4096
+    },
+    "executableLaunch": "descriptor-bound-executable-v1"
+  },
+  "evaluation": {
+    "assignmentValueBits": 4096,
+    "intermediateValueBits": 4096
+  },
+  "inputBoxValidation": {
+    "inclusiveInputMaximums": [4],
+    "maximumAssignments": 5
+  },
+  "counterexampleProbe": "origin-before-live",
+  "boundedPositiveOrdering": "prefer-non-vacuous",
+  "applicableDomainValidation": {
+    "strategy": "strict-relational-positive-affine-v1",
+    "maximumInputs": 1,
+    "maximumAssignments": 3
+  },
+  "applicableDomainOrdering": "prefer-non-vacuous",
+  "counterexampleSimplification": {
+    "strategy": "componentwise-lexicographic-v1",
+    "maximumInputs": 1,
+    "maximumAssignments": 9
+  },
+  "liveSessionOpening": "defer-until-live-query",
+  "usableWorkBudget": {
+    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
+    "milliseconds": 30000
+  },
+  "contract": {
+    "resultShape": "binary-prod-spines-v1",
+    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
+    "targetArgumentRoles": ["observed-spine"],
+    "candidateCasePolicy": "cases-rejected",
+    "precondition": [
+      "not",
+      [
+        "at-most",
+        ["sum", [["input", 0], ["literal", 3]]],
+        ["scale", 2, ["input", 0]]
+      ]
+    ],
+    "postcondition": [
+      "all",
+      [
+        ["equal", ["result", "first"], ["input", 0]],
+        ["equal", ["result", "second"],
+          ["quotient", 2, ["input", 0]]]
+      ]
+    ],
+    "providerLaws": []
+  }
+}
+```
+
+Replace the illustrative 64-hex-digit expectation in either document with the
+digest of the intended Z3 image. Activation checks only that the expectation is
+present; matching occurs at the first live open. Djex then opens the source
+without following the final component, hashes each bounded chunk while copying
+the same bytes into an anonymous image, compares the pin, seals writes and size
+changes, and invokes `execveat` only on that sealed descriptor. No worker or
+executable IO occurs if the deferred pure prefix settles the batch. A namespace
+swap or in-place source rewrite after sealing cannot alter the staged main
+image, and any unavailable primitive or failure is terminal rather than a
+fallback to v15/v16 path launch.
+
+The child requires Linux `close_range` to close every unrelated inherited
+descriptor before `execveat`. If the primitive is unavailable or rejects a
+required segment, descriptor launch fails closed; Djex does not substitute a
+scan capped by the current soft `RLIMIT_NOFILE`, which may lie below a
+descriptor opened before the limit was lowered.
+
+The guarantee is main-image-only: it does not attest an ELF interpreter,
+dynamic loader, shared library, file capability, set-id metadata, Z3 semantics,
+or solver result. V17/v18 add no assessment constructor, ranking tier, or
+candidate presentation note. Their startup notice reports only that descriptor
+launch was selected; it never says the pin matched. Their fixed validation
+order is the v15/v16 order with the execution object's required launch literal
+checked after every inherited execution member and before Djex descriptor
+policy sealing. Contract validation remains last. The generalized dispatcher
+reaches v17/v18 only after the exact v1--v16 cascade returns UnsupportedVersion;
+future version 19 remains unsupported.
+
 Then select a typed Exference-producing engine and synthesize normally. A
 contract-only v6 document can replace the startup-fixed contract for one
 command without changing the CLI grammar:
@@ -1876,9 +2067,9 @@ required, and its case policy is exactly `"cases-rejected"` or
 `"exact-spine-zero-step-v1"`.
 
 The old scalar decoders remain exact compatibility entrances: the startup
-decoder for versions 1--3 rejects v4--v16, and the contract-only decoder for
+decoder for versions 1--3 rejects v4--v18, and the contract-only decoder for
 versions 1--5 rejects v6. The generalized decoders delegate those old versions
-to their unchanged scalar paths and add startup v4--v16 or contract-only v6. A
+to their unchanged scalar paths and add startup v4--v18 or contract-only v6. A
 product file selects which nominal runner Main calls; it does not infer a
 contract from the Lean type, bypass the exact canonical-`Prod` handoff, turn
 solver status into evidence, or grant pruning authority. See the
@@ -1906,6 +2097,10 @@ boundary, and additive identities are recorded in the
 The v15/v16 strict-natural rule, inherited scoped lifecycle, nominal evidence,
 closed schema, and unchanged older routes are recorded in the
 [strict relational positive-affine Length ranking report](docs/reports/2026-08-15-strict-relational-positive-affine-length-ranking.md).
+The v17/v18 sealed main-image selection, closed execution discriminator,
+startup notice, compatibility boundary, and unchanged evidence are recorded in
+the
+[descriptor-bound Length/Z3 launch report](docs/reports/2026-08-15-descriptor-bound-length-z3-launch.md).
 Djex's underlying extraction, closure, receipt, and identity boundary is in its
 [strict relational positive-affine applicable-domain report](lib/Djex/docs/reports/2026-08-15-strict-relational-positive-affine-length-applicable-domain.md).
 
@@ -1930,7 +2125,7 @@ assessments use
 `renderLengthStrictRelationalPositiveAffineApplicableDomainValidationNote` or
 `renderLengthSpinePairStrictRelationalPositiveAffineApplicableDomainValidationNote`.
 Main's v7--v10 path can produce only the literal-ceiling positive-affine receipt
-family; v11--v14 can produce only the relational family; v15/v16 can produce
+family; v11--v14 can produce only the relational family; v15--v18 can produce
 only the strict-relational family; v1--v6 cannot produce any applicable-domain
 family. The semantic note
 never projects the receipt's private provider-name list. Disabled assessment,
@@ -2277,7 +2472,7 @@ Only the separate
 `enableLengthRankingNonVacuousApplicableDomainPreference` moves an established
 receipt with a positive applicable-assignment count into a stable preferred
 partition. Startup versions 1--6 cannot enable either policy, so their file
-behavior is exact. Startup v7--v16 enable that same preference with their
+behavior is exact. Startup v7--v18 enable that same preference with their
 nominal literal-ceiling, relational, or strict-relational positive-affine
 validator; direct-v1 validation remains programmatic-only.
 Contract-only files select constraints rather than ranking policy.
@@ -2318,7 +2513,7 @@ relations and additionally treats only an immediate normalized top-level
 `not (L <= R)` as the exact natural rule `R + 1 <= L`, applying the successor
 before ordinary coefficient cancellation. It is not general negation handling:
 negated equality, nested logical structure, and unsupported positive-affine
-subtrees contribute no rule or partial bound. Startup v15/v16 select its
+subtrees contribute no rule or partial bound. Startup v15--v18 select its
 nominal scalar/product receipt family and otherwise retain v13/v14's complete
 scoped/checkpointed policy.
 
@@ -2389,7 +2584,7 @@ Exceptions propagate instead of producing a ranking. Legacy v1--v8 and
 relational startup v11/v12 retain separate lifecycle and per-query budgets. An
 explicitly v1-budgeted programmatic policy or startup v9/v10 instead places
 admitted preparation and deferred ranking beneath one runtime-unscoped shared
-owner. Startup v13--v16 and the scoped programmatic builder use the additive
+owner. Startup v13--v18 and the scoped programmatic builder use the additive
 owner-thread-affine v2 lease and cooperative phase checkpoints. Neither owner
 claims asynchronous interruption of arbitrary callback code. Main invokes
 this foundation only after the explicit startup opt-in described above; it
@@ -2443,7 +2638,30 @@ optional counterexample simplification, orthogonal non-vacuous ordering
 preferences for applicable-domain and explicit-box receipts, and an eager or
 deferred session-opening choice, plus an optional already validated shared
 usable-work budget. `mkLengthRankingPolicy` leaves the optional choices disabled
-and selects eager opening with no shared budget. The
+and selects eager opening with no shared budget. The additive
+`mkLengthRankingPolicyWithDescriptorBoundExecutableLaunch` validates the same
+source in the same execution-before-evaluation order while selecting Djex's
+sealed main-image launcher:
+
+```haskell
+descriptorPolicy <-
+  mkLengthRankingPolicyWithDescriptorBoundExecutableLaunch policySource
+
+case lengthRankingPolicyExecutableLaunchStrategy descriptorPolicy of
+  LengthSMTLibDescriptorBoundExecutableLaunch ->
+    assessVerifiedLengthCandidatesWithPolicy
+      descriptorPolicy scalarContract verificationBatch
+  LengthSMTLibPathSnapshotThenDirectSpawn ->
+    error "impossible for this constructor"
+```
+
+This construction is pure. It does not open, hash, copy, seal, or launch the
+configured executable. It preserves every later policy builder, and
+`lengthRankingPolicyFromValidatedComponents` retains whichever sealed Djex
+strategy its caller already owns. The corresponding configured-mode projection
+is `lengthAssessmentModeExecutableLaunchStrategy`; disabled assessment returns
+`Nothing` without inspecting any contract.
+The
 finite box is
 enabled by its explicit builder or the version-2 decoder; versions 3 and 4
 enable the box and origin probe while retaining neutral positive ordering.
@@ -2456,7 +2674,9 @@ retain the v7/v8 root bundle, select relational positive-affine validation, and
 leave the usable-work budget disabled. Versions 13 and 14 retain that relational
 bundle and enable the scoped/checkpointed v2 strategy. Versions 15 and 16
 retain that complete scoped bundle and replace only the applicable-domain
-strategy with the strict-relational selector. Programmatic callers opt
+strategy with the strict-relational selector. Versions 17 and 18 retain the
+strict/scoped scalar and product bundles and change only the sealed executable
+launch authority. Programmatic callers opt
 in with `enableLengthRankingUsableWorkBudget` or
 `enableLengthRankingScopedUsableWorkBudget`; both builders are pure and create
 no evidence, and the last budget builder applied determines the strategy.
@@ -2465,8 +2685,9 @@ A scalar `LeanLengthContract` or nominal
 runner, so a request assertion no longer has to share the lifetime of reusable
 process policy. Execution validation
 precedes replay-limit validation. The sealed policy is opaque, has no path or
-digest-byte projection, and retains no worker; a closed classifier reveals only
-whether its execution policy contains a digest expectation. The explicit
+digest-byte projection, and retains no worker; its two closed classifiers
+reveal only digest-expectation presence and the selected executable-launch
+strategy. The explicit
 contract remains a passive assertion. An eager eligible call opens a fresh
 lexical session; a deferred all-pure call opens none, and a deferred live miss
 opens exactly one for the remaining dynamic scope.
@@ -2487,12 +2708,13 @@ Legacy v1--v8 and startup v11/v12 lifecycle and per-query budgets remain
 separate. A policy derived with `enableLengthRankingUsableWorkBudget`, including
 startup v9/v10, instead owns one additive runtime-unscoped v1 usable-work
 window. A policy derived with `enableLengthRankingScopedUsableWorkBudget`,
-including startup v13--v16, owns the owner-thread-affine v2 lease, cooperative
+including startup v13--v18, owns the owner-thread-affine v2 lease, cooperative
 checkpoints, and outer post-finalizer observation described above. There are no
 execution defaults, executable discovery, path normalization, or environment
 reads. The digest is only an optional expectation for Djex's
-pre-spawn executable-file observation, not attestation of the image ultimately
-executed. See the
+live executable observation. V1--v16 retain the explicitly weaker pathname
+snapshot; v17/v18 compare the expectation with the sealed staged main image.
+Neither choice attests loaders, libraries, or solver semantics. See the
 [explicit live Length ranking configuration report](docs/reports/2026-08-11-explicit-live-length-ranking-configuration.md).
 The later
 [single-owner policy checkpoint](docs/reports/2026-08-13-length-ranking-policy-single-ownership.md)
@@ -2502,8 +2724,8 @@ preserving the version-1 compatibility path.
 `Leant.Synth.Length.Configuration.File` keeps the exact version-1 JSON grammar
 for that policy and adds exact scalar opt-in versions 2 and 3. Its established
 `decodeLengthRankingConfigurationFile` remains an exact scalar-only entrance
-and rejects versions 4--16. The generalized
-`decodeLengthAssessmentConfigurationFile` additionally accepts versions 4--16
+and rejects versions 4--18. The generalized
+`decodeLengthAssessmentConfigurationFile` additionally accepts versions 4--18
 and returns an opaque `DisabledLengthAssessmentConfiguration` carrying the same
 checked process policy beside a lazy scalar-or-pair selection. The pure decoder consumes a caller-owned
 strict byte string through a separate bounded JSON parser, rejects malformed
@@ -2523,9 +2745,10 @@ policy, and activation does not inspect the contract. Neither choice launches
 Z3. Neither grants proof, solver-status, or contract authority. There is no
 automatic path, environment or executable discovery, or autoload behavior.
 The explicit CLI loader uses the same 256-KiB bound before activation. The
-optional digest remains only a
-pre-spawn executable-file snapshot expectation, not executed-image
-attestation. The complete schema and budgets are recorded in the
+optional digest remains only an expectation until live opening. V1--v16 compare
+it with the pre-spawn pathname snapshot; v17/v18 compare it with the sealed
+staged main image, still without loader, library, or solver attestation. The
+complete schema and budgets are recorded in the
 [bounded live Length ranking configuration-file report](docs/reports/2026-08-11-bounded-live-length-ranking-configuration-file.md).
 
 The file decoder retains the sealed Djex execution configuration and evaluation
@@ -2637,6 +2860,17 @@ has returned its closed unsupported-version sentinel. The policy remains
 solver-independent: only complete replay of the derived finite box creates the
 new nominal strict-relational receipt, and the scoped owner retains v13/v14's
 cooperative lifecycle and failure boundary byte-for-byte.
+
+Versions 17 and 18 retain that complete strict/scoped profile and append only
+the required `"executableLaunch": "descriptor-bound-executable-v1"` member to
+their exact execution object. The inherited execution fields are decoded in
+their established order, then the launch literal is checked and Djex's
+descriptor-bound execution constructor seals the policy. Evaluation, behavioral
+policies, scoped budget, and nominal scalar-v5/pair-v5 contract follow in the
+same order as v15/v16. The generalized dispatcher reaches these versions only
+after the complete v1--v16 cascade returns UnsupportedVersion; version 19 is
+still unsupported. Decoding and activation remain pure, and an all-pure
+deferred batch still opens no executable descriptor or worker.
 
 `Leant.Synth.Length.Configuration.File.Acquire` is the compatibility facade
 over the shared bounded `Leant.Synth.Length.File.Acquire` filesystem boundary.
