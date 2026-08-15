@@ -145,6 +145,7 @@ import Language.Haskell.Djex
   , ValidatedLengthPositiveAffineApplicableDomain
   , ValidatedLengthRelationalPositiveAffineApplicableDomain
   , ValidatedLengthStrictRelationalPositiveAffineApplicableDomain
+  , ValidatedLengthStrictRelationalPositiveAffineQuotientApplicableDomain
   , defaultLengthSMTLibLiveSessionMaximumQueries
   , lengthSMTLibLiveQueryCleanupIncomplete
   , lengthSMTLibLiveQueryObservationSolverStatus
@@ -160,6 +161,7 @@ import Language.Haskell.Djex
   , validateLengthSMTLibQueryPositiveAffineApplicableDomain
   , validateLengthSMTLibQueryRelationalPositiveAffineApplicableDomain
   , validateLengthSMTLibQueryStrictRelationalPositiveAffineApplicableDomain
+  , validateLengthSMTLibQueryStrictRelationalPositiveAffineQuotientApplicableDomain
   , validateLengthSMTLibQueryInputBox
   , validatedLengthApplicableDomainApplicableAssignmentCount
   , validatedLengthCounterexampleInputs
@@ -168,6 +170,7 @@ import Language.Haskell.Djex
   , validatedLengthPositiveAffineApplicableDomainApplicableAssignmentCount
   , validatedLengthRelationalPositiveAffineApplicableDomainApplicableAssignmentCount
   , validatedLengthStrictRelationalPositiveAffineApplicableDomainApplicableAssignmentCount
+  , validatedLengthStrictRelationalPositiveAffineQuotientApplicableDomainApplicableAssignmentCount
   , checkLengthSMTLibLiveScopedUsableWorkDeadline
   , withLengthSMTLibLiveSession
   , withLengthSMTLibLiveSessionUnderScopedDeadline
@@ -218,6 +221,8 @@ data LengthRankingAssessment
       !ValidatedLengthRelationalPositiveAffineApplicableDomain
   | StrictRelationalPositiveAffineApplicableDomainEstablished
       !ValidatedLengthStrictRelationalPositiveAffineApplicableDomain
+  | StrictRelationalPositiveAffineQuotientApplicableDomainEstablished
+      !ValidatedLengthStrictRelationalPositiveAffineQuotientApplicableDomain
   deriving (Eq, Show)
 
 -- | Stable, payload-free phase at which pure candidate preparation refused.
@@ -557,6 +562,8 @@ data LengthApplicableDomainRankingPolicy
   | LengthApplicableDomainRankingRelationalPositiveAffineEnabled
       !LengthInputBoxLimits
   | LengthApplicableDomainRankingStrictRelationalPositiveAffineEnabled
+      !LengthInputBoxLimits
+  | LengthApplicableDomainRankingStrictRelationalPositiveAffineQuotientEnabled
       !LengthInputBoxLimits
 
 -- | Private query-owned pre-live probe policy.  The enabled constructor is
@@ -1848,6 +1855,27 @@ assessApplicableDomainCandidate evaluation policy simplificationPolicy index
         $ LengthCandidateAssessed
             (StrictRelationalPositiveAffineApplicableDomainEstablished receipt)
             Nothing
+    LengthApplicableDomainRankingStrictRelationalPositiveAffineQuotientEnabled
+        limits -> case
+          validateLengthSMTLibQueryStrictRelationalPositiveAffineQuotientApplicableDomain
+            evaluation limits query of
+      Left (LengthSMTLibApplicableDomainValidationAssociationRejected _) ->
+        Left $ localRankingFailure LengthRankingEvidenceReplayMismatch index
+      Left (LengthSMTLibApplicableDomainValidationRejected
+          (LengthApplicableDomainInputBoxValidationRejected failure))
+        | applicableDomainAdmissionFailure failure -> Right Nothing
+        | otherwise -> Left $ localRankingFailure
+            (LengthRankingApplicableDomainValidationFailed failure) index
+      Right (LengthApplicableDomainInapplicable _) -> Right Nothing
+      Right (LengthApplicableDomainCounterexample receipt) -> Just <$>
+        simplifyCounterexampleAssessment evaluation simplificationPolicy
+          index association query receipt
+      Right (LengthApplicableDomainEstablished receipt) -> Right $ Just
+        $ AssociatedRankedLengthCandidate index association
+        $ LengthCandidateAssessed
+            (StrictRelationalPositiveAffineQuotientApplicableDomainEstablished
+              receipt)
+            Nothing
 
 applicableDomainAdmissionFailure :: LengthInputBoxValidationError -> Bool
 applicableDomainAdmissionFailure failure = case failure of
@@ -2148,6 +2176,9 @@ isNonVacuousApplicableDomain assessment = case assessment of
   StrictRelationalPositiveAffineApplicableDomainEstablished receipt ->
     validatedLengthStrictRelationalPositiveAffineApplicableDomainApplicableAssignmentCount
       receipt > 0
+  StrictRelationalPositiveAffineQuotientApplicableDomainEstablished receipt ->
+    validatedLengthStrictRelationalPositiveAffineQuotientApplicableDomainApplicableAssignmentCount
+      receipt > 0
   _ -> False
 
 unassessedRanking
@@ -2252,6 +2283,8 @@ forceLengthRankingAssessment assessment = case assessment of
   PositiveAffineApplicableDomainEstablished receipt -> rnf receipt
   RelationalPositiveAffineApplicableDomainEstablished receipt -> rnf receipt
   StrictRelationalPositiveAffineApplicableDomainEstablished receipt ->
+    rnf receipt
+  StrictRelationalPositiveAffineQuotientApplicableDomainEstablished receipt ->
     rnf receipt
 
 forceLengthRankingFailure :: Maybe LengthRankingFailure -> ()

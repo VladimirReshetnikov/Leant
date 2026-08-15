@@ -105,6 +105,7 @@ import Language.Haskell.Djex
   , ValidatedLengthSpinePairPositiveAffineApplicableDomain
   , ValidatedLengthSpinePairRelationalPositiveAffineApplicableDomain
   , ValidatedLengthSpinePairStrictRelationalPositiveAffineApplicableDomain
+  , ValidatedLengthSpinePairStrictRelationalPositiveAffineQuotientApplicableDomain
   , defaultLengthSMTLibLiveSessionMaximumQueries
   , lengthSMTLibLiveSessionCleanupIncomplete
   , lengthSMTLibLiveSessionPrimaryFailure
@@ -120,6 +121,7 @@ import Language.Haskell.Djex
   , validateLengthSpinePairSMTLibQueryPositiveAffineApplicableDomain
   , validateLengthSpinePairSMTLibQueryRelationalPositiveAffineApplicableDomain
   , validateLengthSpinePairSMTLibQueryStrictRelationalPositiveAffineApplicableDomain
+  , validateLengthSpinePairSMTLibQueryStrictRelationalPositiveAffineQuotientApplicableDomain
   , validateLengthSpinePairSMTLibQueryInputBox
   , validatedLengthSpinePairApplicableDomainApplicableAssignmentCount
   , validatedLengthSpinePairCounterexampleInputs
@@ -128,6 +130,7 @@ import Language.Haskell.Djex
   , validatedLengthSpinePairPositiveAffineApplicableDomainApplicableAssignmentCount
   , validatedLengthSpinePairRelationalPositiveAffineApplicableDomainApplicableAssignmentCount
   , validatedLengthSpinePairStrictRelationalPositiveAffineApplicableDomainApplicableAssignmentCount
+  , validatedLengthSpinePairStrictRelationalPositiveAffineQuotientApplicableDomainApplicableAssignmentCount
   , checkLengthSMTLibLiveScopedUsableWorkDeadline
   , withLengthSMTLibLiveSession
   , withLengthSMTLibLiveSessionUnderScopedDeadline
@@ -178,6 +181,8 @@ data LengthSpinePairRankingAssessment
       !ValidatedLengthSpinePairRelationalPositiveAffineApplicableDomain
   | LengthSpinePairStrictRelationalPositiveAffineApplicableDomainEstablished
       !ValidatedLengthSpinePairStrictRelationalPositiveAffineApplicableDomain
+  | LengthSpinePairStrictRelationalPositiveAffineQuotientApplicableDomainEstablished
+      !ValidatedLengthSpinePairStrictRelationalPositiveAffineQuotientApplicableDomain
   deriving (Eq, Show)
 
 data LengthSpinePairCandidateAssessment
@@ -435,6 +440,8 @@ data LengthSpinePairApplicableDomainRankingPolicy
   | LengthSpinePairApplicableDomainRankingRelationalPositiveAffineEnabled
       !LengthInputBoxLimits
   | LengthSpinePairApplicableDomainRankingStrictRelationalPositiveAffineEnabled
+      !LengthInputBoxLimits
+  | LengthSpinePairApplicableDomainRankingStrictRelationalPositiveAffineQuotientEnabled
       !LengthInputBoxLimits
 
 data LengthSpinePairOriginProbeRankingPolicy
@@ -1737,6 +1744,29 @@ assessLengthSpinePairApplicableDomainCandidate evaluation policy
           (LengthSpinePairStrictRelationalPositiveAffineApplicableDomainEstablished
             receipt)
           Nothing
+  LengthSpinePairApplicableDomainRankingStrictRelationalPositiveAffineQuotientEnabled
+      limits -> case
+        validateLengthSpinePairSMTLibQueryStrictRelationalPositiveAffineQuotientApplicableDomain
+          evaluation limits query of
+    Left
+        (LengthSpinePairSMTLibApplicableDomainValidationAssociationRejected _) ->
+      Left $ localLengthSpinePairRankingFailure
+        LengthSpinePairRankingEvidenceReplayMismatch index
+    Left (LengthSpinePairSMTLibApplicableDomainValidationRejected
+        (LengthSpinePairApplicableDomainInputBoxValidationRejected failure))
+      | lengthSpinePairApplicableDomainAdmissionFailure failure -> Right Nothing
+      | otherwise -> Left $ localLengthSpinePairRankingFailure
+          (LengthSpinePairRankingApplicableDomainValidationFailed failure) index
+    Right (LengthApplicableDomainInapplicable _) -> Right Nothing
+    Right (LengthApplicableDomainCounterexample receipt) -> Just <$>
+      simplifyLengthSpinePairCounterexampleAssessment evaluation
+        simplificationPolicy index association query receipt
+    Right (LengthApplicableDomainEstablished receipt) -> Right $ Just
+      $ AssociatedRankedLengthSpinePairCandidate index association
+      $ LengthSpinePairCandidateAssessed
+          (LengthSpinePairStrictRelationalPositiveAffineQuotientApplicableDomainEstablished
+            receipt)
+          Nothing
 
 lengthSpinePairApplicableDomainAdmissionFailure
   :: LengthSpinePairInputBoxValidationError
@@ -2052,6 +2082,10 @@ isNonVacuousLengthSpinePairApplicableDomain assessment = case assessment of
       receipt ->
     validatedLengthSpinePairStrictRelationalPositiveAffineApplicableDomainApplicableAssignmentCount
       receipt > 0
+  LengthSpinePairStrictRelationalPositiveAffineQuotientApplicableDomainEstablished
+      receipt ->
+    validatedLengthSpinePairStrictRelationalPositiveAffineQuotientApplicableDomainApplicableAssignmentCount
+      receipt > 0
   _ -> False
 
 unassessedLengthSpinePairRanking
@@ -2166,6 +2200,8 @@ forceLengthSpinePairRankingAssessment assessment = case assessment of
   LengthSpinePairRelationalPositiveAffineApplicableDomainEstablished receipt ->
     rnf receipt
   LengthSpinePairStrictRelationalPositiveAffineApplicableDomainEstablished
+      receipt -> rnf receipt
+  LengthSpinePairStrictRelationalPositiveAffineQuotientApplicableDomainEstablished
       receipt -> rnf receipt
 
 forceLengthSpinePairRankingFailure

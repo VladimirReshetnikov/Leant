@@ -23,6 +23,9 @@
 -- remain literal.  Versions 17 and 18 retain the complete version-15/version-
 -- 16 policy while selecting descriptor-bound executable launch through one
 -- required nested execution discriminator.
+-- Versions 19 and 20 retain that complete descriptor-bound/scoped profile and
+-- replace only the applicable-domain strategy with strict relational positive-
+-- affine root-quotient consequences.
 -- Decoding performs no discovery, path normalization, environment lookup, or
 -- IO.  Every field is required.  A successful decode returns a deliberately
 -- disabled opaque value: callers
@@ -49,6 +52,8 @@ module Leant.Synth.Length.Configuration.File
   , lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineVersion
   , lengthRankingConfigurationFileDescriptorBoundExecutableLaunchVersion
   , lengthRankingConfigurationFileSpinePairDescriptorBoundExecutableLaunchVersion
+  , lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientVersion
+  , lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientVersion
   , lengthRankingConfigurationFileJsonLimits
   , LengthRankingConfigurationFileObject (..)
   , LengthRankingConfigurationFileField (..)
@@ -148,6 +153,7 @@ import Leant.Synth.Length.Configuration
   , enableLengthRankingRelationalPositiveAffineApplicableDomainValidation
   , enableLengthRankingScopedUsableWorkBudget
   , enableLengthRankingStrictRelationalPositiveAffineApplicableDomainValidation
+  , enableLengthRankingStrictRelationalPositiveAffineQuotientApplicableDomainValidation
   , enableLengthRankingUsableWorkBudget
   , lengthRankingPolicyExecutableDigestExpectation
   , lengthRankingPolicyFromValidatedComponents
@@ -220,7 +226,7 @@ lengthRankingConfigurationFileSpinePairScopedUsableWorkBudgetVersion
   :: Natural
 lengthRankingConfigurationFileSpinePairScopedUsableWorkBudgetVersion = 14
 
--- | Latest scalar advanced bundle selecting strict relational positive-affine
+-- | Scalar advanced bundle selecting strict relational positive-affine
 -- applicable-domain validation beneath the scoped/checkpointed usable-work
 -- owner.
 lengthRankingConfigurationFileStrictRelationalPositiveAffineVersion :: Natural
@@ -241,6 +247,19 @@ lengthRankingConfigurationFileSpinePairDescriptorBoundExecutableLaunchVersion
   :: Natural
 lengthRankingConfigurationFileSpinePairDescriptorBoundExecutableLaunchVersion =
   18
+
+-- | Scalar descriptor/scoped profile selecting strict relational positive-
+-- affine root-quotient consequence applicable-domain validation.
+lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientVersion
+  :: Natural
+lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientVersion =
+  19
+
+-- | Nominal binary-product sibling of version 19.
+lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientVersion
+  :: Natural
+lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientVersion =
+  20
 
 -- | Fixed admission policy for the v1 document itself.  The array maximum is
 -- one greater than the widest typed collection so maximum-plus-one reaches the
@@ -548,7 +567,9 @@ decodeLengthRankingConfigurationFile bytes = do
 -- versions only after the relational decoder returns it in turn.  Strict
 -- relational versions are considered only after that complete version-1--14
 -- cascade has returned the sentinel.  Descriptor-bound versions are reached
--- only after the strict version-15/version-16 decoder returns it as well.
+-- only after the strict version-15/version-16 decoder returns it as well.  The
+-- quotient-consequence versions are reached only after the descriptor-bound
+-- version-17/version-18 decoder returns the same sentinel.
 decodeLengthAssessmentConfigurationFile
   :: ByteString
   -> Either
@@ -582,9 +603,14 @@ decodeLengthAssessmentConfigurationFile bytes =
                       decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffine
                         bytes of
                     Right strict -> Right strict
-                    Left LengthRankingConfigurationUnsupportedVersion ->
-                      decodeLengthAssessmentConfigurationFileDescriptorBoundExecutableLaunch
-                        bytes
+                    Left LengthRankingConfigurationUnsupportedVersion -> case
+                        decodeLengthAssessmentConfigurationFileDescriptorBoundExecutableLaunch
+                          bytes of
+                      Right descriptor -> Right descriptor
+                      Left LengthRankingConfigurationUnsupportedVersion ->
+                        decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffineQuotient
+                          bytes
+                      Left failure -> Left failure
                     Left failure -> Left failure
                   Left failure -> Left failure
                 Left failure -> Left failure
@@ -878,6 +904,47 @@ decodeLengthAssessmentConfigurationFileDescriptorBoundExecutableLaunch
         lengthRankingConfigurationFileSpinePairDescriptorBoundExecutableLaunchVersion
       then
         decodeLengthRankingConfigurationFileSpinePairDescriptorBoundExecutableLaunchV18
+          root
+      else Left LengthRankingConfigurationUnsupportedVersion
+
+-- | Decode only the root-quotient-consequence scalar/product siblings after
+-- every version-1--version-18 entrance has returned its closed unsupported-
+-- version sentinel.  Both versions retain the complete descriptor-bound,
+-- scoped-budget profile and replace only the applicable-domain strategy.
+decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffineQuotient
+  :: ByteString
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffineQuotient
+    bytes = do
+  document <- either (Left . LengthRankingConfigurationJsonRejected) Right
+    $ parseBoundedJson lengthRankingConfigurationFileJsonLimits bytes
+  root <- objectFields LengthRankingConfigurationRootObject document
+  formatValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationFormatField
+    "format"
+    root
+  format <- stringField LengthRankingConfigurationFormatField formatValue
+  if format == lengthRankingConfigurationFileFormat
+    then pure ()
+    else Left LengthRankingConfigurationUnsupportedFormat
+  versionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationVersionField
+    "version"
+    root
+  version <- integerField LengthRankingConfigurationVersionField versionValue
+  if version == toInteger
+      lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientVersion
+    then
+      decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientV19
+        root
+    else if version == toInteger
+        lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientVersion
+      then
+        decodeLengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientV20
           root
       else Left LengthRankingConfigurationUnsupportedVersion
 
@@ -1403,6 +1470,43 @@ decodeLengthRankingConfigurationFileSpinePairDescriptorBoundExecutableLaunchV18
   contract <- decodeLeanLengthSpinePairContractValueV5 contractValue
   pure $ DisabledLengthSpinePairAssessmentConfiguration policy contract
 
+decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientV19
+  :: ObjectFields
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientV19
+    root = do
+  policy <-
+    decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientPolicy
+      root
+  contractValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationContractField
+    "contract"
+    root
+  contract <- decodeLeanLengthContractValueV5 contractValue
+  pure $ DisabledLengthScalarAssessmentConfiguration
+    $ disableLengthRankingConfiguration policy contract
+
+decodeLengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientV20
+  :: ObjectFields
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientV20
+    root = do
+  policy <-
+    decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientPolicy
+      root
+  contractValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationContractField
+    "contract"
+    root
+  contract <- decodeLeanLengthSpinePairContractValueV5 contractValue
+  pure $ DisabledLengthSpinePairAssessmentConfiguration policy contract
+
 decodeLengthRankingConfigurationFileUsableWorkBudgetPolicy
   :: ObjectFields
   -> Either LengthRankingConfigurationFileError LengthRankingPolicy
@@ -1477,6 +1581,28 @@ decodeLengthRankingConfigurationFileDescriptorBoundExecutableLaunchPolicy
   let inheritedRoot = filter ((/= "usableWorkBudget") . fst) root
   advancedPolicy <-
     decodeLengthRankingConfigurationFileDescriptorBoundExecutableLaunchBasePolicy
+      inheritedRoot
+  budgetValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationUsableWorkBudgetField
+    "usableWorkBudget"
+    root
+  budget <- decodeScopedUsableWorkBudget budgetValue
+  pure $ enableLengthRankingScopedUsableWorkBudget budget advancedPolicy
+
+-- Versions 19 and 20 retain version 17/18's complete descriptor-bound root,
+-- validation order, and scoped-v2 usable-work owner.  Only the inherited
+-- applicable-domain strategy changes.
+decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientPolicy
+  :: ObjectFields
+  -> Either LengthRankingConfigurationFileError LengthRankingPolicy
+decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientPolicy
+    root = do
+  exactFields LengthRankingConfigurationRootObject
+    rootFieldsUsableWorkBudget root
+  let inheritedRoot = filter ((/= "usableWorkBudget") . fst) root
+  advancedPolicy <-
+    decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientBasePolicy
       inheritedRoot
   budgetValue <- requiredField
     LengthRankingConfigurationRootObject
@@ -1838,6 +1964,97 @@ decodeLengthRankingConfigurationFileDescriptorBoundExecutableLaunchBasePolicy
         enableLengthRankingNonVacuousInputBoxPreference originProbePolicy
       applicableDomainPolicy =
         enableLengthRankingStrictRelationalPositiveAffineApplicableDomainValidation
+          applicableDomainLimits inputBoxPreferencePolicy
+      applicableDomainPreferencePolicy =
+        enableLengthRankingNonVacuousApplicableDomainPreference
+          applicableDomainPolicy
+      simplificationPolicy = enableLengthRankingCounterexampleSimplification
+        counterexampleSimplificationLimits applicableDomainPreferencePolicy
+  pure $ enableLengthRankingDeferredLiveSessionOpening simplificationPolicy
+
+-- Versions 19 and 20 preserve the complete descriptor-bound policy demand
+-- order.  Only the applicable-domain decoder and mutually exclusive builder
+-- select the additive root-quotient-consequence strategy.
+decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientBasePolicy
+  :: ObjectFields
+  -> Either LengthRankingConfigurationFileError LengthRankingPolicy
+decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientBasePolicy
+    root = do
+  exactFields LengthRankingConfigurationRootObject
+    rootFieldsPositiveAffine root
+  executionAdmissionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationExecutionAdmissionField
+    "executionAdmission"
+    root
+  executionLimits <- decodeExecutionAdmission executionAdmissionValue
+  executionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationExecutionField
+    "execution"
+    root
+  execution <- decodeDescriptorBoundExecution executionLimits executionValue
+  evaluationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationEvaluationField
+    "evaluation"
+    root
+  evaluation <- decodeEvaluation evaluationValue
+  inputBoxValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationInputBoxValidationField
+    "inputBoxValidation"
+    root
+  (inputBoxLimits, inclusiveMaximums) <-
+    decodeInputBoxValidation inputBoxValue
+  counterexampleProbeValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationCounterexampleProbeField
+    "counterexampleProbe"
+    root
+  decodeCounterexampleProbe counterexampleProbeValue
+  boundedPositiveOrderingValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationBoundedPositiveOrderingField
+    "boundedPositiveOrdering"
+    root
+  decodeBoundedPositiveOrdering boundedPositiveOrderingValue
+  applicableDomainValidationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationApplicableDomainValidationField
+    "applicableDomainValidation"
+    root
+  applicableDomainLimits <-
+    decodeStrictRelationalPositiveAffineQuotientApplicableDomainValidation
+      applicableDomainValidationValue
+  applicableDomainOrderingValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationApplicableDomainOrderingField
+    "applicableDomainOrdering"
+    root
+  decodeApplicableDomainOrdering applicableDomainOrderingValue
+  counterexampleSimplificationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationCounterexampleSimplificationField
+    "counterexampleSimplification"
+    root
+  counterexampleSimplificationLimits <- decodeCounterexampleSimplification
+    counterexampleSimplificationValue
+  liveSessionOpeningValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationLiveSessionOpeningField
+    "liveSessionOpening"
+    root
+  decodeLiveSessionOpening liveSessionOpeningValue
+  let basePolicy =
+        lengthRankingPolicyFromValidatedComponents execution evaluation
+      inputBoxPolicy = enableLengthRankingInputBoxValidation
+        inputBoxLimits inclusiveMaximums basePolicy
+      originProbePolicy = enableLengthRankingOriginProbe inputBoxPolicy
+      inputBoxPreferencePolicy =
+        enableLengthRankingNonVacuousInputBoxPreference originProbePolicy
+      applicableDomainPolicy =
+        enableLengthRankingStrictRelationalPositiveAffineQuotientApplicableDomainValidation
           applicableDomainLimits inputBoxPreferencePolicy
       applicableDomainPreferencePolicy =
         enableLengthRankingNonVacuousApplicableDomainPreference
@@ -2655,6 +2872,54 @@ decodeStrictRelationalPositiveAffineApplicableDomainValidation value = do
       maximumInputBoxAssignments
   checkedInputBoxLimits maximumInputs maximumAssignments
 
+-- | Decode the additive strict-relational root-quotient-consequence sibling
+-- with the established object shape and bounded-limit diagnostics.  The
+-- literal grants authority only for the validator's nominal root quotient
+-- laws, not for nested, embedded, or two-sided quotient reasoning.
+decodeStrictRelationalPositiveAffineQuotientApplicableDomainValidation
+  :: BoundedJsonValue
+  -> Either LengthRankingConfigurationFileError LengthInputBoxLimits
+decodeStrictRelationalPositiveAffineQuotientApplicableDomainValidation
+    value = do
+  object <- exactObject
+    LengthRankingConfigurationApplicableDomainValidationObject
+    applicableDomainValidationFields value
+  strategyValue <- requiredField
+    LengthRankingConfigurationApplicableDomainValidationObject
+    LengthRankingConfigurationApplicableDomainStrategyField
+    "strategy"
+    object
+  strategy <- stringField
+    LengthRankingConfigurationApplicableDomainStrategyField
+    strategyValue
+  case strategy of
+    "strict-relational-positive-affine-quotient-v1" -> pure ()
+    _ -> Left $ LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationApplicableDomainStrategyField
+  maximumInputsValue <- requiredField
+    LengthRankingConfigurationApplicableDomainValidationObject
+    LengthRankingConfigurationApplicableDomainMaximumInputsField
+    "maximumInputs"
+    object
+  maximumInputs <- naturalField
+    LengthRankingConfigurationApplicableDomainMaximumInputsField
+    maximumInputsValue
+    >>= capNatural
+      LengthRankingConfigurationApplicableDomainMaximumInputsField
+      maximumInputBoxInputs
+  maximumAssignmentsValue <- requiredField
+    LengthRankingConfigurationApplicableDomainValidationObject
+    LengthRankingConfigurationApplicableDomainMaximumAssignmentsField
+    "maximumAssignments"
+    object
+  maximumAssignments <- naturalField
+    LengthRankingConfigurationApplicableDomainMaximumAssignmentsField
+    maximumAssignmentsValue
+    >>= capNatural
+      LengthRankingConfigurationApplicableDomainMaximumAssignmentsField
+      maximumInputBoxAssignments
+  checkedInputBoxLimits maximumInputs maximumAssignments
+
 applicableDomainValidationFields
   :: [(Text, LengthRankingConfigurationFileField)]
 applicableDomainValidationFields =
@@ -2800,7 +3065,7 @@ decodeUsableWorkBudget value = do
 
 -- Keep the established v9/v10 decoder above literal.  This sibling has the
 -- same closed object, field order, caps, and Djex validation, but admits only
--- the scoped/checkpointed strategy selected by versions 13 through 16.
+-- the scoped/checkpointed strategy selected by all scoped profiles.
 decodeScopedUsableWorkBudget
   :: BoundedJsonValue
   -> Either
