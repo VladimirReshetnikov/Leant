@@ -21,6 +21,7 @@ module Leant.Synth.Length.Ranking
   , rankedLengthCandidateOriginalIndex
   , rankedLengthCandidateVerified
   , rankedLengthCandidateAssessment
+  , rankedLengthCandidateCounterexampleSimplification
   , rankedLengthCandidatePreparationRefusal
   , LengthRankingFailureClass (..)
   , LengthRankingFailure
@@ -53,6 +54,7 @@ import Leant.Synth.Length.Ranking.Internal
   , rankVerifiedLengthCandidates
   , rankVerifiedLengthCandidatesWithInputBoxValidation
   , rankedLengthCandidateAssessment
+  , rankedLengthCandidateCounterexampleSimplification
   , rankedLengthCandidateOriginalIndex
   , rankedLengthCandidatePreparationRefusal
   , rankedLengthCandidateVerified

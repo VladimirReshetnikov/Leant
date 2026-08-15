@@ -11,9 +11,11 @@ module Leant.Synth.Length.Presentation
   , lengthCandidatePresentationText
   , lengthCandidatePresentationNote
   , renderLengthCounterexampleNote
+  , renderLengthCounterexampleSimplificationNote
   , renderLengthInputBoxValidationNote
   , renderLengthApplicableDomainValidationNote
   , renderLengthSpinePairCounterexampleNote
+  , renderLengthSpinePairCounterexampleSimplificationNote
   , renderLengthSpinePairInputBoxValidationNote
   , renderLengthSpinePairApplicableDomainValidationNote
   , maximumLengthCounterexampleNoteCharacters
@@ -27,15 +29,22 @@ import Language.Haskell.Djex
   , LengthSpinePair
   , ValidatedLengthApplicableDomain
   , ValidatedLengthCounterexample
+  , ValidatedLengthCounterexampleSimplification
   , ValidatedLengthInputBox
   , ValidatedLengthSpinePairApplicableDomain
   , ValidatedLengthSpinePairCounterexample
+  , ValidatedLengthSpinePairCounterexampleSimplification
   , ValidatedLengthSpinePairInputBox
   , lengthSpinePairFirst
   , lengthSpinePairSecond
   , validatedLengthCounterexampleBasis
   , validatedLengthCounterexampleInputs
   , validatedLengthCounterexampleResult
+  , validatedLengthCounterexampleSimplificationBasis
+  , validatedLengthCounterexampleSimplificationInputs
+  , validatedLengthCounterexampleSimplificationInspectedAssignmentCount
+  , validatedLengthCounterexampleSimplificationOriginalInputs
+  , validatedLengthCounterexampleSimplificationResult
   , validatedLengthApplicableDomainApplicableAssignmentCount
   , validatedLengthApplicableDomainAssignmentCount
   , validatedLengthApplicableDomainBasis
@@ -47,6 +56,11 @@ import Language.Haskell.Djex
   , validatedLengthSpinePairCounterexampleBasis
   , validatedLengthSpinePairCounterexampleInputs
   , validatedLengthSpinePairCounterexampleResult
+  , validatedLengthSpinePairCounterexampleSimplificationBasis
+  , validatedLengthSpinePairCounterexampleSimplificationInputs
+  , validatedLengthSpinePairCounterexampleSimplificationInspectedAssignmentCount
+  , validatedLengthSpinePairCounterexampleSimplificationOriginalInputs
+  , validatedLengthSpinePairCounterexampleSimplificationResult
   , validatedLengthSpinePairApplicableDomainApplicableAssignmentCount
   , validatedLengthSpinePairApplicableDomainAssignmentCount
   , validatedLengthSpinePairApplicableDomainBasis
@@ -78,6 +92,7 @@ import Leant.Synth.Length.Ranking
   , RankedLengthCandidate
   , lengthRankingCandidates
   , rankedLengthCandidateAssessment
+  , rankedLengthCandidateCounterexampleSimplification
   , rankedLengthCandidateVerified
   )
 import Leant.Synth.Length.SpinePair.PostVerification
@@ -91,6 +106,7 @@ import Leant.Synth.Length.SpinePair.Ranking
   , RankedLengthSpinePairCandidate
   , lengthSpinePairRankingCandidates
   , rankedLengthSpinePairCandidateAssessment
+  , rankedLengthSpinePairCandidateCounterexampleSimplification
   , rankedLengthSpinePairCandidateVerified
   )
 import Leant.Synth.Verification
@@ -164,7 +180,11 @@ presentRankedCandidate
 presentRankedCandidate ranked = LengthCandidatePresentation
   (verifiedText $ rankedLengthCandidateVerified ranked)
   $ case rankedLengthCandidateAssessment ranked of
-      Counterexample receipt -> Just $ renderLengthCounterexampleNote receipt
+      Counterexample receipt -> Just $ case
+          rankedLengthCandidateCounterexampleSimplification ranked of
+        Nothing -> renderLengthCounterexampleNote receipt
+        Just simplification ->
+          renderLengthCounterexampleSimplificationNote simplification
       BoundedPositive receipt -> Just
         $ renderLengthInputBoxValidationNote receipt
       ApplicableDomainEstablished receipt -> Just
@@ -185,7 +205,12 @@ presentRankedLengthSpinePairCandidate ranked = LengthCandidatePresentation
   (verifiedText $ rankedLengthSpinePairCandidateVerified ranked)
   $ case rankedLengthSpinePairCandidateAssessment ranked of
       LengthSpinePairCounterexample receipt -> Just
-        $ renderLengthSpinePairCounterexampleNote receipt
+        $ case rankedLengthSpinePairCandidateCounterexampleSimplification
+            ranked of
+          Nothing -> renderLengthSpinePairCounterexampleNote receipt
+          Just simplification ->
+            renderLengthSpinePairCounterexampleSimplificationNote
+              simplification
       LengthSpinePairBoundedPositive receipt -> Just
         $ renderLengthSpinePairInputBoxValidationNote receipt
       LengthSpinePairApplicableDomainEstablished receipt -> Just
@@ -219,6 +244,33 @@ renderLengthCounterexampleNote receipt =
     ++ renderInputs (validatedLengthCounterexampleInputs receipt)
     ++ "; result spine length = "
     ++ renderNatural (validatedLengthCounterexampleResult receipt)
+
+-- | Render only a strict, independently replayed reduction.  This describes
+-- the componentwise-bounded lexicographic search which Djex actually ran; it
+-- deliberately makes no global-minimality or source-language claim.
+renderLengthCounterexampleSimplificationNote
+  :: ValidatedLengthCounterexampleSimplification
+  -> String
+renderLengthCounterexampleSimplificationNote simplification =
+  take maximumLengthCounterexampleNoteCharacters $
+  "replayed bounded query-owned componentwise-lexicographic "
+    ++ "finite-list-spine Length counterexample (model-relative; "
+    ++ renderBasis
+        (validatedLengthCounterexampleSimplificationBasis simplification)
+    ++ "): inspected lower-box assignments = "
+    ++ renderNatural
+        (validatedLengthCounterexampleSimplificationInspectedAssignmentCount
+          simplification)
+    ++ "; input spine lengths reduced from "
+    ++ renderInputs
+        (validatedLengthCounterexampleSimplificationOriginalInputs
+          simplification)
+    ++ " to "
+    ++ renderInputs
+        (validatedLengthCounterexampleSimplificationInputs simplification)
+    ++ "; result spine length = "
+    ++ renderNatural
+        (validatedLengthCounterexampleSimplificationResult simplification)
 
 -- | Render one sanitized positive bounded claim.  The note names the exact
 -- finite box and checked/applicable counts while retaining the same explicit
@@ -288,6 +340,38 @@ renderLengthSpinePairCounterexampleNote receipt =
       ++ renderNatural (lengthSpinePairFirst result)
       ++ "; second result spine length = "
       ++ renderNatural (lengthSpinePairSecond result)
+
+-- | Nominal product-domain presentation of one strict bounded reduction.
+renderLengthSpinePairCounterexampleSimplificationNote
+  :: ValidatedLengthSpinePairCounterexampleSimplification
+  -> String
+renderLengthSpinePairCounterexampleSimplificationNote simplification =
+  let result :: LengthSpinePair Natural
+      result = validatedLengthSpinePairCounterexampleSimplificationResult
+        simplification
+  in take maximumLengthCounterexampleNoteCharacters $
+    "replayed bounded query-owned componentwise-lexicographic "
+      ++ "binary-product finite-spine Length counterexample (model-relative; "
+      ++ renderBasis
+          (validatedLengthSpinePairCounterexampleSimplificationBasis
+            simplification)
+      ++ "): inspected lower-box assignments = "
+      ++ renderNatural
+          (validatedLengthSpinePairCounterexampleSimplificationInspectedAssignmentCount
+            simplification)
+      ++ "; input spine lengths reduced from "
+      ++ renderInputs
+          (validatedLengthSpinePairCounterexampleSimplificationOriginalInputs
+            simplification)
+      ++ " to "
+      ++ renderInputs
+          (validatedLengthSpinePairCounterexampleSimplificationInputs
+            simplification)
+      ++ "; result spine lengths = ["
+      ++ renderNatural (lengthSpinePairFirst result)
+      ++ ", "
+      ++ renderNatural (lengthSpinePairSecond result)
+      ++ "]"
 
 -- | Render one independently checked finite box for the product domain.
 renderLengthSpinePairInputBoxValidationNote

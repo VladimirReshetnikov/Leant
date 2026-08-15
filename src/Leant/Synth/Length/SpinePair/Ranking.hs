@@ -11,6 +11,7 @@ module Leant.Synth.Length.SpinePair.Ranking
   , rankedLengthSpinePairCandidateOriginalIndex
   , rankedLengthSpinePairCandidateVerified
   , rankedLengthSpinePairCandidateAssessment
+  , rankedLengthSpinePairCandidateCounterexampleSimplification
   , rankedLengthSpinePairCandidatePreparationRefusal
   , LengthSpinePairRankingFailureClass (..)
   , LengthSpinePairRankingFailure
@@ -45,6 +46,7 @@ import Leant.Synth.Length.SpinePair.Ranking.Internal
   , rankVerifiedLengthSpinePairCandidates
   , rankVerifiedLengthSpinePairCandidatesWithInputBoxValidation
   , rankedLengthSpinePairCandidateAssessment
+  , rankedLengthSpinePairCandidateCounterexampleSimplification
   , rankedLengthSpinePairCandidateOriginalIndex
   , rankedLengthSpinePairCandidatePreparationRefusal
   , rankedLengthSpinePairCandidateVerified
