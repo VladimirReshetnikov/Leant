@@ -52,6 +52,13 @@
 
 Date: 2026-08-11
 
+> **Later 2026-08-14 follow-up.** Advanced startup v7/v8 defer process opening
+> until the first candidate whose pure MRU → positive-affine-domain → origin
+> prefix misses. An all-pure batch opens nothing; the first miss opens one
+> lexical session and the suffix shares it without rerunning that head's pure
+> prefix. Established entrances and v1--v6 remain eager. See the
+> [positive-affine deferred Length ranking report](2026-08-14-positive-affine-deferred-length-ranking.md).
+
 ## Outcome
 
 `Leant.Synth.Length.Ranking` is now the narrow Leant consumer of Djex's public

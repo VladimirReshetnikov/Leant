@@ -2,6 +2,12 @@
 
 Date: 2026-08-13
 
+> **Later 2026-08-14 follow-up.** The same sole opaque policy now owns the
+> selected direct-v1 or positive-affine-v1 domain rule, simplification, and
+> eager/deferred opening without retaining a worker. V7/v8 select the advanced
+> choices; v1--v6 preserve eager compatibility. See the
+> [positive-affine deferred Length ranking report](2026-08-14-positive-affine-deferred-length-ranking.md).
+
 > **Later 2026-08-14 follow-up.** The single opaque policy now also retains
 > separately enabled directly bounded applicable-domain validation and its
 > independent non-vacuous preference. Startup and contract-only versions 1--6

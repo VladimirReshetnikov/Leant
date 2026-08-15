@@ -129,7 +129,7 @@ session environment; `#`-commands pass straight through.
 
 Finite-list-spine Length counterexample ranking is disabled by default. To opt
 in, pass `--length-ranking-config` with an explicitly chosen absolute path to
-a version-1 through version-6 configuration file. Versions 1--3 select scalar
+a version-1 through version-8 configuration file. Versions 1--3 select scalar
 finite-list-spine Length ranking. Version 1 preserves the established
 counterexample-only behavior. Version 2 additionally requires an explicit
 per-input finite box and enables independent bounded validation after a live
@@ -142,10 +142,15 @@ required binary-product-spine contract. Version 5 is the scalar successor and
 version 6 is the pair successor: both additionally require
 `"boundedPositiveOrdering": "prefer-non-vacuous"`, which explicitly promotes
 only candidates carrying a completed finite-box receipt with at least one
-precondition-applicable assignment. None of startup configuration versions
-1--6 enables the newer directly bounded applicable-domain pass or its separate
-non-vacuous ordering preference; those two choices are currently available
-only through the programmatic `LengthRankingPolicy` builders described below.
+precondition-applicable assignment. Version 7 is the scalar advanced successor
+and version 8 is its nominal binary-product sibling. Both require the distinct
+`"positive-affine-v1"` applicable-domain rule and its non-vacuous preference,
+bounded componentwise-lexicographic counterexample simplification, and
+`"defer-until-live-query"` session opening. The three bounded authorities in a
+v7/v8 file are deliberately independent: its caller-selected post-`unsat` input
+box, applicable-domain limits, and simplification limits cannot substitute for
+one another. Versions 1--6 remain literal eager compatibility paths; their
+schemas, validation precedence, and behavior are unchanged.
 Leant admits and reads that file
 once at startup, requires the configuration to contain an executable SHA-256
 expectation by default, and retains the decoded contract selection as a fixed
@@ -156,8 +161,13 @@ an eligible batch later opens a worker.
 `--length-ranking-config-timeout` sets only the bounded file-load interruption
 budget (default 5,000 ms, maximum 60,000 ms). No option discovers a file or
 solver. POSIX descriptor acquisition is implemented; Windows currently fails
-closed. Every eligible verified synthesis batch still receives a fresh lexical
-solver worker, and any structured live failure preserves callback order.
+closed. Versions 1--6 and the established direct runners open one fresh lexical
+solver worker for every eligible batch. Versions 7 and 8 instead complete all
+admission and preparation, then run each candidate's pure MRU, positive-affine
+domain, and origin prefix before IO: an all-pure batch opens no process, while
+the first live miss opens one lexical session for that query and the remaining
+suffix. Any structured failure preserves callback order through an atomic
+all-`Unassessed` reset.
 The opaque activated mode retains the exact require-pin or permit-unpinned
 decision that released it, and Main derives its startup notice from that mode
 rather than reinterpreting the raw command-line flag.
@@ -477,6 +487,40 @@ otherwise complete passive contract sources used to build the surrounding
 contracts, and that `basePolicy`, `inputBoxLimits`, and `verificationBatch`
 have the same checked meanings as in the preceding example.
 
+The additive positive-affine rule and deferred opening are also explicit
+programmatic choices. This composition uses three independently checked limit
+values: `postUnsatLimits` plus the caller-supplied `[5]` box,
+`applicableDomainLimits`, and `simplificationLimits`:
+
+```haskell
+let advancedPolicy =
+      enableLengthRankingDeferredLiveSessionOpening
+        $ enableLengthRankingCounterexampleSimplification
+            simplificationLimits
+        $ enableLengthRankingNonVacuousApplicableDomainPreference
+        $ enableLengthRankingPositiveAffineApplicableDomainValidation
+            applicableDomainLimits
+        $ enableLengthRankingNonVacuousInputBoxPreference
+        $ enableLengthRankingOriginProbe
+        $ enableLengthRankingInputBoxValidation
+            postUnsatLimits [5] basePolicy
+
+scalarAssessment <- assessVerifiedLengthCandidatesWithPolicy
+  advancedPolicy scalarPositiveAffineContract verificationBatch
+
+pairAssessment <- assessVerifiedLengthSpinePairCandidatesWithPolicy
+  advancedPolicy pairPositiveAffineContract verificationBatch
+```
+
+For example, `scalarPositiveAffineContract` may use the normalized
+precondition `input 0 + 1 <= 4`; the positive-affine rule derives maximum `3`
+without changing the actual precondition replayed at each assignment. The
+positive-affine and historical direct applicable-domain builders select
+different rules and are mutually exclusive: whichever of those two builders is
+applied last is retained. All other builders above are persistent and
+orthogonal. Deferred opening is operational policy, not evidence, and adds no
+presentation note.
+
 Counterexample simplification is another orthogonal, programmatic opt-in.  It
 uses the same checked Djex input-box limits for scalar and canonical-`Prod`
 ranking:
@@ -510,8 +554,9 @@ Width or Cartesian-product refusal, or an anchor which is already the first
 violation, retains the original receipt and makes no simplification claim.  A
 bounded evaluation rejection during an optional earlier trial does the same;
 structural, anchor, internal, and association failures remain indexed atomic
-failures.  This policy is disabled by every established direct runner and
-startup version 1 through 6.  It is bounded componentwise-lexicographic
+failures. This policy is disabled by every established direct runner and
+startup version 1 through 6, while startup versions 7 and 8 require it. It is
+bounded componentwise-lexicographic
 simplification, not global minimality, pruning authority, or a new conclusion
 from Z3.
 
@@ -532,10 +577,18 @@ not change.
 Complete box traversal is `LengthSpinePairBoundedPositive` and remains neutral
 unless the new preference is explicitly enabled. With that preference, a
 receipt whose applicable-assignment count is positive enters a stable preferred
-partition; a zero-applicable, vacuous receipt remains neutral. The eligible
-batch's lexical worker is still opened and capability-probed before this
-per-candidate sequence, so either applicable-domain evidence arm avoids a live
-transaction and ordinal, not worker launch. Status-only
+partition; a zero-applicable, vacuous receipt remains neutral. Under eager
+opening, the eligible batch's lexical worker is opened and capability-probed
+before this per-candidate sequence, so either applicable-domain evidence arm
+avoids only a live transaction and ordinal. Under the v7/v8 deferred policy,
+the pure prefix runs before IO, so an all-pure batch opens no process at all.
+The first miss opens exactly one lexical session, executes that triggering
+candidate once without rerunning its MRU/domain/origin prefix, and processes the
+remaining suffix through the same session. A pure indexed failure before that
+point resets the whole admitted batch and opens nothing. A later indexed
+failure discards earlier pure or live assessments and simplification metadata;
+session opener/finalizer failures keep the established safe index `Nothing`.
+Status-only
 `sat`, `unsat`, and `unknown` remain neutral heuristics. Any structured session
 or live-query failure, live-observation association or replay failure,
 an admitted query-owned applicable-domain evaluation/association failure,
@@ -543,10 +596,20 @@ origin failure, or input-box failure atomically restores the
 admitted batch in original order as unassessed. Candidate-local pure preparation
 refusals stay local, and no result grants pruning authority.
 
+V7/v8 therefore fix the source order as MRU → positive-affine applicable
+domain → origin → live replay → post-`unsat` explicit box. Every counterexample
+from any of those five sources crosses the same simplification seam before
+assessment. A strict receipt's final vector, never its original anchor, enters
+the domain-local MRU bank. Stable ordering is non-vacuous applicable-domain
+receipts, then non-vacuous explicit-box receipts, then neutral assessments
+(including vacuous receipts), then counterexamples. Occurrence handles carry
+each receipt and optional simplification metadata through that ordering.
+
 The opaque execution/evaluation policy and Djex live-session limits are
 domain-neutral and reused by the scalar and product runners. Each Leant call
-still opens one fresh lexical worker for its eligible batch, productively
-admits no more than the shared 64-query maximum, and consumes that session's
+productively admits no more than the shared 64-query maximum. Eager calls open
+one fresh lexical worker for an eligible batch; deferred calls open at most one
+fresh session, only at the first live miss, and then consume that session's
 single total query budget. Behavioral authority is not shared: product
 contracts, queries, live observations, replay receipts, failures, assessments,
 MRU state, and presentation remain product-specific and cannot be cast from
@@ -706,6 +769,178 @@ leant --length-ranking-config /absolute/path/pair-ranking-v6.json \
   --length-ranking-allow-unpinned
 ```
 
+Startup v7 and v8 are the advanced scalar and pair successors. They keep the
+same CLI and add no discovery or inferred defaults. This complete scalar v7
+example uses distinct post-`unsat`, positive-affine, and simplification bounds:
+
+```json
+{
+  "format": "leant-live-length-ranking-configuration",
+  "version": 7,
+  "executionAdmission": {
+    "executablePathCharacters": 4096,
+    "policyFingerprintBytes": 262144
+  },
+  "execution": {
+    "executablePath": "/absolute/path/to/z3",
+    "expectedExecutableSha256": null,
+    "solverTimeoutMilliseconds": 1000,
+    "solverResourceLimit": 100000,
+    "hostDeadlineMilliseconds": 1500,
+    "artifactPolicy": "input-values-after-satisfiable",
+    "responseLimits": {
+      "bytes": 65536,
+      "nestingDepth": 64,
+      "nodes": 4096,
+      "tokenBytes": 4096,
+      "integerBits": 4096
+    }
+  },
+  "evaluation": {
+    "assignmentValueBits": 4096,
+    "intermediateValueBits": 4096
+  },
+  "inputBoxValidation": {
+    "inclusiveInputMaximums": [5],
+    "maximumAssignments": 6
+  },
+  "counterexampleProbe": "origin-before-live",
+  "boundedPositiveOrdering": "prefer-non-vacuous",
+  "applicableDomainValidation": {
+    "strategy": "positive-affine-v1",
+    "maximumInputs": 2,
+    "maximumAssignments": 16
+  },
+  "applicableDomainOrdering": "prefer-non-vacuous",
+  "counterexampleSimplification": {
+    "strategy": "componentwise-lexicographic-v1",
+    "maximumInputs": 1,
+    "maximumAssignments": 8
+  },
+  "liveSessionOpening": "defer-until-live-query",
+  "contract": {
+    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
+    "targetArgumentRoles": ["observed-spine"],
+    "candidateCasePolicy": "cases-rejected",
+    "precondition": [
+      "at-most",
+      ["sum", [["input", 0], ["literal", 1]]],
+      ["literal", 4]
+    ],
+    "postcondition": ["equal", ["result"], ["input", 0]],
+    "providerLaws": []
+  }
+}
+```
+
+Here the positive-affine rule derives the tight maximum `3` from
+`input0 + 1 <= 4`. It still evaluates the complete precondition on every
+assignment in `[0..3]`; the explicit `[0..5]` post-`unsat` box and the
+simplifier's own limits are independent authorities. Because the executable is
+intentionally unpinned, the unchanged startup command is:
+
+```text
+leant --length-ranking-config /absolute/path/scalar-ranking-v7.json \
+  --length-ranking-allow-unpinned
+```
+
+The nominal pair v8 root has the same operational fields and embeds the pair v5
+contract grammar. This complete example deliberately chooses three different
+bounded objects as well:
+
+```json
+{
+  "format": "leant-live-length-ranking-configuration",
+  "version": 8,
+  "executionAdmission": {
+    "executablePathCharacters": 4096,
+    "policyFingerprintBytes": 262144
+  },
+  "execution": {
+    "executablePath": "/absolute/path/to/z3",
+    "expectedExecutableSha256": null,
+    "solverTimeoutMilliseconds": 1000,
+    "solverResourceLimit": 100000,
+    "hostDeadlineMilliseconds": 1500,
+    "artifactPolicy": "input-values-after-satisfiable",
+    "responseLimits": {
+      "bytes": 65536,
+      "nestingDepth": 64,
+      "nodes": 4096,
+      "tokenBytes": 4096,
+      "integerBits": 4096
+    }
+  },
+  "evaluation": {
+    "assignmentValueBits": 4096,
+    "intermediateValueBits": 4096
+  },
+  "inputBoxValidation": {
+    "inclusiveInputMaximums": [4],
+    "maximumAssignments": 5
+  },
+  "counterexampleProbe": "origin-before-live",
+  "boundedPositiveOrdering": "prefer-non-vacuous",
+  "applicableDomainValidation": {
+    "strategy": "positive-affine-v1",
+    "maximumInputs": 3,
+    "maximumAssignments": 32
+  },
+  "applicableDomainOrdering": "prefer-non-vacuous",
+  "counterexampleSimplification": {
+    "strategy": "componentwise-lexicographic-v1",
+    "maximumInputs": 1,
+    "maximumAssignments": 9
+  },
+  "liveSessionOpening": "defer-until-live-query",
+  "contract": {
+    "resultShape": "binary-prod-spines-v1",
+    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
+    "targetArgumentRoles": ["observed-spine"],
+    "candidateCasePolicy": "cases-rejected",
+    "precondition": [
+      "equal",
+      ["sum", [["input", 0], ["literal", 1]]],
+      ["literal", 4]
+    ],
+    "postcondition": [
+      "all",
+      [
+        ["equal", ["result", "first"], ["input", 0]],
+        ["equal", ["result", "second"],
+          ["quotient", 2, ["input", 0]]]
+      ]
+    ],
+    "providerLaws": []
+  }
+}
+```
+
+The equality derives maximum `3` but remains the actual filter, so only input
+`3` is applicable. Start it through the same unchanged option grammar:
+
+```text
+leant --length-ranking-config /absolute/path/pair-ranking-v8.json \
+  --length-ranking-allow-unpinned
+```
+
+Both advanced roots have exactly these fields in semantic validation order:
+`format`, `version`, `executionAdmission`, `execution`, `evaluation`,
+`inputBoxValidation`, `counterexampleProbe`, `boundedPositiveOrdering`,
+`applicableDomainValidation`, `applicableDomainOrdering`,
+`counterexampleSimplification`, `liveSessionOpening`, and `contract`. JSON
+member order is immaterial. The two strategy objects have exactly `strategy`,
+`maximumInputs`, and `maximumAssignments`; their caps are 8 inputs and 65,536
+assignments. The exact literals are `positive-affine-v1`,
+`prefer-non-vacuous`, `componentwise-lexicographic-v1`, and
+`defer-until-live-query`. The explicit input-box vector is independently capped
+at eight entries and 65,536 assignments. The existing 256-KiB JSON,
+4,096-character executable path, 64-KiB response, 60,000-ms solver timeout,
+10,000,000 resource limit, 65,000-ms host deadline, and 4,096-bit evaluation
+and response-integer ceilings remain unchanged. Missing, extra, mistyped, or
+over-cap content fails closed in that demand order before the later
+contract can preempt an earlier operational error.
+
 Then select a typed Exference-producing engine and synthesize normally. A
 contract-only v6 document can replace the startup-fixed contract for one
 command without changing the CLI grammar:
@@ -732,9 +967,9 @@ required, and its case policy is exactly `"cases-rejected"` or
 `"exact-spine-zero-step-v1"`.
 
 The old scalar decoders remain exact compatibility entrances: the startup
-decoder for versions 1--3 rejects v4--v6, and the contract-only decoder for
+decoder for versions 1--3 rejects v4--v8, and the contract-only decoder for
 versions 1--5 rejects v6. The generalized decoders delegate those old versions
-to their unchanged scalar paths and add startup v4--v6 or contract-only v6. A
+to their unchanged scalar paths and add startup v4--v8 or contract-only v6. A
 product file selects which nominal runner Main calls; it does not infer a
 contract from the Lean type, bypass the exact canonical-`Prod` handoff, turn
 solver status into evidence, or grant pruning authority. See the
@@ -747,6 +982,9 @@ v4/v6 file boundary is recorded in the
 The explicit v5/v6 preference and its unchanged evidence and identity
 boundaries are recorded in the
 [non-vacuous bounded-positive ordering report](docs/reports/2026-08-14-non-vacuous-bounded-positive-ordering.md).
+The exact v7/v8 schema, positive-affine receipts, deferred state machine, and
+compatibility boundary are recorded in the
+[positive-affine deferred Length ranking report](docs/reports/2026-08-14-positive-affine-deferred-length-ranking.md).
 
 After a successful occurrence seal, Main dispatches presentation through the
 selected scalar or pair domain and prints a subordinate note only for a
@@ -755,12 +993,15 @@ note summarizes its observed input and result spine lengths; a pair note keeps
 the first and second result lengths source ordered. Both call the receipt
 replayed and model-relative and report only the number of assumed provider laws
 used by that candidate. Independently completed finite-box notes instead give
-the bounded maxima and checked/applicable assignment counts. Programmatic
+the bounded maxima and checked/applicable assignment counts. Direct
 applicable-domain assessments use
-`renderLengthApplicableDomainValidationNote` or its spine-pair sibling to
-report the same bounded fields for the tight box Djex derived from the checked
-precondition. Main's unchanged version-1 through version-6 configuration path
-cannot currently produce that assessment. The semantic note
+`renderLengthApplicableDomainValidationNote` or its spine-pair sibling.
+Positive-affine assessments use
+`renderLengthPositiveAffineApplicableDomainValidationNote` or its pair sibling;
+their notes report derived maxima, checked/applicable counts, the exact
+model/provider-relative basis, and explicit vacuity. Main's v7/v8 path can
+produce only the positive-affine receipt family; v1--v6 cannot produce either
+applicable-domain family. The semantic note
 never projects the receipt's private provider-name list. Disabled assessment,
 rejected input, heuristic status,
 and atomic operational fallback add no semantic note. The note can explain a
@@ -1063,9 +1304,11 @@ The collision boundary is detailed in the
 caller must provide an explicit Djex live-execution policy,
 explicit replay limits, an explicit `LeanLengthContract`, and the complete list
 of callback-verified candidates. It productively admits at most Djex's public
-64-query session bound, attempts every candidate handoff and seals every
-eligible canonical query before opening one lexical live session, and processes
-those candidates serially in original order. After an exact counterexample,
+64-query session bound, attempts every candidate handoff, and seals every
+eligible canonical query before any possible process launch. Eager policy then
+opens one lexical session; deferred policy first processes the pure source
+prefix and opens at most one session on the first live miss. Both process
+candidates serially in original order. After an exact counterexample,
 the ranking pass retains its bounded source-ordered input naturals in a fixed
 four-entry batch-local bank. The bank is newest first, deduplicates exact
 vectors, promotes a replay hit or live counterexample, and evicts the least
@@ -1105,6 +1348,22 @@ receipt with a positive applicable-assignment count into a stable preferred
 partition. Startup and contract-file versions 1--6 cannot enable either new
 policy, so all existing file behavior is exact.
 
+`enableLengthRankingPositiveAffineApplicableDomainValidation` is a separate,
+mutually exclusive extractor. It scans the precondition itself or immediate
+flat top-level conjunction clauses and recognizes only compact inputs, natural
+literals, sums, and positive-literal scales in `A <= k`, `A == k`, or `k == A`.
+For `c + sum(ai*xi) <= k`, each positive coefficient derives
+`xi <= (k-c) quot ai`; equality grants the same necessary upper bound, and
+duplicate bounds take the minimum. Unsupported clauses grant no bound but stay
+in the actual replayed precondition. A literal false, unequal constant-only
+equality in either orientation, or recognized affine constant `c > k` is a
+syntactic contradiction which overrides missing coverage. A contradictory
+nonnullary query validates the one all-zero assignment, yielding maxima all
+zero, total count 1, and applicable count 0. A true constant equality is
+non-binding. A nullary query skips coverage extraction, validates `[]`, and
+records applicable count 1 or 0. Startup v7/v8 select this rule explicitly;
+the direct v1 builder, functions, receipts, and identities remain literal.
+
 Configuration version 3 inserts one query-owned origin probe after all four
 bank entries—and after an enabled applicable-domain pass is inapplicable—before
 that candidate's live Z3 query. Leant supplies no
@@ -1116,10 +1375,10 @@ is no evidence, leaves the bank unchanged, and proceeds to live Z3. An
 evaluation rejection or association mismatch is an indexed operational
 failure and activates the same batch-wide original-order, all-`Unassessed`
 fallback. The probe consumes no solver status and does not itself schedule the
-finite box. The eligible batch's lexical worker has already opened and passed
-Djex's capability probe before this per-candidate sequence begins, so an origin
-hit avoids a live query transaction and ordinal, not process launch or a prior
-session-open failure.
+finite box. Under eager policy the worker has already opened and an origin hit
+avoids only a live transaction and ordinal. Under deferred policy the origin
+probe runs before IO, so an all-pure batch can avoid process launch and its
+capability probe entirely.
 
 With the version-1 historical path, `unsat`, `unknown`, and status-only `sat`
 remain neutral. The explicit input-box paths instead use a live `unsat` only to
@@ -1213,15 +1472,18 @@ admission, complete execution source (absolute Z3 path, optional SHA-256
 expectation, solver/host budgets, artifact policy, and response limits), and
 replay-limit source. After validation, `LengthRankingPolicy` retains the
 opaque sealed Djex execution configuration and evaluation limits plus a
-private optional directly bounded applicable-domain pass, optional origin
-probe, and independent optional finite-input-box orchestration policy, plus
-orthogonal non-vacuous ordering preferences for applicable-domain and explicit
-box receipts. `mkLengthRankingPolicy` leaves all five choices disabled. The
+private selected direct-v1 or positive-affine-v1 applicable-domain pass,
+optional origin probe, independent optional finite-input-box orchestration,
+optional counterexample simplification, orthogonal non-vacuous ordering
+preferences for applicable-domain and explicit-box receipts, and an eager or
+deferred session-opening choice. `mkLengthRankingPolicy` leaves the optional
+choices disabled and selects eager opening. The
 finite box is
 enabled by its explicit builder or the version-2 decoder; versions 3 and 4
 enable the box and origin probe while retaining neutral positive ordering.
-Versions 5 and 6 also enable only the explicit box-receipt preference. No
-configuration version enables applicable-domain validation or its preference.
+Versions 5 and 6 also enable only the explicit box-receipt preference. Versions
+7 and 8 require the positive-affine pass, both non-vacuous preferences,
+simplification, and deferred opening; they cannot select direct v1.
 A scalar `LeanLengthContract` or nominal
 `LeanLengthSpinePairContract` is supplied separately to its domain-specific
 runner, so a request assertion no longer has to share the lifetime of reusable
@@ -1229,8 +1491,9 @@ process policy. Execution validation
 precedes replay-limit validation. The sealed policy is opaque, has no path or
 digest-byte projection, and retains no worker; a closed classifier reveals only
 whether its execution policy contains a digest expectation. The explicit
-contract remains a passive assertion. Every eligible call still opens a fresh
-lexical session.
+contract remains a passive assertion. An eager eligible call opens a fresh
+lexical session; a deferred all-pure call opens none, and a deferred live miss
+opens exactly one for the remaining dynamic scope.
 
 The version-1 file format remains compatible without a second generic
 policy-plus-contract aggregate. Its disabled value retains one strict validated
@@ -1325,6 +1588,25 @@ startup v4. The literal derives the opaque policy with
 post-assessment stable ordering rule, not evidence, validation, or solver
 authority. Existing versions reject the new field and retain their exact
 ordering.
+
+Versions 7 and 8 are the advanced scalar and pair successors. Their exact root
+and fixed semantic validation order are `format`, `version`,
+`executionAdmission`, `execution`, `evaluation`, `inputBoxValidation`,
+`counterexampleProbe`, `boundedPositiveOrdering`,
+`applicableDomainValidation`, `applicableDomainOrdering`,
+`counterexampleSimplification`, `liveSessionOpening`, and `contract`. The
+applicable-domain object requires exactly `"strategy": "positive-affine-v1"`,
+`maximumInputs`, and `maximumAssignments`; the simplification object requires
+the same two independent limits beside exactly
+`"strategy": "componentwise-lexicographic-v1"`. Each width cap is 8 and each
+assignment cap is 65,536. The other new literals are exactly
+`"applicableDomainOrdering": "prefer-non-vacuous"` and
+`"liveSessionOpening": "defer-until-live-query"`. V7 embeds scalar contract
+grammar v5; v8 embeds the nominal pair grammar v5 and requires
+`"resultShape": "binary-prod-spines-v1"`. The decoder constructs independent
+opaque limits for all three bounded activities and demands the contract last.
+The generalized decoder tries the unchanged v1--v6 dispatch first; those roots
+reject every new field and still select eager opening.
 
 `Leant.Synth.Length.Configuration.File.Acquire` is the compatibility facade
 over the shared bounded `Leant.Synth.Length.File.Acquire` filesystem boundary.

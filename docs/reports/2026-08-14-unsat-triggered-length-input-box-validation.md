@@ -2,6 +2,12 @@
 
 Date: 2026-08-14
 
+> **Later 2026-08-14 follow-up.** V7/v8 retain this independent post-`unsat`
+> box after MRU, positive-affine domain, origin, and live replay. Its maxima and
+> cap cannot be borrowed by either new bounded policy, and deferred all-pure
+> batches never reach this live-triggered stage. See the
+> [positive-affine deferred Length ranking report](2026-08-14-positive-affine-deferred-length-ranking.md).
+
 > **Later 2026-08-14 follow-up.** A separate programmatic applicable-domain
 > pass may now finish before live Z3. Its counterexample or establishment skips
 > the live transaction, so no `unsat` exists to schedule this explicit box; an

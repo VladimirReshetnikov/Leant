@@ -2,6 +2,12 @@
 
 Date: 2026-08-14
 
+> **Later 2026-08-14 follow-up.** Startup v8 now composes this nominal pair
+> runner with positive-affine applicable-domain validation, counterexample
+> simplification, both non-vacuous preferences, and deferred session opening.
+> Pair evidence and MRU state remain disjoint from scalar v7. See the
+> [positive-affine deferred Length ranking report](2026-08-14-positive-affine-deferred-length-ranking.md).
+
 > **Later 2026-08-14 follow-up.** The reusable policy can now insert Djex's
 > nominal pair applicable-domain validation after the pair MRU bank and before
 > origin/live execution. Pair counterexample and establishment receipts remain

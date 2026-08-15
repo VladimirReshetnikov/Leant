@@ -2,6 +2,12 @@
 
 Date: 2026-08-11
 
+> **Later 2026-08-14 follow-up.** The generalized assessment decoder now also
+> accepts advanced scalar v7 and pair v8. Their closed roots require independent
+> positive-affine and simplification limits plus deferred session opening;
+> v1--v6 still delegate to the exact eager decoders described below. See the
+> [positive-affine deferred Length ranking report](2026-08-14-positive-affine-deferred-length-ranking.md).
+
 > **Later 2026-08-14 follow-up.** The established scalar-only decoder still
 > accepts exactly the three versions recorded below. The generalized assessment
 > decoder now additionally accepts pair v4 and the explicit preferred-positive

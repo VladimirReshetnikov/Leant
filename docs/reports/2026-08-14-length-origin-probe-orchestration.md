@@ -2,6 +2,12 @@
 
 Date: 2026-08-14
 
+> **Later 2026-08-14 follow-up.** Under advanced v7/v8 the origin probe runs in
+> the pre-open pure prefix after positive-affine applicable-domain misses. An
+> origin hit can therefore help an all-pure batch avoid process launch; v1--v6
+> keep the eager worker timing recorded below. See the
+> [positive-affine deferred Length ranking report](2026-08-14-positive-affine-deferred-length-ranking.md).
+
 > **Later 2026-08-14 follow-up.** A programmatic applicable-domain policy can
 > now run after the MRU bank and before this origin stage. Its inapplicable
 > result reaches the origin probe unchanged; either authoritative evidence arm

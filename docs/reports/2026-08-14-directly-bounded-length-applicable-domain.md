@@ -2,6 +2,12 @@
 
 Date: 2026-08-14
 
+> **Later 2026-08-14 follow-up.** The direct-v1 builder, extraction rule,
+> receipts, and identities below remain literal. Startup v7/v8 explicitly
+> select the nominally distinct positive-affine rule, its non-vacuous
+> preference, simplification, and deferred session opening. See the
+> [positive-affine deferred Length ranking report](2026-08-14-positive-affine-deferred-length-ranking.md).
+
 ## Outcome
 
 Leant now has an explicit programmatic policy which asks Djex to validate the

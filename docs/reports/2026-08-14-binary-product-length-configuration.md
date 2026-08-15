@@ -2,6 +2,13 @@
 
 Date: 2026-08-14
 
+> **Later 2026-08-14 follow-up.** Startup v8 is now the advanced nominal pair
+> successor to v6; scalar v7 is its sibling. Both add the closed positive-affine
+> applicable-domain, simplification, and deferred-opening fields while the
+> contract-only format remains v1--v6. Existing startup v1--v6 schemas and eager
+> behavior remain exact. See the
+> [positive-affine deferred Length ranking report](2026-08-14-positive-affine-deferred-length-ranking.md).
+
 > **Later 2026-08-14 follow-up.** The opaque reusable policy now also has
 > separate programmatic applicable-domain validation and non-vacuous preference
 > choices for both scalar and pair ranking. The closed startup and contract-

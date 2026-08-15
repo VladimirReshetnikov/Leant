@@ -2,6 +2,13 @@
 
 Date: 2026-08-14
 
+> **Later 2026-08-14 follow-up.** Startup v7/v8 now require this same
+> query-owned simplification policy for MRU, positive-affine-domain, origin,
+> live, and post-`unsat` counterexamples. Versions 1--6 and established direct
+> runners still leave it disabled. Deferred atomic fallback also clears every
+> earlier occurrence-attached simplification receipt. See the
+> [positive-affine deferred Length ranking report](2026-08-14-positive-affine-deferred-length-ranking.md).
+
 ## Outcome
 
 Leant can now explicitly ask Djex to simplify every independently replayed

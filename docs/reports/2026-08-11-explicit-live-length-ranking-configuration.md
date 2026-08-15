@@ -17,6 +17,13 @@
 
 Date: 2026-08-11
 
+> **Later 2026-08-14 follow-up.** `LengthRankingPolicy` now also retains an
+> explicitly selected direct-v1 or positive-affine-v1 applicable-domain rule,
+> optional simplification, and eager or deferred opening. Startup v7/v8 select
+> positive-affine validation, simplification, and deferred opening; v1--v6 keep
+> the eager behavior recorded below. See the
+> [positive-affine deferred Length ranking report](2026-08-14-positive-affine-deferred-length-ranking.md).
+
 ## Outcome
 
 `Leant.Synth.Length.Configuration` owns the pure configuration boundary in

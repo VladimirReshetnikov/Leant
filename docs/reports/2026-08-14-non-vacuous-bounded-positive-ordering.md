@@ -2,6 +2,12 @@
 
 Date: 2026-08-14
 
+> **Later 2026-08-14 follow-up.** V7/v8 enable both independent preferences.
+> Stable non-vacuous positive-affine-domain receipts precede non-vacuous
+> explicit-box receipts, then neutral and vacuous assessments, then
+> counterexamples. See the
+> [positive-affine deferred Length ranking report](2026-08-14-positive-affine-deferred-length-ranking.md).
+
 > **Later 2026-08-14 follow-up.** Directly bounded applicable-domain
 > establishment has its own nominal receipt and separate non-vacuous preference.
 > This report's builder continues to classify only explicit post-`unsat`
