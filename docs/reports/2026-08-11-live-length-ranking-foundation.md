@@ -1,5 +1,13 @@
 # Live Length ranking foundation
 
+> **Later 2026-08-14 follow-up.** An explicit programmatic policy now inserts
+> Djex's directly bounded applicable-domain validation after MRU misses and
+> before origin/live execution. A counterexample or establishment skips the
+> live transaction, although the worker is already open; inapplicability
+> continues normally. Acquisition and non-vacuous preference are separate, and
+> startup versions 1--6 cannot enable either. See the
+> [directly bounded applicable-domain report](2026-08-14-directly-bounded-length-applicable-domain.md).
+>
 > **Later 2026-08-14 follow-up.** Bounded-positive receipts remain neutral on
 > every historical/default path, but a new explicit policy may stably prefer
 > only receipts whose independently checked applicable-assignment count is

@@ -50,6 +50,8 @@ Reports are listed oldest first.
 - 2026-08-14 — [Length origin-probe orchestration](2026-08-14-length-origin-probe-orchestration.md)
 - 2026-08-14 — [Live canonical-`Prod` Length ranking](2026-08-14-live-binary-product-length-ranking.md)
 - 2026-08-14 — [Unsat-triggered bounded Length input-box validation](2026-08-14-unsat-triggered-length-input-box-validation.md)
+- 2026-08-14 — [Non-vacuous bounded-positive Length ordering](2026-08-14-non-vacuous-bounded-positive-ordering.md)
+- 2026-08-14 — [Directly bounded Length applicable-domain orchestration](2026-08-14-directly-bounded-length-applicable-domain.md)
 
 ## Standalone PDF reports
 

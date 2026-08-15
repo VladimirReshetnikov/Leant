@@ -2,6 +2,12 @@
 
 Date: 2026-08-13
 
+> **Later 2026-08-14 follow-up.** The single opaque policy now also retains
+> separately enabled directly bounded applicable-domain validation and its
+> independent non-vacuous preference. Startup and contract-only versions 1--6
+> cannot select either choice. See the
+> [directly bounded applicable-domain report](2026-08-14-directly-bounded-length-applicable-domain.md).
+>
 > **Later 2026-08-14 follow-up.** The same opaque `LengthRankingPolicy` now
 > drives either scalar or canonical-`Prod` library ranking. That reuse is
 > limited to process/evaluation and optional origin/box orchestration policy;

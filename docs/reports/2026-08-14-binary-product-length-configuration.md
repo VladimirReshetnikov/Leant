@@ -2,6 +2,12 @@
 
 Date: 2026-08-14
 
+> **Later 2026-08-14 follow-up.** The opaque reusable policy now also has
+> separate programmatic applicable-domain validation and non-vacuous preference
+> choices for both scalar and pair ranking. The closed startup and contract-
+> only schemas remain exactly v1--v6 and cannot enable either choice. See the
+> [directly bounded applicable-domain report](2026-08-14-directly-bounded-length-applicable-domain.md).
+>
 > **Later 2026-08-14 follow-up.** Startup v6 is the pair successor which retains
 > v4's operational and contract grammar and additionally requires
 > `"boundedPositiveOrdering": "prefer-non-vacuous"`. Scalar v5 supplies the same
@@ -19,9 +25,11 @@ version 6 selects the pair domain for one `:synth` request. Neither adds a CLI
 option, infers a contract from a Lean type, or turns a structurally pair-shaped
 candidate into behavioral authority.
 
-The process and behavioral selections remain separate. A single opaque
-`LengthRankingPolicy` still owns only checked execution, evaluation, optional
-input-box, and optional origin-probe policy. A passive
+The process and behavioral selections remain separate. At this checkpoint, a
+single opaque `LengthRankingPolicy` owned checked execution, evaluation,
+optional input-box, and optional origin-probe policy. The later programmatic
+follow-up above adds its two orthogonal choices without changing this report's
+file schemas. A passive
 `LeanLengthContractSelection` chooses either a scalar `LeanLengthContract` or a
 nominal `LeanLengthSpinePairContract`. Dispatch then calls exactly one
 domain-specific occurrence-sealed assessor; scalar and pair queries,

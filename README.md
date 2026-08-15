@@ -142,7 +142,11 @@ required binary-product-spine contract. Version 5 is the scalar successor and
 version 6 is the pair successor: both additionally require
 `"boundedPositiveOrdering": "prefer-non-vacuous"`, which explicitly promotes
 only candidates carrying a completed finite-box receipt with at least one
-precondition-applicable assignment. Leant admits and reads that file
+precondition-applicable assignment. None of startup configuration versions
+1--6 enables the newer directly bounded applicable-domain pass or its separate
+non-vacuous ordering preference; those two choices are currently available
+only through the programmatic `LengthRankingPolicy` builders described below.
+Leant admits and reads that file
 once at startup, requires the configuration to contain an executable SHA-256
 expectation by default, and retains the decoded contract selection as a fixed
 process-wide assertion. Presence at activation is not a digest match; Djex
@@ -430,20 +434,71 @@ independent. Without
 `enableLengthRankingNonVacuousInputBoxPreference`, completed positive receipts
 retain their historical neutral ordering.
 
+The directly bounded applicable-domain pass is a separate programmatic opt-in.
+For a concrete one-input scalar contract and its nominal pair sibling, the
+relevant checked preconditions and reusable policy are:
+
+```haskell
+scalarDirectBound = LengthAtMost
+  (LengthVariable (LengthInput 0)) (LengthLiteral 3)
+
+pairDirectBound = LengthAtMost
+  (LengthVariable (LengthSpinePairInput 0)) (LengthLiteral 3)
+
+let applicablePolicy =
+      enableLengthRankingNonVacuousApplicableDomainPreference
+        $ enableLengthRankingApplicableDomainValidation
+            inputBoxLimits
+        $ enableLengthRankingOriginProbe basePolicy
+
+scalarAssessment <- assessVerifiedLengthCandidatesWithPolicy
+  applicablePolicy
+  scalarContract { leanLengthContractSource =
+    scalarSource { lengthContractPrecondition = scalarDirectBound } }
+  verificationBatch
+
+pairAssessment <- assessVerifiedLengthSpinePairCandidatesWithPolicy
+  applicablePolicy
+  pairContract { leanLengthSpinePairContractSource =
+    pairSource { lengthSpinePairContractPrecondition = pairDirectBound } }
+  verificationBatch
+```
+
+`enableLengthRankingApplicableDomainValidation` supplies only the checked
+width/cardinality limits. Djex derives the tight inclusive maxima from direct
+normalized `input <= literal` clauses; Leant supplies no maxima and consumes
+no solver status. `enableLengthRankingNonVacuousApplicableDomainPreference`
+is independent: without it, even an established applicable-domain receipt is
+neutral. These builders work for both domain-specific assessors, while the
+scalar `ApplicableDomainEstablished` and pair
+`LengthSpinePairApplicableDomainEstablished` assessments and receipts remain
+nominally separate. The snippets assume `scalarSource` and `pairSource` are the
+otherwise complete passive contract sources used to build the surrounding
+contracts, and that `basePolicy`, `inputBoxLimits`, and `verificationBatch`
+have the same checked meanings as in the preceding example.
+
 For each eligible product query, the exact execution order is the product
 batch's newest-first four-entry MRU input replay bank, the optional query-owned
-origin probe, a live pair query, query-first observation replay, and—only when
-that live observation has no counterexample and reports `unsat`—the optional
-exact input-box traversal. Under the historical/default policy, a freshly replayed
+applicable-domain validation, the optional query-owned origin probe, a live
+pair query, query-first observation replay, and—only when that live observation
+has no counterexample and reports `unsat`—the optional exact input-box
+traversal. An applicable-domain counterexample or establishment skips the
+origin and live transaction for that candidate. An inapplicable result simply
+continues to the origin/live stages. Under the historical/default policy, a
+freshly replayed
 and associated pair counterexample is the only assessment which moves: it
 enters the stable demoted partition and can supply an MRU input vector.
 Complete box traversal is `LengthSpinePairBoundedPositive` and remains neutral
 unless the new preference is explicitly enabled. With that preference, a
 receipt whose applicable-assignment count is positive enters a stable preferred
-partition; a zero-applicable, vacuous receipt remains neutral. Status-only
+partition; a zero-applicable, vacuous receipt remains neutral. The eligible
+batch's lexical worker is still opened and capability-probed before this
+per-candidate sequence, so either applicable-domain evidence arm avoids a live
+transaction and ordinal, not worker launch. Status-only
 `sat`, `unsat`, and `unknown` remain neutral heuristics. Any structured session
 or live-query failure, live-observation association or replay failure,
-query-owned origin failure, or input-box failure atomically restores the
+an admitted query-owned applicable-domain evaluation/association failure,
+origin failure, or input-box failure atomically restores the
 admitted batch in original order as unassessed. Candidate-local pure preparation
 refusals stay local, and no result grants pruning authority.
 
@@ -659,7 +714,12 @@ note summarizes its observed input and result spine lengths; a pair note keeps
 the first and second result lengths source ordered. Both call the receipt
 replayed and model-relative and report only the number of assumed provider laws
 used by that candidate. Independently completed finite-box notes instead give
-the bounded maxima and checked/applicable assignment counts. The semantic note
+the bounded maxima and checked/applicable assignment counts. Programmatic
+applicable-domain assessments use
+`renderLengthApplicableDomainValidationNote` or its spine-pair sibling to
+report the same bounded fields for the tight box Djex derived from the checked
+precondition. Main's unchanged version-1 through version-6 configuration path
+cannot currently produce that assessment. The semantic note
 never projects the receipt's private provider-name list. Disabled assessment,
 rejected input, heuristic status,
 and atomic operational fallback add no semantic note. The note can explain a
@@ -984,8 +1044,29 @@ and preparation refusals do not mutate the bank. The bank never contains a
 cached solver result, verdict, query, receipt, provider-law basis, proof,
 solver status, or durable cache entry.
 
+The programmatic
+`enableLengthRankingApplicableDomainValidation inputBoxLimits` policy inserts
+Djex's directly bounded pass after those MRU misses. Djex scans only the exact
+checked normalized top-level precondition for direct `input <= literal`
+clauses, selects the tightest duplicate for each compact input, and requires
+every nonnullary input to be covered. Missing coverage is an ordinary
+inapplicable result and continues to the next stage. A nullary query derives
+maxima `[]` and validates its single assignment `[]`. Width, maximum-
+value, and assignment-count admission refusals are likewise ordinary misses.
+Exact admitted coverage drives a solver-independent tight-box traversal. A
+violation becomes the
+ordinary `Counterexample` and enters the MRU bank; complete traversal becomes
+`ApplicableDomainEstablished`, carries an opaque model/provider-relative
+receipt, and skips origin and live execution. Its vacuous form remains neutral.
+Only the separate
+`enableLengthRankingNonVacuousApplicableDomainPreference` moves an established
+receipt with a positive applicable-assignment count into a stable preferred
+partition. Startup and contract-file versions 1--6 cannot enable either new
+policy, so all existing file behavior is exact.
+
 Configuration version 3 inserts one query-owned origin probe after all four
-bank entries miss and before that candidate's live Z3 query. Leant supplies no
+bank entries—and after an enabled applicable-domain pass is inapplicable—before
+that candidate's live Z3 query. Leant supplies no
 arity or values: Djex derives one zero per compact modeled input from the
 sealed checked problem and runs the ordinary bounded replay and exact
 association gate. A hit is the ordinary `Counterexample`; it is stably demoted
@@ -1039,7 +1120,8 @@ constructor: renderer text, source names, types, graph identities, and nested
 Djex errors are neither evaluated nor retained in the refusal diagnostic, and
 the class makes no behavioral-evidence claim. The exact verified receipt and
 its semantic sidecar remain attached to the candidate. Any returned structured
-live session, query, association, replay, origin-probe, or finite-box failure
+live session, query, association, replay, applicable-domain, origin-probe, or
+finite-box failure
 atomically restores every original candidate in original order as
 `Unassessed`, together with only a
 sanitized batch failure class, cleanup bit, and optional safe original index.
@@ -1066,14 +1148,18 @@ receipt, and additive configuration grammar are detailed in the
 The separately enabled stable preference for non-vacuous positive receipts is
 detailed in the
 [non-vacuous bounded-positive ordering report](docs/reports/2026-08-14-non-vacuous-bounded-positive-ordering.md).
+The directly bounded pre-live pass, separate non-vacuous preference, and
+unchanged configuration boundary are recorded in the
+[directly bounded applicable-domain report](docs/reports/2026-08-14-directly-bounded-length-applicable-domain.md).
 
 `Leant.Synth.Length.SpinePair.Ranking` and
 `Leant.Synth.Length.SpinePair.PostVerification` supply the nominal
 canonical-`Prod` sibling of this orchestration. The pair path reuses the same
 bounded execution policy and lexical Djex session capability, but prepares
 only pair queries and releases only pair-domain assessments and receipts. Its
-own four-entry batch-local MRU bank, optional origin probe, live pair call,
-query-first replay, and optional post-`unsat` pair input box preserve the same
+own four-entry batch-local MRU bank, optional applicable-domain validation,
+optional origin probe, live pair call, query-first replay, and optional
+post-`unsat` pair input box preserve the same
 stable-demotion and atomic-fallback rules without transferring scalar
 authority. Pair-safe terminal projection lives in
 `presentLengthSpinePairPostVerificationResult`; the complete checkpoint is
@@ -1086,12 +1172,16 @@ admission, complete execution source (absolute Z3 path, optional SHA-256
 expectation, solver/host budgets, artifact policy, and response limits), and
 replay-limit source. After validation, `LengthRankingPolicy` retains the
 opaque sealed Djex execution configuration and evaluation limits plus a
-private optional origin probe and an independent optional finite-input-box
-orchestration policy, plus an orthogonal optional non-vacuous-positive ordering
-preference. `mkLengthRankingPolicy` leaves all three disabled. The finite box is
+private optional directly bounded applicable-domain pass, optional origin
+probe, and independent optional finite-input-box orchestration policy, plus
+orthogonal non-vacuous ordering preferences for applicable-domain and explicit
+box receipts. `mkLengthRankingPolicy` leaves all five choices disabled. The
+finite box is
 enabled by its explicit builder or the version-2 decoder; versions 3 and 4
 enable the box and origin probe while retaining neutral positive ordering.
-Versions 5 and 6 also enable the explicit preference. A scalar `LeanLengthContract` or nominal
+Versions 5 and 6 also enable only the explicit box-receipt preference. No
+configuration version enables applicable-domain validation or its preference.
+A scalar `LeanLengthContract` or nominal
 `LeanLengthSpinePairContract` is supplied separately to its domain-specific
 runner, so a request assertion no longer has to share the lifetime of reusable
 process policy. Execution validation

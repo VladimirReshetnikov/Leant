@@ -2,6 +2,14 @@
 
 Date: 2026-08-14
 
+> **Later 2026-08-14 follow-up.** The reusable policy can now insert Djex's
+> nominal pair applicable-domain validation after the pair MRU bank and before
+> origin/live execution. Pair counterexample and establishment receipts remain
+> distinct from scalar evidence; establishment is neutral unless its separate
+> non-vacuous preference is enabled. Startup versions 1--6 cannot select the
+> pass. See the
+> [directly bounded applicable-domain report](2026-08-14-directly-bounded-length-applicable-domain.md).
+>
 > **Later 2026-08-14 follow-up.** Pair bounded-positive receipts remain neutral
 > under startup v4 and the established API. Startup v6 or the explicit policy
 > builder now stably prefers only a pair receipt with a positive applicable

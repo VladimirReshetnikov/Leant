@@ -2,6 +2,13 @@
 
 Date: 2026-08-14
 
+> **Later 2026-08-14 follow-up.** Directly bounded applicable-domain
+> establishment has its own nominal receipt and separate non-vacuous preference.
+> This report's builder continues to classify only explicit post-`unsat`
+> input-box receipts. Startup v5/v6 enable only this established preference;
+> no startup version enables the new one. See the
+> [directly bounded applicable-domain report](2026-08-14-directly-bounded-length-applicable-domain.md).
+
 ## Outcome
 
 Leant now has a separately enabled soft ordering preference for scalar and
@@ -77,13 +84,15 @@ projecting private provider names.
 
 ## Raw Z3 status remains scheduling-only
 
-The per-candidate sequence is unchanged:
+With the later programmatic checkpoint, the complete per-candidate sequence is:
 
 1. try up to four newest-first batch-local counterexample input vectors;
-2. optionally probe the exact query-owned origin;
-3. run the live Z3 query;
-4. pass the observation through query-first association and evidence replay;
-5. only when no counterexample was released and the status is `unsat`, run the
+2. under the newer programmatic policy, optionally try directly bounded
+   applicable-domain validation;
+3. after an inapplicable result, optionally probe the exact query-owned origin;
+4. run the live Z3 query;
+5. pass the observation through query-first association and evidence replay;
+6. only when no counterexample was released and the status is `unsat`, run the
    separately enabled query-owned finite-box traversal.
 
 `unsat` can therefore decide whether an independent traversal is scheduled, but

@@ -2,6 +2,14 @@
 
 Date: 2026-08-14
 
+> **Later 2026-08-14 follow-up.** A programmatic applicable-domain policy can
+> now run after the MRU bank and before this origin stage. Its inapplicable
+> result reaches the origin probe unchanged; either authoritative evidence arm
+> skips origin and the live transaction. Startup versions 1--6 cannot enable
+> the new stage, so their documented MRU/origin/live order is unchanged. See
+> the
+> [directly bounded applicable-domain report](2026-08-14-directly-bounded-length-applicable-domain.md).
+>
 > **Later 2026-08-14 follow-up.** The reusable opaque ranking policy can select
 > the same orchestration shape for canonical-`Prod` ranking. The product runner
 > calls the pair query-owned origin entrance after its own MRU bank misses; a

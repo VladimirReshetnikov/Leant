@@ -2,6 +2,13 @@
 
 Date: 2026-08-14
 
+> **Later 2026-08-14 follow-up.** A separate programmatic applicable-domain
+> pass may now finish before live Z3. Its counterexample or establishment skips
+> the live transaction, so no `unsat` exists to schedule this explicit box; an
+> inapplicable result continues through origin/live to this unchanged trigger.
+> Startup versions 1--6 do not enable the new pass. See the
+> [directly bounded applicable-domain report](2026-08-14-directly-bounded-length-applicable-domain.md).
+>
 > **Later 2026-08-14 follow-up.** Complete traversal remains neutral by default.
 > A separately enabled policy can now stably prefer its receipt only when at
 > least one checked assignment met the precondition; zero-applicable receipts
