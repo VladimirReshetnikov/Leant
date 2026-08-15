@@ -16258,48 +16258,9 @@ assertLengthBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineSchema =
             strictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffinePairDocument
               executable 65000
           documents = [scalar, pair]
-          missing object field path document =
-            assertLengthAssessmentConfigurationFileError
-              (LengthRankingConfigurationMissingField object field)
-              $ deleteJsonField path document
-          unexpected object path document =
-            assertLengthAssessmentConfigurationFileError
-              (LengthRankingConfigurationUnexpectedField object)
-              $ addJsonField path ("private-field", Json.JNull) document
-          rootShape =
-            [ (LengthRankingConfigurationFormatField, "format")
-            , (LengthRankingConfigurationVersionField, "version")
-            , ( LengthRankingConfigurationExecutionAdmissionField
-              , "executionAdmission"
-              )
-            , (LengthRankingConfigurationExecutionField, "execution")
-            , (LengthRankingConfigurationEvaluationField, "evaluation")
-            , ( LengthRankingConfigurationInputBoxValidationField
-              , "inputBoxValidation"
-              )
-            , ( LengthRankingConfigurationCounterexampleProbeField
-              , "counterexampleProbe"
-              )
-            , ( LengthRankingConfigurationBoundedPositiveOrderingField
-              , "boundedPositiveOrdering"
-              )
-            , ( LengthRankingConfigurationApplicableDomainValidationField
-              , "applicableDomainValidation"
-              )
-            , ( LengthRankingConfigurationApplicableDomainOrderingField
-              , "applicableDomainOrdering"
-              )
-            , ( LengthRankingConfigurationCounterexampleSimplificationField
-              , "counterexampleSimplification"
-              )
-            , ( LengthRankingConfigurationLiveSessionOpeningField
-              , "liveSessionOpening"
-              )
-            , ( LengthRankingConfigurationUsableWorkBudgetField
-              , "usableWorkBudget"
-              )
-            , (LengthRankingConfigurationContractField, "contract")
-            ]
+          missing = assertConfigurationFieldMissing
+          unexpected = assertConfigurationFieldUnexpected
+          rootShape = lengthRankingConfigurationRootShape
           applicableShape =
             [ ( LengthRankingConfigurationApplicableDomainStrategyField
               , "strategy"
