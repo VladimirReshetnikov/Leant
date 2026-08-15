@@ -290,6 +290,77 @@ ordinal-zero renderer rule, while choosing `"exact-spine-zero-step-v1"`
 retains the accepted typed renderer ordinal just as version 4 does. Versions
 1--4 and startup continue to reject the quotient tag.
 
+### Offline binary-product Length queries
+
+Leant also has a library-level, fail-closed handoff for a result whose root,
+after the serializer's existing `whnfR` normalization, is saturated canonical
+Lean `Prod` and whose two source-ordered fields are applications of the same
+configured finite spine. Reducible aliases to `Prod` are admitted only after
+that normalization; normalized `And` and `PProd` remain ineligible. Canonical
+`Prod` retains a private provenance marker through translation, while search
+and rendering continue to treat it as an ordinary boxed pair.
+That marker matters only at the behavioral boundary: proposition-valued
+`And`, sort-polymorphic `PProd`, a scalar result, a nested product, and a
+product with either non-spine field are rejected even though some share the
+same structural pair representation.
+
+The serializer acquisition boundary also requires exactly one matching
+`(goal ...)` info envelope. An extra goal-shaped message fails closed instead
+of letting caller-controlled elaboration output shadow the serializer's real
+normalized result.
+
+For example, an integration can describe the callback-verified candidate
+`fun xs => (xs, xs)` for the Lean goal `List Nat → List Nat × List Nat`
+with a contract equating each result-field length to the one observed input
+length:
+
+```haskell
+pairContract :: LeanLengthSpinePairContract
+pairContract = LeanLengthSpinePairContract
+  { leanLengthSpinePairContractSpine =
+      LeanLengthSpineIdentity "List" "List.nil" "List.cons"
+  , leanLengthSpinePairContractTargetArgumentRoles =
+      Just [LengthObservedSpine]
+  , leanLengthSpinePairContractCandidateCasePolicy =
+      LeanLengthCasesRejected
+  , leanLengthSpinePairContractSource = LengthSpinePairContractSource
+      { lengthSpinePairContractPrecondition = LengthTruth True
+      , lengthSpinePairContractPostcondition = LengthAll
+          [ LengthEqual
+              (LengthVariable
+                (LengthSpinePairResult LengthSpinePairFirst))
+              (LengthVariable (LengthSpinePairInput 0))
+          , LengthEqual
+              (LengthVariable
+                (LengthSpinePairResult LengthSpinePairSecond))
+              (LengthVariable (LengthSpinePairInput 0))
+          ]
+      }
+  , leanLengthSpinePairContractProviderLaws = []
+  }
+
+queryResult = prepareCheckedLengthSpinePairQuery pairContract verified
+```
+
+Here `verified` is the existing callback-verified candidate carrying its exact
+Exference origin; the example does not manufacture that authority. The
+handoff reuses the scalar path's exact origin checks, configured-spine and
+provider resolution, candidate-case/target-role policy, and sealed session
+authority. It does not invent a semantic-family binding for Lean's built-in
+`Prod`. Djex then seals a nominally distinct binary-product contract, problem,
+and canonical QF_LIA query. Product model, saved-input, origin, and finite-box
+replay remain pure query-owned operations, and only independently evaluated
+and associated values can become model-relative counterexample evidence. Raw
+`sat`, `unsat`, or `unknown` status has no authority.
+
+This checkpoint is deliberately offline. It adds no product form to the
+startup or `--length-contract` JSON grammars and does not route product queries
+through the scalar live worker, ranking pass, MRU bank, or presentation path.
+Live product ranking and its configuration grammar remain deferred; scalar
+live behavior and scalar query bytes are unchanged. See the
+[canonical `Prod` Length handoff report](docs/reports/2026-08-14-canonical-prod-length-handoff.md)
+for the exact boundary and compatibility details.
+
 After a successful occurrence seal, Main prints a subordinate note only for a
 candidate carrying an independently replayed counterexample. The note calls it
 a replayed, model-relative finite-list-spine Length counterexample, gives a

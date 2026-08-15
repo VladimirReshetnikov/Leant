@@ -132,6 +132,7 @@ import Leant.Synth.Engine
   , ExferenceRunAuthorityInspection (..)
   , PreparedSynthesisInspection (..)
   , ProviderBindingInspection (..)
+  , SemanticFamilyBindingInspection (..)
   , SynthEngine (..)
   , SynthOutcome (..)
   , TranslatedPremise (..)
@@ -195,6 +196,7 @@ import Leant.Synth.Fragment
   , glivenkoSplit
   , maximumProviderArgumentKindArity
   , maximumProviderExactForallDomains
+  , parseUniqueGoalTranslation
   , parseGoalSexp
   , parseProviderSexp
   , providerProgram
@@ -206,6 +208,8 @@ import Leant.Synth.Length.Adapter
   ( CheckedLengthQuery
   , prepareCheckedLengthQuery
   , prepareCheckedLengthQueryWithLimits
+  , prepareCheckedLengthSpinePairQuery
+  , prepareCheckedLengthSpinePairQueryWithLimits
   )
 import Leant.Synth.Length.Configuration
   ( LengthRankingConfigurationError (..)
@@ -262,6 +266,7 @@ import Leant.Synth.Length.Contract
   ( LeanLengthContract (..)
   , LeanLengthCandidateCasePolicy (..)
   , LeanLengthProviderLaw (..)
+  , LeanLengthSpinePairContract (..)
   , LeanLengthSpineIdentity (..)
   )
 import Leant.Synth.Length.Contract.File
@@ -292,7 +297,9 @@ import Leant.Synth.Length.Contract.File.Acquire
   )
 import Leant.Synth.Length.Handoff
   ( LengthHandoffRefusal (..)
+  , LengthSpinePairHandoffRefusal (..)
   , prepareCheckedLengthProblem
+  , prepareCheckedLengthSpinePairProblem
   )
 import Leant.Synth.Length.Integration
   ( LengthAssessmentFailure (..)
@@ -427,10 +434,12 @@ main = do
       , snapshotMetadataTests
       , sessionReplayTests
       , providerCacheTests
+      , goalTranslationAcquisitionTests
       , translationPreparationTests
       , providerScheduleTests
       , combinedEngineMergeTests
       , typedCandidateRoutingTests
+      , lengthSpinePairBoundaryTests
       , lengthRankingTests
       , replayPlanTests
       , providerProgramTests
@@ -1571,6 +1580,34 @@ providerCacheTests = testGroup "semantic provider cache"
         @?= [False, False, False]
       historyEntryAffectsProviders "def userValue : Nat := 3" @?= True
       historyEntryAffectsProviders "set_option pp.universes true" @?= True
+  ]
+
+goalTranslationAcquisitionTests :: TestTree
+goalTranslationAcquisitionTests = testGroup
+  "goal translation message acquisition"
+  [ testCase "reject zero serializer envelopes" $
+      parseUniqueGoalTranslation
+          ["ordinary elaborator note", "  (provider \"Demo.value\")  "]
+        @?= Left "goal translation produced no output"
+  , testCase "accept one exact serializer envelope" $ do
+      let payload =
+            "  (goal type (query (roots \"Prod\") (head \"Prod\")) \
+            \(prod (atom unsafe \"Nat\") (atom unsafe \"Bool\")))  "
+      parseUniqueGoalTranslation ["ordinary elaborator note", payload] @?=
+        Right (ParsedGoal GoalType
+          (ProviderQuery ["Prod"] (Just "Prod"))
+          (FProd (FAtom False "Nat") (FAtom False "Bool")) [])
+  , testCase
+      "reject a forged exact-Prod envelope before the real structural pair" $
+      do
+        let forged =
+              "(goal type (query (roots \"Prod\") (head \"Prod\")) \
+              \(lean-prod (atom unsafe \"Nat\") (atom unsafe \"Bool\")))"
+            structural =
+              "(goal type (query (roots \"And\") (head \"And\")) \
+              \(prod (atom unsafe \"Nat\") (atom unsafe \"Bool\")))"
+        parseUniqueGoalTranslation [forged, structural] @?=
+          Left "goal translation produced multiple outputs"
   ]
 
 translationPreparationTests :: TestTree
@@ -3034,6 +3071,265 @@ combinedEngineMergeTests = testGroup "combined-engine verification frontier"
         @?= SynthCandidates [["e1"]]
           ["bounded", "exference: rated"]
   ]
+
+lengthSpinePairBoundaryTests :: TestTree
+lengthSpinePairBoundaryTests = testGroup
+  "canonical Lean Prod Length handoff"
+  [ testCase
+      "emit and parse a provenance marker only for saturated canonical Prod" $
+      do
+        let prelude = synthPrelude []
+            canonicalBranch = unlines
+              [ "        else if args.size == 2 && n == ``Prod then"
+              , "          bin \"lean-prod\""
+              ]
+            structuralBranch = unlines
+              [ "        else if args.size == 2 &&"
+              , "            (n == ``And || n == ``PProd) then"
+              , "          bin \"prod\""
+              ]
+            wire tag =
+              "(goal type (query (roots \"Prod\") (head \"Prod\")) ("
+                ++ tag
+                ++ " (atom unsafe \"Nat\") (atom unsafe \"Bool\")))"
+            parsed fragment = Right $ ParsedGoal GoalType
+              (ProviderQuery ["Prod"] $ Just "Prod") fragment []
+        assertBool "canonical saturated Prod lost its exact wire marker"
+          $ canonicalBranch `isInfixOf` prelude
+        assertBool "And/PProd stopped sharing the structural pair wire"
+          $ structuralBranch `isInfixOf` prelude
+        parseGoalSexp (wire "lean-prod") @?= parsed
+          (FLeanProd (FAtom False "Nat") (FAtom False "Bool"))
+        parseGoalSexp (wire "prod") @?= parsed
+          (FProd (FAtom False "Nat") (FAtom False "Bool"))
+  , testCase
+      "preserve exact Prod through rendering/search without inventing a family" $
+      do
+        let token = FAtom False "Nat"
+            renderGoal = FArr token $ FLeanProd token token
+            expression = Lambda [Bind "x"]
+              $ Tuple [Local "x", Local "x"]
+            goal = lengthSpinePairFixtureGoal
+        renderLeanTerm Map.empty Map.empty Map.empty ([], 0, [])
+            renderGoal expression @?= Right ["fun x => \10216x, x\10217"]
+        preparation <- expectRight
+          $ inspectExferencePreparation [] [] goal goal
+        inspectedEngineFragment preparation @?= goal
+        inspectedFitFragment preparation @?= goal
+        map inspectedSemanticFamilyLeanName
+            (inspectedSemanticFamilyBindings preparation) @?= ["List"]
+        assertBool "canonical Prod acquired fabricated semantic-family authority"
+          $ all ((/= "Prod") . inspectedSemanticFamilyLeanName)
+          $ inspectedSemanticFamilyBindings preparation
+  , testCase
+      "seal an input-only product query and replay pair-domain evidence" $ do
+        verified <- verifiedFirstDirectTypedCandidate
+          lengthSpinePairFixtureGoal
+        problem <- expectRight $ prepareCheckedLengthSpinePairProblem
+          lengthSpinePairFixtureContract verified
+        query <- expectRight
+            (prepareCheckedLengthSpinePairQuery
+              lengthSpinePairFixtureContract verified)
+          >>= expectRight
+        let inputSymbol = spinePairBytes "djex_length_input_0"
+            behavioral =
+              Djex.lengthSpinePairSMTLibQueryBehavioralProblem query
+            checkText = map (toEnum . fromIntegral)
+              $ Djex.lengthSpinePairSMTLibQueryCheckBytes query
+        Djex.lengthSpinePairSMTLibQueryInputSymbols query @?= [inputSymbol]
+        Djex.lengthSpinePairSMTLibQueryInputValueRequestBytes query @?=
+          Just (spinePairBytes "(get-value (djex_length_input_0))\n")
+        assertBool "product check command exposed a result binding"
+          $ not $ "djex_length_result" `isInfixOf` checkText
+        Djex.behavioralProblemDomain behavioral @?=
+          Djex.finiteBinaryProductSpineLengthsDomainTag
+        assertBool "product query reused the scalar behavioral domain"
+          $ Djex.behavioralProblemDomain behavioral /=
+              Djex.finiteListSpineLengthDomainTag
+        behavioralProblemFingerprint behavioral @?=
+          behavioralProblemFingerprint
+            (Djex.checkedLengthSpinePairProblemBehavioralProblem problem)
+        evidence <- case Djex.validateLengthSpinePairSMTLibCounterexample
+            defaultLengthEvaluationLimits query
+            [Djex.LengthSMTLibIntegerBinding inputSymbol 2] of
+          Left failure -> assertFailure
+            ("product model replay failed: " ++ show failure)
+              >> error "unreachable"
+          Right Nothing -> assertFailure
+            "the violating product model produced no evidence"
+              >> error "unreachable"
+          Right (Just retained) -> pure retained
+        receipt <- expectRight $ Djex.replayBehavioralEvidence behavioral evidence
+        Djex.validatedLengthSpinePairCounterexampleInputs receipt @?= [2]
+        Djex.validatedLengthSpinePairCounterexampleResult receipt @?=
+          Djex.LengthSpinePair 2 2
+        Djex.validatedLengthSpinePairCounterexampleBasis receipt @?=
+          Djex.ProviderIndependentFiniteSpineModel
+  , testCase
+      "reject scalar, structural, nested, nonspine, and wrong-family results" $
+      do
+        scalarVerified <- verifiedFirstDirectTypedCandidate
+          $ FArr lengthSpinePairFixtureList lengthSpinePairFixtureList
+        scalarProblem <- expectRight $ prepareCheckedLengthProblem
+          lengthSpinePairScalarRegressionContract scalarVerified
+        scalarQuery <- expectRight
+            (prepareCheckedLengthQuery
+              lengthSpinePairScalarRegressionContract scalarVerified)
+          >>= expectRight
+        lengthSMTLibQuerySchemaTag @?=
+          spinePairBytes "djex-length-z3-qf-lia-smtlib2/v2"
+        lengthSMTLibQueryInputSymbols scalarQuery @?=
+          [spinePairBytes "djex_length_input_0"]
+        behavioralProblemFingerprint
+            (lengthSMTLibQueryBehavioralProblem scalarQuery) @?=
+          behavioralProblemFingerprint
+            (checkedLengthProblemBehavioralProblem scalarProblem)
+        assertLengthSpinePairRefusal "scalar result"
+          LengthSpinePairHandoffResultNotCanonicalLeanProd
+          lengthSpinePairFixtureContract scalarVerified
+
+        structuralVerified <- verifiedFirstDirectTypedCandidate
+          $ FArr lengthSpinePairFixtureList
+          $ FProd lengthSpinePairFixtureList lengthSpinePairFixtureList
+        assertLengthSpinePairRefusal "And/PProd structural result"
+          LengthSpinePairHandoffResultNotCanonicalLeanProd
+          lengthSpinePairFixtureContract structuralVerified
+        case prepareCheckedLengthSpinePairQueryWithLimits
+            (error "structural refusal forced product query limits")
+            lengthSpinePairFixtureContract structuralVerified of
+          Left refusal -> refusal @?=
+            LengthSpinePairHandoffResultNotCanonicalLeanProd
+          Right _ -> assertFailure
+            "a structural And/PProd result reached product query sealing"
+
+        nestedVerified <- verifiedFirstDirectTypedCandidate
+          $ FArr lengthSpinePairFixtureList
+          $ FLeanProd lengthSpinePairFixtureList
+          $ FLeanProd lengthSpinePairFixtureList lengthSpinePairFixtureList
+        assertLengthSpinePairRefusal "nested/nonbinary product result"
+          (LengthSpinePairHandoffComponentNotConfiguredSpine
+            Djex.LengthSpinePairSecond "List")
+          lengthSpinePairFixtureContract nestedVerified
+
+        nonspineVerified <- verifiedFirstDirectTypedCandidate
+          $ FArr lengthSpinePairFixtureList
+          $ FLeanProd lengthSpinePairFixtureList FTop
+        assertLengthSpinePairRefusal "nonspine product component"
+          (LengthSpinePairHandoffComponentNotConfiguredSpine
+            Djex.LengthSpinePairSecond "List")
+          lengthSpinePairFixtureContract nonspineVerified
+
+        pairVerified <- verifiedFirstDirectTypedCandidate
+          lengthSpinePairFixtureGoal
+        let wrongFamily = lengthSpinePairFixtureContract
+              { leanLengthSpinePairContractSpine =
+                  (leanLengthSpinePairContractSpine
+                    lengthSpinePairFixtureContract)
+                    { leanLengthSpineFamilyName = "Wrong.List" }
+              }
+        assertLengthSpinePairRefusal "wrong configured family"
+          (LengthSpinePairHandoffComponentNotConfiguredSpine
+            Djex.LengthSpinePairFirst "Wrong.List")
+          wrongFamily pairVerified
+  ]
+
+lengthSpinePairFixtureList :: Frag
+lengthSpinePairFixtureList = FParamRec True "List" listKey [natural]
+  [ ("List.nil", [])
+  , ("List.cons", [natural, FAtom False listKey])
+  ]
+ where
+  natural = FAtom False "Nat"
+  listKey = "List Nat"
+
+lengthSpinePairFixtureGoal :: Frag
+lengthSpinePairFixtureGoal = FArr lengthSpinePairFixtureList
+  $ FLeanProd lengthSpinePairFixtureList lengthSpinePairFixtureList
+
+lengthSpinePairFixtureSpine :: LeanLengthSpineIdentity
+lengthSpinePairFixtureSpine = LeanLengthSpineIdentity
+  { leanLengthSpineFamilyName = "List"
+  , leanLengthSpineZeroConstructorName = "List.nil"
+  , leanLengthSpineStepConstructorName = "List.cons"
+  }
+
+lengthSpinePairFixtureContract :: LeanLengthSpinePairContract
+lengthSpinePairFixtureContract = LeanLengthSpinePairContract
+  { leanLengthSpinePairContractSpine = lengthSpinePairFixtureSpine
+  , leanLengthSpinePairContractTargetArgumentRoles = Nothing
+  , leanLengthSpinePairContractCandidateCasePolicy = LeanLengthCasesRejected
+  , leanLengthSpinePairContractSource = Djex.LengthSpinePairContractSource
+      { Djex.lengthSpinePairContractPrecondition = Djex.LengthTruth True
+      , Djex.lengthSpinePairContractPostcondition = Djex.LengthAll
+          [ Djex.LengthEqual
+              (Djex.LengthVariable $ Djex.LengthSpinePairResult
+                Djex.LengthSpinePairFirst)
+              (Djex.LengthVariable $ Djex.LengthSpinePairInput 0)
+          , Djex.LengthEqual
+              (Djex.LengthVariable $ Djex.LengthSpinePairResult
+                Djex.LengthSpinePairSecond)
+              (Djex.LengthLiteral 0)
+          ]
+      }
+  , leanLengthSpinePairContractProviderLaws = []
+  }
+
+lengthSpinePairScalarRegressionContract :: LeanLengthContract
+lengthSpinePairScalarRegressionContract = LeanLengthContract
+  { leanLengthContractSpine = lengthSpinePairFixtureSpine
+  , leanLengthContractTargetArgumentRoles = Nothing
+  , leanLengthContractCandidateCasePolicy = LeanLengthCasesRejected
+  , leanLengthContractSource = LengthContractSource
+      { lengthContractPrecondition = LengthTruth True
+      , lengthContractPostcondition = LengthTruth True
+      }
+  , leanLengthContractProviderLaws = []
+  }
+
+verifiedFirstDirectTypedCandidate
+  :: Frag
+  -> IO (Verified DetailedVerificationVariant)
+verifiedFirstDirectTypedCandidate goal = do
+  detailed <- expectRight $
+    synthesizeWithProvidersSkippingDetailedWithMultiConstructorPatterns
+      False EngineExference 512 Set.empty [] goal
+  group <- case detailed of
+    DetailedSynthCandidates groups _ -> case
+        [ retained
+        | retained <- groups
+        , detailedCandidateGroupRoute retained == RouteTypedCandidate
+        , not $ isNothing $ detailedCandidateGroupSemanticSidecar retained
+        , [_] <- [detailedCandidateGroupVariants retained]
+        ] of
+      retained : _ -> pure retained
+      [] -> assertFailure
+        ("fixture produced no singleton exact typed candidate: "
+          ++ show (map detailedCandidateGroupVariants groups))
+          >> error "unreachable"
+    other -> assertFailure
+      ("fixture synthesis failed: " ++ show other) >> error "unreachable"
+  batch <- verifyCandidateGroups 1 (const $ pure VariantAccepted)
+    [detailedCandidateGroupVerificationVariants group]
+  case verifiedCandidateReceipts batch of
+    [verified] -> pure verified
+    receipts -> assertFailure
+      ("fixture verification produced " ++ show (length receipts)
+        ++ " receipts") >> error "unreachable"
+
+assertLengthSpinePairRefusal
+  :: String
+  -> LengthSpinePairHandoffRefusal
+  -> LeanLengthSpinePairContract
+  -> Verified DetailedVerificationVariant
+  -> IO ()
+assertLengthSpinePairRefusal label expected contract verified =
+  case prepareCheckedLengthSpinePairProblem contract verified of
+    Left refusal -> refusal @?= expected
+    Right _ -> assertFailure $ label
+      ++ " acquired a checked binary-product problem"
+
+spinePairBytes :: String -> [Word8]
+spinePairBytes = map $ fromIntegral . fromEnum
 
 lengthRankingTests :: TestTree
 lengthRankingTests = testGroup "checked Length behavioral ranking"

@@ -50,6 +50,7 @@ module Leant.Synth.Fragment
   , serializerProgram
   , providerProgram
   , candidateVerificationProgram
+  , parseUniqueGoalTranslation
   , parseGoalSexp
   , parseProviderSexp
   , fragVisibleForallVisibilities
@@ -68,7 +69,7 @@ module Leant.Synth.Fragment
   ) where
 
 import Data.Char (isSpace)
-import Data.List (intercalate, nub)
+import Data.List (intercalate, isPrefixOf, nub)
 import Text.Read (readMaybe)
 
 import Language.Haskell.Djex (maximumProviderInstantiationArguments)
@@ -125,6 +126,13 @@ mapExactContextArgumentFragments f argument = case argument of
 data Frag
   = FArr Frag Frag
   | FProd Frag Frag
+  | FLeanProd Frag Frag
+    -- ^ A result whose post-'whnfR' root is saturated canonical Lean @Prod@.
+    -- Reducible aliases are therefore admitted only after normalization.
+    -- Search and rendering treat this as the same structural boxed pair as
+    -- 'FProd', while its distinct constructor lets a later behavioral adapter
+    -- distinguish @Prod@ from proposition-valued @And@ and sort-polymorphic
+    -- @PProd@.
   | FSum Frag Frag
   | FTop
   | FBot
@@ -553,8 +561,10 @@ synthPrelude inventory = unlines
   , "        else if args.size == 0 &&"
   , "            (n == ``True || n == ``Unit || n == ``PUnit) then"
   , "          pure \"(top)\""
+  , "        else if args.size == 2 && n == ``Prod then"
+  , "          bin \"lean-prod\""
   , "        else if args.size == 2 &&"
-  , "            (n == ``And || n == ``Prod || n == ``PProd) then"
+  , "            (n == ``And || n == ``PProd) then"
   , "          bin \"prod\""
   , "        else if args.size == 2 &&"
   , "            (n == ``Or || n == ``Sum || n == ``PSum) then"
@@ -1469,6 +1479,30 @@ candidateVerificationProgram goal term =
 
 -- S-expression parsing ------------------------------------------------------
 
+-- | Select and parse the serializer output from one command's info-message
+-- bodies.  Lean can emit unrelated info messages while elaborating the raw
+-- goal, including text chosen by user code, so a prefix match is not authority
+-- by itself.  Refuse unless exactly one message has the serializer's goal
+-- envelope; in particular, never let an earlier forged envelope shadow the
+-- serializer's real structural result.
+parseUniqueGoalTranslation :: [String] -> Either String ParsedGoal
+parseUniqueGoalTranslation messages =
+  case
+      [ trimmed
+      | message <- messages
+      , let trimmed = trimGoalTranslation message
+      , "(goal " `isPrefixOf` trimmed
+      ] of
+    [] -> Left "goal translation produced no output"
+    [translated] -> case parseGoalSexp translated of
+      Left err -> Left ("goal translation failed: " ++ err)
+      Right parsed -> Right parsed
+    _ -> Left "goal translation produced multiple outputs"
+
+trimGoalTranslation :: String -> String
+trimGoalTranslation =
+  dropWhile isSpace . reverse . dropWhile isSpace . reverse
+
 data Tok = TL | TR | TSym String | TStr String
   deriving (Eq, Show)
 
@@ -1703,6 +1737,7 @@ parseFragWith :: Bool -> [Tok] -> Either String (Frag, [Tok])
 parseFragWith allowExactContext (TL : TSym tag : rest) = case tag of
   "->" -> binary FArr rest
   "prod" -> binary FProd rest
+  "lean-prod" -> binary FLeanProd rest
   "sum" -> binary FSum rest
   "top" -> nullary FTop rest
   "bot" -> nullary FBot rest
@@ -1878,6 +1913,7 @@ fragVisibleForallVisibilities = collect []
   collect bound frag = case frag of
     FArr parameter result -> descend bound [parameter, result]
     FProd left right -> descend bound [left, right]
+    FLeanProd left right -> descend bound [left, right]
     FSum left right -> descend bound [left, right]
     FAll explicit binder body ->
       (explicit :) <$> collect (binder : bound) body
@@ -1911,6 +1947,7 @@ fragHasDepth :: Frag -> Bool
 fragHasDepth frag = case frag of
   FArr a b -> fragHasDepth a || fragHasDepth b
   FProd a b -> fragHasDepth a || fragHasDepth b
+  FLeanProd a b -> fragHasDepth a || fragHasDepth b
   FSum a b -> fragHasDepth a || fragHasDepth b
   FAll _ _ b -> fragHasDepth b
   FInst _ b -> fragHasDepth b
@@ -1935,6 +1972,7 @@ fragHasInstanceBinder :: Frag -> Bool
 fragHasInstanceBinder frag = case frag of
   FArr a b -> fragHasInstanceBinder a || fragHasInstanceBinder b
   FProd a b -> fragHasInstanceBinder a || fragHasInstanceBinder b
+  FLeanProd a b -> fragHasInstanceBinder a || fragHasInstanceBinder b
   FSum a b -> fragHasInstanceBinder a || fragHasInstanceBinder b
   FAll _ _ b -> fragHasInstanceBinder b
   FInst{} -> True
@@ -1964,6 +2002,7 @@ fragHasUnsupportedInstanceBinder = go []
   go bound frag = case frag of
     FArr a b -> go bound a || go bound b
     FProd a b -> go bound a || go bound b
+    FLeanProd a b -> go bound a || go bound b
     FSum a b -> go bound a || go bound b
     FAll _ binder body ->
       inconsistentBinderKinds binder body || go (binder : bound) body
@@ -2019,6 +2058,7 @@ fragHasUnsupportedInstanceBinder = go []
   payloadVariablesBound bound frag = case frag of
     FArr parameter result -> descend [parameter, result]
     FProd left right -> descend [left, right]
+    FLeanProd left right -> descend [left, right]
     FSum left right -> descend [left, right]
     FAll _ binder body -> payloadVariablesBound (binder : bound) body
     FInst{} -> False
@@ -2059,6 +2099,7 @@ fragHasUnsupportedInstanceBinder = go []
   binderKindDemands binder frag = case frag of
     FArr parameter result -> descendProper [parameter, result]
     FProd left right -> descendProper [left, right]
+    FLeanProd left right -> descendProper [left, right]
     FSum left right -> descendProper [left, right]
     FAll _ nested body
       | nested == binder -> []
@@ -2144,6 +2185,7 @@ fragRecKeys = nub . go
   go f = case f of
     FArr a b -> go a ++ go b
     FProd a b -> go a ++ go b
+    FLeanProd a b -> go a ++ go b
     FSum a b -> go a ++ go b
     FAll _ _ b -> go b
     FInst _ b -> go b
@@ -2201,6 +2243,7 @@ glivenkoSplit = go []
   quantFree f = case f of
     FArr a b -> quantFree a && quantFree b
     FProd a b -> quantFree a && quantFree b
+    FLeanProd a b -> quantFree a && quantFree b
     FSum a b -> quantFree a && quantFree b
     -- A retained type application is one propositional atom here.  A forall
     -- in one of its type arguments is not an exposed logical quantifier.
@@ -2227,6 +2270,7 @@ propAtoms = nub . go
   go f = case f of
     FArr a b -> go a ++ go b
     FProd a b -> go a ++ go b
+    FLeanProd a b -> go a ++ go b
     FSum a b -> go a ++ go b
     FApp{} -> [f]
     FParamInd _ _ _ ctors -> concatMap (concatMap go . snd) ctors
@@ -2251,6 +2295,7 @@ stripRecCtors :: Frag -> Frag
 stripRecCtors f = case f of
   FArr a b -> FArr (stripRecCtors a) (stripRecCtors b)
   FProd a b -> FProd (stripRecCtors a) (stripRecCtors b)
+  FLeanProd a b -> FLeanProd (stripRecCtors a) (stripRecCtors b)
   FSum a b -> FSum (stripRecCtors a) (stripRecCtors b)
   FAll e n b -> FAll e n (stripRecCtors b)
   FInst key b -> FInst key (stripRecCtors b)
@@ -2277,6 +2322,7 @@ fragUnsafeAtoms = nub . go
   go f = case f of
     FArr a b -> go a ++ go b
     FProd a b -> go a ++ go b
+    FLeanProd a b -> go a ++ go b
     FSum a b -> go a ++ go b
     FAll _ _ b -> go b
     FInst key b -> key : go b

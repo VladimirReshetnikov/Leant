@@ -1,5 +1,13 @@
 # Unified checked Length handoff policy
 
+> **2026-08-14 additive product checkpoint.** The exact canonical-`Prod`
+> handoff now reuses this same origin, provider, interpretation-policy, and
+> session-authority path, then seals product-specific contract and problem
+> identities. It does not widen or cast the scalar contract/problem types.
+> `And` and `PProd` remain outside that authority, and the product query is
+> offline only. See the
+> [canonical `Prod` Length handoff report](2026-08-14-canonical-prod-length-handoff.md).
+
 ## Outcome
 
 Leant's production Length handoff now converts its two passive contract axes
@@ -46,6 +54,14 @@ identity and interpreter inputs, but it cannot independently select the
 session's candidate-case authority. Contract resealing and candidate
 interpretation therefore cannot accidentally select compatible projections
 from different modes.
+
+The later product sibling deliberately shares the conversion and
+`sealLengthSessionWithInterpretationPolicy` entrance. It diverges only after
+that session exists, using `sealLengthSpinePairContractInSession` and
+`sealLengthSpinePairTypedCandidateProblemInSession`. The shared session owns
+the same exact configured-spine inventory and provider assumptions; the
+product-specific wrappers preserve nominal domain separation rather than
+reinterpreting a scalar checked value.
 
 ## Compatibility
 

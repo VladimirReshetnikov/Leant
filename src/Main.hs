@@ -122,7 +122,7 @@ import Leant.Synth.Fragment
   , fragRefusal
   , fragUnsafeAtoms
   , glivenkoSplit
-  , parseGoalSexp
+  , parseUniqueGoalTranslation
   , parseProviderSexp
   , propAtoms
   , providerProgram
@@ -1936,15 +1936,12 @@ translateGoal st goal = do
         Right v -> do
           let infos = [d | (sev, d) <- respMessages v, sev == "info"]
               errors = [d | (sev, d) <- respMessages v, sev == "error"]
-              sexp = [d | d <- infos, "(goal " `isPrefixOf` trim d]
-          pure $ case (respFatal v, errors, sexp) of
-            (Just fatal, _, _) -> Left [fatal]
-            (_, _ : _, _) -> Left errors
-            (_, [], translated : _) ->
-              case parseGoalSexp (trim translated) of
-                Left err -> Left ["goal translation failed: " ++ err]
-                Right parsed -> Right parsed
-            (Nothing, [], []) -> Left ["goal translation produced no output"]
+          pure $ case (respFatal v, errors) of
+            (Just fatal, _) -> Left [fatal]
+            (_, _ : _) -> Left errors
+            (Nothing, []) -> case parseUniqueGoalTranslation infos of
+              Left err -> Left [err]
+              Right parsed -> Right parsed
 
 reportTranslationErrors :: St -> [String] -> IO ()
 reportTranslationErrors st errors = do
@@ -2457,6 +2454,7 @@ selectLibraryPremises ratings parsed = take 8 (sortOn rank offered)
   fragSize f = 1 + case f of
     FArr a b -> fragSize a + fragSize b
     FProd a b -> fragSize a + fragSize b
+    FLeanProd a b -> fragSize a + fragSize b
     FSum a b -> fragSize a + fragSize b
     FAll _ _ b -> fragSize b
     _ -> 0

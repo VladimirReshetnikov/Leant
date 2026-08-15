@@ -985,6 +985,10 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
     let (x', n1, ds1) = fit cm providers force a x n ds
         (y', n2, ds2) = fit cm providers force b y n1 ds1
     in (Tuple [x', y'], n2, ds2)
+  (FLeanProd a b, Tuple [x, y]) ->
+    let (x', n1, ds1) = fit cm providers force a x n ds
+        (y', n2, ds2) = fit cm providers force b y n1 ds1
+    in (Tuple [x', y'], n2, ds2)
   (FSum a _, Apply h@(Global g) x) | isKind GInl g ->
     let (x', n1, ds1) = fit cm providers force a x n ds
     in (Apply h x', n1, ds1)
@@ -1338,6 +1342,16 @@ inferFragReplacements targets = go Set.empty
   go bound replacements (FProd left right) (FProd left' right') = do
     replacements' <- go bound replacements left left'
     go bound replacements' right right'
+  go bound replacements (FProd left right) (FLeanProd left' right') = do
+    replacements' <- go bound replacements left left'
+    go bound replacements' right right'
+  go bound replacements (FLeanProd left right) (FProd left' right') = do
+    replacements' <- go bound replacements left left'
+    go bound replacements' right right'
+  go bound replacements (FLeanProd left right)
+      (FLeanProd left' right') = do
+    replacements' <- go bound replacements left left'
+    go bound replacements' right right'
   go bound replacements (FSum left right) (FSum left' right') = do
     replacements' <- go bound replacements left left'
     go bound replacements' right right'
@@ -1486,6 +1500,7 @@ specializeFrag replacements = go Set.empty
       | otherwise -> frag
     FArr parameter result -> FArr (recur parameter) (recur result)
     FProd left right -> FProd (recur left) (recur right)
+    FLeanProd left right -> FLeanProd (recur left) (recur right)
     FSum left right -> FSum (recur left) (recur right)
     FAll explicit binder body
       | binder `Set.member` replacementFree ->
@@ -1524,6 +1539,7 @@ freeFragVariables :: Set.Set String -> Frag -> Set.Set String
 freeFragVariables bound frag = case frag of
   FArr parameter result -> descend [parameter, result]
   FProd left right -> descend [left, right]
+  FLeanProd left right -> descend [left, right]
   FSum left right -> descend [left, right]
   FAll _ binder body -> freeFragVariables (Set.insert binder bound) body
   FInst _ body -> freeFragVariables bound body
@@ -1554,6 +1570,7 @@ fragVariableNames :: Frag -> Set.Set String
 fragVariableNames frag = case frag of
   FArr parameter result -> descend [parameter, result]
   FProd left right -> descend [left, right]
+  FLeanProd left right -> descend [left, right]
   FSum left right -> descend [left, right]
   FAll _ binder body -> Set.insert binder (fragVariableNames body)
   FInst _ body -> fragVariableNames body
@@ -1590,6 +1607,7 @@ renameFragBinder :: String -> String -> Frag -> Frag
 renameFragBinder old new frag = case frag of
   FArr parameter result -> FArr (go parameter) (go result)
   FProd left right -> FProd (go left) (go right)
+  FLeanProd left right -> FLeanProd (go left) (go right)
   FSum left right -> FSum (go left) (go right)
   FAll explicit binder body
     | binder == old -> frag
@@ -1626,6 +1644,8 @@ renameFragBinder old new frag = case frag of
 bindDomainPairs :: Pattern String -> Frag -> [(String, Frag)]
 bindDomainPairs (Bind x) dom = [(x, dom)]
 bindDomainPairs (TuplePattern [p, q]) (FProd a b) =
+  bindDomainPairs p a ++ bindDomainPairs q b
+bindDomainPairs (TuplePattern [p, q]) (FLeanProd a b) =
   bindDomainPairs p a ++ bindDomainPairs q b
 bindDomainPairs _ _ = []
 

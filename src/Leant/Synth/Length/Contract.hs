@@ -12,6 +12,7 @@ module Leant.Synth.Length.Contract
   , LeanLengthProviderLaw (..)
   , LeanLengthCandidateCasePolicy (..)
   , LeanLengthContract (..)
+  , LeanLengthSpinePairContract (..)
   ) where
 
 import Language.Haskell.Djex
@@ -19,6 +20,7 @@ import Language.Haskell.Djex
   , LengthExpression
   , LengthProviderArgumentRole
   , LengthProviderVariable
+  , LengthSpinePairContractSource
   , LengthTargetArgumentRole
   )
 
@@ -78,5 +80,24 @@ data LeanLengthContract = LeanLengthContract
   , leanLengthContractCandidateCasePolicy :: LeanLengthCandidateCasePolicy
   , leanLengthContractSource :: LengthContractSource
   , leanLengthContractProviderLaws :: [LeanLengthProviderLaw]
+  }
+  deriving (Eq, Show)
+
+-- | Explicit finite-spine contract for a result whose normalized root is
+-- canonical Lean @Prod@ and whose two source-ordered fields are applications
+-- of the same configured spine.
+--
+-- This additive source value is not decoded by the existing contract-file
+-- grammars.  Like 'LeanLengthContract', it remains a passive assertion until
+-- the exact accepted typed origin, family/provider provenance, contract, and
+-- candidate are sealed together by the product handoff.
+data LeanLengthSpinePairContract = LeanLengthSpinePairContract
+  { leanLengthSpinePairContractSpine :: LeanLengthSpineIdentity
+  , leanLengthSpinePairContractTargetArgumentRoles ::
+      Maybe [LengthTargetArgumentRole]
+  , leanLengthSpinePairContractCandidateCasePolicy ::
+      LeanLengthCandidateCasePolicy
+  , leanLengthSpinePairContractSource :: LengthSpinePairContractSource
+  , leanLengthSpinePairContractProviderLaws :: [LeanLengthProviderLaw]
   }
   deriving (Eq, Show)

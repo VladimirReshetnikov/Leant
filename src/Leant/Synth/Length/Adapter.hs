@@ -17,6 +17,9 @@ module Leant.Synth.Length.Adapter
   ( CheckedLengthQuery
   , prepareCheckedLengthQuery
   , prepareCheckedLengthQueryWithLimits
+  , CheckedLengthSpinePairQuery
+  , prepareCheckedLengthSpinePairQuery
+  , prepareCheckedLengthSpinePairQueryWithLimits
   ) where
 
 import Language.Haskell.Djex
@@ -24,15 +27,23 @@ import Language.Haskell.Djex
   , LengthSMTLibLimits
   , LengthSMTLibQuery
   , LengthSMTLibQueryError
+  , LengthSpinePairSMTLibQuery
+  , LengthSpinePairSMTLibQueryError
   , defaultLengthSMTLibLimits
   , sealLengthSMTLibQuery
+  , sealLengthSpinePairSMTLibQuery
   )
 
 import Leant.Synth.Engine (DetailedVerificationVariant)
-import Leant.Synth.Length.Contract (LeanLengthContract)
+import Leant.Synth.Length.Contract
+  ( LeanLengthContract
+  , LeanLengthSpinePairContract
+  )
 import Leant.Synth.Length.Handoff
   ( LengthHandoffRefusal
+  , LengthSpinePairHandoffRefusal
   , prepareCheckedLengthProblem
+  , prepareCheckedLengthSpinePairProblem
   )
 import Leant.Synth.Verification (Verified)
 
@@ -40,6 +51,11 @@ import Leant.Synth.Verification (Verified)
 -- Leant preparation boundary. The alias adds no wrapper or projection around
 -- Djex's opaque nominal association.
 type CheckedLengthQuery = LengthSMTLibQuery ExferenceLocal ExferenceLocal
+
+-- | Product-domain query specialization for the same exact Exference
+-- identities. It remains nominally distinct from 'CheckedLengthQuery'.
+type CheckedLengthSpinePairQuery =
+  LengthSpinePairSMTLibQuery ExferenceLocal ExferenceLocal
 
 -- | Check the verified origin, then construct a query with Djex's conservative
 -- bounds. The nested result preserves the handoff/query refusal boundary
@@ -65,3 +81,30 @@ prepareCheckedLengthQueryWithLimits limits contract verified =
     Left refusal -> Left refusal
     Right problem -> Right $ problem `seq`
       sealLengthSMTLibQuery limits problem
+
+-- | Check post-@whnfR@ canonical Lean @Prod@ provenance and both configured
+-- spine fields, then construct Djex's pure product query with conservative
+-- bounds.
+prepareCheckedLengthSpinePairQuery
+  :: LeanLengthSpinePairContract
+  -> Verified DetailedVerificationVariant
+  -> Either LengthSpinePairHandoffRefusal
+      (Either LengthSpinePairSMTLibQueryError
+        CheckedLengthSpinePairQuery)
+prepareCheckedLengthSpinePairQuery =
+  prepareCheckedLengthSpinePairQueryWithLimits defaultLengthSMTLibLimits
+
+-- | Product counterpart of 'prepareCheckedLengthQueryWithLimits'. No solver
+-- is launched and no live scalar worker/session protocol is reused.
+prepareCheckedLengthSpinePairQueryWithLimits
+  :: LengthSMTLibLimits
+  -> LeanLengthSpinePairContract
+  -> Verified DetailedVerificationVariant
+  -> Either LengthSpinePairHandoffRefusal
+      (Either LengthSpinePairSMTLibQueryError
+        CheckedLengthSpinePairQuery)
+prepareCheckedLengthSpinePairQueryWithLimits limits contract verified =
+  case prepareCheckedLengthSpinePairProblem contract verified of
+    Left refusal -> Left refusal
+    Right problem -> Right $ problem `seq`
+      sealLengthSpinePairSMTLibQuery limits problem

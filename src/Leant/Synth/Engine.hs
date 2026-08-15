@@ -2227,6 +2227,7 @@ fragExactEvidenceClaims = go Set.empty
   go bound frag = case frag of
     FArr parameter result -> descend bound [parameter, result]
     FProd left right -> descend bound [left, right]
+    FLeanProd left right -> descend bound [left, right]
     FSum left right -> descend bound [left, right]
     FAll _ binder body -> go (Set.insert binder bound) body
     FInst _ body -> go bound body
@@ -2391,6 +2392,7 @@ providerFragmentContainsExactContext :: Frag -> Bool
 providerFragmentContainsExactContext source = case source of
   FArr parameter result -> descend [parameter, result]
   FProd left right -> descend [left, right]
+  FLeanProd left right -> descend [left, right]
   FSum left right -> descend [left, right]
   FAll _ _ body -> providerFragmentContainsExactContext body
   FInst _ body -> providerFragmentContainsExactContext body
@@ -2703,6 +2705,8 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
         FArr a b -> FunctionType
           <$> go premisesEnabled a <*> go premisesEnabled b
         FProd a b -> (\x y -> TupleType Boxed [x, y])
+          <$> go premisesEnabled a <*> go premisesEnabled b
+        FLeanProd a b -> (\x y -> TupleType Boxed [x, y])
           <$> go premisesEnabled a <*> go premisesEnabled b
         FSum a b ->
           (\x y -> TypeApplication
@@ -3457,6 +3461,9 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
     FProd left right -> FProd
       (eraseProviderExactContexts left)
       (eraseProviderExactContexts right)
+    FLeanProd left right -> FLeanProd
+      (eraseProviderExactContexts left)
+      (eraseProviderExactContexts right)
     FSum left right -> FSum
       (eraseProviderExactContexts left)
       (eraseProviderExactContexts right)
@@ -3695,6 +3702,7 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
     collect accum frag = case frag of
       FArr parameter result -> descend accum [parameter, result]
       FProd left right -> descend accum [left, right]
+      FLeanProd left right -> descend accum [left, right]
       FSum left right -> descend accum [left, right]
       FAll _ _ body -> collect accum body
       FInst _ body -> collect accum body
@@ -3830,6 +3838,7 @@ collectFragAtoms :: Set.Set String -> Frag -> Set.Set String
 collectFragAtoms atoms frag = case frag of
   FArr parameter result -> descend atoms [parameter, result]
   FProd left right -> descend atoms [left, right]
+  FLeanProd left right -> descend atoms [left, right]
   FSum left right -> descend atoms [left, right]
   FAll _ _ body -> collectFragAtoms atoms body
   FInst _ body -> collectFragAtoms atoms body
@@ -3865,6 +3874,7 @@ collectProviderSurfaceAtoms :: Set.Set String -> Frag -> Set.Set String
 collectProviderSurfaceAtoms atoms frag = case frag of
   FArr parameter result -> descend atoms [parameter, result]
   FProd left right -> descend atoms [left, right]
+  FLeanProd left right -> descend atoms [left, right]
   FSum left right -> descend atoms [left, right]
   FAll _ _ body -> collectProviderSurfaceAtoms atoms body
   FInst _ body -> collectProviderSurfaceAtoms atoms body
@@ -3890,6 +3900,7 @@ collectExactFamilyUses recursiveProjection premisesEnabled uses frag =
   case frag of
   FArr parameter result -> descend uses [parameter, result]
   FProd left right -> descend uses [left, right]
+  FLeanProd left right -> descend uses [left, right]
   FSum left right -> descend uses [left, right]
   FAll _ _ body -> collect uses body
   FInst _ body -> collect uses body
@@ -4107,6 +4118,7 @@ freeSchemaVariables :: Set.Set String -> Frag -> Set.Set String
 freeSchemaVariables bound frag = case frag of
   FArr parameter result -> descend [parameter, result]
   FProd left right -> descend [left, right]
+  FLeanProd left right -> descend [left, right]
   FSum left right -> descend [left, right]
   FAll _ binder body -> freeSchemaVariables (Set.insert binder bound) body
   FInst _ body -> freeSchemaVariables bound body
@@ -4178,6 +4190,9 @@ schemaEquivalent = go []
   go binders left right = case (left, right) of
     (FArr a b, FArr c d) -> both binders a c b d
     (FProd a b, FProd c d) -> both binders a c b d
+    (FProd a b, FLeanProd c d) -> both binders a c b d
+    (FLeanProd a b, FProd c d) -> both binders a c b d
+    (FLeanProd a b, FLeanProd c d) -> both binders a c b d
     (FSum a b, FSum c d) -> both binders a c b d
     (FTop, FTop) -> True
     (FBot, FBot) -> True
@@ -4310,6 +4325,7 @@ replaceFrag replacements = go Set.empty
       FArr parameter result ->
         FArr (recur parameter) (recur result)
       FProd left right -> FProd (recur left) (recur right)
+      FLeanProd left right -> FLeanProd (recur left) (recur right)
       FSum left right -> FSum (recur left) (recur right)
       FAll explicit binder body
         | binder `Set.member` replacementFreeVariables ->
@@ -4361,6 +4377,7 @@ schemaNames :: Frag -> Set.Set String
 schemaNames frag = case frag of
   FArr parameter result -> descend [parameter, result]
   FProd left right -> descend [left, right]
+  FLeanProd left right -> descend [left, right]
   FSum left right -> descend [left, right]
   FAll _ binder body -> Set.insert binder (schemaNames body)
   FInst _ body -> schemaNames body
@@ -4390,6 +4407,7 @@ renameBoundVariable :: String -> String -> Frag -> Frag
 renameBoundVariable old new frag = case frag of
   FArr parameter result -> FArr (go parameter) (go result)
   FProd left right -> FProd (go left) (go right)
+  FLeanProd left right -> FLeanProd (go left) (go right)
   FSum left right -> FSum (go left) (go right)
   FAll explicit binder body
     | binder == old -> frag

@@ -15,6 +15,8 @@
 module Leant.Synth.Length.Handoff
   ( LengthHandoffRefusal (..)
   , prepareCheckedLengthProblem
+  , LengthSpinePairHandoffRefusal (..)
+  , prepareCheckedLengthSpinePairProblem
   ) where
 
 import qualified Data.Map.Strict as Map
@@ -22,6 +24,7 @@ import Numeric.Natural (Natural)
 
 import Language.Haskell.Djex
   ( CheckedLengthProblem
+  , CheckedLengthSpinePairProblem
   , ExferenceLocal
   , ExferenceTermGraphAbsence
   , ExferenceTypeVariable
@@ -31,6 +34,9 @@ import Language.Haskell.Djex
   , LengthProviderSummarySource (..)
   , LengthInterpretationPolicySource (..)
   , LengthSessionError (..)
+  , LengthSpinePairComponent (..)
+  , LengthSpinePairContractError
+  , LengthSpinePairProblemError
   , LengthSpineModelSource (DeclaredListSpine)
   , LengthTargetArgumentRole
   , Name
@@ -40,6 +46,8 @@ import Language.Haskell.Djex
   , defaultLengthProblemLimits
   , lengthProviderSummaryLimit
   , sealLengthContractInSession
+  , sealLengthSpinePairContractInSession
+  , sealLengthSpinePairTypedCandidateProblemInSession
   , sealLengthSessionWithInterpretationPolicy
   , sealLengthTypedCandidateProblemInSession
   , splitLeadingForalls
@@ -83,7 +91,12 @@ import Leant.Synth.Length.Contract
   ( LeanLengthContract (..)
   , LeanLengthCandidateCasePolicy (..)
   , LeanLengthProviderLaw (..)
+  , LeanLengthSpinePairContract (..)
   , LeanLengthSpineIdentity (..)
+  )
+import Leant.Synth.Fragment
+  ( AppHead (AppNominal)
+  , Frag (..)
   )
 import Leant.Synth.Observability
   ( CandidateRenderingRoute (RouteTypedCandidate) )
@@ -116,6 +129,21 @@ data LengthHandoffRefusal
   | LengthHandoffContractRejected (LengthContractError ExferenceTypeVariable)
   | LengthHandoffProblemRejected
       (LengthProblemError
+        ExferenceTermGraphAbsence ExferenceLocal ExferenceLocal)
+  deriving (Eq, Show)
+
+-- | Fail-closed phases unique to the canonical binary-product entrance.
+-- Shared exact-origin and session refusals remain nested so the scalar public
+-- type and its constructor order stay unchanged.
+data LengthSpinePairHandoffRefusal
+  = LengthSpinePairHandoffSharedRefusal LengthHandoffRefusal
+  | LengthSpinePairHandoffResultNotCanonicalLeanProd
+  | LengthSpinePairHandoffComponentNotConfiguredSpine
+      LengthSpinePairComponent String
+  | LengthSpinePairHandoffContractRejected
+      (LengthSpinePairContractError ExferenceTypeVariable)
+  | LengthSpinePairHandoffProblemRejected
+      (LengthSpinePairProblemError
         ExferenceTermGraphAbsence ExferenceLocal ExferenceLocal)
   deriving (Eq, Show)
 
@@ -196,6 +224,130 @@ prepareCheckedLengthProblem source verified = do
     $ sealLengthTypedCandidateProblemInSession
         defaultLengthProblemLimits session contract candidate
   pure problem
+
+-- | Prepare a product-domain problem only when the accepted goal result has a
+-- post-@whnfR@ saturated canonical Lean @Prod@ root and both source-ordered
+-- fields are exact unary applications of the configured spine family.
+--
+-- Synthesis continues to use the ordinary structural pair translation.  The
+-- distinct 'FLeanProd' marker is consulted here, before Djex seals its boxed
+-- tuple target, so @And@, @PProd@, a scalar spine, and a nested/non-binary
+-- product cannot acquire product behavioral authority by sharing that search
+-- representation.  The configured spine alone is resolved through retained
+-- semantic-family provenance; no binding is invented for Lean's built-in
+-- @Prod@.
+prepareCheckedLengthSpinePairProblem
+  :: LeanLengthSpinePairContract
+  -> Verified DetailedVerificationVariant
+  -> Either LengthSpinePairHandoffRefusal
+      (CheckedLengthSpinePairProblem ExferenceLocal ExferenceLocal)
+prepareCheckedLengthSpinePairProblem source verified = do
+  let variant = verifiedCandidate verified
+      route = detailedVerificationVariantRoute variant
+      shared result = either
+        (Left . LengthSpinePairHandoffSharedRefusal) Right result
+  exactOrigin <- shared $ case detailedVerificationVariantExactTypedOrigin
+      variant of
+    Just retained -> Right retained
+    Nothing
+      | route == RouteTypedCandidate ->
+          Left LengthHandoffMissingSemanticSidecar
+      | otherwise -> Left $ LengthHandoffNotTypedRoute route
+  let semantic = exactTypedVariantOriginSidecar exactOrigin
+      candidate = typedCandidateSemanticCandidate semantic
+      authority = typedCandidateSemanticAuthorityInspection semantic
+      origin = inspectedAuthorityPreparation authority
+  shared $ if inspectedEngineFragment origin == inspectedFitFragment origin
+    then Right ()
+    else Left LengthHandoffRetargetedFragments
+  shared $ if null (inspectedConstructorPremises origin)
+      && null (inspectedCallerPremises origin)
+    then Right ()
+    else Left LengthHandoffPremisesPresent
+  shared $ if inspectedSourceGoal origin == inspectedSearchGoal origin
+    then Right ()
+    else Left LengthHandoffSearchGoalChanged
+  convertedSource <- shared $ traverse (convertSourceVariable authority)
+    $ inspectedSourceGoal origin
+  let request = inspectedAuthorityRequest authority
+  shared $ if null $ requestContexts request
+    then Right ()
+    else Left $ LengthHandoffRequestContextsPresent
+      $ length $ requestContexts request
+  shared $ if requestGoal request == convertedSource
+    then Right ()
+    else Left LengthHandoffRequestGoalChanged
+  shared $ checkDirectRendering
+    (leanLengthSpinePairContractCandidateCasePolicy source)
+    exactOrigin variant
+  let configuredSpine = leanLengthSpinePairContractSpine source
+  case lengthResultFragment $ inspectedEngineFragment origin of
+    FLeanProd first second -> do
+      requireConfiguredSpineApplication
+        LengthSpinePairFirst configuredSpine first
+      requireConfiguredSpineApplication
+        LengthSpinePairSecond configuredSpine second
+    _ -> Left LengthSpinePairHandoffResultNotCanonicalLeanProd
+  (family, zeroConstructor, stepConstructor) <- shared
+    $ resolveSemanticFamily origin configuredSpine
+  providerLaws <- shared $ boundedProviderLawPrefix
+    $ leanLengthSpinePairContractProviderLaws source
+  providerSources <- shared $ mapM
+    (resolveProviderLaw authority origin) providerLaws
+  let inventory = typedCandidateSemanticInventory semantic
+      spineModel = DeclaredListSpine
+        (inspectedSemanticFamilyPrivateTypeName family)
+        zeroConstructor
+        stepConstructor
+      targetRoles = leanLengthSpinePairContractTargetArgumentRoles source
+      casePolicy = leanLengthSpinePairContractCandidateCasePolicy source
+  interpretationPolicy <- shared $ lengthInterpretationPolicySource
+    casePolicy targetRoles
+  session <- shared $ either (Left . LengthHandoffSessionRejected) Right
+    $ sealLengthSessionWithInterpretationPolicy defaultLengthLimits
+        interpretationPolicy inventory spineModel providerSources
+  contract <- either
+    (Left . LengthSpinePairHandoffContractRejected) Right
+    $ sealLengthSpinePairContractInSession session convertedSource
+        (leanLengthSpinePairContractSource source)
+  problem <- either
+    (Left . LengthSpinePairHandoffProblemRejected) Right
+    $ sealLengthSpinePairTypedCandidateProblemInSession
+        defaultLengthProblemLimits session contract candidate
+  pure problem
+
+-- | Peel only the target's introduction spine. A product nested within either
+-- component is therefore not mistaken for the binary result root.
+lengthResultFragment :: Frag -> Frag
+lengthResultFragment fragment = case fragment of
+  FArr _ result -> lengthResultFragment result
+  FAll _ _ result -> lengthResultFragment result
+  FInst _ result -> lengthResultFragment result
+  FExactContext _ _ result -> lengthResultFragment result
+  result -> result
+
+requireConfiguredSpineApplication
+  :: LengthSpinePairComponent
+  -> LeanLengthSpineIdentity
+  -> Frag
+  -> Either LengthSpinePairHandoffRefusal ()
+requireConfiguredSpineApplication component configured fragment
+  | exactUnaryFamilyApplication expectedFamily fragment = Right ()
+  | otherwise = Left $ LengthSpinePairHandoffComponentNotConfiguredSpine
+      component expectedFamily
+ where
+  expectedFamily = leanLengthSpineFamilyName configured
+
+-- Exact parametric-family nodes are emitted from elaborated nominal heads.
+-- The generic application case covers a fail-closed abstract exact family;
+-- the later Djex contract sealer still requires its translated private type to
+-- be the session's structurally checked unary spine.
+exactUnaryFamilyApplication :: String -> Frag -> Bool
+exactUnaryFamilyApplication expected fragment = case fragment of
+  FParamInd family _ [_] _ -> family == expected
+  FParamRec _ family _ [_] _ -> family == expected
+  FApp _ _ (AppNominal family) [_] -> family == expected
+  _ -> False
 
 -- | Convert Leant's two decoded policy axes once, after every exact family and
 -- provider identity has been resolved.  The closed Djex source makes invalid
