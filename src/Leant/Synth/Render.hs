@@ -89,12 +89,15 @@ import Leant.Synth.Fragment
   , ProviderForallDomain (..)
   , ProviderInstantiationArgument (..)
   , Slot (..)
-  , exactContextArgumentPayloadFragments
   , mapExactContextArgumentFragments
+  , fragVariableNames
   , fragVisibleForallVisibilities
   , fragSpine
+  , freeFragVariables
+  , freshFragBinderFrom
   , leadingTypeArgs
   , maximumProviderExactForallDomains
+  , renameFragBinder
   )
 
 -- | One constructor of a datatype 'Leant.Synth.Engine' declared to
@@ -1535,109 +1538,9 @@ specializeFrag replacements = go Set.empty
   mapCtorFields bound = map
     (\(name, fields) -> (name, map (go bound) fields))
 
-freeFragVariables :: Set.Set String -> Frag -> Set.Set String
-freeFragVariables bound frag = case frag of
-  FArr parameter result -> descend [parameter, result]
-  FProd left right -> descend [left, right]
-  FLeanProd left right -> descend [left, right]
-  FSum left right -> descend [left, right]
-  FAll _ binder body -> freeFragVariables (Set.insert binder bound) body
-  FInst _ body -> freeFragVariables bound body
-  FExactContext _ arguments body ->
-    descend
-      (concatMap exactContextArgumentPayloadFragments arguments ++ [body])
-  FVar variable
-    | variable `Set.member` bound -> Set.empty
-    | otherwise -> Set.singleton variable
-  FApp _ _ head' arguments ->
-    let headVariables = case head' of
-          AppVariable variable
-            | variable `Set.member` bound -> Set.empty
-            | otherwise -> Set.singleton variable
-          AppNominal _ -> Set.empty
-    in headVariables `Set.union` descend arguments
-  FParamInd _ _ parameters _ -> descend parameters
-  FInd _ constructors -> descend (concatMap snd constructors)
-  FParamRec _ _ _ parameters constructors ->
-    descend (parameters ++ concatMap snd constructors)
-  FRec _ _ parameters constructors ->
-    descend (parameters ++ concatMap snd constructors)
-  _ -> Set.empty
- where
-  descend = Set.unions . map (freeFragVariables bound)
-
-fragVariableNames :: Frag -> Set.Set String
-fragVariableNames frag = case frag of
-  FArr parameter result -> descend [parameter, result]
-  FProd left right -> descend [left, right]
-  FLeanProd left right -> descend [left, right]
-  FSum left right -> descend [left, right]
-  FAll _ binder body -> Set.insert binder (fragVariableNames body)
-  FInst _ body -> fragVariableNames body
-  FExactContext _ arguments body ->
-    descend
-      (concatMap exactContextArgumentPayloadFragments arguments ++ [body])
-  FVar variable -> Set.singleton variable
-  FApp _ _ head' arguments ->
-    let headNames = case head' of
-          AppVariable variable -> Set.singleton variable
-          AppNominal _ -> Set.empty
-    in headNames `Set.union` descend arguments
-  FParamInd _ _ parameters constructors ->
-    descend (parameters ++ concatMap snd constructors)
-  FInd _ constructors -> descend (concatMap snd constructors)
-  FParamRec _ _ _ parameters constructors ->
-    descend (parameters ++ concatMap snd constructors)
-  FRec _ _ parameters constructors ->
-    descend (parameters ++ concatMap snd constructors)
-  _ -> Set.empty
- where
-  descend = Set.unions . map fragVariableNames
-
+-- | Fresh binders from the render-specific sentinel namespace.
 freshFragBinder :: Set.Set String -> String
-freshFragBinder reserved = choose (0 :: Int)
- where
-  choose index =
-    let candidate = "\0leant-render-bound:" ++ show index
-    in if candidate `Set.member` reserved
-        then choose (index + 1)
-        else candidate
-
-renameFragBinder :: String -> String -> Frag -> Frag
-renameFragBinder old new frag = case frag of
-  FArr parameter result -> FArr (go parameter) (go result)
-  FProd left right -> FProd (go left) (go right)
-  FLeanProd left right -> FLeanProd (go left) (go right)
-  FSum left right -> FSum (go left) (go right)
-  FAll explicit binder body
-    | binder == old -> frag
-    | otherwise -> FAll explicit binder (go body)
-  FInst key body -> FInst key (go body)
-  FExactContext className arguments body ->
-    FExactContext className
-      (map (mapExactContextArgumentFragments go) arguments)
-      (go body)
-  FVar variable
-    | variable == old -> FVar new
-    | otherwise -> frag
-  FApp safe key head' arguments ->
-    let renamedHead = case head' of
-          AppVariable variable
-            | variable == old -> AppVariable new
-          _ -> head'
-    in FApp safe key renamedHead (map go arguments)
-  FParamInd headName key parameters constructors ->
-    FParamInd headName key (map go parameters) (mapCtorFields constructors)
-  FInd key constructors -> FInd key (mapCtorFields constructors)
-  FParamRec complete headName key parameters constructors ->
-    FParamRec complete headName key (map go parameters)
-      (mapCtorFields constructors)
-  FRec complete key parameters constructors ->
-    FRec complete key (map go parameters) (mapCtorFields constructors)
-  _ -> frag
- where
-  go = renameFragBinder old new
-  mapCtorFields = map (\(name, fields) -> (name, map go fields))
+freshFragBinder = freshFragBinderFrom "\0leant-render-bound:"
 
 -- | Binders whose domain type the goal fragment determines, recursing
 -- through tuple destructuring.

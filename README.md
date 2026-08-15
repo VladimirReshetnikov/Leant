@@ -35,6 +35,28 @@ There is a manual: **[docs/Leant.pdf](https://raw.githubusercontent.com/Vladimir
 — an overview and tutorial, with a detailed tour of `:synth`
 ([LaTeX source](docs/Leant.tex)).
 
+## Contents
+
+- [Highlights](#highlights)
+- [Getting started](#getting-started)
+- [Usage](#usage) — command-line options, Length counterexample
+  ranking, and the command table
+- [Interactive proving — `:prove`](#interactive-proving--prove)
+- [`:synth` — automatic term synthesis](#synth--automatic-term-synthesis)
+  - [Higher-order plumbing](#higher-order-plumbing)
+  - [Programs you already know](#programs-you-already-know)
+  - [Rank-N and impredicative goals](#rank-n-and-impredicative-goals)
+  - [Impossibility, proved](#impossibility-proved)
+  - [Classical candidates](#classical-candidates)
+  - [Inductive types](#inductive-types)
+  - [Recursion from the library](#recursion-from-the-library)
+  - [Dependent formulas as cargo](#dependent-formulas-as-cargo)
+  - [Synthesis inside a proof](#synthesis-inside-a-proof)
+  - [Engines, budgets, and the fine print](#engines-budgets-and-the-fine-print)
+- [How it works](#how-it-works)
+- [Development](#development)
+- [License](#license)
+
 ## Highlights
 
 - **Verified term synthesis.** `:synth TYPE` constructs programs and

@@ -204,9 +204,13 @@ import Leant.Synth.Fragment
   , fragVisibleForallVisibilities
   , exactContextArgumentKindArity
   , exactContextArgumentPayloadFragments
+  , fragVariableNames
+  , freeFragVariables
+  , freshFragBinderFrom
   , mapExactContextArgumentFragments
   , maximumProviderArgumentKindArity
   , maximumProviderExactForallDomains
+  , renameFragBinder
   )
 import Leant.Synth.Render
   ( CtorInfo (..)
@@ -4108,44 +4112,11 @@ genericTemplate spelling (parameters, constructors) = ParametricTemplate
 -- an ill-scoped Djex data declaration.
 templateClosed :: ParametricTemplate -> Bool
 templateClosed template = all
-  (Set.null . freeSchemaVariables (Set.fromList (templateFormals template)))
+  (Set.null . freeFragVariables (Set.fromList (templateFormals template)))
   [ field
   | (_, fields) <- templateConstructors template
   , field <- fields
   ]
-
-freeSchemaVariables :: Set.Set String -> Frag -> Set.Set String
-freeSchemaVariables bound frag = case frag of
-  FArr parameter result -> descend [parameter, result]
-  FProd left right -> descend [left, right]
-  FLeanProd left right -> descend [left, right]
-  FSum left right -> descend [left, right]
-  FAll _ binder body -> freeSchemaVariables (Set.insert binder bound) body
-  FInst _ body -> freeSchemaVariables bound body
-  FExactContext _ arguments body ->
-    descend
-      (concatMap exactContextArgumentPayloadFragments arguments ++ [body])
-  FVar variableName
-    | variableName `Set.member` bound -> Set.empty
-    | otherwise -> Set.singleton variableName
-  FApp _ _ head' arguments ->
-    let headVariables = case head' of
-          AppVariable variableName
-            | variableName `Set.member` bound -> Set.empty
-            | otherwise -> Set.singleton variableName
-          AppNominal _ -> Set.empty
-    in headVariables `Set.union` descend arguments
-  -- As in 'collectFragAtoms', the nested exact family's constructors are
-  -- validated by its own plan and do not occur in this field's engine type.
-  FParamInd _ _ parameters _ -> descend parameters
-  FInd _ constructors -> descend (concatMap snd constructors)
-  FParamRec _ _ _ parameters constructors ->
-    descend (parameters ++ concatMap snd constructors)
-  FRec _ _ parameters constructors ->
-    descend (parameters ++ concatMap snd constructors)
-  _ -> Set.empty
- where
-  descend = Set.unions . map (freeSchemaVariables bound)
 
 templateFits
   :: ParametricTemplate
@@ -4296,11 +4267,11 @@ replaceFrag :: [(Frag, Frag)] -> Frag -> Frag
 replaceFrag replacements = go Set.empty
  where
   replacementFreeVariables = Set.unions
-    [ freeSchemaVariables Set.empty replacement
+    [ freeFragVariables Set.empty replacement
     | (_, replacement) <- replacements
     ]
   reservedNames = Set.unions
-    [ schemaNames parameter `Set.union` schemaNames replacement
+    [ fragVariableNames parameter `Set.union` fragVariableNames replacement
     | (parameter, replacement) <- replacements
     ]
 
@@ -4311,12 +4282,12 @@ replaceFrag replacements = go Set.empty
       -- spelling.  The occurrence below that binder denotes the local
       -- variable, not the family argument, so it must not be genericized.
       , Set.null
-          (freeSchemaVariables Set.empty parameter `Set.intersection` shadowed)
+          (freeFragVariables Set.empty parameter `Set.intersection` shadowed)
       -- Every binder that could capture a replacement is alpha-renamed on
       -- entry below.  Retain this guard at the replacement site as a
       -- defensive invariant for fragments introduced by future constructors.
       , Set.null
-          (freeSchemaVariables Set.empty replacement
+          (freeFragVariables Set.empty replacement
             `Set.intersection` shadowed)
       , schemaEquivalent parameter frag
       ] of
@@ -4330,9 +4301,9 @@ replaceFrag replacements = go Set.empty
       FAll explicit binder body
         | binder `Set.member` replacementFreeVariables ->
             let fresh = freshBinderName
-                  (reservedNames `Set.union` schemaNames body
+                  (reservedNames `Set.union` fragVariableNames body
                     `Set.union` shadowed)
-                renamed = renameBoundVariable binder fresh body
+                renamed = renameFragBinder binder fresh body
             in FAll explicit fresh
                 (go (Set.insert fresh shadowed) renamed)
         | otherwise ->
@@ -4362,79 +4333,4 @@ replaceFrag replacements = go Set.empty
   mapCtorFields shadowed = map
     (\(name, fields) -> (name, map (go shadowed) fields))
 
-  freshBinderName reserved = choose (0 :: Int)
-   where
-    choose index =
-      let candidate = "\0leant-bound:" ++ show index
-      in if candidate `Set.member` reserved
-          then choose (index + 1)
-          else candidate
-
--- | Every syntactic variable and binder name in a schema.  Exact nominal
--- heads and display keys live in a separate namespace and need not constrain
--- alpha-renaming.
-schemaNames :: Frag -> Set.Set String
-schemaNames frag = case frag of
-  FArr parameter result -> descend [parameter, result]
-  FProd left right -> descend [left, right]
-  FLeanProd left right -> descend [left, right]
-  FSum left right -> descend [left, right]
-  FAll _ binder body -> Set.insert binder (schemaNames body)
-  FInst _ body -> schemaNames body
-  FExactContext _ arguments body ->
-    descend
-      (concatMap exactContextArgumentPayloadFragments arguments ++ [body])
-  FVar variableName -> Set.singleton variableName
-  FApp _ _ head' arguments ->
-    let headNames = case head' of
-          AppVariable variableName -> Set.singleton variableName
-          AppNominal _ -> Set.empty
-    in headNames `Set.union` descend arguments
-  FParamInd _ _ parameters constructors ->
-    descend (parameters ++ concatMap snd constructors)
-  FInd _ constructors -> descend (concatMap snd constructors)
-  FParamRec _ _ _ parameters constructors ->
-    descend (parameters ++ concatMap snd constructors)
-  FRec _ _ parameters constructors ->
-    descend (parameters ++ concatMap snd constructors)
-  _ -> Set.empty
- where
-  descend = Set.unions . map schemaNames
-
--- | Rename the occurrences bound by one surrounding 'FAll'.  A nested binder
--- with the same spelling shadows it and therefore stops the descent.
-renameBoundVariable :: String -> String -> Frag -> Frag
-renameBoundVariable old new frag = case frag of
-  FArr parameter result -> FArr (go parameter) (go result)
-  FProd left right -> FProd (go left) (go right)
-  FLeanProd left right -> FLeanProd (go left) (go right)
-  FSum left right -> FSum (go left) (go right)
-  FAll explicit binder body
-    | binder == old -> frag
-    | otherwise -> FAll explicit binder (go body)
-  FInst key body -> FInst key (go body)
-  FExactContext className arguments body ->
-    FExactContext className
-      (map (mapExactContextArgumentFragments go) arguments)
-      (go body)
-  FVar variableName
-    | variableName == old -> FVar new
-    | otherwise -> frag
-  FApp safe key head' arguments ->
-    let renamedHead = case head' of
-          AppVariable variableName
-            | variableName == old -> AppVariable new
-          _ -> head'
-    in FApp safe key renamedHead (map go arguments)
-  FParamInd headName key parameters constructors ->
-    FParamInd headName key (map go parameters) (mapCtorFields constructors)
-  FInd key constructors -> FInd key (mapCtorFields constructors)
-  FParamRec complete headName key parameters constructors ->
-    FParamRec complete headName key (map go parameters)
-      (mapCtorFields constructors)
-  FRec complete key parameters constructors ->
-    FRec complete key (map go parameters) (mapCtorFields constructors)
-  _ -> frag
- where
-  go = renameBoundVariable old new
-  mapCtorFields = map (\(name, fields) -> (name, map go fields))
+  freshBinderName = freshFragBinderFrom "\0leant-bound:"
