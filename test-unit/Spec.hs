@@ -230,6 +230,7 @@ import Leant.Synth.Length.Configuration
   , enableLengthRankingScopedUsableWorkBudget
   , enableLengthRankingStrictRelationalPositiveAffineApplicableDomainValidation
   , enableLengthRankingStrictRelationalPositiveAffineQuotientApplicableDomainValidation
+  , enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidation
   , enableLengthRankingUsableWorkBudget
   , mkLengthRankingPolicy
   , mkLengthRankingPolicyWithDescriptorBoundExecutableLaunch
@@ -281,6 +282,8 @@ import Leant.Synth.Length.Configuration.File
   , lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientVersion
   , lengthRankingConfigurationFileDescriptorBoundEffectiveIDExecutableAccessVersion
   , lengthRankingConfigurationFileSpinePairDescriptorBoundEffectiveIDExecutableAccessVersion
+  , lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaVersion
+  , lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaVersion
   , lengthRankingConfigurationFileJsonLimits
   , lengthRankingConfigurationFileVersion
   )
@@ -395,6 +398,7 @@ import Leant.Synth.Length.Presentation
   , renderLengthRelationalPositiveAffineApplicableDomainValidationNote
   , renderLengthStrictRelationalPositiveAffineApplicableDomainValidationNote
   , renderLengthStrictRelationalPositiveAffineQuotientApplicableDomainValidationNote
+  , renderLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidationNote
   , renderLengthSpinePairApplicableDomainValidationNote
   , renderLengthSpinePairCounterexampleNote
   , renderLengthSpinePairCounterexampleSimplificationNote
@@ -403,6 +407,7 @@ import Leant.Synth.Length.Presentation
   , renderLengthSpinePairRelationalPositiveAffineApplicableDomainValidationNote
   , renderLengthSpinePairStrictRelationalPositiveAffineApplicableDomainValidationNote
   , renderLengthSpinePairStrictRelationalPositiveAffineQuotientApplicableDomainValidationNote
+  , renderLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidationNote
   )
 import Leant.Synth.Length.Ranking
   ( LengthRanking
@@ -547,6 +552,7 @@ main = do
       , lengthDescriptorBoundExecutableLaunchTests
       , lengthStrictRelationalPositiveAffineQuotientTests
       , lengthDescriptorBoundEffectiveIDExecutableAccessTests
+      , lengthStrictRelationalPositiveAffineQuotientRootExtremaTests
       , replayPlanTests
       , providerProgramTests
       , candidateVerificationTests
@@ -4468,8 +4474,8 @@ assertLengthUsableWorkBudgetConfigurationSchema =
       $ badContract scalar
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion
-      $ setJsonField ["version"] (Json.JInt 23)
-      $ addJsonField [] ("private-v23", Json.JNull) scalar
+      $ setJsonField ["version"] (Json.JInt 25)
+      $ addJsonField [] ("private-v25", Json.JNull) scalar
 
 assertLengthUsableWorkBudgetLegacySchema :: IO ()
 assertLengthUsableWorkBudgetLegacySchema =
@@ -4884,8 +4890,8 @@ assertLengthScopedUsableWorkBudgetSchema =
         LengthRankingConfigurationUnknownTag)
       $ badContract scalar
 
-    let future = setJsonField ["version"] (Json.JInt 23)
-          $ addJsonField [] ("private-v23", Json.JNull) scalar
+    let future = setJsonField ["version"] (Json.JInt 25)
+          $ addJsonField [] ("private-v25", Json.JNull) scalar
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion future
     assertLengthRankingConfigurationFileError
@@ -7022,8 +7028,8 @@ assertLengthPositiveAffineConfigurationSchema =
       $ badContract scalar
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion
-      $ setJsonField ["version"] (Json.JInt 23)
-      $ addJsonField [] ("private-v23", Json.JNull) scalar
+      $ setJsonField ["version"] (Json.JInt 25)
+      $ addJsonField [] ("private-v25", Json.JNull) scalar
 
 assertLengthPositiveAffineLegacyCompatibility :: IO ()
 assertLengthPositiveAffineLegacyCompatibility = do
@@ -7818,8 +7824,8 @@ assertLengthRelationalPositiveAffineSchema =
       $ badContract v11
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion
-      $ setJsonField ["version"] (Json.JInt 23)
-      $ addJsonField [] ("private-v23", Json.JNull) v11
+      $ setJsonField ["version"] (Json.JInt 25)
+      $ addJsonField [] ("private-v25", Json.JNull) v11
 
 relationalPositiveAffineScalarContract
   :: LengthFormula LengthContractVariable
@@ -8246,7 +8252,7 @@ lengthStrictRelationalPositiveAffineTests :: TestTree
 lengthStrictRelationalPositiveAffineTests = testGroup
   "strict relational positive-affine v15/v16 Length ranking"
   [ testCase
-      "close the exact v15/v16 scoped schema, order, caps, and v23 sentinel"
+      "close the exact v15/v16 scoped schema, order, caps, and v25 sentinel"
       assertLengthStrictRelationalPositiveAffineSchema
   , testCase
       "keep v1-v14 literal and separate every file strategy"
@@ -8531,8 +8537,8 @@ assertLengthStrictRelationalPositiveAffineSchema =
         LengthRankingConfigurationUnknownTag)
       $ badContract scalar
 
-    let future = setJsonField ["version"] (Json.JInt 23)
-          $ addJsonField [] ("private-v23", Json.JNull) scalar
+    let future = setJsonField ["version"] (Json.JInt 25)
+          $ addJsonField [] ("private-v25", Json.JNull) scalar
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion future
     assertLengthRankingConfigurationFileError
@@ -9066,7 +9072,7 @@ lengthDescriptorBoundExecutableLaunchTests :: TestTree
 lengthDescriptorBoundExecutableLaunchTests = testGroup
   "descriptor-bound executable v17/v18 Length ranking"
   [ testCase
-      "close the exact schema, launch literal, order, caps, and v23 sentinel"
+      "close the exact schema, launch literal, order, caps, and v25 sentinel"
       assertLengthDescriptorBoundExecutableLaunchSchema
   , testCase
       "leave every v1-v16 execution object and launch classifier literal"
@@ -9272,8 +9278,8 @@ assertLengthDescriptorBoundExecutableLaunchSchema =
     assertDescriptorBoundExecutableLaunchCaps scalar
     assertDescriptorBoundExecutableLaunchOrder scalar
 
-    let future = setJsonField ["version"] (Json.JInt 23)
-          $ addJsonField [] ("private-v23", Json.JNull) scalar
+    let future = setJsonField ["version"] (Json.JInt 25)
+          $ addJsonField [] ("private-v25", Json.JNull) scalar
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion future
     assertLengthRankingConfigurationFileError
@@ -9865,7 +9871,7 @@ lengthDescriptorBoundEffectiveIDExecutableAccessTests :: TestTree
 lengthDescriptorBoundEffectiveIDExecutableAccessTests = testGroup
   "effective-ID executable-access v21/v22 Length ranking"
   [ testCase
-      "close exact schemas, order, caps, launch literal, and v23 sentinel"
+      "close exact schemas, order, caps, launch literal, and v25 sentinel"
       assertLengthDescriptorBoundEffectiveIDExecutableAccessSchema
   , testCase
       "accept v1-v20 literally and keep all three launch families disjoint"
@@ -10090,8 +10096,8 @@ assertLengthDescriptorBoundEffectiveIDExecutableAccessSchema =
     assertDescriptorBoundExecutableLaunchCaps scalar
     assertDescriptorBoundExecutableLaunchOrder scalar
 
-    let future = setJsonField ["version"] (Json.JInt 23)
-          $ addJsonField [] ("private-v23", Json.JNull) scalar
+    let future = setJsonField ["version"] (Json.JInt 25)
+          $ addJsonField [] ("private-v25", Json.JNull) scalar
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion future
     assertLengthRankingConfigurationFileError
@@ -10619,7 +10625,7 @@ lengthStrictRelationalPositiveAffineQuotientTests :: TestTree
 lengthStrictRelationalPositiveAffineQuotientTests = testGroup
   "quotient-consequence v19/v20 Length ranking"
   [ testCase
-      "close exact descriptor/scoped schemas, order, caps, and v23 sentinel"
+      "close exact descriptor/scoped schemas, order, caps, and v25 sentinel"
       assertLengthStrictRelationalPositiveAffineQuotientSchema
   , testCase
       "keep v1-v18 literal and separate every applicable-domain strategy"
@@ -10869,8 +10875,8 @@ assertLengthStrictRelationalPositiveAffineQuotientSchema =
     assertDescriptorBoundExecutableLaunchCaps scalar
     assertDescriptorBoundExecutableLaunchOrder scalar
 
-    let future = setJsonField ["version"] (Json.JInt 23)
-          $ addJsonField [] ("private-v23", Json.JNull) scalar
+    let future = setJsonField ["version"] (Json.JInt 25)
+          $ addJsonField [] ("private-v25", Json.JNull) scalar
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion future
     assertLengthRankingConfigurationFileError
@@ -11542,6 +11548,860 @@ assertLengthStrictRelationalPositiveAffineQuotientScopedRoutes = do
             Djex.LengthSMTLibLiveSessionCapabilityRejected
         lengthSpinePairRankingFailureOriginalIndex pairFailure @?= Nothing
         lengthSpinePairRankingFailureCleanupIncomplete pairFailure @?= False
+        assertFakeLengthQueryEvents [] [] =<<
+          BS.readFile (executable ++ ".events")
+
+lengthStrictRelationalPositiveAffineQuotientRootExtremaTests :: TestTree
+lengthStrictRelationalPositiveAffineQuotientRootExtremaTests = testGroup
+  "root-extrema v23/v24 Length ranking"
+  [ testCase
+      "close exact inherited schemas, order, caps, and the v25 sentinel"
+      assertLengthStrictRelationalPositiveAffineQuotientRootExtremaSchema
+  , testCase
+      "decode v1-v22 literally and keep all six domain strategies disjoint"
+      assertLengthStrictRelationalPositiveAffineQuotientRootExtremaCompatibility
+  , testCase
+      "select the last of six domain builders without dropping policy"
+      assertLengthStrictRelationalPositiveAffineQuotientRootExtremaBuilderComposition
+  , testCase
+      "establish retained scalar and product extrema without a worker"
+      assertLengthStrictRelationalPositiveAffineQuotientRootExtremaPureRanking
+  , testCase
+      "retain an ordinary simplification and only its final MRU vector"
+      assertLengthStrictRelationalPositiveAffineQuotientRootExtremaSimplificationMRU
+  , testCase
+      "prefer nonvacuous receipts and seal nominal bounded presentations"
+      assertLengthStrictRelationalPositiveAffineQuotientRootExtremaPreferencePresentation
+  , testCase
+      "retain scoped pure, compact-live, and atomic failure routes"
+      assertLengthStrictRelationalPositiveAffineQuotientRootExtremaScopedRoutes
+  ]
+
+strictRelationalPositiveAffineQuotientRootExtremaLiteral :: String
+strictRelationalPositiveAffineQuotientRootExtremaLiteral =
+  "strict-relational-positive-affine-quotient-root-extrema-v1"
+
+strictRelationalPositiveAffineQuotientRootExtremaScalarDocument
+  :: FilePath
+  -> Integer
+  -> Json.JValue
+strictRelationalPositiveAffineQuotientRootExtremaScalarDocument
+    executable milliseconds =
+  setJsonField ["applicableDomainValidation", "strategy"]
+    (Json.JStr strictRelationalPositiveAffineQuotientRootExtremaLiteral)
+  $ setJsonField ["version"]
+      (Json.JInt $ toInteger
+        lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaVersion)
+  $ descriptorBoundEffectiveIDExecutableAccessScalarDocument
+      executable milliseconds
+
+strictRelationalPositiveAffineQuotientRootExtremaPairDocument
+  :: FilePath
+  -> Integer
+  -> Json.JValue
+strictRelationalPositiveAffineQuotientRootExtremaPairDocument
+    executable milliseconds =
+  setJsonField ["applicableDomainValidation", "strategy"]
+    (Json.JStr strictRelationalPositiveAffineQuotientRootExtremaLiteral)
+  $ setJsonField ["version"]
+      (Json.JInt $ toInteger
+        lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaVersion)
+  $ descriptorBoundEffectiveIDExecutableAccessPairDocument
+      executable milliseconds
+
+withRootExtremaApplicableDomainAssignmentLimit
+  :: Integer
+  -> Json.JValue
+  -> Json.JValue
+withRootExtremaApplicableDomainAssignmentLimit maximumAssignments =
+  setJsonField ["applicableDomainValidation", "maximumAssignments"]
+    (Json.JInt maximumAssignments)
+
+expectStrictRelationalPositiveAffineQuotientRootExtremaPolicy
+  :: Json.JValue
+  -> IO (LengthRankingPolicy, LeanLengthContractSelection)
+expectStrictRelationalPositiveAffineQuotientRootExtremaPolicy document = do
+  disabled <- expectLengthAssessmentConfigurationFile document
+  activated <- expectLengthAssessmentConfigurationActivation
+    PermitUnpinnedExecutable disabled
+  lengthRankingPolicyExecutableLaunchStrategy (fst activated) @?=
+    Djex.LengthSMTLibDescriptorBoundEffectiveIDExecutableAccessLaunch
+  pure activated
+
+scalarRootMaximumPrecondition :: LengthFormula LengthContractVariable
+scalarRootMaximumPrecondition = LengthAtMost
+  (LengthMaximum
+    (LengthVariable $ LengthInput 0)
+    (LengthLiteral 2))
+  (LengthLiteral 4)
+
+pairRootMinimumEqualityPrecondition
+  :: LengthFormula Djex.LengthSpinePairContractVariable
+pairRootMinimumEqualityPrecondition = LengthEqual
+  (LengthSum [LengthScale 2 pairInput, LengthLiteral 1])
+  (LengthMinimum
+    (LengthSum [pairInput, LengthLiteral 5])
+    (LengthLiteral 7))
+ where
+  pairInput = LengthVariable $ Djex.LengthSpinePairInput 0
+
+pairVacuousRootMinimumPrecondition
+  :: LengthFormula Djex.LengthSpinePairContractVariable
+pairVacuousRootMinimumPrecondition = LengthAll
+  [ LengthNot $ LengthAtMost
+      (LengthMinimum pairInput $ LengthLiteral 7)
+      (LengthLiteral 4)
+  , LengthAtMost pairInput $ LengthLiteral 4
+  ]
+ where
+  pairInput = LengthVariable $ Djex.LengthSpinePairInput 0
+
+assertLengthStrictRelationalPositiveAffineQuotientRootExtremaSchema :: IO ()
+assertLengthStrictRelationalPositiveAffineQuotientRootExtremaSchema =
+  withTemporaryDirectory "leant-length-root-extrema-schema" $ \root -> do
+    let executable = root </> "missing-z3"
+        scalar =
+          strictRelationalPositiveAffineQuotientRootExtremaScalarDocument
+            executable 65000
+        pair = strictRelationalPositiveAffineQuotientRootExtremaPairDocument
+          executable 65000
+        documents = [scalar, pair]
+        missing object field path document =
+          assertLengthAssessmentConfigurationFileError
+            (LengthRankingConfigurationMissingField object field)
+            $ deleteJsonField path document
+        unexpected object path document =
+          assertLengthAssessmentConfigurationFileError
+            (LengthRankingConfigurationUnexpectedField object)
+            $ addJsonField path ("private-field", Json.JNull) document
+        rootShape =
+          [ (LengthRankingConfigurationFormatField, "format")
+          , (LengthRankingConfigurationVersionField, "version")
+          , ( LengthRankingConfigurationExecutionAdmissionField
+            , "executionAdmission"
+            )
+          , (LengthRankingConfigurationExecutionField, "execution")
+          , (LengthRankingConfigurationEvaluationField, "evaluation")
+          , ( LengthRankingConfigurationInputBoxValidationField
+            , "inputBoxValidation"
+            )
+          , ( LengthRankingConfigurationCounterexampleProbeField
+            , "counterexampleProbe"
+            )
+          , ( LengthRankingConfigurationBoundedPositiveOrderingField
+            , "boundedPositiveOrdering"
+            )
+          , ( LengthRankingConfigurationApplicableDomainValidationField
+            , "applicableDomainValidation"
+            )
+          , ( LengthRankingConfigurationApplicableDomainOrderingField
+            , "applicableDomainOrdering"
+            )
+          , ( LengthRankingConfigurationCounterexampleSimplificationField
+            , "counterexampleSimplification"
+            )
+          , ( LengthRankingConfigurationLiveSessionOpeningField
+            , "liveSessionOpening"
+            )
+          , ( LengthRankingConfigurationUsableWorkBudgetField
+            , "usableWorkBudget"
+            )
+          , (LengthRankingConfigurationContractField, "contract")
+          ]
+        applicableShape =
+          [ ( LengthRankingConfigurationApplicableDomainStrategyField
+            , "strategy"
+            )
+          , ( LengthRankingConfigurationApplicableDomainMaximumInputsField
+            , "maximumInputs"
+            )
+          , ( LengthRankingConfigurationApplicableDomainMaximumAssignmentsField
+            , "maximumAssignments"
+            )
+          ]
+        budgetShape =
+          [ ( LengthRankingConfigurationUsableWorkBudgetStrategyField
+            , "strategy"
+            )
+          , ( LengthRankingConfigurationUsableWorkBudgetMillisecondsField
+            , "milliseconds"
+            )
+          ]
+    lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaVersion
+      @?= 23
+    lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaVersion
+      @?= 24
+    mapM_ (\document -> do
+        _ <- expectLengthAssessmentConfigurationFile document
+        _ <- expectLengthAssessmentConfigurationFile
+          $ reverseJsonObjectFields document
+        assertLengthRankingConfigurationFileError
+          LengthRankingConfigurationUnsupportedVersion document
+        mapM_ (\(field, name) -> missing
+            LengthRankingConfigurationRootObject field [name] document)
+          rootShape
+        unexpected LengthRankingConfigurationRootObject [] document
+        assertLengthAssessmentConfigurationFileError
+          (LengthRankingConfigurationExpectedObject
+            LengthRankingConfigurationApplicableDomainValidationObject)
+          $ setJsonField ["applicableDomainValidation"] Json.JNull document
+        mapM_ (\(field, name) -> missing
+            LengthRankingConfigurationApplicableDomainValidationObject field
+            ["applicableDomainValidation", name] document)
+          applicableShape
+        unexpected
+          LengthRankingConfigurationApplicableDomainValidationObject
+          ["applicableDomainValidation"] document
+        mapM_ (\(field, name) -> missing
+            LengthRankingConfigurationUsableWorkBudgetObject field
+            ["usableWorkBudget", name] document)
+          budgetShape
+        unexpected LengthRankingConfigurationUsableWorkBudgetObject
+          ["usableWorkBudget"] document
+        assertLengthAssessmentConfigurationFileError
+          (LengthRankingConfigurationFieldValueRejected
+            LengthRankingConfigurationApplicableDomainStrategyField)
+          $ setJsonField ["applicableDomainValidation", "strategy"]
+              (Json.JStr strictRelationalPositiveAffineQuotientLiteral)
+              document
+        assertLengthAssessmentConfigurationFileError
+          (LengthRankingConfigurationFieldValueRejected
+            LengthRankingConfigurationExecutableLaunchField)
+          $ setJsonField ["execution", "executableLaunch"]
+              (Json.JStr descriptorBoundExecutableLaunchLiteral) document)
+      documents
+
+    (_, scalarSelection) <-
+      expectStrictRelationalPositiveAffineQuotientRootExtremaPolicy scalar
+    case scalarSelection of
+      LeanLengthScalarContractSelection _ -> pure ()
+      LeanLengthSpinePairContractSelection _ -> assertFailure
+        "v23 selected the product Length contract"
+    (_, pairSelection) <-
+      expectStrictRelationalPositiveAffineQuotientRootExtremaPolicy pair
+    case pairSelection of
+      LeanLengthSpinePairContractSelection _ -> pure ()
+      LeanLengthScalarContractSelection _ -> assertFailure
+        "v24 selected the scalar Length contract"
+
+    assertDescriptorBoundExecutableLaunchCaps scalar
+    assertDescriptorBoundExecutableLaunchOrder scalar
+
+    let future = setJsonField ["version"] (Json.JInt 25)
+          $ addJsonField [] ("private-v25", Json.JNull) scalar
+    assertLengthAssessmentConfigurationFileError
+      LengthRankingConfigurationUnsupportedVersion future
+    assertLengthRankingConfigurationFileError
+      LengthRankingConfigurationUnsupportedVersion future
+
+assertLengthStrictRelationalPositiveAffineQuotientRootExtremaCompatibility
+  :: IO ()
+assertLengthStrictRelationalPositiveAffineQuotientRootExtremaCompatibility =
+  withTemporaryDirectory "leant-length-root-extrema-compatibility"
+    $ \root -> do
+      let executable = root </> "missing-z3"
+          v1 = lengthRankingConfigurationFileFixture executable Nothing
+          v2 = lengthRankingConfigurationFileInputBoxFixture
+            executable Nothing [1] 2
+          v3 = lengthRankingConfigurationFileOriginProbeFixture
+            executable Nothing [1] 2
+          v4 = lengthAssessmentConfigurationFileSpinePairFixture
+            executable Nothing [1] 2 positiveAffinePairContractValue
+          v5 = lengthAssessmentConfigurationFilePositiveOrderingFixture
+            executable Nothing [1] 2 positiveAffineScalarContractValue
+          v6 = lengthAssessmentConfigurationFileSpinePairPositiveOrderingFixture
+            executable Nothing [1] 2 positiveAffinePairContractValue
+          v7 = positiveAffineScalarDocument executable
+          v8 = positiveAffinePairDocument executable
+          v9 = usableWorkBudgetScalarDocument executable 1000
+          v10 = usableWorkBudgetPairDocument executable 1000
+          v11 = relationalPositiveAffineScalarDocument executable
+          v12 = relationalPositiveAffinePairDocument executable
+          v13 = scopedUsableWorkBudgetScalarDocument executable 1000
+          v14 = scopedUsableWorkBudgetPairDocument executable 1000
+          v15 = strictRelationalPositiveAffineScalarDocument executable 1000
+          v16 = strictRelationalPositiveAffinePairDocument executable 1000
+          v17 = descriptorBoundExecutableLaunchScalarDocument executable 1000
+          v18 = descriptorBoundExecutableLaunchPairDocument executable 1000
+          v19 = strictRelationalPositiveAffineQuotientScalarDocument
+            executable 1000
+          v20 = strictRelationalPositiveAffineQuotientPairDocument
+            executable 1000
+          v21 = descriptorBoundEffectiveIDExecutableAccessScalarDocument
+            executable 1000
+          v22 = descriptorBoundEffectiveIDExecutableAccessPairDocument
+            executable 1000
+          v23 =
+            strictRelationalPositiveAffineQuotientRootExtremaScalarDocument
+              executable 1000
+          v24 =
+            strictRelationalPositiveAffineQuotientRootExtremaPairDocument
+              executable 1000
+          legacy =
+            [ v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12
+            , v13, v14, v15, v16, v17, v18, v19, v20, v21, v22
+            ]
+          direct = take 16 legacy
+          descriptor = take 4 $ drop 16 legacy
+          effectiveAccess = drop 20 legacy ++ [v23, v24]
+          inheritedDomain = drop 6 legacy
+          activate document = do
+            disabled <- expectLengthAssessmentConfigurationFile document
+            expectLengthAssessmentConfigurationActivation
+              PermitUnpinnedExecutable disabled
+          setStrategy strategy = setJsonField
+            ["applicableDomainValidation", "strategy"]
+            (Json.JStr strategy)
+          rejectStrategy document =
+            assertLengthAssessmentConfigurationFileError
+              (LengthRankingConfigurationFieldValueRejected
+                LengthRankingConfigurationApplicableDomainStrategyField)
+              document
+      mapM_ (\document -> do
+          (policy, _) <- activate document
+          lengthRankingPolicyExecutableLaunchStrategy policy @?=
+            Djex.LengthSMTLibPathSnapshotThenDirectSpawn)
+        direct
+      mapM_ (\document -> do
+          (policy, _) <- activate document
+          lengthRankingPolicyExecutableLaunchStrategy policy @?=
+            Djex.LengthSMTLibDescriptorBoundExecutableLaunch)
+        descriptor
+      mapM_ (\document -> do
+          (policy, _) <- activate document
+          lengthRankingPolicyExecutableLaunchStrategy policy @?=
+            Djex.LengthSMTLibDescriptorBoundEffectiveIDExecutableAccessLaunch)
+        effectiveAccess
+      mapM_ (rejectStrategy
+          . setStrategy
+              strictRelationalPositiveAffineQuotientRootExtremaLiteral)
+        inheritedDomain
+      mapM_ (\document ->
+          assertLengthAssessmentConfigurationFileError
+            (LengthRankingConfigurationUnexpectedField
+              LengthRankingConfigurationRootObject)
+            $ addJsonField []
+                ( "applicableDomainValidation"
+                , Json.JObj
+                    [ ( "strategy"
+                      , Json.JStr
+                          strictRelationalPositiveAffineQuotientRootExtremaLiteral
+                      )
+                    , ("maximumInputs", Json.JInt 1)
+                    , ("maximumAssignments", Json.JInt 2)
+                    ]
+                ) document)
+        (take 6 legacy)
+      mapM_ (\strategy -> mapM_ (rejectStrategy . setStrategy strategy)
+          [v23, v24])
+        [ "direct-v1"
+        , "positive-affine-v1"
+        , "relational-positive-affine-v1"
+        , "strict-relational-positive-affine-v1"
+        , strictRelationalPositiveAffineQuotientLiteral
+        ]
+
+assertLengthStrictRelationalPositiveAffineQuotientRootExtremaBuilderComposition
+  :: IO ()
+assertLengthStrictRelationalPositiveAffineQuotientRootExtremaBuilderComposition =
+  do
+    identity <- buildOneInputLengthRankingCandidate
+    neutral <- syntheticLengthRankingCandidate "root-extrema-builder-neutral"
+    limits <- explicitLengthInputBoxLimits 1 15
+    shortBudget <- expectLengthUsableWorkBudget 50
+    longBudget <- expectLengthUsableWorkBudget 2000
+    delayGate <- newIORef 0
+    withTemporaryDirectory "leant-length-root-extrema-builder" $ \root -> do
+      let executable = root </> "missing-z3"
+          contract = strictRelationalPositiveAffineQuotientScalarContract
+            scalarRootMaximumPrecondition $ LengthTruth True
+          delayedContract microseconds = contract
+            { leanLengthContractSource =
+                delayedLengthTestValueWithGate delayGate microseconds
+                $ leanLengthContractSource contract
+            }
+          run label policy selectedContract candidates =
+            expectLengthRankingWithin label
+              $ rankVerifiedLengthCandidatesWithPolicy policy
+                  selectedContract candidates
+          expectOpeningFailure label ranking = do
+            map rankedLengthCandidateAssessment
+                (lengthRankingCandidates ranking) @?= [Unassessed]
+            case lengthRankingFailure ranking of
+              Just failure -> case lengthRankingFailureClass failure of
+                LengthRankingLiveSessionFailed _ ->
+                  lengthRankingFailureOriginalIndex failure @?= Nothing
+                failureClass -> assertFailure
+                  $ label ++ " produced " ++ show failureClass
+              Nothing -> assertFailure
+                $ label ++ " retained root-extrema authority unexpectedly"
+      base <- expectRight
+        $ mkLengthRankingPolicyWithDescriptorBoundEffectiveIDExecutableAccessLaunch
+        $ explicitLengthRankingPolicySource
+            Djex.defaultLengthSMTLibExecutionLimits
+            (explicitLengthRankingExecutionSource executable Nothing
+              Djex.LengthSMTLibStatusOnly)
+            Djex.defaultLengthEvaluationLimitSource
+      let retained = enableLengthRankingScopedUsableWorkBudget longBudget
+            $ enableLengthRankingNonVacuousApplicableDomainPreference
+            $ enableLengthRankingNonVacuousInputBoxPreference
+            $ enableLengthRankingCounterexampleSimplification limits
+            $ enableLengthRankingOriginProbe
+            $ enableLengthRankingInputBoxValidation limits [14]
+            $ enableLengthRankingDeferredLiveSessionOpening base
+          direct = enableLengthRankingApplicableDomainValidation limits
+          positive =
+            enableLengthRankingPositiveAffineApplicableDomainValidation limits
+          relational =
+            enableLengthRankingRelationalPositiveAffineApplicableDomainValidation
+              limits
+          strict =
+            enableLengthRankingStrictRelationalPositiveAffineApplicableDomainValidation
+              limits
+          quotient =
+            enableLengthRankingStrictRelationalPositiveAffineQuotientApplicableDomainValidation
+              limits
+          extrema =
+            enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidation
+              limits
+          extremaLast = extrema $ quotient $ strict $ relational $ positive
+            $ direct retained
+          quotientLast = quotient $ extrema $ strict $ relational $ positive
+            $ direct retained
+          strictLast = strict $ extrema $ quotient $ relational $ positive
+            $ direct retained
+          relationalLast = relational $ extrema $ quotient $ strict $ positive
+            $ direct retained
+          positiveLast = positive $ extrema $ quotient $ strict $ relational
+            $ direct retained
+          directLast = direct $ extrema $ quotient $ strict $ relational
+            $ positive retained
+          budgetThenExtrema = extrema
+            $ enableLengthRankingScopedUsableWorkBudget shortBudget
+            $ enableLengthRankingDeferredLiveSessionOpening base
+          extremaThenBudget =
+            enableLengthRankingScopedUsableWorkBudget shortBudget
+            $ extrema $ enableLengthRankingDeferredLiveSessionOpening base
+          policies =
+            [ extremaLast, quotientLast, strictLast, relationalLast
+            , positiveLast, directLast, budgetThenExtrema, extremaThenBudget
+            ]
+      mapM_ (\policy ->
+          lengthRankingPolicyExecutableLaunchStrategy policy @?=
+            Djex.LengthSMTLibDescriptorBoundEffectiveIDExecutableAccessLaunch)
+        policies
+      established <- run "root-extrema builder last" extremaLast contract
+        [neutral, identity]
+      map rankedLengthCandidateOriginalIndex
+          (lengthRankingCandidates established) @?= [1, 0]
+      case map rankedLengthCandidateAssessment
+          $ lengthRankingCandidates established of
+        [ StrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainEstablished
+            _
+          , Unassessed
+          ] -> pure ()
+        assessments -> assertFailure
+          $ "root-extrema builder lost authority: " ++ show assessments
+      origin <- run "root-extrema builder origin retention" extremaLast
+        (lengthRankingContract 2) [identity]
+      lengthRankingFailure origin @?= Nothing
+      case lengthRankingCandidates origin of
+        [ranked] -> case rankedLengthCandidateAssessment ranked of
+          Counterexample receipt -> do
+            Djex.validatedLengthCounterexampleInputs receipt @?= [0]
+            Djex.validatedLengthCounterexampleResult receipt @?= 0
+            rankedLengthCandidateCounterexampleSimplification ranked @?=
+              Nothing
+          assessment -> assertFailure
+            $ "root-extrema builder dropped origin probing: "
+              ++ show assessment
+        ranked -> assertFailure
+          $ "root-extrema origin retention changed cardinality: "
+            ++ show (length ranked)
+      mapM_ (\(label, policy) ->
+          run label policy contract [identity] >>=
+            expectOpeningFailure label)
+        [ ("quotient builder last", quotientLast)
+        , ("strict builder last", strictLast)
+        , ("relational builder last", relationalLast)
+        , ("positive builder last", positiveLast)
+        , ("direct builder last", directLast)
+        ]
+      run "budget then root extrema" budgetThenExtrema
+          (delayedContract 150000) [identity] >>=
+        assertScalarUsableWorkExpiry "budget then root extrema"
+      run "root extrema then budget" extremaThenBudget
+          (delayedContract 160000) [identity] >>=
+        assertScalarUsableWorkExpiry "root extrema then budget"
+      doesFileExist (executable ++ ".events") >>= (@?= False)
+    readIORef delayGate >>= (@?= 2)
+
+assertLengthStrictRelationalPositiveAffineQuotientRootExtremaPureRanking
+  :: IO ()
+assertLengthStrictRelationalPositiveAffineQuotientRootExtremaPureRanking = do
+  identity <- buildOneInputLengthRankingCandidate
+  (pairCandidate, _) <- buildLengthSpinePairRankingFixture
+  let scalarContract = strictRelationalPositiveAffineQuotientScalarContract
+        scalarRootMaximumPrecondition $ LengthTruth True
+      pairContract = strictRelationalPositiveAffineQuotientPairContract
+        pairRootMinimumEqualityPrecondition $ LengthTruth True
+      expectScalarPredecessor ranking = do
+        map rankedLengthCandidateAssessment
+            (lengthRankingCandidates ranking) @?= [Unassessed]
+        case lengthRankingFailure ranking of
+          Just failure -> case lengthRankingFailureClass failure of
+            LengthRankingLiveSessionFailed _ -> pure ()
+            failureClass -> assertFailure
+              $ "v19 predecessor produced " ++ show failureClass
+          Nothing -> assertFailure
+            "v19 predecessor unexpectedly established root extrema"
+      expectPairPredecessor ranking = do
+        map rankedLengthSpinePairCandidateAssessment
+            (lengthSpinePairRankingCandidates ranking) @?=
+          [LengthSpinePairUnassessed]
+        case lengthSpinePairRankingFailure ranking of
+          Just failure -> case lengthSpinePairRankingFailureClass failure of
+            LengthSpinePairRankingLiveSessionFailed _ -> pure ()
+            failureClass -> assertFailure
+              $ "v20 predecessor produced " ++ show failureClass
+          Nothing -> assertFailure
+            "v20 predecessor unexpectedly established root extrema"
+  withTemporaryDirectory "leant-length-root-extrema-pure" $ \root -> do
+    let executable = root </> "missing-z3"
+    (scalarPolicy, _) <-
+      expectStrictRelationalPositiveAffineQuotientRootExtremaPolicy
+      $ withRootExtremaApplicableDomainAssignmentLimit 5
+      $ strictRelationalPositiveAffineQuotientRootExtremaScalarDocument
+          executable 2000
+    scalar <- expectLengthRankingWithin "v23 root-extrema establishment"
+      $ rankVerifiedLengthCandidatesWithPolicy scalarPolicy scalarContract
+          [identity]
+    scalarReceipt <- case map rankedLengthCandidateAssessment
+        $ lengthRankingCandidates scalar of
+      [ StrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainEstablished
+          receipt
+        ] -> pure receipt
+      assessments -> assertFailure
+        ("v23 root-extrema establishment produced " ++ show assessments)
+          >> error "unreachable"
+    Djex.validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainInclusiveMaximums
+        scalarReceipt @?= [4]
+    Djex.validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainAssignmentCount
+        scalarReceipt @?= 5
+    Djex.validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainApplicableAssignmentCount
+        scalarReceipt @?= 5
+    Djex.validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainBasis
+        scalarReceipt @?= Djex.ProviderIndependentFiniteSpineModel
+
+    (pairPolicy, _) <-
+      expectStrictRelationalPositiveAffineQuotientRootExtremaPolicy
+      $ withRootExtremaApplicableDomainAssignmentLimit 4
+      $ strictRelationalPositiveAffineQuotientRootExtremaPairDocument
+          executable 2000
+    pair <- expectRight =<<
+      rankVerifiedLengthSpinePairCandidatesWithPolicy pairPolicy pairContract
+        [pairCandidate]
+    pairReceipt <- case map rankedLengthSpinePairCandidateAssessment
+        $ lengthSpinePairRankingCandidates pair of
+      [ LengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainEstablished
+          receipt
+        ] -> pure receipt
+      assessments -> assertFailure
+        ("v24 root-extrema establishment produced " ++ show assessments)
+          >> error "unreachable"
+    Djex.validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainInclusiveMaximums
+        pairReceipt @?= [3]
+    Djex.validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainAssignmentCount
+        pairReceipt @?= 4
+    Djex.validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainApplicableAssignmentCount
+        pairReceipt @?= 1
+    Djex.validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainBasis
+        pairReceipt @?= Djex.ProviderIndependentFiniteSpineModel
+
+    (scalarPredecessorPolicy, _) <-
+      expectStrictRelationalPositiveAffineQuotientPolicy
+      $ withQuotientApplicableDomainAssignmentLimit 5
+      $ strictRelationalPositiveAffineQuotientScalarDocument executable 2000
+    scalarPredecessor <- expectLengthRankingWithin
+      "v19 root-extrema predecessor control"
+      $ rankVerifiedLengthCandidatesWithPolicy scalarPredecessorPolicy
+          scalarContract [identity]
+    expectScalarPredecessor scalarPredecessor
+
+    (pairPredecessorPolicy, _) <-
+      expectStrictRelationalPositiveAffineQuotientPolicy
+      $ withQuotientApplicableDomainAssignmentLimit 4
+      $ strictRelationalPositiveAffineQuotientPairDocument executable 2000
+    pairPredecessor <- expectRight =<<
+      rankVerifiedLengthSpinePairCandidatesWithPolicy pairPredecessorPolicy
+        pairContract [pairCandidate]
+    expectPairPredecessor pairPredecessor
+    doesFileExist (executable ++ ".events") >>= (@?= False)
+
+assertLengthStrictRelationalPositiveAffineQuotientRootExtremaSimplificationMRU
+  :: IO ()
+assertLengthStrictRelationalPositiveAffineQuotientRootExtremaSimplificationMRU
+  | os /= "linux" = pure ()
+  | otherwise = do
+      identity <- buildOneInputLengthRankingCandidate
+      let contract = (lengthRankingContract 2)
+            { leanLengthContractSource = LengthContractSource
+                { lengthContractPrecondition = LengthAtMost
+                    (LengthLiteral 1) (LengthVariable $ LengthInput 0)
+                , lengthContractPostcondition = LengthEqual
+                    (LengthVariable LengthResult) (LengthLiteral 2)
+                }
+            }
+          withInputValues = setJsonField
+            ["counterexampleSimplification", "maximumAssignments"]
+            (Json.JInt 4)
+            . setJsonField ["execution", "artifactPolicy"]
+                (Json.JStr "input-values-after-satisfiable")
+      withFakeLengthSolver "healthy" $ \executable -> do
+        (policy, _) <-
+          expectStrictRelationalPositiveAffineQuotientRootExtremaPolicy
+          $ withInputValues
+          $ strictRelationalPositiveAffineQuotientRootExtremaScalarDocument
+              executable 2000
+        ranking <- expectLengthRankingWithin
+          "v23 root-extrema simplification and MRU"
+          $ rankVerifiedLengthCandidatesWithPolicy policy contract
+              [identity, identity]
+        (first, second, firstReceipt, secondReceipt) <- case
+            lengthRankingCandidates ranking of
+          [firstRanked, secondRanked] -> case
+              ( rankedLengthCandidateAssessment firstRanked
+              , rankedLengthCandidateAssessment secondRanked
+              ) of
+            (Counterexample firstCounterexample,
+                Counterexample secondCounterexample) -> pure
+              ( firstRanked, secondRanked, firstCounterexample
+              , secondCounterexample
+              )
+            assessments -> assertFailure
+              ("v23 root-extrema simplification produced "
+                ++ show assessments) >> error "unreachable"
+          ranked -> assertFailure
+            ("v23 root-extrema simplification cardinality changed: "
+              ++ show (length ranked)) >> error "unreachable"
+        map Djex.validatedLengthCounterexampleInputs
+            [firstReceipt, secondReceipt] @?= [[1], [1]]
+        simplification <- case
+            rankedLengthCandidateCounterexampleSimplification first of
+          Nothing -> assertFailure
+            "v23 root-extrema path lost simplification metadata"
+              >> error "unreachable"
+          Just retained -> pure retained
+        rankedLengthCandidateCounterexampleSimplification second @?= Nothing
+        Djex.validatedLengthCounterexampleSimplificationOriginalInputs
+            simplification @?= [3]
+        Djex.validatedLengthCounterexampleSimplificationInputs
+            simplification @?= [1]
+        Djex.validatedLengthCounterexampleSimplificationChanged
+            simplification @?= True
+        assertFakeLengthQueryEvents [0] [0] =<<
+          BS.readFile (executable ++ ".events")
+
+assertLengthStrictRelationalPositiveAffineQuotientRootExtremaPreferencePresentation
+  :: IO ()
+assertLengthStrictRelationalPositiveAffineQuotientRootExtremaPreferencePresentation =
+  do
+    identity <- buildOneInputLengthRankingCandidate
+    (pairCandidate, _) <- buildLengthSpinePairRankingFixture
+    scalarNeutral <- syntheticLengthRankingCandidate
+      "root-extrema-preference-scalar-neutral"
+    pairNeutral <- syntheticLengthRankingCandidate
+      "root-extrema-preference-pair-neutral"
+    let scalarContract =
+          strictRelationalPositiveAffineQuotientScalarContract
+            scalarRootMaximumPrecondition $ LengthTruth True
+        pairContract = strictRelationalPositiveAffineQuotientPairContract
+          pairVacuousRootMinimumPrecondition $ LengthTruth True
+    withTemporaryDirectory "leant-length-root-extrema-presentation"
+      $ \root -> do
+        let executable = root </> "missing-z3"
+        (scalarPolicy, _) <-
+          expectStrictRelationalPositiveAffineQuotientRootExtremaPolicy
+          $ withRootExtremaApplicableDomainAssignmentLimit 5
+          $ strictRelationalPositiveAffineQuotientRootExtremaScalarDocument
+              executable 2000
+        scalar <- expectLengthRankingWithin "v23 root-extrema preference"
+          $ rankVerifiedLengthCandidatesWithPolicy scalarPolicy scalarContract
+              [scalarNeutral, identity]
+        map rankedLengthCandidateOriginalIndex
+            (lengthRankingCandidates scalar) @?= [1, 0]
+        scalarReceipt <- case map rankedLengthCandidateAssessment
+            $ lengthRankingCandidates scalar of
+          [ StrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainEstablished
+              receipt
+            , Unassessed
+            ] -> pure receipt
+          assessments -> assertFailure
+            ("v23 root-extrema preference changed: " ++ show assessments)
+              >> error "unreachable"
+        Djex.validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainInclusiveMaximums
+            scalarReceipt @?= [4]
+        Djex.validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainAssignmentCount
+            scalarReceipt @?= 5
+        Djex.validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainApplicableAssignmentCount
+            scalarReceipt @?= 5
+        let scalarNote =
+              renderLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidationNote
+                scalarReceipt
+        scalarNote @?=
+          "complete finite-spine Length domain under strict relational positive-affine quotient/root-extrema precondition coverage rule within admitted bounds (model/provider-relative; provider-independent; no global proof or solver authority): derived maxima = [4]; checked = 5; applicable = 5"
+        assertBool "the v23 root-extrema note exceeded its bound"
+          $ length scalarNote <= maximumLengthCounterexampleNoteCharacters
+        scalarVerification <- verificationBatchFromReceipts
+          [scalarNeutral, identity]
+        scalarAssociated <- expectLengthPostVerificationWithin
+          "v23 root-extrema occurrence seal"
+          $ assessVerifiedLengthCandidatesWithPolicy scalarPolicy
+              scalarContract scalarVerification
+        assertLengthPostVerificationSealed scalarAssociated
+        scalarAssociatedRanking <-
+          expectLengthPostVerificationRanking scalarAssociated
+        map rankedLengthCandidateOriginalIndex
+            (lengthRankingCandidates scalarAssociatedRanking) @?= [1, 0]
+        map lengthCandidatePresentationNote
+            (presentLengthPostVerificationResult scalarAssociated) @?=
+          [Just scalarNote, Nothing]
+
+        (pairPolicy, _) <-
+          expectStrictRelationalPositiveAffineQuotientRootExtremaPolicy
+          $ withRootExtremaApplicableDomainAssignmentLimit 5
+          $ strictRelationalPositiveAffineQuotientRootExtremaPairDocument
+              executable 2000
+        pair <- expectRight =<<
+          rankVerifiedLengthSpinePairCandidatesWithPolicy pairPolicy
+            pairContract [pairNeutral, pairCandidate]
+        map rankedLengthSpinePairCandidateOriginalIndex
+            (lengthSpinePairRankingCandidates pair) @?= [0, 1]
+        pairReceipt <- case map rankedLengthSpinePairCandidateAssessment
+            $ lengthSpinePairRankingCandidates pair of
+          [ LengthSpinePairUnassessed
+            , LengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainEstablished
+                receipt
+            ] -> pure receipt
+          assessments -> assertFailure
+            ("v24 root-extrema vacuity changed: " ++ show assessments)
+              >> error "unreachable"
+        Djex.validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainInclusiveMaximums
+            pairReceipt @?= [0]
+        Djex.validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainAssignmentCount
+            pairReceipt @?= 1
+        Djex.validatedLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainApplicableAssignmentCount
+            pairReceipt @?= 0
+        let pairNote =
+              renderLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidationNote
+                pairReceipt
+        pairNote @?=
+          "complete binary-product finite-spine Length domain under strict relational positive-affine quotient/root-extrema precondition coverage rule within admitted bounds (model/provider-relative; provider-independent; no global proof or solver authority): derived maxima = [0]; checked = 1; applicable = 0; vacuous (no assignment met the precondition)"
+        assertBool "the v24 root-extrema note exceeded its bound"
+          $ length pairNote <= maximumLengthCounterexampleNoteCharacters
+        pairVerification <- verificationBatchFromReceipts
+          [pairNeutral, pairCandidate]
+        pairAssociated <- expectLengthSpinePairPostVerificationWithin
+          $ assessVerifiedLengthSpinePairCandidatesWithPolicy pairPolicy
+              pairContract pairVerification
+        sealed <- case lengthSpinePairPostVerificationSealedBatch
+            pairAssociated of
+          Nothing -> assertFailure
+            "v24 root-extrema assessment bypassed occurrence sealing"
+              >> error "unreachable"
+          Just retained -> pure retained
+        postVerificationBatchCandidates sealed @?=
+          lengthSpinePairPostVerificationCandidates pairAssociated
+        pairAssociatedRanking <-
+          expectLengthSpinePairPostVerificationRanking pairAssociated
+        map rankedLengthSpinePairCandidateOriginalIndex
+            (lengthSpinePairRankingCandidates pairAssociatedRanking) @?=
+          [0, 1]
+        map lengthCandidatePresentationNote
+            (presentLengthSpinePairPostVerificationResult pairAssociated) @?=
+          [Nothing, Just pairNote]
+        doesFileExist (executable ++ ".events") >>= (@?= False)
+
+assertLengthStrictRelationalPositiveAffineQuotientRootExtremaScopedRoutes
+  :: IO ()
+assertLengthStrictRelationalPositiveAffineQuotientRootExtremaScopedRoutes = do
+  identity <- buildOneInputLengthRankingCandidate
+  (_, pairCandidate) <- buildLengthSpinePairRankingFixture
+  pairRefused <- syntheticLengthRankingCandidate
+    "root-extrema-scoped-live-pair-refused"
+  scalarGate <- newIORef 0
+  let scalarPure = strictRelationalPositiveAffineQuotientScalarContract
+        scalarRootMaximumPrecondition $ LengthTruth True
+      delayedScalar = scalarPure
+        { leanLengthContractSource =
+            delayedLengthTestValueWithGate scalarGate 150000
+            $ leanLengthContractSource scalarPure
+        }
+      pairCandidates =
+        [pairRefused, pairCandidate, pairRefused, pairCandidate]
+
+  withTemporaryDirectory "leant-length-root-extrema-scoped-pure"
+    $ \root -> do
+      let executable = root </> "missing-z3"
+      (scalarPolicy, _) <-
+        expectStrictRelationalPositiveAffineQuotientRootExtremaPolicy
+        $ withRootExtremaApplicableDomainAssignmentLimit 5
+        $ strictRelationalPositiveAffineQuotientRootExtremaScalarDocument
+            executable 50
+      scalar <- expectLengthRankingWithin
+        "v23 root-extrema pure scoped deadline"
+        $ rankVerifiedLengthCandidatesWithPolicy scalarPolicy delayedScalar
+            [identity]
+      assertScalarUsableWorkExpiry
+        "v23 root-extrema pure scoped deadline" scalar
+      doesFileExist (executable ++ ".events") >>= (@?= False)
+  readIORef scalarGate >>= (@?= 1)
+
+  if os /= "linux"
+    then pure ()
+    else do
+      withFakeLengthSolver "healthy" $ \executable -> do
+        (pairPolicy, _) <-
+          expectStrictRelationalPositiveAffineQuotientRootExtremaPolicy
+          $ strictRelationalPositiveAffineQuotientRootExtremaPairDocument
+              executable 2000
+        pair <- expectRight =<<
+          rankVerifiedLengthSpinePairCandidatesWithPolicy pairPolicy
+            usableWorkPairLiveContract pairCandidates
+        lengthSpinePairRankingFailure pair @?= Nothing
+        map rankedLengthSpinePairCandidateOriginalIndex
+            (lengthSpinePairRankingCandidates pair) @?= [0, 1, 2, 3]
+        map rankedLengthSpinePairCandidateAssessment
+            (lengthSpinePairRankingCandidates pair) @?=
+          [ LengthSpinePairUnassessed
+          , LengthSpinePairHeuristic Djex.SolverSatisfiable
+          , LengthSpinePairUnassessed
+          , LengthSpinePairHeuristic Djex.SolverSatisfiable
+          ]
+        assertFakeLengthQueryEvents [0, 1] [] =<<
+          BS.readFile (executable ++ ".events")
+
+      withFakeLengthSolver "wrong-echo" $ \executable -> do
+        (scalarPolicy, _) <-
+          expectStrictRelationalPositiveAffineQuotientRootExtremaPolicy
+          $ strictRelationalPositiveAffineQuotientRootExtremaScalarDocument
+              executable 2000
+        scalar <- expectLengthRankingWithin
+          "v23 root-extrema atomic failure"
+          $ rankVerifiedLengthCandidatesWithPolicy scalarPolicy
+              usableWorkScalarLiveContract [identity, identity]
+        map rankedLengthCandidateAssessment
+            (lengthRankingCandidates scalar) @?= [Unassessed, Unassessed]
+        failure <- case lengthRankingFailure scalar of
+          Nothing -> assertFailure
+            "v23 root-extrema discarded its session failure"
+              >> error "unreachable"
+          Just retained -> pure retained
+        lengthRankingFailureClass failure @?=
+          LengthRankingLiveSessionFailed
+            Djex.LengthSMTLibLiveSessionCapabilityRejected
+        lengthRankingFailureOriginalIndex failure @?= Nothing
+        lengthRankingFailureCleanupIncomplete failure @?= False
         assertFakeLengthQueryEvents [] [] =<<
           BS.readFile (executable ++ ".events")
 
@@ -15061,7 +15921,7 @@ assertLengthAssessmentConfigurationFileSpinePairV4Precedence =
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion
       $ setJsonField ["version"]
-          (Json.JInt 23)
+          (Json.JInt 25)
       $ addJsonField [] ("private-root", Json.JNull) base
     let badLegacy = setJsonField ["execution", "executablePath"]
           (Json.JStr "private-relative-z3")
@@ -15287,8 +16147,8 @@ assertLengthAssessmentConfigurationFilePositiveOrderingPrecedence =
     assertLengthAssessmentConfigurationFileError
       LengthRankingConfigurationUnsupportedVersion
       $ setJsonField ["version"]
-          (Json.JInt 23)
-      $ addJsonField [] ("private-v23", Json.JNull) pairBase
+          (Json.JInt 25)
+      $ addJsonField [] ("private-v25", Json.JNull) pairBase
 
     -- New-version precedence repeats the established operational sequence and
     -- inserts the closed ordering choice immediately before the contract.
