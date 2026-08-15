@@ -40,7 +40,7 @@ and is dense by design; read the overview above first.
 ## Contents
 
 - [Startup configuration file](#startup-configuration-file)
-  - [Versions 1 to 30 at a glance](#versions-1-to-30-at-a-glance)
+  - [Versions 1 to 32 at a glance](#versions-1-to-32-at-a-glance)
   - [Activation, pinning, and worker lifecycle](#activation-pinning-and-worker-lifecycle)
   - [Candidate eligibility](#candidate-eligibility)
 - [One-shot contract-only files](#one-shot-contract-only-files)
@@ -61,6 +61,7 @@ and is dense by design; read the overview above first.
   - [Root-extrema consequence extraction](#root-extrema-consequence-extraction)
   - [Root-monus consequence extraction](#root-monus-consequence-extraction)
   - [Boolean finite-union applicable domains](#boolean-finite-union-applicable-domains)
+  - [Atomic branching inside the finite union](#atomic-branching-inside-the-finite-union)
   - [Shared usable-work budget (v1)](#shared-usable-work-budget-v1)
   - [Scoped usable-work lease (v2)](#scoped-usable-work-lease-v2)
   - [Counterexample simplification](#counterexample-simplification)
@@ -83,6 +84,7 @@ and is dense by design; read the overview above first.
   - [Startup versions 25 and 26: root-monus consequences](#startup-versions-25-and-26-root-monus-consequences)
   - [Startup versions 27 and 28: execve-check executable access](#startup-versions-27-and-28-execve-check-executable-access)
   - [Startup versions 29 and 30: Boolean finite-union applicable domains](#startup-versions-29-and-30-boolean-finite-union-applicable-domains)
+  - [Startup versions 31 and 32: atomic-branching finite unions](#startup-versions-31-and-32-atomic-branching-finite-unions)
 - [Pair contracts, decoders, and reports](#pair-contracts-decoders-and-reports)
   - [Using a contract-only version 6 document with `:synth`](#using-a-contract-only-version-6-document-with-synth)
   - [Pair contract grammar and validation order](#pair-contract-grammar-and-validation-order)
@@ -91,11 +93,11 @@ and is dense by design; read the overview above first.
 
 ## Startup configuration file
 
-### Versions 1 to 30 at a glance
+### Versions 1 to 32 at a glance
 
 Finite-list-spine Length counterexample ranking is disabled by default. To opt
 in, pass `--length-ranking-config` with an explicitly chosen absolute path to
-a version-1 through version-30 configuration file. Versions 1--3 select scalar
+a version-1 through version-32 configuration file. Versions 1--3 select scalar
 finite-list-spine Length ranking. Version 1 preserves the established
 counterexample-only behavior. Version 2 additionally requires an explicit
 per-input finite box and enables independent bounded validation after a live
@@ -203,6 +205,15 @@ per-branch rules and closure inspections, retained canonical boxes, raw box
 visits, input width, and the deduplicated assignment set. It represents an
 exact antichain of zero-origin boxes and never substitutes a componentwise
 hull.
+Version 31 is the scalar atomic-branching finite-union successor and version
+32 is its nominal product sibling. They retain the complete v29/v30 JSON and
+operational profile and replace only the applicable-domain strategy with
+`"strict-relational-positive-affine-quotient-root-extrema-monus-boolean-finite-union-atomic-branching-v1"`.
+The same eight-field object is retained; its generated-branch limit now counts
+the Cartesian product of formula-DNF branches and exact alternatives for one
+immediate binary root extremum or may-zero root monus before Boolean cleanup.
+Surviving incomparable boxes remain an exact union; the strategy never
+manufactures a hull or rewrites the checked precondition.
 
 ### Activation, pinning, and worker lifecycle
 
@@ -211,9 +222,9 @@ once at startup, requires the configuration to contain an executable SHA-256
 expectation by default, and retains the decoded contract selection as a fixed
 process-wide assertion. Presence at activation is not a digest match; Djex
 compares the expectation only when an eligible batch later opens a worker.
-V1--v16 use the bounded pre-spawn pathname observation; v17--v30 compare it
-with the sealed staged main image selected for descriptor execution. V21--v30
-add the two point-in-time source VFS execute-access observations. V27--v30 also
+V1--v16 use the bounded pre-spawn pathname observation; v17--v32 compare it
+with the sealed staged main image selected for descriptor execution. V21--v32
+add the two point-in-time source VFS execute-access observations. V27--v32 also
 add two point-in-time source kernel executable checks and one staged-image
 check; none is a reservation or complete future execution decision.
 `--length-ranking-allow-unpinned` is a separate explicit relaxation;
@@ -222,7 +233,7 @@ budget (default 5,000 ms, maximum 60,000 ms). No option discovers a file or
 solver. POSIX configuration-file descriptor acquisition is implemented;
 Windows currently fails
 closed. Versions 1--6 and the established direct runners open one fresh lexical
-solver worker for every eligible batch. Versions 7--30 instead complete all
+solver worker for every eligible batch. Versions 7--32 instead complete all
 admission and preparation, then run each candidate's pure MRU, selected
 positive-affine domain, and origin prefix before IO: an all-pure batch opens no
 process, while
@@ -230,7 +241,7 @@ the first live miss opens one lexical session for that query and the remaining
 suffix. V9/v10 additionally capture one shared usable-work deadline after the
 64-candidate admission gate and before full preparation, so deferred pure work,
 opening, and every live query consume one window instead of receiving a fresh
-batch allowance per query. V13--v30 capture the corresponding dynamically
+batch allowance per query. V13--v32 capture the corresponding dynamically
 scoped v2 owner at the same boundary and add cooperative checkpoints after
 preparation, each complete candidate chain, and result materialization. Any
 structured failure preserves callback order through the established atomic
@@ -957,6 +968,100 @@ remain unchanged. See the
 and Djex's
 [Boolean finite-union applicable-domain report](../lib/Djex/docs/reports/2026-08-15-boolean-finite-union-length-applicable-domain.md).
 
+### Atomic branching inside the finite union
+
+The ninth mutually exclusive strategy retains that complete Boolean union and
+opens exact alternatives for one immediate binary root extremum or may-zero
+root monus inside a signed atomic leaf:
+
+```haskell
+let atomicBranchingPolicy =
+      enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainValidation
+        applicableDomainLimits booleanFiniteUnionLimits finiteUnionScopedPolicy
+
+scalarAssessment <- assessVerifiedLengthCandidatesWithPolicy
+  atomicBranchingPolicy scalarAtomicBranchingContract verificationBatch
+
+pairAssessment <- assessVerifiedLengthSpinePairCandidatesWithPolicy
+  atomicBranchingPolicy pairAtomicBranchingContract verificationBatch
+```
+
+For normalized positive-affine children `A` and `B` and opposite operand `C`,
+the extremum alternatives are exactly:
+
+```text
+C <= max(A,B)      -> [C<=A] | [C<=B]
+min(A,B) <= C      -> [A<=C] | [B<=C]
+not(max(A,B)<=C)   -> [C+1<=A] | [C+1<=B]
+not(C<=min(A,B))   -> [A+1<=C] | [B+1<=C]
+max(A,B)=C         -> [A<=C,B<=C,C<=A] | [A<=C,B<=C,C<=B]
+min(A,B)=C         -> [C<=A,C<=B,A<=C] | [C<=A,C<=B,B<=C]
+```
+
+The root may occur on either equality side. Alternatives always follow the
+normalized first child then the second, and each displayed rule sequence is
+literal: equal or extensionally duplicate rules are not removed. The four
+already exact predecessor extremum orientations stay singleton alternatives.
+
+For `M = A monus B = max(A-B,0)` and a nonconstant positive-affine `C` which
+may be zero, the new zero-first alternatives are:
+
+```text
+C <= M        -> [C<=0] | [B+C<=A]
+M = C, C = M  -> [A<=B+C,C<=0] | [A<=B+C,B+C<=A]
+```
+
+The common equality rule `A<=B+C` remains first, including in the zero branch;
+it is not simplified to `A<=B`. Constant-positive and identically-zero
+opposites, and every already exact monus orientation, retain the root-monus
+predecessor's singleton behavior.
+
+Djex first builds formula-polarity DNF, then lazily counts the complete
+formula-DNF by per-atom-alternative Cartesian product under the existing
+generated-branch cap. This happens before complement removal, deduplication,
+or absorption: two binary atoms in one conjunction count four raw witnesses,
+and the characterized negated-equality case counts three. After admission it
+canonicalizes sets of the *original checked literals*, traverses those sets in
+`Set` order, and re-expands each literal into explicit ignored,
+contradictory, or ordered-rule alternatives. It manufactures no replacement
+formula, canonicalizes no proof-rule set, and assigns rule/closure failure
+indices in that expanded canonical stream.
+
+The existing limits and failures are unchanged. An extremum equality needs
+three rules per alternative and a may-zero monus equality needs two; configured
+caps of two and one therefore observe three and two. The default rule ceiling
+remains 64 and a 65th rule reports bounded observation 65. Input, generated-
+branch, rule, closure, retained-box, value, visit, and unique-assignment limits
+remain ordinary admission misses. Evaluation, invariant, association,
+forcing, live, and finalization failures retain indexed or batch-wide atomic
+fallback through the existing Boolean finite-union failure constructors.
+
+Closure, zero-origin box antichain construction, global lexicographic replay,
+preference, simplification, MRU, and scoped/deferred execution are the literal
+finite-union predecessor. Thus `min(x,y)<=1`, `x<=3`, `y<=3` yields
+`[[1,3],[3,1]]`, 16 visits, and 12 unique/applicable assignments rather than
+the hull `[3,3]`. Likewise `x <= (3 monus y)`, `y<=4` yields
+`[[0,4],[3,3]]`, 21 visits, 17 unique assignments, and 11 applicable
+assignments; equality retains the same cover with five applicable assignments.
+The original checked precondition, never an alternative proof summary, decides
+applicability during replay.
+
+Only complete query-owned replay releases
+`StrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainEstablished`
+or its nominal product sibling
+`LengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainEstablished`.
+Their bounded 384-character renderers are
+`renderLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainValidationNote`
+and
+`renderLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainValidationNote`.
+The fresh scalar and pair receipt tags distinguish evidence and presentation
+only. They alter no contract, problem, query, wire, fingerprint, association,
+execution policy, worker, run, or scoped-owner identity, and grant neither Z3
+proof nor pruning authority. See the
+[atomic-branching Length ranking report](reports/2026-08-15-atomic-branching-length-ranking.md)
+and Djex's
+[atomic-branching applicable-domain report](../lib/Djex/docs/reports/2026-08-15-atomic-branching-length-applicable-domain.md).
+
 ### Shared usable-work budget (v1)
 
 The runtime-unscoped v1 shared usable-work policy is a further orthogonal
@@ -1114,7 +1219,7 @@ violation, retains the original receipt and makes no simplification claim.  A
 bounded evaluation rejection during an optional earlier trial does the same;
 structural, anchor, internal, and association failures remain indexed atomic
 failures. This policy is disabled by every established direct runner and
-startup version 1 through 6, while startup versions 7 through 30 require it.
+startup version 1 through 6, while startup versions 7 through 32 require it.
 It is bounded componentwise-lexicographic
 simplification, not global minimality, pruning authority, or a new conclusion
 from Z3.
@@ -3279,9 +3384,9 @@ limits, applicable-domain preference, simplification, deferred opening,
 scoped-v2 budget, and scalar-v5 or pair-v5 contract retain their v25/v26
 order. The generalized dispatcher reaches v27/v28 only after the complete
 v1--v26 cascade returns `UnsupportedVersion`; v29/v30 are reached only by the
-later Boolean finite-union decoder. Every v1--v26 entrance remains literal and rejects the
-new version, member, or launch literal wherever its closed schema does not
-admit it.
+later Boolean finite-union decoder, and v31/v32 only by its atomic-branching
+successor. Every v1--v26 entrance remains literal and rejects the new version,
+member, or launch literal wherever its closed schema does not admit it.
 
 Loading, activation, and policy construction remain pure. An all-pure deferred
 batch opens no source descriptor, invokes no access checker, creates no staged
@@ -3505,9 +3610,10 @@ bounded-positive preference, the eight-field applicable-domain object,
 applicable-domain preference, simplification, deferred opening, scoped-v2
 budget, then scalar-v5 or pair-v5 contract. The generalized dispatcher reaches
 v29/v30 only after the complete v1--v28 cascade returns
-`UnsupportedVersion`; version 31 is the next unsupported sentinel. Every
-v1--v28 route remains literal and rejects the new version or strategy where
-its closed schema does not admit it.
+`UnsupportedVersion`; v31/v32 are reached only by the later atomic-branching
+decoder, and version 33 is the next unsupported sentinel. Every v1--v28 route
+remains literal and rejects the new versions or strategies where its closed
+schema does not admit them.
 
 Configuration loading, activation, and policy construction remain pure. An
 all-pure deferred batch still captures and checks its scoped deadline clock,
@@ -3541,6 +3647,218 @@ ready-worker, fresh/shared/scoped query-run, or scoped-owner identities. Their
 authority is exactly the canonical finite union replayed under the checked
 contract; it is neither a componentwise hull, a general Boolean solver, a Z3
 proof, a global theorem, nor pruning authority.
+
+### Startup versions 31 and 32: atomic-branching finite unions
+
+Startup v31 and v32 retain the complete v29/v30 root, eight-field applicable-
+domain object,
+execve-check launch, scoped-v2 budget, deferred lifecycle, preference,
+simplification, and scalar-v5 or pair-v5 contract. They replace only the
+applicable-domain strategy. Their constants are
+`lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingVersion`
+(31) and
+`lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingVersion`
+(32). Programmatic callers select the same strategy with
+`enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainValidation`.
+
+The complete scalar v31 document is the v29 document with only `version` and
+`strategy` changed:
+
+```json
+{
+  "format": "leant-live-length-ranking-configuration",
+  "version": 31,
+  "executionAdmission": {
+    "executablePathCharacters": 4096,
+    "policyFingerprintBytes": 262144
+  },
+  "execution": {
+    "executablePath": "/absolute/path/to/z3",
+    "expectedExecutableSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "solverTimeoutMilliseconds": 1000,
+    "solverResourceLimit": 100000,
+    "hostDeadlineMilliseconds": 1500,
+    "artifactPolicy": "input-values-after-satisfiable",
+    "responseLimits": {
+      "bytes": 65536,
+      "nestingDepth": 64,
+      "nodes": 4096,
+      "tokenBytes": 4096,
+      "integerBits": 4096
+    },
+    "executableLaunch": "descriptor-bound-execve-check-executable-access-v1"
+  },
+  "evaluation": {
+    "assignmentValueBits": 4096,
+    "intermediateValueBits": 4096
+  },
+  "inputBoxValidation": {
+    "inclusiveInputMaximums": [5, 5],
+    "maximumAssignments": 36
+  },
+  "counterexampleProbe": "origin-before-live",
+  "boundedPositiveOrdering": "prefer-non-vacuous",
+  "applicableDomainValidation": {
+    "strategy": "strict-relational-positive-affine-quotient-root-extrema-monus-boolean-finite-union-atomic-branching-v1",
+    "maximumInputs": 2,
+    "maximumGeneratedBranches": 4,
+    "maximumRulesPerBranch": 4,
+    "maximumClosureInspectionsPerBranch": 4,
+    "maximumRetainedBoxes": 2,
+    "maximumAssignmentVisits": 20,
+    "maximumAssignments": 20
+  },
+  "applicableDomainOrdering": "prefer-non-vacuous",
+  "counterexampleSimplification": {
+    "strategy": "componentwise-lexicographic-v1",
+    "maximumInputs": 2,
+    "maximumAssignments": 36
+  },
+  "liveSessionOpening": "defer-until-live-query",
+  "usableWorkBudget": {
+    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
+    "milliseconds": 30000
+  },
+  "contract": {
+    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
+    "targetArgumentRoles": ["observed-spine", "observed-spine"],
+    "candidateCasePolicy": "cases-rejected",
+    "precondition": [
+      "all",
+      [
+        ["not", ["at-most", ["literal", 5], ["input", 0]]],
+        ["not", ["at-most", ["input", 0], ["input", 1]]]
+      ]
+    ],
+    "postcondition": ["equal", ["result"], ["input", 0]],
+    "providerLaws": []
+  }
+}
+```
+
+The complete nominal pair v32 document is the v30 document with only those
+same two values changed:
+
+```json
+{
+  "format": "leant-live-length-ranking-configuration",
+  "version": 32,
+  "executionAdmission": {
+    "executablePathCharacters": 4096,
+    "policyFingerprintBytes": 262144
+  },
+  "execution": {
+    "executablePath": "/absolute/path/to/z3",
+    "expectedExecutableSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "solverTimeoutMilliseconds": 1000,
+    "solverResourceLimit": 100000,
+    "hostDeadlineMilliseconds": 1500,
+    "artifactPolicy": "input-values-after-satisfiable",
+    "responseLimits": {
+      "bytes": 65536,
+      "nestingDepth": 64,
+      "nodes": 4096,
+      "tokenBytes": 4096,
+      "integerBits": 4096
+    },
+    "executableLaunch": "descriptor-bound-execve-check-executable-access-v1"
+  },
+  "evaluation": {
+    "assignmentValueBits": 4096,
+    "intermediateValueBits": 4096
+  },
+  "inputBoxValidation": {
+    "inclusiveInputMaximums": [4],
+    "maximumAssignments": 5
+  },
+  "counterexampleProbe": "origin-before-live",
+  "boundedPositiveOrdering": "prefer-non-vacuous",
+  "applicableDomainValidation": {
+    "strategy": "strict-relational-positive-affine-quotient-root-extrema-monus-boolean-finite-union-atomic-branching-v1",
+    "maximumInputs": 1,
+    "maximumGeneratedBranches": 2,
+    "maximumRulesPerBranch": 2,
+    "maximumClosureInspectionsPerBranch": 2,
+    "maximumRetainedBoxes": 1,
+    "maximumAssignmentVisits": 4,
+    "maximumAssignments": 3
+  },
+  "applicableDomainOrdering": "prefer-non-vacuous",
+  "counterexampleSimplification": {
+    "strategy": "componentwise-lexicographic-v1",
+    "maximumInputs": 1,
+    "maximumAssignments": 9
+  },
+  "liveSessionOpening": "defer-until-live-query",
+  "usableWorkBudget": {
+    "strategy": "scoped-checkpointed-shared-usable-work-deadline-v2",
+    "milliseconds": 30000
+  },
+  "contract": {
+    "resultShape": "binary-prod-spines-v1",
+    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
+    "targetArgumentRoles": ["observed-spine"],
+    "candidateCasePolicy": "cases-rejected",
+    "precondition": [
+      "not",
+      [
+        "at-most",
+        ["sum", [["input", 0], ["literal", 3]]],
+        ["scale", 2, ["input", 0]]
+      ]
+    ],
+    "postcondition": [
+      "all",
+      [
+        ["equal", ["result", "first"], ["input", 0]],
+        ["equal", ["result", "second"],
+          ["quotient", 2, ["input", 0]]]
+      ]
+    ],
+    "providerLaws": []
+  }
+}
+```
+
+The applicable-domain object still has exactly eight members in this demand
+order: strategy, maximum inputs, generated branches, rules per branch, closure
+inspections per branch, retained boxes, assignment visits, and unique
+assignments. The numeric caps remain 8, 256, 64, 4096, 256, 262144, and
+65536, with the same negative and cap-plus-one diagnostics and the same
+defensive checked-builder error. The full root and nested validation order is
+literal v29/v30. The generalized decoder reaches v31/v32 only after the
+complete v1--v30 cascade returns `UnsupportedVersion`; version 33 is the next
+unsupported sentinel. Every v1--v30 decoder and closed strategy literal
+remains unchanged.
+
+The scalar assessment is
+`StrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainEstablished`;
+the pair assessment is
+`LengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainEstablished`.
+They use the two matching atomic-branching renderers. The strategy reuses
+`LengthRankingBooleanFiniteUnionApplicableDomainValidationFailed` and
+`LengthSpinePairRankingBooleanFiniteUnionApplicableDomainValidationFailed`,
+including the predecessor's ordinary-admission and indexed atomic-failure
+classification.
+
+Loading, activation, builder composition, and the new finite-union validation
+remain pure. Every all-pure v31/v32 batch still captures and checks the
+scoped-v2 deadline clock but opens no descriptor, performs no source or staged
+access check, stages no image, and launches no worker. A later live miss
+inherits v29/v30's complete execve-check launch and scoped lifecycle.
+Non-vacuous receipts enter the existing preferred partition, vacuous receipts
+remain neutral, counterexamples use the common simplification/MRU path, and
+any operational or forcing failure restores literal original order.
+
+V31/v32 add only fresh scalar/product receipt schema identities and their
+evidence/presentation branches. They change no checked contract, behavioral
+problem, query, SMT-LIB bytes, fingerprint, association, executable policy,
+process, ready worker, fresh/shared/scoped run, or scoped-owner identity. Their
+authority is exact bounded replay of the canonical union under the original
+formula—not a hull, solver proof, global theorem, or pruning grant. See the
+[atomic-branching Length ranking report](reports/2026-08-15-atomic-branching-length-ranking.md)
+and Djex's
+[atomic-branching applicable-domain report](../lib/Djex/docs/reports/2026-08-15-atomic-branching-length-applicable-domain.md).
 
 ## Pair contracts, decoders, and reports
 
@@ -3576,9 +3894,9 @@ required, and its case policy is exactly `"cases-rejected"` or
 ### Decoder compatibility and reports
 
 The old scalar decoders remain exact compatibility entrances: the startup
-decoder for versions 1--3 rejects v4--v30, and the contract-only decoder for
+decoder for versions 1--3 rejects v4--v32, and the contract-only decoder for
 versions 1--5 rejects v6. The generalized decoders delegate those old versions
-to their unchanged scalar paths and add startup v4--v30 or contract-only v6. A
+to their unchanged scalar paths and add startup v4--v32 or contract-only v6. A
 product file selects which nominal runner Main calls; it does not infer a
 contract from the Lean type, bypass the exact canonical-`Prod` handoff, turn
 solver status into evidence, or grant pruning authority. See the
@@ -3632,6 +3950,10 @@ authority are recorded in the
 The v29/v30 bounded Boolean DNF, canonical box union, admission and atomic
 failure routes, nominal assessments, and no-hull authority are recorded in the
 [Boolean finite-union Length ranking report](reports/2026-08-15-boolean-finite-union-length-ranking.md).
+The v31/v32 atomic alternative laws, complete raw-product cap, reused limits
+and errors, nominal receipts, inherited lifecycle, and identity-only extension
+are recorded in the
+[atomic-branching Length ranking report](reports/2026-08-15-atomic-branching-length-ranking.md).
 Djex's underlying strict extraction boundary is in its
 [strict relational positive-affine applicable-domain report](../lib/Djex/docs/reports/2026-08-15-strict-relational-positive-affine-length-applicable-domain.md).
 The quotient-consequence extraction, receipt, authority, and identity boundary
@@ -3646,6 +3968,10 @@ replay precedence, receipt authority, and identity boundary are in Djex's
 Djex's signed DNF, branch and box antichains, bounded closure, exact union
 replay, and receipt authority are recorded in the
 [Boolean finite-union applicable-domain report](../lib/Djex/docs/reports/2026-08-15-boolean-finite-union-length-applicable-domain.md).
+Djex's exact root-extrema and may-zero-monus alternatives, raw-product
+admission, ordered original-literal expansion, no-hull replay, and fresh
+receipt tags are recorded in the
+[atomic-branching applicable-domain report](../lib/Djex/docs/reports/2026-08-15-atomic-branching-length-applicable-domain.md).
 Djex's underlying two-point source-access and sealed-image execution authority
 is recorded in the
 [effective-ID descriptor-bound Z3 launch report](../lib/Djex/docs/reports/2026-08-15-effective-id-descriptor-bound-z3-launch.md).
@@ -3691,12 +4017,17 @@ Boolean finite-union assessments use
 `renderLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainValidationNote`
 or
 `renderLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainValidationNote`.
+Atomic-branching finite-union assessments use
+`renderLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainValidationNote`
+or
+`renderLengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainValidationNote`.
 Main's v7--v10 path can produce only the literal-ceiling positive-affine receipt
 family; v11--v14 can produce only the relational family; v15--v18 can produce
 only the strict-relational family; v19--v22 can produce only the root-quotient
 successor family; v23/v24 can produce only the root-extrema successor family;
 v25--v28 can produce only the root-monus successor family; v29/v30 can produce
-only the Boolean finite-union successor family; v1--v6 cannot produce
+only the Boolean finite-union successor family; v31/v32 can produce only the
+atomic-branching finite-union successor family; v1--v6 cannot produce
 any applicable-domain family. The semantic note
 never projects the receipt's private provider-name list. Disabled assessment,
 rejected input, heuristic status,
