@@ -7,9 +7,11 @@ Date: 2026-08-13
 > limited to process/evaluation and optional origin/box orchestration policy;
 > the request supplies a nominal pair contract and all resulting query,
 > evidence, failure, assessment, and presentation authority remains pair-
-> specific. Product startup version 4 and contract-only version 6 remain
-> deferred. See the
-> [live binary-product Length ranking report](2026-08-14-live-binary-product-length-ranking.md).
+> specific. Main now exposes that reuse through product startup version 4 and
+> contract-only version 6. See the
+> [live binary-product Length ranking report](2026-08-14-live-binary-product-length-ranking.md)
+> and the
+> [binary-product Length configuration report](2026-08-14-binary-product-length-configuration.md).
 
 ## Outcome
 

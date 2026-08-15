@@ -15,6 +15,7 @@ module Leant.Synth.Length.Configuration.File.Acquire
   , LengthRankingConfigurationFileLoadError
   , mkLengthRankingConfigurationFileRequest
   , loadLengthRankingConfigurationFile
+  , loadLengthAssessmentConfigurationFile
   , lengthRankingConfigurationFileLoadErrorClass
   , lengthRankingConfigurationFileLoadCleanupIncomplete
   ) where
@@ -24,7 +25,9 @@ import Numeric.Natural (Natural)
 import Leant.Json.Bounded (BoundedJsonLimits (..))
 import Leant.Synth.Length.Configuration.File
   ( DisabledLengthRankingConfiguration
+  , DisabledLengthAssessmentConfiguration
   , LengthRankingConfigurationFileError
+  , decodeLengthAssessmentConfigurationFile
   , decodeLengthRankingConfigurationFile
   , lengthRankingConfigurationFileJsonLimits
   )
@@ -131,6 +134,24 @@ loadLengthRankingConfigurationFile
   loaded <- loadLengthFile
     lengthRankingConfigurationFileLoadMaximumBytes
     decodeLengthRankingConfigurationFile
+    request
+  pure $ case loaded of
+    Left failure -> Left $ mapLoadError failure
+    Right value -> Right value
+
+-- | Load the additive scalar-or-product startup selection through the exact
+-- same admitted request and acquisition boundary as the scalar facade.
+loadLengthAssessmentConfigurationFile
+  :: LengthRankingConfigurationFileRequest
+  -> IO
+      (Either
+        LengthRankingConfigurationFileLoadError
+        DisabledLengthAssessmentConfiguration)
+loadLengthAssessmentConfigurationFile
+    (LengthRankingConfigurationFileRequest request) = do
+  loaded <- loadLengthFile
+    lengthRankingConfigurationFileLoadMaximumBytes
+    decodeLengthAssessmentConfigurationFile
     request
   pure $ case loaded of
     Left failure -> Left $ mapLoadError failure

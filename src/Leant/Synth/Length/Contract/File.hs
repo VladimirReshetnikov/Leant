@@ -6,9 +6,10 @@
 -- process policy. Version 1 reuses the exact compatibility grammar; version 2
 -- adds positive-literal Natural modulo; version 3 additionally requires an
 -- exact source-ordered target-role vector; version 4 requires the exact-case
--- policy; and version 5 adds positive-literal Natural quotient while requiring
--- an explicit case choice. Names, provider roles, target roles, case semantics,
--- and resource limits therefore cannot drift.
+-- policy; version 5 adds positive-literal Natural quotient while requiring
+-- an explicit case choice; and version 6 selects a nominal binary-product
+-- result with two independently addressable spines. Names, provider roles,
+-- target roles, case semantics, and resource limits therefore cannot drift.
 module Leant.Synth.Length.Contract.File
   ( lengthContractFileFormat
   , lengthContractFileVersion
@@ -16,11 +17,13 @@ module Leant.Synth.Length.Contract.File
   , lengthContractFileTargetRolesVersion
   , lengthContractFileExactCaseVersion
   , lengthContractFileQuotientVersion
+  , lengthContractFileSpinePairVersion
   , lengthContractFileJsonLimits
   , LengthContractFileField (..)
   , LengthContractFileValueType (..)
   , LengthContractFileError (..)
   , decodeLengthContractFile
+  , decodeLengthContractSelectionFile
   ) where
 
 import Data.ByteString (ByteString)
@@ -41,9 +44,13 @@ import Leant.Synth.Length.Configuration.File
   , decodeLeanLengthContractValueV3
   , decodeLeanLengthContractValueV4
   , decodeLeanLengthContractValueV5
+  , decodeLeanLengthSpinePairContractValueV5
   , lengthRankingConfigurationFileJsonLimits
   )
-import Leant.Synth.Length.Contract (LeanLengthContract)
+import Leant.Synth.Length.Contract
+  ( LeanLengthContract
+  , LeanLengthContractSelection (..)
+  )
 
 lengthContractFileFormat :: Text
 lengthContractFileFormat = "leant-finite-list-spine-length-contract"
@@ -75,6 +82,12 @@ lengthContractFileExactCaseVersion = 4
 -- case-rejecting or exact zero/step policy without changing startup version 1.
 lengthContractFileQuotientVersion :: Natural
 lengthContractFileQuotientVersion = 5
+
+-- | Contract-only version 6 retains version 5's arithmetic, roles, explicit
+-- case policy, and provider-law grammar while selecting a canonical binary
+-- product whose two result spines remain nominally distinct.
+lengthContractFileSpinePairVersion :: Natural
+lengthContractFileSpinePairVersion = 6
 
 -- | The contract-only format deliberately uses the compatibility grammar's
 -- complete parser ceiling.  More specific contract limits still win at their
@@ -154,6 +167,58 @@ decodeLengthContractFile bytes = do
       LengthContractFileContractField LengthContractFileObjectValue
   either (Left . LengthContractFileContractRejected) Right
     $ decoder contractValue
+ where
+  permitted name = name `elem` ["format", "version", "contract"]
+
+-- | Decode either supported passive contract domain.  Established scalar
+-- files and diagnostics come directly from 'decodeLengthContractFile'; only
+-- its unsupported-version sentinel admits the additive version-6 parser.
+decodeLengthContractSelectionFile
+  :: ByteString
+  -> Either LengthContractFileError LeanLengthContractSelection
+decodeLengthContractSelectionFile bytes = case decodeLengthContractFile bytes of
+  Right contract -> Right $ LeanLengthScalarContractSelection contract
+  Left LengthContractFileUnsupportedVersion ->
+    decodeLengthContractSelectionFileSpinePairV6 bytes
+  Left failure -> Left failure
+
+decodeLengthContractSelectionFileSpinePairV6
+  :: ByteString
+  -> Either LengthContractFileError LeanLengthContractSelection
+decodeLengthContractSelectionFileSpinePairV6 bytes = do
+  document <- either (Left . LengthContractFileJsonRejected) Right
+    $ parseBoundedJson lengthContractFileJsonLimits bytes
+  root <- case document of
+    BoundedJsonObject fields -> Right fields
+    _ -> Left LengthContractFileExpectedRootObject
+  formatValue <- requiredField LengthContractFileFormatField "format" root
+  format <- case formatValue of
+    BoundedJsonString value -> Right value
+    _ -> Left $ LengthContractFileFieldTypeMismatch
+      LengthContractFileFormatField LengthContractFileStringValue
+  if format == lengthContractFileFormat
+    then pure ()
+    else Left LengthContractFileUnsupportedFormat
+  versionValue <- requiredField LengthContractFileVersionField "version" root
+  version <- case versionValue of
+    BoundedJsonInteger value -> Right value
+    _ -> Left $ LengthContractFileFieldTypeMismatch
+      LengthContractFileVersionField LengthContractFileIntegerValue
+  if version == toInteger lengthContractFileSpinePairVersion
+    then pure ()
+    else Left LengthContractFileUnsupportedVersion
+  case find (not . permitted . fst) root of
+    Nothing -> pure ()
+    Just _ -> Left LengthContractFileUnexpectedRootField
+  contractValue <- requiredField
+    LengthContractFileContractField "contract" root
+  case contractValue of
+    BoundedJsonObject _ -> pure ()
+    _ -> Left $ LengthContractFileFieldTypeMismatch
+      LengthContractFileContractField LengthContractFileObjectValue
+  contract <- either (Left . LengthContractFileContractRejected) Right
+    $ decodeLeanLengthSpinePairContractValueV5 contractValue
+  pure $ LeanLengthSpinePairContractSelection contract
  where
   permitted name = name `elem` ["format", "version", "contract"]
 

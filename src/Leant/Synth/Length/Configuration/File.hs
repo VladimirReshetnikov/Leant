@@ -19,6 +19,7 @@ module Leant.Synth.Length.Configuration.File
   , lengthRankingConfigurationFileVersion
   , lengthRankingConfigurationFileInputBoxVersion
   , lengthRankingConfigurationFileOriginProbeVersion
+  , lengthRankingConfigurationFileSpinePairVersion
   , lengthRankingConfigurationFileJsonLimits
   , LengthRankingConfigurationFileObject (..)
   , LengthRankingConfigurationFileField (..)
@@ -29,16 +30,20 @@ module Leant.Synth.Length.Configuration.File
   , LengthRankingConfigurationSyntaxError (..)
   , LengthRankingConfigurationFileError (..)
   , DisabledLengthRankingConfiguration
+  , DisabledLengthAssessmentConfiguration
   , LengthRankingConfigurationActivationPolicy (..)
   , LengthRankingConfigurationActivationError (..)
   , decodeLengthRankingConfigurationFile
+  , decodeLengthAssessmentConfigurationFile
   , decodeLeanLengthContractValue
   , decodeLeanLengthContractValueV2
   , decodeLeanLengthContractValueV3
   , decodeLeanLengthContractValueV4
   , decodeLeanLengthContractValueV5
+  , decodeLeanLengthSpinePairContractValueV5
   , disableLengthRankingConfiguration
   , activateLengthRankingConfiguration
+  , activateLengthAssessmentConfiguration
   ) where
 
 import Data.ByteString (ByteString)
@@ -62,6 +67,9 @@ import Language.Haskell.Djex
   , LengthInputBoxLimits
   , LengthProviderArgumentRole (..)
   , LengthProviderVariable (..)
+  , LengthSpinePairComponent (..)
+  , LengthSpinePairContractSource (..)
+  , LengthSpinePairContractVariable (..)
   , LengthTargetArgumentRole (..)
   , LengthSMTLibArtifactPolicy (..)
   , LengthSMTLibExecutionConfigError
@@ -89,8 +97,10 @@ import Leant.Json.Bounded
 import Leant.Synth.Length.Contract
   ( LeanLengthContract (..)
   , LeanLengthCandidateCasePolicy (..)
+  , LeanLengthContractSelection (..)
   , LeanLengthProviderLaw (..)
   , LeanLengthSpineIdentity (..)
+  , LeanLengthSpinePairContract (..)
   )
 import Leant.Synth.Length.Configuration
   ( LengthRankingPolicy
@@ -116,6 +126,11 @@ lengthRankingConfigurationFileInputBoxVersion = 2
 -- explicit query-owned origin probe before live execution.
 lengthRankingConfigurationFileOriginProbeVersion :: Natural
 lengthRankingConfigurationFileOriginProbeVersion = 3
+
+-- | Additive startup grammar for canonical binary-product finite-spine
+-- results.  Versions 1--3 retain their literal scalar-only decoder.
+lengthRankingConfigurationFileSpinePairVersion :: Natural
+lengthRankingConfigurationFileSpinePairVersion = 4
 
 -- | Fixed admission policy for the v1 document itself.  The array maximum is
 -- one greater than the widest typed collection so maximum-plus-one reaches the
@@ -185,6 +200,7 @@ data LengthRankingConfigurationFileField
   | LengthRankingConfigurationProviderLawTransferField !Natural
   | LengthRankingConfigurationTargetArgumentRolesField
   | LengthRankingConfigurationCandidateCasePolicyField
+  | LengthRankingConfigurationResultShapeField
   deriving (Eq, Ord, Show)
 
 data LengthRankingConfigurationFileValueType
@@ -280,6 +296,16 @@ data DisabledLengthRankingConfiguration =
     !LengthRankingPolicy
     LeanLengthContract
 
+-- | Additive disabled startup selection.  The scalar branch retains the
+-- established opaque value wholesale; the pair branch has the same strict
+-- validated-policy and lazy passive-contract boundary.
+data DisabledLengthAssessmentConfiguration
+  = DisabledLengthScalarAssessmentConfiguration
+      !DisabledLengthRankingConfiguration
+  | DisabledLengthSpinePairAssessmentConfiguration
+      !LengthRankingPolicy
+      LeanLengthSpinePairContract
+
 -- | Retain an already validated policy beside one passive contract assertion
 -- without granting permission to execute it.  The strict policy and lazy
 -- contract fields match the compatibility-file decoder's demand boundary.
@@ -320,6 +346,33 @@ activateLengthRankingConfiguration policy
         Right (rankingPolicy, contract)
   PermitUnpinnedExecutable -> Right (rankingPolicy, contract)
 
+-- | Activate either supported startup domain under the same explicit digest
+-- decision.  Scalar activation delegates to the established function.
+activateLengthAssessmentConfiguration
+  :: LengthRankingConfigurationActivationPolicy
+  -> DisabledLengthAssessmentConfiguration
+  -> Either
+      LengthRankingConfigurationActivationError
+      (LengthRankingPolicy, LeanLengthContractSelection)
+activateLengthAssessmentConfiguration policy disabled = case disabled of
+  DisabledLengthScalarAssessmentConfiguration scalar -> do
+    (rankingPolicy, contract) <-
+      activateLengthRankingConfiguration policy scalar
+    pure (rankingPolicy, LeanLengthScalarContractSelection contract)
+  DisabledLengthSpinePairAssessmentConfiguration rankingPolicy contract ->
+    case policy of
+      RequirePinnedExecutable ->
+        case lengthRankingPolicyExecutableDigestExpectation rankingPolicy of
+          LengthSMTLibExecutableDigestExpectationAbsent ->
+            Left LengthRankingConfigurationExecutablePinRequired
+          LengthSMTLibExecutableDigestExpectationPresent ->
+            Right
+              ( rankingPolicy
+              , LeanLengthSpinePairContractSelection contract
+              )
+      PermitUnpinnedExecutable -> Right
+        (rankingPolicy, LeanLengthSpinePairContractSelection contract)
+
 decodeLengthRankingConfigurationFile
   :: ByteString
   -> Either
@@ -353,6 +406,51 @@ decodeLengthRankingConfigurationFile bytes = do
           toInteger lengthRankingConfigurationFileOriginProbeVersion
         then decodeLengthRankingConfigurationFileOriginProbeV3 root
         else Left LengthRankingConfigurationUnsupportedVersion
+
+-- | Decode the additive domain-selecting startup grammar.  Every established
+-- scalar success and every scalar diagnostic except the closed unsupported-
+-- version sentinel is returned by the old decoder itself.  Only that sentinel
+-- permits a second bounded parse, which accepts exactly version 4.
+decodeLengthAssessmentConfigurationFile
+  :: ByteString
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthAssessmentConfigurationFile bytes =
+  case decodeLengthRankingConfigurationFile bytes of
+    Right scalar -> Right
+      $ DisabledLengthScalarAssessmentConfiguration scalar
+    Left LengthRankingConfigurationUnsupportedVersion ->
+      decodeLengthAssessmentConfigurationFileSpinePairV4 bytes
+    Left failure -> Left failure
+
+decodeLengthAssessmentConfigurationFileSpinePairV4
+  :: ByteString
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthAssessmentConfigurationFileSpinePairV4 bytes = do
+  document <- either (Left . LengthRankingConfigurationJsonRejected) Right
+    $ parseBoundedJson lengthRankingConfigurationFileJsonLimits bytes
+  root <- objectFields LengthRankingConfigurationRootObject document
+  formatValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationFormatField
+    "format"
+    root
+  format <- stringField LengthRankingConfigurationFormatField formatValue
+  if format == lengthRankingConfigurationFileFormat
+    then pure ()
+    else Left LengthRankingConfigurationUnsupportedFormat
+  versionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationVersionField
+    "version"
+    root
+  version <- integerField LengthRankingConfigurationVersionField versionValue
+  if version == toInteger lengthRankingConfigurationFileSpinePairVersion
+    then decodeLengthRankingConfigurationFileSpinePairV4 root
+    else Left LengthRankingConfigurationUnsupportedVersion
 
 -- Keep the established version-1 path literal: its exact root, validation
 -- order, embedded contract grammar, and disabled policy construction do not
@@ -488,6 +586,59 @@ decodeLengthRankingConfigurationFileOriginProbeV3 root = do
         inputBoxLimits inclusiveMaximums basePolicy
       policy = enableLengthRankingOriginProbe inputBoxPolicy
   pure $ disableLengthRankingConfiguration policy contract
+
+-- Version 4 intentionally repeats version 3's operational precedence and
+-- validates the nominal product contract only after the origin-probe choice.
+decodeLengthRankingConfigurationFileSpinePairV4
+  :: ObjectFields
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthRankingConfigurationFileSpinePairV4 root = do
+  exactFields LengthRankingConfigurationRootObject rootFieldsOriginProbeV3 root
+  executionAdmissionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationExecutionAdmissionField
+    "executionAdmission"
+    root
+  executionLimits <- decodeExecutionAdmission executionAdmissionValue
+  executionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationExecutionField
+    "execution"
+    root
+  execution <- decodeExecution executionLimits executionValue
+  evaluationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationEvaluationField
+    "evaluation"
+    root
+  evaluation <- decodeEvaluation evaluationValue
+  inputBoxValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationInputBoxValidationField
+    "inputBoxValidation"
+    root
+  (inputBoxLimits, inclusiveMaximums) <-
+    decodeInputBoxValidation inputBoxValue
+  counterexampleProbeValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationCounterexampleProbeField
+    "counterexampleProbe"
+    root
+  decodeCounterexampleProbe counterexampleProbeValue
+  contractValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationContractField
+    "contract"
+    root
+  contract <- decodeLeanLengthSpinePairContractValueV5 contractValue
+  let basePolicy =
+        lengthRankingPolicyFromValidatedComponents execution evaluation
+      inputBoxPolicy = enableLengthRankingInputBoxValidation
+        inputBoxLimits inclusiveMaximums basePolicy
+      policy = enableLengthRankingOriginProbe inputBoxPolicy
+  pure $ DisabledLengthSpinePairAssessmentConfiguration policy contract
 
 rootFields :: [(Text, LengthRankingConfigurationFileField)]
 rootFields =
@@ -1083,6 +1234,107 @@ decodeLeanLengthContractValueV5
 decodeLeanLengthContractValueV5 = decodeLeanLengthContractValueWithGrammar
   LengthContractGrammarV5
 
+-- | Decode the nominal binary-product contract used by startup version 4 and
+-- contract-only version 6.  It shares version 5's closed arithmetic and
+-- provider-law grammar while retaining a distinct result-shape marker,
+-- variable type, and passive source value.
+decodeLeanLengthSpinePairContractValueV5
+  :: BoundedJsonValue
+  -> Either LengthRankingConfigurationFileError LeanLengthSpinePairContract
+decodeLeanLengthSpinePairContractValueV5 value = do
+  object <- exactObject LengthRankingConfigurationContractObject
+    spinePairContractFields value
+  resultShapeValue <- requiredField
+    LengthRankingConfigurationContractObject
+    LengthRankingConfigurationResultShapeField
+    "resultShape"
+    object
+  resultShape <- stringField LengthRankingConfigurationResultShapeField
+    resultShapeValue
+  if resultShape == "binary-prod-spines-v1"
+    then pure ()
+    else Left $ LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationResultShapeField
+  spineValue <- requiredField
+    LengthRankingConfigurationContractObject
+    LengthRankingConfigurationSpineField
+    "spine"
+    object
+  spine <- decodeSpine spineValue
+  rolesValue <- requiredField
+    LengthRankingConfigurationContractObject
+    LengthRankingConfigurationTargetArgumentRolesField
+    "targetArgumentRoles"
+    object
+  targetRoles <- decodeTargetRoles rolesValue
+  policyValue <- requiredField
+    LengthRankingConfigurationContractObject
+    LengthRankingConfigurationCandidateCasePolicyField
+    "candidateCasePolicy"
+    object
+  casePolicy <- decodeCandidateCasePolicy LengthContractGrammarV5 policyValue
+  preconditionValue <- requiredField
+    LengthRankingConfigurationContractObject
+    LengthRankingConfigurationPreconditionField
+    "precondition"
+    object
+  (precondition, afterPrecondition) <- parseLengthFormula
+    LengthContractGrammarV5
+    LengthRankingConfigurationPreconditionSyntax
+    spinePairContractVariable
+    1
+    emptySyntaxUsage
+    preconditionValue
+  postconditionValue <- requiredField
+    LengthRankingConfigurationContractObject
+    LengthRankingConfigurationPostconditionField
+    "postcondition"
+    object
+  (postcondition, _) <- parseLengthFormula
+    LengthContractGrammarV5
+    LengthRankingConfigurationPostconditionSyntax
+    spinePairContractVariable
+    1
+    afterPrecondition
+    postconditionValue
+  providerLawsValue <- requiredField
+    LengthRankingConfigurationContractObject
+    LengthRankingConfigurationProviderLawsField
+    "providerLaws"
+    object
+  lawValues <- arrayField LengthRankingConfigurationProviderLawsField
+    providerLawsValue
+  boundedCollection LengthRankingConfigurationProviderLawsField
+    maximumProviderLaws lawValues
+  providerLaws <- decodeProviderLaws LengthContractGrammarV5
+    0 emptySyntaxUsage lawValues
+  pure LeanLengthSpinePairContract
+    { leanLengthSpinePairContractSpine = spine
+    , leanLengthSpinePairContractTargetArgumentRoles = Just targetRoles
+    , leanLengthSpinePairContractCandidateCasePolicy = casePolicy
+    , leanLengthSpinePairContractSource = LengthSpinePairContractSource
+        { lengthSpinePairContractPrecondition = precondition
+        , lengthSpinePairContractPostcondition = postcondition
+        }
+    , leanLengthSpinePairContractProviderLaws = providerLaws
+    }
+
+spinePairContractFields
+  :: [(Text, LengthRankingConfigurationFileField)]
+spinePairContractFields =
+  [ ("resultShape", LengthRankingConfigurationResultShapeField)
+  , ("spine", LengthRankingConfigurationSpineField)
+  , ( "targetArgumentRoles"
+    , LengthRankingConfigurationTargetArgumentRolesField
+    )
+  , ( "candidateCasePolicy"
+    , LengthRankingConfigurationCandidateCasePolicyField
+    )
+  , ("precondition", LengthRankingConfigurationPreconditionField)
+  , ("postcondition", LengthRankingConfigurationPostconditionField)
+  , ("providerLaws", LengthRankingConfigurationProviderLawsField)
+  ]
+
 data LengthContractGrammar
   = LengthContractGrammarV1
   | LengthContractGrammarV2
@@ -1465,6 +1717,27 @@ contractVariable tag arguments = case tag of
   "result" -> do
     noArguments arguments
     Right $ Just LengthResult
+  _ -> Right Nothing
+
+spinePairContractVariable
+  :: VariableDecoder LengthSpinePairContractVariable
+spinePairContractVariable tag arguments = case tag of
+  "input" -> do
+    argument <- onlyArgument arguments
+    index <- syntaxNatural argument
+    if index <= maximumContractInputIndex
+      then Right $ Just $ LengthSpinePairInput index
+      else Left $ LengthRankingConfigurationSyntaxLimitExceeded
+        LengthRankingConfigurationInputIndex
+        maximumContractInputIndex (maximumContractInputIndex + 1)
+  "result" -> do
+    argument <- onlyArgument arguments
+    component <- case argument of
+      BoundedJsonString "first" -> Right LengthSpinePairFirst
+      BoundedJsonString "second" -> Right LengthSpinePairSecond
+      BoundedJsonString _ -> Left LengthRankingConfigurationUnknownTag
+      _ -> Left LengthRankingConfigurationExpectedTag
+    Right $ Just $ LengthSpinePairResult component
   _ -> Right Nothing
 
 providerVariable

@@ -5,9 +5,11 @@ Date: 2026-08-14
 > **Later 2026-08-14 follow-up.** The reusable opaque ranking policy can select
 > the same orchestration shape for canonical-`Prod` ranking. The product runner
 > calls the pair query-owned origin entrance after its own MRU bank misses; a
-> pair receipt cannot be converted to scalar evidence. Product startup version
-> 4 remains deferred. See the
-> [live binary-product Length ranking report](2026-08-14-live-binary-product-length-ranking.md).
+> pair receipt cannot be converted to scalar evidence. Startup version 4 now
+> selects that pair runner while preserving this order. See the
+> [live binary-product Length ranking report](2026-08-14-live-binary-product-length-ranking.md)
+> and the
+> [binary-product Length configuration report](2026-08-14-binary-product-length-configuration.md).
 
 ## Outcome
 

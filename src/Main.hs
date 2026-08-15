@@ -138,7 +138,7 @@ import Leant.Synth.Length.Integration
   , authorizeExplicitLengthAssessmentRequest
   , compatibilityLengthAssessmentRequest
   , disabledLengthAssessmentMode
-  , explicitLengthAssessmentRequest
+  , explicitLengthAssessmentSelectionRequest
   , lengthAssessmentFailure
   , lengthAssessmentModeActivationPolicy
   , loadLengthAssessmentMode
@@ -150,7 +150,7 @@ import Leant.Synth.Length.Command
 import Leant.Synth.Length.Contract.File.Acquire
   ( LengthContractFileSource (..)
   , lengthContractFileDefaultTimeoutMilliseconds
-  , loadLengthContractFile
+  , loadLengthContractSelectionFile
   , mkLengthContractFileRequest
   )
 import Leant.Synth.Length.Presentation
@@ -311,7 +311,8 @@ data ReplState = ReplState
   , rsLengthAssessmentMode :: LengthAssessmentMode
     -- ^ Explicitly disabled by default. Enabled values come only from one
     -- bounded, activated configuration-file setup at process startup. Its
-    -- finite-list-spine contract remains fixed for this process, while each
+    -- finite-spine domain selection and contract remain fixed for this process,
+    -- while each
     -- eligible batch still owns a fresh lexical solver session.
   , rsRatings :: [(String, Double)]
     -- ^ the library inventory with ratings (lower is better), best
@@ -1892,22 +1893,22 @@ lengthAssessmentRequestForCommand state command =
     Just path -> case authorizeExplicitLengthAssessmentRequest
         $ rsLengthAssessmentMode state of
       Left failure -> pure $ Left
-        $ "one-shot finite-list-spine Length contract rejected before IO: "
+        $ "one-shot finite-spine Length contract rejected before IO: "
             ++ show failure
       Right permission -> case mkLengthContractFileRequest
           $ LengthContractFileSource path
               lengthContractFileDefaultTimeoutMilliseconds of
         Left failure -> pure $ Left
-          $ "one-shot finite-list-spine Length contract admission failed: "
+          $ "one-shot finite-spine Length contract admission failed: "
               ++ show failure
         Right admittedRequest -> do
-          loaded <- loadLengthContractFile admittedRequest
+          loaded <- loadLengthContractSelectionFile admittedRequest
           pure $ case loaded of
             Left failure -> Left
-              $ "one-shot finite-list-spine Length contract load failed: "
+              $ "one-shot finite-spine Length contract load failed: "
                   ++ show failure
-            Right contract -> Right
-              $ explicitLengthAssessmentRequest permission contract
+            Right selection -> Right
+              $ explicitLengthAssessmentSelectionRequest permission selection
 
 synthRun :: LengthAssessmentRequest -> St -> [String] -> String -> IO ()
 synthRun assessmentRequest st args goal = do
@@ -2658,7 +2659,7 @@ verifyAndDisplay assessmentRequest st args goal groups = do
   forM_ (lengthAssessmentFailure assessment) $ \failure -> do
     prefix <- cYellow st "warning: "
     emitLn st $ prefix ++
-      "finite-list-spine Length counterexample ranking preserved callback " ++
+      "finite-spine Length counterexample ranking preserved callback " ++
       "order: " ++
       show failure
   let presentations = presentLengthAssessment assessment
@@ -4333,7 +4334,7 @@ run opts = do
       loaded <- loadLengthAssessmentMode activation source
       case loaded of
         Left failure -> do
-          putStrLn $ "error: finite-list-spine Length counterexample " ++
+          putStrLn $ "error: finite-spine Length counterexample " ++
             "ranking setup failed: " ++ show failure
           exitWith $ ExitFailure 1
         Right mode -> pure mode
@@ -4452,11 +4453,11 @@ run opts = do
         Just activation -> do
           emitLn st =<< cDim st (case activation of
             RequirePinnedExecutable ->
-              "Finite-list-spine Length counterexample ranking enabled for " ++
+              "Finite-spine Length counterexample ranking enabled for " ++
                 "eligible typed Exference origins with a startup-fixed " ++
                 "contract; a solver executable digest expectation was required."
             PermitUnpinnedExecutable ->
-              "Finite-list-spine Length counterexample ranking enabled for " ++
+              "Finite-spine Length counterexample ranking enabled for " ++
                 "eligible typed Exference origins with a startup-fixed " ++
                 "contract; unpinned solver execution was explicitly permitted.")
           emitLn st =<< cDim st

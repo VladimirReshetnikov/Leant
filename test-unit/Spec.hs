@@ -225,7 +225,8 @@ import Leant.Synth.Length.Configuration
   , rankVerifiedLengthCandidatesWithPolicy
   )
 import Leant.Synth.Length.Configuration.File
-  ( DisabledLengthRankingConfiguration
+  ( DisabledLengthAssessmentConfiguration
+  , DisabledLengthRankingConfiguration
   , LengthRankingConfigurationActivationError (..)
   , LengthRankingConfigurationActivationPolicy (..)
   , LengthRankingConfigurationFileError (..)
@@ -237,11 +238,14 @@ import Leant.Synth.Length.Configuration.File
   , LengthRankingConfigurationSyntaxLimit (..)
   , LengthRankingConfigurationSyntaxPhase (..)
   , activateLengthRankingConfiguration
+  , activateLengthAssessmentConfiguration
+  , decodeLengthAssessmentConfigurationFile
   , decodeLengthRankingConfigurationFile
   , disableLengthRankingConfiguration
   , lengthRankingConfigurationFileFormat
   , lengthRankingConfigurationFileInputBoxVersion
   , lengthRankingConfigurationFileOriginProbeVersion
+  , lengthRankingConfigurationFileSpinePairVersion
   , lengthRankingConfigurationFileJsonLimits
   , lengthRankingConfigurationFileVersion
   )
@@ -257,6 +261,7 @@ import Leant.Synth.Length.Configuration.File.Acquire
   , lengthRankingConfigurationFileMaximumPathCharacters
   , lengthRankingConfigurationFileMaximumTimeoutMilliseconds
   , loadLengthRankingConfigurationFile
+  , loadLengthAssessmentConfigurationFile
   , mkLengthRankingConfigurationFileRequest
   )
 import Leant.Synth.Length.Command
@@ -266,6 +271,7 @@ import Leant.Synth.Length.Command
   )
 import Leant.Synth.Length.Contract
   ( LeanLengthContract (..)
+  , LeanLengthContractSelection (..)
   , LeanLengthCandidateCasePolicy (..)
   , LeanLengthProviderLaw (..)
   , LeanLengthSpinePairContract (..)
@@ -276,17 +282,20 @@ import Leant.Synth.Length.Contract.File
   , LengthContractFileField (..)
   , LengthContractFileValueType (..)
   , decodeLengthContractFile
+  , decodeLengthContractSelectionFile
   , lengthContractFileFormat
   , lengthContractFileExactCaseVersion
   , lengthContractFileJsonLimits
   , lengthContractFileModuloVersion
   , lengthContractFileQuotientVersion
+  , lengthContractFileSpinePairVersion
   , lengthContractFileTargetRolesVersion
   , lengthContractFileVersion
   )
 import Leant.Synth.Length.Contract.File.Acquire
   ( LengthContractFileAdmissionError (..)
   , LengthContractFileLoadErrorClass (..)
+  , LengthContractFileRequest
   , LengthContractFileSource (..)
   , lengthContractFileDefaultTimeoutMilliseconds
   , lengthContractFileLoadCleanupIncomplete
@@ -295,6 +304,7 @@ import Leant.Synth.Length.Contract.File.Acquire
   , lengthContractFileMaximumPathCharacters
   , lengthContractFileMaximumTimeoutMilliseconds
   , loadLengthContractFile
+  , loadLengthContractSelectionFile
   , mkLengthContractFileRequest
   )
 import Leant.Synth.Length.Handoff
@@ -313,11 +323,14 @@ import Leant.Synth.Length.Integration
   , compatibilityLengthAssessmentRequest
   , disabledLengthAssessmentMode
   , explicitLengthAssessmentRequest
+  , explicitLengthAssessmentSelectionRequest
   , lengthAssessmentCandidates
   , lengthAssessmentFailure
   , lengthAssessmentModeActivationPolicy
   , lengthAssessmentPostVerificationResult
   , lengthAssessmentRanking
+  , lengthAssessmentSpinePairPostVerificationResult
+  , lengthAssessmentSpinePairRanking
   , loadLengthAssessmentMode
   )
 import Leant.Synth.Length.PostVerification
@@ -384,7 +397,8 @@ import Leant.Synth.Length.SpinePair.Ranking
 import qualified Leant.Synth.Length.SpinePair.Ranking.Internal
   as LengthSpinePairRankingInternal
 import Leant.Synth.Length.SpinePair.PostVerification
-  ( LengthSpinePairPostVerificationResult
+  ( LengthSpinePairPostVerificationFailure (..)
+  , LengthSpinePairPostVerificationResult
   , lengthSpinePairPostVerificationAdapterFailure
   , lengthSpinePairPostVerificationCandidates
   , lengthSpinePairPostVerificationRanking
@@ -4216,6 +4230,12 @@ lengthRankingConfigurationFileTests = testGroup
       assertLengthRankingConfigurationFileOriginProbeV3
   , testCase "bound v3 origin grammar in fixed validation order"
       assertLengthRankingConfigurationFileOriginProbeV3Bounds
+  , testCase
+      "decode exact v4 product policy without widening the v1-v3 decoder"
+      assertLengthAssessmentConfigurationFileSpinePairV4
+  , testCase
+      "validate the v4 product root and contract in a closed fixed order"
+      assertLengthAssessmentConfigurationFileSpinePairV4Precedence
   , testCase "apply format, version, schema, decimal, and digest precedence"
       assertLengthRankingConfigurationFileSchemaPrecedence
   , testCase "validate execution before evaluation before contract syntax"
@@ -4255,10 +4275,18 @@ lengthContractFileTests = testGroup
   , testCase
       "gate quotient to contract-only version 5 with either explicit case policy"
       assertLengthContractFileQuotientGrammar
+  , testCase
+      "decode exact binary-product contracts only through version 6 selection"
+      assertLengthContractFileSpinePairGrammar
+  , testCase
+      "keep v1-v5 parity and close v6 product schema and syntax errors"
+      assertLengthContractFileSpinePairPrecedence
   , testCase "reject contract roots and redact nested private values"
       assertLengthContractFileSchemaAndRedaction
   , testCase "admit and acquire one explicit contract-only regular file"
       assertLengthContractFileAcquisition
+  , testCase "acquire v6 product contracts without widening scalar loading"
+      assertLengthContractSelectionFileAcquisition
   ]
 
 assertLengthSynthCommandParsing :: IO ()
@@ -4866,6 +4894,252 @@ assertLengthContractFileQuotientGrammar = do
             $ jsonLengthQuotient 0 poisonedChild
         ]
 
+assertLengthContractFileSpinePairGrammar :: IO ()
+assertLengthContractFileSpinePairGrammar = do
+  lengthContractFileSpinePairVersion @?= 6
+  let roles = ["observed-spine", "unobserved-target"]
+      precondition = jsonLengthEqual
+        (jsonLengthModulo 2 $ jsonLengthInput 0)
+        (jsonLengthLiteral 1)
+      postcondition = jsonLengthAll
+        [ jsonLengthEqual jsonLengthSpinePairResultFirst
+            $ jsonLengthInput 0
+        , jsonLengthEqual jsonLengthSpinePairResultSecond
+            $ jsonLengthQuotient 3
+            $ jsonLengthSum
+                [ jsonLengthInput 0
+                , jsonLengthModulo 2 $ jsonLengthInput 1
+                ]
+        ]
+      law = jsonLengthProviderLaw "Demo.mapPair"
+        ["unobserved", "spine"]
+        $ jsonLengthQuotient 5 $ jsonLengthArgument 1
+      contractValue = jsonLengthSpinePairContract roles
+        "cases-rejected" precondition postcondition [law]
+      document = lengthContractFileFixtureVersion
+        lengthContractFileSpinePairVersion contractValue
+      expected = lengthSpinePairFixtureContract
+        { leanLengthSpinePairContractTargetArgumentRoles = Just
+            [LengthObservedSpine, LengthUnobservedTarget]
+        , leanLengthSpinePairContractCandidateCasePolicy =
+            LeanLengthCasesRejected
+        , leanLengthSpinePairContractSource =
+            Djex.LengthSpinePairContractSource
+              { Djex.lengthSpinePairContractPrecondition =
+                  Djex.LengthEqual
+                    (Djex.LengthModulo 2
+                      $ Djex.LengthVariable $ Djex.LengthSpinePairInput 0)
+                    (Djex.LengthLiteral 1)
+              , Djex.lengthSpinePairContractPostcondition = Djex.LengthAll
+                  [ Djex.LengthEqual
+                      (Djex.LengthVariable $ Djex.LengthSpinePairResult
+                        Djex.LengthSpinePairFirst)
+                      (Djex.LengthVariable $ Djex.LengthSpinePairInput 0)
+                  , Djex.LengthEqual
+                      (Djex.LengthVariable $ Djex.LengthSpinePairResult
+                        Djex.LengthSpinePairSecond)
+                      (Djex.LengthQuotient 3 $ Djex.LengthSum
+                        [ Djex.LengthVariable $ Djex.LengthSpinePairInput 0
+                        , Djex.LengthModulo 2
+                            $ Djex.LengthVariable
+                            $ Djex.LengthSpinePairInput 1
+                        ])
+                  ]
+              }
+        , leanLengthSpinePairContractProviderLaws =
+            [ LeanLengthProviderLaw
+                { leanLengthProviderLawName = "Demo.mapPair"
+                , leanLengthProviderLawArgumentRoles =
+                    [LengthUnobservedArgument, LengthSpineArgument]
+                , leanLengthProviderLawTransfer = Djex.LengthQuotient 5
+                    $ Djex.LengthVariable $ Djex.LengthProviderArgument 1
+                }
+            ]
+        }
+  expectLengthContractSelectionFile document >>=
+    (@?= LeanLengthSpinePairContractSelection expected)
+  expectLengthContractSelectionFile (reverseJsonObjectFields document) >>=
+    (@?= LeanLengthSpinePairContractSelection expected)
+  assertLengthContractFileError LengthContractFileUnsupportedVersion document
+
+  let exactDocument = lengthContractFileFixtureVersion
+        lengthContractFileSpinePairVersion
+        $ jsonLengthSpinePairContract roles "exact-spine-zero-step-v1"
+            precondition postcondition [law]
+  exact <- expectLengthContractSelectionFile exactDocument
+  case exact of
+    LeanLengthSpinePairContractSelection contract ->
+      leanLengthSpinePairContractCandidateCasePolicy contract @?=
+        LeanLengthExactSpineZeroStepV1
+    LeanLengthScalarContractSelection _ ->
+      assertFailure "v6 product contract decoded as a scalar contract"
+
+assertLengthContractFileSpinePairPrecedence :: IO ()
+assertLengthContractFileSpinePairPrecedence = do
+  let scalarDocuments =
+        [ lengthContractFileFixture
+            $ jsonLengthContract (jsonLengthTruth True)
+                (jsonLengthTruth True) []
+        , lengthContractFileFixtureVersion lengthContractFileModuloVersion
+            $ jsonLengthContract (jsonLengthTruth True)
+                (jsonLengthTruth True) []
+        , lengthContractFileFixtureVersion lengthContractFileTargetRolesVersion
+            $ jsonRoleAwareLengthContract ["observed-spine"]
+                (jsonLengthTruth True) (jsonLengthTruth True) []
+        , lengthContractFileFixtureVersion lengthContractFileExactCaseVersion
+            $ addJsonField []
+                ( "candidateCasePolicy"
+                , Json.JStr "exact-spine-zero-step-v1"
+                )
+            $ jsonRoleAwareLengthContract ["observed-spine"]
+                (jsonLengthTruth True) (jsonLengthTruth True) []
+        , lengthContractFileFixtureVersion lengthContractFileQuotientVersion
+            $ addJsonField []
+                ("candidateCasePolicy", Json.JStr "cases-rejected")
+            $ jsonRoleAwareLengthContract ["observed-spine"]
+                (jsonLengthTruth True)
+                (jsonLengthEqual jsonLengthResult
+                  $ jsonLengthQuotient 2 $ jsonLengthInput 0) []
+        ]
+  mapM_ assertScalarParity scalarDocuments
+
+  let validContract = jsonLengthSpinePairContract ["observed-spine"]
+        "cases-rejected" (jsonLengthTruth True)
+        (jsonLengthEqual jsonLengthSpinePairResultFirst
+          $ jsonLengthModulo 2 $ jsonLengthInput 0) []
+      base = lengthContractFileFixtureVersion
+        lengthContractFileSpinePairVersion validContract
+      contractFailure failure = assertLengthContractSelectionFileError
+        (LengthContractFileContractRejected failure)
+      unknown phase = LengthRankingConfigurationSyntaxRejected phase
+        LengthRankingConfigurationUnknownTag
+      poisonedPre = setJsonField ["contract", "precondition"]
+        $ Json.JArr [Json.JStr "private-precondition"]
+      poisonedPost = setJsonField ["contract", "postcondition"]
+        $ Json.JArr [Json.JStr "private-postcondition"]
+      poisonedProvider = setJsonField
+        ["contract", "providerLaws"]
+        $ Json.JArr [jsonLengthProviderLaw "private-provider" []
+            $ Json.JArr [Json.JStr "private-transfer"]]
+  assertLengthContractFileError LengthContractFileUnsupportedVersion base
+  assertLengthContractSelectionFileError
+    (LengthContractFileMissingRootField LengthContractFileFormatField)
+    $ deleteJsonField ["format"] base
+  assertLengthContractSelectionFileError
+    (LengthContractFileFieldTypeMismatch
+      LengthContractFileFormatField LengthContractFileStringValue)
+    $ setJsonField ["format"] (Json.JBool False) base
+  assertLengthContractSelectionFileError
+    LengthContractFileUnsupportedFormat
+    $ setJsonField ["format"] (Json.JStr "private-format") base
+  assertLengthContractSelectionFileError
+    (LengthContractFileMissingRootField LengthContractFileVersionField)
+    $ deleteJsonField ["version"] base
+  assertLengthContractSelectionFileError
+    (LengthContractFileFieldTypeMismatch
+      LengthContractFileVersionField LengthContractFileIntegerValue)
+    $ setJsonField ["version"] (Json.JStr "private-version") base
+  assertLengthContractSelectionFileError
+    LengthContractFileUnsupportedVersion
+    $ setJsonField ["version"] (Json.JInt 7) base
+  assertLengthContractSelectionFileError
+    LengthContractFileUnexpectedRootField
+    $ addJsonField [] ("private-root", Json.JNull)
+    $ deleteJsonField ["contract"] base
+  assertLengthContractSelectionFileError
+    (LengthContractFileMissingRootField LengthContractFileContractField)
+    $ deleteJsonField ["contract"] base
+  assertLengthContractSelectionFileError
+    (LengthContractFileFieldTypeMismatch
+      LengthContractFileContractField LengthContractFileObjectValue)
+    $ setJsonField ["contract"] (Json.JStr "private-contract") base
+  contractFailure
+    (LengthRankingConfigurationMissingField
+      LengthRankingConfigurationContractObject
+      LengthRankingConfigurationResultShapeField)
+    $ deleteJsonField ["contract", "resultShape"]
+    $ poisonedPre base
+  contractFailure
+    (LengthRankingConfigurationFieldTypeMismatch
+      LengthRankingConfigurationResultShapeField
+      LengthRankingConfigurationStringValue)
+    $ setJsonField ["contract", "resultShape"] (Json.JBool False)
+    $ poisonedPre base
+  contractFailure
+    (LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationResultShapeField)
+    $ setJsonField ["contract", "resultShape"]
+        (Json.JStr "private-result-shape")
+    $ poisonedPre base
+  contractFailure
+    (LengthRankingConfigurationMissingField
+      LengthRankingConfigurationContractObject
+      LengthRankingConfigurationSpineField)
+    $ deleteJsonField ["contract", "spine"]
+    $ poisonedPre base
+  contractFailure
+    (LengthRankingConfigurationMissingField
+      LengthRankingConfigurationContractObject
+      LengthRankingConfigurationTargetArgumentRolesField)
+    $ deleteJsonField ["contract", "targetArgumentRoles"]
+    $ poisonedPre base
+  contractFailure
+    (LengthRankingConfigurationMissingField
+      LengthRankingConfigurationContractObject
+      LengthRankingConfigurationCandidateCasePolicyField)
+    $ deleteJsonField ["contract", "candidateCasePolicy"]
+    $ poisonedPre base
+  contractFailure (unknown LengthRankingConfigurationPreconditionSyntax)
+    $ poisonedPre base
+  contractFailure (unknown LengthRankingConfigurationPostconditionSyntax)
+    $ poisonedPost base
+  contractFailure
+    (unknown $ LengthRankingConfigurationProviderTransferSyntax 0)
+    $ poisonedProvider base
+  contractFailure
+    (LengthRankingConfigurationUnexpectedField
+      LengthRankingConfigurationContractObject)
+    $ addJsonField ["contract"] ("private-contract-field", Json.JNull)
+        base
+
+  contractFailure
+    (LengthRankingConfigurationSyntaxRejected
+      LengthRankingConfigurationPostconditionSyntax
+      $ LengthRankingConfigurationTagArityMismatch 1 0)
+    $ setJsonField ["contract", "postcondition"]
+        (jsonLengthEqual (Json.JArr [Json.JStr "result"])
+          $ jsonLengthLiteral 0) base
+  contractFailure
+    (LengthRankingConfigurationSyntaxRejected
+      LengthRankingConfigurationPostconditionSyntax
+      LengthRankingConfigurationUnknownTag)
+    $ setJsonField ["contract", "postcondition"]
+        (jsonLengthEqual
+          (Json.JArr [Json.JStr "result", Json.JStr "private-component"])
+          $ jsonLengthLiteral 0) base
+  contractFailure
+    (LengthRankingConfigurationSyntaxRejected
+      LengthRankingConfigurationPostconditionSyntax
+      LengthRankingConfigurationExpectedTag)
+    $ setJsonField ["contract", "postcondition"]
+        (jsonLengthEqual
+          (Json.JArr [Json.JStr "result", Json.JInt 0])
+          $ jsonLengthLiteral 0) base
+
+  let privateShape = "private-redacted-result-shape"
+  case decodeLengthContractSelectionFile
+      $ encodeLengthRankingConfigurationFile
+      $ setJsonField ["contract", "resultShape"]
+          (Json.JStr privateShape) base of
+    Right _ -> assertFailure "private v6 result shape unexpectedly decoded"
+    Left failure -> assertBool "v6 error exposed a private result shape"
+      $ not $ privateShape `isInfixOf` show failure
+ where
+  assertScalarParity document = do
+    expected <- expectLengthContractFile document
+    actual <- expectLengthContractSelectionFile document
+    actual @?= LeanLengthScalarContractSelection expected
+
 assertLengthContractFileSchemaAndRedaction :: IO ()
 assertLengthContractFileSchemaAndRedaction = do
   let contract = jsonLengthContract
@@ -5011,6 +5285,109 @@ assertLengthContractFileAcquisition = do
           lengthContractFileLoadCleanupIncomplete failure @?= False
         Right _ -> assertFailure "oversized contract file loaded"
 
+assertLengthContractSelectionFileAcquisition :: IO ()
+assertLengthContractSelectionFileAcquisition
+  | os == "mingw32" = pure ()
+  | otherwise = withTemporaryDirectory
+      "leant-one-shot-contract-selection" $ \root -> do
+    let path = root </> "pair.json"
+        malformedPath = root </> "malformed.json"
+        oversizedPath = root </> "oversized.json"
+        pairValue = jsonLengthSpinePairContract ["observed-spine"]
+          "cases-rejected" (jsonLengthTruth True)
+          (jsonLengthAll
+            [ jsonLengthEqual jsonLengthSpinePairResultFirst
+                $ jsonLengthInput 0
+            , jsonLengthEqual jsonLengthSpinePairResultSecond
+                $ jsonLengthQuotient 2 $ jsonLengthInput 0
+            ]) []
+        pairDocument = lengthContractFileFixtureVersion
+          lengthContractFileSpinePairVersion pairValue
+        expected = lengthSpinePairFixtureContract
+          { leanLengthSpinePairContractTargetArgumentRoles =
+              Just [LengthObservedSpine]
+          , leanLengthSpinePairContractCandidateCasePolicy =
+              LeanLengthCasesRejected
+          , leanLengthSpinePairContractSource =
+              Djex.LengthSpinePairContractSource
+                { Djex.lengthSpinePairContractPrecondition =
+                    Djex.LengthTruth True
+                , Djex.lengthSpinePairContractPostcondition = Djex.LengthAll
+                    [ Djex.LengthEqual
+                        (Djex.LengthVariable $ Djex.LengthSpinePairResult
+                          Djex.LengthSpinePairFirst)
+                        (Djex.LengthVariable $ Djex.LengthSpinePairInput 0)
+                    , Djex.LengthEqual
+                        (Djex.LengthVariable $ Djex.LengthSpinePairResult
+                          Djex.LengthSpinePairSecond)
+                        (Djex.LengthQuotient 2
+                          $ Djex.LengthVariable
+                          $ Djex.LengthSpinePairInput 0)
+                    ]
+                }
+          , leanLengthSpinePairContractProviderLaws = []
+          }
+    ByteString.writeFile path
+      $ encodeLengthRankingConfigurationFile pairDocument
+    request <- expectLengthContractFileRequest path
+    loaded <- loadLengthContractSelectionFile request
+    loaded @?= Right (LeanLengthSpinePairContractSelection expected)
+
+    legacy <- loadLengthContractFile request
+    case legacy of
+      Left failure -> do
+        lengthContractFileLoadErrorClass failure @?=
+          LengthContractFileDecodeRejected
+            LengthContractFileUnsupportedVersion
+        lengthContractFileLoadCleanupIncomplete failure @?= False
+      Right _ -> assertFailure "scalar loader admitted a v6 product contract"
+
+    ByteString.writeFile path
+      $ encodeLengthRankingConfigurationFile
+      $ lengthContractFileFixture
+      $ jsonLengthContract (jsonLengthTruth True) (jsonLengthTruth True) []
+    scalarLoaded <- loadLengthContractSelectionFile request
+    case scalarLoaded of
+      Right (LeanLengthScalarContractSelection _) -> pure ()
+      Right (LeanLengthSpinePairContractSelection _) ->
+        assertFailure "v1 scalar contract loaded as a product contract"
+      Left failure -> assertFailure $ "v1 selection load failed: " ++
+        show failure
+
+    ByteString.writeFile malformedPath $ BS.pack "{"
+    malformedRequest <- expectLengthContractFileRequest malformedPath
+    malformed <- loadLengthContractSelectionFile malformedRequest
+    case malformed of
+      Left failure -> do
+        case lengthContractFileLoadErrorClass failure of
+          LengthContractFileDecodeRejected _ -> pure ()
+          failureClass -> assertFailure $ "unexpected selection decode class: "
+            ++ show failureClass
+        lengthContractFileLoadCleanupIncomplete failure @?= False
+      Right _ -> assertFailure "malformed contract selection decoded"
+
+    ByteString.writeFile oversizedPath $ ByteString.replicate
+      (fromIntegral lengthContractFileLoadMaximumBytes + 1) 32
+    oversizedRequest <- expectLengthContractFileRequest oversizedPath
+    oversized <- loadLengthContractSelectionFile oversizedRequest
+    case oversized of
+      Left failure -> do
+        lengthContractFileLoadErrorClass failure @?=
+          LengthContractFileByteLimitExceeded
+            lengthContractFileLoadMaximumBytes
+            (lengthContractFileLoadMaximumBytes + 1)
+        lengthContractFileLoadCleanupIncomplete failure @?= False
+      Right _ -> assertFailure "oversized contract selection loaded"
+
+expectLengthContractFileRequest
+  :: FilePath
+  -> IO LengthContractFileRequest
+expectLengthContractFileRequest path = case mkLengthContractFileRequest
+    $ LengthContractFileSource path 1000 of
+  Left failure -> assertFailure ("contract request admission failed: " ++
+    show failure) >> error "unreachable"
+  Right request -> pure request
+
 lengthContractFileFixture :: Json.JValue -> Json.JValue
 lengthContractFileFixture = lengthContractFileFixtureVersion
   lengthContractFileVersion
@@ -5033,6 +5410,16 @@ expectLengthContractFile document =
       show failure) >> error "unreachable"
     Right contract -> pure contract
 
+expectLengthContractSelectionFile
+  :: Json.JValue
+  -> IO LeanLengthContractSelection
+expectLengthContractSelectionFile document =
+  case decodeLengthContractSelectionFile
+      $ encodeLengthRankingConfigurationFile document of
+    Left failure -> assertFailure ("contract selection file was rejected: " ++
+      show failure) >> error "unreachable"
+    Right selection -> pure selection
+
 assertLengthContractFileError
   :: LengthContractFileError
   -> Json.JValue
@@ -5042,6 +5429,17 @@ assertLengthContractFileError expected document =
       $ encodeLengthRankingConfigurationFile document of
     Left failure -> failure @?= expected
     Right _ -> assertFailure $ "expected contract-file failure: " ++
+      show expected
+
+assertLengthContractSelectionFileError
+  :: LengthContractFileError
+  -> Json.JValue
+  -> IO ()
+assertLengthContractSelectionFileError expected document =
+  case decodeLengthContractSelectionFile
+      $ encodeLengthRankingConfigurationFile document of
+    Left failure -> failure @?= expected
+    Right _ -> assertFailure $ "expected contract-selection failure: " ++
       show expected
 
 lengthRankingConfigurationFileAcquisitionTests :: TestTree
@@ -5082,6 +5480,12 @@ lengthAssessmentIntegrationTests = testGroup
       assertLengthAssessmentFailureFallback
   , testCase "bound and sanitize counterexample presentation"
       assertLengthCounterexamplePresentation
+  , testCase
+      "dispatch startup v4 and one-shot v6 products through one sealed policy"
+      assertLengthAssessmentSpinePairDispatch
+  , testCase
+      "keep disabled selection requests lazy and pair projections disjoint"
+      assertLengthAssessmentSpinePairDisabled
   ]
 
 assertLengthHandoffUsesUnifiedSealers :: IO ()
@@ -6280,6 +6684,202 @@ assertLengthCounterexamplePresentation = do
   assertBool "counterexample terminal note exceeded its configured bound"
     $ length huge <= maximumLengthCounterexampleNoteCharacters
 
+assertLengthAssessmentSpinePairDispatch :: IO ()
+assertLengthAssessmentSpinePairDispatch
+  | os == "mingw32" = pure ()
+  | otherwise = do
+      (duplicatedInput, inputAndZero) <- buildLengthSpinePairRankingFixture
+      refused <- syntheticLengthRankingCandidate
+        "pair-integration-occurrence-retained"
+      withFakeLengthSolver "healthy" $ \executable -> do
+        let configurationPath = takeDirectory executable </>
+              "pair-assessment-v4.json"
+            contractPath = takeDirectory executable </>
+              "pair-assessment-v6.json"
+            pairContract second = jsonLengthSpinePairContract
+              ["observed-spine"] "cases-rejected"
+              (jsonLengthTruth True)
+              (jsonLengthAll
+                [ jsonLengthEqual jsonLengthSpinePairResultFirst
+                    $ jsonLengthInput 0
+                , jsonLengthEqual jsonLengthSpinePairResultSecond
+                    $ jsonLengthLiteral second
+                ])
+              [ jsonLengthProviderLaw "Demo.zeroList" []
+                  $ jsonLengthLiteral 0
+              ]
+            startupDocument = setJsonField
+              ["execution", "artifactPolicy"]
+              (Json.JStr "input-values-after-satisfiable")
+              $ lengthAssessmentConfigurationFileSpinePairFixture
+                  executable Nothing [1] 2 (pairContract 1)
+            contractDocument second = lengthContractFileFixtureVersion
+              lengthContractFileSpinePairVersion $ pairContract second
+        ByteString.writeFile configurationPath
+          $ encodeLengthRankingConfigurationFile startupDocument
+        loaded <- loadLengthAssessmentMode PermitUnpinnedExecutable
+          $ LengthRankingConfigurationFileSource configurationPath 1000
+        mode <- case loaded of
+          Left failure -> assertFailure
+            ("pair assessment setup failed: " ++ show failure)
+              >> error "unreachable"
+          Right configured -> pure configured
+        lengthAssessmentModeActivationPolicy mode @?=
+          Just PermitUnpinnedExecutable
+        doesFileExist (executable ++ ".events") >>= (@?= False)
+
+        verification <- verificationBatchFromReceipts
+          [inputAndZero, inputAndZero, refused]
+        assessed <- expectLengthAssessmentWithin
+          $ assessLengthVerificationBatch mode verification
+        lengthAssessmentFailure assessed @?= Nothing
+        assertBool "pair startup assessment retained a scalar ranking"
+          $ isNothing $ lengthAssessmentRanking assessed
+        assertBool "pair startup assessment retained a scalar seal"
+          $ isNothing $ lengthAssessmentPostVerificationResult assessed
+        pairResult <- case
+            lengthAssessmentSpinePairPostVerificationResult assessed of
+          Nothing -> assertFailure
+            "pair startup assessment discarded its product seal"
+              >> error "unreachable"
+          Just result -> pure result
+        sealed <- case lengthSpinePairPostVerificationSealedBatch pairResult of
+          Nothing -> assertFailure
+            "pair startup assessment bypassed occurrence sealing"
+              >> error "unreachable"
+          Just value -> pure value
+        let expected = [refused, inputAndZero, inputAndZero]
+        postVerificationBatchCandidates sealed @?= expected
+        lengthAssessmentCandidates assessed @?= expected
+        pairRanking <- case lengthAssessmentSpinePairRanking assessed of
+          Nothing -> assertFailure
+            "pair startup assessment discarded its product ranking"
+              >> error "unreachable"
+          Just ranking -> pure ranking
+        map rankedLengthSpinePairCandidateOriginalIndex
+            (lengthSpinePairRankingCandidates pairRanking) @?= [2, 0, 1]
+        case map lengthCandidatePresentationNote
+            $ presentLengthAssessment assessed of
+          [Nothing, Just first, Just second] -> mapM_ (\note -> do
+              assertBool "pair presentation omitted its first component"
+                $ "first result spine length = 0" `isInfixOf` note
+              assertBool "pair presentation omitted its second component"
+                $ "second result spine length = 0" `isInfixOf` note
+              assertBool "pair presentation exposed a provider name"
+                $ not $ "Demo.zeroList" `isInfixOf` note)
+            [first, second]
+          notes -> assertFailure $ "pair occurrence notes drifted: " ++
+            show notes
+
+        permission <- case authorizeExplicitLengthAssessmentRequest mode of
+          Left failure -> assertFailure (show failure) >> error "unreachable"
+          Right authorized -> pure authorized
+        ByteString.writeFile contractPath
+          $ encodeLengthRankingConfigurationFile $ contractDocument 0
+        request <- expectLengthContractFileRequest contractPath
+        selectionLoaded <- loadLengthContractSelectionFile request
+        selection <- case selectionLoaded of
+          Left failure -> assertFailure
+            ("v6 pair selection load failed: " ++ show failure)
+              >> error "unreachable"
+          Right value -> pure value
+        -- The request owns the decoded selection; changing its source cannot
+        -- affect the later assessment.
+        ByteString.writeFile contractPath $ BS.pack "{"
+        failingVerification <- verificationBatchFromReceipts [inputAndZero]
+        failed <- expectLengthAssessmentWithin
+          $ assessLengthVerificationRequest
+              (explicitLengthAssessmentSelectionRequest permission selection)
+              failingVerification
+        lengthAssessmentCandidates failed @?= [inputAndZero]
+        assertBool "v6 pair failure exposed a scalar ranking"
+          $ isNothing $ lengthAssessmentRanking failed
+        assertBool "v6 pair failure exposed a scalar seal"
+          $ isNothing $ lengthAssessmentPostVerificationResult failed
+        case lengthAssessmentFailure failed of
+          Just (LengthAssessmentSpinePairRankingFailed failure) -> do
+            lengthSpinePairRankingFailureClass failure @?=
+              LengthSpinePairRankingLiveQueryFailed
+                Djex.LengthSpinePairSMTLibLiveQueryCounterexampleRejected
+            lengthSpinePairRankingFailureOriginalIndex failure @?= Just 0
+            lengthSpinePairRankingFailureCleanupIncomplete failure @?= False
+          failure -> assertFailure $ "unexpected v6 pair failure: " ++
+            show failure
+        assertBool "v6 pair failure discarded its product result"
+          $ case lengthAssessmentSpinePairPostVerificationResult failed of
+              Nothing -> False
+              Just _ -> True
+        assertBool "atomic v6 pair failure emitted a semantic note"
+          $ all isNothing $ map lengthCandidatePresentationNote
+          $ presentLengthAssessment failed
+
+        scalar <- expectLengthAssessmentWithin
+          $ assessLengthVerificationRequest
+              (explicitLengthAssessmentRequest permission
+                $ lengthRankingContract 0)
+              failingVerification
+        assertBool "scalar compatibility request exposed a pair ranking"
+          $ isNothing $ lengthAssessmentSpinePairRanking scalar
+        assertBool "scalar compatibility request exposed a pair seal"
+          $ isNothing
+          $ lengthAssessmentSpinePairPostVerificationResult scalar
+        assertBool "scalar compatibility request lost its scalar seal"
+          $ case lengthAssessmentPostVerificationResult scalar of
+              Nothing -> False
+              Just _ -> True
+
+        -- Product selection is lazy below the constructor: the occurrence
+        -- adapter rejects maximum-plus-one before demanding its contract.
+        let maximumCandidates =
+              Djex.defaultLengthSMTLibLiveSessionMaximumQueries
+            oversizedCount = fromIntegral maximumCandidates + 1
+        oversized <- verificationBatchFromReceipts
+          $ replicate oversizedCount duplicatedInput
+        rejected <- expectLengthAssessmentWithin
+          $ assessLengthVerificationRequest
+              (explicitLengthAssessmentSelectionRequest permission
+                $ LeanLengthSpinePairContractSelection
+                $ error "pair maximum-plus-one forced its contract")
+              oversized
+        case lengthAssessmentFailure rejected of
+          Just (LengthAssessmentSpinePairPostVerificationFailed
+              (LengthSpinePairPostVerificationInputRejected
+                (LengthRankingInputLimitExceeded maximumValue observed))) ->
+                  (maximumValue, observed) @?=
+                    (maximumCandidates, maximumCandidates + 1)
+          failure -> assertFailure $ "unexpected lazy pair rejection: " ++
+            show failure
+
+assertLengthAssessmentSpinePairDisabled :: IO ()
+assertLengthAssessmentSpinePairDisabled = do
+  result <- assessLengthVerificationBatch disabledLengthAssessmentMode
+    (error "disabled pair-aware integration forced its verification batch")
+  lengthAssessmentFailure result @?= Nothing
+  assertBool "disabled pair-aware integration retained a scalar ranking"
+    $ isNothing $ lengthAssessmentRanking result
+  assertBool "disabled pair-aware integration retained a product ranking"
+    $ isNothing $ lengthAssessmentSpinePairRanking result
+  assertBool "disabled pair-aware integration retained a scalar result"
+    $ isNothing $ lengthAssessmentPostVerificationResult result
+  assertBool "disabled pair-aware integration retained a product result"
+    $ isNothing $ lengthAssessmentSpinePairPostVerificationResult result
+  parseLengthSynthCommand
+      "--length-contract /tmp/pair-v6.json -- List Nat -> Prod (List Nat) (List Nat)"
+    @?= Right LengthSynthCommand
+      { lengthSynthCommandContractPath = Just "/tmp/pair-v6.json"
+      , lengthSynthCommandGoal = "List Nat -> Prod (List Nat) (List Nat)"
+      }
+  options <- expectOptions
+    [ "--length-ranking-config", "/tmp/pair-v4.json"
+    , "--length-ranking-config-timeout", "1234"
+    , "--length-ranking-allow-unpinned"
+    ]
+  case lengthAssessmentSetup options of
+    Just (PermitUnpinnedExecutable,
+        LengthRankingConfigurationFileSource path milliseconds) ->
+          (path, milliseconds) @?= ("/tmp/pair-v4.json", 1234)
+    _ -> assertFailure "pair schemas changed the established CLI grammar"
+
 
 expectLengthAssessmentWithin
   :: IO result
@@ -6831,6 +7431,210 @@ assertLengthRankingConfigurationFileOriginProbeV3Bounds =
         LengthRankingConfigurationPreconditionSyntax
         LengthRankingConfigurationUnknownTag)
       $ badContract base
+
+assertLengthAssessmentConfigurationFileSpinePairV4 :: IO ()
+assertLengthAssessmentConfigurationFileSpinePairV4 =
+  withTemporaryDirectory "leant-length-file-pair-v4" $ \root -> do
+    let executable = root </> "missing-z3"
+        pairValue = jsonLengthSpinePairContract ["observed-spine"]
+          "cases-rejected" (jsonLengthTruth True)
+          (jsonLengthAll
+            [ jsonLengthEqual jsonLengthSpinePairResultFirst
+                $ jsonLengthInput 0
+            , jsonLengthEqual jsonLengthSpinePairResultSecond
+                $ jsonLengthQuotient 2 $ jsonLengthInput 0
+            ]) []
+        v4 = lengthAssessmentConfigurationFileSpinePairFixture
+          executable Nothing [1] 2 pairValue
+        pinnedV4 = setJsonField
+          ["execution", "expectedExecutableSha256"]
+          (Json.JStr $ replicate 64 '0') v4
+        expected = lengthSpinePairFixtureContract
+          { leanLengthSpinePairContractTargetArgumentRoles =
+              Just [LengthObservedSpine]
+          , leanLengthSpinePairContractCandidateCasePolicy =
+              LeanLengthCasesRejected
+          , leanLengthSpinePairContractSource =
+              Djex.LengthSpinePairContractSource
+                { Djex.lengthSpinePairContractPrecondition =
+                    Djex.LengthTruth True
+                , Djex.lengthSpinePairContractPostcondition = Djex.LengthAll
+                    [ Djex.LengthEqual
+                        (Djex.LengthVariable $ Djex.LengthSpinePairResult
+                          Djex.LengthSpinePairFirst)
+                        (Djex.LengthVariable $ Djex.LengthSpinePairInput 0)
+                    , Djex.LengthEqual
+                        (Djex.LengthVariable $ Djex.LengthSpinePairResult
+                          Djex.LengthSpinePairSecond)
+                        (Djex.LengthQuotient 2
+                          $ Djex.LengthVariable
+                          $ Djex.LengthSpinePairInput 0)
+                    ]
+                }
+          , leanLengthSpinePairContractProviderLaws = []
+          }
+    lengthRankingConfigurationFileSpinePairVersion @?= 4
+    assertLengthRankingConfigurationFileError
+      LengthRankingConfigurationUnsupportedVersion v4
+    disabled <- expectLengthAssessmentConfigurationFile v4
+    case activateLengthAssessmentConfiguration
+        RequirePinnedExecutable disabled of
+      Left failure -> failure @?=
+        LengthRankingConfigurationExecutablePinRequired
+      Right _ -> assertFailure "unpinned v4 product policy was activated"
+    (policy, selected) <- expectLengthAssessmentConfigurationActivation
+      PermitUnpinnedExecutable disabled
+    selected @?= LeanLengthSpinePairContractSelection expected
+    lengthRankingPolicyExecutableDigestExpectation policy @?=
+      Djex.LengthSMTLibExecutableDigestExpectationAbsent
+    doesFileExist (executable ++ ".events") >>= (@?= False)
+
+    pinned <- expectLengthAssessmentConfigurationFile pinnedV4
+    (pinnedPolicy, pinnedSelected) <-
+      expectLengthAssessmentConfigurationActivation
+        RequirePinnedExecutable pinned
+    pinnedSelected @?= LeanLengthSpinePairContractSelection expected
+    lengthRankingPolicyExecutableDigestExpectation pinnedPolicy @?=
+      Djex.LengthSMTLibExecutableDigestExpectationPresent
+    reordered <- expectLengthAssessmentConfigurationFile
+      $ reverseJsonObjectFields pinnedV4
+    (_, reorderedSelected) <- expectLengthAssessmentConfigurationActivation
+      RequirePinnedExecutable reordered
+    reorderedSelected @?= pinnedSelected
+
+    let scalarValues =
+          [ lengthRankingConfigurationFileFixture executable Nothing
+          , lengthRankingConfigurationFileInputBoxFixture
+              executable Nothing [0] 1
+          , lengthRankingConfigurationFileOriginProbeFixture
+              executable Nothing [0] 1
+          ]
+    mapM_ assertStartupScalarParity scalarValues
+
+    let sourcePath = root </> "pair-startup.json"
+    ByteString.writeFile sourcePath
+      $ encodeLengthRankingConfigurationFile v4
+    request <- expectLengthRankingConfigurationFileRequest sourcePath 1000
+    loaded <- loadLengthAssessmentConfigurationFile request
+    generalized <- case loaded of
+      Left failure -> assertFailure
+        ("v4 assessment configuration load failed: " ++ show failure)
+          >> error "unreachable"
+      Right value -> pure value
+    (_, loadedSelection) <- expectLengthAssessmentConfigurationActivation
+      PermitUnpinnedExecutable generalized
+    loadedSelection @?= LeanLengthSpinePairContractSelection expected
+    legacy <- loadLengthRankingConfigurationFile request
+    expectLengthRankingConfigurationFileLoadFailure
+      (LengthRankingConfigurationFileDecodeRejected
+        LengthRankingConfigurationUnsupportedVersion)
+      legacy
+    ByteString.writeFile sourcePath $ BS.pack "{"
+    malformed <- loadLengthAssessmentConfigurationFile request
+    case malformed of
+      Left failure -> do
+        case lengthRankingConfigurationFileLoadErrorClass failure of
+          LengthRankingConfigurationFileDecodeRejected _ -> pure ()
+          failureClass -> assertFailure
+            $ "unexpected generalized startup decode class: "
+            ++ show failureClass
+        lengthRankingConfigurationFileLoadCleanupIncomplete failure @?= False
+      Right _ -> assertFailure
+        "malformed generalized startup configuration decoded"
+    let oversizedPath = root </> "pair-startup-oversized.json"
+    ByteString.writeFile oversizedPath $ ByteString.replicate
+      (fromIntegral lengthRankingConfigurationFileLoadMaximumBytes + 1) 32
+    oversizedRequest <- expectLengthRankingConfigurationFileRequest
+      oversizedPath 1000
+    oversized <- loadLengthAssessmentConfigurationFile oversizedRequest
+    case oversized of
+      Left failure -> do
+        lengthRankingConfigurationFileLoadErrorClass failure @?=
+          LengthRankingConfigurationFileByteLimitExceeded
+            lengthRankingConfigurationFileLoadMaximumBytes
+            (lengthRankingConfigurationFileLoadMaximumBytes + 1)
+        lengthRankingConfigurationFileLoadCleanupIncomplete failure @?= False
+      Right _ -> assertFailure
+        "oversized generalized startup configuration loaded"
+ where
+  assertStartupScalarParity document = do
+    scalarDisabled <- expectLengthRankingConfigurationFile document
+    (_, scalarContract) <- expectLengthRankingConfigurationActivation
+      PermitUnpinnedExecutable scalarDisabled
+    selectedDisabled <- expectLengthAssessmentConfigurationFile document
+    (_, selection) <- expectLengthAssessmentConfigurationActivation
+      PermitUnpinnedExecutable selectedDisabled
+    selection @?= LeanLengthScalarContractSelection scalarContract
+
+assertLengthAssessmentConfigurationFileSpinePairV4Precedence :: IO ()
+assertLengthAssessmentConfigurationFileSpinePairV4Precedence =
+  withTemporaryDirectory "leant-length-file-pair-v4-precedence" $ \root -> do
+    let pairValue = jsonLengthSpinePairContract ["observed-spine"]
+          "cases-rejected" (jsonLengthTruth True)
+          (jsonLengthEqual jsonLengthSpinePairResultFirst
+            $ jsonLengthInput 0) []
+        base = lengthAssessmentConfigurationFileSpinePairFixture
+          (root </> "missing-z3") Nothing [0] 1 pairValue
+        badAdmission = setJsonField
+          ["executionAdmission", "executablePathCharacters"]
+          (Json.JInt (-1))
+        badExecution = setJsonField ["execution", "executablePath"]
+          (Json.JStr "private-relative-z3")
+        badEvaluation = setJsonField
+          ["evaluation", "assignmentValueBits"] (Json.JInt (-1))
+        badInputBox = setJsonField
+          ["inputBoxValidation", "maximumAssignments"] (Json.JInt (-1))
+        badProbe = setJsonField ["counterexampleProbe"]
+          (Json.JStr "private-probe")
+        badContract = deleteJsonField ["contract", "resultShape"]
+        allBad = badAdmission $ badExecution $ badEvaluation $ badInputBox
+          $ badProbe $ badContract base
+    _ <- expectLengthAssessmentConfigurationFile base
+    assertLengthAssessmentConfigurationFileError
+      (LengthRankingConfigurationUnexpectedField
+        LengthRankingConfigurationRootObject)
+      $ addJsonField [] ("private-root", Json.JNull)
+      $ deleteJsonField ["executionAdmission"] base
+    assertLengthAssessmentConfigurationFileError
+      (LengthRankingConfigurationFieldValueRejected
+        LengthRankingConfigurationExecutablePathCharactersField)
+      allBad
+    assertLengthAssessmentConfigurationFileError
+      (LengthRankingConfigurationExecutionRejected
+        Djex.LengthSMTLibExecutionExecutablePathNotAbsolute)
+      $ badExecution $ badEvaluation $ badInputBox $ badProbe
+      $ badContract base
+    assertLengthAssessmentConfigurationFileError
+      (LengthRankingConfigurationEvaluationRejected
+        $ Djex.NegativeLengthEvaluationLimit
+            Djex.LengthAssignmentValueBits (-1))
+      $ badEvaluation $ badInputBox $ badProbe $ badContract base
+    assertLengthAssessmentConfigurationFileError
+      (LengthRankingConfigurationFieldValueRejected
+        LengthRankingConfigurationInputBoxMaximumAssignmentsField)
+      $ badInputBox $ badProbe $ badContract base
+    assertLengthAssessmentConfigurationFileError
+      (LengthRankingConfigurationFieldValueRejected
+        LengthRankingConfigurationCounterexampleProbeField)
+      $ badProbe $ badContract base
+    assertLengthAssessmentConfigurationFileError
+      (LengthRankingConfigurationMissingField
+        LengthRankingConfigurationContractObject
+        LengthRankingConfigurationResultShapeField)
+      $ badContract base
+
+    assertLengthAssessmentConfigurationFileError
+      LengthRankingConfigurationUnsupportedVersion
+      $ setJsonField ["version"] (Json.JInt 5)
+      $ addJsonField [] ("private-root", Json.JNull) base
+    let badLegacy = setJsonField ["execution", "executablePath"]
+          (Json.JStr "private-relative-z3")
+          $ lengthRankingConfigurationFileFixture
+              (root </> "unused-z3") Nothing
+    assertLengthAssessmentConfigurationFileError
+      (LengthRankingConfigurationExecutionRejected
+        Djex.LengthSMTLibExecutionExecutablePathNotAbsolute)
+      badLegacy
 
 assertLengthRankingConfigurationFileSchemaPrecedence :: IO ()
 assertLengthRankingConfigurationFileSchemaPrecedence =
@@ -7599,6 +8403,21 @@ lengthRankingConfigurationFileOriginProbeFixture executable digest maximums
   $ lengthRankingConfigurationFileInputBoxFixture
       executable digest maximums maximumAssignments
 
+lengthAssessmentConfigurationFileSpinePairFixture
+  :: FilePath
+  -> Maybe String
+  -> [Integer]
+  -> Integer
+  -> Json.JValue
+  -> Json.JValue
+lengthAssessmentConfigurationFileSpinePairFixture executable digest maximums
+    maximumAssignments contract =
+  setJsonField ["contract"] contract
+  $ setJsonField ["version"]
+      (Json.JInt $ toInteger lengthRankingConfigurationFileSpinePairVersion)
+  $ lengthRankingConfigurationFileOriginProbeFixture
+      executable digest maximums maximumAssignments
+
 jsonLengthTruth :: Bool -> Json.JValue
 jsonLengthTruth value = Json.JArr
   [Json.JStr "truth", Json.JBool value]
@@ -7612,6 +8431,14 @@ jsonLengthInput index = Json.JArr [Json.JStr "input", Json.JInt index]
 
 jsonLengthResult :: Json.JValue
 jsonLengthResult = Json.JArr [Json.JStr "result"]
+
+jsonLengthSpinePairResultFirst :: Json.JValue
+jsonLengthSpinePairResultFirst = Json.JArr
+  [Json.JStr "result", Json.JStr "first"]
+
+jsonLengthSpinePairResultSecond :: Json.JValue
+jsonLengthSpinePairResultSecond = Json.JArr
+  [Json.JStr "result", Json.JStr "second"]
 
 jsonLengthArgument :: Integer -> Json.JValue
 jsonLengthArgument index = Json.JArr
@@ -7706,6 +8533,28 @@ jsonRoleAwareLengthContract roles precondition postcondition laws =
     ("targetArgumentRoles", Json.JArr $ map Json.JStr roles)
     $ jsonLengthContract precondition postcondition laws
 
+jsonLengthSpinePairContract
+  :: [String]
+  -> String
+  -> Json.JValue
+  -> Json.JValue
+  -> [Json.JValue]
+  -> Json.JValue
+jsonLengthSpinePairContract roles casePolicy precondition postcondition laws =
+  Json.JObj
+    [ ("resultShape", Json.JStr "binary-prod-spines-v1")
+    , ("spine", Json.JObj
+        [ ("family", Json.JStr "List")
+        , ("zero", Json.JStr "List.nil")
+        , ("step", Json.JStr "List.cons")
+        ])
+    , ("targetArgumentRoles", Json.JArr $ map Json.JStr roles)
+    , ("candidateCasePolicy", Json.JStr casePolicy)
+    , ("precondition", precondition)
+    , ("postcondition", postcondition)
+    , ("providerLaws", Json.JArr laws)
+    ]
+
 encodeLengthRankingConfigurationFile
   :: Json.JValue
   -> ByteString.ByteString
@@ -7723,6 +8572,17 @@ expectLengthRankingConfigurationFile document =
       show failure) >> error "unreachable"
     Right disabled -> pure disabled
 
+expectLengthAssessmentConfigurationFile
+  :: Json.JValue
+  -> IO DisabledLengthAssessmentConfiguration
+expectLengthAssessmentConfigurationFile document =
+  case decodeLengthAssessmentConfigurationFile
+      $ encodeLengthRankingConfigurationFile document of
+    Left failure -> assertFailure
+      ("assessment configuration file was rejected: " ++ show failure)
+        >> error "unreachable"
+    Right disabled -> pure disabled
+
 expectLengthRankingConfigurationActivation
   :: LengthRankingConfigurationActivationPolicy
   -> DisabledLengthRankingConfiguration
@@ -7731,6 +8591,17 @@ expectLengthRankingConfigurationActivation policy disabled =
   case activateLengthRankingConfiguration policy disabled of
     Left failure -> assertFailure ("configuration activation failed: " ++
       show failure) >> error "unreachable"
+    Right configuration -> pure configuration
+
+expectLengthAssessmentConfigurationActivation
+  :: LengthRankingConfigurationActivationPolicy
+  -> DisabledLengthAssessmentConfiguration
+  -> IO (LengthRankingPolicy, LeanLengthContractSelection)
+expectLengthAssessmentConfigurationActivation policy disabled =
+  case activateLengthAssessmentConfiguration policy disabled of
+    Left failure -> assertFailure
+      ("assessment configuration activation failed: " ++ show failure)
+        >> error "unreachable"
     Right configuration -> pure configuration
 
 assertLengthRankingConfigurationFileError
@@ -7743,6 +8614,17 @@ assertLengthRankingConfigurationFileError expected document =
     Left failure -> failure @?= expected
     Right _ -> assertFailure $ "expected configuration-file failure: " ++
       show expected
+
+assertLengthAssessmentConfigurationFileError
+  :: LengthRankingConfigurationFileError
+  -> Json.JValue
+  -> IO ()
+assertLengthAssessmentConfigurationFileError expected document =
+  case decodeLengthAssessmentConfigurationFile
+      $ encodeLengthRankingConfigurationFile document of
+    Left failure -> failure @?= expected
+    Right _ -> assertFailure $ "expected assessment-configuration failure: "
+      ++ show expected
 
 setJsonField :: [String] -> Json.JValue -> Json.JValue -> Json.JValue
 setJsonField [] _ source = source

@@ -2,6 +2,12 @@
 
 Date: 2026-08-14
 
+> **Later 2026-08-14 follow-up.** Main now exposes this nominal pair runner
+> through startup configuration version 4 and contract-only version 6. The new
+> generalized decoders dispatch a passive scalar-or-pair selection while the
+> established scalar decoders remain exact and reject the new versions. See the
+> [binary-product Length configuration report](2026-08-14-binary-product-length-configuration.md).
+
 ## Outcome
 
 Leant now consumes Djex's live
@@ -24,10 +30,10 @@ The public library surface is split by responsibility:
 - `Leant.Synth.Length.Presentation` projects pair receipts to bounded terminal
   notes without separating evidence from the candidate which produced it.
 
-This is an additive library checkpoint. Main does not yet select the pair
-domain. The existing startup ranking configuration versions 1--3 and
-contract-only versions 1--5 remain scalar-only; prospective startup version 4
-and contract-only version 6 are explicitly deferred.
+This was initially an additive library checkpoint: Main did not yet select the
+pair domain, startup ranking configuration versions 1--3 and contract-only
+versions 1--5 remained scalar-only, and startup version 4 plus contract-only
+version 6 were reserved for the later file-boundary checkpoint linked above.
 
 ## Concrete policy entrance
 
@@ -211,7 +217,7 @@ between those separate calls, or any evidence. Within any one Djex session,
 however, scalar and product transactions consume the same configured total
 query counter; the domain distinction never doubles that capability budget.
 
-## Deferred configuration work
+## Configuration work deferred at this checkpoint
 
 This checkpoint intentionally does not:
 
@@ -221,7 +227,9 @@ This checkpoint intentionally does not:
 - infer a product contract from `Prod` syntax; or
 - retain a product policy or contract in interactive state.
 
-Startup configuration version 4 and contract-only version 6 are reserved as
-future, separately reviewed grammar work. Until that work lands, the live
-canonical-`Prod` API is an explicit library entrance and the existing scalar
-file versions continue to reject product-only fields.
+The later configuration checkpoint resolves the first two items with startup
+version 4 and contract-only version 6. It deliberately leaves the remaining
+three items unchanged: selection is explicit, no product contract is inferred
+from Lean syntax, and no contract is retained in interactive state. Existing
+scalar file versions and scalar-only compatibility decoders still reject the
+new product versions and fields.

@@ -107,15 +107,18 @@ session environment; `#`-commands pass straight through.
 
 Finite-list-spine Length counterexample ranking is disabled by default. To opt
 in, pass `--length-ranking-config` with an explicitly chosen absolute path to
-a version-1, version-2, or version-3 configuration file. Version 1 preserves
+a version-1, version-2, version-3, or version-4 configuration file. Versions
+1--3 select scalar finite-list-spine Length ranking. Version 1 preserves
 the established counterexample-only behavior. Version 2 additionally requires
 an explicit per-input finite box and enables independent bounded validation
 after a live `unsat` trigger. Version 3 retains that exact box and requires
 `"counterexampleProbe": "origin-before-live"`; after the four-entry MRU bank
 misses, each exact query asks Djex to replay its canonical all-zero input before
-Leant issues that candidate's live Z3 query. Leant admits and reads that file
+Leant issues that candidate's live Z3 query. Version 4 retains version 3's
+operational policy but selects the nominal canonical-`Prod` domain through a
+required binary-product-spine contract. Leant admits and reads that file
 once at startup, requires the configuration to contain an executable SHA-256
-expectation by default, and retains the decoded contract as a fixed
+expectation by default, and retains the decoded contract selection as a fixed
 process-wide assertion. Presence at activation is not a digest match; Djex
 compares the expectation with its bounded pre-spawn file observation only when
 an eligible batch later opens a worker.
@@ -135,8 +138,8 @@ worker by themselves. The default `djinn` synthesis engine supplies no typed
 graph; select `:set synth-engine exference` or `both` to produce candidates
 which may reach this ranking path.
 
-After startup activation, one command may replace only the fixed compatibility
-contract with an explicitly named contract-only document:
+After startup activation, one command may replace only the fixed startup
+contract selection with an explicitly named contract-only document:
 
 ```text
 :synth --length-contract ABSOLUTE-PATH -- TYPE
@@ -161,12 +164,17 @@ retains roles and modulo, requires an explicit case policy, accepts exactly
 `"cases-rejected"` or `"exact-spine-zero-step-v1"`, and adds
 `["quotient", positiveLiteral, expression]` to preconditions, postconditions,
 and provider transfers. Thus quotient does not itself grant case authority.
-All three startup configuration versions retain the compatibility contract
-grammar from version 1 and reject roles, candidate-case policy, modulo, and
-quotient.
+Version 6 is the separately typed binary-product-spine form: its required
+`"resultShape": "binary-prod-spines-v1"` selects a pair contract whose result
+variables are `["result", "first"]` and `["result", "second"]`. It retains
+version 5's arithmetic, explicit target roles, and explicit case-policy
+vocabulary. Startup versions 1--3 retain the scalar compatibility contract
+grammar from version 1 and reject roles, candidate-case policy, modulo,
+quotient, and product-only fields. Startup version 4 requires the version-6
+pair contract grammar.
 No contract-only version can
 replace the executable, pin choice, solver limits, artifact policy, or replay
-limits. The decoded contract is carried only through
+limits. The decoded contract selection is carried only through
 that command's ordinary, universe-retry, provider, and classical synthesis
 lanes; it is not stored in `ReplState`, `ParsedGoal`, snapshots, history, or a
 cache, and later commands return to the startup-fixed contract unless they name
@@ -411,23 +419,144 @@ MRU state, and presentation remain product-specific and cannot be cast from
 their scalar siblings. The existing scalar path, public scalar types, query
 bytes, ranking behavior, and presentation are unchanged.
 
-Product selection remains a library-level opt-in. The existing startup
-`--length-ranking-config` and command-local `--length-contract` JSON grammars
-still select only scalar ranking. Their prospective product versions (startup
-version 4 and contract-only version 6) are explicitly deferred and are not
-accepted by this checkpoint. See the
+Main now exposes that same product path through closed, separately typed file
+versions. Contract-only version 6 has the same three-field root as versions
+1--5, but its version selects a pair contract and requires the closed result
+shape. For example, `/absolute/path/pair-contract-v6.json` can state that the
+first result length equals the input length and the second equals half of it:
+
+```json
+{
+  "format": "leant-finite-list-spine-length-contract",
+  "version": 6,
+  "contract": {
+    "resultShape": "binary-prod-spines-v1",
+    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
+    "targetArgumentRoles": ["observed-spine"],
+    "candidateCasePolicy": "cases-rejected",
+    "precondition": ["truth", true],
+    "postcondition": [
+      "all",
+      [
+        ["equal", ["result", "first"], ["input", 0]],
+        ["equal", ["result", "second"],
+          ["quotient", 2, ["input", 0]]]
+      ]
+    ],
+    "providerLaws": []
+  }
+}
+```
+
+Startup version 4 selects pair ranking process-wide and retains version 3's
+required input box and origin-before-live policy. A complete unpinned example
+is:
+
+```json
+{
+  "format": "leant-live-length-ranking-configuration",
+  "version": 4,
+  "executionAdmission": {
+    "executablePathCharacters": 4096,
+    "policyFingerprintBytes": 262144
+  },
+  "execution": {
+    "executablePath": "/absolute/path/to/z3",
+    "expectedExecutableSha256": null,
+    "solverTimeoutMilliseconds": 1000,
+    "solverResourceLimit": 100000,
+    "hostDeadlineMilliseconds": 1500,
+    "artifactPolicy": "input-values-after-satisfiable",
+    "responseLimits": {
+      "bytes": 65536,
+      "nestingDepth": 64,
+      "nodes": 4096,
+      "tokenBytes": 4096,
+      "integerBits": 4096
+    }
+  },
+  "evaluation": {
+    "assignmentValueBits": 4096,
+    "intermediateValueBits": 4096
+  },
+  "inputBoxValidation": {
+    "inclusiveInputMaximums": [3],
+    "maximumAssignments": 4
+  },
+  "counterexampleProbe": "origin-before-live",
+  "contract": {
+    "resultShape": "binary-prod-spines-v1",
+    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
+    "targetArgumentRoles": ["observed-spine"],
+    "candidateCasePolicy": "cases-rejected",
+    "precondition": ["truth", true],
+    "postcondition": [
+      "all",
+      [
+        ["equal", ["result", "first"], ["input", 0]],
+        ["equal", ["result", "second"],
+          ["quotient", 2, ["input", 0]]]
+      ]
+    ],
+    "providerLaws": []
+  }
+}
+```
+
+Because that example intentionally has no executable digest expectation, start
+it only with the separate explicit relaxation:
+
+```text
+leant --length-ranking-config /absolute/path/pair-ranking-v4.json \
+  --length-ranking-allow-unpinned
+```
+
+Then select a typed Exference-producing engine and synthesize normally. A
+contract-only v6 document can replace the startup-fixed contract for one
+command without changing the CLI grammar:
+
+```text
+:set synth-engine exference
+:synth List Nat → Prod (List Nat) (List Nat)
+:synth --length-contract /absolute/path/pair-contract-v6.json -- List Nat → Prod (List Nat) (List Nat)
+```
+
+Versions, not a redundant domain field, choose the grammar. Pair contract
+objects have exactly `resultShape`, `spine`, `targetArgumentRoles`,
+`candidateCasePolicy`, `precondition`, `postcondition`, and `providerLaws`.
+After the bounded root/schema gates, v6 validates those fields in that order;
+v4 first validates execution admission, execution, evaluation, input-box
+validation, and the closed origin-probe selection, then validates the pair
+contract in the same order. JSON object member order is immaterial. The pair
+grammar retains v5's modulo, positive-literal quotient, formulas, and provider
+laws, but admits only `["input", n]`, `["result", "first"]`, and
+`["result", "second"]` as contract variables. Its target-role vector is
+required, and its case policy is exactly `"cases-rejected"` or
+`"exact-spine-zero-step-v1"`.
+
+The old scalar decoders remain exact compatibility entrances: the startup
+decoder for versions 1--3 rejects v4, and the contract-only decoder for
+versions 1--5 rejects v6. The generalized decoders delegate those old versions
+to their unchanged scalar paths. A product file selects which nominal runner
+Main calls; it does not infer a contract from the Lean type, bypass the exact
+canonical-`Prod` handoff, turn solver status into evidence, or grant pruning
+authority. See the
 [canonical `Prod` Length handoff report](docs/reports/2026-08-14-canonical-prod-length-handoff.md)
 for the exact handoff boundary and the
 [live binary-product Length ranking report](docs/reports/2026-08-14-live-binary-product-length-ranking.md)
-for the live orchestration, authority, and compatibility details.
+for the live orchestration, authority, and compatibility details. The closed
+v4/v6 file boundary is recorded in the
+[binary-product Length configuration report](docs/reports/2026-08-14-binary-product-length-configuration.md).
 
-On the existing scalar Main path, after a successful occurrence seal, Main
-prints a subordinate note only for a
-candidate carrying an independently replayed counterexample. The note calls it
-a replayed, model-relative finite-list-spine Length counterexample, gives a
-bounded summary of observed input and result spine lengths, and reports only the number
-of assumed provider laws used by that candidate. The semantic note never
-projects the receipt's private provider-name list. Disabled assessment,
+After a successful occurrence seal, Main dispatches presentation through the
+selected scalar or pair domain and prints a subordinate note only for a
+candidate carrying independently validated evidence. A scalar counterexample
+note summarizes its observed input and result spine lengths; a pair note keeps
+the first and second result lengths source ordered. Both call the receipt
+replayed and model-relative and report only the number of assumed provider laws
+used by that candidate. Independently completed finite-box notes instead give
+the bounded maxima and checked/applicable assignment counts. The semantic note
+never projects the receipt's private provider-name list. Disabled assessment,
 rejected input, heuristic status,
 and atomic operational fallback add no semantic note. The note can explain a
 stable demotion; it never proves, prunes, or claims concrete Lean behavior.
@@ -447,7 +576,7 @@ stable demotion; it never proves, prunes, or claims concrete Lean behavior.
 | `:search TEXT` | case-insensitive name search over the environment |
 | `:search? TYPE` | proof search: what proves TYPE? (via `exact?`) |
 | `:synth TYPE` | verified term synthesis (see below) |
-| `:synth --length-contract ABSOLUTE-PATH -- TYPE` | use one passive Length contract for this synthesis command |
+| `:synth --length-contract ABSOLUTE-PATH -- TYPE` | use one passive scalar-or-pair Length contract selection for this synthesis command |
 | `:prove [PROP]` | interactive prove mode; bare form resumes the last `sorry` |
 | `:set OPT VAL` | `set_option` persisting in the session |
 | `:undo` | revert the last state-changing command |
@@ -847,10 +976,11 @@ replay-limit source. After validation, `LengthRankingPolicy` retains the
 opaque sealed Djex execution configuration and evaluation limits plus a
 private optional origin probe and an independent optional finite-input-box
 orchestration policy. `mkLengthRankingPolicy` leaves both disabled. The finite
-box is enabled by its explicit builder or the version-2 decoder; version 3
-enables both policies. A `LeanLengthContract` is supplied separately to each
-`rankVerifiedLengthCandidatesWithPolicy` call, so a request assertion no longer
-has to share the lifetime of reusable process policy. Execution validation
+box is enabled by its explicit builder or the version-2 decoder; versions 3
+and 4 enable both policies. A scalar `LeanLengthContract` or nominal
+`LeanLengthSpinePairContract` is supplied separately to its domain-specific
+runner, so a request assertion no longer has to share the lifetime of reusable
+process policy. Execution validation
 precedes replay-limit validation. The sealed policy is opaque, has no path or
 digest-byte projection, and retains no worker; a closed classifier reveals only
 whether its execution policy contains a digest expectation. The explicit
@@ -881,7 +1011,12 @@ records removal of the redundant generic configuration aggregate while
 preserving the version-1 compatibility path.
 
 `Leant.Synth.Length.Configuration.File` keeps the exact version-1 JSON grammar
-for that policy and adds exact opt-in versions 2 and 3. The pure decoder consumes a caller-owned
+for that policy and adds exact scalar opt-in versions 2 and 3. Its established
+`decodeLengthRankingConfigurationFile` remains an exact scalar-only entrance
+and rejects version 4. The generalized
+`decodeLengthAssessmentConfigurationFile` additionally accepts version 4 and
+returns an opaque `DisabledLengthAssessmentConfiguration` carrying the same
+checked process policy beside a lazy pair selection. The pure decoder consumes a caller-owned
 strict byte string through a separate bounded JSON parser, rejects malformed
 UTF-8, duplicate keys, unknown or missing fields, non-integral policy numbers,
 and any parser, contract, or operational value above its hard ceiling. Every
@@ -925,6 +1060,15 @@ permission for the query-owned all-zero replay after four MRU misses; it
 contains no arity, vector, solver status, receipt, or verdict. Versions 1 and 2
 reject the field, retain their exact ranking behavior, and never run the probe.
 
+Version 4 preserves that complete operational grammar and order but replaces
+the embedded scalar compatibility contract with the required closed pair
+contract described above. The version is the domain selection; no independent
+domain tag can disagree with it. Generalized decoding delegates versions 1--3
+to their established decoder and wraps the resulting scalar contract without
+changing old failure precedence. `activateLengthAssessmentConfiguration`
+performs the same separate digest-policy decision for either domain and still
+does not inspect the lazy contract or launch Z3.
+
 `Leant.Synth.Length.Configuration.File.Acquire` is the compatibility facade
 over the shared bounded `Leant.Synth.Length.File.Acquire` filesystem boundary.
 Callers must explicitly
@@ -938,7 +1082,9 @@ cleanup bit rather than paths, errno text, or file content. The timeout is an
 interruption budget rather than a hard kernel deadline, final-component
 no-follow does not exclude ancestor symlinks or in-place mutation, and Windows
 fails closed until an equivalent native handle implementation exists. Main
-uses the configuration facade only for its explicit startup CLI path; there is
+uses `loadLengthAssessmentConfigurationFile` for its explicit startup CLI path;
+the old `loadLengthRankingConfigurationFile` remains the scalar-only
+compatibility entrance. There is
 still no discovery or default path, and loading/activation alone never launches
 a solver. See the
 [bounded acquisition report](docs/reports/2026-08-11-bounded-live-length-ranking-configuration-acquisition.md).
@@ -955,10 +1101,13 @@ and requires the sole admitted candidate-case policy,
 `exact-spine-zero-step-v1`; versions 1--3 reject that field. Version 5 retains
 roles, modulo, and required explicit case choice; it accepts exactly
 `cases-rejected` or `exact-spine-zero-step-v1` and alone adds positive-literal
-Natural quotient. Execution and
-evaluation fields remain unknown and rejected, and all three startup
-configuration versions retain contract grammar version 1, so they reject both later
-authorities.
+Natural quotient. The established `decodeLengthContractFile` still accepts
+exactly those scalar versions 1--5 and rejects version 6. The generalized
+`decodeLengthContractSelectionFile` additionally admits v6's nominal pair
+contract, while delegating every older version to that unchanged scalar
+decoder. Execution and evaluation fields remain unknown and rejected. Startup
+versions 1--3 retain scalar contract grammar version 1; startup v4 alone
+selects the pair grammar.
 Its `Contract.File.Acquire` facade uses the same path, descriptor, and timeout
 owner as startup acquisition, but maps failures into contract-only closed
 vocabulary. `Leant.Synth.Length.Command` recognizes only the exact
@@ -968,12 +1117,14 @@ request syntax cannot disappear into Lean goal text.
 `Leant.Synth.Length.Integration` authorizes an explicit request from the
 already activated policy before Main admits or opens its contract path. The
 result is an opaque command-local choice containing either the historical
-disabled identity or one strict policy beside one lazy contract. Compatibility
-and one-shot contracts enter the same occurrence-sealed assessor; the request
-does not remember a second policy/contract origin tag. Main loads a named
-contract once before translating the goal and threads that value through every
-retry and synthesis lane. It never writes the request to interactive state or
-a snapshot. See the
+disabled identity or one strict policy beside one lazy scalar-or-pair
+selection. `LeanLengthContractSelection` is passive and nominal: dispatch
+chooses exactly one scalar or pair occurrence-sealed assessor, and the two
+ranking/evidence result types remain separate. Compatibility and one-shot
+contracts enter the same lifetime owner; the request does not remember a
+second policy/contract origin tag. Main loads a named contract once before
+translating the goal and threads that value through every retry and synthesis
+lane. It never writes the request to interactive state or a snapshot. See the
 [one-shot contract report](docs/reports/2026-08-13-one-shot-length-contract.md).
 The version-2 extension and its QF_LIA witness boundary are recorded in the
 [contract-only v2 modulo report](docs/reports/2026-08-13-contract-only-v2-modulo.md).

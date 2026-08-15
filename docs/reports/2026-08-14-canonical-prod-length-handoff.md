@@ -7,9 +7,11 @@ Date: 2026-08-14
 > and presentation path. It reuses only the domain-neutral execution policy
 > and common Djex session limits; product contracts, observations, evidence,
 > failures, MRU state, and assessments remain distinct from scalar Length.
-> Product startup configuration version 4 and contract-only version 6 remain
-> deferred. See the
-> [live binary-product Length ranking report](2026-08-14-live-binary-product-length-ranking.md).
+> Main now exposes that runner through startup configuration version 4 and
+> contract-only version 6 without weakening the nominal boundary. See the
+> [live binary-product Length ranking report](2026-08-14-live-binary-product-length-ranking.md)
+> and the
+> [binary-product Length configuration report](2026-08-14-binary-product-length-configuration.md).
 
 ## Outcome
 
@@ -189,6 +191,7 @@ The later live-ranking checkpoint resolves the live execution, ranking,
 replay-bank, origin, input-box, and presentation items through nominal
 product-specific APIs. It deliberately reuses the common capability-probed
 Djex live session instead of introducing a second worker type; the common
-session budget grants no scalar-to-product evidence conversion. Product
-startup/command configuration and automatic contract inference remain
-deferred.
+session budget grants no scalar-to-product evidence conversion. The subsequent
+configuration checkpoint resolves product startup/command selection through
+explicit v4/v6 documents. Automatic contract inference remains deliberately
+absent.

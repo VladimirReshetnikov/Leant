@@ -53,6 +53,7 @@ import Leant.Synth.Length.Integration
   ( LengthAssessmentResult
   , lengthAssessmentCandidates
   , lengthAssessmentRanking
+  , lengthAssessmentSpinePairRanking
   )
 import Leant.Synth.Length.PostVerification
   ( LengthPostVerificationResult
@@ -110,8 +111,10 @@ presentLengthAssessment
   -> [LengthCandidatePresentation]
 presentLengthAssessment assessment = case lengthAssessmentRanking assessment of
   Just ranking -> presentLengthRanking ranking
-  Nothing -> map presentUnassessedCandidate
-    $ lengthAssessmentCandidates assessment
+  Nothing -> case lengthAssessmentSpinePairRanking assessment of
+    Just ranking -> presentLengthSpinePairRanking ranking
+    Nothing -> map presentUnassessedCandidate
+      $ lengthAssessmentCandidates assessment
 
 -- | Present one completed occurrence-sealed adapter result. Rejection has no
 -- ranking and therefore no semantic note; accepted output traverses the same

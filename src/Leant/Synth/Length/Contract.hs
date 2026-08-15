@@ -13,6 +13,7 @@ module Leant.Synth.Length.Contract
   , LeanLengthCandidateCasePolicy (..)
   , LeanLengthContract (..)
   , LeanLengthSpinePairContract (..)
+  , LeanLengthContractSelection (..)
   ) where
 
 import Language.Haskell.Djex
@@ -87,10 +88,11 @@ data LeanLengthContract = LeanLengthContract
 -- canonical Lean @Prod@ and whose two source-ordered fields are applications
 -- of the same configured spine.
 --
--- This additive source value is not decoded by the existing contract-file
--- grammars.  Like 'LeanLengthContract', it remains a passive assertion until
--- the exact accepted typed origin, family/provider provenance, contract, and
--- candidate are sealed together by the product handoff.
+-- The established scalar file grammars do not decode this additive source
+-- value; the domain-selecting startup-v4 and contract-only-v6 entrances do.
+-- Like 'LeanLengthContract', it remains a passive assertion until the exact
+-- accepted typed origin, family/provider provenance, contract, and candidate
+-- are sealed together by the product handoff.
 data LeanLengthSpinePairContract = LeanLengthSpinePairContract
   { leanLengthSpinePairContractSpine :: LeanLengthSpineIdentity
   , leanLengthSpinePairContractTargetArgumentRoles ::
@@ -100,4 +102,13 @@ data LeanLengthSpinePairContract = LeanLengthSpinePairContract
   , leanLengthSpinePairContractSource :: LengthSpinePairContractSource
   , leanLengthSpinePairContractProviderLaws :: [LeanLengthProviderLaw]
   }
+  deriving (Eq, Show)
+
+-- | Passive domain selection decoded by the additive configuration and
+-- contract-file entrances.  Neither branch carries execution authority, and
+-- both payloads remain lazy so domain dispatch does not inspect a contract
+-- before the established activation and request-admission boundaries.
+data LeanLengthContractSelection
+  = LeanLengthScalarContractSelection LeanLengthContract
+  | LeanLengthSpinePairContractSelection LeanLengthSpinePairContract
   deriving (Eq, Show)

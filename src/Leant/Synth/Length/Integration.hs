@@ -1,12 +1,12 @@
--- | Explicit optional integration of finite-list-spine Length ranking.
+-- | Explicit optional integration of finite-spine Length ranking.
 --
 -- This module owns the complete caller-facing transition from an explicitly
 -- named configuration file to one reusable, activated ranking policy and the
--- file's fixed compatibility contract.  The configuration file's embedded
--- compatibility contract is a fixed startup choice for the process: every
--- later verified batch is checked against that same contract, while every
--- eligible batch still gets a fresh worker scope.  This module also owns the
--- disabled identity branch used by Main.  Loading performs
+-- file's fixed nominal domain selection and contract.  That selection is a
+-- fixed startup choice for the process: every later verified batch is checked
+-- against the same contract, while every eligible batch still gets a fresh
+-- worker scope.  This module also owns the disabled identity branch used by
+-- Main.  Loading performs
 -- bounded acquisition and closed activation only; no solver is launched until
 -- an eligible verified batch is assessed, and every such batch still receives
 -- a fresh lexical worker scope from the ranking layer.
@@ -24,31 +24,35 @@ module Leant.Synth.Length.Integration
   , compatibilityLengthAssessmentRequest
   , authorizeExplicitLengthAssessmentRequest
   , explicitLengthAssessmentRequest
+  , explicitLengthAssessmentSelectionRequest
   , LengthAssessmentFailure (..)
   , LengthAssessmentResult
   , assessLengthVerificationBatch
   , assessLengthVerificationRequest
   , lengthAssessmentCandidates
   , lengthAssessmentRanking
+  , lengthAssessmentSpinePairRanking
   , lengthAssessmentFailure
   , lengthAssessmentPostVerificationResult
+  , lengthAssessmentSpinePairPostVerificationResult
   ) where
 
 import Leant.Synth.Engine (DetailedVerificationVariant)
 import Leant.Synth.Length.Configuration
   ( LengthRankingPolicy
   , assessVerifiedLengthCandidatesWithPolicy
+  , assessVerifiedLengthSpinePairCandidatesWithPolicy
   )
 import Leant.Synth.Length.Configuration.File
   ( LengthRankingConfigurationActivationError
   , LengthRankingConfigurationActivationPolicy (..)
-  , activateLengthRankingConfiguration
+  , activateLengthAssessmentConfiguration
   )
 import Leant.Synth.Length.Configuration.File.Acquire
   ( LengthRankingConfigurationFileAdmissionError
   , LengthRankingConfigurationFileLoadError
   , LengthRankingConfigurationFileSource (..)
-  , loadLengthRankingConfigurationFile
+  , loadLengthAssessmentConfigurationFile
   , mkLengthRankingConfigurationFileRequest
   )
 import Leant.Synth.Length.PostVerification
@@ -59,10 +63,25 @@ import Leant.Synth.Length.PostVerification
   , lengthPostVerificationRanking
   , lengthPostVerificationRankingFailure
   )
-import Leant.Synth.Length.Contract (LeanLengthContract)
+import Leant.Synth.Length.Contract
+  ( LeanLengthContract
+  , LeanLengthContractSelection (..)
+  )
 import Leant.Synth.Length.Ranking
   ( LengthRanking
   , LengthRankingFailure
+  )
+import Leant.Synth.Length.SpinePair.PostVerification
+  ( LengthSpinePairPostVerificationFailure
+  , LengthSpinePairPostVerificationResult
+  , lengthSpinePairPostVerificationAdapterFailure
+  , lengthSpinePairPostVerificationCandidates
+  , lengthSpinePairPostVerificationRanking
+  , lengthSpinePairPostVerificationRankingFailure
+  )
+import Leant.Synth.Length.SpinePair.Ranking
+  ( LengthSpinePairRanking
+  , LengthSpinePairRankingFailure
   )
 import Leant.Synth.PostVerification
   ( skipPostVerificationAssessment )
@@ -92,7 +111,7 @@ data LengthAssessmentMode
   | LengthAssessmentConfigured
       !LengthRankingConfigurationActivationPolicy
       !LengthRankingPolicy
-      LeanLengthContract
+      LeanLengthContractSelection
 
 -- | Closed refusal before a one-shot contract file may be touched.  An
 -- explicit contract can reuse only a policy which passed startup activation;
@@ -116,7 +135,7 @@ data LengthAssessmentRequest
   = LengthAssessmentRequestDisabled
   | LengthAssessmentEnabledRequest
       !LengthRankingPolicy
-      LeanLengthContract
+      LeanLengthContractSelection
 
 disabledLengthAssessmentMode :: LengthAssessmentMode
 disabledLengthAssessmentMode = LengthAssessmentDisabled
@@ -128,8 +147,8 @@ compatibilityLengthAssessmentRequest
   -> LengthAssessmentRequest
 compatibilityLengthAssessmentRequest mode = case mode of
   LengthAssessmentDisabled -> LengthAssessmentRequestDisabled
-  LengthAssessmentConfigured _ policy contract ->
-    LengthAssessmentEnabledRequest policy contract
+  LengthAssessmentConfigured _ policy selection ->
+    LengthAssessmentEnabledRequest policy selection
 
 -- | Authorize one explicit request before its path is admitted or read.
 -- Matching a configured mode does not inspect its fixed compatibility
@@ -153,7 +172,20 @@ explicitLengthAssessmentRequest
   -> LengthAssessmentRequest
 explicitLengthAssessmentRequest
     (ExplicitLengthAssessmentPermission policy) contract =
-  LengthAssessmentEnabledRequest policy contract
+  LengthAssessmentEnabledRequest policy
+    $ LeanLengthScalarContractSelection contract
+
+-- | Associate one successfully decoded passive domain selection with the
+-- exact startup-activated policy.  This additive entrance is used by Main;
+-- the established scalar wrapper above remains unchanged for callers which
+-- intentionally accept only scalar contracts.
+explicitLengthAssessmentSelectionRequest
+  :: ExplicitLengthAssessmentPermission
+  -> LeanLengthContractSelection
+  -> LengthAssessmentRequest
+explicitLengthAssessmentSelectionRequest
+    (ExplicitLengthAssessmentPermission policy) selection =
+  LengthAssessmentEnabledRequest policy selection
 
 -- | The permission decision that actually released a configured mode.
 -- This deliberately reports no executable path, digest bytes, or later
@@ -178,14 +210,14 @@ loadLengthAssessmentMode activation source =
     Left failure -> pure $ Left
       $ LengthAssessmentFileAdmissionRejected failure
     Right request -> do
-      loaded <- loadLengthRankingConfigurationFile request
+      loaded <- loadLengthAssessmentConfigurationFile request
       pure $ case loaded of
         Left failure -> Left $ LengthAssessmentFileLoadRejected failure
         Right disabled -> case
-            activateLengthRankingConfiguration activation disabled of
+            activateLengthAssessmentConfiguration activation disabled of
           Left failure -> Left $ LengthAssessmentActivationRejected failure
-          Right (policy, contract) -> Right
-            $ LengthAssessmentConfigured activation policy contract
+          Right (policy, selection) -> Right
+            $ LengthAssessmentConfigured activation policy selection
 
 -- | One sanitized reason why enabled ranking preserved callback order.
 -- Candidate-local preparation refusal remains part of the ranking report and
@@ -195,6 +227,10 @@ data LengthAssessmentFailure
       !LengthPostVerificationFailure
   | LengthAssessmentRankingFailed
       !LengthRankingFailure
+  | LengthAssessmentSpinePairPostVerificationFailed
+      !LengthSpinePairPostVerificationFailure
+  | LengthAssessmentSpinePairRankingFailed
+      !LengthSpinePairRankingFailure
   deriving (Eq, Ord, Show)
 
 -- | Common result for disabled and configured post-verification paths.
@@ -204,6 +240,8 @@ data LengthAssessmentResult
   = LengthAssessmentSkipped
       (VerificationBatch DetailedVerificationVariant)
   | LengthAssessmentCompleted !LengthPostVerificationResult
+  | LengthAssessmentSpinePairCompleted
+      !LengthSpinePairPostVerificationResult
 
 -- | Preserve callback order without IO when disabled.  When configured, check
 -- the exact verified batch against the startup-fixed contract through the
@@ -226,9 +264,14 @@ assessLengthVerificationRequest
 assessLengthVerificationRequest request verification = case request of
   LengthAssessmentRequestDisabled ->
     pure $ LengthAssessmentSkipped verification
-  LengthAssessmentEnabledRequest policy contract ->
-    LengthAssessmentCompleted <$>
-      assessVerifiedLengthCandidatesWithPolicy policy contract verification
+  LengthAssessmentEnabledRequest policy selection -> case selection of
+    LeanLengthScalarContractSelection contract ->
+      LengthAssessmentCompleted <$>
+        assessVerifiedLengthCandidatesWithPolicy policy contract verification
+    LeanLengthSpinePairContractSelection contract ->
+      LengthAssessmentSpinePairCompleted <$>
+        assessVerifiedLengthSpinePairCandidatesWithPolicy
+          policy contract verification
 
 lengthAssessmentCandidates
   :: LengthAssessmentResult
@@ -238,6 +281,8 @@ lengthAssessmentCandidates result = case result of
     skipPostVerificationAssessment verification
   LengthAssessmentCompleted assessed ->
     lengthPostVerificationCandidates assessed
+  LengthAssessmentSpinePairCompleted assessed ->
+    lengthSpinePairPostVerificationCandidates assessed
 
 -- | The receipt-associated compatibility ranking after the occurrence seal.
 -- Disabled assessment and rejected configured input have no ranking.  The
@@ -251,6 +296,18 @@ lengthAssessmentRanking result = case result of
   LengthAssessmentSkipped _ -> Nothing
   LengthAssessmentCompleted assessed ->
     lengthPostVerificationRanking assessed
+  LengthAssessmentSpinePairCompleted _ -> Nothing
+
+-- | The product-domain ranking after the occurrence seal.  Scalar and
+-- disabled assessments have no product ranking.
+lengthAssessmentSpinePairRanking
+  :: LengthAssessmentResult
+  -> Maybe LengthSpinePairRanking
+lengthAssessmentSpinePairRanking result = case result of
+  LengthAssessmentSkipped _ -> Nothing
+  LengthAssessmentCompleted _ -> Nothing
+  LengthAssessmentSpinePairCompleted assessed ->
+    lengthSpinePairPostVerificationRanking assessed
 
 lengthAssessmentPostVerificationResult
   :: LengthAssessmentResult
@@ -258,6 +315,15 @@ lengthAssessmentPostVerificationResult
 lengthAssessmentPostVerificationResult result = case result of
   LengthAssessmentSkipped _ -> Nothing
   LengthAssessmentCompleted assessed -> Just assessed
+  LengthAssessmentSpinePairCompleted _ -> Nothing
+
+lengthAssessmentSpinePairPostVerificationResult
+  :: LengthAssessmentResult
+  -> Maybe LengthSpinePairPostVerificationResult
+lengthAssessmentSpinePairPostVerificationResult result = case result of
+  LengthAssessmentSkipped _ -> Nothing
+  LengthAssessmentCompleted _ -> Nothing
+  LengthAssessmentSpinePairCompleted assessed -> Just assessed
 
 lengthAssessmentFailure
   :: LengthAssessmentResult
@@ -270,3 +336,10 @@ lengthAssessmentFailure result = case result of
     Nothing -> case lengthPostVerificationRankingFailure assessed of
       Nothing -> Nothing
       Just failure -> Just $ LengthAssessmentRankingFailed failure
+  LengthAssessmentSpinePairCompleted assessed -> case
+      lengthSpinePairPostVerificationAdapterFailure assessed of
+    Just failure -> Just
+      $ LengthAssessmentSpinePairPostVerificationFailed failure
+    Nothing -> case lengthSpinePairPostVerificationRankingFailure assessed of
+      Nothing -> Nothing
+      Just failure -> Just $ LengthAssessmentSpinePairRankingFailed failure

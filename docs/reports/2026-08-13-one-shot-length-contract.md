@@ -2,6 +2,11 @@
 
 Date: 2026-08-13
 
+> **Later 2026-08-14 follow-up.** The unchanged command grammar now also
+> accepts contract-only version 6, which selects the nominal canonical-`Prod`
+> pair domain. Versions 1--5 remain exact scalar contracts. See the
+> [binary-product Length configuration report](2026-08-14-binary-product-length-configuration.md).
+
 ## Outcome
 
 An activated Length-ranking policy can now assess one `:synth` command under a
@@ -183,13 +188,15 @@ equivalence. Future domains require their own checked semantics and evidence
 replay rather than an extension of this command parser into a generic solver
 interface.
 
-The additive canonical-`Prod` checkpoint follows that rule. Its
-`LeanLengthSpinePairContract` is a library-level passive source and is not
-decoded by startup configuration versions 1--3 or contract-only versions
-1--5. Its product query and replay boundary is offline only: no product option,
-JSON tag, live worker request, ranking policy, or presentation grammar is
-introduced here. See the
-[canonical `Prod` Length handoff report](2026-08-14-canonical-prod-length-handoff.md).
+The additive canonical-`Prod` checkpoint followed that rule. At that
+checkpoint its `LeanLengthSpinePairContract` was a library-level passive source
+not decoded by startup configuration versions 1--3 or contract-only versions
+1--5, and its product query/replay boundary was offline. Later nominal live
+ranking and explicit startup-v4/contract-v6 checkpoints extended this same
+command-local lifetime owner without changing those old scalar versions. See
+the [canonical `Prod` Length handoff report](2026-08-14-canonical-prod-length-handoff.md)
+and the
+[binary-product Length configuration report](2026-08-14-binary-product-length-configuration.md).
 
 Later additive contract-only versions preserve this command-local acquisition
 and lifetime owner. Version 3 adds explicit target roles and version 4 adds the
