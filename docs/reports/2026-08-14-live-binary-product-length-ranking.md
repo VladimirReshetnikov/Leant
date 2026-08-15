@@ -22,6 +22,13 @@ Date: 2026-08-14
 > generalized decoders dispatch a passive scalar-or-pair selection while the
 > established scalar decoders remain exact and reject the new versions. See the
 > [binary-product Length configuration report](2026-08-14-binary-product-length-configuration.md).
+>
+> **Later 2026-08-14 follow-up.** A programmatic policy can finalize every
+> product counterexample source through Djex's nominal query-owned bounded
+> simplifier. A strict reduction supplies the ordinary final pair receipt and
+> its inputs to the unchanged pair-local MRU bank; metadata remains attached
+> to the same occurrence for presentation. See the
+> [bounded counterexample simplification report](2026-08-14-bounded-length-counterexample-simplification.md).
 
 ## Outcome
 

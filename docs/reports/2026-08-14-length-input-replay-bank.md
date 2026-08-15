@@ -23,6 +23,12 @@ Date: 2026-08-14
 > gate. No scalar receipt, query, status, authority, or bank entry crosses that
 > nominal domain boundary. See the
 > [live binary-product Length ranking report](2026-08-14-live-binary-product-length-ranking.md).
+>
+> **Later 2026-08-14 follow-up.** An explicit programmatic policy can pass any
+> freshly replayed scalar or product counterexample through Djex's bounded
+> query-owned simplifier before assessment and bank promotion. Only the final
+> receipt's input vector enters this unchanged four-entry bank. See the
+> [bounded counterexample simplification report](2026-08-14-bounded-length-counterexample-simplification.md).
 
 ## Outcome and work bound
 

@@ -477,6 +477,44 @@ otherwise complete passive contract sources used to build the surrounding
 contracts, and that `basePolicy`, `inputBoxLimits`, and `verificationBatch`
 have the same checked meanings as in the preceding example.
 
+Counterexample simplification is another orthogonal, programmatic opt-in.  It
+uses the same checked Djex input-box limits for scalar and canonical-`Prod`
+ranking:
+
+```haskell
+let simplifiedPolicy =
+      enableLengthRankingCounterexampleSimplification
+        inputBoxLimits applicablePolicy
+
+scalarAssessment <- assessVerifiedLengthCandidatesWithPolicy
+  simplifiedPolicy scalarContract verificationBatch
+
+pairAssessment <- assessVerifiedLengthSpinePairCandidatesWithPolicy
+  simplifiedPolicy pairContract verificationBatch
+```
+
+Every independently replayed counterexample—whether found by the MRU bank,
+applicable-domain traversal, origin probe, live observation, or post-`unsat`
+box—passes through one query-owned finalization seam.  Djex first revalidates
+the anchor, then searches the complete componentwise-dominated input box from
+zero in lexicographic order with the last input varying fastest.  A strict
+reduction becomes the ordinary final counterexample, and only its reduced
+inputs enter the four-entry MRU bank.  The ranked candidate retains separate
+opaque simplification metadata through
+`rankedLengthCandidateCounterexampleSimplification` or the spine-pair sibling,
+so presentation can report the original inputs, final inputs, and exact number
+of lower-box assignments inspected without changing the counterexample
+assessment type.
+
+Width or Cartesian-product refusal, or an anchor which is already the first
+violation, retains the original receipt and makes no simplification claim.  A
+bounded evaluation rejection during an optional earlier trial does the same;
+structural, anchor, internal, and association failures remain indexed atomic
+failures.  This policy is disabled by every established direct runner and
+startup version 1 through 6.  It is bounded componentwise-lexicographic
+simplification, not global minimality, pruning authority, or a new conclusion
+from Z3.
+
 For each eligible product query, the exact execution order is the product
 batch's newest-first four-entry MRU input replay bank, the optional query-owned
 applicable-domain validation, the optional query-owned origin probe, a live
@@ -488,6 +526,9 @@ continues to the origin/live stages. Under the historical/default policy, a
 freshly replayed
 and associated pair counterexample is the only assessment which moves: it
 enters the stable demoted partition and can supply an MRU input vector.
+When simplification is enabled, the finalized receipt and its final input
+vector take those same roles; acquisition order and live transaction order do
+not change.
 Complete box traversal is `LengthSpinePairBoundedPositive` and remains neutral
 unless the new preference is explicitly enabled. With that preference, a
 receipt whose applicable-assignment count is positive enters a stable preferred

@@ -13,6 +13,13 @@
 > counterexample note. An origin miss or indexed atomic failure produces no new
 > semantic presentation. See the
 > [origin-probe orchestration report](2026-08-14-length-origin-probe-orchestration.md).
+>
+> **Later 2026-08-14 follow-up.** The explicit counterexample-simplification
+> policy retains opaque metadata beside the ordinary final receipt. Associated
+> presentation then reports the bounded componentwise-lexicographic reduction,
+> original and final inputs, and inspected assignment count under the same
+> sanitization ceiling. See the
+> [bounded counterexample simplification report](2026-08-14-bounded-length-counterexample-simplification.md).
 
 ## Scope
 
