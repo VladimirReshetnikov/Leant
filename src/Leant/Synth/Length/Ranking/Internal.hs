@@ -39,9 +39,12 @@
 -- cached verdicts, solver results, receipts, or proofs, and it never crosses a
 -- ranking batch.
 --
--- The private opener/finalizer budgets and the execution policy's per-query
--- host budget remain separate; this function promises no batch-wide hard
--- wall-clock deadline.  Synchronous and asynchronous exceptions are not
+-- Historical entrances retain separate opener/finalizer and per-query host
+-- windows.  The additive usable-work entrance instead captures one shared
+-- owner after admission and before preparation.  It remains an observed
+-- normal-return boundary, not an asynchronous watchdog: nested final readiness
+-- and cleanup use fresh private windows, but the outer owner checks only after
+-- those stages return and may then reject the batch.  Exceptions are not
 -- caught here and retain the live facade's durable-cleanup behavior.
 module Leant.Synth.Length.Ranking.Internal
   ( LengthRankingInputError (..)
@@ -94,11 +97,15 @@ module Leant.Synth.Length.Ranking.Internal
   , rankPostVerificationLengthCandidatesWithRankingPolicies
   , rankVerifiedLengthCandidatesWithRankingPoliciesAndLiveSessionOpening
   , rankPostVerificationLengthCandidatesWithRankingPoliciesAndLiveSessionOpening
+  , rankVerifiedLengthCandidatesWithRankingPoliciesAndUsableWorkBudget
+  , rankPostVerificationLengthCandidatesWithRankingPoliciesAndUsableWorkBudget
   , promoteCounterexampleSeed
   , replayCounterexampleSeeds
   ) where
 
-import Control.DeepSeq (force)
+import Control.DeepSeq (NFData (rnf), force)
+import Control.Exception (evaluate)
+import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.List (partition)
 import Numeric.Natural (Natural)
 
@@ -125,6 +132,8 @@ import Language.Haskell.Djex
   , LengthSMTLibLiveSession
   , LengthSMTLibLiveSessionError
   , LengthSMTLibLiveSessionFailure
+  , LengthSMTLibLiveUsableWorkBudget
+  , LengthSMTLibLiveUsableWorkDeadline
   , SolverStatus (..)
   , ValidatedLengthApplicableDomain
   , ValidatedLengthCounterexample
@@ -151,6 +160,8 @@ import Language.Haskell.Djex
   , validatedLengthInputBoxApplicableAssignmentCount
   , validatedLengthPositiveAffineApplicableDomainApplicableAssignmentCount
   , withLengthSMTLibLiveSession
+  , withLengthSMTLibLiveSessionUnderDeadline
+  , withLengthSMTLibLiveUsableWorkDeadline
   )
 
 import Leant.Synth.Engine (DetailedVerificationVariant)
@@ -805,6 +816,205 @@ rankPostVerificationLengthCandidatesWithRankingPoliciesAndLiveSessionOpening
   rankAssociatedLengthCandidatesWithLiveSessionOpening inputBoxPolicy
     applicableDomainPolicy originProbePolicy simplificationPolicy openingPolicy
     execution evaluation contract postVerificationCandidateVerified
+
+-- | Budgeted complete-policy entrance.  Admission remains outside the shared
+-- owner; every preparation, pure evidence pass, live operation, final ranking
+-- transform, and ranking-owned result thunk is evaluated beneath the one
+-- captured usable-work deadline.
+rankVerifiedLengthCandidatesWithRankingPoliciesAndUsableWorkBudget
+  :: (LengthRanking -> LengthRanking)
+  -> LengthSMTLibLiveUsableWorkBudget
+  -> LengthInputBoxRankingPolicy
+  -> LengthApplicableDomainRankingPolicy
+  -> LengthOriginProbeRankingPolicy
+  -> LengthCounterexampleSimplificationRankingPolicy
+  -> LengthLiveSessionOpeningPolicy
+  -> LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LeanLengthContract
+  -> [Verified DetailedVerificationVariant]
+  -> IO (Either LengthRankingInputError LengthRanking)
+rankVerifiedLengthCandidatesWithRankingPoliciesAndUsableWorkBudget finalize
+    budget inputBoxPolicy applicableDomainPolicy originProbePolicy
+    simplificationPolicy openingPolicy execution evaluation contract
+    candidates =
+  rankAssociatedLengthCandidatesWithUsableWorkBudget budget
+    (finalize . projectAssociatedLengthRankingWith id)
+    forceLengthRankingOwnedResult inputBoxPolicy applicableDomainPolicy
+    originProbePolicy simplificationPolicy openingPolicy execution evaluation
+    contract id candidates
+
+-- | Occurrence-associated budgeted sibling.  The caller supplies only the
+-- closed stable ranking transform; occurrence associations retain their
+-- established WHNF demand and are never given an 'NFData' requirement.
+rankPostVerificationLengthCandidatesWithRankingPoliciesAndUsableWorkBudget
+  :: (AssociatedLengthRanking
+        (PostVerificationCandidate epoch DetailedVerificationVariant)
+      -> AssociatedLengthRanking
+        (PostVerificationCandidate epoch DetailedVerificationVariant))
+  -> LengthSMTLibLiveUsableWorkBudget
+  -> LengthInputBoxRankingPolicy
+  -> LengthApplicableDomainRankingPolicy
+  -> LengthOriginProbeRankingPolicy
+  -> LengthCounterexampleSimplificationRankingPolicy
+  -> LengthLiveSessionOpeningPolicy
+  -> LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LeanLengthContract
+  -> [PostVerificationCandidate epoch DetailedVerificationVariant]
+  -> IO
+      (Either LengthRankingInputError
+        (AssociatedLengthRanking
+          (PostVerificationCandidate epoch DetailedVerificationVariant)))
+rankPostVerificationLengthCandidatesWithRankingPoliciesAndUsableWorkBudget
+    finalize budget inputBoxPolicy applicableDomainPolicy originProbePolicy
+    simplificationPolicy openingPolicy execution evaluation contract
+    candidates =
+  rankAssociatedLengthCandidatesWithUsableWorkBudget budget finalize
+    forceAssociatedLengthRankingOwnedResult inputBoxPolicy
+    applicableDomainPolicy originProbePolicy simplificationPolicy openingPolicy
+    execution evaluation contract postVerificationCandidateVerified candidates
+
+data LengthUsableWorkSnapshot association = LengthUsableWorkSnapshot
+  ![PreparedLengthCandidate association]
+  !Bool
+
+type role LengthUsableWorkSnapshot nominal
+
+rankAssociatedLengthCandidatesWithUsableWorkBudget
+  :: LengthSMTLibLiveUsableWorkBudget
+  -> (AssociatedLengthRanking association -> result)
+  -> (result -> ())
+  -> LengthInputBoxRankingPolicy
+  -> LengthApplicableDomainRankingPolicy
+  -> LengthOriginProbeRankingPolicy
+  -> LengthCounterexampleSimplificationRankingPolicy
+  -> LengthLiveSessionOpeningPolicy
+  -> LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LeanLengthContract
+  -> (association -> Verified DetailedVerificationVariant)
+  -> [association]
+  -> IO (Either LengthRankingInputError result)
+rankAssociatedLengthCandidatesWithUsableWorkBudget budget finish forceResult
+    inputBoxPolicy applicableDomainPolicy originProbePolicy
+    simplificationPolicy openingPolicy execution evaluation contract
+    verifiedFor associations =
+  case admitCandidates defaultLengthSMTLibLiveSessionMaximumQueries
+      associations of
+    Left failure -> pure $ Left failure
+    Right admitted -> do
+      snapshotRef <- newIORef Nothing
+      owned <- withLengthSMTLibLiveUsableWorkDeadline budget $ \deadline -> do
+        let prepared = prepareCandidates contract verifiedFor admitted
+            snapshot = LengthUsableWorkSnapshot prepared False
+        _ <- evaluate $ forcePreparedLengthCandidates prepared
+        snapshot `seq` writeIORef snapshotRef (Just snapshot)
+        ranking <- runPreparedCandidatesUnderUsableWorkDeadline deadline
+          execution evaluation inputBoxPolicy applicableDomainPolicy
+          originProbePolicy simplificationPolicy openingPolicy prepared
+        let cleanupIncomplete = associatedLengthRankingCleanupIncomplete ranking
+            completedSnapshot = LengthUsableWorkSnapshot
+              prepared cleanupIncomplete
+            result = finish ranking
+        completedSnapshot `seq`
+          writeIORef snapshotRef (Just completedSnapshot)
+        _ <- evaluate $ forceResult result
+        pure result
+      case owned of
+        Right result -> pure $ Right result
+        Left ownerFailure -> do
+          snapshot <- readIORef snapshotRef
+          let cleanupIncomplete = case snapshot of
+                Nothing -> False
+                Just (LengthUsableWorkSnapshot _ incomplete) -> incomplete
+              failure = ownerLengthRankingFailure
+                cleanupIncomplete ownerFailure
+              ranking = case snapshot of
+                Nothing -> unpreparedUnassessedRanking admitted failure
+                Just (LengthUsableWorkSnapshot prepared _) ->
+                  unassessedRanking prepared failure
+              result = finish ranking
+          _ <- evaluate $ forceResult result
+          pure $ Right result
+
+runPreparedCandidatesUnderUsableWorkDeadline
+  :: LengthSMTLibLiveUsableWorkDeadline budget
+  -> LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LengthInputBoxRankingPolicy
+  -> LengthApplicableDomainRankingPolicy
+  -> LengthOriginProbeRankingPolicy
+  -> LengthCounterexampleSimplificationRankingPolicy
+  -> LengthLiveSessionOpeningPolicy
+  -> [PreparedLengthCandidate association]
+  -> IO (AssociatedLengthRanking association)
+runPreparedCandidatesUnderUsableWorkDeadline deadline execution evaluation
+    inputBoxPolicy applicableDomainPolicy originProbePolicy
+    simplificationPolicy openingPolicy prepared = case prepared of
+  [] -> pure $ AssociatedLengthRanking [] Nothing
+  _ | not (hasEligibleCandidate prepared) -> pure $ AssociatedLengthRanking
+        (map preparedCandidateUnassessed prepared) Nothing
+    | otherwise -> case openingPolicy of
+        LengthLiveSessionOpeningEager -> do
+          scoped <- withLengthSMTLibLiveSessionUnderDeadline deadline execution
+            $ \session -> runPreparedCandidates evaluation inputBoxPolicy
+                applicableDomainPolicy originProbePolicy simplificationPolicy
+                session prepared
+          pure $ case scoped of
+            Left failure -> unassessedRanking prepared
+              $ sessionRankingFailure failure
+            Right (Left failure) -> unassessedRanking prepared failure
+            Right (Right assessed) -> AssociatedLengthRanking
+              (stableCounterexampleDemotion assessed) Nothing
+        LengthLiveSessionOpeningDeferredUntilLiveQuery ->
+          runPreparedCandidatesWithDeferredLiveSessionOpeningUnderDeadline
+            deadline execution evaluation inputBoxPolicy applicableDomainPolicy
+            originProbePolicy simplificationPolicy prepared
+
+runPreparedCandidatesWithDeferredLiveSessionOpeningUnderDeadline
+  :: LengthSMTLibLiveUsableWorkDeadline budget
+  -> LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LengthInputBoxRankingPolicy
+  -> LengthApplicableDomainRankingPolicy
+  -> LengthOriginProbeRankingPolicy
+  -> LengthCounterexampleSimplificationRankingPolicy
+  -> [PreparedLengthCandidate association]
+  -> IO (AssociatedLengthRanking association)
+runPreparedCandidatesWithDeferredLiveSessionOpeningUnderDeadline deadline
+    execution evaluation inputBoxPolicy applicableDomainPolicy originProbePolicy
+    simplificationPolicy prepared = case runPreparedCandidatesBeforeLive
+        evaluation applicableDomainPolicy originProbePolicy simplificationPolicy
+        prepared of
+  PreparedLengthCandidatesCompleted assessed -> pure
+    $ AssociatedLengthRanking (stableCounterexampleDemotion assessed) Nothing
+  PreparedLengthCandidatesFailed failure -> pure
+    $ unassessedRanking prepared failure
+  PreparedLengthCandidatesNeedLive reversed seedBank index association query
+      rest -> do
+    scoped <- withLengthSMTLibLiveSessionUnderDeadline deadline execution
+      $ \session -> do
+        observed <- runLengthSMTLibLiveQuery evaluation session query
+        case observed of
+          Left failure -> pure $ Left $ queryRankingFailure index failure
+          Right observation -> case assessCandidate evaluation inputBoxPolicy
+              simplificationPolicy index association query observation of
+            Left failure -> pure $ Left failure
+            Right assessed ->
+              let nextSeedBank = case counterexampleSeed assessed of
+                    Nothing -> seedBank
+                    Just retained -> promoteCounterexampleSeed retained seedBank
+              in nextSeedBank `seq` runPreparedCandidatesFrom evaluation
+                  inputBoxPolicy applicableDomainPolicy originProbePolicy
+                  simplificationPolicy session (assessed : reversed)
+                  nextSeedBank rest
+    pure $ case scoped of
+      Left failure -> unassessedRanking prepared
+        $ sessionRankingFailure failure
+      Right (Left failure) -> unassessedRanking prepared failure
+      Right (Right assessed) -> AssociatedLengthRanking
+        (stableCounterexampleDemotion assessed) Nothing
 
 -- | Rank caller-owned occurrences while retaining each occurrence handle
 -- through preparation, live assessment, stable partitioning, and atomic
@@ -1500,6 +1710,119 @@ sanitizePreparedCandidates = go []
     candidate : rest ->
       let sanitized = preparedCandidateUnassessed candidate
       in sanitized `seq` go (sanitized : reversed) rest
+
+unpreparedUnassessedRanking
+  :: [association]
+  -> LengthRankingFailure
+  -> AssociatedLengthRanking association
+unpreparedUnassessedRanking associations failure = AssociatedLengthRanking
+  (go 0 [] associations) (Just failure)
+ where
+  go _ reversed [] = reverse reversed
+  go index reversed (association : rest) =
+    let candidate = AssociatedRankedLengthCandidate index association
+          $ LengthCandidateAssessed Unassessed Nothing
+    in candidate `seq` go (index + 1) (candidate : reversed) rest
+
+associatedLengthRankingCleanupIncomplete
+  :: AssociatedLengthRanking association
+  -> Bool
+associatedLengthRankingCleanupIncomplete
+    (AssociatedLengthRanking _ Nothing) = False
+associatedLengthRankingCleanupIncomplete
+    (AssociatedLengthRanking _ (Just failure)) =
+  lengthRankingFailureCleanupIncomplete failure
+
+ownerLengthRankingFailure
+  :: Bool
+  -> LengthSMTLibLiveSessionError
+  -> LengthRankingFailure
+ownerLengthRankingFailure nestedCleanup ownerFailure =
+  case sessionRankingFailure ownerFailure of
+    LengthRankingFailure failure cleanup _ -> LengthRankingFailure failure
+      (cleanup || nestedCleanup) Nothing
+
+-- Force only ranking-owned structure.  Caller-owned verified receipts and
+-- occurrence associations retain their established WHNF boundary.
+forceLengthRankingOwnedResult :: LengthRanking -> ()
+forceLengthRankingOwnedResult (LengthRanking candidates failure) =
+  forceRankedLengthCandidates candidates `seq` forceLengthRankingFailure failure
+
+forceAssociatedLengthRankingOwnedResult
+  :: AssociatedLengthRanking association
+  -> ()
+forceAssociatedLengthRankingOwnedResult
+    (AssociatedLengthRanking candidates failure) =
+  forceAssociatedRankedLengthCandidates candidates `seq`
+    forceLengthRankingFailure failure
+
+forceRankedLengthCandidates :: [RankedLengthCandidate] -> ()
+forceRankedLengthCandidates candidates = case candidates of
+  [] -> ()
+  RankedLengthCandidate index verified state : rest ->
+    index `seq` verified `seq` forceLengthCandidateAssessment state `seq`
+      forceRankedLengthCandidates rest
+
+forceAssociatedRankedLengthCandidates
+  :: [AssociatedRankedLengthCandidate association]
+  -> ()
+forceAssociatedRankedLengthCandidates candidates = case candidates of
+  [] -> ()
+  AssociatedRankedLengthCandidate index association state : rest ->
+    index `seq` association `seq` forceLengthCandidateAssessment state `seq`
+      forceAssociatedRankedLengthCandidates rest
+
+forceLengthCandidateAssessment :: LengthCandidateAssessment -> ()
+forceLengthCandidateAssessment state = case state of
+  LengthCandidatePreparationRefused refusal -> refusal `seq` ()
+  LengthCandidateAssessed assessment simplification ->
+    forceLengthRankingAssessment assessment `seq` case simplification of
+      Nothing -> ()
+      Just receipt -> rnf receipt
+
+forceLengthRankingAssessment :: LengthRankingAssessment -> ()
+forceLengthRankingAssessment assessment = case assessment of
+  Unassessed -> ()
+  Heuristic status -> status `seq` ()
+  Counterexample receipt -> rnf receipt
+  BoundedPositive receipt -> rnf receipt
+  ApplicableDomainEstablished receipt -> rnf receipt
+  PositiveAffineApplicableDomainEstablished receipt -> rnf receipt
+
+forceLengthRankingFailure :: Maybe LengthRankingFailure -> ()
+forceLengthRankingFailure failure = case failure of
+  Nothing -> ()
+  Just (LengthRankingFailure failureClass cleanup index) ->
+    forceLengthRankingFailureClass failureClass `seq`
+      cleanup `seq` forceLengthRankingFailureIndex index
+
+forceLengthRankingFailureIndex :: Maybe Natural -> ()
+forceLengthRankingFailureIndex index = case index of
+  Nothing -> ()
+  Just retained -> retained `seq` ()
+
+forceLengthRankingFailureClass :: LengthRankingFailureClass -> ()
+forceLengthRankingFailureClass failure = case failure of
+  LengthRankingLiveSessionFailed nested -> rnf nested
+  LengthRankingLiveQueryFailed nested -> rnf nested
+  LengthRankingQueryAssociationMismatch -> ()
+  LengthRankingEvidenceReplayMismatch -> ()
+  LengthRankingOriginProbeEvaluationFailed nested -> rnf nested
+  LengthRankingInputBoxValidationFailed nested -> rnf nested
+  LengthRankingApplicableDomainValidationFailed nested -> rnf nested
+  LengthRankingCounterexampleSimplificationFailed nested -> rnf nested
+
+forcePreparedLengthCandidates
+  :: [PreparedLengthCandidate association]
+  -> ()
+forcePreparedLengthCandidates prepared = case prepared of
+  [] -> ()
+  PreparedLengthCandidateUnassessed index association refusal : rest ->
+    index `seq` association `seq` refusal `seq`
+      forcePreparedLengthCandidates rest
+  PreparedLengthCandidateEligible index association query : rest ->
+    index `seq` association `seq` query `seq`
+      forcePreparedLengthCandidates rest
 
 -- | Reduce a checked-handoff refusal to its stable payload-free phase.
 --

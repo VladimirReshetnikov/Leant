@@ -12,7 +12,9 @@
 -- grant for the scalar and product domains respectively.  Generalized-only
 -- versions 7 and 8 add positive-affine applicable-domain validation, its
 -- independent ordering grant, bounded counterexample simplification, and
--- deferred live-session opening.  Older decoders and grammars remain literal.
+-- deferred live-session opening.  Versions 9 and 10 retain those exact scalar
+-- and product policies and add one required shared usable-work budget.  Older
+-- decoders and grammars remain literal.
 -- Decoding performs no discovery, path normalization, environment lookup, or
 -- IO.  Every field is required.  A successful decode returns a deliberately
 -- disabled opaque value: callers
@@ -29,6 +31,8 @@ module Leant.Synth.Length.Configuration.File
   , lengthRankingConfigurationFileSpinePairPositiveOrderingVersion
   , lengthRankingConfigurationFilePositiveAffineVersion
   , lengthRankingConfigurationFileSpinePairPositiveAffineVersion
+  , lengthRankingConfigurationFileUsableWorkBudgetVersion
+  , lengthRankingConfigurationFileSpinePairUsableWorkBudgetVersion
   , lengthRankingConfigurationFileJsonLimits
   , LengthRankingConfigurationFileObject (..)
   , LengthRankingConfigurationFileField (..)
@@ -90,11 +94,15 @@ import Language.Haskell.Djex
   , LengthSMTLibResponseLimitError
   , LengthSMTLibResponseLimitSource (..)
   , LengthSMTLibResponseLimits
+  , LengthSMTLibLiveUsableWorkBudget
+  , LengthSMTLibLiveUsableWorkBudgetError
+  , LengthSMTLibLiveUsableWorkBudgetSource (..)
   , mkLengthEvaluationLimits
   , mkLengthInputBoxLimits
   , mkLengthSMTLibExecutionConfig
   , mkLengthSMTLibExecutionLimits
   , mkLengthSMTLibResponseLimits
+  , mkLengthSMTLibLiveUsableWorkBudget
   )
 
 import Leant.Json.Bounded
@@ -120,6 +128,7 @@ import Leant.Synth.Length.Configuration
   , enableLengthRankingOriginProbe
   , enableLengthRankingInputBoxValidation
   , enableLengthRankingPositiveAffineApplicableDomainValidation
+  , enableLengthRankingUsableWorkBudget
   , lengthRankingPolicyExecutableDigestExpectation
   , lengthRankingPolicyFromValidatedComponents
   )
@@ -165,6 +174,12 @@ lengthRankingConfigurationFilePositiveAffineVersion = 7
 lengthRankingConfigurationFileSpinePairPositiveAffineVersion :: Natural
 lengthRankingConfigurationFileSpinePairPositiveAffineVersion = 8
 
+lengthRankingConfigurationFileUsableWorkBudgetVersion :: Natural
+lengthRankingConfigurationFileUsableWorkBudgetVersion = 9
+
+lengthRankingConfigurationFileSpinePairUsableWorkBudgetVersion :: Natural
+lengthRankingConfigurationFileSpinePairUsableWorkBudgetVersion = 10
+
 -- | Fixed admission policy for the v1 document itself.  The array maximum is
 -- one greater than the widest typed collection so maximum-plus-one reaches the
 -- more specific schema diagnostic.
@@ -190,6 +205,7 @@ data LengthRankingConfigurationFileObject
   | LengthRankingConfigurationInputBoxValidationObject
   | LengthRankingConfigurationApplicableDomainValidationObject
   | LengthRankingConfigurationCounterexampleSimplificationObject
+  | LengthRankingConfigurationUsableWorkBudgetObject
   | LengthRankingConfigurationContractObject
   | LengthRankingConfigurationSpineObject
   | LengthRankingConfigurationProviderLawObject !Natural
@@ -247,6 +263,9 @@ data LengthRankingConfigurationFileField
   | LengthRankingConfigurationCounterexampleSimplificationMaximumInputsField
   | LengthRankingConfigurationCounterexampleSimplificationMaximumAssignmentsField
   | LengthRankingConfigurationLiveSessionOpeningField
+  | LengthRankingConfigurationUsableWorkBudgetField
+  | LengthRankingConfigurationUsableWorkBudgetStrategyField
+  | LengthRankingConfigurationUsableWorkBudgetMillisecondsField
   deriving (Eq, Ord, Show)
 
 data LengthRankingConfigurationFileValueType
@@ -327,6 +346,8 @@ data LengthRankingConfigurationFileError
       !LengthEvaluationLimitError
   | LengthRankingConfigurationInputBoxLimitsRejected
       !LengthInputBoxLimitError
+  | LengthRankingConfigurationUsableWorkBudgetRejected
+      !LengthSMTLibLiveUsableWorkBudgetError
   | LengthRankingConfigurationSyntaxRejected
       !LengthRankingConfigurationSyntaxPhase
       !LengthRankingConfigurationSyntaxError
@@ -475,8 +496,12 @@ decodeLengthAssessmentConfigurationFile bytes =
       Left LengthRankingConfigurationUnsupportedVersion ->
         case decodeLengthAssessmentConfigurationFilePositiveOrdering bytes of
           Right positiveOrdering -> Right positiveOrdering
-          Left LengthRankingConfigurationUnsupportedVersion ->
-            decodeLengthAssessmentConfigurationFilePositiveAffine bytes
+          Left LengthRankingConfigurationUnsupportedVersion -> case
+              decodeLengthAssessmentConfigurationFilePositiveAffine bytes of
+            Right positiveAffine -> Right positiveAffine
+            Left LengthRankingConfigurationUnsupportedVersion ->
+              decodeLengthAssessmentConfigurationFileUsableWorkBudget bytes
+            Left failure -> Left failure
           Left failure -> Left failure
       Left failure -> Left failure
     Left failure -> Left failure
@@ -576,6 +601,38 @@ decodeLengthAssessmentConfigurationFilePositiveAffine bytes = do
     else if version == toInteger
         lengthRankingConfigurationFileSpinePairPositiveAffineVersion
       then decodeLengthRankingConfigurationFileSpinePairPositiveAffineV8 root
+      else Left LengthRankingConfigurationUnsupportedVersion
+
+decodeLengthAssessmentConfigurationFileUsableWorkBudget
+  :: ByteString
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthAssessmentConfigurationFileUsableWorkBudget bytes = do
+  document <- either (Left . LengthRankingConfigurationJsonRejected) Right
+    $ parseBoundedJson lengthRankingConfigurationFileJsonLimits bytes
+  root <- objectFields LengthRankingConfigurationRootObject document
+  formatValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationFormatField
+    "format"
+    root
+  format <- stringField LengthRankingConfigurationFormatField formatValue
+  if format == lengthRankingConfigurationFileFormat
+    then pure ()
+    else Left LengthRankingConfigurationUnsupportedFormat
+  versionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationVersionField
+    "version"
+    root
+  version <- integerField LengthRankingConfigurationVersionField versionValue
+  if version ==
+      toInteger lengthRankingConfigurationFileUsableWorkBudgetVersion
+    then decodeLengthRankingConfigurationFileUsableWorkBudgetV9 root
+    else if version == toInteger
+        lengthRankingConfigurationFileSpinePairUsableWorkBudgetVersion
+      then decodeLengthRankingConfigurationFileSpinePairUsableWorkBudgetV10 root
       else Left LengthRankingConfigurationUnsupportedVersion
 
 -- Keep the established version-1 path literal: its exact root, validation
@@ -927,6 +984,54 @@ decodeLengthRankingConfigurationFileSpinePairPositiveAffineV8 root = do
   contract <- decodeLeanLengthSpinePairContractValueV5 contractValue
   pure $ DisabledLengthSpinePairAssessmentConfiguration policy contract
 
+decodeLengthRankingConfigurationFileUsableWorkBudgetV9
+  :: ObjectFields
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthRankingConfigurationFileUsableWorkBudgetV9 root = do
+  policy <- decodeLengthRankingConfigurationFileUsableWorkBudgetPolicy root
+  contractValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationContractField
+    "contract"
+    root
+  contract <- decodeLeanLengthContractValueV5 contractValue
+  pure $ DisabledLengthScalarAssessmentConfiguration
+    $ disableLengthRankingConfiguration policy contract
+
+decodeLengthRankingConfigurationFileSpinePairUsableWorkBudgetV10
+  :: ObjectFields
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthRankingConfigurationFileSpinePairUsableWorkBudgetV10 root = do
+  policy <- decodeLengthRankingConfigurationFileUsableWorkBudgetPolicy root
+  contractValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationContractField
+    "contract"
+    root
+  contract <- decodeLeanLengthSpinePairContractValueV5 contractValue
+  pure $ DisabledLengthSpinePairAssessmentConfiguration policy contract
+
+decodeLengthRankingConfigurationFileUsableWorkBudgetPolicy
+  :: ObjectFields
+  -> Either LengthRankingConfigurationFileError LengthRankingPolicy
+decodeLengthRankingConfigurationFileUsableWorkBudgetPolicy root = do
+  exactFields LengthRankingConfigurationRootObject
+    rootFieldsUsableWorkBudget root
+  let inheritedRoot = filter ((/= "usableWorkBudget") . fst) root
+  advancedPolicy <-
+    decodeLengthRankingConfigurationFilePositiveAffinePolicy inheritedRoot
+  budgetValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationUsableWorkBudgetField
+    "usableWorkBudget"
+    root
+  budget <- decodeUsableWorkBudget budgetValue
+  pure $ enableLengthRankingUsableWorkBudget budget advancedPolicy
+
 -- Decode the advanced policy in its frozen diagnostic order.  The two bounded
 -- objects are decoded independently and retain distinct validated limits.
 decodeLengthRankingConfigurationFilePositiveAffinePolicy
@@ -1103,6 +1208,41 @@ rootFieldsPositiveAffine =
     )
   , ( "liveSessionOpening"
     , LengthRankingConfigurationLiveSessionOpeningField
+    )
+  , ("contract", LengthRankingConfigurationContractField)
+  ]
+
+rootFieldsUsableWorkBudget
+  :: [(Text, LengthRankingConfigurationFileField)]
+rootFieldsUsableWorkBudget =
+  [ ("format", LengthRankingConfigurationFormatField)
+  , ("version", LengthRankingConfigurationVersionField)
+  , ("executionAdmission", LengthRankingConfigurationExecutionAdmissionField)
+  , ("execution", LengthRankingConfigurationExecutionField)
+  , ("evaluation", LengthRankingConfigurationEvaluationField)
+  , ( "inputBoxValidation"
+    , LengthRankingConfigurationInputBoxValidationField
+    )
+  , ( "counterexampleProbe"
+    , LengthRankingConfigurationCounterexampleProbeField
+    )
+  , ( "boundedPositiveOrdering"
+    , LengthRankingConfigurationBoundedPositiveOrderingField
+    )
+  , ( "applicableDomainValidation"
+    , LengthRankingConfigurationApplicableDomainValidationField
+    )
+  , ( "applicableDomainOrdering"
+    , LengthRankingConfigurationApplicableDomainOrderingField
+    )
+  , ( "counterexampleSimplification"
+    , LengthRankingConfigurationCounterexampleSimplificationField
+    )
+  , ( "liveSessionOpening"
+    , LengthRankingConfigurationLiveSessionOpeningField
+    )
+  , ( "usableWorkBudget"
+    , LengthRankingConfigurationUsableWorkBudgetField
     )
   , ("contract", LengthRankingConfigurationContractField)
   ]
@@ -1703,6 +1843,53 @@ decodeLiveSessionOpening value = do
     "defer-until-live-query" -> Right ()
     _ -> Left $ LengthRankingConfigurationFieldValueRejected
       LengthRankingConfigurationLiveSessionOpeningField
+
+decodeUsableWorkBudget
+  :: BoundedJsonValue
+  -> Either
+      LengthRankingConfigurationFileError
+      LengthSMTLibLiveUsableWorkBudget
+decodeUsableWorkBudget value = do
+  object <- exactObject LengthRankingConfigurationUsableWorkBudgetObject
+    usableWorkBudgetFields value
+  strategyValue <- requiredField
+    LengthRankingConfigurationUsableWorkBudgetObject
+    LengthRankingConfigurationUsableWorkBudgetStrategyField
+    "strategy"
+    object
+  strategy <- stringField
+    LengthRankingConfigurationUsableWorkBudgetStrategyField strategyValue
+  case strategy of
+    "shared-usable-work-deadline-v1" -> pure ()
+    _ -> Left $ LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationUsableWorkBudgetStrategyField
+  millisecondsValue <- requiredField
+    LengthRankingConfigurationUsableWorkBudgetObject
+    LengthRankingConfigurationUsableWorkBudgetMillisecondsField
+    "milliseconds"
+    object
+  milliseconds <- intField
+    LengthRankingConfigurationUsableWorkBudgetMillisecondsField
+    millisecondsValue
+    >>= capIntUpper
+      LengthRankingConfigurationUsableWorkBudgetMillisecondsField 65000
+  case mkLengthSMTLibLiveUsableWorkBudget
+      LengthSMTLibLiveUsableWorkBudgetSource
+        { lengthSMTLibLiveUsableWorkBudgetSourceMilliseconds = milliseconds } of
+    Left failure -> Left
+      $ LengthRankingConfigurationUsableWorkBudgetRejected failure
+    Right validated -> Right validated
+
+usableWorkBudgetFields
+  :: [(Text, LengthRankingConfigurationFileField)]
+usableWorkBudgetFields =
+  [ ( "strategy"
+    , LengthRankingConfigurationUsableWorkBudgetStrategyField
+    )
+  , ( "milliseconds"
+    , LengthRankingConfigurationUsableWorkBudgetMillisecondsField
+    )
+  ]
 
 -- | Decode version 2's explicit source-ordered inclusive input box.  Width is
 -- bounded before any element is decoded, element values are then decoded

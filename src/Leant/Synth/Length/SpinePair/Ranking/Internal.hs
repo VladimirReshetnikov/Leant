@@ -6,6 +6,10 @@
 -- and diagnostic vocabulary.  Its additive post-assessment preference keeps
 -- pair receipts and occurrence handles nominal throughout the stable
 -- non-vacuous-positive/neutral/counterexample trichotomy.
+-- Its additive usable-work entrance is the nominal product sibling of the
+-- scalar owner: admission precedes capture, preparation and live work share
+-- one deadline, and the outer normal-return check observes the completed
+-- nested final-readiness/cleanup stages without interrupting them.
 module Leant.Synth.Length.SpinePair.Ranking.Internal
   ( LengthSpinePairRankingAssessment (..)
   , lengthSpinePairHandoffPreparationRefusalClass
@@ -53,11 +57,15 @@ module Leant.Synth.Length.SpinePair.Ranking.Internal
   , rankPostVerificationLengthSpinePairCandidatesWithRankingPolicies
   , rankVerifiedLengthSpinePairCandidatesWithRankingPoliciesAndLiveSessionOpening
   , rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndLiveSessionOpening
+  , rankVerifiedLengthSpinePairCandidatesWithRankingPoliciesAndUsableWorkBudget
+  , rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndUsableWorkBudget
   , promoteLengthSpinePairCounterexampleSeed
   , replayLengthSpinePairCounterexampleSeeds
   ) where
 
-import Control.DeepSeq (force)
+import Control.DeepSeq (NFData (rnf), force)
+import Control.Exception (evaluate)
+import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.List (partition)
 import Numeric.Natural (Natural)
 
@@ -71,6 +79,8 @@ import Language.Haskell.Djex
   , LengthSMTLibLiveSession
   , LengthSMTLibLiveSessionError
   , LengthSMTLibLiveSessionFailure
+  , LengthSMTLibLiveUsableWorkBudget
+  , LengthSMTLibLiveUsableWorkDeadline
   , LengthSpinePairEvaluationError
   , LengthSpinePairCounterexampleSimplificationError (..)
   , LengthSpinePairApplicableDomainValidationError (..)
@@ -110,6 +120,8 @@ import Language.Haskell.Djex
   , validatedLengthSpinePairInputBoxApplicableAssignmentCount
   , validatedLengthSpinePairPositiveAffineApplicableDomainApplicableAssignmentCount
   , withLengthSMTLibLiveSession
+  , withLengthSMTLibLiveSessionUnderDeadline
+  , withLengthSMTLibLiveUsableWorkDeadline
   )
 
 import Leant.Synth.Engine (DetailedVerificationVariant)
@@ -636,6 +648,213 @@ rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndLiveSessionOp
   rankAssociatedLengthSpinePairCandidatesWithLiveSessionOpening inputBoxPolicy
     applicableDomainPolicy originProbePolicy simplificationPolicy openingPolicy
     execution evaluation contract postVerificationCandidateVerified
+
+rankVerifiedLengthSpinePairCandidatesWithRankingPoliciesAndUsableWorkBudget
+  :: (LengthSpinePairRanking -> LengthSpinePairRanking)
+  -> LengthSMTLibLiveUsableWorkBudget
+  -> LengthSpinePairInputBoxRankingPolicy
+  -> LengthSpinePairApplicableDomainRankingPolicy
+  -> LengthSpinePairOriginProbeRankingPolicy
+  -> LengthSpinePairCounterexampleSimplificationRankingPolicy
+  -> LengthLiveSessionOpeningPolicy
+  -> LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LeanLengthSpinePairContract
+  -> [Verified DetailedVerificationVariant]
+  -> IO (Either LengthRankingInputError LengthSpinePairRanking)
+rankVerifiedLengthSpinePairCandidatesWithRankingPoliciesAndUsableWorkBudget
+    finalize budget inputBoxPolicy applicableDomainPolicy originProbePolicy
+    simplificationPolicy openingPolicy execution evaluation contract
+    candidates =
+  rankAssociatedLengthSpinePairCandidatesWithUsableWorkBudget budget
+    (finalize . projectAssociatedLengthSpinePairRankingWith id)
+    forceLengthSpinePairRankingOwnedResult inputBoxPolicy
+    applicableDomainPolicy originProbePolicy simplificationPolicy openingPolicy
+    execution evaluation contract id candidates
+
+rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndUsableWorkBudget
+  :: (AssociatedLengthSpinePairRanking
+        (PostVerificationCandidate epoch DetailedVerificationVariant)
+      -> AssociatedLengthSpinePairRanking
+        (PostVerificationCandidate epoch DetailedVerificationVariant))
+  -> LengthSMTLibLiveUsableWorkBudget
+  -> LengthSpinePairInputBoxRankingPolicy
+  -> LengthSpinePairApplicableDomainRankingPolicy
+  -> LengthSpinePairOriginProbeRankingPolicy
+  -> LengthSpinePairCounterexampleSimplificationRankingPolicy
+  -> LengthLiveSessionOpeningPolicy
+  -> LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LeanLengthSpinePairContract
+  -> [PostVerificationCandidate epoch DetailedVerificationVariant]
+  -> IO
+      (Either LengthRankingInputError
+        (AssociatedLengthSpinePairRanking
+          (PostVerificationCandidate epoch DetailedVerificationVariant)))
+rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndUsableWorkBudget
+    finalize budget inputBoxPolicy applicableDomainPolicy originProbePolicy
+    simplificationPolicy openingPolicy execution evaluation contract
+    candidates =
+  rankAssociatedLengthSpinePairCandidatesWithUsableWorkBudget budget finalize
+    forceAssociatedLengthSpinePairRankingOwnedResult inputBoxPolicy
+    applicableDomainPolicy originProbePolicy simplificationPolicy openingPolicy
+    execution evaluation contract postVerificationCandidateVerified candidates
+
+data LengthSpinePairUsableWorkSnapshot association =
+  LengthSpinePairUsableWorkSnapshot
+    ![PreparedLengthSpinePairCandidate association]
+    !Bool
+
+type role LengthSpinePairUsableWorkSnapshot nominal
+
+rankAssociatedLengthSpinePairCandidatesWithUsableWorkBudget
+  :: LengthSMTLibLiveUsableWorkBudget
+  -> (AssociatedLengthSpinePairRanking association -> result)
+  -> (result -> ())
+  -> LengthSpinePairInputBoxRankingPolicy
+  -> LengthSpinePairApplicableDomainRankingPolicy
+  -> LengthSpinePairOriginProbeRankingPolicy
+  -> LengthSpinePairCounterexampleSimplificationRankingPolicy
+  -> LengthLiveSessionOpeningPolicy
+  -> LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LeanLengthSpinePairContract
+  -> (association -> Verified DetailedVerificationVariant)
+  -> [association]
+  -> IO (Either LengthRankingInputError result)
+rankAssociatedLengthSpinePairCandidatesWithUsableWorkBudget budget finish
+    forceResult inputBoxPolicy applicableDomainPolicy originProbePolicy
+    simplificationPolicy openingPolicy execution evaluation contract
+    verifiedFor associations =
+  case admitLengthSpinePairCandidates
+      defaultLengthSMTLibLiveSessionMaximumQueries associations of
+    Left failure -> pure $ Left failure
+    Right admitted -> do
+      snapshotRef <- newIORef Nothing
+      owned <- withLengthSMTLibLiveUsableWorkDeadline budget $ \deadline -> do
+        let prepared = prepareLengthSpinePairCandidates
+              contract verifiedFor admitted
+            snapshot = LengthSpinePairUsableWorkSnapshot prepared False
+        _ <- evaluate $ forcePreparedLengthSpinePairCandidates prepared
+        snapshot `seq` writeIORef snapshotRef (Just snapshot)
+        ranking <- runPreparedLengthSpinePairCandidatesUnderUsableWorkDeadline
+          deadline execution evaluation inputBoxPolicy applicableDomainPolicy
+          originProbePolicy simplificationPolicy openingPolicy prepared
+        let cleanupIncomplete =
+              associatedLengthSpinePairRankingCleanupIncomplete ranking
+            completedSnapshot = LengthSpinePairUsableWorkSnapshot
+              prepared cleanupIncomplete
+            result = finish ranking
+        completedSnapshot `seq`
+          writeIORef snapshotRef (Just completedSnapshot)
+        _ <- evaluate $ forceResult result
+        pure result
+      case owned of
+        Right result -> pure $ Right result
+        Left ownerFailure -> do
+          snapshot <- readIORef snapshotRef
+          let cleanupIncomplete = case snapshot of
+                Nothing -> False
+                Just (LengthSpinePairUsableWorkSnapshot _ incomplete) ->
+                  incomplete
+              failure = ownerLengthSpinePairRankingFailure
+                cleanupIncomplete ownerFailure
+              ranking = case snapshot of
+                Nothing -> unpreparedUnassessedLengthSpinePairRanking
+                  admitted failure
+                Just (LengthSpinePairUsableWorkSnapshot prepared _) ->
+                  unassessedLengthSpinePairRanking prepared failure
+              result = finish ranking
+          _ <- evaluate $ forceResult result
+          pure $ Right result
+
+runPreparedLengthSpinePairCandidatesUnderUsableWorkDeadline
+  :: LengthSMTLibLiveUsableWorkDeadline budget
+  -> LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LengthSpinePairInputBoxRankingPolicy
+  -> LengthSpinePairApplicableDomainRankingPolicy
+  -> LengthSpinePairOriginProbeRankingPolicy
+  -> LengthSpinePairCounterexampleSimplificationRankingPolicy
+  -> LengthLiveSessionOpeningPolicy
+  -> [PreparedLengthSpinePairCandidate association]
+  -> IO (AssociatedLengthSpinePairRanking association)
+runPreparedLengthSpinePairCandidatesUnderUsableWorkDeadline deadline execution
+    evaluation inputBoxPolicy applicableDomainPolicy originProbePolicy
+    simplificationPolicy openingPolicy prepared = case prepared of
+  [] -> pure $ AssociatedLengthSpinePairRanking [] Nothing
+  _ | not (hasEligibleLengthSpinePairCandidate prepared) -> pure
+        $ AssociatedLengthSpinePairRanking
+            (map preparedLengthSpinePairCandidateUnassessed prepared) Nothing
+    | otherwise -> case openingPolicy of
+        LengthLiveSessionOpeningEager -> do
+          scoped <- withLengthSMTLibLiveSessionUnderDeadline deadline execution
+            $ \session -> runPreparedLengthSpinePairCandidates evaluation
+                inputBoxPolicy applicableDomainPolicy originProbePolicy
+                simplificationPolicy session prepared
+          pure $ case scoped of
+            Left failure -> unassessedLengthSpinePairRanking prepared
+              $ lengthSpinePairSessionRankingFailure failure
+            Right (Left failure) ->
+              unassessedLengthSpinePairRanking prepared failure
+            Right (Right assessed) -> AssociatedLengthSpinePairRanking
+              (stableLengthSpinePairCounterexampleDemotion assessed) Nothing
+        LengthLiveSessionOpeningDeferredUntilLiveQuery ->
+          runPreparedLengthSpinePairCandidatesWithDeferredLiveSessionOpeningUnderDeadline
+            deadline execution evaluation inputBoxPolicy applicableDomainPolicy
+            originProbePolicy simplificationPolicy prepared
+
+runPreparedLengthSpinePairCandidatesWithDeferredLiveSessionOpeningUnderDeadline
+  :: LengthSMTLibLiveUsableWorkDeadline budget
+  -> LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LengthSpinePairInputBoxRankingPolicy
+  -> LengthSpinePairApplicableDomainRankingPolicy
+  -> LengthSpinePairOriginProbeRankingPolicy
+  -> LengthSpinePairCounterexampleSimplificationRankingPolicy
+  -> [PreparedLengthSpinePairCandidate association]
+  -> IO (AssociatedLengthSpinePairRanking association)
+runPreparedLengthSpinePairCandidatesWithDeferredLiveSessionOpeningUnderDeadline
+    deadline execution evaluation inputBoxPolicy applicableDomainPolicy
+    originProbePolicy simplificationPolicy prepared = case
+        runPreparedLengthSpinePairCandidatesBeforeLive evaluation
+          applicableDomainPolicy originProbePolicy simplificationPolicy
+          prepared of
+  PreparedLengthSpinePairCandidatesCompleted assessed -> pure
+    $ AssociatedLengthSpinePairRanking
+        (stableLengthSpinePairCounterexampleDemotion assessed) Nothing
+  PreparedLengthSpinePairCandidatesFailed failure -> pure
+    $ unassessedLengthSpinePairRanking prepared failure
+  PreparedLengthSpinePairCandidatesNeedLive reversed seedBank index association
+      query rest -> do
+    scoped <- withLengthSMTLibLiveSessionUnderDeadline deadline execution
+      $ \session -> do
+        observed <- runLengthSpinePairSMTLibLiveQuery evaluation session query
+        case observed of
+          Left failure -> pure $ Left
+            $ lengthSpinePairQueryRankingFailure index failure
+          Right observation -> case assessLengthSpinePairCandidate evaluation
+              inputBoxPolicy simplificationPolicy index association query
+              observation of
+            Left failure -> pure $ Left failure
+            Right assessed ->
+              let nextSeedBank = case
+                      lengthSpinePairCounterexampleSeed assessed of
+                    Nothing -> seedBank
+                    Just retained ->
+                      promoteLengthSpinePairCounterexampleSeed retained seedBank
+              in nextSeedBank `seq`
+                  runPreparedLengthSpinePairCandidatesFrom evaluation
+                    inputBoxPolicy applicableDomainPolicy originProbePolicy
+                    simplificationPolicy session (assessed : reversed)
+                    nextSeedBank rest
+    pure $ case scoped of
+      Left failure -> unassessedLengthSpinePairRanking prepared
+        $ lengthSpinePairSessionRankingFailure failure
+      Right (Left failure) ->
+        unassessedLengthSpinePairRanking prepared failure
+      Right (Right assessed) -> AssociatedLengthSpinePairRanking
+        (stableLengthSpinePairCounterexampleDemotion assessed) Nothing
 
 rankAssociatedLengthSpinePairCandidates
   :: LengthSpinePairInputBoxRankingPolicy
@@ -1363,6 +1582,136 @@ sanitizePreparedLengthSpinePairCandidates = go []
     candidate : rest ->
       let sanitized = preparedLengthSpinePairCandidateUnassessed candidate
       in sanitized `seq` go (sanitized : reversed) rest
+
+unpreparedUnassessedLengthSpinePairRanking
+  :: [association]
+  -> LengthSpinePairRankingFailure
+  -> AssociatedLengthSpinePairRanking association
+unpreparedUnassessedLengthSpinePairRanking associations failure =
+  AssociatedLengthSpinePairRanking (go 0 [] associations) (Just failure)
+ where
+  go _ reversed [] = reverse reversed
+  go index reversed (association : rest) =
+    let candidate = AssociatedRankedLengthSpinePairCandidate index association
+          $ LengthSpinePairCandidateAssessed
+              LengthSpinePairUnassessed Nothing
+    in candidate `seq` go (index + 1) (candidate : reversed) rest
+
+associatedLengthSpinePairRankingCleanupIncomplete
+  :: AssociatedLengthSpinePairRanking association
+  -> Bool
+associatedLengthSpinePairRankingCleanupIncomplete
+    (AssociatedLengthSpinePairRanking _ Nothing) = False
+associatedLengthSpinePairRankingCleanupIncomplete
+    (AssociatedLengthSpinePairRanking _ (Just failure)) =
+  lengthSpinePairRankingFailureCleanupIncomplete failure
+
+ownerLengthSpinePairRankingFailure
+  :: Bool
+  -> LengthSMTLibLiveSessionError
+  -> LengthSpinePairRankingFailure
+ownerLengthSpinePairRankingFailure nestedCleanup ownerFailure =
+  case lengthSpinePairSessionRankingFailure ownerFailure of
+    LengthSpinePairRankingFailure failure cleanup _ ->
+      LengthSpinePairRankingFailure failure
+        (cleanup || nestedCleanup) Nothing
+
+forceLengthSpinePairRankingOwnedResult :: LengthSpinePairRanking -> ()
+forceLengthSpinePairRankingOwnedResult
+    (LengthSpinePairRanking candidates failure) =
+  forceRankedLengthSpinePairCandidates candidates `seq`
+    forceLengthSpinePairRankingFailure failure
+
+forceAssociatedLengthSpinePairRankingOwnedResult
+  :: AssociatedLengthSpinePairRanking association
+  -> ()
+forceAssociatedLengthSpinePairRankingOwnedResult
+    (AssociatedLengthSpinePairRanking candidates failure) =
+  forceAssociatedRankedLengthSpinePairCandidates candidates `seq`
+    forceLengthSpinePairRankingFailure failure
+
+forceRankedLengthSpinePairCandidates
+  :: [RankedLengthSpinePairCandidate]
+  -> ()
+forceRankedLengthSpinePairCandidates candidates = case candidates of
+  [] -> ()
+  RankedLengthSpinePairCandidate index verified state : rest ->
+    index `seq` verified `seq`
+      forceLengthSpinePairCandidateAssessment state `seq`
+      forceRankedLengthSpinePairCandidates rest
+
+forceAssociatedRankedLengthSpinePairCandidates
+  :: [AssociatedRankedLengthSpinePairCandidate association]
+  -> ()
+forceAssociatedRankedLengthSpinePairCandidates candidates = case candidates of
+  [] -> ()
+  AssociatedRankedLengthSpinePairCandidate index association state : rest ->
+    index `seq` association `seq`
+      forceLengthSpinePairCandidateAssessment state `seq`
+      forceAssociatedRankedLengthSpinePairCandidates rest
+
+forceLengthSpinePairCandidateAssessment
+  :: LengthSpinePairCandidateAssessment
+  -> ()
+forceLengthSpinePairCandidateAssessment state = case state of
+  LengthSpinePairCandidatePreparationRefused refusal -> refusal `seq` ()
+  LengthSpinePairCandidateAssessed assessment simplification ->
+    forceLengthSpinePairRankingAssessment assessment `seq`
+      case simplification of
+        Nothing -> ()
+        Just receipt -> rnf receipt
+
+forceLengthSpinePairRankingAssessment
+  :: LengthSpinePairRankingAssessment
+  -> ()
+forceLengthSpinePairRankingAssessment assessment = case assessment of
+  LengthSpinePairUnassessed -> ()
+  LengthSpinePairHeuristic status -> status `seq` ()
+  LengthSpinePairCounterexample receipt -> rnf receipt
+  LengthSpinePairBoundedPositive receipt -> rnf receipt
+  LengthSpinePairApplicableDomainEstablished receipt -> rnf receipt
+  LengthSpinePairPositiveAffineApplicableDomainEstablished receipt ->
+    rnf receipt
+
+forceLengthSpinePairRankingFailure
+  :: Maybe LengthSpinePairRankingFailure
+  -> ()
+forceLengthSpinePairRankingFailure failure = case failure of
+  Nothing -> ()
+  Just (LengthSpinePairRankingFailure failureClass cleanup index) ->
+    forceLengthSpinePairRankingFailureClass failureClass `seq`
+      cleanup `seq` forceLengthSpinePairRankingFailureIndex index
+
+forceLengthSpinePairRankingFailureIndex :: Maybe Natural -> ()
+forceLengthSpinePairRankingFailureIndex index = case index of
+  Nothing -> ()
+  Just retained -> retained `seq` ()
+
+forceLengthSpinePairRankingFailureClass
+  :: LengthSpinePairRankingFailureClass
+  -> ()
+forceLengthSpinePairRankingFailureClass failure = case failure of
+  LengthSpinePairRankingLiveSessionFailed nested -> rnf nested
+  LengthSpinePairRankingLiveQueryFailed nested -> rnf nested
+  LengthSpinePairRankingQueryAssociationMismatch -> ()
+  LengthSpinePairRankingEvidenceReplayMismatch -> ()
+  LengthSpinePairRankingOriginProbeEvaluationFailed nested -> rnf nested
+  LengthSpinePairRankingInputBoxValidationFailed nested -> rnf nested
+  LengthSpinePairRankingApplicableDomainValidationFailed nested -> rnf nested
+  LengthSpinePairRankingCounterexampleSimplificationFailed nested -> rnf nested
+
+forcePreparedLengthSpinePairCandidates
+  :: [PreparedLengthSpinePairCandidate association]
+  -> ()
+forcePreparedLengthSpinePairCandidates prepared = case prepared of
+  [] -> ()
+  PreparedLengthSpinePairCandidateUnassessed
+      index association refusal : rest ->
+    index `seq` association `seq` refusal `seq`
+      forcePreparedLengthSpinePairCandidates rest
+  PreparedLengthSpinePairCandidateEligible index association query : rest ->
+    index `seq` association `seq` query `seq`
+      forcePreparedLengthSpinePairCandidates rest
 
 lengthSpinePairHandoffPreparationRefusalClass
   :: LengthSpinePairHandoffRefusal

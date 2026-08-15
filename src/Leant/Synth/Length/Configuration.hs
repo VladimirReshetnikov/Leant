@@ -38,6 +38,7 @@ module Leant.Synth.Length.Configuration
   , enableLengthRankingNonVacuousInputBoxPreference
   , enableLengthRankingNonVacuousApplicableDomainPreference
   , enableLengthRankingDeferredLiveSessionOpening
+  , enableLengthRankingUsableWorkBudget
   , lengthRankingPolicyExecutableDigestExpectation
   , LengthRankingConfigurationError (..)
   , assessVerifiedLengthCandidatesWithPolicy
@@ -58,6 +59,7 @@ import Language.Haskell.Djex
   , LengthSMTLibExecutionConfigSource
   , LengthSMTLibExecutionLimits
   , LengthSMTLibExecutableDigestExpectation
+  , LengthSMTLibLiveUsableWorkBudget
   , lengthSMTLibExecutionExecutableDigestExpectation
   , mkLengthEvaluationLimits
   , mkLengthSMTLibExecutionConfig
@@ -92,7 +94,9 @@ import Leant.Synth.Length.Ranking.Internal
   , rankVerifiedLengthCandidatesWithOriginProbe
   , rankVerifiedLengthCandidatesWithInputBoxValidationAndOriginProbe
   , rankPostVerificationLengthCandidatesWithRankingPoliciesAndLiveSessionOpening
+  , rankPostVerificationLengthCandidatesWithRankingPoliciesAndUsableWorkBudget
   , rankVerifiedLengthCandidatesWithRankingPoliciesAndLiveSessionOpening
+  , rankVerifiedLengthCandidatesWithRankingPoliciesAndUsableWorkBudget
   )
 import Leant.Synth.Length.PostVerification.Internal
   ( LengthPostVerificationResult
@@ -124,7 +128,9 @@ import Leant.Synth.Length.SpinePair.Ranking.Internal
   , rankVerifiedLengthSpinePairCandidatesWithInputBoxValidationAndOriginProbe
   , rankVerifiedLengthSpinePairCandidatesWithOriginProbe
   , rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndLiveSessionOpening
+  , rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndUsableWorkBudget
   , rankVerifiedLengthSpinePairCandidatesWithRankingPoliciesAndLiveSessionOpening
+  , rankVerifiedLengthSpinePairCandidatesWithRankingPoliciesAndUsableWorkBudget
   )
 import Leant.Synth.PostVerification (PostVerificationCandidate)
 import Leant.Synth.Verification
@@ -156,6 +162,7 @@ data LengthRankingPolicy = LengthRankingPolicy
   !LengthRankingNonVacuousInputBoxPreference
   !LengthRankingNonVacuousApplicableDomainPreference
   !LengthRankingLiveSessionOpening
+  !LengthRankingUsableWorkBudget
 
 -- | Private optional orchestration policy.  It contains no solver status,
 -- query, receipt, or verdict; each enabled use must still pass Djex's exact
@@ -211,6 +218,13 @@ data LengthRankingLiveSessionOpening
   = LengthRankingLiveSessionOpeningEager
   | LengthRankingLiveSessionOpeningDeferredUntilLiveQuery
 
+-- | Optional shared usable-work authority.  The validated Djex value contains
+-- a duration only; an absolute deadline is captured independently for every
+-- admitted ranking batch.
+data LengthRankingUsableWorkBudget
+  = LengthRankingUsableWorkBudgetDisabled
+  | LengthRankingUsableWorkBudgetEnabled !LengthSMTLibLiveUsableWorkBudget
+
 -- | Pure validation failure in fixed execution-before-evaluation order.
 data LengthRankingConfigurationError
   = LengthRankingExecutionConfigurationRejected
@@ -243,6 +257,7 @@ mkLengthRankingPolicy source = do
     LengthRankingNonVacuousInputBoxPreferenceDisabled
     LengthRankingNonVacuousApplicableDomainPreferenceDisabled
     LengthRankingLiveSessionOpeningEager
+    LengthRankingUsableWorkBudgetDisabled
 
 -- | Assemble one reusable policy from already validated Djex execution and
 -- replay authorities with the origin probe and finite-box validation disabled.
@@ -262,6 +277,7 @@ lengthRankingPolicyFromValidatedComponents execution evaluation =
     LengthRankingNonVacuousInputBoxPreferenceDisabled
     LengthRankingNonVacuousApplicableDomainPreferenceDisabled
     LengthRankingLiveSessionOpeningEager
+    LengthRankingUsableWorkBudgetDisabled
 
 -- | Derive an origin-probing sibling without changing the validated
 -- execution/evaluation authorities or any independently selected finite box.
@@ -274,11 +290,11 @@ enableLengthRankingOriginProbe
 enableLengthRankingOriginProbe
     (LengthRankingPolicy execution evaluation inputBoxValidation
       applicableDomainValidation _ simplification inputBoxPreference
-      applicableDomainPreference liveSessionOpening) =
+      applicableDomainPreference liveSessionOpening usableWorkBudget) =
   LengthRankingPolicy execution evaluation inputBoxValidation
     applicableDomainValidation LengthRankingOriginProbeEnabled
     simplification inputBoxPreference applicableDomainPreference
-    liveSessionOpening
+    liveSessionOpening usableWorkBudget
 
 -- | Derive an explicitly enabled finite-box policy without changing the
 -- already validated execution/evaluation authorities or the reusable base
@@ -295,11 +311,11 @@ enableLengthRankingInputBoxValidation
 enableLengthRankingInputBoxValidation limits maximums
     (LengthRankingPolicy execution evaluation _ applicableDomainValidation
       originProbe simplification inputBoxPreference applicableDomainPreference
-      liveSessionOpening) =
+      liveSessionOpening usableWorkBudget) =
   LengthRankingPolicy execution evaluation
     (LengthRankingInputBoxValidationEnabled limits maximums)
     applicableDomainValidation originProbe simplification inputBoxPreference
-    applicableDomainPreference liveSessionOpening
+    applicableDomainPreference liveSessionOpening usableWorkBudget
 
 -- | Derive an explicitly enabled complete applicable-domain traversal without
 -- changing execution, evaluation, origin probing, the optional caller-owned
@@ -314,11 +330,11 @@ enableLengthRankingApplicableDomainValidation
 enableLengthRankingApplicableDomainValidation limits
     (LengthRankingPolicy execution evaluation inputBoxValidation _ originProbe
       simplification inputBoxPreference applicableDomainPreference
-      liveSessionOpening) =
+      liveSessionOpening usableWorkBudget) =
   LengthRankingPolicy execution evaluation inputBoxValidation
     (LengthRankingApplicableDomainValidationDirectV1 limits) originProbe
     simplification inputBoxPreference applicableDomainPreference
-    liveSessionOpening
+    liveSessionOpening usableWorkBudget
 
 -- | Select positive-affine-v1 complete applicable-domain extraction.  This is
 -- mutually exclusive with the historical direct-v1 extractor, so whichever
@@ -330,11 +346,11 @@ enableLengthRankingPositiveAffineApplicableDomainValidation
 enableLengthRankingPositiveAffineApplicableDomainValidation limits
     (LengthRankingPolicy execution evaluation inputBoxValidation _ originProbe
       simplification inputBoxPreference applicableDomainPreference
-      liveSessionOpening) =
+      liveSessionOpening usableWorkBudget) =
   LengthRankingPolicy execution evaluation inputBoxValidation
     (LengthRankingApplicableDomainValidationPositiveAffineV1 limits) originProbe
     simplification inputBoxPreference applicableDomainPreference
-    liveSessionOpening
+    liveSessionOpening usableWorkBudget
 
 -- | Enable the same bounded, query-owned strict counterexample simplifier for
 -- every counterexample source without changing source order or enabling any
@@ -348,11 +364,12 @@ enableLengthRankingCounterexampleSimplification
 enableLengthRankingCounterexampleSimplification limits
     (LengthRankingPolicy execution evaluation inputBoxValidation
       applicableDomainValidation originProbe _ inputBoxPreference
-      applicableDomainPreference liveSessionOpening) =
+      applicableDomainPreference liveSessionOpening usableWorkBudget) =
   LengthRankingPolicy execution evaluation inputBoxValidation
     applicableDomainValidation originProbe
     (LengthRankingCounterexampleSimplificationEnabled limits)
     inputBoxPreference applicableDomainPreference liveSessionOpening
+    usableWorkBudget
 
 -- | Derive an explicit evidence-ordering sibling without enabling or changing
 -- finite-box validation, origin probing, execution, evaluation, or contract
@@ -365,11 +382,11 @@ enableLengthRankingNonVacuousInputBoxPreference
 enableLengthRankingNonVacuousInputBoxPreference
     (LengthRankingPolicy execution evaluation inputBoxValidation
       applicableDomainValidation originProbe simplification _
-      applicableDomainPreference liveSessionOpening) =
+      applicableDomainPreference liveSessionOpening usableWorkBudget) =
   LengthRankingPolicy execution evaluation inputBoxValidation
     applicableDomainValidation originProbe simplification
     LengthRankingNonVacuousInputBoxPreferenceEnabled applicableDomainPreference
-    liveSessionOpening
+    liveSessionOpening usableWorkBudget
 
 -- | Derive an independent ordering preference for non-vacuous complete-domain
 -- receipts.  This does not enable traversal.  When composed with the existing
@@ -381,10 +398,11 @@ enableLengthRankingNonVacuousApplicableDomainPreference
 enableLengthRankingNonVacuousApplicableDomainPreference
     (LengthRankingPolicy execution evaluation inputBoxValidation
       applicableDomainValidation originProbe simplification inputBoxPreference
-      _ liveSessionOpening) =
+      _ liveSessionOpening usableWorkBudget) =
   LengthRankingPolicy execution evaluation inputBoxValidation
     applicableDomainValidation originProbe simplification inputBoxPreference
     LengthRankingNonVacuousApplicableDomainPreferenceEnabled liveSessionOpening
+    usableWorkBudget
 
 -- | Derive a policy which delays lexical worker creation until the first live
 -- query is actually required.  Pure admission, query preparation, MRU replay,
@@ -396,11 +414,27 @@ enableLengthRankingDeferredLiveSessionOpening
 enableLengthRankingDeferredLiveSessionOpening
     (LengthRankingPolicy execution evaluation inputBoxValidation
       applicableDomainValidation originProbe simplification inputBoxPreference
-      applicableDomainPreference _) =
+      applicableDomainPreference _ usableWorkBudget) =
   LengthRankingPolicy execution evaluation inputBoxValidation
     applicableDomainValidation originProbe simplification inputBoxPreference
     applicableDomainPreference
-    LengthRankingLiveSessionOpeningDeferredUntilLiveQuery
+    LengthRankingLiveSessionOpeningDeferredUntilLiveQuery usableWorkBudget
+
+-- | Derive a sibling whose admitted scalar or product ranking batches share
+-- one Djex usable-work deadline.  The value is already validated; this pure
+-- builder reads no clock and performs no IO.  Applying it again is last-wins.
+enableLengthRankingUsableWorkBudget
+  :: LengthSMTLibLiveUsableWorkBudget
+  -> LengthRankingPolicy
+  -> LengthRankingPolicy
+enableLengthRankingUsableWorkBudget budget
+    (LengthRankingPolicy execution evaluation inputBoxValidation
+      applicableDomainValidation originProbe simplification inputBoxPreference
+      applicableDomainPreference liveSessionOpening _) =
+  LengthRankingPolicy execution evaluation inputBoxValidation
+    applicableDomainValidation originProbe simplification inputBoxPreference
+    applicableDomainPreference liveSessionOpening
+    (LengthRankingUsableWorkBudgetEnabled budget)
 
 -- | Classify only whether the sealed execution policy contains an executable
 -- digest expectation.  This reveals neither the digest bytes nor the path and
@@ -410,7 +444,7 @@ lengthRankingPolicyExecutableDigestExpectation
   :: LengthRankingPolicy
   -> LengthSMTLibExecutableDigestExpectation
 lengthRankingPolicyExecutableDigestExpectation
-    (LengthRankingPolicy execution _ _ _ _ _ _ _ _) =
+    (LengthRankingPolicy execution _ _ _ _ _ _ _ _ _) =
   lengthSMTLibExecutionExecutableDigestExpectation execution
 
 -- Apply the ranking-only preference after all behavioral acquisition has
@@ -439,6 +473,26 @@ applyLengthRankingNonVacuousApplicableDomainPreference preference prefer action 
     LengthRankingNonVacuousApplicableDomainPreferenceDisabled -> action
     LengthRankingNonVacuousApplicableDomainPreferenceEnabled ->
       fmap (fmap prefer) action
+
+applyLengthRankingNonVacuousInputBoxPreferenceValue
+  :: LengthRankingNonVacuousInputBoxPreference
+  -> (ranking -> ranking)
+  -> ranking
+  -> ranking
+applyLengthRankingNonVacuousInputBoxPreferenceValue preference prefer ranking =
+  case preference of
+    LengthRankingNonVacuousInputBoxPreferenceDisabled -> ranking
+    LengthRankingNonVacuousInputBoxPreferenceEnabled -> prefer ranking
+
+applyLengthRankingNonVacuousApplicableDomainPreferenceValue
+  :: LengthRankingNonVacuousApplicableDomainPreference
+  -> (ranking -> ranking)
+  -> ranking
+  -> ranking
+applyLengthRankingNonVacuousApplicableDomainPreferenceValue preference prefer
+    ranking = case preference of
+  LengthRankingNonVacuousApplicableDomainPreferenceDisabled -> ranking
+  LengthRankingNonVacuousApplicableDomainPreferenceEnabled -> prefer ranking
 
 scalarInputBoxRankingPolicy
   :: LengthRankingInputBoxValidation
@@ -534,12 +588,14 @@ rankVerifiedLengthCandidatesWithPolicy
 rankVerifiedLengthCandidatesWithPolicy
     (LengthRankingPolicy execution evaluation inputBoxValidation
       applicableDomainValidation originProbe simplification inputBoxPreference
-      applicableDomainPreference liveSessionOpening) contract candidates =
-  applyLengthRankingNonVacuousApplicableDomainPreference
-    applicableDomainPreference preferNonVacuousApplicableDomainLengthRanking
-    $ applyLengthRankingNonVacuousInputBoxPreference inputBoxPreference
-        preferNonVacuousBoundedPositiveLengthRanking
-    $ case
+      applicableDomainPreference liveSessionOpening usableWorkBudget) contract
+    candidates = case usableWorkBudget of
+  LengthRankingUsableWorkBudgetDisabled ->
+    applyLengthRankingNonVacuousApplicableDomainPreference
+      applicableDomainPreference preferNonVacuousApplicableDomainLengthRanking
+      $ applyLengthRankingNonVacuousInputBoxPreference inputBoxPreference
+          preferNonVacuousBoundedPositiveLengthRanking
+      $ case
         (applicableDomainValidation, simplification, liveSessionOpening) of
         (LengthRankingApplicableDomainValidationDisabled,
             LengthRankingCounterexampleSimplificationDisabled,
@@ -569,6 +625,20 @@ rankVerifiedLengthCandidatesWithPolicy
             (scalarCounterexampleSimplificationRankingPolicy simplification)
             (liveSessionOpeningPolicy liveSessionOpening)
             execution evaluation contract candidates
+  LengthRankingUsableWorkBudgetEnabled budget ->
+    rankVerifiedLengthCandidatesWithRankingPoliciesAndUsableWorkBudget
+      (applyLengthRankingNonVacuousApplicableDomainPreferenceValue
+        applicableDomainPreference
+        preferNonVacuousApplicableDomainLengthRanking
+        . applyLengthRankingNonVacuousInputBoxPreferenceValue
+            inputBoxPreference preferNonVacuousBoundedPositiveLengthRanking)
+      budget
+      (scalarInputBoxRankingPolicy inputBoxValidation)
+      (scalarApplicableDomainRankingPolicy applicableDomainValidation)
+      (scalarOriginProbeRankingPolicy originProbe)
+      (scalarCounterexampleSimplificationRankingPolicy simplification)
+      (liveSessionOpeningPolicy liveSessionOpening)
+      execution evaluation contract candidates
 
 -- | Associated variant used by a batch-scoped post-verification adapter.
 -- Caller-owned occurrence handles remain attached until that adapter validates
@@ -584,13 +654,15 @@ rankPostVerificationLengthCandidatesWithPolicy
 rankPostVerificationLengthCandidatesWithPolicy
     (LengthRankingPolicy execution evaluation inputBoxValidation
       applicableDomainValidation originProbe simplification inputBoxPreference
-      applicableDomainPreference liveSessionOpening) contract candidates =
-  applyLengthRankingNonVacuousApplicableDomainPreference
-    applicableDomainPreference
-    preferNonVacuousApplicableDomainAssociatedLengthRanking
-    $ applyLengthRankingNonVacuousInputBoxPreference inputBoxPreference
-        preferNonVacuousBoundedPositiveAssociatedLengthRanking
-    $ case
+      applicableDomainPreference liveSessionOpening usableWorkBudget) contract
+    candidates = case usableWorkBudget of
+  LengthRankingUsableWorkBudgetDisabled ->
+    applyLengthRankingNonVacuousApplicableDomainPreference
+      applicableDomainPreference
+      preferNonVacuousApplicableDomainAssociatedLengthRanking
+      $ applyLengthRankingNonVacuousInputBoxPreference inputBoxPreference
+          preferNonVacuousBoundedPositiveAssociatedLengthRanking
+      $ case
         (applicableDomainValidation, simplification, liveSessionOpening) of
         (LengthRankingApplicableDomainValidationDisabled,
             LengthRankingCounterexampleSimplificationDisabled,
@@ -620,6 +692,21 @@ rankPostVerificationLengthCandidatesWithPolicy
             (scalarCounterexampleSimplificationRankingPolicy simplification)
             (liveSessionOpeningPolicy liveSessionOpening)
             execution evaluation contract candidates
+  LengthRankingUsableWorkBudgetEnabled budget ->
+    rankPostVerificationLengthCandidatesWithRankingPoliciesAndUsableWorkBudget
+      (applyLengthRankingNonVacuousApplicableDomainPreferenceValue
+        applicableDomainPreference
+        preferNonVacuousApplicableDomainAssociatedLengthRanking
+        . applyLengthRankingNonVacuousInputBoxPreferenceValue
+            inputBoxPreference
+            preferNonVacuousBoundedPositiveAssociatedLengthRanking)
+      budget
+      (scalarInputBoxRankingPolicy inputBoxValidation)
+      (scalarApplicableDomainRankingPolicy applicableDomainValidation)
+      (scalarOriginProbeRankingPolicy originProbe)
+      (scalarCounterexampleSimplificationRankingPolicy simplification)
+      (liveSessionOpeningPolicy liveSessionOpening)
+      execution evaluation contract candidates
 
 -- | Assess one exact callback batch with an explicit reusable policy and
 -- request-owned contract, then expose a report only through the generative
@@ -644,13 +731,15 @@ rankVerifiedLengthSpinePairCandidatesWithPolicy
 rankVerifiedLengthSpinePairCandidatesWithPolicy
     (LengthRankingPolicy execution evaluation inputBoxValidation
       applicableDomainValidation originProbe simplification inputBoxPreference
-      applicableDomainPreference liveSessionOpening) contract candidates =
-  applyLengthRankingNonVacuousApplicableDomainPreference
-    applicableDomainPreference
-    preferNonVacuousApplicableDomainLengthSpinePairRanking
-    $ applyLengthRankingNonVacuousInputBoxPreference inputBoxPreference
-        preferNonVacuousBoundedPositiveLengthSpinePairRanking
-    $ case
+      applicableDomainPreference liveSessionOpening usableWorkBudget) contract
+    candidates = case usableWorkBudget of
+  LengthRankingUsableWorkBudgetDisabled ->
+    applyLengthRankingNonVacuousApplicableDomainPreference
+      applicableDomainPreference
+      preferNonVacuousApplicableDomainLengthSpinePairRanking
+      $ applyLengthRankingNonVacuousInputBoxPreference inputBoxPreference
+          preferNonVacuousBoundedPositiveLengthSpinePairRanking
+      $ case
         (applicableDomainValidation, simplification, liveSessionOpening) of
         (LengthRankingApplicableDomainValidationDisabled,
             LengthRankingCounterexampleSimplificationDisabled,
@@ -682,6 +771,21 @@ rankVerifiedLengthSpinePairCandidatesWithPolicy
               simplification)
             (liveSessionOpeningPolicy liveSessionOpening)
             execution evaluation contract candidates
+  LengthRankingUsableWorkBudgetEnabled budget ->
+    rankVerifiedLengthSpinePairCandidatesWithRankingPoliciesAndUsableWorkBudget
+      (applyLengthRankingNonVacuousApplicableDomainPreferenceValue
+        applicableDomainPreference
+        preferNonVacuousApplicableDomainLengthSpinePairRanking
+        . applyLengthRankingNonVacuousInputBoxPreferenceValue
+            inputBoxPreference
+            preferNonVacuousBoundedPositiveLengthSpinePairRanking)
+      budget
+      (spinePairInputBoxRankingPolicy inputBoxValidation)
+      (spinePairApplicableDomainRankingPolicy applicableDomainValidation)
+      (spinePairOriginProbeRankingPolicy originProbe)
+      (spinePairCounterexampleSimplificationRankingPolicy simplification)
+      (liveSessionOpeningPolicy liveSessionOpening)
+      execution evaluation contract candidates
 
 rankPostVerificationLengthSpinePairCandidatesWithPolicy
   :: LengthRankingPolicy
@@ -694,13 +798,15 @@ rankPostVerificationLengthSpinePairCandidatesWithPolicy
 rankPostVerificationLengthSpinePairCandidatesWithPolicy
     (LengthRankingPolicy execution evaluation inputBoxValidation
       applicableDomainValidation originProbe simplification inputBoxPreference
-      applicableDomainPreference liveSessionOpening) contract candidates =
-  applyLengthRankingNonVacuousApplicableDomainPreference
-    applicableDomainPreference
-    preferNonVacuousApplicableDomainAssociatedLengthSpinePairRanking
-    $ applyLengthRankingNonVacuousInputBoxPreference inputBoxPreference
-        preferNonVacuousBoundedPositiveAssociatedLengthSpinePairRanking
-    $ case
+      applicableDomainPreference liveSessionOpening usableWorkBudget) contract
+    candidates = case usableWorkBudget of
+  LengthRankingUsableWorkBudgetDisabled ->
+    applyLengthRankingNonVacuousApplicableDomainPreference
+      applicableDomainPreference
+      preferNonVacuousApplicableDomainAssociatedLengthSpinePairRanking
+      $ applyLengthRankingNonVacuousInputBoxPreference inputBoxPreference
+          preferNonVacuousBoundedPositiveAssociatedLengthSpinePairRanking
+      $ case
         (applicableDomainValidation, simplification, liveSessionOpening) of
         (LengthRankingApplicableDomainValidationDisabled,
             LengthRankingCounterexampleSimplificationDisabled,
@@ -732,6 +838,21 @@ rankPostVerificationLengthSpinePairCandidatesWithPolicy
               simplification)
             (liveSessionOpeningPolicy liveSessionOpening)
             execution evaluation contract candidates
+  LengthRankingUsableWorkBudgetEnabled budget ->
+    rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndUsableWorkBudget
+      (applyLengthRankingNonVacuousApplicableDomainPreferenceValue
+        applicableDomainPreference
+        preferNonVacuousApplicableDomainAssociatedLengthSpinePairRanking
+        . applyLengthRankingNonVacuousInputBoxPreferenceValue
+            inputBoxPreference
+            preferNonVacuousBoundedPositiveAssociatedLengthSpinePairRanking)
+      budget
+      (spinePairInputBoxRankingPolicy inputBoxValidation)
+      (spinePairApplicableDomainRankingPolicy applicableDomainValidation)
+      (spinePairOriginProbeRankingPolicy originProbe)
+      (spinePairCounterexampleSimplificationRankingPolicy simplification)
+      (liveSessionOpeningPolicy liveSessionOpening)
+      execution evaluation contract candidates
 
 -- | Assess one callback batch through the pair-specific occurrence seal.
 assessVerifiedLengthSpinePairCandidatesWithPolicy
