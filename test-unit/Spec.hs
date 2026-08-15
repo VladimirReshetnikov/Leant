@@ -3796,12 +3796,7 @@ assertLengthSpinePairApplicableDomain = do
         [retained, positiveCandidate, counterexampleCandidate,
           counterexampleCandidate]
   withFakeLengthSolver "query-unsat" $ \executable -> do
-    base <- expectRight $ mkLengthRankingPolicy
-      $ explicitLengthRankingPolicySource
-          Djex.defaultLengthSMTLibExecutionLimits
-          (explicitLengthRankingExecutionSource executable Nothing
-            Djex.LengthSMTLibStatusOnly)
-          Djex.defaultLengthEvaluationLimitSource
+    base <- expectRight $ statusOnlyLengthRankingPolicy executable
     let domainThenPreference =
           enableLengthRankingNonVacuousApplicableDomainPreference
           $ enableLengthRankingOriginProbe
@@ -3943,12 +3938,7 @@ assertLengthSpinePairNonVacuousPositivePreference = do
         , retainedSecond, positiveCandidate, counterexampleCandidate
         ]
   withFakeLengthSolver "query-unsat" $ \executable -> do
-    base <- expectRight $ mkLengthRankingPolicy
-      $ explicitLengthRankingPolicySource
-          Djex.defaultLengthSMTLibExecutionLimits
-          (explicitLengthRankingExecutionSource executable Nothing
-            Djex.LengthSMTLibStatusOnly)
-          Djex.defaultLengthEvaluationLimitSource
+    base <- expectRight $ statusOnlyLengthRankingPolicy executable
     let bounded = enableLengthRankingInputBoxValidation limits [1] base
         preferred = enableLengthRankingNonVacuousInputBoxPreference bounded
         run label policy = do
@@ -4011,12 +4001,7 @@ assertLengthSpinePairPositivePreferenceSafety = do
         [positiveCandidate, retained, counterexampleCandidate,
           positiveCandidate]
   withFakeLengthSolver "query-unsat" $ \executable -> do
-    base <- expectRight $ mkLengthRankingPolicy
-      $ explicitLengthRankingPolicySource
-          Djex.defaultLengthSMTLibExecutionLimits
-          (explicitLengthRankingExecutionSource executable Nothing
-            Djex.LengthSMTLibStatusOnly)
-          Djex.defaultLengthEvaluationLimitSource
+    base <- expectRight $ statusOnlyLengthRankingPolicy executable
     let preferred = enableLengthRankingNonVacuousInputBoxPreference
           $ enableLengthRankingInputBoxValidation limits [1] base
     vacuous <- expectRight =<<
@@ -4083,12 +4068,7 @@ assertLengthSpinePairPositivePreferenceSafety = do
         }
       original = [positiveCandidate, counterexampleCandidate, trailing]
   withFakeLengthSolver "query-unsat" $ \executable -> do
-    base <- expectRight $ mkLengthRankingPolicy
-      $ explicitLengthRankingPolicySource
-          Djex.defaultLengthSMTLibExecutionLimits
-          (explicitLengthRankingExecutionSource executable Nothing
-            Djex.LengthSMTLibStatusOnly)
-          Djex.defaultLengthEvaluationLimitSource
+    base <- expectRight $ statusOnlyLengthRankingPolicy executable
     let preferred = enableLengthRankingNonVacuousInputBoxPreference
           $ enableLengthRankingInputBoxValidation limits [] base
     fallback <- expectRight =<<
@@ -4632,12 +4612,7 @@ assertLengthUsableWorkBudgetBuilderAndAdmission = do
   shortBudget <- expectLengthUsableWorkBudget 80
   longBudget <- expectLengthUsableWorkBudget 700
   withFakeLengthSolver "query-delay-300ms" $ \executable -> do
-    base <- expectRight $ mkLengthRankingPolicy
-      $ explicitLengthRankingPolicySource
-          Djex.defaultLengthSMTLibExecutionLimits
-          (explicitLengthRankingExecutionSource executable Nothing
-            Djex.LengthSMTLibStatusOnly)
-          Djex.defaultLengthEvaluationLimitSource
+    base <- expectRight $ statusOnlyLengthRankingPolicy executable
     let shortLast = enableLengthRankingUsableWorkBudget shortBudget
           $ enableLengthRankingUsableWorkBudget longBudget base
         longLast = enableLengthRankingUsableWorkBudget longBudget
@@ -4677,12 +4652,7 @@ assertLengthUsableWorkBudgetBuilderAndAdmission = do
           Just (Right _) -> assertFailure
             $ label ++ " admitted maximum-plus-one input"
           Nothing -> assertFailure $ label ++ " did not reject productively"
-    base <- expectRight $ mkLengthRankingPolicy
-      $ explicitLengthRankingPolicySource
-          Djex.defaultLengthSMTLibExecutionLimits
-          (explicitLengthRankingExecutionSource executable Nothing
-            Djex.LengthSMTLibStatusOnly)
-          Djex.defaultLengthEvaluationLimitSource
+    base <- expectRight $ statusOnlyLengthRankingPolicy executable
     policy <- enableLengthRankingUsableWorkBudget
       <$> expectLengthUsableWorkBudget 40 <*> pure base
     scalar <- timeout 1000000
@@ -4986,12 +4956,7 @@ assertLengthScopedUsableWorkBudgetBuilderComposition = do
               pure ()
             assessments -> assertFailure
               $ label ++ " lost the relational policy: " ++ show assessments
-    base <- expectRight $ mkLengthRankingPolicy
-      $ explicitLengthRankingPolicySource
-          Djex.defaultLengthSMTLibExecutionLimits
-          (explicitLengthRankingExecutionSource executable Nothing
-            Djex.LengthSMTLibStatusOnly)
-          Djex.defaultLengthEvaluationLimitSource
+    base <- expectRight $ statusOnlyLengthRankingPolicy executable
     let advanced = enableLengthRankingNonVacuousApplicableDomainPreference
           $ enableLengthRankingDeferredLiveSessionOpening
           $ enableLengthRankingRelationalPositiveAffineApplicableDomainValidation
@@ -5442,12 +5407,7 @@ assertLengthUsableWorkBudgetAllPure = do
           { leanLengthSpinePairContractSource = delayedLengthTestValue 150000
               $ leanLengthSpinePairContractSource usableWorkPairPureContract
           }
-    base <- expectRight $ mkLengthRankingPolicy
-      $ explicitLengthRankingPolicySource
-          Djex.defaultLengthSMTLibExecutionLimits
-          (explicitLengthRankingExecutionSource executable Nothing
-            Djex.LengthSMTLibStatusOnly)
-          Djex.defaultLengthEvaluationLimitSource
+    base <- expectRight $ statusOnlyLengthRankingPolicy executable
     let advanced = enableLengthRankingDeferredLiveSessionOpening
           $ enableLengthRankingPositiveAffineApplicableDomainValidation limits
             base
@@ -7247,12 +7207,7 @@ assertLengthPositiveAffineBuilderComposition = do
   refused <- syntheticLengthRankingCandidate
     "deferred-opening-all-ineligible"
   withFakeLengthSolver "healthy" $ \executable -> do
-    base <- expectRight $ mkLengthRankingPolicy
-      $ explicitLengthRankingPolicySource
-          Djex.defaultLengthSMTLibExecutionLimits
-          (explicitLengthRankingExecutionSource executable Nothing
-            Djex.LengthSMTLibStatusOnly)
-          Djex.defaultLengthEvaluationLimitSource
+    base <- expectRight $ statusOnlyLengthRankingPolicy executable
     let deferred = enableLengthRankingDeferredLiveSessionOpening base
         liveContract = (lengthRankingContract 0)
           { leanLengthContractSource = LengthContractSource
@@ -7892,12 +7847,7 @@ assertLengthRelationalPositiveAffineBuilderComposition = do
             failureClass -> assertFailure
               $ label ++ " produced " ++ show failureClass
           Nothing -> assertFailure $ label ++ " unexpectedly stayed pure"
-    base <- expectRight $ mkLengthRankingPolicy
-      $ explicitLengthRankingPolicySource
-          Djex.defaultLengthSMTLibExecutionLimits
-          (explicitLengthRankingExecutionSource executable Nothing
-            Djex.LengthSMTLibStatusOnly)
-          Djex.defaultLengthEvaluationLimitSource
+    base <- expectRight $ statusOnlyLengthRankingPolicy executable
     let deferred = enableLengthRankingDeferredLiveSessionOpening base
         relationalLast =
           enableLengthRankingRelationalPositiveAffineApplicableDomainValidation
@@ -8692,12 +8642,7 @@ assertLengthStrictRelationalPositiveAffineBuilderComposition = do
               pure ()
             assessments -> assertFailure
               $ label ++ " lost the strict strategy: " ++ show assessments
-    base <- expectRight $ mkLengthRankingPolicy
-      $ explicitLengthRankingPolicySource
-          Djex.defaultLengthSMTLibExecutionLimits
-          (explicitLengthRankingExecutionSource executable Nothing
-            Djex.LengthSMTLibStatusOnly)
-          Djex.defaultLengthEvaluationLimitSource
+    base <- expectRight $ statusOnlyLengthRankingPolicy executable
     let retained = enableLengthRankingScopedUsableWorkBudget longBudget
           $ enableLengthRankingNonVacuousApplicableDomainPreference
           $ enableLengthRankingDeferredLiveSessionOpening base
@@ -20861,6 +20806,19 @@ explicitLengthRankingPolicySource executionLimits executionSource
   , lengthRankingPolicyEvaluationSource = evaluationSource
   }
 
+-- | The base ranking policy most live-ranking cases start from: the
+-- status-only artifact policy over one unpinned fake-solver executable, with
+-- default execution and evaluation limits.
+statusOnlyLengthRankingPolicy
+  :: FilePath
+  -> Either LengthRankingConfigurationError LengthRankingPolicy
+statusOnlyLengthRankingPolicy executable = mkLengthRankingPolicy
+  $ explicitLengthRankingPolicySource
+      Djex.defaultLengthSMTLibExecutionLimits
+      (explicitLengthRankingExecutionSource executable Nothing
+        Djex.LengthSMTLibStatusOnly)
+      Djex.defaultLengthEvaluationLimitSource
+
 explicitLengthRankingExecutionSource
   :: FilePath
   -> Maybe [Word8]
@@ -21772,12 +21730,7 @@ assertLengthRankingApplicableDomainComposition = do
       contract = lengthRankingContract 0
       original = [retained, identity, zero, one]
   withFakeLengthSolver "query-unsat" $ \executable -> do
-    base <- expectRight $ mkLengthRankingPolicy
-      $ explicitLengthRankingPolicySource
-          Djex.defaultLengthSMTLibExecutionLimits
-          (explicitLengthRankingExecutionSource executable Nothing
-            Djex.LengthSMTLibStatusOnly)
-          Djex.defaultLengthEvaluationLimitSource
+    base <- expectRight $ statusOnlyLengthRankingPolicy executable
     let forward = enableLengthRankingNonVacuousApplicableDomainPreference
           $ enableLengthRankingNonVacuousInputBoxPreference
           $ enableLengthRankingApplicableDomainValidation applicableLimits
@@ -22006,12 +21959,7 @@ assertLengthRankingNonVacuousPositivePreference = do
       original = [retainedFirst, one, zero, retainedSecond, zero, one]
       contract = lengthRankingContract 0
   withFakeLengthSolver "query-unsat" $ \executable -> do
-    base <- expectRight $ mkLengthRankingPolicy
-      $ explicitLengthRankingPolicySource
-          Djex.defaultLengthSMTLibExecutionLimits
-          (explicitLengthRankingExecutionSource executable Nothing
-            Djex.LengthSMTLibStatusOnly)
-          Djex.defaultLengthEvaluationLimitSource
+    base <- expectRight $ statusOnlyLengthRankingPolicy executable
     let bounded = enableLengthRankingInputBoxValidation limits [] base
         preferred = enableLengthRankingNonVacuousInputBoxPreference bounded
         run label policy = do
@@ -22074,12 +22022,7 @@ assertLengthRankingPositivePreferenceSafety = do
         }
       vacuousInput = [zero, retained, one, zero]
   withFakeLengthSolver "query-unsat" $ \executable -> do
-    base <- expectRight $ mkLengthRankingPolicy
-      $ explicitLengthRankingPolicySource
-          Djex.defaultLengthSMTLibExecutionLimits
-          (explicitLengthRankingExecutionSource executable Nothing
-            Djex.LengthSMTLibStatusOnly)
-          Djex.defaultLengthEvaluationLimitSource
+    base <- expectRight $ statusOnlyLengthRankingPolicy executable
     let preferred = enableLengthRankingNonVacuousInputBoxPreference
           $ enableLengthRankingInputBoxValidation limits [] base
     vacuous <- expectLengthRankingWithin "vacuous positive ordering"
@@ -22139,12 +22082,7 @@ assertLengthRankingPositivePreferenceSafety = do
         }
       original = [oneInput, zeroInput, trailing]
   withFakeLengthSolver "query-unsat" $ \executable -> do
-    base <- expectRight $ mkLengthRankingPolicy
-      $ explicitLengthRankingPolicySource
-          Djex.defaultLengthSMTLibExecutionLimits
-          (explicitLengthRankingExecutionSource executable Nothing
-            Djex.LengthSMTLibStatusOnly)
-          Djex.defaultLengthEvaluationLimitSource
+    base <- expectRight $ statusOnlyLengthRankingPolicy executable
     let preferred = enableLengthRankingNonVacuousInputBoxPreference
           $ enableLengthRankingInputBoxValidation mismatchLimits [1] base
     fallback <- expectLengthRankingWithin "positive preference fallback"
