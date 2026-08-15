@@ -129,7 +129,7 @@ session environment; `#`-commands pass straight through.
 
 Finite-list-spine Length counterexample ranking is disabled by default. To opt
 in, pass `--length-ranking-config` with an explicitly chosen absolute path to
-a version-1 through version-10 configuration file. Versions 1--3 select scalar
+a version-1 through version-12 configuration file. Versions 1--3 select scalar
 finite-list-spine Length ranking. Version 1 preserves the established
 counterexample-only behavior. Version 2 additionally requires an explicit
 per-input finite box and enables independent bounded validation after a live
@@ -155,6 +155,14 @@ one additional `"usableWorkBudget"` object selecting
 `"shared-usable-work-deadline-v1"`. Versions 1--8 remain literal: versions
 1--6 keep eager opening, while v7/v8 keep deferred opening with the historical
 separate opener and fresh-per-query deadlines.
+Version 11 is the scalar relational positive-affine successor and version 12
+is its nominal product sibling. They branch from the exact v7/v8 operational
+root, replace only the applicable-domain strategy with
+`"relational-positive-affine-v1"`, and deliberately have no
+`"usableWorkBudget"` field. Their deferred live lifecycle therefore retains
+the historical separate opener/finalizer and fresh per-query deadlines. Version
+numbers are closed schema selections rather than cumulative feature levels;
+versions 1--10 remain literal.
 Leant admits and reads that file
 once at startup, requires the configuration to contain an executable SHA-256
 expectation by default, and retains the decoded contract selection as a fixed
@@ -166,9 +174,10 @@ an eligible batch later opens a worker.
 budget (default 5,000 ms, maximum 60,000 ms). No option discovers a file or
 solver. POSIX descriptor acquisition is implemented; Windows currently fails
 closed. Versions 1--6 and the established direct runners open one fresh lexical
-solver worker for every eligible batch. Versions 7--10 instead complete all
-admission and preparation, then run each candidate's pure MRU, positive-affine
-domain, and origin prefix before IO: an all-pure batch opens no process, while
+solver worker for every eligible batch. Versions 7--12 instead complete all
+admission and preparation, then run each candidate's pure MRU, selected
+positive-affine domain, and origin prefix before IO: an all-pure batch opens no
+process, while
 the first live miss opens one lexical session for that query and the remaining
 suffix. V9/v10 additionally capture one shared usable-work deadline after the
 64-candidate admission gate and before full preparation, so deferred pure work,
@@ -522,11 +531,43 @@ pairAssessment <- assessVerifiedLengthSpinePairCandidatesWithPolicy
 For example, `scalarPositiveAffineContract` may use the normalized
 precondition `input 0 + 1 <= 4`; the positive-affine rule derives maximum `3`
 without changing the actual precondition replayed at each assignment. The
-positive-affine and historical direct applicable-domain builders select
-different rules and are mutually exclusive: whichever of those two builders is
-applied last is retained. All other builders above are persistent and
+literal-ceiling positive-affine and historical direct applicable-domain
+builders select different rules. All other builders above are persistent and
 orthogonal. Deferred opening is operational policy, not evidence, and adds no
 presentation note.
+
+Relational positive-affine extraction is a third explicit selection. This
+programmatic example replaces `advancedPolicy`'s literal-ceiling extractor but
+retains its independent limits, ordering preferences, simplification, origin
+probe, post-`unsat` box, and deferred opening:
+
+```haskell
+let relationalPolicy =
+      enableLengthRankingRelationalPositiveAffineApplicableDomainValidation
+        applicableDomainLimits advancedPolicy
+
+scalarAssessment <- assessVerifiedLengthCandidatesWithPolicy
+  relationalPolicy scalarRelationalContract verificationBatch
+
+pairAssessment <- assessVerifiedLengthSpinePairCandidatesWithPolicy
+  relationalPolicy pairRelationalContract verificationBatch
+```
+
+For example, `scalarRelationalContract` may combine `input 0 == input 1`
+with `input 1 <= 5`, deriving inclusive maxima `[5, 5]` through the relation.
+`pairRelationalContract` may use `2 * input 0 <= input 0 + 1`; exact
+coefficient cancellation derives maximum `[1]`. The direct,
+literal-ceiling-positive-affine, and relational-positive-affine builders are
+mutually exclusive and last-wins; none changes the actual precondition replayed
+over the derived box. Complete scalar traversal produces
+`RelationalPositiveAffineApplicableDomainEstablished`, while the nominal pair
+path produces
+`LengthSpinePairRelationalPositiveAffineApplicableDomainEstablished`.
+Presentation uses
+`renderLengthRelationalPositiveAffineApplicableDomainValidationNote` or
+`renderLengthSpinePairRelationalPositiveAffineApplicableDomainValidationNote`.
+Those notes describe bounded, model/provider-relative evidence; selecting the
+policy itself produces no evidence or pruning authority.
 
 The shared usable-work policy is a further orthogonal programmatic opt-in. Its
 builder accepts only an already validated opaque Djex budget and works for both
@@ -572,8 +613,8 @@ Budget expiry is the existing sanitized session deadline failure with safe
 original index `Nothing` and the established original-order atomic fallback.
 It creates no assessment, evidence, presentation note, proof, or pruning
 authority. The budgeted Djex ready-worker and nominal scalar/product query-run
-identities bind the shared selection and effective deadline cause; v1--v8 keep
-their exact legacy identities. See the
+identities bind the shared selection and effective deadline cause; v1--v8 and
+startup v11/v12 keep the unbudgeted worker/run identities. See the
 [shared usable-work Length ranking report](docs/reports/2026-08-15-shared-usable-work-length-ranking.md).
 
 Counterexample simplification is another orthogonal, programmatic opt-in.  It
@@ -610,8 +651,8 @@ violation, retains the original receipt and makes no simplification claim.  A
 bounded evaluation rejection during an optional earlier trial does the same;
 structural, anchor, internal, and association failures remain indexed atomic
 failures. This policy is disabled by every established direct runner and
-startup version 1 through 6, while startup versions 7 and 8 require it. It is
-bounded componentwise-lexicographic
+startup version 1 through 6, while startup versions 7 through 12 require it.
+It is bounded componentwise-lexicographic
 simplification, not global minimality, pruning authority, or a new conclusion
 from Z3.
 
@@ -1162,6 +1203,173 @@ validation, and only then the scalar-v5 or pair-v5 contract. An earlier
 operational or budget error therefore cannot be preempted by a later malformed
 contract.
 
+Startup v11 and v12 select relational positive-affine applicable-domain
+validation without selecting the v9/v10 shared usable-work owner. The exported
+version constants are
+`lengthRankingConfigurationFileRelationalPositiveAffineVersion` (11) and
+`lengthRankingConfigurationFileSpinePairRelationalPositiveAffineVersion`
+(12). This complete scalar v11 document lets the bound on input 1 flow through
+an equality to input 0:
+
+```json
+{
+  "format": "leant-live-length-ranking-configuration",
+  "version": 11,
+  "executionAdmission": {
+    "executablePathCharacters": 4096,
+    "policyFingerprintBytes": 262144
+  },
+  "execution": {
+    "executablePath": "/absolute/path/to/z3",
+    "expectedExecutableSha256": null,
+    "solverTimeoutMilliseconds": 1000,
+    "solverResourceLimit": 100000,
+    "hostDeadlineMilliseconds": 1500,
+    "artifactPolicy": "input-values-after-satisfiable",
+    "responseLimits": {
+      "bytes": 65536,
+      "nestingDepth": 64,
+      "nodes": 4096,
+      "tokenBytes": 4096,
+      "integerBits": 4096
+    }
+  },
+  "evaluation": {
+    "assignmentValueBits": 4096,
+    "intermediateValueBits": 4096
+  },
+  "inputBoxValidation": {
+    "inclusiveInputMaximums": [5, 5],
+    "maximumAssignments": 36
+  },
+  "counterexampleProbe": "origin-before-live",
+  "boundedPositiveOrdering": "prefer-non-vacuous",
+  "applicableDomainValidation": {
+    "strategy": "relational-positive-affine-v1",
+    "maximumInputs": 2,
+    "maximumAssignments": 36
+  },
+  "applicableDomainOrdering": "prefer-non-vacuous",
+  "counterexampleSimplification": {
+    "strategy": "componentwise-lexicographic-v1",
+    "maximumInputs": 2,
+    "maximumAssignments": 36
+  },
+  "liveSessionOpening": "defer-until-live-query",
+  "contract": {
+    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
+    "targetArgumentRoles": ["observed-spine", "observed-spine"],
+    "candidateCasePolicy": "cases-rejected",
+    "precondition": [
+      "all",
+      [
+        ["equal", ["input", 0], ["input", 1]],
+        ["at-most", ["input", 1], ["literal", 5]]
+      ]
+    ],
+    "postcondition": ["equal", ["result"], ["input", 0]],
+    "providerLaws": []
+  }
+}
+```
+
+The relational rule derives maxima `[5, 5]`, then the existing finite-box
+verifier checks all 36 assignments. Exactly six diagonal assignments satisfy
+the precondition. The independent post-`unsat` box happens to use the same
+maxima in this example; it remains a separate authority and is not used to
+derive the applicable domain.
+
+The nominal product v12 document uses exact coefficient cancellation to reduce
+`2 * input0 <= input0 + 1` to `input0 <= 1`:
+
+```json
+{
+  "format": "leant-live-length-ranking-configuration",
+  "version": 12,
+  "executionAdmission": {
+    "executablePathCharacters": 4096,
+    "policyFingerprintBytes": 262144
+  },
+  "execution": {
+    "executablePath": "/absolute/path/to/z3",
+    "expectedExecutableSha256": null,
+    "solverTimeoutMilliseconds": 1000,
+    "solverResourceLimit": 100000,
+    "hostDeadlineMilliseconds": 1500,
+    "artifactPolicy": "input-values-after-satisfiable",
+    "responseLimits": {
+      "bytes": 65536,
+      "nestingDepth": 64,
+      "nodes": 4096,
+      "tokenBytes": 4096,
+      "integerBits": 4096
+    }
+  },
+  "evaluation": {
+    "assignmentValueBits": 4096,
+    "intermediateValueBits": 4096
+  },
+  "inputBoxValidation": {
+    "inclusiveInputMaximums": [4],
+    "maximumAssignments": 5
+  },
+  "counterexampleProbe": "origin-before-live",
+  "boundedPositiveOrdering": "prefer-non-vacuous",
+  "applicableDomainValidation": {
+    "strategy": "relational-positive-affine-v1",
+    "maximumInputs": 1,
+    "maximumAssignments": 8
+  },
+  "applicableDomainOrdering": "prefer-non-vacuous",
+  "counterexampleSimplification": {
+    "strategy": "componentwise-lexicographic-v1",
+    "maximumInputs": 1,
+    "maximumAssignments": 9
+  },
+  "liveSessionOpening": "defer-until-live-query",
+  "contract": {
+    "resultShape": "binary-prod-spines-v1",
+    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
+    "targetArgumentRoles": ["observed-spine"],
+    "candidateCasePolicy": "cases-rejected",
+    "precondition": [
+      "at-most",
+      ["scale", 2, ["input", 0]],
+      ["sum", [["input", 0], ["literal", 1]]]
+    ],
+    "postcondition": [
+      "all",
+      [
+        ["equal", ["result", "first"], ["input", 0]],
+        ["equal", ["result", "second"],
+          ["quotient", 2, ["input", 0]]]
+      ]
+    ],
+    "providerLaws": []
+  }
+}
+```
+
+Both documents intentionally have the exact v7/v8 root fields and validation
+order. Their `applicableDomainValidation` object still has exactly `strategy`,
+`maximumInputs`, and `maximumAssignments`; only the strategy literal is the new
+`relational-positive-affine-v1`. The existing width cap of 8 and assignment
+cap of 65,536 apply. The scalar-v5 or pair-v5 contract remains last.
+`usableWorkBudget` is not optional here: it is an unknown extra root field and
+is rejected. Consequently startup v11/v12 retain deferred opening but use the
+historical separate opener/finalizer and fresh per-query host deadlines rather
+than a shared ranking owner. A programmatic caller may independently compose
+the relational builder with a validated budget, but the versioned schemas do
+not infer that composition.
+
+The generalized decoder reaches the v11/v12 parser only after the literal
+v1--v10 chain returns its closed unsupported-version sentinel. The relational
+parser reuses the established applicable-domain object, field, limit, and
+validation-error identities, validates the exact operational root in its
+established order, and demands the contract last. Both examples are unpinned
+and therefore require the separate explicit
+`--length-ranking-allow-unpinned` activation choice.
+
 Then select a typed Exference-producing engine and synthesize normally. A
 contract-only v6 document can replace the startup-fixed contract for one
 command without changing the CLI grammar:
@@ -1188,9 +1396,9 @@ required, and its case policy is exactly `"cases-rejected"` or
 `"exact-spine-zero-step-v1"`.
 
 The old scalar decoders remain exact compatibility entrances: the startup
-decoder for versions 1--3 rejects v4--v10, and the contract-only decoder for
+decoder for versions 1--3 rejects v4--v12, and the contract-only decoder for
 versions 1--5 rejects v6. The generalized decoders delegate those old versions
-to their unchanged scalar paths and add startup v4--v10 or contract-only v6. A
+to their unchanged scalar paths and add startup v4--v12 or contract-only v6. A
 product file selects which nominal runner Main calls; it does not infer a
 contract from the Lean type, bypass the exact canonical-`Prod` handoff, turn
 solver status into evidence, or grant pruning authority. See the
@@ -1209,6 +1417,9 @@ compatibility boundary are recorded in the
 The additive v9/v10 shared usable-work owner and unchanged behavioral authority
 are recorded in the
 [shared usable-work Length ranking report](docs/reports/2026-08-15-shared-usable-work-length-ranking.md).
+The v11/v12 relational rule, exact v7/v8-shaped schema, nominal evidence, and
+deliberate absence of the shared budget are recorded in the
+[relational positive-affine Length ranking report](docs/reports/2026-08-15-relational-positive-affine-length-ranking.md).
 
 After a successful occurrence seal, Main dispatches presentation through the
 selected scalar or pair domain and prints a subordinate note only for a
@@ -1223,8 +1434,12 @@ applicable-domain assessments use
 Positive-affine assessments use
 `renderLengthPositiveAffineApplicableDomainValidationNote` or its pair sibling;
 their notes report derived maxima, checked/applicable counts, the exact
-model/provider-relative basis, and explicit vacuity. Main's v7--v10 path can
-produce only the positive-affine receipt family; v1--v6 cannot produce either
+model/provider-relative basis, and explicit vacuity. Relational assessments use
+`renderLengthRelationalPositiveAffineApplicableDomainValidationNote` or
+`renderLengthSpinePairRelationalPositiveAffineApplicableDomainValidationNote`
+with the same bounded projections and a distinct rule label. Main's v7--v10
+path can produce only the literal-ceiling positive-affine receipt family;
+v11/v12 can produce only the relational family; v1--v6 cannot produce any
 applicable-domain family. The semantic note
 never projects the receipt's private provider-name list. Disabled assessment,
 rejected input, heuristic status,
@@ -1570,8 +1785,9 @@ Only the separate
 `enableLengthRankingNonVacuousApplicableDomainPreference` moves an established
 receipt with a positive applicable-assignment count into a stable preferred
 partition. Startup versions 1--6 cannot enable either policy, so their file
-behavior is exact. Startup v7--v10 enable that same preference with the nominal
-positive-affine validator; direct-v1 validation remains programmatic-only.
+behavior is exact. Startup v7--v12 enable that same preference with their
+nominal literal-ceiling or relational positive-affine validator; direct-v1
+validation remains programmatic-only.
 Contract-only files select constraints rather than ranking policy.
 
 `enableLengthRankingPositiveAffineApplicableDomainValidation` is a separate,
@@ -1589,6 +1805,19 @@ zero, total count 1, and applicable count 0. A true constant equality is
 non-binding. A nullary query skips coverage extraction, validates `[]`, and
 records applicable count 1 or 0. Startup v7--v10 select this rule explicitly;
 the direct v1 builder, functions, receipts, and identities remain literal.
+
+`enableLengthRankingRelationalPositiveAffineApplicableDomainValidation` is the
+third mutually exclusive extractor. It accepts the same positive-affine
+expression grammar on both sides of a top-level inequality or equality,
+cancels common constants and coefficients, and propagates maxima through
+directed relations. Equality contributes both directions. Bounds advance in
+immutable synchronous snapshots, and every eligible rule fires at most once;
+the sound result is deliberately not a numeric least fixed point. Unsupported
+clauses grant no coverage rule, unresolved inputs remain ordinary
+inapplicability, and the actual normalized precondition is still replayed over
+the complete derived box. Startup v11/v12 select only this relational rule and
+its nominal scalar/product receipt family. They retain every v7/v8 operational
+selection but deliberately omit v9/v10's usable-work budget.
 
 Configuration version 3 inserts one query-owned origin probe after all four
 bank entries—and after an enabled applicable-domain pass is inapplicable—before
@@ -1615,8 +1844,8 @@ stably demoted, and updates the MRU bank. Complete traversal becomes
 `BoundedPositive`, contributes no seed, and records only bounded/model-relative
 positive evidence. It stays in the neutral stable partition under the existing
 builder and startup versions 2--4. The explicit
-`enableLengthRankingNonVacuousInputBoxPreference` builder—or startup scalar v5
-or v7, or pair v6 or v8—moves only a receipt with a positive
+`enableLengthRankingNonVacuousInputBoxPreference` builder—or startup scalar
+v5/v7/v9/v11 or pair v6/v8/v10/v12—moves only a receipt with a positive
 applicable-assignment count into a stable preferred partition. A
 zero-applicable receipt remains neutral.
 A validation
@@ -1654,9 +1883,10 @@ atomically restores every original candidate in original order as
 sanitized batch failure class, cleanup bit, and optional safe original index.
 Candidate-local pure preparation classes survive that fallback; candidates
 whose preparation succeeded have no invented refusal reason. Exceptions
-propagate instead of producing a ranking. Legacy v1--v8 lifecycle and
-per-query budgets remain separate. An explicitly budgeted programmatic policy
-or startup v9/v10 instead places admitted preparation and deferred ranking
+propagate instead of producing a ranking. Legacy v1--v8 and relational startup
+v11/v12 retain separate lifecycle and per-query budgets. An explicitly
+budgeted programmatic policy or startup v9/v10 instead places admitted
+preparation and deferred ranking
 beneath one shared usable-work owner, without claiming asynchronous
 interruption of arbitrary callback code. Main invokes
 this foundation only after the explicit startup opt-in described above; it
@@ -1702,7 +1932,8 @@ admission, complete execution source (absolute Z3 path, optional SHA-256
 expectation, solver/host budgets, artifact policy, and response limits), and
 replay-limit source. After validation, `LengthRankingPolicy` retains the
 opaque sealed Djex execution configuration and evaluation limits plus a
-private selected direct-v1 or positive-affine-v1 applicable-domain pass,
+private selected direct-v1, positive-affine-v1, or
+relational-positive-affine-v1 applicable-domain pass,
 optional origin probe, independent optional finite-input-box orchestration,
 optional counterexample simplification, orthogonal non-vacuous ordering
 preferences for applicable-domain and explicit-box receipts, and an eager or
@@ -1716,7 +1947,9 @@ Versions 5 and 6 also enable only the explicit box-receipt preference. Versions
 7 and 8 require the positive-affine pass, both non-vacuous preferences,
 simplification, and deferred opening; they cannot select direct v1. Versions 9
 and 10 retain those respective scalar/product bundles and additionally enable
-the required validated budget. Programmatic callers opt in with
+the required validated budget. Versions 11 and 12 instead retain the v7/v8
+root bundle, select relational positive-affine validation, and leave the
+usable-work budget disabled. Programmatic callers opt in with
 `enableLengthRankingUsableWorkBudget`; the builder neither reads a clock nor
 creates evidence.
 A scalar `LeanLengthContract` or nominal
@@ -1742,7 +1975,8 @@ contract is checked candidate-by-candidate only during the later full
 preparation pass. The no-option command deliberately reuses that decoded
 contract for the process. Lower-level policy APIs and the one-shot Main path
 can instead associate the same activated policy with a request-owned contract.
-Legacy lifecycle and per-query budgets remain separate. A policy derived with
+Legacy v1--v8 and startup v11/v12 lifecycle and per-query budgets remain
+separate. A policy derived with
 `enableLengthRankingUsableWorkBudget`, including startup v9/v10, instead owns
 one additive shared usable-work window with the callback-return boundary
 described above. There are no
@@ -1759,8 +1993,8 @@ preserving the version-1 compatibility path.
 `Leant.Synth.Length.Configuration.File` keeps the exact version-1 JSON grammar
 for that policy and adds exact scalar opt-in versions 2 and 3. Its established
 `decodeLengthRankingConfigurationFile` remains an exact scalar-only entrance
-and rejects versions 4--8. The generalized
-`decodeLengthAssessmentConfigurationFile` additionally accepts versions 4--8
+and rejects versions 4--12. The generalized
+`decodeLengthAssessmentConfigurationFile` additionally accepts versions 4--12
 and returns an opaque `DisabledLengthAssessmentConfiguration` carrying the same
 checked process policy beside a lazy scalar-or-pair selection. The pure decoder consumes a caller-owned
 strict byte string through a separate bounded JSON parser, rejects malformed
@@ -1857,6 +2091,18 @@ then the contract. It constructs the final opaque policy with
 this additive parser only after the unchanged v1--v8 chain reports its closed
 unsupported-version sentinel, so every old success, diagnostic, schema and
 identity stays literal.
+
+Versions 11 and 12 are the relational positive-affine scalar and product
+siblings of v7/v8. They reuse that exact root, field identities, caps, and
+validation order, but require
+`"strategy": "relational-positive-affine-v1"` in the applicable-domain object
+and construct the policy with
+`enableLengthRankingRelationalPositiveAffineApplicableDomainValidation`. They
+do not admit `usableWorkBudget`; contract validation remains last, and the
+generalized dispatcher reaches them only after the literal v1--v10 chain has
+returned its closed unsupported-version sentinel. The distinct scalar and
+product assessments and renderers expose only independently replayed bounded,
+model/provider-relative evidence and grant no proof or pruning authority.
 
 `Leant.Synth.Length.Configuration.File.Acquire` is the compatibility facade
 over the shared bounded `Leant.Synth.Length.File.Acquire` filesystem boundary.
