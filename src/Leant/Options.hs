@@ -63,6 +63,8 @@ lengthAssessmentSetup options = case optLengthRankingConfig options of
         $ optLengthRankingLoadTimeout options
     )
 
+-- | Parse the command line, validating option combinations.  @--help@ and
+-- errors return 'Left' with the message to print.
 parseArgs :: [String] -> Either String Options
 parseArgs = go defaultOptions
  where
@@ -126,6 +128,7 @@ parseArgs = go defaultOptions
           "--length-ranking-allow-unpinned requires --length-ranking-config"
     | otherwise = Right opts
 
+-- | The complete @--help@ text.
 usage :: String
 usage = unlines
   [ "usage: leant [FILE] [options]"

@@ -71,9 +71,11 @@ data SnapshotMetadata = SnapshotMetadata
   }
   deriving (Eq, Show)
 
+-- | Path of the synthesis companion snapshot beside a main @.olean@.
 snapshotCompanionPath :: FilePath -> FilePath
 snapshotCompanionPath path = snapshotStem path ++ ".leant-synth.olean"
 
+-- | Path of the JSON metadata sidecar beside a main @.olean@.
 snapshotMetadataPath :: FilePath -> FilePath
 snapshotMetadataPath path = snapshotStem path ++ ".leant.json"
 
@@ -93,6 +95,7 @@ snapshotStem path
  where
   extension = ".olean"
 
+-- | Stream a snapshot file once, producing its byte count and FNV-1a hash.
 fingerprintSnapshot :: FilePath -> IO SnapshotFingerprint
 fingerprintSnapshot path = withBinaryFile path ReadMode (go fnvOffset 0)
  where
@@ -128,6 +131,8 @@ synthesisToolingABI source = "leant-synth-fnv1a64-"
   step hash character =
     (hash `xor` fromIntegral (ord character)) * fnvPrime
 
+-- | Render the versioned sidecar document written next to a pickled
+-- snapshot.  'decodeSnapshotMetadata' reads exactly this format back.
 encodeSnapshotMetadata :: SnapshotMetadata -> String
 encodeSnapshotMetadata metadata = encodeJson $ JObj
   [ ("format", JStr "leant-snapshot")
@@ -150,6 +155,8 @@ encodeSnapshotMetadata metadata = encodeJson $ JObj
     , ("fnv1a64", JStr (snapshotFNV1a64 fingerprint))
     ]
 
+-- | Parse and validate a sidecar document, rejecting unknown formats,
+-- versions, and out-of-range counters with a short error description.
 decodeSnapshotMetadata :: String -> Either String SnapshotMetadata
 decodeSnapshotMetadata text = do
   value <- parseJson text

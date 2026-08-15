@@ -59,9 +59,12 @@ generatedResultName name = case stripPrefix "it!" name of
 newtype ProviderWorld = ProviderWorld Integer
   deriving (Eq, Ord, Show)
 
+-- | The provider world of a fresh session.
 initialProviderWorld :: ProviderWorld
 initialProviderWorld = ProviderWorld 0
 
+-- | Note one provider-affecting session change, invalidating every cache
+-- entry keyed to earlier worlds.
 advanceProviderWorld :: ProviderWorld -> ProviderWorld
 advanceProviderWorld (ProviderWorld generation) =
   ProviderWorld (generation + 1)
@@ -73,12 +76,15 @@ data ProviderKey = ProviderKey ProviderWorld ProviderQuery
 -- Main stores parsed provider inventories while tests can use small markers.
 data ProviderCache value = ProviderCache Int [(ProviderKey, value)]
 
+-- | An empty cache holding at most the given number of entries.
 emptyProviderCache :: Int -> ProviderCache value
 emptyProviderCache capacity = ProviderCache (max 0 capacity) []
 
+-- | Drop every entry while keeping the configured capacity.
 clearProviderCache :: ProviderCache value -> ProviderCache value
 clearProviderCache (ProviderCache capacity _) = ProviderCache capacity []
 
+-- | Number of currently retained entries.
 providerCacheSize :: ProviderCache value -> Int
 providerCacheSize (ProviderCache _ entries) = length entries
 

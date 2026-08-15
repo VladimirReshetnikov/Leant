@@ -213,14 +213,18 @@ data RankedLengthCandidate = RankedLengthCandidate
   !(Verified DetailedVerificationVariant)
   !LengthCandidateAssessment
 
+-- | Zero-based position of this candidate in the caller's admitted input.
 rankedLengthCandidateOriginalIndex :: RankedLengthCandidate -> Natural
 rankedLengthCandidateOriginalIndex (RankedLengthCandidate index _ _) = index
 
+-- | The exact callback receipt this assessment was made for.
 rankedLengthCandidateVerified
   :: RankedLengthCandidate
   -> Verified DetailedVerificationVariant
 rankedLengthCandidateVerified (RankedLengthCandidate _ verified _) = verified
 
+-- | Legacy assessment projection; a preparation refusal reads as
+-- 'Unassessed'.
 rankedLengthCandidateAssessment
   :: RankedLengthCandidate
   -> LengthRankingAssessment
@@ -273,15 +277,18 @@ data LengthRankingFailure = LengthRankingFailure
   !(Maybe Natural)
   deriving (Eq, Ord, Show)
 
+-- | The sanitized batch-failure class.
 lengthRankingFailureClass
   :: LengthRankingFailure
   -> LengthRankingFailureClass
 lengthRankingFailureClass (LengthRankingFailure failure _ _) = failure
 
+-- | Whether Djex reported that worker cleanup may be incomplete.
 lengthRankingFailureCleanupIncomplete :: LengthRankingFailure -> Bool
 lengthRankingFailureCleanupIncomplete
     (LengthRankingFailure _ incomplete _) = incomplete
 
+-- | Safe original input index of the failing candidate, when one applies.
 lengthRankingFailureOriginalIndex
   :: LengthRankingFailure
   -> Maybe Natural
@@ -294,9 +301,11 @@ data LengthRanking = LengthRanking
   ![RankedLengthCandidate]
   !(Maybe LengthRankingFailure)
 
+-- | Every admitted candidate, reordered only by a successful assessment.
 lengthRankingCandidates :: LengthRanking -> [RankedLengthCandidate]
 lengthRankingCandidates (LengthRanking candidates _) = candidates
 
+-- | The batch-wide sanitized failure behind an all-'Unassessed' fallback.
 lengthRankingFailure :: LengthRanking -> Maybe LengthRankingFailure
 lengthRankingFailure (LengthRanking _ failure) = failure
 
