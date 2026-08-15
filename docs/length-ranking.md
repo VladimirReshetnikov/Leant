@@ -36,6 +36,54 @@ design; read the overview above first.
 
 ---
 
+## Contents
+
+- [Startup configuration file](#startup-configuration-file)
+  - [Versions 1 to 20 at a glance](#versions-1-to-20-at-a-glance)
+  - [Activation, pinning, and worker lifecycle](#activation-pinning-and-worker-lifecycle)
+  - [Candidate eligibility](#candidate-eligibility)
+- [One-shot contract-only files](#one-shot-contract-only-files)
+  - [Command syntax, admission, and lifetime](#command-syntax-admission-and-lifetime)
+  - [Contract-only versions 1 and 2: compatibility grammar and modulo](#contract-only-versions-1-and-2-compatibility-grammar-and-modulo)
+  - [Contract-only version 3: explicit target-argument roles](#contract-only-version-3-explicit-target-argument-roles)
+  - [Contract-only version 4: exact-spine zero-step case policy](#contract-only-version-4-exact-spine-zero-step-case-policy)
+  - [Contract-only version 5: positive-literal quotient](#contract-only-version-5-positive-literal-quotient)
+- [Binary-product Length queries](#binary-product-length-queries)
+  - [Canonical `Prod` eligibility and the serializer boundary](#canonical-prod-eligibility-and-the-serializer-boundary)
+  - [Library-level pair query handoff](#library-level-pair-query-handoff)
+  - [Live pair ranking and non-vacuous bounded-positive preference](#live-pair-ranking-and-non-vacuous-bounded-positive-preference)
+  - [Direct applicable-domain validation](#direct-applicable-domain-validation)
+  - [Positive-affine applicable domain and deferred opening](#positive-affine-applicable-domain-and-deferred-opening)
+  - [Relational positive-affine extraction](#relational-positive-affine-extraction)
+  - [Strict relational positive-affine extraction](#strict-relational-positive-affine-extraction)
+  - [Root-quotient consequence extraction](#root-quotient-consequence-extraction)
+  - [Shared usable-work budget (v1)](#shared-usable-work-budget-v1)
+  - [Scoped usable-work lease (v2)](#scoped-usable-work-lease-v2)
+  - [Counterexample simplification](#counterexample-simplification)
+  - [Per-candidate execution order and stable ordering](#per-candidate-execution-order-and-stable-ordering)
+  - [Domain-neutral limits and product-specific authority](#domain-neutral-limits-and-product-specific-authority)
+- [Startup configuration examples by version](#startup-configuration-examples-by-version)
+  - [Startup version 5: scalar bounded-positive ordering](#startup-version-5-scalar-bounded-positive-ordering)
+  - [Contract-only version 6: binary-product pair contract](#contract-only-version-6-binary-product-pair-contract)
+  - [Startup versions 4 and 6: pair ranking](#startup-versions-4-and-6-pair-ranking)
+  - [Startup versions 7 and 8: positive-affine deferred opening](#startup-versions-7-and-8-positive-affine-deferred-opening)
+  - [Startup versions 9 and 10: shared usable-work budget](#startup-versions-9-and-10-shared-usable-work-budget)
+  - [Root fields and validation order for versions 7 to 10](#root-fields-and-validation-order-for-versions-7-to-10)
+  - [Startup versions 11 and 12: relational positive-affine](#startup-versions-11-and-12-relational-positive-affine)
+  - [Startup versions 13 and 14: scoped usable-work lease](#startup-versions-13-and-14-scoped-usable-work-lease)
+  - [Startup versions 15 and 16: strict relational positive-affine](#startup-versions-15-and-16-strict-relational-positive-affine)
+  - [Startup versions 17 and 18: descriptor-bound executable launch](#startup-versions-17-and-18-descriptor-bound-executable-launch)
+  - [Startup versions 19 and 20: root-quotient consequences](#startup-versions-19-and-20-root-quotient-consequences)
+- [Pair contracts, decoders, and reports](#pair-contracts-decoders-and-reports)
+  - [Using a contract-only version 6 document with `:synth`](#using-a-contract-only-version-6-document-with-synth)
+  - [Pair contract grammar and validation order](#pair-contract-grammar-and-validation-order)
+  - [Decoder compatibility and reports](#decoder-compatibility-and-reports)
+- [Presentation notes on the Main path](#presentation-notes-on-the-main-path)
+
+## Startup configuration file
+
+### Versions 1 to 20 at a glance
+
 Finite-list-spine Length counterexample ranking is disabled by default. To opt
 in, pass `--length-ranking-config` with an explicitly chosen absolute path to
 a version-1 through version-20 configuration file. Versions 1--3 select scalar
@@ -100,6 +148,9 @@ one side of a top-level inequality, equality, or immediate negated inequality.
 It is not general quotient reasoning.
 Version numbers are closed schema selections rather than cumulative feature
 levels; versions 1--18 remain literal.
+
+### Activation, pinning, and worker lifecycle
+
 Leant admits and reads that file
 once at startup, requires the configuration to contain an executable SHA-256
 expectation by default, and retains the decoded contract selection as a fixed
@@ -129,12 +180,19 @@ fallback.
 The opaque activated mode retains the exact require-pin or permit-unpinned
 decision that released it, and Main derives its startup notice from that mode
 rather than reinterpreting the raw command-line flag.
+
+### Candidate eligibility
+
 Only callback-verified candidates with direct or exact-duplicate-recovered
 typed Exference authority are eligible. Candidates with neither authority
 remain in place with a payload-free preparation refusal and do not open a
 worker by themselves. The default `djinn` synthesis engine supplies no typed
 graph; select `:set synth-engine exference` or `both` to produce candidates
 which may reach this ranking path.
+
+## One-shot contract-only files
+
+### Command syntax, admission, and lifetime
 
 After startup activation, one command may replace only the fixed startup
 contract selection with an explicitly named contract-only document:
@@ -181,6 +239,8 @@ cache, and later commands return to the startup-fixed contract unless they name
 their own file. Malformed option syntax is rejected rather than silently
 treated as a goal.
 
+### Contract-only versions 1 and 2: compatibility grammar and modulo
+
 The contract-only document has exactly three root fields; for example:
 
 ```json
@@ -203,6 +263,8 @@ modulo occurrence to private quotient/remainder witness equations using only
 QF_LIA. No SMT-LIB `mod` term is emitted, and private witnesses never enter
 `get-value` or counterexample presentation. Old one-shot version-1 documents
 and version-2 documents retain their exact grammar and behavior.
+
+### Contract-only version 3: explicit target-argument roles
 
 Version 3 is the explicit role-aware form. A map-shaped request can use this
 exact contract object:
@@ -253,6 +315,8 @@ lane, and neither it nor its roles enter `ReplState`, history, snapshots, or a
 cache. A later command returns to the startup-fixed version-1 compatibility
 contract unless it explicitly names another contract-only file.
 
+### Contract-only version 4: exact-spine zero-step case policy
+
 Version 4 explicitly enables the one nonempty case shape currently modeled by
 Length. It requires the version-3 role vector and the exact field below:
 
@@ -285,6 +349,8 @@ purity, totality, termination, strictness, source-level equivalence, or a
 provider law, and it grants no pruning authority. Like version 3, version 4 is
 command-local and leaves no role or case-policy state behind.
 
+### Contract-only version 5: positive-literal quotient
+
 Version 5 adds positive-literal Natural floor quotient without changing that
 authority model. For example, a postcondition can contain
 `["quotient", 2, ["input", 0]]`. The divisor is checked before its child, must
@@ -298,7 +364,9 @@ ordinal-zero renderer rule, while choosing `"exact-spine-zero-step-v1"`
 retains the accepted typed renderer ordinal just as version 4 does. Versions
 1--4 and startup continue to reject the quotient tag.
 
-### Binary-product Length queries
+## Binary-product Length queries
+
+### Canonical `Prod` eligibility and the serializer boundary
 
 Leant also has a library-level, fail-closed handoff for a result whose root,
 after the serializer's existing `whnfR` normalization, is saturated canonical
@@ -316,6 +384,8 @@ The serializer acquisition boundary also requires exactly one matching
 `(goal ...)` info envelope. An extra goal-shaped message fails closed instead
 of letting caller-controlled elaboration output shadow the serializer's real
 normalized result.
+
+### Library-level pair query handoff
 
 For example, an integration can describe the callback-verified candidate
 `fun xs => (xs, xs)` for the Lean goal `List Nat → List Nat × List Nat`
@@ -361,6 +431,8 @@ replay remain pure query-owned operations, and only independently evaluated
 and associated values can become model-relative counterexample evidence. Raw
 `sat`, `unsat`, or `unknown` status has no authority.
 
+### Live pair ranking and non-vacuous bounded-positive preference
+
 That first checkpoint was deliberately offline. The library now also exposes
 the product-specific live runner, ranking, post-verification, and presentation
 path. The bounded-positive ordering choice is an orthogonal, explicit policy
@@ -401,6 +473,8 @@ permutation seal. The three policy builders are persistent and order
 independent. Without
 `enableLengthRankingNonVacuousInputBoxPreference`, completed positive receipts
 retain their historical neutral ordering.
+
+### Direct applicable-domain validation
 
 The directly bounded applicable-domain pass is a separate programmatic opt-in.
 For a concrete one-input scalar contract and its nominal pair sibling, the
@@ -445,6 +519,8 @@ otherwise complete passive contract sources used to build the surrounding
 contracts, and that `basePolicy`, `inputBoxLimits`, and `verificationBatch`
 have the same checked meanings as in the preceding example.
 
+### Positive-affine applicable domain and deferred opening
+
 The additive positive-affine rule and deferred opening are also explicit
 programmatic choices. This composition uses three independently checked limit
 values: `postUnsatLimits` plus the caller-supplied `[5]` box,
@@ -478,6 +554,8 @@ builders select different rules. All other builders above are persistent and
 orthogonal. Deferred opening is operational policy, not evidence, and adds no
 presentation note.
 
+### Relational positive-affine extraction
+
 Relational positive-affine extraction is a third explicit selection. This
 programmatic example replaces `advancedPolicy`'s literal-ceiling extractor but
 retains its independent limits, ordering preferences, simplification, origin
@@ -510,6 +588,8 @@ Presentation uses
 `renderLengthSpinePairRelationalPositiveAffineApplicableDomainValidationNote`.
 Those notes describe bounded, model/provider-relative evidence; selecting the
 policy itself produces no evidence or pruning authority.
+
+### Strict relational positive-affine extraction
 
 Strict relational positive-affine extraction is the additive fourth selection.
 It retains every ordinary relation supported above and adds only the exact
@@ -561,6 +641,8 @@ the relational pass. Here *strict* means natural strict comparison, not source
 evaluation strictness. See the
 [strict relational positive-affine Length ranking report](reports/2026-08-15-strict-relational-positive-affine-length-ranking.md).
 
+### Root-quotient consequence extraction
+
 The additive root-quotient successor replaces only that policy dimension:
 
 ```haskell
@@ -601,6 +683,8 @@ and
 `renderLengthSpinePairStrictRelationalPositiveAffineQuotientApplicableDomainValidationNote`.
 See the
 [strict relational positive-affine quotient Length ranking report](reports/2026-08-15-strict-relational-positive-affine-quotient-length-ranking.md).
+
+### Shared usable-work budget (v1)
 
 The runtime-unscoped v1 shared usable-work policy is a further orthogonal
 programmatic opt-in. Its builder accepts only an already validated opaque Djex
@@ -656,6 +740,8 @@ authority. The budgeted Djex ready-worker and nominal scalar/product query-run
 identities bind the shared selection and effective deadline cause; v1--v8 and
 startup v11/v12 keep the unbudgeted worker/run identities. See the
 [shared usable-work Length ranking report](reports/2026-08-15-shared-usable-work-length-ranking.md).
+
+### Scoped usable-work lease (v2)
 
 New code can instead select Djex's owner-thread-affine, dynamically scoped v2
 lease. The duration value is shared with v1, but the policy builder and runtime
@@ -719,6 +805,8 @@ asserts only process/session timing association: it supplies no solver proof,
 behavioral receipt, assessment, presentation note, or pruning authority. See the
 [scoped usable-work Length ranking report](reports/2026-08-15-scoped-usable-work-length-ranking.md).
 
+### Counterexample simplification
+
 Counterexample simplification is another orthogonal, programmatic opt-in.  It
 uses the same checked Djex input-box limits for scalar and canonical-`Prod`
 ranking:
@@ -757,6 +845,8 @@ startup version 1 through 6, while startup versions 7 through 20 require it.
 It is bounded componentwise-lexicographic
 simplification, not global minimality, pruning authority, or a new conclusion
 from Z3.
+
+### Per-candidate execution order and stable ordering
 
 For each eligible product query, the exact execution order is the product
 batch's newest-first four-entry MRU input replay bank, the optional query-owned
@@ -803,6 +893,8 @@ receipts, then non-vacuous explicit-box receipts, then neutral assessments
 (including vacuous receipts), then counterexamples. Occurrence handles carry
 each receipt and optional simplification metadata through that ordering.
 
+### Domain-neutral limits and product-specific authority
+
 The opaque execution/evaluation policy and Djex live-session limits are
 domain-neutral and reused by the scalar and product runners. Each Leant call
 productively admits no more than the shared 64-query maximum. Eager calls open
@@ -813,6 +905,10 @@ contracts, queries, live observations, replay receipts, failures, assessments,
 MRU state, and presentation remain product-specific and cannot be cast from
 their scalar siblings. The existing/default scalar path, public scalar types,
 query bytes, neutral ranking behavior, and presentation are unchanged.
+
+## Startup configuration examples by version
+
+### Startup version 5: scalar bounded-positive ordering
 
 Startup version 5 is the concrete scalar file opt-in. This complete unpinned
 example checks input lengths 0 through 3 and prefers a candidate only after the
@@ -873,6 +969,8 @@ leant --length-ranking-config /absolute/path/scalar-ranking-v5.json \
   --length-ranking-allow-unpinned
 ```
 
+### Contract-only version 6: binary-product pair contract
+
 Main now exposes that same product path through closed, separately typed file
 versions. Contract-only version 6 has the same three-field root as versions
 1--5, but its version selects a pair contract and requires the closed result
@@ -901,6 +999,8 @@ first result length equals the input length and the second equals half of it:
   }
 }
 ```
+
+### Startup versions 4 and 6: pair ranking
 
 Startup version 4 selects pair ranking process-wide and retains version 3's
 required input box and origin-before-live policy while leaving positive receipts
@@ -966,6 +1066,8 @@ it only with the separate explicit relaxation:
 leant --length-ranking-config /absolute/path/pair-ranking-v6.json \
   --length-ranking-allow-unpinned
 ```
+
+### Startup versions 7 and 8: positive-affine deferred opening
 
 Startup v7 and v8 are the advanced scalar and pair successors. They keep the
 same CLI and add no discovery or inferred defaults. This complete scalar v7
@@ -1122,6 +1224,8 @@ leant --length-ranking-config /absolute/path/pair-ranking-v8.json \
   --length-ranking-allow-unpinned
 ```
 
+### Startup versions 9 and 10: shared usable-work budget
+
 Startup v9 and v10 retain those complete scalar and product policy bundles and
 add only the required shared usable-work object. The exported version constants
 are
@@ -1277,6 +1381,8 @@ usable-work object has exactly `strategy` followed semantically by
 the duration must be positive, and the file grammar caps it at 65,000 ms before
 delegating to Djex's representability validator.
 
+### Root fields and validation order for versions 7 to 10
+
 The v7/v8 advanced roots have exactly these fields in semantic validation order:
 `format`, `version`, `executionAdmission`, `execution`, `evaluation`,
 `inputBoxValidation`, `counterexampleProbe`, `boundedPositiveOrdering`,
@@ -1304,6 +1410,8 @@ by the exact budget object, strategy, milliseconds cap and Djex budget
 validation, and only then the scalar-v5 or pair-v5 contract. An earlier
 operational or budget error therefore cannot be preempted by a later malformed
 contract.
+
+### Startup versions 11 and 12: relational positive-affine
 
 Startup v11 and v12 select relational positive-affine applicable-domain
 validation without selecting the v9/v10 shared usable-work owner. The exported
@@ -1471,6 +1579,8 @@ validation-error identities, validates the exact operational root in its
 established order, and demands the contract last. Both examples are unpinned
 and therefore require the separate explicit
 `--length-ranking-allow-unpinned` activation choice.
+
+### Startup versions 13 and 14: scoped usable-work lease
 
 Startup v13 and v14 combine the relational scalar/product choices with Djex's
 dynamically scoped v2 usable-work lease. Their exported constants are
@@ -1644,6 +1754,8 @@ diagnostic identities rather than introducing evidence-bearing schema. These
 examples are also unpinned and require the explicit
 `--length-ranking-allow-unpinned` activation choice.
 
+### Startup versions 15 and 16: strict relational positive-affine
+
 Startup v15 and v16 preserve that complete scoped root and runtime route while
 selecting Djex's strict relational rule. Their exported constants are
 `lengthRankingConfigurationFileStrictRelationalPositiveAffineVersion` (15) and
@@ -1816,6 +1928,8 @@ top-level `not (L <= R)` as `R + 1 <= L`; negated equality, nested logical
 structure, and unsupported expression subtrees grant no partial bound. These
 examples are unpinned and require the explicit
 `--length-ranking-allow-unpinned` activation choice.
+
+### Startup versions 17 and 18: descriptor-bound executable launch
 
 Startup v17 and v18 retain that exact strict/scoped behavioral profile and
 change only executable-launch authority. Their exported constants are
@@ -2000,6 +2114,8 @@ policy sealing. Contract validation remains last. The generalized dispatcher
 reaches v17/v18 only after the exact v1--v16 cascade returns UnsupportedVersion;
 v19/v20 are handled only by their later quotient-consequence decoder.
 
+### Startup versions 19 and 20: root-quotient consequences
+
 Startup v19 and v20 retain the complete descriptor-bound/scoped profiles and
 replace only the applicable-domain strategy selection. Their exported
 constants are
@@ -2176,6 +2292,10 @@ v19/v20 only after the exact v1--v18 cascade returns UnsupportedVersion;
 version 21 remains unsupported. Loading and activation remain pure, and an
 all-pure deferred batch opens neither an executable descriptor nor a worker.
 
+## Pair contracts, decoders, and reports
+
+### Using a contract-only version 6 document with `:synth`
+
 Then select a typed Exference-producing engine and synthesize normally. A
 contract-only v6 document can replace the startup-fixed contract for one
 command without changing the CLI grammar:
@@ -2185,6 +2305,8 @@ command without changing the CLI grammar:
 :synth List Nat → Prod (List Nat) (List Nat)
 :synth --length-contract /absolute/path/pair-contract-v6.json -- List Nat → Prod (List Nat) (List Nat)
 ```
+
+### Pair contract grammar and validation order
 
 Versions, not a redundant domain field, choose the grammar. Pair contract
 objects have exactly `resultShape`, `spine`, `targetArgumentRoles`,
@@ -2200,6 +2322,8 @@ provider laws, but admits only `["input", n]`, `["result", "first"]`, and
 `["result", "second"]` as contract variables. Its target-role vector is
 required, and its case policy is exactly `"cases-rejected"` or
 `"exact-spine-zero-step-v1"`.
+
+### Decoder compatibility and reports
 
 The old scalar decoders remain exact compatibility entrances: the startup
 decoder for versions 1--3 rejects v4--v20, and the contract-only decoder for
@@ -2244,6 +2368,8 @@ Djex's underlying strict extraction boundary is in its
 The quotient-consequence extraction, receipt, authority, and identity boundary
 is in Djex's
 [strict relational positive-affine quotient applicable-domain report](../lib/Djex/docs/reports/2026-08-15-strict-relational-positive-affine-quotient-length-applicable-domain.md).
+
+## Presentation notes on the Main path
 
 After a successful occurrence seal, Main dispatches presentation through the
 selected scalar or pair domain and prints a subordinate note only for a
