@@ -147,6 +147,7 @@ import Language.Haskell.Djex
   , ValidatedLengthStrictRelationalPositiveAffineApplicableDomain
   , ValidatedLengthStrictRelationalPositiveAffineQuotientApplicableDomain
   , ValidatedLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomain
+  , ValidatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomain
   , defaultLengthSMTLibLiveSessionMaximumQueries
   , lengthSMTLibLiveQueryCleanupIncomplete
   , lengthSMTLibLiveQueryObservationSolverStatus
@@ -164,6 +165,7 @@ import Language.Haskell.Djex
   , validateLengthSMTLibQueryStrictRelationalPositiveAffineApplicableDomain
   , validateLengthSMTLibQueryStrictRelationalPositiveAffineQuotientApplicableDomain
   , validateLengthSMTLibQueryStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomain
+  , validateLengthSMTLibQueryStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomain
   , validateLengthSMTLibQueryInputBox
   , validatedLengthApplicableDomainApplicableAssignmentCount
   , validatedLengthCounterexampleInputs
@@ -174,6 +176,7 @@ import Language.Haskell.Djex
   , validatedLengthStrictRelationalPositiveAffineApplicableDomainApplicableAssignmentCount
   , validatedLengthStrictRelationalPositiveAffineQuotientApplicableDomainApplicableAssignmentCount
   , validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainApplicableAssignmentCount
+  , validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainApplicableAssignmentCount
   , checkLengthSMTLibLiveScopedUsableWorkDeadline
   , withLengthSMTLibLiveSession
   , withLengthSMTLibLiveSessionUnderScopedDeadline
@@ -228,6 +231,8 @@ data LengthRankingAssessment
       !ValidatedLengthStrictRelationalPositiveAffineQuotientApplicableDomain
   | StrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainEstablished
       !ValidatedLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomain
+  | StrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainEstablished
+      !ValidatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomain
   deriving (Eq, Show)
 
 -- | Stable, payload-free phase at which pure candidate preparation refused.
@@ -571,6 +576,8 @@ data LengthApplicableDomainRankingPolicy
   | LengthApplicableDomainRankingStrictRelationalPositiveAffineQuotientEnabled
       !LengthInputBoxLimits
   | LengthApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaEnabled
+      !LengthInputBoxLimits
+  | LengthApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusEnabled
       !LengthInputBoxLimits
 
 -- | Private query-owned pre-live probe policy.  The enabled constructor is
@@ -1904,6 +1911,27 @@ assessApplicableDomainCandidate evaluation policy simplificationPolicy index
             (StrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainEstablished
               receipt)
             Nothing
+    LengthApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusEnabled
+        limits -> case
+          validateLengthSMTLibQueryStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomain
+            evaluation limits query of
+      Left (LengthSMTLibApplicableDomainValidationAssociationRejected _) ->
+        Left $ localRankingFailure LengthRankingEvidenceReplayMismatch index
+      Left (LengthSMTLibApplicableDomainValidationRejected
+          (LengthApplicableDomainInputBoxValidationRejected failure))
+        | applicableDomainAdmissionFailure failure -> Right Nothing
+        | otherwise -> Left $ localRankingFailure
+            (LengthRankingApplicableDomainValidationFailed failure) index
+      Right (LengthApplicableDomainInapplicable _) -> Right Nothing
+      Right (LengthApplicableDomainCounterexample receipt) -> Just <$>
+        simplifyCounterexampleAssessment evaluation simplificationPolicy
+          index association query receipt
+      Right (LengthApplicableDomainEstablished receipt) -> Right $ Just
+        $ AssociatedRankedLengthCandidate index association
+        $ LengthCandidateAssessed
+            (StrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainEstablished
+              receipt)
+            Nothing
 
 applicableDomainAdmissionFailure :: LengthInputBoxValidationError -> Bool
 applicableDomainAdmissionFailure failure = case failure of
@@ -2211,6 +2239,10 @@ isNonVacuousApplicableDomain assessment = case assessment of
       receipt ->
     validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainApplicableAssignmentCount
       receipt > 0
+  StrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainEstablished
+      receipt ->
+    validatedLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainApplicableAssignmentCount
+      receipt > 0
   _ -> False
 
 unassessedRanking
@@ -2319,6 +2351,8 @@ forceLengthRankingAssessment assessment = case assessment of
   StrictRelationalPositiveAffineQuotientApplicableDomainEstablished receipt ->
     rnf receipt
   StrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainEstablished
+      receipt -> rnf receipt
+  StrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainEstablished
       receipt -> rnf receipt
 
 forceLengthRankingFailure :: Maybe LengthRankingFailure -> ()

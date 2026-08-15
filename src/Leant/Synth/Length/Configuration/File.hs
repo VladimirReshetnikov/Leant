@@ -32,6 +32,9 @@
 -- Versions 23 and 24 retain that complete effective-ID/scoped profile and
 -- replace only the applicable-domain strategy with cumulative immediate
 -- binary root-extrema consequences.
+-- Versions 25 and 26 retain that complete root-extrema/effective-ID/scoped
+-- profile and replace only the applicable-domain strategy with cumulative
+-- immediate root-monus consequences.
 -- Decoding performs no discovery, path normalization, environment lookup, or
 -- IO.  Every field is required.  A successful decode returns a deliberately
 -- disabled opaque value: callers
@@ -64,6 +67,8 @@ module Leant.Synth.Length.Configuration.File
   , lengthRankingConfigurationFileSpinePairDescriptorBoundEffectiveIDExecutableAccessVersion
   , lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaVersion
   , lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaVersion
+  , lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusVersion
+  , lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusVersion
   , lengthRankingConfigurationFileJsonLimits
   , LengthRankingConfigurationFileObject (..)
   , LengthRankingConfigurationFileField (..)
@@ -166,6 +171,7 @@ import Leant.Synth.Length.Configuration
   , enableLengthRankingStrictRelationalPositiveAffineApplicableDomainValidation
   , enableLengthRankingStrictRelationalPositiveAffineQuotientApplicableDomainValidation
   , enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidation
+  , enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainValidation
   , enableLengthRankingUsableWorkBudget
   , lengthRankingPolicyExecutableDigestExpectation
   , lengthRankingPolicyFromValidatedComponents
@@ -298,6 +304,19 @@ lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRoo
   :: Natural
 lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaVersion =
   24
+
+-- | Scalar effective-ID/scoped profile selecting cumulative immediate root-
+-- monus consequence applicable-domain validation.
+lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusVersion
+  :: Natural
+lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusVersion =
+  25
+
+-- | Nominal binary-product sibling of version 25.
+lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusVersion
+  :: Natural
+lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusVersion =
+  26
 
 -- | Fixed admission policy for the v1 document itself.  The array maximum is
 -- one greater than the widest typed collection so maximum-plus-one reaches the
@@ -611,7 +630,8 @@ decodeLengthRankingConfigurationFile bytes = do
 -- executable-access versions are reached only after the quotient version-19/
 -- version-20 decoder returns it in turn.  Root-extrema versions are reached
 -- only after the effective-ID version-21/version-22 decoder returns the same
--- sentinel.
+-- sentinel.  Root-monus versions are reached only after the root-extrema
+-- version-23/version-24 decoder returns it in turn.
 decodeLengthAssessmentConfigurationFile
   :: ByteString
   -> Either
@@ -657,9 +677,14 @@ decodeLengthAssessmentConfigurationFile bytes =
                             decodeLengthAssessmentConfigurationFileDescriptorBoundEffectiveIDExecutableAccess
                               bytes of
                           Right effectiveID -> Right effectiveID
-                          Left LengthRankingConfigurationUnsupportedVersion ->
-                            decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffineQuotientRootExtrema
-                              bytes
+                          Left LengthRankingConfigurationUnsupportedVersion -> case
+                              decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffineQuotientRootExtrema
+                                bytes of
+                            Right rootExtrema -> Right rootExtrema
+                            Left LengthRankingConfigurationUnsupportedVersion ->
+                              decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonus
+                                bytes
+                            Left failure -> Left failure
                           Left failure -> Left failure
                         Left failure -> Left failure
                       Left failure -> Left failure
@@ -1081,6 +1106,48 @@ decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffineQuotientRoo
         lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaVersion
       then
         decodeLengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaV24
+          root
+      else Left LengthRankingConfigurationUnsupportedVersion
+
+-- | Decode only the cumulative root-monus scalar/product siblings after
+-- every version-1--version-24 entrance has returned its closed unsupported-
+-- version sentinel.  Both versions retain the complete effective-ID,
+-- root-extrema, scoped-budget profile and replace only the applicable-domain
+-- strategy.
+decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonus
+  :: ByteString
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonus
+    bytes = do
+  document <- either (Left . LengthRankingConfigurationJsonRejected) Right
+    $ parseBoundedJson lengthRankingConfigurationFileJsonLimits bytes
+  root <- objectFields LengthRankingConfigurationRootObject document
+  formatValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationFormatField
+    "format"
+    root
+  format <- stringField LengthRankingConfigurationFormatField formatValue
+  if format == lengthRankingConfigurationFileFormat
+    then pure ()
+    else Left LengthRankingConfigurationUnsupportedFormat
+  versionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationVersionField
+    "version"
+    root
+  version <- integerField LengthRankingConfigurationVersionField versionValue
+  if version == toInteger
+      lengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusVersion
+    then
+      decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusV25
+        root
+    else if version == toInteger
+        lengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusVersion
+      then
+        decodeLengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusV26
           root
       else Left LengthRankingConfigurationUnsupportedVersion
 
@@ -1717,6 +1784,43 @@ decodeLengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuoti
   contract <- decodeLeanLengthSpinePairContractValueV5 contractValue
   pure $ DisabledLengthSpinePairAssessmentConfiguration policy contract
 
+decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusV25
+  :: ObjectFields
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusV25
+    root = do
+  policy <-
+    decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusPolicy
+      root
+  contractValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationContractField
+    "contract"
+    root
+  contract <- decodeLeanLengthContractValueV5 contractValue
+  pure $ DisabledLengthScalarAssessmentConfiguration
+    $ disableLengthRankingConfiguration policy contract
+
+decodeLengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusV26
+  :: ObjectFields
+  -> Either
+      LengthRankingConfigurationFileError
+      DisabledLengthAssessmentConfiguration
+decodeLengthRankingConfigurationFileSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusV26
+    root = do
+  policy <-
+    decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusPolicy
+      root
+  contractValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationContractField
+    "contract"
+    root
+  contract <- decodeLeanLengthSpinePairContractValueV5 contractValue
+  pure $ DisabledLengthSpinePairAssessmentConfiguration policy contract
+
 decodeLengthRankingConfigurationFileUsableWorkBudgetPolicy
   :: ObjectFields
   -> Either LengthRankingConfigurationFileError LengthRankingPolicy
@@ -1857,6 +1961,28 @@ decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootEx
   let inheritedRoot = filter ((/= "usableWorkBudget") . fst) root
   advancedPolicy <-
     decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaBasePolicy
+      inheritedRoot
+  budgetValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationUsableWorkBudgetField
+    "usableWorkBudget"
+    root
+  budget <- decodeScopedUsableWorkBudget budgetValue
+  pure $ enableLengthRankingScopedUsableWorkBudget budget advancedPolicy
+
+-- Versions 25 and 26 retain version 23/24's complete effective-ID,
+-- root-extrema, descriptor-bound root, validation order, and scoped-v2 usable-
+-- work owner.  Only the inherited applicable-domain strategy changes.
+decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusPolicy
+  :: ObjectFields
+  -> Either LengthRankingConfigurationFileError LengthRankingPolicy
+decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusPolicy
+    root = do
+  exactFields LengthRankingConfigurationRootObject
+    rootFieldsUsableWorkBudget root
+  let inheritedRoot = filter ((/= "usableWorkBudget") . fst) root
+  advancedPolicy <-
+    decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBasePolicy
       inheritedRoot
   budgetValue <- requiredField
     LengthRankingConfigurationRootObject
@@ -2493,6 +2619,98 @@ decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootEx
         enableLengthRankingNonVacuousInputBoxPreference originProbePolicy
       applicableDomainPolicy =
         enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidation
+          applicableDomainLimits inputBoxPreferencePolicy
+      applicableDomainPreferencePolicy =
+        enableLengthRankingNonVacuousApplicableDomainPreference
+          applicableDomainPolicy
+      simplificationPolicy = enableLengthRankingCounterexampleSimplification
+        counterexampleSimplificationLimits applicableDomainPreferencePolicy
+  pure $ enableLengthRankingDeferredLiveSessionOpening simplificationPolicy
+
+-- Versions 25 and 26 preserve version 23/24's complete effective-ID launch
+-- and policy demand order.  Only the applicable-domain decoder and mutually
+-- exclusive builder select the cumulative root-monus strategy.
+decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBasePolicy
+  :: ObjectFields
+  -> Either LengthRankingConfigurationFileError LengthRankingPolicy
+decodeLengthRankingConfigurationFileStrictRelationalPositiveAffineQuotientRootExtremaMonusBasePolicy
+    root = do
+  exactFields LengthRankingConfigurationRootObject
+    rootFieldsPositiveAffine root
+  executionAdmissionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationExecutionAdmissionField
+    "executionAdmission"
+    root
+  executionLimits <- decodeExecutionAdmission executionAdmissionValue
+  executionValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationExecutionField
+    "execution"
+    root
+  execution <- decodeDescriptorBoundEffectiveIDExecutableAccessExecution
+    executionLimits executionValue
+  evaluationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationEvaluationField
+    "evaluation"
+    root
+  evaluation <- decodeEvaluation evaluationValue
+  inputBoxValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationInputBoxValidationField
+    "inputBoxValidation"
+    root
+  (inputBoxLimits, inclusiveMaximums) <-
+    decodeInputBoxValidation inputBoxValue
+  counterexampleProbeValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationCounterexampleProbeField
+    "counterexampleProbe"
+    root
+  decodeCounterexampleProbe counterexampleProbeValue
+  boundedPositiveOrderingValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationBoundedPositiveOrderingField
+    "boundedPositiveOrdering"
+    root
+  decodeBoundedPositiveOrdering boundedPositiveOrderingValue
+  applicableDomainValidationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationApplicableDomainValidationField
+    "applicableDomainValidation"
+    root
+  applicableDomainLimits <-
+    decodeStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainValidation
+      applicableDomainValidationValue
+  applicableDomainOrderingValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationApplicableDomainOrderingField
+    "applicableDomainOrdering"
+    root
+  decodeApplicableDomainOrdering applicableDomainOrderingValue
+  counterexampleSimplificationValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationCounterexampleSimplificationField
+    "counterexampleSimplification"
+    root
+  counterexampleSimplificationLimits <- decodeCounterexampleSimplification
+    counterexampleSimplificationValue
+  liveSessionOpeningValue <- requiredField
+    LengthRankingConfigurationRootObject
+    LengthRankingConfigurationLiveSessionOpeningField
+    "liveSessionOpening"
+    root
+  decodeLiveSessionOpening liveSessionOpeningValue
+  let basePolicy =
+        lengthRankingPolicyFromValidatedComponents execution evaluation
+      inputBoxPolicy = enableLengthRankingInputBoxValidation
+        inputBoxLimits inclusiveMaximums basePolicy
+      originProbePolicy = enableLengthRankingOriginProbe inputBoxPolicy
+      inputBoxPreferencePolicy =
+        enableLengthRankingNonVacuousInputBoxPreference originProbePolicy
+      applicableDomainPolicy =
+        enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainValidation
           applicableDomainLimits inputBoxPreferencePolicy
       applicableDomainPreferencePolicy =
         enableLengthRankingNonVacuousApplicableDomainPreference
@@ -3475,6 +3693,54 @@ decodeStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidatio
     strategyValue
   case strategy of
     "strict-relational-positive-affine-quotient-root-extrema-v1" -> pure ()
+    _ -> Left $ LengthRankingConfigurationFieldValueRejected
+      LengthRankingConfigurationApplicableDomainStrategyField
+  maximumInputsValue <- requiredField
+    LengthRankingConfigurationApplicableDomainValidationObject
+    LengthRankingConfigurationApplicableDomainMaximumInputsField
+    "maximumInputs"
+    object
+  maximumInputs <- naturalField
+    LengthRankingConfigurationApplicableDomainMaximumInputsField
+    maximumInputsValue
+    >>= capNatural
+      LengthRankingConfigurationApplicableDomainMaximumInputsField
+      maximumInputBoxInputs
+  maximumAssignmentsValue <- requiredField
+    LengthRankingConfigurationApplicableDomainValidationObject
+    LengthRankingConfigurationApplicableDomainMaximumAssignmentsField
+    "maximumAssignments"
+    object
+  maximumAssignments <- naturalField
+    LengthRankingConfigurationApplicableDomainMaximumAssignmentsField
+    maximumAssignmentsValue
+    >>= capNatural
+      LengthRankingConfigurationApplicableDomainMaximumAssignmentsField
+      maximumInputBoxAssignments
+  checkedInputBoxLimits maximumInputs maximumAssignments
+
+-- | Decode the cumulative strict-relational quotient/root-extrema/monus
+-- sibling with the established object shape and bounded-limit diagnostics.
+-- The literal grants authority only for the validator's nominal immediate
+-- root-monus laws in addition to its inherited coverage rules.
+decodeStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainValidation
+  :: BoundedJsonValue
+  -> Either LengthRankingConfigurationFileError LengthInputBoxLimits
+decodeStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainValidation
+    value = do
+  object <- exactObject
+    LengthRankingConfigurationApplicableDomainValidationObject
+    applicableDomainValidationFields value
+  strategyValue <- requiredField
+    LengthRankingConfigurationApplicableDomainValidationObject
+    LengthRankingConfigurationApplicableDomainStrategyField
+    "strategy"
+    object
+  strategy <- stringField
+    LengthRankingConfigurationApplicableDomainStrategyField
+    strategyValue
+  case strategy of
+    "strict-relational-positive-affine-quotient-root-extrema-monus-v1" -> pure ()
     _ -> Left $ LengthRankingConfigurationFieldValueRejected
       LengthRankingConfigurationApplicableDomainStrategyField
   maximumInputsValue <- requiredField
