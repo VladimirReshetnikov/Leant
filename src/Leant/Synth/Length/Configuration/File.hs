@@ -826,7 +826,7 @@ decodeLengthAssessmentConfigurationFileScopedUsableWorkBudget bytes = do
           root
       else Left LengthRankingConfigurationUnsupportedVersion
 
--- | Decode only the latest scalar/product strict relational siblings after
+-- | Decode only the scalar/product strict relational predecessor siblings after
 -- every version-1--version-14 entrance has returned its closed unsupported-
 -- version sentinel.  Both versions retain the complete scoped-budget root.
 decodeLengthAssessmentConfigurationFileStrictRelationalPositiveAffine
