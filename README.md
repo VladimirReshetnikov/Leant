@@ -250,26 +250,30 @@ saved: theorem double_two_mul : ∀ n : Nat, double n = 2 * n
 
 `:synth TYPE` answers the question *"write me a term of this type"* —
 read through propositions-as-types, *"prove this"* — and sometimes the
-stronger question *"show me that no such term exists."* It covers the
-structural fragment `→ / × / ∧ / ⊕ / ∨ / ↔ / ¬ / ⊥ / ⊤ / ∀` over opaque
-variables, plus structurally representable inductive data, with bounded
-support for rank-N and impredicative quantification. Proper-type applications
-of one inductive family are shared by exact Lean head across the whole query,
-so differently instantiated `Option`, `Except`, `List`, and user-family
-occurrences retain one nominal identity. Compatible non-recursive families
-keep their constructors and cases; compatible recursive families additionally
-retain bounded one-layer elimination in Exference. If its usual all-inputs-used
-search has no candidate, Leant retries that same Exference query with omissions
-allowed; this can project an impredicative payload while rendering the unopened
-recursive tail as `_`. Both engines can also reuse a small, goal-relevant slice
-of the live Lean environment, and `List` and `Nat` goals can compose rated
-library functions such as `List.map` and `List.foldr` into candidates. Design
-and phasing:
-[docs/SYNTHESIS_PROPOSAL.md](docs/SYNTHESIS_PROPOSAL.md).
+stronger question *"show me that no such term exists."*
 
-The implementation boundaries behind all of this — the semantic-origin
-record, provider bindings, the Length handoff, and the invariant each dated
-report pins — are documented in
+**What it can take.** The core fragment is the structural connectives
+`→ / × / ∧ / ⊕ / ∨ / ↔ / ¬ / ⊥ / ⊤ / ∀` over opaque variables. On top of
+that:
+
+- *Inductive types* whose constructors can be represented structurally —
+  built-ins such as `Option`, `Except`, and `List`, and your own
+  `inductive`/`structure` declarations. Non-recursive families get their
+  constructors and case analysis; recursive families get their
+  constructors plus one layer of case analysis. Occurrences of the same
+  family at different type arguments are recognized as one family across
+  the whole goal.
+- *Rank-N and impredicative quantification*, within explicit bounds
+  ([below](#rank-n-and-impredicative-goals)).
+- *A slice of your live environment*: both engines can pull in a small,
+  goal-relevant set of session and library declarations, and `List`/`Nat`
+  goals can compose rated library functions such as `List.map` and
+  `List.foldr` into candidates ([below](#recursion-from-the-library)).
+
+The design and its phasing are in
+[docs/SYNTHESIS_PROPOSAL.md](docs/SYNTHESIS_PROPOSAL.md); the internal
+boundaries — how the goal is translated, how providers are bound, and
+which dated report pins each invariant — are in
 [docs/synth-internals.md](docs/synth-internals.md).
 
 Three rules run through the design:
@@ -1166,31 +1170,18 @@ does not block `:unpickle`; such a snapshot is restored as an upstream snapshot
 and Leant builds synthesis tooling over it when its imports expose Lean's
 metaprogramming API.
 
-A `:synth` query passes through checked stages: a Lean metaprogram
+A `:synth` query passes through checked stages. A Lean metaprogram
 (compiled once into a cached side environment) elaborates the goal and
-serializes it into the engine's fragment; the fragment translator
-accepts it or refuses with a reason. For every engine mode and an accepted
-structural fragment, the engine first searches without providers and the
-backend re-elaborates its rendered candidates against the original goal. After
-no provider-free term verifies, a second metaprogram builds the bounded
-live-provider inventory and runs the fallback search. A complete Djinn
-refutation is kept as a sound fallback during those constructive lanes: a
-verified provider candidate overrides it, while provider discovery/search
-failure or exhaustion restores it before the explicit classical policy is
-considered.
-Atomic/provider-open refusals use that provider path directly. Djinn-backed
-fallback tries discovery-order prefixes of 1, 4, and 16 providers before the
-full inventory, omitting milestones at or beyond the actual inventory size.
-Combined mode runs both engines at the singleton and terminal full widths and
-Djinn alone at intermediate widths. Within a combined lane, stable exact-text
-deduplication keeps the first scheduled spelling and preserves variant order
-inside each group: `D1–D4, E1–E12, D5–D12` form the 24-group frontier, then the
-tails alternate. Empty or duplicate-only groups spend no slot. An exact later
-Exference duplicate may supply a private variant-local behavioral origin, but
-never changes the first occurrence's display ownership or gives authority to a
-different spelling. Constructor and exact provider names are restored and
-binders named by role before every verification; only survivors are shown and
-bound.
+serializes it into the engine's fragment; the fragment translator accepts
+it or refuses with a reason. The engine first searches without providers
+and the backend re-elaborates its rendered candidates against the original
+goal; only if no provider-free term verifies does a second metaprogram build
+the bounded live-provider inventory and run the fallback lanes described
+under [Engines, budgets, and the fine print](#engines-budgets-and-the-fine-print).
+A complete Djinn refutation is kept as a sound fallback while those
+constructive lanes run and restored if they find nothing. Constructor and
+exact provider names are restored and binders named by role before every
+verification; only survivors are shown and bound.
 
 The synthesis side environment tracks exactly which session history it
 has replayed. An unchanged history reuses it directly; an append replays
