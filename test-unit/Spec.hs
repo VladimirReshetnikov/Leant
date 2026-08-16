@@ -207,6 +207,22 @@ import Leant.Synth.Fragment
   , serializerProgram
   , synthPrelude
   )
+import Leant.Synth.BehavioralSelection
+  ( BehavioralSelectionCollection (..)
+  , BehavioralSelectionError (..)
+  , behavioralSelectionBatchRejected
+  , behavioralSelectionBatchSelected
+  , behavioralSelectionCandidateVerified
+  , behavioralSelectionInputCandidates
+  , behaviorallyRejectedReason
+  , behaviorallyRejectedVerified
+  , behaviorallySelectedRetention
+  , behaviorallySelectedVerified
+  , sealBehavioralSelectionBatch
+  , withBehavioralSelectionInput
+  )
+import qualified Leant.Synth.BehavioralSelection.Internal
+  as BehavioralSelectionInternal
 import Leant.Synth.Length.Adapter
   ( CheckedLengthQuery
   , prepareCheckedLengthQuery
@@ -503,6 +519,7 @@ main = do
       , candidateVerificationTests
       , verificationObservabilityTests
       , postVerificationTests
+      , behavioralSelectionTests
       , providerParserTests
       , instanceImplicitTests
       , providerEngineTests
@@ -1554,6 +1571,255 @@ assertPostVerificationError expected result = case result of
   Left actual -> actual @?= expected
   Right _ -> assertFailure $
     "post-verification proposal was admitted; expected: " ++ show expected
+
+behavioralSelectionTests :: TestTree
+behavioralSelectionTests = testGroup "behavioral selection occurrence seal"
+  [ testCase "seal an empty batch at the zero limit" $ do
+      verification <- syntheticPostVerificationBatch []
+      withBehavioralSelectionInput verification $ \input -> do
+        batch <- expectRight $ sealBehavioralSelectionBatch 0 input []
+        length (behavioralSelectionBatchSelected batch) @?= 0
+        length (behavioralSelectionBatchRejected batch) @?= 0
+  , testCase
+      "partition scrambled decisions in stable original occurrence order" $
+      do
+        verification <- syntheticPostVerificationBatch
+          [ "selection-first"
+          , "selection-second"
+          , "selection-third"
+          , "selection-fourth"
+          ]
+        withBehavioralSelectionInput verification $ \input -> case
+            behavioralSelectionInputCandidates input of
+          [first, second, third, fourth] -> do
+            batch <- expectRight $ sealBehavioralSelectionBatch 4 input
+              [ BehavioralSelectionInternal.rejectBehavioralSelectionCandidate
+                  fourth "reject-fourth"
+              , BehavioralSelectionInternal.retainBehavioralSelectionCandidate
+                  second "retain-second"
+              , BehavioralSelectionInternal.rejectBehavioralSelectionCandidate
+                  first "reject-first"
+              , BehavioralSelectionInternal.retainBehavioralSelectionCandidate
+                  third "retain-third"
+              ]
+            let selected = behavioralSelectionBatchSelected batch
+                rejected = behavioralSelectionBatchRejected batch
+            map (detailedVerificationVariantText . verifiedCandidate
+                . behaviorallySelectedVerified) selected
+              @?= ["selection-second", "selection-third"]
+            map behaviorallySelectedRetention selected
+              @?= ["retain-second", "retain-third"]
+            map (detailedVerificationVariantText . verifiedCandidate
+                . behaviorallyRejectedVerified) rejected
+              @?= ["selection-first", "selection-fourth"]
+            map behaviorallyRejectedReason rejected
+              @?= ["reject-first", "reject-fourth"]
+            length selected + length rejected @?= 4
+          candidates -> assertFailure $
+            "unexpected behavioral-selection handle count: "
+              ++ show (length candidates)
+  , testCase "reject missing, extra, and duplicate decisions in precedence" $
+      do
+        verification <- syntheticPostVerificationBatch
+          ["selection-first", "selection-second", "selection-third"]
+        withBehavioralSelectionInput verification $ \input -> case
+            behavioralSelectionInputCandidates input of
+          [first, second, third] -> do
+            let retain candidate reason =
+                  BehavioralSelectionInternal.retainBehavioralSelectionCandidate
+                    candidate reason
+                reject candidate reason =
+                  BehavioralSelectionInternal.rejectBehavioralSelectionCandidate
+                    candidate reason
+            assertBehavioralSelectionError
+              (BehavioralSelectionDecisionLengthMismatch 3 2)
+              $ sealBehavioralSelectionBatch 4 input
+                  [ error "length admission forced the first decision"
+                  , error "length admission forced the second decision"
+                  ]
+            assertBehavioralSelectionError
+              (BehavioralSelectionDecisionLengthMismatch 3 4)
+              $ sealBehavioralSelectionBatch 4 input
+                  [ retain first "first"
+                  , reject second "second"
+                  , retain third "third"
+                  , reject first "extra-duplicate"
+                  ]
+            assertBehavioralSelectionError
+              (BehavioralSelectionDecisionDuplicateIndex 0)
+              $ sealBehavioralSelectionBatch 3 input
+                  [ retain first "first"
+                  , reject first "duplicate"
+                  , retain third "third"
+                  ]
+          candidates -> assertFailure $
+            "unexpected behavioral-selection handle count: "
+              ++ show (length candidates)
+  , testCase
+      "admit candidates before decisions and bound a cyclic decision spine" $
+      do
+        oversized <- syntheticPostVerificationBatch
+          [ "selection-first"
+          , "selection-second"
+          , "selection-third"
+          , "selection-fourth"
+          ]
+        withBehavioralSelectionInput oversized $ \input ->
+          assertBehavioralSelectionError
+            (BehavioralSelectionCollectionLimitExceeded
+              BehavioralSelectionCandidates 3 4)
+            $ sealBehavioralSelectionBatch 3 input
+                (error "candidate admission forced the decision spine")
+
+        verification <- syntheticPostVerificationBatch
+          ["selection-first", "selection-second", "selection-third"]
+        withBehavioralSelectionInput verification $ \input -> case
+            behavioralSelectionInputCandidates input of
+          first : _ -> do
+            let poisonDecision =
+                  BehavioralSelectionInternal.retainBehavioralSelectionCandidate
+                    first
+                    (error "decision admission forced retention evidence")
+            bounded <- timeout 1000000 $ evaluate
+              $ sealBehavioralSelectionBatch 3 input
+              $ cycle [poisonDecision]
+            case bounded of
+              Just result -> assertBehavioralSelectionError
+                (BehavioralSelectionCollectionLimitExceeded
+                  BehavioralSelectionDecisions 3 4)
+                result
+              Nothing -> assertFailure
+                "cyclic behavioral decisions were not rejected productively"
+          [] -> assertFailure "behavioral-selection input was unexpectedly empty"
+        -- A cyclic candidate spine cannot be constructed through this safe
+        -- boundary: VerificationBatch owns a finite, quota-bounded receipt
+        -- list and its constructor is opaque. The finite maximum-plus-one
+        -- case above pins the candidate-side admission rule.
+  , testCase "keep equal candidate occurrences independently classified" $ do
+      verification <- syntheticPostVerificationBatch
+        ["selection-same", "selection-same", "selection-same"]
+      withBehavioralSelectionInput verification $ \input -> case
+          behavioralSelectionInputCandidates input of
+        [first, second, third] -> do
+          batch <- expectRight $ sealBehavioralSelectionBatch 3 input
+            [ BehavioralSelectionInternal.retainBehavioralSelectionCandidate
+                third "third-occurrence"
+            , BehavioralSelectionInternal.rejectBehavioralSelectionCandidate
+                second "second-occurrence"
+            , BehavioralSelectionInternal.retainBehavioralSelectionCandidate
+                first "first-occurrence"
+            ]
+          let selected = behavioralSelectionBatchSelected batch
+              rejected = behavioralSelectionBatchRejected batch
+          map (detailedVerificationVariantText . verifiedCandidate
+              . behaviorallySelectedVerified) selected @?=
+            ["selection-same", "selection-same"]
+          map behaviorallySelectedRetention selected @?=
+            ["first-occurrence", "third-occurrence"]
+          map (detailedVerificationVariantText . verifiedCandidate
+              . behaviorallyRejectedVerified) rejected @?=
+            ["selection-same"]
+          map behaviorallyRejectedReason rejected @?= ["second-occurrence"]
+          assertBehavioralSelectionError
+            (BehavioralSelectionDecisionDuplicateIndex 0)
+            $ sealBehavioralSelectionBatch 3 input
+                [ BehavioralSelectionInternal.retainBehavioralSelectionCandidate
+                    first "first"
+                , BehavioralSelectionInternal.rejectBehavioralSelectionCandidate
+                    first "duplicate"
+                , BehavioralSelectionInternal.retainBehavioralSelectionCandidate
+                    third "third"
+                ]
+        candidates -> assertFailure $
+          "unexpected equal-occurrence handle count: "
+            ++ show (length candidates)
+  , testCase "keep candidate and evidence payloads lazy below the seal" $ do
+      let poisonCandidate :: DetailedVerificationVariant
+          poisonCandidate =
+            error "behavioral selection forced a verified candidate payload"
+      verification <- verifyCandidateGroups 2
+        (const $ pure VariantAccepted)
+        [[poisonCandidate], [poisonCandidate]]
+      withBehavioralSelectionInput verification $ \input -> case
+          behavioralSelectionInputCandidates input of
+        [first, second] -> do
+          -- Projecting a handle may expose its opaque Verified wrapper without
+          -- evaluating the candidate stored beneath that wrapper.
+          _ <- evaluate $ behavioralSelectionCandidateVerified first
+          batch <- expectRight $ sealBehavioralSelectionBatch 2 input
+            [ BehavioralSelectionInternal.rejectBehavioralSelectionCandidate
+                second (error "behavioral seal forced rejection evidence")
+            , BehavioralSelectionInternal.retainBehavioralSelectionCandidate
+                first (error "behavioral seal forced retention evidence")
+            ]
+          length (behavioralSelectionBatchSelected batch) @?= 1
+          length (behavioralSelectionBatchRejected batch) @?= 1
+          case behavioralSelectionBatchSelected batch of
+            [selected] -> do
+              _ <- evaluate $ behaviorallySelectedVerified selected
+              pure ()
+            selected -> assertFailure $
+              "unexpected lazy selected partition: " ++ show (length selected)
+          case behavioralSelectionBatchRejected batch of
+            [rejected] -> do
+              _ <- evaluate $ behaviorallyRejectedVerified rejected
+              pure ()
+            rejected -> assertFailure $
+              "unexpected lazy rejected partition: " ++ show (length rejected)
+        candidates -> assertFailure $
+          "unexpected poison-candidate handle count: "
+            ++ show (length candidates)
+  , testCase "keep epoch handles, decisions, and batch constructors opaque" $ do
+      publicSource <- readFile "src/Leant/Synth/BehavioralSelection.hs"
+      internalSource <- readFile
+        "src/Leant/Synth/BehavioralSelection/Internal.hs"
+      let exportHeader = unlines
+            . takeWhile (not . isInfixOf ") where")
+            . lines
+          publicExports = exportHeader publicSource
+          internalExports = exportHeader internalSource
+          opaqueTypes =
+            [ "BehavioralSelectionInput"
+            , "BehavioralSelectionCandidate"
+            , "BehavioralSelectionDecision"
+            , "BehaviorallySelected"
+            , "BehaviorallyRejected"
+            , "BehavioralSelectionBatch"
+            ]
+          builders =
+            [ "retainBehavioralSelectionCandidate"
+            , "rejectBehavioralSelectionCandidate"
+            ]
+      mapM_ (\name -> assertBool
+          ("public facade exposed decision builder " ++ name)
+          $ not $ name `isInfixOf` publicExports) builders
+      mapM_ (\name -> assertBool
+          ("internal surface omitted decision builder " ++ name)
+          $ name `isInfixOf` internalExports) builders
+      mapM_ (\name -> do
+          assertBool ("public facade exposed constructor for " ++ name)
+            $ not $ (name ++ " (..)") `isInfixOf` publicExports
+          assertBool ("internal surface exposed constructor for " ++ name)
+            $ not $ (name ++ " (..)") `isInfixOf` internalExports)
+        opaqueTypes
+      mapM_ (\roleLine -> assertBool
+          ("behavioral selection lost nominal role: " ++ roleLine)
+          $ roleLine `isInfixOf` internalSource)
+        [ "type role BehavioralSelectionInput nominal nominal"
+        , "type role BehavioralSelectionCandidate nominal nominal"
+        , "type role BehavioralSelectionDecision nominal nominal nominal nominal"
+        , "type role BehavioralSelectionBatch nominal nominal nominal"
+        ]
+  ]
+
+assertBehavioralSelectionError
+  :: BehavioralSelectionError
+  -> Either BehavioralSelectionError batch
+  -> IO ()
+assertBehavioralSelectionError expected result = case result of
+  Left actual -> actual @?= expected
+  Right _ -> assertFailure $
+    "behavioral selection was admitted; expected: " ++ show expected
 
 replayPlanTests :: TestTree
 replayPlanTests = testGroup "synthesis history replay"
