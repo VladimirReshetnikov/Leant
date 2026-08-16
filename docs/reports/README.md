@@ -103,3 +103,13 @@ a forward-looking proposal rather than a dated record:
   increments: counterexample-guided search, typed sketch completion,
   semantic pruning, more behavioral domains, and Lean-checked proof
   artifacts.
+- [Rewriting Leant and Djex in Lean 4](../Leant_Djex_Lean4_Rewrite_Analysis/Leant_Djex_Lean4_Rewrite_Analysis.pdf)
+  (August 15, 2026; [LaTeX source](../Leant_Djex_Lean4_Rewrite_Analysis/Leant_Djex_Lean4_Rewrite_Analysis.tex))
+  — a feasibility study, pinned to that day's snapshots of both
+  repositories, of reimplementing the Lean-facing parts of the system in
+  Lean itself: capability fit, per-engine rewrite designs, which current
+  boundaries should survive, a hybrid migration path, and a recommended
+  end state. Complements the
+  [formalization study](djex_leant_lean_formalization_report/djex_leant_lean_formalization_report.pdf)
+  above, which asks instead what a Lean checker could certify about the
+  existing Haskell implementation.
