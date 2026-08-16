@@ -192,6 +192,7 @@ import Leant.Synth.Fragment
   ( AppHead (..)
   , ExactContextArgument (..)
   , Frag (..)
+  , fragChildren
   , ProviderFrag (..)
   , ProviderInstantiationArgument (..)
   , Slot (..)
@@ -2382,24 +2383,8 @@ data ProviderContextProjection
 
 providerFragmentContainsExactContext :: Frag -> Bool
 providerFragmentContainsExactContext source = case source of
-  FArr parameter result -> descend [parameter, result]
-  FProd left right -> descend [left, right]
-  FLeanProd left right -> descend [left, right]
-  FSum left right -> descend [left, right]
-  FAll _ _ body -> providerFragmentContainsExactContext body
-  FInst _ body -> providerFragmentContainsExactContext body
   FExactContext{} -> True
-  FApp _ _ _ arguments -> descend arguments
-  FParamInd _ _ parameters constructors ->
-    descend $ parameters ++ concatMap snd constructors
-  FInd _ constructors -> descend $ concatMap snd constructors
-  FParamRec _ _ _ parameters constructors ->
-    descend $ parameters ++ concatMap snd constructors
-  FRec _ _ parameters constructors ->
-    descend $ parameters ++ concatMap snd constructors
-  _ -> False
- where
-  descend = any providerFragmentContainsExactContext
+  _ -> any providerFragmentContainsExactContext (fragChildren source)
 
 djinnRecursiveProjection :: RecursiveProjection
 djinnRecursiveProjection = RecursiveProjection
