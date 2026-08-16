@@ -343,6 +343,7 @@ import Leant.Synth.Length.Integration
   , lengthAssessmentFailure
   , lengthAssessmentModeActivationPolicy
   , lengthAssessmentModeExecutableLaunchStrategy
+  , lengthAssessmentRequestBehaviorMode
   , lengthAssessmentPostVerificationResult
   , lengthAssessmentRanking
   , lengthAssessmentSelectionResult
@@ -1516,6 +1517,34 @@ verificationObservabilityTests = testGroup "verification observability"
           "unexpected indexed verification result: " ++ show accepted
       observationCount LeanVariantAttempted
         (verificationObservations one) @?= 1
+  , testCase "stop ranking after exactly five accepted candidates" $ do
+      let acceptedGroups =
+            [["rank-accepted-" ++ show index]
+            | index <- [1 :: Int .. synthMaxShown]
+            ]
+          groups = acceptedGroups ++ error
+            "rank verification forced the group tail after five successes"
+      batch <- verifyCandidateGroups synthMaxShown
+        (const $ pure VariantAccepted) groups
+      verifiedCandidates batch @?= concat acceptedGroups
+      observationCount LeanVariantAttempted
+        (verificationObservations batch) @?= fromIntegral synthMaxShown
+  , testCase "bound an enlarged filter quota before a poison or cyclic tail" $
+      do
+        let acceptedGroups =
+              [["filter-accepted-" ++ show index]
+              | index <- [1 :: Int .. synthMaxTried]
+              ]
+            poisonous = acceptedGroups ++ error
+              "filter prefix forced the group tail past its lane bound"
+        poisonBatch <- verifyCandidateGroups synthMaxTried
+          (const $ pure VariantAccepted)
+          (take synthMaxTried poisonous)
+        verifiedCandidates poisonBatch @?= concat acceptedGroups
+        cyclicBatch <- timeout 1000000 $ verifyCandidateGroups synthMaxTried
+          (const $ pure VariantAccepted)
+          (take synthMaxTried $ cycle acceptedGroups)
+        fmap verifiedCandidates cyclicBatch @?= Just (concat acceptedGroups)
   ]
 
 postVerificationTests :: TestTree
@@ -3918,6 +3947,14 @@ combinedEngineMergeTests = testGroup "combined-engine verification frontier"
       takeDistinct 3
           (replicate 60 "same" ++ ["later", "last", "outside"])
         @?= ["same", "later", "last"]
+  , testCase "fit every combined refill batch below Length admission" $ do
+      let combined = synthVerificationWindow EngineBoth
+          maximumQueries =
+            Djex.defaultLengthSMTLibLiveSessionMaximumQueries
+      combined @?= 24
+      maximumQueries @?= 64
+      assertBool "combined refill reached Length selection admission"
+        $ fromIntegral combined < maximumQueries
   , testCase "reserve a bounded frontier for fresh Exference groups" $ do
       let groups prefix = [[prefix ++ show i] | i <- [1 :: Int .. 20]]
           merged = mergeCandidateGroups (groups "d") (groups "e")
@@ -8594,6 +8631,9 @@ lengthAssessmentIntegrationTests = testGroup
       "dispatch startup and one-shot product filters without sticky state"
       assertLengthAssessmentSpinePairFilterDispatch
   , testCase
+      "refill through five rejections to seven ordered survivors in one batch"
+      assertLengthAssessmentFilterSurvivorRefill
+  , testCase
       "handle all-rejected filters without binding or stale it splices"
       assertLengthAssessmentMainFilterBoundary
   , testCase "admit setup before IO or activation"
@@ -8698,6 +8738,8 @@ assertLengthAssessmentExplicitDisabled = do
     Right _ -> assertFailure "disabled mode enabled startup filtering"
   disabledRequest <- expectRight $ startupLengthAssessmentRequest
     LengthBehaviorRank disabledLengthAssessmentMode
+  lengthAssessmentRequestBehaviorMode disabledRequest @?=
+    LengthBehaviorRank
   lazyResult <- assessLengthVerificationRequest disabledRequest
     (error "disabled command request forced its verification batch")
   lengthAssessmentFailure lazyResult @?= Nothing
@@ -8745,6 +8787,8 @@ assertLengthAssessmentScalarFilterDispatch
 
         rankRequest <- expectRight $ startupLengthAssessmentRequest
           LengthBehaviorRank mode
+        lengthAssessmentRequestBehaviorMode rankRequest @?=
+          LengthBehaviorRank
         ranked <- expectLengthAssessmentWithin
           $ assessLengthVerificationRequest rankRequest verification
         length (lengthAssessmentCandidates ranked) @?= length original
@@ -8757,6 +8801,8 @@ assertLengthAssessmentScalarFilterDispatch
 
         filterRequest <- expectRight $ startupLengthAssessmentRequest
           LengthBehaviorFilter mode
+        lengthAssessmentRequestBehaviorMode filterRequest @?=
+          LengthBehaviorFilter
         filtered <- expectLengthAssessmentWithin
           $ assessLengthVerificationRequest filterRequest verification
         lengthAssessmentFailure filtered @?= Nothing
@@ -8794,6 +8840,10 @@ assertLengthAssessmentScalarFilterDispatch
             LengthBehaviorFilter mode of
           Left failure -> assertFailure (show failure) >> error "unreachable"
           Right authorized -> pure authorized
+        let bottomContractRequest = explicitLengthAssessmentRequest permission
+              (error "behavior projection forced its one-shot contract")
+        lengthAssessmentRequestBehaviorMode bottomContractRequest @?=
+          LengthBehaviorFilter
         ByteString.writeFile contractPath
           $ encodeLengthRankingConfigurationFile
           $ lengthContractFileFixture "scalar"
@@ -8804,6 +8854,8 @@ assertLengthAssessmentScalarFilterDispatch
           pure
         let oneShotRequest = explicitLengthAssessmentRequest
               permission loadedContract
+        lengthAssessmentRequestBehaviorMode oneShotRequest @?=
+          LengthBehaviorFilter
         ByteString.writeFile contractPath $ BS.pack "{"
         oneShot <- expectLengthAssessmentWithin
           $ assessLengthVerificationRequest oneShotRequest verification
@@ -8846,6 +8898,8 @@ assertLengthAssessmentScalarFilterDispatch
         assertBool "filter admission failure exposed rejected associations"
           $ isNothing $ lengthSelectionRejected preservedResult
         length (presentLengthAssessment preserved) @?= oversizedCount
+        length (take synthMaxShown $ presentLengthAssessment preserved) @?=
+          synthMaxShown
         assertBool "filter admission failure emitted rejection rows"
           $ null $ presentLengthAssessmentRejections preserved
 
@@ -8880,6 +8934,72 @@ assertLengthAssessmentScalarFilterDispatch
         length rejectionRows @?= 2
         doesFileExist executable >>= (@?= False)
         doesFileExist (executable ++ ".events") >>= (@?= False)
+
+assertLengthAssessmentFilterSurvivorRefill :: IO ()
+assertLengthAssessmentFilterSurvivorRefill = do
+  identity <- buildOneInputLengthRankingCandidate
+  retained <- mapM
+    (syntheticLengthRankingCandidate . ("refill-survivor-" ++) . show)
+    [1 :: Int .. 7]
+  let input = LengthVariable $ LengthInput 0
+      contract = (lengthRankingContractWithObservedInputs 1 2)
+        { leanLengthContractSource = LengthContractSource
+            { lengthContractPrecondition = LengthAtMost
+                (LengthLiteral 1) input
+            , lengthContractPostcondition = LengthEqual
+                (LengthVariable LengthResult) (LengthLiteral 2)
+            }
+        }
+      candidatePrefix = replicate synthMaxShown identity ++ retained
+      renderVerified = detailedVerificationVariantText . verifiedCandidate
+  length candidatePrefix @?= synthMaxTried
+  withFakeLengthSolver "healthy" $ \executable -> do
+    base <- expectRight $ mkLengthRankingPolicy
+      $ explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits
+          (explicitLengthRankingExecutionSource executable Nothing
+            Djex.LengthSMTLibInputValuesAfterSatisfiable)
+          Djex.defaultLengthEvaluationLimitSource
+    simplificationLimits <- explicitLengthInputBoxLimits 1 4
+    let policy = enableLengthRankingCounterexampleSimplification
+          simplificationLimits base
+    verification <- verificationBatchFromReceipts candidatePrefix
+    let original = verifiedCandidateReceipts verification
+        (expectedRejected, expectedSelected) = splitAt synthMaxShown original
+    result <- expectLengthSelectionWithin "survivor refill batch"
+      $ selectVerifiedLengthCandidatesWithPolicy policy contract verification
+    lengthSelectionFailure result @?= Nothing
+    selected <- expectLengthSelectionSelected result
+    rejected <- expectLengthSelectionRejected result
+    lengthSelectionCandidates result @?= expectedSelected
+    map behaviorallySelectedVerified selected @?= expectedSelected
+    map behaviorallyRejectedVerified rejected @?= expectedRejected
+    map (renderVerified . behaviorallySelectedVerified) selected @?=
+      ["refill-survivor-" ++ show index | index <- [1 :: Int .. 7]]
+    map (lengthSelectionRetentionClass . behaviorallySelectedRetention)
+        selected @?=
+      replicate 7 LengthSelectionPreparationRefused
+    let rejectionEvidence = map behaviorallyRejectedReason rejected
+        receipts = map lengthSelectionRejectionCounterexample
+          rejectionEvidence
+        simplifications = map
+          lengthSelectionRejectionCounterexampleSimplification
+          rejectionEvidence
+    map Djex.validatedLengthCounterexampleInputs receipts @?=
+      replicate synthMaxShown [1]
+    map Djex.validatedLengthCounterexampleResult receipts @?=
+      replicate synthMaxShown 1
+    case simplifications of
+      Just first : replayed -> do
+        Djex.validatedLengthCounterexampleSimplificationOriginalInputs first
+          @?= [3]
+        Djex.validatedLengthCounterexampleSimplificationInputs first @?= [1]
+        assertBool "later refill rejections did not reuse the MRU seed"
+          $ all isNothing replayed
+      other -> assertFailure $ "unexpected refill simplifications: "
+        ++ show other
+    assertFakeLengthQueryEvents [0] [0] =<<
+      BS.readFile (executable ++ ".events")
 
 assertLengthAssessmentSpinePairFilterDispatch :: IO ()
 assertLengthAssessmentSpinePairFilterDispatch
@@ -8978,8 +9098,12 @@ assertLengthAssessmentSpinePairFilterDispatch
 assertLengthAssessmentMainFilterBoundary :: IO ()
 assertLengthAssessmentMainFilterBoundary = do
   source <- readFile "src/Main.hs"
-  let section = takeWhile (not . isInfixOf "synthBind ::")
-        $ dropWhile (not . isInfixOf "verifyAndDisplay assessmentRequest")
+  let sourceLines = lines source
+      sourceWords = unwords $ words source
+      section = takeWhile
+          (not . isInfixOf "reportLengthAssessmentRejections ::")
+        $ dropWhile (not . isInfixOf
+            "verifyAndDisplay assessmentRequest groupLimit st args goal groups =")
         $ lines source
       positions fragment =
         [index | (index, line) <- zip [0 :: Int ..] section
@@ -8989,12 +9113,33 @@ assertLengthAssessmentMainFilterBoundary = do
         [] -> assertFailure
           ("Main filter boundary omitted " ++ show fragment)
             >> error "unreachable"
+  boundedPrefix <- firstPosition "case take groupLimit groups of"
+  projectedMode <- firstPosition
+    "lengthAssessmentRequestBehaviorMode assessmentRequest"
+  rankQuota <- firstPosition "LengthBehaviorRank -> synthMaxShown"
+  filterQuota <- firstPosition "LengthBehaviorFilter -> groupLimit"
+  verifier <- firstPosition "verification <- synthVerify successQuota st goal"
+  presentationCap <- firstPosition "let presentations = take synthMaxShown"
+  fullRejections <- firstPosition
+    "rejections = presentLengthAssessmentRejections assessment"
   nullShown <- firstPosition "if null shown"
   nullRejections <- firstPosition "then if null rejections"
   clearedIts <- firstPosition "rsSynthIts = []"
   clearedProve <- firstPosition "rsSynthItsProve = False"
   survivorBind <- firstPosition
     "counters <- mapM (synthBind st goal) (reverse shown)"
+  assertBool "Main chose a quota before bounding the candidate stream"
+    $ boundedPrefix < projectedMode
+  assertBool "Main did not keep rank at exactly five verified candidates"
+    $ projectedMode < rankQuota && rankQuota < verifier
+  assertBool "Main did not give filtering the complete bounded lane prefix"
+    $ projectedMode < filterQuota && filterQuota < verifier
+  assertBool "Main did not cap survivor presentation before binding"
+    $ verifier < presentationCap && presentationCap < survivorBind
+  assertBool "Main truncated rejection diagnostics to the survivor cap"
+    $ verifier < fullRejections && fullRejections < survivorBind
+      && not ("take synthMaxShown $ presentLengthAssessmentRejections"
+        `isInfixOf` unlines section)
   assertBool "all-rejected handling did not follow the empty survivor test"
     $ nullShown < nullRejections
   assertBool "all-rejected handling could bind an itN before clearing splices"
@@ -9010,6 +9155,22 @@ assertLengthAssessmentMainFilterBoundary = do
         `isInfixOf` unlines section
       && not ("shown = map lengthCandidateRejectionPresentationText"
         `isInfixOf` unlines section)
+  mapM_ (\fragment -> assertBool
+      ("Main refill scheduling omitted " ++ show fragment)
+      $ fragment `isInfixOf` sourceWords)
+    [ "let groupLimit = synthVerificationWindow laneEngine"
+    , "shown <- verifyGroups groupLimit checkedGroups"
+    , "verifyAndDisplay assessmentRequest groupLimit st args goal groups"
+    , "shownEm <- verifyAndDisplay assessmentRequest (synthMaxTried `div` 2) st args goal emGroups"
+    , "verifyAndDisplay assessmentRequest groupLimit st args goal (map"
+    ]
+  let providerSection = takeWhile
+        (not . isInfixOf "tryCandidates groupLimit bounded")
+        $ dropWhile (not . isInfixOf "runProviderLanes fallback")
+        $ sourceLines
+  assertBool "provider lanes discarded their engine-specific refill bound"
+    $ "let groupLimit = synthVerificationWindow laneEngine"
+        `isInfixOf` unlines providerSection
   let requestSection = takeWhile (not . isInfixOf "synthRun ::")
         $ dropWhile
             (not . isInfixOf "lengthAssessmentRequestForCommand state command")
