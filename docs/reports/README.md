@@ -86,6 +86,7 @@ Reports are listed oldest first.
 - 2026-08-15 — [Versionless command-local Length contract](2026-08-15-versionless-length-contract.md)
 - 2026-08-15 — [Current-only Length applicable-domain policy](2026-08-15-current-length-applicable-domain-policy.md)
 - 2026-08-15 — [Guarded conditional Length ranking](2026-08-15-guarded-conditional-length-ranking.md)
+- 2026-08-15 — [Behavioral-selection occurrence partition seal](2026-08-15-behavioral-selection-partition-seal.md)
 
 ## Standalone PDF reports
 

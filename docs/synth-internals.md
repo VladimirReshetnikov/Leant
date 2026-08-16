@@ -41,6 +41,7 @@ who wants the *what* can stop at the paragraph.
   - [Integration and one-shot contracts](#integration-and-one-shot-contracts)
 - [Contract vocabulary and module ownership](#contract-vocabulary-and-module-ownership)
 - [Post-verification sealing](#post-verification-sealing)
+  - [The behavioral-selection partition seal](#the-behavioral-selection-partition-seal)
   - [The Length domain adapter](#the-length-domain-adapter)
 - [Provider instantiation evidence](#provider-instantiation-evidence)
   - [Exact provider assignment vectors](#exact-provider-assignment-vectors)
@@ -909,6 +910,40 @@ or over-limit tail without comparing or forcing candidate payloads. Only
 success can construct the opaque `PostVerificationBatch`, which therefore
 carries a complete occurrence permutation rather than a pruned, duplicated,
 manufactured, substituted, or reassociated candidate batch.
+
+### The behavioral-selection partition seal
+
+`Leant.Synth.BehavioralSelection` is a separate structural boundary for a
+future hard-selection path. `withBehavioralSelectionInput` mints private
+occurrence handles from one exact `VerificationBatch` inside a fresh rank-2
+epoch. The public facade keeps the input, handle, decision, selected receipt,
+rejected receipt, and batch constructors opaque and exports no decision
+builder. A package-internal domain adapter may import
+`Leant.Synth.BehavioralSelection.Internal` to classify a supplied handle with
+one retention or rejection payload, but it cannot manufacture a handle or
+change its private original index.
+
+`sealBehavioralSelectionBatch` first bounds the candidate occurrences, then
+bounds the decision spine, requires one decision per occurrence, and checks
+each private index for range before duplication. It reconstructs the exact
+original `Verified` receipt rather than trusting a receipt in the decision,
+then emits both the selected and rejected partitions in original callback
+order, independent of decision order. Equal candidate payloads remain
+different occurrences, and the seal neither compares nor forces candidate,
+retention, or rejection payloads. Cyclic decisions stop at the caller's
+maximum plus one. An out-of-range handle is checked defensively, although the
+safe public and package-internal builders cannot construct one for the same
+epoch.
+
+This generic seal validates only a bounded total occurrence partition and its
+association with the original callback receipts. In particular,
+`BehaviorallyRejected` is not behavioral evidence: the generic layer does not
+fingerprint, replay, or validate its rejection payload, apply an
+unknown/inapplicable policy, inspect solver status, or establish a Lean proof.
+The seal is not yet connected to Main, Length assessment, configuration, or
+presentation and cannot by itself authorize filtering. Those policy and
+evidence checks belong to the later domain adapter described by the
+[behavioral-selection partition report](reports/2026-08-15-behavioral-selection-partition-seal.md).
 
 ### The Length domain adapter
 
