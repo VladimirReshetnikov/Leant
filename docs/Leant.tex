@@ -1478,8 +1478,28 @@ alternating tails. Within each Exference invocation, Leant
 stable-deduplicates rendered groups before applying the internal 60-candidate
 collection window. The first spelling remains authoritative, while repeated
 backend histories cannot hide later distinct terms behind the bound; the
-outer 12- and 24-group verification frontiers then apply.  Ordinary ranking
-retains its historical verifier stop after five accepted groups.  An explicit
+outer 12- and 24-group verification frontiers then apply.
+
+Independently of the executable scheduler, \code{Leant.Synth.Engine} now
+exports an opaque \code{DetailedSynthCursor} over one lazy detailed outcome.
+For a nonempty candidate outcome below the cap, an admitted request of 1
+through 60 returns a nonempty ordered batch and a lazy successor; cumulative
+observation stops at the existing product-wide 60-group hard cap. Natural
+exhaustion is distinct from reaching that cap: after group 60 the
+cursor reports the cap without probing group 61, even when the finite stream
+ended exactly there. Its force helper traverses the selected group-list and
+variant-list spines and their constructors far enough to project text, forces
+each selected route to weak head normal form, traverses each selected rendered
+spelling's \code{String} list spine through \code{length}, and traverses the
+run-note list spine and each note's \code{String} spine through \code{length}.
+It neither forces \code{Char} values nor performs text encoding, and leaves
+semantic sidecars, the successor, and the unselected tail lazy for a caller-owned
+deadline. Main imports none of this new surface and still uses the one-window
+behavior described here; the cursor is a foundation for a later progressive
+scheduler, not a new command behavior.
+
+Ordinary ranking retains its historical verifier stop after five accepted
+groups.  An explicit
 behavioral filter may instead verify the rest of that same bounded lane, assess
 the verified occurrences once, and refill early behavioral rejections from
 later same-lane survivors.  In either operation at most five candidates are
@@ -1704,8 +1724,9 @@ replay-input store, accumulation, and lane outcomes are never persistent REPL
 state. This is a bounded command-local reuse and continuation slice, not quota
 filling or the proposal's complete CEGIS loop: no engine accepts a
 counterexample-directed replacement request, no typed prefix is pruned, and no
-context survives the command. No engine, verification module, or REPL state
-contract changed. The current reference
+context survives the command. Main's engine invocation, verification module,
+and REPL state contract remain unchanged. The separate additive Engine cursor
+does not enter this path. The current reference
 is \code{docs/length-ranking.md}; the command-authority predecessor, historical
 refill checkpoint, and private outcome seam are recorded in
 \code{docs/reports/2026-08-15-command-authorized-length-filtering.md} and
@@ -1717,6 +1738,8 @@ runtime successor is
 \code{docs/reports/2026-08-16-filter-only-length-counterexample-bank-context-runner.md}.
 The command-local scheduler successor is
 \code{docs/reports/2026-08-16-command-local-length-counterexample-bank-scheduler.md}.
+The later Engine-only observation foundation is
+\code{docs/reports/2026-08-16-opaque-detailed-synthesis-cursor-foundation.md}.
 Dated
 reports under \code{docs/reports/} are historical engineering records rather
 than current file contracts. When assessment is disabled, an ordinary or

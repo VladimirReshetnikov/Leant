@@ -40,6 +40,8 @@ who wants the *what* can stop at the paragraph.
   - [File acquisition](#file-acquisition)
   - [Contract-only files and the length-contract command](#contract-only-files-and-the-length-contract-command)
   - [Integration and one-shot contracts](#integration-and-one-shot-contracts)
+- [Opaque detailed synthesis cursor foundation](#opaque-detailed-synthesis-cursor-foundation)
+- [Main's bounded lane outcome and command-local scheduler](#mains-bounded-lane-outcome-and-command-local-scheduler)
 - [Contract vocabulary and module ownership](#contract-vocabulary-and-module-ownership)
 - [Post-verification sealing](#post-verification-sealing)
   - [The behavioral-selection partition seal](#the-behavioral-selection-partition-seal)
@@ -1017,7 +1019,73 @@ successful filter returns only sealed survivors, while every selection failure
 returns the complete original batch. `lengthAssessmentFailure` maps both
 selection failure families into the mode-neutral Main warning path.
 
-### Main's bounded lane outcome and command-local scheduler
+## Opaque detailed synthesis cursor foundation
+
+`Leant.Synth.Engine` now has an additive observation boundary over one lazy
+`Either String DetailedSynthOutcome`. `DetailedSynthCursor` and
+`DetailedCandidateBatch` are positional, lazy types whose constructors remain
+hidden. They have no record selectors, strict fields, `Eq`, or `Show`
+instances. Callers can inspect a returned batch only through
+`detailedCandidateBatchGroups` and `detailedCandidateBatchNotes`; the Engine
+module is therefore the sole constructor of the nonempty ordered group slice
+and its association with the original run-level notes. This is ordinary pure
+Haskell opacity, not a linear capability: a caller may retain an older cursor,
+but advancing any cursor observes the already retained outcome and never
+reruns an engine.
+
+`startDetailedSynthCursor` wraps its outcome without demanding the verdict or
+candidate stream. `advanceDetailedSynthCursor` first validates the requested
+per-step size independently of its cursor. Zero and negative requests return
+`DetailedSynthCursorBatchSizeNotPositive`; requests above
+`candidateWindow`, currently 60, return
+`DetailedSynthCursorBatchSizeLimitExceeded` with the maximum followed by the
+observed request. Both errors precede even a bottom cursor. For an admitted
+request, the outer `Right` is likewise available without demanding the cursor;
+forcing its `DetailedSynthCursorStep` performs the first outcome observation.
+
+A candidate step selects at most the requested number of groups and at most
+the unspent part of the product-wide 60-group hard cap. It returns
+`DetailedSynthCursorCandidateBatch` with one nonempty batch and a lazy
+successor. Batches preserve engine order and carry the original notes
+unchanged. A request can return fewer groups because the stream ended or
+because the remaining hard-cap allowance was smaller; the following step
+states which boundary was reached.
+
+`DetailedSynthCursorNaturallyExhausted` is returned only when advancing before
+the cap observes an empty stream. Once 60 groups have been returned,
+`DetailedSynthCursorHardCapReached` wins without probing the next group. An
+exactly 60-element finite stream is therefore intentionally a hard-cap result,
+not an exhaustion witness, and group 61 may be bottom or an infinite cyclic
+tail without affecting productivity. `DetailedSynthCursorEngineFailed`,
+`DetailedSynthCursorRefuted`, and `DetailedSynthCursorNoTerm` preserve the
+existing error, refutation-soundness flag, and no-term notes rather than
+coercing them into candidate completion.
+
+`forceDetailedSynthCursorStep` supplies the value a deadline-owning caller can
+evaluate for exactly one step. On a candidate batch it traverses the selected
+group-list spine and group constructors, forces each rendering route to weak
+head normal form, traverses each variant-list spine and variant constructor far
+enough to project text, and traverses each selected rendered spelling's
+`String` list spine through `length`. It likewise traverses the run-note list
+spine and each note's `String` spine through `length`. It does not force `Char`
+values or perform text encoding, and it does not demand semantic sidecars, lazy
+recovered-origin lookup, the successor, or the unselected tail. Terminal steps
+use the same error/note `String`-list-spine or
+soundness-`Bool` boundary as the established `forceDetailedOutcome`; that older
+helper is factored through the same private group/note forcing functions and
+remains Main's only engine force target. The cursor helper does not itself
+install a timeout.
+
+This foundation is deliberately dormant in the executable. `src/Main.hs`
+imports none of the new cursor or batch surface and still forces one 12-, 24-,
+or excluded-middle 6-group lane through `forceDetailedOutcome`, verifies and
+assesses that lane once, and stops on its first survivor or preserve-all
+result. The cursor owns no assessment context, counterexample bank, provider
+deduplication, note-presentation policy, survivor quota, `ReplState` field, or
+counterexample-directed engine request. Progressive same-run batching remains
+a separate scheduler change.
+
+## Main's bounded lane outcome and command-local scheduler
 
 Each `verifySynthLane` caller passes the exact group bound it already owns.
 Main immediately takes that prefix and returns a lazy unassessed
@@ -1098,9 +1166,11 @@ through provider stages and from excluded middle to double negation. Survivors
 and preserve-all assessment failure are terminal. This is not a cross-lane
 five-survivor quota: ranking still stops at five accepted groups, filtering
 still uses each caller-owned 12/24/6 bound, and the first lane with one survivor
-stops scheduling. The change adds no engine-side counterexample request,
-prefix pruning, `Engine` or `Verification` API, persistent state, or
-`ReplState` field.
+stops scheduling. That scheduler checkpoint added no engine-side
+counterexample request, prefix pruning, `Engine` or `Verification` API,
+persistent state, or `ReplState` field. The later additive Engine cursor
+foundation remains outside this Main path and changes none of those scheduling
+claims.
 
 Reporting keeps structural authority separate from behavioral handling. On
 ordinary candidate, no-term, or non-sound-refutation exhaustion, aggregate
@@ -1134,6 +1204,8 @@ The later filter-only context runner is recorded in the
 [counterexample-bank context runner report](reports/2026-08-16-filter-only-length-counterexample-bank-context-runner.md).
 The command-local scheduler successor is recorded in the
 [command-local counterexample-bank scheduler report](reports/2026-08-16-command-local-length-counterexample-bank-scheduler.md).
+The later Engine-only observation seam is recorded in the
+[opaque detailed synthesis cursor report](reports/2026-08-16-opaque-detailed-synthesis-cursor-foundation.md).
 The older [one-shot contract report](reports/2026-08-13-one-shot-length-contract.md)
 and the reports below remain useful landing history, but their version routing
 and public API names are not current contracts. The historical modulo QF_LIA

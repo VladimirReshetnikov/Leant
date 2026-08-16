@@ -59,7 +59,11 @@ after a complete no-verified or all-rejected lane through Main's already
 existing provider and classical schedule. This is a bounded Level-2 slice, not
 the proposal's complete CEGIS design: it does not ask an engine to synthesize a
 counterexample-directed replacement, fill a survivor quota across lanes, prune
-a typed prefix, or persist a bank. New engine-side enumeration, a session-
+a typed prefix, or persist a bank. `Leant.Synth.Engine` now separately exposes
+an opaque cursor which can observe successive bounded slices of one lazy
+detailed outcome without rerunning synthesis. Main does not import that
+surface: progressive verification and assessment across those slices,
+five-survivor filling, every counterexample-directed engine request, a session-
 persistent bank, typed sketch completion, sound prefix pruning, further
 behavioral domains, and Lean-checked proof artifacts remain proposed work.
 
@@ -375,8 +379,10 @@ dispositions. A baseline or provider result in either class may enter the next
 provider stage; an all-rejected excluded-middle result may enter double
 negation just like no-verification. Survivors and assessment-preserved remain
 terminal. Continuation never fills a presentation quota across lanes: the
-first terminal lane stops even if it supplies only one survivor. The engine,
-verification module, lane bounds, and rank-five quota are unchanged.
+first terminal lane stops even if it supplies only one survivor. The engine
+invocation, verification module, lane bounds, and rank-five quota used by Main
+are unchanged. The current Engine module has an additive cursor observation
+surface, but no command path names it and no lane uses it.
 
 One deferred `finalizeSynthLaneAccumulation` owns all result effects. It emits
 debug metrics in chronological order for every retained outcome, then uses the
@@ -420,7 +426,9 @@ This bounded command-local continuation is not survivor-quota filling or a
 complete counterexample-guided engine loop. It neither asks an engine for a
 counterexample-directed replacement nor prunes a typed prefix. The outcome
 types and context add no `Engine`, `Verification`, or `ReplState` field,
-session bank, serialization, snapshot, restoration, or persistence.
+session bank, serialization, snapshot, restoration, or persistence. The
+separate Engine cursor is a pure continuation over one detailed outcome; it
+does not add a Main field, assessment batch, or runtime scheduling edge.
 
 ### Stable partition, failure, and Main behavior
 
@@ -474,6 +482,8 @@ The filter-only nominal-bank runner is recorded in the
 [filter-only counterexample-bank context runner report](reports/2026-08-16-filter-only-length-counterexample-bank-context-runner.md).
 The command-local scheduler successor is recorded in the
 [command-local counterexample-bank scheduler report](reports/2026-08-16-command-local-length-counterexample-bank-scheduler.md).
+The later Engine-only observation foundation is recorded in the
+[opaque detailed synthesis cursor report](reports/2026-08-16-opaque-detailed-synthesis-cursor-foundation.md).
 
 ## One-shot contract-only files
 

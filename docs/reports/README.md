@@ -42,6 +42,20 @@ finalizer owns chronological metrics, effective warnings, at most one state
 action, terminal candidate rows, accumulated rejection rows, and handled notes.
 Structural/classical and abnormal diagnostics remain separately gated.
 
+The Engine module now also exports an additive opaque cursor over one lazy
+detailed outcome. It returns ordered nonempty slices, retains the original
+run-level notes, validates each requested size before cursor demand, and caps
+cumulative observation at the existing 60-group candidate window. Natural
+exhaustion remains distinct from reaching that cap without probing the next
+group. Its force helper forces each selected rendering route to weak head
+normal form; traverses the selected group-list and variant-list spines and
+their constructors far enough to project text; traverses each selected
+rendered spelling's `String` list spine through `length`; and traverses the
+run-note list spine and each note's `String` spine through `length`. It does not
+force `Char` values or perform text encoding, and leaves semantic sidecars, the
+successor, and the unselected tail lazy. Main imports none of this surface, so
+current 12/24/6 one-batch runtime scheduling and presentation are unchanged.
+
 There is still no `ReplState` field, serialization, snapshot restoration,
 session bank, or persistence, and no new engine-side counterexample request,
 typed prefix pruning, or complete Level-2 CEGIS loop. Preserve-all candidate
@@ -121,6 +135,7 @@ Reports are listed oldest first.
 - 2026-08-16 — [Package-private nominal Length counterexample-bank state](2026-08-16-nominal-length-counterexample-bank-state.md)
 - 2026-08-16 — [Filter-only nominal Length counterexample-bank context runner](2026-08-16-filter-only-length-counterexample-bank-context-runner.md)
 - 2026-08-16 — [Command-local Length counterexample-bank scheduler](2026-08-16-command-local-length-counterexample-bank-scheduler.md)
+- 2026-08-16 — [Opaque detailed synthesis cursor foundation](2026-08-16-opaque-detailed-synthesis-cursor-foundation.md)
 
 ## Standalone PDF reports
 
