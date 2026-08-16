@@ -156,18 +156,28 @@ adding `--length-contract ABSOLUTE-PATH` uses that passive contract for this
 command. Filtering verifies and assesses one already bounded synthesis lane as
 one batch—at most 12 groups for a standalone engine, 24 for `both`, or 6 for
 the excluded-middle classical route—so later same-lane survivors can replace
-early behavioral rejections. It still shows and binds at most five survivors,
-while every rejection from the bounded assessed batch remains visible. Raw
-`sat`, `unsat`, and `unknown`, preparation refusal, unassessed input, and
-positive bounded evidence never authorize rejection. Any adapter, ranking,
-association, or partition-seal failure preserves the complete internal
-verified batch and presents at most five candidates. An all-rejected batch is
-handled output and does not continue into another provider or classical lane.
-This is bounded lane-local refill, not a persistent or cross-lane CEGIS loop.
+early behavioral rejections. The context-aware filter assessor owns one
+nominal scalar or product counterexample bank for that assessment, tries its
+retained samples newest first, and freshly replays every attempted sample
+against the later same-scope candidate. Ordinary and explicit
+ranking keep the established raw four-vector, batch-local MRU path unchanged.
+Main still invokes the compatibility assessor once for each bounded lane, and
+that entrance creates a fresh filter context for every call; no bank therefore
+continues into another lane. Filtering still shows and binds at most five
+survivors, while every rejection from the bounded assessed batch remains
+visible. Raw `sat`, `unsat`, and `unknown`, preparation refusal, unassessed
+input, and positive bounded evidence never authorize rejection. Any adapter,
+ranking, association, or partition-seal failure preserves the complete
+internal verified batch and presents at most five candidates, although
+already completed bank transitions are cache effects and are not rolled back.
+An all-rejected batch is handled output and does not continue into another
+provider or classical lane. This is bounded lane-local refill, not a persistent
+or cross-lane CEGIS loop; no bank enters `ReplState`, history, or snapshots.
 The complete reference — including the fixed command grammar, current
 versionless startup and contract-only schemas (`rankingDomain` is `scalar` or
-`binary-product`), batch-local replay bank, origin probe, bounded validation,
-rejection rules, and presentation — is
+`binary-product`), unchanged raw rank MRU, fresh-per-assessment Integration
+filter-context bank,
+origin probe, bounded validation, rejection rules, and presentation — is
 [docs/length-ranking.md](docs/length-ranking.md).
 
 Applicable-domain ranking now has one current recursive piecewise-affine

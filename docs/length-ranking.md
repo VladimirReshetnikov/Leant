@@ -32,8 +32,11 @@ Five rules define the current authority boundary:
 - **Filtering can refill only inside the current bounded lane.** Ranking keeps
   its historical five-success verifier frontier. Filtering instead assesses
   the verified output of one already bounded 12-, 24-, or excluded-middle
-  6-group lane as one batch, then shows and binds at most five survivors while
-  reporting every rejection from that batch.
+  6-group lane as one batch. That filter assessment owns one nominal scalar or
+  product counterexample bank, then shows and binds at most five survivors
+  while reporting every rejection from that batch. Main creates a fresh
+  context for each such assessment; it does not carry that bank to another
+  lane.
 - **Raw solver status has no authority.** `sat`, `unsat`, and `unknown` are
   heuristics. Preparation refusal, unassessed input, heuristic status,
   independently completed finite-box evidence, and established applicable-
@@ -51,23 +54,35 @@ Length decision is an exact replayed counterexample. The current lane-local
 refill lets that filter consume the remainder of one already bounded synthesis
 lane after early behavioral rejections, but it is not the proposal's Level-2
 command-local CEGIS loop: it neither requests candidates from another lane nor
-persists a bank across batches. Persistent sample banks, cross-lane candidate
-enumeration, typed sketch completion, sound prefix pruning, further behavioral
-domains, and Lean-checked proof artifacts remain proposed work.
+keeps a context across Main's assessment calls. Cross-lane candidate
+enumeration, a command- or session-persistent bank, typed sketch completion,
+sound prefix pruning, further behavioral domains, and Lean-checked proof
+artifacts remain proposed work.
 
 The vendored Djex revision now contains candidate-independent scalar and
 binary-product counterexample-bank scopes, bounded immutable input stores, and
 exact query-owned operations for fresh receipt recording and retained-sample
 replay. Leant wraps that bridge in one package-private, nominally separated
-scalar/product state module. Each pure state retains validated limits and at
-most one active scope, initializes lazily, resets on exact scope drift, threads
-charged successors through ordered replay refusals, and keeps hit promotion an
-explicit evaluation-free operation. This is still a dormant runtime
-foundation: no Ranking, Selection, Integration, Main, command-state, or
-persistence path constructs or consults the state. Unless this document
-explicitly says otherwise, “replay bank” therefore means Leant's existing
-fresh four-vector, one-assessment MRU below, not the package-private nominal
-state.
+scalar/product state-and-context module. Each context serializes transitions
+over one state which retains validated limits and at most one active scope,
+initializes lazily, resets on exact scope drift, threads charged successors
+through ordered replay refusals, and keeps hit promotion an explicit
+evaluation-free operation. The additive context-aware filter path through
+Configuration, Selection, and internal Ranking now uses that context in place
+of the raw four-vector MRU. Established rank runners and the direct scalar/product
+Selection compatibility APIs still construct the fresh raw `[[Natural]]` MRU
+for every batch; their APIs and behavior are unchanged. Integration's
+compatibility wrapper remains raw on rank calls but creates a fresh context for
+each filter call.
+
+Integration can introduce a nominal rank-2 `LengthAssessmentContext` and
+assess more than one batch through it. Reuse of a filter context reuses its one
+bank; rank contexts intentionally contain no bank. The compatibility
+`assessLengthVerificationRequest` entrance, which is the only entrance Main
+calls, introduces a fresh context for each assessment call. Main, its lane
+scheduler, `ReplState`, history, snapshots, and persistence are unchanged, so
+the current command path still has no true cross-lane or full-command bank
+lifetime.
 
 Everything below this line describes the exact behavior of the current tree:
 the startup-configuration schema, the current contract-file schema, the
@@ -134,7 +149,9 @@ passive contract. It does not expose one-member strategy switches. Every
 accepted startup file selects the current policy bundle:
 
 - descriptor-bound execve-check executable access;
-- the four-entry MRU replay bank followed by the all-zero origin probe;
+- newest-first counterexample replay followed by the all-zero origin probe
+  (the unchanged raw four-entry MRU for rank/direct Selection compatibility
+  paths, or the nominal context bank for Integration filtering);
 - independent post-`unsat` input-box validation;
 - current guarded recursive piecewise-affine applicable-domain validation;
 - non-vacuous preference for both applicable-domain and input-box receipts;
@@ -183,7 +200,8 @@ budget (default 5,000 ms, maximum 60,000 ms). No option discovers a file or
 solver. POSIX configuration-file descriptor acquisition is implemented;
 Windows currently fails
 closed. The current route completes admission and preparation, then runs each
-candidate's pure MRU, guarded applicable-domain, and origin prefix before IO.
+candidate's pure bank replay, guarded applicable-domain, and origin prefix
+before IO.
 An all-pure batch opens no process; the first live miss opens one lexical
 session for that query and the remaining suffix. The batch captures one
 dynamically scoped usable-work owner after the 64-candidate admission gate and
@@ -286,12 +304,15 @@ is optional metadata owned by that same occurrence. The selection adapter does
 not introduce another query runner, executable policy, counterexample
 validator, or evidence format.
 
-The four-entry newest-first input-vector bank remains local to one assessment
-batch. A replayed violation from an earlier candidate can seed a later
-candidate only after the later candidate independently evaluates and associates
-that vector with its own checked problem. A new batch starts empty. No bank,
-behavior mode, or selection result is retained in `ReplState`, history,
-snapshots, or another command.
+The established ranking entrances retain their four-entry newest-first raw
+input-vector MRU local to one assessment batch. Integration's additive
+context-aware filter entrance uses the nominal bank instead. Either kind of
+retained sample can seed a later candidate only after that candidate
+independently evaluates and
+associates the exact vector with its own checked problem. Main's compatibility
+assessment entrance creates a fresh filter context for every call, so the next
+lane assessment still starts empty. No bank, behavior mode, or selection result
+is retained in `ReplState`, history, snapshots, or another command.
 
 ### Bounded lane-local survivor refill
 
@@ -309,9 +330,9 @@ mode instead gives verification the complete caller-owned lane limit. Because
 the verification quota counts accepted groups rather than attempted groups,
 the prior `take` is a separate productivity boundary: failed groups do not
 allow traversal beyond the finite 12-, 24-, or 6-group lane prefix. The
-complete verified filter frontier is then assessed once, so its four-entry MRU
-bank can replay a counterexample learned from an early rejected occurrence
-against a later occurrence in that same batch.
+complete verified filter frontier is then assessed once through one fresh
+nominal context, so its bounded bank can replay a counterexample learned from
+an early rejected occurrence against a later occurrence in that same batch.
 
 The lane result retains two deliberately noninterchangeable histories. Its
 checked spelling frontier is every rendered variant in the complete bounded
@@ -345,10 +366,11 @@ no-verification disposition permits provider or classical continuation. An
 accepted all-rejected batch is the distinct terminal all-behaviorally-rejected
 disposition, so structural filtering still does not enter provider lanes and
 an all-rejected excluded-middle batch still does not enter the double-negation
-lane. No candidate from a later lane enters the assessment. The new outcome
-types are private to Main; they add no public API, `Engine`, `Verification`, or
-`ReplState` change, persistent runtime bank, provider continuation, or
-cross-lane CEGIS scheduling.
+lane. No candidate from a later lane enters the assessment. The outcome types
+are private to Main; they add no `Engine`, `Verification`, or `ReplState`
+change, persistent command/session bank, provider continuation, or cross-lane
+CEGIS scheduling. The reusable Integration context is an additive
+package-internal seam and is not retained by this scheduler.
 
 ### Stable partition, failure, and Main behavior
 
@@ -370,8 +392,12 @@ original order. Such a result exposes no accepted selection wrappers and no
 rejections. Main displays a mode-neutral warning that behavioral assessment
 preserved all verified candidates and then presents at most five unannotated
 original candidates. The complete preserved batch remains the internal
-failure result. Exceptions still propagate after owned cleanup rather than
-becoming a filter result.
+failure result. This atomicity is about candidate reports and selection, not a
+transaction over the filter cache: every nominal-bank replay, promotion, or
+record transition which completed before the later failure remains committed.
+An unexpected synchronous or asynchronous exception during one bank transition
+instead propagates without publishing its successor. Other exceptions still
+propagate after owned cleanup rather than becoming a filter result.
 
 On accepted selection, presentation traverses the associated survivor and
 rejection wrappers directly; it never zips detached candidates and evidence.
@@ -391,6 +417,8 @@ The current refill checkpoint and its exact test surface are recorded in the
 [lane-local Length survivor-refill report](reports/2026-08-15-lane-local-length-survivor-refill.md).
 Its behavior-preserving outcome-seam successor is recorded in the
 [explicit synthesis-lane outcome report](reports/2026-08-16-explicit-synthesis-lane-outcomes.md).
+The filter-only nominal-bank runner is recorded in the
+[filter-only counterexample-bank context runner report](reports/2026-08-16-filter-only-length-counterexample-bank-context-runner.md).
 
 ## One-shot contract-only files
 
@@ -436,6 +464,15 @@ lanes; it is not stored in `ReplState`, `ParsedGoal`, snapshots, history, or a
 cache, and later commands return to the startup-fixed contract unless they name
 their own file. Malformed option syntax is rejected rather than silently
 treated as a goal.
+
+The request value can travel through several scheduler lanes, but Main calls
+`assessLengthVerificationRequest` separately for each verified lane. That
+compatibility entrance introduces and closes one fresh nominal assessment
+context per call. The additive rank-2
+`withLengthAssessmentRequestContext`/`assessLengthVerificationContext` seam can
+reuse a filter bank across several batches when one caller deliberately keeps
+the callback-scoped context, but Main does not use that seam and no such owner
+is stored in command or REPL state.
 
 ### Scalar contract example
 
@@ -987,24 +1024,55 @@ fingerprints or bytes.
 For every eligible candidate, Leant keeps this source order:
 
 ```text
-four-entry newest-first MRU replay
+current newest-first counterexample-bank replay
   -> current applicable-domain traversal
   -> all-zero origin probe
   -> live query and query-first replay
   -> post-unsat explicit input-box traversal
 ```
 
+The first source has two deliberately separate implementations. Every
+established rank and direct Selection compatibility entrance constructs the
+literal raw four-vector batch-local MRU. Only the additive context-aware filter
+entrance receives a nominal scalar or product context and traverses its exact
+opaque samples. The eager runner
+opens its worker before either replay path; the deferred runner completes the
+bank/domain/origin prefix before opening. Unbudgeted, v1 usable-work, and
+scoped-v2 usable-work runners thread the same selected cursor without changing
+the remaining source order.
+
 An applicable-domain counterexample or establishment skips the later stages
 for that candidate. An inapplicable result or admission miss proceeds to the
 origin/live stages. Every counterexample source crosses the same optional
-componentwise-lexicographic simplification seam, and only the final vector
-enters the domain-local MRU bank.
+componentwise-lexicographic simplification seam. On the raw path only the final
+vector enters the four-vector MRU. On the context path an unsimplified bank hit
+promotes its exact retained sample without reevaluation; a simplified bank hit
+records the final receipt as simplification replay instead. Fresh live-model
+and solver-independent sources are recorded under their corresponding coarse
+origin, or under simplification replay when the final receipt is a strict
+reduction. Recording is a cache confirmation and does not replace the final
+receipt already retained by the candidate assessment.
 
-Under deferred opening the MRU/domain/origin prefix runs before process IO. An
-all-pure batch opens no worker. The first live miss opens exactly one lexical
-session, executes that candidate once without repeating its pure prefix, and
-processes the suffix in the same scope. A failure discards partial assessments
-and restores the admitted batch in original order.
+Under deferred opening the bank/domain/origin prefix runs before process IO.
+An all-pure batch opens no worker. The first live miss opens exactly one
+lexical session, executes that candidate once without repeating its pure
+prefix, and processes the suffix in the same scope. A ranking failure discards
+partial assessments and restores the admitted batch in original order, but it
+does not roll back context-bank transitions which already completed. A fatal
+simplification failure performs no promotion or recording for that candidate;
+if its acquisition was a context replay, the already completed replay charge
+and authoritative successor remain.
+
+Expected replay refusals and attempt-cap exhaustion are ordinary misses.
+Expected recording attempt or insertion unavailability likewise retains the
+authoritative successor and the candidate's existing assessment. Structural
+replay, stale promotion, or fail-closed record mismatch becomes the established
+indexed evidence-replay failure. Each context transition is serialized; it
+fully forces the successor state and forces the outer `Either` plus its selected
+failure or outcome constructor to weak head normal form before commit. If that
+preparation raises a synchronous or asynchronous exception,
+the old state is restored and the exception propagates. The surrounding
+ranking or solver loop is not masked by the bank cell.
 
 With both current preferences enabled, stable order is non-vacuous applicable-
 domain evidence, non-vacuous explicit-box evidence, neutral and vacuous
@@ -1107,7 +1175,7 @@ worker, and grants no evidence. Applying either budget builder again is last-
 wins across v1 and v2 while every non-budget policy component is retained. At
 each scalar or pair run, Leant admits the at-most-64 input outside the clock,
 captures a fresh v2 owner before preparation, and keeps complete preparation,
-the deferred MRU/applicable-domain/origin prefix, worker opening, and the live
+the deferred bank/applicable-domain/origin prefix, worker opening, and the live
 suffix beneath that one absolute deadline. It checkpoints initially, after
 forced preparation, after each complete bounded candidate chain, immediately
 before a pure miss can demand its first live session, after live candidates,
@@ -1166,13 +1234,18 @@ pairAssessment <- assessVerifiedLengthSpinePairCandidatesWithPolicy
   simplifiedPolicy pairContract verificationBatch
 ```
 
-Every independently replayed counterexample—whether found by the MRU bank,
+Every independently replayed counterexample—whether found by the active raw
+MRU or nominal context bank,
 applicable-domain traversal, origin probe, live observation, or post-`unsat`
 box—passes through one query-owned finalization seam.  Djex first revalidates
 the anchor, then searches the complete componentwise-dominated input box from
 zero in lexicographic order with the last input varying fastest.  A strict
-reduction becomes the ordinary final counterexample, and only its reduced
-inputs enter the four-entry MRU bank.  The ranked candidate retains separate
+reduction becomes the ordinary final counterexample. On the raw rank/direct-
+Selection compatibility path only its reduced inputs enter the four-entry MRU.
+On the context-aware filter path the final
+receipt is freshly recorded in the nominal bank with simplification origin;
+an unsimplified nominal replay hit is promoted without a second evaluation.
+The ranked candidate retains separate
 opaque simplification metadata through
 `rankedLengthCandidateCounterexampleSimplification` or the spine-pair sibling,
 so presentation can report the original inputs, final inputs, and exact number
@@ -1183,24 +1256,28 @@ Width or Cartesian-product refusal, or an anchor which is already the first
 violation, retains the original receipt and makes no simplification claim.  A
 bounded evaluation rejection during an optional earlier trial does the same;
 structural, anchor, internal, and association failures remain indexed atomic
-failures. This policy is disabled by the established direct runner and enabled
-by the current startup configuration. It is bounded componentwise-lexicographic
+failures. A fatal simplification failure does not promote or record that
+candidate, although an already completed context replay remains charged. This
+policy is disabled by the established direct runner and enabled by the current
+startup configuration. It is bounded componentwise-lexicographic
 simplification, not global minimality, pruning authority, or a new conclusion
 from Z3.
 
 ### Per-candidate execution order and stable ordering
 
-For each eligible product query, the exact execution order is the product
-batch's newest-first four-entry MRU input replay bank, the optional query-owned
-applicable-domain validation, the optional query-owned origin probe, a live
-pair query, query-first observation replay, and—only when that live observation
-has no counterexample and reports `unsat`—the optional exact input-box
-traversal. An applicable-domain counterexample or establishment skips the
-origin and live transaction for that candidate. An inapplicable result simply
+For each eligible product query, the exact execution order is its selected
+newest-first replay source, optional query-owned applicable-domain validation,
+optional query-owned origin probe, live pair query, query-first observation
+replay, and—only when that live observation has no counterexample and reports
+`unsat`—the optional exact input-box traversal. Ranking selects its established
+raw four-entry batch MRU; Integration's context-aware filtering selects its
+supplied nominal product-bank context. An applicable-domain counterexample or establishment skips the origin
+and live transaction for that candidate. An inapplicable result simply
 continues to the origin/live stages. In ranking mode, a freshly replayed and
 associated pair counterexample enters the stable demoted partition and can
-supply an MRU input vector. In filter mode, that same exact report is the only
-assessment which enters the rejected partition.
+supply a raw MRU input vector. In filter mode, that same exact report is the
+only assessment which enters the rejected partition and its completed cache
+transition remains independent of that later selection.
 When simplification is enabled, the finalized receipt and its final input
 vector take those same roles; acquisition order and live transaction order do
 not change.
@@ -1213,10 +1290,11 @@ before this per-candidate sequence, so either applicable-domain evidence arm
 avoids only a live transaction and ordinal. Under the current startup policy's
 deferred opening, the pure prefix runs before IO, so an all-pure batch opens no process at all.
 The first miss opens exactly one lexical session, executes that triggering
-candidate once without rerunning its MRU/domain/origin prefix, and processes the
+candidate once without rerunning its bank/domain/origin prefix, and processes the
 remaining suffix through the same session. A pure indexed failure before that
 point resets the whole admitted batch and opens nothing. A later indexed
-failure discards earlier pure or live assessments and simplification metadata;
+failure discards earlier pure or live assessments and simplification metadata
+from the report, but does not undo completed context transitions;
 session opener/finalizer failures keep the established safe index `Nothing`.
 Status-only
 `sat`, `unsat`, and `unknown` remain neutral heuristics. Any structured session
@@ -1228,12 +1306,13 @@ refusals stay local. None of those statuses or failures grants rejection
 authority; only the later explicit selection adapter may turn the final
 replayed `Counterexample` assessment into a rejection.
 
-The current startup route therefore fixes the source order as MRU → recursive
+The current startup route therefore fixes the source order as selected bank → recursive
 piecewise-affine applicable domain → origin → live replay → post-`unsat`
 explicit box. Every counterexample
 from any of those five sources crosses the same simplification seam before
 assessment. A strict receipt's final vector, never its original anchor, enters
-the domain-local MRU bank. Stable ordering is non-vacuous applicable-domain
+the raw rank/direct-Selection MRU or is recorded in the context-aware filter
+context under simplification origin. Stable ordering is non-vacuous applicable-domain
 receipts, then non-vacuous explicit-box receipts, then neutral assessments
 (including vacuous receipts), then counterexamples. Occurrence handles carry
 each receipt and optional simplification metadata through that ordering.
@@ -1248,7 +1327,7 @@ startup route is deferred: it opens at most one fresh session, only at the
 first live miss, and then consumes that session's
 single total query budget. Behavioral authority is not shared: product
 contracts, queries, live observations, replay receipts, failures, assessments,
-MRU state, and presentation remain product-specific and cannot be cast from
+raw MRU/context state, and presentation remain product-specific and cannot be cast from
 their scalar siblings. The existing/default scalar path, public scalar types,
 query bytes, neutral ranking behavior, and presentation are unchanged.
 

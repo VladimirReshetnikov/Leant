@@ -1569,8 +1569,10 @@ Lean for at most five successful groups. A filter request first bounds its
 input, then may verify and assess up to all 12 groups in a standalone lane, all
 24 in a combined lane, or all 6 in the cheaper excluded-middle classical
 route. That verified filter frontier enters one assessment batch, allowing its
-four-entry MRU input bank to replay an early counterexample against a later
-occurrence. Only after selection does Leant take at most five survivor
+fresh nominal scalar or product context bank to replay an early
+counterexample against a later occurrence. Existing ranking and direct
+Selection compatibility paths keep the raw four-vector MRU unchanged. Only
+after selection does Leant take at most five survivor
 presentations for display and binding; every rejection from the bounded batch
 is still printed.
 
@@ -1610,20 +1612,35 @@ replayed over every unique assignment and remains semantic authority. The
 former public aliases were deleted without migration because Leant is
 experimental and promises no stability or backward compatibility. This API
 reset does not alter the versionless file shapes or the seven numeric limits
-inside \code{applicableDomainValidation}. The MRU, domain, origin, deferred
+inside \code{applicableDomainValidation}. The selected-bank, domain, origin, deferred
 opening, live query, post-\code{unsat} input-box, scoped-budget, and stable
-preference boundaries remain unchanged. The four-vector MRU is local to one
-verified batch; a later candidate must independently replay a vector against
-its own checked problem, and the next batch starts empty.
+preference boundaries remain unchanged. Ranking and direct Selection
+compatibility entrances keep the four-vector MRU local to one verified batch.
 The vendored Djex revision separately exposes candidate-independent scalar and
 binary-product bank scopes, bounded immutable input stores, and exact
-query-owned fresh replay. Leant now has a package-private pure state adapter
-over that bridge: each nominal domain retains validated limits and at most one
-active scope, resets on exact scope drift, threads charged successors through
-newest-first replay, and separates a replay hit from evaluation-free
-promotion. No ranking, filtering, integration, command, or persistent-state
-path calls the adapter. It is therefore a dormant runtime foundation, not a
-command-local bank or a change to the active batch-local MRU.
+query-owned fresh replay. Leant's package-private adapter now includes nominal
+scalar/product contexts over that bridge: each retains validated limits and at
+most one active scope, resets on exact scope drift, threads authoritative
+charged successors through newest-first replay, and separates a replay hit
+from evaluation-free promotion. Context transitions are serialized in
+exception-restoring cells; the successor state is fully forced and the selected
+outer classification is forced to weak head normal form before commit, so an
+unexpected exception leaves the old state and propagates.
+
+Only the additive context-aware Configuration, Selection, and internal Ranking
+path uses those contexts, and Integration selects that path only for filtering.
+An unsimplified bank hit is promoted without reevaluation; a simplified hit is
+freshly recorded under simplification origin. Fresh live and solver-independent
+receipts retain their corresponding cache origins only without a strict
+reduction; every strict reduction records under simplification origin. The
+candidate keeps its pre-record final receipt. Completed cache transitions survive a later
+candidate-report fallback.
+
+Integration can introduce one reusable rank-2
+\code{LengthAssessmentContext}; repeated context assessments reuse its filter
+bank, while rank contexts contain no bank. Its compatibility request assessor
+creates a fresh context per call. Main still calls that wrapper once for each
+bounded lane and retains no context, so a later lane starts fresh.
 
 Filtering runs the same scalar or nominal pair assessor, maps every report
 back to its exact callback occurrence by the retained original index, and
@@ -1632,7 +1649,9 @@ to original callback order; filter mode does not inherit ranking order. Any
 batch-wide post-verification-adapter, ranking, evidence-association,
 admission-limit, or partition-seal failure preserves the complete original
 verified batch and exposes no partial rejection; the warning path still
-displays at most five original candidates. A
+displays at most five original candidates. That preserve-all result does not
+roll back bank replay, promotion, or recording transitions which already
+completed. A
 surviving bounded-positive receipt keeps its established note. A rejected
 occurrence keeps its exact counterexample or simplification note. If all
 verified occurrences are rejected, the result is handled: Leant prints the
@@ -1651,17 +1670,20 @@ warnings, binding and cache effects, rows, and handled-lane notes. Only the
 empty-verified-receipt disposition can continue to another provider or
 classical lane, so the refactor changes no scheduling or output behavior.
 
-Behavior mode, selection results, both kinds of replay-input store, and the
-lane outcomes are never persistent REPL state. This is not the proposal's full
-command-local CEGIS loop: no bank or candidate crosses a lane, and no public
-API, engine, verification module, or REPL state changed. The current reference
+Behavior mode, assessment contexts, selection results, both kinds of
+replay-input store, and the lane outcomes are never persistent REPL state. This
+is not the proposal's full command-local CEGIS loop: Main carries no context or
+candidate across a lane, and no engine, verification module, scheduler, or REPL
+state changed. The current reference
 is \code{docs/length-ranking.md}; the command-authority predecessor, current
 refill checkpoint, and private outcome seam are recorded in
 \code{docs/reports/2026-08-15-command-authorized-length-filtering.md} and
 \code{docs/reports/2026-08-15-lane-local-length-survivor-refill.md}, and
-\code{docs/reports/2026-08-16-explicit-synthesis-lane-outcomes.md}. The dormant
-nominal state foundation is recorded in
-\code{docs/reports/2026-08-16-nominal-length-counterexample-bank-state.md}.
+\code{docs/reports/2026-08-16-explicit-synthesis-lane-outcomes.md}. The
+historical nominal-state foundation is recorded in
+\code{docs/reports/2026-08-16-nominal-length-counterexample-bank-state.md}; its
+runtime successor is
+\code{docs/reports/2026-08-16-filter-only-length-counterexample-bank-context-runner.md}.
 Dated
 reports under \code{docs/reports/} are historical engineering records rather
 than current file contracts. When assessment is disabled, an ordinary or

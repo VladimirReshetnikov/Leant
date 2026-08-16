@@ -32,10 +32,16 @@ and does not continue into another lane; there is still no persistent or
 cross-lane CEGIS bank. Main now retains one private four-way lane disposition,
 with the complete bounded provider-dedup spelling frontier separate from the
 exact callback-attempt trace, but only the no-verified-receipt disposition can
-continue. Djex's vendored candidate-independent bank types remain an unused
-runtime foundation: Leant now has pure package-private scalar/product state
-over Djex's fresh replay bridge, but no Ranking, Selection, Integration, Main,
-command-lifetime, persistence, or cross-lane caller uses it.
+continue. Djex's vendored candidate-independent bank types are no longer
+merely an unused runtime foundation: Leant's additive context-aware filter path now
+threads package-private nominal scalar/product banks through Configuration,
+Selection, and internal Ranking. Established rank and direct Selection
+compatibility paths keep their raw four-vector MRU. Integration can introduce one
+rank-2 reusable filter context, but its compatibility assessor creates a fresh
+context per call and Main still calls that entrance separately for each lane.
+There is therefore no Main-owned cross-lane or full-command bank, `ReplState`
+field, serialization, snapshot restoration, or persistence. Preserve-all
+candidate fallback does not roll back already completed cache transitions.
 The [README](../../README.md) and
 [Length ranking reference](../length-ranking.md) describe the current tree.
 
@@ -109,6 +115,7 @@ Reports are listed oldest first.
 - 2026-08-15 — [Lane-local bounded Length survivor refill](2026-08-15-lane-local-length-survivor-refill.md)
 - 2026-08-16 — [Explicit synthesis-lane outcomes](2026-08-16-explicit-synthesis-lane-outcomes.md)
 - 2026-08-16 — [Package-private nominal Length counterexample-bank state](2026-08-16-nominal-length-counterexample-bank-state.md)
+- 2026-08-16 — [Filter-only nominal Length counterexample-bank context runner](2026-08-16-filter-only-length-counterexample-bank-context-runner.md)
 
 ## Standalone PDF reports
 
