@@ -541,6 +541,10 @@ detailedCandidateVariantExactTypedOrigin
 detailedCandidateVariantExactTypedOrigin
     (DetailedCandidateVariant _ _ exactOrigin) = exactOrigin
 
+-- | The exact typed origin whose recorded spelling is still this variant's
+-- accepted text.  A retained origin whose recorded text differs from the
+-- accepted spelling is answered with 'Nothing', so a caller never associates
+-- semantics with a different term.
 detailedVerificationVariantExactTypedOrigin
   :: DetailedVerificationVariant
   -> Maybe ExactTypedVariantOrigin
@@ -550,6 +554,9 @@ detailedVerificationVariantExactTypedOrigin
     | exactTypedVariantOriginText retained == text -> Just retained
   _ -> Nothing
 
+-- | Zero-based ordinal of the origin's spelling within the Exference
+-- renderer's alternative list, recorded before verification.  Handoffs use
+-- it to select the same alternative when the exact renderer is re-run.
 exactTypedVariantOriginOrdinal :: ExactTypedVariantOrigin -> Natural
 exactTypedVariantOriginOrdinal
     (ExactTypedVariantOrigin ordinal _ _) = ordinal
@@ -557,6 +564,9 @@ exactTypedVariantOriginOrdinal
 exactTypedVariantOriginText :: ExactTypedVariantOrigin -> String
 exactTypedVariantOriginText (ExactTypedVariantOrigin _ text _) = text
 
+-- | The checked Exference candidate and run authority retained by the
+-- origin.  This is the sidecar of the Exference candidate which produced the
+-- spelling, even when a Djinn group displayed the same text first.
 exactTypedVariantOriginSidecar
   :: ExactTypedVariantOrigin
   -> TypedCandidateSemanticSidecar
@@ -713,6 +723,9 @@ renderCandidateByAvailability
 data SynthEngine = EngineDjinn | EngineExference | EngineBoth
   deriving (Eq, Show)
 
+-- | Parse the user-facing engine name accepted by @:set synth-engine@:
+-- exactly @djinn@, @exference@, or @both@ (case-sensitive, untrimmed);
+-- anything else is 'Nothing'.  Inverse of 'synthEngineName'.
 parseSynthEngine :: String -> Maybe SynthEngine
 parseSynthEngine value = case value of
   "djinn" -> Just EngineDjinn
@@ -720,6 +733,8 @@ parseSynthEngine value = case value of
   "both" -> Just EngineBoth
   _ -> Nothing
 
+-- | The user-facing engine name shown by @:set synth-engine@ with no
+-- argument; 'parseSynthEngine' accepts exactly these spellings.
 synthEngineName :: SynthEngine -> String
 synthEngineName engine = case engine of
   EngineDjinn -> "djinn"

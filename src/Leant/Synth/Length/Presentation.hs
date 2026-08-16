@@ -125,11 +125,17 @@ data LengthCandidatePresentation = LengthCandidatePresentation
   String
   (Maybe String)
 
+-- | The exact verified Lean spelling of the candidate to display; the same
+-- text that was passed to the backend verifier.
 lengthCandidatePresentationText
   :: LengthCandidatePresentation
   -> String
 lengthCandidatePresentationText (LengthCandidatePresentation text _) = text
 
+-- | The rendered Length note for this candidate, if its ranked assessment
+-- produced one (counterexample, simplification, bounded-positive, or
+-- applicable-domain claim).  Heuristic, unassessed, and unranked candidates
+-- have none.
 lengthCandidatePresentationNote
   :: LengthCandidatePresentation
   -> Maybe String

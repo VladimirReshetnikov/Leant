@@ -139,6 +139,9 @@ data LengthAssessmentRequest
       !LengthRankingPolicy
       LeanLengthContractSelection
 
+-- | The mode Main uses when no Length configuration file was named.  It
+-- holds no policy or contract, so assessment preserves callback order
+-- without IO and an explicit contract request is refused.
 disabledLengthAssessmentMode :: LengthAssessmentMode
 disabledLengthAssessmentMode = LengthAssessmentDisabled
 
@@ -274,6 +277,10 @@ assessLengthVerificationRequest request verification = case request of
         assessVerifiedLengthSpinePairCandidatesWithPolicy
           policy contract verification
 
+-- | The verified receipts to present, in final order: the untouched callback
+-- order for a skipped or rejected assessment, or the sealed post-assessment
+-- order for an accepted scalar or spine-pair ranking.  The skipped branch
+-- performs no traversal or IO.
 lengthAssessmentCandidates
   :: LengthAssessmentResult
   -> [Verified DetailedVerificationVariant]
@@ -310,6 +317,9 @@ lengthAssessmentSpinePairRanking result = case result of
   LengthAssessmentSpinePairCompleted assessed ->
     lengthSpinePairPostVerificationRanking assessed
 
+-- | The underlying scalar-domain adapter result, present exactly when the
+-- assessment ran under a scalar contract; disabled and spine-pair
+-- assessments have none.
 lengthAssessmentPostVerificationResult
   :: LengthAssessmentResult
   -> Maybe LengthPostVerificationResult
@@ -318,6 +328,9 @@ lengthAssessmentPostVerificationResult result = case result of
   LengthAssessmentCompleted assessed -> Just assessed
   LengthAssessmentSpinePairCompleted _ -> Nothing
 
+-- | The underlying binary-product adapter result, present exactly when the
+-- assessment ran under a spine-pair contract; disabled and scalar
+-- assessments have none.
 lengthAssessmentSpinePairPostVerificationResult
   :: LengthAssessmentResult
   -> Maybe LengthSpinePairPostVerificationResult
@@ -326,6 +339,10 @@ lengthAssessmentSpinePairPostVerificationResult result = case result of
   LengthAssessmentCompleted _ -> Nothing
   LengthAssessmentSpinePairCompleted assessed -> Just assessed
 
+-- | The batch-wide reason a configured assessment kept callback order, if
+-- any.  An adapter rejection takes precedence over a ranking failure; a
+-- skipped (disabled) assessment reports nothing.  Main prints this as a
+-- warning beside the candidates.
 lengthAssessmentFailure
   :: LengthAssessmentResult
   -> Maybe LengthAssessmentFailure

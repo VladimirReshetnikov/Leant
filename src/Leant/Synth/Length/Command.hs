@@ -13,17 +13,30 @@ module Leant.Synth.Length.Command
 import Data.Char (isSpace)
 import Data.List (stripPrefix)
 
+-- | One parsed @:synth@ argument line: the optional request-scoped Length
+-- contract path and the remaining goal text.  Both parts are already
+-- trimmed of surrounding whitespace.
 data LengthSynthCommand = LengthSynthCommand
   { lengthSynthCommandContractPath :: Maybe FilePath
+    -- ^ present exactly when the line began with @--length-contract@
   , lengthSynthCommandGoal :: String
+    -- ^ opaque Lean goal text; never inspected by this module
   }
   deriving (Eq, Show)
 
+-- | Why a line beginning with @--length-contract@ was refused.  A line
+-- without the option never fails.
 data LengthSynthCommandError
   = LengthSynthCommandContractPathMissing
+    -- ^ the @--@ delimiter was found but no path text preceded it
   | LengthSynthCommandDelimiterMissing
+    -- ^ no standalone @--@ delimiter followed the option
   deriving (Bounded, Enum, Eq, Ord, Show)
 
+-- | Split one @:synth@ argument line.  When the trimmed line starts with
+-- @--length-contract@ followed by whitespace or end of input, the text up to
+-- the first standalone @--@ token is the contract path and the rest is the
+-- goal; otherwise the whole trimmed line is the goal and no path is present.
 parseLengthSynthCommand
   :: String
   -> Either LengthSynthCommandError LengthSynthCommand

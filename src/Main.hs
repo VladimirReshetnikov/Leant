@@ -4314,6 +4314,10 @@ mkSettings st = Settings
 trim :: String -> String
 trim = dropWhile isSpace . reverse . dropWhile isSpace . reverse
 
+-- | Entry point: set UTF-8 handles, parse the command line, and hand the
+-- options to 'run', which loads the optional Length ranking mode, locates and
+-- probes the Lean REPL backend, and drives the interactive loop until exit.
+-- A command-line parse failure prints the message and exits with status 2.
 main :: IO ()
 main = do
   hSetEncoding stdin utf8

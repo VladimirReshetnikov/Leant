@@ -104,6 +104,9 @@ data ExactContextArgument
   | ExactContextNominalArgument Int String [Frag]
   deriving (Eq, Show)
 
+-- | The retained kind arity of one exact context argument: the number of
+-- type arguments the payload still expects.  Zero marks a proper-type
+-- payload; for a nominal head it counts the arguments not yet supplied.
 exactContextArgumentKindArity :: ExactContextArgument -> Int
 exactContextArgumentKindArity argument = case argument of
   ExactContextFragmentArgument arity _ -> arity
@@ -117,6 +120,10 @@ exactContextArgumentPayloadFragments argument = case argument of
   ExactContextFragmentArgument _ frag -> [frag]
   ExactContextNominalArgument _ _ supplied -> supplied
 
+-- | Apply a fragment rewrite to every fragment payload of an exact context
+-- argument (the whole fragment of a proper-kind argument, or each supplied
+-- argument of a nominal head), keeping the arity and nominal head unchanged.
+-- Recursive fragment traversals use this to descend through 'FExactContext'.
 mapExactContextArgumentFragments
   :: (Frag -> Frag)
   -> ExactContextArgument
@@ -202,13 +209,21 @@ data Slot
   | SlotInst            -- ^ an erased instance binder that Lean must still bind
   deriving (Eq, Show)
 
+-- | Whether the serialized goal is a proposition ('GoalProp', Lean's
+-- @Meta.isProp@ held) or a type ('GoalType').  Main uses it to phrase a
+-- refutation as constructive rather than as a disproof.
 data GoalSort = GoalProp | GoalType
   deriving (Eq, Show)
 
+-- | The serializer's @(goal SORT QUERY FRAG PREMS)@ message decoded into its
+-- parts: sort, provider query, the goal's fragment, and offered premises.
 data ParsedGoal = ParsedGoal
   { pgSort :: GoalSort
+    -- ^ proposition or type, as reported by the serializer
   , pgProviderQuery :: ProviderQuery
+    -- ^ constant roots and result head used for provider discovery
   , pgFrag :: Frag
+    -- ^ the goal lowered to the synthesis fragment
   , pgPrems :: [(String, Frag)]
     -- ^ library premises the serializer offered (phase-3 vanguard):
     -- curated functions over the goal's recursive inductives,
@@ -229,6 +244,12 @@ data ProviderForallDomain
   | ProviderForallDomainSort
   deriving (Eq, Show)
 
+-- | One argument of an exact provider instantiation assignment, in the
+-- provider's leading 'FAll' order.  The kind arity is the number of type
+-- arguments the payload still expects: zero for a proper type, and for a
+-- nominal head the count of not-yet-supplied arguments.  The constructor
+-- records which wire form supplied the payload: a plain or @kinded@ fragment,
+-- an exact fragment with forall-domain tags, or a kinded nominal head.
 data ProviderInstantiationArgument
   = ProviderInstantiationArgument
       { providerInstantiationArgumentKindArity :: Int
