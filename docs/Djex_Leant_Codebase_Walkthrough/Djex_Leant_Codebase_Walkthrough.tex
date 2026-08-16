@@ -85,7 +85,7 @@
 \newcommand{\RepoDjex}{\href{https://github.com/VladimirReshetnikov/Djex}{Djex}}
 \newcommand{\RepoLeant}{\href{https://github.com/VladimirReshetnikov/Leant}{Leant}}
 \def\DjexBase{https://github.com/VladimirReshetnikov/Djex/blob/f957549e36a63cd6003f5edef4ab8a867221813f/}
-\def\LeantBase{https://github.com/VladimirReshetnikov/Leant/blob/feb234ff770faf2e42106a01f6473c48410f1152/}
+\def\LeantBase{https://github.com/VladimirReshetnikov/Leant/blob/a9b917f5689ed71a8bf1d3aed038af8e34602a9e/}
 \newcommand{\dpath}[1]{\href{\DjexBase#1}{\nolinkurl{#1}}}
 \newcommand{\lpath}[1]{\href{\LeantBase#1}{\nolinkurl{#1}}}
 \newcommand{\dsym}[2]{\code{#2} in \dpath{#1}}
@@ -183,7 +183,7 @@ and practical extension paths\par}
 \small
 \begin{tabularx}{\textwidth}{@{}L{0.18\textwidth}Y@{}}
 \textbf{Djex snapshot} & \commitid{f957549e36a63cd6003f5edef4ab8a867221813f} \\
-\textbf{Leant snapshot} & \commitid{feb234ff770faf2e42106a01f6473c48410f1152} \\
+\textbf{Leant snapshot} & \commitid{a9b917f5689ed71a8bf1d3aed038af8e34602a9e} \\
 \textbf{Relationship} & Leant's \filepath{lib/Djex} submodule is pinned to the same Djex revision. \\
 \textbf{Prepared} & August 16, 2026 \\
 \end{tabularx}
@@ -2612,6 +2612,7 @@ The largest change surfaces are:
 
 The right response is not to avoid these files but to enter them through a checklist. Appendix~\ref{app:change-recipes} provides one.
 
+\Needspace{7\baselineskip}
 \begin{summarybox}
 Leant's architecture is a sequence of explicit semantic boundaries wrapped in a large interactive orchestrator. The pure modules are already shaped like compiler passes. Maintaining correctness means preserving their metadata contracts and keeping process-local identities out of durable state.
 \end{summarybox}
@@ -3226,7 +3227,7 @@ Use state-transition boundaries rather than arbitrary line ranges.
 
 \begin{itemize}
   \item Djex pinned tree: \href{https://github.com/VladimirReshetnikov/Djex/tree/f957549e36a63cd6003f5edef4ab8a867221813f}{\nolinkurl{github.com/VladimirReshetnikov/Djex/tree/f957549...}}
-  \item Leant pinned tree: \href{https://github.com/VladimirReshetnikov/Leant/tree/feb234ff770faf2e42106a01f6473c48410f1152}{\nolinkurl{github.com/VladimirReshetnikov/Leant/tree/feb234f...}}
+  \item Leant pinned tree: \href{https://github.com/VladimirReshetnikov/Leant/tree/a9b917f5689ed71a8bf1d3aed038af8e34602a9e}{\nolinkurl{github.com/VladimirReshetnikov/Leant/tree/a9b917f...}}
   \item Leant's submodule declaration: \lpath{.gitmodules}
   \item Leant's multi-package build: \lpath{cabal.project}
 \end{itemize}
