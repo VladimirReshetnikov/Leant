@@ -39,6 +39,8 @@ Executable leant
     Leant.Options
     Leant.Session.Replay
     Leant.Session.Snapshot
+    Leant.Synth.BehavioralSelection
+    Leant.Synth.BehavioralSelection.Internal
     Leant.Synth.Engine
     Leant.Synth.Fragment
     Leant.Synth.Length.Adapter
@@ -97,6 +99,8 @@ Test-Suite leant-synth-tests
   Other-Modules:
     Leant.Backend
     Leant.Options
+    Leant.Synth.BehavioralSelection
+    Leant.Synth.BehavioralSelection.Internal
     Leant.Synth.Engine
     Leant.Synth.Fragment
     Leant.Synth.Length.Adapter
