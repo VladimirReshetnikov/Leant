@@ -6070,7 +6070,14 @@ assertCounterexampleBankRunnerArchitecture = do
     , ("product Ranking facade", publicPairRanking)
     , ("scalar Selection facade", publicScalarSelection)
     , ("product Selection facade", publicPairSelection)
-    , ("Main/ReplState", mainSource)
+    ]
+  assertBool "Main exposed the low-level counterexample-bank context"
+    $ not $ "CounterexampleBankContext" `isInfixOf` mainSource
+  mapM_ (\name -> assertBool
+      ("Main lost its sealed Integration context seam: " ++ name)
+      $ name `isInfixOf` mainSource)
+    [ "withLengthAssessmentRequestContext"
+    , "assessLengthVerificationContext"
     ]
 
 lengthCounterexampleBankRunnerBasePolicy
@@ -11381,14 +11388,23 @@ lengthAssessmentIntegrationTests = testGroup
       "refill through five rejections to seven ordered survivors in one batch"
       assertLengthAssessmentFilterSurvivorRefill
   , testCase
-      "separate bounded lane verification from outcome finalization"
+      "scope one assessment context across the complete synthesis command"
+      assertLengthAssessmentMainCommandContext
+  , testCase
+      "separate bounded lane verification from command accumulation"
       assertLengthAssessmentMainLaneSeam
   , testCase
-      "finalize every terminal lane without weakening splice ownership"
+      "fold continuing lane outcomes in chronological attempt order"
+      assertLengthAssessmentMainLaneAccumulation
+  , testCase
+      "finalize one chronological command accumulation exactly once"
       assertLengthAssessmentMainLaneFinalization
   , testCase
-      "continue providers and classical retries only after no verification"
+      "continue providers and classical retries after every nonterminal lane"
       assertLengthAssessmentMainLaneScheduling
+  , testCase
+      "gate normal diagnostics after aggregate behavioral handling"
+      assertLengthAssessmentMainDiagnosticGates
   , testCase
       "authorize command-local filtering before contract path IO"
       assertLengthAssessmentMainCommandAdmission
@@ -11875,17 +11891,116 @@ assertMainSourceContains boundary section fragment =
   assertBool ("Main " ++ boundary ++ " omitted " ++ show fragment)
     $ fragment `isInfixOf` unwords (words $ unlines section)
 
+assertLengthAssessmentMainCommandContext :: IO ()
+assertLengthAssessmentMainCommandContext = do
+  sourceLines <- lines <$> readFile "src/Main.hs"
+  let sourceText = unlines sourceLines
+      importSection = mainSourceSection
+        "import Leant.Synth.Length.Integration"
+        "import Leant.Synth.Length.Command" sourceLines
+      stateSection = mainSourceSection
+        "data ReplState = ReplState"
+        "-- | Backend-local identifiers" sourceLines
+      commandSection = mainSourceSection
+        "cmdSynth :: St -> String -> IO ()"
+        "-- | Select one command-local assessment authority" sourceLines
+      runSection = mainSourceSection
+        "synthRun :: LengthAssessmentRequest"
+        "-- | Run the serializer on one goal" sourceLines
+      retrySection = mainSourceSection
+        "synthUniverseRetry assessmentContext st args goal originalErrors = do"
+        "-- | Whether an error text names this marker universe" sourceLines
+      goSection = mainSourceSection
+        "synthGo assessmentContext st args retriedVars goal parsed = do"
+        "synthGo' assessmentContext st args retriedVars goal parsed = do"
+        sourceLines
+      schedulerSection = mainSourceSection
+        "synthGo' assessmentContext st args retriedVars goal parsed = do"
+        "loadSynthProviders ::" sourceLines
+      classicalSection = mainSourceSection
+        "synthClassical assessmentContext st goal parsed accumulation ="
+        "verifySynthLane assessmentContext groupLimit st goal notes groups ="
+        sourceLines
+  mapM_ (assertMainSourceContains "Length Integration import" importSection)
+    [ "LengthAssessmentContext"
+    , "assessLengthVerificationContext"
+    , "lengthAssessmentContextBehaviorMode"
+    , "withLengthAssessmentRequestContext"
+    ]
+  mapM_ (\fragment -> assertBool
+      ("Main retained the request-only Integration surface " ++ show fragment)
+      $ not $ fragment `isInfixOf` sourceText)
+    [ "assessLengthVerificationRequest"
+    , "lengthAssessmentRequestBehaviorMode"
+    ]
+  assertMainSourceContains "rank-2 command context" sourceLines
+    "{-# LANGUAGE RankNTypes #-}"
+  length (mainSourcePositions
+      "withLengthAssessmentRequestContext assessmentRequest" sourceLines)
+    @?= 1
+  length (mainSourcePositions
+      ":: LengthAssessmentContext command" sourceLines)
+    @?= 5
+
+  assertMainSourceContains "command entrance" commandSection
+    "synthRun assessmentRequest st args goal"
+  assertBool "cmdSynth created a second assessment context"
+    $ not ("withLengthAssessmentRequestContext" `isInfixOf`
+      unlines commandSection)
+  contextOpen <- expectMainSourcePosition "synthRun context"
+    "withLengthAssessmentRequestContext assessmentRequest"
+      runSection
+  translation <- expectMainSourcePosition "synthRun context"
+    "outcome <- translateGoal st goal" runSection
+  direct <- expectMainSourcePosition "synthRun context"
+    "synthGo assessmentContext st args Nothing goal parsed" runSection
+  retry <- expectMainSourcePosition "synthRun context"
+    "synthUniverseRetry assessmentContext st args goal errors" runSection
+  assertBool "the command context did not enclose translation and both exits"
+    $ contextOpen < translation && translation < direct && translation < retry
+
+  retryTranslation <- expectMainSourcePosition "universe retry context"
+    "outcome <- translateGoal st wrapped" retrySection
+  retryScheduler <- expectMainSourcePosition "universe retry context"
+    "synthGo assessmentContext st args (Just wrapVars) wrapped parsed"
+      retrySection
+  assertBool "the universe retry replaced its command context"
+    $ retryTranslation < retryScheduler
+  assertMainSourceContains "synthGo context forwarding" goSection
+    "synthGo' assessmentContext st args retriedVars goal parsed"
+  mapM_ (assertMainSourceContains "constructive context" schedulerSection)
+    [ "verifySynthLane assessmentContext groupLimit st goal notes groups"
+    , "synthClassical assessmentContext st goal parsed accumulation"
+    ]
+  length (mainSourcePositions
+      "verifySynthLane assessmentContext" classicalSection) @?= 2
+  mapM_ (assertMainSourceContains "classical context" classicalSection)
+    [ "emOutcome <- verifySynthLane assessmentContext"
+    , "nnOutcome <- verifySynthLane assessmentContext groupLimit st goal []"
+    ]
+
+  assertMainSourceContains "ReplState Length configuration" stateSection
+    "rsLengthAssessmentMode :: LengthAssessmentMode"
+  mapM_ (\fragment -> assertBool
+      ("Main persisted command-local synthesis state in ReplState: "
+        ++ fragment)
+      $ not $ fragment `isInfixOf` unlines stateSection)
+    [ "LengthAssessmentContext"
+    , "SynthLaneAccumulation"
+    , "CounterexampleBankContext"
+    ]
+
 assertLengthAssessmentMainLaneSeam :: IO ()
 assertLengthAssessmentMainLaneSeam = do
   sourceLines <- lines <$> readFile "src/Main.hs"
   let declarationSection = mainSourceSection
         "data SynthLaneOutcome =" "-- Output (" sourceLines
       verificationSection = mainSourceSection
-        "verifySynthLane assessmentRequest groupLimit st goal notes groups ="
+        "verifySynthLane assessmentContext groupLimit st goal notes groups ="
         "synthLaneDisposition ::" sourceLines
       dispositionSection = mainSourceSection
         "synthLaneDisposition outcome ="
-        "finalizeSynthLaneOutcome" sourceLines
+        "synthLaneAccumulationDisposition" sourceLines
       callbackSection = mainSourceSection
         "synthVerify successQuota st goal groups ="
         "completionCandidates ::" sourceLines
@@ -11911,7 +12026,7 @@ assertLengthAssessmentMainLaneSeam = do
   boundedPrefix <- expectMainSourcePosition "lane verifier"
     "case take groupLimit groups of" verificationSection
   projectedMode <- expectMainSourcePosition "lane verifier"
-    "lengthAssessmentRequestBehaviorMode assessmentRequest"
+    "lengthAssessmentContextBehaviorMode assessmentContext"
       verificationSection
   rankQuota <- expectMainSourcePosition "lane verifier"
     "LengthBehaviorRank -> synthMaxShown" verificationSection
@@ -11921,7 +12036,7 @@ assertLengthAssessmentMainLaneSeam = do
     "(verification, callbackAttempts) <- synthVerify successQuota st goal"
       verificationSection
   assessment <- expectMainSourcePosition "lane verifier"
-    "assessLengthVerificationRequest assessmentRequest verification"
+    "assessLengthVerificationContext assessmentContext verification"
       verificationSection
   assertBool "Main projected behavior mode before bounding the lane"
     $ boundedPrefix < projectedMode
@@ -11950,6 +12065,8 @@ assertLengthAssessmentMainLaneSeam = do
     , "reportLengthAssessmentRejections"
     , "reportSynthLaneNotes"
     , "finalizeSynthLaneOutcome"
+    , "finalizeSynthLaneAccumulation"
+    , "accumulateSynthLaneOutcome"
     ]
 
   mapM_ (assertMainSourceContains "callback trace" callbackSection)
@@ -11964,7 +12081,7 @@ assertLengthAssessmentMainLaneSeam = do
     "modifyIORef' reverseAttempts (variant :)" callbackSection
   backendAttempt <- expectMainSourcePosition "callback trace"
     "result <- runCurrentCmd st" callbackSection
-  assertBool "Main recorded a callback only after attempting the backend"
+  assertBool "Main moved the callback trace after the backend attempt"
     $ traceAppend < backendAttempt
   assertBool "Main substituted the full checked frontier for callback attempts"
     $ not ("concatMap detailedCandidateGroupVariants"
@@ -12000,17 +12117,91 @@ assertLengthAssessmentMainLaneSeam = do
   synthVerificationWindow EngineBoth @?= 24
   synthMaxTried `div` 2 @?= 6
 
+assertLengthAssessmentMainLaneAccumulation :: IO ()
+assertLengthAssessmentMainLaneAccumulation = do
+  sourceLines <- lines <$> readFile "src/Main.hs"
+  let declarationSection = mainSourceSection
+        "newtype SynthLaneAccumulation ="
+        "-- | Pure scheduling meaning of a lane" sourceLines
+      foldSection = mainSourceSection
+        "synthLaneAccumulationDisposition"
+        "-- | Finalize one command's already verified/assessed lanes"
+        sourceLines
+      declarationText = unlines declarationSection
+      foldText = unlines foldSection
+  mapM_ (assertMainSourceContains "lane accumulation declaration"
+      declarationSection)
+    [ "newtype SynthLaneAccumulation = SynthLaneAccumulation [SynthLaneOutcome]"
+    , "emptySynthLaneAccumulation :: SynthLaneAccumulation"
+    , "emptySynthLaneAccumulation = SynthLaneAccumulation []"
+    , "accumulateSynthLaneOutcome :: SynthLaneOutcome -> SynthLaneAccumulation -> SynthLaneAccumulation"
+    , "accumulateSynthLaneOutcome outcome (SynthLaneAccumulation reverseOutcomes) = SynthLaneAccumulation (outcome : reverseOutcomes)"
+    ]
+  assertBool "Main made the reverse lane accumulation strict"
+    $ not ("!" `isInfixOf` declarationText)
+  assertBool "Main replaced the positional private accumulation with a record"
+    $ not ("{" `isInfixOf` declarationText)
+  mapM_ (\fragment -> assertBool
+      ("Main derived a frozen accumulation instance: " ++ fragment)
+      $ not $ fragment `isInfixOf` declarationText)
+    [ "deriving"
+    , "Eq"
+    , "Show"
+    ]
+
+  chronologicalFold <- expectMainSourcePosition "lane accumulation fold"
+    "foldl accumulateDisposition SynthLaneNoVerified" foldSection
+  chronologicalInput <- expectMainSourcePosition "lane accumulation fold"
+    "map synthLaneDisposition $ reverse reverseOutcomes" foldSection
+  assertBool "Main stopped folding the reverse history chronologically"
+    $ chronologicalFold < chronologicalInput
+  mapM_ (assertMainSourceContains "lane accumulation fold" foldSection)
+    [ "accumulateDisposition accumulated disposition = case accumulated of"
+    , "SynthLaneSurvivors _ _ -> accumulated"
+    , "SynthLaneAssessmentPreserved _ _ -> accumulated"
+    , "SynthLaneNoVerified -> accumulated"
+    , "SynthLaneAllBehaviorallyRejected rejections -> appendRejections accumulated rejections"
+    , "SynthLaneSurvivors presentations rejections -> SynthLaneSurvivors presentations (dispositionRejections accumulated ++ rejections)"
+    , "SynthLaneAssessmentPreserved presentations rejections -> SynthLaneAssessmentPreserved presentations (dispositionRejections accumulated ++ rejections)"
+    , "SynthLaneNoVerified -> SynthLaneAllBehaviorallyRejected rejections"
+    , "SynthLaneAllBehaviorallyRejected prior -> SynthLaneAllBehaviorallyRejected (prior ++ rejections)"
+    , "SynthLaneNoVerified -> []"
+    ]
+  survivorGuard <- expectMainSourcePosition "lane accumulation fold"
+    "SynthLaneSurvivors _ _ -> accumulated" foldSection
+  preservedGuard <- expectMainSourcePosition "lane accumulation fold"
+    "SynthLaneAssessmentPreserved _ _ -> accumulated" foldSection
+  newLane <- expectMainSourcePosition "lane accumulation fold"
+    "_ -> case disposition of" foldSection
+  assertBool "the accumulated-terminal guard no longer precedes the new lane"
+    $ survivorGuard < newLane && preservedGuard < newLane
+  length (mainSourcePositions
+      "SynthLaneSurvivors _ _ -> accumulated" foldSection) @?= 2
+  length (mainSourcePositions
+      "SynthLaneAssessmentPreserved _ _ -> accumulated" foldSection) @?= 2
+  mapM_ (\fragment -> assertBool
+      ("pure lane accumulation retained effect " ++ show fragment)
+      $ not $ fragment `isInfixOf` foldText)
+    [ "emitLn st"
+    , "synthBind st"
+    , "modifyIORef'"
+    , "finalizeSynthLaneAccumulation"
+    , "reportLengthAssessmentRejections"
+    , "reportSynthLaneNotes"
+    ]
+
 assertLengthAssessmentMainLaneFinalization :: IO ()
 assertLengthAssessmentMainLaneFinalization = do
   sourceLines <- lines <$> readFile "src/Main.hs"
-  let verificationSection = mainSourceSection
-        "verifySynthLane assessmentRequest groupLimit st goal notes groups ="
+  let sourceText = unlines sourceLines
+      verificationSection = mainSourceSection
+        "verifySynthLane assessmentContext groupLimit st goal notes groups ="
         "synthLaneDisposition ::" sourceLines
       dispositionSection = mainSourceSection
         "synthLaneDisposition outcome ="
-        "finalizeSynthLaneOutcome" sourceLines
+        "synthLaneAccumulationDisposition" sourceLines
       finalizerSection = mainSourceSection
-        "finalizeSynthLaneOutcome st args goal outcome = do"
+        "accumulation@(SynthLaneAccumulation reverseOutcomes) = do"
         "finalizeSynthLanePresentations st args goal presentations rejections = do"
         sourceLines
       presentationSection = mainSourceSection
@@ -12029,16 +12220,30 @@ assertLengthAssessmentMainLaneFinalization = do
       finalizerText = unlines finalizerSection
       presentationText = unlines presentationSection
   mapM_ (assertMainSourceContains "lane finalizer" finalizerSection)
-    [ "leantObservationCodeEntries $ synthLaneOutcomeObservations outcome"
+    [ "let outcomes = reverse reverseOutcomes"
+    , "dispositions = map synthLaneDisposition outcomes"
+    , "effectiveLanes = throughFirstTerminal $ zip outcomes dispositions"
+    , "forM_ outcomes $ \\outcome -> forM_ (leantObservationCodeEntries $ synthLaneOutcomeObservations outcome)"
+    , "forM_ (map fst effectiveLanes) $ \\outcome -> case synthLaneAssessed outcome of"
     , "lengthAssessmentFailure $ assessedSynthLaneLengthAssessment assessed"
-    , "let disposition = synthLaneDisposition outcome"
+    , "let disposition = synthLaneAccumulationDisposition accumulation"
     , "SynthLaneNoVerified -> pure ()"
     , "SynthLaneSurvivors presentations rejections -> finalizeSynthLanePresentations st args goal presentations rejections"
     , "SynthLaneAllBehaviorallyRejected rejections -> do"
     , "rsSynthIts = [], rsSynthItsProve = False"
     , "SynthLaneAssessmentPreserved presentations rejections -> finalizeSynthLanePresentations st args goal presentations rejections"
+    , "forM_ effectiveLanes $ \\(outcome, laneDisposition) -> case laneDisposition of"
     , "SynthLaneNoVerified -> pure () SynthLaneSurvivors _ _ -> reportSynthLaneNotes st (synthLaneOutcomeNotes outcome)"
+    , "throughFirstTerminal lanes = case lanes of"
+    , "SynthLaneSurvivors _ _ -> []"
+    , "SynthLaneAssessmentPreserved _ _ -> []"
+    , "SynthLaneNoVerified -> throughFirstTerminal remaining"
+    , "SynthLaneAllBehaviorallyRejected _ -> throughFirstTerminal remaining"
     ]
+  assertBool "the singular eager lane finalizer survived"
+    $ not ("finalizeSynthLaneOutcome" `isInfixOf` sourceText)
+  assertBool "the command finalizer collapsed per-lane forensic metrics"
+    $ not ("mconcat" `isInfixOf` finalizerText)
   assertBool "NoVerified cleared or replaced stale synthesis splices"
     $ not ("rsSynthIts" `isInfixOf` unlines noVerifiedBranch)
   mapM_ (assertMainSourceContains "all-rejected finalizer"
@@ -12080,19 +12285,30 @@ assertLengthAssessmentMainLaneFinalization = do
   assertBool "survivor finalization projected text from rejection rows"
     $ not ("lengthCandidateRejectionPresentationText"
       `isInfixOf` presentationText)
+  length (mainSourcePositions
+      "counters <- mapM (synthBind st goal)" presentationSection) @?= 1
+  length (mainSourcePositions
+      "modifyIORef' st" presentationSection) @?= 1
 
-  warning <- expectMainSourcePosition "lane finalizer"
-    "lengthAssessmentFailure" finalizerSection
+  chronology <- expectMainSourcePosition "lane finalizer"
+    "let outcomes = reverse reverseOutcomes" finalizerSection
+  metrics <- expectMainSourcePosition "lane finalizer"
+    "forM_ outcomes" finalizerSection
+  warnings <- expectMainSourcePosition "lane finalizer"
+    "forM_ (map fst effectiveLanes)" finalizerSection
   disposition <- expectMainSourcePosition "lane finalizer"
-    "let disposition = synthLaneDisposition outcome" finalizerSection
-  allRejectedRows <- expectMainSourcePosition "lane finalizer"
-    "reportLengthAssessmentRejections st rejections" finalizerSection
+    "let disposition = synthLaneAccumulationDisposition accumulation"
+      finalizerSection
+  stateAndRows <- expectMainSourcePosition "lane finalizer"
+    "case disposition of" finalizerSection
   handledNotes <- expectMainSourcePosition "lane finalizer"
-    "reportSynthLaneNotes st" finalizerSection
-  assertBool "Main emitted handled-lane notes before terminal output"
-    $ warning < disposition
-      && disposition < allRejectedRows
-      && allRejectedRows < handledNotes
+    "forM_ effectiveLanes" finalizerSection
+  assertBool "Main changed chronological finalizer effect ordering"
+    $ chronology < metrics
+      && metrics < warnings
+      && warnings < disposition
+      && disposition < stateAndRows
+      && stateAndRows < handledNotes
   mapM_ (\fragment -> assertBool
       ("verification/disposition seam retained finalizer effect "
         ++ show fragment)
@@ -12112,14 +12328,27 @@ assertLengthAssessmentMainLaneScheduling :: IO ()
 assertLengthAssessmentMainLaneScheduling = do
   sourceLines <- lines <$> readFile "src/Main.hs"
   let schedulerSection = mainSourceSection
-        "synthGo' assessmentRequest st args retriedVars goal parsed = do"
+        "synthGo' assessmentContext st args retriedVars goal parsed = do"
         "loadSynthProviders ::" sourceLines
       reportSection = mainSourceSection
-        "report groupLimit checkedOutcome (Just outcome) = case outcome of"
+        "report accumulation _ _ Nothing = do"
         "verifyGroups groupLimit notes groups = do" schedulerSection
+      providerSection = mainSourceSection
+        "runProviderLanes fallback runLane checked accumulation lanes ="
+        "tryCandidates groupLimit bounded = case bounded of"
+        schedulerSection
+      baselineNoVerifiedSection = mainSourceSection
+        "SynthLaneNoVerified -> do"
+        "SynthLaneAllBehaviorallyRejected _ -> do" schedulerSection
+      baselineAllRejectedSection = mainSourceSection
+        "SynthLaneAllBehaviorallyRejected _ -> do"
+        "SynthLaneSurvivors _ _ -> finalize accumulation" schedulerSection
+      verificationDispatchSection = mainSourceSection
+        "verifyGroups groupLimit notes groups = do"
+        "loadSynthProviders ::" schedulerSection
       classicalSection = mainSourceSection
-        "synthClassical assessmentRequest st args goal parsed ="
-        "verifySynthLane assessmentRequest groupLimit st goal notes groups ="
+        "synthClassical assessmentContext st goal parsed accumulation ="
+        "verifySynthLane assessmentContext groupLimit st goal notes groups ="
         sourceLines
       schedulerText = unlines schedulerSection
       classicalText = unlines classicalSection
@@ -12128,15 +12357,21 @@ assertLengthAssessmentMainLaneScheduling = do
     , "let groupLimit = synthVerificationWindow laneEngine"
     , "let checkedGroups = take groupLimit groups"
     , "(checkedOutcome, disposition) <- tryCandidates baselineLimit baseline"
+    , "let accumulation = maybe emptySynthLaneAccumulation (`accumulateSynthLaneOutcome` emptySynthLaneAccumulation) checkedOutcome"
     , "case disposition of SynthLaneNoVerified -> do"
-    , "SynthLaneSurvivors _ _ -> pure ()"
-    , "SynthLaneAllBehaviorallyRejected _ -> pure ()"
-    , "SynthLaneAssessmentPreserved _ _ -> pure ()"
+    , "SynthLaneAllBehaviorallyRejected _ -> do"
+    , "SynthLaneSurvivors _ _ -> finalize accumulation"
+    , "SynthLaneAssessmentPreserved _ _ -> finalize accumulation"
     , "synthLaneCheckedFrontierSpellings checkedOutcome"
-    , "Just previous -> pure (previous, synthLaneDisposition previous)"
-    , "report fallbackLimit Nothing fallbackOutcome"
-    , "outcome <- verifySynthLane assessmentRequest groupLimit st goal notes groups"
-    , "disposition <- finalizeSynthLaneOutcome st args goal outcome"
+    , "let accumulation' = maybe accumulation (`accumulateSynthLaneOutcome` accumulation) checkedOutcome"
+    , "checked' = Set.union checked $ Set.fromList $ maybe [] synthLaneCheckedFrontierSpellings checkedOutcome"
+    , "SynthLaneSurvivors _ _ -> finalize accumulation'"
+    , "SynthLaneAssessmentPreserved _ _ -> finalize accumulation'"
+    , "report finalAccumulation fallbackLimit Nothing fallbackOutcome"
+    , "Just previous -> pure (accumulation, previous)"
+    , "accumulateSynthLaneOutcome freshLane accumulation"
+    , "outcome <- verifySynthLane assessmentContext groupLimit st goal notes groups"
+    , "pure (outcome, synthLaneDisposition outcome)"
     ]
   assertBool "provider dedup lost one bounded structural/provider frontier"
     $ length (mainSourcePositions
@@ -12147,6 +12382,63 @@ assertLengthAssessmentMainLaneScheduling = do
       `isInfixOf` schedulerText)
   assertBool "the old Bool handled boundary survived the lane outcome refactor"
     $ not ("verifyAndDisplay" `isInfixOf` schedulerText)
+  mapM_ (\fragment -> assertBool
+      ("lane scheduler retained quota-fill arithmetic " ++ show fragment)
+      $ not $ fragment `isInfixOf` schedulerText)
+    [ "remainingQuota"
+    , "successesNeeded"
+    , "synthMaxShown -"
+    , "groupLimit -"
+    ]
+  mapM_ (assertMainSourceContains "baseline no-verification continuation"
+      baselineNoVerifiedSection)
+    [ "then loadSynthProviders st (pgProviderQuery parsed)"
+    , "then report accumulation baselineLimit checkedOutcome baseline"
+    , "else runProviderLanes Nothing (runSynthesis False) checked accumulation"
+    ]
+  mapM_ (assertMainSourceContains "baseline all-rejected continuation"
+      baselineAllRejectedSection)
+    [ "then loadSynthProviders st (pgProviderQuery parsed)"
+    , "then report accumulation baselineLimit checkedOutcome baseline"
+    , "else runProviderLanes Nothing (runSynthesis False) checked accumulation"
+    ]
+  length (mainSourcePositions
+      "accumulateSynthLaneOutcome" schedulerSection) @?= 3
+  length (mainSourcePositions
+      "accumulateSynthLaneOutcome" classicalSection) @?= 2
+  baselineAppend <- expectMainSourcePosition "baseline accumulation"
+    "let accumulation = maybe emptySynthLaneAccumulation"
+      schedulerSection
+  baselineDisposition <- expectMainSourcePosition "baseline accumulation"
+    "case disposition of" schedulerSection
+  providerAppend <- expectMainSourcePosition "provider accumulation"
+    "let accumulation' = maybe accumulation" providerSection
+  providerDisposition <- expectMainSourcePosition "provider accumulation"
+    "case disposition of" providerSection
+  reportAppend <- expectMainSourcePosition "final candidate accumulation"
+    "accumulateSynthLaneOutcome freshLane accumulation" reportSection
+  reportFinalize <- expectMainSourcePosition "final candidate accumulation"
+    "disposition <- finalizeSynthLaneAccumulation" reportSection
+  assertBool "Main classified or finalized a lane before accumulating it"
+    $ baselineAppend < baselineDisposition
+      && providerAppend < providerDisposition
+      && reportAppend < reportFinalize
+
+  mapM_ (assertMainSourceContains "provider continuation" providerSection)
+    [ "SynthLaneNoVerified -> if null remaining then finish accumulation' groupLimit checkedOutcome fresh else runProviderLanes fallback runLane checked' accumulation' remaining"
+    , "SynthLaneAllBehaviorallyRejected _ -> if null remaining then finish accumulation' groupLimit checkedOutcome fresh else runProviderLanes fallback runLane checked' accumulation' remaining"
+    , "SynthLaneSurvivors _ _ -> finalize accumulation'"
+    , "SynthLaneAssessmentPreserved _ _ -> finalize accumulation'"
+    ]
+  mapM_ (\fragment -> assertBool
+      ("verification dispatcher retained finalization effect " ++ show fragment)
+      $ not $ fragment `isInfixOf` unlines verificationDispatchSection)
+    [ "finalizeSynthLaneAccumulation"
+    , "accumulateSynthLaneOutcome"
+    , "reportLengthAssessmentRejections"
+    , "reportSynthLaneNotes"
+    , "synthBind"
+    ]
 
   noVerifiedError <- expectMainSourcePosition "candidate report"
     "the engine proposed " reportSection
@@ -12165,30 +12457,186 @@ assertLengthAssessmentMainLaneScheduling = do
 
   mapM_ (assertMainSourceContains "classical lane scheduler"
       classicalSection)
-    [ "Nothing -> pure SynthLaneNoVerified"
+    [ "Nothing -> pure accumulation"
     , "take (synthMaxTried `div` 2) groups"
-    , "emOutcome <- verifySynthLane assessmentRequest (synthMaxTried `div` 2) st goal [] emGroups"
-    , "emDisposition <- finalizeSynthLaneOutcome st args goal emOutcome"
-    , "case emDisposition of SynthLaneNoVerified -> do"
-    , "let groupLimit = synthVerificationWindow engine"
-    , "nnOutcome <- verifySynthLane assessmentRequest groupLimit st goal [] $ map"
-    , "finalizeSynthLaneOutcome st args goal nnOutcome"
-    , "SynthLaneSurvivors _ _ -> pure emDisposition"
-    , "SynthLaneAllBehaviorallyRejected _ -> pure emDisposition"
-    , "SynthLaneAssessmentPreserved _ _ -> pure emDisposition"
+    , "emOutcome <- verifySynthLane assessmentContext (synthMaxTried `div` 2) st goal [] emGroups"
+    , "let accumulation' = accumulateSynthLaneOutcome emOutcome accumulation"
+    , "emDisposition = synthLaneDisposition emOutcome"
+    , "SynthLaneNoVerified -> runDoubleNegation limit engine steps prefix body accumulation'"
+    , "SynthLaneAllBehaviorallyRejected _ -> runDoubleNegation limit engine steps prefix body accumulation'"
+    , "groupLimit = synthVerificationWindow engine"
+    , "nnOutcome <- verifySynthLane assessmentContext groupLimit st goal [] $ map"
+    , "pure $ accumulateSynthLaneOutcome nnOutcome accumulation'"
+    , "SynthLaneSurvivors _ _ -> pure accumulation'"
+    , "SynthLaneAssessmentPreserved _ _ -> pure accumulation'"
     ]
   assertMainSourceContains "classical lane signature" sourceLines
-    "-> IO SynthLaneDisposition"
-  emFinalizer <- expectMainSourcePosition "classical lane scheduler"
-    "emDisposition <- finalizeSynthLaneOutcome" classicalSection
+    "synthClassical :: LengthAssessmentContext command -> St -> String -> ParsedGoal -> SynthLaneAccumulation -> IO SynthLaneAccumulation"
+  emVerification <- expectMainSourcePosition "classical lane scheduler"
+    "emOutcome <- verifySynthLane assessmentContext" classicalSection
+  emAccumulation <- expectMainSourcePosition "classical lane scheduler"
+    "let accumulation' = accumulateSynthLaneOutcome emOutcome accumulation"
+      classicalSection
   noVerified <- expectMainSourcePosition "classical lane scheduler"
-    "SynthLaneNoVerified -> do" classicalSection
+    "SynthLaneNoVerified ->" classicalSection
   doubleNegation <- expectMainSourcePosition "classical lane scheduler"
     "let nnFrag =" classicalSection
-  assertBool "double-negation ran before the excluded-middle lane finalized"
-    $ emFinalizer < noVerified && noVerified < doubleNegation
+  nnVerification <- expectMainSourcePosition "classical lane scheduler"
+    "nnOutcome <- verifySynthLane assessmentContext" classicalSection
+  nnAccumulation <- expectMainSourcePosition "classical lane scheduler"
+    "pure $ accumulateSynthLaneOutcome nnOutcome accumulation'"
+      classicalSection
+  assertBool "classical retry lost EM-before-NN chronological accumulation"
+    $ emVerification < emAccumulation
+      && emAccumulation < noVerified
+      && noVerified < doubleNegation
+      && doubleNegation < nnVerification
+      && nnVerification < nnAccumulation
   assertBool "classical scheduling retained a Bool handled result"
     $ not ("IO Bool" `isInfixOf` classicalText)
+  assertBool "classical scheduling finalized before returning to its caller"
+    $ not ("finalizeSynthLane" `isInfixOf` classicalText)
+
+assertLengthAssessmentMainDiagnosticGates :: IO ()
+assertLengthAssessmentMainDiagnosticGates = do
+  sourceLines <- lines <$> readFile "src/Main.hs"
+  let schedulerSection = mainSourceSection
+        "synthGo' assessmentContext st args retriedVars goal parsed = do"
+        "loadSynthProviders ::" sourceLines
+      reportSection = mainSourceSection
+        "report accumulation _ _ Nothing = do"
+        "verifyGroups groupLimit notes groups = do" schedulerSection
+      timeoutSection = mainSourceSection
+        "report accumulation _ _ Nothing = do"
+        "report accumulation groupLimit checkedOutcome (Just outcome)"
+        reportSection
+      errorSection = mainSourceSection
+        "Left err -> do"
+        "Right (DetailedSynthCandidates groups notes) -> do" reportSection
+      candidateSection = mainSourceSection
+        "Right (DetailedSynthCandidates groups notes) -> do"
+        "Right (DetailedSynthRefuted sound)" reportSection
+      refutationSection = mainSourceSection
+        "Right (DetailedSynthRefuted sound)"
+        "Right (DetailedSynthNoTerm notes) -> do" reportSection
+      soundSection = mainSourceSection
+        "| sound -> do" "| otherwise -> do" refutationSection
+      unsoundSection = mainSourceSection
+        "| otherwise -> do" "Right (DetailedSynthNoTerm notes) -> do"
+        refutationSection
+      noTermSection = mainSourceSection
+        "Right (DetailedSynthNoTerm notes) -> do"
+        "verifyGroups groupLimit notes groups = do" reportSection
+      providerFinishSection = mainSourceSection
+        "finish finalAccumulation groupLimit checkedOutcome bounded ="
+        "tryCandidates groupLimit bounded = case bounded of"
+        schedulerSection
+
+  timeoutFinalize <- expectMainSourcePosition "timeout diagnostic"
+    "finalizeSynthLaneAccumulation st args goal accumulation" timeoutSection
+  timeoutDiagnostic <- expectMainSourcePosition "timeout diagnostic"
+    "the engine did not finish within" timeoutSection
+  assertBool "timeout output preceded completed lane finalization"
+    $ timeoutFinalize < timeoutDiagnostic
+  errorFinalize <- expectMainSourcePosition "engine-error diagnostic"
+    "finalizeSynthLaneAccumulation st args goal accumulation" errorSection
+  engineError <- expectMainSourcePosition "engine-error diagnostic"
+    "synthesis engine error:" errorSection
+  assertBool "engine-error output preceded completed lane finalization"
+    $ errorFinalize < engineError
+
+  candidateFinalize <- expectMainSourcePosition "candidate diagnostic"
+    "disposition <- finalizeSynthLaneAccumulation" candidateSection
+  candidateGate <- expectMainSourcePosition "candidate diagnostic"
+    "case disposition of" candidateSection
+  candidateDiagnostic <- expectMainSourcePosition "candidate diagnostic"
+    "the engine proposed " candidateSection
+  candidateNotes <- expectMainSourcePosition "candidate diagnostic"
+    "reportSynthLaneNotes st (synthLaneOutcomeNotes lane)" candidateSection
+  assertBool "candidate miss text escaped the aggregate NoVerified gate"
+    $ candidateFinalize < candidateGate
+      && candidateGate < candidateDiagnostic
+      && candidateDiagnostic < candidateNotes
+  mapM_ (assertMainSourceContains "candidate diagnostic gate"
+      candidateSection)
+    [ "SynthLaneSurvivors _ _ -> pure ()"
+    , "SynthLaneAllBehaviorallyRejected _ -> pure ()"
+    , "SynthLaneAssessmentPreserved _ _ -> pure ()"
+    ]
+
+  unsoundFinalize <- expectMainSourcePosition "unsound-refutation diagnostic"
+    "disposition <- finalizeSynthLaneAccumulation" unsoundSection
+  unsoundGate <- expectMainSourcePosition "unsound-refutation diagnostic"
+    "case disposition of" unsoundSection
+  unsoundDiagnostic <- expectMainSourcePosition "unsound-refutation diagnostic"
+    "no term found within bounds" unsoundSection
+  assertBool "unsound-refutation text escaped the aggregate NoVerified gate"
+    $ unsoundFinalize < unsoundGate && unsoundGate < unsoundDiagnostic
+  mapM_ (assertMainSourceContains "unsound-refutation diagnostic gate"
+      unsoundSection)
+    [ "SynthLaneSurvivors _ _ -> pure ()"
+    , "SynthLaneAllBehaviorallyRejected _ -> pure ()"
+    , "SynthLaneAssessmentPreserved _ _ -> pure ()"
+    ]
+
+  noTermFinalize <- expectMainSourcePosition "bounded-miss diagnostic"
+    "disposition <- finalizeSynthLaneAccumulation" noTermSection
+  noTermGate <- expectMainSourcePosition "bounded-miss diagnostic"
+    "case disposition of" noTermSection
+  noTermDiagnostic <- expectMainSourcePosition "bounded-miss diagnostic"
+    "no term found within the search bounds" noTermSection
+  noTermNotes <- expectMainSourcePosition "bounded-miss diagnostic"
+    "reportSynthLaneNotes st notes" noTermSection
+  assertBool "bounded miss text or notes escaped the aggregate NoVerified gate"
+    $ noTermFinalize < noTermGate
+      && noTermGate < noTermDiagnostic
+      && noTermDiagnostic < noTermNotes
+  mapM_ (assertMainSourceContains "bounded-miss diagnostic gate"
+      noTermSection)
+    [ "SynthLaneSurvivors _ _ -> pure ()"
+    , "SynthLaneAllBehaviorallyRejected _ -> pure ()"
+    , "SynthLaneAssessmentPreserved _ _ -> pure ()"
+    ]
+
+  classicalRetry <- expectMainSourcePosition "sound-refutation diagnostic"
+    "then synthClassical assessmentContext st goal parsed accumulation"
+      soundSection
+  soundFinalize <- expectMainSourcePosition "sound-refutation diagnostic"
+    "classical <- finalizeSynthLaneAccumulation" soundSection
+  let classicalGates = mainSourcePositions "case classical of" soundSection
+  firstGate <- case classicalGates of
+    first : _ -> pure first
+    [] -> assertFailure "Main omitted the sound-refutation result gate"
+      >> error "unreachable"
+  secondGate <- case classicalGates of
+    _ : second : _ -> pure second
+    _ -> assertFailure "Main omitted the constructive-hint result gate"
+      >> error "unreachable"
+  uninhabited <- expectMainSourcePosition "sound-refutation diagnostic"
+    "provably uninhabited" soundSection
+  retryAnnotation <- expectMainSourcePosition "sound-refutation diagnostic"
+    "forM_ retriedVars" soundSection
+  constructiveHint <- expectMainSourcePosition "sound-refutation diagnostic"
+    "constructively" soundSection
+  assertBool "sound-refutation gates changed aggregate handling or retry notes"
+    $ classicalRetry < soundFinalize
+      && soundFinalize < firstGate
+      && firstGate < uninhabited
+      && uninhabited < retryAnnotation
+      && retryAnnotation < secondGate
+      && secondGate < constructiveHint
+  length (mainSourcePositions
+      "SynthLaneAllBehaviorallyRejected _ -> pure ()" soundSection) @?= 2
+  length (mainSourcePositions
+      "SynthLaneSurvivors _ _ -> pure ()" soundSection) @?= 2
+  length (mainSourcePositions
+      "SynthLaneAssessmentPreserved _ _ -> pure ()" soundSection) @?= 2
+
+  mapM_ (assertMainSourceContains "structural fallback" providerFinishSection)
+    [ "case fallback of"
+    , "Just (fallbackLimit, fallbackOutcome) -> report finalAccumulation fallbackLimit Nothing fallbackOutcome"
+    , "Nothing -> report finalAccumulation groupLimit checkedOutcome bounded"
+    ]
 
 assertLengthAssessmentMainCommandAdmission :: IO ()
 assertLengthAssessmentMainCommandAdmission = do
