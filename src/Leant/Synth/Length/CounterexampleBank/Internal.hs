@@ -71,8 +71,9 @@ module Leant.Synth.Length.CounterexampleBank.Internal
   , recordLengthSpinePairCounterexampleBankReceiptInContext
   ) where
 
-import Control.Exception (mask_)
-import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
+import Control.Concurrent.MVar (MVar, modifyMVar, newMVar, readMVar)
+import Control.DeepSeq (rnf)
+import Control.Exception (evaluate)
 
 import Language.Haskell.Djex
   ( LengthCounterexampleBank
@@ -162,7 +163,7 @@ lengthCounterexampleBankStateActiveBank
 -- Mutation remains private to the transition functions below.
 newtype LengthCounterexampleBankContext command identity =
   LengthCounterexampleBankContext
-    (IORef (LengthCounterexampleBankState identity))
+    (MVar (LengthCounterexampleBankState identity))
 
 type role LengthCounterexampleBankContext nominal nominal
 
@@ -173,7 +174,7 @@ withLengthCounterexampleBankContext
       LengthCounterexampleBankContext command identity -> IO result)
   -> IO result
 withLengthCounterexampleBankContext limits action = do
-  state <- newIORef $ emptyLengthCounterexampleBankState limits
+  state <- newMVar $ emptyLengthCounterexampleBankState limits
   action $ LengthCounterexampleBankContext state
 
 withDefaultLengthCounterexampleBankContext
@@ -189,7 +190,7 @@ readLengthCounterexampleBankContextState
   :: LengthCounterexampleBankContext command identity
   -> IO (LengthCounterexampleBankState identity)
 readLengthCounterexampleBankContextState
-    (LengthCounterexampleBankContext state) = readIORef state
+    (LengthCounterexampleBankContext state) = readMVar state
 
 ensureLengthCounterexampleBankState
   :: LengthSMTLibQuery identity local
@@ -358,11 +359,12 @@ data LengthCounterexampleBankContextReplayOutcome command identity
 
 type role LengthCounterexampleBankContextReplayOutcome nominal nominal
 
--- | Replay through one mutable owner.  Exactly one completed pure adapter
--- transition is forced and installed under a narrow asynchronous-exception
--- mask.  Expected failure classifications therefore retain their authoritative
--- successor; an unexpected exception propagates instead of manufacturing a
--- partial transition.
+-- | Replay through one mutable owner.  Exactly one pure adapter transition is
+-- serialized, and its complete successor state and expected classification are
+-- forced before commit.  The exception-restoring transition cell retains the
+-- old state when synchronous or asynchronous forcing fails, then propagates
+-- that exception; completed expected classifications install their
+-- authoritative successor.
 replayLengthCounterexampleBankInContext
   :: LengthEvaluationLimits
   -> LengthSMTLibQuery identity local
@@ -388,15 +390,29 @@ replayLengthCounterexampleBankInContext evaluationLimits query
         $ LengthCounterexampleBankContextReplayHitValue hit
 
 transitionLengthCounterexampleBankContext
-  :: IORef (LengthCounterexampleBankState identity)
+  :: MVar (LengthCounterexampleBankState identity)
   -> (LengthCounterexampleBankState identity
       -> (LengthCounterexampleBankState identity, Either failure outcome))
   -> IO (Either failure outcome)
-transitionLengthCounterexampleBankContext state transition = mask_ $
-  atomicModifyIORef' state $ \initial ->
+transitionLengthCounterexampleBankContext state transition =
+  modifyMVar state $ \initial ->
     case transition initial of
-      completed@(successor, outcome) ->
-        successor `seq` forceEitherClassification outcome `seq` completed
+      (successor, outcome) -> do
+        _ <- evaluate $ forceLengthCounterexampleBankSuccessor successor
+        _ <- evaluate $ forceEitherClassification outcome
+        pure (successor, outcome)
+
+-- Construction deliberately keeps validated limits lazy.  Before any
+-- transition installs a successor, however, both those limits and the complete
+-- bounded active bank are forced: no deferred limit, replay input, origin,
+-- sample, or statistic may cross the serialized context boundary.  An
+-- unexpected exception therefore leaves the old context state untouched.
+forceLengthCounterexampleBankSuccessor
+  :: LengthCounterexampleBankState identity
+  -> ()
+forceLengthCounterexampleBankSuccessor
+    (LengthCounterexampleBankState limits active) =
+  rnf limits `seq` rnf active
 
 forceEitherClassification :: Either failure outcome -> ()
 forceEitherClassification classified = case classified of
@@ -581,7 +597,7 @@ lengthSpinePairCounterexampleBankStateActiveBank
 
 newtype LengthSpinePairCounterexampleBankContext command identity =
   LengthSpinePairCounterexampleBankContext
-    (IORef (LengthSpinePairCounterexampleBankState identity))
+    (MVar (LengthSpinePairCounterexampleBankState identity))
 
 type role LengthSpinePairCounterexampleBankContext nominal nominal
 
@@ -591,7 +607,7 @@ withLengthSpinePairCounterexampleBankContext
       LengthSpinePairCounterexampleBankContext command identity -> IO result)
   -> IO result
 withLengthSpinePairCounterexampleBankContext limits action = do
-  state <- newIORef $ emptyLengthSpinePairCounterexampleBankState limits
+  state <- newMVar $ emptyLengthSpinePairCounterexampleBankState limits
   action $ LengthSpinePairCounterexampleBankContext state
 
 withDefaultLengthSpinePairCounterexampleBankContext
@@ -606,7 +622,7 @@ readLengthSpinePairCounterexampleBankContextState
   :: LengthSpinePairCounterexampleBankContext command identity
   -> IO (LengthSpinePairCounterexampleBankState identity)
 readLengthSpinePairCounterexampleBankContextState
-    (LengthSpinePairCounterexampleBankContext state) = readIORef state
+    (LengthSpinePairCounterexampleBankContext state) = readMVar state
 
 ensureLengthSpinePairCounterexampleBankState
   :: LengthSpinePairSMTLibQuery identity local
@@ -795,17 +811,26 @@ replayLengthSpinePairCounterexampleBankInContext evaluationLimits query
         $ LengthSpinePairCounterexampleBankContextReplayHitValue hit
 
 transitionLengthSpinePairCounterexampleBankContext
-  :: IORef (LengthSpinePairCounterexampleBankState identity)
+  :: MVar (LengthSpinePairCounterexampleBankState identity)
   -> (LengthSpinePairCounterexampleBankState identity
       -> ( LengthSpinePairCounterexampleBankState identity
          , Either failure outcome
          ))
   -> IO (Either failure outcome)
-transitionLengthSpinePairCounterexampleBankContext state transition = mask_ $
-  atomicModifyIORef' state $ \initial ->
+transitionLengthSpinePairCounterexampleBankContext state transition =
+  modifyMVar state $ \initial ->
     case transition initial of
-      completed@(successor, outcome) ->
-        successor `seq` forceEitherClassification outcome `seq` completed
+      (successor, outcome) -> do
+        _ <- evaluate $ forceLengthSpinePairCounterexampleBankSuccessor successor
+        _ <- evaluate $ forceEitherClassification outcome
+        pure (successor, outcome)
+
+forceLengthSpinePairCounterexampleBankSuccessor
+  :: LengthSpinePairCounterexampleBankState identity
+  -> ()
+forceLengthSpinePairCounterexampleBankSuccessor
+    (LengthSpinePairCounterexampleBankState limits active) =
+  rnf limits `seq` rnf active
 
 -- Binary-product promotion -------------------------------------------------
 
