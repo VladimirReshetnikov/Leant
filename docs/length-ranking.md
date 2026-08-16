@@ -29,9 +29,9 @@ Three rules make this safe to use:
   none of this code runs and no worker is ever launched.
 
 Everything below this line describes the exact behavior of the current tree:
-the startup-configuration schema, contract-file selectors, the binary-product
-extension, the replay bank, the origin probe, bounded validation, and
-presentation notes. (The module-by-module ownership map lives in
+the startup-configuration schema, the current contract-file schema, the
+binary-product extension, the replay bank, the origin probe, bounded
+validation, and presentation notes. (The module-by-module ownership map lives in
 [synth-internals.md](synth-internals.md).) Leant is experimental and makes no
 public stability or backward-compatibility promise. Names, numeric selectors,
 JSON shapes, tags, diagnostics, and output may be revised before a stable
@@ -49,11 +49,9 @@ first.
   - [Candidate eligibility](#candidate-eligibility)
 - [One-shot contract-only files](#one-shot-contract-only-files)
   - [Command syntax, admission, and lifetime](#command-syntax-admission-and-lifetime)
-  - [Contract-only versions 1 and 2: baseline scalar grammar and modulo](#contract-only-versions-1-and-2-baseline-scalar-grammar-and-modulo)
-  - [Contract-only version 3: explicit target-argument roles](#contract-only-version-3-explicit-target-argument-roles)
-  - [Contract-only version 4: exact-spine zero-step case policy](#contract-only-version-4-exact-spine-zero-step-case-policy)
-  - [Contract-only version 5: positive-literal quotient](#contract-only-version-5-positive-literal-quotient)
-  - [Contract-only version 6: binary-product pair contract](#contract-only-version-6-binary-product-pair-contract)
+  - [Scalar contract example](#scalar-contract-example)
+  - [Binary-product contract example](#binary-product-contract-example)
+  - [Current nested grammar and authority](#current-nested-grammar-and-authority)
 - [Binary-product Length queries](#binary-product-length-queries)
   - [Canonical `Prod` eligibility and the serializer boundary](#canonical-prod-eligibility-and-the-serializer-boundary)
   - [Library-level pair query handoff](#library-level-pair-query-handoff)
@@ -78,7 +76,7 @@ first.
   - [Binary-product startup configuration](#binary-product-startup-configuration)
   - [Schema and validation order](#schema-and-validation-order)
 - [Pair contracts, decoders, and reports](#pair-contracts-decoders-and-reports)
-  - [Using a contract-only version 6 document with `:synth`](#using-a-contract-only-version-6-document-with-synth)
+  - [Using a binary-product contract document with `:synth`](#using-a-binary-product-contract-document-with-synth)
   - [Pair contract grammar and validation order](#pair-contract-grammar-and-validation-order)
   - [Decoder separation and reports](#decoder-separation-and-reports)
 - [Presentation notes on the Main path](#presentation-notes-on-the-main-path)
@@ -124,7 +122,8 @@ older decoder. An untouched old root fails first because it has no required
 removed member remains, exact-root validation rejects that member as
 unexpected. Leant is experimental, so Git history and the dated reports record
 the old shapes without obliging the executable to continue accepting them. The
-separate contract-only format remains versioned and is described below.
+separate contract-only format is likewise one current versionless schema and
+is described below.
 
 ### Activation, pinning, and worker lifecycle
 
@@ -182,28 +181,22 @@ reserved as the delimiter. Leant first requires an activated startup policy;
 when ranking is disabled it rejects the option before path admission or file
 IO. Otherwise it admits and reads that absolute POSIX path once, before goal
 translation, using a fixed 5,000-ms interruption budget and the same 256-KiB
-JSON ceiling as the startup file. The separate contract-only root has
-format `leant-finite-list-spine-length-contract`. Version 1 uses the baseline
-bounded scalar grammar; version 2 adds the exact expression
-form `["modulo", positiveLiteral, expression]` in preconditions,
-postconditions, and provider transfers. Version 3 retains that modulo grammar
-and requires an exact source-ordered `targetArgumentRoles` array containing
-only `"observed-spine"` and `"unobserved-target"`. Versions 1 and 2 reject that
-field, while version 3 rejects its absence. Version 4 retains version 3 and
-also requires `"candidateCasePolicy": "exact-spine-zero-step-v1"`. Version 5
-retains roles and modulo, requires an explicit case policy, accepts exactly
-`"cases-rejected"` or `"exact-spine-zero-step-v1"`, and adds
-`["quotient", positiveLiteral, expression]` to preconditions, postconditions,
-and provider transfers. Thus quotient does not itself grant case authority.
-Version 6 is the separately typed binary-product-spine form: its required
-`"resultShape": "binary-prod-spines-v1"` selects a pair contract whose result
-variables are `["result", "first"]` and `["result", "second"]`. It retains
-version 5's arithmetic, explicit target roles, and explicit case-policy
-vocabulary. The current startup schema is separate: `rankingDomain: "scalar"`
-requires the full scalar contract grammar represented by contract-only version
-5, while `rankingDomain: "binary-product"` requires the pair grammar represented
-by contract-only version 6. The startup root itself remains versionless.
-No contract-only version can
+JSON ceiling as the startup file. The separate contract-only root has exactly
+`format`, `rankingDomain`, and `contract`; it has no `version` member. `format`
+is `leant-finite-list-spine-length-contract`, and `rankingDomain` is exactly
+`"scalar"` or `"binary-product"`. That field alone selects the nominal scalar
+or pair decoder. The nested contract never contains a second domain marker such
+as `resultShape`.
+
+The file is parsed once through the bounded JSON parser and one current decoder.
+There is no version dispatcher, migration pass, compatibility fallback, or
+retry through another domain. A historical root without `rankingDomain` fails
+at that required field. If a valid domain is added while `version` remains,
+exact-root validation rejects the extra member. The current schema always
+requires explicit target roles and an explicit case policy, and always admits
+the current modulo and positive-literal quotient grammar.
+
+A contract-only file cannot
 replace the executable, pin choice, solver limits, artifact policy, or replay
 limits. The decoded contract selection is carried only through
 that command's ordinary, universe-retry, provider, and classical synthesis
@@ -212,144 +205,44 @@ cache, and later commands return to the startup-fixed contract unless they name
 their own file. Malformed option syntax is rejected rather than silently
 treated as a goal.
 
-### Contract-only versions 1 and 2: baseline scalar grammar and modulo
+### Scalar contract example
 
-The contract-only document has exactly three root fields; for example:
-
-```json
-{
-  "format": "leant-finite-list-spine-length-contract",
-  "version": 1,
-  "contract": {
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "precondition": ["truth", true],
-    "postcondition": ["equal", ["result"], ["literal", 0]],
-    "providerLaws": []
-  }
-}
-```
-
-Changing only `"version"` to `2` enables positive-literal Natural modulo. The
-divisor must be nonzero and no wider than 256 bits. Leant preserves the passive
-AST; Djex normalization and sealing own its semantics and lower every surviving
-modulo occurrence to private quotient/remainder witness equations using only
-QF_LIA. No SMT-LIB `mod` term is emitted, and private witnesses never enter
-`get-value` or counterexample presentation. In the current tree, contract-only
-versions 1 and 2 continue to select those respective grammars.
-
-### Contract-only version 3: explicit target-argument roles
-
-Version 3 is the explicit role-aware form. A map-shaped request can use this
-exact contract object:
+A current scalar contract document is:
 
 ```json
 {
   "format": "leant-finite-list-spine-length-contract",
-  "version": 3,
-  "contract": {
-    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
-    "targetArgumentRoles": ["unobserved-target", "observed-spine"],
-    "precondition": ["truth", true],
-    "postcondition": ["equal", ["result"], ["literal", 0]],
-    "providerLaws": [
-      {
-        "name": "Demo.mapList",
-        "argumentRoles": ["unobserved", "spine"],
-        "transfer": ["argument", 1]
-      }
-    ]
-  }
-}
-```
-
-The target-role array is bounded to eight entries and must match the complete
-physical target argument spine after leading quantifiers. Leant never infers
-it from the target, a provider name, a provider scheme, or a candidate. Only
-`"observed-spine"` positions must have the configured list-spine type. They
-receive compact contract indices in observed-position order, so the two
-physical target roles above expose only `LengthInput 0`. Provider-law roles are
-different: they still align with every physical provider argument, and a
-transfer such as `["argument", 1]` refers to physical provider argument 1; it
-is not renumbered to 0 merely because argument 0 is `"unobserved"`.
-
-`"unobserved-target"` means only that the checked Length interpreter carries a
-non-inspectable token at that position and may pass it through a non-demanding
-path, including forwarding it to an explicitly `"unobserved"` provider
-argument. Calling, spine-observing, or tuple-destructuring the token rejects
-candidate preparation. The role makes no claim about whether the source type
-is inhabited, whether a source implementation evaluates the argument, or
-about purity, totality, parametricity, strictness, or effects. The resulting
-counterexample remains model-relative evidence under the explicit provider
-laws, not a theorem about Lean execution.
-
-Version 3 changes no contract lifetime. Its file is still read once for that
-`:synth` command, the decoded request is shared by every retry and synthesis
-lane, and neither it nor its roles enter `ReplState`, history, snapshots, or a
-cache. A later command returns to the startup-fixed current contract unless it
-explicitly names another contract-only file.
-
-### Contract-only version 4: exact-spine zero-step case policy
-
-Version 4 explicitly enables the one nonempty case shape currently modeled by
-Length. It requires the version-3 role vector and the exact field below:
-
-```json
-{
-  "format": "leant-finite-list-spine-length-contract",
-  "version": 4,
+  "rankingDomain": "scalar",
   "contract": {
     "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
     "targetArgumentRoles": ["observed-spine"],
-    "candidateCasePolicy": "exact-spine-zero-step-v1",
+    "candidateCasePolicy": "cases-rejected",
     "precondition": ["truth", true],
-    "postcondition": ["equal", ["result"], ["literal", 0]],
+    "postcondition": [
+      "equal",
+      ["result"],
+      ["sum", [
+        ["modulo", 2, ["input", 0]],
+        ["quotient", 2, ["input", 0]]
+      ]]
+    ],
     "providerLaws": []
   }
 }
 ```
 
-The policy is not inferred from a graph. Exference must independently retain a
-checked complete case over the exact recursive two-constructor spine, with one
-zero-field constructor and one two-field constructor whose single recursive
-field is the scrutinized spine. Djex freshly re-seals that graph against the
-contract-resolved `List` schema. The zero branch receives length zero; the step
-branch receives an opaque payload and a tail length `input monus 1`; the whole
-case retains the union of provider laws reached by either branch. Every other
-case shape fails closed, and versions 1--3 keep rejecting all nonempty cases.
+The scalar grammar admits `["result"]`; it rejects pair result references.
 
-This remains a bounded model-relative interpretation. It does not prove Lean
-purity, totality, termination, strictness, source-level equivalence, or a
-provider law, and it grants no pruning authority. Like version 3, version 4 is
-command-local and leaves no role or case-policy state behind.
+### Binary-product contract example
 
-### Contract-only version 5: positive-literal quotient
-
-Version 5 adds positive-literal Natural floor quotient without changing that
-authority model. For example, a postcondition can contain
-`["quotient", 2, ["input", 0]]`. The divisor is checked before its child, must
-be nonzero, and is bounded by the same 256-bit numeral limit as modulo. Djex
-lowers every surviving quotient to the same private Euclidean witness shape
-`e = k*q + r`, `q >= 0`, `r >= 0`, and `r <= k-1`, then projects `q`; it emits
-no SMT-LIB `div`. Replay independently recomputes Natural quotient from the
-original input. Version 5 requires both `targetArgumentRoles` and
-`candidateCasePolicy`. Choosing `"cases-rejected"` preserves the singleton,
-ordinal-zero renderer rule, while choosing `"exact-spine-zero-step-v1"`
-retains the accepted typed renderer ordinal just as version 4 does. Versions
-1--4 continue to reject the quotient tag.
-
-### Contract-only version 6: binary-product pair contract
-
-Contract-only version 6 keeps the exact three-field contract-only root but
-selects the nominal binary-product domain. Its contract object requires
-`"resultShape": "binary-prod-spines-v1"` and otherwise retains version 5's
-arithmetic, target-role, case-policy, and provider-law grammar. For example:
+The same root selects the nominal pair grammar through `rankingDomain`; there
+is no nested `resultShape`:
 
 ```json
 {
   "format": "leant-finite-list-spine-length-contract",
-  "version": 6,
+  "rankingDomain": "binary-product",
   "contract": {
-    "resultShape": "binary-prod-spines-v1",
     "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
     "targetArgumentRoles": ["observed-spine"],
     "candidateCasePolicy": "cases-rejected",
@@ -368,9 +261,80 @@ arithmetic, target-role, case-policy, and provider-law grammar. For example:
 ```
 
 Only pair result references `["result", "first"]` and
-`["result", "second"]` are admitted in that domain. Version 6 remains a
-command-local contract selection; it contains no execution, ranking, replay,
-or budget policy.
+`["result", "second"]` are admitted in that domain. The domain remains
+nominal: a scalar result reference fails in the pair decoder and a pair result
+reference fails in the scalar decoder.
+
+### Current nested grammar and authority
+
+Both selected contract objects have exactly six members, validated in this
+order after their exact shape is admitted: `spine`, `targetArgumentRoles`,
+`candidateCasePolicy`, `precondition`, `postcondition`, and `providerLaws`.
+All field names, enum values, and syntax tags are case-sensitive.
+
+The target-role array is always explicit, is bounded to eight entries, and must
+match the complete physical target argument spine after leading quantifiers.
+Leant never infers it from the target, a provider name, a provider scheme, or a
+candidate. Only `"observed-spine"` positions must have the configured
+list-spine type. They receive compact contract indices in observed-position
+order. Provider-law roles are different: they align with every physical
+provider argument, and `["argument", n]` in a transfer keeps that physical
+index rather than being renumbered through the target-role projection.
+
+`"unobserved-target"` means only that the checked Length interpreter carries a
+non-inspectable token at that position and may pass it through a non-demanding
+path, including forwarding it to an explicitly `"unobserved"` provider
+argument. Calling, spine-observing, or tuple-destructuring the token rejects
+candidate preparation. The role makes no claim about whether the source type
+is inhabited, whether a source implementation evaluates the argument, or
+about purity, totality, parametricity, strictness, or effects.
+
+`candidateCasePolicy` is also always explicit. `"cases-rejected"` preserves the
+singleton, ordinal-zero renderer rule. `"exact-spine-zero-step-v1"` enables the
+one nonempty case shape currently modeled by Length. The policy is not inferred
+from a graph. Exference must independently retain a
+checked complete case over the exact recursive two-constructor spine, with one
+zero-field constructor and one two-field constructor whose single recursive
+field is the scrutinized spine. Djex freshly re-seals that graph against the
+contract-resolved `List` schema. The zero branch receives length zero; the step
+branch receives an opaque payload and a tail length `input monus 1`; the whole
+case retains the union of provider laws reached by either branch. Every other
+case shape fails closed.
+
+This remains a bounded model-relative interpretation. It does not prove Lean
+purity, totality, termination, strictness, source-level equivalence, or a
+provider law, and it grants no pruning authority. The selection is command-local
+and leaves no role or case-policy state behind.
+
+The current expression grammar includes input/result or provider-argument
+variables, natural literals, sums, scaling, monus, minimum, maximum,
+conditionals, `["modulo", positiveLiteral, expression]`, and
+`["quotient", positiveLiteral, expression]`. Both arithmetic tags are accepted
+in preconditions, postconditions, and provider transfers. The divisor is
+checked before its operand, must be nonzero, and is bounded by the same 256-bit
+numeral limit as every contract literal.
+
+Leant retains the passive syntax. Djex lowers each surviving operation to a
+private Euclidean witness shape `e = k*q + r`, `q >= 0`, `r >= 0`, and
+`r <= k-1`, then projects the remainder for modulo or the quotient for
+quotient. It emits no SMT-LIB `mod` or `div`; private witnesses never enter
+`get-value` or presentation, and replay independently recomputes Natural
+arithmetic from the original inputs.
+
+After bounded JSON and root-object admission, validation checks format
+presence/type/value, then `rankingDomain` presence/type/value, then the exact
+three-member root. Exact-root validation reports an unexpected member before a
+remaining missing member. The `contract` must then be an object, after which
+the selected decoder admits the exact six-member nested shape and checks spine,
+roles, case policy, precondition, postcondition, and provider laws in that
+order. JSON object-member order does not alter this precedence.
+
+The command-local selection contains no execution, ranking, replay,
+simplification, ordering, or budget policy. Its file is read once before goal
+translation and the same request is carried through ordinary, retry, provider,
+and classical lanes. It never enters `ReplState`, history, snapshots, or a
+cache; a later command returns to the startup-fixed contract unless it names
+another file.
 
 ## Binary-product Length queries
 
@@ -406,7 +370,7 @@ pairContract = LeanLengthSpinePairContract
   { leanLengthSpinePairContractSpine =
       LeanLengthSpineIdentity "List" "List.nil" "List.cons"
   , leanLengthSpinePairContractTargetArgumentRoles =
-      Just [LengthObservedSpine]
+      [LengthObservedSpine]
   , leanLengthSpinePairContractCandidateCasePolicy =
       LeanLengthCasesRejected
   , leanLengthSpinePairContractSource = LengthSpinePairContractSource
@@ -1423,8 +1387,8 @@ result length equals the first input length:
 ### Binary-product startup configuration
 
 The binary-product root selects a nominally distinct contract and assessment
-path. Its contract must include the closed result shape, and expressions refer
-to the two result components explicitly:
+path. The root-level domain is the only discriminator; expressions refer to
+the two result components explicitly:
 
 ```json
 {
@@ -1474,7 +1438,6 @@ to the two result components explicitly:
     "milliseconds": 30000
   },
   "contract": {
-    "resultShape": "binary-prod-spines-v1",
     "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
     "targetArgumentRoles": ["observed-spine"],
     "candidateCasePolicy": "cases-rejected",
@@ -1499,10 +1462,10 @@ to the two result components explicitly:
 }
 ```
 
-The domain tag never infers a contract from the Lean goal. A scalar root with a
-pair-only `resultShape` or pair result reference fails in the selected scalar
-contract decoder; a binary-product root without the required result shape, or
-with a scalar result reference, fails in the selected pair decoder.
+The domain tag never infers a contract from the Lean goal. `resultShape` is not
+part of either nested schema and is rejected as unexpected. A pair result
+reference fails in the selected scalar decoder, while a scalar result reference
+fails in the selected pair decoder.
 
 ### Schema and validation order
 
@@ -1552,60 +1515,61 @@ fixed by the current decoder rather than represented by
 
 Historical startup documents with a `version` member or any removed strategy
 member are outside this schema. They are rejected rather than migrated, and
-there is no startup unsupported-version sentinel. This statement does not
-apply to the separately versioned contract-only format.
+there is no startup unsupported-version sentinel. The contract-only format now
+uses the same versionless domain-selection rule.
 
 ## Pair contracts, decoders, and reports
 
-### Using a contract-only version 6 document with `:synth`
+### Using a binary-product contract document with `:synth`
 
 Then select a typed Exference-producing engine and synthesize normally. A
-contract-only v6 document can replace the startup-fixed contract for one
-command without changing the CLI grammar:
+versionless binary-product document can replace the startup-fixed contract for
+one command without changing the CLI grammar:
 
 ```text
 :set synth-engine exference
 :synth List Nat → Prod (List Nat) (List Nat)
-:synth --length-contract /absolute/path/pair-contract-v6.json -- List Nat → Prod (List Nat) (List Nat)
+:synth --length-contract /absolute/path/pair-contract.json -- List Nat → Prod (List Nat) (List Nat)
 ```
 
 ### Pair contract grammar and validation order
 
-The two file formats select domains differently. Contract-only root versions
-1--5 select the scalar grammar and version 6 selects the pair grammar. The
-versionless startup root instead uses `rankingDomain`: `"scalar"` selects
-the full scalar grammar, while `"binary-product"` selects the pair grammar.
+Both file formats select their nominal contract domain with `rankingDomain`:
+`"scalar"` selects the full scalar grammar and `"binary-product"` selects the
+pair grammar. Neither decoder infers that choice from a Lean goal.
 
-Pair contract objects have exactly `resultShape`, `spine`,
-`targetArgumentRoles`, `candidateCasePolicy`, `precondition`,
-`postcondition`, and `providerLaws`. After the bounded root/schema gates,
-contract-only version 6 validates those fields in that order. The startup
-decoder validates all operational objects first and the domain-selected
-contract last. JSON object member order is immaterial.
+Pair contract objects have exactly `spine`, `targetArgumentRoles`,
+`candidateCasePolicy`, `precondition`, `postcondition`, and `providerLaws`.
+After the bounded root/schema gates, the contract-only decoder validates those
+fields in that order. The startup decoder validates all operational objects
+first and the domain-selected contract last. JSON object member order is
+immaterial.
 
 The pair grammar retains the scalar grammar's modulo, positive-literal
 quotient, formulas, and provider laws, but admits only `["input", n]`,
-`["result", "first"]`, and `["result", "second"]` as variables. Its
-`resultShape` is exactly `"binary-prod-spines-v1"`, its target-role vector
-is required, and its case policy is exactly `"cases-rejected"` or
+`["result", "first"]`, and `["result", "second"]` as variables. Its target-role
+vector is required, and its case policy is exactly `"cases-rejected"` or
 `"exact-spine-zero-step-v1"`.
 
 ### Decoder separation and reports
 
-The startup and contract-only roots are deliberately separate contracts. The
-startup decoder accepts one exact, versionless
+The startup and contract-only roots remain separate formats. The startup
+decoder accepts one exact, versionless
 `leant-live-length-ranking-configuration` root and chooses the nominal runner
-from `rankingDomain`. The contract-only decoder continues to accept the
-separately versioned `leant-finite-list-spine-length-contract` root. A
-startup `version` member is outside the exact root (and is reported as
-unexpected once the earlier `rankingDomain` gate succeeds); a contract-only
-`version` member is required. Neither decoder delegates to the other.
+from `rankingDomain`. The contract-only decoder accepts one exact, versionless
+`leant-finite-list-spine-length-contract` root and returns the same nominal
+selection type. A `version` member is outside either exact root and is reported
+as unexpected once the earlier `rankingDomain` gate succeeds. Each input is
+parsed once; neither decoder delegates to a historical parser or retries under
+another domain.
 
 A binary-product startup file selects which nominal runner Main calls. It does
 not infer a contract from the Lean type, bypass the exact canonical-`Prod`
 handoff, turn solver status into evidence, or grant pruning authority. The
 current startup reset is recorded in the
 [versionless startup configuration report](reports/2026-08-15-versionless-length-ranking-configuration.md).
+The matching command-local reset is recorded in the
+[versionless Length contract report](reports/2026-08-15-versionless-length-contract.md).
 The exact handoff and live pair boundaries are recorded in the historical
 [canonical `Prod` Length handoff report](reports/2026-08-14-canonical-prod-length-handoff.md)
 and

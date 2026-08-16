@@ -136,8 +136,8 @@ Finite-list-spine **Length counterexample ranking** is an optional last
 stage that consults Z3 about the behavior of verified candidates and stably
 reorders them; it is off unless you pass `--length-ranking-config`, it never
 prunes, and raw solver status carries no authority. The complete reference —
-the current versionless startup schema (`rankingDomain` is `scalar` or
-`binary-product`), the separately versioned contract-only grammar, replay bank,
+the current versionless startup and contract-only schemas (`rankingDomain` is
+`scalar` or `binary-product`), replay bank,
 origin probe, bounded validation, and presentation notes — is
 [docs/length-ranking.md](docs/length-ranking.md).
 

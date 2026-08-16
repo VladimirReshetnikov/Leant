@@ -7,7 +7,7 @@ document holds the design detail that used to sit inline there.*
 
 The material below is a current-tree specification of internal boundaries.
 Leant is experimental and makes no public stability or backward-compatibility
-promise: startup JSON shapes, contract-only numeric selectors, tags, names,
+promise: startup or contract-only JSON shapes, tags, names,
 diagnostics, and output may be revised before a stable release. Historical
 comparisons below are regression descriptions, not commitments to preserve
 earlier design decisions. Each paragraph
@@ -165,10 +165,8 @@ reassociated contract, and the
 candidate-specific Djex problem. That checked preparation consumes the
 renderer, family, and session authority and returns only the sealed problem;
 Engine owns the exact-origin rerender mechanics and private premise-layout ABI.
-Handoff preserves the historical singleton/ordinal-zero rule whenever the
-contract selects case rejection: implicitly in contract-only versions 1--3,
-or explicitly in contract-only version 5 or 6 and either startup domain. The
-exact policy in contract-only version 4, 5, or 6 or either startup domain
+Handoff preserves the singleton/ordinal-zero rule whenever the explicitly
+selected current contract policy rejects cases. The exact zero/step policy
 instead owns selection of the retained original ordinal and equality with the
 callback-accepted text; other valid renderer alternatives neither replace that
 retained variant nor make its exact association ambiguous.
@@ -176,14 +174,12 @@ retained variant nor make its exact association ambiguous.
 ### Interpretation policy and session-owned sealing
 
 Only after renderer correspondence and exact family/provider resolution,
-Handoff converts the contract's `(candidate case policy, target roles)` pair
-once into Djex's closed `LengthInterpretationPolicySource`. Contract-only v1/v2
-case-rejecting contracts use the implicit all-observed source; contract-only
-v3/v5/v6 and current startup case-rejecting contracts carry their explicit
-role vector; and contract-only v4/v5/v6 and current startup exact contracts
-carry that vector beside exact zero/step authority. Exact authority without
-roles is still refused at this point, so family and provider failures retain
-their historical precedence. Handoff then uses only Djex's
+Handoff converts the contract's explicit `(candidate case policy, target
+roles)` pair once into Djex's closed `LengthInterpretationPolicySource`.
+Case-rejecting and exact zero/step contracts both carry their exact
+source-ordered role vector; the current grammar cannot construct the former
+implicit-role combination or exact authority without roles. Handoff then uses
+only Djex's
 session-owned `sealLengthSessionWithInterpretationPolicy`,
 `sealLengthContractInSession`, and
 `sealLengthTypedCandidateProblemInSession` path. The contract and candidate
@@ -196,9 +192,9 @@ encodings 4/5/6; a successfully ground-discharged carrier uses candidate v3.
 Conditional provider inventory v3 and semantic inventory v2 retain the
 source context, while legacy provider/semantic inventory v2/v1, plain candidate
 v1, obligation-free associated candidate v2, and concrete encodings 1/2/3 keep
-their exact identities. Contract grammar and signatures,
-legacy-versus-explicit-all-observed equivalence within each policy family, and
-Leant's renderer selection remain unchanged.
+their exact identities. Djex's legacy-versus-explicit-all-observed equivalence
+within each policy family and Leant's renderer selection remain unchanged;
+Leant's current files no longer construct the legacy entrance.
 The authority migration and compatibility matrix are detailed in the
 [unified checked Length handoff policy report](reports/2026-08-13-unified-length-handoff-policy.md).
 The opaque carrier handoff and its trust limits are recorded in the
@@ -923,8 +919,9 @@ Every accepted startup file constructs the same operational bundle:
 
 `rankingDomain = scalar` selects the nominal scalar assessor and the full
 scalar contract grammar. `rankingDomain = binary-product` selects the
-nominal canonical-`Prod` assessor and requires the pair contract's
-`resultShape = binary-prod-spines-v1`. Domain selection never comes from the
+nominal canonical-`Prod` assessor and its separately typed pair contract.
+`rankingDomain` is the sole domain discriminator; neither nested contract
+admits `resultShape`. Domain selection never comes from the
 Lean goal and cannot cast contracts, queries, receipts, failures, assessments,
 MRU state, or presentation across the scalar/product boundary.
 
@@ -965,26 +962,30 @@ path, and loading/activation alone never launches a solver. See the historical
 
 ### Contract-only files and the length-contract command
 
-`Leant.Synth.Length.Contract.File` adds the separate contract-only versioned
-root with format `leant-finite-list-spine-length-contract` for a command-owned
-passive contract. It contains exact `format`, `version`, and `contract` fields.
-Version 1 delegates to the baseline scalar grammar. Version 2 uses the
-same bounded parser owner and adds only positive-literal Natural modulo to
-contract and provider-transfer expressions. Version 3 retains version 2's
-expression grammar and additionally requires the exact ordered target-role
-vector; versions 1 and 2 reject that field. Version 4 retains the v3 grammar
-and requires the sole admitted candidate-case policy,
-`exact-spine-zero-step-v1`; versions 1--3 reject that field. Version 5 retains
-roles, modulo, and required explicit case choice; it accepts exactly
-`cases-rejected` or `exact-spine-zero-step-v1` and alone adds positive-literal
-Natural quotient. The established `decodeLengthContractFile` still accepts
-exactly those scalar versions 1--5 and rejects version 6. The generalized
-`decodeLengthContractSelectionFile` additionally admits v6's nominal pair
-contract, while delegating every older version to that unchanged scalar
-decoder. Execution and evaluation fields remain unknown and rejected. Startup
-configuration does not enter this version dispatcher: its `rankingDomain`
-selects the full scalar grammar or the pair grammar directly.
-Its `Contract.File.Acquire` facade uses the same path, descriptor, and timeout
+`Leant.Synth.Length.Contract.File` adds the separate versionless root with
+format `leant-finite-list-spine-length-contract` for a command-owned passive
+contract. Its exact fields are `format`, `rankingDomain`, and `contract`.
+`rankingDomain` is exactly `scalar` or `binary-product` and is the sole domain
+discriminator; neither nested grammar admits `resultShape`. Execution and
+evaluation fields remain unknown and rejected.
+
+`decodeLengthContractFile` parses bounded JSON exactly once and returns one
+`LeanLengthContractSelection`. Its semantic order is root object, format
+presence/type/value, domain presence/type/value, exact root, contract-object
+type, and then the selected nested decoder. Exact-root validation reports an
+unexpected member before a remaining missing member. There is no version
+dispatcher, unsupported-version sentinel, compatibility fallback, migration,
+or retry through another domain.
+
+Both nested decoders first require the exact six fields `spine`,
+`targetArgumentRoles`, `candidateCasePolicy`, `precondition`, `postcondition`,
+and `providerLaws`, then validate them in that order. Roles and case policy are
+always explicit. The current expression grammar always admits positive-literal
+Natural modulo and quotient in contract formulas and provider transfers; both
+divisors are checked before their operands and must be nonzero. All names,
+enum values, and syntax tags are case-sensitive.
+
+The `Contract.File.Acquire` facade uses the same path, descriptor, and timeout
 owner as startup acquisition, but maps failures into contract-only closed
 vocabulary. `Leant.Synth.Length.Command` recognizes only the exact
 `--length-contract` spelling and requires a standalone `--`, so malformed
@@ -994,17 +995,25 @@ request syntax cannot disappear into Lean goal text.
 
 `Leant.Synth.Length.Integration` authorizes an explicit request from the
 already activated policy before Main admits or opens its contract path. The
-result is an opaque command-local choice containing either the
-disabled identity or one strict policy beside one lazy scalar-or-pair
-selection. `LeanLengthContractSelection` is passive and nominal: dispatch
-chooses exactly one scalar or pair occurrence-sealed assessor, and the two
-ranking/evidence result types remain separate. Startup and one-shot
-contracts enter the same lifetime owner; the request does not remember a
-second policy/contract origin tag. Main loads a named contract once before
-translating the goal and threads that value through every retry and synthesis
-lane. It never writes the request to interactive state or a snapshot. See the
-[one-shot contract report](reports/2026-08-13-one-shot-length-contract.md).
-The version-2 extension and its QF_LIA witness boundary are recorded in the
+result is an opaque command-local choice containing either the disabled
+identity or one strict policy beside one lazy scalar-or-pair selection.
+`LeanLengthContractSelection` is passive and nominal: dispatch chooses exactly
+one scalar or pair occurrence-sealed assessor, and the two ranking/evidence
+result types remain separate. Startup and one-shot contracts enter the same
+lifetime owner; the request does not remember a second policy/contract origin
+tag. Main calls `loadLengthContractFile` and then
+`explicitLengthAssessmentRequest` once before translating the goal and threads
+that value through every retry and synthesis lane. It never writes the request
+to interactive state or a snapshot. The selection-suffixed entrances have been
+removed; the unsuffixed decoder, loader, and request names now carry the
+nominal scalar-or-pair selection instead of their former scalar-only types.
+
+The current reset is recorded in the
+[versionless Length contract report](reports/2026-08-15-versionless-length-contract.md).
+The older [one-shot contract report](reports/2026-08-13-one-shot-length-contract.md)
+and the reports below remain useful landing history, but their version routing
+and public API names are not current contracts. The historical modulo QF_LIA
+witness boundary is recorded in the
 [contract-only v2 modulo report](reports/2026-08-13-contract-only-v2-modulo.md).
 The explicit role vocabulary, compact numbering, checked opaque-token boundary,
 focused map path, and conditional Djex identities are recorded in the
