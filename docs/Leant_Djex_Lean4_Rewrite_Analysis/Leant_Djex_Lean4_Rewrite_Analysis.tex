@@ -221,6 +221,8 @@ That conclusion does \emph{not} imply that the best design is one large in-proce
 
 The recommended architecture is therefore a \term{semantic full rewrite}: a Lean controller and a project-toolchain-matched Lean worker, with all synthesis, checking, semantic ranking, protocol logic, and session policy implemented in Lean, plus an optional narrow C shim for the strongest Z3 launch mode. The worker owns the Lean environment and local context; a pure, serializable synthesis IR remains separate from Lean's metavariable state; every positive candidate is checked by the kernel; text rendering is a presentation and copy-paste check rather than evidence; and negative conclusions retain an explicit completeness ledger. During migration, the best hybrid is a Lean worker around the existing Haskell Djex service, followed by a Lean Djinn port and then an inseparable Exference-plus-typed-semantic port. A long-term split that leaves Exference in one language and its associated typed graph/Length authority in another is possible but architecturally poor.
 
+The report attaches one qualification to its own verdict. ``Advisable'' is established under the rule that implementation effort is not counted, and that rule conceals the dominant practical risk: the codebase is large and invariant-dense, Exference's workload is a poor match for Lean's runtime until measured otherwise, and Lean's metaprogramming API would move inside the trust boundary. The concrete commitment should therefore be the first two hybrids (a Lean worker owning preparation, lowering and kernel checking, then a Lean Djinn), with the remaining phases gated on measured results rather than assumed.
+
 \tableofcontents
 \clearpage
 \pagenumbering{arabic}
@@ -233,6 +235,16 @@ The recommended architecture is therefore a \term{semantic full rewrite}: a Lean
 
 The strongest target is not ``translate every Haskell module line for line.'' It is to replace the Lean-facing semantic system with a Lean-native architecture, delete Haskell-only compatibility layers, preserve the worker-process and final-kernel-check boundaries, and keep only a tiny platform C shim where the current descriptor-bound Z3 launch policy genuinely requires operating-system primitives below Lean's standard process API.
 \end{verdictbox}
+
+\begin{riskbox}[title={How to read the verdict}]
+The verdict is a statement about semantic and architectural fit under the evaluation rule of \autoref{ch:scope}: implementation effort is not counted. Three things that rule hides should be kept in view when the verdict is turned into a plan.
+\begin{enumerate}
+  \item \term{Volume is the dominant practical risk.} The two repositories are large and invariant-dense (Leant's unit suite alone runs on the order of nineteen thousand assertions), and the migration in \autoref{ch:migration} is ten phases each requiring a differential oracle. The report's fallback (\autoref{ch:recommendation}) is not a consolation prize: a Lean worker owning preparation, lowering and kernel checking around the Haskell Djex service, followed by a Lean Djinn, captures a large share of the benefit and is the state that should actually be committed to.
+  \item \term{Exference performance is the most likely stalling point.} Lean's runtime, reference counting with destructive update only for unshared values and no laziness, is a poor match for a search whose branches are many persistent snapshots sharing large substructures; GHC's generational collector and lazy result streams suit that workload unusually well (\autoref{sec:performance}). This is measurable, not fatal, but it is the single most probable reason the full rewrite ends at the ``Lean worker plus Haskell controller'' hybrid.
+  \item \term{Meta-API churn moves inside the trust boundary.} Today the community REPL absorbs Lean releases; after the rewrite every release can break the worker, and the version matrix becomes a permanent obligation rather than a one-time port cost.
+\end{enumerate}
+None of these changes the direction. They change what should be promised: the full rewrite is the right end state to design toward; the concrete commitment is Hybrids 1 and 3 with the rest gated on evidence (\autoref{sec:gates}).
+\end{riskbox}
 
 Readers who know Lean 4 but not these two codebases should read \autoref{sec:terminology} first; the rest of the report uses the projects' own vocabulary (fragment, neutral IR, provider, sidecar, completeness ledger, lease) without further definition. Readers who know the codebases can skip directly to \autoref{ch:lean-fit}.
 
@@ -744,7 +756,7 @@ The FFI is also sufficient to retain the existing C helper. The current Lean ref
 Do not move the entire Z3 protocol into C merely because a C shim is retained. Keep policy validation, command bytes, deadlines, response framing, causal transaction state, and replay in Lean. The C layer should perform only the primitive launch operation that Lean's standard library cannot express with the required guarantees.
 \end{riskbox}
 
-\section{Performance is an empirical risk, not a feasibility barrier}
+\section{Performance is an empirical risk, not a feasibility barrier}\label{sec:performance}
 
 Lean 4 is designed as an efficient functional language and compiles to native code. It supports arrays, hash tables, tasks, compact algebraic data, and functional-but-in-place optimization. There is no reason in principle that Djinn or Exference must be slower. There are, however, specific places where the current GHC behavior should not be assumed to transfer automatically:
 
@@ -757,6 +769,8 @@ Lean 4 is designed as an efficient functional language and compiles to native co
   \item interaction between long search tasks and Lean's heartbeat/cancellation accounting;
   \item debug versus optimized native builds of metaprograms loaded into a project worker.
 \end{itemize}
+
+The first item deserves more weight than the others, because it is where the two runtimes differ in kind rather than degree. Lean manages memory by reference counting and performs destructive updates only when a value's count is one; a value reachable from two branch snapshots is copied on the first update by either. Exference's queue is precisely a population of branch snapshots that share substitutions, scope forests and binding maps, so the ``functional but in place'' optimization is defeated by design in the hot path, and the cost shows up as copying and count traffic on large maps. GHC, by contrast, allocates such branches cheaply into a nursery, shares them freely, and reclaims the dead majority in bulk with a generational collector, and its laziness means a rejected branch's untouched substructure is never materialized. Djinn's proof search shares comparatively little between branches and is much less exposed. For Exference the honest expectation is therefore not ``about the same'' but ``unknown until measured, with a plausible regression to be engineered away'': persistent maps chosen for cheap copying, delta chains compacted periodically, node payloads kept small, and the queue owned by one cursor so that at least the scheduler's own state can be updated in place. \autoref{ch:migration} makes these measurements a gate rather than a hope.
 
 The remedy is architectural: keep proofs out of hot nodes when a sealed checked constructor suffices; use compact numeric IDs internally; preserve immutable authority at boundaries; use mutable arrays locally under \code{ST}/IO where uniqueness permits; and benchmark candidate quality, not only wall-clock time. Exference's search ordering can change when allocation or queue tie-breaking changes even if every candidate remains type-correct.
 
@@ -2194,7 +2208,7 @@ Explicit Lean search cursors make continuation state, budgets, and completion co
 
 \subsection{Lean API coupling}
 
-The worker necessarily depends on Lean metaprogramming internals: expression forms, declaration metadata, elaboration helpers, environment extensions, pretty printing, and kernel-add APIs. These can change across releases. The current Haskell controller is insulated from most of that because the external REPL absorbs it.
+The worker necessarily depends on Lean metaprogramming internals: expression forms, declaration metadata, elaboration helpers, environment extensions, pretty printing, and kernel-add APIs. These can change across releases. The current Haskell controller is insulated from most of that because the external REPL absorbs it: a Lean release that reshapes \code{Environment} or the \code{addDecl} family is the REPL maintainers' problem today and would be Leant's tomorrow. This should be counted as a permanent operating cost, not a one-time porting cost. Because the worker is compiled with each project's toolchain, Leant must support every Lean version its users' projects pin, simultaneously; the effort-neutral evaluation rule of \autoref{ch:scope} sets aside the port but cannot set aside that ongoing matrix. The mitigations below make it manageable; they do not make it small.
 
 Mitigations are:
 
@@ -2995,6 +3009,20 @@ Define the target as a Lean-native synthesis package and project-local worker, b
 
 This recommendation is stronger than ``a partial rewrite is possible.'' Under the user's assumptions, a complete semantic rewrite is not only feasible; it removes a disproportionate amount of complexity that exists solely because Lean expressions and Lean candidates are temporarily represented in Haskell.
 
+\section{Concrete commitment and gates}\label{sec:gates}
+
+The verdict above is a design target. What should be committed to now is narrower, and each further step should be unlocked by a measurement rather than by the plan's own momentum:
+
+\begin{enumerate}
+  \item \term{Commit: Hybrid 1} (\autoref{ch:hybrid}), that is, Phases 0 to 2 of \autoref{ch:migration}: a project-local Lean worker that owns direct fragment preparation, exact origin tables, lowering to \code{Expr} and the kernel check, around the existing Haskell Djex service. This alone deletes the generated serializer, the S-expression bridge and text-as-authority, and it is where most of the representation-crossing complexity lives.
+  \item \term{Commit: the Djinn port} (Phase 4) with its checker-soundness theorem, using the Haskell engine as a shadow oracle. Djinn shares little between branches, has an executable specification in its existing checker, and is the engine that currently lacks typed-graph authority; it is the port most likely to succeed and to teach the most.
+  \item \term{Gate 1, before Phase 6:} an Exference-in-Lean prototype over the neutral core must meet explicit thresholds against the Haskell oracle on the fixed corpora of \autoref{ch:migration}: time to first checked candidate, time and peak memory for the top $k$, and top-$k$ set and order agreement under identical policies. If it does not, the ``Lean worker plus Haskell controller'' hybrid with a Haskell Exference service (\autoref{ch:hybrid}, Hybrid~2 kept as a portfolio) is the end state until it does.
+  \item \term{Gate 2, before removing the Haskell semantic core:} the version-matrix cost must have been observed across at least two Lean minor releases with the Lean worker in service, so that the ongoing Meta-API obligation of \autoref{ch:pros-cons} is a measured number rather than an estimate.
+  \item \term{Gate 3, before retiring the Haskell controller:} the Lean controller must reach the current recovery contract under fault injection (\autoref{ch:migration}) and an acceptable line-editing experience; until then Hybrid~3 is the steady state.
+\end{enumerate}
+
+Under this framing the difference between ``full rewrite'' and ``best partial rewrite'' is not a decision to be taken now. It is the outcome of Gates 1 to 3, and either outcome leaves the system better than today.
+
 \section{Precise qualification}
 
 The recommended end state is \emph{not}:
@@ -3061,7 +3089,7 @@ Retain Haskell at the outermost or most self-contained boundaries:
 \midrule
 \endhead
 Is a complete rewrite in Lean 4 feasible? & \textbf{Yes.} All search, checking, semantic, protocol, session, and UI logic is implementable in Lean. Exact current hardened Z3 launch is best retained as a tiny C FFI primitive. \\
-Is a complete rewrite advisable when work is not counted against it? & \textbf{Yes, for the Lean-only target.} It removes accidental representation crossings, gives exact source identity, improves integration and proof opportunities, and eliminates irrelevant Haskell frontends. \\
+Is a complete rewrite advisable when work is not counted against it? & \textbf{Yes, for the Lean-only target}, as the state to design toward. It removes accidental representation crossings, gives exact source identity, improves integration and proof opportunities, and eliminates irrelevant Haskell frontends. What should be committed to now is Hybrids 1 and 3, with the remaining phases gated on measured Djinn and Exference results (\autoref{sec:gates}). \\
 Should the result be one process? & \textbf{No, not as the default standalone design.} Preserve a project-local worker for toolchain and fault isolation. \\
 Should Djex use Lean's raw \code{Expr}/metavariable state as its search language? & \textbf{No.} Keep a pure neutral IR and exact origin map; use MetaM at preparation/lowering boundaries. \\
 Does rewriting in Lean make negative results formally proved? & \textbf{No, not automatically.} It enables proofs of checker/search/translation components, but source-projection completeness remains a separate obligation. \\
