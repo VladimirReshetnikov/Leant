@@ -59,10 +59,14 @@ Executable leant
     Leant.Synth.Length.Presentation
     Leant.Synth.Length.Ranking
     Leant.Synth.Length.Ranking.Internal
+    Leant.Synth.Length.Selection
+    Leant.Synth.Length.Selection.Internal
     Leant.Synth.Length.SpinePair.PostVerification
     Leant.Synth.Length.SpinePair.PostVerification.Internal
     Leant.Synth.Length.SpinePair.Ranking
     Leant.Synth.Length.SpinePair.Ranking.Internal
+    Leant.Synth.Length.SpinePair.Selection
+    Leant.Synth.Length.SpinePair.Selection.Internal
     Leant.Synth.Observability
     Leant.Synth.PostVerification
     Leant.Synth.ProviderCache
@@ -119,10 +123,14 @@ Test-Suite leant-synth-tests
     Leant.Synth.Length.Presentation
     Leant.Synth.Length.Ranking
     Leant.Synth.Length.Ranking.Internal
+    Leant.Synth.Length.Selection
+    Leant.Synth.Length.Selection.Internal
     Leant.Synth.Length.SpinePair.PostVerification
     Leant.Synth.Length.SpinePair.PostVerification.Internal
     Leant.Synth.Length.SpinePair.Ranking
     Leant.Synth.Length.SpinePair.Ranking.Internal
+    Leant.Synth.Length.SpinePair.Selection
+    Leant.Synth.Length.SpinePair.Selection.Internal
     Leant.Synth.Observability
     Leant.Synth.PostVerification
     Leant.Synth.ProviderCache
