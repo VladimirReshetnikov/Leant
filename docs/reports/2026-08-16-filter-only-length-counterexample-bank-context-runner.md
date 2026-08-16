@@ -302,8 +302,66 @@ remains forward-looking for a scheduler-owned full-command bank, cross-lane
 enumeration, typed sketches, sound prefix pruning, further domains, and
 Lean-checked proof artifacts.
 
-The maintained PDFs are generated artifacts and are intentionally unchanged in
-the source-document checkpoint. An artifact-only successor will pin the
-walkthrough to the exact frozen source-document commit, complete this section
-with final hashes and rendered checks, and regenerate only the manual and
-walkthrough PDFs from clean temporary directories.
+The documentation source was frozen and pushed at
+`feb234ff770faf2e42106a01f6473c48410f1152`. The artifact-only successor
+updates the walkthrough's Leant blob base, title-page snapshot, and
+repository-tree link to that exact commit while retaining the vendored Djex
+revision `f957549e36a63cd6003f5edef4ab8a867221813f`. The prepared date remains
+August 16, 2026, matching the source checkpoint.
+
+The final documentation sources are:
+
+| File | Lines | SHA-256 |
+| --- | ---: | --- |
+| `docs/Leant.tex` | 1,827 | `eec0a7ff99e34a20bfdc4d49975c4ffed7a4879f4c76da8107ff46fda1789552` |
+| `docs/Djex_Leant_Codebase_Walkthrough/Djex_Leant_Codebase_Walkthrough.tex` | 3,248 | `bedd414f98d466095e1d60de2916397bd7f20b82724f29e2dc7131d9f6b282f1` |
+
+Both maintained PDFs were regenerated from new empty temporary directories
+with three fail-fast passes apiece: LuaLaTeX for the manual and pdfLaTeX for
+the walkthrough. Their final measurements are:
+
+- `docs/Leant.pdf`: 30 pages, 186,396 bytes, SHA-256
+  `500e61282c7dead6911e8478b7452cb5f02facc15cb66f38898fad06828f65b2`;
+  and
+- `docs/Djex_Leant_Codebase_Walkthrough/Djex_Leant_Codebase_Walkthrough.pdf`:
+  117 pages, 773,353 bytes, SHA-256
+  `cd07f685baa3db78c7664b9ae4e0a142de195c5f0a85aaa0247da737bec56bfa`.
+
+The final logs contain no undefined citation or reference, rerun request,
+missing glyph, fatal diagnostic, or TeX error. The manual retains one
+nonfatal LuaTeX duplicate-`page.1` destination warning and six underfull box
+diagnostics in the expanded behavioral section. The walkthrough retains four
+underfull lines in the fixed descriptor-launch quotation and one pre-existing
+overfull binder-hygiene paragraph containing long fixed identifiers. PDF
+metadata inspection, text extraction, image-table scanning, and font
+inspection all succeed. Neither PDF contains a raster-image payload, and every
+font is embedded and subsetted with a Unicode mapping.
+
+Extracted manual text contains the raw rank/direct-Selection MRU boundary,
+fresh-per-assessment Integration context, nominal-bank transition and origin
+rules, Main and persistence ceiling, and this report path. Its eleven URL
+annotations include ten relative report targets, all present in the tree.
+Extracted walkthrough text contains the exact full title-page snapshots,
+context-aware filter narrative, nominal-bank module map, 22,240/439/438 test
+inventory, 438/438 result, current report links, and abbreviated pinned-tree
+labels.
+
+The walkthrough has 236 URL annotations. All 179 Djex source links use the
+exact `f957549e36a63cd6003f5edef4ab8a867221813f` blob root, all 50 Leant source
+links use the exact `feb234ff770faf2e42106a01f6473c48410f1152` blob root, and
+the two repository-tree links use those same full commits. No prior
+`0611e2c`, `30bbb0a`, `d3a57be`, `a9150c`, or `6802674` pin remains in the
+walkthrough source, extracted text, or URL annotations.
+
+A same-resolution comparison against the source-checkpoint artifacts found
+changed rasters on the manual's physical pages 26--30 and the walkthrough's
+physical pages 1, 11--27, 93--94, and 116. Every changed page was
+raster-inspected. The new manual narrative, exact title snapshot, behavioral
+addendum, nominal-bank module tables and runtime summary, test inventory, and
+pinned-tree appendix are readable without clipping or overlap.
+
+This evidence section, the walkthrough pin refresh, and the two regenerated
+PDFs form a four-file artifact delta after the frozen source-document commit.
+They change no Haskell production or test source, Cabal file, vendored Djex
+file, manual TeX, normative Markdown reference, or earlier point-in-time
+report.
