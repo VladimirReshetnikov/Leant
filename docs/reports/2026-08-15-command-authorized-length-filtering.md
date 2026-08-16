@@ -179,9 +179,31 @@ The command characterization is frozen in
 - the strict warning-as-error test target and executable both build cleanly.
 
 The production and test commits remain separate so the evidence does not claim
-to predate the source it characterizes. The final documentation source pin and
-rendered-document measurements are recorded only after the documentation
-snapshot is frozen.
+to predate the source it characterizes. The normative documentation source was
+then frozen and pushed at
+`1e2bc44f51268233f31cf24b27f565d90671fb3d`. The walkthrough resolves Leant
+source and tree links against that exact checkpoint while retaining the Djex
+checkpoint `a9150c77623767f187d64af5d3cd75ec1194f67b`.
+
+The two rendered artifacts were rebuilt from clean temporary directories with
+three fail-fast TeX passes apiece. Their final measurements are:
+
+- `docs/Leant.pdf`: 29 pages, 181,808 bytes, SHA-256
+  `9566a6a3848bd869fc63d01de4ef1b976d0321b7f0349b38996a7ad34ce4106f`;
+- `docs/Djex_Leant_Codebase_Walkthrough/Djex_Leant_Codebase_Walkthrough.pdf`:
+  115 pages, 761,614 bytes, SHA-256
+  `926f679bdad77c6d19f26e3affed5300f4a43b80d071fcbd07a431af5b66776e`.
+
+Both final passes have stable references with no undefined citation or
+reference, rerun request, missing glyph, or fatal TeX diagnostic. The remaining
+non-fatal layout diagnostics are inherited from fixed long text and do not
+affect the new command-authority material. The manual command table was also
+inspected from a rasterization of physical page 5: its short option labels,
+descriptions, and separate exact-grammar block are readable and do not overlap.
+This final evidence paragraph,
+walkthrough checkpoint refresh, and the two generated PDFs form a narrow
+artifact delta after the frozen documentation source; they change no
+production or test source.
 
 ## Documentation boundary
 
