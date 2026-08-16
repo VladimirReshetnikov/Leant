@@ -167,8 +167,35 @@ early occurrences without additional live queries. The tests also pin:
 
 The production, boundary-comment, and test commits remain separate so the
 evidence does not claim to predate the source it characterizes. The final
-documentation source pin and rendered-document measurements are recorded only
-after the documentation snapshot is frozen.
+documentation source was then frozen and pushed at
+`6802674ecd0814ee9f17c2b9a0b64ed3e0085918`. The walkthrough resolves Leant
+source and tree links against that exact checkpoint while retaining the Djex
+checkpoint `a9150c77623767f187d64af5d3cd75ec1194f67b`.
+
+Both rendered artifacts were rebuilt from clean temporary directories with
+three fail-fast TeX passes apiece. Their final measurements are:
+
+- `docs/Leant.pdf`: 29 pages, 182,610 bytes, SHA-256
+  `35ef5d60b6bd3aa330d51873a5727d7aef676b29ec19716de3fd046190db26b3`;
+- `docs/Djex_Leant_Codebase_Walkthrough/Djex_Leant_Codebase_Walkthrough.pdf`:
+  115 pages, 765,015 bytes, SHA-256
+  `322704206b9ec229abcf75dc173da67ec41ba1e65c281cb7b6134a0e4fd708e4`.
+
+Both final logs have stable references with no undefined citation or
+reference, rerun request, missing glyph, or fatal TeX diagnostic. The remaining
+non-fatal layout diagnostics are one underfull manual paragraph and four
+underfull plus one fixed-long-path overfull walkthrough diagnostics. Extracted
+text pins the new lane-local limits, survivor/rejection behavior, frozen test
+metrics, full Leant snapshot, and short tree label. Extracted PDF links resolve
+Leant source paths through `6802674ecd0814ee9f17c2b9a0b64ed3e0085918`
+and Djex paths through `a9150c77623767f187d64af5d3cd75ec1194f67b`, with no
+old Leant documentation pin. The manual's physical PDF pages 26--27 and the
+walkthrough's title, candidate funnel, unit-test, and limits pages were also
+raster-inspected; the new material is readable and does not overlap.
+
+This final evidence paragraph, the walkthrough pin refresh, and the two
+generated PDFs form a narrow artifact delta after the frozen documentation
+source. They change no production or test source.
 
 ## Documentation boundary
 
