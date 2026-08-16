@@ -40,8 +40,8 @@ There is a manual: **[docs/Leant.pdf](https://raw.githubusercontent.com/Vladimir
 - [Highlights](#highlights)
 - [Getting started](#getting-started)
 - [Usage](#usage) — command-line options and the command table
-- [Interactive proving — `:prove`](#interactive-proving-prove)
-- [`:synth` — automatic term synthesis](#synth-automatic-term-synthesis)
+- [Interactive proving — `:prove`](#interactive-proving--prove)
+- [`:synth` — automatic term synthesis](#synth--automatic-term-synthesis)
   - [Higher-order plumbing](#higher-order-plumbing)
   - [Programs you already know](#programs-you-already-know)
   - [Rank-N and impredicative goals](#rank-n-and-impredicative-goals)
@@ -153,11 +153,18 @@ ranking and its historical five-success verification frontier. An explicit
 `:synth --behavior-mode filter -- TYPE` may instead omit only candidates with
 an independently replayed counterexample to the activated startup contract;
 adding `--length-contract ABSOLUTE-PATH` uses that passive contract for this
-command. Filtering verifies and assesses each already bounded synthesis lane
-as one batch—at most 12 groups for a standalone engine, 24 for `both`, or 6
-for the excluded-middle classical route—so later same-lane survivors can
-replace early behavioral rejections. Before goal translation, Main now
-introduces one rank-2 assessment context for the admitted command. Its lexical
+command. Filtering consumes each ordinary lazy engine result through one
+opaque cursor. It verifies and assesses a first batch of at most 12 groups for
+a standalone engine or 24 for `both`; only no verification or complete
+behavioral rejection may request one successor batch of the same width. Thus
+an ordinary filter run can inspect at most 12+12 or 24+24 groups without
+rerunning synthesis. The excluded-middle classical route remains one six-group
+batch, while double negation uses the ordinary policy and a filter-only Djinn
+candidate cutoff of 60. Rank and disabled commands retain one batch. Every
+returned batch is verified and assessed exactly once, so a later same-run
+survivor can replace early behavioral rejections without reassessing earlier
+work. Before goal translation, Main introduces one rank-2 assessment context
+for the admitted command. Its lexical
 lifetime spans universe retries and every ordinary, provider, and classical
 lane. A filter context therefore owns one nominal scalar or product
 counterexample bank for the complete command, tries retained samples newest
@@ -166,13 +173,15 @@ candidate. Ordinary and explicit ranking keep the established raw four-vector
 MRU path unchanged; their contexts contain no bank.
 
 Failure to verify any candidate and successful behavioral all-rejection are
-distinct continuing lane results. Either lets the existing scheduler enter its
-next provider or classical lane, and either contributes the complete bounded
-spelling frontier to provider deduplication. A survivor or preserve-all
-assessment result remains terminal. This does not fill a five-survivor quota
-across lanes: the first later lane with any survivor stops scheduling, display
-and binding remain capped at five, and every rejection accumulated before that
-terminal lane stays visible. Raw `sat`, `unsat`, and `unknown`, preparation
+distinct continuing batch results. In the first ordinary filter batch, either
+may consume the one same-run successor. Only after that run finishes may its
+continuing result enter the next provider or classical route, carrying the
+complete chronological spelling frontier into provider deduplication. A
+survivor or preserve-all assessment result remains terminal. This does not fill
+a five-survivor quota within a run or across routes: the first batch with any
+survivor stops scheduling, display and binding remain capped at five, and every
+rejection accumulated before that terminal batch stays visible. Raw `sat`,
+`unsat`, and `unknown`, preparation
 refusal, unassessed input, and positive bounded evidence never authorize
 rejection or continuation as all-rejected. Any adapter, ranking, association,
 or partition-seal failure preserves the complete internal verified batch and
@@ -180,22 +189,32 @@ presents at most five candidates, although already completed bank transitions
 are cache effects and are not rolled back.
 
 One deferred command finalizer owns result metrics, warnings, bindings, cache
-mutation, candidate and rejection rows, and handled-lane notes. Ordinary
+mutation, candidate and rejection rows, and handled-batch notes. Complete
+spelling frontiers, observations, and debug group ordinals remain chronological
+across the at-most-two batches. Ordinary run notes attach once to the rightmost
+handled batch; an all-no-verification run retains them only for its final
+diagnostic, and classical handled outcomes remain note-free. Ordinary
 all-rejected exhaustion suppresses an unrelated no-term or Lean-verification
 diagnostic. A retained structural refutation still gates classical search and
-masks provider timeout/error as before, while completed lane outcomes remain
+masks provider timeout/error as before, while completed batch outcomes remain
 accounted for; without that fallback, completed outcomes are finalized before
-the unchanged abnormal diagnostic. This is a bounded command-local reuse and
-continuation slice, not a persistent or quota-filling CEGIS loop. No context or
-bank enters `ReplState`, history, snapshots, or another command.
+the unchanged abnormal diagnostic. Filter mode keeps the original absolute
+command deadline through both batches and both classical routes. Rank and
+disabled modes retain the historical classical policy: each reached excluded-
+middle and double-negation route independently receives a fresh configured-
+duration deadline; a zero timeout remains unbounded. This is a bounded command-
+local reuse and continuation slice, not a persistent or quota-filling CEGIS
+loop. There is no third cursor probe, engine rerun, batch reassessment, or
+survivor quota fill, and no context or bank enters `ReplState`, history,
+snapshots, or another command.
 The complete reference — including the fixed command grammar, current
 versionless startup and contract-only schemas (`rankingDomain` is `scalar` or
 `binary-product`), unchanged raw rank MRU, one lexical command assessment
 context and filter bank, origin probe, bounded validation, rejection rules,
 and presentation — is
 [docs/length-ranking.md](docs/length-ranking.md).
-The exact Main scheduler landing and validation evidence are recorded in the
-[command-local counterexample-bank scheduler report](docs/reports/2026-08-16-command-local-length-counterexample-bank-scheduler.md).
+The exact progressive Main landing and validation evidence are recorded in the
+[progressive same-run Length filter batching report](docs/reports/2026-08-16-progressive-same-run-length-filter-batching.md).
 
 Applicable-domain ranking now has one current recursive piecewise-affine
 algorithm. Library callers use
@@ -767,8 +786,14 @@ classical attempt
 (disable with `:set synth-classical off`): first with an
 excluded-middle case split per atomic subformula, then—after either no
 verification or complete behavioral all-rejection—via the Glivenko double-
-negation translation wrapped in `Classical.byContradiction`. Both attempts use
-the same command-local assessment context and are finalized together.
+negation translation wrapped in `Classical.byContradiction`. Excluded middle
+remains one six-group batch. A filter-mode double-negation run may consume its
+ordinary 12+12 or 24+24 frontier, while rank and disabled modes consume one
+12- or 24-group batch. Both attempts use the same command-local assessment
+context and are finalized together. Filtering also keeps the command's
+original absolute deadline through both routes; rank and disabled commands
+allocate a fresh configured-duration deadline separately at each route they
+actually reach.
 Peirce's law has no constructive inhabitant — `:synth` proves that,
 then answers the classical question with a term whose spelling shows
 exactly what was used:
@@ -1046,11 +1071,13 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   Within each Exference invocation, Leant stable-deduplicates rendered groups
   before applying the internal 60-candidate collection window. The first
   spelling remains authoritative, while repeated backend derivations cannot
-  consume slots ahead of later distinct terms; the outer 12/24-group
-  frontiers then apply as above. Ranking stops after five accepted groups;
-  filtering may verify and assess that complete same-lane prefix before its
-  five-survivor presentation cap. Combined exact-text deduplication likewise
-  keeps the first display occurrence. If that occurrence has no typed
+  consume slots ahead of later distinct terms. Ranking and disabled commands
+  retain one outer 12/24-group batch and ranking stops after five accepted
+  groups. Filtering may consume one successor of the same width after a first
+  no-verification or all-rejected batch, for a 12+12 standalone or 24+24
+  combined maximum from the same engine outcome, before its five-survivor
+  presentation cap. There is no third probe. Combined exact-text deduplication
+  likewise keeps the first display occurrence. If that occurrence has no typed
   authority, the exact spelling may lazily retain the first bounded later
   Exference origin solely for checked behavioral preparation; route metrics,
   ordinals, sibling variants, and displayed order do not change.
@@ -1060,9 +1087,9 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   baseline lane. Its rendered candidates are checked by Lean first, and live
   providers are discovered whenever no baseline term verifies or an authorized
   filter rejects every verified baseline occurrence. The same command-local
-  filter bank and accumulated rejection history cross those lanes. A complete
+  filter bank and accumulated rejection history cross those runs. A complete
   Djinn refutation is retained provisionally while the constructive provider
-  lanes run: the first lane with any surviving or preserve-all result wins,
+  lanes run: the first batch with any surviving or preserve-all result wins,
   while empty, all-rejected, unavailable, timed-out, or unsuccessful provider
   search restores the proof-backed control-flow fallback. Completed provider
   outcomes are not discarded. Only then does the explicit classical fallback
@@ -1072,10 +1099,11 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   first 4 and 16 providers before the full bounded inventory after verified
   misses; Exference keeps its internally rated full-inventory lane. Combined
   mode runs both engines for the singleton and full lanes but uses Djinn alone
-  for the intermediate prefixes. All lanes consume one command-wide
-  `LEANT_SYNTH_TIMEOUT` deadline. Before a later lane is forced or capped,
-  every spelling in an earlier no-verified or all-rejected bounded frontier is
-  removed from each source stream and newly empty groups are dropped.
+  for the intermediate prefixes. Baseline and provider lanes consume one
+  command-wide `LEANT_SYNTH_TIMEOUT` deadline, including both batches of a
+  filter run. Before a later provider lane is forced or capped, every spelling
+  in an earlier completed no-verified or all-rejected run frontier is removed
+  from each source stream and newly empty groups are dropped.
   Rediscovered candidates therefore consume no fresh lane quota. Continuation
   does not collect five survivors across lanes: one survivor is terminal. This
   policy
@@ -1147,8 +1175,12 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   guard (default 20 s, `LEANT_SYNTH_TIMEOUT=N`, `0` waits indefinitely)
   covers quantified goals whose bounded instantiation widens the
   space. The same deadline covers the baseline and every provider fallback
-  rather than restarting for each lane; hitting it is reported as "no answer",
-  never as a verdict.
+  rather than restarting for each lane; filter mode carries that original
+  absolute deadline through excluded middle and double negation as well. Rank
+  and disabled modes preserve their historical classical budgets by capturing
+  an independent fresh configured duration at each classical route actually
+  reached. Hitting any such boundary is reported as "no answer", never as a
+  verdict.
 - `LEANT_SYNTH_DEBUG=1` prints the translated fragment, discovered providers,
   rendered variants, and stable `code=count` verification metrics — the
   fastest way to see why a candidate was dropped and how much Lean work the

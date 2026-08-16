@@ -41,7 +41,7 @@ who wants the *what* can stop at the paragraph.
   - [Contract-only files and the length-contract command](#contract-only-files-and-the-length-contract-command)
   - [Integration and one-shot contracts](#integration-and-one-shot-contracts)
 - [Opaque detailed synthesis cursor foundation](#opaque-detailed-synthesis-cursor-foundation)
-- [Main's bounded lane outcome and command-local scheduler](#mains-bounded-lane-outcome-and-command-local-scheduler)
+- [Main's progressive same-run cursor scheduler](#mains-progressive-same-run-cursor-scheduler)
 - [Contract vocabulary and module ownership](#contract-vocabulary-and-module-ownership)
 - [Post-verification sealing](#post-verification-sealing)
   - [The behavioral-selection partition seal](#the-behavioral-selection-partition-seal)
@@ -1073,124 +1073,135 @@ recovered-origin lookup, the successor, or the unselected tail. Terminal steps
 use the same error/note `String`-list-spine or
 soundness-`Bool` boundary as the established `forceDetailedOutcome`; that older
 helper is factored through the same private group/note forcing functions and
-remains Main's only engine force target. The cursor helper does not itself
-install a timeout.
+retains its compatibility force boundary. Main now uses the cursor-step helper.
+Neither helper installs a timeout.
 
-This foundation is deliberately dormant in the executable. `src/Main.hs`
-imports none of the new cursor or batch surface and still forces one 12-, 24-,
-or excluded-middle 6-group lane through `forceDetailedOutcome`, verifies and
-assesses that lane once, and stops on its first survivor or preserve-all
-result. The cursor owns no assessment context, counterexample bank, provider
+`src/Main.hs` consumes this surface without reconstructing either opaque
+representation. It imports the cursor and step types, visible terminal
+constructors, start/advance operations, batch accessors, and force helper, but
+not the hidden `DetailedCandidateBatch` or `DetailedSynthCursor` constructors.
+The cursor still owns no assessment context, counterexample bank, provider
 deduplication, note-presentation policy, survivor quota, `ReplState` field, or
-counterexample-directed engine request. Progressive same-run batching remains
-a separate scheduler change.
+counterexample-directed engine request; those private orchestration choices
+remain in Main.
 
-## Main's bounded lane outcome and command-local scheduler
+## Main's progressive same-run cursor scheduler
 
-Each `verifySynthLane` caller passes the exact group bound it already owns.
-Main immediately takes that prefix and returns a lazy unassessed
-`SynthLaneOutcome` on an empty result before projecting the context's behavior
-mode. Ordinary, universe-retry, provider, and full double-negation calls pass
-`synthVerificationWindow` for the current engine: 12 for either standalone
-engine and 24 for `EngineBoth`. The cheaper excluded-middle route passes half
-of `synthMaxTried`, currently 6.
+Main adds three private, lazy representation boundaries with no `Eq` or `Show`
+instance. `SynthLaneCursorPolicy` owns the batch width, the filter-successor
+permission, and ordinary-note retention. `SynthLaneRunEnd` distinguishes
+stopped-by-disposition, policy completion, natural exhaustion, hard cap,
+timeout, cursor-admission failure, engine failure, refutation, and no term.
+`SynthLaneRun` retains the updated command accumulation, chronological
+same-run spelling frontier, cumulative candidate-group count, run notes, and
+that terminal reason. None is exported or stored in `ReplState`.
 
-Private `synthVerify` receives a mode-dependent successful-group quota. Ranking
-keeps `synthMaxShown`, currently 5. Filtering receives the caller's complete
-lane bound. The prior finite `take` is mandatory because
-`verifyCandidateGroups` counts successful groups; a failed group must not let a
-lazy or cyclic tail escape the lane limit. `Leant.Synth.Verification` itself is
-unchanged.
+`ordinarySynthLaneCursorPolicy` uses `synthVerificationWindow`: 12 for either
+standalone engine and 24 for `EngineBoth`. Rank and disabled contexts disallow
+a successor. Filter contexts allow one. The excluded-middle policy always uses
+half of `synthMaxTried`, currently 6, and disallows a successor. Double
+negation uses the ordinary policy; its tuned Djinn candidate cutoff remains 12
+for rank and disabled modes and becomes `candidateWindow`, currently 60, for
+filter mode. Thus filter-mode standalone and combined runs observe at most
+12+12 and 24+24 groups respectively, while EM remains six. The 48-group maximum
+stays below Engine's cumulative 60-group cap.
 
-`SynthLaneOutcome` retains two noninterchangeable histories. The complete
-bounded `concatMap detailedCandidateGroupVariants` spelling frontier is the
-existing provider-deduplication authority. It includes every variant in the
-bounded groups even when lazy callback verification does not reach it. The
-separate `[DetailedVerificationVariant]` trace is appended immediately before
-each backend callback; it contains failed variants before an acceptance, but
-not later siblings of an accepted group or groups beyond the success quota.
-Current scheduling uses only the complete spelling frontier. Both a no-verified
-and an all-behaviorally-rejected outcome union it into the checked set before a
-later provider stage. The exact callback trace is retained for accounting and
-cannot silently narrow provider deduplication.
+`runDetailedSynthCursorBefore` calls `advanceDetailedSynthCursor` before the
+timeout branch. Valid admission is non-demanding by Engine's contract. With no
+deadline it forces the selected step directly; otherwise it computes the
+remaining duration from the supplied absolute deadline and evaluates
+`forceDetailedSynthCursorStep` beneath `timeout`. It neither captures a new
+deadline nor forces the successor or unselected tail.
 
-The resulting `VerificationBatch` is assessed exactly once and retained beside
-that assessment in a private `AssessedSynthLane`. Every call receives the one
-`LengthAssessmentContext command` introduced by `synthRun`; filter mode can
-therefore reuse a same-scope bank successor from a preceding lane. Rank mode
-still selects the raw-MRU runner through a bank-free context. `verifySynthLane`
-owns the Lean callbacks and optional Length work but emits no result metrics,
-warning, candidate or rejection row, or engine note; it neither binds a
-candidate nor changes the synthesis-splice cache. Its fields remain lazy, and
-the private types deliberately derive neither `Eq` nor `Show`.
+`runSynthLaneCursor` calls `startDetailedSynthCursor` once for the retained
+outcome and owns the only advance site. Every candidate step maps its optional
+classical transform over the selected groups, advances the cumulative count,
+emits ordinary debug spellings with ordinals continuing from that count, and
+calls `verifySynthLane` once. Only `SynthLaneNoVerified` and
+`SynthLaneAllBehaviorallyRejected` reach `continueOrStop`; survivor and
+preserve-all finish as `SynthLaneRunStoppedByDisposition`.
 
-The pure `synthLaneDisposition` classifies four cases:
+The continuation guard is literal: the policy must allow a successor and the
+current ordinal must be less than two. A continuing second batch therefore
+finishes as `SynthLaneRunBatchPolicyReached` without a third advance, even just
+to decide whether the tail is empty. Natural exhaustion and the hard cap are
+recorded only when the corresponding Engine step was actually observed. The
+driver maps every other terminal cursor step and a timeout/admission failure to
+the matching `SynthLaneRunEnd` without flattening the result.
 
-- `SynthLaneNoVerified` for an unassessed empty lane or, as the first and sole
-  assessed-lane gate, an empty `verifiedCandidateReceipts` batch;
-- `SynthLaneSurvivors` for an ordinary accepted presentation, carrying the
-  at-most-five survivors and complete rejection projection;
+Each `verifySynthLane` call takes its supplied batch bound before projecting
+behavior mode. Private `synthVerify` receives `synthMaxShown`, currently 5, in
+rank mode and the complete current batch width in filter mode. The exact
+`VerificationBatch` is assessed once and retained with its one
+`LengthAssessmentResult` in `AssessedSynthLane`. The driver contains no engine
+invocation and no verification or assessment path around its one
+`verifySynthLane` call per candidate batch. It therefore cannot rerun
+synthesis, reverify a previous batch, or reassess it. Both batches receive the same
+`LengthAssessmentContext command`; a filter bank successor is therefore
+available to the second batch.
+
+`SynthLaneOutcome` still retains two noninterchangeable histories. Its complete
+`concatMap detailedCandidateGroupVariants` spelling frontier includes every
+variant in the current batch even when lazy callback verification did not reach
+it. Its `[DetailedVerificationVariant]` trace records only actual callbacks.
+`SynthLaneRun` reverses its at-most-two buffered outcomes into chronological
+order, folds them into the command's reverse accumulation, and concatenates
+their complete frontiers in that same order. Later provider deduplication uses
+only the run frontier; callback attempts never become scheduling authority.
+
+The pure `synthLaneDisposition` remains four-way:
+
+- `SynthLaneNoVerified` for an unassessed empty batch or an assessed batch with
+  no verified receipt;
+- `SynthLaneSurvivors` for an accepted presentation, carrying at most five
+  survivors and its complete rejection projection;
 - `SynthLaneAllBehaviorallyRejected` when an accepted assessment has only
   rejection rows; and
 - `SynthLaneAssessmentPreserved` when assessment failure preserves the
   original verified batch.
 
-The defensive callback-verified/no-presentation branch is terminal
-`SynthLaneSurvivors [] []`, never no-verification. This keeps a future
-presentation-contract regression from gaining provider/classical continuation
-authority.
+The defensive callback-verified/no-presentation branch remains terminal
+`SynthLaneSurvivors [] []`. Continuing after NV or AR does not fill a survivor
+quota: the first S or P batch stops, even with one survivor, and there is never
+a third same-run batch.
 
-`SynthLaneAccumulation` is a positional newtype over a lazy list in reverse
-attempt order. `accumulateSynthLaneOutcome` prepends without forcing a prior
-outcome. The pure `synthLaneAccumulationDisposition` folds chronological lane
-dispositions: no-verification adds nothing; all-rejection appends its complete
-rejection projection; the first survivor or preserve-all disposition supplies
-the only candidate presentation and terminates the effective fold. A defensive
-guard ignores every later disposition, although the scheduler never appends
-after a terminal result.
+Engine notes arrive unchanged on every cursor batch, but Main assigns them only
+after the run ends. `attachNotesToRightmostHandled` walks the reverse same-run
+outcomes, skips no-verification, and attaches the notes once to the newest
+all-rejected, survivor, or preserve-all outcome. If all outcomes are
+no-verification, the notes remain only in `SynthLaneRun` for the final candidate
+or no-term diagnostic. Both classical policies disable handled-note retention.
 
-`finalizeSynthLaneAccumulation` is the sole effect owner. It reverses the raw
-history once. Every retained outcome may emit chronological debug metrics for
-forensic accounting, while only the effective prefix through the first
-terminal outcome supplies warnings, aggregate state and rows, and handled
-notes. Survivor or preserve-all candidate rows print first. Their rejection
-rows are the prior continuing all-rejected rows followed by terminal-lane
-rejections. Notes follow in chronological all-rejected-then-terminal order;
-no-verification notes are withheld. Aggregate all-rejection clears the splice
-cache once. A survivor or preserve-all result performs reverse binding/cache
-replacement once. Verification never re-runs, and no lane is finalized before
-the command reaches its terminal or reporting boundary.
+`classicalSynthLaneDeadline` is behavior-mode sensitive. Filter mode returns
+the original command deadline without reading the environment or clock, so
+ordinary work, both batches, excluded middle, and double negation share one
+absolute budget. Rank and disabled modes read `LEANT_SYNTH_TIMEOUT` and capture
+a fresh full duration independently at each reached EM and NN entry. A skipped
+route captures nothing, a terminal EM prevents the NN capture, and a nonpositive
+configured duration returns the established unbounded `Nothing`.
 
-Both `SynthLaneNoVerified` and `SynthLaneAllBehaviorallyRejected` continue
-through provider stages and from excluded middle to double negation. Survivors
-and preserve-all assessment failure are terminal. This is not a cross-lane
-five-survivor quota: ranking still stops at five accepted groups, filtering
-still uses each caller-owned 12/24/6 bound, and the first lane with one survivor
-stops scheduling. That scheduler checkpoint added no engine-side
-counterexample request, prefix pruning, `Engine` or `Verification` API,
-persistent state, or `ReplState` field. The later additive Engine cursor
-foundation remains outside this Main path and changes none of those scheduling
-claims.
+`SynthLaneAccumulation` remains a positional lazy reverse history. Its pure fold
+uses the chronological prefix through the first terminal outcome.
+`finalizeSynthLaneAccumulation` remains the sole effect owner: chronological
+metrics, effective warnings, one final cache/binding phase, candidate and
+rejection rows, and handled notes. Aggregate all-rejection clears once;
+survivor or preserve-all replaces once. No batch is finalized early.
 
-Reporting keeps structural authority separate from behavioral handling. On
-ordinary candidate, no-term, or non-sound-refutation exhaustion, aggregate
-all-rejection suppresses the unrelated generic diagnostic and final engine
-notes; aggregate no-verification keeps the old diagnostic. Without a sound
-fallback, timeout/error first finalizes completed outcomes, then emits the
-unchanged abnormal diagnostic and timeout hint, with no later generic notes.
+Only a completed continuing run reaches another provider stage, contributing
+its concatenated spelling frontier. Provider timeout/error remains masked by a
+retained sound provider-free refutation, while completed outcomes survive in
+the accumulation. The sound-refutation path passes the original command
+deadline into `synthClassical`; EM no-verification or all-rejection reaches NN,
+while survivor or preserve-all stops. `synthClassical` never finalizes. Its
+caller retains the established provably-uninhabited, unresolved-universe, and
+constructive/classical-hint gates.
 
-A provider-free sound refutation remains the fallback control-flow result.
-Provider timeout/error stays masked by it, but completed provider outcomes stay
-in the accumulation. The sound-refutation path passes that accumulation into
-`synthClassical`. When the Glivenko split exists, excluded middle is always
-accumulated; no-verification or all-rejection enters double negation, survivor
-or preserve-all stops, and a double-negation outcome is accumulated only when
-that run actually returns candidates. `synthClassical` performs no
-finalization. Its caller finalizes once, then emits the old provably-uninhabited
-claim and constructive/classical
-hint only for aggregate no-verification. The unresolved-universe annotation
-remains on its existing goal-qualified path for every aggregate disposition,
-between claim and hint when both exist.
+Without a sound fallback, timeout, cursor-admission failure, or engine failure
+first finalizes completed outcomes and then emits the corresponding abnormal
+diagnostic. Ordinary aggregate all-rejection still suppresses unrelated no-
+verification/no-term text. This scheduler adds no quota fill, engine rerun,
+reassessment, counterexample-directed request, prefix pruning, public Engine or
+Verification API, persistence, or `ReplState` field.
 
 The current reset is recorded in the
 [versionless Length contract report](reports/2026-08-15-versionless-length-contract.md).
@@ -1206,6 +1217,8 @@ The command-local scheduler successor is recorded in the
 [command-local counterexample-bank scheduler report](reports/2026-08-16-command-local-length-counterexample-bank-scheduler.md).
 The later Engine-only observation seam is recorded in the
 [opaque detailed synthesis cursor report](reports/2026-08-16-opaque-detailed-synthesis-cursor-foundation.md).
+Its progressive Main runtime successor is recorded in the
+[same-run Length filter batching report](reports/2026-08-16-progressive-same-run-length-filter-batching.md).
 The older [one-shot contract report](reports/2026-08-13-one-shot-length-contract.md)
 and the reports below remain useful landing history, but their version routing
 and public API names are not current contracts. The historical modulo QF_LIA
@@ -1364,12 +1377,13 @@ box and applicable-domain evidence keeps the existing positive note. Rejection
 uses the existing bounded counterexample or simplification renderer verbatim.
 Main binds only the survivor presentations as `itN` and prints omitted
 occurrences separately as `rejected`. An accepted all-rejected partition is a
-handled lane result but now remains pending in the command accumulation: it may
-enter the next provider or classical lane with no new binding or immediate
-cache mutation. Final aggregate all-rejection prints every accumulated row and
-clears the old synthesis-splice cache once. A later terminal survivor or
-preserve-all result prints its candidate rows before the retained earlier
-rejections. Partial and zero-rejection selections remain terminal. Assessment
+handled batch result but remains pending in the command accumulation. It may
+consume the one permitted same-run successor; only a completed continuing run
+may enter the next provider or classical route, with no new binding or
+immediate cache mutation. Final aggregate all-rejection prints every
+accumulated row and clears the old synthesis-splice cache once. A later terminal
+survivor or preserve-all batch prints its candidate rows before the retained
+earlier rejections. Partial and zero-rejection selections remain terminal. Assessment
 failure prints one mode-neutral preserve-all warning, retains the complete
 verification batch, and shows at most five unannotated original candidates.
 

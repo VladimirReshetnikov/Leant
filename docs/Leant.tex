@@ -1316,11 +1316,16 @@ propositional logic. The findings are rendered as \code{Classical.em}
 case splits. If that misses, the goal's double-negation translation runs
 instead (complete by Glivenko's theorem) and the candidate is wrapped
 in \code{Classical.byContradiction}. Both kinds are verified like any
-other candidate. An explicit behavioral filter uses the same command-local
-bank in both routes: either no verification or complete all-rejection in the
-excluded-middle lane enters double negation, while any survivor or
-preserve-all result stops. The sound-refutation caller accumulates both attempts and
-finalizes them only once. The whole behavior sits behind a switch:
+other candidate. Excluded middle remains one six-group batch. An explicit
+behavioral filter uses the same command-local bank in both routes: either no
+verification or complete all-rejection enters double negation, whose ordinary
+cursor policy may inspect 12+12 standalone or 24+24 combined groups from one
+engine outcome. Any survivor or preserve-all result stops, with no third
+cursor probe. Filtering retains the original command deadline through both
+routes. Rank and disabled commands instead preserve their historical classical
+budgets by capturing a fresh configured duration separately at each route they
+actually reach. The sound-refutation caller accumulates every completed batch
+and finalizes only once. The whole behavior sits behind a switch:
 
 \begin{session}
 λ> :set synth-classical off
@@ -1470,18 +1475,19 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
 The default engine is Djinn: complete, terminating, and the only
 source of refutations. \code{:set synth-engine exference} switches to
 the ranked heuristic search, and \code{both} runs the two together ---
-negative verdicts still come only from Djinn. Standalone lanes send at
-most 12 fresh candidate groups to Lean. A combined lane gets 24 and
+negative verdicts still come only from Djinn. One standalone batch sends at
+most 12 fresh candidate groups to Lean. A combined batch gets 24 and
 retains both standalone frontiers: writing D and E for fresh Djinn and
 Exference groups, its order is \code{D1–D4, E1–E12, D5–D12}, then
 alternating tails. Within each Exference invocation, Leant
 stable-deduplicates rendered groups before applying the internal 60-candidate
 collection window. The first spelling remains authoritative, while repeated
 backend histories cannot hide later distinct terms behind the bound; the
-outer 12- and 24-group verification frontiers then apply.
+outer 12- and 24-group batch frontiers then apply.
 
-Independently of the executable scheduler, \code{Leant.Synth.Engine} now
-exports an opaque \code{DetailedSynthCursor} over one lazy detailed outcome.
+\code{Leant.Synth.Engine} exports an opaque \code{DetailedSynthCursor} over one
+lazy detailed outcome, and Main now consumes it for bounded filter
+progression.
 For a nonempty candidate outcome below the cap, an admitted request of 1
 through 60 returns a nonempty ordered batch and a lazy successor; cumulative
 observation stops at the existing product-wide 60-group hard cap. Natural
@@ -1494,16 +1500,20 @@ spelling's \code{String} list spine through \code{length}, and traverses the
 run-note list spine and each note's \code{String} spine through \code{length}.
 It neither forces \code{Char} values nor performs text encoding, and leaves
 semantic sidecars, the successor, and the unselected tail lazy for a caller-owned
-deadline. Main imports none of this new surface and still uses the one-window
-behavior described here; the cursor is a foundation for a later progressive
-scheduler, not a new command behavior.
+deadline. Main imports the opaque cursor type without its constructor, the
+visible step taxonomy, batch accessors, and cursor operations. It neither names
+the hidden batch type nor imports either hidden constructor.
 
 Ordinary ranking retains its historical verifier stop after five accepted
-groups.  An explicit
-behavioral filter may instead verify the rest of that same bounded lane, assess
-the verified occurrences once, and refill early behavioral rejections from
-later same-lane survivors.  In either operation at most five candidates are
-displayed and bound.  Exference runs under
+groups and consumes one batch. An explicit behavioral filter verifies and
+assesses one complete 12-group standalone or 24-group combined batch. Only no
+verification or complete behavioral rejection may consume one successor of the
+same width from that cursor, giving 12+12 or 24+24 groups from one engine run.
+Every batch is verified and assessed exactly once through the same context;
+Main neither reruns the engine nor reassesses the first batch. Survivor and
+preserve-all stop immediately, and a continuing second batch stops without a
+third tail probe. In either operation at most five candidates are displayed and
+bound. Exference runs under
 explicit budgets
 (\code{:set synth-steps}, default 4096), and truncation is always
 reported:
@@ -1591,15 +1601,18 @@ one separately as rejected, and binds only survivors. A raw \code{sat},
 preparation refusal, unassessed input, heuristic status, completed finite box,
 or established applicable domain.
 
-Every assessment remains deliberately lane-bounded. A rank request asks Lean
-for at most five successful groups. A filter request first bounds its input,
-then may verify and assess up to all 12 groups in a standalone lane, all 24 in
-a combined lane, or all 6 in the cheaper excluded-middle classical route. Main
-introduces one rank-2 context before goal translation and carries it through
-universe retries and every ordinary, provider, and classical lane. Each
-verified frontier enters one assessment batch, while the filter context's one
-nominal scalar or product bank can replay an earlier counterexample against a
-later occurrence or same-scope lane. Existing ranking and direct Selection
+Every assessment remains deliberately batch-bounded. A rank request asks Lean
+for at most five successful groups and consumes one engine batch. A filter
+request may verify and assess two 12-group standalone or two 24-group combined
+batches from one cursor. The second is admitted only after no verification or
+complete all-rejection. Excluded middle stays one six-group batch; double
+negation uses the ordinary at-most-two-batch policy and a filter-mode Djinn
+candidate cutoff of 60. Main introduces one rank-2 context before goal
+translation and carries it through both batches, universe retries, and every
+ordinary, provider, and classical route. Each verified frontier enters exactly
+one assessment, while the filter context's one nominal scalar or product bank
+can replay an earlier counterexample against a later occurrence, successor
+batch, or same-scope lane. Existing ranking and direct Selection
 compatibility paths keep the raw four-vector MRU unchanged; rank contexts have
 no bank. Only after a terminal selection does Leant take at most five survivor
 presentations for display and binding; every accumulated rejection is still
@@ -1668,7 +1681,8 @@ candidate-report fallback.
 Integration introduces one reusable rank-2
 \code{LengthAssessmentContext}; repeated context assessments reuse its filter
 bank, while rank contexts contain no bank. Main now opens one context inside
-\code{synthRun} before initial translation and supplies it to every lane. Its
+\code{synthRun} before initial translation and supplies it to every cursor
+batch and later route. Its
 fresh-per-call compatibility request assessor remains for other callers. The
 rank-2 owner dies when the command returns and cannot enter REPL state.
 
@@ -1684,31 +1698,54 @@ roll back bank replay, promotion, or recording transitions which already
 completed. A
 surviving bounded-positive receipt keeps its established note. A rejected
 occurrence keeps its exact counterexample or simplification note. If all
-verified occurrences are rejected, the lane is handled but not yet finalized:
-like a no-verified lane, it may enter the next provider or classical route with
-the same bank and its complete spelling frontier in the deduplication set.
-Survivor and preserve-all results remain terminal.
+verified occurrences are rejected, the batch is handled but not yet finalized:
+like a no-verified batch, it may consume the one permitted same-run successor
+or enter the next provider or classical route with the same bank. Survivor and
+preserve-all results remain terminal.
 
-Main prepends each actual lane outcome to one private lazy accumulation in
-reverse attempt order. Each outcome keeps the complete bounded
-rendered-spelling frontier separate from the exact variants which reached Lean
-callbacks. Verification and assessment perform no candidate presentation or
-synthesis-splice mutation. A pure fold distinguishes no verified receipt,
-survivors, aggregate all-rejection, and preserve-all failure, stopping at the
-first terminal result. One deferred finalizer owns metrics, warnings, binding
-and cache effects, rows, and handled-lane notes. Terminal candidate rows print
-first; rejection rows are every earlier all-rejected projection followed by
-the terminal lane's rejections; handled notes retain that chronological order.
-No-verification contributes only its debug metrics. Final all-rejection clears
-the old splice cache once; survivor or preserve-all output replaces it once.
+Main wraps each lazy engine outcome once in the opaque cursor. Rank and disabled
+commands admit one candidate batch. Filter-mode ordinary, provider, and double-
+negation runs admit a second same-width batch only after no verification or
+all-rejection: at most 12+12 groups for a standalone engine and 24+24 for
+\code{both}. Excluded middle remains one six-group batch. The second batch ends
+the run without a third tail probe. Every batch is verified and assessed once
+through the command context; the cursor successor never reruns an engine.
 
-Continuation does not fill a five-survivor quota across lanes. The first lane
-with even one survivor stops scheduling, ranking retains its historical
-five-success quota, and filtering retains each 12/24/6 bound. On ordinary
+Each batch outcome keeps its complete bounded rendered-spelling frontier
+separate from the exact variants which reached Lean callbacks. One private run
+receipt restores the at-most-two outcomes to chronological order, concatenates
+their complete frontiers for provider deduplication, and preserves cumulative
+group counts and debug ordinals. It then prepends the outcomes to the existing
+lazy reverse command accumulation. Verification and assessment perform no
+candidate presentation or synthesis-splice mutation. A pure fold distinguishes
+no verified receipt, survivors, aggregate all-rejection, and preserve-all
+failure, stopping at the first terminal result.
+
+Ordinary run notes attach once to the chronologically rightmost handled batch.
+If every batch is no-verification, they remain only in the run receipt for the
+final diagnostic. Classical handled outcomes remain note-free. One deferred
+finalizer owns metrics, warnings, binding and cache effects, rows, and handled
+notes. Terminal candidate rows print first; rejection rows are every earlier
+all-rejected projection followed by the terminal batch's rejections. Final
+all-rejection clears the old splice cache once; survivor or preserve-all output
+replaces it once.
+
+Continuation does not fill a five-survivor quota within a run or across lanes.
+The first batch with even one survivor stops scheduling, ranking retains its
+historical five-success quota, and filtering retains each 12/24 batch width and
+the single six-group EM width. On ordinary
 all-rejected exhaustion the accumulated rejection output suppresses an
 unrelated no-term or Lean-verification diagnostic. Without a retained sound
-refutation, timeout or engine error finalizes completed outcomes first and then
-prints its unchanged abnormal diagnostic.
+refutation, timeout, cursor-admission failure, or engine error finalizes
+completed outcomes first and then prints its corresponding abnormal diagnostic.
+
+Filter mode uses the original absolute command deadline for every constructive
+run, both batches, excluded middle, and double negation; it does not recapture a
+clock at a classical boundary. Rank and disabled modes keep that command
+deadline for ordinary and provider work but preserve their historical
+classical budgets: each reached excluded-middle and double-negation route
+independently captures a fresh configured duration. A skipped route captures
+nothing, and timeout zero remains unbounded.
 
 A provider-free sound Djinn refutation still masks provider timeout/error and
 controls the later classical path, but completed provider outcomes stay in the
@@ -1724,9 +1761,9 @@ replay-input store, accumulation, and lane outcomes are never persistent REPL
 state. This is a bounded command-local reuse and continuation slice, not quota
 filling or the proposal's complete CEGIS loop: no engine accepts a
 counterexample-directed replacement request, no typed prefix is pruned, and no
-context survives the command. Main's engine invocation, verification module,
-and REPL state contract remain unchanged. The separate additive Engine cursor
-does not enter this path. The current reference
+context survives the command. There is no engine rerun, batch reassessment, or
+third cursor probe. The public Engine API, verification module, and REPL state
+contract remain unchanged. The current reference
 is \code{docs/length-ranking.md}; the command-authority predecessor, historical
 refill checkpoint, and private outcome seam are recorded in
 \code{docs/reports/2026-08-15-command-authorized-length-filtering.md} and
@@ -1740,6 +1777,8 @@ The command-local scheduler successor is
 \code{docs/reports/2026-08-16-command-local-length-counterexample-bank-scheduler.md}.
 The later Engine-only observation foundation is
 \code{docs/reports/2026-08-16-opaque-detailed-synthesis-cursor-foundation.md}.
+Its progressive Main runtime successor is
+\code{docs/reports/2026-08-16-progressive-same-run-length-filter-batching.md}.
 Dated
 reports under \code{docs/reports/} are historical engineering records rather
 than current file contracts. When assessment is disabled, an ordinary or
@@ -1761,8 +1800,11 @@ The pure searches answer in microseconds to milliseconds; the cost
 center is backend verification, a few hundred milliseconds per
 candidate. A wall-clock guard (default 20\,s,
 \code{LEANT\_SYNTH\_TIMEOUT}) covers the quantified goals whose
-bounded instantiation can widen the space; hitting it is reported as
-``no answer,'' never as a verdict.
+bounded instantiation can widen the space. Baseline and provider work share one
+absolute command deadline. Filter mode carries it through both batches and
+both classical routes; rank and disabled modes instead give each reached
+classical route a fresh configured duration. Zero waits indefinitely, and
+hitting a finite boundary is reported as ``no answer,'' never as a verdict.
 
 \subsection{What \code{:synth} will not do}\label{sec:limits}
 
