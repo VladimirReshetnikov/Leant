@@ -82,6 +82,13 @@ domains is recorded in the
 
 ## The Djex engine
 
+If dependent types, propositions-as-types, or how Lean elaborates and
+checks a term are unfamiliar, read
+[Lean from First Principles](Lean_from_First_Principles/Lean_from_First_Principles.pdf)
+first: it builds that background from zero and then follows the pipeline
+below chapter by chapter, from the fragment translation through search,
+rendering, verification, and negative evidence.
+
 The engine is the vendored [Djex](../lib/Djex) library, linked in-process.
 Djex began as a merger of two classic Haskell synthesizers — **Djinn**
 (complete, terminating proof search for intuitionistic propositional

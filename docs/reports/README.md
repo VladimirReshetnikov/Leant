@@ -186,3 +186,12 @@ a forward-looking proposal rather than a dated record:
   of the implemented Length domain and Leant's rank and filter modes; the
   planned extensions and the Z3 capabilities each needs; and a reading and
   troubleshooting guide.
+- [Lean from First Principles: Dependent Types, the Calculus of Constructions, and the Architecture of Leant](../Lean_from_First_Principles/Lean_from_First_Principles.pdf)
+  (August 16, 2026; [LaTeX source](../Lean_from_First_Principles/Lean_from_First_Principles.tex))
+  — the companion prerequisite on the Lean side: dependent type theory
+  from zero (judgments, Pi and Sigma types, universes, definitional
+  equality, inductive types, equality and transport, the Calculus of
+  Constructions), how Lean turns surface syntax into kernel terms and what
+  it trusts, and a chapter-by-chapter account of Leant's translation,
+  search, rendering, verification, and negative-evidence boundaries with
+  worked traces.

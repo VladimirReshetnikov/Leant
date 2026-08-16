@@ -63,6 +63,16 @@ Companion documents:
   Length counterexample-ranking and replay-authorized filtering reference;
 - **[docs/synth-internals.md](docs/synth-internals.md)** — the design
   boundaries and dated-report index behind `:synth`;
+- **[Lean from First Principles](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Lean_from_First_Principles/Lean_from_First_Principles.pdf)**
+  — a beginner's path from "a term has a type" to verified type-directed
+  synthesis: reading Lean syntax, propositions as types, dependent
+  functions and pairs, universes, definitional equality, inductive types,
+  and the Calculus of Constructions; how Lean elaborates surface syntax
+  into kernel terms and what the kernel trusts; and then Leant and Djex
+  end to end — the smaller synthesis type world, the fragment
+  translation, the two search engines, rendering, verification, negative
+  evidence, and worked traces
+  ([LaTeX source](docs/Lean_from_First_Principles/Lean_from_First_Principles.tex));
 - **[Z3 from First Principles](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Z3_for_Leant_and_Djex/Z3_for_Leant_and_Djex.pdf)**
   — a beginner's guide to Z3 for this codebase, assuming no logic
   background: what satisfiability, models, and `unsat` mean, SMT-LIB from
