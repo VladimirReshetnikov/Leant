@@ -255,7 +255,9 @@ import Leant.Synth.Length.Configuration
   , lengthRankingPolicyExecutableDigestExpectation
   , lengthRankingPolicyExecutableLaunchStrategy
   , lengthRankingPolicyFromValidatedComponents
+  , assessVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext
   , assessVerifiedLengthSpinePairCandidatesWithPolicy
+  , assessVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
   , rankVerifiedLengthSpinePairCandidatesWithPolicy
   , rankVerifiedLengthCandidatesWithPolicy
   )
@@ -335,7 +337,9 @@ import Leant.Synth.Length.Handoff
 import Leant.Synth.Length.Integration
   ( LengthAssessmentFailure (..)
   , LengthAssessmentRequestError (..)
+  , LengthAssessmentResult
   , LengthAssessmentSetupError (..)
+  , assessLengthVerificationContext
   , assessLengthVerificationRequest
   , assessLengthVerificationBatch
   , authorizeExplicitLengthAssessmentRequest
@@ -346,6 +350,7 @@ import Leant.Synth.Length.Integration
   , lengthAssessmentFailure
   , lengthAssessmentModeActivationPolicy
   , lengthAssessmentModeExecutableLaunchStrategy
+  , lengthAssessmentContextBehaviorMode
   , lengthAssessmentRequestBehaviorMode
   , lengthAssessmentPostVerificationResult
   , lengthAssessmentRanking
@@ -354,6 +359,7 @@ import Leant.Synth.Length.Integration
   , lengthAssessmentSpinePairRanking
   , lengthAssessmentSpinePairSelectionResult
   , loadLengthAssessmentMode
+  , withLengthAssessmentRequestContext
   )
 import Leant.Synth.Length.PostVerification
   ( LengthPostVerificationFailure (..)
@@ -384,6 +390,8 @@ import Leant.Synth.Length.Selection
   , lengthSelectionSelected
   , selectVerifiedLengthCandidatesWithPolicy
   )
+import qualified Leant.Synth.Length.Selection.Internal
+  as LengthSelectionInternal
 import Leant.Synth.Length.Presentation
   ( LengthCandidatePresentation
   , lengthCandidateRejectionPresentationNote
@@ -477,6 +485,8 @@ import Leant.Synth.Length.SpinePair.Selection
   , lengthSpinePairSelectionSelected
   , selectVerifiedLengthSpinePairCandidatesWithPolicy
   )
+import qualified Leant.Synth.Length.SpinePair.Selection.Internal
+  as LengthSpinePairSelectionInternal
 import Leant.Synth.Observability
   ( CandidateRenderingRoute (..)
   , LeantSynthesisMetric (..)
@@ -557,6 +567,7 @@ main = do
       , combinedEngineMergeTests
       , typedCandidateRoutingTests
       , lengthCounterexampleBankAdapterTests
+      , lengthCounterexampleBankRunnerTests
       , lengthSpinePairBoundaryTests
       , lengthSpinePairRankingTests
       , lengthRankingTests
@@ -5324,6 +5335,310 @@ lengthCounterexampleBankAdapterTests = withResource
         pairAdapterBankStats pairReplayBank @?= (0, 0, 0, 0, 0, 0)
 
   , testCase
+      "commit scalar context transitions atomically and keep snapshots immutable" $
+      do
+        retained <- fixture
+        (_, secondReceipt, thirdReceipt) <- scalarAdapterReceiptTriple retained
+        let sourceQuery = counterexampleBankScalarSourceQuery retained
+            targetQuery = counterexampleBankScalarTargetQuery retained
+            live =
+              LengthCounterexampleBank.LengthCounterexampleBankReceiptFromLiveModel
+        LengthCounterexampleBank.withDefaultLengthCounterexampleBankContext $
+          \context -> do
+            initial <-
+              LengthCounterexampleBank.readLengthCounterexampleBankContextState
+                context
+            assertBool "fresh scalar context acquired a bank eagerly"
+              $ isNothing
+              $ LengthCounterexampleBank.lengthCounterexampleBankStateActiveBank
+                  initial
+            exceptional <- try
+              (LengthCounterexampleBank.recordLengthCounterexampleBankReceiptInContext
+                (error "scalar context transition failed to force its result")
+                sourceQuery live thirdReceipt context >>= evaluate)
+              :: IO
+                  (Either SomeException
+                    (Either
+                      LengthCounterexampleBank.LengthCounterexampleBankRecordFailure
+                      LengthCounterexampleBank.LengthCounterexampleBankRecordOutcome))
+            case exceptional of
+              Left _ -> pure ()
+              Right _ -> assertFailure
+                "scalar context returned an unforced exceptional transition"
+            afterException <- try $ do
+              state <-
+                LengthCounterexampleBank.readLengthCounterexampleBankContextState
+                  context
+              evaluate $ isNothing
+                $ LengthCounterexampleBank.lengthCounterexampleBankStateActiveBank
+                    state
+            case afterException :: Either SomeException Bool of
+              Left _ -> assertFailure
+                "exceptional scalar transition installed a poisoned successor"
+              Right stillEmpty -> assertBool
+                "exceptional scalar transition installed partial state"
+                stillEmpty
+
+            recorded <-
+              LengthCounterexampleBank.recordLengthCounterexampleBankReceiptInContext
+                defaultLengthEvaluationLimits sourceQuery live thirdReceipt
+                context
+            case recorded of
+              Right
+                  (LengthCounterexampleBank.LengthCounterexampleBankRecorded
+                    fresh) -> do
+                      Djex.validatedLengthCounterexampleInputs fresh @?= [3]
+                      Djex.validatedLengthCounterexampleResult fresh @?= 3
+              Left failure -> assertFailure
+                $ "scalar context record failed: " ++ show failure
+              Right unavailable -> assertFailure
+                $ "scalar context record unavailable: " ++ show unavailable
+            recordedSnapshot <-
+              LengthCounterexampleBank.readLengthCounterexampleBankContextState
+                context
+            recordedBank <- expectScalarAdapterBank recordedSnapshot
+            scalarAdapterBankStats recordedBank @?=
+              (1, scalarAdapterBankEncodedBytes recordedBank, 1, 0, 0, 1)
+
+            poisonedOrigin <- try
+              (LengthCounterexampleBank.recordLengthCounterexampleBankReceiptInContext
+                defaultLengthEvaluationLimits sourceQuery
+                (error "scalar context committed a poisoned sample origin")
+                secondReceipt context >>= evaluate)
+              :: IO
+                  (Either SomeException
+                    (Either
+                      LengthCounterexampleBank.LengthCounterexampleBankRecordFailure
+                      LengthCounterexampleBank.LengthCounterexampleBankRecordOutcome))
+            case poisonedOrigin of
+              Left _ -> pure ()
+              Right _ -> assertFailure
+                "scalar context returned a successor with a poisoned origin"
+            afterPoisonedOrigin <-
+              LengthCounterexampleBank.readLengthCounterexampleBankContextState
+                context
+            afterPoisonedOriginBank <- expectScalarAdapterBank
+              afterPoisonedOrigin
+            map Djex.lengthCounterexampleBankSampleInputs
+                (Djex.lengthCounterexampleBankSamples afterPoisonedOriginBank)
+              @?= [[3]]
+            scalarAdapterBankStats afterPoisonedOriginBank @?=
+              ( 1
+              , scalarAdapterBankEncodedBytes afterPoisonedOriginBank
+              , 1
+              , 0
+              , 0
+              , 1
+              )
+
+            scalarDelayGate <- newIORef 0
+            interrupted <- timeout 30000
+              $ LengthCounterexampleBank.recordLengthCounterexampleBankReceiptInContext
+                  defaultLengthEvaluationLimits sourceQuery
+                  (delayedLengthTestValueWithGate scalarDelayGate 200000 live)
+                  secondReceipt context
+            interrupted @?= Nothing
+            readIORef scalarDelayGate >>= (@?= 1)
+            afterInterrupt <-
+              LengthCounterexampleBank.readLengthCounterexampleBankContextState
+                context
+            afterInterruptBank <- expectScalarAdapterBank afterInterrupt
+            map Djex.lengthCounterexampleBankSampleInputs
+                (Djex.lengthCounterexampleBankSamples afterInterruptBank) @?=
+              [[3]]
+            scalarAdapterBankStats afterInterruptBank @?=
+              (1, scalarAdapterBankEncodedBytes afterInterruptBank,
+                1, 0, 0, 1)
+
+            replayed <-
+              LengthCounterexampleBank.replayLengthCounterexampleBankInContext
+                defaultLengthEvaluationLimits targetQuery context
+            hit <- case replayed of
+              Right
+                  (LengthCounterexampleBank.LengthCounterexampleBankContextReplayHit
+                    [] retainedHit) -> pure retainedHit
+              Left failure -> assertFailure
+                ("scalar context replay failed: " ++ show failure)
+                  >> error "unreachable"
+              Right _ -> assertFailure "scalar context replay produced no hit"
+                >> error "unreachable"
+            Djex.validatedLengthCounterexampleResult
+                (LengthCounterexampleBank.lengthCounterexampleBankContextReplayHitCounterexample
+                  hit) @?= 3
+            replayedSnapshot <-
+              LengthCounterexampleBank.readLengthCounterexampleBankContextState
+                context
+            replayedBank <- expectScalarAdapterBank replayedSnapshot
+            scalarAdapterBankStats replayedBank @?=
+              (1, scalarAdapterBankEncodedBytes replayedBank, 1, 0, 0, 2)
+            -- A diagnostic snapshot is immutable and cannot become a setter.
+            scalarAdapterBankStats recordedBank @?=
+              (1, scalarAdapterBankEncodedBytes recordedBank, 1, 0, 0, 1)
+
+            promoted <-
+              LengthCounterexampleBank.promoteLengthCounterexampleBankReplayHitInContext
+                hit context
+            promoted @?= Right ()
+            promotedState <-
+              LengthCounterexampleBank.readLengthCounterexampleBankContextState
+                context
+            promotedBank <- expectScalarAdapterBank promotedState
+            scalarAdapterBankStats promotedBank @?=
+              (1, scalarAdapterBankEncodedBytes promotedBank, 2, 1, 0, 2)
+
+  , testCase
+      "commit product context transitions atomically and keep snapshots immutable" $
+      do
+        retained <- fixture
+        (_, secondReceipt, thirdReceipt) <- pairAdapterReceiptTriple retained
+        let sourceQuery = counterexampleBankPairSourceQuery retained
+            targetQuery = counterexampleBankPairTargetQuery retained
+            live =
+              LengthCounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromLiveModel
+        LengthCounterexampleBank.withDefaultLengthSpinePairCounterexampleBankContext $
+          \context -> do
+            initial <-
+              LengthCounterexampleBank.readLengthSpinePairCounterexampleBankContextState
+                context
+            assertBool "fresh product context acquired a bank eagerly"
+              $ isNothing
+              $ LengthCounterexampleBank.lengthSpinePairCounterexampleBankStateActiveBank
+                  initial
+            exceptional <- try
+              (LengthCounterexampleBank.recordLengthSpinePairCounterexampleBankReceiptInContext
+                (error "product context transition failed to force its result")
+                sourceQuery live thirdReceipt context >>= evaluate)
+              :: IO
+                  (Either SomeException
+                    (Either
+                      LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordFailure
+                      LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordOutcome))
+            case exceptional of
+              Left _ -> pure ()
+              Right _ -> assertFailure
+                "product context returned an unforced exceptional transition"
+            afterException <- try $ do
+              state <-
+                LengthCounterexampleBank.readLengthSpinePairCounterexampleBankContextState
+                  context
+              evaluate $ isNothing
+                $ LengthCounterexampleBank.lengthSpinePairCounterexampleBankStateActiveBank
+                    state
+            case afterException :: Either SomeException Bool of
+              Left _ -> assertFailure
+                "exceptional product transition installed a poisoned successor"
+              Right stillEmpty -> assertBool
+                "exceptional product transition installed partial state"
+                stillEmpty
+
+            recorded <-
+              LengthCounterexampleBank.recordLengthSpinePairCounterexampleBankReceiptInContext
+                defaultLengthEvaluationLimits sourceQuery live thirdReceipt
+                context
+            case recorded of
+              Right
+                  (LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecorded
+                    fresh) -> do
+                      Djex.validatedLengthSpinePairCounterexampleInputs fresh @?=
+                        [3]
+                      Djex.validatedLengthSpinePairCounterexampleResult fresh @?=
+                        Djex.LengthSpinePair 3 3
+              Left failure -> assertFailure
+                $ "product context record failed: " ++ show failure
+              Right unavailable -> assertFailure
+                $ "product context record unavailable: " ++ show unavailable
+            recordedSnapshot <-
+              LengthCounterexampleBank.readLengthSpinePairCounterexampleBankContextState
+                context
+            recordedBank <- expectPairAdapterBank recordedSnapshot
+            pairAdapterBankStats recordedBank @?=
+              (1, pairAdapterBankEncodedBytes recordedBank, 1, 0, 0, 1)
+
+            poisonedOrigin <- try
+              (LengthCounterexampleBank.recordLengthSpinePairCounterexampleBankReceiptInContext
+                defaultLengthEvaluationLimits sourceQuery
+                (error "product context committed a poisoned sample origin")
+                secondReceipt context >>= evaluate)
+              :: IO
+                  (Either SomeException
+                    (Either
+                      LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordFailure
+                      LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordOutcome))
+            case poisonedOrigin of
+              Left _ -> pure ()
+              Right _ -> assertFailure
+                "product context returned a successor with a poisoned origin"
+            afterPoisonedOrigin <-
+              LengthCounterexampleBank.readLengthSpinePairCounterexampleBankContextState
+                context
+            afterPoisonedOriginBank <- expectPairAdapterBank
+              afterPoisonedOrigin
+            map Djex.lengthSpinePairCounterexampleBankSampleInputs
+                (Djex.lengthSpinePairCounterexampleBankSamples
+                  afterPoisonedOriginBank) @?= [[3]]
+            pairAdapterBankStats afterPoisonedOriginBank @?=
+              ( 1
+              , pairAdapterBankEncodedBytes afterPoisonedOriginBank
+              , 1
+              , 0
+              , 0
+              , 1
+              )
+
+            pairDelayGate <- newIORef 0
+            interrupted <- timeout 30000
+              $ LengthCounterexampleBank.recordLengthSpinePairCounterexampleBankReceiptInContext
+                  defaultLengthEvaluationLimits sourceQuery
+                  (delayedLengthTestValueWithGate pairDelayGate 200000 live)
+                  secondReceipt context
+            interrupted @?= Nothing
+            readIORef pairDelayGate >>= (@?= 1)
+            afterInterrupt <-
+              LengthCounterexampleBank.readLengthSpinePairCounterexampleBankContextState
+                context
+            afterInterruptBank <- expectPairAdapterBank afterInterrupt
+            map Djex.lengthSpinePairCounterexampleBankSampleInputs
+                (Djex.lengthSpinePairCounterexampleBankSamples afterInterruptBank)
+              @?= [[3]]
+            pairAdapterBankStats afterInterruptBank @?=
+              (1, pairAdapterBankEncodedBytes afterInterruptBank,
+                1, 0, 0, 1)
+
+            replayed <-
+              LengthCounterexampleBank.replayLengthSpinePairCounterexampleBankInContext
+                defaultLengthEvaluationLimits targetQuery context
+            hit <- case replayed of
+              Right
+                  (LengthCounterexampleBank.LengthSpinePairCounterexampleBankContextReplayHit
+                    [] retainedHit) -> pure retainedHit
+              Left failure -> assertFailure
+                ("product context replay failed: " ++ show failure)
+                  >> error "unreachable"
+              Right _ -> assertFailure "product context replay produced no hit"
+                >> error "unreachable"
+            Djex.validatedLengthSpinePairCounterexampleResult
+                (LengthCounterexampleBank.lengthSpinePairCounterexampleBankContextReplayHitCounterexample
+                  hit) @?= Djex.LengthSpinePair 3 3
+            replayedSnapshot <-
+              LengthCounterexampleBank.readLengthSpinePairCounterexampleBankContextState
+                context
+            replayedBank <- expectPairAdapterBank replayedSnapshot
+            pairAdapterBankStats replayedBank @?=
+              (1, pairAdapterBankEncodedBytes replayedBank, 1, 0, 0, 2)
+            pairAdapterBankStats recordedBank @?=
+              (1, pairAdapterBankEncodedBytes recordedBank, 1, 0, 0, 1)
+            promoted <-
+              LengthCounterexampleBank.promoteLengthSpinePairCounterexampleBankReplayHitInContext
+                hit context
+            promoted @?= Right ()
+            promotedState <-
+              LengthCounterexampleBank.readLengthSpinePairCounterexampleBankContextState
+                context
+            promotedBank <- expectPairAdapterBank promotedState
+            pairAdapterBankStats promotedBank @?=
+              (1, pairAdapterBankEncodedBytes promotedBank, 2, 1, 0, 2)
+
+  , testCase
       "keep adapter constructors closed, mappings exhaustive, and identities nominal" $
       do
         retained <- fixture
@@ -5337,12 +5652,18 @@ lengthCounterexampleBankAdapterTests = withResource
             opaqueTypes =
               [ "LengthCounterexampleBankState"
               , "LengthCounterexampleBankReplayHit"
+              , "LengthCounterexampleBankContext"
+              , "LengthCounterexampleBankContextReplayHit"
               , "LengthSpinePairCounterexampleBankState"
               , "LengthSpinePairCounterexampleBankReplayHit"
+              , "LengthSpinePairCounterexampleBankContext"
+              , "LengthSpinePairCounterexampleBankContextReplayHit"
               ]
             exposedOutcomes =
               [ "LengthCounterexampleBankReplayOutcome (..)"
+              , "LengthCounterexampleBankContextReplayOutcome (..)"
               , "LengthSpinePairCounterexampleBankReplayOutcome (..)"
+              , "LengthSpinePairCounterexampleBankContextReplayOutcome (..)"
               ]
         mapM_ (\name -> assertBool
             ("counterexample-bank adapter exposed constructor for " ++ name)
@@ -5358,9 +5679,24 @@ lengthCounterexampleBankAdapterTests = withResource
           [ "type role LengthCounterexampleBankState nominal"
           , "type role LengthCounterexampleBankReplayHit nominal"
           , "type role LengthCounterexampleBankReplayOutcome nominal"
+          , "type role LengthCounterexampleBankContext nominal nominal"
+          , "type role LengthCounterexampleBankContextReplayHit nominal nominal"
+          , "type role LengthCounterexampleBankContextReplayOutcome nominal nominal"
           , "type role LengthSpinePairCounterexampleBankState nominal"
           , "type role LengthSpinePairCounterexampleBankReplayHit nominal"
           , "type role LengthSpinePairCounterexampleBankReplayOutcome nominal"
+          , "type role LengthSpinePairCounterexampleBankContext nominal nominal"
+          , "type role LengthSpinePairCounterexampleBankContextReplayHit nominal nominal"
+          , "type role LengthSpinePairCounterexampleBankContextReplayOutcome\n  nominal nominal"
+          ]
+        mapM_ (\boundary -> assertBool
+            ("counterexample-bank context lost its rank-2 boundary: "
+              ++ boundary)
+            $ boundary `isInfixOf` source)
+          [ "(forall command.\n      LengthCounterexampleBankContext command identity"
+          , "(forall command.\n      LengthSpinePairCounterexampleBankContext command identity"
+          , "modifyMVar state $ \\initial ->"
+          , "rnf limits `seq` rnf active"
           ]
         mapM_ (\mapping -> assertBool
             ("counterexample-bank adapter lost source mapping: " ++ mapping)
@@ -5524,6 +5860,944 @@ lengthCounterexampleBankAdapterTests = withResource
           , LengthCounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromSimplificationReplay
           ]
     ]
+
+data LengthCounterexampleBankRunnerFixture =
+  LengthCounterexampleBankRunnerFixture
+    { counterexampleBankRunnerScalarContract :: LeanLengthContract
+    , counterexampleBankRunnerScaledCandidate ::
+        Verified DetailedVerificationVariant
+    , counterexampleBankRunnerIndependentCandidate ::
+        Verified DetailedVerificationVariant
+    , counterexampleBankRunnerDuplicatedCandidate ::
+        Verified DetailedVerificationVariant
+    , counterexampleBankRunnerInputAndZeroCandidate ::
+        Verified DetailedVerificationVariant
+    }
+
+buildLengthCounterexampleBankRunnerFixture
+  :: IO LengthCounterexampleBankRunnerFixture
+buildLengthCounterexampleBankRunnerFixture = do
+  (scalarContract, scaled, independent) <-
+    buildSameScopeScalarCounterexampleBankRunnerFixture
+  (duplicated, inputAndZero) <- buildLengthSpinePairRankingFixture
+  pure LengthCounterexampleBankRunnerFixture
+    { counterexampleBankRunnerScalarContract = scalarContract
+    , counterexampleBankRunnerScaledCandidate = scaled
+    , counterexampleBankRunnerIndependentCandidate = independent
+    , counterexampleBankRunnerDuplicatedCandidate = duplicated
+    , counterexampleBankRunnerInputAndZeroCandidate = inputAndZero
+    }
+
+buildSameScopeScalarCounterexampleBankRunnerFixture
+  :: IO
+      ( LeanLengthContract
+      , Verified DetailedVerificationVariant
+      , Verified DetailedVerificationVariant
+      )
+buildSameScopeScalarCounterexampleBankRunnerFixture = do
+  let natural = FAtom False "Nat"
+      listKey = "List Nat"
+      list = FParamRec True "List" listKey [natural]
+        [ ("List.nil", [])
+        , ("List.cons", [natural, FAtom False listKey])
+        ]
+      goal = FArr list list
+      providerName = "Demo.scaleSameList"
+      provider = ProviderFrag providerName goal
+      contract = (lengthRankingContract 0)
+        { leanLengthContractTargetArgumentRoles = [LengthObservedSpine]
+        , leanLengthContractProviderLaws =
+            [ LeanLengthProviderLaw
+                { leanLengthProviderLawName = providerName
+                , leanLengthProviderLawArgumentRoles = [LengthSpineArgument]
+                , leanLengthProviderLawTransfer = LengthScale 2
+                    $ LengthVariable $ Djex.LengthProviderArgument 0
+                }
+            ]
+        }
+  detailed <- expectRight $
+    synthesizeWithProvidersSkippingDetailedWithMultiConstructorPatterns
+      False EngineExference 512 Set.empty [provider] goal
+  groups <- case detailed of
+    DetailedSynthCandidates retained _ -> pure retained
+    other -> assertFailure
+      ("same-scope scalar bank synthesis failed: " ++ show other)
+        >> error "unreachable"
+  scaledGroup <- case
+      [ group
+      | group <- groups
+      , [spelling] <- [detailedCandidateGroupVariants group]
+      , providerName `isInfixOf` spelling
+      , not $ isNothing $ detailedCandidateGroupSemanticSidecar group
+      ] of
+    group : _ -> pure group
+    [] -> assertFailure "same-scope scalar bank fixture lacked its provider"
+      >> error "unreachable"
+  independentGroup <- case
+      [ group
+      | group <- groups
+      , providerIndependentProjectionSpelling 1 `elem`
+          detailedCandidateGroupVariants group
+      , not $ isNothing $ detailedCandidateGroupSemanticSidecar group
+      ] of
+    group : _ -> pure group
+    [] -> assertFailure "same-scope scalar bank fixture lacked its identity"
+      >> error "unreachable"
+  scaled <- verifySingleLengthRankingGroup scaledGroup
+  independent <- verifySingleLengthRankingGroup independentGroup
+  pure (contract, scaled, independent)
+
+lengthCounterexampleBankRunnerTests :: TestTree
+lengthCounterexampleBankRunnerTests = withResource
+  buildLengthCounterexampleBankRunnerFixture
+  (const $ pure ()) $ \fixture -> testGroup
+    "command-local Length counterexample-bank runners"
+    [ testCase
+        "reuse scalar evidence across every eager, deferred, and budget route" $
+        fixture >>= assertScalarCounterexampleBankRunnerRoutes
+    , testCase
+        "reuse product evidence across every eager, deferred, and budget route" $
+        fixture >>= assertPairCounterexampleBankRunnerRoutes
+    , testCase
+        "retain scalar and product rejections when bank caps refuse updates" $
+        fixture >>= assertCounterexampleBankRunnerCaps
+    , testCase
+        "seal, preserve, and resume scalar and product command selections" $
+        fixture >>= assertCounterexampleBankSelectionContinuity
+    , testCase
+        "preserve scalar and product batches after live-session failure" $
+        fixture >>= assertCounterexampleBankSelectionLiveFailure
+    , testCase
+        "reuse Integration filter contexts but keep wrappers and rank calls fresh" $
+        fixture >>= assertCounterexampleBankIntegrationContexts
+    , testCase
+        "keep command banks nominal, failure-atomic, and package-private"
+        assertCounterexampleBankRunnerArchitecture
+    ]
+
+assertCounterexampleBankRunnerArchitecture :: IO ()
+assertCounterexampleBankRunnerArchitecture = do
+  scalarRanking <- readFile
+    "src/Leant/Synth/Length/Ranking/Internal.hs"
+  pairRanking <- readFile
+    "src/Leant/Synth/Length/SpinePair/Ranking/Internal.hs"
+  scalarSelection <- readFile
+    "src/Leant/Synth/Length/Selection/Internal.hs"
+  pairSelection <- readFile
+    "src/Leant/Synth/Length/SpinePair/Selection/Internal.hs"
+  integration <- readFile "src/Leant/Synth/Length/Integration.hs"
+  publicScalarRanking <- readFile "src/Leant/Synth/Length/Ranking.hs"
+  publicPairRanking <- readFile
+    "src/Leant/Synth/Length/SpinePair/Ranking.hs"
+  publicScalarSelection <- readFile "src/Leant/Synth/Length/Selection.hs"
+  publicPairSelection <- readFile
+    "src/Leant/Synth/Length/SpinePair/Selection.hs"
+  mainSource <- readFile "src/Main.hs"
+  let normalized = unwords . words
+      scalarText = normalized scalarRanking
+      pairText = normalized pairRanking
+      scalarSelectionText = normalized scalarSelection
+      pairSelectionText = normalized pairSelection
+      integrationText = normalized integration
+      integrationExports = unlines
+        . takeWhile (not . isInfixOf ") where")
+        $ lines integration
+  mapM_ (\fragment -> assertBool
+      ("scalar bank runner lost its nominal/failure boundary: " ++ fragment)
+      $ normalized fragment `isInfixOf` scalarText)
+    [ "type role LengthCounterexampleBankCursor nominal"
+    , "type role LengthCounterexampleAcquisition nominal"
+    , "Left _ -> Left $ localRankingFailure LengthRankingEvidenceReplayMismatch index"
+    , "Left _ -> Left $ localRankingFailure LengthRankingEvidenceReplayMismatch index Right () -> Right cursor"
+    , "case simplifyCounterexampleAssessment evaluation simplificationPolicy index association query receipt of Left failure -> pure $ PreparedLengthCandidatesFailed failure Right assessed -> continueAssessed"
+    , "continueAssessed reversed cursor index query acquisition rest assessed = do advanced <- advanceLengthCounterexampleBankCursor"
+    ]
+  mapM_ (\fragment -> assertBool
+      ("product bank runner lost its nominal/failure boundary: " ++ fragment)
+      $ normalized fragment `isInfixOf` pairText)
+    [ "type role LengthSpinePairCounterexampleBankCursor nominal"
+    , "type role LengthSpinePairCounterexampleAcquisition nominal"
+    , "Left _ -> Left $ localLengthSpinePairRankingFailure LengthSpinePairRankingEvidenceReplayMismatch index"
+    , "case simplifyLengthSpinePairCounterexampleAssessment evaluation simplificationPolicy index association query receipt of Left failure -> pure $ PreparedLengthSpinePairCandidatesFailed failure Right assessed -> continueAssessed"
+    , "continueAssessed reversed cursor index query acquisition rest assessed = do advanced <- advanceLengthSpinePairCounterexampleBankCursor"
+    ]
+  mapM_ (\(domain, sourceText, fragments) ->
+      mapM_ (\fragment -> assertBool
+          (domain ++ " selection lost preserve/seal ordering: " ++ fragment)
+          $ normalized fragment `isInfixOf` sourceText) fragments)
+    [ ( "scalar"
+      , scalarSelectionText
+      , [ "assessed <- assess verification pure $ case lengthPostVerificationAdapterFailure assessed of"
+        , "Just failure -> preserve $ LengthSelectionPostVerificationFailed failure"
+        , "Just failure -> preserve $ LengthSelectionRankingFailed failure"
+        , "Left failure -> preserve $ LengthSelectionSealFailed failure"
+        , "preserve = LengthSelectionPreserved verification"
+        ]
+      )
+    , ( "product"
+      , pairSelectionText
+      , [ "assessed <- assess verification pure $ case lengthSpinePairPostVerificationAdapterFailure assessed of"
+        , "Just failure -> preserve $ LengthSpinePairSelectionPostVerificationFailed failure"
+        , "Just failure -> preserve $ LengthSpinePairSelectionRankingFailed failure"
+        , "Left failure -> preserve $ LengthSpinePairSelectionSealFailed failure"
+        , "preserve = LengthSpinePairSelectionPreserved verification"
+        ]
+      )
+    ]
+  assertBool "Integration exposed its context constructor"
+    $ not $ "LengthAssessmentContext (..)" `isInfixOf` integrationExports
+  mapM_ (\fragment -> assertBool
+      ("Integration lost command-local ownership: " ++ fragment)
+      $ normalized fragment `isInfixOf` integrationText)
+    [ "type role LengthAssessmentContext nominal"
+    , "-> (forall command. LengthAssessmentContext command -> IO result)"
+    , "assessLengthVerificationRequest request verification = withLengthAssessmentRequestContext request $ \\context -> assessLengthVerificationContext context verification"
+    , "LengthAssessmentDisabledContext -> pure $ LengthAssessmentSkipped verification"
+    , "LengthAssessmentScalarRankingContext policy contract -> LengthAssessmentCompleted <$> assessVerifiedLengthCandidatesWithPolicy policy contract verification"
+    , "LengthAssessmentSpinePairRankingContext policy contract -> LengthAssessmentSpinePairCompleted <$> assessVerifiedLengthSpinePairCandidatesWithPolicy policy contract verification"
+    , "LengthAssessmentScalarFilteringContext policy contract bank -> LengthAssessmentSelectionCompleted <$> selectVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext"
+    , "LengthAssessmentSpinePairFilteringContext policy contract bank -> LengthAssessmentSpinePairSelectionCompleted <$> selectVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext"
+    ]
+  mapM_ (\(path, source) ->
+      mapM_ (\name -> assertBool
+          (path ++ " exposed command-local bank wiring: " ++ name)
+          $ not $ name `isInfixOf` source)
+        [ "CounterexampleBankContext"
+        , "withLengthAssessmentRequestContext"
+        , "assessLengthVerificationContext"
+        ])
+    [ ("scalar Ranking facade", publicScalarRanking)
+    , ("product Ranking facade", publicPairRanking)
+    , ("scalar Selection facade", publicScalarSelection)
+    , ("product Selection facade", publicPairSelection)
+    , ("Main/ReplState", mainSource)
+    ]
+
+lengthCounterexampleBankRunnerBasePolicy
+  :: FilePath
+  -> IO LengthRankingPolicy
+lengthCounterexampleBankRunnerBasePolicy executable = expectRight
+  $ mkLengthRankingPolicy
+  $ explicitLengthRankingPolicySource
+      Djex.defaultLengthSMTLibExecutionLimits
+      (explicitLengthRankingExecutionSource executable Nothing
+        Djex.LengthSMTLibInputValuesAfterSatisfiable)
+      Djex.defaultLengthEvaluationLimitSource
+
+lengthCounterexampleBankRunnerPolicyCases
+  :: FilePath
+  -> IO [(String, Bool, LengthRankingPolicy)]
+lengthCounterexampleBankRunnerPolicyCases executable = do
+  base <- lengthCounterexampleBankRunnerBasePolicy executable
+  budget <- expectLengthUsableWorkBudget 2000
+  pure
+    [ ("eager unbudgeted", False, base)
+    , ( "deferred unbudgeted"
+      , True
+      , enableLengthRankingDeferredLiveSessionOpening base
+      )
+    , ("eager v1", False, enableLengthRankingUsableWorkBudget budget base)
+    , ( "deferred v1"
+      , True
+      , enableLengthRankingDeferredLiveSessionOpening
+          $ enableLengthRankingUsableWorkBudget budget base
+      )
+    , ( "eager scoped"
+      , False
+      , enableLengthRankingScopedUsableWorkBudget budget base
+      )
+    , ( "deferred scoped"
+      , True
+      , enableLengthRankingDeferredLiveSessionOpening
+          $ enableLengthRankingScopedUsableWorkBudget budget base
+      )
+    ]
+
+assertScalarCounterexampleBankRunnerRoutes
+  :: LengthCounterexampleBankRunnerFixture
+  -> IO ()
+assertScalarCounterexampleBankRunnerRoutes fixture = do
+  firstVerification <- verificationBatchFromReceipts
+    [counterexampleBankRunnerScaledCandidate fixture]
+  secondVerification <- verificationBatchFromReceipts
+    [counterexampleBankRunnerIndependentCandidate fixture]
+  withFakeLengthSolver "healthy" $ \executable -> do
+    policies <- lengthCounterexampleBankRunnerPolicyCases executable
+    mapM_ (runRoute executable firstVerification secondVerification) policies
+ where
+  runRoute executable firstVerification secondVerification
+      (label, deferred, policy) =
+    LengthCounterexampleBank.withDefaultLengthCounterexampleBankContext $
+      \context -> do
+        first <- expectLengthPostVerificationWithin (label ++ " scalar first")
+          $ assessVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext
+              policy context
+              (counterexampleBankRunnerScalarContract fixture)
+              firstVerification
+        firstReceipt <- expectOnlyScalarPostVerificationCounterexample first
+        Djex.validatedLengthCounterexampleInputs firstReceipt @?= [3]
+        Djex.validatedLengthCounterexampleResult firstReceipt @?= 6
+        firstState <-
+          LengthCounterexampleBank.readLengthCounterexampleBankContextState
+            context
+        firstBank <- expectScalarAdapterBank firstState
+        map Djex.lengthCounterexampleBankSampleInputs
+            (Djex.lengthCounterexampleBankSamples firstBank) @?= [[3]]
+        map Djex.lengthCounterexampleBankSampleOrigin
+            (Djex.lengthCounterexampleBankSamples firstBank) @?=
+          [Djex.lengthCounterexampleBankLiveModelReplayOrigin]
+        scalarAdapterBankStats firstBank @?=
+          (1, scalarAdapterBankEncodedBytes firstBank, 1, 0, 0, 1)
+        firstEvents <- BS.readFile $ executable ++ ".events"
+        assertFakeLengthQueryEvents [0] [0] firstEvents
+        byteStringOccurrenceCount (BS.pack "EVENT start ") firstEvents @?= 1
+
+        second <- expectLengthPostVerificationWithin (label ++ " scalar hit")
+          $ assessVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext
+              policy context
+              (counterexampleBankRunnerScalarContract fixture)
+              secondVerification
+        secondReceipt <- expectOnlyScalarPostVerificationCounterexample second
+        Djex.validatedLengthCounterexampleInputs secondReceipt @?= [3]
+        Djex.validatedLengthCounterexampleResult secondReceipt @?= 3
+        secondState <-
+          LengthCounterexampleBank.readLengthCounterexampleBankContextState
+            context
+        secondBank <- expectScalarAdapterBank secondState
+        map Djex.lengthCounterexampleBankSampleInputs
+            (Djex.lengthCounterexampleBankSamples secondBank) @?= [[3]]
+        map Djex.lengthCounterexampleBankSampleOrigin
+            (Djex.lengthCounterexampleBankSamples secondBank) @?=
+          [Djex.lengthCounterexampleBankSolverIndependentReplayOrigin]
+        scalarAdapterBankStats secondBank @?=
+          (1, scalarAdapterBankEncodedBytes secondBank, 2, 1, 0, 2)
+        -- The snapshot taken before promotion is immutable.
+        scalarAdapterBankStats firstBank @?=
+          (1, scalarAdapterBankEncodedBytes firstBank, 1, 0, 0, 1)
+        secondEvents <- BS.readFile $ executable ++ ".events"
+        if deferred
+          then secondEvents @?= firstEvents
+          else do
+            assertFakeLengthQueryEvents [] [] secondEvents
+            byteStringOccurrenceCount (BS.pack "EVENT start ") secondEvents
+              @?= 1
+
+assertPairCounterexampleBankRunnerRoutes
+  :: LengthCounterexampleBankRunnerFixture
+  -> IO ()
+assertPairCounterexampleBankRunnerRoutes fixture = do
+  firstVerification <- verificationBatchFromReceipts
+    [counterexampleBankRunnerDuplicatedCandidate fixture]
+  secondVerification <- verificationBatchFromReceipts
+    [counterexampleBankRunnerInputAndZeroCandidate fixture]
+  withFakeLengthSolver "healthy" $ \executable -> do
+    policies <- lengthCounterexampleBankRunnerPolicyCases executable
+    mapM_ (runRoute executable firstVerification secondVerification) policies
+ where
+  runRoute executable firstVerification secondVerification
+      (label, deferred, policy) =
+    LengthCounterexampleBank.withDefaultLengthSpinePairCounterexampleBankContext
+      $ \context -> do
+        first <- expectLengthSpinePairPostVerificationWithin
+          $ assessVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
+              policy context lengthSpinePairSecondOneContract firstVerification
+        firstReceipt <- expectOnlyPairPostVerificationCounterexample first
+        Djex.validatedLengthSpinePairCounterexampleInputs firstReceipt @?= [3]
+        Djex.validatedLengthSpinePairCounterexampleResult firstReceipt @?=
+          Djex.LengthSpinePair 3 3
+        firstState <-
+          LengthCounterexampleBank.readLengthSpinePairCounterexampleBankContextState
+            context
+        firstBank <- expectPairAdapterBank firstState
+        map Djex.lengthSpinePairCounterexampleBankSampleInputs
+            (Djex.lengthSpinePairCounterexampleBankSamples firstBank) @?= [[3]]
+        map Djex.lengthSpinePairCounterexampleBankSampleOrigin
+            (Djex.lengthSpinePairCounterexampleBankSamples firstBank) @?=
+          [Djex.lengthSpinePairCounterexampleBankLiveModelReplayOrigin]
+        pairAdapterBankStats firstBank @?=
+          (1, pairAdapterBankEncodedBytes firstBank, 1, 0, 0, 1)
+        firstEvents <- BS.readFile $ executable ++ ".events"
+        assertFakeLengthQueryEvents [0] [0] firstEvents
+        byteStringOccurrenceCount (BS.pack "EVENT start ") firstEvents @?= 1
+
+        second <- expectLengthSpinePairPostVerificationWithin
+          $ assessVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
+              policy context lengthSpinePairSecondOneContract secondVerification
+        secondReceipt <- expectOnlyPairPostVerificationCounterexample second
+        Djex.validatedLengthSpinePairCounterexampleInputs secondReceipt @?= [3]
+        Djex.validatedLengthSpinePairCounterexampleResult secondReceipt @?=
+          Djex.LengthSpinePair 3 0
+        secondState <-
+          LengthCounterexampleBank.readLengthSpinePairCounterexampleBankContextState
+            context
+        secondBank <- expectPairAdapterBank secondState
+        map Djex.lengthSpinePairCounterexampleBankSampleInputs
+            (Djex.lengthSpinePairCounterexampleBankSamples secondBank) @?= [[3]]
+        map Djex.lengthSpinePairCounterexampleBankSampleOrigin
+            (Djex.lengthSpinePairCounterexampleBankSamples secondBank) @?=
+          [Djex.lengthSpinePairCounterexampleBankSolverIndependentReplayOrigin]
+        pairAdapterBankStats secondBank @?=
+          (1, pairAdapterBankEncodedBytes secondBank, 2, 1, 0, 2)
+        pairAdapterBankStats firstBank @?=
+          (1, pairAdapterBankEncodedBytes firstBank, 1, 0, 0, 1)
+        secondEvents <- BS.readFile $ executable ++ ".events"
+        if deferred
+          then secondEvents @?= firstEvents
+          else do
+            assertFakeLengthQueryEvents [] [] secondEvents
+            byteStringOccurrenceCount (BS.pack "EVENT start ") secondEvents
+              @?= 1
+        label `seq` pure ()
+
+expectOnlyScalarPostVerificationCounterexample
+  :: LengthPostVerificationResult
+  -> IO Djex.ValidatedLengthCounterexample
+expectOnlyScalarPostVerificationCounterexample result = do
+  lengthPostVerificationAdapterFailure result @?= Nothing
+  ranking <- expectLengthPostVerificationRanking result
+  lengthRankingFailure ranking @?= Nothing
+  case map rankedLengthCandidateAssessment
+      $ lengthRankingCandidates ranking of
+    [Counterexample receipt] -> pure receipt
+    assessments -> assertFailure
+      ("expected one scalar counterexample: " ++ show assessments)
+        >> error "unreachable"
+
+expectOnlyPairPostVerificationCounterexample
+  :: LengthSpinePairPostVerificationResult
+  -> IO Djex.ValidatedLengthSpinePairCounterexample
+expectOnlyPairPostVerificationCounterexample result = do
+  lengthSpinePairPostVerificationAdapterFailure result @?= Nothing
+  ranking <- expectLengthSpinePairPostVerificationRanking result
+  expectOnlyLengthSpinePairCounterexample ranking
+
+assertCounterexampleBankRunnerCaps
+  :: LengthCounterexampleBankRunnerFixture
+  -> IO ()
+assertCounterexampleBankRunnerCaps fixture = do
+  scalarFirst <- verificationBatchFromReceipts
+    [counterexampleBankRunnerScaledCandidate fixture]
+  scalarSecond <- verificationBatchFromReceipts
+    [counterexampleBankRunnerIndependentCandidate fixture]
+  pairFirst <- verificationBatchFromReceipts
+    [counterexampleBankRunnerDuplicatedCandidate fixture]
+  pairSecond <- verificationBatchFromReceipts
+    [counterexampleBankRunnerInputAndZeroCandidate fixture]
+  withFakeLengthSolver "healthy" $ \executable -> do
+    base <- lengthCounterexampleBankRunnerBasePolicy executable
+    let policy = enableLengthRankingDeferredLiveSessionOpening base
+        scalarContract = counterexampleBankRunnerScalarContract fixture
+        scalarAttemptLimits =
+          scalarCounterexampleBankAdapterLimits 1 1 8 4096 1
+        scalarInsertionLimits =
+          scalarCounterexampleBankAdapterLimits 0 1 8 4096 1
+    LengthCounterexampleBank.withLengthCounterexampleBankContext
+        scalarAttemptLimits $ \context -> do
+      first <- expectLengthSelectionWithin "scalar bank attempt seed"
+        $ LengthSelectionInternal.selectVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext
+            policy context scalarContract scalarFirst
+      assertOnlyScalarBankSelectionRejection
+        (counterexampleBankRunnerScaledCandidate fixture) 6 first
+      firstState <-
+        LengthCounterexampleBank.readLengthCounterexampleBankContextState
+          context
+      firstBank <- expectScalarAdapterBank firstState
+      scalarAdapterBankStats firstBank @?=
+        (1, scalarAdapterBankEncodedBytes firstBank, 1, 0, 0, 1)
+      assertFakeLengthQueryEvents [0] [0] =<<
+        BS.readFile (executable ++ ".events")
+
+      unavailable <- expectLengthSelectionWithin
+        "scalar ordinary bank attempt unavailability"
+        $ LengthSelectionInternal.selectVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext
+            policy context scalarContract scalarSecond
+      assertOnlyScalarBankSelectionRejection
+        (counterexampleBankRunnerIndependentCandidate fixture) 3 unavailable
+      unavailableState <-
+        LengthCounterexampleBank.readLengthCounterexampleBankContextState
+          context
+      unavailableBank <- expectScalarAdapterBank unavailableState
+      scalarAdapterBankStats unavailableBank @?=
+        ( 1
+        , scalarAdapterBankEncodedBytes unavailableBank
+        , 1
+        , 0
+        , 0
+        , 1
+        )
+      map Djex.lengthCounterexampleBankSampleOrigin
+          (Djex.lengthCounterexampleBankSamples unavailableBank) @?=
+        [Djex.lengthCounterexampleBankLiveModelReplayOrigin]
+      assertFakeLengthQueryEvents [0] [0] =<<
+        BS.readFile (executable ++ ".events")
+
+    LengthCounterexampleBank.withLengthCounterexampleBankContext
+        scalarInsertionLimits $ \context -> do
+      insertion <- expectLengthSelectionWithin
+        "scalar ordinary bank insertion unavailability"
+        $ LengthSelectionInternal.selectVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext
+            policy context scalarContract scalarFirst
+      assertOnlyScalarBankSelectionRejection
+        (counterexampleBankRunnerScaledCandidate fixture) 6 insertion
+      insertionState <-
+        LengthCounterexampleBank.readLengthCounterexampleBankContextState
+          context
+      insertionBank <- expectScalarAdapterBank insertionState
+      Djex.lengthCounterexampleBankSamples insertionBank @?= []
+      scalarAdapterBankStats insertionBank @?= (0, 0, 0, 0, 0, 1)
+
+    let pairAttemptLimits =
+          pairCounterexampleBankAdapterLimits 1 1 8 4096 1
+        pairInsertionLimits =
+          pairCounterexampleBankAdapterLimits 0 1 8 4096 1
+    LengthCounterexampleBank.withLengthSpinePairCounterexampleBankContext
+        pairAttemptLimits $ \context -> do
+      first <- expectLengthSpinePairSelectionWithin
+        $ LengthSpinePairSelectionInternal.selectVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
+            policy context lengthSpinePairSecondOneContract pairFirst
+      assertOnlyPairBankSelectionRejection
+        (counterexampleBankRunnerDuplicatedCandidate fixture)
+        (Djex.LengthSpinePair 3 3) first
+      firstState <-
+        LengthCounterexampleBank.readLengthSpinePairCounterexampleBankContextState
+          context
+      firstBank <- expectPairAdapterBank firstState
+      pairAdapterBankStats firstBank @?=
+        (1, pairAdapterBankEncodedBytes firstBank, 1, 0, 0, 1)
+
+      unavailable <- expectLengthSpinePairSelectionWithin
+        $ LengthSpinePairSelectionInternal.selectVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
+            policy context lengthSpinePairSecondOneContract pairSecond
+      assertOnlyPairBankSelectionRejection
+        (counterexampleBankRunnerInputAndZeroCandidate fixture)
+        (Djex.LengthSpinePair 3 0) unavailable
+      unavailableState <-
+        LengthCounterexampleBank.readLengthSpinePairCounterexampleBankContextState
+          context
+      unavailableBank <- expectPairAdapterBank unavailableState
+      pairAdapterBankStats unavailableBank @?=
+        ( 1
+        , pairAdapterBankEncodedBytes unavailableBank
+        , 1
+        , 0
+        , 0
+        , 1
+        )
+      map Djex.lengthSpinePairCounterexampleBankSampleOrigin
+          (Djex.lengthSpinePairCounterexampleBankSamples unavailableBank) @?=
+        [Djex.lengthSpinePairCounterexampleBankLiveModelReplayOrigin]
+      assertFakeLengthQueryEvents [0] [0] =<<
+        BS.readFile (executable ++ ".events")
+
+    LengthCounterexampleBank.withLengthSpinePairCounterexampleBankContext
+        pairInsertionLimits $ \context -> do
+      insertion <- expectLengthSpinePairSelectionWithin
+        $ LengthSpinePairSelectionInternal.selectVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
+            policy context lengthSpinePairSecondOneContract pairFirst
+      assertOnlyPairBankSelectionRejection
+        (counterexampleBankRunnerDuplicatedCandidate fixture)
+        (Djex.LengthSpinePair 3 3) insertion
+      insertionState <-
+        LengthCounterexampleBank.readLengthSpinePairCounterexampleBankContextState
+          context
+      insertionBank <- expectPairAdapterBank insertionState
+      Djex.lengthSpinePairCounterexampleBankSamples insertionBank @?= []
+      pairAdapterBankStats insertionBank @?= (0, 0, 0, 0, 0, 1)
+
+assertOnlyScalarBankSelectionRejection
+  :: Verified DetailedVerificationVariant
+  -> Natural
+  -> LengthSelectionResult
+  -> IO ()
+assertOnlyScalarBankSelectionRejection expected expectedResult result = do
+  lengthSelectionFailure result @?= Nothing
+  lengthSelectionCandidates result @?= []
+  selected <- expectLengthSelectionSelected result
+  rejected <- expectLengthSelectionRejected result
+  length selected @?= 0
+  case rejected of
+    [removed] -> do
+      behaviorallyRejectedVerified removed @?= expected
+      let receipt = lengthSelectionRejectionCounterexample
+            $ behaviorallyRejectedReason removed
+      Djex.validatedLengthCounterexampleInputs receipt @?= [3]
+      Djex.validatedLengthCounterexampleResult receipt @?= expectedResult
+    removed -> assertFailure $ "expected one scalar bank rejection, observed "
+      ++ show (length removed)
+
+assertOnlyPairBankSelectionRejection
+  :: Verified DetailedVerificationVariant
+  -> Djex.LengthSpinePair Natural
+  -> LengthSpinePairSelectionResult
+  -> IO ()
+assertOnlyPairBankSelectionRejection expected expectedResult result = do
+  lengthSpinePairSelectionFailure result @?= Nothing
+  lengthSpinePairSelectionCandidates result @?= []
+  selected <- expectLengthSpinePairSelectionSelected result
+  rejected <- expectLengthSpinePairSelectionRejected result
+  length selected @?= 0
+  case rejected of
+    [removed] -> do
+      behaviorallyRejectedVerified removed @?= expected
+      let receipt = lengthSpinePairSelectionRejectionCounterexample
+            $ behaviorallyRejectedReason removed
+      Djex.validatedLengthSpinePairCounterexampleInputs receipt @?= [3]
+      Djex.validatedLengthSpinePairCounterexampleResult receipt @?=
+        expectedResult
+    removed -> assertFailure $ "expected one product bank rejection, observed "
+      ++ show (length removed)
+
+assertCounterexampleBankSelectionContinuity
+  :: LengthCounterexampleBankRunnerFixture
+  -> IO ()
+assertCounterexampleBankSelectionContinuity fixture = do
+  scalarFirst <- verificationBatchFromReceipts
+    [counterexampleBankRunnerScaledCandidate fixture]
+  scalarSecond <- verificationBatchFromReceipts
+    [counterexampleBankRunnerIndependentCandidate fixture]
+  pairFirst <- verificationBatchFromReceipts
+    [counterexampleBankRunnerDuplicatedCandidate fixture]
+  pairSecond <- verificationBatchFromReceipts
+    [counterexampleBankRunnerInputAndZeroCandidate fixture]
+  let maximumCandidates = Djex.defaultLengthSMTLibLiveSessionMaximumQueries
+      oversizedCount = fromIntegral maximumCandidates + 1
+  scalarOversized <- verificationBatchFromReceipts
+    $ replicate oversizedCount
+      $ counterexampleBankRunnerScaledCandidate fixture
+  pairOversized <- verificationBatchFromReceipts
+    $ replicate oversizedCount
+      $ counterexampleBankRunnerDuplicatedCandidate fixture
+  withFakeLengthSolver "healthy" $ \executable -> do
+    base <- lengthCounterexampleBankRunnerBasePolicy executable
+    let policy = enableLengthRankingDeferredLiveSessionOpening base
+        scalarContract = counterexampleBankRunnerScalarContract fixture
+    LengthCounterexampleBank.withDefaultLengthCounterexampleBankContext $
+      \context -> do
+        first <- expectLengthSelectionWithin "scalar selection continuity seed"
+          $ LengthSelectionInternal.selectVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext
+              policy context scalarContract scalarFirst
+        assertOnlyScalarBankSelectionRejection
+          (counterexampleBankRunnerScaledCandidate fixture) 6 first
+        firstEvents <- BS.readFile $ executable ++ ".events"
+        beforePreserve <-
+          LengthCounterexampleBank.readLengthCounterexampleBankContextState
+            context
+        beforeBank <- expectScalarAdapterBank beforePreserve
+
+        preserved <- expectLengthSelectionWithin
+          "scalar selection continuity preserve"
+          $ LengthSelectionInternal.selectVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext
+              policy context scalarContract scalarOversized
+        assertLengthSelectionPreserved
+          (verifiedCandidateReceipts scalarOversized) preserved
+        case lengthSelectionFailure preserved of
+          Just LengthSelectionPostVerificationFailed{} -> pure ()
+          failure -> assertFailure
+            $ "unexpected scalar preserve failure: " ++ show failure
+        afterPreserve <-
+          LengthCounterexampleBank.readLengthCounterexampleBankContextState
+            context
+        afterPreserveBank <- expectScalarAdapterBank afterPreserve
+        scalarAdapterBankStats afterPreserveBank @?=
+          scalarAdapterBankStats beforeBank
+
+        resumed <- expectLengthSelectionWithin
+          "scalar selection continuity replay"
+          $ LengthSelectionInternal.selectVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext
+              policy context scalarContract scalarSecond
+        assertOnlyScalarBankSelectionRejection
+          (counterexampleBankRunnerIndependentCandidate fixture) 3 resumed
+        resumedState <-
+          LengthCounterexampleBank.readLengthCounterexampleBankContextState
+            context
+        resumedBank <- expectScalarAdapterBank resumedState
+        scalarAdapterBankStats resumedBank @?=
+          (1, scalarAdapterBankEncodedBytes resumedBank, 2, 1, 0, 2)
+        BS.readFile (executable ++ ".events") >>= (@?= firstEvents)
+
+    LengthCounterexampleBank.withDefaultLengthSpinePairCounterexampleBankContext
+      $ \context -> do
+        first <- expectLengthSpinePairSelectionWithin
+          $ LengthSpinePairSelectionInternal.selectVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
+              policy context lengthSpinePairSecondOneContract pairFirst
+        assertOnlyPairBankSelectionRejection
+          (counterexampleBankRunnerDuplicatedCandidate fixture)
+          (Djex.LengthSpinePair 3 3) first
+        firstEvents <- BS.readFile $ executable ++ ".events"
+        beforePreserve <-
+          LengthCounterexampleBank.readLengthSpinePairCounterexampleBankContextState
+            context
+        beforeBank <- expectPairAdapterBank beforePreserve
+
+        preserved <- expectLengthSpinePairSelectionWithin
+          $ LengthSpinePairSelectionInternal.selectVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
+              policy context lengthSpinePairSecondOneContract pairOversized
+        lengthSpinePairSelectionCandidates preserved @?=
+          verifiedCandidateReceipts pairOversized
+        assertBool "preserved product selection exposed selected associations"
+          $ isNothing $ lengthSpinePairSelectionSelected preserved
+        assertBool "preserved product selection exposed rejected associations"
+          $ isNothing $ lengthSpinePairSelectionRejected preserved
+        case lengthSpinePairSelectionFailure preserved of
+          Just LengthSpinePairSelectionPostVerificationFailed{} -> pure ()
+          failure -> assertFailure
+            $ "unexpected product preserve failure: " ++ show failure
+        afterPreserve <-
+          LengthCounterexampleBank.readLengthSpinePairCounterexampleBankContextState
+            context
+        afterPreserveBank <- expectPairAdapterBank afterPreserve
+        pairAdapterBankStats afterPreserveBank @?= pairAdapterBankStats beforeBank
+
+        resumed <- expectLengthSpinePairSelectionWithin
+          $ LengthSpinePairSelectionInternal.selectVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
+              policy context lengthSpinePairSecondOneContract pairSecond
+        assertOnlyPairBankSelectionRejection
+          (counterexampleBankRunnerInputAndZeroCandidate fixture)
+          (Djex.LengthSpinePair 3 0) resumed
+        resumedState <-
+          LengthCounterexampleBank.readLengthSpinePairCounterexampleBankContextState
+            context
+        resumedBank <- expectPairAdapterBank resumedState
+        pairAdapterBankStats resumedBank @?=
+          (1, pairAdapterBankEncodedBytes resumedBank, 2, 1, 0, 2)
+        BS.readFile (executable ++ ".events") >>= (@?= firstEvents)
+
+assertCounterexampleBankSelectionLiveFailure
+  :: LengthCounterexampleBankRunnerFixture
+  -> IO ()
+assertCounterexampleBankSelectionLiveFailure fixture = do
+  scalarVerification <- verificationBatchFromReceipts
+    [counterexampleBankRunnerScaledCandidate fixture]
+  pairVerification <- verificationBatchFromReceipts
+    [counterexampleBankRunnerDuplicatedCandidate fixture]
+  withFakeLengthSolver "wrong-echo" $ \executable -> do
+    base <- lengthCounterexampleBankRunnerBasePolicy executable
+    let policy = enableLengthRankingDeferredLiveSessionOpening base
+    LengthCounterexampleBank.withDefaultLengthCounterexampleBankContext $
+      \context -> do
+        result <- expectLengthSelectionWithin "scalar bank live failure"
+          $ LengthSelectionInternal.selectVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext
+              policy context
+              (counterexampleBankRunnerScalarContract fixture)
+              scalarVerification
+        assertLengthSelectionRankingPreserved
+          (verifiedCandidateReceipts scalarVerification) result
+        state <-
+          LengthCounterexampleBank.readLengthCounterexampleBankContextState
+            context
+        bank <- expectScalarAdapterBank state
+        scalarAdapterBankStats bank @?= (0, 0, 0, 0, 0, 0)
+        assertFakeLengthQueryEvents [] [] =<<
+          BS.readFile (executable ++ ".events")
+
+    LengthCounterexampleBank.withDefaultLengthSpinePairCounterexampleBankContext
+      $ \context -> do
+        result <- expectLengthSpinePairSelectionWithin
+          $ LengthSpinePairSelectionInternal.selectVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
+              policy context lengthSpinePairSecondOneContract pairVerification
+        lengthSpinePairSelectionCandidates result @?=
+          verifiedCandidateReceipts pairVerification
+        assertBool "failed product selection exposed selected associations"
+          $ isNothing $ lengthSpinePairSelectionSelected result
+        assertBool "failed product selection exposed rejected associations"
+          $ isNothing $ lengthSpinePairSelectionRejected result
+        case lengthSpinePairSelectionFailure result of
+          Just LengthSpinePairSelectionRankingFailed{} -> pure ()
+          failure -> assertFailure
+            $ "unexpected product live failure: " ++ show failure
+        state <-
+          LengthCounterexampleBank.readLengthSpinePairCounterexampleBankContextState
+            context
+        bank <- expectPairAdapterBank state
+        pairAdapterBankStats bank @?= (0, 0, 0, 0, 0, 0)
+        assertFakeLengthQueryEvents [] [] =<<
+          BS.readFile (executable ++ ".events")
+
+assertCounterexampleBankIntegrationContexts
+  :: LengthCounterexampleBankRunnerFixture
+  -> IO ()
+assertCounterexampleBankIntegrationContexts fixture = do
+  disabledRequest <- expectRight $ startupLengthAssessmentRequest
+    LengthBehaviorRank disabledLengthAssessmentMode
+  withLengthAssessmentRequestContext disabledRequest $ \context -> do
+    lengthAssessmentContextBehaviorMode context @?= LengthBehaviorRank
+    skipped <- assessLengthVerificationContext context
+      (error "disabled Length assessment context forced its batch")
+    lengthAssessmentFailure skipped @?= Nothing
+    assertBool "disabled context manufactured a ranking"
+      $ isNothing $ lengthAssessmentRanking skipped
+
+  whenDescriptorBoundExecveCheckLaunchPubliclyReachable
+    $ assertLiveCounterexampleBankIntegrationContexts fixture
+
+assertLiveCounterexampleBankIntegrationContexts
+  :: LengthCounterexampleBankRunnerFixture
+  -> IO ()
+assertLiveCounterexampleBankIntegrationContexts fixture = do
+  scalarVerification <- verificationBatchFromReceipts
+    [counterexampleBankRunnerScaledCandidate fixture]
+  withFakeLengthSolver "healthy" $ \executable -> do
+    let configurationPath = executable ++ ".scalar-bank.json"
+        scalarContract = addJsonField []
+          ("candidateCasePolicy", Json.JStr "cases-rejected")
+          $ jsonRoleAwareLengthContract ["observed-spine"]
+              (jsonLengthTruth True)
+              (jsonLengthAtMost jsonLengthResult $ jsonLengthLiteral 2)
+              [ jsonLengthProviderLaw "Demo.scaleSameList" ["spine"]
+                  $ jsonLengthScale 2 $ jsonLengthArgument 0
+              ]
+        configuration = setJsonField
+              ["applicableDomainValidation", "maximumInputs"]
+              (Json.JInt 0)
+          $ setJsonField ["execution", "artifactPolicy"]
+              (Json.JStr "input-values-after-satisfiable")
+          $ setJsonField ["contract"] scalarContract
+          $ lengthRankingConfigurationFileFixture executable Nothing
+    ByteString.writeFile configurationPath
+      $ encodeLengthRankingConfigurationFile configuration
+    loaded <- loadLengthAssessmentMode PermitUnpinnedExecutable
+      $ LengthRankingConfigurationFileSource configurationPath 1000
+    mode <- case loaded of
+      Left failure -> assertFailure (show failure) >> error "unreachable"
+      Right configured -> pure configured
+    filterRequest <- expectRight $ startupLengthAssessmentRequest
+      LengthBehaviorFilter mode
+    rankRequest <- expectRight $ startupLengthAssessmentRequest
+      LengthBehaviorRank mode
+
+    firstWrapper <- expectLengthAssessmentWithin
+      $ assessLengthVerificationRequest filterRequest scalarVerification
+    assertScalarIntegrationRejection firstWrapper
+    assertFakeLengthQueryEvents [0] [0] =<<
+      BS.readFile (executable ++ ".events")
+    removeFile $ executable ++ ".events"
+    secondWrapper <- expectLengthAssessmentWithin
+      $ assessLengthVerificationRequest filterRequest scalarVerification
+    assertScalarIntegrationRejection secondWrapper
+    doesFileExist (executable ++ ".events") >>= (@?= True)
+    assertFakeLengthQueryEvents [0] [0] =<<
+      BS.readFile (executable ++ ".events")
+
+    withLengthAssessmentRequestContext filterRequest $ \context -> do
+      lengthAssessmentContextBehaviorMode context @?= LengthBehaviorFilter
+      first <- expectLengthAssessmentWithin
+        $ assessLengthVerificationContext context scalarVerification
+      assertScalarIntegrationRejection first
+      assertFakeLengthQueryEvents [0] [0] =<<
+        BS.readFile (executable ++ ".events")
+      removeFile $ executable ++ ".events"
+      second <- expectLengthAssessmentWithin
+        $ assessLengthVerificationContext context scalarVerification
+      assertScalarIntegrationRejection second
+      doesFileExist (executable ++ ".events") >>= (@?= False)
+
+    withLengthAssessmentRequestContext rankRequest $ \context -> do
+      lengthAssessmentContextBehaviorMode context @?= LengthBehaviorRank
+      first <- expectLengthAssessmentWithin
+        $ assessLengthVerificationContext context scalarVerification
+      lengthAssessmentFailure first @?= Nothing
+      lengthAssessmentCandidates first @?=
+        verifiedCandidateReceipts scalarVerification
+      assertFakeLengthQueryEvents [0] [0] =<<
+        BS.readFile (executable ++ ".events")
+      removeFile $ executable ++ ".events"
+      second <- expectLengthAssessmentWithin
+        $ assessLengthVerificationContext context scalarVerification
+      lengthAssessmentFailure second @?= Nothing
+      lengthAssessmentCandidates second @?=
+        verifiedCandidateReceipts scalarVerification
+      assertFakeLengthQueryEvents [0] [0] =<<
+        BS.readFile (executable ++ ".events")
+
+    permission <- case authorizeExplicitLengthAssessmentRequest
+        LengthBehaviorFilter mode of
+      Left failure -> assertFailure (show failure) >> error "unreachable"
+      Right authorized -> pure authorized
+    let lazyRequest = explicitLengthAssessmentRequest permission
+          $ LeanLengthScalarContractSelection
+          $ error "Integration context forced its passive contract"
+    withLengthAssessmentRequestContext lazyRequest $ \context ->
+      lengthAssessmentContextBehaviorMode context @?= LengthBehaviorFilter
+
+  pairVerification <- verificationBatchFromReceipts
+    [counterexampleBankRunnerDuplicatedCandidate fixture]
+  withFakeLengthSolver "healthy" $ \executable -> do
+    let configurationPath = executable ++ ".pair-bank.json"
+        pairContract = jsonLengthSpinePairContract ["observed-spine"]
+          "cases-rejected" (jsonLengthTruth True)
+          (jsonLengthAll
+            [ jsonLengthEqual jsonLengthSpinePairResultFirst
+                $ jsonLengthInput 0
+            , jsonLengthAtMost jsonLengthSpinePairResultSecond
+                $ jsonLengthLiteral 2
+            ])
+          [jsonLengthProviderLaw "Demo.zeroList" [] $ jsonLengthLiteral 0]
+        configuration = setJsonField
+              ["applicableDomainValidation", "maximumInputs"]
+              (Json.JInt 0)
+          $ setJsonField ["execution", "artifactPolicy"]
+              (Json.JStr "input-values-after-satisfiable")
+          $ lengthAssessmentConfigurationFileSpinePairFixture
+              executable Nothing [1] 2 pairContract
+    ByteString.writeFile configurationPath
+      $ encodeLengthRankingConfigurationFile configuration
+    loaded <- loadLengthAssessmentMode PermitUnpinnedExecutable
+      $ LengthRankingConfigurationFileSource configurationPath 1000
+    mode <- case loaded of
+      Left failure -> assertFailure (show failure) >> error "unreachable"
+      Right configured -> pure configured
+    filterRequest <- expectRight $ startupLengthAssessmentRequest
+      LengthBehaviorFilter mode
+
+    firstWrapper <- expectLengthAssessmentWithin
+      $ assessLengthVerificationRequest filterRequest pairVerification
+    assertPairIntegrationRejection firstWrapper
+    assertFakeLengthQueryEvents [0] [0] =<<
+      BS.readFile (executable ++ ".events")
+    removeFile $ executable ++ ".events"
+    secondWrapper <- expectLengthAssessmentWithin
+      $ assessLengthVerificationRequest filterRequest pairVerification
+    assertPairIntegrationRejection secondWrapper
+    doesFileExist (executable ++ ".events") >>= (@?= True)
+    assertFakeLengthQueryEvents [0] [0] =<<
+      BS.readFile (executable ++ ".events")
+
+    withLengthAssessmentRequestContext filterRequest $ \context -> do
+      lengthAssessmentContextBehaviorMode context @?= LengthBehaviorFilter
+      first <- expectLengthAssessmentWithin
+        $ assessLengthVerificationContext context pairVerification
+      assertPairIntegrationRejection first
+      assertFakeLengthQueryEvents [0] [0] =<<
+        BS.readFile (executable ++ ".events")
+      removeFile $ executable ++ ".events"
+      second <- expectLengthAssessmentWithin
+        $ assessLengthVerificationContext context pairVerification
+      assertPairIntegrationRejection second
+      doesFileExist (executable ++ ".events") >>= (@?= False)
+
+assertScalarIntegrationRejection
+  :: LengthAssessmentResult
+  -> IO ()
+assertScalarIntegrationRejection result = do
+  lengthAssessmentFailure result @?= Nothing
+  lengthAssessmentCandidates result @?= []
+  case lengthAssessmentSelectionResult result of
+    Nothing -> assertFailure "Integration scalar filter lost its selection"
+    Just selected -> lengthSelectionCandidates selected @?= []
+  assertBool "Integration scalar filter used the product projection"
+    $ isNothing $ lengthAssessmentSpinePairSelectionResult result
+
+assertPairIntegrationRejection
+  :: LengthAssessmentResult
+  -> IO ()
+assertPairIntegrationRejection result = do
+  lengthAssessmentFailure result @?= Nothing
+  lengthAssessmentCandidates result @?= []
+  case lengthAssessmentSpinePairSelectionResult result of
+    Nothing -> assertFailure "Integration product filter lost its selection"
+    Just selected -> lengthSpinePairSelectionCandidates selected @?= []
+  assertBool "Integration product filter used the scalar projection"
+    $ isNothing $ lengthAssessmentSelectionResult result
 
 showReplayShape
   :: Either
