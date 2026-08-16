@@ -255,3 +255,65 @@ forward-looking for command-local ownership, all-rejected continuation,
 cross-lane enumeration, and later CEGIS policy. Neither historical document is
 silently rewritten into a claim that this dormant package-private state is the
 completed loop.
+
+## Documentation and artifact evidence
+
+The current documentation source was frozen and pushed at
+`0611e2c9685590508bf76cda165147c29b69d1fb`. The artifact-only successor
+updates the walkthrough's source, title, and repository-tree links to that
+exact Leant commit while retaining the vendored Djex revision
+`f957549e36a63cd6003f5edef4ab8a867221813f`. The prepared date remains August
+16, 2026, matching the source checkpoint.
+
+The final documentation sources are:
+
+| File | Lines | SHA-256 |
+| --- | ---: | --- |
+| `docs/Leant.tex` | 1,805 | `66a5be26c8cb75a22bd7d1e9d858b913f6b77d3278d3cfb6e0115461b8a1d050` |
+| `docs/Djex_Leant_Codebase_Walkthrough/Djex_Leant_Codebase_Walkthrough.tex` | 3,245 | `464080a85f0bceeb1aba547131fe7003e86e518253253e6043301581bab51aa1` |
+
+Both maintained PDFs were regenerated from new empty temporary directories
+with three fail-fast passes apiece: LuaLaTeX for the manual and pdfLaTeX for
+the walkthrough. Their final measurements are:
+
+- `docs/Leant.pdf`: 30 pages, 185,216 bytes, SHA-256
+  `9551f25c2bd1e76ac3234723b2d05a198767254617bde2fa1ed98374df14be8c`;
+  and
+- `docs/Djex_Leant_Codebase_Walkthrough/Djex_Leant_Codebase_Walkthrough.pdf`:
+  117 pages, 770,545 bytes, SHA-256
+  `05c288fc97a548cad5993e3c6fc05906a0caca4626ee43f72bc44cde66344d9e`.
+
+The final logs contain no undefined citation or reference, rerun request,
+missing glyph, fatal diagnostic, or TeX error. The manual retains one nonfatal
+LuaTeX duplicate-`page.1` destination warning and four underfull paragraphs.
+The walkthrough retains four underfull lines in the fixed descriptor-launch
+quotation and one pre-existing overfull binder-hygiene paragraph containing
+long fixed identifiers. PDF metadata inspection, text extraction, image-table
+scanning, and font inspection all succeed. Every font is embedded and
+subsetted with a Unicode mapping.
+
+Extracted manual text contains the package-private nominal state, exact scope
+reset, charged newest-first replay, evaluation-free promotion, dormant runtime
+boundary, and report path. Its eleven URL annotations include ten relative
+report targets, all present in the tree. Extracted walkthrough text contains
+the exact full title-page snapshots, package-private state narrative, Djex
+fresh-replay boundary, new module-map row, current report links, and abbreviated
+pinned-tree labels.
+
+The walkthrough has 236 URL annotations. All 179 Djex source links use the
+exact `f957549e36a63cd6003f5edef4ab8a867221813f` blob root, all 50 Leant source
+links use the exact `0611e2c9685590508bf76cda165147c29b69d1fb` blob root, and
+the two repository-tree links use those same full commits. No prior
+`d3a57be`, `30bbb0a`, `a9150c`, or `6802674` pin remains in the walkthrough
+source, extracted text, or URL annotations.
+
+The manual's physical PDF page 27 and the walkthrough's physical pages 1, 11,
+19, 24, 27, and 116 were raster-inspected. The updated manual paragraph and
+report path, exact title snapshot table, addendum headline, detailed bank-state
+boundary, module-map row, current report links, and pinned-tree appendix are
+readable without clipping, overlap, or malformed line breaking.
+
+This evidence paragraph, the walkthrough pin refresh, and the two regenerated
+PDFs form a four-file artifact delta after the frozen source-doc commit. They
+change no Haskell production or test source, Cabal file, vendored Djex file,
+manual TeX, normative Markdown reference, or earlier point-in-time report.
