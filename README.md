@@ -31,9 +31,9 @@ where the unit of work is a line, not a file.
 **Leant is experimental and under active development.** Commands change
 shape between commits and output formats are not stable.
 
-There is a manual: **[docs/Leant.pdf](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Leant.pdf)**
+There is a manual: **[docs/Leant_Overview/Leant_Overview.pdf](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Leant_Overview/Leant_Overview.pdf)**
 — an overview and tutorial, with a detailed tour of `:synth`
-([LaTeX source](docs/Leant.tex)).
+([LaTeX source](docs/Leant_Overview/Leant_Overview.tex)).
 
 ## Contents
 
@@ -58,12 +58,12 @@ There is a manual: **[docs/Leant.pdf](https://raw.githubusercontent.com/Vladimir
 
 Companion documents:
 
-- the **[manual](docs/Leant.pdf)** — tutorial and `:synth` tour;
+- the **[manual](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Leant_Overview/Leant_Overview.pdf)** — tutorial and `:synth` tour;
 - **[docs/length-ranking.md](docs/length-ranking.md)** — the complete
   Length counterexample-ranking and replay-authorized filtering reference;
 - **[docs/synth-internals.md](docs/synth-internals.md)** — the design
   boundaries and dated-report index behind `:synth`;
-- **[Z3 from First Principles](docs/Z3_for_Leant_and_Djex/Z3_for_Leant_and_Djex.pdf)**
+- **[Z3 from First Principles](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Z3_for_Leant_and_Djex/Z3_for_Leant_and_Djex.pdf)**
   — a beginner's guide to Z3 for this codebase, assuming no logic
   background: what satisfiability, models, and `unsat` mean, SMT-LIB from
   syntax to models, cores, and Horn clauses, why a solver boundary needs
@@ -71,11 +71,11 @@ Companion documents:
   trace of how the current Length domain and Leant's rank and filter modes
   actually use Z3, plus a reading and troubleshooting guide
   ([LaTeX source](docs/Z3_for_Leant_and_Djex/Z3_for_Leant_and_Djex.tex));
-- the **[Z3 behavioral synthesis proposal](docs/Z3_Behavioral_Synthesis_Proposal/Z3_Behavioral_Synthesis_Proposal.pdf)**
+- the **[Z3 behavioral synthesis proposal](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Z3_Behavioral_Synthesis_Proposal/Z3_Behavioral_Synthesis_Proposal.pdf)**
   — where the behavioral layer goes next: counterexample-guided search,
   typed sketch completion, semantic pruning, and Lean-checked proof
   artifacts ([LaTeX source](docs/Z3_Behavioral_Synthesis_Proposal/Z3_Behavioral_Synthesis_Proposal.tex));
-- the **[Lean 4 rewrite analysis](docs/Leant_Djex_Lean4_Rewrite_Analysis/Leant_Djex_Lean4_Rewrite_Analysis.pdf)**
+- the **[Lean 4 rewrite analysis](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Leant_Djex_Lean4_Rewrite_Analysis/Leant_Djex_Lean4_Rewrite_Analysis.pdf)**
   — a feasibility study of reimplementing Leant and Djex in Lean itself:
   which of today's boundaries would survive, what a Lean host makes
   simpler (elaborated goals staying `Expr`, kernel-checked candidates
@@ -1198,7 +1198,7 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
 
 The design below — a Haskell REPL and synthesis engine driving a Lean
 worker over a text protocol — is examined at length in the
-[Lean 4 rewrite analysis](docs/Leant_Djex_Lean4_Rewrite_Analysis/Leant_Djex_Lean4_Rewrite_Analysis.pdf),
+[Lean 4 rewrite analysis](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Leant_Djex_Lean4_Rewrite_Analysis/Leant_Djex_Lean4_Rewrite_Analysis.pdf),
 which asks which of these boundaries would survive reimplementing both
 projects in Lean itself.
 

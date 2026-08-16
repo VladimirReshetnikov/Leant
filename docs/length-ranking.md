@@ -5,7 +5,7 @@ behavior of already-verified candidates. Its default operation stably ranks
 the complete verified batch; an explicit command mode may instead omit only
 independently replayed counterexamples. This document is the complete
 reference; the [README](../README.md) gives the one-paragraph overview and the
-[manual](Leant.pdf) the user-level tour. If satisfiability, models, `unsat`,
+[manual](Leant_Overview/Leant_Overview.pdf) the user-level tour. If satisfiability, models, `unsat`,
 or SMT-LIB are unfamiliar, read
 [Z3 from First Principles](Z3_for_Leant_and_Djex/Z3_for_Leant_and_Djex.pdf)
 first: it teaches those ideas from zero and then traces this exact stage
