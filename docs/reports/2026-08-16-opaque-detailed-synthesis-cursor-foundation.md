@@ -359,3 +359,92 @@ successor will pin those three walkthrough locations to the exact frozen
 source-document commit, complete this section with final source/render/link
 evidence, and regenerate only the manual and walkthrough PDFs from separate
 empty temporary directories with three fail-fast TeX passes each.
+
+## Artifact successor evidence
+
+The source-document checkpoint was frozen and pushed as
+`a18f3d0a99bb1b988f48747ecaadbe28b756e139`. The artifact-only successor
+changes the walkthrough's three Leant pin locations to that exact commit. Its
+three Djex pin locations remain
+`f957549e36a63cd6003f5edef4ab8a867221813f`. No former `a9b917f` pin or other
+stale Leant/Djex checkpoint pin remains in the walkthrough source, extracted
+text, or URL annotations.
+
+The final maintained sources are:
+
+| File | Lines | SHA-256 |
+| --- | ---: | --- |
+| `docs/Leant.tex` | 1,883 | `a63129932bbc0d6309fcaf6450b168f077dbaec49d2aa21f74d9c377707db82b` |
+| `docs/Djex_Leant_Codebase_Walkthrough/Djex_Leant_Codebase_Walkthrough.tex` | 3,333 | `4a6decb2f81e4209d93a54a4b88fee308b7ce4481f75500e5972faa7a57ccf67` |
+
+The manual was rebuilt in the initially empty
+`/tmp/leant-cursor-stage2-manual.zxUPX2` directory with three fail-fast
+LuaLaTeX passes. The walkthrough was rebuilt independently in the initially
+empty `/tmp/leant-cursor-stage2-walk.MP2l8c` directory with three fail-fast
+pdfLaTeX passes. Both used `-interaction=nonstopmode`, `-halt-on-error`, and
+`-file-line-error`; pass-two and pass-three stdout are byte-identical for each
+document. The engines were LuaHBTeX 1.14.0 and pdfTeX
+3.141592653-2.6-1.40.22 from TeX Live 2022/dev/Debian.
+
+The final artifacts are:
+
+- `docs/Leant.pdf`: 31 pages, 190,765 bytes, SHA-256
+  `d08c5530353bd03e6884984db8469609b0323e8e3b0bd28a5243b828e3231d8b`;
+  and
+- `docs/Djex_Leant_Codebase_Walkthrough/Djex_Leant_Codebase_Walkthrough.pdf`:
+  119 pages, 781,256 bytes, SHA-256
+  `701db9b7b1ff7ccb52fac0bf7e413db74c66bf677ea2a4b3a51617be548ee2ac`.
+
+The final logs contain no literal `LaTeX Warning` or `Package ... Warning`
+line and no undefined citation or reference, rerun request, missing glyph,
+fatal diagnostic, or TeX error. The manual retains five underfull boxes: one
+in the command grammar paragraph at
+source lines 1608--1658 and four in the dated-report path paragraph at lines
+1722--1749. It has no overfull box. The walkthrough retains four underfull
+boxes in the fixed descriptor-launch quotation at lines 463--464 and the
+pre-existing 36.05583-point overfull binder-hygiene paragraph at lines
+2050--2051.
+
+Both PDFs are unencrypted, untagged PDF 1.5 documents on 612-by-792-point
+letter pages, with no form, JavaScript, embedded file, signature,
+raster-image payload, or suspect-object flag. A raw object-key scan likewise
+finds no JavaScript, launch, rich-media, XFA, or open-action key. Their 53 and
+689 named destinations, respectively, have no duplicate name. All eight manual
+font rows and all 17 walkthrough font rows are embedded and subsetted with
+Unicode mappings.
+
+Plain text extraction succeeds on every physical page. The manual extract is
+82,995 bytes over 1,499 lines with SHA-256
+`72df59c2eba37b1c805063643a10f8938052094b949ec67dce4cf374f09a416a`.
+The walkthrough extract is 310,572 bytes over 6,283 lines with SHA-256
+`cdf2804941e6e78a3d5189fb9d984b0a95bec68a679a11b129d1d820276bfe0f`.
+UTF-8 validation finds no replacement character. The extracts retain the
+opaque cursor name and boundary, exact 23,248/452/451 test inventory, full
+source snapshots, and abbreviated pinned-tree labels.
+
+The manual has 11 URL annotations: one repository link and ten relative report
+links covering eight unique targets, all present. The walkthrough has 236 URL
+annotations. All 179 Djex blob links use the exact `f957549` root; all 50 Leant
+blob links use the exact `a18f3d0` root; and the two repository-tree links use
+those same full commits. The remaining five external kernel documentation,
+source, and manual-page targets resolve. All 63 unique Djex blob targets and
+all 18 unique Leant blob targets exist in the pinned Git trees. The source
+contains three full Leant pins and three full Djex pins; the annotation set
+contains 51 Leant and 180 Djex full-pin occurrences.
+
+At 144 DPI, every rendered page is a 1,224-by-1,584-pixel raster. Exact
+same-resolution comparison with the source-checkpoint artifacts
+(`bc321e8...` for the 31-page manual and `41edba2...` for the 118-page
+walkthrough) finds changed physical pages 24--31 in the manual and pages 1,
+7--9, 11--13, 23, 27, 66--67, and 83--119 in the walkthrough. Every other
+paired page is byte-identical at raster level. Every changed page, including
+the walkthrough's new page 119, was inspected; the title snapshots, cursor
+narrative, current authority chain, test inventory, diagrams, appendices,
+pinned-source entry points, and conclusion remain readable without clipping,
+overlap, an orphaned fragment, or malformed line breaking.
+
+This evidence append, the three walkthrough pin substitutions, and the two
+regenerated PDFs are the complete four-file artifact delta. It changes no
+manual TeX, normative Markdown reference, reports index, historical report,
+Haskell production or test source, Cabal file, golden fixture, or vendored Djex
+file.
