@@ -100,6 +100,7 @@ import Leant.Synth.Length.Contract
   )
 import Leant.Synth.Length.Configuration
   ( LengthRankingPolicy
+  , enableLengthRankingApplicableDomainValidation
   , enableLengthRankingCounterexampleSimplification
   , enableLengthRankingDeferredLiveSessionOpening
   , enableLengthRankingNonVacuousApplicableDomainPreference
@@ -107,7 +108,6 @@ import Leant.Synth.Length.Configuration
   , enableLengthRankingOriginProbe
   , enableLengthRankingInputBoxValidation
   , enableLengthRankingScopedUsableWorkBudget
-  , enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineApplicableDomainValidation
   , lengthRankingPolicyExecutableDigestExpectation
   , lengthRankingPolicyFromValidatedComponents
   )
@@ -401,7 +401,7 @@ decodeLengthAssessmentConfigurationFile bytes = do
       inputBoxPreferencePolicy =
         enableLengthRankingNonVacuousInputBoxPreference originProbePolicy
       applicableDomainPolicy =
-        enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineApplicableDomainValidation
+        enableLengthRankingApplicableDomainValidation
           applicableDomainInputBoxLimits booleanFiniteUnionLimits
           inputBoxPreferencePolicy
       applicableDomainPreferencePolicy =

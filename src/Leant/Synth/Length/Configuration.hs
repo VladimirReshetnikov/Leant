@@ -37,15 +37,6 @@ module Leant.Synth.Length.Configuration
   , enableLengthRankingOriginProbe
   , enableLengthRankingInputBoxValidation
   , enableLengthRankingApplicableDomainValidation
-  , enableLengthRankingPositiveAffineApplicableDomainValidation
-  , enableLengthRankingRelationalPositiveAffineApplicableDomainValidation
-  , enableLengthRankingStrictRelationalPositiveAffineApplicableDomainValidation
-  , enableLengthRankingStrictRelationalPositiveAffineQuotientApplicableDomainValidation
-  , enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidation
-  , enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainValidation
-  , enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainValidation
-  , enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainValidation
-  , enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineApplicableDomainValidation
   , enableLengthRankingCounterexampleSimplification
   , enableLengthRankingNonVacuousInputBoxPreference
   , enableLengthRankingNonVacuousApplicableDomainPreference
@@ -195,29 +186,12 @@ data LengthRankingInputBoxValidation
   = LengthRankingInputBoxValidationDisabled
   | LengthRankingInputBoxValidationEnabled !LengthInputBoxLimits [Natural]
 
--- | Private permission to attempt complete traversal of the query-owned
--- applicable domain under the selected checked-precondition extraction rule.
--- Missing bounds and bounded-admission refusals remain ordinary misses.
+-- | Private permission to attempt the current complete traversal of the
+-- query-owned applicable domain. Missing bounds and bounded-admission refusals
+-- remain ordinary misses.
 data LengthRankingApplicableDomainValidation
   = LengthRankingApplicableDomainValidationDisabled
-  | LengthRankingApplicableDomainValidationDirectV1 !LengthInputBoxLimits
-  | LengthRankingApplicableDomainValidationPositiveAffineV1
-      !LengthInputBoxLimits
-  | LengthRankingApplicableDomainValidationRelationalPositiveAffineV1
-      !LengthInputBoxLimits
-  | LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineV1
-      !LengthInputBoxLimits
-  | LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientV1
-      !LengthInputBoxLimits
-  | LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaV1
-      !LengthInputBoxLimits
-  | LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusV1
-      !LengthInputBoxLimits
-  | LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionV1
-      !LengthInputBoxLimits !LengthBooleanFiniteUnionLimits
-  | LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingV1
-      !LengthInputBoxLimits !LengthBooleanFiniteUnionLimits
-  | LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineV1
+  | LengthRankingApplicableDomainValidationEnabled
       !LengthInputBoxLimits !LengthBooleanFiniteUnionLimits
 
 -- | Private permission to run Djex's query-owned canonical origin replay
@@ -432,206 +406,24 @@ enableLengthRankingInputBoxValidation limits maximums
     applicableDomainValidation originProbe simplification inputBoxPreference
     applicableDomainPreference liveSessionOpening usableWorkBudget
 
--- | Derive an explicitly enabled complete applicable-domain traversal without
--- changing execution, evaluation, origin probing, the optional caller-owned
--- finite box, or either ranking preference.  Each candidate derives inclusive
--- maxima only from direct precondition bounds retained by its exact checked
--- query.  A missing bound or bounded-admission refusal falls through to the
+-- | Enable the complete current applicable-domain algorithm without changing
+-- execution, evaluation, origin probing, the optional caller-owned finite box,
+-- or either ranking preference. The two independently validated limits bound
+-- input enumeration and recursive Boolean finite-union construction. A
+-- bounded-admission refusal remains an ordinary miss and falls through to the
 -- established origin/live path.
 enableLengthRankingApplicableDomainValidation
   :: LengthInputBoxLimits
-  -> LengthRankingPolicy
-  -> LengthRankingPolicy
-enableLengthRankingApplicableDomainValidation limits
-    (LengthRankingPolicy execution evaluation inputBoxValidation _ originProbe
-      simplification inputBoxPreference applicableDomainPreference
-      liveSessionOpening usableWorkBudget) =
-  LengthRankingPolicy execution evaluation inputBoxValidation
-    (LengthRankingApplicableDomainValidationDirectV1 limits) originProbe
-    simplification inputBoxPreference applicableDomainPreference
-    liveSessionOpening usableWorkBudget
-
--- | Select positive-affine-v1 complete applicable-domain extraction.  This is
--- mutually exclusive with the historical direct-v1 extractor, so whichever
--- applicable-domain builder is applied last determines the retained strategy.
-enableLengthRankingPositiveAffineApplicableDomainValidation
-  :: LengthInputBoxLimits
-  -> LengthRankingPolicy
-  -> LengthRankingPolicy
-enableLengthRankingPositiveAffineApplicableDomainValidation limits
-    (LengthRankingPolicy execution evaluation inputBoxValidation _ originProbe
-      simplification inputBoxPreference applicableDomainPreference
-      liveSessionOpening usableWorkBudget) =
-  LengthRankingPolicy execution evaluation inputBoxValidation
-    (LengthRankingApplicableDomainValidationPositiveAffineV1 limits) originProbe
-    simplification inputBoxPreference applicableDomainPreference
-    liveSessionOpening usableWorkBudget
-
--- | Select relational-positive-affine-v1 complete applicable-domain
--- extraction.  This is mutually exclusive with the historical direct-v1 and
--- positive-affine-v1 extractors, so the last applicable-domain builder wins.
-enableLengthRankingRelationalPositiveAffineApplicableDomainValidation
-  :: LengthInputBoxLimits
-  -> LengthRankingPolicy
-  -> LengthRankingPolicy
-enableLengthRankingRelationalPositiveAffineApplicableDomainValidation limits
-    (LengthRankingPolicy execution evaluation inputBoxValidation _ originProbe
-      simplification inputBoxPreference applicableDomainPreference
-      liveSessionOpening usableWorkBudget) =
-  LengthRankingPolicy execution evaluation inputBoxValidation
-    (LengthRankingApplicableDomainValidationRelationalPositiveAffineV1 limits)
-    originProbe simplification inputBoxPreference applicableDomainPreference
-    liveSessionOpening usableWorkBudget
-
--- | Select strict-relational-positive-affine-v1 complete applicable-domain
--- extraction.  This additive superset recognizes the relational rule plus an
--- immediate normalized top-level negated at-most relation; it is not general
--- negation handling.  All applicable-domain builders remain mutually
--- exclusive, so the last one applied determines the retained strategy.
-enableLengthRankingStrictRelationalPositiveAffineApplicableDomainValidation
-  :: LengthInputBoxLimits
-  -> LengthRankingPolicy
-  -> LengthRankingPolicy
-enableLengthRankingStrictRelationalPositiveAffineApplicableDomainValidation
-    limits
-    (LengthRankingPolicy execution evaluation inputBoxValidation _ originProbe
-      simplification inputBoxPreference applicableDomainPreference
-      liveSessionOpening usableWorkBudget) =
-  LengthRankingPolicy execution evaluation inputBoxValidation
-    (LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineV1
-      limits)
-    originProbe simplification inputBoxPreference applicableDomainPreference
-    liveSessionOpening usableWorkBudget
-
--- | Select strict-relational-positive-affine-quotient-v1 complete applicable-
--- domain extraction.  This additive strict-relational superset recognizes
--- exact consequences of one positive-literal quotient at the root of exactly
--- one relation side.  It grants no authority for nested, embedded, or
--- two-sided quotient reasoning.  All applicable-domain builders remain
--- mutually exclusive, so the last one applied determines the retained
--- strategy.
-enableLengthRankingStrictRelationalPositiveAffineQuotientApplicableDomainValidation
-  :: LengthInputBoxLimits
-  -> LengthRankingPolicy
-  -> LengthRankingPolicy
-enableLengthRankingStrictRelationalPositiveAffineQuotientApplicableDomainValidation
-    limits
-    (LengthRankingPolicy execution evaluation inputBoxValidation _ originProbe
-      simplification inputBoxPreference applicableDomainPreference
-      liveSessionOpening usableWorkBudget) =
-  LengthRankingPolicy execution evaluation inputBoxValidation
-    (LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientV1
-      limits)
-    originProbe simplification inputBoxPreference applicableDomainPreference
-    liveSessionOpening usableWorkBudget
-
--- | Select strict-relational-positive-affine-quotient-root-extrema-v1
--- complete applicable-domain extraction.  This additive sibling recognizes
--- the validator's exact consequences of one immediate binary maximum or
--- minimum at a relation root while preserving the established positive-
--- affine and root-quotient coverage.  It grants no authority for nested,
--- mixed, n-ary, or two-sided extrema reasoning.  All applicable-domain
--- builders remain mutually exclusive, so the last one applied determines the
--- retained strategy.
-enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidation
-  :: LengthInputBoxLimits
-  -> LengthRankingPolicy
-  -> LengthRankingPolicy
-enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidation
-    limits
-    (LengthRankingPolicy execution evaluation inputBoxValidation _ originProbe
-      simplification inputBoxPreference applicableDomainPreference
-      liveSessionOpening usableWorkBudget) =
-  LengthRankingPolicy execution evaluation inputBoxValidation
-    (LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaV1
-      limits)
-    originProbe simplification inputBoxPreference applicableDomainPreference
-    liveSessionOpening usableWorkBudget
-
--- | Select strict-relational-positive-affine-quotient-root-extrema-monus-v1
--- complete applicable-domain extraction.  This cumulative sibling recognizes
--- the validator's exact consequences of one immediate monus at a relation
--- root while preserving the established affine, quotient, and root-extrema
--- coverage.  All applicable-domain builders remain mutually exclusive, so
--- the last one applied determines the retained strategy.
-enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainValidation
-  :: LengthInputBoxLimits
-  -> LengthRankingPolicy
-  -> LengthRankingPolicy
-enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainValidation
-    limits
-    (LengthRankingPolicy execution evaluation inputBoxValidation _ originProbe
-      simplification inputBoxPreference applicableDomainPreference
-      liveSessionOpening usableWorkBudget) =
-  LengthRankingPolicy execution evaluation inputBoxValidation
-    (LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusV1
-      limits)
-    originProbe simplification inputBoxPreference applicableDomainPreference
-    liveSessionOpening usableWorkBudget
-
--- | Select the bounded Boolean finite-union successor to cumulative root-
--- monus applicable-domain extraction.  The independent union limits bound
--- normalized branch generation, rules and immutable-snapshot closure
--- inspections per branch, retained canonical boxes, and raw assignment
--- visits; the existing input-box limits continue to bound input width and the
--- deduplicated assignment set.  All applicable-domain builders remain
--- mutually exclusive, so the last one applied determines the retained
--- strategy.
-enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainValidation
-  :: LengthInputBoxLimits
   -> LengthBooleanFiniteUnionLimits
   -> LengthRankingPolicy
   -> LengthRankingPolicy
-enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainValidation
+enableLengthRankingApplicableDomainValidation
     inputBoxLimits unionLimits
     (LengthRankingPolicy execution evaluation inputBoxValidation _ originProbe
       simplification inputBoxPreference applicableDomainPreference
       liveSessionOpening usableWorkBudget) =
   LengthRankingPolicy execution evaluation inputBoxValidation
-    (LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionV1
-      inputBoxLimits unionLimits)
-    originProbe simplification inputBoxPreference applicableDomainPreference
-    liveSessionOpening usableWorkBudget
-
--- | Select the cumulative atomic-branching successor to the bounded Boolean
--- finite-union validator.  It retains the same independently sealed limits
--- while opening the admitted root-extrema and may-zero-monus atomic
--- alternatives before per-branch closure.  All applicable-domain builders
--- remain mutually exclusive, so the last one applied determines the retained
--- strategy.
-enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainValidation
-  :: LengthInputBoxLimits
-  -> LengthBooleanFiniteUnionLimits
-  -> LengthRankingPolicy
-  -> LengthRankingPolicy
-enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainValidation
-    inputBoxLimits unionLimits
-    (LengthRankingPolicy execution evaluation inputBoxValidation _ originProbe
-      simplification inputBoxPreference applicableDomainPreference
-      liveSessionOpening usableWorkBudget) =
-  LengthRankingPolicy execution evaluation inputBoxValidation
-    (LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingV1
-      inputBoxLimits unionLimits)
-    originProbe simplification inputBoxPreference applicableDomainPreference
-    liveSessionOpening usableWorkBudget
-
--- | Select the nominal recursive piecewise-affine successor to the cumulative
--- atomic-branching validator.  It retains the same independently sealed limits
--- while recursively branching the additionally admitted extrema/monus
--- piecewise-affine atoms.  All applicable-domain builders remain mutually
--- exclusive, so the last one applied determines the retained strategy.
-enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineApplicableDomainValidation
-  :: LengthInputBoxLimits
-  -> LengthBooleanFiniteUnionLimits
-  -> LengthRankingPolicy
-  -> LengthRankingPolicy
-enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineApplicableDomainValidation
-    inputBoxLimits unionLimits
-    (LengthRankingPolicy execution evaluation inputBoxValidation _ originProbe
-      simplification inputBoxPreference applicableDomainPreference
-      liveSessionOpening usableWorkBudget) =
-  LengthRankingPolicy execution evaluation inputBoxValidation
-    (LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineV1
+    (LengthRankingApplicableDomainValidationEnabled
       inputBoxLimits unionLimits)
     originProbe simplification inputBoxPreference applicableDomainPreference
     liveSessionOpening usableWorkBudget
@@ -822,38 +614,9 @@ scalarApplicableDomainRankingPolicy
 scalarApplicableDomainRankingPolicy validation = case validation of
   LengthRankingApplicableDomainValidationDisabled ->
     LengthApplicableDomainRankingDisabled
-  LengthRankingApplicableDomainValidationDirectV1 limits ->
-    LengthApplicableDomainRankingEnabled limits
-  LengthRankingApplicableDomainValidationPositiveAffineV1 limits ->
-    LengthApplicableDomainRankingPositiveAffineEnabled limits
-  LengthRankingApplicableDomainValidationRelationalPositiveAffineV1 limits ->
-    LengthApplicableDomainRankingRelationalPositiveAffineEnabled limits
-  LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineV1
-      limits ->
-    LengthApplicableDomainRankingStrictRelationalPositiveAffineEnabled limits
-  LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientV1
-      limits ->
-    LengthApplicableDomainRankingStrictRelationalPositiveAffineQuotientEnabled
-      limits
-  LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaV1
-      limits ->
-    LengthApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaEnabled
-      limits
-  LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusV1
-      limits ->
-    LengthApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusEnabled
-      limits
-  LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionV1
+  LengthRankingApplicableDomainValidationEnabled
       inputBoxLimits unionLimits ->
-    LengthApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionEnabled
-      inputBoxLimits unionLimits
-  LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingV1
-      inputBoxLimits unionLimits ->
-    LengthApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingEnabled
-      inputBoxLimits unionLimits
-  LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineV1
-      inputBoxLimits unionLimits ->
-    LengthApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineEnabled
+    LengthApplicableDomainRankingEnabled
       inputBoxLimits unionLimits
 
 scalarOriginProbeRankingPolicy
@@ -887,39 +650,9 @@ spinePairApplicableDomainRankingPolicy
 spinePairApplicableDomainRankingPolicy validation = case validation of
   LengthRankingApplicableDomainValidationDisabled ->
     LengthSpinePairApplicableDomainRankingDisabled
-  LengthRankingApplicableDomainValidationDirectV1 limits ->
-    LengthSpinePairApplicableDomainRankingEnabled limits
-  LengthRankingApplicableDomainValidationPositiveAffineV1 limits ->
-    LengthSpinePairApplicableDomainRankingPositiveAffineEnabled limits
-  LengthRankingApplicableDomainValidationRelationalPositiveAffineV1 limits ->
-    LengthSpinePairApplicableDomainRankingRelationalPositiveAffineEnabled limits
-  LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineV1
-      limits ->
-    LengthSpinePairApplicableDomainRankingStrictRelationalPositiveAffineEnabled
-      limits
-  LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientV1
-      limits ->
-    LengthSpinePairApplicableDomainRankingStrictRelationalPositiveAffineQuotientEnabled
-      limits
-  LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaV1
-      limits ->
-    LengthSpinePairApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaEnabled
-      limits
-  LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusV1
-      limits ->
-    LengthSpinePairApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusEnabled
-      limits
-  LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionV1
+  LengthRankingApplicableDomainValidationEnabled
       inputBoxLimits unionLimits ->
-    LengthSpinePairApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionEnabled
-      inputBoxLimits unionLimits
-  LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingV1
-      inputBoxLimits unionLimits ->
-    LengthSpinePairApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingEnabled
-      inputBoxLimits unionLimits
-  LengthRankingApplicableDomainValidationStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineV1
-      inputBoxLimits unionLimits ->
-    LengthSpinePairApplicableDomainRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineEnabled
+    LengthSpinePairApplicableDomainRankingEnabled
       inputBoxLimits unionLimits
 
 liveSessionOpeningPolicy
