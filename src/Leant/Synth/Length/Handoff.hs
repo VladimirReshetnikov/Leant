@@ -124,7 +124,6 @@ data LengthHandoffRefusal
   | LengthHandoffProviderUnavailable String
   | LengthHandoffProviderAmbiguous String Int
   | LengthHandoffProviderVariableMissing String String
-  | LengthHandoffExactCasePolicyRequiresTargetRoles
   | LengthHandoffSessionRejected (LengthSessionError ExferenceLocal)
   | LengthHandoffContractRejected (LengthContractError ExferenceTypeVariable)
   | LengthHandoffProblemRejected
@@ -212,8 +211,8 @@ prepareCheckedLengthProblem source verified = do
         stepConstructor
       targetRoles = leanLengthContractTargetArgumentRoles source
       casePolicy = leanLengthContractCandidateCasePolicy source
-  interpretationPolicy <- lengthInterpretationPolicySource
-    casePolicy targetRoles
+      interpretationPolicy = lengthInterpretationPolicySource
+        casePolicy targetRoles
   session <- either (Left . LengthHandoffSessionRejected) Right
     $ sealLengthSessionWithInterpretationPolicy defaultLengthLimits
         interpretationPolicy inventory spineModel providerSources
@@ -301,8 +300,8 @@ prepareCheckedLengthSpinePairProblem source verified = do
         stepConstructor
       targetRoles = leanLengthSpinePairContractTargetArgumentRoles source
       casePolicy = leanLengthSpinePairContractCandidateCasePolicy source
-  interpretationPolicy <- shared $ lengthInterpretationPolicySource
-    casePolicy targetRoles
+      interpretationPolicy = lengthInterpretationPolicySource
+        casePolicy targetRoles
   session <- shared $ either (Left . LengthHandoffSessionRejected) Right
     $ sealLengthSessionWithInterpretationPolicy defaultLengthLimits
         interpretationPolicy inventory spineModel providerSources
@@ -349,24 +348,20 @@ exactUnaryFamilyApplication expected fragment = case fragment of
   FApp _ _ (AppNominal family) [_] -> family == expected
   _ -> False
 
--- | Convert Leant's two decoded policy axes once, after every exact family and
--- provider identity has been resolved.  The closed Djex source makes invalid
--- combinations unrepresentable past this point while retaining the startup
--- and contract-only legacy entrance exactly.
+-- | Convert Leant's two explicit policy axes once, after every exact family
+-- and provider identity has been resolved.  The closed Djex source makes the
+-- selected case semantics and exact source-ordered roles inseparable past
+-- this point.
 lengthInterpretationPolicySource
   :: LeanLengthCandidateCasePolicy
-  -> Maybe [LengthTargetArgumentRole]
-  -> Either LengthHandoffRefusal LengthInterpretationPolicySource
+  -> [LengthTargetArgumentRole]
+  -> LengthInterpretationPolicySource
 lengthInterpretationPolicySource casePolicy targetRoles =
-  case (casePolicy, targetRoles) of
-    (LeanLengthCasesRejected, Nothing) ->
-      Right LengthLegacyCasesRejected
-    (LeanLengthCasesRejected, Just roles) ->
-      Right $ LengthExplicitTargetRolesCasesRejected roles
-    (LeanLengthExactSpineZeroStepV1, Just roles) ->
-      Right $ LengthExplicitTargetRolesExactZeroStepCases roles
-    (LeanLengthExactSpineZeroStepV1, Nothing) ->
-      Left LengthHandoffExactCasePolicyRequiresTargetRoles
+  case casePolicy of
+    LeanLengthCasesRejected ->
+      LengthExplicitTargetRolesCasesRejected targetRoles
+    LeanLengthExactSpineZeroStepV1 ->
+      LengthExplicitTargetRolesExactZeroStepCases targetRoles
 
 resolveSemanticFamily
   :: PreparedSynthesisInspection

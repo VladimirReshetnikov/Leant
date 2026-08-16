@@ -26,7 +26,6 @@ module Leant.Synth.Length.Integration
   , startupLengthAssessmentRequest
   , authorizeExplicitLengthAssessmentRequest
   , explicitLengthAssessmentRequest
-  , explicitLengthAssessmentSelectionRequest
   , LengthAssessmentFailure (..)
   , LengthAssessmentResult
   , assessLengthVerificationBatch
@@ -69,10 +68,7 @@ import Leant.Synth.Length.PostVerification
   , lengthPostVerificationRanking
   , lengthPostVerificationRankingFailure
   )
-import Leant.Synth.Length.Contract
-  ( LeanLengthContract
-  , LeanLengthContractSelection (..)
-  )
+import Leant.Synth.Length.Contract (LeanLengthContractSelection (..))
 import Leant.Synth.Length.Ranking
   ( LengthRanking
   , LengthRankingFailure
@@ -174,22 +170,9 @@ authorizeExplicitLengthAssessmentRequest mode = case mode of
 -- startup-activated policy.  The contract remains lazy and no IO occurs.
 explicitLengthAssessmentRequest
   :: ExplicitLengthAssessmentPermission
-  -> LeanLengthContract
-  -> LengthAssessmentRequest
-explicitLengthAssessmentRequest
-    (ExplicitLengthAssessmentPermission policy) contract =
-  LengthAssessmentEnabledRequest policy
-    $ LeanLengthScalarContractSelection contract
-
--- | Associate one successfully decoded passive domain selection with the
--- exact startup-activated policy.  Main uses this domain-general entrance;
--- the scalar wrapper above remains available to callers which intentionally
--- accept only scalar contracts.
-explicitLengthAssessmentSelectionRequest
-  :: ExplicitLengthAssessmentPermission
   -> LeanLengthContractSelection
   -> LengthAssessmentRequest
-explicitLengthAssessmentSelectionRequest
+explicitLengthAssessmentRequest
     (ExplicitLengthAssessmentPermission policy) selection =
   LengthAssessmentEnabledRequest policy selection
 

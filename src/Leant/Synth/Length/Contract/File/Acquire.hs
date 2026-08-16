@@ -15,7 +15,6 @@ module Leant.Synth.Length.Contract.File.Acquire
   , LengthContractFileLoadError
   , mkLengthContractFileRequest
   , loadLengthContractFile
-  , loadLengthContractSelectionFile
   , lengthContractFileLoadErrorClass
   , lengthContractFileLoadCleanupIncomplete
   ) where
@@ -23,14 +22,10 @@ module Leant.Synth.Length.Contract.File.Acquire
 import Numeric.Natural (Natural)
 
 import Leant.Json.Bounded (BoundedJsonLimits (..))
-import Leant.Synth.Length.Contract
-  ( LeanLengthContract
-  , LeanLengthContractSelection
-  )
+import Leant.Synth.Length.Contract (LeanLengthContractSelection)
 import Leant.Synth.Length.Contract.File
   ( LengthContractFileError
   , decodeLengthContractFile
-  , decodeLengthContractSelectionFile
   , lengthContractFileJsonLimits
   )
 import Leant.Synth.Length.File.Acquire
@@ -123,23 +118,10 @@ mkLengthContractFileRequest source =
 
 loadLengthContractFile
   :: LengthContractFileRequest
-  -> IO (Either LengthContractFileLoadError LeanLengthContract)
+  -> IO (Either LengthContractFileLoadError LeanLengthContractSelection)
 loadLengthContractFile (LengthContractFileRequest request) = do
   loaded <- loadLengthFile lengthContractFileLoadMaximumBytes
     decodeLengthContractFile request
-  pure $ case loaded of
-    Left failure -> Left $ mapLoadError failure
-    Right contract -> Right contract
-
--- | Additive acquisition entrance which preserves the same admitted request,
--- descriptor ownership, byte ceiling, timeout, and sanitized error surface
--- while permitting the version-6 product selection.
-loadLengthContractSelectionFile
-  :: LengthContractFileRequest
-  -> IO (Either LengthContractFileLoadError LeanLengthContractSelection)
-loadLengthContractSelectionFile (LengthContractFileRequest request) = do
-  loaded <- loadLengthFile lengthContractFileLoadMaximumBytes
-    decodeLengthContractSelectionFile request
   pure $ case loaded of
     Left failure -> Left $ mapLoadError failure
     Right selection -> Right selection

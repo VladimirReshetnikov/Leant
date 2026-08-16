@@ -52,10 +52,8 @@ data LeanLengthProviderLaw = LeanLengthProviderLaw
 
 -- | Closed candidate-case authority carried by one passive contract.
 --
--- Contract-only versions 1--3 retain the rejecting policy. Contract-only
--- version 4 must spell the exact zero/step policy; versions 5 and 6 and the
--- current startup grammar explicitly choose either policy. Handoff never
--- infers the choice from a graph or a failed sealer.
+-- Both current file entrances spell this choice explicitly. Handoff never
+-- infers it from a graph or a failed sealer.
 data LeanLengthCandidateCasePolicy
   = LeanLengthCasesRejected
   | LeanLengthExactSpineZeroStepV1
@@ -69,16 +67,11 @@ data LeanLengthCandidateCasePolicy
 -- infer a behavioral specification from Lean declarations.
 data LeanLengthContract = LeanLengthContract
   { leanLengthContractSpine :: LeanLengthSpineIdentity
-  -- | 'Nothing' is the exact legacy all-observed policy used by contract-only
-  -- v1/v2.  'Just' retains the exact source-ordered role vector required by
-  -- contract-only v3--v6 and the current startup grammar; no roles are inferred
-  -- from the target type or provider declarations.
-  , leanLengthContractTargetArgumentRoles ::
-      Maybe [LengthTargetArgumentRole]
-  -- | Explicit candidate-case authority. Contract-only versions 1--3 use
-  -- 'LeanLengthCasesRejected'; contract-only v4 selects the exact zero/step
-  -- policy, while v5/v6 and the current startup grammar explicitly select
-  -- either policy beside their required roles.
+  -- | Exact source-ordered role vector. No roles are inferred from the target
+  -- type or provider declarations.
+  , leanLengthContractTargetArgumentRoles :: ![LengthTargetArgumentRole]
+  -- | Explicit candidate-case authority selected by either current file
+  -- entrance.
   , leanLengthContractCandidateCasePolicy :: LeanLengthCandidateCasePolicy
   , leanLengthContractSource :: LengthContractSource
   , leanLengthContractProviderLaws :: [LeanLengthProviderLaw]
@@ -89,16 +82,15 @@ data LeanLengthContract = LeanLengthContract
 -- canonical Lean @Prod@ and whose two source-ordered fields are applications
 -- of the same configured spine.
 --
--- The scalar file grammars do not decode this additive source value; the
--- current @rankingDomain = binary-product@ startup entrance and the
--- contract-only-v6 entrance do.
+-- The current @rankingDomain = binary-product@ startup and contract-only
+-- entrances decode this additive source value.
 -- Like 'LeanLengthContract', it remains a passive assertion until the exact
 -- accepted typed origin, family/provider provenance, contract, and candidate
 -- are sealed together by the product handoff.
 data LeanLengthSpinePairContract = LeanLengthSpinePairContract
   { leanLengthSpinePairContractSpine :: LeanLengthSpineIdentity
   , leanLengthSpinePairContractTargetArgumentRoles ::
-      Maybe [LengthTargetArgumentRole]
+      ![LengthTargetArgumentRole]
   , leanLengthSpinePairContractCandidateCasePolicy ::
       LeanLengthCandidateCasePolicy
   , leanLengthSpinePairContractSource :: LengthSpinePairContractSource

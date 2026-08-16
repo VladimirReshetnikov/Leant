@@ -142,7 +142,7 @@ import Leant.Synth.Length.Integration
   , authorizeExplicitLengthAssessmentRequest
   , startupLengthAssessmentRequest
   , disabledLengthAssessmentMode
-  , explicitLengthAssessmentSelectionRequest
+  , explicitLengthAssessmentRequest
   , lengthAssessmentFailure
   , lengthAssessmentModeActivationPolicy
   , lengthAssessmentModeExecutableLaunchStrategy
@@ -155,7 +155,7 @@ import Leant.Synth.Length.Command
 import Leant.Synth.Length.Contract.File.Acquire
   ( LengthContractFileSource (..)
   , lengthContractFileDefaultTimeoutMilliseconds
-  , loadLengthContractSelectionFile
+  , loadLengthContractFile
   , mkLengthContractFileRequest
   )
 import Leant.Synth.Length.Presentation
@@ -1907,13 +1907,13 @@ lengthAssessmentRequestForCommand state command =
           $ "one-shot finite-spine Length contract admission failed: "
               ++ show failure
         Right admittedRequest -> do
-          loaded <- loadLengthContractSelectionFile admittedRequest
+          loaded <- loadLengthContractFile admittedRequest
           pure $ case loaded of
             Left failure -> Left
               $ "one-shot finite-spine Length contract load failed: "
                   ++ show failure
             Right selection -> Right
-              $ explicitLengthAssessmentSelectionRequest permission selection
+              $ explicitLengthAssessmentRequest permission selection
 
 synthRun :: LengthAssessmentRequest -> St -> [String] -> String -> IO ()
 synthRun assessmentRequest st args goal = do
