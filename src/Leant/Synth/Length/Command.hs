@@ -1,11 +1,12 @@
--- | Pure parsing for the request-scoped @:synth@ Length contract option.
+-- | Pure parsing for the request-scoped @:synth@ Length behavior options.
 --
--- Goal syntax remains opaque text.  The standalone @--@ delimiter is required
--- so Lean tokens and spaces are never parsed as option fields.  The contract
--- path is the trimmed finite text between the option and delimiter; it may
--- contain spaces, but the delimiter spelling itself is reserved.
+-- Ordinary goals remain opaque, delimiter-free text.  Once either exact
+-- option token is recognized, the standalone @--@ delimiter is mandatory.
+-- The order is fixed: behavior mode, then contract.  A contract without an
+-- explicit mode keeps the established ranking operation.
 module Leant.Synth.Length.Command
-  ( LengthSynthCommand (..)
+  ( LengthBehaviorMode (..)
+  , LengthSynthCommand (..)
   , LengthSynthCommandError (..)
   , parseLengthSynthCommand
   ) where
@@ -13,56 +14,121 @@ module Leant.Synth.Length.Command
 import Data.Char (isSpace)
 import Data.List (stripPrefix)
 
--- | One parsed @:synth@ argument line: the optional request-scoped Length
--- contract path and the remaining goal text.  Both parts are already
+-- | Closed behavior-changing authority understood by the current Length
+-- integration.  Ranking retains every verified candidate; filtering may
+-- remove only candidates carrying adapter-authorized replay evidence.
+data LengthBehaviorMode
+  = LengthBehaviorRank
+  | LengthBehaviorFilter
+  deriving (Bounded, Enum, Eq, Ord, Show)
+
+-- | One parsed @:synth@ argument line: the behavior mode (ranking unless
+-- @--behavior-mode filter@ was given), the optional request-scoped Length
+-- contract path, and the remaining goal text.  Path and goal are already
 -- trimmed of surrounding whitespace.
 data LengthSynthCommand = LengthSynthCommand
-  { lengthSynthCommandContractPath :: Maybe FilePath
-    -- ^ present exactly when the line began with @--length-contract@
+  { lengthSynthCommandBehaviorMode :: !LengthBehaviorMode
+  , lengthSynthCommandContractPath :: Maybe FilePath
+    -- ^ present exactly when the line named @--length-contract@
   , lengthSynthCommandGoal :: String
     -- ^ opaque Lean goal text; never inspected by this module
   }
   deriving (Eq, Show)
 
--- | Why a line beginning with @--length-contract@ was refused.  A line
--- without the option never fails.
+-- | Why a line beginning with @--behavior-mode@ or @--length-contract@ was
+-- refused.  A line without either option never fails.
 data LengthSynthCommandError
-  = LengthSynthCommandContractPathMissing
-    -- ^ the @--@ delimiter was found but no path text preceded it
+  = LengthSynthCommandBehaviorModeMissing
+    -- ^ @--behavior-mode@ was not followed by a mode word
+  | LengthSynthCommandBehaviorModeInvalid
+    -- ^ the mode word was neither @rank@ nor @filter@
   | LengthSynthCommandDelimiterMissing
-    -- ^ no standalone @--@ delimiter followed the option
+    -- ^ an option was recognized but no standalone @--@ delimiter followed
+  | LengthSynthCommandContractPathMissing
+    -- ^ the @--@ delimiter was found but no path text preceded it
+  | LengthSynthCommandBehaviorModeMustPrecedeContract
+    -- ^ @--behavior-mode@ appeared after @--length-contract@
   deriving (Bounded, Enum, Eq, Ord, Show)
 
--- | Split one @:synth@ argument line.  When the trimmed line starts with
--- @--length-contract@ followed by whitespace or end of input, the text up to
--- the first standalone @--@ token is the contract path and the rest is the
--- goal; otherwise the whole trimmed line is the goal and no path is present.
+-- | Split one @:synth@ argument line.  A trimmed line that starts with an
+-- exact @--behavior-mode@ token names @rank@ or @filter@ next; a line that
+-- starts with (or continues with) an exact @--length-contract@ token supplies
+-- a path up to the first standalone @--@ token; the text after that
+-- delimiter is the goal.  Either option makes the delimiter mandatory, the
+-- mode must precede the contract, and a line naming neither option is
+-- entirely the goal under the ranking mode.
 parseLengthSynthCommand
   :: String
   -> Either LengthSynthCommandError LengthSynthCommand
-parseLengthSynthCommand source = case optionTail of
-  Just rest -> do
-    (pathSource, goal) <- case splitDelimiter rest of
-      Nothing -> Left LengthSynthCommandDelimiterMissing
-      Just values -> Right values
-    let path = trim pathSource
-    if null path
-      then Left LengthSynthCommandContractPathMissing
-      else Right LengthSynthCommand
-        { lengthSynthCommandContractPath = Just path
-        , lengthSynthCommandGoal = trim goal
-        }
-  Nothing -> Right LengthSynthCommand
-    { lengthSynthCommandContractPath = Nothing
-    , lengthSynthCommandGoal = trim source
-    }
+parseLengthSynthCommand source = case exactOptionTail behaviorModeOption trimmed of
+  Just rest -> parseBehaviorMode rest
+  Nothing -> case exactOptionTail lengthContractOption trimmed of
+    Just rest -> parseContract LengthBehaviorRank rest
+    Nothing -> Right $ command LengthBehaviorRank Nothing trimmed
  where
   trimmed = trim source
-  optionTail = case stripPrefix "--length-contract" trimmed of
-    Just [] -> Just []
-    Just rest@(character : _)
-      | isSpace character -> Just $ dropWhile isSpace rest
-    _ -> Nothing
+
+  parseBehaviorMode rest = case takeToken rest of
+    Nothing -> Left LengthSynthCommandBehaviorModeMissing
+    Just ("--", _) -> Left LengthSynthCommandBehaviorModeMissing
+    Just (modeSource, afterMode) -> case modeSource of
+      "rank" -> parseAfterMode LengthBehaviorRank afterMode
+      "filter" -> parseAfterMode LengthBehaviorFilter afterMode
+      _ -> Left LengthSynthCommandBehaviorModeInvalid
+
+  parseAfterMode mode rest = case exactOptionTail lengthContractOption rest of
+    Just afterContract -> parseContract mode afterContract
+    Nothing -> case consumeDelimiter rest of
+      Just goal -> Right $ command mode Nothing goal
+      Nothing -> Left LengthSynthCommandDelimiterMissing
+
+  parseContract mode rest = case splitDelimiter rest of
+    Nothing -> Left LengthSynthCommandDelimiterMissing
+    Just (pathSource, goal) ->
+      let path = trim pathSource
+          (pathWords, laterWords) = break (== behaviorModeOption) $ words path
+      in if null path
+        then Left LengthSynthCommandContractPathMissing
+        else case laterWords of
+          _ : _
+            | null pathWords -> Left LengthSynthCommandContractPathMissing
+            | otherwise ->
+                Left LengthSynthCommandBehaviorModeMustPrecedeContract
+          [] -> Right $ command mode (Just path) goal
+
+  command mode path goal = LengthSynthCommand
+    { lengthSynthCommandBehaviorMode = mode
+    , lengthSynthCommandContractPath = path
+    , lengthSynthCommandGoal = trim goal
+    }
+
+behaviorModeOption :: String
+behaviorModeOption = "--behavior-mode"
+
+lengthContractOption :: String
+lengthContractOption = "--length-contract"
+
+-- | Match one exact option token and trim the separating whitespace.  Longer
+-- lookalike prefixes remain ordinary goal text.
+exactOptionTail :: String -> String -> Maybe String
+exactOptionTail option source = case stripPrefix option source of
+  Just [] -> Just []
+  Just rest@(character : _)
+    | isSpace character -> Just $ dropWhile isSpace rest
+  _ -> Nothing
+
+takeToken :: String -> Maybe (String, String)
+takeToken source = case dropWhile isSpace source of
+  [] -> Nothing
+  remaining ->
+    let (token, rest) = span (not . isSpace) remaining
+    in Just (token, dropWhile isSpace rest)
+
+consumeDelimiter :: String -> Maybe String
+consumeDelimiter source = case dropWhile isSpace source of
+  '-' : '-' : after
+    | delimiterEnd after -> Just $ dropWhile isSpace after
+  _ -> Nothing
 
 splitDelimiter :: String -> Maybe (String, String)
 splitDelimiter source = case source of

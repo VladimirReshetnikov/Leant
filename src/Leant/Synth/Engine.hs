@@ -54,6 +54,15 @@ module Leant.Synth.Engine
   , mapDetailedCandidateGroupVariantsDroppingSemanticSidecar
   , DetailedSynthOutcome (..)
   , projectDetailedSynthOutcome
+  , DetailedCandidateBatch
+  , detailedCandidateBatchGroups
+  , detailedCandidateBatchNotes
+  , DetailedSynthCursor
+  , DetailedSynthCursorError (..)
+  , DetailedSynthCursorStep (..)
+  , startDetailedSynthCursor
+  , advanceDetailedSynthCursor
+  , forceDetailedSynthCursorStep
   , parseSynthEngine
   , synthEngineName
   , providerStages
@@ -632,6 +641,112 @@ projectDetailedSynthOutcome outcome = case outcome of
   DetailedSynthRefuted sound -> SynthRefuted sound
   DetailedSynthNoTerm notes -> SynthNoTerm notes
 
+-- | One nonempty, ordered slice of a detailed candidate stream.  The
+-- constructor stays hidden so callers cannot manufacture an empty batch or
+-- detach a slice from the run-level notes produced alongside it.  Both fields
+-- deliberately remain lazy: advancing a cursor chooses the slice, while the
+-- caller's deadline owns forcing its search and rendering work.
+data DetailedCandidateBatch = DetailedCandidateBatch
+  [DetailedCandidateGroup]
+  [String]
+
+-- | Candidate groups in their original engine order.
+detailedCandidateBatchGroups
+  :: DetailedCandidateBatch
+  -> [DetailedCandidateGroup]
+detailedCandidateBatchGroups (DetailedCandidateBatch groups _) = groups
+
+-- | Original run-level notes, unchanged for every slice of the run.
+detailedCandidateBatchNotes :: DetailedCandidateBatch -> [String]
+detailedCandidateBatchNotes (DetailedCandidateBatch _ notes) = notes
+
+-- | Opaque continuation over one detailed engine outcome.  The consumed
+-- count and payload are intentionally lazy.  In particular,
+-- 'startDetailedSynthCursor' does not start the engine, and the successor in a
+-- 'DetailedSynthCursorCandidateBatch' does not inspect the unselected stream
+-- tail.
+data DetailedSynthCursor = DetailedSynthCursor
+  Int
+  (Either String DetailedSynthOutcome)
+
+-- | Invalid per-step batch requests.  The limit error records the maximum
+-- first and the observed request second.
+data DetailedSynthCursorError
+  = DetailedSynthCursorBatchSizeNotPositive Int
+  | DetailedSynthCursorBatchSizeLimitExceeded Int Int
+  deriving (Eq, Show)
+
+-- | One observable cursor step.  Candidate batches always contain at least
+-- one group.  Exhaustion is distinguished from consuming the product-wide
+-- hard cap because only the former observes an empty engine tail.
+data DetailedSynthCursorStep
+  = DetailedSynthCursorCandidateBatch
+      DetailedCandidateBatch
+      DetailedSynthCursor
+  | DetailedSynthCursorNaturallyExhausted [String]
+  | DetailedSynthCursorHardCapReached [String]
+  | DetailedSynthCursorEngineFailed String
+  | DetailedSynthCursorRefuted Bool
+  | DetailedSynthCursorNoTerm [String]
+
+-- | Wrap a detailed result without evaluating either its verdict or search.
+startDetailedSynthCursor
+  :: Either String DetailedSynthOutcome
+  -> DetailedSynthCursor
+startDetailedSynthCursor = DetailedSynthCursor 0
+
+-- | Select the next bounded, nonempty candidate slice.  Request admission is
+-- independent of the cursor: invalid sizes are rejected before even the
+-- cursor constructor is demanded.  A valid request returns its outer 'Right'
+-- without demanding the cursor or engine outcome; forcing the step payload
+-- performs that work.
+advanceDetailedSynthCursor
+  :: Int
+  -> DetailedSynthCursor
+  -> Either DetailedSynthCursorError DetailedSynthCursorStep
+advanceDetailedSynthCursor requested cursor
+  | requested <= 0 =
+      Left $ DetailedSynthCursorBatchSizeNotPositive requested
+  | requested > candidateWindow =
+      Left $ DetailedSynthCursorBatchSizeLimitExceeded
+        candidateWindow requested
+  | otherwise = Right $ advanceValidDetailedSynthCursor requested cursor
+
+advanceValidDetailedSynthCursor
+  :: Int
+  -> DetailedSynthCursor
+  -> DetailedSynthCursorStep
+advanceValidDetailedSynthCursor requested
+    (DetailedSynthCursor consumed outcome)
+  | consumed >= candidateWindow = hardCapStep outcome
+  | otherwise = case outcome of
+      Left err -> DetailedSynthCursorEngineFailed err
+      Right (DetailedSynthRefuted sound) ->
+        DetailedSynthCursorRefuted sound
+      Right (DetailedSynthNoTerm notes) -> DetailedSynthCursorNoTerm notes
+      Right (DetailedSynthCandidates groups notes) -> case batch of
+        [] -> DetailedSynthCursorNaturallyExhausted notes
+        _ : _ -> DetailedSynthCursorCandidateBatch
+          (DetailedCandidateBatch batch notes)
+          (DetailedSynthCursor
+            (consumed + length batch)
+            (Right $ DetailedSynthCandidates rest notes))
+       where
+        (batch, rest) = splitAt remainingRequest groups
+        remainingRequest = min requested (candidateWindow - consumed)
+
+-- The only reachable capped cursor follows at least one candidate batch, so
+-- its payload is a locally reconstructed candidate outcome.  Keeping the
+-- cases total makes the invariant robust without inspecting the candidate
+-- tail in the ordinary case.
+hardCapStep :: Either String DetailedSynthOutcome -> DetailedSynthCursorStep
+hardCapStep outcome = case outcome of
+  Right (DetailedSynthCandidates _ notes) ->
+    DetailedSynthCursorHardCapReached notes
+  Left err -> DetailedSynthCursorEngineFailed err
+  Right (DetailedSynthRefuted sound) -> DetailedSynthCursorRefuted sound
+  Right (DetailedSynthNoTerm notes) -> DetailedSynthCursorNoTerm notes
+
 -- | Product-wide verification limits.  Combined-engine scheduling keeps
 -- Exference's first fresh group inside the displayed frontier while the
 -- caller applies the larger tried frontier to backend work.
@@ -686,13 +801,34 @@ forceDetailedOutcome :: Int -> Either String DetailedSynthOutcome -> Int
 forceDetailedOutcome n outcome = case outcome of
   Left err -> length err
   Right (DetailedSynthCandidates groups notes) ->
-    sum (map groupSize (take n groups)) + noteSize notes
+    detailedGroupSize (take n groups) + detailedNoteSize notes
   Right (DetailedSynthRefuted sound) -> if sound then 1 else 0
-  Right (DetailedSynthNoTerm notes) -> noteSize notes
+  Right (DetailedSynthNoTerm notes) -> detailedNoteSize notes
+
+-- | Force exactly the work owned by the current cursor step.  For a
+-- candidate step this is the whole selected batch and the original notes,
+-- matching 'forceDetailedOutcome' while leaving semantic sidecars, the
+-- successor cursor, and the unselected stream tail untouched.  Terminal
+-- payloads use that same historical forcing boundary.
+forceDetailedSynthCursorStep :: DetailedSynthCursorStep -> Int
+forceDetailedSynthCursorStep step = case step of
+  DetailedSynthCursorCandidateBatch
+      (DetailedCandidateBatch groups notes) _ ->
+    detailedGroupSize groups + detailedNoteSize notes
+  DetailedSynthCursorNaturallyExhausted notes -> detailedNoteSize notes
+  DetailedSynthCursorHardCapReached notes -> detailedNoteSize notes
+  DetailedSynthCursorEngineFailed err -> length err
+  DetailedSynthCursorRefuted sound -> if sound then 1 else 0
+  DetailedSynthCursorNoTerm notes -> detailedNoteSize notes
+
+detailedGroupSize :: [DetailedCandidateGroup] -> Int
+detailedGroupSize = sum . map groupSize
  where
   groupSize (DetailedCandidateGroup route variants _) =
     route `seq` sum (map (length . detailedCandidateVariantText) variants)
-  noteSize = sum . map length
+
+detailedNoteSize :: [String] -> Int
+detailedNoteSize = sum . map length
 
 -- | Select and render the typed expression when present; only an explicit
 -- absence may consult the compatibility projection.  A typed rendering

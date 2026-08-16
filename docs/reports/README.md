@@ -13,10 +13,64 @@ landing checkpoints; the current contract-only decoder accepts one versionless
 `{format, rankingDomain, contract}` root and performs no migration.
 Reports from directly bounded through recursive piecewise-affine applicable-
 domain ranking likewise preserve a superseded public strategy ladder. The
-current tree exposes one short recursive applicable-domain policy; its lower
-analysis stages are private Djex fallbacks, and the predecessor builders,
+current tree exposes one short guarded recursive applicable-domain policy; its
+lower analysis stages are private Djex fallbacks, and the predecessor builders,
 assessments, failures, receipts, renderers, and schema tags have no aliases or
-migration surface.
+migration surface. Fully supported expression conditionals now participate in
+that one current policy rather than selecting another schema or strategy.
+The current command layer also has an explicit `--behavior-mode filter` path:
+only independently replayed scalar or pair counterexamples are rejected;
+every other assessment is retained, every selection failure preserves the
+complete verified batch, and omitted occurrences remain separately presented.
+The earlier behavioral-selection report correctly says its structural seal was
+not connected at that landing checkpoint; the later command-authorized report
+records the connection. Ranking still stops after five accepted groups and
+rank/disabled engine runs retain one batch. Filter mode now consumes an
+ordinary lazy outcome progressively: one 12-group standalone or 24-group
+combined batch, followed after no verification or complete all-rejection by at
+most one same-width successor from the same cursor. Double negation uses that
+ordinary policy with a filter-only Djinn cutoff of 60; excluded middle remains
+one six-group batch. Main introduces one rank-2 assessment context before
+translation and reuses its nominal scalar or product filter bank through both
+batches, universe retry, and every ordinary, provider, and classical route.
+Established rank and direct Selection compatibility paths keep their raw four-
+vector MRU; rank contexts contain no bank.
+
+Main retains private four-way batch outcomes with the complete bounded
+provider-dedup spelling frontier separate from the exact callback-attempt
+trace. No-verification and all-behaviorally-rejected dispositions may consume
+the single filter successor; survivor and preserve-all dispositions terminate.
+There is no third probe within a run, engine rerun, reverification,
+reassessment, or cross-lane five-survivor quota filling. Same-run frontiers,
+outcomes, observations,
+group ordinals, and counts remain chronological. Ordinary run notes attach
+once to the rightmost handled batch, while an all-no-verification run retains
+them only for its final diagnostic and classical handled outcomes remain note-
+free. One deferred plural finalizer still owns metrics, warnings, one final
+cache/binding phase, candidate rows, accumulated rejection rows, and handled
+notes. Structural/classical and abnormal diagnostics remain separately gated.
+
+The Engine module exports the additive opaque cursor over one lazy
+detailed outcome. It returns ordered nonempty slices, retains the original
+run-level notes, validates each requested size before cursor demand, and caps
+cumulative observation at the existing 60-group candidate window. Natural
+exhaustion remains distinct from reaching that cap without probing the next
+group. Its force helper forces each selected rendering route to weak head
+normal form; traverses the selected group-list and variant-list spines and
+their constructors far enough to project text; traverses each selected
+rendered spelling's `String` list spine through `length`; and traverses the
+run-note list spine and each note's `String` spine through `length`. It does not
+force `Char` values or perform text encoding, and leaves semantic sidecars, the
+successor, and the unselected tail lazy. Main now consumes that surface through
+private run-policy and run-receipt types. Filter mode carries the original
+absolute command deadline through both batches and both classical routes;
+rank and disabled modes retain independently fresh configured-duration
+deadlines at each reached EM and NN route. Timeout zero remains unbounded.
+
+There is still no `ReplState` field, serialization, snapshot restoration,
+session bank, or persistence, and no new engine-side counterexample request,
+typed prefix pruning, or complete Level-2 CEGIS loop. Preserve-all candidate
+fallback does not roll back already completed cache transitions.
 The [README](../../README.md) and
 [Length ranking reference](../length-ranking.md) describe the current tree.
 
@@ -84,6 +138,16 @@ Reports are listed oldest first.
 - 2026-08-15 — [Versionless live Length ranking configuration](2026-08-15-versionless-length-ranking-configuration.md)
 - 2026-08-15 — [Versionless command-local Length contract](2026-08-15-versionless-length-contract.md)
 - 2026-08-15 — [Current-only Length applicable-domain policy](2026-08-15-current-length-applicable-domain-policy.md)
+- 2026-08-15 — [Guarded conditional Length ranking](2026-08-15-guarded-conditional-length-ranking.md)
+- 2026-08-15 — [Behavioral-selection occurrence partition seal](2026-08-15-behavioral-selection-partition-seal.md)
+- 2026-08-15 — [Command-authorized replay-backed Length filtering](2026-08-15-command-authorized-length-filtering.md)
+- 2026-08-15 — [Lane-local bounded Length survivor refill](2026-08-15-lane-local-length-survivor-refill.md)
+- 2026-08-16 — [Explicit synthesis-lane outcomes](2026-08-16-explicit-synthesis-lane-outcomes.md)
+- 2026-08-16 — [Package-private nominal Length counterexample-bank state](2026-08-16-nominal-length-counterexample-bank-state.md)
+- 2026-08-16 — [Filter-only nominal Length counterexample-bank context runner](2026-08-16-filter-only-length-counterexample-bank-context-runner.md)
+- 2026-08-16 — [Command-local Length counterexample-bank scheduler](2026-08-16-command-local-length-counterexample-bank-scheduler.md)
+- 2026-08-16 — [Opaque detailed synthesis cursor foundation](2026-08-16-opaque-detailed-synthesis-cursor-foundation.md)
+- 2026-08-16 — [Progressive same-run Length filter batching](2026-08-16-progressive-same-run-length-filter-batching.md)
 
 ## Standalone PDF reports
 

@@ -266,8 +266,8 @@ bare-stdlib session shown above.  \code{-i MOD} (also
 it, default 300); \code{-{}-time} shows per-command timing;
 \code{-{}-transcript [FILE]} and \code{-{}-timestamps} start transcript
 recording; \code{-{}-lake PATH} selects the lake executable.  The three
-\code{-{}-length-ranking} options opt into finite-list-spine Length
-counterexample ranking (\S\ref{sec:engines}): the configuration file is
+\code{-{}-length-ranking} options activate finite-list-spine Length
+behavioral assessment (\S\ref{sec:engines}): the configuration file is
 admitted once at startup from an explicitly chosen absolute path, the
 timeout bounds only the file-load interruption budget (default
 5{,}000\,ms, at most 60{,}000\,ms), and both auxiliary options are
@@ -341,9 +341,13 @@ environment.
 \cmdrow{:synth TYPE}{synthesize verified terms of \code{TYPE};
   candidates are bound as \code{it1} (= \code{it}), \code{it2}, \dots
   (\S\ref{sec:synth})}
-\cmdrow{:synth --length-contract P -- TYPE}{use one passive Length
-  contract file for this command only; the standalone \code{-{}-} is
-  mandatory and requires the startup ranking opt-in
+\cmdrow{behavior option}{\code{-{}-behavior-mode rank|filter} explicitly
+  chooses the operation; disabled \code{rank} is identity, while filtering
+  uses the activated startup Length contract and requires its policy}
+\cmdrow{contract option}{\code{-{}-length-contract PATH} supplies one passive
+  Length contract file for this command only; an optional preceding behavior
+  mode selects \code{rank} or \code{filter}, omitted mode means \code{rank},
+  and every contract form requires the startup policy opt-in
   (\S\ref{sec:engines})}
 \cmdrow{:set synth-engine E}{\code{djinn} (default) $\mid$
   \code{exference} $\mid$ \code{both}}
@@ -354,6 +358,12 @@ environment.
   inductives (\code{on}$\mid$\code{off}, default on;
   \S\ref{sec:synth-library})}
 \end{cmdtable}
+
+\noindent\textbf{Exact option-bearing grammar}
+\begin{center}
+\small\code{:synth [-{}-behavior-mode rank|filter]
+  [-{}-length-contract PATH] -{}- TYPE}
+\end{center}
 
 \subsection{Persistence and utility}
 \begin{cmdtable}
@@ -1306,7 +1316,16 @@ propositional logic. The findings are rendered as \code{Classical.em}
 case splits. If that misses, the goal's double-negation translation runs
 instead (complete by Glivenko's theorem) and the candidate is wrapped
 in \code{Classical.byContradiction}. Both kinds are verified like any
-other candidate. The whole behavior sits behind a switch:
+other candidate. Excluded middle remains one six-group batch. An explicit
+behavioral filter uses the same command-local bank in both routes: either no
+verification or complete all-rejection enters double negation, whose ordinary
+cursor policy may inspect 12+12 standalone or 24+24 combined groups from one
+engine outcome. Any survivor or preserve-all result stops, with no third
+cursor probe. Filtering retains the original command deadline through both
+routes. Rank and disabled commands instead preserve their historical classical
+budgets by capturing a fresh configured duration separately at each route they
+actually reach. The sound-refutation caller accumulates every completed batch
+and finalizes only once. The whole behavior sits behind a switch:
 
 \begin{session}
 λ> :set synth-classical off
@@ -1456,18 +1475,45 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
 The default engine is Djinn: complete, terminating, and the only
 source of refutations. \code{:set synth-engine exference} switches to
 the ranked heuristic search, and \code{both} runs the two together ---
-negative verdicts still come only from Djinn. Standalone lanes send at
-most 12 fresh candidate groups to Lean. A combined lane gets 24 and
+negative verdicts still come only from Djinn. One standalone batch sends at
+most 12 fresh candidate groups to Lean. A combined batch gets 24 and
 retains both standalone frontiers: writing D and E for fresh Djinn and
 Exference groups, its order is \code{D1–D4, E1–E12, D5–D12}, then
 alternating tails. Within each Exference invocation, Leant
 stable-deduplicates rendered groups before applying the internal 60-candidate
 collection window. The first spelling remains authoritative, while repeated
 backend histories cannot hide later distinct terms behind the bound; the
-outer 12- and 24-group verification frontiers then apply.  Whatever the
-frontier verifies, at most five candidates are ever displayed and bound;
-the rest of the frontier exists to survive Lean's rejections.  Exference
-runs under
+outer 12- and 24-group batch frontiers then apply.
+
+\code{Leant.Synth.Engine} exports an opaque \code{DetailedSynthCursor} over one
+lazy detailed outcome, and Main now consumes it for bounded filter
+progression.
+For a nonempty candidate outcome below the cap, an admitted request of 1
+through 60 returns a nonempty ordered batch and a lazy successor; cumulative
+observation stops at the existing product-wide 60-group hard cap. Natural
+exhaustion is distinct from reaching that cap: after group 60 the
+cursor reports the cap without probing group 61, even when the finite stream
+ended exactly there. Its force helper traverses the selected group-list and
+variant-list spines and their constructors far enough to project text, forces
+each selected route to weak head normal form, traverses each selected rendered
+spelling's \code{String} list spine through \code{length}, and traverses the
+run-note list spine and each note's \code{String} spine through \code{length}.
+It neither forces \code{Char} values nor performs text encoding, and leaves
+semantic sidecars, the successor, and the unselected tail lazy for a caller-owned
+deadline. Main imports the opaque cursor type without its constructor, the
+visible step taxonomy, batch accessors, and cursor operations. It neither names
+the hidden batch type nor imports either hidden constructor.
+
+Ordinary ranking retains its historical verifier stop after five accepted
+groups and consumes one batch. An explicit behavioral filter verifies and
+assesses one complete 12-group standalone or 24-group combined batch. Only no
+verification or complete behavioral rejection may consume one successor of the
+same width from that cursor, giving 12+12 or 24+24 groups from one engine run.
+Every batch is verified and assessed exactly once through the same context;
+Main neither reruns the engine nor reassesses the first batch. Survivor and
+preserve-all stop immediately, and a continuing second batch stops without a
+third tail probe. In either operation at most five candidates are displayed and
+bound. Exference runs under
 explicit budgets
 (\code{:set synth-steps}, default 4096), and truncation is always
 reported:
@@ -1482,12 +1528,15 @@ note: exference: search truncated: step limit reached, queue limit pruned 36194
 
 Every engine mode first gives a structurally accepted goal a
 provider-free lane and asks Lean to verify its candidates. When no
-provider-free term verifies, Lean discovers at most 80 live term providers
-under the namespaces used by the target (plus exact session declarations).
-A complete Djinn refutation is retained as a sound fallback while those
-constructive provider lanes run: the first candidate accepted by Lean wins;
-an empty, unavailable, timed-out, or unsuccessful provider search restores
-the refutation before any classical retry.
+provider-free term verifies, or an authorized behavioral filter rejects every
+verified occurrence, Lean discovers at most 80 live term providers under the
+namespaces used by the target (plus exact session declarations). The command's
+filter bank and accumulated rejection rows cross those lanes. A complete Djinn
+refutation is retained as a sound control-flow fallback while constructive
+provider lanes run: the first survivor or preserve-all result wins; an empty,
+all-rejected, unavailable, timed-out, or unsuccessful provider search restores
+the refutation before any classical retry, without discarding completed lane
+accounting.
 The focused \code{synth-provider-refutation-fallback} transcript checks exact
 rank-N overrides under Djinn, Exference, and combined mode. It also enables
 classical search for a Peirce-shaped goal and confirms that an exact
@@ -1530,29 +1579,60 @@ Lean still reconstructs every dictionary
 during final elaboration---only the closed kind/type vector crosses the bridge.
 
 Exact rendered spellings keep their first scheduled occurrence. Before a
-later provider lane is forced or capped, spellings already rejected by Lean
-are removed from each engine's source stream and newly empty groups are
-dropped. Rediscovered failures therefore spend none of that lane's 12- or
-24-group fresh frontier.
+later provider lane is forced or capped, every spelling in an earlier complete
+no-verified or all-behaviorally-rejected bounded frontier is removed from each
+engine's source stream and newly empty groups are dropped. Rediscovered
+candidates therefore spend none of that lane's 12- or 24-group fresh frontier.
 
 An entirely optional last stage can consult Z3.  Passing
-\code{-{}-length-ranking-config} at startup (\S\ref{sec:start}) opts
-into finite-list-spine \emph{Length} counterexample ranking: a passive
+\code{-{}-length-ranking-config} at startup (\S\ref{sec:start}) activates
+finite-list-spine \emph{Length} behavioral assessment: a passive
 JSON contract states a law over the lengths of list-spine arguments and
 results, eligible verified candidates are translated into canonical
-\code{QF\_LIA} queries, and a scoped Z3 worker is consulted once per
-batch.  Only a counterexample that Leant's vendored Djex engine has
+\code{QF\_LIA} queries, and at most one scoped Z3 worker is opened per
+batch when pure replay does not finish the assessment. Only a counterexample
+that Leant's vendored Djex engine has
 independently replayed against the exact checked problem can move a
-candidate --- such candidates are stably demoted, never pruned --- and a
-raw \code{sat}, \code{unsat}, or \code{unknown} has no authority at
-all.  A per-command variant, \code{:synth -{}-length-contract PATH
--{}- TYPE}, swaps in one contract file for a single command.  The
+candidate. In the default \code{rank} operation such candidates are stably
+demoted, never pruned. An explicit \code{-{}-behavior-mode filter} operation
+instead omits exactly those replayed-counterexample occurrences, prints each
+one separately as rejected, and binds only survivors. A raw \code{sat},
+\code{unsat}, or \code{unknown} has no authority at all; neither do a
+preparation refusal, unassessed input, heuristic status, completed finite box,
+or established applicable domain.
+
+Every assessment remains deliberately batch-bounded. A rank request asks Lean
+for at most five successful groups and consumes one engine batch. A filter
+request may verify and assess two 12-group standalone or two 24-group combined
+batches from one cursor. The second is admitted only after no verification or
+complete all-rejection. Excluded middle stays one six-group batch; double
+negation uses the ordinary at-most-two-batch policy and a filter-mode Djinn
+candidate cutoff of 60. Main introduces one rank-2 context before goal
+translation and carries it through both batches, universe retries, and every
+ordinary, provider, and classical route. Each verified frontier enters exactly
+one assessment, while the filter context's one nominal scalar or product bank
+can replay an earlier counterexample against a later occurrence, successor
+batch, or same-scope lane. Existing ranking and direct Selection
+compatibility paths keep the raw four-vector MRU unchanged; rank contexts have
+no bank. Only after a terminal selection does Leant take at most five survivor
+presentations for display and binding; every accumulated rejection is still
+printed.
+
+The exact option-bearing grammar is
+\code{:synth [-{}-behavior-mode rank|filter]
+[-{}-length-contract PATH] -{}- TYPE}; mode must precede contract and the
+standalone delimiter is mandatory. Ordinary \code{:synth TYPE} remains
+delimiter-free. Omitting behavior mode selects \code{rank}. A per-command
+contract swaps in one passive scalar-or-pair assertion for that command;
+filter without a contract uses the startup contract. Filtering and every
+contract form require the already activated startup policy and are rejected
+before contract-path admission or file IO when it is absent. The
 startup grammar is one current strict, versionless shape selected by
 \code{rankingDomain}; the separate contract-only grammar is likewise one
 current strict, versionless \code{\{format, rankingDomain, contract\}} shape.
 It is parsed once with no migration fallback and carries only the command-local
 passive scalar or binary-product contract, never startup execution policy. The
-startup policy fixes one recursive piecewise-affine applicable-domain
+startup policy fixes one guarded recursive piecewise-affine applicable-domain
 algorithm. Programmatic callers have one short builder,
 \nolinkurl{enableLengthRankingApplicableDomainValidation}, and the current
 assessments are \code{ApplicableDomainEstablished} and
@@ -1561,24 +1641,170 @@ assessments are \code{ApplicableDomainEstablished} and
 \nolinkurl{renderLengthSpinePairApplicableDomainValidationNote}. Djex keeps the
 direct, affine, relational,
 strict, quotient, extrema, monus, Boolean-union, and atomic analyses as private
-ordered fallbacks; they are not separately selectable Leant contracts. Their
+ordered fallbacks; they are not separately selectable Leant contracts. Its
+recursive expression grammar includes an all-or-nothing \code{LengthIf}:
+both condition polarities and both arms must be fully supported, the true arm
+precedes the false arm, and raw guard alternatives consume the existing branch
+budget before contradictions collapse. For example,
+\code{(if x <= 2 then x else 5) <= 3} establishes the provider-independent
+box \code{[[2]]} with three visits, three unique assignments, and three
+applicable assignments entirely before process IO; an unsupported arm makes
+the whole fallback atom inapplicable. The original checked problem is still
+replayed over every unique assignment and remains semantic authority. The
 former public aliases were deleted without migration because Leant is
 experimental and promises no stability or backward compatibility. This API
 reset does not alter the versionless file shapes or the seven numeric limits
-inside \code{applicableDomainValidation}. The MRU, domain, origin, deferred
+inside \code{applicableDomainValidation}. The selected-bank, domain, origin, deferred
 opening, live query, post-\code{unsat} input-box, scoped-budget, and stable
-preference boundaries remain unchanged. The
-current reference is \code{docs/length-ranking.md}; dated
+preference boundaries remain unchanged. Ranking and direct Selection
+compatibility entrances keep the four-vector MRU local to one verified batch.
+The vendored Djex revision separately exposes candidate-independent scalar and
+binary-product bank scopes, bounded immutable input stores, and exact
+query-owned fresh replay. Leant's package-private adapter now includes nominal
+scalar/product contexts over that bridge: each retains validated limits and at
+most one active scope, resets on exact scope drift, threads authoritative
+charged successors through newest-first replay, and separates a replay hit
+from evaluation-free promotion. Context transitions are serialized in
+exception-restoring cells; the successor state is fully forced and the selected
+outer classification is forced to weak head normal form before commit, so an
+unexpected exception leaves the old state and propagates.
+
+Only the additive context-aware Configuration, Selection, and internal Ranking
+path uses those contexts, and Integration selects that path only for filtering.
+An unsimplified bank hit is promoted without reevaluation; a simplified hit is
+freshly recorded under simplification origin. Fresh live and solver-independent
+receipts retain their corresponding cache origins only without a strict
+reduction; every strict reduction records under simplification origin. The
+candidate keeps its pre-record final receipt. Completed cache transitions survive a later
+candidate-report fallback.
+
+Integration introduces one reusable rank-2
+\code{LengthAssessmentContext}; repeated context assessments reuse its filter
+bank, while rank contexts contain no bank. Main now opens one context inside
+\code{synthRun} before initial translation and supplies it to every cursor
+batch and later route. Its
+fresh-per-call compatibility request assessor remains for other callers. The
+rank-2 owner dies when the command returns and cannot enter REPL state.
+
+Filtering runs the same scalar or nominal pair assessor, maps every report
+back to its exact callback occurrence by the retained original index, and
+seals one bounded total partition. Both survivors and rejections are restored
+to original callback order; filter mode does not inherit ranking order. Any
+batch-wide post-verification-adapter, ranking, evidence-association,
+admission-limit, or partition-seal failure preserves the complete original
+verified batch and exposes no partial rejection; the warning path still
+displays at most five original candidates. That preserve-all result does not
+roll back bank replay, promotion, or recording transitions which already
+completed. A
+surviving bounded-positive receipt keeps its established note. A rejected
+occurrence keeps its exact counterexample or simplification note. If all
+verified occurrences are rejected, the batch is handled but not yet finalized:
+like a no-verified batch, it may consume the one permitted same-run successor
+or enter the next provider or classical route with the same bank. Survivor and
+preserve-all results remain terminal.
+
+Main wraps each lazy engine outcome once in the opaque cursor. Rank and disabled
+commands admit one candidate batch. Filter-mode ordinary, provider, and double-
+negation runs admit a second same-width batch only after no verification or
+all-rejection: at most 12+12 groups for a standalone engine and 24+24 for
+\code{both}. Excluded middle remains one six-group batch. The second batch ends
+the run without a third tail probe. Every batch is verified and assessed once
+through the command context; the cursor successor never reruns an engine.
+
+Each batch outcome keeps its complete bounded rendered-spelling frontier
+separate from the exact variants which reached Lean callbacks. One private run
+receipt restores the at-most-two outcomes to chronological order, concatenates
+their complete frontiers for provider deduplication, and preserves cumulative
+group counts and debug ordinals. It then prepends the outcomes to the existing
+lazy reverse command accumulation. Verification and assessment perform no
+candidate presentation or synthesis-splice mutation. A pure fold distinguishes
+no verified receipt, survivors, aggregate all-rejection, and preserve-all
+failure, stopping at the first terminal result.
+
+Ordinary run notes attach once to the chronologically rightmost handled batch.
+If every batch is no-verification, they remain only in the run receipt for the
+final diagnostic. Classical handled outcomes remain note-free. One deferred
+finalizer owns metrics, warnings, binding and cache effects, rows, and handled
+notes. Terminal candidate rows print first; rejection rows are every earlier
+all-rejected projection followed by the terminal batch's rejections. Final
+all-rejection clears the old splice cache once; survivor or preserve-all output
+replaces it once.
+
+Continuation does not fill a five-survivor quota within a run or across lanes.
+The first batch with even one survivor stops scheduling, ranking retains its
+historical five-success quota, and filtering retains each 12/24 batch width and
+the single six-group EM width. On ordinary
+all-rejected exhaustion the accumulated rejection output suppresses an
+unrelated no-term or Lean-verification diagnostic. Without a retained sound
+refutation, timeout, cursor-admission failure, or engine error finalizes
+completed outcomes first and then prints its corresponding abnormal diagnostic.
+
+Filter mode uses the original absolute command deadline for every constructive
+run, both batches, excluded middle, and double negation; it does not recapture a
+clock at a classical boundary. Rank and disabled modes keep that command
+deadline for ordinary and provider work but preserve their historical
+classical budgets: each reached excluded-middle and double-negation route
+independently captures a fresh configured duration. A skipped route captures
+nothing, and timeout zero remains unbounded.
+
+A provider-free sound Djinn refutation still masks provider timeout/error and
+controls the later classical path, but completed provider outcomes stay in the
+accumulation. When the Glivenko split exists, excluded-middle no-verification
+or all-rejection enters double negation; survivor or preserve-all stops. The
+sound-refutation caller finalizes once. Aggregate no-verification keeps the
+existing provably-uninhabited claim, unresolved-universe annotation, and
+constructive/classical hint in that order. Aggregate all-rejection suppresses
+the unrelated claim and hint while keeping the goal-qualified annotation.
+
+Behavior mode, assessment contexts, selection results, both kinds of
+replay-input store, accumulation, and lane outcomes are never persistent REPL
+state. This is a bounded command-local reuse and continuation slice, not quota
+filling or the proposal's complete CEGIS loop: no engine accepts a
+counterexample-directed replacement request, no typed prefix is pruned, and no
+context survives the command. There is no engine rerun, batch reassessment, or
+third cursor probe. The public Engine API, verification module, and REPL state
+contract remain unchanged. The current reference
+is \code{docs/length-ranking.md}; the command-authority predecessor, historical
+refill checkpoint, and private outcome seam are recorded in
+\code{docs/reports/2026-08-15-command-authorized-length-filtering.md} and
+\code{docs/reports/2026-08-15-lane-local-length-survivor-refill.md}, and
+\code{docs/reports/2026-08-16-explicit-synthesis-lane-outcomes.md}. The
+historical nominal-state foundation is recorded in
+\code{docs/reports/2026-08-16-nominal-length-counterexample-bank-state.md}; its
+runtime successor is
+\code{docs/reports/2026-08-16-filter-only-length-counterexample-bank-context-runner.md}.
+The command-local scheduler successor is
+\code{docs/reports/2026-08-16-command-local-length-counterexample-bank-scheduler.md}.
+The later Engine-only observation foundation is
+\code{docs/reports/2026-08-16-opaque-detailed-synthesis-cursor-foundation.md}.
+Its progressive Main runtime successor is
+\code{docs/reports/2026-08-16-progressive-same-run-length-filter-batching.md}.
+Dated
 reports under \code{docs/reports/} are historical engineering records rather
-than current file contracts. Everything in this paragraph
-is off by default and leaves no trace when disabled.
+than current file contracts. When assessment is disabled, an ordinary or
+explicit no-contract \code{rank} remains the exact identity and leaves no
+trace; explicit \code{filter} and every contract form instead return their
+pre-IO request errors.
+
+When live work is required, the fixed execve-check launcher inherits Djex's
+current descriptor ownership rule. Resource-producing worker results are
+published masked through one terminal completion cell; every native descriptor
+strategy shares one rollback-protected raw-child handoff; and interruptible
+initialization resumes only after the opaque process has accepted cleanup
+ownership. The child exec-status handle is closed on every normal,
+synchronous-failure, deadline, and asynchronous-interruption exit. These rules
+prevent leaked children and handles; they do not strengthen executable
+attestation, solver status, or behavioral evidence.
 
 The pure searches answer in microseconds to milliseconds; the cost
 center is backend verification, a few hundred milliseconds per
 candidate. A wall-clock guard (default 20\,s,
 \code{LEANT\_SYNTH\_TIMEOUT}) covers the quantified goals whose
-bounded instantiation can widen the space; hitting it is reported as
-``no answer,'' never as a verdict.
+bounded instantiation can widen the space. Baseline and provider work share one
+absolute command deadline. Filter mode carries it through both batches and
+both classical routes; rank and disabled modes instead give each reached
+classical route a fresh configured duration. Zero waits indefinitely, and
+hitting a finite boundary is reported as ``no answer,'' never as a verdict.
 
 \subsection{What \code{:synth} will not do}\label{sec:limits}
 

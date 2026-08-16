@@ -1,4 +1,8 @@
--- | Explicit optional integration of finite-spine Length ranking.
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RoleAnnotations #-}
+
+-- | Explicit optional integration of finite-spine Length ranking and
+-- replay-authorized hard filtering.
 --
 -- This module owns the complete caller-facing transition from an explicitly
 -- named configuration file to one reusable, activated ranking policy and the
@@ -23,25 +27,35 @@ module Leant.Synth.Length.Integration
   , LengthAssessmentRequestError (..)
   , ExplicitLengthAssessmentPermission
   , LengthAssessmentRequest
+  , lengthAssessmentRequestBehaviorMode
   , startupLengthAssessmentRequest
   , authorizeExplicitLengthAssessmentRequest
   , explicitLengthAssessmentRequest
+  , LengthAssessmentContext
+  , withLengthAssessmentRequestContext
+  , lengthAssessmentContextBehaviorMode
   , LengthAssessmentFailure (..)
   , LengthAssessmentResult
   , assessLengthVerificationBatch
   , assessLengthVerificationRequest
+  , assessLengthVerificationContext
   , lengthAssessmentCandidates
   , lengthAssessmentRanking
   , lengthAssessmentSpinePairRanking
   , lengthAssessmentFailure
   , lengthAssessmentPostVerificationResult
   , lengthAssessmentSpinePairPostVerificationResult
+  , lengthAssessmentSelectionResult
+  , lengthAssessmentSpinePairSelectionResult
   ) where
 
 import Language.Haskell.Djex
-  ( LengthSMTLibExecutableLaunchStrategy )
+  ( ExferenceLocal
+  , LengthSMTLibExecutableLaunchStrategy
+  )
 
 import Leant.Synth.Engine (DetailedVerificationVariant)
+import Leant.Synth.Length.Command (LengthBehaviorMode (..))
 import Leant.Synth.Length.Configuration
   ( LengthRankingPolicy
   , assessVerifiedLengthCandidatesWithPolicy
@@ -68,11 +82,25 @@ import Leant.Synth.Length.PostVerification
   , lengthPostVerificationRanking
   , lengthPostVerificationRankingFailure
   )
-import Leant.Synth.Length.Contract (LeanLengthContractSelection (..))
+import Leant.Synth.Length.Contract
+  ( LeanLengthContract
+  , LeanLengthContractSelection (..)
+  , LeanLengthSpinePairContract
+  )
+import qualified Leant.Synth.Length.CounterexampleBank.Internal
+  as CounterexampleBank
 import Leant.Synth.Length.Ranking
   ( LengthRanking
   , LengthRankingFailure
   )
+import Leant.Synth.Length.Selection
+  ( LengthSelectionFailure
+  , LengthSelectionResult
+  , lengthSelectionCandidates
+  , lengthSelectionFailure
+  )
+import Leant.Synth.Length.Selection.Internal
+  ( selectVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext )
 import Leant.Synth.Length.SpinePair.PostVerification
   ( LengthSpinePairPostVerificationFailure
   , LengthSpinePairPostVerificationResult
@@ -85,6 +113,14 @@ import Leant.Synth.Length.SpinePair.Ranking
   ( LengthSpinePairRanking
   , LengthSpinePairRankingFailure
   )
+import Leant.Synth.Length.SpinePair.Selection
+  ( LengthSpinePairSelectionFailure
+  , LengthSpinePairSelectionResult
+  , lengthSpinePairSelectionCandidates
+  , lengthSpinePairSelectionFailure
+  )
+import Leant.Synth.Length.SpinePair.Selection.Internal
+  ( selectVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext )
 import Leant.Synth.PostVerification
   ( skipPostVerificationAssessment )
 import Leant.Synth.Verification
@@ -120,24 +156,103 @@ data LengthAssessmentMode
 -- the default disabled mode contains no execution authority to pair with it.
 data LengthAssessmentRequestError
   = LengthAssessmentExplicitContractRequiresActivatedPolicy
+  | LengthAssessmentFilteringRequiresActivatedPolicy
   deriving (Bounded, Enum, Eq, Ord, Show)
 
--- | Opaque command-local permission retaining exactly the activated policy.
--- Main obtains this before contract-file admission or IO, then associates the
--- successfully decoded passive contract without projecting the policy.
+-- | Opaque command-local permission retaining both the parsed behavior
+-- authority and exactly the activated policy.  Main obtains this before
+-- contract-file admission or IO, then associates the successfully decoded
+-- passive contract without projecting either field.
 data ExplicitLengthAssessmentPermission =
-  ExplicitLengthAssessmentPermission !LengthRankingPolicy
+  ExplicitLengthAssessmentPermission
+    !LengthBehaviorMode
+    !LengthRankingPolicy
 
--- | One command's exact assessment choice.  Both the startup-fixed path
--- and an explicit request enter the same enabled owner: one activated policy
--- beside one lazy contract.  The origin and lifetime of that passive contract
--- are not a second execution authority.  The disabled constructor preserves
--- the established non-strict identity path.
+-- | One command's exact assessment choice.  Both the startup-fixed path and
+-- an explicit request enter the same enabled owner: the parsed behavior
+-- authority, one activated policy, and one lazy contract.  The origin and
+-- lifetime of that passive contract are not a second execution authority.
+-- The disabled constructor is reachable only for ranking and preserves the
+-- established non-strict identity path.
 data LengthAssessmentRequest
   = LengthAssessmentRequestDisabled
   | LengthAssessmentEnabledRequest
+      !LengthBehaviorMode
       !LengthRankingPolicy
       LeanLengthContractSelection
+
+-- | One command-local assessment owner.  Ranking contexts deliberately carry
+-- no bank, while each filter context owns exactly one nominal mutable bank for
+-- every batch assessed through that same context.  Contract fields remain lazy
+-- so behavior classification never demands their contents.
+data LengthAssessmentContext command
+  = LengthAssessmentDisabledContext
+  | LengthAssessmentScalarRankingContext
+      !LengthRankingPolicy
+      LeanLengthContract
+  | LengthAssessmentSpinePairRankingContext
+      !LengthRankingPolicy
+      LeanLengthSpinePairContract
+  | LengthAssessmentScalarFilteringContext
+      !LengthRankingPolicy
+      LeanLengthContract
+      !(CounterexampleBank.LengthCounterexampleBankContext
+          command ExferenceLocal)
+  | LengthAssessmentSpinePairFilteringContext
+      !LengthRankingPolicy
+      LeanLengthSpinePairContract
+      !(CounterexampleBank.LengthSpinePairCounterexampleBankContext
+          command ExferenceLocal)
+
+type role LengthAssessmentContext nominal
+
+-- | Introduce the nominal lifetime for one request.  The compatibility request
+-- runner below invokes this once per call; future command scheduling may keep
+-- the context and feed multiple batches without changing this API.
+withLengthAssessmentRequestContext
+  :: LengthAssessmentRequest
+  -> (forall command. LengthAssessmentContext command -> IO result)
+  -> IO result
+withLengthAssessmentRequestContext request action = case request of
+  LengthAssessmentRequestDisabled ->
+    action LengthAssessmentDisabledContext
+  LengthAssessmentEnabledRequest behavior policy selection ->
+    case (behavior, selection) of
+      (LengthBehaviorRank, LeanLengthScalarContractSelection contract) ->
+        action $ LengthAssessmentScalarRankingContext policy contract
+      (LengthBehaviorRank, LeanLengthSpinePairContractSelection contract) ->
+        action $ LengthAssessmentSpinePairRankingContext policy contract
+      (LengthBehaviorFilter, LeanLengthScalarContractSelection contract) ->
+        CounterexampleBank.withDefaultLengthCounterexampleBankContext
+          $ \context -> action
+              $ LengthAssessmentScalarFilteringContext
+                  policy contract context
+      (LengthBehaviorFilter, LeanLengthSpinePairContractSelection contract) ->
+        CounterexampleBank.withDefaultLengthSpinePairCounterexampleBankContext
+          $ \context -> action
+              $ LengthAssessmentSpinePairFilteringContext
+                  policy contract context
+
+lengthAssessmentContextBehaviorMode
+  :: LengthAssessmentContext command
+  -> LengthBehaviorMode
+lengthAssessmentContextBehaviorMode context = case context of
+  LengthAssessmentDisabledContext -> LengthBehaviorRank
+  LengthAssessmentScalarRankingContext {} -> LengthBehaviorRank
+  LengthAssessmentSpinePairRankingContext {} -> LengthBehaviorRank
+  LengthAssessmentScalarFilteringContext {} -> LengthBehaviorFilter
+  LengthAssessmentSpinePairFilteringContext {} -> LengthBehaviorFilter
+
+-- | The exact command-local behavior selected for this request.  Disabled
+-- assessment is the established ranking identity.  The enabled projection
+-- inspects only its strict behavior tag and does not force the retained lazy
+-- contract.
+lengthAssessmentRequestBehaviorMode
+  :: LengthAssessmentRequest
+  -> LengthBehaviorMode
+lengthAssessmentRequestBehaviorMode request = case request of
+  LengthAssessmentRequestDisabled -> LengthBehaviorRank
+  LengthAssessmentEnabledRequest behavior _ _ -> behavior
 
 -- | The mode Main uses when no Length configuration file was named.  It
 -- holds no policy or contract, so assessment preserves callback order
@@ -145,29 +260,37 @@ data LengthAssessmentRequest
 disabledLengthAssessmentMode :: LengthAssessmentMode
 disabledLengthAssessmentMode = LengthAssessmentDisabled
 
--- | Select the startup-fixed behavior without inspecting the configured
--- contract.  This is the exact no-option path.
+-- | Select the parsed operation over the startup-fixed contract without
+-- inspecting that contract.  Disabled ranking remains the lazy identity;
+-- disabled filtering is refused before any contract can be admitted or read.
 startupLengthAssessmentRequest
-  :: LengthAssessmentMode
-  -> LengthAssessmentRequest
-startupLengthAssessmentRequest mode = case mode of
-  LengthAssessmentDisabled -> LengthAssessmentRequestDisabled
+  :: LengthBehaviorMode
+  -> LengthAssessmentMode
+  -> Either LengthAssessmentRequestError LengthAssessmentRequest
+startupLengthAssessmentRequest behavior mode = case mode of
+  LengthAssessmentDisabled -> case behavior of
+    LengthBehaviorRank -> Right LengthAssessmentRequestDisabled
+    LengthBehaviorFilter -> Left
+      LengthAssessmentFilteringRequiresActivatedPolicy
   LengthAssessmentConfigured _ policy selection ->
-    LengthAssessmentEnabledRequest policy selection
+    Right $ LengthAssessmentEnabledRequest behavior policy selection
 
 -- | Authorize one explicit request before its path is admitted or read.
 -- Matching a configured mode does not inspect its fixed startup contract; a
 -- disabled mode fails without accepting a contract value.
 authorizeExplicitLengthAssessmentRequest
-  :: LengthAssessmentMode
+  :: LengthBehaviorMode
+  -> LengthAssessmentMode
   -> Either
       LengthAssessmentRequestError
       ExplicitLengthAssessmentPermission
-authorizeExplicitLengthAssessmentRequest mode = case mode of
-  LengthAssessmentDisabled -> Left
-    LengthAssessmentExplicitContractRequiresActivatedPolicy
+authorizeExplicitLengthAssessmentRequest behavior mode = case mode of
+  LengthAssessmentDisabled -> Left $ case behavior of
+    LengthBehaviorRank ->
+      LengthAssessmentExplicitContractRequiresActivatedPolicy
+    LengthBehaviorFilter -> LengthAssessmentFilteringRequiresActivatedPolicy
   LengthAssessmentConfigured _ policy _ -> Right
-    $ ExplicitLengthAssessmentPermission policy
+    $ ExplicitLengthAssessmentPermission behavior policy
 
 -- | Associate one successfully decoded passive contract with the exact
 -- startup-activated policy.  The contract remains lazy and no IO occurs.
@@ -176,8 +299,8 @@ explicitLengthAssessmentRequest
   -> LeanLengthContractSelection
   -> LengthAssessmentRequest
 explicitLengthAssessmentRequest
-    (ExplicitLengthAssessmentPermission policy) selection =
-  LengthAssessmentEnabledRequest policy selection
+    (ExplicitLengthAssessmentPermission behavior policy) selection =
+  LengthAssessmentEnabledRequest behavior policy selection
 
 -- | The permission decision that actually released a configured mode.
 -- This deliberately reports no executable path, digest bytes, or later
@@ -223,9 +346,9 @@ loadLengthAssessmentMode activation source =
           Right (policy, selection) -> Right
             $ LengthAssessmentConfigured activation policy selection
 
--- | One sanitized reason why enabled ranking preserved callback order.
--- Candidate-local preparation refusal remains part of the ranking report and
--- is not inflated into a batch-wide failure here.
+-- | One sanitized reason why an enabled operation preserved every verified
+-- occurrence.  Candidate-local preparation refusal remains part of the rank
+-- or selection report and is not inflated into a batch-wide failure here.
 data LengthAssessmentFailure
   = LengthAssessmentPostVerificationFailed
       !LengthPostVerificationFailure
@@ -235,10 +358,13 @@ data LengthAssessmentFailure
       !LengthSpinePairPostVerificationFailure
   | LengthAssessmentSpinePairRankingFailed
       !LengthSpinePairRankingFailure
+  | LengthAssessmentSelectionFailed !LengthSelectionFailure
+  | LengthAssessmentSpinePairSelectionFailed
+      !LengthSpinePairSelectionFailure
   deriving (Eq, Ord, Show)
 
--- | Common result for disabled and configured post-verification paths.
--- The skipped branch deliberately retains its batch lazily so constructing the
+-- | Common result for disabled, ranking, and hard-selection paths.  The
+-- skipped branch deliberately retains its batch lazily so constructing the
 -- disabled result performs no candidate traversal or other IO.
 data LengthAssessmentResult
   = LengthAssessmentSkipped
@@ -246,6 +372,9 @@ data LengthAssessmentResult
   | LengthAssessmentCompleted !LengthPostVerificationResult
   | LengthAssessmentSpinePairCompleted
       !LengthSpinePairPostVerificationResult
+  | LengthAssessmentSelectionCompleted !LengthSelectionResult
+  | LengthAssessmentSpinePairSelectionCompleted
+      !LengthSpinePairSelectionResult
 
 -- | Preserve callback order without IO when disabled.  When configured, check
 -- the exact verified batch against the startup-fixed contract through the
@@ -256,7 +385,10 @@ assessLengthVerificationBatch
   -> VerificationBatch DetailedVerificationVariant
   -> IO LengthAssessmentResult
 assessLengthVerificationBatch mode = assessLengthVerificationRequest
-  $ startupLengthAssessmentRequest mode
+  $ case mode of
+    LengthAssessmentDisabled -> LengthAssessmentRequestDisabled
+    LengthAssessmentConfigured _ policy selection ->
+      LengthAssessmentEnabledRequest LengthBehaviorRank policy selection
 
 -- | Assess one exact callback batch under the command-local contract choice.
 -- Both contract lifetimes use the same occurrence-sealed policy runner.  The
@@ -265,22 +397,40 @@ assessLengthVerificationRequest
   :: LengthAssessmentRequest
   -> VerificationBatch DetailedVerificationVariant
   -> IO LengthAssessmentResult
-assessLengthVerificationRequest request verification = case request of
-  LengthAssessmentRequestDisabled ->
-    pure $ LengthAssessmentSkipped verification
-  LengthAssessmentEnabledRequest policy selection -> case selection of
-    LeanLengthScalarContractSelection contract ->
-      LengthAssessmentCompleted <$>
-        assessVerifiedLengthCandidatesWithPolicy policy contract verification
-    LeanLengthSpinePairContractSelection contract ->
-      LengthAssessmentSpinePairCompleted <$>
-        assessVerifiedLengthSpinePairCandidatesWithPolicy
-          policy contract verification
+assessLengthVerificationRequest request verification =
+  withLengthAssessmentRequestContext request $ \context ->
+    assessLengthVerificationContext context verification
 
--- | The verified receipts to present, in final order: the untouched callback
--- order for a skipped or rejected assessment, or the sealed post-assessment
--- order for an accepted scalar or spine-pair ranking.  The skipped branch
--- performs no traversal or IO.
+-- | Assess one batch through an already introduced command-local owner.
+-- Reusing a filter context reuses its one nominal bank; rank contexts continue
+-- through the established bank-free runners.
+assessLengthVerificationContext
+  :: LengthAssessmentContext command
+  -> VerificationBatch DetailedVerificationVariant
+  -> IO LengthAssessmentResult
+assessLengthVerificationContext context verification = case context of
+  LengthAssessmentDisabledContext ->
+    pure $ LengthAssessmentSkipped verification
+  LengthAssessmentScalarRankingContext policy contract ->
+    LengthAssessmentCompleted <$>
+      assessVerifiedLengthCandidatesWithPolicy policy contract verification
+  LengthAssessmentSpinePairRankingContext policy contract ->
+    LengthAssessmentSpinePairCompleted <$>
+      assessVerifiedLengthSpinePairCandidatesWithPolicy
+        policy contract verification
+  LengthAssessmentScalarFilteringContext policy contract bank ->
+    LengthAssessmentSelectionCompleted <$>
+      selectVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext
+        policy bank contract verification
+  LengthAssessmentSpinePairFilteringContext policy contract bank ->
+    LengthAssessmentSpinePairSelectionCompleted <$>
+      selectVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
+        policy bank contract verification
+
+-- | Effective verified candidates for the requested operation.  Ranking and
+-- disabled assessment retain their established candidates; an accepted
+-- filter returns only sealed survivors, while every filter failure preserves
+-- the complete original batch.
 lengthAssessmentCandidates
   :: LengthAssessmentResult
   -> [Verified DetailedVerificationVariant]
@@ -291,6 +441,10 @@ lengthAssessmentCandidates result = case result of
     lengthPostVerificationCandidates assessed
   LengthAssessmentSpinePairCompleted assessed ->
     lengthSpinePairPostVerificationCandidates assessed
+  LengthAssessmentSelectionCompleted selected ->
+    lengthSelectionCandidates selected
+  LengthAssessmentSpinePairSelectionCompleted selected ->
+    lengthSpinePairSelectionCandidates selected
 
 -- | The receipt-associated scalar ranking after the occurrence seal.
 -- Disabled assessment and rejected configured input have no ranking.  The
@@ -305,6 +459,8 @@ lengthAssessmentRanking result = case result of
   LengthAssessmentCompleted assessed ->
     lengthPostVerificationRanking assessed
   LengthAssessmentSpinePairCompleted _ -> Nothing
+  LengthAssessmentSelectionCompleted _ -> Nothing
+  LengthAssessmentSpinePairSelectionCompleted _ -> Nothing
 
 -- | The product-domain ranking after the occurrence seal.  Scalar and
 -- disabled assessments have no product ranking.
@@ -316,6 +472,8 @@ lengthAssessmentSpinePairRanking result = case result of
   LengthAssessmentCompleted _ -> Nothing
   LengthAssessmentSpinePairCompleted assessed ->
     lengthSpinePairPostVerificationRanking assessed
+  LengthAssessmentSelectionCompleted _ -> Nothing
+  LengthAssessmentSpinePairSelectionCompleted _ -> Nothing
 
 -- | The underlying scalar-domain adapter result, present exactly when the
 -- assessment ran under a scalar contract; disabled and spine-pair
@@ -327,6 +485,8 @@ lengthAssessmentPostVerificationResult result = case result of
   LengthAssessmentSkipped _ -> Nothing
   LengthAssessmentCompleted assessed -> Just assessed
   LengthAssessmentSpinePairCompleted _ -> Nothing
+  LengthAssessmentSelectionCompleted _ -> Nothing
+  LengthAssessmentSpinePairSelectionCompleted _ -> Nothing
 
 -- | The underlying binary-product adapter result, present exactly when the
 -- assessment ran under a spine-pair contract; disabled and scalar
@@ -338,6 +498,32 @@ lengthAssessmentSpinePairPostVerificationResult result = case result of
   LengthAssessmentSkipped _ -> Nothing
   LengthAssessmentCompleted _ -> Nothing
   LengthAssessmentSpinePairCompleted assessed -> Just assessed
+  LengthAssessmentSelectionCompleted _ -> Nothing
+  LengthAssessmentSpinePairSelectionCompleted _ -> Nothing
+
+-- | Scalar hard-selection result, present only for an explicitly authorized
+-- scalar filter request.
+lengthAssessmentSelectionResult
+  :: LengthAssessmentResult
+  -> Maybe LengthSelectionResult
+lengthAssessmentSelectionResult result = case result of
+  LengthAssessmentSkipped _ -> Nothing
+  LengthAssessmentCompleted _ -> Nothing
+  LengthAssessmentSpinePairCompleted _ -> Nothing
+  LengthAssessmentSelectionCompleted selected -> Just selected
+  LengthAssessmentSpinePairSelectionCompleted _ -> Nothing
+
+-- | Binary-product hard-selection result, nominally disjoint from scalar
+-- selection and present only for an explicitly authorized filter request.
+lengthAssessmentSpinePairSelectionResult
+  :: LengthAssessmentResult
+  -> Maybe LengthSpinePairSelectionResult
+lengthAssessmentSpinePairSelectionResult result = case result of
+  LengthAssessmentSkipped _ -> Nothing
+  LengthAssessmentCompleted _ -> Nothing
+  LengthAssessmentSpinePairCompleted _ -> Nothing
+  LengthAssessmentSelectionCompleted _ -> Nothing
+  LengthAssessmentSpinePairSelectionCompleted selected -> Just selected
 
 -- | The batch-wide reason a configured assessment kept callback order, if
 -- any.  An adapter rejection takes precedence over a ranking failure; a
@@ -361,3 +547,8 @@ lengthAssessmentFailure result = case result of
     Nothing -> case lengthSpinePairPostVerificationRankingFailure assessed of
       Nothing -> Nothing
       Just failure -> Just $ LengthAssessmentSpinePairRankingFailed failure
+  LengthAssessmentSelectionCompleted selected ->
+    LengthAssessmentSelectionFailed <$> lengthSelectionFailure selected
+  LengthAssessmentSpinePairSelectionCompleted selected ->
+    LengthAssessmentSpinePairSelectionFailed <$>
+      lengthSpinePairSelectionFailure selected

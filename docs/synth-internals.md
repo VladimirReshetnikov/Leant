@@ -27,11 +27,12 @@ who wants the *what* can stop at the paragraph.
   - [Interpretation policy and session-owned sealing](#interpretation-policy-and-session-owned-sealing)
   - [Adapter and canonical query sealing](#adapter-and-canonical-query-sealing)
 - [Ranking foundation](#ranking-foundation)
+  - [Package-private nominal counterexample-bank state and context](#package-private-nominal-counterexample-bank-state-and-context)
   - [Current applicable-domain validation](#current-applicable-domain-validation)
   - [The origin probe](#the-origin-probe)
   - [Live input-box validation and query-first replay](#live-input-box-validation-and-query-first-replay)
   - [Refusals, atomic fallback, and lifecycle owners](#refusals-atomic-fallback-and-lifecycle-owners)
-- [SpinePair ranking and post-verification](#spinepair-ranking-and-post-verification)
+- [SpinePair ranking, post-verification, and selection](#spinepair-ranking-post-verification-and-selection)
 - [Configuration and its file grammar](#configuration-and-its-file-grammar)
   - [Policy builders and usable-work budgets](#policy-builders-and-usable-work-budgets)
   - [`Configuration.File`: the current versionless JSON grammar](#configurationfile-the-current-versionless-json-grammar)
@@ -39,9 +40,12 @@ who wants the *what* can stop at the paragraph.
   - [File acquisition](#file-acquisition)
   - [Contract-only files and the length-contract command](#contract-only-files-and-the-length-contract-command)
   - [Integration and one-shot contracts](#integration-and-one-shot-contracts)
+- [Opaque detailed synthesis cursor foundation](#opaque-detailed-synthesis-cursor-foundation)
+- [Main's progressive same-run cursor scheduler](#mains-progressive-same-run-cursor-scheduler)
 - [Contract vocabulary and module ownership](#contract-vocabulary-and-module-ownership)
 - [Post-verification sealing](#post-verification-sealing)
-  - [The Length domain adapter](#the-length-domain-adapter)
+  - [The behavioral-selection partition seal](#the-behavioral-selection-partition-seal)
+  - [The Length ranking and selection adapters](#the-length-ranking-and-selection-adapters)
 - [Provider instantiation evidence](#provider-instantiation-evidence)
   - [Exact provider assignment vectors](#exact-provider-assignment-vectors)
 - [Proper-type applications and family plans](#proper-type-applications-and-family-plans)
@@ -240,9 +244,10 @@ of callback-verified candidates. It productively admits at most Djex's public
 eligible canonical query before any possible process launch. Eager policy then
 opens one lexical session; deferred policy first processes the pure source
 prefix and opens at most one session on the first live miss. Both process
-candidates serially in original order. After an exact counterexample,
-the ranking pass retains its bounded source-ordered input naturals in a fixed
-four-entry batch-local bank. The bank is newest first, deduplicates exact
+candidates serially in original order. Every established rank and direct
+Selection compatibility runner retains the historical raw-bank path. After an exact counterexample,
+that path retains its bounded source-ordered input naturals in a fixed
+four-entry batch-local bank. The raw bank is newest first, deduplicates exact
 vectors, promotes a replay hit or live counterexample, and evicts the least
 recently used vector when a fifth distinct live counterexample is inserted.
 For each later eligible query, Leant makes at most four pure replay attempts in
@@ -260,6 +265,89 @@ and preparation refusals do not mutate the bank. The bank never contains a
 cached solver result, verdict, query, receipt, provider-law basis, proof,
 solver status, or durable cache entry.
 
+### Package-private nominal counterexample-bank state and context
+
+The vendored Djex snapshot exposes nominal candidate-independent scalar and
+binary-product scopes, bounded immutable input stores, and pure query-owned
+bridges which fresh-replay a receipt before recording its inputs or replay one
+exact retained sample against a later same-scope query. A same-scope match
+authorizes only that fresh attempt; neither an old receipt nor a stored vector
+is a reusable verdict.
+
+`Leant.Synth.Length.CounterexampleBank.Internal` is the package-private state
+owner over those Djex primitives. The scalar and product state types are
+nominal and distinct. Each retains validated limits and zero or one active
+bank. Its empty and default constructors leave that bank absent without
+forcing the limits. The first replay or record operation initializes from the
+exact query-owned scope. A same-scope query retains the bank; scope drift
+replaces it with one empty bank under the original limits and does not inspect
+the discarded samples.
+
+Whole-bank replay traverses exact opaque samples newest first. Every admitted
+attempt accepts Djex's returned charged successor as authoritative. Evaluation
+or association refusal is retained in attempt order and traversal continues;
+an ordinary non-counterexample also continues. Exhaustion is an ordinary miss,
+and attempt-cap exhaustion is ordinary bounded unavailability. A hit returns
+an opaque sample/scope association plus the fresh current-query receipt but
+does not promote implicitly. Promotion is a separate membership- and
+scope-checked input-only insertion under the solver-independent replay origin,
+so it performs no second evaluation.
+
+Recording accepts a previously validated receipt only as an input-vector
+source. Djex first fresh-replays it once through the current query, and Leant
+records only a reproduced counterexample under one closed coarse origin: live
+model, solver-independent replay, or simplification replay. Evaluation,
+association, non-reproduction, attempt-limit, and insertion-limit outcomes
+remain explicit, and every bridge-returned successor is threaded even when a
+later step refuses the operation.
+
+The module now also owns abstract scalar and product context cells. Each
+context's `command` type parameter has a nominal role, as does its semantic
+identity parameter, and the introducer quantifies `command` inside a rank-2
+callback. A context replay mints a command-tagged opaque hit, so a same-
+identity hit cannot later be promoted through another context. The only state
+projection returns an immutable snapshot; there is no setter or constructor
+which restores a snapshot.
+
+Each context cell is an `MVar`, not a whole-assessment lock. Replay, promotion,
+and recording each run one serialized exception-restoring transition. Before
+commit the adapter fully evaluates the successor limits and complete active
+bank, then forces the outer `Either` and its selected failure or outcome
+constructor to weak head normal form. A synchronous or asynchronous exception
+during that preparation restores the old state and propagates. Every completed
+expected result instead installs Djex's authoritative successor, including
+ordinary refusal, miss, attempt-cap, and insertion-cap results. Ranking,
+simplification, worker IO, and the rest of the candidate loop remain outside
+the cell's masking and serialization boundary.
+
+`Ranking.Internal` now has an additive scalar cursor which is either the
+historical raw `[[Natural]]` MRU or one supplied nominal context; the pair
+module mirrors it. Existing ranking and compatibility selection entrances
+always choose the raw cursor. Only the context-aware Configuration and
+Selection entrances used by Integration's filter context choose the nominal
+cursor. The cursor is threaded through eager/deferred opening and unbudgeted,
+v1, and scoped-v2 usable-work loops without changing the established rank/raw
+entrances.
+
+On the context path, an unsimplified bank hit promotes its exact opaque sample
+without reevaluation. A simplified hit records the final receipt under the
+simplification origin instead. Fresh live-model and solver-independent sources
+use their corresponding origin unless simplification produced the final
+receipt. Recording is only a cache side effect: the assessment keeps the final
+pre-record receipt and simplification metadata. A fatal simplification failure
+does not promote or record, while its already completed replay transition
+remains charged. A later indexed ranking failure or preserve-all selection
+failure likewise does not roll back earlier completed bank transitions.
+
+The pure-state foundation checkpoint remains recorded in Leant's historical
+[nominal bank-state report](reports/2026-08-16-nominal-length-counterexample-bank-state.md).
+Its filter-only runtime successor is recorded in the
+[counterexample-bank context runner report](reports/2026-08-16-filter-only-length-counterexample-bank-context-runner.md).
+Djex's storage and fresh-replay boundaries are recorded separately in its
+[nominal bank report](../lib/Djex/docs/reports/2026-08-16-nominal-length-counterexample-bank-foundation.md)
+and
+[query-replay bridge report](../lib/Djex/docs/reports/2026-08-16-length-counterexample-bank-query-replay-bridge.md).
+
 ### Current applicable-domain validation
 
 Leant has one applicable-domain policy in the current tree. The programmatic
@@ -272,8 +360,10 @@ generated branches, rules per branch, closure inspections per branch, retained
 boxes, and raw assignment visits. Its name identifies the resource-cap record,
 not a selectable predecessor strategy.
 
-The policy runs after the four-entry newest-first MRU replay and before the
-origin probe. An ordinary inapplicable result or any width, generated-branch,
+The policy runs after the selected newest-first replay source—the raw
+four-entry MRU on rank/direct compatibility paths or the nominal context on
+Integration's filter path—and before the origin probe. An ordinary
+inapplicable result or any width, generated-branch,
 rule, closure, retained-box, maximum-value, visit, or unique-assignment
 admission refusal is a pure miss and continues through origin and live
 execution. A replayed violation becomes the ordinary `Counterexample`.
@@ -326,17 +416,20 @@ the current validator:
 direct literal -> positive affine -> relational -> strict relational
   -> positive-literal quotient -> root extrema -> root monus
   -> Boolean finite union / atomic branching
-  -> recursive piecewise-affine fallback
+  -> guarded recursive piecewise-affine fallback
 ```
 
 Each leaf first uses the complete atomic scanner. Recursive expansion runs only
 for its singleton ignored alternative when the relation still contains
-minimum, maximum, or natural monus, so an earlier exact result remains
-authoritative. The recursive grammar admits compact inputs, natural literals,
-normalized sums, positive scales, minimum, maximum, and monus. A quotient,
-modulo, conditional, result reference, out-of-range input, retained zero
-scale, or another unsupported child rejects that fallback atom; an earlier
-private stage may still have handled the complete leaf.
+minimum, maximum, natural monus, or a conditional, so an earlier exact result
+remains authoritative. The recursive grammar admits compact inputs, natural
+literals, normalized sums, positive scales, minimum, maximum, monus, and
+`LengthIf condition trueArm falseArm`. A conditional is all-or-nothing: every
+leaf in both condition polarities and every descendant in both selected arms
+must be supported. A quotient, modulo, result reference, out-of-range input,
+retained zero scale, or another unsupported child rejects the complete
+fallback atom; an earlier private stage may still have handled the complete
+leaf.
 
 For child values `L` and `R`, the exact alternatives are:
 
@@ -344,9 +437,15 @@ For child values `L` and `R`, the exact alternatives are:
 min(L,R)  -> [L <= R;     value L] | [R + 1 <= L; value R]
 max(L,R)  -> [R <= L;     value L] | [L + 1 <= R; value R]
 L monus R -> [L <= R;     value 0] | [R + 1 <= L; value L - R]
+if F then T else E
+          -> [positive F guards; value T]
+           | [negative F guards; value E]
 ```
 
-The first case owns equality. Left-child alternatives precede right-child
+The first extrema/monus case owns equality. Conditional true-arm alternatives
+precede false-arm alternatives; inside an arm, condition-DNF alternatives are
+outermost, the selected expression is innermost, and condition guards precede
+selected-arm guards. Left-child alternatives otherwise precede right-child
 alternatives, descendant guards precede the current selector, and the final
 relation rule comes last. Signed coefficients produced by positive monus
 branches transfer exactly into the natural positive-sided rule
@@ -354,7 +453,9 @@ representation. The closure uses one immutable snapshot per pass and fires
 each source-ordered rule at most once.
 
 Generated-branch admission counts the raw formula-DNF and recursive-alternative
-Cartesian product before cleanup. Canonical original literal sets are
+Cartesian product before cleanup, including impossible conditional guards that
+collapse only when the enclosing relation forms branch coverage. Canonical
+original literal sets are
 re-expanded in set order before rule and closure accounting. Every surviving
 branch must bound every compact input. Bounded branches form a
 lexicographically ordered, componentwise-maximal box antichain; incomparable
@@ -363,13 +464,17 @@ deduplicates assignments, and Djex replays the original checked precondition
 and postcondition once per assignment in global lexicographic order. Derived
 guards, rules, boxes, and solver status never replace this query-owned replay.
 
-The scalar discriminator retains `[[2,3],[3,2]]` with two boxes, 24 visits,
-15 unique assignments, and ten applicable assignments. The product
-discriminator retains `[[2,2]]` with 1/9/9/9 box, visit, unique, and
-applicable counts; its 32 raw alternatives distinguish branch caps 31 and 32
-before contradictory cases disappear.
+The one-input discriminator `(if x <= 2 then x else 5) <= 3` retains
+`[[2]]` with 1/3/3/3 box, visit, unique, and applicable counts; its two raw
+alternatives distinguish branch caps one and two. A negative equality guard
+retains all three complement alternatives. The nested discriminator
+`y <= 2` and `(if x <= 1 then max(x,y) else x monus y) <= 2` retains
+`[[4,2]]` with 1/15/15/12 counts. Its four raw alternatives precede rule and
+closure admission, and an independent wider-rectangle replay oracle checks
+that no satisfying assignment is omitted. Replacing either arm with an
+unsupported modulo or quotient descendant rejects the whole fallback atom.
 
-Under deferred opening the MRU/domain/origin prefix remains before process IO.
+Under deferred opening the selected-bank/domain/origin prefix remains before process IO.
 A pure establishment or counterexample opens no worker. The first live miss
 opens one lexical session without repeating the prefix; the remaining
 candidates stay in that scope. The current policy and deletion rationale are
@@ -378,19 +483,23 @@ recorded in the
 The detailed grammar, cap precedence, receipt identity, and replay authority
 are owned by Djex's
 [current applicable-domain surface report](../lib/Djex/docs/reports/2026-08-15-current-length-applicable-domain-surface.md).
+The guarded extension and inherited native process ownership are recorded in
+the
+[guarded conditional Length ranking report](reports/2026-08-15-guarded-conditional-length-ranking.md).
 The older strategy reports are non-normative development history.
 
 ### The origin probe
 
-The current startup policy inserts one query-owned origin probe after all four
-bank entries—and after the applicable-domain pass is inapplicable—before that
+The current startup policy inserts one query-owned origin probe after the
+selected replay source is exhausted—at most four raw entries on the established
+rank path—and after the applicable-domain pass is inapplicable, before that
 candidate's live Z3 query. Programmatic policies can enable the same probe
 explicitly. Leant supplies no
 arity or values: Djex derives one zero per compact modeled input from the
 sealed checked problem and runs the ordinary bounded replay and exact
 association gate. A hit is the ordinary `Counterexample`; it is stably demoted
-and its exact zero vector is inserted or promoted in the same MRU bank. A miss
-is no evidence, leaves the bank unchanged, and proceeds to live Z3. An
+and its exact zero vector updates the selected raw MRU or nominal context. A
+miss is no evidence, leaves the bank unchanged, and proceeds to live Z3. An
 evaluation rejection or association mismatch is an indexed operational
 failure and activates the same batch-wide original-order, all-`Unassessed`
 fallback. The probe consumes no solver status and does not itself schedule the
@@ -406,7 +515,7 @@ neutral. The current startup policy and explicit input-box builder use a live
 `unsat` only to trigger Djex's independent exhaustive replay of
 caller-selected per-input inclusive maxima. A discovered violation becomes the
 ordinary `Counterexample`, is
-stably demoted, and updates the MRU bank. Complete traversal becomes
+stably demoted, and updates the selected raw MRU or nominal context. Complete traversal becomes
 `BoundedPositive`, contributes no seed, and records only bounded/model-relative
 positive evidence. It stays in the neutral stable partition unless the
 non-vacuous preference is selected. The current startup route selects that
@@ -437,7 +546,8 @@ text with a detached evidence list.
 
 ### Refusals, atomic fallback, and lifecycle owners
 
-Nothing is pruned. A candidate-local handoff or query-construction refusal
+The ranking foundation never prunes. A candidate-local handoff or query-
+construction refusal
 still projects through the compatible `Unassessed` assessment, but now also
 retains one bounded payload-free `LengthPreparationRefusalClass` with a fixed
 machine code. The exhaustive classifiers inspect only the outer refusal
@@ -451,7 +561,12 @@ order: eligible prepared candidates become `Unassessed`, while candidate-local
 pure preparation refusals retain their bounded refusal class. The result carries
 only one sanitized batch failure class, cleanup bit, and optional safe original
 index; a successfully prepared candidate gains no invented refusal reason.
-Exceptions propagate instead of producing a ranking. Programmatic callers may
+That atomic fallback discards partial candidate assessments, not completed
+nominal-bank transitions: accepted replay charges and authoritative promotion
+or record successors remain in the context. An exception inside a context
+transition is the complementary case; the `MVar` restores the old state before
+the exception propagates. Other exceptions propagate instead of producing a
+ranking. Programmatic callers may
 retain separate per-query budgets or explicitly select the runtime-unscoped v1
 shared owner. The current startup route and the scoped programmatic builder use
 the owner-thread-affine v2 lease and cooperative phase checkpoints. Neither owner
@@ -460,14 +575,14 @@ this foundation only after the explicit startup opt-in described above; it
 never infers an executable path, contract, or policy. The foundation is
 detailed in the
 [live Length ranking foundation report](reports/2026-08-11-live-length-ranking-foundation.md).
-The batch-local replay optimization and its unchanged trust and identity
+The raw batch-local replay optimization and its unchanged trust and identity
 boundaries are recorded in the
 [Length counterexample seed replay report](reports/2026-08-13-length-counterexample-seed-replay.md).
-Its fixed four-entry MRU policy and Djex's query-owned raw-input replay boundary
+Its fixed raw four-entry MRU policy and Djex's query-owned raw-input replay boundary
 are detailed in the
 [Length input replay bank report](reports/2026-08-14-length-input-replay-bank.md).
 The historical checkpoint which introduced the all-zero probe, exact
-MRU/origin/live order, and failure and identity boundaries is detailed in the
+raw-MRU/origin/live order, and failure and identity boundaries is detailed in the
 [Length origin-probe orchestration report](reports/2026-08-14-length-origin-probe-orchestration.md).
 The opt-in finite-box policy, its unsat-as-trigger-only boundary, positive
 receipt, and additive configuration grammar are detailed in the
@@ -482,21 +597,26 @@ Its public validator family has been superseded by the one current algorithm
 documented in the
 [current applicable-domain policy report](reports/2026-08-15-current-length-applicable-domain-policy.md).
 
-## SpinePair ranking and post-verification
+## SpinePair ranking, post-verification, and selection
 
 `Leant.Synth.Length.SpinePair.Ranking` and
 `Leant.Synth.Length.SpinePair.PostVerification` supply the nominal
 canonical-`Prod` sibling of this orchestration. The pair path reuses the same
 bounded execution policy and lexical Djex session capability, but prepares
 only pair queries and releases only pair-domain assessments and receipts. Its
-own four-entry batch-local MRU bank, optional applicable-domain validation,
-optional origin probe, live pair call, query-first replay, and optional
-post-`unsat` pair input box preserve the same
+established ranking and direct Selection compatibility entrances retain their own raw four-entry
+batch-local MRU, while the additive context-aware filter entrance receives the
+nominal product bank. Optional applicable-domain validation, origin probe,
+live pair call, query-first replay, and post-`unsat` pair input box preserve the same
 stable-demotion and atomic-fallback rules without transferring scalar
 authority. Pair-safe terminal projection lives in
 `presentLengthSpinePairPostVerificationResult`; the complete checkpoint is
 recorded in the
 [live binary-product Length ranking report](reports/2026-08-14-live-binary-product-length-ranking.md).
+The later nominal `Leant.Synth.Length.SpinePair.Selection` adapter consumes
+only this pair report, rejects only an independently replayed pair
+counterexample, and otherwise follows the preserve-all and stable original-
+order selection rules described below.
 
 ## Configuration and its file grammar
 
@@ -532,6 +652,15 @@ case lengthRankingPolicyExecutableLaunchStrategy descriptorPolicy of
   LengthSMTLibDescriptorBoundExecveCheckExecutableAccessLaunch ->
     error "impossible for this constructor"
 ```
+
+The established `rankPostVerification...WithPolicy` and
+`assessVerified...WithPolicy` scalar/product entrances remain literal raw-MRU
+compatibility paths. Additive
+`assessVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext` and
+`assessVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext`
+entrances accept the matching nominal context. Their private ranking siblings
+dispatch that same context through every eager/deferred and
+unbudgeted/v1/scoped policy branch; the policy value itself owns no bank.
 
 This construction is pure. It does not open, hash, copy, seal, or launch the
 configured executable. It preserves every later policy builder, and
@@ -600,11 +729,32 @@ policy and configured-mode projections reveal only the fourth closed
 classifier, not descriptors, credentials, check results, requested staging
 flags, or runtime admission.
 
+All three native descriptor launch variants share the same lower ownership
+transition. A resource-producing deadline worker stays masked until it
+publishes one terminal `Either` through one completion cell as its final
+effect. Cancellation, deadline loss, or an exception in the controller kills
+that worker, joins by reading the same completion, and rolls back any returned
+resource; there is no separately visible outcome followed by a lagging done
+signal. Source descriptors, staged images, portable `createProcess` results,
+and native spawn results use this masked-publication entrance.
+
+After native spawn, a shared masked handoff retains rollback ownership of the
+raw child, stdin, stdout, and stderr bundle across one restored asynchronous-
+exception checkpoint. The consumer is entered masked; it allocates the opaque
+process owner before restoring interruptible initialization, after which that
+process value owns cleanup. The exec-status `Handle` has its own masked
+`finally`, so EOF, a child-reported exec failure, synchronous read failure,
+deadline cancellation, and asynchronous interruption all close it before
+child-and-stdio cleanup proceeds. This changes neither public process types nor
+behavioral evidence; it closes leak windows in the inherited runtime. See
+Djex's
+[descriptor spawn resource-ownership report](../lib/Djex/docs/reports/2026-08-15-descriptor-spawn-resource-ownership.md).
+
 The retained policy builders are persistent and orthogonal for programmatic
 callers. Applicable-domain construction has only the short current builder;
 its lower analysis stages are private inside Djex. The startup decoder always
 enables the input box, origin probe, both non-vacuous
-preferences, recursive piecewise-affine applicable-domain validation,
+preferences, guarded recursive piecewise-affine applicable-domain validation,
 counterexample simplification, deferred opening, and the scoped/checkpointed
 usable-work owner on top of the execve-check descriptor launcher. Only numeric
 limits and the genuine scalar-or-binary-product domain choice remain in the
@@ -682,7 +832,7 @@ candidate, contract, provider, literal, fingerprint, or evaluation authority.
 
 The document exposes only numeric parameters and genuine choices. The current
 execve-check descriptor launcher is fixed, so `execution` has no
-`executableLaunch` member. The current recursive piecewise-affine algorithm is
+`executableLaunch` member. The current guarded recursive piecewise-affine algorithm is
 fixed, so `applicableDomainValidation` has no `strategy` member.
 Counterexample simplification and the scoped-v2 budget likewise omit their
 one-choice `strategy` fields. The origin probe, both non-vacuous preferences,
@@ -724,9 +874,11 @@ Every accepted startup file constructs the same operational bundle:
   point-in-time effective-ID source VFS checks, two source
   `AT_EXECVE_CHECK` observations, sealed `MFD_EXEC` image, and one staged
   descriptor check;
-- the four-entry MRU bank and all-zero origin probe;
+- newest-first replay and the all-zero origin probe, using the raw four-entry
+  MRU on rank/direct compatibility paths or the supplied nominal context on
+  Integration's filter path;
 - independent post-`unsat` input-box traversal;
-- current recursive piecewise-affine applicable-domain traversal;
+- current guarded recursive piecewise-affine applicable-domain traversal;
 - non-vacuous preference for both positive-evidence families;
 - componentwise-lexicographic counterexample simplification;
 - deferred worker opening; and
@@ -738,22 +890,23 @@ nominal canonical-`Prod` assessor and its separately typed pair contract.
 `rankingDomain` is the sole domain discriminator; neither nested contract
 admits `resultShape`. Domain selection never comes from the
 Lean goal and cannot cast contracts, queries, receipts, failures, assessments,
-MRU state, or presentation across the scalar/product boundary.
+raw-MRU/context state, or presentation across the scalar/product boundary.
 
 Construction remains pure. An all-pure batch captures and checks the scoped
 clock but performs no executable or access-check IO. The first live miss opens
 one lexical session for the remaining suffix. Any access, staging, live,
 replay, association, forcing, or finalization failure preserves the established
-original-order atomic fallback.
+original-order assessment fallback. That fallback does not rewind completed
+nominal-context cache transitions.
 
 The current schema reset and deleted compatibility surface are recorded in the
 [versionless startup configuration report](reports/2026-08-15-versionless-length-ranking-configuration.md).
-The recursive semantic and evidence boundary is recorded in the historical
-[recursive piecewise-affine Length ranking report](reports/2026-08-15-recursive-piecewise-affine-length-ranking.md)
+The current semantic and evidence boundary is recorded in the
+[guarded conditional Length ranking report](reports/2026-08-15-guarded-conditional-length-ranking.md)
 and Djex's
-[recursive piecewise-affine applicable-domain report](../lib/Djex/docs/reports/2026-08-15-recursive-piecewise-affine-length-applicable-domain.md).
-The former report's startup-number discussion describes its landing checkpoint,
-not the current grammar.
+[guarded conditional applicable-domain report](../lib/Djex/docs/reports/2026-08-15-guarded-conditional-length-applicable-domain.md).
+The earlier recursive reports and their startup-number discussion describe
+their landing checkpoint, not the current grammar.
 
 ### File acquisition
 
@@ -802,29 +955,270 @@ enum values, and syntax tags are case-sensitive.
 
 The `Contract.File.Acquire` facade uses the same path, descriptor, and timeout
 owner as startup acquisition, but maps failures into contract-only closed
-vocabulary. `Leant.Synth.Length.Command` recognizes only the exact
-`--length-contract` spelling and requires a standalone `--`, so malformed
-request syntax cannot disappear into Lean goal text.
+vocabulary. `Leant.Synth.Length.Command` owns the exact option-bearing grammar
+
+```text
+:synth [--behavior-mode rank|filter] [--length-contract PATH] -- TYPE
+```
+
+while keeping ordinary `:synth TYPE` delimiter-free. Only the exact option
+tokens are recognized; longer lookalike prefixes remain goal text. The mode
+must precede the contract, every recognized option form requires the standalone
+delimiter, the behavior value is exactly `rank` or `filter`, and an empty path
+is rejected before a misplaced exact mode token in the contract span.
+Omitting the behavior mode defaults to `rank`.
 
 ### Integration and one-shot contracts
 
-`Leant.Synth.Length.Integration` authorizes an explicit request from the
-already activated policy before Main admits or opens its contract path. The
-result is an opaque command-local choice containing either the disabled
-identity or one strict policy beside one lazy scalar-or-pair selection.
-`LeanLengthContractSelection` is passive and nominal: dispatch chooses exactly
-one scalar or pair occurrence-sealed assessor, and the two ranking/evidence
-result types remain separate. Startup and one-shot contracts enter the same
-lifetime owner; the request does not remember a second policy/contract origin
-tag. Main calls `loadLengthContractFile` and then
-`explicitLengthAssessmentRequest` once before translating the goal and threads
-that value through every retry and synthesis lane. It never writes the request
-to interactive state or a snapshot. The selection-suffixed entrances have been
-removed; the unsuffixed decoder, loader, and request names now carry the
-nominal scalar-or-pair selection instead of their former scalar-only types.
+`Leant.Synth.Length.Integration` carries the parsed strict
+`LengthBehaviorMode` beside the already activated policy and lazy passive
+contract selection. `LengthBehaviorRank` dispatches to the scalar or pair
+permutation-sealed ranking adapter; `LengthBehaviorFilter` dispatches to the
+matching scalar or pair selection adapter. Startup and one-shot contracts
+enter the same lifetime owner; the request does not remember a second policy/
+contract origin tag. `lengthAssessmentRequestBehaviorMode` projects only the
+strict mode tag: disabled assessment projects `LengthBehaviorRank`, and an
+enabled projection does not force its retained lazy contract.
+
+`withLengthAssessmentRequestContext` introduces a fresh nominal
+`LengthAssessmentContext command` through a rank-2 callback. Disabled and
+enabled rank contexts deliberately contain no counterexample bank. A scalar or
+product filter context owns exactly one matching nominal bank, and repeated
+`assessLengthVerificationContext` calls through that same callback-scoped
+value reuse it across batches. `lengthAssessmentContextBehaviorMode` inspects
+only the strict context tag and preserves contract laziness.
+
+`assessLengthVerificationRequest` is the compatibility entrance: it calls the
+rank-2 introducer once and assesses exactly one batch. A filter call therefore
+gets a fresh bank, while a rank call still uses the established raw-MRU runner.
+`assessLengthVerificationBatch` delegates through the same compatibility edge.
+Main no longer uses that compatibility entrance. `synthRun` calls
+`withLengthAssessmentRequestContext` once before initial goal translation and
+threads the resulting context through universe narrowing and every ordinary,
+provider, excluded-middle, and double-negation assessment. A filter bank is
+therefore reusable across all assessed batches in that command; a rank context
+remains bank-free.
+
+The disabled rank request is the established non-strict identity. A disabled
+filter request returns `LengthAssessmentFilteringRequiresActivatedPolicy`.
+For a command-local contract, Integration authorizes mode-plus-policy before
+Main admits or opens the path: disabled rank returns the established explicit-
+contract activation refusal and disabled filter returns the filtering refusal.
+Only after permission does Main call `loadLengthContractFile` and
+`explicitLengthAssessmentRequest`. It passes that request into `synthRun`,
+which introduces the context before goal translation and keeps it around every
+retry and synthesis lane. It never writes behavior mode, the request, an
+assessment context, a replay bank, or a selection result to interactive state
+or a snapshot.
+
+`LengthAssessmentResult` keeps scalar ranking, pair ranking, scalar selection,
+and pair selection nominally disjoint. Ranking projections return `Nothing`
+for selection results and selection projections return `Nothing` for ranking.
+`lengthAssessmentCandidates` is the common effective-candidate projection: a
+successful filter returns only sealed survivors, while every selection failure
+returns the complete original batch. `lengthAssessmentFailure` maps both
+selection failure families into the mode-neutral Main warning path.
+
+## Opaque detailed synthesis cursor foundation
+
+`Leant.Synth.Engine` now has an additive observation boundary over one lazy
+`Either String DetailedSynthOutcome`. `DetailedSynthCursor` and
+`DetailedCandidateBatch` are positional, lazy types whose constructors remain
+hidden. They have no record selectors, strict fields, `Eq`, or `Show`
+instances. Callers can inspect a returned batch only through
+`detailedCandidateBatchGroups` and `detailedCandidateBatchNotes`; the Engine
+module is therefore the sole constructor of the nonempty ordered group slice
+and its association with the original run-level notes. This is ordinary pure
+Haskell opacity, not a linear capability: a caller may retain an older cursor,
+but advancing any cursor observes the already retained outcome and never
+reruns an engine.
+
+`startDetailedSynthCursor` wraps its outcome without demanding the verdict or
+candidate stream. `advanceDetailedSynthCursor` first validates the requested
+per-step size independently of its cursor. Zero and negative requests return
+`DetailedSynthCursorBatchSizeNotPositive`; requests above
+`candidateWindow`, currently 60, return
+`DetailedSynthCursorBatchSizeLimitExceeded` with the maximum followed by the
+observed request. Both errors precede even a bottom cursor. For an admitted
+request, the outer `Right` is likewise available without demanding the cursor;
+forcing its `DetailedSynthCursorStep` performs the first outcome observation.
+
+A candidate step selects at most the requested number of groups and at most
+the unspent part of the product-wide 60-group hard cap. It returns
+`DetailedSynthCursorCandidateBatch` with one nonempty batch and a lazy
+successor. Batches preserve engine order and carry the original notes
+unchanged. A request can return fewer groups because the stream ended or
+because the remaining hard-cap allowance was smaller; the following step
+states which boundary was reached.
+
+`DetailedSynthCursorNaturallyExhausted` is returned only when advancing before
+the cap observes an empty stream. Once 60 groups have been returned,
+`DetailedSynthCursorHardCapReached` wins without probing the next group. An
+exactly 60-element finite stream is therefore intentionally a hard-cap result,
+not an exhaustion witness, and group 61 may be bottom or an infinite cyclic
+tail without affecting productivity. `DetailedSynthCursorEngineFailed`,
+`DetailedSynthCursorRefuted`, and `DetailedSynthCursorNoTerm` preserve the
+existing error, refutation-soundness flag, and no-term notes rather than
+coercing them into candidate completion.
+
+`forceDetailedSynthCursorStep` supplies the value a deadline-owning caller can
+evaluate for exactly one step. On a candidate batch it traverses the selected
+group-list spine and group constructors, forces each rendering route to weak
+head normal form, traverses each variant-list spine and variant constructor far
+enough to project text, and traverses each selected rendered spelling's
+`String` list spine through `length`. It likewise traverses the run-note list
+spine and each note's `String` spine through `length`. It does not force `Char`
+values or perform text encoding, and it does not demand semantic sidecars, lazy
+recovered-origin lookup, the successor, or the unselected tail. Terminal steps
+use the same error/note `String`-list-spine or
+soundness-`Bool` boundary as the established `forceDetailedOutcome`; that older
+helper is factored through the same private group/note forcing functions and
+retains its compatibility force boundary. Main now uses the cursor-step helper.
+Neither helper installs a timeout.
+
+`src/Main.hs` consumes this surface without reconstructing either opaque
+representation. It imports the cursor and step types, visible terminal
+constructors, start/advance operations, batch accessors, and force helper, but
+not the hidden `DetailedCandidateBatch` or `DetailedSynthCursor` constructors.
+The cursor still owns no assessment context, counterexample bank, provider
+deduplication, note-presentation policy, survivor quota, `ReplState` field, or
+counterexample-directed engine request; those private orchestration choices
+remain in Main.
+
+## Main's progressive same-run cursor scheduler
+
+Main adds three private, lazy representation boundaries with no `Eq` or `Show`
+instance. `SynthLaneCursorPolicy` owns the batch width, the filter-successor
+permission, and ordinary-note retention. `SynthLaneRunEnd` distinguishes
+stopped-by-disposition, policy completion, natural exhaustion, hard cap,
+timeout, cursor-admission failure, engine failure, refutation, and no term.
+`SynthLaneRun` retains the updated command accumulation, chronological
+same-run spelling frontier, cumulative candidate-group count, run notes, and
+that terminal reason. None is exported or stored in `ReplState`.
+
+`ordinarySynthLaneCursorPolicy` uses `synthVerificationWindow`: 12 for either
+standalone engine and 24 for `EngineBoth`. Rank and disabled contexts disallow
+a successor. Filter contexts allow one. The excluded-middle policy always uses
+half of `synthMaxTried`, currently 6, and disallows a successor. Double
+negation uses the ordinary policy; its tuned Djinn candidate cutoff remains 12
+for rank and disabled modes and becomes `candidateWindow`, currently 60, for
+filter mode. Thus filter-mode standalone and combined runs observe at most
+12+12 and 24+24 groups respectively, while EM remains six. The 48-group maximum
+stays below Engine's cumulative 60-group cap.
+
+`runDetailedSynthCursorBefore` calls `advanceDetailedSynthCursor` before the
+timeout branch. Valid admission is non-demanding by Engine's contract. With no
+deadline it forces the selected step directly; otherwise it computes the
+remaining duration from the supplied absolute deadline and evaluates
+`forceDetailedSynthCursorStep` beneath `timeout`. It neither captures a new
+deadline nor forces the successor or unselected tail.
+
+`runSynthLaneCursor` calls `startDetailedSynthCursor` once for the retained
+outcome and owns the only advance site. Every candidate step maps its optional
+classical transform over the selected groups, advances the cumulative count,
+emits ordinary debug spellings with ordinals continuing from that count, and
+calls `verifySynthLane` once. Only `SynthLaneNoVerified` and
+`SynthLaneAllBehaviorallyRejected` reach `continueOrStop`; survivor and
+preserve-all finish as `SynthLaneRunStoppedByDisposition`.
+
+The continuation guard is literal: the policy must allow a successor and the
+current ordinal must be less than two. A continuing second batch therefore
+finishes as `SynthLaneRunBatchPolicyReached` without a third advance, even just
+to decide whether the tail is empty. Natural exhaustion and the hard cap are
+recorded only when the corresponding Engine step was actually observed. The
+driver maps every other terminal cursor step and a timeout/admission failure to
+the matching `SynthLaneRunEnd` without flattening the result.
+
+Each `verifySynthLane` call takes its supplied batch bound before projecting
+behavior mode. Private `synthVerify` receives `synthMaxShown`, currently 5, in
+rank mode and the complete current batch width in filter mode. The exact
+`VerificationBatch` is assessed once and retained with its one
+`LengthAssessmentResult` in `AssessedSynthLane`. The driver contains no engine
+invocation and no verification or assessment path around its one
+`verifySynthLane` call per candidate batch. It therefore cannot rerun
+synthesis, reverify a previous batch, or reassess it. Both batches receive the same
+`LengthAssessmentContext command`; a filter bank successor is therefore
+available to the second batch.
+
+`SynthLaneOutcome` still retains two noninterchangeable histories. Its complete
+`concatMap detailedCandidateGroupVariants` spelling frontier includes every
+variant in the current batch even when lazy callback verification did not reach
+it. Its `[DetailedVerificationVariant]` trace records only actual callbacks.
+`SynthLaneRun` reverses its at-most-two buffered outcomes into chronological
+order, folds them into the command's reverse accumulation, and concatenates
+their complete frontiers in that same order. Later provider deduplication uses
+only the run frontier; callback attempts never become scheduling authority.
+
+The pure `synthLaneDisposition` remains four-way:
+
+- `SynthLaneNoVerified` for an unassessed empty batch or an assessed batch with
+  no verified receipt;
+- `SynthLaneSurvivors` for an accepted presentation, carrying at most five
+  survivors and its complete rejection projection;
+- `SynthLaneAllBehaviorallyRejected` when an accepted assessment has only
+  rejection rows; and
+- `SynthLaneAssessmentPreserved` when assessment failure preserves the
+  original verified batch.
+
+The defensive callback-verified/no-presentation branch remains terminal
+`SynthLaneSurvivors [] []`. Continuing after NV or AR does not fill a survivor
+quota: the first S or P batch stops, even with one survivor, and there is never
+a third same-run batch.
+
+Engine notes arrive unchanged on every cursor batch, but Main assigns them only
+after the run ends. `attachNotesToRightmostHandled` walks the reverse same-run
+outcomes, skips no-verification, and attaches the notes once to the newest
+all-rejected, survivor, or preserve-all outcome. If all outcomes are
+no-verification, the notes remain only in `SynthLaneRun` for the final candidate
+or no-term diagnostic. Both classical policies disable handled-note retention.
+
+`classicalSynthLaneDeadline` is behavior-mode sensitive. Filter mode returns
+the original command deadline without reading the environment or clock, so
+ordinary work, both batches, excluded middle, and double negation share one
+absolute budget. Rank and disabled modes read `LEANT_SYNTH_TIMEOUT` and capture
+a fresh full duration independently at each reached EM and NN entry. A skipped
+route captures nothing, a terminal EM prevents the NN capture, and a nonpositive
+configured duration returns the established unbounded `Nothing`.
+
+`SynthLaneAccumulation` remains a positional lazy reverse history. Its pure fold
+uses the chronological prefix through the first terminal outcome.
+`finalizeSynthLaneAccumulation` remains the sole effect owner: chronological
+metrics, effective warnings, one final cache/binding phase, candidate and
+rejection rows, and handled notes. Aggregate all-rejection clears once;
+survivor or preserve-all replaces once. No batch is finalized early.
+
+Only a completed continuing run reaches another provider stage, contributing
+its concatenated spelling frontier. Provider timeout/error remains masked by a
+retained sound provider-free refutation, while completed outcomes survive in
+the accumulation. The sound-refutation path passes the original command
+deadline into `synthClassical`; EM no-verification or all-rejection reaches NN,
+while survivor or preserve-all stops. `synthClassical` never finalizes. Its
+caller retains the established provably-uninhabited, unresolved-universe, and
+constructive/classical-hint gates.
+
+Without a sound fallback, timeout, cursor-admission failure, or engine failure
+first finalizes completed outcomes and then emits the corresponding abnormal
+diagnostic. Ordinary aggregate all-rejection still suppresses unrelated no-
+verification/no-term text. This scheduler adds no quota fill, engine rerun,
+reassessment, counterexample-directed request, prefix pruning, public Engine or
+Verification API, persistence, or `ReplState` field.
 
 The current reset is recorded in the
 [versionless Length contract report](reports/2026-08-15-versionless-length-contract.md).
+The behavior request and selection dispatch are recorded in the
+[command-authorized Length filtering report](reports/2026-08-15-command-authorized-length-filtering.md).
+Its bounded lane-local refill successor is recorded in the
+[lane-local Length survivor-refill report](reports/2026-08-15-lane-local-length-survivor-refill.md).
+The private behavior-preserving outcome seam is recorded in the
+[explicit synthesis-lane outcome report](reports/2026-08-16-explicit-synthesis-lane-outcomes.md).
+The later filter-only context runner is recorded in the
+[counterexample-bank context runner report](reports/2026-08-16-filter-only-length-counterexample-bank-context-runner.md).
+The command-local scheduler successor is recorded in the
+[command-local counterexample-bank scheduler report](reports/2026-08-16-command-local-length-counterexample-bank-scheduler.md).
+The later Engine-only observation seam is recorded in the
+[opaque detailed synthesis cursor report](reports/2026-08-16-opaque-detailed-synthesis-cursor-foundation.md).
+Its progressive Main runtime successor is recorded in the
+[same-run Length filter batching report](reports/2026-08-16-progressive-same-run-length-filter-batching.md).
 The older [one-shot contract report](reports/2026-08-13-one-shot-length-contract.md)
 and the reports below remain useful landing history, but their version routing
 and public API names are not current contracts. The historical modulo QF_LIA
@@ -860,7 +1254,8 @@ explicit. Without the startup opt-in, Main sends the opaque, nominal
 `VerificationBatch` through the exact non-strict disabled identity path, which
 performs no IO, cannot start a worker, and claims no validated ordering
 authority. With the opt-in, the Length assessor instead gives
-`sealPostVerificationBatch` opaque occurrence handles minted from that batch
+`sealPostVerificationBatch` opaque occurrence handles for ranking, minted from
+that batch
 inside a rank-2 `PostVerificationInput` epoch. Handle constructors and original
 indices are private, and nominal roles prevent coercion; handles from another
 batch inhabit a different abstract epoch and cannot be mixed without an
@@ -870,20 +1265,58 @@ or over-limit tail without comparing or forcing candidate payloads. Only
 success can construct the opaque `PostVerificationBatch`, which therefore
 carries a complete occurrence permutation rather than a pruned, duplicated,
 manufactured, substituted, or reassociated candidate batch.
+An explicit filter operation uses the distinct total-partition seal below; it
+does not weaken or overload this permutation contract.
 
-### The Length domain adapter
+### The behavioral-selection partition seal
 
-`Leant.Synth.Length.PostVerification` is the first domain adapter for that
-boundary. The Length ranker now retains each receipt's safe original index;
+`Leant.Synth.BehavioralSelection` is the separate structural boundary used by
+the hard-selection path. `withBehavioralSelectionInput` mints private
+occurrence handles from one exact `VerificationBatch` inside a fresh rank-2
+epoch. The public facade keeps the input, handle, decision, selected receipt,
+rejected receipt, and batch constructors opaque and exports no decision
+builder. A package-internal domain adapter may import
+`Leant.Synth.BehavioralSelection.Internal` to classify a supplied handle with
+one retention or rejection payload, but it cannot manufacture a handle or
+change its private original index.
+
+`sealBehavioralSelectionBatch` first bounds the candidate occurrences, then
+bounds the decision spine, requires one decision per occurrence, and checks
+each private index for range before duplication. It reconstructs the exact
+original `Verified` receipt rather than trusting a receipt in the decision,
+then emits both the selected and rejected partitions in original callback
+order, independent of decision order. Equal candidate payloads remain
+different occurrences, and the seal neither compares nor forces candidate,
+retention, or rejection payloads. Cyclic decisions stop at the caller's
+maximum plus one. An out-of-range handle is checked defensively, although the
+safe public and package-internal builders cannot construct one for the same
+epoch.
+
+This generic seal validates only a bounded total occurrence partition and its
+association with the original callback receipts. In particular,
+`BehaviorallyRejected` is not behavioral evidence: the generic layer does not
+fingerprint, replay, or validate its rejection payload, apply an
+unknown/inapplicable policy, inspect solver status, or establish a Lean proof.
+The seal therefore cannot by itself authorize filtering. The current Length
+selection adapters supply the narrower replay-only decision taxonomy, and
+Integration plus Main require explicit per-command filter authority before
+using their result. The generic boundary itself remains domain-neutral. Its
+structural landing checkpoint is described by the
+[behavioral-selection partition report](reports/2026-08-15-behavioral-selection-partition-seal.md),
+while the connected Length path is recorded in the
+[command-authorized filtering report](reports/2026-08-15-command-authorized-length-filtering.md).
+
+### The Length ranking and selection adapters
+
+`Leant.Synth.Length.PostVerification` is the scalar ranking adapter for the
+permutation boundary. The Length ranker retains each receipt's safe original
+index;
 package-private `Ranking.Internal` and `PostVerification.Internal` modules
 thread each batch-scoped occurrence handle as the only receipt-bearing field
 in transient ranking state through preparation, live assessment, stable
-partitioning, atomic fallback, and the final seal. That control flow is
-written once, in `Leant.Synth.Length.Ranking.Generic`, over a closed
-`LengthRankingDomain` class; the scalar and binary-product `Ranking.Internal`
-modules are its two instances and keep their nominal assessment, failure,
-policy, and receipt types by wrapping the shared structure in domain
-newtypes. The
+partitioning, atomic fallback, and the final seal. The scalar and
+binary-product `Ranking.Internal` modules carry that control flow as nominal
+siblings with their own assessment, failure, policy, and receipt types. The
 ordinary `Ranking` facade exports neither the associated plan nor its
 projector, while the public configuration surface exports no associated
 runner and its post-verification assessment entry points return only sealed
@@ -898,22 +1331,86 @@ that batch and summary only when projected. Policy callers may supply a
 request-owned contract. The startup bundle fixes its decoded domain-selected
 contract, while an exact
 `:synth --length-contract ... --` request can reuse that activated policy with
-one separately decoded command-local contract.
+one separately decoded command-local contract. The nominal pair stack mirrors
+these rules in `Leant.Synth.Length.SpinePair.PostVerification`.
 Input or proposal failure preserves the original opaque verification batch,
 exposes no sealed output, and withholds the unsealed associated plan.
 Operational ranking failure already
 produces an original-order all-`Unassessed` ranking and passes through the same
 seal. Main selects this path only for an explicitly loaded and activated
-policy; without one, even an explicit command contract is rejected before file
-IO and the historical no-option identity path is exact. Replayed
+policy, except that an ordinary or explicit rank command with no contract keeps
+the disabled identity when no policy is active. Without activation, any
+explicit command contract is rejected before file IO. Replayed
 counterexamples may rank and receive a bounded model-relative note, and an
 explicitly enabled complete finite-box traversal may receive a separate bounded
-positive note with checked/applicable counts and visible vacuity. Neither can
-prune or prove source behavior; raw `sat`, `unsat`, and `unknown` grant no proof
-authority. See the
+positive note with checked/applicable counts and visible vacuity. Ranking never
+prunes or proves source behavior; raw `sat`, `unsat`, and `unknown` grant no
+proof authority.
+
+`Leant.Synth.Length.Selection` and
+`Leant.Synth.Length.SpinePair.Selection` are nominal hard-selection adapters
+over those existing assessors. Their established `...WithPolicy` entrances
+keep the raw-MRU compatibility assessment. Additive package-private
+`...WithPolicyAndCounterexampleBankContext` entrances select the matching
+context-aware assessor and are the only Selection calls used by Integration's
+filter contexts. Each opens a fresh behavioral-selection epoch,
+uses the ranking report's safe original index to select the matching private
+occurrence handle, and makes one total decision. Candidate-local preparation
+refusal, `Unassessed`, every heuristic solver status, `BoundedPositive`, and
+`ApplicableDomainEstablished` are explicit retention classes. Only an
+independently replayed `Counterexample` becomes a rejection, carrying that
+domain's exact final replay receipt and optional simplification metadata. A raw
+`sat`, `unsat`, or `unknown` never rejects.
+
+The adapter then invokes the generic total-partition seal. Success exposes
+opaque, intrinsically associated `BehaviorallySelected` and
+`BehaviorallyRejected` wrappers in original callback order. Decision order and
+the ranking permutation have no selection-order authority. Every
+post-verification, ranking, ranking-absence, original-index, candidate/decision
+limit, or seal failure instead returns one preserve-all result containing the
+literal original `VerificationBatch`; no partial rejection escapes. Scalar and
+pair retentions, rejections, failures, and results cannot be cast across the
+domain boundary. Preserve-all rolls back the candidate partition only; any
+context transitions completed while constructing the failed report remain.
+
+`Leant.Synth.Length.Presentation` traverses selected and rejected wrappers
+directly, without zipping candidate text to detached evidence. Retained finite-
+box and applicable-domain evidence keeps the existing positive note. Rejection
+uses the existing bounded counterexample or simplification renderer verbatim.
+Main binds only the survivor presentations as `itN` and prints omitted
+occurrences separately as `rejected`. An accepted all-rejected partition is a
+handled batch result but remains pending in the command accumulation. It may
+consume the one permitted same-run successor; only a completed continuing run
+may enter the next provider or classical route, with no new binding or
+immediate cache mutation. Final aggregate all-rejection prints every
+accumulated row and clears the old synthesis-splice cache once. A later terminal
+survivor or preserve-all batch prints its candidate rows before the retained
+earlier rejections. Partial and zero-rejection selections remain terminal. Assessment
+failure prints one mode-neutral preserve-all warning, retains the complete
+verification batch, and shows at most five unannotated original candidates.
+
+The established ranking and direct Selection compatibility paths still obtain
+their assessments through one fresh raw four-entry batch-local MRU. The
+Integration filter path instead uses the supplied nominal context bank. Both
+stores retain inputs rather than verdicts; a later occurrence must independently
+replay and associate a sample against its own checked problem before it can be
+rejected. Main supplies one filter context across every assessment in a
+command; Integration's fresh-per-call compatibility wrapper remains available
+to other callers. No behavior mode, context, replay bank, contract request, or
+selection result enters `ReplState`.
+
+The ranking foundation is detailed in the
 [post-verification assessment seam report](reports/2026-08-11-post-verification-assessment-seam.md)
 and the
 [explicit integration report](reports/2026-08-12-explicit-length-ranking-integration.md).
+The hard-selection adapter and command integration are specified by the
+[command-authorized Length filtering report](reports/2026-08-15-command-authorized-length-filtering.md),
+with the historical lane-local scheduling checkpoint in the
+[survivor-refill report](reports/2026-08-15-lane-local-length-survivor-refill.md).
+The context-aware successor is recorded in the
+[filter-only bank runner report](reports/2026-08-16-filter-only-length-counterexample-bank-context-runner.md).
+Its Main scheduler successor is recorded in the
+[command-local counterexample-bank scheduler report](reports/2026-08-16-command-local-length-counterexample-bank-scheduler.md).
 
 ## Provider instantiation evidence
 

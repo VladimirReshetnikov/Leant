@@ -39,6 +39,8 @@ Executable leant
     Leant.Options
     Leant.Session.Replay
     Leant.Session.Snapshot
+    Leant.Synth.BehavioralSelection
+    Leant.Synth.BehavioralSelection.Internal
     Leant.Synth.Engine
     Leant.Synth.Fragment
     Leant.Synth.Length.Adapter
@@ -46,6 +48,7 @@ Executable leant
     Leant.Synth.Length.Configuration
     Leant.Synth.Length.Configuration.File
     Leant.Synth.Length.Configuration.File.Acquire
+    Leant.Synth.Length.CounterexampleBank.Internal
     Leant.Synth.Length.Contract
     Leant.Synth.Length.Contract.File
     Leant.Synth.Length.Contract.File.Acquire
@@ -56,12 +59,15 @@ Executable leant
     Leant.Synth.Length.PostVerification.Internal
     Leant.Synth.Length.Presentation
     Leant.Synth.Length.Ranking
-    Leant.Synth.Length.Ranking.Generic
     Leant.Synth.Length.Ranking.Internal
+    Leant.Synth.Length.Selection
+    Leant.Synth.Length.Selection.Internal
     Leant.Synth.Length.SpinePair.PostVerification
     Leant.Synth.Length.SpinePair.PostVerification.Internal
     Leant.Synth.Length.SpinePair.Ranking
     Leant.Synth.Length.SpinePair.Ranking.Internal
+    Leant.Synth.Length.SpinePair.Selection
+    Leant.Synth.Length.SpinePair.Selection.Internal
     Leant.Synth.Observability
     Leant.Synth.PostVerification
     Leant.Synth.ProviderCache
@@ -98,6 +104,8 @@ Test-Suite leant-synth-tests
   Other-Modules:
     Leant.Backend
     Leant.Options
+    Leant.Synth.BehavioralSelection
+    Leant.Synth.BehavioralSelection.Internal
     Leant.Synth.Engine
     Leant.Synth.Fragment
     Leant.Synth.Length.Adapter
@@ -105,6 +113,7 @@ Test-Suite leant-synth-tests
     Leant.Synth.Length.Configuration
     Leant.Synth.Length.Configuration.File
     Leant.Synth.Length.Configuration.File.Acquire
+    Leant.Synth.Length.CounterexampleBank.Internal
     Leant.Synth.Length.Contract
     Leant.Synth.Length.Contract.File
     Leant.Synth.Length.Contract.File.Acquire
@@ -115,12 +124,15 @@ Test-Suite leant-synth-tests
     Leant.Synth.Length.PostVerification.Internal
     Leant.Synth.Length.Presentation
     Leant.Synth.Length.Ranking
-    Leant.Synth.Length.Ranking.Generic
     Leant.Synth.Length.Ranking.Internal
+    Leant.Synth.Length.Selection
+    Leant.Synth.Length.Selection.Internal
     Leant.Synth.Length.SpinePair.PostVerification
     Leant.Synth.Length.SpinePair.PostVerification.Internal
     Leant.Synth.Length.SpinePair.Ranking
     Leant.Synth.Length.SpinePair.Ranking.Internal
+    Leant.Synth.Length.SpinePair.Selection
+    Leant.Synth.Length.SpinePair.Selection.Internal
     Leant.Synth.Observability
     Leant.Synth.PostVerification
     Leant.Synth.ProviderCache

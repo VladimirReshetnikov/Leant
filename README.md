@@ -40,8 +40,8 @@ There is a manual: **[docs/Leant.pdf](https://raw.githubusercontent.com/Vladimir
 - [Highlights](#highlights)
 - [Getting started](#getting-started)
 - [Usage](#usage) — command-line options and the command table
-- [Interactive proving — `:prove`](#interactive-proving-prove)
-- [`:synth` — automatic term synthesis](#synth-automatic-term-synthesis)
+- [Interactive proving — `:prove`](#interactive-proving--prove)
+- [`:synth` — automatic term synthesis](#synth--automatic-term-synthesis)
   - [Higher-order plumbing](#higher-order-plumbing)
   - [Programs you already know](#programs-you-already-know)
   - [Rank-N and impredicative goals](#rank-n-and-impredicative-goals)
@@ -60,7 +60,7 @@ Companion documents:
 
 - the **[manual](docs/Leant.pdf)** — tutorial and `:synth` tour;
 - **[docs/length-ranking.md](docs/length-ranking.md)** — the complete
-  Length counterexample-ranking reference;
+  Length counterexample-ranking and replay-authorized filtering reference;
 - **[docs/synth-internals.md](docs/synth-internals.md)** — the design
   boundaries and dated-report index behind `:synth`;
 - the **[Z3 behavioral synthesis proposal](docs/Z3_Behavioral_Synthesis_Proposal/Z3_Behavioral_Synthesis_Proposal.pdf)**
@@ -144,14 +144,77 @@ bare stdlib session with subsecond startup. Expressions evaluate via
 `inductive`, `open`, …) run verbatim and, on success, advance the
 session environment; `#`-commands pass straight through.
 
-Finite-list-spine **Length counterexample ranking** is an optional last
-stage that consults Z3 about the behavior of verified candidates and stably
-reorders them; it is off unless you pass `--length-ranking-config`, it never
-prunes, and raw solver status carries no authority. The complete reference —
-the current versionless startup and contract-only schemas (`rankingDomain` is
-`scalar` or `binary-product`), replay bank,
-origin probe, bounded validation, and presentation notes — is
+Finite-list-spine **Length behavioral assessment** is an optional last stage
+that consults Z3 about already verified candidates. Passing
+`--length-ranking-config` activates one startup policy and scalar-or-pair
+contract. Ordinary `:synth TYPE`, explicit `--behavior-mode rank`, and a
+contract-only command with no behavior mode all keep the established stable
+ranking and its historical five-success verification frontier. An explicit
+`:synth --behavior-mode filter -- TYPE` may instead omit only candidates with
+an independently replayed counterexample to the activated startup contract;
+adding `--length-contract ABSOLUTE-PATH` uses that passive contract for this
+command. Filtering consumes each ordinary lazy engine result through one
+opaque cursor. It verifies and assesses a first batch of at most 12 groups for
+a standalone engine or 24 for `both`; only no verification or complete
+behavioral rejection may request one successor batch of the same width. Thus
+an ordinary filter run can inspect at most 12+12 or 24+24 groups without
+rerunning synthesis. The excluded-middle classical route remains one six-group
+batch, while double negation uses the ordinary policy and a filter-only Djinn
+candidate cutoff of 60. Rank and disabled commands retain one batch. Every
+returned batch is verified and assessed exactly once, so a later same-run
+survivor can replace early behavioral rejections without reassessing earlier
+work. Before goal translation, Main introduces one rank-2 assessment context
+for the admitted command. Its lexical
+lifetime spans universe retries and every ordinary, provider, and classical
+lane. A filter context therefore owns one nominal scalar or product
+counterexample bank for the complete command, tries retained samples newest
+first, and freshly replays every attempt against the later same-scope
+candidate. Ordinary and explicit ranking keep the established raw four-vector
+MRU path unchanged; their contexts contain no bank.
+
+Failure to verify any candidate and successful behavioral all-rejection are
+distinct continuing batch results. In the first ordinary filter batch, either
+may consume the one same-run successor. Only after that run finishes may its
+continuing result enter the next provider or classical route, carrying the
+complete chronological spelling frontier into provider deduplication. A
+survivor or preserve-all assessment result remains terminal. This does not fill
+a five-survivor quota within a run or across routes: the first batch with any
+survivor stops scheduling, display and binding remain capped at five, and every
+rejection accumulated before that terminal batch stays visible. Raw `sat`,
+`unsat`, and `unknown`, preparation
+refusal, unassessed input, and positive bounded evidence never authorize
+rejection or continuation as all-rejected. Any adapter, ranking, association,
+or partition-seal failure preserves the complete internal verified batch and
+presents at most five candidates, although already completed bank transitions
+are cache effects and are not rolled back.
+
+One deferred command finalizer owns result metrics, warnings, bindings, cache
+mutation, candidate and rejection rows, and handled-batch notes. Complete
+spelling frontiers, observations, and debug group ordinals remain chronological
+across the at-most-two batches. Ordinary run notes attach once to the rightmost
+handled batch; an all-no-verification run retains them only for its final
+diagnostic, and classical handled outcomes remain note-free. Ordinary
+all-rejected exhaustion suppresses an unrelated no-term or Lean-verification
+diagnostic. A retained structural refutation still gates classical search and
+masks provider timeout/error as before, while completed batch outcomes remain
+accounted for; without that fallback, completed outcomes are finalized before
+the unchanged abnormal diagnostic. Filter mode keeps the original absolute
+command deadline through both batches and both classical routes. Rank and
+disabled modes retain the historical classical policy: each reached excluded-
+middle and double-negation route independently receives a fresh configured-
+duration deadline; a zero timeout remains unbounded. This is a bounded command-
+local reuse and continuation slice, not a persistent or quota-filling CEGIS
+loop. There is no third cursor probe, engine rerun, batch reassessment, or
+survivor quota fill, and no context or bank enters `ReplState`, history,
+snapshots, or another command.
+The complete reference — including the fixed command grammar, current
+versionless startup and contract-only schemas (`rankingDomain` is `scalar` or
+`binary-product`), unchanged raw rank MRU, one lexical command assessment
+context and filter bank, origin probe, bounded validation, rejection rules,
+and presentation — is
 [docs/length-ranking.md](docs/length-ranking.md).
+The exact progressive Main landing and validation evidence are recorded in the
+[progressive same-run Length filter batching report](docs/reports/2026-08-16-progressive-same-run-length-filter-batching.md).
 
 Applicable-domain ranking now has one current recursive piecewise-affine
 algorithm. Library callers use
@@ -183,7 +246,8 @@ members of `applicableDomainValidation`; see the
 | `:search TEXT` | case-insensitive name search over the environment |
 | `:search? TYPE` | proof search: what proves TYPE? (via `exact?`) |
 | `:synth TYPE` | verified term synthesis (see below) |
-| `:synth --length-contract ABSOLUTE-PATH -- TYPE` | use one passive scalar-or-pair Length contract selection for this synthesis command |
+| `:synth --behavior-mode rank\|filter -- TYPE` | explicitly choose the operation; disabled `rank` is identity, while `filter` requires an activated startup Length policy |
+| `:synth [--behavior-mode rank\|filter] --length-contract ABSOLUTE-PATH -- TYPE` | use one passive scalar-or-pair Length contract for this command; omitted mode means `rank` |
 | `:prove [PROP]` | interactive prove mode; bare form resumes the last `sorry` |
 | `:set OPT VAL` | `set_option` persisting in the session |
 | `:undo` | revert the last state-changing command |
@@ -698,9 +762,11 @@ translation had to hide structure behind an opaque atom, the verdict
 backs off to "no term found within bounds". The proof is complete for the
 provider-free structural calculus, but it is only a fallback with respect to
 the live Lean environment. Leant still runs its bounded constructive provider
-lanes, and the first candidate that Lean verifies wins. If provider discovery
-is empty or unavailable, times out, or yields no verified candidate, Leant
-restores the original proof-backed refutation. Provider discovery is
+lanes, and the first candidate retained by behavioral assessment wins. If
+provider discovery is empty or unavailable, times out, errors, yields no
+verified candidate, or has every verified candidate independently rejected,
+Leant restores the original proof-backed control-flow fallback. Completed
+behavioral outcomes remain accumulated. Provider discovery is
 intentionally bounded and best-effort, so that verdict is not an exhaustive
 claim about every axiom or declaration in the environment.
 
@@ -718,8 +784,16 @@ rank-N assignment, and retention of refutation for an unusable provider.
 After those constructive provider lanes fail, refuted `Prop` goals get a
 classical attempt
 (disable with `:set synth-classical off`): first with an
-excluded-middle case split per atomic subformula, then via the Glivenko
-double-negation translation wrapped in `Classical.byContradiction`.
+excluded-middle case split per atomic subformula, then—after either no
+verification or complete behavioral all-rejection—via the Glivenko double-
+negation translation wrapped in `Classical.byContradiction`. Excluded middle
+remains one six-group batch. A filter-mode double-negation run may consume its
+ordinary 12+12 or 24+24 frontier, while rank and disabled modes consume one
+12- or 24-group batch. Both attempts use the same command-local assessment
+context and are finalized together. Filtering also keeps the command's
+original absolute deadline through both routes; rank and disabled commands
+allocate a fresh configured-duration deadline separately at each route they
+actually reach.
 Peirce's law has no constructive inhabitant — `:synth` proves that,
 then answers the classical question with a term whose spelling shows
 exactly what was used:
@@ -997,8 +1071,12 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   Within each Exference invocation, Leant stable-deduplicates rendered groups
   before applying the internal 60-candidate collection window. The first
   spelling remains authoritative, while repeated backend derivations cannot
-  consume slots ahead of later distinct terms; the outer 12/24-group
-  verification frontiers then apply as above. Combined exact-text deduplication
+  consume slots ahead of later distinct terms. Ranking and disabled commands
+  retain one outer 12/24-group batch and ranking stops after five accepted
+  groups. Filtering may consume one successor of the same width after a first
+  no-verification or all-rejected batch, for a 12+12 standalone or 24+24
+  combined maximum from the same engine outcome, before its five-survivor
+  presentation cap. There is no third probe. Combined exact-text deduplication
   likewise keeps the first display occurrence. If that occurrence has no typed
   authority, the exact spelling may lazily retain the first bounded later
   Exference origin solely for checked behavioral preparation; route metrics,
@@ -1007,21 +1085,28 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   complete, terminating LJT search.
 - Every engine mode gives a structurally accepted goal a provider-free
   baseline lane. Its rendered candidates are checked by Lean first, and live
-  providers are discovered whenever no baseline term verifies. A complete
+  providers are discovered whenever no baseline term verifies or an authorized
+  filter rejects every verified baseline occurrence. The same command-local
+  filter bank and accumulated rejection history cross those runs. A complete
   Djinn refutation is retained provisionally while the constructive provider
-  lanes run: the first Lean-verified provider candidate wins, while empty,
-  unavailable, timed-out, or unsuccessful provider search restores the
-  proof-backed refutation. Only then does the explicit classical fallback run.
+  lanes run: the first batch with any surviving or preserve-all result wins,
+  while empty, all-rejected, unavailable, timed-out, or unsuccessful provider
+  search restores the proof-backed control-flow fallback. Completed provider
+  outcomes are not discarded. Only then does the explicit classical fallback
+  run.
   Provider-eligible atomic/refused goals go directly to provider search.
   Djinn first isolates the highest-ranked provider, then widens through the
   first 4 and 16 providers before the full bounded inventory after verified
   misses; Exference keeps its internally rated full-inventory lane. Combined
   mode runs both engines for the singleton and full lanes but uses Djinn alone
-  for the intermediate prefixes. All lanes consume one command-wide
-  `LEANT_SYNTH_TIMEOUT` deadline. Before a later lane is forced or capped,
-  spellings that already failed Lean are removed from each source stream and
-  newly empty groups are dropped. Rediscovered failures therefore consume no
-  fresh quota. This policy
+  for the intermediate prefixes. Baseline and provider lanes consume one
+  command-wide `LEANT_SYNTH_TIMEOUT` deadline, including both batches of a
+  filter run. Before a later provider lane is forced or capped, every spelling
+  in an earlier completed no-verified or all-rejected run frontier is removed
+  from each source stream and newly empty groups are dropped.
+  Rediscovered candidates therefore consume no fresh lane quota. Continuation
+  does not collect five survivors across lanes: one survivor is terminal. This
+  policy
   deliberately favors a structural solution over breadth: provider
   alternatives are not enumerated after a baseline term succeeds. See the
   dated
@@ -1090,8 +1175,12 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   guard (default 20 s, `LEANT_SYNTH_TIMEOUT=N`, `0` waits indefinitely)
   covers quantified goals whose bounded instantiation widens the
   space. The same deadline covers the baseline and every provider fallback
-  rather than restarting for each lane; hitting it is reported as "no answer",
-  never as a verdict.
+  rather than restarting for each lane; filter mode carries that original
+  absolute deadline through excluded middle and double negation as well. Rank
+  and disabled modes preserve their historical classical budgets by capturing
+  an independent fresh configured duration at each classical route actually
+  reached. Hitting any such boundary is reported as "no answer", never as a
+  verdict.
 - `LEANT_SYNTH_DEBUG=1` prints the translated fragment, discovered providers,
   rendered variants, and stable `code=count` verification metrics — the
   fastest way to see why a candidate was dropped and how much Lean work the
@@ -1137,13 +1226,15 @@ A `:synth` query passes through checked stages. A Lean metaprogram
 serializes it into the engine's fragment; the fragment translator accepts
 it or refuses with a reason. The engine first searches without providers
 and the backend re-elaborates its rendered candidates against the original
-goal; only if no provider-free term verifies does a second metaprogram build
-the bounded live-provider inventory and run the fallback lanes described
+goal; only if no provider-free term verifies, or an authorized filter rejects
+all verified baseline occurrences, does a second metaprogram build the bounded
+live-provider inventory and run the fallback lanes described
 under [Engines, budgets, and the fine print](#engines-budgets-and-the-fine-print).
 A complete Djinn refutation is kept as a sound fallback while those
-constructive lanes run and restored if they find nothing. Constructor and
+constructive lanes run and restored if they find no survivor. Constructor and
 exact provider names are restored and binders named by role before every
-verification; only survivors are shown and bound.
+verification; only survivors are bound, while accumulated behavioral
+rejections remain separately visible.
 
 The synthesis side environment tracks exactly which session history it
 has replayed. An unchanged history reuses it directly; an append replays
