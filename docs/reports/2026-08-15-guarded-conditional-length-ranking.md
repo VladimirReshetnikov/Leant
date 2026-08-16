@@ -177,8 +177,8 @@ promise that every future decoder will accept the same shapes.
 ## Frozen validation
 
 The final vendored documentation snapshot is
-`a9150c776237a74928157ed7c562fda5ccbb957b`; Leant pins it in
-`32059c2c39f4bb48e918c16fa46a26b4c919305d`. Leant's guarded tandem test landed
+`a9150c77623767f187d64af5d3cd75ec1194f67b`; Leant pins it in
+`32059c2c39f42d30a62a25b58369669e4ae64c58`. Leant's guarded tandem test landed
 earlier in `a93e7f2ca3e501d4be6158ef817261632644cba7`.
 
 At that frozen source checkpoint:
