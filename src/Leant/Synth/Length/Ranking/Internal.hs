@@ -395,6 +395,8 @@ data AssociatedRankedLengthCandidate association =
 
 type role AssociatedRankedLengthCandidate nominal
 
+-- | The caller-owned occurrence handle this assessment was derived from.
+-- This is the only receipt-bearing projection of the transient record.
 associatedRankedLengthCandidateAssociation
   :: AssociatedRankedLengthCandidate association
   -> association
@@ -408,6 +410,8 @@ data AssociatedLengthRanking association = AssociatedLengthRanking
 
 type role AssociatedLengthRanking nominal
 
+-- | Every admitted associated candidate, reordered only by a successful
+-- assessment; on failure they stay in original order, all 'Unassessed'.
 associatedLengthRankingCandidates
   :: AssociatedLengthRanking association
   -> [AssociatedRankedLengthCandidate association]
@@ -479,12 +483,16 @@ sealPostVerificationLengthRanking maximumCandidates input associated = do
       in verified `seq` projected `seq`
           projectCandidates (projected : reversed) rest
 
+-- | The sealed permutation batch, the sole owner of the verified receipts
+-- behind this ranking.  Its candidates are in ranked order.
 postVerificationLengthRankingBatch
   :: PostVerificationLengthRanking
   -> PostVerificationBatch DetailedVerificationVariant
 postVerificationLengthRankingBatch
     (PostVerificationLengthRanking batch _ _) = batch
 
+-- | The batch-wide sanitized failure retained from the sealed associated
+-- ranking, when its candidates were left 'Unassessed'.
 postVerificationLengthRankingFailure
   :: PostVerificationLengthRanking
   -> Maybe LengthRankingFailure
@@ -1039,6 +1047,11 @@ rankPostVerificationLengthCandidatesWithRankingPoliciesAndCounterexampleBankCont
     simplificationPolicy
 
 
+-- | Budgeted sibling of the counterexample-bank filter entrance.  Like the
+-- bank-free budgeted runner, admission stays outside the shared owner and all
+-- preparation, live work, and the caller's final transform run beneath the one
+-- captured usable-work deadline, but counterexample replay and recording go
+-- through the supplied command-local bank instead of the batch-local MRU.
 rankPostVerificationLengthCandidatesWithRankingPoliciesAndCounterexampleBankContextAndUsableWorkBudget
   :: (AssociatedLengthRanking
         (PostVerificationCandidate epoch DetailedVerificationVariant)
@@ -1074,6 +1087,10 @@ rankPostVerificationLengthCandidatesWithRankingPoliciesAndCounterexampleBankCont
     simplificationPolicy
 
 
+-- | Scoped/checkpointed sibling of the counterexample-bank filter entrance.
+-- It selects the same-thread scoped owner with explicit bounded-phase
+-- checkpoints while replaying and recording counterexamples through the
+-- supplied command-local bank instead of the batch-local MRU.
 rankPostVerificationLengthCandidatesWithRankingPoliciesAndCounterexampleBankContextAndScopedUsableWorkBudget
   :: (AssociatedLengthRanking
         (PostVerificationCandidate epoch DetailedVerificationVariant)
@@ -2148,6 +2165,8 @@ advanceLengthCounterexampleBankCursor evaluation index query acquisition
       LengthCounterexampleFromCommandReplay _ ->
         CounterexampleBank.LengthCounterexampleBankReceiptFromSolverIndependentReplay
 
+-- | Replay the batch-local seed bank against one checked query, MRU first,
+-- returning the first vector that independently yields a counterexample.
 -- A seed is only an input vector from an exact receipt.  The later checked
 -- query independently evaluates that vector against its own retained problem
 -- and associates the resulting evidence back to that problem; no earlier
@@ -2178,6 +2197,8 @@ replayCounterexampleSeeds evaluation query =
 counterexampleSeedBankMaximumEntries :: Int
 counterexampleSeedBankMaximumEntries = 4
 
+-- | Promote one counterexample input vector to the front of the batch-local
+-- seed bank.
 -- Insert at the MRU end, remove every exact duplicate, retain at most the four
 -- newest distinct vectors, and force that bounded value before it is retained
 -- across another candidate.  The bank never contains receipts or query

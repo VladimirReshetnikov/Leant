@@ -1014,6 +1014,11 @@ rankPostVerificationLengthCandidatesWithPolicyAndCounterexampleBankContext
           inputBoxPreference
           preferNonVacuousBoundedPositiveAssociatedLengthRanking
 
+-- | Filter-mode sibling of 'assessVerifiedLengthCandidatesWithPolicy'.  The
+-- same policy selects the eager, budgeted, or scoped runner, but counterexample
+-- replay and recording go through the supplied command-local bank instead of
+-- the batch-local seed bank; the report is still exposed only through the
+-- generative occurrence-permutation seal.
 assessVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext
   :: LengthRankingPolicy
   -> CounterexampleBank.LengthCounterexampleBankContext
@@ -1161,6 +1166,11 @@ rankPostVerificationLengthSpinePairCandidatesWithPolicyAndCounterexampleBankCont
           inputBoxPreference
           preferNonVacuousBoundedPositiveAssociatedLengthSpinePairRanking
 
+-- | Filter-mode sibling of 'assessVerifiedLengthSpinePairCandidatesWithPolicy'.
+-- The same policy selects the eager, budgeted, or scoped pair runner, but
+-- counterexample replay and recording go through the supplied command-local
+-- pair bank instead of the batch-local seed bank; the report is still exposed
+-- only through the pair-specific occurrence seal.
 assessVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
   :: LengthRankingPolicy
   -> CounterexampleBank.LengthSpinePairCounterexampleBankContext

@@ -140,17 +140,24 @@ data LengthCounterexampleBankState identity =
 
 type role LengthCounterexampleBankState nominal
 
+-- | An uninitialized scalar state owning the supplied validated limits and no
+-- active bank.  The limits are not inspected; the first replay or recording
+-- transition supplies the scope of the bank it creates.
 emptyLengthCounterexampleBankState
   :: LengthCounterexampleBankLimits
   -> LengthCounterexampleBankState identity
 emptyLengthCounterexampleBankState limits =
   LengthCounterexampleBankState limits Nothing
 
+-- | 'emptyLengthCounterexampleBankState' at Djex's
+-- 'defaultLengthCounterexampleBankLimits'.
 defaultLengthCounterexampleBankState
   :: LengthCounterexampleBankState identity
 defaultLengthCounterexampleBankState = emptyLengthCounterexampleBankState
   defaultLengthCounterexampleBankLimits
 
+-- | The state's sole active bank, or 'Nothing' until a replay or recording
+-- transition has ensured one for a query's scope.
 lengthCounterexampleBankStateActiveBank
   :: LengthCounterexampleBankState identity
   -> Maybe (LengthCounterexampleBank identity)
@@ -177,6 +184,8 @@ withLengthCounterexampleBankContext limits action = do
   state <- newMVar $ emptyLengthCounterexampleBankState limits
   action $ LengthCounterexampleBankContext state
 
+-- | 'withLengthCounterexampleBankContext' at Djex's
+-- 'defaultLengthCounterexampleBankLimits'.
 withDefaultLengthCounterexampleBankContext
   :: (forall command.
       LengthCounterexampleBankContext command identity -> IO result)
@@ -241,6 +250,8 @@ data LengthCounterexampleBankReplayHit identity =
 
 type role LengthCounterexampleBankReplayHit nominal
 
+-- | The fresh current-query receipt established by replaying the hit's
+-- retained scalar sample.
 lengthCounterexampleBankReplayHitCounterexample
   :: LengthCounterexampleBankReplayHit identity
   -> ValidatedLengthCounterexample
@@ -338,6 +349,8 @@ newtype LengthCounterexampleBankContextReplayHit command identity =
 
 type role LengthCounterexampleBankContextReplayHit nominal nominal
 
+-- | The fresh current-query receipt carried by a command-nominal scalar
+-- replay hit; see 'lengthCounterexampleBankReplayHitCounterexample'.
 lengthCounterexampleBankContextReplayHitCounterexample
   :: LengthCounterexampleBankContextReplayHit command identity
   -> ValidatedLengthCounterexample
@@ -421,6 +434,11 @@ forceEitherClassification classified = case classified of
 
 -- Scalar promotion ---------------------------------------------------------
 
+-- | Why one explicit scalar replay hit was not promoted.  The scope and
+-- membership cases are structural invariant failures: the hit's scope no
+-- longer matches the active bank, or its exact sample is no longer retained
+-- there.  Insertion rejection carries Djex's bank error.  Every failure
+-- leaves the state unchanged.
 data LengthCounterexampleBankPromotionFailure
   = LengthCounterexampleBankPromotionScopeInvariant
   | LengthCounterexampleBankPromotionMembershipInvariant
@@ -461,6 +479,9 @@ promoteLengthCounterexampleBankReplayHit
         Right promoted ->
           (replaceLengthCounterexampleBank promoted state, Right ())
 
+-- | 'promoteLengthCounterexampleBankReplayHit' as one serialized transition
+-- of the owner which minted the hit.  The shared command tag ties the hit to
+-- that owner; a failure leaves the owner's state unchanged.
 promoteLengthCounterexampleBankReplayHitInContext
   :: LengthCounterexampleBankContextReplayHit command identity
   -> LengthCounterexampleBankContext command identity
@@ -481,6 +502,12 @@ data LengthCounterexampleBankReceiptOrigin
   | LengthCounterexampleBankReceiptFromSimplificationReplay
   deriving (Bounded, Enum, Eq, Ord, Show)
 
+-- | Why one fresh scalar receipt was not recorded.  Scope invariant is a
+-- structural failure after the active bank has been ensured; the remaining
+-- cases are Djex's input-replay refusals and a receipt whose fresh replay
+-- against the current query reproduced no counterexample.  Ordinary bounded
+-- unavailability is reported through 'LengthCounterexampleBankRecordOutcome'
+-- instead.
 data LengthCounterexampleBankRecordFailure
   = LengthCounterexampleBankRecordScopeInvariant
   | LengthCounterexampleBankRecordEvaluationRejected !LengthEvaluationError
@@ -498,6 +525,13 @@ data LengthCounterexampleBankRecordOutcome
       !LengthCounterexampleBankError
   deriving (Eq, Show)
 
+-- | Record one freshly established scalar receipt in the active same-scope
+-- bank.
+--
+-- The state is first ensured for the query's scope.  Djex freshly replays
+-- the receipt's inputs against the current query before inserting only those
+-- inputs under the mapped origin; the bank returned by that recording bridge
+-- replaces the active bank for every classification.
 recordLengthCounterexampleBankReceipt
   :: LengthEvaluationLimits
   -> LengthSMTLibQuery identity local
@@ -542,6 +576,9 @@ recordLengthCounterexampleBankReceipt evaluationLimits query origin
       Right $ LengthCounterexampleBankRecordInsertionUnavailable failure
     Right fresh -> Right $ LengthCounterexampleBankRecorded fresh
 
+-- | 'recordLengthCounterexampleBankReceipt' as one serialized transition of
+-- a mutable scalar owner.  The forced successor state is committed for both
+-- classifications.
 recordLengthCounterexampleBankReceiptInContext
   :: LengthEvaluationLimits
   -> LengthSMTLibQuery identity local
@@ -570,6 +607,10 @@ scalarReceiptOrigin origin = case origin of
 
 -- Binary-product ownership -------------------------------------------------
 
+-- | Validated binary-product limits and zero or one active same-scope bank;
+-- the pair-domain sibling of 'LengthCounterexampleBankState'.  Both fields
+-- likewise remain lazy, so constructing an empty state inspects no limits and
+-- needs no query.
 data LengthSpinePairCounterexampleBankState identity =
   LengthSpinePairCounterexampleBankState
     LengthSpinePairCounterexampleBankLimits
@@ -577,30 +618,44 @@ data LengthSpinePairCounterexampleBankState identity =
 
 type role LengthSpinePairCounterexampleBankState nominal
 
+-- | An uninitialized binary-product state owning the supplied validated
+-- limits and no active bank.  The limits are not inspected; the first replay
+-- or recording transition supplies the scope of the bank it creates.
 emptyLengthSpinePairCounterexampleBankState
   :: LengthSpinePairCounterexampleBankLimits
   -> LengthSpinePairCounterexampleBankState identity
 emptyLengthSpinePairCounterexampleBankState limits =
   LengthSpinePairCounterexampleBankState limits Nothing
 
+-- | 'emptyLengthSpinePairCounterexampleBankState' at Djex's
+-- 'defaultLengthSpinePairCounterexampleBankLimits'.
 defaultLengthSpinePairCounterexampleBankState
   :: LengthSpinePairCounterexampleBankState identity
 defaultLengthSpinePairCounterexampleBankState =
   emptyLengthSpinePairCounterexampleBankState
     defaultLengthSpinePairCounterexampleBankLimits
 
+-- | The state's sole active bank, or 'Nothing' until a replay or recording
+-- transition has ensured one for a query's scope.
 lengthSpinePairCounterexampleBankStateActiveBank
   :: LengthSpinePairCounterexampleBankState identity
   -> Maybe (LengthSpinePairCounterexampleBank identity)
 lengthSpinePairCounterexampleBankStateActiveBank
     (LengthSpinePairCounterexampleBankState _ active) = active
 
+-- | One command-owned mutable binary-product bank; the pair-domain sibling
+-- of 'LengthCounterexampleBankContext'.  The fresh nominal command tag
+-- likewise prevents a replay hit from one owner from being promoted through
+-- another owner, and mutation stays private to the transition functions
+-- below.
 newtype LengthSpinePairCounterexampleBankContext command identity =
   LengthSpinePairCounterexampleBankContext
     (MVar (LengthSpinePairCounterexampleBankState identity))
 
 type role LengthSpinePairCounterexampleBankContext nominal nominal
 
+-- | Introduce a fresh empty binary-product owner with caller-validated
+-- limits.
 withLengthSpinePairCounterexampleBankContext
   :: LengthSpinePairCounterexampleBankLimits
   -> (forall command.
@@ -610,6 +665,8 @@ withLengthSpinePairCounterexampleBankContext limits action = do
   state <- newMVar $ emptyLengthSpinePairCounterexampleBankState limits
   action $ LengthSpinePairCounterexampleBankContext state
 
+-- | 'withLengthSpinePairCounterexampleBankContext' at Djex's
+-- 'defaultLengthSpinePairCounterexampleBankLimits'.
 withDefaultLengthSpinePairCounterexampleBankContext
   :: (forall command.
       LengthSpinePairCounterexampleBankContext command identity -> IO result)
@@ -618,6 +675,9 @@ withDefaultLengthSpinePairCounterexampleBankContext =
   withLengthSpinePairCounterexampleBankContext
     defaultLengthSpinePairCounterexampleBankLimits
 
+-- | Take an immutable diagnostic snapshot of a binary-product owner.  As for
+-- the scalar owner, there is no setter and no context constructor which
+-- accepts an earlier snapshot.
 readLengthSpinePairCounterexampleBankContextState
   :: LengthSpinePairCounterexampleBankContext command identity
   -> IO (LengthSpinePairCounterexampleBankState identity)
@@ -648,17 +708,25 @@ replaceLengthSpinePairCounterexampleBank bank
 
 -- Binary-product replay ----------------------------------------------------
 
+-- | A post-ensure structural invariant failure while traversing exact
+-- retained binary-product samples.
 data LengthSpinePairCounterexampleBankReplayFailure
   = LengthSpinePairCounterexampleBankReplayScopeInvariant
   | LengthSpinePairCounterexampleBankReplayMembershipInvariant
   deriving (Eq, Ord, Show)
 
+-- | One ordinary per-sample binary-product refusal.  It is retained in
+-- newest-first attempt order while traversal continues with the charged
+-- successor bank.
 data LengthSpinePairCounterexampleBankReplayRefusal
   = LengthSpinePairCounterexampleBankReplayEvaluationRefused
       !LengthSpinePairEvaluationError
   | LengthSpinePairCounterexampleBankReplayAssociationRefused
   deriving (Eq, Ord, Show)
 
+-- | One exact retained binary-product sample and the fresh current-query
+-- receipt produced by replaying it.  The private scope/sample association is
+-- required for a later explicit no-evaluation promotion.
 data LengthSpinePairCounterexampleBankReplayHit identity =
   LengthSpinePairCounterexampleBankReplayHitValue
     (LengthSpinePairCounterexampleBankScope identity)
@@ -667,6 +735,8 @@ data LengthSpinePairCounterexampleBankReplayHit identity =
 
 type role LengthSpinePairCounterexampleBankReplayHit nominal
 
+-- | The fresh current-query receipt established by replaying the hit's
+-- retained binary-product sample.
 lengthSpinePairCounterexampleBankReplayHitCounterexample
   :: LengthSpinePairCounterexampleBankReplayHit identity
   -> ValidatedLengthSpinePairCounterexample
@@ -674,6 +744,9 @@ lengthSpinePairCounterexampleBankReplayHitCounterexample
     (LengthSpinePairCounterexampleBankReplayHitValue _ _ counterexample) =
   counterexample
 
+-- | Whole-bank binary-product replay result.  Exhaustion is an ordinary miss
+-- and an attempt cap is ordinary bounded unavailability; neither supplies
+-- evidence.
 data LengthSpinePairCounterexampleBankReplayOutcome identity
   = LengthSpinePairCounterexampleBankReplayMiss
       [LengthSpinePairCounterexampleBankReplayRefusal]
@@ -686,6 +759,12 @@ data LengthSpinePairCounterexampleBankReplayOutcome identity
 
 type role LengthSpinePairCounterexampleBankReplayOutcome nominal
 
+-- | Replay the active binary-product bank's exact retained samples newest
+-- first.
+--
+-- Every bridge-returned bank replaces the active bank before its result is
+-- classified.  An ordinary non-counterexample continues with the next exact
+-- sample; a hit is returned without implicit promotion.
 replayLengthSpinePairCounterexampleBank
   :: LengthEvaluationLimits
   -> LengthSpinePairSMTLibQuery identity local
@@ -757,12 +836,18 @@ replayLengthSpinePairCounterexampleBank evaluationLimits query initial =
                 sample counterexample
         )
 
+-- | A binary-product replay hit tied to both the semantic bank identity and
+-- the fresh command owner which produced it.  Its constructor stays private
+-- so only a context replay can mint promotion authority.
 newtype LengthSpinePairCounterexampleBankContextReplayHit command identity =
   LengthSpinePairCounterexampleBankContextReplayHitValue
     (LengthSpinePairCounterexampleBankReplayHit identity)
 
 type role LengthSpinePairCounterexampleBankContextReplayHit nominal nominal
 
+-- | The fresh current-query receipt carried by a command-nominal
+-- binary-product replay hit; see
+-- 'lengthSpinePairCounterexampleBankReplayHitCounterexample'.
 lengthSpinePairCounterexampleBankContextReplayHitCounterexample
   :: LengthSpinePairCounterexampleBankContextReplayHit command identity
   -> ValidatedLengthSpinePairCounterexample
@@ -770,6 +855,9 @@ lengthSpinePairCounterexampleBankContextReplayHitCounterexample
     (LengthSpinePairCounterexampleBankContextReplayHitValue hit) =
   lengthSpinePairCounterexampleBankReplayHitCounterexample hit
 
+-- | Binary-product context replay keeps the established refusal and
+-- bounded-unavailability vocabulary while making a successful hit
+-- command-nominal.
 data LengthSpinePairCounterexampleBankContextReplayOutcome command identity
   = LengthSpinePairCounterexampleBankContextReplayMiss
       [LengthSpinePairCounterexampleBankReplayRefusal]
@@ -783,6 +871,12 @@ data LengthSpinePairCounterexampleBankContextReplayOutcome command identity
 type role LengthSpinePairCounterexampleBankContextReplayOutcome
   nominal nominal
 
+-- | Replay through one mutable binary-product owner.  Exactly one pure
+-- adapter transition is serialized, and its complete successor state and
+-- expected classification are forced before commit.  The exception-restoring
+-- transition cell retains the old state when synchronous or asynchronous
+-- forcing fails, then propagates that exception; completed expected
+-- classifications install their authoritative successor.
 replayLengthSpinePairCounterexampleBankInContext
   :: LengthEvaluationLimits
   -> LengthSpinePairSMTLibQuery identity local
@@ -834,6 +928,11 @@ forceLengthSpinePairCounterexampleBankSuccessor
 
 -- Binary-product promotion -------------------------------------------------
 
+-- | Why one explicit binary-product replay hit was not promoted.  The scope
+-- and membership cases are structural invariant failures: the hit's scope no
+-- longer matches the active bank, or its exact sample is no longer retained
+-- there.  Insertion rejection carries Djex's bank error.  Every failure
+-- leaves the state unchanged.
 data LengthSpinePairCounterexampleBankPromotionFailure
   = LengthSpinePairCounterexampleBankPromotionScopeInvariant
   | LengthSpinePairCounterexampleBankPromotionMembershipInvariant
@@ -841,6 +940,13 @@ data LengthSpinePairCounterexampleBankPromotionFailure
       !LengthSpinePairCounterexampleBankError
   deriving (Eq, Ord, Show)
 
+-- | Promote one explicit binary-product replay hit without replaying or
+-- recording it a second time.
+--
+-- The exact retained sample must still belong to the active same-scope bank.
+-- Direct insertion performs Djex's input-only deduplication and MRU
+-- promotion; this replay-established use receives the solver-independent
+-- replay origin.
 promoteLengthSpinePairCounterexampleBankReplayHit
   :: LengthSpinePairCounterexampleBankReplayHit identity
   -> LengthSpinePairCounterexampleBankState identity
@@ -876,6 +982,9 @@ promoteLengthSpinePairCounterexampleBankReplayHit
         Right promoted ->
           (replaceLengthSpinePairCounterexampleBank promoted state, Right ())
 
+-- | 'promoteLengthSpinePairCounterexampleBankReplayHit' as one serialized
+-- transition of the owner which minted the hit.  The shared command tag ties
+-- the hit to that owner; a failure leaves the owner's state unchanged.
 promoteLengthSpinePairCounterexampleBankReplayHitInContext
   :: LengthSpinePairCounterexampleBankContextReplayHit command identity
   -> LengthSpinePairCounterexampleBankContext command identity
@@ -888,12 +997,21 @@ promoteLengthSpinePairCounterexampleBankReplayHitInContext
 
 -- Binary-product recording -------------------------------------------------
 
+-- | Coarse provenance for one freshly established binary-product receipt.
+-- These labels carry no evidence authority; Djex freshly replays before
+-- insertion.
 data LengthSpinePairCounterexampleBankReceiptOrigin
   = LengthSpinePairCounterexampleBankReceiptFromLiveModel
   | LengthSpinePairCounterexampleBankReceiptFromSolverIndependentReplay
   | LengthSpinePairCounterexampleBankReceiptFromSimplificationReplay
   deriving (Bounded, Enum, Eq, Ord, Show)
 
+-- | Why one fresh binary-product receipt was not recorded.  Scope invariant
+-- is a structural failure after the active bank has been ensured; the
+-- remaining cases are Djex's input-replay refusals and a receipt whose fresh
+-- replay against the current query reproduced no counterexample.  Ordinary
+-- bounded unavailability is reported through
+-- 'LengthSpinePairCounterexampleBankRecordOutcome' instead.
 data LengthSpinePairCounterexampleBankRecordFailure
   = LengthSpinePairCounterexampleBankRecordScopeInvariant
   | LengthSpinePairCounterexampleBankRecordEvaluationRejected
@@ -902,6 +1020,8 @@ data LengthSpinePairCounterexampleBankRecordFailure
   | LengthSpinePairCounterexampleBankRecordCounterexampleNotReproduced
   deriving (Eq, Ord, Show)
 
+-- | Ordinary bounded binary-product recording outcomes.  Unavailable results
+-- retain no claim that the supplied receipt was fresh for the current query.
 data LengthSpinePairCounterexampleBankRecordOutcome
   = LengthSpinePairCounterexampleBankRecorded
       !ValidatedLengthSpinePairCounterexample
@@ -911,6 +1031,13 @@ data LengthSpinePairCounterexampleBankRecordOutcome
       !LengthSpinePairCounterexampleBankError
   deriving (Eq, Show)
 
+-- | Record one freshly established binary-product receipt in the active
+-- same-scope bank.
+--
+-- The state is first ensured for the query's scope.  Djex freshly replays
+-- the receipt's inputs against the current query before inserting only those
+-- inputs under the mapped origin; the bank returned by that recording bridge
+-- replaces the active bank for every classification.
 recordLengthSpinePairCounterexampleBankReceipt
   :: LengthEvaluationLimits
   -> LengthSpinePairSMTLibQuery identity local
@@ -966,6 +1093,9 @@ recordLengthSpinePairCounterexampleBankReceipt evaluationLimits query origin
         $ LengthSpinePairCounterexampleBankRecordInsertionUnavailable failure
     Right fresh -> Right $ LengthSpinePairCounterexampleBankRecorded fresh
 
+-- | 'recordLengthSpinePairCounterexampleBankReceipt' as one serialized
+-- transition of a mutable binary-product owner.  The forced successor state
+-- is committed for both classifications.
 recordLengthSpinePairCounterexampleBankReceiptInContext
   :: LengthEvaluationLimits
   -> LengthSpinePairSMTLibQuery identity local

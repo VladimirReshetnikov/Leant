@@ -112,6 +112,9 @@ data LengthSelectionRetention
       !ValidatedLengthApplicableDomain
   deriving (Eq, Show)
 
+-- | The closed reason class of a retention explanation.  At most one of the
+-- payload projections below returns 'Just' for a given explanation, and none
+-- does for 'LengthSelectionUnassessed'.
 lengthSelectionRetentionClass
   :: LengthSelectionRetention
   -> LengthSelectionRetentionClass
@@ -124,6 +127,9 @@ lengthSelectionRetentionClass retention = case retention of
   LengthSelectionRetainedApplicableDomainEstablished _ ->
     LengthSelectionApplicableDomainEstablished
 
+-- | The preparation refusal diagnostic of a
+-- 'LengthSelectionPreparationRefused' retention; 'Nothing' for every other
+-- class.
 lengthSelectionRetentionPreparationRefusal
   :: LengthSelectionRetention
   -> Maybe LengthPreparationRefusalClass
@@ -131,6 +137,9 @@ lengthSelectionRetentionPreparationRefusal retention = case retention of
   LengthSelectionRetainedPreparationRefusal refusal -> Just refusal
   _ -> Nothing
 
+-- | The raw solver status of a 'LengthSelectionHeuristic' retention;
+-- 'Nothing' for every other class.  A status is a diagnostic, never negative
+-- behavioral evidence.
 lengthSelectionRetentionSolverStatus
   :: LengthSelectionRetention
   -> Maybe SolverStatus
@@ -138,6 +147,8 @@ lengthSelectionRetentionSolverStatus retention = case retention of
   LengthSelectionRetainedHeuristic status -> Just status
   _ -> Nothing
 
+-- | The finite input-box receipt of a 'LengthSelectionBoundedPositive'
+-- retention; 'Nothing' for every other class.
 lengthSelectionRetentionInputBox
   :: LengthSelectionRetention
   -> Maybe ValidatedLengthInputBox
@@ -145,6 +156,9 @@ lengthSelectionRetentionInputBox retention = case retention of
   LengthSelectionRetainedBoundedPositive receipt -> Just receipt
   _ -> Nothing
 
+-- | The applicable-domain receipt of a
+-- 'LengthSelectionApplicableDomainEstablished' retention; 'Nothing' for every
+-- other class.
 lengthSelectionRetentionApplicableDomain
   :: LengthSelectionRetention
   -> Maybe ValidatedLengthApplicableDomain
@@ -161,12 +175,16 @@ data LengthSelectionRejection = LengthSelectionRejection
   !(Maybe ValidatedLengthCounterexampleSimplification)
   deriving (Eq, Show)
 
+-- | The independently replayed scalar counterexample which rejected the
+-- occurrence; the ordinary receipt regardless of any simplification.
 lengthSelectionRejectionCounterexample
   :: LengthSelectionRejection
   -> ValidatedLengthCounterexample
 lengthSelectionRejectionCounterexample
     (LengthSelectionRejection receipt _) = receipt
 
+-- | The optional simplification metadata carried by the same ranked
+-- candidate as the rejecting counterexample.
 lengthSelectionRejectionCounterexampleSimplification
   :: LengthSelectionRejection
   -> Maybe ValidatedLengthCounterexampleSimplification
@@ -234,6 +252,8 @@ lengthSelectionRejected result = case result of
   LengthSelectionAccepted batch -> Just
     $ behavioralSelectionBatchRejected batch
 
+-- | The sanitized failure which preserved the original batch, or 'Nothing'
+-- when the total partition was sealed.
 lengthSelectionFailure
   :: LengthSelectionResult
   -> Maybe LengthSelectionFailure
@@ -255,6 +275,11 @@ selectVerifiedLengthCandidatesWithPolicy policy contract verification = do
   selectVerifiedLengthCandidatesWithAssessment
     (assessVerifiedLengthCandidatesWithPolicy policy contract) verification
 
+-- | 'selectVerifiedLengthCandidatesWithPolicy' whose assessment pipeline
+-- replays and records counterexamples through the supplied command-owned
+-- scalar bank context instead of a batch-local bank.  Selection semantics
+-- are otherwise identical: only an independently replayed counterexample
+-- rejects, and every failure preserves the supplied batch.
 selectVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext
   :: LengthRankingPolicy
   -> CounterexampleBank.LengthCounterexampleBankContext

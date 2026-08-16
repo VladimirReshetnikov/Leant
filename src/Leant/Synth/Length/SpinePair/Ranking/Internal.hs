@@ -178,23 +178,30 @@ data LengthSpinePairCandidateAssessment
       !LengthSpinePairRankingAssessment
       !(Maybe ValidatedLengthSpinePairCounterexampleSimplification)
 
+-- | One callback receipt and the pair-domain assessment made for that exact
+-- candidate.  The constructor stays private so receipts cannot be detached
+-- and paired with another candidate's assessment.
 data RankedLengthSpinePairCandidate = RankedLengthSpinePairCandidate
   !Natural
   !(Verified DetailedVerificationVariant)
   !LengthSpinePairCandidateAssessment
 
+-- | Zero-based position of this candidate in the caller's admitted input.
 rankedLengthSpinePairCandidateOriginalIndex
   :: RankedLengthSpinePairCandidate
   -> Natural
 rankedLengthSpinePairCandidateOriginalIndex
     (RankedLengthSpinePairCandidate index _ _) = index
 
+-- | The exact callback receipt this assessment was made for.
 rankedLengthSpinePairCandidateVerified
   :: RankedLengthSpinePairCandidate
   -> Verified DetailedVerificationVariant
 rankedLengthSpinePairCandidateVerified
     (RankedLengthSpinePairCandidate _ verified _) = verified
 
+-- | Assessment projection; a preparation refusal reads as
+-- 'LengthSpinePairUnassessed'.
 rankedLengthSpinePairCandidateAssessment
   :: RankedLengthSpinePairCandidate
   -> LengthSpinePairRankingAssessment
@@ -202,6 +209,12 @@ rankedLengthSpinePairCandidateAssessment
     (RankedLengthSpinePairCandidate _ _ state) =
   spinePairCandidateAssessment state
 
+-- | Candidate-local pure preparation refusal, if one occurred.
+--
+-- 'Nothing' with 'LengthSpinePairUnassessed' means that preparation
+-- succeeded but an operational batch failure atomically reset the
+-- assessment; callers should inspect 'lengthSpinePairRankingFailure' for
+-- that batch-wide cause.
 rankedLengthSpinePairCandidatePreparationRefusal
   :: RankedLengthSpinePairCandidate
   -> Maybe LengthPreparationRefusalClass
@@ -224,6 +237,9 @@ spinePairCandidatePreparationRefusal state = case state of
   LengthSpinePairCandidatePreparationRefused refusal -> Just refusal
   LengthSpinePairCandidateAssessed _ _ -> Nothing
 
+-- | Metadata for a strict query-owned reduction of this exact candidate's
+-- pair counterexample, when the optional bounded simplifier found one.  The
+-- ordinary assessment always carries the final freshly replayed receipt.
 rankedLengthSpinePairCandidateCounterexampleSimplification
   :: RankedLengthSpinePairCandidate
   -> Maybe ValidatedLengthSpinePairCounterexampleSimplification
@@ -232,6 +248,11 @@ rankedLengthSpinePairCandidateCounterexampleSimplification
   LengthSpinePairCandidatePreparationRefused _ -> Nothing
   LengthSpinePairCandidateAssessed _ simplification -> simplification
 
+-- | Sanitized pair-domain failure classes.  Nested live and
+-- bounded-evaluation failures retain only Djex's closed public diagnostics;
+-- association and replay failures deliberately discard their richer internal
+-- details here.  Pure handoff/query-sealing refusals are ordinary
+-- per-candidate absence of assessment rather than batch failures.
 data LengthSpinePairRankingFailureClass
   = LengthSpinePairRankingLiveSessionFailed
       !LengthSMTLibLiveSessionFailure
@@ -249,46 +270,64 @@ data LengthSpinePairRankingFailureClass
       !LengthSpinePairCounterexampleSimplificationError
   deriving (Eq, Ord, Show)
 
+-- | One fail-closed pair ranking failure.  The optional index is the safe,
+-- zero-based position in the caller's admitted input, never a solver
+-- ordinal.  The Boolean copies only Djex's sanitized incomplete-cleanup
+-- observation.
 data LengthSpinePairRankingFailure = LengthSpinePairRankingFailure
   !LengthSpinePairRankingFailureClass
   !Bool
   !(Maybe Natural)
   deriving (Eq, Ord, Show)
 
+-- | The sanitized batch-failure class.
 lengthSpinePairRankingFailureClass
   :: LengthSpinePairRankingFailure
   -> LengthSpinePairRankingFailureClass
 lengthSpinePairRankingFailureClass
     (LengthSpinePairRankingFailure failure _ _) = failure
 
+-- | Whether Djex reported that worker cleanup may be incomplete.
 lengthSpinePairRankingFailureCleanupIncomplete
   :: LengthSpinePairRankingFailure
   -> Bool
 lengthSpinePairRankingFailureCleanupIncomplete
     (LengthSpinePairRankingFailure _ incomplete _) = incomplete
 
+-- | Safe original input index of the failing candidate, when one applies.
 lengthSpinePairRankingFailureOriginalIndex
   :: LengthSpinePairRankingFailure
   -> Maybe Natural
 lengthSpinePairRankingFailureOriginalIndex
     (LengthSpinePairRankingFailure _ _ index) = index
 
+-- | Complete all-or-fallback pair result.  A successful value may be stably
+-- reordered.  Any failure contains every original receipt in original order,
+-- all 'LengthSpinePairUnassessed', plus one sanitized failure.
 data LengthSpinePairRanking = LengthSpinePairRanking
   ![RankedLengthSpinePairCandidate]
   !(Maybe LengthSpinePairRankingFailure)
 
+-- | Every admitted candidate, reordered only by a successful assessment.
 lengthSpinePairRankingCandidates
   :: LengthSpinePairRanking
   -> [RankedLengthSpinePairCandidate]
 lengthSpinePairRankingCandidates
     (LengthSpinePairRanking candidates _) = candidates
 
+-- | The batch-wide sanitized failure behind an
+-- all-'LengthSpinePairUnassessed' fallback.
 lengthSpinePairRankingFailure
   :: LengthSpinePairRanking
   -> Maybe LengthSpinePairRankingFailure
 lengthSpinePairRankingFailure
     (LengthSpinePairRanking _ failure) = failure
 
+-- | Internal pair ranking result which keeps one caller-owned occurrence
+-- handle inseparable from the assessment derived from its receipt.  The
+-- association is the only receipt-bearing field in this transient ranking
+-- record; the trusted projection edge later erases that association
+-- deliberately.
 data AssociatedRankedLengthSpinePairCandidate association =
   AssociatedRankedLengthSpinePairCandidate
     !Natural
@@ -297,12 +336,15 @@ data AssociatedRankedLengthSpinePairCandidate association =
 
 type role AssociatedRankedLengthSpinePairCandidate nominal
 
+-- | The caller-owned occurrence handle this assessment was derived from.
+-- This is the only receipt-bearing projection of the transient record.
 associatedRankedLengthSpinePairCandidateAssociation
   :: AssociatedRankedLengthSpinePairCandidate association
   -> association
 associatedRankedLengthSpinePairCandidateAssociation
     (AssociatedRankedLengthSpinePairCandidate _ association _) = association
 
+-- | Complete associated pair plan before its batch-scoped handles are erased.
 data AssociatedLengthSpinePairRanking association =
   AssociatedLengthSpinePairRanking
     ![AssociatedRankedLengthSpinePairCandidate association]
@@ -310,6 +352,9 @@ data AssociatedLengthSpinePairRanking association =
 
 type role AssociatedLengthSpinePairRanking nominal
 
+-- | Every admitted associated candidate, reordered only by a successful
+-- assessment; on failure they stay in original order, all
+-- 'LengthSpinePairUnassessed'.
 associatedLengthSpinePairRankingCandidates
   :: AssociatedLengthSpinePairRanking association
   -> [AssociatedRankedLengthSpinePairCandidate association]
@@ -331,6 +376,11 @@ projectAssociatedLengthSpinePairRankingWith verifiedFor
             index (verifiedFor association) state
       in projected `seq` go (projected : reversed) rest
 
+-- | One exact sealed permutation and its receipt-free pair compatibility
+-- state.  The opaque value stores verified receipts only through the sealed
+-- batch.  Its already bounded summary spine is materialized eagerly so no
+-- erased epoch handle can survive behind an accepted post-verification
+-- result.
 data PostVerificationLengthSpinePairRanking =
   PostVerificationLengthSpinePairRanking
     !(PostVerificationBatch DetailedVerificationVariant)
@@ -342,6 +392,12 @@ data PostVerificationLengthSpinePairCandidateSummary =
     !Natural
     !LengthSpinePairCandidateAssessment
 
+-- | Seal one associated pair proposal and retain its receipt-free
+-- compatibility state in the same fixed operation.  No package caller can
+-- pair a summary with an independently sourced same-cardinality batch.
+-- Receipt weak-head demand deliberately matches the complete-report
+-- projection even though the values are retained only by the sealed
+-- 'PostVerificationBatch'.
 sealPostVerificationLengthSpinePairRanking
   :: Natural
   -> PostVerificationInput epoch DetailedVerificationVariant
@@ -370,18 +426,27 @@ sealPostVerificationLengthSpinePairRanking maximumCandidates input associated =
       in verified `seq` projected `seq`
           projectCandidates (projected : reversed) rest
 
+-- | The sealed permutation batch, the sole owner of the verified receipts
+-- behind this pair ranking.  Its candidates are in ranked order.
 postVerificationLengthSpinePairRankingBatch
   :: PostVerificationLengthSpinePairRanking
   -> PostVerificationBatch DetailedVerificationVariant
 postVerificationLengthSpinePairRankingBatch
     (PostVerificationLengthSpinePairRanking batch _ _) = batch
 
+-- | The batch-wide sanitized failure retained from the sealed associated
+-- pair ranking, when its candidates were left 'LengthSpinePairUnassessed'.
 postVerificationLengthSpinePairRankingFailure
   :: PostVerificationLengthSpinePairRanking
   -> Maybe LengthSpinePairRankingFailure
 postVerificationLengthSpinePairRankingFailure
     (PostVerificationLengthSpinePairRanking _ _ failure) = failure
 
+-- | Materialize the association-free pair compatibility report from the sole
+-- retained receipt owner and its receipt-free summary.  Both inputs are
+-- package-private products of the same successful seal.  A cardinality
+-- mismatch therefore denotes an internal invariant violation rather than a
+-- caller-controlled ranking failure.
 materializePostVerificationLengthSpinePairRanking
   :: PostVerificationLengthSpinePairRanking
   -> LengthSpinePairRanking
@@ -413,20 +478,36 @@ data PreparedLengthSpinePairCandidate association
       !association
       !CheckedLengthSpinePairQuery
 
+-- | Pair-domain finite input-box validation policy.  The disabled
+-- constructor skips the post-@unsat@ box entirely.  The enabled constructor
+-- owns only an independently checked traversal limit and caller-supplied
+-- finite maxima; it carries no solver observation or behavioral verdict.
 data LengthSpinePairInputBoxRankingPolicy
   = LengthSpinePairInputBoxRankingDisabled
   | LengthSpinePairInputBoxRankingEnabled
       !LengthInputBoxLimits [Natural]
 
+-- | Permission to attempt the complete query-owned validation of the
+-- precondition-applicable pair input domain after every counterexample-bank
+-- miss.  Admission limits remain an ordinary miss and no solver observation
+-- is retained here.
 data LengthSpinePairApplicableDomainRankingPolicy
   = LengthSpinePairApplicableDomainRankingDisabled
   | LengthSpinePairApplicableDomainRankingEnabled
       !LengthInputBoxLimits !LengthBooleanFiniteUnionLimits
 
+-- | Query-owned pre-live probe policy.  The enabled constructor is only
+-- permission to run Djex's canonical pair origin replay after every
+-- counterexample-bank miss; it carries no input vector, query, receipt, or
+-- verdict.
 data LengthSpinePairOriginProbeRankingPolicy
   = LengthSpinePairOriginProbeRankingDisabled
   | LengthSpinePairOriginProbeRankingEnabled
 
+-- | Permission to replace any independently replayed pair counterexample with
+-- Djex's strictly smaller query-owned sibling.  The same bounded policy is
+-- applied regardless of where the starting receipt came from.  @Nothing@ from
+-- Djex retains that exact starting receipt.
 data LengthSpinePairCounterexampleSimplificationRankingPolicy
   = LengthSpinePairCounterexampleSimplificationRankingDisabled
   | LengthSpinePairCounterexampleSimplificationRankingEnabled
@@ -464,6 +545,14 @@ data LengthSpinePairCounterexampleAcquisition command
 
 type role LengthSpinePairCounterexampleAcquisition nominal
 
+-- | Rank one already Lean-callback-verified batch under an explicit
+-- binary-product behavioral contract and explicit live/evaluation policies.
+--
+-- Input admission precedes all behavioral-preparation work.  An empty
+-- admitted batch, or one with no eligible candidate, opens no worker.  Every
+-- nonempty eligible batch uses exactly one live session and processes its
+-- pre-sealed queries serially in original order; a later seed-replay hit can
+-- avoid that query's live execution.
 rankVerifiedLengthSpinePairCandidates
   :: LengthSMTLibExecutionConfig
   -> LengthEvaluationLimits
@@ -479,6 +568,9 @@ rankVerifiedLengthSpinePairCandidates execution evaluation contract candidates =
         LengthSpinePairCounterexampleSimplificationRankingDisabled)
         execution evaluation contract id candidates
 
+-- | Opt in to one query-owned pair origin replay after the bounded seed bank
+-- misses and before live execution.  A counterexample follows the ordinary
+-- receipt/seed-bank path; an ordinary replay miss has no positive authority.
 rankVerifiedLengthSpinePairCandidatesWithOriginProbe
   :: LengthSMTLibExecutionConfig
   -> LengthEvaluationLimits
@@ -495,6 +587,10 @@ rankVerifiedLengthSpinePairCandidatesWithOriginProbe
         LengthSpinePairCounterexampleSimplificationRankingDisabled)
         execution evaluation contract id candidates
 
+-- | Opt in to independently validating one exact finite pair input box after
+-- a live @unsat@ observation.  The solver status is only the trigger: Djex
+-- owns traversal, evaluation, and exact query/problem association.  Seed
+-- replay still runs first and can avoid the live call.
 rankVerifiedLengthSpinePairCandidatesWithInputBoxValidation
   :: LengthSMTLibExecutionConfig
   -> LengthEvaluationLimits
@@ -514,6 +610,9 @@ rankVerifiedLengthSpinePairCandidatesWithInputBoxValidation
         LengthSpinePairCounterexampleSimplificationRankingDisabled)
         execution evaluation contract id candidates
 
+-- | Compose the pre-live pair origin probe with the post-@unsat@ finite-box
+-- validation.  A probe hit avoids the live query, so no solver status exists
+-- which could schedule the box for that candidate.
 rankVerifiedLengthSpinePairCandidatesWithInputBoxValidationAndOriginProbe
   :: LengthSMTLibExecutionConfig
   -> LengthEvaluationLimits
@@ -533,6 +632,9 @@ rankVerifiedLengthSpinePairCandidatesWithInputBoxValidationAndOriginProbe
         LengthSpinePairCounterexampleSimplificationRankingDisabled)
         execution evaluation contract id candidates
 
+-- | Safe associated pair entry point for the post-verification seam.  The
+-- receipt projection is fixed here so callers cannot rank one receipt while
+-- retaining another occurrence's batch-scoped handle.
 rankPostVerificationLengthSpinePairCandidates
   :: LengthSMTLibExecutionConfig
   -> LengthEvaluationLimits
@@ -550,6 +652,8 @@ rankPostVerificationLengthSpinePairCandidates execution evaluation contract =
         LengthSpinePairCounterexampleSimplificationRankingDisabled)
     execution evaluation contract postVerificationCandidateVerified
 
+-- | Occurrence-associated origin-probe sibling used by the generative
+-- post-verification permutation seal.
 rankPostVerificationLengthSpinePairCandidatesWithOriginProbe
   :: LengthSMTLibExecutionConfig
   -> LengthEvaluationLimits
@@ -568,6 +672,9 @@ rankPostVerificationLengthSpinePairCandidatesWithOriginProbe
         LengthSpinePairCounterexampleSimplificationRankingDisabled)
     execution evaluation contract postVerificationCandidateVerified
 
+-- | Occurrence-associated opt-in used by the post-verification permutation
+-- seal.  The finite-box receipt remains attached to the exact occurrence
+-- until that seal deliberately erases the batch-scoped handle.
 rankPostVerificationLengthSpinePairCandidatesWithInputBoxValidation
   :: LengthSMTLibExecutionConfig
   -> LengthEvaluationLimits
@@ -589,6 +696,8 @@ rankPostVerificationLengthSpinePairCandidatesWithInputBoxValidation
         LengthSpinePairCounterexampleSimplificationRankingDisabled)
     execution evaluation contract postVerificationCandidateVerified
 
+-- | Occurrence-associated composition of the pre-live pair origin probe and
+-- the post-@unsat@ finite-box validator.
 rankPostVerificationLengthSpinePairCandidatesWithInputBoxValidationAndOriginProbe
   :: LengthSMTLibExecutionConfig
   -> LengthEvaluationLimits
@@ -633,6 +742,10 @@ rankVerifiedLengthSpinePairCandidatesWithRankingPolicies
     LengthLiveSessionOpeningEager execution evaluation contract candidates
 
 
+-- | Complete pair policy entrance with an explicit worker-opening strategy.
+-- This is package-private so programmatic policies and the current startup
+-- decoder can opt in without widening the established public ranking
+-- surface.
 rankVerifiedLengthSpinePairCandidatesWithRankingPoliciesAndLiveSessionOpening
   :: LengthSpinePairInputBoxRankingPolicy
   -> LengthSpinePairApplicableDomainRankingPolicy
@@ -682,6 +795,8 @@ rankPostVerificationLengthSpinePairCandidatesWithRankingPolicies
     LengthLiveSessionOpeningEager execution evaluation contract
 
 
+-- | Occurrence-associated sibling of the opening-aware complete pair
+-- entrance.
 rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndLiveSessionOpening
   :: LengthSpinePairInputBoxRankingPolicy
   -> LengthSpinePairApplicableDomainRankingPolicy
@@ -709,6 +824,10 @@ rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndLiveSessionOp
     simplificationPolicy
 
 
+-- | Budgeted complete pair-policy entrance.  Admission remains outside the
+-- shared owner; every preparation, pure evidence pass, live operation, final
+-- ranking transform, and ranking-owned result thunk is evaluated beneath the
+-- one captured usable-work deadline.
 rankVerifiedLengthSpinePairCandidatesWithRankingPoliciesAndUsableWorkBudget
   :: (LengthSpinePairRanking -> LengthSpinePairRanking)
   -> LengthSMTLibLiveUsableWorkBudget
@@ -736,6 +855,9 @@ rankVerifiedLengthSpinePairCandidatesWithRankingPoliciesAndUsableWorkBudget
     simplificationPolicy
 
 
+-- | Occurrence-associated budgeted pair sibling.  The caller supplies only
+-- the closed stable ranking transform; occurrence associations retain their
+-- established WHNF demand and are never given an 'NFData' requirement.
 rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndUsableWorkBudget
   :: (AssociatedLengthSpinePairRanking
         (PostVerificationCandidate epoch DetailedVerificationVariant)
@@ -768,6 +890,9 @@ rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndUsableWorkBud
     simplificationPolicy
 
 
+-- | Scoped/checkpointed complete pair-policy entrance.  It retains the v1
+-- admission and atomic-result contract while selecting the additive
+-- same-thread owner and explicit bounded-phase checkpoints.
 rankVerifiedLengthSpinePairCandidatesWithRankingPoliciesAndScopedUsableWorkBudget
   :: (LengthSpinePairRanking -> LengthSpinePairRanking)
   -> LengthSMTLibLiveUsableWorkBudget
@@ -795,6 +920,9 @@ rankVerifiedLengthSpinePairCandidatesWithRankingPoliciesAndScopedUsableWorkBudge
     simplificationPolicy
 
 
+-- | Occurrence-associated scoped/checkpointed pair sibling.  Checkpointing
+-- never projects or forces caller-owned occurrence handles beyond their
+-- established weak-head boundary.
 rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndScopedUsableWorkBudget
   :: (AssociatedLengthSpinePairRanking
         (PostVerificationCandidate epoch DetailedVerificationVariant)
@@ -828,6 +956,9 @@ rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndScopedUsableW
     simplificationPolicy
 
 
+-- | Additive occurrence-associated pair filter entrance using one
+-- caller-owned nominal counterexample bank.  No established ranking entrance
+-- calls this function; their raw four-vector seed bank remains literal.
 rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndCounterexampleBankContextAndLiveSessionOpening
   :: CounterexampleBank.LengthSpinePairCounterexampleBankContext
       command ExferenceLocal
@@ -855,6 +986,12 @@ rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndCounterexampl
     inputBoxPolicy applicableDomainPolicy originProbePolicy simplificationPolicy
 
 
+-- | Budgeted sibling of the pair counterexample-bank filter entrance.  Like
+-- the bank-free budgeted runner, admission stays outside the shared owner and
+-- all preparation, live work, and the caller's final transform run beneath
+-- the one captured usable-work deadline, but counterexample replay and
+-- recording go through the supplied command-local bank instead of the
+-- batch-local seed bank.
 rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndCounterexampleBankContextAndUsableWorkBudget
   :: (AssociatedLengthSpinePairRanking
         (PostVerificationCandidate epoch DetailedVerificationVariant)
@@ -889,6 +1026,11 @@ rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndCounterexampl
     inputBoxPolicy applicableDomainPolicy originProbePolicy simplificationPolicy
 
 
+-- | Scoped/checkpointed sibling of the pair counterexample-bank filter
+-- entrance.  It selects the same-thread scoped owner with explicit
+-- bounded-phase checkpoints while replaying and recording counterexamples
+-- through the supplied command-local bank instead of the batch-local seed
+-- bank.
 rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndCounterexampleBankContextAndScopedUsableWorkBudget
   :: (AssociatedLengthSpinePairRanking
         (PostVerificationCandidate epoch DetailedVerificationVariant)
@@ -2008,6 +2150,13 @@ advanceLengthSpinePairCounterexampleBankCursor evaluation index query
       LengthSpinePairCounterexampleFromCommandReplay _ ->
         CounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromSolverIndependentReplay
 
+-- | Replay the batch-local seed bank against one checked pair query, MRU
+-- first, returning the first vector that independently yields a
+-- counterexample.  A seed is only an input vector from an exact receipt; the
+-- checked query evaluates it against its own retained problem, so no earlier
+-- verdict, receipt, or solver observation crosses this edge.  Every rejection
+-- and ordinary non-counterexample is a miss, so an older vector can still be
+-- attempted.
 replayLengthSpinePairCounterexampleSeeds
   :: LengthEvaluationLimits
   -> CheckedLengthSpinePairQuery
@@ -2033,6 +2182,11 @@ replayLengthSpinePairCounterexampleSeeds evaluation query =
 lengthSpinePairCounterexampleSeedBankMaximumEntries :: Int
 lengthSpinePairCounterexampleSeedBankMaximumEntries = 4
 
+-- | Promote one pair counterexample input vector to the front of the
+-- batch-local seed bank: insert at the MRU end, remove every exact duplicate,
+-- retain at most the four newest distinct vectors, and force that bounded
+-- value before it is retained across another candidate.  The bank never
+-- contains receipts or query metadata.
 promoteLengthSpinePairCounterexampleSeed
   :: [Natural]
   -> [[Natural]]
@@ -2445,6 +2599,10 @@ forcePreparedLengthSpinePairCandidates prepared = case prepared of
     index `seq` association `seq` query `seq`
       forcePreparedLengthSpinePairCandidates rest
 
+-- | Reduce a binary-product handoff refusal to its stable payload-free phase.
+-- Shared scalar refusals nested in 'LengthSpinePairHandoffSharedRefusal' are
+-- classified by 'lengthHandoffPreparationRefusalClass'; every payload
+-- wildcard is intentional so no raw refusal payload is evaluated or retained.
 lengthSpinePairHandoffPreparationRefusalClass
   :: LengthSpinePairHandoffRefusal
   -> LengthPreparationRefusalClass
@@ -2460,6 +2618,9 @@ lengthSpinePairHandoffPreparationRefusalClass refusal = case refusal of
   LengthSpinePairHandoffProblemRejected _ ->
     LengthPreparationCandidateSemanticsRejected
 
+-- | Reduce a canonical pair-query construction refusal to its payload-free
+-- phase.  Every constructor maps to
+-- 'LengthPreparationQueryConstructionRejected'; no field is inspected.
 lengthSpinePairQueryPreparationRefusalClass
   :: LengthSpinePairSMTLibQueryError
   -> LengthPreparationRefusalClass

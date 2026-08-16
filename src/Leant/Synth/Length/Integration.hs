@@ -233,6 +233,10 @@ withLengthAssessmentRequestContext request action = case request of
               $ LengthAssessmentSpinePairFilteringContext
                   policy contract context
 
+-- | The behavior selected by one command-local assessment context.  Filtering
+-- contexts (those owning a counterexample bank) report 'LengthBehaviorFilter';
+-- both ranking contexts and the disabled context report 'LengthBehaviorRank'.
+-- Only the constructor is inspected; no policy or lazy contract is forced.
 lengthAssessmentContextBehaviorMode
   :: LengthAssessmentContext command
   -> LengthBehaviorMode

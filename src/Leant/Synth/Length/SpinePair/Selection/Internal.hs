@@ -111,6 +111,9 @@ data LengthSpinePairSelectionRetention
       !ValidatedLengthSpinePairApplicableDomain
   deriving (Eq, Show)
 
+-- | The closed reason class of a pair-domain retention explanation.  At most
+-- one of the payload projections below returns 'Just' for a given
+-- explanation, and none does for 'LengthSpinePairSelectionUnassessed'.
 lengthSpinePairSelectionRetentionClass
   :: LengthSpinePairSelectionRetention
   -> LengthSpinePairSelectionRetentionClass
@@ -126,6 +129,9 @@ lengthSpinePairSelectionRetentionClass retention = case retention of
   LengthSpinePairSelectionRetainedApplicableDomainEstablished _ ->
     LengthSpinePairSelectionApplicableDomainEstablished
 
+-- | The preparation refusal diagnostic of a
+-- 'LengthSpinePairSelectionPreparationRefused' retention; 'Nothing' for
+-- every other class.
 lengthSpinePairSelectionRetentionPreparationRefusal
   :: LengthSpinePairSelectionRetention
   -> Maybe LengthPreparationRefusalClass
@@ -135,6 +141,9 @@ lengthSpinePairSelectionRetentionPreparationRefusal retention =
       Just refusal
     _ -> Nothing
 
+-- | The raw solver status of a 'LengthSpinePairSelectionHeuristic'
+-- retention; 'Nothing' for every other class.  A status is a diagnostic,
+-- never negative behavioral evidence.
 lengthSpinePairSelectionRetentionSolverStatus
   :: LengthSpinePairSelectionRetention
   -> Maybe SolverStatus
@@ -142,6 +151,9 @@ lengthSpinePairSelectionRetentionSolverStatus retention = case retention of
   LengthSpinePairSelectionRetainedHeuristic status -> Just status
   _ -> Nothing
 
+-- | The finite pair input-box receipt of a
+-- 'LengthSpinePairSelectionBoundedPositive' retention; 'Nothing' for every
+-- other class.
 lengthSpinePairSelectionRetentionInputBox
   :: LengthSpinePairSelectionRetention
   -> Maybe ValidatedLengthSpinePairInputBox
@@ -149,6 +161,9 @@ lengthSpinePairSelectionRetentionInputBox retention = case retention of
   LengthSpinePairSelectionRetainedBoundedPositive receipt -> Just receipt
   _ -> Nothing
 
+-- | The pair applicable-domain receipt of a
+-- 'LengthSpinePairSelectionApplicableDomainEstablished' retention; 'Nothing'
+-- for every other class.
 lengthSpinePairSelectionRetentionApplicableDomain
   :: LengthSpinePairSelectionRetention
   -> Maybe ValidatedLengthSpinePairApplicableDomain
@@ -166,18 +181,26 @@ data LengthSpinePairSelectionRejection =
     !(Maybe ValidatedLengthSpinePairCounterexampleSimplification)
   deriving (Eq, Show)
 
+-- | The independently replayed pair counterexample which rejected the
+-- occurrence; the ordinary receipt regardless of any simplification.
 lengthSpinePairSelectionRejectionCounterexample
   :: LengthSpinePairSelectionRejection
   -> ValidatedLengthSpinePairCounterexample
 lengthSpinePairSelectionRejectionCounterexample
     (LengthSpinePairSelectionRejection receipt _) = receipt
 
+-- | The optional simplification metadata carried by the same ranked pair
+-- candidate as the rejecting counterexample.
 lengthSpinePairSelectionRejectionCounterexampleSimplification
   :: LengthSpinePairSelectionRejection
   -> Maybe ValidatedLengthSpinePairCounterexampleSimplification
 lengthSpinePairSelectionRejectionCounterexampleSimplification
     (LengthSpinePairSelectionRejection _ simplification) = simplification
 
+-- | Fail-closed pair-domain reasons which preserve the complete original
+-- verification batch.  The index failure is an internal association
+-- inconsistency: a ranking report named an occurrence outside the fresh
+-- selection input (candidate count, requested index).
 data LengthSpinePairSelectionFailure
   = LengthSpinePairSelectionPostVerificationFailed
       !LengthSpinePairPostVerificationFailure
@@ -210,6 +233,8 @@ lengthSpinePairSelectionCandidates result = case result of
   LengthSpinePairSelectionAccepted batch ->
     map behaviorallySelectedVerified $ behavioralSelectionBatchSelected batch
 
+-- | Intrinsically associated selected pair occurrences, available only after
+-- the total partition seal succeeded.
 lengthSpinePairSelectionSelected
   :: LengthSpinePairSelectionResult
   -> Maybe
@@ -220,6 +245,8 @@ lengthSpinePairSelectionSelected result = case result of
   LengthSpinePairSelectionAccepted batch -> Just
     $ behavioralSelectionBatchSelected batch
 
+-- | Intrinsically associated rejected pair occurrences, available only after
+-- the total partition seal succeeded.
 lengthSpinePairSelectionRejected
   :: LengthSpinePairSelectionResult
   -> Maybe
@@ -230,6 +257,8 @@ lengthSpinePairSelectionRejected result = case result of
   LengthSpinePairSelectionAccepted batch -> Just
     $ behavioralSelectionBatchRejected batch
 
+-- | The sanitized failure which preserved the original batch, or 'Nothing'
+-- when the total partition was sealed.
 lengthSpinePairSelectionFailure
   :: LengthSpinePairSelectionResult
   -> Maybe LengthSpinePairSelectionFailure
@@ -251,6 +280,12 @@ selectVerifiedLengthSpinePairCandidatesWithPolicy
     (assessVerifiedLengthSpinePairCandidatesWithPolicy policy contract)
     verification
 
+-- | 'selectVerifiedLengthSpinePairCandidatesWithPolicy' whose assessment
+-- pipeline replays and records pair counterexamples through the supplied
+-- command-owned binary-product bank context instead of a batch-local bank.
+-- Selection semantics are otherwise identical: only an independently
+-- replayed pair counterexample rejects, and every failure preserves the
+-- supplied batch.
 selectVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
   :: LengthRankingPolicy
   -> CounterexampleBank.LengthSpinePairCounterexampleBankContext

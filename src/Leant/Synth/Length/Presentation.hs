@@ -193,12 +193,17 @@ lengthCandidatePresentationNote
   -> Maybe String
 lengthCandidatePresentationNote (LengthCandidatePresentation _ note) = note
 
+-- | The exact verified Lean spelling of the omitted candidate; the same text
+-- that was passed to the backend verifier.
 lengthCandidateRejectionPresentationText
   :: LengthCandidateRejectionPresentation
   -> String
 lengthCandidateRejectionPresentationText
     (LengthCandidateRejectionPresentation text _) = text
 
+-- | The rendered counterexample note which authorized this omission.  Unlike
+-- a survivor note it is always present: every rejection carries a replayed
+-- counterexample, and its simplified reduction is rendered when available.
 lengthCandidateRejectionPresentationNote
   :: LengthCandidateRejectionPresentation
   -> String

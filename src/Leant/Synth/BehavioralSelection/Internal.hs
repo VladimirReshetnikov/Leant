@@ -41,11 +41,18 @@ import Leant.Synth.Verification
   , verifiedCandidateReceipts
   )
 
+-- | Which of the two bounded lists a collection limit refusal names: the
+-- exact callback candidates or an adapter's proposed decisions.
 data BehavioralSelectionCollection
   = BehavioralSelectionCandidates
   | BehavioralSelectionDecisions
   deriving (Bounded, Enum, Eq, Ord, Show)
 
+-- | Why a proposed partition was not sealed, in check order: a collection
+-- exceeded the caller's maximum (maximum and observed count capped at
+-- maximum plus one), the decision count differs from the candidate count
+-- (candidate count, decision count), a decision's index is out of range
+-- (candidate count, index), or an index was decided twice.
 data BehavioralSelectionError
   = BehavioralSelectionCollectionLimitExceeded
       !BehavioralSelectionCollection !Natural !Natural
@@ -106,6 +113,9 @@ data BehavioralSelectionBatch candidate retained rejection =
 
 type role BehavioralSelectionBatch nominal nominal nominal
 
+-- | Introduce one fresh batch scope.  The rank-2 epoch prevents handles from
+-- another invocation from being supplied to this input's seal without an
+-- explicit unsafe operation.
 withBehavioralSelectionInput
   :: VerificationBatch candidate
   -> (forall epoch. BehavioralSelectionInput epoch candidate -> result)
@@ -115,18 +125,25 @@ withBehavioralSelectionInput verification action =
     $ zipWith BehavioralSelectionCandidate [0 ..]
     $ verifiedCandidateReceipts verification
 
+-- | The batch's occurrence handles in original callback order; the only
+-- source of handles an adapter may classify for
+-- 'sealBehavioralSelectionBatch'.
 behavioralSelectionInputCandidates
   :: BehavioralSelectionInput epoch candidate
   -> [BehavioralSelectionCandidate epoch candidate]
 behavioralSelectionInputCandidates (BehavioralSelectionInput candidates) =
   candidates
 
+-- | The opaque verified receipt behind one occurrence handle.
 behavioralSelectionCandidateVerified
   :: BehavioralSelectionCandidate epoch candidate
   -> Verified candidate
 behavioralSelectionCandidateVerified
     (BehavioralSelectionCandidate _ verified) = verified
 
+-- | Propose that one exact occurrence be retained with the supplied domain
+-- retention explanation.  Package-private: the payload's authority is the
+-- adapter's responsibility, not this builder's.
 retainBehavioralSelectionCandidate
   :: BehavioralSelectionCandidate epoch candidate
   -> retained
@@ -134,6 +151,9 @@ retainBehavioralSelectionCandidate
 retainBehavioralSelectionCandidate candidate retained =
   BehavioralSelectionDecision candidate $ BehavioralSelectionRetain retained
 
+-- | Propose that one exact occurrence be rejected with the supplied domain
+-- rejection evidence.  Package-private: the payload's authority is the
+-- adapter's responsibility, not this builder's.
 rejectBehavioralSelectionCandidate
   :: BehavioralSelectionCandidate epoch candidate
   -> rejection
@@ -141,32 +161,38 @@ rejectBehavioralSelectionCandidate
 rejectBehavioralSelectionCandidate candidate rejection =
   BehavioralSelectionDecision candidate $ BehavioralSelectionReject rejection
 
+-- | The opaque verified receipt of one selected occurrence.
 behaviorallySelectedVerified
   :: BehaviorallySelected candidate retained
   -> Verified candidate
 behaviorallySelectedVerified (BehaviorallySelected verified _) = verified
 
+-- | The domain retention explanation attached to one selected occurrence.
 behaviorallySelectedRetention
   :: BehaviorallySelected candidate retained
   -> retained
 behaviorallySelectedRetention (BehaviorallySelected _ retained) = retained
 
+-- | The opaque verified receipt of one rejected occurrence.
 behaviorallyRejectedVerified
   :: BehaviorallyRejected candidate rejection
   -> Verified candidate
 behaviorallyRejectedVerified (BehaviorallyRejected verified _) = verified
 
+-- | The domain rejection evidence attached to one rejected occurrence.
 behaviorallyRejectedReason
   :: BehaviorallyRejected candidate rejection
   -> rejection
 behaviorallyRejectedReason (BehaviorallyRejected _ rejection) = rejection
 
+-- | The sealed selected partition in original callback order.
 behavioralSelectionBatchSelected
   :: BehavioralSelectionBatch candidate retained rejection
   -> [BehaviorallySelected candidate retained]
 behavioralSelectionBatchSelected
     (BehavioralSelectionBatch selected _) = selected
 
+-- | The sealed rejected partition in original callback order.
 behavioralSelectionBatchRejected
   :: BehavioralSelectionBatch candidate retained rejection
   -> [BehaviorallyRejected candidate rejection]
