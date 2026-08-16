@@ -159,9 +159,13 @@ import Leant.Synth.Length.Contract.File.Acquire
   , mkLengthContractFileRequest
   )
 import Leant.Synth.Length.Presentation
-  ( lengthCandidatePresentationNote
+  ( LengthCandidateRejectionPresentation
+  , lengthCandidatePresentationNote
   , lengthCandidatePresentationText
+  , lengthCandidateRejectionPresentationNote
+  , lengthCandidateRejectionPresentationText
   , presentLengthAssessment
+  , presentLengthAssessmentRejections
   )
 import Leant.Synth.Observability
   ( VerificationFailureClass (..)
@@ -1055,7 +1059,10 @@ helpText = unlines
   , "  :search TEXT             search declaration names (case-insensitive)"
   , "  :search? TYPE            proof search: what proves TYPE? (via exact?)"
   , "  :synth TYPE              synthesize verified terms of TYPE (LJT engine)"
-  , "  :synth --length-contract ABSOLUTE-PATH -- TYPE"
+  , "  :synth --behavior-mode filter -- TYPE"
+  , "                           filter with the activated startup contract"
+  , "  :synth [--behavior-mode rank|filter]"
+  , "         --length-contract ABSOLUTE-PATH -- TYPE"
   , "                           use one contract file for this command only"
   , "                           candidates are bound as it1 (= it), it2, ..."
   , "  :set synth-engine E      djinn (default) | exference | both"
@@ -1846,7 +1853,8 @@ cmdSynth :: St -> String -> IO ()
 cmdSynth st rawArg = do
   case parseLengthSynthCommand rawArg of
     Left _ -> emitLn st =<< cRed st
-      ("usage: :synth [--length-contract ABSOLUTE-PATH --] TYPE " ++
+      ("usage: :synth TYPE | :synth [--behavior-mode rank|filter] " ++
+       "[--length-contract ABSOLUTE-PATH] -- TYPE " ++
        "(TYPE may be empty in prove mode / after a `sorry`)")
     Right command -> do
       state <- readIORef st
@@ -1892,14 +1900,18 @@ lengthAssessmentRequestForCommand
   -> LengthSynthCommand
   -> IO (Either String LengthAssessmentRequest)
 lengthAssessmentRequestForCommand state command =
-  case lengthSynthCommandContractPath command of
-    Nothing -> pure $ Right $ startupLengthAssessmentRequest
-      $ rsLengthAssessmentMode state
-    Just path -> case authorizeExplicitLengthAssessmentRequest
-        $ rsLengthAssessmentMode state of
-      Left failure -> pure $ Left
-        $ "one-shot finite-spine Length contract rejected before IO: "
+  let behavior = lengthSynthCommandBehaviorMode command
+      mode = rsLengthAssessmentMode state
+      rejectedBeforeIO failure = Left
+        $ "finite-spine Length request rejected before IO: "
             ++ show failure
+  in
+  case lengthSynthCommandContractPath command of
+    Nothing -> pure $ case startupLengthAssessmentRequest behavior mode of
+      Left failure -> rejectedBeforeIO failure
+      Right assessmentRequest -> Right assessmentRequest
+    Just path -> case authorizeExplicitLengthAssessmentRequest behavior mode of
+      Left failure -> pure $ rejectedBeforeIO failure
       Right permission -> case mkLengthContractFileRequest
           $ LengthContractFileSource path
               lengthContractFileDefaultTimeoutMilliseconds of
@@ -2664,18 +2676,29 @@ verifyAndDisplay assessmentRequest st args goal groups = do
   forM_ (lengthAssessmentFailure assessment) $ \failure -> do
     prefix <- cYellow st "warning: "
     emitLn st $ prefix ++
-      "finite-spine Length counterexample ranking preserved callback " ++
-      "order: " ++
+      "finite-spine Length behavioral assessment preserved all verified " ++
+      "candidates: " ++
       show failure
   let presentations = presentLengthAssessment assessment
+      rejections = presentLengthAssessmentRejections assessment
       -- Keep callback acceptance, semantic origin, and original renderer
       -- ordinal together through semantic presentation. Candidate text and
-      -- any model-relative note are projected from one opaque ranked receipt;
+      -- any model-relative note are projected from one opaque ranked or
+      -- selected receipt;
       -- rsSynthIts intentionally remains the established user-facing
       -- text/splice cache rather than a trust store.
       shown = map lengthCandidatePresentationText presentations
   if null shown
-    then pure False
+    then if null rejections
+      then pure False
+      else do
+        -- An accepted filter can intentionally remove the whole verified
+        -- batch.  This is a handled synthesis result, but it creates no itN
+        -- bindings and invalidates the previous synthesis splice cache.
+        modifyIORef' st (\s -> s
+          { rsSynthIts = [], rsSynthItsProve = False })
+        reportLengthAssessmentRejections st rejections
+        pure True
     else do
       proving <- isJust . rsProve <$> readIORef st
       splices <-
@@ -2702,7 +2725,21 @@ verifyAndDisplay assessmentRequest st args goal groups = do
         emitLn st ("  " ++ label ++ "  " ++ term)
         forM_ (lengthCandidatePresentationNote presentation) $ \note ->
           emitLn st ("       " ++ note)
+      reportLengthAssessmentRejections st rejections
       pure True
+
+reportLengthAssessmentRejections
+  :: St
+  -> [LengthCandidateRejectionPresentation]
+  -> IO ()
+reportLengthAssessmentRejections st rejections =
+  forM_ rejections $ \rejection -> do
+    label <- cYellow st "rejected"
+    emitLn st
+      ("  " ++ label ++ "  "
+        ++ lengthCandidateRejectionPresentationText rejection)
+    emitLn st
+      ("            " ++ lengthCandidateRejectionPresentationNote rejection)
 
 -- | Leave prove mode.  Prove-scoped `itN` splices mention the goal's
 -- hypotheses and stop making sense outside the proof, so they go too.
@@ -3395,7 +3432,10 @@ proveHelp = unlines
   , "  :auto              try common finishing tactics on the current goal"
   , "  :synth             synthesize terms for the goal, with the hypotheses"
   , "                     as premises (then `exact it1` records the step)"
-  , "  :synth --length-contract ABSOLUTE-PATH --"
+  , "  :synth --behavior-mode filter --"
+  , "                     filter with the activated startup Length contract"
+  , "  :synth [--behavior-mode rank|filter]"
+  , "         --length-contract ABSOLUTE-PATH --"
   , "                     use one Length contract for this command's goal"
   , "  :qed [NAME]        finish - save as `theorem NAME` in the session"
   , "                     (a `def` if the statement is not a proposition)"

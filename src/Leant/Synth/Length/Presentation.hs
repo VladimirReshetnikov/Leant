@@ -1,15 +1,24 @@
 -- | Association-safe terminal presentation of finite-spine Length evidence.
 --
 -- Candidate text and its optional semantic note enter one opaque value from
--- the same ranked receipt.  Main can therefore bind and display a reordered
--- candidate without ever zipping it to a separately projected evidence list.
+-- the same ranked or selected receipt.  Rejected candidates use a separate
+-- opaque presentation projected directly from their sealed wrappers.  Main
+-- never zips detached candidates and evidence.
 module Leant.Synth.Length.Presentation
   ( LengthCandidatePresentation
+  , LengthCandidateRejectionPresentation
   , presentLengthAssessment
+  , presentLengthAssessmentRejections
   , presentLengthPostVerificationResult
   , presentLengthSpinePairPostVerificationResult
+  , presentLengthSelectionResult
+  , presentLengthSpinePairSelectionResult
   , lengthCandidatePresentationText
   , lengthCandidatePresentationNote
+  , lengthCandidateRejectionPresentationText
+  , lengthCandidateRejectionPresentationNote
+  , renderLengthSelectionRejectionNote
+  , renderLengthSpinePairSelectionRejectionNote
   , renderLengthCounterexampleNote
   , renderLengthCounterexampleSimplificationNote
   , renderLengthInputBoxValidationNote
@@ -79,11 +88,21 @@ import Leant.Synth.Engine
   ( DetailedVerificationVariant
   , detailedVerificationVariantText
   )
+import Leant.Synth.BehavioralSelection
+  ( BehaviorallyRejected
+  , BehaviorallySelected
+  , behaviorallyRejectedReason
+  , behaviorallyRejectedVerified
+  , behaviorallySelectedRetention
+  , behaviorallySelectedVerified
+  )
 import Leant.Synth.Length.Integration
   ( LengthAssessmentResult
   , lengthAssessmentCandidates
   , lengthAssessmentRanking
+  , lengthAssessmentSelectionResult
   , lengthAssessmentSpinePairRanking
+  , lengthAssessmentSpinePairSelectionResult
   )
 import Leant.Synth.Length.PostVerification
   ( LengthPostVerificationResult
@@ -99,6 +118,20 @@ import Leant.Synth.Length.Ranking
   , rankedLengthCandidateCounterexampleSimplification
   , rankedLengthCandidateVerified
   )
+import Leant.Synth.Length.Selection
+  ( LengthSelectionRejection
+  , LengthSelectionResult
+  , LengthSelectionRetention
+  , LengthSelectionRetentionClass (..)
+  , lengthSelectionCandidates
+  , lengthSelectionRejected
+  , lengthSelectionRejectionCounterexample
+  , lengthSelectionRejectionCounterexampleSimplification
+  , lengthSelectionRetentionApplicableDomain
+  , lengthSelectionRetentionClass
+  , lengthSelectionRetentionInputBox
+  , lengthSelectionSelected
+  )
 import Leant.Synth.Length.SpinePair.PostVerification
   ( LengthSpinePairPostVerificationResult
   , lengthSpinePairPostVerificationCandidates
@@ -113,6 +146,20 @@ import Leant.Synth.Length.SpinePair.Ranking
   , rankedLengthSpinePairCandidateCounterexampleSimplification
   , rankedLengthSpinePairCandidateVerified
   )
+import Leant.Synth.Length.SpinePair.Selection
+  ( LengthSpinePairSelectionRejection
+  , LengthSpinePairSelectionResult
+  , LengthSpinePairSelectionRetention
+  , LengthSpinePairSelectionRetentionClass (..)
+  , lengthSpinePairSelectionCandidates
+  , lengthSpinePairSelectionRejected
+  , lengthSpinePairSelectionRejectionCounterexample
+  , lengthSpinePairSelectionRejectionCounterexampleSimplification
+  , lengthSpinePairSelectionRetentionApplicableDomain
+  , lengthSpinePairSelectionRetentionClass
+  , lengthSpinePairSelectionRetentionInputBox
+  , lengthSpinePairSelectionSelected
+  )
 import Leant.Synth.Verification
   ( Verified
   , verifiedCandidate
@@ -125,6 +172,11 @@ data LengthCandidatePresentation = LengthCandidatePresentation
   String
   (Maybe String)
 
+-- | One omitted candidate and the exact independently replayed evidence
+-- retained by that same sealed rejection occurrence.
+data LengthCandidateRejectionPresentation =
+  LengthCandidateRejectionPresentation String String
+
 lengthCandidatePresentationText
   :: LengthCandidatePresentation
   -> String
@@ -135,18 +187,49 @@ lengthCandidatePresentationNote
   -> Maybe String
 lengthCandidatePresentationNote (LengthCandidatePresentation _ note) = note
 
--- | Choose exactly one presentation source.  An accepted ranking is traversed
--- through its opaque candidate/evidence association; disabled or rejected
--- assessment uses the established candidate projection with no semantic note.
+lengthCandidateRejectionPresentationText
+  :: LengthCandidateRejectionPresentation
+  -> String
+lengthCandidateRejectionPresentationText
+    (LengthCandidateRejectionPresentation text _) = text
+
+lengthCandidateRejectionPresentationNote
+  :: LengthCandidateRejectionPresentation
+  -> String
+lengthCandidateRejectionPresentationNote
+    (LengthCandidateRejectionPresentation _ note) = note
+
+-- | Choose exactly one survivor presentation source.  Accepted rankings and
+-- filters are traversed through opaque candidate/evidence associations;
+-- disabled or preserve-all assessment uses the effective candidate projection
+-- with no semantic note.
 presentLengthAssessment
   :: LengthAssessmentResult
   -> [LengthCandidatePresentation]
-presentLengthAssessment assessment = case lengthAssessmentRanking assessment of
-  Just ranking -> presentLengthRanking ranking
-  Nothing -> case lengthAssessmentSpinePairRanking assessment of
-    Just ranking -> presentLengthSpinePairRanking ranking
-    Nothing -> map presentUnassessedCandidate
-      $ lengthAssessmentCandidates assessment
+presentLengthAssessment assessment = case
+    lengthAssessmentSelectionResult assessment of
+  Just selected -> presentLengthSelectionResult selected
+  Nothing -> case lengthAssessmentSpinePairSelectionResult assessment of
+    Just selected -> presentLengthSpinePairSelectionResult selected
+    Nothing -> case lengthAssessmentRanking assessment of
+      Just ranking -> presentLengthRanking ranking
+      Nothing -> case lengthAssessmentSpinePairRanking assessment of
+        Just ranking -> presentLengthSpinePairRanking ranking
+        Nothing -> map presentUnassessedCandidate
+          $ lengthAssessmentCandidates assessment
+
+-- | Present omitted occurrences separately from survivors.  Ranking,
+-- disabled assessment, and preserve-all filter failures have no rejections.
+-- Accepted filters traverse only the sealed associated rejection wrappers.
+presentLengthAssessmentRejections
+  :: LengthAssessmentResult
+  -> [LengthCandidateRejectionPresentation]
+presentLengthAssessmentRejections assessment = case
+    lengthAssessmentSelectionResult assessment of
+  Just selected -> presentLengthSelectionRejections selected
+  Nothing -> case lengthAssessmentSpinePairSelectionResult assessment of
+    Just selected -> presentLengthSpinePairSelectionRejections selected
+    Nothing -> []
 
 -- | Present one completed occurrence-sealed adapter result. Rejection has no
 -- ranking and therefore no semantic note; accepted output traverses the same
@@ -170,6 +253,108 @@ presentLengthSpinePairPostVerificationResult result = case
   Just ranking -> presentLengthSpinePairRanking ranking
   Nothing -> map presentUnassessedCandidate
     $ lengthSpinePairPostVerificationCandidates result
+
+-- | Present scalar filter survivors through their associated retention
+-- wrappers.  Preserve-all failure remains an unannotated original batch.
+presentLengthSelectionResult
+  :: LengthSelectionResult
+  -> [LengthCandidatePresentation]
+presentLengthSelectionResult result = case lengthSelectionSelected result of
+  Nothing -> map presentUnassessedCandidate $ lengthSelectionCandidates result
+  Just selected -> map presentLengthSelectionCandidate selected
+
+-- | Present pair-domain filter survivors without detaching retention evidence
+-- from the candidate occurrence which owns it.
+presentLengthSpinePairSelectionResult
+  :: LengthSpinePairSelectionResult
+  -> [LengthCandidatePresentation]
+presentLengthSpinePairSelectionResult result = case
+    lengthSpinePairSelectionSelected result of
+  Nothing -> map presentUnassessedCandidate
+    $ lengthSpinePairSelectionCandidates result
+  Just selected -> map presentLengthSpinePairSelectionCandidate selected
+
+presentLengthSelectionCandidate
+  :: BehaviorallySelected
+      DetailedVerificationVariant LengthSelectionRetention
+  -> LengthCandidatePresentation
+presentLengthSelectionCandidate selected = LengthCandidatePresentation
+  (verifiedText $ behaviorallySelectedVerified selected)
+  $ presentLengthSelectionRetention
+  $ behaviorallySelectedRetention selected
+
+presentLengthSelectionRetention
+  :: LengthSelectionRetention
+  -> Maybe String
+presentLengthSelectionRetention retention = case
+    lengthSelectionRetentionClass retention of
+  LengthSelectionBoundedPositive -> renderLengthInputBoxValidationNote
+    <$> lengthSelectionRetentionInputBox retention
+  LengthSelectionApplicableDomainEstablished ->
+    renderLengthApplicableDomainValidationNote
+      <$> lengthSelectionRetentionApplicableDomain retention
+  LengthSelectionPreparationRefused -> Nothing
+  LengthSelectionUnassessed -> Nothing
+  LengthSelectionHeuristic -> Nothing
+
+presentLengthSpinePairSelectionCandidate
+  :: BehaviorallySelected
+      DetailedVerificationVariant LengthSpinePairSelectionRetention
+  -> LengthCandidatePresentation
+presentLengthSpinePairSelectionCandidate selected = LengthCandidatePresentation
+  (verifiedText $ behaviorallySelectedVerified selected)
+  $ presentLengthSpinePairSelectionRetention
+  $ behaviorallySelectedRetention selected
+
+presentLengthSpinePairSelectionRetention
+  :: LengthSpinePairSelectionRetention
+  -> Maybe String
+presentLengthSpinePairSelectionRetention retention = case
+    lengthSpinePairSelectionRetentionClass retention of
+  LengthSpinePairSelectionBoundedPositive ->
+    renderLengthSpinePairInputBoxValidationNote
+      <$> lengthSpinePairSelectionRetentionInputBox retention
+  LengthSpinePairSelectionApplicableDomainEstablished ->
+    renderLengthSpinePairApplicableDomainValidationNote
+      <$> lengthSpinePairSelectionRetentionApplicableDomain retention
+  LengthSpinePairSelectionPreparationRefused -> Nothing
+  LengthSpinePairSelectionUnassessed -> Nothing
+  LengthSpinePairSelectionHeuristic -> Nothing
+
+presentLengthSelectionRejections
+  :: LengthSelectionResult
+  -> [LengthCandidateRejectionPresentation]
+presentLengthSelectionRejections result = case lengthSelectionRejected result of
+  Nothing -> []
+  Just rejected -> map presentLengthSelectionRejection rejected
+
+presentLengthSelectionRejection
+  :: BehaviorallyRejected
+      DetailedVerificationVariant LengthSelectionRejection
+  -> LengthCandidateRejectionPresentation
+presentLengthSelectionRejection rejected =
+  LengthCandidateRejectionPresentation
+    (verifiedText $ behaviorallyRejectedVerified rejected)
+    (renderLengthSelectionRejectionNote
+      $ behaviorallyRejectedReason rejected)
+
+presentLengthSpinePairSelectionRejections
+  :: LengthSpinePairSelectionResult
+  -> [LengthCandidateRejectionPresentation]
+presentLengthSpinePairSelectionRejections result = case
+    lengthSpinePairSelectionRejected result of
+  Nothing -> []
+  Just rejected -> map presentLengthSpinePairSelectionRejection rejected
+
+presentLengthSpinePairSelectionRejection
+  :: BehaviorallyRejected
+      DetailedVerificationVariant LengthSpinePairSelectionRejection
+  -> LengthCandidateRejectionPresentation
+presentLengthSpinePairSelectionRejection rejected =
+  LengthCandidateRejectionPresentation
+    (verifiedText $ behaviorallyRejectedVerified rejected)
+    (renderLengthSpinePairSelectionRejectionNote
+      $ behaviorallyRejectedReason rejected)
 
 -- | Present a complete association-free ranking without separating any
 -- candidate from the assessment retained by its opaque ranked receipt.
@@ -232,6 +417,30 @@ verifiedText
   :: Verified DetailedVerificationVariant
   -> String
 verifiedText = detailedVerificationVariantText . verifiedCandidate
+
+-- | Render the exact scalar replay evidence which authorized omission.  The
+-- optional independently replayed reduction is preferred when available;
+-- the ordinary replay receipt remains mandatory in the opaque rejection.
+renderLengthSelectionRejectionNote
+  :: LengthSelectionRejection
+  -> String
+renderLengthSelectionRejectionNote rejection = case
+    lengthSelectionRejectionCounterexampleSimplification rejection of
+  Just simplification ->
+    renderLengthCounterexampleSimplificationNote simplification
+  Nothing -> renderLengthCounterexampleNote
+    $ lengthSelectionRejectionCounterexample rejection
+
+-- | Nominal binary-product sibling of the scalar rejection renderer.
+renderLengthSpinePairSelectionRejectionNote
+  :: LengthSpinePairSelectionRejection
+  -> String
+renderLengthSpinePairSelectionRejectionNote rejection = case
+    lengthSpinePairSelectionRejectionCounterexampleSimplification rejection of
+  Just simplification ->
+    renderLengthSpinePairCounterexampleSimplificationNote simplification
+  Nothing -> renderLengthSpinePairCounterexampleNote
+    $ lengthSpinePairSelectionRejectionCounterexample rejection
 
 -- | Render one sanitized, bounded user-facing claim.  The counterexample is a
 -- finite-spine model result, not automatically a realized Lean counterexample.
