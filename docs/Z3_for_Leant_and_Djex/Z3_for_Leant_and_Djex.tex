@@ -53,7 +53,7 @@
   linkcolor=Navy,
   citecolor=Green,
   urlcolor=Blue,
-  pdfauthor={OpenAI},
+  pdfauthor={A beginner's guide to Z3 for the Leant and Djex projects},
   pdftitle={Z3 from First Principles: A Beginner's Guide for Leant and Djex},
   pdfsubject={SMT, SMT-LIB, counterexample search, robust solver integration, and behavioral synthesis in Leant and Djex},
   pdfkeywords={Z3, SMT, SMT-LIB, QF-LIA, Leant, Djex, Lean 4, synthesis, CEGIS, counterexample, verification}
@@ -123,7 +123,7 @@
 \newcommand{\RepoLeant}{\href{https://github.com/VladimirReshetnikov/Leant}{Leant}}
 \newcommand{\RepoDjex}{\href{https://github.com/VladimirReshetnikov/Djex}{Djex}}
 \newcommand{\RepoZthree}{\href{https://github.com/Z3Prover/z3}{Z3}}
-\def\LeantCommit{49c8f9f100a644b5a32b3c942bc6565a3a3ba6a0}
+\def\LeantCommit{494259dbd85ae2e6749246b08377f44b2f9936ac}
 \def\DjexCommit{0cf82f2aa22debb1de2c7aaa13a2abbe190550d8}
 \def\DjexPinnedCommit{7d65eba6f753727ae7b3d734fb4a7e00f1f44aa7}
 \def\ZthreeCommit{bc4585e0ba5b1041f301b0c16ba652645729e796}
@@ -385,6 +385,28 @@ Instead of asking Z3 to ``prove'' the implication directly, assert its negation:
   x\ge 0 \land y\ge 0 \land x+y<0.
 \]
 If this counterexample condition is unsatisfiable, no counterexample exists in the chosen mathematical theory.
+Here is the same derivation as an executable script. Each conjunct of the negation becomes its own \code{assert}; a set of assertions is always read as a conjunction:
+
+\begin{lstlisting}[language=SMTLib,caption={Checking validity by asserting the negation.}]
+(set-logic QF_LIA)
+(declare-const x Int)
+(declare-const y Int)
+(assert (>= x 0))
+(assert (>= y 0))
+(assert (< (+ x y) 0))
+(check-sat)
+\end{lstlisting}
+
+Z3 answers \unsat: no nonnegative integers have a negative sum, so the implication is valid. It is instructive to break the property. Replace the last assertion by \code{(assert (not (> (+ x y) 0)))}, that is, ask whether $x+y>0$ can fail, and add \code{(get-value (x y))} after the check. Z3 now answers
+
+\begin{lstlisting}[language=SMTLib]
+sat
+((x 0)
+ (y 0))
+\end{lstlisting}
+
+The strict version of the claim is false, and the model is exactly the counterexample a human would give. (Writing the negation as one formula, \code{(assert (not (=> (and (>= x 0) (>= y 0)) (>= (+ x y) 0))))}, is equivalent and also yields \unsat; splitting it into conjuncts merely makes each hypothesis visible.)
+
 
 This transformation is the bridge to behavioral checking. Let $P(x)$ be a precondition, let $C(x)$ be the result computed by a candidate, and let $Q(x,C(x))$ be the desired postcondition. The candidate is wrong exactly when
 \begin{equation}
@@ -458,7 +480,7 @@ Parameterized sorts include arrays and sequences:
 \]
 Users can also declare uninterpreted sorts and algebraic datatypes.
 
-Sort checking prevents nonsense such as adding a Boolean to an integer. This resembles static type checking, but Z3's sort system is much simpler than Lean's dependent type theory. It has no universe polymorphism, dependent function type, implicit argument elaboration, or type-class synthesis.
+Sort checking rejects ill-sorted terms: with \code{x : Int} and \code{p : Bool}, the term \code{(and x p)} is refused with a ``Sort mismatch'' error, and an \code{Int} can never be equated with a bit-vector (``Sorts Int and (\_ BitVec 8) are incompatible''). Z3's front end is, however, more lenient than the SMT-LIB standard in a few places: it silently inserts \code{to_real} when an \code{Int} meets a \code{Real}, and Z3~5.0.0 even accepts \code{(+ x p)} with \code{p : Bool}, reading it as $x+\operatorname{ite}(p,1,0)$ instead of reporting an error. Generated queries should never rely on such coercions. Sort checking resembles static type checking, but Z3's sort system is much simpler than Lean's dependent type theory. It has no universe polymorphism, dependent function type, implicit argument elaboration, or type-class synthesis.
 
 \begin{pitfall}
 Do not identify a Z3 sort with an arbitrary Lean type. A domain designer chooses a mathematical abstraction. A Lean \code{List a} may be represented only by its natural-number length; an arbitrary state type may be represented by an uninterpreted sort; a \code{UInt32} may be represented by a 32-bit bit-vector. The abstraction is part of the contract.
@@ -615,9 +637,32 @@ SMT-LIB names standard fragments with compact identifiers. The name \QFLIA{} dec
 \end{tabular}
 \end{center}
 
-``Linear'' means variables are not multiplied by one another and do not occur with variable exponents. Constant scaling such as $7x$ is linear; $xy$ and $x^2$ are nonlinear. Related names include \textsf{QF\_LRA} for linear real arithmetic, \QFBV{} for quantifier-free bit-vectors, and \textsf{QF\_AUFLIA} for arrays plus uninterpreted functions plus linear integer arithmetic.
+``Linear'' means variables are not multiplied by one another and do not occur with variable exponents. Constant scaling such as $7x$ is linear; $xy$ and $x^2$ are nonlinear. Related names include \textsf{QF\_LRA} for linear real arithmetic, \textsf{QF\_UFLIA} for uninterpreted functions plus linear integer arithmetic, \QFBV{} for quantifier-free bit-vectors, and \textsf{QF\_AUFLIA} for arrays plus uninterpreted functions plus linear integer arithmetic. Two Z3-specific names are also common: \textsf{ALL} enables every theory Z3 knows, and \textsf{HORN} selects the constrained-Horn-clause engine of Chapter~\ref{chap:chc}.
 
 The \code{set-logic} command communicates the intended fragment. It can select specialized behavior, validate feature use, and document the encoding. It is not merely a comment.
+\begin{pitfall}
+Z3 really does check the declared logic, and it does not stop after complaining. Under \code{(set-logic QF_LIA)}, declaring an uninterpreted function \code{(declare-fun f (Int) Int)} yields \code{(error "... logic does not support uninterpreted functions")}, a quantifier yields \code{logic does not support quantifiers}, and a product of two variables yields \code{logic does not support nonlinear arithmetic}. The dangerous part is what happens next: the offending command is discarded and the script continues.
+
+\begin{lstlisting}[language=SMTLib]
+(set-logic QF_LIA)
+(declare-const x Int)
+(assert (> x 5))
+(assert (< (* x x) 10))
+(check-sat)
+(get-value (x))
+\end{lstlisting}
+
+Z3~5.0.0 prints
+
+\begin{lstlisting}[language=SMTLib]
+(error "line 4 column 22: logic does not support nonlinear arithmetic")
+sat
+((x 6))
+\end{lstlisting}
+
+The \sat{} and the ``model'' $x=6$ refer to the remaining assertion only; the intended problem ($x>5\land x^2<10$) is unsatisfiable. A driver that scans stdout for \code{sat} and then reads values would accept a counterexample for a query that was never checked. Any \code{(error ...)} line must abort the whole transaction, and the exit code (Z3 exits with~1 after an error) is not enough because the wrong answers have already been printed. Djex's response parser rejects such transcripts; a hand-written harness must do the same.
+\end{pitfall}
+
 
 \section{Decidable does not mean cheap}
 
@@ -698,13 +743,49 @@ A replayed counterexample is asymmetric evidence: one concrete witness is enough
 
 \section{What \texttt{unknown} means}
 
-\unknown{} means ``the selected procedure did not return sat or unsat.'' Z3 can provide a reason in some interfaces, but the reason is diagnostic, not a theorem. Quantifiers, nonlinear arithmetic, incomplete theory combinations, and configured time/resource limits are common causes.
+\unknown{} means ``the selected procedure did not return sat or unsat.'' In SMT-LIB, the command \code{(get-info :reason-unknown)} issued after an \unknown{} answer returns a short diagnostic string---in Z3~5.0.0 typically \code{"timeout"} (a soft \code{:timeout} expired), \code{"canceled"} (an \code{:rlimit} resource budget was exhausted), or a text such as \code{"(incomplete quantifiers)"} (the procedure gave up)---but the reason is diagnostic, not a theorem. Quantifiers, nonlinear arithmetic, incomplete theory combinations, and configured time/resource limits are common causes.
 
 Unknown should be a first-class policy case. For hard behavioral filtering, the safe default is to retain the candidate. For ranking, an unknown observation may place the candidate in a neutral tier. For an explicitly strict mode, the user may choose to reject inconclusive candidates, but that is a policy decision, not logical evidence of failure.
+\subsection*{What the outcomes look like on the wire}
+
+Table~\ref{tab:outcomes} lists what a driver actually observes for each outcome, verified with Z3~5.0.0. The scripts are small: the ``timeout'' and ``canceled'' rows use the nonlinear query $x^3+y^3=z^3$ with $x,y,z>0$ (Fermat's equation for exponent~3, which Z3 cannot decide), preceded by \code{(set-option :timeout 1000)} or \code{(set-option :rlimit 100000)}; the ``incomplete quantifiers'' row uses
+
+\begin{lstlisting}[language=SMTLib]
+(set-option :smt.mbqi false)
+(set-option :auto_config false)
+(declare-fun f (Int) Int)
+(assert (forall ((x Int)) (! (>= (f x) 0) :pattern ((f x)))))
+(assert (= (f 3) 5))
+(check-sat)
+(get-info :reason-unknown)
+\end{lstlisting}
+
+which is satisfiable (with model-based instantiation left on, Z3 answers \sat{} and prints the model $f=[3\mapsto5,\text{else}\mapsto0]$), but pattern-based instantiation alone cannot establish either answer.
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}L{0.24\textwidth}L{0.30\textwidth}Y@{}}
+\toprule
+Outcome & Observed output & What it does and does not tell you \\
+\midrule
+\sat & \code{sat}, then values on request & A model exists for the assertions as encoded. Nothing about uniqueness, minimality, or the fidelity of the encoding. \\
+\unsat & \code{unsat}; \code{get-model} now errors & No model exists for the assertions as encoded. Nothing about vacuity or encoding fidelity. \\
+\unknown{} (soft timeout) & \code{unknown}, then \code{(:reason-unknown "timeout")} & The \code{:timeout} budget expired. The instance may be trivially sat or unsat under a larger budget. \\
+\unknown{} (resource limit) & \code{unknown}, then \code{(:reason-unknown "canceled")} & The \code{:rlimit} budget expired. Deterministic across runs of the same build, unlike wall-clock timeouts. \\
+\unknown{} (incompleteness) & \code{unknown}, then e.g. \code{(:reason-unknown "smt tactic failed to show goal to be sat/unsat (incomplete quantifiers)")} & The procedure gave up without exhausting a budget; more time will not help, a different encoding or option might. \\
+Hard timeout (\code{z3 -T:5}) & The single line \code{timeout}; the process exits & Not an SMT-LIB status at all. No \code{get-info} is possible because the process is gone. \\
+Error & \code{(error "...")} lines interleaved with normal answers & A command was rejected; later answers refer to a different problem than intended. \\
+No output / partial output & (nothing, or a truncated S-expression) & Crash, kill, or transport failure. Treat as a driver-level failure, not as \unknown. \\
+\bottomrule
+\end{tabularx}
+\caption{Solver outcomes as observed by a driver, and their evidential value.}
+\label{tab:outcomes}
+\end{table}
+
 
 \section{Models are witnesses, not explanations}
 
-A model demonstrates satisfiability, but it may not explain why the formula is satisfiable in a human-friendly way. Uninterpreted function models often use finite tables with an ``else'' value. Arrays may be represented by stores over a constant array. Algebraic values may contain generated names. Z3 is free to choose any model.
+A model demonstrates satisfiability, but it may not explain why the formula is satisfiable in a human-friendly way. Uninterpreted function models are finite tables with a default (``else'') value, which Z3 prints as a nested \code{ite} chain inside a \code{define-fun}. Arrays may be represented by stores over a constant array. Algebraic values may contain generated names. Z3 is free to choose any model.
 
 If the application needs a small counterexample, it can simplify after replay, add optimization objectives, or search a bounded box in deterministic order. Djex's Length pipeline includes query-owned counterexample simplification and finite input-box validation rather than assuming Z3 returns the nicest values.
 
@@ -817,14 +898,17 @@ Create \filepath{hello.smt2}:
 (exit)
 \end{lstlisting}
 
-A possible response is:
+Z3~5.0.0 answers:
 
 \begin{lstlisting}[language=SMTLib]
 sat
-((x 0) (y 10))
+((x 4)
+ (y 6))
 \end{lstlisting}
 
-The model is allowed to choose any satisfying pair. If one needs $x$ and $y$ to be as close as possible, or $y$ minimal, that preference must be encoded as an optimization objective or enforced by a deterministic outer search.
+Note the layout: \code{get-value} prints one \code{(symbol value)} pair per line inside one outer pair of parentheses, so a response parser must read S-expressions, not lines. The model is allowed to choose any satisfying pair; another Z3 build or another random seed could legitimately print \code{((x 0) (y 10))}. If one needs $x$ and $y$ to be as close as possible, or $y$ minimal, that preference must be encoded as an optimization objective (Section~\ref{sec:opt-example}) or enforced by a deterministic outer search.
+
+Two details of the script are worth knowing. \code{(set-option :produce-models true)} is required by the SMT-LIB standard before \code{get-value} may be used; Z3 happens to produce models by default, so the script works without it, but a portable script should keep it. \code{(exit)} is optional when running a file: Z3 stops at end of input anyway.
 
 \section{Version and capability observations}
 
@@ -877,9 +961,15 @@ Command & Purpose \\
 \code{(check-sat-assuming (...))} & Check under temporary Boolean assumptions. \\
 \code{(get-value (t1 ... tn))} & Evaluate selected terms in the current model. \\
 \code{(get-model)} & Request a representation of the complete model exposed by the solver. \\
-\code{(push 1)} / \code{(pop 1)} & Save and restore assertion-stack scopes. \\
-\code{(reset)} & Reset declarations, assertions, and much solver state. \\
+\code{(push 1)} / \code{(pop 1)} & Save and restore assertion-stack scopes; a \code{pop} also removes declarations made inside the popped scope. \\
+\code{(reset)} & Reset declarations, assertions, and much solver state. (In Z3~5.0.0, options set through \code{set-option}, such as \code{:timeout} or \code{:pp.decimal}, survive a \code{reset}.) \\
 \code{(reset-assertions)} & Remove assertions while retaining declarations where supported. \\
+\code{(get-unsat-core)} & After \unsat, list the named assertions or assumptions used (Chapter~\ref{chap:cores-opt}). \\
+\code{(get-info :reason-unknown)} & After \unknown, return a diagnostic string. \\
+\code{(echo "text")} & Print a string; useful for marking transaction boundaries in a transcript. \\
+\code{(define-fun-rec f (...) R body)} & Define a recursive function (Chapter~\ref{chap:quantifiers}). \\
+\code{(declare-datatypes ...)} & Declare algebraic datatypes (Chapter~\ref{chap:theories}). \\
+\code{(minimize t)} / \code{(maximize t)} / \code{(assert-soft p)} & Optimization objectives and soft constraints (Chapter~\ref{chap:cores-opt}). \\
 \code{(exit)} & End the command session. \\
 \bottomrule
 \end{longtable}
@@ -948,7 +1038,7 @@ Natural numerals such as \code{0}, \code{17}, and \code{1000} are atoms. A negat
 (- 3)
 \end{lstlisting}
 
-Response parsers should follow the accepted grammar rather than assume every integer arrives as a JSON-style signed token. They must also impose explicit bit-width or byte limits before converting attacker- or child-controlled decimal text into unbounded host integers.
+Z3's parser also tolerates \code{-3} on input, but on output it always prints negative values in the application form: \code{(get-value (x))} for a model with $x=-4$ prints \code{((x (- 4)))}. Response parsers should follow the accepted grammar rather than assume every integer arrives as a JSON-style signed token. They must also impose explicit bit-width or byte limits before converting attacker- or child-controlled decimal text into unbounded host integers.
 
 \section{Why \texttt{get-value} is often better than \texttt{get-model}}
 
@@ -967,8 +1057,25 @@ Never ask the solver for a derived result merely because recomputing it is incon
 \end{trustbox}
 
 \section{The model is valid only after a successful check}
+\label{sec:model-after-check}
 
-A value or model request is meaningful only after a satisfiable check in the same coherent solver state. Asking for a model after \unsat, after \unknown, after a reset, or after unrelated assertions have changed is a protocol error or at least application misuse.
+A value or model request is meaningful only after a satisfiable check in the same coherent solver state. Asking for a model after \unsat, after \unknown, after a reset, or after unrelated assertions have changed is a protocol error or at least application misuse. Z3 reports it as an error, and---importantly for a driver---keeps executing the rest of the script:
+
+\begin{lstlisting}[language=SMTLib,caption={Model requests outside a satisfiable state. Z3 5.0.0 prints an error line for the premature request, then continues.}]
+(declare-const x Int)
+(assert (> x 0))
+(get-value (x))
+(check-sat)
+(get-value (x))
+\end{lstlisting}
+
+\begin{lstlisting}[language=SMTLib]
+(error "line 3 column 14: model is not available")
+sat
+((x 1))
+\end{lstlisting}
+
+The same \code{model is not available} error is printed for \code{(get-model)} after an \unsat{} answer, for \code{(get-value ...)} after an \unknown{} answer that produced no candidate model, and for \code{(get-value ...)} issued after a \code{pop} that discarded the scope in which the last \code{check-sat} ran. The process exit code becomes~1 once any error has been printed, but the remaining commands still run and still print answers.
 
 A robust driver therefore treats ``check, inspect status, conditionally request values, consume exact response'' as one transaction. Djex's causal protocol associates output with an ordinal/barrier internally so that stale output cannot be mistaken for the current query.
 
@@ -992,6 +1099,8 @@ Incremental solving reuses a stable base:
 \end{lstlisting}
 
 Declarations and base assertions remain while scoped assertions are removed. This can be much faster than recreating a solver, but it also introduces state-contamination risks. A lost \code{pop}, an unexpected error, or a partially consumed response can corrupt later transactions.
+Z3~5.0.0 answers \code{sat} twice for the script above ($x=0$ satisfies the first scope, $x=101$ the second); without the \code{pop} between them, the second check would be \unsat{} because $x<5$ and $x>100$ would both be in force. Two consequences of scoping are easy to overlook. First, a declaration made inside a scope disappears with it: declaring \code{y} after \code{(push 1)} and mentioning it after \code{(pop 1)} produces \code{(error "... unknown constant y")}. Second, the model of a check performed inside a scope is gone after the \code{pop}; a \code{get-value} issued then produces \code{model is not available} until a new \code{check-sat} runs (Section~\ref{sec:model-after-check}). Popping more levels than were pushed is also an error (\code{invalid pop command, argument is greater than the current stack depth}).
+
 
 The current Length live protocol uses a reset-oriented, serialized transaction profile and probes that profile at startup. The planned typed-sketch/CEGIS protocol will need a new explicitly fingerprinted incremental state machine; it should not quietly repurpose the Length protocol.
 
@@ -1087,6 +1196,39 @@ A schematic lowering is:
 \end{lstlisting}
 
 Only original input symbols are requested from the model. The evaluator recomputes quotient/modulo independently during replay.
+\begin{pitfall}
+Beginners often reach for the built-in \code{div} and \code{mod} instead of witness equations, and are then surprised by their semantics. SMT-LIB integer division is \emph{Euclidean}: the remainder is always nonnegative, so the quotient rounds toward $-\infty$ for a positive divisor and toward $+\infty$ for a negative one. Verified with Z3~5.0.0:
+
+\begin{lstlisting}[language=SMTLib]
+(declare-const a Int)
+(declare-const b Int)
+(assert (= a (div (- 7) 2)))
+(assert (= b (mod (- 7) 2)))
+(check-sat)
+(get-value (a b (div 7 (- 2)) (mod 7 (- 2))))
+\end{lstlisting}
+
+\begin{lstlisting}[language=SMTLib]
+sat
+((a (- 4))
+ (b 1)
+ ((div 7 (- 2)) (- 3))
+ ((mod 7 (- 2)) 1))
+\end{lstlisting}
+
+C, Java, and Haskell's \code{quot}/\code{rem} truncate toward zero ($-7/2=-3$ with remainder $-1$); Haskell's \code{div}/\code{mod} floor (\code{7 `div` (-2)} is $-4$ with remainder $-1$). Neither matches SMT-LIB in general, so ``the same'' expression can denote different integers in the query and in the replay evaluator. Division by zero is worse: SMT-LIB makes \code{(div x 0)} and \code{(mod x 0)} \emph{total but unconstrained}, so the solver may pick any value. The script
+
+\begin{lstlisting}[language=SMTLib]
+(declare-const a Int)
+(assert (= a (div 7 0)))
+(assert (= (div 8 0) 42))
+(check-sat)
+(get-value (a (div 8 0)))
+\end{lstlisting}
+
+is \sat{} (Z3 prints \code{((a 42) ((div 8 0) 42))}); a query with an unguarded division can thus be satisfied by an assignment that no program would ever compute. Explicit witness equations with a positive literal divisor, as in the lowering above, sidestep both problems and keep the query in a fragment whose semantics the replay evaluator can reproduce exactly.
+\end{pitfall}
+
 
 \section{A complete counterexample query}
 \label{sec:qflia-example}
@@ -1140,7 +1282,7 @@ Djex's applicable-domain validators separately track whether any assignment sati
 
 \section{Real arithmetic}
 
-SMT-LIB \code{Real} denotes exact mathematical reals, represented symbolically by rational and algebraic values. It is not IEEE floating point. Mixed integer/real formulas require explicit or theory-defined coercions such as \code{to_real}; one should not assume programming-language implicit conversions.
+SMT-LIB \code{Real} denotes exact mathematical reals, represented symbolically by rational and algebraic values. It is not IEEE floating point; Z3 prints the rational one half as \code{(/ 1.0 2.0)} unless \code{:pp.decimal} is set. The SMT-LIB standard requires explicit coercions between the sorts: \code{(to_real n)} embeds an integer, \code{(to_int r)} rounds toward $-\infty$ (so \code{(to_int (- 2.7))} is $-3$), and \code{(is_int r)} tests integrality. Z3's parser is lenient and silently inserts \code{to_real} when an \code{Int} term meets a \code{Real} term (\code{(= r (+ x 0.5))} with \code{x : Int} is accepted), but generated encodings should write the coercion explicitly rather than rely on that leniency or on programming-language intuitions.
 
 Linear real arithmetic is useful for geometric constraints, rates, and rational coefficients. It is not currently needed by the Length domain, whose semantic values are naturals.
 
@@ -1190,6 +1332,35 @@ Datatypes can serve two roles:
 \end{enumerate}
 
 For Leant/Djex, the first role is useful for first-order semantic domains. The second should initially be avoided for the main synthesis grammar because Djex already owns a checked typed DAG, including information that would be expensive and risky to duplicate in Z3. Finite selector variables over Djex-prepared alternatives are a cleaner first sketch encoding.
+The SMT-LIB syntax names each datatype with its number of sort parameters, then lists constructors with their named selectors. A tester is written \code{(_ is C)}:
+
+\begin{lstlisting}[language=SMTLib,caption={A two-constructor datatype with selectors and a tester.}]
+(declare-datatypes ((Shape 0))
+  (((circle (radius Int))
+    (rect (w Int) (h Int)))))
+(declare-const s Shape)
+(declare-const t Shape)
+(assert (= (radius s) 3))
+(assert (not ((_ is circle) t)))
+(assert (= (w t) (radius s)))
+(check-sat)
+(get-model)
+\end{lstlisting}
+
+Z3~5.0.0 answers
+
+\begin{lstlisting}[language=SMTLib]
+sat
+(
+  (define-fun s () Shape
+    (circle 3))
+  (define-fun t () Shape
+    (rect 3 2))
+)
+\end{lstlisting}
+
+One caveat matters for encodings: applying a selector to the wrong constructor is not an error but an under-specified value. Adding \code{(assert ((_ is rect) s))} to the script keeps it \sat{} (Z3 chooses \code{(rect 2 4)} for \code{s}, and \code{(radius s)} is then some integer that happens to be~$3$). Encodings should guard every selector by the corresponding tester, exactly as array and sequence reads must be guarded by bounds.
+
 
 \section{Sequences and strings}
 
@@ -1283,6 +1454,28 @@ These mechanisms are valuable for specialized domains, but the pattern set, solv
 SMT-LIB and Z3 support recursive function definitions. Z3 reasons by incremental unfolding and other techniques; it does not thereby perform mathematical induction over arbitrary recursive definitions. This can find bounded counterexamples and solve useful instances, but it is not a general positive-proof method.
 
 For a recursive candidate, bounded unfolding is an under-approximation of all executions: a found counterexample may be replayable, but failure to find one does not establish the property for all recursion depths.
+A small experiment makes the asymmetry concrete. Define the triangular-number function recursively and ask for a counterexample to a false claim:
+
+\begin{lstlisting}[language=SMTLib,caption={A recursive definition and a falsifiable claim.}]
+(define-fun-rec sumTo ((n Int)) Int
+  (ite (<= n 0) 0 (+ n (sumTo (- n 1)))))
+(declare-const n Int)
+(assert (>= n 0))
+(assert (not (= (sumTo n) (* 3 n))))
+(check-sat)
+(get-value (n (sumTo n)))
+\end{lstlisting}
+
+Z3~5.0.0 answers immediately:
+
+\begin{lstlisting}[language=SMTLib]
+sat
+((n 1)
+ ((sumTo n) 1))
+\end{lstlisting}
+
+One unfolding sufficed: $\operatorname{sumTo}(1)=1\ne3$. Now replace the claim by the true identity $2\cdot\operatorname{sumTo}(n)=n(n+1)$, that is, \code{(assert (not (= (* 2 (sumTo n)) (* n (+ n 1)))))}, and add \code{(set-option :timeout 5000)} at the top. Z3 unfolds and unfolds, never finds a counterexample, and eventually prints \code{unknown} with \code{(:reason-unknown "timeout")}: it has no induction principle with which to close the argument. Only after adding the bound \code{(assert (<= n 20))} does it answer \unsat, in about a tenth of a second, because twenty-one unfoldings then exhaust the domain. That \unsat{} is a statement about $n\le20$, not about all naturals; the general theorem needs induction, which is Lean's job.
+
 
 \section{When \texttt{unknown} is expected}
 
@@ -1313,12 +1506,25 @@ When a formula is satisfiable, a model assigns values to free constants and inte
   f=[0\mapsto3,\;3\mapsto0,\;\text{else}\mapsto1].
 \]
 This is a compact representation of a total function, not a claim that only three arguments exist.
+Z3~5.0.0 prints such a function as a \code{define-fun} whose body is a nested \code{ite}; for the assertions $f(0)=3$, $f(3)=0$, $f(5)=f(7)$, $f(5)\ne0$ it prints
+
+\begin{lstlisting}[language=SMTLib]
+(
+  (define-fun f ((x!0 Int)) Int
+    (ite (= x!0 0) 3
+    (ite (= x!0 3) 0
+      1)))
+)
+\end{lstlisting}
+
+where \code{x!0} is a solver-generated bound-variable name and the final \code{1} is the default. Older Z3 versions printed the same information with an explicit \code{else} keyword; parsers must not assume either spelling.
+
 
 The printed model is a serialization chosen by the solver. Applications should prefer term-specific values and a narrow parser whenever possible.
 
 \section{Partial display versus complete semantics}
 
-A model display may omit unconstrained constants or choose arbitrary default values. API calls often support model completion when evaluating a term. This does not make the completed values semantically important; it merely extends a partial presentation to one total interpretation consistent with the assertions.
+A model display may omit unconstrained constants or choose arbitrary default values. (Z3~5.0.0's \code{get-model} happens to list every declared constant, assigning a default such as \code{0} to one that no assertion mentions; that is a presentation choice of this version, not a guarantee.) API calls often support model completion when evaluating a term. This does not make the completed values semantically important; it merely extends a partial presentation to one total interpretation consistent with the assertions.
 
 A counterexample decoder should request every symbol needed for replay and reject missing values rather than silently invent defaults.
 
@@ -1398,19 +1604,56 @@ The newest Leant filter context owns one command-local nominal bank and reuses i
 
 \code{check-sat-assuming} adds Boolean literals for one check without permanently asserting them. A common pattern guards clauses by named assumption literals:
 
-\begin{lstlisting}[language=SMTLib]
+\begin{lstlisting}[language=SMTLib,caption={Guarding clauses by assumption literals.}]
+(set-option :produce-unsat-cores true)
+(declare-const x Int)
 (declare-const a_clause Bool)
 (declare-const b_clause Bool)
+(declare-const c_clause Bool)
 (assert (=> a_clause (> x 0)))
 (assert (=> b_clause (< x 0)))
-(check-sat-assuming (a_clause b_clause))
+(assert (=> c_clause (< x 100)))
+(check-sat-assuming (a_clause b_clause c_clause))
+(get-unsat-core)
+(check-sat-assuming (a_clause c_clause))
+(get-value (x))
 \end{lstlisting}
 
-The assumptions activate both incompatible clauses. They can later be changed without rebuilding declarations and can participate in unsat-core extraction.
+Z3~5.0.0 answers:
+
+\begin{lstlisting}[language=SMTLib]
+unsat
+(a_clause b_clause)
+sat
+((x 1))
+\end{lstlisting}
+
+The first check activates two incompatible clauses and is \unsat; the core names only the two assumptions actually needed (\code{c_clause} is not blamed). The second check drops \code{b_clause} without touching the assertion set and succeeds. Assumptions can thus be changed freely between checks without rebuilding declarations. Note that an unset guard does not deactivate its clause by force: an unguarded \code{check-sat} may still set \code{a_clause} to \code{true} or \code{false} as it pleases, so a guard that must be off has to be assumed as \code{(not a_clause)}.
 
 \section{Unsatisfiable cores}
 
 An unsatisfiable core is a subset of tracked assertions or assumptions that is itself unsatisfiable. It is not necessarily minimal. A core can explain that a contract is inconsistent or that a particular combination of grammar choices cannot satisfy the samples.
+Besides assumption literals, SMT-LIB lets an assertion be tracked by name with the \code{!} annotation. Cores must be enabled explicitly, otherwise \code{get-unsat-core} fails with \code{unsat core construction is not enabled, use command (set-option :produce-unsat-cores true)}:
+
+\begin{lstlisting}[language=SMTLib,caption={Named assertions and an unsatisfiable core.}]
+(set-option :produce-unsat-cores true)
+(declare-const x Int)
+(assert (! (> x 0) :named pos))
+(assert (! (< x 0) :named neg))
+(assert (! (< x 100) :named small))
+(check-sat)
+(get-unsat-core)
+\end{lstlisting}
+
+Z3~5.0.0 answers
+
+\begin{lstlisting}[language=SMTLib]
+unsat
+(pos neg)
+\end{lstlisting}
+
+The core is the list of names; \code{small} is not blamed because it played no part in the conflict.
+
 
 Potential Leant/Djex uses include:
 
@@ -1440,6 +1683,35 @@ Z3 supports objectives such as:
 \end{lstlisting}
 
 Multiple objectives can be lexicographic, Pareto, or independent depending on the interface and options. Optimization chooses among satisfying models; it does not weaken hard constraints.
+\label{sec:opt-example}
+Objectives are ordinary commands in Z3's SMT-LIB front end; \code{(get-objectives)} reports the optimum reached. Revisiting the first script of Chapter~\ref{chap:z3-interfaces} with a preference for a small $y$:
+
+\begin{lstlisting}[language=SMTLib,caption={An optimization objective added to the hello script.}]
+(declare-const x Int)
+(declare-const y Int)
+(assert (= (+ x y) 10))
+(assert (>= x 0))
+(assert (>= y 0))
+(assert (< x y))
+(minimize y)
+(check-sat)
+(get-value (x y))
+(get-objectives)
+\end{lstlisting}
+
+Z3~5.0.0 answers
+
+\begin{lstlisting}[language=SMTLib]
+sat
+((x 4)
+ (y 6))
+(objectives
+ (y 6)
+)
+\end{lstlisting}
+
+Here $y=6$ is genuinely optimal ($x<y$ and $x+y=10$ force $y\ge6$), and the reported value now carries that meaning, whereas the identical-looking model in Chapter~\ref{chap:z3-interfaces} was an arbitrary choice.
+
 
 For synthesis, useful objectives include:
 
@@ -1509,7 +1781,27 @@ A reachability relation over nonnegative integers can be written schematically a
 (check-sat)
 \end{lstlisting}
 
-In the pure SMT-LIB Horn style, a clause with no positive relation in the head represents a safety query. The fixedpoint API also supports explicit \code{rule} and \code{query} commands.
+In the pure SMT-LIB Horn style, a clause with no positive relation in the head (a clause whose conclusion is \code{false}) represents a safety query. The fixedpoint API also supports explicit \code{rule} and \code{query} commands.
+
+The meaning of the answer is inverted relative to counterexample search, and this trips up almost every newcomer. In \textsf{HORN} logic, \sat{} means ``there is an interpretation of the relations that makes every clause true,'' that is, an inductive invariant that keeps \code{Reach} away from the bad states: the system is \emph{safe}. \unsat{} means the clauses can only be satisfied by making the bad clause's premise reachable, so the bad state \emph{is} reachable. For the script above, Z3~5.0.0 prints
+
+\begin{lstlisting}[language=SMTLib]
+sat
+(
+  (define-fun Reach ((x!0 Int)) Bool
+    (not (<= x!0 (- 1))))
+)
+\end{lstlisting}
+
+The ``model'' is the invariant $\operatorname{Reach}(x)\equiv x\ge 0$: it contains $0$, is preserved by the step rule, and excludes every negative value. If the bad clause is changed to blame values above $5$,
+
+\begin{lstlisting}[language=SMTLib]
+; Bad: a reachable value exceeds 5.
+(assert (forall ((x Int))
+  (=> (and (Reach x) (> x 5)) false)))
+\end{lstlisting}
+
+the same script prints \unsat, because $0,1,\dots,10$ really are reachable and $6$ violates the property. A driver for the fixedpoint engine must therefore not reuse the ``\sat{} means counterexample'' branch of the ordinary SMT protocol.
 
 \section{Counterexample trace or invariant}
 
@@ -1632,7 +1924,7 @@ A type signature rarely reveals behavior. The provider \code{List.reverse} has t
 \]
 The law must be explicit and associated with the exact provider declaration and occurrence.
 
-The current Length source distinguishes uniformly assumed laws, laws conditional on ground class-constraint discharge, and potential Lean-proved laws. It never infers a transfer from a provider's name. Z3 is never type-class or dictionary authority.
+The current Length source distinguishes exactly two trust classes for a provider law (\code{LengthProviderTrust} in Djex's private \code{Internal.Semantic.Length}): a context-free assumed law (\code{AssumedProviderLaw}), and a law on a class-constrained provider that becomes usable only after the occurrence's ground constraints have been discharged independently (\code{AssumedProviderLawConditionalOnConstraintDischarge}). Leant's handoff picks the class purely from the exact inventory scheme: an empty leading context yields the first, a nonempty one the second. A Lean-proved law is proposed, not implemented. The source never infers a transfer from a provider's name, and Z3 is never type-class or dictionary authority.
 
 A result conditional on provider laws should say so. If a provider law is false, both symbolic Z3 reasoning and concrete domain replay can agree with each other while disagreeing with the actual Lean function. A future proof path should link provider laws to Lean theorems whenever possible.
 
@@ -1654,7 +1946,7 @@ Sound prefix pruning requires an over-approximation of all completions. Bounded 
 
 \section{Contract roles}
 
-A contract should not infer semantics from a type constructor's spelling. It supplies a source-ordered role vector: observed spine, opaque value, callback, result component, and so forth. Roles are arity-checked against the exact target.
+A contract should not infer semantics from a type constructor's spelling. It supplies a source-ordered role vector, arity-checked against the exact target. (The implemented Length domain admits exactly two target roles, \code{observed-spine} and \code{unobserved-target}, and two provider-argument roles, \code{spine} and \code{unobserved}; richer vocabularies with callbacks or result components are design space, not current code.)
 
 For example, a function may accept two lists but observe only the first, or return a pair of observed lists. The product Length domain has a distinct nominal contract and problem type for two result spines; it is not a cast of scalar evidence.
 
@@ -1700,34 +1992,38 @@ Djex constructs a typed QF-LIA plan first. Rendering is a bounded projection. Th
 
 \section{A small typed command language}
 
-Conceptually, the internal AST contains constructors such as:
+The internal AST lives in the private module \code{Language.Haskell.Synthesis.Internal.SMTLib.QFLIA}. Its three types have exactly these constructors (strictness annotations omitted):
 
-\begin{lstlisting}[language=HaskellX,caption={Schematic typed QF-LIA plan; names are simplified.}]
-data IntExpr
-  = IVar Symbol
-  | INumeral Natural
-  | IAdd [IntExpr]
-  | ISub IntExpr IntExpr
-  | IScale Integer IntExpr
-  | IIte BoolExpr IntExpr IntExpr
+\begin{lstlisting}[language=HaskellX,caption={The typed QF-LIA plan, verbatim constructor names from the private Djex module Internal.SMTLib.QFLIA.}]
+data QFLIAIntegerExpression
+  = QFLIAIntegerSymbol [Word8]
+  | QFLIANaturalNumeral Natural
+  | QFLIAIntegerSum [QFLIAIntegerExpression]
+  | QFLIAIntegerScale Natural QFLIAIntegerExpression
+  | QFLIAIntegerDifference QFLIAIntegerExpression QFLIAIntegerExpression
+  | QFLIAIntegerBinaryApplication [Word8]
+      QFLIAIntegerExpression QFLIAIntegerExpression
+  | QFLIAIntegerIf QFLIABooleanExpression
+      QFLIAIntegerExpression QFLIAIntegerExpression
 
-data BoolExpr
-  = BAnd [BoolExpr]
-  | BOr [BoolExpr]
-  | BNot BoolExpr
-  | BEq IntExpr IntExpr
-  | BLe IntExpr IntExpr
+data QFLIABooleanExpression
+  = QFLIABooleanTruth Bool
+  | QFLIAIntegerEqual QFLIAIntegerExpression QFLIAIntegerExpression
+  | QFLIAIntegerAtMost QFLIAIntegerExpression QFLIAIntegerExpression
+  | QFLIABooleanNot QFLIABooleanExpression
+  | QFLIABooleanAll [QFLIABooleanExpression]
 
-data Command
-  = SetLogic Logic
-  | DeclareInt Symbol
-  | DefineBinaryInt Symbol Symbol Symbol IntExpr
-  | Assert BoolExpr
-  | CheckSat
-  | GetValue [Symbol]
+data QFLIACommand
+  = QFLIASetLogic [Word8]
+  | QFLIASetOption [Word8] [Word8]
+  | QFLIADefineBinaryInteger [Word8] [Word8] [Word8] QFLIAIntegerExpression
+  | QFLIADeclareInteger [Word8]
+  | QFLIAAssert QFLIABooleanExpression
+  | QFLIACheckSatisfiable
+  | QFLIAGetValues [QFLIAIntegerExpression]
 \end{lstlisting}
 
-A constructor cannot accidentally place an integer expression where a Boolean formula is required. The renderer has one canonical spelling for each node.
+Notice what is absent: there is no disjunction, no strict comparison, no negative literal, and no general multiplication. Strict comparison is written as the negation of an at-most; ``or'' never arises because the Length formula language itself has only truth, equality, at-most, negation, and finite conjunction; and the only subtraction is the one inside the monus helper's body. A constructor cannot accidentally place an integer expression where a Boolean formula is required, and the renderer (\code{renderQFLIACommand}) has one canonical spelling for each node: an empty sum renders as \code{0}, a one-term sum or one-clause conjunction renders as its only member, an empty conjunction renders as \code{true}, and every command ends with exactly one line feed.
 
 \section{Canonicalization choices}
 
@@ -1755,12 +2051,12 @@ The scalar and binary-product translators emit an input-only \QFLIA{} program. T
 \item enables model production;
 \item fixes the random seed to $1$;
 \item sets logic \QFLIA;
-\item defines natural monus;
-\item defines integer minimum;
-\item defines integer maximum.
+\item defines natural monus as \code{djex_nat_monus};
+\item defines binary minimum as \code{djex_nat_min};
+\item defines binary maximum as \code{djex_nat_max}.
 \end{enumerate}
 
-The query then declares source input symbols, declares deterministic quotient/remainder witnesses if needed, asserts nonnegativity of inputs, asserts witness equations, asserts the combined bad-state condition, and calls \code{check-sat}. A separate optional command requests values for all and only the source input symbols.
+The query then declares the source input symbols \code{djex_length_input_0}, \code{djex_length_input_1}, \ldots{} in source-position order, declares any private quotient/remainder witness pairs, asserts nonnegativity of every input, asserts the witness constraints, asserts the combined bad-state condition, and calls \code{check-sat} (see \code{sealLengthSMTLibQuery} in the private \code{Internal.Semantic.Length.SMTLib}). A separate optional command, \code{(get-value (djex_length_input_0 ...))}, requests values for all and only the source input symbols; a nullary problem has no such command.
 
 The scalar translator schema is currently tagged \code{djex-length-z3-qf-lia-smtlib2/v2}; the binary-product sibling has a distinct schema. These tags identify translation formats, not the versionless Leant JSON configuration grammar.
 
@@ -1772,7 +2068,7 @@ For a nullary problem there are no input values to request. A satisfiable nullar
 
 \section{Structural fingerprints}
 
-A fingerprint is a collision-resistant identity built from canonical, tagged structural fields. Different subject types prevent accidental comparison of, for example, an inventory fingerprint with a candidate fingerprint.
+A fingerprint is a complete, versioned canonical encoding of tagged structural fields---a structural key, not a digest, so equality never depends on accepting a hash collision (SHA-256 appears only inside a fingerprint as the value of an executable-image field). Different subject types prevent accidental comparison of, for example, an inventory fingerprint with a candidate fingerprint.
 
 The Length problem and query bind identities for:
 
@@ -1854,25 +2150,22 @@ These choices reduce accidental dependence on locale, configuration files, path 
 
 A configuration can contain an expected SHA-256 digest. Activation policy separately decides whether an unpinned executable is allowed. This separation is important: successfully decoding a path and digest field does not grant permission to execute it.
 
-The live opener must defend resolution, hashing, and spawn against path replacement races. Djex exposes several descriptor-bound launch strategies, including strategies that stage an opened executable descriptor and perform access checks under defined credential semantics. A narrow C helper supports the strongest Linux launch mode where necessary.
+The live opener must defend resolution, hashing, and spawn against path replacement races. Djex exposes four launch strategies (\code{LengthSMTLibExecutableLaunchStrategy}): a portable path-snapshot-then-spawn strategy, and three Linux descriptor-bound strategies that open the executable once, copy its bytes into a sealed anonymous memory image, compare the digest, and spawn from that descriptor, optionally after effective-ID or \code{AT_EXECVE_CHECK} access checks on the source and the staged image. The three descriptor-bound launches share one pipeline (\code{openDescriptorBoundProcessWith}, parameterized by a \code{DescriptorBoundLaunchPolicy} record, in the private \code{Internal.SMTLib.Z3.Process}) and one narrow C helper, \dpath{synthesis/cbits/z3_descriptor_spawn.c}, compiled only on Linux; elsewhere they fail closed before any spawn.
 
 The public API reveals only closed classifications such as whether a digest expectation exists and which launch strategy was selected. It does not leak path or digest bytes through ordinary errors.
 
 \section{Capability probing}
 
-A process that launches successfully is not yet a ready Length solver. The readiness probe checks the exact operational profile, including:
+A process that launches successfully is not yet a ready Length solver. The readiness probe (private \code{Session/Capability.hs}) is a fixed four-write handshake; each write ends with a fresh positional \code{echo} barrier whose exact quoted string must come back before the next phase may begin:
 
-\begin{itemize}
-\item acceptance of required startup options;
-\item \QFLIA{} satisfiability status;
-\item model/value retrieval;
-\item reset behavior;
-\item response framing and whitespace rules;
-\item transport liveness;
-\item resource-limit behavior expected by the protocol.
-\end{itemize}
+\begin{enumerate}
+\item the startup option \code{(set-option :print-success false)}: nothing but the barrier echo may come back;
+\item a reset, the canonical Length preamble, one declared integer asserted equal to $0$, and \code{(check-sat)}: the solver must answer \sat;
+\item \code{(get-value ...)} for that constant: the solver must answer exactly \code{((djex_capability_input 0))};
+\item a reset, the preamble, the constant asserted equal to both $0$ and $1$, and \code{(check-sat)}: the solver must answer \unsat.
+\end{enumerate}
 
-The probe establishes only the demonstrated profile. It does not certify arbitrary Z3 capabilities or semantic soundness.
+Together these demonstrate acceptance of the startup options, \QFLIA{} status framing in both directions, value retrieval in the exact shape the decoder expects, reset behavior, whitespace and framing rules across write boundaries, and transport liveness. The probe establishes only this demonstrated profile. It does not certify arbitrary Z3 capabilities, resource-limit behavior, or semantic soundness.
 
 \section{Causal framing}
 
@@ -1901,7 +2194,7 @@ A malformed model, stale output, unexpected success token, extra payload, or rep
 
 Solver-side timeout/resource options and host-side deadlines solve different problems. A cooperative solver timeout may not fire if the process is stuck outside the relevant check. A host deadline can interrupt transport and initiate cleanup, but cannot prove the child honored internal resource limits.
 
-The execution policy binds finite values for solver timeout, solver resource limit, host deadline, response limits, and optional shared usable-work budget. The host deadline must exceed the solver timeout by a minimum margin so there is time to receive and parse a cooperative response.
+The execution policy binds finite values for solver timeout, solver resource limit, host deadline, response limits, and optional shared usable-work budget. The host deadline must exceed the solver timeout by a minimum margin (currently $100$ ms, \code{z3SMTLibMinimumHostDeadlineMarginMilliseconds}) so there is time to receive and parse a cooperative response. The solver timeout and resource limit are passed on the command line as \code{timeout=} and \code{rlimit=} arguments, and both must be finite and nonzero.
 
 A shared usable-work deadline can cover session opening and several queries. The newer scoped token checks owner thread and dynamic extent at runtime; rank-$N$ polymorphism alone cannot prevent a closure or forked thread from retaining a phantom token.
 
@@ -2106,7 +2399,7 @@ Nogoods and sample banks must therefore be scoped by exact fingerprints.
 
 \section{Semantic signatures}
 
-Before full solver-selected sketches, Djex can evaluate enumerated candidates on the current sample bank and compute a semantic signature:
+Before full solver-selected sketches, a smaller step is available in principle (it is not in the current tree): evaluate enumerated candidates on the current sample bank and compute a semantic signature:
 \[
   \sigma(C)=\bigl(C(x_1),\ldots,C(x_k)\bigr)
 \]
@@ -2251,7 +2544,7 @@ Behavioral interpretation must not reverse-engineer a term graph from rendered L
 The Length handoff obtains that origin from the \code{Verified} receipt and rerenders it internally. The caller does not separately submit a graph and claim that it corresponds to the accepted text.
 
 \begin{projectnote}
-This is why the behavioral layer is currently available only for candidate routes carrying sufficient typed provenance. A text-only candidate may be perfectly good Lean, but the Length interpreter refuses to guess which Djex graph or provider occurrences produced it.
+This is why the behavioral layer is currently available only for candidate routes carrying sufficient typed provenance. A text-only candidate may be perfectly good Lean, but the Length interpreter refuses to guess which Djex graph or provider occurrences produced it. In practice this means selecting the Exference engine: Leant's default \code{synth-engine} is \code{djinn}, which supplies no typed graph, so under the default engine every candidate is retained with the payload-free refusal code \code{unsupported-route} and no worker is opened. Use \code{:set synth-engine exference} (or \code{both}) to produce assessable candidates; Leant prints a reminder to that effect when a configuration is activated at startup.
 \end{projectnote}
 
 \section{What each repository contributes}
@@ -2280,7 +2573,7 @@ Lean project backend & External Lean project/toolchain driven by Leant & Elabora
 \end{longtable}
 
 \begin{sourcebox}
-For the broad architecture, compare the existing \lpath{docs/Leant.tex}, \lpath{docs/Djex_Leant_Codebase_Walkthrough/Djex_Leant_Codebase_Walkthrough.tex}, and \lpath{docs/Z3_Behavioral_Synthesis_Proposal/Z3_Behavioral_Synthesis_Proposal.tex}. The current narrow behavioral entrances are concentrated in \lpath{src/Leant/Synth/Length/Handoff.hs}, \lpath{src/Leant/Synth/Length/Integration.hs}, \lpath{src/Leant/Synth/Length/Ranking.hs}, and \lpath{src/Leant/Synth/Length/Selection.hs}.
+For the broad architecture, compare the existing \lpath{docs/Leant_Overview/Leant_Overview.tex}, \lpath{docs/Djex_Leant_Codebase_Walkthrough/Djex_Leant_Codebase_Walkthrough.tex}, and \lpath{docs/Z3_Behavioral_Synthesis_Proposal/Z3_Behavioral_Synthesis_Proposal.tex}. The current narrow behavioral entrances are concentrated in \lpath{src/Leant/Synth/Length/Handoff.hs}, \lpath{src/Leant/Synth/Length/Integration.hs}, \lpath{src/Leant/Synth/Length/Ranking.hs}, and \lpath{src/Leant/Synth/Length/Selection.hs}.
 \end{sourcebox}
 
 \chapter{The implemented finite-spine Length domain}
@@ -2357,7 +2650,7 @@ Field & Meaning \\
 \bottomrule
 \endfoot
 Spine identity & Exact Lean family, zero-constructor, and step-constructor names. \\
-Target argument roles & A source-ordered vector declaring which target arguments are modeled spines, opaque values, callbacks, or other admitted roles. Roles are not guessed from types. \\
+Target argument roles & A source-ordered vector with one entry per physical target argument, each either \code{observed-spine} (a modeled spine of the configured family; observed positions are numbered compactly from zero) or \code{unobserved-target} (an opaque token that may be forwarded but never inspected, called, or destructured). Roles are not guessed from types. \\
 Candidate case policy & Either reject candidate case analysis or admit the exact finite-spine zero/step case semantics supported by the current interpreter. \\
 Precondition & A solver-neutral Length formula describing when the contract applies. \\
 Postcondition & A solver-neutral Length formula relating modeled inputs and result length or result pair. \\
@@ -2531,7 +2824,7 @@ This table also illustrates the model's scope. Length preservation does not esta
 
 \section{Why QF\_LIA is sufficient}
 
-The current translator emits exactly \QFLIA: quantifier-free linear integer arithmetic. The supported expressions include natural literals, input variables, addition, linear scaling, comparisons, Boolean connectives, conditionals, monus, minimum, maximum, and positive-literal natural quotient or remainder through a special lowering.
+The current translator emits exactly \QFLIA: quantifier-free linear integer arithmetic. The Length expression language (\code{LengthExpression}) has natural literals, input variables, sums, scaling by a literal, monus, minimum, maximum, conditionals, and positive-literal quotient and modulo; the formula language (\code{LengthFormula}) has only truth constants, equality, at-most, negation, and finite conjunction. Strict comparison is spelled as a negated at-most and there is no disjunction. Each of these has a direct \QFLIA{} lowering, with quotient and modulo handled by the witness scheme below.
 
 Natural inputs are represented as SMT integers plus assertions
 \[
@@ -2543,50 +2836,44 @@ The expression remains linear because variable-by-variable multiplication is not
 
 \section{Canonical preamble and commands}
 
-Every scalar query begins with a deterministic preamble equivalent to:
+Every scalar and every product query begins with the same six-line preamble, rendered byte for byte as:
 
-\begin{lstlisting}[language=SMTLib,caption={Conceptual shape of the current fixed preamble.}]
+\begin{lstlisting}[language=SMTLib,caption={The fixed preamble exactly as the current translator renders it (one command per line).}]
 (set-option :produce-models true)
 (set-option :random-seed 1)
 (set-logic QF_LIA)
-
-(define-fun djex.nat.monus ((x Int) (y Int)) Int
-  (ite (<= y x) (- x y) 0))
-
-(define-fun djex.int.min ((x Int) (y Int)) Int
-  (ite (<= x y) x y))
-
-(define-fun djex.int.max ((x Int) (y Int)) Int
-  (ite (<= x y) y x))
+(define-fun djex_nat_monus ((x Int) (y Int)) Int (ite (<= y x) (- x y) 0))
+(define-fun djex_nat_min ((x Int) (y Int)) Int (ite (<= x y) x y))
+(define-fun djex_nat_max ((x Int) (y Int)) Int (ite (<= x y) y x))
 \end{lstlisting}
 
-The exact private symbols are allocated by the typed renderer and should not be treated as a stable public API. After the preamble, the query declares each input, declares any private Euclidean witnesses, asserts input nonnegativity and witness constraints, asserts the bad state, and calls \code{check-sat}.
+The symbol bytes (\code{djex_nat_monus}, \code{djex_length_input_0}, \code{djex_length_modulo_quotient_0}, \ldots) are chosen by the Length translator in the private \code{Internal.Semantic.Length.SMTLib}, not by the QF-LIA renderer, and are internal spellings rather than a stable public API. After the preamble, the query declares each input, declares any private Euclidean witnesses, asserts input nonnegativity and witness constraints, asserts the bad state, and calls \code{check-sat}.
 
-A pedagogical query for the constant-empty candidate under unconditional length preservation is:
+The complete check program for the constant-empty candidate under unconditional length preservation ($P=\top$, $Q\equiv r=n$) is, byte for byte (this exact text is frozen by a Djex regression test in \dpath{synthesis/test-length/Spec.hs}):
 
-\begin{lstlisting}[language=SMTLib,caption={Pedagogical scalar Length counterexample query.}]
+\begin{lstlisting}[language=SMTLib,caption={Exact scalar Length counterexample query for the constant-empty candidate.}]
 (set-option :produce-models true)
 (set-option :random-seed 1)
 (set-logic QF_LIA)
-
-(declare-const input.0 Int)
-(assert (<= 0 input.0))
-
-; precondition true, candidate result 0, required result = input.0
-(assert (not (= 0 input.0)))
+(define-fun djex_nat_monus ((x Int) (y Int)) Int (ite (<= y x) (- x y) 0))
+(define-fun djex_nat_min ((x Int) (y Int)) Int (ite (<= x y) x y))
+(define-fun djex_nat_max ((x Int) (y Int)) Int (ite (<= x y) y x))
+(declare-const djex_length_input_0 Int)
+(assert (<= 0 djex_length_input_0))
+(assert (not (= djex_length_input_0 0)))
 (check-sat)
 \end{lstlisting}
 
-Z3 can return \sat. Djex then sends a separate input-value request equivalent to
+The bad-state line is the whole of $P\land\neg Q$ after substitution and normalization: the precondition $\top$ has been dropped from the conjunction, and the equation is oriented input-before-literal by the normalizer's fixed term ordering. Z3 returns \sat. Djex then sends the separate input-value request
 
 \begin{lstlisting}[language=SMTLib]
-(get-value (input.0))
+(get-value (djex_length_input_0))
 \end{lstlisting}
 
-and may receive a value such as $1$.
+and receives a valuation such as \code{((djex_length_input_0 1))}.
 
 \begin{projectnote}
-The actual query is not assembled from free-form strings like this tutorial listing. Djex constructs a typed QF-LIA plan, renders canonical bytes under limits, fingerprints the plan and bytes together, and retains the checked problem needed for replay.
+Although the listing above is the exact rendered text, Djex does not assemble it from free-form strings. It constructs a typed QF-LIA plan, renders canonical bytes under limits, fingerprints the plan and bytes together, and retains the checked problem needed for replay.
 \end{projectnote}
 
 \section{Positive-literal quotient and modulo without SMT \code{div} or \code{mod}}
@@ -2599,18 +2886,16 @@ Natural quotient and remainder by a positive literal $k$ are lowered to the uniq
 \]
 The requested projection is $q$ for quotient or $r$ for modulo. The translator allocates deterministic private witness symbols in expression preorder. It deliberately does not emit SMT-LIB \code{div} or \code{mod}; this keeps the supported semantics and arithmetic fragment explicit.
 
-For example, $e\bmod 3$ can be represented by private integers $q_0,r_0$ and assertions
+For example, when $e\bmod 3$ is the first Euclidean operation met in expression preorder, the translator declares the pair \code{djex_length_modulo_quotient_0} and \code{djex_length_modulo_remainder_0} (a quotient operation uses the \code{djex_length_quotient_...} spellings; the ordinal counter is shared by both kinds) and, after the input-nonnegativity assertions, asserts
 
 \begin{lstlisting}[language=SMTLib]
-(declare-const q.0 Int)
-(declare-const r.0 Int)
-(assert (<= 0 q.0))
-(assert (<= 0 r.0))
-(assert (< r.0 3))
-(assert (= e (+ (* 3 q.0) r.0)))
+(assert (<= 0 djex_length_modulo_quotient_0))
+(assert (<= 0 djex_length_modulo_remainder_0))
+(assert (<= djex_length_modulo_remainder_0 2))
+(assert (= E (+ (* 3 djex_length_modulo_quotient_0) djex_length_modulo_remainder_0)))
 \end{lstlisting}
 
-Only original input symbols are requested from Z3. Private witnesses are part of the canonical proof-search encoding, not part of the counterexample exposed to the evaluator.
+where \code{E} stands for the rendering of $e$. Note that $r<3$ is spelled $r\le 2$: the typed plan has no strict comparison, so the bound is the literal $k-1$. Inside the bad-state formula the operation itself is replaced by the remainder symbol. Only original input symbols are requested from Z3. Private witnesses are part of the canonical encoding, not part of the counterexample exposed to the evaluator; the query fingerprint records which lowering schemas were used (\code{djex-length-z3-qf-lia-positive-literal-modulo-witness/v1} and its quotient sibling).
 
 \section{Input-only models}
 
@@ -2692,7 +2977,7 @@ A bank stores replay inputs, not verdicts. It is scoped by candidate-independent
 
 This is an important CEGIS-ready distinction. The same input $n=1$ may refute constant-empty and duplicate candidates but not identity. The bank says ``this input has been useful in this exact problem family,'' not ``every future candidate is wrong at this input.''
 
-The current Leant filtering context owns one nominal mutable bank for the dynamic lifetime of a command-local request. Progressive same-run batches can therefore learn from earlier rejected candidates. Ranking contexts remain bank-free at the Leant integration owner, although lower-level ranking APIs also support explicit bank contexts.
+The current Leant filtering context owns one nominal mutable bank for the dynamic lifetime of a command-local request. Progressive same-run batches can therefore learn from earlier rejected candidates. Ranking is different: the rank runners keep only a batch-local, newest-first raw store of at most four input vectors (the ``MRU'' described in \lpath{src/Leant/Synth/Length/Ranking.hs}), tried against later candidates of the same batch and discarded with it; the integration owner's rank context carries no bank across batches.
 
 \section{Canonical query identities and limits}
 
@@ -2709,6 +2994,20 @@ djex-length-spine-pair-z3-qf-lia-smtlib2/v1
 \end{lstlisting}
 
 The query fingerprint binds the exact checked problem, translator schema, typed plan, symbol order, helper and witness structure, command sequence, and rendered bytes. Execution identity is layered on top because the executable, observed digest, protocol profile, limits, and runtime options are not properties of the pure formula.
+Concretely, \code{buildQueryFingerprint} in the private \code{Internal.Semantic.Length.SMTLib} builds a version-1 fingerprint with role \code{finite-list-spine-length/z3-qf-lia-query} (the product translator uses \code{finite-binary-product-spine-lengths/z3-qf-lia-query}) whose tagged fields are, in order:
+
+\begin{itemize}
+\item \code{schema}: the translator schema tag above;
+\item \code{logic}: \code{QF_LIA};
+\item \code{fixed-options}: \code{:produce-models=true} and \code{:random-seed=1};
+\item \code{problem-domain}, \code{problem-inventory}, \code{problem-encoding}, \code{problem-candidate}, \code{complete-problem}: the domain tag and the four canonical fingerprints of the checked problem's generic behavioral envelope;
+\item \code{typed-plan}: the input-symbol list, the translated bad-state condition, every check command, the value-request command or an explicit \code{absent} marker, and, when a quotient or modulo was lowered, an \code{expression-lowering} list naming the witness schemas used---all projected structurally from the typed AST, not from text;
+\item \code{check-command}: the rendered check bytes;
+\item \code{input-value-request}: the rendered value-request bytes, or \code{absent}.
+\end{itemize}
+
+The \code{problem-encoding} field is itself a fingerprint (role \code{finite-list-spine-length/concrete-encoding}) built one stage earlier from the session's encoding policy, the contract fingerprint, a list of interpreter policy tags such as \code{lazy-symbolic-interpreter/v1} and \code{exact-zero-step-spine-case/v1}, the provider laws the candidate actually used, the normalized candidate result, and the normalized bad-state formula. Two candidates with the same rendered bytes but different used provider laws therefore have different query fingerprints; the same bytes translated for the scalar and the product domain do too.
+
 
 The current default pure-query limits include:
 
@@ -2719,6 +3018,79 @@ The current default pure-query limits include:
 \end{itemize}
 
 Other layers independently bound problem graphs, syntax, formula clauses, response bytes, nesting, nodes, tokens, integer widths, evaluation steps, finite-domain assignments, process queries, and wall/resource budgets.
+\section{An end-to-end example: one contract, four candidates}
+\label{sec:length-worked-example}
+
+This section follows one small goal through the whole stage list of Chapter~\ref{chap:compile-behavior}, with every emitted line derived from the translation code rather than sketched. Take the goal \code{List a -> List a}, the Exference engine (\code{:set synth-engine exference}), and the following contract-only document, which says ``the result has the same length as the input'' and admits two provider laws:
+
+\begin{lstlisting}[language={},caption={A scalar length-preservation contract with two provider laws.}]
+{
+  "format": "leant-finite-list-spine-length-contract",
+  "rankingDomain": "scalar",
+  "contract": {
+    "spine": {"family": "List", "zero": "List.nil", "step": "List.cons"},
+    "targetArgumentRoles": ["observed-spine"],
+    "candidateCasePolicy": "cases-rejected",
+    "precondition": ["truth", true],
+    "postcondition": ["equal", ["result"], ["input", 0]],
+    "providerLaws": [
+      {"name": "List.reverse", "argumentRoles": ["spine"],
+       "transfer": ["argument", 0]},
+      {"name": "List.append", "argumentRoles": ["spine", "spine"],
+       "transfer": ["sum", [["argument", 0], ["argument", 1]]]}
+    ]
+  }
+}
+\end{lstlisting}
+
+Suppose the callback has verified four occurrences (their exact rendered spellings may differ from these Lean forms):
+\code{fun xs => xs},
+\code{fun xs => List.reverse xs},
+\code{fun _ => List.nil}, and
+\code{fun xs => List.append xs xs}.
+
+\paragraph{Symbolic interpretation.} With one observed spine of symbolic length $n$ (\code{LengthInput 0}), the interpreter returns $R=n$ for the identity; $R=n$ for the reverse candidate through the admitted law (and records \code{List.reverse} as a used provider law); $R=0$ for the zero constructor; and $R=n+n$ for the append candidate through its law. Nothing else about the candidates survives.
+
+\paragraph{Contract substitution and normalization.} The raw bad state is $\top\land\neg(R=n)$ for each candidate. Djex normalizes it before translation (\code{normalizeLengthFormula}): a true clause is dropped from a conjunction, an equation between syntactically equal sides folds to $\top$, and negation of a constant folds. So the identity and reverse candidates have the bad state $\bot$, the zero constructor has $\neg(n=0)$, and the append candidate has $\neg(n=n+n)$; equations are oriented by a fixed term ordering (variables before literals before sums), which is why the input appears on the left.
+
+\paragraph{Emitted queries.} All four check programs share the six-line preamble, \code{(declare-const djex_length_input_0 Int)}, and \code{(assert (<= 0 djex_length_input_0))}; they differ only in the bad-state assertion before \code{(check-sat)}:
+
+\begin{lstlisting}[language=SMTLib,caption={The bad-state assertion emitted for each of the four candidates.}]
+(assert false)                                     ; fun xs => xs
+(assert false)                                     ; fun xs => List.reverse xs
+(assert (not (= djex_length_input_0 0)))           ; fun _  => List.nil
+(assert (not (= djex_length_input_0
+               (+ djex_length_input_0 djex_length_input_0))))
+                                                   ; fun xs => List.append xs xs
+\end{lstlisting}
+
+The two \code{(assert false)} programs are byte-identical, yet their query fingerprints differ, because the encoding fingerprint records that the second one used the \code{List.reverse} law. The doubled sum is not folded to \code{(* 2 ...)}: the normalizer sorts and flattens sums but does not collect like terms.
+
+\paragraph{Solver-independent stages first.} Under the current startup policy each candidate is tried against the bank (empty at the start of the command), then against the applicable-domain traversal (a miss here, since $P=\top$ bounds nothing), then at the origin $n=0$: all four satisfy $R(0)=0$, so none is refuted there.
+
+\paragraph{Live queries and replay.} The first candidate that reaches this stage opens the one lexical worker. Z3 answers \unsat{} for the two \code{(assert false)} programs; the assessment is \code{Heuristic SolverUnsatisfiable}, and because a post-\unsat{} input box is configured (say maxima \code{[5]}), Djex then enumerates $n=0,\ldots,5$ itself, finds no violation, and upgrades the assessment to a nonvacuous \code{BoundedPositive} receipt (six checked, six applicable). For the zero constructor Z3 answers \sat{}; \code{(get-value (djex_length_input_0))} returns, say, \code{((djex_length_input_0 1))}; the decoder checks the exact symbol set; the evaluator recomputes $R(1)=0$, confirms $P(1)$ and $\neg Q(1,0)$; and only then does the candidate carry a \code{Counterexample} receipt. In filter mode that vector $[1]$ is recorded in the command's bank, so if the append candidate is assessed afterwards it is refuted by bank replay ($R(1)=2\ne1$) without a second solver transaction; in rank mode the same effect comes from the batch-local four-entry store.
+
+\paragraph{Outcomes.} The two modes read the same assessments differently:
+
+\begin{longtable}{@{}L{0.30\textwidth}L{0.30\textwidth}L{0.14\textwidth}L{0.16\textwidth}@{}}
+\toprule
+Candidate & Assessment & Rank & Filter \\
+\midrule
+\endfirsthead
+\toprule
+Candidate & Assessment & Rank & Filter \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+\code{fun xs => xs} & nonvacuous \code{BoundedPositive} & preferred tier & retained \\
+\code{fun xs => List.reverse xs} & nonvacuous \code{BoundedPositive} (law assumed) & preferred tier & retained \\
+\code{fun _ => List.nil} & \code{Counterexample} at $[1]$ & demoted tier & rejected \\
+\code{fun xs => List.append xs xs} & \code{Counterexample} at $[1]$ & demoted tier & rejected \\
+\end{longtable}
+
+Ranking prints all four, the last two after the first two, each demoted one with a note of the form ``replayed finite-list-spine Length counterexample (model-relative; \ldots): observed input spine lengths = [1] \ldots''. Filtering binds only the first two as \code{it1} and \code{it2} and prints the other two as \code{rejected} rows with the same note. Had the worker failed to open, or a transaction failed, both modes would have shown all four in callback order with a mode-neutral warning: no verdict is invented from an operational failure.
+
 
 \begin{sourcebox}
 Public query and replay API: \dpath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib.hs}. Canonical translation and model checking: \dpath{synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length/SMTLib.hs}. Typed QF-LIA command AST and renderer: \dpath{synthesis/internal/Language/Haskell/Synthesis/Internal/SMTLib/QFLIA.hs}. Concrete evaluator and finite validations: \dpath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/Evaluate.hs} and its private implementation.
@@ -2737,7 +3109,7 @@ A \code{LengthSMTLibExecutionConfig} is a pure sealed policy. It describes such 
 \item direct argument prefix and policy-derived timeout/resource arguments;
 \item solver timeout and resource limit;
 \item host deadline;
-\item artifact-retention policy;
+\item artifact policy (\code{LengthSMTLibArtifactPolicy}): either stop at the status, or request input values after \sat; the current startup file always selects the latter (\code{"artifactPolicy": "input-values-after-satisfiable"});
 \item bounded response-decoder policy.
 \end{itemize}
 
@@ -2745,7 +3117,7 @@ Constructing this value does not prove that the executable exists, is accessible
 
 \section{No shell, ambient environment, or inherited working directory}
 
-The current execution profile launches Z3 directly with a fixed argument discipline. It does not invoke a shell. The child receives an exact empty environment rather than inherited variables, and it runs in a newly created empty working directory rather than the caller's directory.
+The current execution profile launches Z3 directly with the fixed argument vector \code{-in -smt2 smtlib2_compliant=true timeout=<ms> rlimit=<n>}, where the last two values come from the sealed policy. It does not invoke a shell. The child receives an exact empty environment (\code{env = Just []}) rather than inherited variables, and it runs in a newly created empty working directory rather than the caller's directory. The first command written is \code{(set-option :print-success false)}, and every query is preceded by \code{(reset)} followed by that same option again.
 
 These choices reduce ambiguity and attack surface:
 
@@ -2756,7 +3128,7 @@ These choices reduce ambiguity and attack surface:
 \item command identity is easier to fingerprint and audit.
 \end{itemize}
 
-The Linux-oriented strong launch strategies can bind execution to an already inspected descriptor and perform progressively stronger executable-access checks. The optional digest pin is checked against the observed executable bytes. Even when no expected digest is configured, the live identity binds the observed digest.
+The three Linux descriptor-bound strategies bind execution to an already inspected and sealed image and perform progressively stronger executable-access checks; the current Leant startup decoder always selects the strongest one, \code{LengthSMTLibDescriptorBoundExecveCheckExecutableAccessLaunch}. On a build without the native launcher (any non-Linux host) the live opener fails closed with the sanitized class \code{LengthSMTLibLiveSessionLaunchFailed}, and Leant preserves the batch in callback order. The optional digest pin is checked against the staged image bytes. Even when no expected digest is configured, the live identity binds the observed digest.
 
 \begin{pitfall}
 A path string is not a stable executable identity. The file at that path can change between inspection and spawn. That time-of-check/time-of-use problem is why the implementation has descriptor-bound launch profiles rather than relying only on ``hash path, then run path.''
@@ -2780,17 +3152,35 @@ The newer scoped usable-work token adds runtime owner-thread and dynamic-extent 
 
 \section{Readiness probing}
 
-Opening a process is not enough. The session performs a readiness/capability probe for the exact operational profile needed by Length. Conceptually it verifies:
+Opening a process is not enough. The session performs a readiness/capability probe for the exact operational profile needed by Length. It consists of four writes; each ends with an \code{echo} of a fresh 256-bit nonce, spelled \code{(echo "djex-smtlib-frame/v1/<64 hex digits>")}, and the phase machine advances only when that exact quoted string is the next complete frame:
 
-\begin{itemize}
-\item QF-LIA acceptance;
-\item reset behavior;
-\item \sat/\unsat/\unknown{} status framing;
-\item requested input-value responses;
-\item command/response causality under chunked streams;
-\item bounded parser compatibility;
-\item transport and cleanup behavior.
-\end{itemize}
+\begin{lstlisting}[language=SMTLib,caption={The four readiness writes and the responses they require (barrier nonces abbreviated).}]
+; write 1                                    ; expected: only the echo
+(set-option :print-success false)
+(echo "djex-smtlib-frame/v1/...")
+; write 2                                    ; expected: sat, then the echo
+(reset)
+(set-option :print-success false)
+<the six-line canonical preamble>
+(declare-const djex_capability_input Int)
+(assert (= djex_capability_input 0))
+(check-sat)
+(echo "djex-smtlib-frame/v1/...")
+; write 3                    ; expected: ((djex_capability_input 0)), then the echo
+(get-value (djex_capability_input))
+(echo "djex-smtlib-frame/v1/...")
+; write 4                                    ; expected: unsat, then the echo
+(reset)
+(set-option :print-success false)
+<the six-line canonical preamble>
+(declare-const djex_capability_input Int)
+(assert (= djex_capability_input 0))
+(assert (= djex_capability_input 1))
+(check-sat)
+(echo "djex-smtlib-frame/v1/...")
+\end{lstlisting}
+
+Between phases only SMT-LIB whitespace may cross a write boundary, so a value or status emitted early can never satisfy a later phase. This checks QF-LIA acceptance, reset behavior, \sat/\unsat{} framing, the exact input-value response shape, causality under chunked streams, bounded-parser compatibility, and transport liveness. The plan, its four writes, and the expected responses are sealed into a capability fingerprint that becomes part of the ready-worker identity.
 
 This is a protocol capability, not a theorem-proving certificate. A malicious process could mimic the probe and later lie. Independent replay limits the damage of false satisfying models; raw \unsat{} remains nonauthoritative.
 
@@ -2811,6 +3201,24 @@ A simplified successful scalar transaction is:
 \end{enumerate}
 
 A protocol error, malformed response, timeout, resource limit, stale marker, unexpected EOF, failed replay, or cleanup problem is not silently converted to \unknown. It is represented by a sanitized failure class and the batch-level policy decides how conservatively to continue.
+On the wire, one scalar transaction is at most two writes. The first is the reset prefix, the sealed check bytes, and a fresh echo barrier; the second, sent only after \sat{} when the query has inputs and the artifact policy asks for values, is the sealed value request and another barrier:
+
+\begin{lstlisting}[language=SMTLib,caption={The two writes of one query transaction (barrier nonces abbreviated).}]
+; write 1: (reset), print-success off, the sealed check bytes, barrier
+(reset)
+(set-option :print-success false)
+<the sealed check program, ending in (check-sat)>
+(echo "djex-smtlib-frame/v1/...")
+; expected: exactly one status frame (sat | unsat | unknown), then the echo
+
+; write 2 (only after sat, only if the query has inputs)
+(get-value (djex_length_input_0 ...))
+(echo "djex-smtlib-frame/v1/...")
+; expected: exactly one valuation frame, then the echo
+\end{lstlisting}
+
+The 256-bit nonce in each barrier is fresh for that barrier (derived from a per-session seed, with the spent check and value roles recorded in the run identity), so a frame answering an earlier command cannot be mistaken for the answer to this one even if it was buffered late.
+
 
 \section{Budgets and cleanup}
 
@@ -2868,27 +3276,22 @@ leant --length-ranking-config /absolute/path/config.json \
       --length-ranking-allow-unpinned
 \end{lstlisting}
 
-The default load timeout is $5000$ milliseconds. The current acquisition entrance is POSIX-oriented and requires an admitted absolute path. Unless \code{--length-ranking-allow-unpinned} is present, activation rejects a policy with no expected executable digest.
+The default load timeout is $5000$ milliseconds and the maximum is $60{,}000$. The current acquisition entrance is POSIX-only (Windows fails closed before reading) and requires an admitted absolute path. Unless \code{--length-ranking-allow-unpinned} is present, activation rejects a policy with no expected executable digest.
 
-The startup file is bounded JSON with a versionless current grammar. It has a fixed \code{format} literal and a required \code{rankingDomain} selecting \code{scalar} or \code{binary-product}. Its sections describe:
+The startup file is bounded JSON (at most $256$~KiB) with one versionless current grammar. Its root has exactly ten required members, validated in this order: the fixed \code{format} literal \code{leant-live-length-ranking-configuration}; \code{rankingDomain}, selecting \code{scalar} or \code{binary-product}; and then
 
 \begin{itemize}
-\item execution admission and launch strategy;
-\item executable path and optional expected SHA-256;
-\item solver timeout, resource limit, and host deadline;
-\item response byte/tree/token/integer bounds;
-\item concrete evaluation limits;
-\item optional origin probe;
-\item optional finite input-box validation;
-\item optional complete applicable-domain validation;
-\item optional counterexample simplification;
-\item optional nonvacuous-positive ranking preferences;
-\item eager or deferred live-session opening;
-\item optional shared usable-work budget;
-\item one fixed scalar or binary-product contract.
+\item \code{executionAdmission}: the executable-path character bound and the policy-fingerprint byte bound;
+\item \code{execution}: absolute \code{executablePath}, optional \code{expectedExecutableSha256}, solver timeout, solver resource limit, host deadline, \code{artifactPolicy}, and response byte/depth/node/token/integer bounds;
+\item \code{evaluation}: concrete-replay value-width limits;
+\item \code{inputBoxValidation}: the post-\unsat{} finite input box (inclusive per-input maxima and an assignment cap);
+\item \code{applicableDomainValidation}: the caps of the guarded recursive applicable-domain traversal;
+\item \code{counterexampleSimplification}: input-count and assignment caps for counterexample simplification;
+\item \code{usableWorkBudget}: one shared usable-work duration in milliseconds (at most $65{,}000$);
+\item \code{contract}: one fixed scalar or binary-product contract in the selected grammar.
 \end{itemize}
 
-Decoding is pure and grants no execution authority. Activation separately decides whether an absent digest pin is acceptable. Loading and activation do not launch Z3; an enabled deferred policy may still complete an all-pure batch without starting a process.
+There are no strategy switches. Every accepted file selects the same policy bundle: the descriptor-bound execve-check launch strategy, the all-zero origin probe, both non-vacuous positive-receipt preferences, deferred live-session opening, and the scoped (v2) usable-work owner. Decoding is pure and grants no execution authority. Activation separately decides whether an absent digest pin is acceptable. Loading and activation do not launch Z3; an enabled deferred policy may still complete an all-pure batch without starting a process.
 
 \begin{checkpoint}
 There are three distinct moments: \emph{decode the file}, \emph{authorize its executable policy}, and \emph{open a live worker}. Keeping them separate makes it possible to reject malformed or insufficiently pinned configuration before any child process exists.
@@ -2922,13 +3325,13 @@ Ranking is the conservative default. It retains every callback-verified occurren
 
 \begin{description}
 \item[\code{Unassessed}.] No usable semantic assessment was obtained.
-\item[\code{Heuristic status}.] Z3 reported \sat, \unsat, or \unknown{}, but no independently replayed counterexample or positive finite receipt was attached.
+\item[\code{Heuristic}.] Carries the raw \code{SolverStatus} (\code{SolverSatisfiable}, \code{SolverUnsatisfiable}, or \code{SolverUnknown}); no independently replayed counterexample or positive finite receipt was attached.
 \item[\code{Counterexample}.] An input vector independently reproduced the contract violation.
 \item[\code{BoundedPositive}.] Exhaustive finite-box validation completed without a counterexample; the receipt records the applicable-assignment count.
 \item[\code{ApplicableDomainEstablished}.] The current finite representation of the complete applicable domain was independently traversed and established.
 \end{description}
 
-The historical stable ranking moves replayed counterexamples after all other candidates, preserving source order within both partitions. Optional post-assessment policies can prefer nonvacuous bounded-positive or applicable-domain-positive receipts while leaving vacuous receipts neutral. Raw status alone is neutral except as explicitly documented by a policy.
+The historical stable ranking moves replayed counterexamples after all other candidates, preserving source order within both partitions. Two additive preferences, both enabled by the current startup decoder, move nonvacuous applicable-domain receipts first and nonvacuous bounded-positive receipts next, while vacuous receipts (no assignment met the precondition) stay neutral. The resulting stable order is: nonvacuous applicable-domain receipts, then nonvacuous input-box receipts, then everything neutral (\code{Unassessed}, \code{Heuristic}, preparation refusals, vacuous receipts), then replayed counterexamples; original order is kept inside each partition. Raw status alone is neutral.
 
 If any batch-wide operational or sealing failure occurs, the ranking result preserves callback order. Candidate-local preparation refusals are diagnostic and do not become negative behavioral evidence.
 
@@ -2963,24 +3366,24 @@ The selection seal proves only that the output is a total occurrence-respecting 
 
 \section{Same-run progressive filtering}
 
-A filter request introduces one nominal command-local counterexample-bank context. Leant can feed several synthesis batches through that same context. When an early candidate yields a replayed counterexample, its input can be recorded and tried against later candidates before another live query.
+A filter request introduces one nominal command-local counterexample-bank context. Leant can feed several synthesis batches through that same context. When an early candidate yields a replayed counterexample, its input vector is recorded and tried against later candidates before another live query.
 
 This produces an elementary CEGIS-like feedback effect inside one command even though the candidate generator itself is not yet solver-guided:
 
 \begin{enumerate}
-\item Djex enumerates a bounded candidate prefix;
-\item Lean verifies a batch of occurrences;
-\item Length filtering rejects replayed violators and records useful inputs;
-\item synthesis advances to another batch if more survivors are needed;
-\item the new batch first replays retained inputs;
-\item Z3 is opened only for candidates that survive pure replay and other enabled checks.
+\item Djex enumerates a bounded candidate prefix (Main consumes an opaque engine cursor in batches of at most 12 candidate groups, or 24 when both engines run);
+\item Lean verifies the batch of occurrences;
+\item Length filtering rejects replayed violators and records their input vectors in the bank;
+\item only if the batch had no verified candidate at all, or every verified candidate was rejected, does Main request at most one same-width successor batch; a batch with even one survivor, or a preserve-all fallback, is terminal (this is not survivor-quota filling);
+\item the successor batch first replays the retained inputs against each new candidate;
+\item Z3 is opened only for candidates that survive pure replay and the other enabled solver-independent checks.
 \end{enumerate}
 
 The bank does not outlive its nominal request context, and it stores only bounded input vectors. It does not cache verdicts, opaque evidence receipts, or raw solver observations.
 
 \section{A worked conceptual session}
 
-The following transcript is illustrative rather than a promise of exact current presentation text. Assume startup configuration enables the scalar List spine, a pinned Z3 worker, and a length-preservation contract.
+The following transcript is illustrative rather than a promise of exact current presentation text (Section~\ref{sec:length-worked-example} derives the exact queries and verdicts behind it). Assume startup configuration enables the scalar List spine, a pinned Z3 worker, and a length-preservation contract, and that \code{:set synth-engine exference} has been issued: under the default \code{djinn} engine no candidate carries a typed graph, so every one is retained with the refusal code \code{unsupported-route} and no worker is opened. In filter mode the omitted occurrences are printed as separate \code{rejected} rows carrying the counterexample note; only survivors are bound as \code{it1}, \code{it2}, \ldots
 
 \begin{lstlisting}[language={},caption={Conceptual ranking and filtering outcomes.}]
 -- Every shown term has already been accepted by Lean at List a -> List a.
@@ -3098,15 +3501,50 @@ A failure at any of these stages is a pure preparation refusal. No live worker i
 For a live miss:
 
 \begin{enumerate}
-\item \lpath{src/Leant/Synth/Length/Ranking/Internal.hs} or the selection sibling decides to open/use a worker under the configured policy.
-\item \dpath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib/Live.hs} exposes the public scoped capability.
-\item private \filepath{Length/SMTLib/Session/} modules open, probe, reset, transact, and close the worker;
-\item private \dpath{synthesis/internal/Language/Haskell/Synthesis/Internal/SMTLib/Causal/Driver.hs} and stream/response modules maintain framing;
-\item private \dpath{synthesis/internal/Language/Haskell/Synthesis/Internal/SMTLib/Z3/Process.hs} owns process launch, transport, cancellation, and cleanup;
-\item public replay gates return a status plus optional independently validated evidence.
+\item \lpath{src/Leant/Synth/Length/Ranking/Internal.hs} (or its nominal twin \lpath{src/Leant/Synth/Length/SpinePair/Ranking/Internal.hs}) runs the per-candidate source order---bank replay, applicable-domain traversal, origin probe, live query, post-\unsat{} input box---and decides when to open the one lexical worker under the configured policy. The selection adapters in \lpath{src/Leant/Synth/Length/Selection/Internal.hs} run no queries; they consume the finished ranking assessment.
+\item \dpath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib/Live.hs} exposes the public scoped capability (\code{withLengthSMTLibLiveSession...}, \code{runLengthSMTLibLiveQuery}, \code{replayLengthSMTLibLiveQueryObservation}).
+\item The private \dpath{synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length/SMTLib/Session.hs} owns the ready worker: workspace, launch, the four-write readiness probe from \dpath{synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length/SMTLib/Session/Capability.hs}, query leases, and run identities.
+\item The private \dpath{synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length/SMTLib/Protocol.hs} is the pure per-query phase machine (reset + check bytes + barrier, one status frame, optional value request + barrier).
+\item The private \dpath{synthesis/internal/Language/Haskell/Synthesis/Internal/SMTLib/Causal/Driver.hs} and the stream/response modules perform the writes and maintain framing over chunked stdout.
+\item The private \dpath{synthesis/internal/Language/Haskell/Synthesis/Internal/SMTLib/Z3/Process.hs} owns process launch (including the descriptor-bound pipeline), pipes, cancellation, and cleanup.
+\item The public replay gate returns a status plus optional independently validated evidence.
 \end{enumerate}
 
 When diagnosing a reported \unknown{}, distinguish a genuine solver \unknown{} from host timeout, resource exhaustion, transport failure, malformed response, capability rejection, and an application-level refusal. They have different remediation and trust implications.
+\section{Stage by stage: owning module and failure class}
+
+The following table lists, for one Length-aware \code{:synth}, each stage in execution order, the module that owns it, the closed failure vocabulary it can raise, and what that failure does to the batch. ``Candidate-local'' means the occurrence stays in place with a payload-free refusal code and the rest of the batch proceeds; ``batch'' means every verified occurrence is preserved in callback order as \code{Unassessed} and Main prints a mode-neutral warning.
+
+\begin{longtable}{@{}L{0.16\textwidth}L{0.26\textwidth}L{0.41\textwidth}L{0.09\textwidth}@{}}
+\toprule
+Stage & Module & Failure vocabulary & Effect \\
+\midrule
+\endfirsthead
+\toprule
+Stage & Module & Failure vocabulary & Effect \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Option parsing & \lpath{src/Leant/Options.hs} & usage error (\code{--length-ranking-config-timeout} and \code{--length-ranking-allow-unpinned} require \code{--length-ranking-config}) & startup refused \\
+File acquisition & \lpath{src/Leant/Synth/Length/Configuration/File/Acquire.hs} over the shared \lpath{src/Leant/Synth/Length/File/Acquire.hs} & \code{LengthFileAdmissionError}, sanitized load-error class; \code{LengthFilePlatformUnsupported} on Windows & startup refused \\
+Decoding & \lpath{src/Leant/Synth/Length/Configuration/File.hs} & \code{LengthRankingConfigurationFileError}: bounded-JSON, format, \code{rankingDomain}, exact ten-member root, then per-section field errors & startup refused \\
+Activation & \lpath{src/Leant/Synth/Length/Integration.hs} & \code{LengthAssessmentActivationRejected} (no digest pin without \code{--length-ranking-allow-unpinned}) & startup refused \\
+Command syntax & \lpath{src/Leant/Synth/Length/Command.hs} & \code{LengthSynthCommandError}: mode missing/invalid, delimiter missing, contract path missing, mode after contract & command refused \\
+Request admission & \lpath{src/Leant/Synth/Length/Integration.hs} & \code{LengthAssessmentRequestError}: an explicit contract path or a filter request without an activated startup policy & command refused before file IO \\
+Batch admission & \lpath{src/Leant/Synth/Length/Ranking/Internal.hs} & \code{LengthRankingInputLimitExceeded} (more than 64 candidates) & batch \\
+Handoff & \lpath{src/Leant/Synth/Length/Handoff.hs} & \code{LengthHandoffRefusal}, surfaced as the codes \code{unsupported-route}, \code{typed-authority-unavailable}, \code{candidate-association-rejected}, \code{rendering-association-rejected}, \code{spine-binding-unavailable}, \code{provider-binding-unavailable}, \code{session-rejected}, \code{contract-rejected}, \code{candidate-semantics-rejected} & candidate-local \\
+Query sealing & \lpath{src/Leant/Synth/Length/Adapter.hs} calling Djex \code{sealLengthSMTLibQuery} & \code{LengthSMTLibQueryError} (result variable leaked, input out of range, zero divisor, numeral-bit, command-byte, or fingerprint-byte limit), surfaced as \code{query-construction-rejected} & candidate-local \\
+Pure validations & Djex \code{Semantic.Length.SMTLib} / \code{Evaluate} & \code{LengthRankingFailureClass} constructors for origin-probe evaluation, applicable-domain validation, input-box validation, and counterexample-simplification failures (bounded admission misses are ordinary, not failures) & batch \\
+Worker opening & Djex \dpath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib/Live.hs} & \code{LengthRankingLiveSessionFailed} carrying \code{LengthSMTLibLiveSessionFailure}: deadline exceeded, workspace unavailable, executable unavailable/rejected, launch failed, capability rejected, resource limit, transport, cleanup, internal, usable-work scope unavailable & batch \\
+Query transaction & same & \code{LengthRankingLiveQueryFailed} carrying \code{LengthSMTLibLiveQueryFailure}: session unavailable, query limit, deadline, configuration rejected, resource limit, transport, protocol rejected, counterexample rejected, internal & batch \\
+Association and replay & Djex replay gates & \code{LengthRankingQueryAssociationMismatch}, \code{LengthRankingEvidenceReplayMismatch} & batch \\
+Permutation seal & \lpath{src/Leant/Synth/PostVerification.hs} & \code{PostVerificationError}: collection limit, length mismatch, index out of range, duplicate index & batch \\
+Selection seal & \lpath{src/Leant/Synth/BehavioralSelection.hs} via \lpath{src/Leant/Synth/Length/Selection/Internal.hs} & \code{LengthSelectionFailure}: post-verification failed, ranking failed/unavailable, index out of range, seal failed & batch \\
+\end{longtable}
+
+Solver status is deliberately absent from the failure column: \sat, \unsat, and \unknown{} are assessments (\code{Heuristic}), not failures, and none of them changes the batch shape by itself.
+
 
 \section{Trace through ranking or selection}
 
@@ -3160,7 +3598,7 @@ The implemented flow is mostly sequential:
   \longrightarrow
   \text{Length assessment}.
 \]
-This already gives useful ranking and safe opt-in rejection. It does not yet use behavioral information to decide which candidates Djex generates next. If the first thousand type-correct candidates all violate the same simple property, the generator may still enumerate them before the assessor says the same thing repeatedly.
+This already gives useful ranking and safe opt-in rejection (\code{--behavior-mode filter}). In filter mode the disposition of one assessed batch even decides whether Main forces a second ordered batch out of the same lazy engine outcome: a successor is requested only after no verification or complete all-rejection, and never a third time. What the tree does not yet do is use behavioral information to decide \emph{which} candidates Djex generates next. The counterexamples learned so far never reach the enumerator, so if every type-correct candidate in a batch violates the same simple property, the generator still produces the whole batch, Lean still checks each candidate, and only then does the assessor say the same thing repeatedly.
 
 The planned architecture adds feedback:
 \[
@@ -3217,13 +3655,15 @@ Level & Main idea & What Z3 does & Status at the inspected tree \\
 \bottomrule
 \endfoot
 1 & Post-verification behavioral assessment & Search for a counterexample to each checked candidate & Ranking and replay-authorized hard filtering implemented for Length \\
-2 & Counterexample-guided enumeration & Supply separating samples and equivalence classes to Djex's enumerator & Partial infrastructure exists through same-request banks; generator feedback is planned \\
+2 & Counterexample-guided enumeration & Supply separating samples and equivalence classes to Djex's enumerator & Bounded slice implemented: one command-local nominal counterexample bank (\lpath{src/Leant/Synth/Length/CounterexampleBank/Internal.hs}) is replayed across at most two ordered same-run filter batches taken from one lazy engine outcome through the Engine cursor (\lpath{src/Leant/Synth/Engine.hs}); counterexample-directed generation and semantic signatures are planned \\
 3 & Typed finite sketches & Solve selector, wiring, literal, and finite-table variables in a Djex-prepared DAG & Planned \\
 4 & Semantic prefix pruning & Refute incomplete search states using sound over-approximations & Planned \\
 5 & Recursive relational synthesis/proof & Solve CHCs for traces or invariants; support richer domains and proof artifacts & Planned research path \\
 \end{longtable}
 
 The levels are additive. Level 3 does not eliminate Level 1: a selector model still materializes a candidate, Lean still checks it, and the exact behavioral verifier still tries to refute it. Level 5 does not eliminate replay or proof checking.
+The numbering compresses the proposal's ladder. The proposal \cite{proposal} distinguishes six levels: its Level 5 is the recursive CHC path alone, and its Level 6 is an explicitly experimental \emph{specification and law inference} mode in which Z3 proposes contract parameters or provider summaries from examples, proposals that never become assumed laws without user acceptance or a Lean theorem. This guide folds richer domains and proof artifacts into its Level 5 and does not plan law inference. When the two documents are read side by side, compare mechanisms rather than level numbers.
+
 
 \section{A generic behavioral domain interface}
 
@@ -3276,13 +3716,44 @@ For example, a candidate may be interpreted exactly for list length, conditional
 \begin{mentalmodel}
 An ``exactness descriptor'' says which bridge was crossed and under which assumptions. It prevents a useful bounded fact from being presented as a universal source theorem.
 \end{mentalmodel}
+\section{Planned mechanisms, Z3 features, and status at a glance}
+\label{sec:mechanism-status-table}
+
+The chapters of this Part discuss one mechanism at a time. The table below lists them together with the Z3 feature each relies on and its status at the inspected tree, so that a reader can tell at a glance what is already running from what is only argued for. Every Z3 feature named here was exercised against Z3 5.0.0 while writing this Part; the exact scripts and answers appear in the sections cited.
+
+\begin{longtable}{@{}L{0.24\textwidth}L{0.30\textwidth}L{0.40\textwidth}@{}}
+\toprule
+Planned mechanism & Z3 feature relied on & Status at the inspected tree \\
+\midrule
+\endfirsthead
+\toprule
+Planned mechanism & Z3 feature relied on & Status at the inspected tree \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Post-verification counterexample search (Level 1) & \QFLIA{} \code{check-sat} plus \code{get-value}, one \code{reset}/check/value transaction per query & Implemented for Length: ranking by default, hard filtering under \code{--behavior-mode filter} with the occurrence-sealed partition of \lpath{src/Leant/Synth/BehavioralSelection.hs} \\
+Counterexample bank replay & none (pure Djex replay of stored input vectors) & Implemented: four-entry batch-local MRU on the rank path; command-local nominal bank on the filter path (\lpath{src/Leant/Synth/Length/CounterexampleBank/Internal.hs}) \\
+Progressive same-run batching & none & Implemented: at most two ordered batches from one lazy engine outcome through the Engine cursor, a successor only after no verification or complete all-rejection \\
+Guarded-conditional finite domains & none (pure applicable-domain validation) & Implemented: guarded recursive piecewise-affine validation over \code{LengthIf} summaries \\
+Semantic signatures and scheduling & none at first; later \code{check-sat} equivalence queries (Section~\ref{sec:equivalence-worked}) & Planned, Milestone~1 \\
+Candidate-level CEGIS with generator feedback & incremental assertion of samples in one solver session (Section~\ref{sec:cegis-worked}) & Planned, Milestone~2 \\
+Typed sketches with selector variables & integer or one-hot selectors, \code{ite}, \code{check-sat}, \code{get-value}; optional \code{pbeq}/\code{at-most} cardinality atoms & Planned, Milestone~3 \\
+Contract diagnostics and grammar nogoods & \code{check-sat-assuming}, \code{:produce-unsat-cores}, \code{get-unsat-core}, optional \code{smt.core.minimize} (Section~\ref{sec:nogood-worked}) & Planned, Milestone~4 \\
+Optimization and canonical models & \code{minimize}/\code{maximize}, \code{assert-soft}, \code{get-objectives}; or iterative bounds with \code{push}/\code{pop} (Section~\ref{sec:opt-worked}) & Planned, Milestone~4 \\
+Sound prefix pruning & \unsat{} of an over-approximate summary against samples; cores for nogoods & Planned, staged; only scheduling hints at first \\
+Richer behavioral domains & algebraic datatypes, uninterpreted sorts and functions (EUF), arrays, \code{Seq}, bit-vectors & Planned, Milestone~5 \\
+Lean proof artifacts & none from Z3; Lean tactics such as \code{simp}, \code{omega}, \code{bv_decide} & Planned, Milestone~6 \\
+CHCs for recursive candidates & Spacer through \code{declare-rel}/\code{rule}/\code{query} or \code{(set-logic HORN)} with \code{check-sat}; \code{:fp.print_certificate}, \code{get-model} & Planned, Milestone~7 \\
+\end{longtable}
+
 
 \chapter{Counterexample-guided enumeration}
 \label{chap:candidate-cegis}
 
 \section{Turning the current bank into generator feedback}
 
-The existing filter can learn an input from candidate $C_1$ and replay it against later candidates $C_2,C_3,\ldots$. The next step is to expose the sample set to Djex's search scheduler before candidates reach Lean.
+The existing filter can learn an input from candidate $C_1$ and replay it against later candidates $C_2,C_3,\ldots$: in \code{--behavior-mode filter} one nominal bank of source-ordered input vectors is opened per \code{:synth} command and reused across the run's at most two ordered batches and its later provider and classical lanes (the rank path keeps its older four-entry batch-local MRU). Every retained vector still has to be independently replayed against the later candidate's own checked problem before it counts; the bank stores no verdicts. The next step is to expose that sample set to Djex's search scheduler before candidates reach Lean.
 
 For a sample bank
 \[
@@ -3327,7 +3798,7 @@ There are two policy choices for sample inconsistency:
 \item[Scheduling only.] Inconsistent candidates are moved behind consistent classes but remain enumerable. This preserves the present callback frontier more closely and is useful while semantic applicability is incomplete.
 \end{description}
 
-The initial implementation should support both, with scheduling as the compatibility default and hard pruning requiring an explicit behavioral mode.
+The initial implementation should support both, with scheduling as the compatibility default and hard pruning requiring an explicit behavioral mode; the existing request-scoped \code{--behavior-mode filter} is the natural switch, since it already carries the authority to omit candidates and already owns the command-local bank.
 
 \section{Counterexample lifecycle}
 
@@ -3350,7 +3821,7 @@ Only the input vector is generally reusable across candidates. Evidence remains 
 Unboundedly retaining every counterexample can make sample evaluation dominate search. A bank needs a deterministic bounded policy. Useful strategies include:
 
 \begin{itemize}
-\item newest-first MRU, as the current ranking layer uses for a small seed set;
+\item newest-first retention with duplicate promotion, as the current Length layer uses (a four-entry batch-local MRU on the rank path; on the filter path a command-local bank whose default limits are four entries, eight naturals per sample, 256 bits per natural, 4096 encoded bytes, and 256 replay attempts, per \dpath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/CounterexampleBank.hs});
 \item smallest-first under a domain-specific lexicographic measure;
 \item coverage-based retention: keep samples that separate the most current signature classes;
 \item subsumption: remove a sample whose rejection set is contained in another's;
@@ -3370,6 +3841,27 @@ Suppose two candidates $C_1$ and $C_2$ both satisfy the current sample bank. A d
 If \sat{}, replay validates the decoded $x$ for both candidates and refines the partition. This is not necessarily a contract counterexample; it is an \emph{equivalence query}. The evidence type and bank origin should therefore be distinct from violation evidence.
 
 For the Length domain, identity and reverse cannot be separated because both have result length $n$. This correctly tells the scheduler that a richer observation domain is needed, not that the functions are extensionally equal.
+\subsection*{Worked equivalence query}
+\label{sec:equivalence-worked}
+
+Two candidates \emph{can} be separated when their length behavior differs. Suppose the bank holds only $n=0$, and both an identity-like candidate $C_1$ (result length $n$) and a tail-like candidate $C_2$ (result length $\operatorname{ite}(n=0,0,n-1)$) agree with it. The separating query is:
+
+\begin{lstlisting}[language=SMTLib,caption={An equivalence query separating two candidates that agree on the current bank.}]
+(set-logic QF_LIA)
+(declare-const n Int)
+(assert (<= 0 n))
+; C1: result length n               (identity-like)
+(define-fun out1 () Int n)
+; C2: result length ite(n=0,0,n-1)  (tail-like)
+(define-fun out2 () Int (ite (= n 0) 0 (- n 1)))
+; both agree on the current bank {n = 0}; ask for a separating input
+(assert (not (= out1 out2)))
+(check-sat)
+(get-value (n))
+\end{lstlisting}
+
+Z3 5.0.0 answers \sat{} with \code{((n 1))}. Replaying $n=1$ against both candidates gives result lengths $1$ and $0$, so the two signature classes split. Nothing here says which candidate is right; that is the contract's job, and the input enters the bank under a distinct ``equivalence probe'' origin rather than as violation evidence.
+
 
 \section{Interaction with completeness claims}
 
@@ -3461,7 +3953,9 @@ For three alternatives:
 (assert (not (and choose.1 choose.2)))
 \end{lstlisting}
 
-A production assumption literal can imply the corresponding choice. During a candidate query, \code{check-sat-assuming} can activate a partial assignment and expose an unsat core over those assumptions.
+Run as written, Z3 5.0.0 answers \sat{} and \code{(get-value (s choose.0 choose.1 choose.2))} prints \code{((s 0) (choose.0 true) (choose.1 false) (choose.2 false))}: with no semantic constraint the solver simply picks the first alternative in both encodings, which is one reason later sections insist on canonical tie-breaking. Z3 also offers native cardinality atoms for the one-hot form, for example \code{(assert ((_ pbeq 1 1 1 1) choose.0 choose.1 choose.2))} (``exactly one of the three, each with weight one'') or \code{((_ at-most 1) ...)} together with the disjunction; adding \code{(assert (not choose.0))} to the \code{pbeq} form yields \code{((choose.0 false) (choose.1 false) (choose.2 true))}.
+
+A production assumption literal can imply the corresponding choice. During a candidate query, \code{check-sat-assuming} can activate a partial assignment and expose an unsat core over those assumptions, provided \code{(set-option :produce-unsat-cores true)} was issued first; without it Z3 5.0.0 answers the \code{get-unsat-core} with the error ``unsat core construction is not enabled''. Section~\ref{sec:nogood-worked} runs such a query.
 
 \section{Semantic equations over samples}
 
@@ -3526,7 +4020,7 @@ A schematic SMT encoding is:
 (get-value (none.branch some.branch))
 \end{lstlisting}
 
-The model chooses $(0,1)$. Djex decodes those selector indices against the exact alternative tables, materializes the case expression, and asks Lean to elaborate it. The behavioral verifier then checks the materialized exact candidate, rather than trusting the sample equations alone.
+Run through Z3 5.0.0 the script answers \sat{} and prints \code{((none.branch 0) (some.branch 1))}: the model chooses $(0,1)$, which is the only assignment consistent with both samples (the \code{none} sample rules out the provider token in the \code{none} branch, and the \code{some} sample rules out both \code{none} and the provider token in the \code{some} branch). Djex decodes those selector indices against the exact alternative tables, materializes the case expression, and asks Lean to elaborate it. The behavioral verifier then checks the materialized exact candidate, rather than trusting the sample equations alone.
 
 \section{Worked sketch: state threading}
 
@@ -3547,6 +4041,36 @@ The contract requires
   G(\pi_1(F(s_0)),\pi_2(F(s_0))).
 \]
 A separating model can make $s_0\ne s_1$ and assign different outputs to the two $G$ applications. The selector consistent with all such counterexamples is $s_{arg}=s_1$.
+Concretely, the proposal's verification query for the wrong wiring (\cite{proposal}, appendix ``Concrete SMT-LIB encodings'') answers \sat{} with \code{s0} and \code{s1} distinct. Turning that observation into a sample constraint and adding the selector gives the following script, which Z3 5.0.0 answers with \sat{} and \code{((use.s1 true))}:
+
+\begin{lstlisting}[language=SMTLib,caption={Selector version of the state-threading sketch over uninterpreted sorts and a tuple datatype.}]
+(set-logic ALL)
+(declare-sort S 0)
+(declare-sort A 0)
+(declare-sort B 0)
+(declare-datatypes ((Pair 2))
+  ((par (X Y) ((mk-pair (fst X) (snd Y))))))
+(declare-fun f (S) (Pair A S))
+(declare-fun g (A S) (Pair B S))
+(declare-const s0 S)
+(define-fun a0 () A (fst (f s0)))
+(define-fun s1 () S (snd (f s0)))
+(define-fun expected () (Pair B S) (g a0 s1))
+
+; selector: false = pass s0 to g, true = pass s1
+(declare-const use.s1 Bool)
+(define-fun actual () (Pair B S) (g a0 (ite use.s1 s1 s0)))
+
+; sample learned from the wrong wiring's counterexample model:
+; there, the two applications of g differ
+(assert (not (= (g a0 s0) (g a0 s1))))
+(assert (= actual expected))
+(check-sat)
+(get-value (use.s1))
+\end{lstlisting}
+
+The disequality is the sample: it records the finite interpretation in which the two $G$ applications differ, and it forces the only wiring that agrees with the expected result. Djex materializes the alternative selected by \code{use.s1}; Lean elaborates it; the domain's ordinary verification query then confirms that no interpretation separates \code{actual} from \code{expected}.
+
 
 This example shows why future domains need uninterpreted sorts/functions and algebraic tuples even when the synthesis selector itself is finite.
 
@@ -3578,6 +4102,80 @@ A sketch model proves only that the selected candidate satisfies the current fin
 \item if no counterexample is established, either emit the best available status, run a complete domain validator, or generate a Lean proof obligation;
 \item stop under explicit iteration, model, solver, and wall budgets.
 \end{enumerate}
+\section{Worked example: two rounds of sketch CEGIS on lengths}
+\label{sec:cegis-worked}
+
+The loop is easiest to see on the smallest possible sketch. Take the target \code{List a -> List a}, the contract ``result length equals input length'', and one Djex-prepared choice node with three alternatives: return \code{[]} (result length $0$), cons one element onto the input (result length $n+1$), or return the input (result length $n$). Every alternative already has the right type; Z3 only chooses. All four scripts below were run as written against Z3 5.0.0, each in a fresh process, and the answers are quoted after them.
+
+\textbf{Round 1, sketch query.} The bank is empty, so only the range constraint applies:
+
+\begin{lstlisting}[language=SMTLib,caption={Round 1: choose an alternative with no samples.}]
+(set-logic QF_LIA)
+; one choice node; alternatives prepared by Djex at type List a
+;   0: []            result length 0
+;   1: x :: xs       result length n + 1
+;   2: xs            result length n
+(declare-const s Int)
+(assert (and (<= 0 s) (< s 3)))
+(define-fun out ((n Int)) Int
+  (ite (= s 0) 0
+  (ite (= s 1) (+ n 1)
+               n)))
+; round 1: the bank is empty, so only the range constraint applies
+(check-sat)
+(get-value (s))
+\end{lstlisting}
+
+Answer: \sat{}, \code{((s 0))}. Z3 picks the constant-empty alternative. Djex materializes \code{fun xs => []}, Lean accepts it, and the domain now asks whether it violates the contract.
+
+\textbf{Round 1, verification query.} The materialized candidate has result length $0$, so the bad state is $n\ge0\land 0\ne n$:
+
+\begin{lstlisting}[language=SMTLib,caption={Round 1: refute the materialized candidate.}]
+(set-logic QF_LIA)
+(declare-const n Int)
+(assert (<= 0 n))
+; alternative 0 materialized: result length 0
+(define-fun out () Int 0)
+; bad state: the contract "result length = input length" fails
+(assert (not (= out n)))
+(check-sat)
+(get-value (n))
+\end{lstlisting}
+
+Answer: \sat{}, \code{((n 1))}. Independent replay evaluates the exact candidate at input length one, obtains result length zero, confirms $0\ne1$, and inserts the input vector $(1)$ into the bank.
+
+\textbf{Round 2, sketch query.} The same declarations are kept and the sample is asserted as one more equation over the shared selector:
+
+\begin{lstlisting}[language=SMTLib,caption={Round 2: the replayed sample constrains every alternative at once.}]
+(set-logic QF_LIA)
+(declare-const s Int)
+(assert (and (<= 0 s) (< s 3)))
+(define-fun out ((n Int)) Int
+  (ite (= s 0) 0
+  (ite (= s 1) (+ n 1)
+               n)))
+; round 2: the replayed sample n = 1 now constrains every alternative
+(assert (= (out 1) 1))
+(check-sat)
+(get-value (s))
+\end{lstlisting}
+
+Answer: \sat{}, \code{((s 2))}. One sample eliminated two of the three alternatives ($0\ne1$ and $2\ne1$), and Z3 selects the identity alternative. In an incremental session the second script is just the extra \code{assert} and \code{check-sat} appended to the first one; we confirmed that the same session answers \code{((s 0))} and then \code{((s 2))}, and still \code{((s 2))} after a further sample \code{(assert (= (out 0) 0))}.
+
+\textbf{Round 2, verification query.} The materialized candidate is \code{fun xs => xs} with result length $n$:
+
+\begin{lstlisting}[language=SMTLib,caption={Round 2: the verification query for the identity alternative.}]
+(set-logic QF_LIA)
+(declare-const n Int)
+(assert (<= 0 n))
+; alternative 2 materialized: result length n
+(define-fun out () Int n)
+(assert (not (= out n)))
+(check-sat)
+\end{lstlisting}
+
+Answer: \unsat{}. The loop stops. Note what has and has not been established: the selector model proved that alternative~2 agrees with the one retained sample under the sketch encoding; Lean established that the materialized term is well typed at the goal; the final \unsat{} is a heuristic solver observation that no length-model counterexample exists for that exact candidate. In the current authority vocabulary the candidate is ``solver-indisproved in model'', not proved; a complete finite validator or a Lean theorem is needed for more. Two rounds sufficed here because the sketch was tiny; the same protocol scales to many nodes, but the three kinds of answer keep their distinct meanings.
+
 
 \section{Unsat means different things in synthesis and verification}
 
@@ -3637,6 +4235,21 @@ may have an over-approximation
   0\le r\le 2n+2.
 \]
 This is too broad to prove length preservation impossible. If a prefix has already committed to a constant-empty root and no reachable hole can alter the result, the exact summary $r=0$ refutes preservation at $n=1$.
+The proposal's worked prefix (\cite{proposal}, Level~4) is the smallest honest example. Suppose Exference is at the partial state \code{fun xs => List.cons ?h1 ?h2} with \code{?h2 : List a}, and the bank holds the empty list, $n=0$. The Length domain knows nothing about the eventual completion of \code{?h2} except its type, so its sound summary is ``some length $t\ge0$'', and the prefix summary is $r=1+t$. The pruning query on the bank is:
+
+\begin{lstlisting}[language=SMTLib,caption={An over-approximate prefix summary refuted by one sample.}]
+(set-logic QF_LIA)
+; hole ?h2 : List a may complete to any length t >= 0
+(declare-const t Int)
+(assert (>= t 0))
+; prefix  fun xs => List.cons ?h1 ?h2  has result length 1 + t;
+; the retained sample n = 0 requires result length 0
+(assert (= (+ 1 t) 0))
+(check-sat)
+\end{lstlisting}
+
+Z3 5.0.0 answers \unsat{}: every completion returns a nonempty list on the empty input, so the whole subtree can be pruned, and the receipt records the summary $t\ge0$, the exact bank identity, and the grammar fingerprint. Had the domain summarized \code{?h2} by the completions it happened to enumerate first (say ``one of the locals'', giving $r=1+n$), the query for a length-one sample would also be \unsat{}, yet the completion \code{?h2 := []} satisfies that sample; that is the polarity error the mental model above warns about.
+
 
 The useful summary is often structural rather than purely numeric: which holes can still influence the root, which inputs can still flow to them, and which provider transfers remain selectable.
 
@@ -3701,6 +4314,56 @@ the learned nogood is
 This forbids every future model containing the same conflicting choice combination.
 
 A core is not necessarily minimal. A deterministic deletion pass can attempt to remove assumptions while preserving unsatisfiability under a separate budget. The resulting nogood remains scoped to the exact grammar and sample set.
+\subsection*{Worked nogood extraction}
+\label{sec:nogood-worked}
+
+The following two-node sketch shows both the mechanism and the non-minimality. Node~A chooses the base value (constant zero or the input length $n$), node~B chooses an increment ($+0$, $+1$, or $+2$), the root is their sum, and two retained samples require lengths $1$ and $3$ to be preserved. Each production choice gets an assumption literal, and three partial assignments are probed with \code{check-sat-assuming}:
+
+\begin{lstlisting}[language=SMTLib,caption={Assumption literals per production choice, and cores over them.}]
+(set-option :produce-unsat-cores true)
+(set-logic QF_LIA)
+; node A, base value:  0 = constant zero, 1 = input length n
+(declare-const sA Int)
+(assert (and (<= 0 sA) (< sA 2)))
+; node B, increment:   0 = +0, 1 = +1, 2 = +2
+(declare-const sB Int)
+(assert (and (<= 0 sB) (< sB 3)))
+(define-fun out ((n Int)) Int
+  (+ (ite (= sA 0) 0 n)
+     (ite (= sB 0) 0 (ite (= sB 1) 1 2))))
+; retained samples: lengths 1 and 3 must be preserved
+(assert (= (out 1) 1))
+(assert (= (out 3) 3))
+; one assumption literal per production choice
+(declare-const pA0 Bool) (declare-const pA1 Bool)
+(declare-const pB0 Bool) (declare-const pB1 Bool) (declare-const pB2 Bool)
+(assert (=> pA0 (= sA 0))) (assert (=> pA1 (= sA 1)))
+(assert (=> pB0 (= sB 0))) (assert (=> pB1 (= sB 1))) (assert (=> pB2 (= sB 2)))
+; partial assignment: constant-zero base, increment +1
+(check-sat-assuming (pA0 pB1))
+(get-unsat-core)
+; partial assignment: input-length base, increment +1
+(check-sat-assuming (pA1 pB1))
+(get-unsat-core)
+; partial assignment: input-length base, increment +0
+(check-sat-assuming (pA1 pB0))
+(get-value (sA sB))
+\end{lstlisting}
+
+Z3 5.0.0 answers:
+
+\begin{lstlisting}[language=SMTLib]
+unsat
+(pA0 pB1)
+unsat
+(pA1 pB1)
+sat
+((sA 1)
+ (sB 0))
+\end{lstlisting}
+
+The first core is not minimal: a constant-zero base can never reach length $3$ with an increment of at most $2$, so \code{pA0} alone is already infeasible, yet Z3 blamed both literals. Inserting \code{(set-option :smt.core.minimize true)} before the logic declaration and rerunning in a fresh process gives the cores \code{(pA0)} and \code{(pB1)} instead: the first now says ``no constant-zero base, whatever the increment'', and the second says ``no $+1$ increment, whatever the base'' (with base $0$ it fails length $3$; with base $n$ it fails length $1$). Both smaller nogoods are correct and prune more of the remaining grammar, which is why a deterministic minimization pass, or the solver's own minimizer under a fingerprinted option, is worth its budget. Every one of these nogoods is valid only for the exact grammar and the exact two-sample bank that produced it.
+
 
 \section{Monotonicity rules for reuse}
 
@@ -3794,6 +4457,21 @@ A reverse contract can search for one violating index:
   0\le i<n\land r[i]\ne x[n-1-i].
 \]
 This replaces a universal property by an existential bad index, making counterexample search quantifier-free when candidate semantics and array theory permit it.
+As a first taste of the sequence theory, here is the reverse contract checked against the identity candidate with native sequences; the candidate's output is the input itself, so \code{r} is just \code{x}:
+
+\begin{lstlisting}[language=SMTLib,caption={One bad index refutes identity against the reverse contract.}]
+(declare-const x (Seq Int))
+(declare-const i Int)
+(define-fun n () Int (seq.len x))
+; candidate: identity, so r = x; contract: r[i] = x[n-1-i]
+(assert (and (<= 0 i) (< i n)))
+(assert (not (= (seq.nth x i) (seq.nth x (- (- n 1) i)))))
+(check-sat)
+(get-value (x i))
+\end{lstlisting}
+
+Z3 5.0.0 answers \sat{} with \code{((x (seq.++ (seq.unit 4) (seq.unit 7))) (i 1))}: the two-element sequence $[4,7]$ and index $1$, where the identity returns $7$ but reversal would return $4$. The element values $4$ and $7$ are arbitrary; a domain decoder would map them to two distinct finite atoms and replay the index comparison, never trusting the literal integers as Lean elements. The bounds guard on \code{i} is essential: without it Z3 could satisfy the disequality with an out-of-range \code{seq.nth}, whose value is unconstrained.
+
 
 Replay can use finite symbolic atoms rather than arbitrary Lean elements. The receipt must state whether the atom model is exact for the claimed property. Parametricity can sometimes justify a small-model theorem, but that theorem belongs in Lean or a separately checked domain argument.
 
@@ -3968,20 +4646,38 @@ A likely design uses assumptions for production choices and tracked contract cla
 
 Before searching candidates, the system can check whether hard contract clauses and finite-domain axioms are mutually consistent. Each clause is guarded by a stable assumption literal:
 
-\begin{lstlisting}[language=SMTLib,caption={Tracked contract clauses.}]
+\begin{lstlisting}[language=SMTLib,caption={Tracked contract clauses. A contract author asked for length preservation and, by mistake, also for a pointwise clause that forces one extra element.}]
+(set-option :produce-unsat-cores true)
+(set-logic QF_LIA)
+(declare-const n Int)
+(declare-const r Int)
 (declare-const c.pre Bool)
 (declare-const c.length Bool)
 (declare-const c.pointwise Bool)
 
-(assert (=> c.pre       precondition-is-admissible))
-(assert (=> c.length    length-clause))
-(assert (=> c.pointwise pointwise-clause))
+; each contract clause is guarded by a stable assumption literal
+(assert (=> c.pre       (<= 0 n)))
+(assert (=> c.length    (= r n)))
+(assert (=> c.pointwise (= r (+ n 1))))
 
 (check-sat-assuming (c.pre c.length c.pointwise))
 (get-unsat-core)
+; drop one blamed clause and the remaining contract is satisfiable
+(check-sat-assuming (c.pre c.length))
+(get-value (n r))
 \end{lstlisting}
 
-A returned core identifies a conflicting subset, not necessarily a minimal one. Leant can map stable literals back to source spans and run a deterministic deletion minimizer under a separate budget. The diagnostic should say ``inconsistent in this checked finite/model profile,'' not ``logically inconsistent in Lean'' unless Lean checks the contradiction.
+Z3 5.0.0 answers:
+
+\begin{lstlisting}[language=SMTLib]
+unsat
+(c.length c.pointwise)
+sat
+((n 0)
+ (r 0))
+\end{lstlisting}
+
+The core names exactly the two clauses that contradict each other and leaves the harmless precondition literal \code{c.pre} out, so Leant can point at the two contract spans instead of saying ``the contract is inconsistent''. A returned core identifies a conflicting subset, not necessarily a minimal one, and the order in which Z3 prints the literals is not stable (\code{smt.core.minimize} changed it in our runs), so the decoder must canonicalize the set. Leant can map stable literals back to source spans and run a deterministic deletion minimizer under a separate budget. The diagnostic should say ``inconsistent in this checked finite/model profile,'' not ``logically inconsistent in Lean'' unless Lean checks the contradiction.
 
 \section{Grammar cores and learned nogoods}
 
@@ -4039,6 +4735,43 @@ Even with a fixed seed, Z3 may choose different satisfying selector assignments 
 \end{itemize}
 
 Alternatively, after finding a cost optimum, ordinary SAT queries can pin each selector greedily to the smallest feasible value. This is slower but gives an explicit deterministic algorithm independent of Optimize's model preferences.
+\subsection*{Worked optimization}
+\label{sec:opt-worked}
+
+A root with three alternatives, the input, a provider identity applied to the input, and the constant \code{[]}, has two selector values consistent with the sample $n=1\mapsto1$. A modeled cost of one node for the input, two for the provider call, and one for \code{[]} breaks the tie, and a second objective on the selector itself fixes the canonical choice:
+
+\begin{lstlisting}[language=SMTLib,caption={Native Optimize with two lexicographic objectives.}]
+(set-logic QF_LIA)
+; root: 0 = the input, 1 = a provider identity applied to the input, 2 = []
+(declare-const s Int)
+(assert (and (<= 0 s) (< s 3)))
+(define-fun out ((n Int)) Int
+  (ite (= s 0) n (ite (= s 1) n 0)))
+(assert (= (out 1) 1))
+; modeled cost: one node for the input, two for the provider call, one for []
+(define-fun cost () Int
+  (ite (= s 0) 1 (ite (= s 1) 2 1)))
+(minimize cost)
+(minimize s)
+(check-sat)
+(get-value (s cost))
+(get-objectives)
+\end{lstlisting}
+
+Z3 5.0.0 answers:
+
+\begin{lstlisting}[language=SMTLib]
+sat
+((s 0)
+ (cost 1))
+(objectives
+ ((ite (= s 0) 1 (ite (= s 1) 2 1)) 1)
+ (s 0)
+)
+\end{lstlisting}
+
+Note that \code{get-objectives} prints the expanded body of \code{cost}, not its name, and the objective values in declaration order; a decoder must key on position, not text. The iterative alternative uses only ordinary satisfiability: assert \code{(<= cost 1)} inside a \code{push}/\code{pop} scope and check (\sat{}, \code{((s 0) (cost 1))}), then \code{(<= cost 0)} in a fresh scope (\unsat{}), so cost $1$ is optimal and the smallest selector value with that cost is then pinned by one more query. Both procedures were run against Z3 5.0.0 and agree; the iterative one is slower per optimum but reuses the plain state machine, assumptions, and cores.
+
 
 \section{Session rebuild and recovery}
 
@@ -4087,7 +4820,21 @@ For a nonrecursive candidate in a first-order domain, symbolic evaluation produc
 \item sensitive to the chosen unfolding bound.
 \end{itemize}
 
-Z3 supports recursive function definitions, but iterative unfolding is not mathematical induction. The planned positive path therefore uses constrained Horn clauses for relational semantics and Lean for final proof authority.
+Z3 supports recursive function definitions (\code{define-fun-rec}), but iterative unfolding is not mathematical induction. A three-line experiment shows the difference. Define \code{len} recursively as $\operatorname{len}(n)=\operatorname{ite}(n\le0,0,1+\operatorname{len}(n-1))$ and ask whether some $n\ge0$ has $\operatorname{len}(n)\ne n$:
+
+\begin{lstlisting}[language=SMTLib,caption={Bounded unfolding cannot prove a universal fact about a recursive definition.}]
+(set-option :timeout 3000)
+(define-fun-rec len ((n Int)) Int
+  (ite (<= n 0) 0 (+ 1 (len (- n 1)))))
+(declare-const n Int)
+(assert (>= n 0))
+; is there an n at which len n differs from n?
+(assert (not (= (len n) n)))
+(check-sat)
+(get-info :reason-unknown)
+\end{lstlisting}
+
+Z3 5.0.0 answers \unknown{} with \code{(:reason-unknown "timeout")}: it keeps unfolding \code{len} without ever finding a counterexample and without being able to conclude that none exists. Adding the bound \code{(assert (<= n 3))} turns the answer into \unsat{} within milliseconds, and replacing the definition by a faulty one that never increments (\code{(ite (<= n 0) 0 (bad (- n 1)))}) yields \sat{} with \code{((n 1))} at once. So unfolding is excellent at finding small counterexamples and useless as a proof of the unbounded property. The planned positive path therefore uses constrained Horn clauses for relational semantics and Lean for final proof authority.
 
 \section{Relational semantics}
 
@@ -4139,7 +4886,40 @@ A small illustrative CHC system for the identity length recursion is:
 (query Bad)
 \end{lstlisting}
 
-A fixedpoint engine such as Spacer can establish that \code{Bad} is unreachable by inferring an invariant equivalent to $r=n$. A faulty step rule might make \code{Bad} reachable and produce a derivation or trace.
+Run through Z3 5.0.0, \code{(query Bad)} answers \unsat{}: under the \code{declare-rel}/\code{rule}/\code{query} front end this means that \code{Bad} is \emph{not derivable}, that is, the candidate is safe. Spacer establishes it by inferring an invariant equivalent to $r=n$; adding \code{(set-option :fp.print_certificate true)} before the query makes Z3 print that invariant after the status:
+
+\begin{lstlisting}[language=SMTLib]
+unsat
+(forall ((A Int) (B Int))
+  (! (let ((a!1 (not (<= (+ A (* (- 1) B)) (- 1))))
+           (a!2 (not (>= (+ A (* (- 1) B)) 1))))
+       (= (Eval A B) (and a!1 a!2)))
+     :weight 0))
+\end{lstlisting}
+
+Read the answer as $\operatorname{Eval}(A,B)\iff \neg(A-B\le-1)\land\neg(A-B\ge1)$, which is $A=B$: exactly the invariant a domain would normalize to $r=n$ before handing it to Lean. A faulty step rule makes \code{Bad} reachable and produces a derivation. Replacing the step head by \code{(Eval (+ n 1) r)}, so that the result length is never incremented, gives \sat{} and, with the same option, the hyper-resolution derivation
+
+\begin{lstlisting}[language=SMTLib]
+sat
+(let ((a!1 (forall ((A Int) (B Int))
+             (! (=> (and (Eval A B) (<= 0 A) (not (= A B))) query!0) :weight 0)))
+      (a!2 (forall ((A Int) (B Int) (C Int))
+             (! (=> (and (Eval B C) (<= 0 B) (= A (+ 1 B))) (Eval A C))
+                :weight 0))))
+(let ((a!3 ((_ hyper-res 0 0 0 1)
+             (asserted a!2)
+             ((_ hyper-res 0 0) (asserted (Eval 0 0)) (Eval 0 0))
+             (Eval 1 0))))
+  (mp ((_ hyper-res 0 0 0 1) (asserted a!1) a!3 query!0)
+      (asserted (=> query!0 false))
+      false)))
+\end{lstlisting}
+
+whose interesting fact is the derived atom \code{(Eval 1 0)}: input length one evaluates to result length zero, the concrete counterexample the domain would replay and store in the bank.
+
+\begin{pitfall}
+The two Horn front ends report the same fact with opposite words. With \code{declare-rel}/\code{rule}/\code{query}, as above, \code{(query Bad)} answers \unsat{} when the bad state is unreachable (safe) and \sat{} when it is reachable. With the pure SMT-LIB encoding of Chapter~\ref{chap:chc}, where the clauses are \code{assert}ed under \code{(set-logic HORN)} and the query is a clause with head \code{false} checked by \code{check-sat}, Z3 answers \sat{} when an inductive model of all clauses exists (safe; \code{get-model} then prints the invariant, for this system \code{(define-fun Eval ((x!0 Int) (x!1 Int)) Bool ...)} with the same $x_0=x_1$ body) and \unsat{} when \code{false} is derivable (bad state reachable; \code{get-model} then fails with ``model is not available''). Both were checked against Z3 5.0.0. A fixedpoint protocol must commit to one front end and name outcomes by meaning, ``safe with invariant artifact'' or ``bad state reachable with derivation'', never by the raw word.
+\end{pitfall}
 
 The fixedpoint command language and result interpretation are a separate protocol profile from ordinary \code{check-sat}. Query status, answer expressions, trace extraction, and statistics need their own bounded decoder and fingerprints.
 
@@ -4160,7 +4940,7 @@ A trace should be simplified deterministically where possible: shortest derivati
 
 \section{Invariant candidates}
 
-When \code{Bad} is unreachable, Spacer may expose an inductive interpretation for relations. An invariant candidate $I(x,y)$ is useful only after checking:
+When \code{Bad} is unreachable, Spacer may expose an inductive interpretation for relations: under the \code{query} front end through \code{(set-option :fp.print_certificate true)}, under the \code{check-sat} front end through \code{get-model}, as shown above. An invariant candidate $I(x,y)$ is useful only after checking:
 
 \begin{align*}
 \text{Base} &\Rightarrow I,\\
@@ -4171,7 +4951,7 @@ I &\Rightarrow Q.
 There are three authority levels:
 
 \begin{enumerate}
-\item raw fixedpoint \unsat{} and answer expression: heuristic solver observation;
+\item raw fixedpoint ``not derivable'' status (\unsat{} under the \code{query} front end, \sat{} under the \code{check-sat} front end) and its answer expression: heuristic solver observation;
 \item independently rechecked invariant obligations in a restricted decidable domain: model-relative positive evidence;
 \item translated invariant and obligations proved in Lean: source-level checked theorem under explicit provider assumptions.
 \end{enumerate}
@@ -4248,7 +5028,7 @@ A synthesis loop can alternate between selector solving, CHC safety checking, an
 
 \section{Synthesiz3 as an adjacent experiment}
 
-The Z3 ecosystem has explored synthesis-oriented extensions such as Synthesiz3, which encodes restricted synthesis specifications over Z3. It is relevant as a comparative backend, particularly for first-order grammars and specifications with symbols allowed in reasoning but forbidden in generated terms.
+The Z3 ecosystem has explored synthesis-oriented extensions such as Synthesiz3 (Hozzov\'a and Bj\o rner, FMCAD~2025; the proposal \cite{proposal} gives the citation and artifact location), which encodes restricted synthesis specifications over Z3 through an extended \code{assert-synth} command and an \code{:uncomputable} option naming symbols that may appear in the specification but not in the synthesized term. It is relevant as a comparative backend, particularly for first-order grammars and specifications with symbols allowed in reasoning but forbidden in generated terms. It is not part of the pinned Z3 build's ordinary SMT-LIB surface and nothing in the current tree depends on it.
 
 For Leant/Djex, the initial production path should remain selector-based because:
 
@@ -4277,6 +5057,10 @@ This vocabulary is not bureaucratic decoration. It is the difference between a s
 
 \chapter{A staged implementation and evaluation plan}
 \label{chap:staged-plan}
+\begin{projectnote}
+The milestones below are this guide's compressed ordering; they do not correspond one-to-one to the proposal's Milestones~0--10 \cite{proposal}. In particular the proposal places constructor-behavior and state-provenance domains (its Milestone~4) before nonrecursive typed sketches (its Milestone~5), and sound prefix pruning at its Milestone~9, whereas here the first sketch slice comes before new domains and prefix pruning is staged across chapters. Its Milestone~1, hard filtering over the current Length domain, is the part already implemented at the inspected tree.
+\end{projectnote}
+
 
 \section{Milestone 0: preserve and benchmark the current baseline}
 
@@ -4505,9 +5289,9 @@ Unexpected variable-by-variable multiplication, quantifiers, arrays, sequences, 
 Classify every declared symbol:
 
 \begin{description}
-\item[Source input.] Should have a stable generated position and appear in the exact input-value request.
+\item[Source input.] Should have a stable generated position and appear in the exact input-value request. At the pinned revision the scalar translator names them \code{djex_length_input_0}, \code{djex_length_input_1}, \ldots{} in source-argument order (Section~\ref{sec:real-query}).
 \item[Selector.] Future sketch choice; must have a checked finite range.
-\item[Private witness.] Quotient/remainder, abstraction, or auxiliary value; should not be exposed as a source counterexample without a decoder.
+\item[Private witness.] Quotient/remainder, abstraction, or auxiliary value; should not be exposed as a source counterexample without a decoder. The pinned translator allocates \code{djex_length_modulo_quotient_N}/\code{djex_length_modulo_remainder_N} and \code{djex_length_quotient_quotient_N}/\code{djex_length_quotient_remainder_N} in expression preorder; they are declared but never requested by \code{get-value}.
 \item[Semantic value.] Sample-specific node output in a sketch.
 \item[Assumption literal.] Tracks a clause or production choice for cores.
 \item[Relation.] Fixedpoint/CHC predicate with a declared argument signature.
@@ -4588,7 +5372,40 @@ For an interactive stream:
 z3 -in -smt2
 \end{lstlisting}
 
-Standalone success does not prove the embedded protocol is correct. The application may use different arguments, environment, timeout, resource limit, working directory, executable bytes, framing, or response parser.
+Standalone success does not prove the embedded protocol is correct. The application may use different arguments, environment, timeout, resource limit, working directory, executable bytes, framing, or response parser. Section~\ref{sec:embedded-launch} reproduces the exact embedded argument vector and stream so that a shell test can at least speak the same protocol.
+
+\subsection{Reproducing the embedded launch by hand}
+\label{sec:embedded-launch}
+
+The pinned execution profile (\dpath{synthesis/internal/Language/Haskell/Synthesis/Internal/SMTLib/Z3/Execution.hs}) launches the executable directly, without a shell, with an empty environment, in a fresh empty working directory, and with exactly this argument vector:
+
+\begin{lstlisting}[language=ShellX,caption={Argument vector of the pinned profile; the two numbers come from the startup file.}]
+z3 -in -smt2 smtlib2_compliant=true timeout=<solverTimeoutMilliseconds> rlimit=<solverResourceLimit>
+\end{lstlisting}
+
+From a shell, \code{env -i} and \code{cd "$(mktemp -d)"} approximate the environment and directory policy (the real launcher additionally binds a descriptor and, on Linux, stages a sealed copy of the executable). On standard input the session first writes the startup command and a barrier, then for every query the reset prefix, the canonical check bytes, and a barrier, and, only after \sat, the value request and a barrier:
+
+\begin{lstlisting}[language=SMTLib,caption={Exact stream shape for one scalar transaction; each barrier carries a fresh 32-byte nonce in hex.}]
+(set-option :print-success false)
+(echo "djex-smtlib-frame/v1/<64 hex digits>")
+(reset)
+(set-option :print-success false)
+(set-option :produce-models true)
+(set-option :random-seed 1)
+(set-logic QF_LIA)
+(define-fun djex_nat_monus ((x Int) (y Int)) Int (ite (<= y x) (- x y) 0))
+(define-fun djex_nat_min ((x Int) (y Int)) Int (ite (<= x y) x y))
+(define-fun djex_nat_max ((x Int) (y Int)) Int (ite (<= x y) y x))
+(declare-const djex_length_input_0 Int)
+(assert (<= 0 djex_length_input_0))
+(assert (not (= djex_length_input_0 0)))
+(check-sat)
+(echo "djex-smtlib-frame/v1/<64 hex digits>")
+(get-value (djex_length_input_0))
+(echo "djex-smtlib-frame/v1/<64 hex digits>")
+\end{lstlisting}
+
+Z3~5.0.0 answers, in order, the quoted startup barrier, \code{sat}, the quoted check barrier, \code{((djex_length_input_0 1))}, and the quoted value barrier (reproduced through the Python bindings with the same three global parameters). Before the first query the session runs a four-write readiness handshake against the same preamble (\dpath{synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length/SMTLib/Session/Capability.hs}): a declaration \code{djex_capability_input} asserted equal to \code{0} must answer \code{sat}, its \code{get-value} must answer exactly \code{((djex_capability_input 0))}, and the same declaration asserted equal to both \code{0} and \code{1} must answer \code{unsat}, each followed by its own barrier echo. A worker that prints \code{success} lines, drops the quotes around echoed strings, or reorders frames is \code{CapabilityRejected} before any Length query is sent. Nothing in the reproduction grants evidence: the point is only to make a shell test byte-compatible with what the worker actually receives.
 
 \section{Minimize without changing the claim}
 
@@ -4623,26 +5440,95 @@ A byte diff can be noisy when one private witness shifts every later name. Compa
 
 If plans differ, a byte diff is merely a symptom. If plans match but bytes differ, the canonical renderer or symbol allocator is suspect.
 
+\section{Reading a real query and its fingerprint}
+\label{sec:real-query}
+
+The pedagogical listings in this document use friendly names such as \code{input.0}. This section shows what the pinned translator actually emits, so that a maintainer reading a retained artifact recognizes it. The bytes below were produced by sealing a checked problem through the pinned Djex tree (\code{sealLengthSMTLibQuery} with \code{defaultLengthSMTLibLimits}, using the Length test harness's constant-empty candidate \code{fun _ => []} under the contract $P\equiv\top$, $Q\equiv r=n_0$) and are the exact \code{lengthSMTLibQueryCheckBytes}:
+
+\begin{lstlisting}[language=SMTLib,caption={Exact check bytes sealed by the pinned Djex translator for a constant-empty candidate under length preservation.}]
+(set-option :produce-models true)
+(set-option :random-seed 1)
+(set-logic QF_LIA)
+(define-fun djex_nat_monus ((x Int) (y Int)) Int (ite (<= y x) (- x y) 0))
+(define-fun djex_nat_min ((x Int) (y Int)) Int (ite (<= x y) x y))
+(define-fun djex_nat_max ((x Int) (y Int)) Int (ite (<= x y) y x))
+(declare-const djex_length_input_0 Int)
+(assert (<= 0 djex_length_input_0))
+(assert (not (= djex_length_input_0 0)))
+(check-sat)
+\end{lstlisting}
+
+The separate value request is \code{(get-value (djex_length_input_0))} followed by one line feed, and \code{lengthSMTLibQueryInputSymbols} is exactly \code{["djex_length_input_0"]}. Z3~5.0.0 answers \code{sat} and \code{((djex_length_input_0 1))}. Points to notice:
+
+\begin{itemize}
+\item One command per line, single spaces, no comments: the renderer in \dpath{synthesis/internal/Language/Haskell/Synthesis/Internal/SMTLib/QFLIA.hs} has exactly one spelling for each construct, which is what makes byte identity meaningful.
+\item The precondition \code{true} has disappeared and the equality reads \code{(= djex_length_input_0 0)} although the contract wrote ``result equals input.'' The Length normalizer canonicalizes conjunct and operand order before translation, so source order cannot be read back from the bytes; a contract with precondition $n_0>0$ and postcondition $r=n_0\mathbin{\dot{-}}1$ came out, for the same candidate, as \code{(assert (and (not (= 0 (djex_nat_monus djex_length_input_0 1))) (not (<= djex_length_input_0 0))))}, negated postcondition first.
+\item A modulo in the contract adds declarations and witness constraints between the input declaration and the bad state; for $Q\equiv r=n_0\bmod 3$ and the same candidate the sealed bytes declare \code{djex_length_modulo_quotient_0} and \code{djex_length_modulo_remainder_0}, assert both nonnegative, assert \code{(<= djex_length_modulo_remainder_0 2)} and \code{(= djex_length_input_0 (+ (* 3 djex_length_modulo_quotient_0) djex_length_modulo_remainder_0))}, and only then \code{(assert (not (= 0 djex_length_modulo_remainder_0)))}; Z3 answers \code{sat} with \code{djex_length_input_0 = 1}, and the witnesses are never requested.
+\item Replay is a separate step with its own closed errors. Calling \code{validateLengthSMTLibCounterexample} on this query with the binding \code{djex_length_input_0} $=1$ yields evidence; \code{0} yields \code{Nothing} (not a counterexample, so the transaction would fail closed); \code{-1} yields \code{LengthSMTLibNegativeInputValue}; the symbol \code{input.0} yields \code{LengthSMTLibUnknownInputSymbol}; and an empty binding list yields \code{LengthSMTLibBindingArityMismatch 1 0}. All five were reproduced in the pinned tree.
+\end{itemize}
+
+The query fingerprint is not a digest of those bytes but a complete canonical key. Its layout (\dpath{synthesis/internal/Language/Haskell/Synthesis/Internal/Fingerprint.hs}) is the six magic bytes \code{DJEXFP} and an encoding-version byte, then a natural (the builder version, here $1$), then the role bytes \code{finite-list-spine-length/z3-qf-lia-query}, then one sequence of tagged fields, each field written as a one-byte kind (\code{0x01} natural, \code{0x02} bytes, \code{0x03} sequence, \code{0x04} tag, \code{0x05} name), a variable-length byte count, and the payload. For the query above the tags are, in order: \code{schema} (\code{djex-length-z3-qf-lia-smtlib2/v2}), \code{logic} (\code{QF_LIA}), \code{fixed-options} (\code{:produce-models=true}, \code{:random-seed=1}), \code{problem-domain} (\code{finite-list-spine-length/v1}), \code{problem-inventory}, \code{problem-encoding}, \code{problem-candidate}, and \code{complete-problem} (each the complete nested key of that fingerprint, which is why the key for even this trivial query is about $8.9$\,KB and mostly consists of the inventory, session policy, contract, and typed-graph identities), then \code{typed-plan} (input symbols, the condition tree, the command tree, and the value request), \code{check-command} (the exact bytes above), and \code{input-value-request} (\code{present} plus the exact request bytes, or \code{absent} for a nullary problem). Because every payload is length-prefixed the key is decodable and two different plans cannot share a key; the \code{Show} instance prints it as lowercase hex (\code{fingerprintCode}), and any SHA-256 you see in tests is computed over this key for a snapshot assertion, not stored as identity. When two retained queries ``look the same,'' diff the tagged fields in this order before diffing bytes: a difference in \code{problem-inventory} or \code{problem-candidate} with identical \code{check-command} is the normal case of two candidates that happen to have the same length semantics, and it is exactly why identical bytes never make one candidate's evidence valid for another.
+
 \chapter{Troubleshooting by symptom}
 \label{chap:troubleshooting}
+% Line-breakable monospace for long generated identifiers in narrow table
+% cells (the ordinary \code{} never breaks).  xurl lets \nolinkurl break
+% anywhere; hyperref makes it a plain non-link.
+\providecommand{\bcode}[1]{\nolinkurl{#1}}
+
+The table below is the short form of this chapter: what you see, what most often causes it, where the deciding code lives, and what to change. Every message is quoted from the pinned sources; the failure constructors appear verbatim in Leant's \code{warning:}/\code{error:} lines because they are printed with \code{show}. Long identifiers are set in a line-breakable monospace so that they fit the columns. The sections that follow give the longer reasoning.
+
+\begin{longtable}{@{}L{0.28\textwidth}L{0.23\textwidth}L{0.19\textwidth}L{0.22\textwidth}@{}}
+\toprule
+Symptom & Likely cause & Where to look & What to change \\
+\midrule
+\endfirsthead
+\toprule
+Symptom & Likely cause & Where to look & What to change \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Leant exits before the prompt with \code{error: finite-spine Length counterexample ranking setup failed:} \bcode{LengthAssessmentFileAdmissionRejected} \bcode{LengthRankingConfigurationFilePathNotAbsolute} & Relative \bcode{--length-ranking-config} path & \lpath{src/Leant/Synth/Length/File/Acquire.hs}, \bcode{mkLengthFileRequest} & Pass an absolute path (also required for \bcode{--length-contract}). \\
+\ldots{} \bcode{LengthAssessmentFileLoadRejected} \bcode{(LengthRankingConfigurationFileLoadError} \bcode{LengthRankingConfigurationFilePlatformUnsupported} \code{False)} & Windows build: acquisition is POSIX-only and fails closed & same file, the \bcode{mingw32_HOST_OS} branch & Run Leant's Length assessment on Linux. \\
+\ldots{} \bcode{LengthRankingConfigurationFileDecodeRejected} \bcode{(LengthRankingConfigurationUnexpectedField} \bcode{LengthRankingConfigurationRootObject)} & A historical \code{version} or strategy member in the startup file & \lpath{src/Leant/Synth/Length/Configuration/File.hs}, \code{rootFields} & Keep exactly the ten root members; delete removed ones. \\
+\ldots{} \bcode{LengthRankingConfigurationFieldValueRejected} \bcode{LengthRankingConfigurationExpectedExecutableSha256Field} & Digest is not 64 lowercase hex characters (uppercase hex is rejected) & same file, \bcode{decodeExpectedDigest} & Use \code{sha256sum} output verbatim, or \code{null} plus \bcode{--length-ranking-allow-unpinned}. \\
+\ldots{} \bcode{LengthAssessmentActivationRejected} \bcode{LengthRankingConfigurationExecutablePinRequired} & \bcode{expectedExecutableSha256} is \code{null} without the allow-unpinned flag & \lpath{src/Leant/Synth/Length/Integration.hs} & Supply the digest or add the flag deliberately. \\
+\code{:synth} answers \code{usage: :synth TYPE | :synth [--behavior-mode rank|filter] [--length-contract ABSOLUTE-PATH] -- TYPE} & Mode word missing or not \code{rank}/\code{filter}; \bcode{--} delimiter missing; empty path; mode after contract & \lpath{src/Leant/Synth/Length/Command.hs} & Order is mode, then contract, then a standalone \bcode{--}. \\
+\code{finite-spine Length request rejected before IO:} \bcode{LengthAssessmentFilteringRequiresActivatedPolicy} or \bcode{LengthAssessmentExplicitContractRequiresActivatedPolicy} & Filter mode or a contract file requested while assessment is disabled & \lpath{src/Leant/Synth/Length/Integration.hs}, \bcode{startupLengthAssessmentRequest} & Start Leant with \bcode{--length-ranking-config}; a contract file cannot activate Z3. \\
+\code{one-shot finite-spine Length contract admission failed:} or \code{... load failed:} & Contract path not absolute, or the document is not the exact three-member \bcode{leant-finite-list-spine-length-contract} root with a six-member \code{contract} & \lpath{src/Leant/Synth/Length/Contract/File.hs} & Follow the schema in \filepath{docs/length-ranking.md}; \code{rankingDomain} must match the result references the expressions use. \\
+Every candidate is shown, no notes, no warning & Default \code{djinn} engine (no typed origin), or every candidate refused preparation & \lpath{src/Main.hs} (\code{rsSynthEngine}), \lpath{src/Leant/Synth/Length/Handoff.hs} & \code{:set synth-engine exference} (or \code{both}); confirm with \bcode{LEANT_SYNTH_DEBUG=1}. \\
+\code{warning: finite-spine Length behavioral assessment preserved all verified candidates:} \ldots{} \bcode{LengthRankingLiveSessionFailed} \bcode{LengthSMTLibLiveSessionLaunchFailed} \ldots{} & Non-Linux build, or a Linux kernel without \bcode{AT_EXECVE_CHECK}; the fixed launcher has no fallback & \dpath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib/Live.hs}, \bcode{sessionProcessFailure} & Use Linux with a kernel providing \bcode{AT_EXECVE_CHECK} (upstream 6.14 or later). \\
+\ldots{} \bcode{LengthSMTLibLiveSessionExecutableRejected} & Digest mismatch, executable not a regular/executable file, metadata changed between inspection and launch, or exec-check denied & same mapping & Recompute the SHA-256 of the exact file named by \bcode{executablePath}; fix mode bits. \\
+\ldots{} \bcode{LengthSMTLibLiveSessionExecutableUnavailable} & \bcode{executablePath} does not exist & same & Fix the path (absolute, no NUL, no surrogates). \\
+\ldots{} \bcode{LengthSMTLibLiveSessionCapabilityRejected} & The file is not Z3, or does not answer the readiness handshake byte-exactly & \dpath{synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length/SMTLib/Session/Capability.hs} & Replay the handshake by hand (Section~\ref{sec:embedded-launch}). \\
+\ldots{} \bcode{LengthSMTLibLiveSessionDeadlineExceeded} or \bcode{LengthRankingLiveQueryFailed} \bcode{LengthSMTLibLiveQueryDeadlineExceeded} & Host deadline or the shared usable-work budget too small for opening plus queries & startup \bcode{execution.hostDeadlineMilliseconds}, \bcode{usableWorkBudget.milliseconds} & Raise them (host deadline $\ge$ solver timeout $+100$\,ms, cap 65\,000; budget cap 65\,000). \\
+\ldots{} \bcode{LengthSMTLibLiveQueryLimitExceeded} \code{64 65} & More than 64 scalar-plus-product transactions in one live scope & \dpath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib/Live.hs} & Only library callers can hit this; Main's batches are at most 24. \\
+\ldots{} \bcode{LengthSMTLibLiveQueryProtocolRejected} & Response exceeded \code{responseLimits} or was malformed & startup \bcode{execution.responseLimits} & Raise \code{bytes}, \code{nodes}, \code{tokenBytes}, or \code{integerBits} (caps 65\,536, 4\,096, 4\,096, 4\,096). \\
+\ldots{} \bcode{LengthSMTLibLiveQueryCounterexampleRejected} & Z3's model failed Djex's independent replay, or its bindings were malformed & \dpath{synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length/SMTLib.hs}, \bcode{validateLengthSMTLibCounterexample} & Treat as a correctness bug: rerun the exact bytes standalone and compare. \\
+Z3 says \sat{} standalone but the candidate carries no note & \code{"artifactPolicy":} \code{"status-only"}: no \code{get-value} is ever sent & \dpath{synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length/SMTLib/Session.hs} & Use \bcode{"input-values-after-satisfiable"}. \\
+Survivor note ends in \code{vacuous within this box (no assignment met the precondition)} & The precondition excludes every assignment of the configured box & startup \bcode{inputBoxValidation.inclusiveInputMaximums} & Widen the box or check the precondition; a vacuous receipt is neutral, not positive. \\
+\end{longtable}
+
 
 \section{Z3 was not launched}
 
 Possible explanations include:
 
 \begin{itemize}
-\item assessment is disabled;
-\item the command used ordinary ranking with no enabled context;
-\item configuration or activation failed before request admission;
-\item the candidate route lacks exact typed authority;
-\item handoff, contract sealing, candidate interpretation, or query construction refused;
+\item assessment is disabled (no \bcode{--length-ranking-config}), so ranking is the lazy identity;
+\item the startup file was refused, in which case Leant printed \code{error: finite-spine Length counterexample ranking setup failed: ...} and exited with status~1 before the prompt appeared (Section~\ref{sec:ts-startup});
+\item the synthesis engine is the default \code{djinn}, which supplies no typed candidate graph: only \code{:set synth-engine exference} or \code{both} produce candidates with the exact typed authority the handoff requires (\lpath{src/Main.hs} starts with \code{EngineDjinn}; the enabled-mode banner ends with ``Select synth-engine exference or both to produce graph-eligible candidates'');
+\item the candidate route otherwise lacks exact typed authority (text-only or duplicate-recovered without a sidecar);
+\item handoff, contract sealing, candidate interpretation, or query construction refused (a candidate-local preparation refusal; Section~\ref{sec:unassessed});
 \item a retained bank sample already produced a counterexample;
-\item the origin probe or finite validator completed the assessment;
-\item deferred opening was selected and no candidate reached a live miss;
-\item the verified batch was empty.
+\item the guarded applicable-domain validation or the all-zero origin probe completed the assessment before IO (input-box validation cannot: it runs only after a live \unsat);
+\item deferred opening is the fixed startup policy and no candidate reached a live miss;
+\item the verified batch was empty;
+\item the platform cannot launch the fixed descriptor-bound launcher at all: on Windows the configuration file itself is refused (\code{LengthRankingConfigurationFilePlatformUnsupported}), and on a non-Linux build or a Linux kernel without \code{AT_EXECVE_CHECK} (upstream 6.14) the first live miss ends the batch with \code{LengthSMTLibLiveSessionLaunchFailed} (Section~\ref{sec:ts-warning}).
 \end{itemize}
 
-Inspect preparation and request-context observations before process logs.
+Inspect preparation and request-context observations before process logs. Two cheap probes: the enabled-mode startup banner (``Finite-spine Length counterexample ranking enabled for eligible typed Exference origins \ldots'') confirms activation, and \code{LEANT_SYNTH_DEBUG=1} makes each lane print \code{debug metric: typed-candidate-rendered=N}; with \code{N} absent or zero no candidate could have reached the Length handoff.
 
 \section{Z3 reported \sat{}, but the candidate was retained}
 
@@ -4654,18 +5540,20 @@ This can be correct. Possibilities:
 \item independent replay did not reproduce a violation;
 \item the result was attached only as heuristic status;
 \item ranking mode demoted but did not remove the candidate;
+\item the startup file says \code{"artifactPolicy": "status-only"}, under which a live \sat{} is deliberately never followed by \code{get-value}: it stays a heuristic status and no candidate can ever be rejected from a live query (only \code{"input-values-after-satisfiable"} requests inputs; \dpath{synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length/SMTLib/Session.hs}, \code{replayLengthSMTLibQuery});
+\item a later candidate in the same batch hit an operational failure, and the fail-closed ranking then reset \emph{every} candidate of that batch to \code{Unassessed} (Section~\ref{sec:ts-warning});
 \item filter mode encountered a batch-level failure and preserved the original batch;
 \item the candidate belonged to a different nominal domain than the observation;
 \item a displayed \sat{} came from a synthesis or equivalence query rather than the verification bad state.
 \end{itemize}
 
-Only an adapter-authorized replayed counterexample rejects in the current filter.
+Only an adapter-authorized replayed counterexample rejects in the current filter. Note that a Z3 model that fails independent replay does not merely leave the candidate retained: it fails the query transaction (\code{LengthSMTLibLiveQueryCounterexampleRejected}) and, through the batch-wide fallback, unassesses the whole batch. A live \sat{} that ``vanishes'' should therefore be looked for first in the batch warning, not in the candidate note.
 
 \section{Z3 reported \unsat{}, but Leant did not call the candidate proved}
 
 That is the intended trust policy. Raw \unsat{} is a solver observation. The system may rank it neutrally, trigger a finite validator, or retain the candidate. A universal Lean theorem requires a separate proof-producing path.
 
-Check whether the configured policy enables finite input-box or applicable-domain validation and nonvacuous-positive preference. Those receipts are still scoped to their validated model.
+In the current versionless startup grammar these are not switches. Every accepted configuration file enables the post-\unsat{} input-box validation, the guarded recursive applicable-domain validation, both non-vacuous preferences, the all-zero origin probe, counterexample simplification, and deferred opening (\lpath{src/Leant/Synth/Length/Configuration/File.hs}, \code{decodeLengthAssessmentConfigurationFile}); the file chooses only their limits, chiefly \code{inputBoxValidation.inclusiveInputMaximums} and \code{maximumAssignments} and the seven \code{applicableDomainValidation} caps. A candidate that survives after a raw \unsat{} is therefore shown either with no note at all (heuristic) or with an ``independently checked \ldots{} Length input box'' or ``complete \ldots{} domain'' note (Section~\ref{sec:ts-note}). Those receipts are still scoped to their validated model and never become a proof.
 
 \section{The same candidate receives different models}
 
@@ -4684,8 +5572,26 @@ SMT models are generally noncanonical. Differences may come from:
 Replay should accept every genuine counterexample. For reproducible presentation, run deterministic counterexample simplification or add an explicit optimization/minimization profile.
 
 \section{A candidate is unassessed}
+\label{sec:unassessed}
 
-Distinguish candidate-local preparation refusal from operational fallback. Preparation refusal says the exact modeled problem could not be constructed. Operational fallback says a prepared batch could not complete assessment.
+Distinguish candidate-local preparation refusal from operational fallback. Preparation refusal says the exact modeled problem could not be constructed. Operational fallback says a prepared batch could not complete assessment. Neither adds a note in the REPL: an unassessed candidate is displayed exactly like an unranked one, and only operational fallback prints a batch-wide warning (Section~\ref{sec:ts-warning}). The candidate-local class is available programmatically as one of ten payload-free codes (\lpath{src/Leant/Synth/Length/Ranking/Internal.hs}, \code{lengthPreparationRefusalClassCode}):
+
+\begin{multicols}{2}
+\begin{itemize}
+\item \code{unsupported-route}
+\item \code{typed-authority-unavailable}
+\item \code{candidate-association-rejected}
+\item \code{rendering-association-rejected}
+\item \code{spine-binding-unavailable}
+\item \code{provider-binding-unavailable}
+\item \code{session-rejected}
+\item \code{contract-rejected}
+\item \code{candidate-semantics-rejected}
+\item \code{query-construction-rejected}
+\end{itemize}
+\end{multicols}
+
+The first two are by far the most common and both mean the same thing for a user: the candidate did not come from a typed Exference route.
 
 Common preparation causes:
 
@@ -4748,7 +5654,7 @@ Compare:
 \item cleanup and EOF behavior.
 \end{itemize}
 
-A shell test is not equivalent to descriptor-bound execution under an empty environment.
+A shell test is not equivalent to descriptor-bound execution under an empty environment. Concretely, the pinned profile runs \code{z3 -in -smt2 smtlib2_compliant=true timeout=<ms> rlimit=<n>} with an empty environment in a fresh empty directory, sends \code{(set-option :print-success false)} first, prefixes every query with \code{(reset)} and that option again, and brackets every write with an \code{echo} barrier whose quoted reply it must see before it reads the next frame; Section~\ref{sec:embedded-launch} gives the exact stream. The two differences that most often turn a working shell test into an embedded failure are \code{smtlib2_compliant=true} (it changes response formatting, for example \code{echo} replies keep their double quotes) and the missing \code{print-success} suppression (a worker that answers \code{success} to every command fails the readiness handshake).
 
 \section{The query unexpectedly returns \unknown{}}
 
@@ -4763,7 +5669,7 @@ Ask Z3 for a reason in a standalone diagnostic context if the profile supports i
 \item cancellation or host deadline reported separately by the application.
 \end{itemize}
 
-Current Length is QF-LIA and should ordinarily be decidable; repeated solver \unknown{} on small canonical queries is therefore a strong capability/configuration signal.
+Current Length is QF-LIA and should ordinarily be decidable; repeated solver \unknown{} on small canonical queries is therefore a strong capability/configuration signal. Standalone, \code{(get-info :reason-unknown)} after the check names the cause; because the pinned profile passes the solver limits as \code{timeout=<ms>} and \code{rlimit=<n>} on the command line, the two answers to expect are \code{(:reason-unknown "timeout")} and \code{(:reason-unknown "max. resource limit exceeded")} (both reproduced with Z3~5.0.0). Raise \code{execution.solverTimeoutMilliseconds} (cap 60\,000) or \code{execution.solverResourceLimit} (cap 10\,000\,000) in the startup file, remembering that \code{hostDeadlineMilliseconds} must exceed the solver timeout by at least 100\,ms and is capped at 65\,000. The embedded worker never asks for the reason: an \unknown{} stays a byte-free heuristic status.
 
 \section{The candidate is rejected in filter mode but seems correct}
 
@@ -4797,6 +5703,65 @@ Possible explanations include:
 
 A survivor means ``not rejected under this exact configured evidence policy,'' not ``universally correct.''
 
+\section{Leant refuses at startup or at the prompt}
+\label{sec:ts-startup}
+
+Every refusal before a worker exists is a pure decision printed with its constructor name; there is no hidden state to inspect. Three places can refuse.
+
+\begin{description}
+\item[Startup.] \lpath{src/Leant/Options.hs} accepts \bcode{--length-ranking-config PATH}, \bcode{--length-ranking-config-timeout MS} (1\ldots60\,000, default 5\,000; refused without the config option), and \bcode{--length-ranking-allow-unpinned} (likewise). \lpath{src/Main.hs} then calls \code{loadLengthAssessmentMode}; any \code{Left} prints \code{error: finite-spine Length counterexample ranking setup failed:} followed by one of \code{LengthAssessmentFileAdmissionRejected} (path length, empty path, embedded NUL, relative path, timeout out of range: no IO has happened), \code{LengthAssessmentFileLoadRejected} (platform unsupported, open/inspect/read failure, not a regular file, more than 256\,KiB, deadline, cleanup, or the decoder's \code{LengthRankingConfigurationFileError}), or \code{LengthAssessmentActivationRejected LengthRankingConfigurationExecutablePinRequired}, and exits with status~1. The decoder validates in a fixed order: bounded JSON, \code{format} (\code{leant-live-length-ranking-configuration}), \code{rankingDomain} (\code{scalar} or \code{binary-product}), the exact ten-member root, then \code{executionAdmission}, \code{execution}, \code{evaluation}, \code{inputBoxValidation}, \code{applicableDomainValidation}, \code{counterexampleSimplification}, \code{usableWorkBudget}, and finally the domain-selected \code{contract}. An unexpected member is reported before a missing one, so a leftover historical \code{version} key surfaces as \code{LengthRankingConfigurationUnexpectedField LengthRankingConfigurationRootObject}. Success prints the enabled-mode banner, the launch-strategy line, and the engine hint, and nothing else; no process has been started.
+
+\item[The \code{:synth} line.] \lpath{src/Leant/Synth/Length/Command.hs} parses only two exact tokens. \bcode{--behavior-mode} without a following word is \code{LengthSynthCommandBehaviorModeMissing}; a word other than \code{rank}/\code{filter} is \code{...BehaviorModeInvalid}; either option without a later standalone \bcode{--} is \code{...DelimiterMissing}; \bcode{--length-contract} directly followed by \bcode{--} is \code{...ContractPathMissing}; and a mode token after the contract option is \code{...BehaviorModeMustPrecedeContract}. Main prints the single \code{usage:} line for all five. Longer look-alikes such as \bcode{--behavior-model} are ordinary goal text and are handed to Lean.
+
+\item[Request authorization.] Before any contract path is admitted, \lpath{src/Leant/Synth/Length/Integration.hs} asks the activated mode for permission. With assessment disabled, \bcode{--behavior-mode filter} yields \code{LengthAssessmentFilteringRequiresActivatedPolicy} and \bcode{--length-contract} yields \code{LengthAssessmentExplicitContractRequiresActivatedPolicy}; both are printed after \code{finite-spine Length request rejected before IO:}. Only then is a named contract file admitted (\code{one-shot finite-spine Length contract admission failed:}) and read (\code{... load failed:}); its decoder mirrors the startup one but expects the three-member \code{leant-finite-list-spine-length-contract} root and can never supply execution authority.
+\end{description}
+
+\section{A batch-wide warning says assessment preserved all verified candidates}
+\label{sec:ts-warning}
+
+This warning is the only place operational failure becomes visible. \lpath{src/Main.hs} prints \code{warning: finite-spine Length behavioral assessment preserved all verified candidates:} followed by the \code{LengthAssessmentFailure} constructor, and then displays the callback batch in original order with no notes; in filter mode nothing is rejected. The wrapper says which layer failed (\code{LengthAssessmentPostVerificationFailed}, \code{LengthAssessmentRankingFailed}, \code{LengthAssessmentSelectionFailed}, or their \code{SpinePair} siblings), and the payload is a \code{LengthRankingFailure} whose three positional fields are the class, whether Djex reported incomplete cleanup, and the zero-based index of the candidate whose transaction failed (or \code{Nothing} for opener/finalizer failures). For example:
+
+\begin{lstlisting}[language={},caption={Shape of a batch-wide warning after a live-session refusal.}]
+warning: finite-spine Length behavioral assessment preserved all verified candidates: LengthAssessmentRankingFailed (LengthRankingFailure (LengthRankingLiveSessionFailed LengthSMTLibLiveSessionLaunchFailed) False Nothing)
+\end{lstlisting}
+
+The class vocabulary is closed (\lpath{src/Leant/Synth/Length/Ranking/Internal.hs}, \code{LengthRankingFailureClass}):
+
+\begin{description}
+\item[\code{LengthRankingLiveSessionFailed}] wraps a \code{LengthSMTLibLiveSessionFailure} from opening, probing, or closing the scope: \code{DeadlineExceeded}, \code{WorkspaceUnavailable} (the fresh empty directory could not be created), \code{ExecutableUnavailable}, \code{ExecutableRejected} (not regular, not executable, metadata changed between inspection and spawn, digest mismatch, or an executable-access/exec check denied), \code{LaunchFailed} (descriptor-bound launch unavailable on this build or kernel, staging or exec failure, spawn or pipe failure), \code{CapabilityRejected} (readiness handshake failed), \code{ResourceLimitExceeded}, \code{TransportFailed}, \code{CleanupFailed}, \code{InternalFailure}, and \code{UsableWorkScopeUnavailable}. The mapping from Djex's fine-grained process errors to these classes is \code{sessionProcessFailure} in \dpath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib/Live.hs}.
+\item[\code{LengthRankingLiveQueryFailed}] wraps a \code{LengthSMTLibLiveQueryFailure} for one transaction: \code{SessionUnavailable}, \code{LimitExceeded 64 65} (the shared per-scope query budget), \code{DeadlineExceeded}, \code{ConfigurationRejected}, \code{ResourceLimitExceeded}, \code{TransportFailed}, \code{ProtocolRejected} (framing, response limits, unexpected reply), \code{CounterexampleRejected} (the model failed replay or its bindings were malformed), and \code{InternalFailure}.
+\item[\code{LengthRankingQueryAssociationMismatch}, \code{LengthRankingEvidenceReplayMismatch}] an observation or receipt did not belong to the query or problem it was presented for; both indicate a Djex/Leant defect rather than a configuration problem.
+\item[\code{LengthRankingOriginProbeEvaluationFailed}, \code{...InputBoxValidationFailed}, \code{...ApplicableDomainValidationFailed}, \code{...CounterexampleSimplificationFailed}] a pure bounded evaluation exceeded its configured \code{evaluation}, box, domain, or simplification limits.
+\end{description}
+
+Two properties of the fallback are worth internalizing. First, it is atomic per batch: one failing transaction discards every earlier pure or live assessment of that batch, so a \sat{} you saw standalone can vanish because a \emph{later} candidate's query timed out. Second, it is not a transaction over the filter bank: replays, promotions, and recordings that completed before the failure stay committed, so the next batch of the same command may still reject a duplicate from the bank even though this batch printed the warning. A \code{LengthPostVerificationFailed} wrapper with \code{LengthRankingInputLimitExceeded 64 65} means a library caller submitted more than 64 verified candidates in one batch; Main never does.
+
+\section{Reading a real assessment note}
+\label{sec:ts-note}
+
+Every semantic note in the REPL is produced by one of eight renderers in \lpath{src/Leant/Synth/Length/Presentation.hs}, so its shape tells you which evidence class produced it. Main prints a survivor as an \code{itN} row with the note indented beneath it, and an omitted occurrence as a \code{rejected} row whose note is always present. Illustratively, for a length-preservation contract:
+
+\begin{lstlisting}[language={},caption={Note shapes as rendered by the pinned Presentation module (candidate texts illustrative).}]
+  it1  fun xs => xs
+  it2  fun xs => xs.reverse
+  rejected  fun _ => []
+            replayed finite-list-spine Length counterexample (model-relative; provider-independent): observed input spine lengths = [1]; result spine length = 0
+  rejected  fun xs => xs ++ xs
+            replayed finite-list-spine Length counterexample (model-relative; conditional on 1 assumed provider law used by this candidate): observed input spine lengths = [1]; result spine length = 2
+\end{lstlisting}
+
+How to read each shape:
+
+\begin{itemize}
+\item \code{replayed finite-list-spine Length counterexample (model-relative; ...)}: an independently replayed \code{Counterexample} receipt. The parenthesis names the basis: \code{provider-independent} when the candidate used no provider law, otherwise \code{conditional on N assumed provider law(s) used by this candidate}; provider names are deliberately reduced to a count. Then the source-ordered input lengths (at most eight, then \code{...}) and the result length; the binary-product family prints \code{first result spine length} and \code{second result spine length}. In rank mode this note sits under a still-visible, still-bound demoted candidate; in filter mode under a \code{rejected} row with no \code{itN}.
+\item \code{replayed bounded query-owned componentwise-lexicographic finite-list-spine Length counterexample (...): inspected lower-box assignments = N; input spine lengths reduced from [...] to [...]; result spine length = R}: the simplifier found a strictly smaller replayed counterexample; the final vector is the one that entered the bank.
+\item \code{independently checked finite-list-spine Length input box (bounded/model-relative; ...): inclusive input maxima = [...]; checked assignments = N; applicable assignments = M}: a \code{BoundedPositive} receipt after a live \unsat; if \code{M} is zero the suffix \code{; vacuous within this box (no assignment met the precondition)} is added and the receipt is neutral rather than preferred.
+\item \code{complete finite-spine Length Boolean finite-union atomic-branching recursive piecewise-affine domain ... (model/provider-relative; ...; no global proof or solver authority): boxes = ...; visits = ...; unique = ...; applicable = ...; maxima = [[...]]}: an \code{ApplicableDomainEstablished} receipt from the pure validator, with the same vacuity suffix rule.
+\item No note: heuristic status, unassessed, preparation refused, disabled assessment, or preserve-all fallback. The renderer never distinguishes these for the user.
+\end{itemize}
+
+Every note is cut at 384 characters, and a natural above 24 decimal digits is shown as \code{<N-bit natural>}. Nothing in a note is authority: rejection came from the selection adapter's replay-only rule and the sealed occurrence association, and the note is projected from the same opaque wrapper, never matched back by text.
+
 \chapter{A concept crosswalk for Lean, Djex, and Z3}
 \label{chap:crosswalk}
 
@@ -4825,6 +5790,10 @@ Type class & Elaborator search and instance terms & No corresponding automatic a
 Inductive data & Lean inductive declaration with eliminators and recursion & SMT algebraic datatype or a domain abstraction \\
 Natural number & Lean \code{Nat} with source semantics & Commonly SMT \code{Int} plus nonnegativity, or a custom datatype/bit-vector depending on domain \\
 Candidate identity & Exact typed graph occurrence plus inventory/provenance & Selector vector or formula symbols only after explicit association \\
+Truncated subtraction & Lean \code{Nat.sub} (\code{n - 1} at type \code{Nat} is $0$ when $n=0$); Djex monus & No primitive: SMT \code{-} on \code{Int} goes negative, so the translator defines \code{djex_nat_monus} as \code{(ite (<= y x) (- x y) 0)} \\
+Assumption & A hypothesis or \code{axiom}; a Djex provider law is an explicit assumed length transfer & An \code{assert}, or an assumption literal in \code{check-sat-assuming}; the solver never validates it \\
+Decision procedure & \code{omega} (linear arithmetic over \code{Nat}/\code{Int}), \code{decide} (kernel evaluation of a \code{Decidable} instance) & \code{check-sat} under \QFLIA; the closest Djex analogue of \code{decide} is exhaustive input-box validation, not Z3 \\
+Counterexample & A concrete \code{Nat} vector plus a candidate that Djex re-evaluates; Lean itself has no ``model'' notion & A satisfying assignment read back with \code{get-value}, evidence only after Djex replay \\
 \end{longtable}
 
 \section{Elaboration versus solving}
@@ -4870,6 +5839,18 @@ Z3 can minimize a numeric objective over the encoded grammar. Human notions such
 \section{Fixedpoint safety versus induction theorem}
 
 Spacer can infer a relation invariant and show a bad predicate unreachable in the CHC model. Lean induction proves a proposition about an exact recursive definition. The intended bridge is to translate the invariant and rule obligations into Lean, not to identify the two judgments by terminology alone.
+
+\section{Lean automation versus Z3}
+
+Three Lean tactics are the natural points of comparison, and confusing them with the solver is a common source of miscommunication.
+
+\begin{description}
+\item[\code{omega}] is a decision procedure for linear arithmetic over \code{Nat} and \code{Int}: literal coefficients, truncated \code{Nat} subtraction, \code{min}/\code{max}, and division and remainder by literals, with case splits performed internally. That is essentially the fragment the Length translator emits, so the arithmetic obligation of a Length contract, once the candidate's length behavior has been stated as a Lean lemma, is a natural \code{omega} target. The difference is authority, not power: \code{omega} produces a kernel-checked proof term, while Z3 returns \unsat{} for the negation and no artifact Lean can check.
+\item[\code{decide}] evaluates a \code{Decidable} instance by kernel reduction and therefore proves only what a finite computation can settle. Its Djex analogue is exhaustive input-box or applicable-domain validation, which is why those receipts are called ``bounded-positive'': the analogue of \code{decide} over an infinite domain does not exist on either side.
+\item[\code{simp}] rewrites with an equational theory. Its solver counterpart is Z3's preprocessing and the \code{define-fun} helpers, not the decision procedure; a Length provider law is closer to a \code{simp} lemma that Lean has \emph{not} proved than to anything Z3 does.
+\end{description}
+
+The proposed positive path of Chapter~\ref{chap:future-chc-proofs} can be summarized in this vocabulary: Z3 finds the invariant or shows the bad state unsatisfiable, and Lean's \code{omega}/\code{decide}/\code{simp} (or an induction the invariant guides) discharges the translated obligations. Neither replaces the other.
 
 \begin{checkpoint}
 When moving a fact across tools, always name the conversion: render, elaborate, seal, encode, decode, replay, materialize, or prove. ``Z3 knows the Lean term is correct'' skips every boundary that makes the system trustworthy.
@@ -4944,8 +5925,12 @@ Command & Purpose \\
 \code{(get-value (x y))} & Request values of exact terms after \sat{}. \\
 \code{(get-model)} & Request a model, often broader and less stable than exact \code{get-value}. \\
 \code{(get-unsat-core)} & Request a core after an unsatisfiable tracked/assumption check. \\
-\code{(reset)} & Reset declarations and assertions to a fresh solver state. \\
-\code{(reset-assertions)} & Remove assertions while retaining declarations/options where supported. \\
+\code{(reset)} & Reset declarations, assertions, and options to a fresh solver state; the pinned Djex profile sends it before every query. \\
+\code{(reset-assertions)} & Remove assertions; the standard also drops declarations unless \code{:global-declarations} is true, whereas Z3 keeps them (verified: a constant declared before \code{reset-assertions} is still usable afterwards). \\
+\code{(set-option :print-success false)} & Suppress the \code{success} reply Z3 otherwise prints after each non-query command in compliant mode; the pinned profile sends it at startup and after every \code{reset}. \\
+\code{(echo "text")} & Print the string; in \code{smtlib2_compliant=true} mode the reply keeps its double quotes. Djex uses \code{(echo "djex-smtlib-frame/v1/<64 hex>")} as a causal barrier after every write. \\
+\code{(get-info :reason-unknown)} & After \unknown, name the cause, e.g.\ \code{(:reason-unknown "timeout")}. \\
+\code{(get-option :produce-models)} & Read an option back; useful when checking which options a script actually set. \\
 \code{(minimize cost)} & Add an optimization objective. \\
 \code{(assert-soft phi :weight 3)} & Add a weighted soft constraint in Optimize. \\
 \code{(declare-rel R (Int Int))} & Declare a fixedpoint relation. \\
@@ -4990,7 +5975,7 @@ p\Rightarrow q&\leftrightarrow\code{(=> p q)}.
 (> x y)
 \end{lstlisting}
 
-In \QFLIA, multiplication must remain linear: at most one operand contains variables. The current Length translator lowers its admitted natural quotient/modulo operations to Euclidean witnesses rather than emitting \code{div}/\code{mod}.
+In \QFLIA, multiplication must remain linear: at most one operand contains variables. Z3 does not police this for you: \code{(set-logic QF_LIA)} followed by \code{(assert (= (* x y) 6))} is accepted and answered \sat{} (verified with Z3~5.0.0), so a translator must enforce its own profile. The current Length translator lowers its admitted natural quotient/modulo operations to Euclidean witnesses rather than emitting \code{div}/\code{mod}.
 
 \section{Arrays}
 
@@ -5001,7 +5986,7 @@ In \QFLIA, multiplication must remain linear: at most one operand contains varia
 ((as const (Array Int Int)) 0)
 \end{lstlisting}
 
-Arrays are total mathematical maps. A sequence represented by array plus length needs explicit bounds guards around every semantically meaningful read.
+Arrays are total mathematical maps. The constant-array form \code{((as const (Array Int Int)) 0)} is a Z3 extension rather than part of the SMT-LIB standard. A sequence represented by array plus length needs explicit bounds guards around every semantically meaningful read.
 
 \section{Bit-vectors}
 
@@ -5051,6 +6036,8 @@ unknown
 
 (error "diagnostic text")
 \end{lstlisting}
+
+Three error responses are worth recognizing on sight (all reproduced with Z3~5.0.0): \code{(error "line 7 column 14: model is not available")} after \code{get-value} follows an \unsat{} check; \code{(error "line 2 column 11: unknown constant m")} when a term names an undeclared symbol; and \code{(error "line 4 column 11: the logic has already been set")} when \code{set-logic} is repeated without a \code{reset}. Note that Z3 answers \code{get-value} after \sat{} even when \code{:produce-models} was never set, so a script that ``works'' may still be relying on a default the pinned Djex preamble sets explicitly.
 
 An application parser should not assume that one operating-system read equals one response. It must bound and frame the stream.
 
@@ -5103,7 +6090,7 @@ The scripts below are self-contained learning examples. They illustrate the math
 (get-value (x y))
 \end{lstlisting}
 
-Expected status: \sat. One possible model is $x=6,y=4$; many others satisfy the constraints.
+Expected status: \sat. One possible model is $x=6,y=4$; many others satisfy the constraints, and Z3~5.0.0 actually answered \code{((x 10) (y 0))}, which is why a production decoder must not hard-code the model it ``expects.
 
 \section{Proving a linear implication by refuting its negation}
 
@@ -5261,7 +6248,7 @@ For 8-bit unsigned addition, find $x,y$ such that the wrapped sum is smaller tha
 (get-value (x y (bvadd x y)))
 \end{lstlisting}
 
-Expected status: \sat. Many overflow pairs exist, such as $x=255,y=1$ producing $0$.
+Expected status: \sat. Many overflow pairs exist, such as $x=255,y=1$ producing $0$; Z3~5.0.0 returned the mirror image \code{((x #x01) (y #xff) ((bvadd x y) #x00))}.
 
 \section{A fixedpoint safety query}
 
@@ -5351,6 +6338,8 @@ The real translator conceptually performs:
 \item construct the separate input-value request;
 \item fingerprint the typed plan and rendered bytes with the exact problem.
 \end{enumerate}
+
+Section~\ref{sec:real-query} shows the bytes this produces for the simpler constant-empty candidate under the same contract; the tail candidate differs only in its bad-state assertion, which uses the \code{djex_nat_monus} helper from the preamble.
 
 \section{Live transaction}
 
@@ -5460,7 +6449,7 @@ Counterexample bank & A bounded fingerprint-scoped collection of input vectors f
 Decoder & A bounded parser/converter from solver response syntax to a domain-owned payload. \\
 Exact typed origin & Leant's opaque sidecar tying one accepted spelling to the exact Djex candidate graph, inventory, goals, provider bindings, and renderer identity. \\
 Exactness descriptor & Structured metadata stating source-fragment coverage, abstraction direction, finite scope, provider assumptions, and evidence/proof level. \\
-Fingerprint & Collision-resistant structural identity of a checked artifact, including its schema and all semantically relevant components. \\
+Fingerprint & Structural identity of a checked artifact, including its schema and all semantically relevant components. In Djex it is the complete versioned canonical encoding of those components (magic \code{DJEXFP}, tag-length-payload fields), so it is collision-free by construction and decodable; it is not a lossy hash, and its \code{Show} form is the lowercase hex of the whole key. \\
 Fixedpoint & A solver mode for relations and Horn rules; Spacer is Z3's principal property-directed engine in this area. \\
 Grammar & The finite or recursively bounded family of candidate constructions made available to search. \\
 Heuristic status & A solver status associated with an exact query but not upgraded to independent behavioral evidence. \\
@@ -5539,7 +6528,7 @@ Document & Best use & Relationship to this introduction \\
 \endhead
 \bottomrule
 \endfoot
-\lpath{docs/Leant.tex} & User-facing Leant manual and REPL orientation & Explains Leant broadly. This introduction supplies the logic/solver prerequisites and behavioral-assessment internals. \\
+\lpath{docs/Leant_Overview/Leant_Overview.tex} & User-facing Leant manual and REPL orientation & Explains Leant broadly. This introduction supplies the logic/solver prerequisites and behavioral-assessment internals. \\
 \lpath{docs/Djex_Leant_Codebase_Walkthrough/Djex_Leant_Codebase_Walkthrough.tex} & Maintainer-level source tour of both codebases & Read after Parts IV and VI for a wider module-by-module understanding beyond Z3/Length. \\
 \lpath{docs/Leant_Djex_Lean4_Rewrite_Analysis/Leant_Djex_Lean4_Rewrite_Analysis.tex} & Architectural analysis of possible Lean rewrite/partitioning & Assumes familiarity with Leant/Djex boundaries; this introduction clarifies why solver execution and proof authority are distinct. \\
 \lpath{docs/Z3_Behavioral_Synthesis_Proposal/Z3_Behavioral_Synthesis_Proposal.tex} & Detailed proposal for precise behavioral synthesis & The closest companion. It develops architecture and domains at expert level; this introduction teaches Z3 first, updates the current hard-filter status, and explains every proposal mechanism from beginner principles. \\
@@ -5563,6 +6552,50 @@ The proposal was tied to an August 15 snapshot at which Length was described as 
 \item[Lean proof integration.] Chapters~\ref{chap:future-chc-proofs} and \ref{chap:crosswalk}, then inspect existing theorem automation appropriate to the selected domain.
 \end{description}
 
+\section{Where each key concept is introduced}
+
+The glossary defines terms; this table says where each one is first developed at length, so that a reader arriving from a later chapter can jump back.
+
+\begin{longtable}{@{}L{0.30\textwidth}L{0.64\textwidth}@{}}
+\toprule
+Concept & Introduced in \\
+\midrule
+\endfirsthead
+\toprule
+Concept & Introduced in \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Constraint, satisfiability, model & Chapter~\ref{chap:problem}; formal vocabulary in Chapter~\ref{chap:logic-vocabulary} \\
+SAT versus SMT, theories & Chapter~\ref{chap:sat-smt}; individual theories in Chapter~\ref{chap:theories} \\
+\sat/\unsat/\unknown{} and what \unknown{} is not & Chapter~\ref{chap:three-answers} \\
+Z3 executable, library, options & Chapter~\ref{chap:z3-interfaces} \\
+SMT-LIB syntax, \code{declare-const}, \code{assert}, \code{check-sat} & Chapter~\ref{chap:smtlib}; reference card in Appendix~\ref{app:smtlib-reference} \\
+Linear integer arithmetic, \QFLIA, \code{ite}, monus lowering & Chapter~\ref{chap:qflia} \\
+Quantifiers, recursive definitions, incompleteness & Chapter~\ref{chap:quantifiers} \\
+Models, \code{get-value}, response parsing & Chapter~\ref{chap:models} \\
+Assumption literals, unsat cores, \code{minimize}/\code{assert-soft} & Chapter~\ref{chap:cores-opt} \\
+Constrained Horn clauses, Spacer, \code{declare-rel}/\code{rule}/\code{query} & Chapter~\ref{chap:chc}; planned use in Chapter~\ref{chap:future-chc-proofs} \\
+Bad state $P\land\neg Q$, over-/under-approximation, role vector & Chapter~\ref{chap:compile-behavior} \\
+Typed plan, canonical bytes, fingerprint, schema tags & Chapter~\ref{chap:canonical}; real bytes in Section~\ref{sec:real-query} \\
+Process ownership, digest, empty environment, framing & Chapter~\ref{chap:process}; exact launch in Section~\ref{sec:embedded-launch} \\
+Observation versus evidence, replay, opaque receipts & Chapter~\ref{chap:evidence} \\
+Incrementality, determinism, counterexample bank & Chapter~\ref{chap:incrementality}; Leant's bank in Chapter~\ref{chap:leant-modes} \\
+Four-layer architecture, \code{Verified} receipt, exact typed origin & Chapter~\ref{chap:current-architecture} \\
+Spine, passive contract, provider law, case policy, sealing order & Chapter~\ref{chap:length-domain} \\
+Length QF-LIA translation, Euclidean witnesses, input-only models & Chapter~\ref{chap:length-query} \\
+Live worker, capability probe, budgets, artifact policy & Chapter~\ref{chap:live-worker} \\
+Startup options, \code{:synth} request syntax, rank versus filter & Chapter~\ref{chap:leant-modes}; refusals in Section~\ref{sec:ts-startup} \\
+Source map of one assessment & Chapter~\ref{chap:current-source-map} \\
+Counterexample-guided enumeration, semantic signature & Chapter~\ref{chap:candidate-cegis} \\
+Sketch, selector, materialization & Chapter~\ref{chap:typed-sketches} \\
+Nogood, sound prefix pruning & Chapter~\ref{chap:prefix-pruning} \\
+Richer domains, exactness descriptor & Chapter~\ref{chap:richer-domains} \\
+Staged plan & Chapter~\ref{chap:staged-plan} \\
+Reading a query, troubleshooting, crosswalk & Chapters~\ref{chap:read-query}, \ref{chap:troubleshooting}, \ref{chap:crosswalk} \\
+\end{longtable}
+
 \section{Primary source paths}
 
 \subsection{Leant}
@@ -5581,8 +6614,11 @@ The proposal was tied to an August 15 snapshot at which Length was described as 
 \item \lpath{src/Leant/Synth/Length/Integration.hs}: request contexts, activation, rank/filter orchestration.
 \item \lpath{src/Leant/Synth/Length/Ranking.hs}: public conservative ranking report.
 \item \lpath{src/Leant/Synth/Length/Selection.hs}: scalar hard-filter policy.
-\item \lpath{src/Leant/Synth/Length/CounterexampleBank.hs}: nominal bank facade.
+\item \lpath{src/Leant/Synth/Length/CounterexampleBank/Internal.hs}: package-private nominal bank state and context (there is no public \code{CounterexampleBank.hs} facade at the pinned revision).
 \item \lpath{src/Leant/Synth/Length/Presentation.hs}: bounded user-facing assessment notes.
+\item \lpath{src/Leant/Synth/Length/Command.hs}: \code{:synth} option grammar and its five syntax refusals.
+\item \lpath{src/Leant/Synth/Length/File/Acquire.hs}: shared bounded file acquisition (POSIX only; Windows fails closed).
+\item \lpath{src/Leant/Synth/Length/Adapter.hs}: checked query wrapper and detailed refusal mapping.
 \end{itemize}
 
 \subsection{Djex}
@@ -5671,18 +6707,18 @@ The SMT-LIB Initiative.
 \newblock \url{https://smt-lib.org/}.
 
 \bibitem{leant}
-Vladimir Reshetnikov.
+The Leant contributors.
 \newblock Leant repository, inspected at commit \commitid{\LeantCommit}.
 \newblock \url{https://github.com/VladimirReshetnikov/Leant}.
 
 \bibitem{djex}
-Vladimir Reshetnikov.
+The Djex contributors, building on Lennart Augustsson's Djinn and Lennart Spitzner's Exference.
 \newblock Djex repository, Leant-pinned commit \commitid{\DjexPinnedCommit}; independent head \commitid{\DjexCommit}.
 \newblock \url{https://github.com/VladimirReshetnikov/Djex}.
 
 \bibitem{leantmanual}
 \newblock Leant Manual.
-\newblock \lpath{docs/Leant.tex}.
+\newblock \lpath{docs/Leant_Overview/Leant_Overview.tex}.
 
 \bibitem{walkthrough}
 \newblock Djex and Leant Codebase Walkthrough.
