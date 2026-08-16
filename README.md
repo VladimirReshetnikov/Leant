@@ -56,15 +56,23 @@ There is a manual: **[docs/Leant.pdf](https://raw.githubusercontent.com/Vladimir
 - [Development](#development)
 - [License](#license)
 
-Companion documents: the **[manual](docs/Leant.pdf)** (tutorial and
-`:synth` tour), **[docs/length-ranking.md](docs/length-ranking.md)** (the
-complete Length counterexample-ranking reference),
-**[docs/synth-internals.md](docs/synth-internals.md)** (the design
-boundaries and dated-report index behind `:synth`), and the
-**[Z3 behavioral synthesis proposal](docs/Z3_Behavioral_Synthesis_Proposal/Z3_Behavioral_Synthesis_Proposal.pdf)**
-(where the behavioral layer goes next: counterexample-guided search, typed
-sketch completion, semantic pruning, and Lean-checked proof artifacts;
-[LaTeX source](docs/Z3_Behavioral_Synthesis_Proposal/Z3_Behavioral_Synthesis_Proposal.tex)).
+Companion documents:
+
+- the **[manual](docs/Leant.pdf)** — tutorial and `:synth` tour;
+- **[docs/length-ranking.md](docs/length-ranking.md)** — the complete
+  Length counterexample-ranking reference;
+- **[docs/synth-internals.md](docs/synth-internals.md)** — the design
+  boundaries and dated-report index behind `:synth`;
+- the **[Z3 behavioral synthesis proposal](docs/Z3_Behavioral_Synthesis_Proposal/Z3_Behavioral_Synthesis_Proposal.pdf)**
+  — where the behavioral layer goes next: counterexample-guided search,
+  typed sketch completion, semantic pruning, and Lean-checked proof
+  artifacts ([LaTeX source](docs/Z3_Behavioral_Synthesis_Proposal/Z3_Behavioral_Synthesis_Proposal.tex));
+- the **[Lean 4 rewrite analysis](docs/Leant_Djex_Lean4_Rewrite_Analysis/Leant_Djex_Lean4_Rewrite_Analysis.pdf)**
+  — a feasibility study of reimplementing Leant and Djex in Lean itself:
+  which of today's boundaries would survive, what a Lean host makes
+  simpler (elaborated goals staying `Expr`, kernel-checked candidates
+  without pretty-printed text as authority), and a recommended end state
+  and migration path ([LaTeX source](docs/Leant_Djex_Lean4_Rewrite_Analysis/Leant_Djex_Lean4_Rewrite_Analysis.tex)).
 
 ## Highlights
 
@@ -1075,6 +1083,12 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   lane performed.
 
 ## How it works
+
+The design below — a Haskell REPL and synthesis engine driving a Lean
+worker over a text protocol — is examined at length in the
+[Lean 4 rewrite analysis](docs/Leant_Djex_Lean4_Rewrite_Analysis/Leant_Djex_Lean4_Rewrite_Analysis.pdf),
+which asks which of these boundaries would survive reimplementing both
+projects in Lean itself.
 
 Leant implements the backend protocol directly
 ([src/Leant/Backend.hs](src/Leant/Backend.hs)): JSON over stdin/stdout
