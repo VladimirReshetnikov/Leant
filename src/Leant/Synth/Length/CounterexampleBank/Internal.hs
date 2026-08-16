@@ -1,3 +1,4 @@
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RoleAnnotations #-}
 
 -- | Package-private ownership and query-owned replay for Djex's bounded
@@ -20,35 +21,58 @@ module Leant.Synth.Length.CounterexampleBank.Internal
   , emptyLengthCounterexampleBankState
   , defaultLengthCounterexampleBankState
   , lengthCounterexampleBankStateActiveBank
+  , LengthCounterexampleBankContext
+  , withLengthCounterexampleBankContext
+  , withDefaultLengthCounterexampleBankContext
+  , readLengthCounterexampleBankContextState
   , LengthCounterexampleBankReplayFailure (..)
   , LengthCounterexampleBankReplayRefusal (..)
   , LengthCounterexampleBankReplayHit
   , lengthCounterexampleBankReplayHitCounterexample
   , LengthCounterexampleBankReplayOutcome (..)
   , replayLengthCounterexampleBank
+  , LengthCounterexampleBankContextReplayHit
+  , lengthCounterexampleBankContextReplayHitCounterexample
+  , LengthCounterexampleBankContextReplayOutcome (..)
+  , replayLengthCounterexampleBankInContext
   , LengthCounterexampleBankPromotionFailure (..)
   , promoteLengthCounterexampleBankReplayHit
+  , promoteLengthCounterexampleBankReplayHitInContext
   , LengthCounterexampleBankReceiptOrigin (..)
   , LengthCounterexampleBankRecordFailure (..)
   , LengthCounterexampleBankRecordOutcome (..)
   , recordLengthCounterexampleBankReceipt
+  , recordLengthCounterexampleBankReceiptInContext
   , LengthSpinePairCounterexampleBankState
   , emptyLengthSpinePairCounterexampleBankState
   , defaultLengthSpinePairCounterexampleBankState
   , lengthSpinePairCounterexampleBankStateActiveBank
+  , LengthSpinePairCounterexampleBankContext
+  , withLengthSpinePairCounterexampleBankContext
+  , withDefaultLengthSpinePairCounterexampleBankContext
+  , readLengthSpinePairCounterexampleBankContextState
   , LengthSpinePairCounterexampleBankReplayFailure (..)
   , LengthSpinePairCounterexampleBankReplayRefusal (..)
   , LengthSpinePairCounterexampleBankReplayHit
   , lengthSpinePairCounterexampleBankReplayHitCounterexample
   , LengthSpinePairCounterexampleBankReplayOutcome (..)
   , replayLengthSpinePairCounterexampleBank
+  , LengthSpinePairCounterexampleBankContextReplayHit
+  , lengthSpinePairCounterexampleBankContextReplayHitCounterexample
+  , LengthSpinePairCounterexampleBankContextReplayOutcome (..)
+  , replayLengthSpinePairCounterexampleBankInContext
   , LengthSpinePairCounterexampleBankPromotionFailure (..)
   , promoteLengthSpinePairCounterexampleBankReplayHit
+  , promoteLengthSpinePairCounterexampleBankReplayHitInContext
   , LengthSpinePairCounterexampleBankReceiptOrigin (..)
   , LengthSpinePairCounterexampleBankRecordFailure (..)
   , LengthSpinePairCounterexampleBankRecordOutcome (..)
   , recordLengthSpinePairCounterexampleBankReceipt
+  , recordLengthSpinePairCounterexampleBankReceiptInContext
   ) where
+
+import Control.Exception (mask_)
+import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
 
 import Language.Haskell.Djex
   ( LengthCounterexampleBank
@@ -131,6 +155,41 @@ lengthCounterexampleBankStateActiveBank
   -> Maybe (LengthCounterexampleBank identity)
 lengthCounterexampleBankStateActiveBank
     (LengthCounterexampleBankState _ active) = active
+
+-- | One command-owned mutable scalar bank.  The fresh nominal command tag
+-- prevents a replay hit from one owner from being promoted through another
+-- owner even when both banks share Djex's semantic identity parameter.
+-- Mutation remains private to the transition functions below.
+newtype LengthCounterexampleBankContext command identity =
+  LengthCounterexampleBankContext
+    (IORef (LengthCounterexampleBankState identity))
+
+type role LengthCounterexampleBankContext nominal nominal
+
+-- | Introduce a fresh empty scalar owner with caller-validated limits.
+withLengthCounterexampleBankContext
+  :: LengthCounterexampleBankLimits
+  -> (forall command.
+      LengthCounterexampleBankContext command identity -> IO result)
+  -> IO result
+withLengthCounterexampleBankContext limits action = do
+  state <- newIORef $ emptyLengthCounterexampleBankState limits
+  action $ LengthCounterexampleBankContext state
+
+withDefaultLengthCounterexampleBankContext
+  :: (forall command.
+      LengthCounterexampleBankContext command identity -> IO result)
+  -> IO result
+withDefaultLengthCounterexampleBankContext =
+  withLengthCounterexampleBankContext defaultLengthCounterexampleBankLimits
+
+-- | Take an immutable diagnostic snapshot.  There is deliberately no setter
+-- and no context constructor which accepts an earlier snapshot.
+readLengthCounterexampleBankContextState
+  :: LengthCounterexampleBankContext command identity
+  -> IO (LengthCounterexampleBankState identity)
+readLengthCounterexampleBankContextState
+    (LengthCounterexampleBankContext state) = readIORef state
 
 ensureLengthCounterexampleBankState
   :: LengthSMTLibQuery identity local
@@ -269,6 +328,81 @@ replayLengthCounterexampleBank evaluationLimits query initial =
                 sample counterexample
         )
 
+-- | A replay hit tied to both the semantic bank identity and the fresh
+-- command owner which produced it.  Its constructor stays private so only a
+-- context replay can mint promotion authority.
+newtype LengthCounterexampleBankContextReplayHit command identity =
+  LengthCounterexampleBankContextReplayHitValue
+    (LengthCounterexampleBankReplayHit identity)
+
+type role LengthCounterexampleBankContextReplayHit nominal nominal
+
+lengthCounterexampleBankContextReplayHitCounterexample
+  :: LengthCounterexampleBankContextReplayHit command identity
+  -> ValidatedLengthCounterexample
+lengthCounterexampleBankContextReplayHitCounterexample
+    (LengthCounterexampleBankContextReplayHitValue hit) =
+  lengthCounterexampleBankReplayHitCounterexample hit
+
+-- | Context replay keeps the established refusal and bounded-unavailability
+-- vocabulary while making a successful hit command-nominal.
+data LengthCounterexampleBankContextReplayOutcome command identity
+  = LengthCounterexampleBankContextReplayMiss
+      [LengthCounterexampleBankReplayRefusal]
+  | LengthCounterexampleBankContextReplayAttemptUnavailable
+      [LengthCounterexampleBankReplayRefusal]
+      !LengthCounterexampleBankError
+  | LengthCounterexampleBankContextReplayHit
+      [LengthCounterexampleBankReplayRefusal]
+      !(LengthCounterexampleBankContextReplayHit command identity)
+
+type role LengthCounterexampleBankContextReplayOutcome nominal nominal
+
+-- | Replay through one mutable owner.  Exactly one completed pure adapter
+-- transition is forced and installed under a narrow asynchronous-exception
+-- mask.  Expected failure classifications therefore retain their authoritative
+-- successor; an unexpected exception propagates instead of manufacturing a
+-- partial transition.
+replayLengthCounterexampleBankInContext
+  :: LengthEvaluationLimits
+  -> LengthSMTLibQuery identity local
+  -> LengthCounterexampleBankContext command identity
+  -> IO
+      (Either LengthCounterexampleBankReplayFailure
+        (LengthCounterexampleBankContextReplayOutcome command identity))
+replayLengthCounterexampleBankInContext evaluationLimits query
+    (LengthCounterexampleBankContext state) =
+  transitionLengthCounterexampleBankContext state $ \initial ->
+    let (successor, replayed) =
+          replayLengthCounterexampleBank evaluationLimits query initial
+    in (successor, fmap tagOutcome replayed)
+ where
+  tagOutcome replayed = case replayed of
+    LengthCounterexampleBankReplayMiss refusals ->
+      LengthCounterexampleBankContextReplayMiss refusals
+    LengthCounterexampleBankReplayAttemptUnavailable refusals failure ->
+      LengthCounterexampleBankContextReplayAttemptUnavailable
+        refusals failure
+    LengthCounterexampleBankReplayHit refusals hit ->
+      LengthCounterexampleBankContextReplayHit refusals
+        $ LengthCounterexampleBankContextReplayHitValue hit
+
+transitionLengthCounterexampleBankContext
+  :: IORef (LengthCounterexampleBankState identity)
+  -> (LengthCounterexampleBankState identity
+      -> (LengthCounterexampleBankState identity, Either failure outcome))
+  -> IO (Either failure outcome)
+transitionLengthCounterexampleBankContext state transition = mask_ $
+  atomicModifyIORef' state $ \initial ->
+    case transition initial of
+      completed@(successor, outcome) ->
+        successor `seq` forceEitherClassification outcome `seq` completed
+
+forceEitherClassification :: Either failure outcome -> ()
+forceEitherClassification classified = case classified of
+  Left failure -> failure `seq` ()
+  Right outcome -> outcome `seq` ()
+
 -- Scalar promotion ---------------------------------------------------------
 
 data LengthCounterexampleBankPromotionFailure
@@ -310,6 +444,16 @@ promoteLengthCounterexampleBankReplayHit
           )
         Right promoted ->
           (replaceLengthCounterexampleBank promoted state, Right ())
+
+promoteLengthCounterexampleBankReplayHitInContext
+  :: LengthCounterexampleBankContextReplayHit command identity
+  -> LengthCounterexampleBankContext command identity
+  -> IO (Either LengthCounterexampleBankPromotionFailure ())
+promoteLengthCounterexampleBankReplayHitInContext
+    (LengthCounterexampleBankContextReplayHitValue hit)
+    (LengthCounterexampleBankContext state) =
+  transitionLengthCounterexampleBankContext state
+    $ promoteLengthCounterexampleBankReplayHit hit
 
 -- Scalar recording ---------------------------------------------------------
 
@@ -382,6 +526,21 @@ recordLengthCounterexampleBankReceipt evaluationLimits query origin
       Right $ LengthCounterexampleBankRecordInsertionUnavailable failure
     Right fresh -> Right $ LengthCounterexampleBankRecorded fresh
 
+recordLengthCounterexampleBankReceiptInContext
+  :: LengthEvaluationLimits
+  -> LengthSMTLibQuery identity local
+  -> LengthCounterexampleBankReceiptOrigin
+  -> ValidatedLengthCounterexample
+  -> LengthCounterexampleBankContext command identity
+  -> IO
+      (Either LengthCounterexampleBankRecordFailure
+        LengthCounterexampleBankRecordOutcome)
+recordLengthCounterexampleBankReceiptInContext evaluationLimits query origin
+    counterexample (LengthCounterexampleBankContext state) =
+  transitionLengthCounterexampleBankContext state
+    $ recordLengthCounterexampleBankReceipt
+        evaluationLimits query origin counterexample
+
 scalarReceiptOrigin
   :: LengthCounterexampleBankReceiptOrigin
   -> LengthCounterexampleBankOrigin
@@ -419,6 +578,35 @@ lengthSpinePairCounterexampleBankStateActiveBank
   -> Maybe (LengthSpinePairCounterexampleBank identity)
 lengthSpinePairCounterexampleBankStateActiveBank
     (LengthSpinePairCounterexampleBankState _ active) = active
+
+newtype LengthSpinePairCounterexampleBankContext command identity =
+  LengthSpinePairCounterexampleBankContext
+    (IORef (LengthSpinePairCounterexampleBankState identity))
+
+type role LengthSpinePairCounterexampleBankContext nominal nominal
+
+withLengthSpinePairCounterexampleBankContext
+  :: LengthSpinePairCounterexampleBankLimits
+  -> (forall command.
+      LengthSpinePairCounterexampleBankContext command identity -> IO result)
+  -> IO result
+withLengthSpinePairCounterexampleBankContext limits action = do
+  state <- newIORef $ emptyLengthSpinePairCounterexampleBankState limits
+  action $ LengthSpinePairCounterexampleBankContext state
+
+withDefaultLengthSpinePairCounterexampleBankContext
+  :: (forall command.
+      LengthSpinePairCounterexampleBankContext command identity -> IO result)
+  -> IO result
+withDefaultLengthSpinePairCounterexampleBankContext =
+  withLengthSpinePairCounterexampleBankContext
+    defaultLengthSpinePairCounterexampleBankLimits
+
+readLengthSpinePairCounterexampleBankContextState
+  :: LengthSpinePairCounterexampleBankContext command identity
+  -> IO (LengthSpinePairCounterexampleBankState identity)
+readLengthSpinePairCounterexampleBankContextState
+    (LengthSpinePairCounterexampleBankContext state) = readIORef state
 
 ensureLengthSpinePairCounterexampleBankState
   :: LengthSpinePairSMTLibQuery identity local
@@ -553,6 +741,72 @@ replayLengthSpinePairCounterexampleBank evaluationLimits query initial =
                 sample counterexample
         )
 
+newtype LengthSpinePairCounterexampleBankContextReplayHit command identity =
+  LengthSpinePairCounterexampleBankContextReplayHitValue
+    (LengthSpinePairCounterexampleBankReplayHit identity)
+
+type role LengthSpinePairCounterexampleBankContextReplayHit nominal nominal
+
+lengthSpinePairCounterexampleBankContextReplayHitCounterexample
+  :: LengthSpinePairCounterexampleBankContextReplayHit command identity
+  -> ValidatedLengthSpinePairCounterexample
+lengthSpinePairCounterexampleBankContextReplayHitCounterexample
+    (LengthSpinePairCounterexampleBankContextReplayHitValue hit) =
+  lengthSpinePairCounterexampleBankReplayHitCounterexample hit
+
+data LengthSpinePairCounterexampleBankContextReplayOutcome command identity
+  = LengthSpinePairCounterexampleBankContextReplayMiss
+      [LengthSpinePairCounterexampleBankReplayRefusal]
+  | LengthSpinePairCounterexampleBankContextReplayAttemptUnavailable
+      [LengthSpinePairCounterexampleBankReplayRefusal]
+      !LengthSpinePairCounterexampleBankError
+  | LengthSpinePairCounterexampleBankContextReplayHit
+      [LengthSpinePairCounterexampleBankReplayRefusal]
+      !(LengthSpinePairCounterexampleBankContextReplayHit command identity)
+
+type role LengthSpinePairCounterexampleBankContextReplayOutcome
+  nominal nominal
+
+replayLengthSpinePairCounterexampleBankInContext
+  :: LengthEvaluationLimits
+  -> LengthSpinePairSMTLibQuery identity local
+  -> LengthSpinePairCounterexampleBankContext command identity
+  -> IO
+      (Either LengthSpinePairCounterexampleBankReplayFailure
+        (LengthSpinePairCounterexampleBankContextReplayOutcome
+          command identity))
+replayLengthSpinePairCounterexampleBankInContext evaluationLimits query
+    (LengthSpinePairCounterexampleBankContext state) =
+  transitionLengthSpinePairCounterexampleBankContext state $ \initial ->
+    let (successor, replayed) =
+          replayLengthSpinePairCounterexampleBank
+            evaluationLimits query initial
+    in (successor, fmap tagOutcome replayed)
+ where
+  tagOutcome replayed = case replayed of
+    LengthSpinePairCounterexampleBankReplayMiss refusals ->
+      LengthSpinePairCounterexampleBankContextReplayMiss refusals
+    LengthSpinePairCounterexampleBankReplayAttemptUnavailable
+        refusals failure ->
+      LengthSpinePairCounterexampleBankContextReplayAttemptUnavailable
+        refusals failure
+    LengthSpinePairCounterexampleBankReplayHit refusals hit ->
+      LengthSpinePairCounterexampleBankContextReplayHit refusals
+        $ LengthSpinePairCounterexampleBankContextReplayHitValue hit
+
+transitionLengthSpinePairCounterexampleBankContext
+  :: IORef (LengthSpinePairCounterexampleBankState identity)
+  -> (LengthSpinePairCounterexampleBankState identity
+      -> ( LengthSpinePairCounterexampleBankState identity
+         , Either failure outcome
+         ))
+  -> IO (Either failure outcome)
+transitionLengthSpinePairCounterexampleBankContext state transition = mask_ $
+  atomicModifyIORef' state $ \initial ->
+    case transition initial of
+      completed@(successor, outcome) ->
+        successor `seq` forceEitherClassification outcome `seq` completed
+
 -- Binary-product promotion -------------------------------------------------
 
 data LengthSpinePairCounterexampleBankPromotionFailure
@@ -596,6 +850,16 @@ promoteLengthSpinePairCounterexampleBankReplayHit
           )
         Right promoted ->
           (replaceLengthSpinePairCounterexampleBank promoted state, Right ())
+
+promoteLengthSpinePairCounterexampleBankReplayHitInContext
+  :: LengthSpinePairCounterexampleBankContextReplayHit command identity
+  -> LengthSpinePairCounterexampleBankContext command identity
+  -> IO (Either LengthSpinePairCounterexampleBankPromotionFailure ())
+promoteLengthSpinePairCounterexampleBankReplayHitInContext
+    (LengthSpinePairCounterexampleBankContextReplayHitValue hit)
+    (LengthSpinePairCounterexampleBankContext state) =
+  transitionLengthSpinePairCounterexampleBankContext state
+    $ promoteLengthSpinePairCounterexampleBankReplayHit hit
 
 -- Binary-product recording -------------------------------------------------
 
@@ -676,6 +940,22 @@ recordLengthSpinePairCounterexampleBankReceipt evaluationLimits query origin
       Right
         $ LengthSpinePairCounterexampleBankRecordInsertionUnavailable failure
     Right fresh -> Right $ LengthSpinePairCounterexampleBankRecorded fresh
+
+recordLengthSpinePairCounterexampleBankReceiptInContext
+  :: LengthEvaluationLimits
+  -> LengthSpinePairSMTLibQuery identity local
+  -> LengthSpinePairCounterexampleBankReceiptOrigin
+  -> ValidatedLengthSpinePairCounterexample
+  -> LengthSpinePairCounterexampleBankContext command identity
+  -> IO
+      (Either LengthSpinePairCounterexampleBankRecordFailure
+        LengthSpinePairCounterexampleBankRecordOutcome)
+recordLengthSpinePairCounterexampleBankReceiptInContext
+    evaluationLimits query origin counterexample
+    (LengthSpinePairCounterexampleBankContext state) =
+  transitionLengthSpinePairCounterexampleBankContext state
+    $ recordLengthSpinePairCounterexampleBankReceipt
+        evaluationLimits query origin counterexample
 
 spinePairReceiptOrigin
   :: LengthSpinePairCounterexampleBankReceiptOrigin

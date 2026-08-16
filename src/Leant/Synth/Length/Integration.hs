@@ -1,3 +1,6 @@
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RoleAnnotations #-}
+
 -- | Explicit optional integration of finite-spine Length ranking and
 -- replay-authorized hard filtering.
 --
@@ -28,10 +31,14 @@ module Leant.Synth.Length.Integration
   , startupLengthAssessmentRequest
   , authorizeExplicitLengthAssessmentRequest
   , explicitLengthAssessmentRequest
+  , LengthAssessmentContext
+  , withLengthAssessmentRequestContext
+  , lengthAssessmentContextBehaviorMode
   , LengthAssessmentFailure (..)
   , LengthAssessmentResult
   , assessLengthVerificationBatch
   , assessLengthVerificationRequest
+  , assessLengthVerificationContext
   , lengthAssessmentCandidates
   , lengthAssessmentRanking
   , lengthAssessmentSpinePairRanking
@@ -43,7 +50,9 @@ module Leant.Synth.Length.Integration
   ) where
 
 import Language.Haskell.Djex
-  ( LengthSMTLibExecutableLaunchStrategy )
+  ( ExferenceLocal
+  , LengthSMTLibExecutableLaunchStrategy
+  )
 
 import Leant.Synth.Engine (DetailedVerificationVariant)
 import Leant.Synth.Length.Command (LengthBehaviorMode (..))
@@ -73,7 +82,13 @@ import Leant.Synth.Length.PostVerification
   , lengthPostVerificationRanking
   , lengthPostVerificationRankingFailure
   )
-import Leant.Synth.Length.Contract (LeanLengthContractSelection (..))
+import Leant.Synth.Length.Contract
+  ( LeanLengthContract
+  , LeanLengthContractSelection (..)
+  , LeanLengthSpinePairContract
+  )
+import qualified Leant.Synth.Length.CounterexampleBank.Internal
+  as CounterexampleBank
 import Leant.Synth.Length.Ranking
   ( LengthRanking
   , LengthRankingFailure
@@ -83,8 +98,9 @@ import Leant.Synth.Length.Selection
   , LengthSelectionResult
   , lengthSelectionCandidates
   , lengthSelectionFailure
-  , selectVerifiedLengthCandidatesWithPolicy
   )
+import Leant.Synth.Length.Selection.Internal
+  ( selectVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext )
 import Leant.Synth.Length.SpinePair.PostVerification
   ( LengthSpinePairPostVerificationFailure
   , LengthSpinePairPostVerificationResult
@@ -102,8 +118,9 @@ import Leant.Synth.Length.SpinePair.Selection
   , LengthSpinePairSelectionResult
   , lengthSpinePairSelectionCandidates
   , lengthSpinePairSelectionFailure
-  , selectVerifiedLengthSpinePairCandidatesWithPolicy
   )
+import Leant.Synth.Length.SpinePair.Selection.Internal
+  ( selectVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext )
 import Leant.Synth.PostVerification
   ( skipPostVerificationAssessment )
 import Leant.Synth.Verification
@@ -163,6 +180,68 @@ data LengthAssessmentRequest
       !LengthBehaviorMode
       !LengthRankingPolicy
       LeanLengthContractSelection
+
+-- | One command-local assessment owner.  Ranking contexts deliberately carry
+-- no bank, while each filter context owns exactly one nominal mutable bank for
+-- every batch assessed through that same context.  Contract fields remain lazy
+-- so behavior classification never demands their contents.
+data LengthAssessmentContext command
+  = LengthAssessmentDisabledContext
+  | LengthAssessmentScalarRankingContext
+      !LengthRankingPolicy
+      LeanLengthContract
+  | LengthAssessmentSpinePairRankingContext
+      !LengthRankingPolicy
+      LeanLengthSpinePairContract
+  | LengthAssessmentScalarFilteringContext
+      !LengthRankingPolicy
+      LeanLengthContract
+      !(CounterexampleBank.LengthCounterexampleBankContext
+          command ExferenceLocal)
+  | LengthAssessmentSpinePairFilteringContext
+      !LengthRankingPolicy
+      LeanLengthSpinePairContract
+      !(CounterexampleBank.LengthSpinePairCounterexampleBankContext
+          command ExferenceLocal)
+
+type role LengthAssessmentContext nominal
+
+-- | Introduce the nominal lifetime for one request.  The compatibility request
+-- runner below invokes this once per call; future command scheduling may keep
+-- the context and feed multiple batches without changing this API.
+withLengthAssessmentRequestContext
+  :: LengthAssessmentRequest
+  -> (forall command. LengthAssessmentContext command -> IO result)
+  -> IO result
+withLengthAssessmentRequestContext request action = case request of
+  LengthAssessmentRequestDisabled ->
+    action LengthAssessmentDisabledContext
+  LengthAssessmentEnabledRequest behavior policy selection ->
+    case (behavior, selection) of
+      (LengthBehaviorRank, LeanLengthScalarContractSelection contract) ->
+        action $ LengthAssessmentScalarRankingContext policy contract
+      (LengthBehaviorRank, LeanLengthSpinePairContractSelection contract) ->
+        action $ LengthAssessmentSpinePairRankingContext policy contract
+      (LengthBehaviorFilter, LeanLengthScalarContractSelection contract) ->
+        CounterexampleBank.withDefaultLengthCounterexampleBankContext
+          $ \context -> action
+              $ LengthAssessmentScalarFilteringContext
+                  policy contract context
+      (LengthBehaviorFilter, LeanLengthSpinePairContractSelection contract) ->
+        CounterexampleBank.withDefaultLengthSpinePairCounterexampleBankContext
+          $ \context -> action
+              $ LengthAssessmentSpinePairFilteringContext
+                  policy contract context
+
+lengthAssessmentContextBehaviorMode
+  :: LengthAssessmentContext command
+  -> LengthBehaviorMode
+lengthAssessmentContextBehaviorMode context = case context of
+  LengthAssessmentDisabledContext -> LengthBehaviorRank
+  LengthAssessmentScalarRankingContext {} -> LengthBehaviorRank
+  LengthAssessmentSpinePairRankingContext {} -> LengthBehaviorRank
+  LengthAssessmentScalarFilteringContext {} -> LengthBehaviorFilter
+  LengthAssessmentSpinePairFilteringContext {} -> LengthBehaviorFilter
 
 -- | The exact command-local behavior selected for this request.  Disabled
 -- assessment is the established ranking identity.  The enabled projection
@@ -315,26 +394,35 @@ assessLengthVerificationRequest
   :: LengthAssessmentRequest
   -> VerificationBatch DetailedVerificationVariant
   -> IO LengthAssessmentResult
-assessLengthVerificationRequest request verification = case request of
-  LengthAssessmentRequestDisabled ->
+assessLengthVerificationRequest request verification =
+  withLengthAssessmentRequestContext request $ \context ->
+    assessLengthVerificationContext context verification
+
+-- | Assess one batch through an already introduced command-local owner.
+-- Reusing a filter context reuses its one nominal bank; rank contexts continue
+-- through the established bank-free runners.
+assessLengthVerificationContext
+  :: LengthAssessmentContext command
+  -> VerificationBatch DetailedVerificationVariant
+  -> IO LengthAssessmentResult
+assessLengthVerificationContext context verification = case context of
+  LengthAssessmentDisabledContext ->
     pure $ LengthAssessmentSkipped verification
-  LengthAssessmentEnabledRequest behavior policy selection ->
-    case (behavior, selection) of
-      (LengthBehaviorRank, LeanLengthScalarContractSelection contract) ->
-        LengthAssessmentCompleted <$>
-          assessVerifiedLengthCandidatesWithPolicy policy contract verification
-      (LengthBehaviorRank, LeanLengthSpinePairContractSelection contract) ->
-        LengthAssessmentSpinePairCompleted <$>
-          assessVerifiedLengthSpinePairCandidatesWithPolicy
-            policy contract verification
-      (LengthBehaviorFilter, LeanLengthScalarContractSelection contract) ->
-        LengthAssessmentSelectionCompleted <$>
-          selectVerifiedLengthCandidatesWithPolicy
-            policy contract verification
-      (LengthBehaviorFilter, LeanLengthSpinePairContractSelection contract) ->
-        LengthAssessmentSpinePairSelectionCompleted <$>
-          selectVerifiedLengthSpinePairCandidatesWithPolicy
-            policy contract verification
+  LengthAssessmentScalarRankingContext policy contract ->
+    LengthAssessmentCompleted <$>
+      assessVerifiedLengthCandidatesWithPolicy policy contract verification
+  LengthAssessmentSpinePairRankingContext policy contract ->
+    LengthAssessmentSpinePairCompleted <$>
+      assessVerifiedLengthSpinePairCandidatesWithPolicy
+        policy contract verification
+  LengthAssessmentScalarFilteringContext policy contract bank ->
+    LengthAssessmentSelectionCompleted <$>
+      selectVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext
+        policy bank contract verification
+  LengthAssessmentSpinePairFilteringContext policy contract bank ->
+    LengthAssessmentSpinePairSelectionCompleted <$>
+      selectVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
+        policy bank contract verification
 
 -- | Effective verified candidates for the requested operation.  Ranking and
 -- disabled assessment retain their established candidates; an accepted

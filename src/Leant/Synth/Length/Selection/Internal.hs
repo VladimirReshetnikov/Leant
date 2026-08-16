@@ -24,12 +24,14 @@ module Leant.Synth.Length.Selection.Internal
   , lengthSelectionRejected
   , lengthSelectionFailure
   , selectVerifiedLengthCandidatesWithPolicy
+  , selectVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext
   ) where
 
 import Numeric.Natural (Natural)
 
 import Language.Haskell.Djex
-  ( SolverStatus
+  ( ExferenceLocal
+  , SolverStatus
   , ValidatedLengthApplicableDomain
   , ValidatedLengthCounterexample
   , ValidatedLengthCounterexampleSimplification
@@ -57,10 +59,14 @@ import Leant.Synth.Engine (DetailedVerificationVariant)
 import Leant.Synth.Length.Configuration
   ( LengthRankingPolicy
   , assessVerifiedLengthCandidatesWithPolicy
+  , assessVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext
   )
 import Leant.Synth.Length.Contract (LeanLengthContract)
+import qualified Leant.Synth.Length.CounterexampleBank.Internal
+  as CounterexampleBank
 import Leant.Synth.Length.PostVerification
   ( LengthPostVerificationFailure
+  , LengthPostVerificationResult
   , lengthPostVerificationAdapterFailure
   , lengthPostVerificationRanking
   , lengthPostVerificationRankingFailure
@@ -246,8 +252,29 @@ selectVerifiedLengthCandidatesWithPolicy
   -> VerificationBatch DetailedVerificationVariant
   -> IO LengthSelectionResult
 selectVerifiedLengthCandidatesWithPolicy policy contract verification = do
-  assessed <- assessVerifiedLengthCandidatesWithPolicy
-    policy contract verification
+  selectVerifiedLengthCandidatesWithAssessment
+    (assessVerifiedLengthCandidatesWithPolicy policy contract) verification
+
+selectVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext
+  :: LengthRankingPolicy
+  -> CounterexampleBank.LengthCounterexampleBankContext
+      command ExferenceLocal
+  -> LeanLengthContract
+  -> VerificationBatch DetailedVerificationVariant
+  -> IO LengthSelectionResult
+selectVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext
+    policy context contract =
+  selectVerifiedLengthCandidatesWithAssessment
+    $ assessVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext
+        policy context contract
+
+selectVerifiedLengthCandidatesWithAssessment
+  :: (VerificationBatch DetailedVerificationVariant
+      -> IO LengthPostVerificationResult)
+  -> VerificationBatch DetailedVerificationVariant
+  -> IO LengthSelectionResult
+selectVerifiedLengthCandidatesWithAssessment assess verification = do
+  assessed <- assess verification
   pure $ case lengthPostVerificationAdapterFailure assessed of
     Just failure -> preserve
       $ LengthSelectionPostVerificationFailed failure

@@ -61,6 +61,9 @@ module Leant.Synth.Length.SpinePair.Ranking.Internal
   , rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndUsableWorkBudget
   , rankVerifiedLengthSpinePairCandidatesWithRankingPoliciesAndScopedUsableWorkBudget
   , rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndScopedUsableWorkBudget
+  , rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndCounterexampleBankContextAndLiveSessionOpening
+  , rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndCounterexampleBankContextAndUsableWorkBudget
+  , rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndCounterexampleBankContextAndScopedUsableWorkBudget
   , promoteLengthSpinePairCounterexampleSeed
   , replayLengthSpinePairCounterexampleSeeds
   ) where
@@ -134,6 +137,8 @@ import Leant.Synth.Length.Adapter
   , prepareCheckedLengthSpinePairQuery
   )
 import Leant.Synth.Length.Contract (LeanLengthSpinePairContract)
+import qualified Leant.Synth.Length.CounterexampleBank.Internal
+  as CounterexampleBank
 import Leant.Synth.Length.Handoff
   ( LengthSpinePairHandoffRefusal (..))
 import Leant.Synth.Length.Ranking.Internal
@@ -440,6 +445,24 @@ data LengthSpinePairRankingPolicies = LengthSpinePairRankingPolicies
   , simplificationPolicyOf
       :: !LengthSpinePairCounterexampleSimplificationRankingPolicy
   }
+
+data LengthSpinePairCounterexampleBankCursor command
+  = LengthSpinePairBatchLocalCounterexampleBank ![[Natural]]
+  | LengthSpinePairCommandLocalCounterexampleBank
+      !(CounterexampleBank.LengthSpinePairCounterexampleBankContext
+          command ExferenceLocal)
+
+type role LengthSpinePairCounterexampleBankCursor nominal
+
+data LengthSpinePairCounterexampleAcquisition command
+  = LengthSpinePairCounterexampleFromBatchReplay ![Natural]
+  | LengthSpinePairCounterexampleFromCommandReplay
+      !(CounterexampleBank.LengthSpinePairCounterexampleBankContextReplayHit
+          command ExferenceLocal)
+  | LengthSpinePairCounterexampleFresh
+      !CounterexampleBank.LengthSpinePairCounterexampleBankReceiptOrigin
+
+type role LengthSpinePairCounterexampleAcquisition nominal
 
 rankVerifiedLengthSpinePairCandidates
   :: LengthSMTLibExecutionConfig
@@ -805,6 +828,101 @@ rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndScopedUsableW
     simplificationPolicy
 
 
+rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndCounterexampleBankContextAndLiveSessionOpening
+  :: CounterexampleBank.LengthSpinePairCounterexampleBankContext
+      command ExferenceLocal
+  -> LengthSpinePairInputBoxRankingPolicy
+  -> LengthSpinePairApplicableDomainRankingPolicy
+  -> LengthSpinePairOriginProbeRankingPolicy
+  -> LengthSpinePairCounterexampleSimplificationRankingPolicy
+  -> LengthLiveSessionOpeningPolicy
+  -> LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LeanLengthSpinePairContract
+  -> [PostVerificationCandidate epoch DetailedVerificationVariant]
+  -> IO
+      (Either LengthRankingInputError
+        (AssociatedLengthSpinePairRanking
+          (PostVerificationCandidate epoch DetailedVerificationVariant)))
+rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndCounterexampleBankContextAndLiveSessionOpening
+    context inputBoxPolicy applicableDomainPolicy originProbePolicy
+    simplificationPolicy openingPolicy execution evaluation contract =
+  rankAssociatedLengthSpinePairCandidatesWithLiveSessionOpeningAndCursor
+    (LengthSpinePairCommandLocalCounterexampleBank context) policies openingPolicy
+    execution evaluation contract postVerificationCandidateVerified
+ where
+  policies = LengthSpinePairRankingPolicies
+    inputBoxPolicy applicableDomainPolicy originProbePolicy simplificationPolicy
+
+
+rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndCounterexampleBankContextAndUsableWorkBudget
+  :: (AssociatedLengthSpinePairRanking
+        (PostVerificationCandidate epoch DetailedVerificationVariant)
+      -> AssociatedLengthSpinePairRanking
+        (PostVerificationCandidate epoch DetailedVerificationVariant))
+  -> LengthSMTLibLiveUsableWorkBudget
+  -> CounterexampleBank.LengthSpinePairCounterexampleBankContext
+      command ExferenceLocal
+  -> LengthSpinePairInputBoxRankingPolicy
+  -> LengthSpinePairApplicableDomainRankingPolicy
+  -> LengthSpinePairOriginProbeRankingPolicy
+  -> LengthSpinePairCounterexampleSimplificationRankingPolicy
+  -> LengthLiveSessionOpeningPolicy
+  -> LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LeanLengthSpinePairContract
+  -> [PostVerificationCandidate epoch DetailedVerificationVariant]
+  -> IO
+      (Either LengthRankingInputError
+        (AssociatedLengthSpinePairRanking
+          (PostVerificationCandidate epoch DetailedVerificationVariant)))
+rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndCounterexampleBankContextAndUsableWorkBudget
+    finalize budget context inputBoxPolicy applicableDomainPolicy
+    originProbePolicy simplificationPolicy openingPolicy execution evaluation
+    contract candidates =
+  rankAssociatedLengthSpinePairCandidatesWithUsableWorkBudgetAndCursor
+    (LengthSpinePairCommandLocalCounterexampleBank context) budget finalize
+    forceAssociatedLengthSpinePairRankingOwnedResult policies openingPolicy
+    execution evaluation contract postVerificationCandidateVerified candidates
+ where
+  policies = LengthSpinePairRankingPolicies
+    inputBoxPolicy applicableDomainPolicy originProbePolicy simplificationPolicy
+
+
+rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndCounterexampleBankContextAndScopedUsableWorkBudget
+  :: (AssociatedLengthSpinePairRanking
+        (PostVerificationCandidate epoch DetailedVerificationVariant)
+      -> AssociatedLengthSpinePairRanking
+        (PostVerificationCandidate epoch DetailedVerificationVariant))
+  -> LengthSMTLibLiveUsableWorkBudget
+  -> CounterexampleBank.LengthSpinePairCounterexampleBankContext
+      command ExferenceLocal
+  -> LengthSpinePairInputBoxRankingPolicy
+  -> LengthSpinePairApplicableDomainRankingPolicy
+  -> LengthSpinePairOriginProbeRankingPolicy
+  -> LengthSpinePairCounterexampleSimplificationRankingPolicy
+  -> LengthLiveSessionOpeningPolicy
+  -> LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LeanLengthSpinePairContract
+  -> [PostVerificationCandidate epoch DetailedVerificationVariant]
+  -> IO
+      (Either LengthRankingInputError
+        (AssociatedLengthSpinePairRanking
+          (PostVerificationCandidate epoch DetailedVerificationVariant)))
+rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndCounterexampleBankContextAndScopedUsableWorkBudget
+    finalize budget context inputBoxPolicy applicableDomainPolicy
+    originProbePolicy simplificationPolicy openingPolicy execution evaluation
+    contract candidates =
+  rankAssociatedLengthSpinePairCandidatesWithScopedUsableWorkBudgetAndCursor
+    (LengthSpinePairCommandLocalCounterexampleBank context) budget finalize
+    forceAssociatedLengthSpinePairRankingOwnedResult policies openingPolicy
+    execution evaluation contract postVerificationCandidateVerified candidates
+ where
+  policies = LengthSpinePairRankingPolicies
+    inputBoxPolicy applicableDomainPolicy originProbePolicy simplificationPolicy
+
+
 data LengthSpinePairUsableWorkSnapshot association =
   LengthSpinePairUsableWorkSnapshot
     ![PreparedLengthSpinePairCandidate association]
@@ -827,6 +945,26 @@ rankAssociatedLengthSpinePairCandidatesWithUsableWorkBudget
 rankAssociatedLengthSpinePairCandidatesWithUsableWorkBudget budget finish
     forceResult policies openingPolicy execution evaluation contract
     verifiedFor associations =
+  rankAssociatedLengthSpinePairCandidatesWithUsableWorkBudgetAndCursor
+    (LengthSpinePairBatchLocalCounterexampleBank []) budget finish forceResult
+    policies openingPolicy execution evaluation contract verifiedFor associations
+
+rankAssociatedLengthSpinePairCandidatesWithUsableWorkBudgetAndCursor
+  :: LengthSpinePairCounterexampleBankCursor command
+  -> LengthSMTLibLiveUsableWorkBudget
+  -> (AssociatedLengthSpinePairRanking association -> result)
+  -> (result -> ())
+  -> LengthSpinePairRankingPolicies
+  -> LengthLiveSessionOpeningPolicy
+  -> LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LeanLengthSpinePairContract
+  -> (association -> Verified DetailedVerificationVariant)
+  -> [association]
+  -> IO (Either LengthRankingInputError result)
+rankAssociatedLengthSpinePairCandidatesWithUsableWorkBudgetAndCursor cursor
+    budget finish forceResult policies openingPolicy execution evaluation
+    contract verifiedFor associations =
   case admitLengthSpinePairCandidates
       defaultLengthSMTLibLiveSessionMaximumQueries associations of
     Left failure -> pure $ Left failure
@@ -839,7 +977,7 @@ rankAssociatedLengthSpinePairCandidatesWithUsableWorkBudget budget finish
         _ <- evaluate $ forcePreparedLengthSpinePairCandidates prepared
         snapshot `seq` writeIORef snapshotRef (Just snapshot)
         ranking <- runPreparedLengthSpinePairCandidatesUnderUsableWorkDeadline
-          deadline execution evaluation policies openingPolicy prepared
+          deadline execution evaluation policies openingPolicy cursor prepared
         let cleanupIncomplete =
               associatedLengthSpinePairRankingCleanupIncomplete ranking
             completedSnapshot = LengthSpinePairUsableWorkSnapshot
@@ -883,6 +1021,26 @@ rankAssociatedLengthSpinePairCandidatesWithScopedUsableWorkBudget
 rankAssociatedLengthSpinePairCandidatesWithScopedUsableWorkBudget budget
     finish forceResult policies openingPolicy execution evaluation contract
     verifiedFor associations =
+  rankAssociatedLengthSpinePairCandidatesWithScopedUsableWorkBudgetAndCursor
+    (LengthSpinePairBatchLocalCounterexampleBank []) budget finish forceResult
+    policies openingPolicy execution evaluation contract verifiedFor associations
+
+rankAssociatedLengthSpinePairCandidatesWithScopedUsableWorkBudgetAndCursor
+  :: LengthSpinePairCounterexampleBankCursor command
+  -> LengthSMTLibLiveUsableWorkBudget
+  -> (AssociatedLengthSpinePairRanking association -> result)
+  -> (result -> ())
+  -> LengthSpinePairRankingPolicies
+  -> LengthLiveSessionOpeningPolicy
+  -> LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LeanLengthSpinePairContract
+  -> (association -> Verified DetailedVerificationVariant)
+  -> [association]
+  -> IO (Either LengthRankingInputError result)
+rankAssociatedLengthSpinePairCandidatesWithScopedUsableWorkBudgetAndCursor
+    cursor budget finish forceResult policies openingPolicy execution evaluation
+    contract verifiedFor associations =
   case admitLengthSpinePairCandidates
       defaultLengthSMTLibLiveSessionMaximumQueries associations of
     Left failure -> pure $ Left failure
@@ -908,7 +1066,7 @@ rankAssociatedLengthSpinePairCandidatesWithScopedUsableWorkBudget budget
                   ranked <-
                     runPreparedLengthSpinePairCandidatesUnderScopedUsableWorkDeadline
                       deadline execution evaluation policies openingPolicy
-                      prepared
+                      cursor prepared
                   case ranked of
                     Left failure -> pure $ Left failure
                     Right ranking -> do
@@ -961,10 +1119,11 @@ runPreparedLengthSpinePairCandidatesUnderUsableWorkDeadline
   -> LengthEvaluationLimits
   -> LengthSpinePairRankingPolicies
   -> LengthLiveSessionOpeningPolicy
+  -> LengthSpinePairCounterexampleBankCursor command
   -> [PreparedLengthSpinePairCandidate association]
   -> IO (AssociatedLengthSpinePairRanking association)
 runPreparedLengthSpinePairCandidatesUnderUsableWorkDeadline deadline execution
-    evaluation policies openingPolicy prepared = case prepared of
+    evaluation policies openingPolicy cursor prepared = case prepared of
   [] -> pure $ AssociatedLengthSpinePairRanking [] Nothing
   _ | not (hasEligibleLengthSpinePairCandidate prepared) -> pure
         $ AssociatedLengthSpinePairRanking
@@ -973,7 +1132,7 @@ runPreparedLengthSpinePairCandidatesUnderUsableWorkDeadline deadline execution
         LengthLiveSessionOpeningEager -> do
           scoped <- withLengthSMTLibLiveSessionUnderDeadline deadline execution
             $ \session -> runPreparedLengthSpinePairCandidates evaluation
-                policies session prepared
+                policies cursor session prepared
           pure $ case scoped of
             Left failure -> unassessedLengthSpinePairRanking prepared
               $ lengthSpinePairSessionRankingFailure failure
@@ -983,54 +1142,55 @@ runPreparedLengthSpinePairCandidatesUnderUsableWorkDeadline deadline execution
               (stableLengthSpinePairCounterexampleDemotion assessed) Nothing
         LengthLiveSessionOpeningDeferredUntilLiveQuery ->
           runPreparedLengthSpinePairCandidatesWithDeferredLiveSessionOpeningUnderDeadline
-            deadline execution evaluation policies prepared
+            deadline execution evaluation policies cursor prepared
 
 runPreparedLengthSpinePairCandidatesWithDeferredLiveSessionOpeningUnderDeadline
   :: LengthSMTLibLiveUsableWorkDeadline budget
   -> LengthSMTLibExecutionConfig
   -> LengthEvaluationLimits
   -> LengthSpinePairRankingPolicies
+  -> LengthSpinePairCounterexampleBankCursor command
   -> [PreparedLengthSpinePairCandidate association]
   -> IO (AssociatedLengthSpinePairRanking association)
 runPreparedLengthSpinePairCandidatesWithDeferredLiveSessionOpeningUnderDeadline
-    deadline execution evaluation policies prepared = case
-        runPreparedLengthSpinePairCandidatesBeforeLive evaluation
-          applicableDomainPolicy originProbePolicy simplificationPolicy
-          prepared of
-  PreparedLengthSpinePairCandidatesCompleted assessed -> pure
-    $ AssociatedLengthSpinePairRanking
-        (stableLengthSpinePairCounterexampleDemotion assessed) Nothing
-  PreparedLengthSpinePairCandidatesFailed failure -> pure
-    $ unassessedLengthSpinePairRanking prepared failure
-  PreparedLengthSpinePairCandidatesNeedLive reversed seedBank index association
-      query rest -> do
-    scoped <- withLengthSMTLibLiveSessionUnderDeadline deadline execution
-      $ \session -> do
-        observed <- runLengthSpinePairSMTLibLiveQuery evaluation session query
-        case observed of
-          Left failure -> pure $ Left
-            $ lengthSpinePairQueryRankingFailure index failure
-          Right observation -> case assessLengthSpinePairCandidate evaluation
-              inputBoxPolicy simplificationPolicy index association query
-              observation of
-            Left failure -> pure $ Left failure
-            Right assessed ->
-              let nextSeedBank = case
-                      lengthSpinePairCounterexampleSeed assessed of
-                    Nothing -> seedBank
-                    Just retained ->
-                      promoteLengthSpinePairCounterexampleSeed retained seedBank
-              in nextSeedBank `seq`
-                  runPreparedLengthSpinePairCandidatesFrom evaluation
-                    policies session (assessed : reversed)
-                    nextSeedBank rest
-    pure $ case scoped of
-      Left failure -> unassessedLengthSpinePairRanking prepared
-        $ lengthSpinePairSessionRankingFailure failure
-      Right (Left failure) ->
-        unassessedLengthSpinePairRanking prepared failure
-      Right (Right assessed) -> AssociatedLengthSpinePairRanking
-        (stableLengthSpinePairCounterexampleDemotion assessed) Nothing
+    deadline execution evaluation policies cursor prepared = do
+  beforeLive <- runPreparedLengthSpinePairCandidatesBeforeLive evaluation
+    applicableDomainPolicy originProbePolicy simplificationPolicy cursor prepared
+  case beforeLive of
+    PreparedLengthSpinePairCandidatesCompleted assessed -> pure
+      $ AssociatedLengthSpinePairRanking
+          (stableLengthSpinePairCounterexampleDemotion assessed) Nothing
+    PreparedLengthSpinePairCandidatesFailed failure -> pure
+      $ unassessedLengthSpinePairRanking prepared failure
+    PreparedLengthSpinePairCandidatesNeedLive reversed nextCursor index
+        association query rest -> do
+      scoped <- withLengthSMTLibLiveSessionUnderDeadline deadline execution
+        $ \session -> do
+          observed <- runLengthSpinePairSMTLibLiveQuery evaluation session query
+          case observed of
+            Left failure -> pure $ Left
+              $ lengthSpinePairQueryRankingFailure index failure
+            Right observation -> case
+                assessLengthSpinePairCandidateWithCounterexampleOrigin evaluation
+                  inputBoxPolicy simplificationPolicy index association query
+                  observation of
+              Left failure -> pure $ Left failure
+              Right (assessed, origin) -> do
+                advanced <- advanceLengthSpinePairCounterexampleBankCursor
+                  evaluation index query
+                  (LengthSpinePairCounterexampleFresh origin) assessed nextCursor
+                case advanced of
+                  Left failure -> pure $ Left failure
+                  Right advancedCursor ->
+                    runPreparedLengthSpinePairCandidatesFrom evaluation policies
+                      advancedCursor session (assessed : reversed) rest
+      pure $ case scoped of
+        Left failure -> unassessedLengthSpinePairRanking prepared
+          $ lengthSpinePairSessionRankingFailure failure
+        Right (Left failure) ->
+          unassessedLengthSpinePairRanking prepared failure
+        Right (Right assessed) -> AssociatedLengthSpinePairRanking
+          (stableLengthSpinePairCounterexampleDemotion assessed) Nothing
  where
   inputBoxPolicy = inputBoxPolicyOf policies
   applicableDomainPolicy = applicableDomainPolicyOf policies
@@ -1044,12 +1204,13 @@ runPreparedLengthSpinePairCandidatesUnderScopedUsableWorkDeadline
   -> LengthEvaluationLimits
   -> LengthSpinePairRankingPolicies
   -> LengthLiveSessionOpeningPolicy
+  -> LengthSpinePairCounterexampleBankCursor command
   -> [PreparedLengthSpinePairCandidate association]
   -> IO
       (Either LengthSMTLibLiveSessionError
         (AssociatedLengthSpinePairRanking association))
 runPreparedLengthSpinePairCandidatesUnderScopedUsableWorkDeadline deadline
-    execution evaluation policies openingPolicy prepared = case prepared of
+    execution evaluation policies openingPolicy cursor prepared = case prepared of
   [] -> pure $ Right $ AssociatedLengthSpinePairRanking [] Nothing
   _ | not (hasEligibleLengthSpinePairCandidate prepared) -> pure $ Right
         $ AssociatedLengthSpinePairRanking
@@ -1059,7 +1220,7 @@ runPreparedLengthSpinePairCandidatesUnderScopedUsableWorkDeadline deadline
           scoped <- withLengthSMTLibLiveSessionUnderScopedDeadline
             deadline execution $ \session ->
               runPreparedLengthSpinePairCandidatesFromUnderScopedUsableWorkDeadline
-                deadline evaluation policies session [] [] prepared
+                deadline evaluation policies cursor session [] prepared
           pure $ case scoped of
             Left failure -> Right $ unassessedLengthSpinePairRanking prepared
               $ lengthSpinePairSessionRankingFailure failure
@@ -1071,23 +1232,24 @@ runPreparedLengthSpinePairCandidatesUnderScopedUsableWorkDeadline deadline
                   (stableLengthSpinePairCounterexampleDemotion assessed) Nothing
         LengthLiveSessionOpeningDeferredUntilLiveQuery ->
           runPreparedLengthSpinePairCandidatesWithDeferredLiveSessionOpeningUnderScopedDeadline
-            deadline execution evaluation policies prepared
+            deadline execution evaluation policies cursor prepared
 
 runPreparedLengthSpinePairCandidatesWithDeferredLiveSessionOpeningUnderScopedDeadline
   :: LengthSMTLibLiveScopedUsableWorkDeadline budget
   -> LengthSMTLibExecutionConfig
   -> LengthEvaluationLimits
   -> LengthSpinePairRankingPolicies
+  -> LengthSpinePairCounterexampleBankCursor command
   -> [PreparedLengthSpinePairCandidate association]
   -> IO
       (Either LengthSMTLibLiveSessionError
         (AssociatedLengthSpinePairRanking association))
 runPreparedLengthSpinePairCandidatesWithDeferredLiveSessionOpeningUnderScopedDeadline
-    deadline execution evaluation policies prepared = do
+    deadline execution evaluation policies cursor prepared = do
   beforeLive <-
     runPreparedLengthSpinePairCandidatesBeforeLiveUnderScopedUsableWorkDeadline
       deadline evaluation applicableDomainPolicy originProbePolicy
-      simplificationPolicy prepared
+      simplificationPolicy cursor prepared
   case beforeLive of
     Left failure -> pure $ Left failure
     Right (PreparedLengthSpinePairCandidatesCompleted assessed) -> pure $ Right
@@ -1095,7 +1257,7 @@ runPreparedLengthSpinePairCandidatesWithDeferredLiveSessionOpeningUnderScopedDea
           (stableLengthSpinePairCounterexampleDemotion assessed) Nothing
     Right (PreparedLengthSpinePairCandidatesFailed failure) -> pure $ Right
       $ unassessedLengthSpinePairRanking prepared failure
-    Right (PreparedLengthSpinePairCandidatesNeedLive reversed seedBank index
+    Right (PreparedLengthSpinePairCandidatesNeedLive reversed nextCursor index
         association query rest) -> do
       scoped <- withLengthSMTLibLiveSessionUnderScopedDeadline
         deadline execution $ \session -> do
@@ -1103,25 +1265,26 @@ runPreparedLengthSpinePairCandidatesWithDeferredLiveSessionOpeningUnderScopedDea
           case observed of
             Left failure -> pure $ Right $ Left
               $ lengthSpinePairQueryRankingFailure index failure
-            Right observation -> case assessLengthSpinePairCandidate evaluation
-                inputBoxPolicy simplificationPolicy index association query
-                observation of
+            Right observation -> case
+                assessLengthSpinePairCandidateWithCounterexampleOrigin evaluation
+                  inputBoxPolicy simplificationPolicy index association query
+                  observation of
               Left failure -> pure $ Right $ Left failure
-              Right assessed -> do
-                let nextSeedBank = case
-                        lengthSpinePairCounterexampleSeed assessed of
-                      Nothing -> seedBank
-                      Just retained ->
-                        promoteLengthSpinePairCounterexampleSeed retained seedBank
-                nextSeedBank `seq` pure ()
-                checkpoint <-
-                  checkLengthSMTLibLiveScopedUsableWorkDeadline deadline
-                case checkpoint of
-                  Left failure -> pure $ Left failure
-                  Right () ->
-                    runPreparedLengthSpinePairCandidatesFromUnderScopedUsableWorkDeadline
-                      deadline evaluation policies session
-                      (assessed : reversed) nextSeedBank rest
+              Right (assessed, origin) -> do
+                advanced <- advanceLengthSpinePairCounterexampleBankCursor
+                  evaluation index query
+                  (LengthSpinePairCounterexampleFresh origin) assessed nextCursor
+                case advanced of
+                  Left failure -> pure $ Right $ Left failure
+                  Right advancedCursor -> do
+                    checkpoint <-
+                      checkLengthSMTLibLiveScopedUsableWorkDeadline deadline
+                    case checkpoint of
+                      Left failure -> pure $ Left failure
+                      Right () ->
+                        runPreparedLengthSpinePairCandidatesFromUnderScopedUsableWorkDeadline
+                          deadline evaluation policies advancedCursor session
+                          (assessed : reversed) rest
       pure $ case scoped of
         Left failure -> Right $ unassessedLengthSpinePairRanking prepared
           $ lengthSpinePairSessionRankingFailure failure
@@ -1147,15 +1310,16 @@ runPreparedLengthSpinePairCandidatesBeforeLiveUnderScopedUsableWorkDeadline
   -> LengthSpinePairApplicableDomainRankingPolicy
   -> LengthSpinePairOriginProbeRankingPolicy
   -> LengthSpinePairCounterexampleSimplificationRankingPolicy
+  -> LengthSpinePairCounterexampleBankCursor command
   -> [PreparedLengthSpinePairCandidate association]
   -> IO
       (Either LengthSMTLibLiveSessionError
-        (PreparedLengthSpinePairCandidatesBeforeLive association))
+        (PreparedLengthSpinePairCandidatesBeforeLive command association))
 runPreparedLengthSpinePairCandidatesBeforeLiveUnderScopedUsableWorkDeadline
     deadline evaluation applicableDomainPolicy originProbePolicy
-    simplificationPolicy = go [] []
+    simplificationPolicy initialCursor = go [] initialCursor
  where
-  go reversed seedBank remaining = case remaining of
+  go reversed cursor remaining = case remaining of
     [] -> pure $ Right
       $ PreparedLengthSpinePairCandidatesCompleted $ reverse reversed
     PreparedLengthSpinePairCandidateUnassessed
@@ -1163,24 +1327,27 @@ runPreparedLengthSpinePairCandidatesBeforeLiveUnderScopedUsableWorkDeadline
       continue
         (AssociatedRankedLengthSpinePairCandidate index association
           (LengthSpinePairCandidatePreparationRefused refusal) : reversed)
-        seedBank rest
-    PreparedLengthSpinePairCandidateEligible index association query : rest ->
-      case replayLengthSpinePairCounterexampleSeeds
-          evaluation query seedBank of
-        Just (inputs, receipt) ->
-          inputs `seq` case simplifyLengthSpinePairCounterexampleAssessment
-              evaluation simplificationPolicy index association query receipt of
+        cursor rest
+    PreparedLengthSpinePairCandidateEligible index association query : rest -> do
+      replayed <- replayLengthSpinePairCounterexampleBankCursor
+        evaluation index query cursor
+      case replayed of
+        Left failure -> pure $ Right
+          $ PreparedLengthSpinePairCandidatesFailed failure
+        Right (Just (receipt, acquisition)) ->
+          case simplifyLengthSpinePairCounterexampleAssessment evaluation
+              simplificationPolicy index association query receipt of
             Left failure -> pure $ Right
               $ PreparedLengthSpinePairCandidatesFailed failure
-            Right assessed ->
-              continueAssessed reversed seedBank rest assessed
-        Nothing -> case assessLengthSpinePairApplicableDomainCandidate
+            Right assessed -> continueAssessed reversed cursor index query
+              acquisition rest assessed
+        Right Nothing -> case assessLengthSpinePairApplicableDomainCandidate
             evaluation applicableDomainPolicy simplificationPolicy index
             association query of
           Left failure -> pure $ Right
             $ PreparedLengthSpinePairCandidatesFailed failure
-          Right (Just assessed) ->
-            continueAssessed reversed seedBank rest assessed
+          Right (Just assessed) -> continueAssessed reversed cursor index query
+            lengthSpinePairSolverIndependentAcquisition rest assessed
           Right Nothing -> case probeLengthSpinePairOriginCounterexample
               evaluation originProbePolicy query of
             Left
@@ -1198,29 +1365,29 @@ runPreparedLengthSpinePairCandidatesBeforeLiveUnderScopedUsableWorkDeadline
                   simplificationPolicy index association query receipt of
               Left failure -> pure $ Right
                 $ PreparedLengthSpinePairCandidatesFailed failure
-              Right assessed ->
-                continueAssessed reversed seedBank rest assessed
+              Right assessed -> continueAssessed reversed cursor index query
+                lengthSpinePairSolverIndependentAcquisition rest assessed
             Right Nothing -> do
               checkpoint <-
                 checkLengthSMTLibLiveScopedUsableWorkDeadline deadline
               pure $ case checkpoint of
                 Left failure -> Left failure
                 Right () -> Right $ PreparedLengthSpinePairCandidatesNeedLive
-                  reversed seedBank index association query rest
+                  reversed cursor index association query rest
 
-  continueAssessed reversed seedBank rest assessed =
-    let nextSeedBank = case lengthSpinePairCounterexampleSeed assessed of
-          Nothing -> seedBank
-          Just retained ->
-            promoteLengthSpinePairCounterexampleSeed retained seedBank
-    in nextSeedBank `seq`
-        continue (assessed : reversed) nextSeedBank rest
+  continueAssessed reversed cursor index query acquisition rest assessed = do
+    advanced <- advanceLengthSpinePairCounterexampleBankCursor evaluation index
+      query acquisition assessed cursor
+    case advanced of
+      Left failure -> pure $ Right
+        $ PreparedLengthSpinePairCandidatesFailed failure
+      Right nextCursor -> continue (assessed : reversed) nextCursor rest
 
-  continue reversed seedBank rest = do
+  continue reversed cursor rest = do
     checkpoint <- checkLengthSMTLibLiveScopedUsableWorkDeadline deadline
     case checkpoint of
       Left failure -> pure $ Left failure
-      Right () -> go reversed seedBank rest
+      Right () -> go reversed cursor rest
 
 -- | Live sibling which checks after every completed candidate before any
 -- following candidate can demand pure replay or another live transaction.
@@ -1228,44 +1395,46 @@ runPreparedLengthSpinePairCandidatesFromUnderScopedUsableWorkDeadline
   :: LengthSMTLibLiveScopedUsableWorkDeadline budget
   -> LengthEvaluationLimits
   -> LengthSpinePairRankingPolicies
+  -> LengthSpinePairCounterexampleBankCursor command
   -> LengthSMTLibLiveSession epoch
   -> [AssociatedRankedLengthSpinePairCandidate association]
-  -> [[Natural]]
   -> [PreparedLengthSpinePairCandidate association]
   -> IO
       (Either LengthSMTLibLiveSessionError
         (Either LengthSpinePairRankingFailure
           [AssociatedRankedLengthSpinePairCandidate association]))
 runPreparedLengthSpinePairCandidatesFromUnderScopedUsableWorkDeadline deadline
-    evaluation policies session = go
+    evaluation policies initialCursor session = go initialCursor
  where
   inputBoxPolicy = inputBoxPolicyOf policies
   applicableDomainPolicy = applicableDomainPolicyOf policies
   originProbePolicy = originProbePolicyOf policies
   simplificationPolicy = simplificationPolicyOf policies
-  go reversed seedBank remaining = case remaining of
+  go cursor reversed remaining = case remaining of
     [] -> pure $ Right $ Right $ reverse reversed
     PreparedLengthSpinePairCandidateUnassessed
         index association refusal : rest ->
       continue
         (AssociatedRankedLengthSpinePairCandidate index association
           (LengthSpinePairCandidatePreparationRefused refusal) : reversed)
-        seedBank rest
-    PreparedLengthSpinePairCandidateEligible index association query : rest ->
-      case replayLengthSpinePairCounterexampleSeeds
-          evaluation query seedBank of
-        Just (inputs, receipt) ->
-          inputs `seq` case simplifyLengthSpinePairCounterexampleAssessment
-              evaluation simplificationPolicy index association query receipt of
+        cursor rest
+    PreparedLengthSpinePairCandidateEligible index association query : rest -> do
+      replayed <- replayLengthSpinePairCounterexampleBankCursor
+        evaluation index query cursor
+      case replayed of
+        Left failure -> pure $ Right $ Left failure
+        Right (Just (receipt, acquisition)) ->
+          case simplifyLengthSpinePairCounterexampleAssessment evaluation
+              simplificationPolicy index association query receipt of
             Left failure -> pure $ Right $ Left failure
-            Right assessed ->
-              continueAssessed reversed seedBank rest assessed
-        Nothing -> case assessLengthSpinePairApplicableDomainCandidate
+            Right assessed -> continueAssessed reversed cursor index query
+              acquisition rest assessed
+        Right Nothing -> case assessLengthSpinePairApplicableDomainCandidate
             evaluation applicableDomainPolicy simplificationPolicy index
             association query of
           Left failure -> pure $ Right $ Left failure
-          Right (Just assessed) ->
-            continueAssessed reversed seedBank rest assessed
+          Right (Just assessed) -> continueAssessed reversed cursor index query
+            lengthSpinePairSolverIndependentAcquisition rest assessed
           Right Nothing -> case probeLengthSpinePairOriginCounterexample
               evaluation originProbePolicy query of
             Left
@@ -1279,34 +1448,35 @@ runPreparedLengthSpinePairCandidatesFromUnderScopedUsableWorkDeadline deadline
                 simplifyLengthSpinePairCounterexampleAssessment evaluation
                   simplificationPolicy index association query receipt of
               Left failure -> pure $ Right $ Left failure
-              Right assessed ->
-                continueAssessed reversed seedBank rest assessed
+              Right assessed -> continueAssessed reversed cursor index query
+                lengthSpinePairSolverIndependentAcquisition rest assessed
             Right Nothing -> do
               observed <- runLengthSpinePairSMTLibLiveQuery
                 evaluation session query
               case observed of
                 Left failure -> pure $ Right $ Left
                   $ lengthSpinePairQueryRankingFailure index failure
-                Right observation -> case assessLengthSpinePairCandidate
-                    evaluation inputBoxPolicy simplificationPolicy index
-                    association query observation of
+                Right observation -> case
+                    assessLengthSpinePairCandidateWithCounterexampleOrigin
+                      evaluation inputBoxPolicy simplificationPolicy index
+                      association query observation of
                   Left failure -> pure $ Right $ Left failure
-                  Right assessed ->
-                    continueAssessed reversed seedBank rest assessed
+                  Right (assessed, origin) -> continueAssessed reversed cursor
+                    index query (LengthSpinePairCounterexampleFresh origin) rest
+                    assessed
 
-  continueAssessed reversed seedBank rest assessed =
-    let nextSeedBank = case lengthSpinePairCounterexampleSeed assessed of
-          Nothing -> seedBank
-          Just retained ->
-            promoteLengthSpinePairCounterexampleSeed retained seedBank
-    in nextSeedBank `seq`
-        continue (assessed : reversed) nextSeedBank rest
+  continueAssessed reversed cursor index query acquisition rest assessed = do
+    advanced <- advanceLengthSpinePairCounterexampleBankCursor evaluation index
+      query acquisition assessed cursor
+    case advanced of
+      Left failure -> pure $ Right $ Left failure
+      Right nextCursor -> continue (assessed : reversed) nextCursor rest
 
-  continue reversed seedBank rest = do
+  continue reversed cursor rest = do
     checkpoint <- checkLengthSMTLibLiveScopedUsableWorkDeadline deadline
     case checkpoint of
       Left failure -> pure $ Left failure
-      Right () -> go reversed seedBank rest
+      Right () -> go cursor reversed rest
 
 rankAssociatedLengthSpinePairCandidates
   :: LengthSpinePairRankingPolicies
@@ -1338,6 +1508,25 @@ rankAssociatedLengthSpinePairCandidatesWithLiveSessionOpening
 rankAssociatedLengthSpinePairCandidatesWithLiveSessionOpening policies
     openingPolicy
     execution evaluation contract verifiedFor associations =
+  rankAssociatedLengthSpinePairCandidatesWithLiveSessionOpeningAndCursor
+    (LengthSpinePairBatchLocalCounterexampleBank []) policies openingPolicy
+    execution evaluation contract verifiedFor associations
+
+rankAssociatedLengthSpinePairCandidatesWithLiveSessionOpeningAndCursor
+  :: LengthSpinePairCounterexampleBankCursor command
+  -> LengthSpinePairRankingPolicies
+  -> LengthLiveSessionOpeningPolicy
+  -> LengthSMTLibExecutionConfig
+  -> LengthEvaluationLimits
+  -> LeanLengthSpinePairContract
+  -> (association -> Verified DetailedVerificationVariant)
+  -> [association]
+  -> IO
+      (Either LengthRankingInputError
+        (AssociatedLengthSpinePairRanking association))
+rankAssociatedLengthSpinePairCandidatesWithLiveSessionOpeningAndCursor cursor
+    policies openingPolicy execution evaluation contract verifiedFor
+    associations =
   case admitLengthSpinePairCandidates
       defaultLengthSMTLibLiveSessionMaximumQueries associations of
     Left failure -> pure $ Left failure
@@ -1353,7 +1542,7 @@ rankAssociatedLengthSpinePairCandidatesWithLiveSessionOpening policies
             LengthLiveSessionOpeningEager -> do
               scoped <- withLengthSMTLibLiveSession execution $ \session ->
                 runPreparedLengthSpinePairCandidates evaluation policies
-                  session prepared
+                  cursor session prepared
               pure $ Right $ case scoped of
                 Left failure -> unassessedLengthSpinePairRanking prepared
                   $ lengthSpinePairSessionRankingFailure failure
@@ -1363,7 +1552,7 @@ rankAssociatedLengthSpinePairCandidatesWithLiveSessionOpening policies
                   (stableLengthSpinePairCounterexampleDemotion assessed) Nothing
             LengthLiveSessionOpeningDeferredUntilLiveQuery -> Right <$>
               runPreparedLengthSpinePairCandidatesWithDeferredLiveSessionOpening
-                execution evaluation policies prepared
+                execution evaluation policies cursor prepared
 
 admitLengthSpinePairCandidates
   :: Natural
@@ -1424,64 +1613,66 @@ preparedLengthSpinePairCandidateUnassessed prepared = case prepared of
     AssociatedRankedLengthSpinePairCandidate index association
       $ LengthSpinePairCandidateAssessed LengthSpinePairUnassessed Nothing
 
-data PreparedLengthSpinePairCandidatesBeforeLive association
+data PreparedLengthSpinePairCandidatesBeforeLive command association
   = PreparedLengthSpinePairCandidatesCompleted
       ![AssociatedRankedLengthSpinePairCandidate association]
   | PreparedLengthSpinePairCandidatesFailed
       !LengthSpinePairRankingFailure
   | PreparedLengthSpinePairCandidatesNeedLive
       ![AssociatedRankedLengthSpinePairCandidate association]
-      ![[Natural]]
+      !(LengthSpinePairCounterexampleBankCursor command)
       !Natural
       !association
       !CheckedLengthSpinePairQuery
       ![PreparedLengthSpinePairCandidate association]
 
-type role PreparedLengthSpinePairCandidatesBeforeLive nominal
+type role PreparedLengthSpinePairCandidatesBeforeLive nominal nominal
 
 runPreparedLengthSpinePairCandidatesWithDeferredLiveSessionOpening
   :: LengthSMTLibExecutionConfig
   -> LengthEvaluationLimits
   -> LengthSpinePairRankingPolicies
+  -> LengthSpinePairCounterexampleBankCursor command
   -> [PreparedLengthSpinePairCandidate association]
   -> IO (AssociatedLengthSpinePairRanking association)
 runPreparedLengthSpinePairCandidatesWithDeferredLiveSessionOpening execution
-    evaluation policies prepared = case
-        runPreparedLengthSpinePairCandidatesBeforeLive evaluation
-          applicableDomainPolicy originProbePolicy simplificationPolicy prepared of
-  PreparedLengthSpinePairCandidatesCompleted assessed -> pure
-    $ AssociatedLengthSpinePairRanking
-        (stableLengthSpinePairCounterexampleDemotion assessed) Nothing
-  PreparedLengthSpinePairCandidatesFailed failure -> pure
-    $ unassessedLengthSpinePairRanking prepared failure
-  PreparedLengthSpinePairCandidatesNeedLive reversed seedBank index association
-      query rest -> do
-    scoped <- withLengthSMTLibLiveSession execution $ \session -> do
-      observed <- runLengthSpinePairSMTLibLiveQuery evaluation session query
-      case observed of
-        Left failure -> pure $ Left
-          $ lengthSpinePairQueryRankingFailure index failure
-        Right observation -> case assessLengthSpinePairCandidate evaluation
-            inputBoxPolicy simplificationPolicy index association query
-              observation of
-          Left failure -> pure $ Left failure
-          Right assessed ->
-            let nextSeedBank = case
-                    lengthSpinePairCounterexampleSeed assessed of
-                  Nothing -> seedBank
-                  Just retained ->
-                    promoteLengthSpinePairCounterexampleSeed retained seedBank
-            in nextSeedBank `seq`
-                runPreparedLengthSpinePairCandidatesFrom evaluation
-                  policies session (assessed : reversed)
-                  nextSeedBank rest
-    pure $ case scoped of
-      Left failure -> unassessedLengthSpinePairRanking prepared
-        $ lengthSpinePairSessionRankingFailure failure
-      Right (Left failure) ->
-        unassessedLengthSpinePairRanking prepared failure
-      Right (Right assessed) -> AssociatedLengthSpinePairRanking
-        (stableLengthSpinePairCounterexampleDemotion assessed) Nothing
+    evaluation policies cursor prepared = do
+  beforeLive <- runPreparedLengthSpinePairCandidatesBeforeLive evaluation
+    applicableDomainPolicy originProbePolicy simplificationPolicy cursor prepared
+  case beforeLive of
+    PreparedLengthSpinePairCandidatesCompleted assessed -> pure
+      $ AssociatedLengthSpinePairRanking
+          (stableLengthSpinePairCounterexampleDemotion assessed) Nothing
+    PreparedLengthSpinePairCandidatesFailed failure -> pure
+      $ unassessedLengthSpinePairRanking prepared failure
+    PreparedLengthSpinePairCandidatesNeedLive reversed nextCursor index
+        association query rest -> do
+      scoped <- withLengthSMTLibLiveSession execution $ \session -> do
+        observed <- runLengthSpinePairSMTLibLiveQuery evaluation session query
+        case observed of
+          Left failure -> pure $ Left
+            $ lengthSpinePairQueryRankingFailure index failure
+          Right observation -> case
+              assessLengthSpinePairCandidateWithCounterexampleOrigin evaluation
+                inputBoxPolicy simplificationPolicy index association query
+                observation of
+            Left failure -> pure $ Left failure
+            Right (assessed, origin) -> do
+              advanced <- advanceLengthSpinePairCounterexampleBankCursor
+                evaluation index query (LengthSpinePairCounterexampleFresh origin)
+                assessed nextCursor
+              case advanced of
+                Left failure -> pure $ Left failure
+                Right advancedCursor ->
+                  runPreparedLengthSpinePairCandidatesFrom evaluation policies
+                    advancedCursor session (assessed : reversed) rest
+      pure $ case scoped of
+        Left failure -> unassessedLengthSpinePairRanking prepared
+          $ lengthSpinePairSessionRankingFailure failure
+        Right (Left failure) ->
+          unassessedLengthSpinePairRanking prepared failure
+        Right (Right assessed) -> AssociatedLengthSpinePairRanking
+          (stableLengthSpinePairCounterexampleDemotion assessed) Nothing
  where
   inputBoxPolicy = inputBoxPolicyOf policies
   applicableDomainPolicy = applicableDomainPolicyOf policies
@@ -1494,111 +1685,121 @@ runPreparedLengthSpinePairCandidatesBeforeLive
   -> LengthSpinePairApplicableDomainRankingPolicy
   -> LengthSpinePairOriginProbeRankingPolicy
   -> LengthSpinePairCounterexampleSimplificationRankingPolicy
+  -> LengthSpinePairCounterexampleBankCursor command
   -> [PreparedLengthSpinePairCandidate association]
-  -> PreparedLengthSpinePairCandidatesBeforeLive association
+  -> IO (PreparedLengthSpinePairCandidatesBeforeLive command association)
 runPreparedLengthSpinePairCandidatesBeforeLive evaluation
-    applicableDomainPolicy originProbePolicy simplificationPolicy = go [] []
+    applicableDomainPolicy originProbePolicy simplificationPolicy initialCursor =
+  go [] initialCursor
  where
-  go reversed seedBank remaining = case remaining of
-    [] -> PreparedLengthSpinePairCandidatesCompleted $ reverse reversed
+  go reversed cursor remaining = case remaining of
+    [] -> pure $ PreparedLengthSpinePairCandidatesCompleted $ reverse reversed
     PreparedLengthSpinePairCandidateUnassessed
         index association refusal : rest ->
       go (AssociatedRankedLengthSpinePairCandidate index association
             (LengthSpinePairCandidatePreparationRefused refusal) : reversed)
-        seedBank rest
-    PreparedLengthSpinePairCandidateEligible index association query : rest ->
-      case replayLengthSpinePairCounterexampleSeeds
-          evaluation query seedBank of
-        Just (inputs, receipt) ->
-          inputs `seq` case simplifyLengthSpinePairCounterexampleAssessment
-              evaluation simplificationPolicy index association query receipt of
-            Left failure ->
-              PreparedLengthSpinePairCandidatesFailed failure
-            Right assessed -> continueAssessed
-              reversed seedBank rest assessed
-        Nothing -> case assessLengthSpinePairApplicableDomainCandidate
+        cursor rest
+    PreparedLengthSpinePairCandidateEligible index association query : rest -> do
+      replayed <- replayLengthSpinePairCounterexampleBankCursor
+        evaluation index query cursor
+      case replayed of
+        Left failure -> pure $ PreparedLengthSpinePairCandidatesFailed failure
+        Right (Just (receipt, acquisition)) ->
+          case simplifyLengthSpinePairCounterexampleAssessment evaluation
+              simplificationPolicy index association query receipt of
+            Left failure -> pure
+              $ PreparedLengthSpinePairCandidatesFailed failure
+            Right assessed -> continueAssessed reversed cursor index query
+              acquisition rest assessed
+        Right Nothing -> case assessLengthSpinePairApplicableDomainCandidate
             evaluation applicableDomainPolicy simplificationPolicy index
               association query of
-          Left failure -> PreparedLengthSpinePairCandidatesFailed failure
-          Right (Just assessed) -> continueAssessed
-            reversed seedBank rest assessed
+          Left failure -> pure $ PreparedLengthSpinePairCandidatesFailed failure
+          Right (Just assessed) -> continueAssessed reversed cursor index query
+            lengthSpinePairSolverIndependentAcquisition rest assessed
           Right Nothing -> case probeLengthSpinePairOriginCounterexample
               evaluation originProbePolicy query of
             Left
                 (LengthSpinePairSMTLibInputReplayEvaluationRejected failure) ->
-              PreparedLengthSpinePairCandidatesFailed
+              pure $ PreparedLengthSpinePairCandidatesFailed
                 $ localLengthSpinePairRankingFailure
                     (LengthSpinePairRankingOriginProbeEvaluationFailed failure)
                     index
             Left (LengthSpinePairSMTLibInputReplayAssociationRejected _) ->
-              PreparedLengthSpinePairCandidatesFailed
+              pure $ PreparedLengthSpinePairCandidatesFailed
                 $ localLengthSpinePairRankingFailure
                     LengthSpinePairRankingEvidenceReplayMismatch index
             Right (Just receipt) -> case
                 simplifyLengthSpinePairCounterexampleAssessment evaluation
                   simplificationPolicy index association query receipt of
-              Left failure -> PreparedLengthSpinePairCandidatesFailed failure
-              Right assessed -> continueAssessed
-                reversed seedBank rest assessed
-            Right Nothing -> PreparedLengthSpinePairCandidatesNeedLive
-              reversed seedBank index association query rest
+              Left failure -> pure
+                $ PreparedLengthSpinePairCandidatesFailed failure
+              Right assessed -> continueAssessed reversed cursor index query
+                lengthSpinePairSolverIndependentAcquisition rest assessed
+            Right Nothing -> pure $ PreparedLengthSpinePairCandidatesNeedLive
+              reversed cursor index association query rest
 
-  continueAssessed reversed seedBank rest assessed =
-    let nextSeedBank = case lengthSpinePairCounterexampleSeed assessed of
-          Nothing -> seedBank
-          Just retained ->
-            promoteLengthSpinePairCounterexampleSeed retained seedBank
-    in nextSeedBank `seq` go (assessed : reversed) nextSeedBank rest
+  continueAssessed reversed cursor index query acquisition rest assessed = do
+    advanced <- advanceLengthSpinePairCounterexampleBankCursor evaluation index
+      query acquisition assessed cursor
+    case advanced of
+      Left failure -> pure $ PreparedLengthSpinePairCandidatesFailed failure
+      Right nextCursor -> go (assessed : reversed) nextCursor rest
 
 runPreparedLengthSpinePairCandidates
   :: LengthEvaluationLimits
   -> LengthSpinePairRankingPolicies
+  -> LengthSpinePairCounterexampleBankCursor command
   -> LengthSMTLibLiveSession epoch
   -> [PreparedLengthSpinePairCandidate association]
   -> IO
       (Either LengthSpinePairRankingFailure
         [AssociatedRankedLengthSpinePairCandidate association])
-runPreparedLengthSpinePairCandidates evaluation policies session =
-  runPreparedLengthSpinePairCandidatesFrom evaluation policies session [] []
+runPreparedLengthSpinePairCandidates evaluation policies cursor session =
+  runPreparedLengthSpinePairCandidatesFrom evaluation policies cursor session []
 
 runPreparedLengthSpinePairCandidatesFrom
   :: LengthEvaluationLimits
   -> LengthSpinePairRankingPolicies
+  -> LengthSpinePairCounterexampleBankCursor command
   -> LengthSMTLibLiveSession epoch
   -> [AssociatedRankedLengthSpinePairCandidate association]
-  -> [[Natural]]
   -> [PreparedLengthSpinePairCandidate association]
   -> IO
       (Either LengthSpinePairRankingFailure
         [AssociatedRankedLengthSpinePairCandidate association])
-runPreparedLengthSpinePairCandidatesFrom evaluation policies session = go
+runPreparedLengthSpinePairCandidatesFrom evaluation policies initialCursor
+    session = go initialCursor
  where
   inputBoxPolicy = inputBoxPolicyOf policies
   applicableDomainPolicy = applicableDomainPolicyOf policies
   originProbePolicy = originProbePolicyOf policies
   simplificationPolicy = simplificationPolicyOf policies
-  go reversed seedBank remaining = case remaining of
+  go cursor reversed remaining = case remaining of
     [] -> pure $ Right $ reverse reversed
     PreparedLengthSpinePairCandidateUnassessed
         index association refusal : rest ->
-      go (AssociatedRankedLengthSpinePairCandidate index association
-            (LengthSpinePairCandidatePreparationRefused refusal) : reversed)
-        seedBank rest
-    PreparedLengthSpinePairCandidateEligible index association query : rest ->
-      case replayLengthSpinePairCounterexampleSeeds
-          evaluation query seedBank of
-        Just (inputs, receipt) ->
-          inputs `seq` case simplifyLengthSpinePairCounterexampleAssessment
-              evaluation simplificationPolicy index association query receipt of
+      go cursor
+        (AssociatedRankedLengthSpinePairCandidate index association
+          (LengthSpinePairCandidatePreparationRefused refusal) : reversed)
+        rest
+    PreparedLengthSpinePairCandidateEligible index association query : rest -> do
+      replayed <- replayLengthSpinePairCounterexampleBankCursor
+        evaluation index query cursor
+      case replayed of
+        Left failure -> pure $ Left failure
+        Right (Just (receipt, acquisition)) ->
+          case simplifyLengthSpinePairCounterexampleAssessment evaluation
+              simplificationPolicy index association query receipt of
             Left failure -> pure $ Left failure
-            Right assessed -> continueAssessed
-              reversed seedBank rest assessed
-        Nothing -> case assessLengthSpinePairApplicableDomainCandidate
+            Right assessed -> continueAssessed reversed cursor index query
+              acquisition rest assessed
+        Right Nothing -> case assessLengthSpinePairApplicableDomainCandidate
             evaluation applicableDomainPolicy simplificationPolicy index
               association query of
           Left failure -> pure $ Left failure
-          Right (Just assessed) -> continueAssessed
-            reversed seedBank rest assessed
+          Right (Just assessed) -> continueAssessed reversed cursor index query
+            lengthSpinePairSolverIndependentAcquisition rest assessed
           Right Nothing -> case probeLengthSpinePairOriginCounterexample
               evaluation originProbePolicy query of
             Left (LengthSpinePairSMTLibInputReplayEvaluationRejected failure) ->
@@ -1611,27 +1812,29 @@ runPreparedLengthSpinePairCandidatesFrom evaluation policies session = go
               case simplifyLengthSpinePairCounterexampleAssessment evaluation
                   simplificationPolicy index association query receipt of
                 Left failure -> pure $ Left failure
-                Right assessed -> continueAssessed
-                  reversed seedBank rest assessed
+                Right assessed -> continueAssessed reversed cursor index query
+                  lengthSpinePairSolverIndependentAcquisition rest assessed
             Right Nothing -> do
               observed <- runLengthSpinePairSMTLibLiveQuery
                 evaluation session query
               case observed of
                 Left failure -> pure $ Left
                   $ lengthSpinePairQueryRankingFailure index failure
-                Right observation -> case assessLengthSpinePairCandidate
-                    evaluation inputBoxPolicy simplificationPolicy index
+                Right observation -> case
+                    assessLengthSpinePairCandidateWithCounterexampleOrigin
+                      evaluation inputBoxPolicy simplificationPolicy index
                       association query observation of
                   Left failure -> pure $ Left failure
-                  Right assessed -> continueAssessed
-                    reversed seedBank rest assessed
+                  Right (assessed, origin) -> continueAssessed reversed cursor
+                    index query (LengthSpinePairCounterexampleFresh origin) rest
+                    assessed
 
-  continueAssessed reversed seedBank rest assessed =
-    let nextSeedBank = case lengthSpinePairCounterexampleSeed assessed of
-          Nothing -> seedBank
-          Just retained ->
-            promoteLengthSpinePairCounterexampleSeed retained seedBank
-    in nextSeedBank `seq` go (assessed : reversed) nextSeedBank rest
+  continueAssessed reversed cursor index query acquisition rest assessed = do
+    advanced <- advanceLengthSpinePairCounterexampleBankCursor evaluation index
+      query acquisition assessed cursor
+    case advanced of
+      Left failure -> pure $ Left failure
+      Right nextCursor -> go nextCursor (assessed : reversed) rest
 
 -- | Attempt the current complete applicable-domain traversal. Inapplicability
 -- under that algorithm and failures which prevent bounded traversal admission
@@ -1696,6 +1899,114 @@ probeLengthSpinePairOriginCounterexample evaluation policy query = case policy o
   LengthSpinePairOriginProbeRankingDisabled -> Right Nothing
   LengthSpinePairOriginProbeRankingEnabled ->
     probeLengthSpinePairSMTLibCounterexampleAtOrigin evaluation query
+
+lengthSpinePairSolverIndependentAcquisition
+  :: LengthSpinePairCounterexampleAcquisition command
+lengthSpinePairSolverIndependentAcquisition =
+  LengthSpinePairCounterexampleFresh
+    CounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromSolverIndependentReplay
+
+replayLengthSpinePairCounterexampleBankCursor
+  :: LengthEvaluationLimits
+  -> Natural
+  -> CheckedLengthSpinePairQuery
+  -> LengthSpinePairCounterexampleBankCursor command
+  -> IO
+      (Either LengthSpinePairRankingFailure
+        (Maybe
+          ( ValidatedLengthSpinePairCounterexample
+          , LengthSpinePairCounterexampleAcquisition command
+          )))
+replayLengthSpinePairCounterexampleBankCursor evaluation index query cursor =
+  case cursor of
+    LengthSpinePairBatchLocalCounterexampleBank seedBank -> pure $ Right $ case
+        replayLengthSpinePairCounterexampleSeeds evaluation query seedBank of
+      Nothing -> Nothing
+      Just (inputs, receipt) -> inputs `seq` Just
+        (receipt, LengthSpinePairCounterexampleFromBatchReplay inputs)
+    LengthSpinePairCommandLocalCounterexampleBank context -> do
+      replayed <-
+        CounterexampleBank.replayLengthSpinePairCounterexampleBankInContext
+          evaluation query context
+      pure $ case replayed of
+        Left _ -> Left $ localLengthSpinePairRankingFailure
+          LengthSpinePairRankingEvidenceReplayMismatch index
+        Right outcome -> Right $ case outcome of
+          CounterexampleBank.LengthSpinePairCounterexampleBankContextReplayMiss
+              _ -> Nothing
+          CounterexampleBank.LengthSpinePairCounterexampleBankContextReplayAttemptUnavailable
+              _ _ -> Nothing
+          CounterexampleBank.LengthSpinePairCounterexampleBankContextReplayHit
+              _ hit -> Just
+            ( CounterexampleBank.lengthSpinePairCounterexampleBankContextReplayHitCounterexample
+                hit
+            , LengthSpinePairCounterexampleFromCommandReplay hit
+            )
+
+advanceLengthSpinePairCounterexampleBankCursor
+  :: LengthEvaluationLimits
+  -> Natural
+  -> CheckedLengthSpinePairQuery
+  -> LengthSpinePairCounterexampleAcquisition command
+  -> AssociatedRankedLengthSpinePairCandidate association
+  -> LengthSpinePairCounterexampleBankCursor command
+  -> IO
+      (Either LengthSpinePairRankingFailure
+        (LengthSpinePairCounterexampleBankCursor command))
+advanceLengthSpinePairCounterexampleBankCursor evaluation index query
+    acquisition assessed cursor = case assessed of
+  AssociatedRankedLengthSpinePairCandidate _ _ state -> case state of
+    LengthSpinePairCandidatePreparationRefused _ -> pure $ Right cursor
+    LengthSpinePairCandidateAssessed assessment simplification -> case
+        assessment of
+      LengthSpinePairCounterexample receipt ->
+        advanceCounterexample receipt simplification
+      _ -> pure $ Right cursor
+ where
+  advanceCounterexample receipt simplification = case cursor of
+    LengthSpinePairBatchLocalCounterexampleBank seedBank -> case acquisition of
+      LengthSpinePairCounterexampleFromCommandReplay _ -> mismatch
+      LengthSpinePairCounterexampleFromBatchReplay _ ->
+        promoteBatch seedBank receipt
+      LengthSpinePairCounterexampleFresh _ -> promoteBatch seedBank receipt
+    LengthSpinePairCommandLocalCounterexampleBank context ->
+      case (acquisition, simplification) of
+        (LengthSpinePairCounterexampleFromBatchReplay _, _) -> mismatch
+        (LengthSpinePairCounterexampleFromCommandReplay hit, Nothing) -> do
+          promoted <-
+            CounterexampleBank.promoteLengthSpinePairCounterexampleBankReplayHitInContext
+              hit context
+          pure $ case promoted of
+            Left _ -> Left $ localLengthSpinePairRankingFailure
+              LengthSpinePairRankingEvidenceReplayMismatch index
+            Right () -> Right cursor
+        _ -> do
+          recorded <-
+            CounterexampleBank.recordLengthSpinePairCounterexampleBankReceiptInContext
+              evaluation query (receiptOrigin simplification) receipt context
+          pure $ case recorded of
+            Left _ -> Left $ localLengthSpinePairRankingFailure
+              LengthSpinePairRankingEvidenceReplayMismatch index
+            Right _ -> Right cursor
+
+  promoteBatch seedBank receipt =
+    let promoted = promoteLengthSpinePairCounterexampleSeed
+          (validatedLengthSpinePairCounterexampleInputs receipt) seedBank
+    in promoted `seq` pure (Right
+        $ LengthSpinePairBatchLocalCounterexampleBank promoted)
+
+  mismatch = pure $ Left $ localLengthSpinePairRankingFailure
+    LengthSpinePairRankingEvidenceReplayMismatch index
+
+  receiptOrigin simplification = case simplification of
+    Just _ ->
+      CounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromSimplificationReplay
+    Nothing -> case acquisition of
+      LengthSpinePairCounterexampleFresh origin -> origin
+      LengthSpinePairCounterexampleFromBatchReplay _ ->
+        CounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromSolverIndependentReplay
+      LengthSpinePairCounterexampleFromCommandReplay _ ->
+        CounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromSolverIndependentReplay
 
 replayLengthSpinePairCounterexampleSeeds
   :: LengthEvaluationLimits
@@ -1778,17 +2089,7 @@ simplifyLengthSpinePairCounterexampleAssessment evaluation policy index
             simplification)
           (Just simplification)
 
-lengthSpinePairCounterexampleSeed
-  :: AssociatedRankedLengthSpinePairCandidate association
-  -> Maybe [Natural]
-lengthSpinePairCounterexampleSeed
-    (AssociatedRankedLengthSpinePairCandidate _ _ state) = case state of
-  LengthSpinePairCandidateAssessed
-      (LengthSpinePairCounterexample receipt) _ ->
-    Just $ validatedLengthSpinePairCounterexampleInputs receipt
-  _ -> Nothing
-
-assessLengthSpinePairCandidate
+assessLengthSpinePairCandidateWithCounterexampleOrigin
   :: LengthEvaluationLimits
   -> LengthSpinePairInputBoxRankingPolicy
   -> LengthSpinePairCounterexampleSimplificationRankingPolicy
@@ -1798,10 +2099,12 @@ assessLengthSpinePairCandidate
   -> LengthSpinePairSMTLibLiveQueryObservation
       epoch ExferenceLocal ExferenceLocal
   -> Either LengthSpinePairRankingFailure
-      (AssociatedRankedLengthSpinePairCandidate association)
-assessLengthSpinePairCandidate evaluation inputBoxPolicy simplificationPolicy
-    index association query observation = do
-  assessment <- case
+      ( AssociatedRankedLengthSpinePairCandidate association
+      , CounterexampleBank.LengthSpinePairCounterexampleBankReceiptOrigin
+      )
+assessLengthSpinePairCandidateWithCounterexampleOrigin evaluation inputBoxPolicy
+    simplificationPolicy index association query observation = do
+  (assessment, origin) <- case
       replayLengthSpinePairSMTLibLiveQueryObservation query observation of
     Left LengthSpinePairSMTLibLiveObservationQueryFingerprintMismatch ->
       Left $ localLengthSpinePairRankingFailure
@@ -1812,13 +2115,19 @@ assessLengthSpinePairCandidate evaluation inputBoxPolicy simplificationPolicy
     Right Nothing -> assessStatus
       $ lengthSpinePairSMTLibLiveQueryObservationSolverStatus observation
     Right (Just receipt) -> Right
-      $ LengthSpinePairCounterexample receipt
+      ( LengthSpinePairCounterexample receipt
+      , CounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromLiveModel
+      )
   case assessment of
-    LengthSpinePairCounterexample receipt ->
-      simplifyLengthSpinePairCounterexampleAssessment evaluation
+    LengthSpinePairCounterexample receipt -> do
+      assessed <- simplifyLengthSpinePairCounterexampleAssessment evaluation
         simplificationPolicy index association query receipt
-    _ -> pure $ AssociatedRankedLengthSpinePairCandidate index association
-      $ LengthSpinePairCandidateAssessed assessment Nothing
+      pure (assessed, origin)
+    _ -> pure
+      ( AssociatedRankedLengthSpinePairCandidate index association
+          $ LengthSpinePairCandidateAssessed assessment Nothing
+      , origin
+      )
  where
   assessStatus status = case (status, inputBoxPolicy) of
     (SolverUnsatisfiable,
@@ -1833,10 +2142,17 @@ assessLengthSpinePairCandidate evaluation inputBoxPolicy simplificationPolicy
           Left $ localLengthSpinePairRankingFailure
             LengthSpinePairRankingEvidenceReplayMismatch index
         Right (LengthInputBoxCounterexample receipt) -> Right
-          $ LengthSpinePairCounterexample receipt
+          ( LengthSpinePairCounterexample receipt
+          , CounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromSolverIndependentReplay
+          )
         Right (LengthInputBoxValidated receipt) -> Right
-          $ LengthSpinePairBoundedPositive receipt
-    _ -> Right $ LengthSpinePairHeuristic status
+          ( LengthSpinePairBoundedPositive receipt
+          , CounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromSolverIndependentReplay
+          )
+    _ -> Right
+      ( LengthSpinePairHeuristic status
+      , CounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromLiveModel
+      )
 
 stableLengthSpinePairCounterexampleDemotion
   :: [AssociatedRankedLengthSpinePairCandidate association]

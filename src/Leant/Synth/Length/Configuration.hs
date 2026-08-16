@@ -47,15 +47,18 @@ module Leant.Synth.Length.Configuration
   , lengthRankingPolicyExecutableLaunchStrategy
   , LengthRankingConfigurationError (..)
   , assessVerifiedLengthCandidatesWithPolicy
+  , assessVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext
   , rankVerifiedLengthCandidatesWithPolicy
   , assessVerifiedLengthSpinePairCandidatesWithPolicy
+  , assessVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
   , rankVerifiedLengthSpinePairCandidatesWithPolicy
   ) where
 
 import Numeric.Natural (Natural)
 
 import Language.Haskell.Djex
-  ( LengthBooleanFiniteUnionLimits
+  ( ExferenceLocal
+  , LengthBooleanFiniteUnionLimits
   , LengthEvaluationLimitError
   , LengthEvaluationLimitSource
   , LengthEvaluationLimits
@@ -81,6 +84,8 @@ import Leant.Synth.Length.Contract
   ( LeanLengthContract
   , LeanLengthSpinePairContract
   )
+import qualified Leant.Synth.Length.CounterexampleBank.Internal
+  as CounterexampleBank
 import Leant.Synth.Length.Ranking
   ( LengthRanking
   , LengthRankingInputError
@@ -107,6 +112,9 @@ import Leant.Synth.Length.Ranking.Internal
   , rankPostVerificationLengthCandidatesWithRankingPoliciesAndLiveSessionOpening
   , rankPostVerificationLengthCandidatesWithRankingPoliciesAndUsableWorkBudget
   , rankPostVerificationLengthCandidatesWithRankingPoliciesAndScopedUsableWorkBudget
+  , rankPostVerificationLengthCandidatesWithRankingPoliciesAndCounterexampleBankContextAndLiveSessionOpening
+  , rankPostVerificationLengthCandidatesWithRankingPoliciesAndCounterexampleBankContextAndUsableWorkBudget
+  , rankPostVerificationLengthCandidatesWithRankingPoliciesAndCounterexampleBankContextAndScopedUsableWorkBudget
   , rankVerifiedLengthCandidatesWithRankingPoliciesAndLiveSessionOpening
   , rankVerifiedLengthCandidatesWithRankingPoliciesAndUsableWorkBudget
   , rankVerifiedLengthCandidatesWithRankingPoliciesAndScopedUsableWorkBudget
@@ -143,6 +151,9 @@ import Leant.Synth.Length.SpinePair.Ranking.Internal
   , rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndLiveSessionOpening
   , rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndUsableWorkBudget
   , rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndScopedUsableWorkBudget
+  , rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndCounterexampleBankContextAndLiveSessionOpening
+  , rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndCounterexampleBankContextAndUsableWorkBudget
+  , rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndCounterexampleBankContextAndScopedUsableWorkBudget
   , rankVerifiedLengthSpinePairCandidatesWithRankingPoliciesAndLiveSessionOpening
   , rankVerifiedLengthSpinePairCandidatesWithRankingPoliciesAndUsableWorkBudget
   , rankVerifiedLengthSpinePairCandidatesWithRankingPoliciesAndScopedUsableWorkBudget
@@ -859,6 +870,77 @@ assessVerifiedLengthCandidatesWithPolicy policy contract =
   assessVerifiedLengthCandidatesWith
     $ rankPostVerificationLengthCandidatesWithPolicy policy contract
 
+rankPostVerificationLengthCandidatesWithPolicyAndCounterexampleBankContext
+  :: LengthRankingPolicy
+  -> CounterexampleBank.LengthCounterexampleBankContext
+      command ExferenceLocal
+  -> LeanLengthContract
+  -> [PostVerificationCandidate epoch DetailedVerificationVariant]
+  -> IO
+      (Either LengthRankingInputError
+        (AssociatedLengthRanking
+          (PostVerificationCandidate epoch DetailedVerificationVariant)))
+rankPostVerificationLengthCandidatesWithPolicyAndCounterexampleBankContext
+    (LengthRankingPolicy execution evaluation inputBoxValidation
+      applicableDomainValidation originProbe simplification inputBoxPreference
+      applicableDomainPreference liveSessionOpening usableWorkBudget)
+    context contract candidates = case usableWorkBudget of
+  LengthRankingUsableWorkBudgetDisabled ->
+    applyLengthRankingNonVacuousApplicableDomainPreference
+      applicableDomainPreference
+      preferNonVacuousApplicableDomainAssociatedLengthRanking
+      $ applyLengthRankingNonVacuousInputBoxPreference inputBoxPreference
+          preferNonVacuousBoundedPositiveAssociatedLengthRanking
+      $ rankPostVerificationLengthCandidatesWithRankingPoliciesAndCounterexampleBankContextAndLiveSessionOpening
+          context
+          (scalarInputBoxRankingPolicy inputBoxValidation)
+          (scalarApplicableDomainRankingPolicy applicableDomainValidation)
+          (scalarOriginProbeRankingPolicy originProbe)
+          (scalarCounterexampleSimplificationRankingPolicy simplification)
+          (liveSessionOpeningPolicy liveSessionOpening)
+          execution evaluation contract candidates
+  LengthRankingUsableWorkBudgetEnabled LengthRankingUsableWorkBudgetV1
+      budget ->
+    rankPostVerificationLengthCandidatesWithRankingPoliciesAndCounterexampleBankContextAndUsableWorkBudget
+      finalize budget context
+      (scalarInputBoxRankingPolicy inputBoxValidation)
+      (scalarApplicableDomainRankingPolicy applicableDomainValidation)
+      (scalarOriginProbeRankingPolicy originProbe)
+      (scalarCounterexampleSimplificationRankingPolicy simplification)
+      (liveSessionOpeningPolicy liveSessionOpening)
+      execution evaluation contract candidates
+  LengthRankingUsableWorkBudgetEnabled
+      LengthRankingUsableWorkBudgetScopedV2 budget ->
+    rankPostVerificationLengthCandidatesWithRankingPoliciesAndCounterexampleBankContextAndScopedUsableWorkBudget
+      finalize budget context
+      (scalarInputBoxRankingPolicy inputBoxValidation)
+      (scalarApplicableDomainRankingPolicy applicableDomainValidation)
+      (scalarOriginProbeRankingPolicy originProbe)
+      (scalarCounterexampleSimplificationRankingPolicy simplification)
+      (liveSessionOpeningPolicy liveSessionOpening)
+      execution evaluation contract candidates
+ where
+  finalize =
+    applyLengthRankingNonVacuousApplicableDomainPreferenceValue
+      applicableDomainPreference
+      preferNonVacuousApplicableDomainAssociatedLengthRanking
+      . applyLengthRankingNonVacuousInputBoxPreferenceValue
+          inputBoxPreference
+          preferNonVacuousBoundedPositiveAssociatedLengthRanking
+
+assessVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext
+  :: LengthRankingPolicy
+  -> CounterexampleBank.LengthCounterexampleBankContext
+      command ExferenceLocal
+  -> LeanLengthContract
+  -> VerificationBatch DetailedVerificationVariant
+  -> IO LengthPostVerificationResult
+assessVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext
+    policy context contract =
+  assessVerifiedLengthCandidatesWith
+    $ rankPostVerificationLengthCandidatesWithPolicyAndCounterexampleBankContext
+        policy context contract
+
 -- | Run the nominal binary-product sibling under the same process/evaluation
 -- policy.  The policy contains no scalar contract, query, or evidence
 -- authority; all four branches enter pair-specific runners and receipts.
@@ -1036,3 +1118,74 @@ assessVerifiedLengthSpinePairCandidatesWithPolicy
 assessVerifiedLengthSpinePairCandidatesWithPolicy policy contract =
   assessVerifiedLengthSpinePairCandidatesWith
     $ rankPostVerificationLengthSpinePairCandidatesWithPolicy policy contract
+
+rankPostVerificationLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
+  :: LengthRankingPolicy
+  -> CounterexampleBank.LengthSpinePairCounterexampleBankContext
+      command ExferenceLocal
+  -> LeanLengthSpinePairContract
+  -> [PostVerificationCandidate epoch DetailedVerificationVariant]
+  -> IO
+      (Either LengthRankingInputError
+        (AssociatedLengthSpinePairRanking
+          (PostVerificationCandidate epoch DetailedVerificationVariant)))
+rankPostVerificationLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
+    (LengthRankingPolicy execution evaluation inputBoxValidation
+      applicableDomainValidation originProbe simplification inputBoxPreference
+      applicableDomainPreference liveSessionOpening usableWorkBudget)
+    context contract candidates = case usableWorkBudget of
+  LengthRankingUsableWorkBudgetDisabled ->
+    applyLengthRankingNonVacuousApplicableDomainPreference
+      applicableDomainPreference
+      preferNonVacuousApplicableDomainAssociatedLengthSpinePairRanking
+      $ applyLengthRankingNonVacuousInputBoxPreference inputBoxPreference
+          preferNonVacuousBoundedPositiveAssociatedLengthSpinePairRanking
+      $ rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndCounterexampleBankContextAndLiveSessionOpening
+          context
+          (spinePairInputBoxRankingPolicy inputBoxValidation)
+          (spinePairApplicableDomainRankingPolicy applicableDomainValidation)
+          (spinePairOriginProbeRankingPolicy originProbe)
+          (spinePairCounterexampleSimplificationRankingPolicy simplification)
+          (liveSessionOpeningPolicy liveSessionOpening)
+          execution evaluation contract candidates
+  LengthRankingUsableWorkBudgetEnabled LengthRankingUsableWorkBudgetV1
+      budget ->
+    rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndCounterexampleBankContextAndUsableWorkBudget
+      finalize budget context
+      (spinePairInputBoxRankingPolicy inputBoxValidation)
+      (spinePairApplicableDomainRankingPolicy applicableDomainValidation)
+      (spinePairOriginProbeRankingPolicy originProbe)
+      (spinePairCounterexampleSimplificationRankingPolicy simplification)
+      (liveSessionOpeningPolicy liveSessionOpening)
+      execution evaluation contract candidates
+  LengthRankingUsableWorkBudgetEnabled
+      LengthRankingUsableWorkBudgetScopedV2 budget ->
+    rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndCounterexampleBankContextAndScopedUsableWorkBudget
+      finalize budget context
+      (spinePairInputBoxRankingPolicy inputBoxValidation)
+      (spinePairApplicableDomainRankingPolicy applicableDomainValidation)
+      (spinePairOriginProbeRankingPolicy originProbe)
+      (spinePairCounterexampleSimplificationRankingPolicy simplification)
+      (liveSessionOpeningPolicy liveSessionOpening)
+      execution evaluation contract candidates
+ where
+  finalize =
+    applyLengthRankingNonVacuousApplicableDomainPreferenceValue
+      applicableDomainPreference
+      preferNonVacuousApplicableDomainAssociatedLengthSpinePairRanking
+      . applyLengthRankingNonVacuousInputBoxPreferenceValue
+          inputBoxPreference
+          preferNonVacuousBoundedPositiveAssociatedLengthSpinePairRanking
+
+assessVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
+  :: LengthRankingPolicy
+  -> CounterexampleBank.LengthSpinePairCounterexampleBankContext
+      command ExferenceLocal
+  -> LeanLengthSpinePairContract
+  -> VerificationBatch DetailedVerificationVariant
+  -> IO LengthSpinePairPostVerificationResult
+assessVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
+    policy context contract =
+  assessVerifiedLengthSpinePairCandidatesWith
+    $ rankPostVerificationLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
+        policy context contract

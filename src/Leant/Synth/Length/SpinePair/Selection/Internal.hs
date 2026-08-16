@@ -23,12 +23,14 @@ module Leant.Synth.Length.SpinePair.Selection.Internal
   , lengthSpinePairSelectionRejected
   , lengthSpinePairSelectionFailure
   , selectVerifiedLengthSpinePairCandidatesWithPolicy
+  , selectVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
   ) where
 
 import Numeric.Natural (Natural)
 
 import Language.Haskell.Djex
-  ( SolverStatus
+  ( ExferenceLocal
+  , SolverStatus
   , ValidatedLengthSpinePairApplicableDomain
   , ValidatedLengthSpinePairCounterexample
   , ValidatedLengthSpinePairCounterexampleSimplification
@@ -56,12 +58,16 @@ import Leant.Synth.Engine (DetailedVerificationVariant)
 import Leant.Synth.Length.Configuration
   ( LengthRankingPolicy
   , assessVerifiedLengthSpinePairCandidatesWithPolicy
+  , assessVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
   )
 import Leant.Synth.Length.Contract (LeanLengthSpinePairContract)
+import qualified Leant.Synth.Length.CounterexampleBank.Internal
+  as CounterexampleBank
 import Leant.Synth.Length.Ranking
   ( LengthPreparationRefusalClass )
 import Leant.Synth.Length.SpinePair.PostVerification
   ( LengthSpinePairPostVerificationFailure
+  , LengthSpinePairPostVerificationResult
   , lengthSpinePairPostVerificationAdapterFailure
   , lengthSpinePairPostVerificationRanking
   , lengthSpinePairPostVerificationRankingFailure
@@ -241,8 +247,30 @@ selectVerifiedLengthSpinePairCandidatesWithPolicy
   -> IO LengthSpinePairSelectionResult
 selectVerifiedLengthSpinePairCandidatesWithPolicy
     policy contract verification = do
-  assessed <- assessVerifiedLengthSpinePairCandidatesWithPolicy
-    policy contract verification
+  selectVerifiedLengthSpinePairCandidatesWithAssessment
+    (assessVerifiedLengthSpinePairCandidatesWithPolicy policy contract)
+    verification
+
+selectVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
+  :: LengthRankingPolicy
+  -> CounterexampleBank.LengthSpinePairCounterexampleBankContext
+      command ExferenceLocal
+  -> LeanLengthSpinePairContract
+  -> VerificationBatch DetailedVerificationVariant
+  -> IO LengthSpinePairSelectionResult
+selectVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
+    policy context contract =
+  selectVerifiedLengthSpinePairCandidatesWithAssessment
+    $ assessVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
+        policy context contract
+
+selectVerifiedLengthSpinePairCandidatesWithAssessment
+  :: (VerificationBatch DetailedVerificationVariant
+      -> IO LengthSpinePairPostVerificationResult)
+  -> VerificationBatch DetailedVerificationVariant
+  -> IO LengthSpinePairSelectionResult
+selectVerifiedLengthSpinePairCandidatesWithAssessment assess verification = do
+  assessed <- assess verification
   pure $ case lengthSpinePairPostVerificationAdapterFailure assessed of
     Just failure -> preserve
       $ LengthSpinePairSelectionPostVerificationFailed failure
