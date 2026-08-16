@@ -48,6 +48,7 @@ Executable leant
     Leant.Synth.Length.Configuration
     Leant.Synth.Length.Configuration.File
     Leant.Synth.Length.Configuration.File.Acquire
+    Leant.Synth.Length.CounterexampleBank.Internal
     Leant.Synth.Length.Contract
     Leant.Synth.Length.Contract.File
     Leant.Synth.Length.Contract.File.Acquire
@@ -112,6 +113,7 @@ Test-Suite leant-synth-tests
     Leant.Synth.Length.Configuration
     Leant.Synth.Length.Configuration.File
     Leant.Synth.Length.Configuration.File.Acquire
+    Leant.Synth.Length.CounterexampleBank.Internal
     Leant.Synth.Length.Contract
     Leant.Synth.Length.Contract.File
     Leant.Synth.Length.Contract.File.Acquire
