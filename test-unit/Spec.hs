@@ -7,7 +7,7 @@ import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as BS
 import Data.Char (isAlphaNum, toLower)
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef)
-import Data.List (isInfixOf, sortOn)
+import Data.List (isInfixOf, isPrefixOf, sortOn, tails)
 import Data.Maybe (isNothing)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -128,8 +128,12 @@ import Leant.Options
   , parseArgs
   )
 import Leant.Synth.Engine
-  ( DetailedCandidateGroup
+  ( DetailedCandidateBatch
+  , DetailedCandidateGroup
   , DetailedSynthOutcome (..)
+  , DetailedSynthCursor
+  , DetailedSynthCursorError (..)
+  , DetailedSynthCursorStep (..)
   , DetailedVerificationVariant
   , TypedCandidateSemanticSidecar
   , ExferenceRunAuthorityInspection (..)
@@ -144,12 +148,15 @@ import Leant.Synth.Engine
   , detailedCandidateGroupSemanticSidecar
   , detailedCandidateGroupVariants
   , detailedCandidateGroupVerificationVariants
+  , detailedCandidateBatchGroups
+  , detailedCandidateBatchNotes
   , detailedVerificationVariantOrdinal
   , detailedVerificationVariantExactTypedOrigin
   , detailedVerificationVariantRoute
   , detailedVerificationVariantSemanticSidecar
   , detailedVerificationVariantText
   , forceDetailedOutcome
+  , forceDetailedSynthCursorStep
   , inspectExferencePreparation
   , mapDetailedCandidateGroupVariantsDroppingSemanticSidecar
   , mergeCandidateGroups
@@ -168,6 +175,8 @@ import Leant.Synth.Engine
   , synthesizeWithProvidersSkippingDetailed
   , synthesizeWithProvidersSkippingDetailedWithMultiConstructorPatterns
   , synthesizeTunedDetailed
+  , startDetailedSynthCursor
+  , advanceDetailedSynthCursor
   , projectDetailedSynthOutcome
   , renderExactTypedVariantOrigin
   , renderCandidateByAvailability
@@ -565,6 +574,7 @@ main = do
       , translationPreparationTests
       , providerScheduleTests
       , combinedEngineMergeTests
+      , detailedSynthCursorTests
       , typedCandidateRoutingTests
       , lengthCounterexampleBankAdapterTests
       , lengthCounterexampleBankRunnerTests
@@ -4140,6 +4150,556 @@ combinedEngineMergeTests = testGroup "combined-engine verification frontier"
         @?= SynthCandidates [["e1"]]
           ["bounded", "exference: rated"]
   ]
+
+detailedSynthCursorTests :: TestTree
+detailedSynthCursorTests = testGroup "bounded detailed synthesis cursor"
+  [ testCase
+      "advance ordered 2/2/1 batches with unchanged notes to natural exhaustion" $
+      do
+        let notes = ["ranked", "search complete"]
+            groups = map cursorFixtureGroup [1 .. 5]
+            cursor = startDetailedSynthCursor
+              $ Right $ DetailedSynthCandidates groups notes
+        (first, afterFirst) <- expectDetailedCandidateBatch 2 cursor
+        detailedCandidateBatchSpellings first @?=
+          [["candidate-1"], ["candidate-2"]]
+        detailedCandidateBatchNotes first @?= notes
+        (second, afterSecond) <- expectDetailedCandidateBatch 2 afterFirst
+        detailedCandidateBatchSpellings second @?=
+          [["candidate-3"], ["candidate-4"]]
+        detailedCandidateBatchNotes second @?= notes
+        (third, afterThird) <- expectDetailedCandidateBatch 2 afterSecond
+        detailedCandidateBatchSpellings third @?= [["candidate-5"]]
+        detailedCandidateBatchNotes third @?= notes
+        terminal <- expectDetailedSynthCursorStep 2 afterThird
+        case terminal of
+          DetailedSynthCursorNaturallyExhausted terminalNotes ->
+            terminalNotes @?= notes
+          other -> assertFailure $
+            "expected natural cursor exhaustion, got "
+              ++ detailedSynthCursorStepTag other
+  , testCase
+      "preserve engine failure, refutation, no-term, and empty-stream taxonomy" $
+      do
+        failed <- cursorStepFromOutcome $ Left "engine failed"
+        case failed of
+          DetailedSynthCursorEngineFailed message ->
+            message @?= "engine failed"
+          other -> assertFailure $
+            "expected an engine failure, got "
+              ++ detailedSynthCursorStepTag other
+        refutedTrue <- cursorStepFromOutcome
+          $ Right $ DetailedSynthRefuted True
+        case refutedTrue of
+          DetailedSynthCursorRefuted sound -> sound @?= True
+          other -> assertFailure $
+            "expected a sound refutation, got "
+              ++ detailedSynthCursorStepTag other
+        refutedFalse <- cursorStepFromOutcome
+          $ Right $ DetailedSynthRefuted False
+        case refutedFalse of
+          DetailedSynthCursorRefuted sound -> sound @?= False
+          other -> assertFailure $
+            "expected an unsound refutation, got "
+              ++ detailedSynthCursorStepTag other
+        noTerm <- cursorStepFromOutcome
+          $ Right $ DetailedSynthNoTerm ["bounded miss"]
+        case noTerm of
+          DetailedSynthCursorNoTerm notes -> notes @?= ["bounded miss"]
+          other -> assertFailure $
+            "expected no-term completion, got "
+              ++ detailedSynthCursorStepTag other
+        empty <- cursorStepFromOutcome
+          $ Right $ DetailedSynthCandidates [] ["empty stream"]
+        case empty of
+          DetailedSynthCursorNaturallyExhausted notes ->
+            notes @?= ["empty stream"]
+          other -> assertFailure $
+            "an empty candidate stream changed taxonomy to "
+              ++ detailedSynthCursorStepTag other
+  , testCase
+      "validate every request bound before demanding a poisoned cursor" $ do
+        let poisonCursor :: DetailedSynthCursor
+            poisonCursor = error "invalid request demanded its cursor"
+        candidateWindow @?= 60
+        assertDetailedSynthCursorError
+          (DetailedSynthCursorBatchSizeNotPositive 0) 0 poisonCursor
+        assertDetailedSynthCursorError
+          (DetailedSynthCursorBatchSizeNotPositive (-7)) (-7) poisonCursor
+        assertDetailedSynthCursorError
+          (DetailedSynthCursorBatchSizeLimitExceeded candidateWindow 61)
+          61 poisonCursor
+        assertDetailedSynthCursorError
+          (DetailedSynthCursorBatchSizeLimitExceeded
+            candidateWindow (maxBound :: Int))
+          (maxBound :: Int) poisonCursor
+  , testCase
+      "separate lazy start and outer Right from a demanded poisoned step" $ do
+        started <- timeout 1000000
+          (try (evaluate $
+              startDetailedSynthCursor
+                  (error "start demanded its outcome" ::
+                    Either String DetailedSynthOutcome)
+                `seq` True)
+            :: IO (Either SomeException Bool))
+        case started of
+          Just (Right True) -> pure ()
+          Just (Right False) -> assertFailure
+            "cursor start returned an impossible false witness"
+          Just (Left failure) -> assertFailure $
+            "cursor start forced its outcome: " ++ show failure
+          Nothing -> assertFailure "lazy cursor start did not terminate"
+
+        let poisonCursor :: DetailedSynthCursor
+            poisonCursor = error "valid request demanded its cursor"
+            advanced = advanceDetailedSynthCursor 1 poisonCursor
+        outer <- timeout 1000000
+          (try (evaluate $ case advanced of
+              Left _ -> False
+              Right _ -> True)
+            :: IO (Either SomeException Bool))
+        case outer of
+          Just (Right True) -> pure ()
+          Just (Right False) -> assertFailure
+            "a valid cursor request returned an admission error"
+          Just (Left failure) -> assertFailure $
+            "valid cursor admission forced its cursor: " ++ show failure
+          Nothing -> assertFailure "valid cursor admission did not terminate"
+        case advanced of
+          Left err -> assertFailure $
+            "valid poisoned-cursor request was rejected: " ++ show err
+          Right step -> do
+            demanded <- timeout 1000000
+              (try (evaluate step) ::
+                IO (Either SomeException DetailedSynthCursorStep))
+            case demanded of
+              Just (Left _) -> pure ()
+              Just (Right other) -> assertFailure $
+                "forcing the cursor step hid its poisoned cursor as "
+                  ++ detailedSynthCursorStepTag other
+              Nothing -> assertFailure
+                "forcing the poisoned cursor step did not terminate"
+  , testCase
+      "distinguish 59-group exhaustion from the exact 60-group hard-cap tie" $
+      do
+        let notes = ["boundary"]
+            groups count = map cursorFixtureGroup [1 .. count]
+            outcome count = Right $ DetailedSynthCandidates
+              (groups count) notes
+        (fiftyNine, afterFiftyNine) <- expectDetailedCandidateBatch 60
+          $ startDetailedSynthCursor $ outcome 59
+        length (detailedCandidateBatchGroups fiftyNine) @?= 59
+        afterNatural <- expectDetailedSynthCursorStep 1 afterFiftyNine
+        case afterNatural of
+          DetailedSynthCursorNaturallyExhausted terminalNotes ->
+            terminalNotes @?= notes
+          other -> assertFailure $
+            "the 59-group stream did not end naturally: "
+              ++ detailedSynthCursorStepTag other
+
+        (sixty, afterSixty) <- expectDetailedCandidateBatch 60
+          $ startDetailedSynthCursor $ outcome 60
+        length (detailedCandidateBatchGroups sixty) @?= candidateWindow
+        afterCap <- expectDetailedSynthCursorStep 1 afterSixty
+        case afterCap of
+          DetailedSynthCursorHardCapReached terminalNotes ->
+            terminalNotes @?= notes
+          other -> assertFailure $
+            "the exact-cap stream probed for natural exhaustion: "
+              ++ detailedSynthCursorStepTag other
+  , testCase
+      "leave group 61 poisoned and give request validation precedence at cap" $
+      do
+        let notes = ["hard cap"]
+            safeGroups = map cursorFixtureGroup [1 .. candidateWindow]
+            poisonTail = error "cursor forced group 61"
+            outcome = Right $ DetailedSynthCandidates
+              (safeGroups ++ poisonTail) notes
+        bounded <- timeout 1000000 $ case advanceDetailedSynthCursor
+            candidateWindow (startDetailedSynthCursor outcome) of
+          Left err -> assertFailure $
+            "exact-cap cursor request failed: " ++ show err
+          Right step -> case step of
+            DetailedSynthCursorCandidateBatch batch capped -> do
+              forceDetailedSynthCursorStep step @?=
+                forceDetailedOutcome candidateWindow outcome
+              detailedCandidateBatchGroups batch @?= safeGroups
+              detailedCandidateBatchNotes batch @?= notes
+              assertDetailedSynthCursorError
+                (DetailedSynthCursorBatchSizeNotPositive 0) 0 capped
+              terminal <- expectDetailedSynthCursorStep 1 capped
+              forceDetailedSynthCursorStep terminal @?=
+                forceDetailedOutcome 0
+                  (Right $ DetailedSynthCandidates [] notes)
+              case terminal of
+                DetailedSynthCursorHardCapReached terminalNotes ->
+                  terminalNotes @?= notes
+                other -> assertFailure $
+                  "the capped poisoned stream returned "
+                    ++ detailedSynthCursorStepTag other
+            other -> assertFailure $
+              "the exact-cap request returned "
+                ++ detailedSynthCursorStepTag other
+        case bounded of
+          Just () -> pure ()
+          Nothing -> assertFailure
+            "the exact-cap poisoned stream did not terminate"
+  , testCase
+      "bound cyclic varied groups to the first 60 with a final request clamp" $
+      do
+        let notes = ["cyclic"]
+            cyclePattern =
+              [ detailedCandidateGroup RouteUnobserved ["one"]
+              , detailedCandidateGroup RouteTypedCandidate ["two-a", "two-b"]
+              , detailedCandidateGroup RouteLegacyCandidateFallback
+                  ["three-a", "three-b", "three-c"]
+              ]
+            cyclicGroups = cycle cyclePattern
+            cursor = startDetailedSynthCursor $ Right $
+              DetailedSynthCandidates cyclicGroups notes
+        bounded <- timeout 1000000 $ do
+          (first, afterFirst) <- expectDetailedCandidateBatch 7 cursor
+          _ <- evaluate $ forceDetailedSynthCursorStep
+            $ detailedCandidateBatchStep first afterFirst
+          (second, afterSecond) <- expectDetailedCandidateBatch 19 afterFirst
+          _ <- evaluate $ forceDetailedSynthCursorStep
+            $ detailedCandidateBatchStep second afterSecond
+          (third, afterThird) <- expectDetailedCandidateBatch 40 afterSecond
+          _ <- evaluate $ forceDetailedSynthCursorStep
+            $ detailedCandidateBatchStep third afterThird
+          terminal <- expectDetailedSynthCursorStep 1 afterThird
+          case terminal of
+            DetailedSynthCursorHardCapReached terminalNotes ->
+              pure ([first, second, third], terminalNotes)
+            other -> assertFailure
+              ("the cyclic cursor did not stop at its hard cap: "
+                ++ detailedSynthCursorStepTag other)
+                >> error "unreachable"
+        case bounded of
+          Nothing -> assertFailure "the cyclic cursor did not terminate"
+          Just (batches, terminalNotes) -> do
+            let batchGroups = map detailedCandidateBatchGroups batches
+            map length batchGroups @?= [7, 19, 34]
+            concat batchGroups @?= take candidateWindow cyclicGroups
+            terminalNotes @?= notes
+            map detailedCandidateBatchNotes batches @?=
+              replicate 3 notes
+  , testCase
+      "match legacy force boundaries including a lazy recovered-origin tail" $
+      do
+        let notes = ["ranked", "complete"]
+            groups =
+              [ detailedCandidateGroup RouteTypedCandidate ["typed", "alt"]
+              , detailedCandidateGroup RouteLegacyCandidateFallback
+                  ["fallback"]
+              , detailedCandidateGroup RouteUnobserved ["unobserved"]
+              ]
+            outcome = Right $ DetailedSynthCandidates groups notes
+        step <- expectDetailedSynthCursorStep 2
+          $ startDetailedSynthCursor outcome
+        forceDetailedSynthCursorStep step @?=
+          forceDetailedOutcome 2 outcome
+
+        let terminalOutcomes =
+              [ Left "engine failed"
+              , Right $ DetailedSynthRefuted True
+              , Right $ DetailedSynthRefuted False
+              , Right $ DetailedSynthNoTerm notes
+              , Right $ DetailedSynthCandidates [] notes
+              ]
+        mapM_ (assertDetailedSynthCursorForceParity 1) terminalOutcomes
+
+        let compatibility = detailedCandidateGroup
+              RouteUnobserved ["compatibility"]
+            poisonOrigins = error "cursor forced recovered-origin search"
+            lazyMerge = mergeDetailedCandidateGroups
+              [compatibility] poisonOrigins
+            lazyOutcome = Right $ DetailedSynthCandidates lazyMerge notes
+        lazyStep <- expectDetailedSynthCursorStep 1
+          $ startDetailedSynthCursor lazyOutcome
+        forceDetailedSynthCursorStep lazyStep @?=
+          forceDetailedOutcome 1 lazyOutcome
+        case lazyStep of
+          DetailedSynthCursorCandidateBatch batch _ ->
+            detailedCandidateBatchSpellings batch @?= [["compatibility"]]
+          other -> assertFailure $
+            "lazy merged cursor returned "
+              ++ detailedSynthCursorStepTag other
+  , testCase
+      "force selected payloads but not the successor or unselected tail" $ do
+        let poisonCases =
+              [ ( "route"
+                , Right $ DetailedSynthCandidates
+                    [detailedCandidateGroup
+                      (error "cursor omitted its selected route") ["safe"]]
+                    []
+                )
+              , ( "variant"
+                , Right $ DetailedSynthCandidates
+                    [detailedCandidateGroup RouteUnobserved
+                      ["safe", error "cursor omitted a selected variant"]]
+                    []
+                )
+              , ( "note"
+                , Right $ DetailedSynthCandidates
+                    [detailedCandidateGroup RouteUnobserved ["safe"]]
+                    ["safe", error "cursor omitted a selected note"]
+                )
+              ]
+        mapM_ (\(label, outcome) -> do
+            step <- expectDetailedSynthCursorStep 1
+              $ startDetailedSynthCursor outcome
+            assertDetailedSynthCursorForceThrows label step)
+          poisonCases
+
+        let good = detailedCandidateGroup RouteUnobserved ["good"]
+            selectedPoison = error "cursor omitted selected group two"
+            unselectedPoison = error "cursor forced an unselected tail"
+            selectedOutcome = Right $ DetailedSynthCandidates
+              (good : selectedPoison : unselectedPoison) []
+        selectedStep <- expectDetailedSynthCursorStep 2
+          $ startDetailedSynthCursor selectedOutcome
+        selectedWhnf <- timeout 1000000
+          (try (evaluate selectedStep) ::
+            IO (Either SomeException DetailedSynthCursorStep))
+        case selectedWhnf of
+          Just (Right (DetailedSynthCursorCandidateBatch _ _)) -> pure ()
+          Just (Right other) -> assertFailure $
+            "selected poison changed Step WHNF to "
+              ++ detailedSynthCursorStepTag other
+          Just (Left failure) -> assertFailure $
+            "Step WHNF forced a later selected group: " ++ show failure
+          Nothing -> assertFailure "selected-poison Step WHNF did not terminate"
+        assertDetailedSynthCursorForceThrows "later selected group" selectedStep
+
+        let safeOutcome = Right $ DetailedSynthCandidates
+              (good : unselectedPoison) ["safe note"]
+            expectedSafeForce = forceDetailedOutcome 1
+              (Right $ DetailedSynthCandidates [good] ["safe note"])
+        safeStep <- expectDetailedSynthCursorStep 1
+          $ startDetailedSynthCursor safeOutcome
+        boundedSafe <- timeout 1000000
+          (try (evaluate $ forceDetailedSynthCursorStep safeStep) ::
+            IO (Either SomeException Int))
+        case boundedSafe of
+          Just (Right forced) -> forced @?= expectedSafeForce
+          Just (Left failure) -> assertFailure $
+            "forcing a selected batch demanded its successor: "
+              ++ show failure
+          Nothing -> assertFailure
+            "forcing before an unselected poison did not terminate"
+        case safeStep of
+          DetailedSynthCursorCandidateBatch authenticBatch _ -> do
+            let poisonSuccessor :: DetailedSynthCursor
+                poisonSuccessor = error
+                  "cursor force demanded its explicit successor"
+                reconstructed = DetailedSynthCursorCandidateBatch
+                  authenticBatch poisonSuccessor
+            boundedSuccessor <- timeout 1000000
+              (try (evaluate $ forceDetailedSynthCursorStep reconstructed) ::
+                IO (Either SomeException Int))
+            case boundedSuccessor of
+              Just (Right forced) -> forced @?= expectedSafeForce
+              Just (Left failure) -> assertFailure $
+                "cursor force demanded its explicit successor: "
+                  ++ show failure
+              Nothing -> assertFailure
+                "forcing a batch with a poisoned successor did not terminate"
+          other -> assertFailure $
+            "the authentic safe cursor step changed to "
+              ++ detailedSynthCursorStepTag other
+  , testCase
+      "keep cursor and batch representations opaque, lazy, and out of Main" $
+      assertDetailedSynthCursorArchitecture
+  ]
+
+cursorFixtureGroup :: Int -> DetailedCandidateGroup
+cursorFixtureGroup ordinal = detailedCandidateGroup RouteUnobserved
+  ["candidate-" ++ show ordinal]
+
+detailedCandidateBatchSpellings :: DetailedCandidateBatch -> [[String]]
+detailedCandidateBatchSpellings =
+  map detailedCandidateGroupVariants . detailedCandidateBatchGroups
+
+detailedCandidateBatchStep
+  :: DetailedCandidateBatch
+  -> DetailedSynthCursor
+  -> DetailedSynthCursorStep
+detailedCandidateBatchStep = DetailedSynthCursorCandidateBatch
+
+expectDetailedSynthCursorStep
+  :: Int
+  -> DetailedSynthCursor
+  -> IO DetailedSynthCursorStep
+expectDetailedSynthCursorStep requested cursor =
+  case advanceDetailedSynthCursor requested cursor of
+    Left err -> assertFailure
+      ("detailed cursor advance failed: " ++ show err)
+        >> error "unreachable"
+    Right step -> pure step
+
+expectDetailedCandidateBatch
+  :: Int
+  -> DetailedSynthCursor
+  -> IO (DetailedCandidateBatch, DetailedSynthCursor)
+expectDetailedCandidateBatch requested cursor = do
+  step <- expectDetailedSynthCursorStep requested cursor
+  case step of
+    DetailedSynthCursorCandidateBatch batch successor ->
+      pure (batch, successor)
+    other -> assertFailure
+      ("expected a detailed candidate batch, got "
+        ++ detailedSynthCursorStepTag other)
+        >> error "unreachable"
+
+cursorStepFromOutcome
+  :: Either String DetailedSynthOutcome
+  -> IO DetailedSynthCursorStep
+cursorStepFromOutcome =
+  expectDetailedSynthCursorStep 1 . startDetailedSynthCursor
+
+detailedSynthCursorStepTag :: DetailedSynthCursorStep -> String
+detailedSynthCursorStepTag step = case step of
+  DetailedSynthCursorCandidateBatch _ _ -> "candidate batch"
+  DetailedSynthCursorNaturallyExhausted _ -> "natural exhaustion"
+  DetailedSynthCursorHardCapReached _ -> "hard cap"
+  DetailedSynthCursorEngineFailed _ -> "engine failure"
+  DetailedSynthCursorRefuted sound ->
+    "refutation (sound=" ++ show sound ++ ")"
+  DetailedSynthCursorNoTerm _ -> "no term"
+
+assertDetailedSynthCursorError
+  :: DetailedSynthCursorError
+  -> Int
+  -> DetailedSynthCursor
+  -> IO ()
+assertDetailedSynthCursorError expected requested cursor =
+  case advanceDetailedSynthCursor requested cursor of
+    Left observed -> observed @?= expected
+    Right _ -> assertFailure $
+      "invalid detailed cursor request was admitted: " ++ show requested
+
+assertDetailedSynthCursorForceParity
+  :: Int
+  -> Either String DetailedSynthOutcome
+  -> IO ()
+assertDetailedSynthCursorForceParity requested outcome = do
+  step <- expectDetailedSynthCursorStep requested
+    $ startDetailedSynthCursor outcome
+  forceDetailedSynthCursorStep step @?=
+    forceDetailedOutcome requested outcome
+
+assertDetailedSynthCursorForceThrows
+  :: String
+  -> DetailedSynthCursorStep
+  -> IO ()
+assertDetailedSynthCursorForceThrows label step = do
+  bounded <- timeout 1000000
+    (try (evaluate $ forceDetailedSynthCursorStep step) ::
+      IO (Either SomeException Int))
+  case bounded of
+    Just (Left _) -> pure ()
+    Just (Right forced) -> assertFailure $
+      "cursor force omitted its selected " ++ label
+        ++ " and returned " ++ show forced
+    Nothing -> assertFailure $
+      "cursor force of selected " ++ label ++ " did not terminate"
+
+assertDetailedSynthCursorArchitecture :: IO ()
+assertDetailedSynthCursorArchitecture = do
+  engineLines <- lines <$> readFile "src/Leant/Synth/Engine.hs"
+  mainSource <- readFile "src/Main.hs"
+  let exportHeader = unlines
+        $ takeWhile (not . isInfixOf ") where") engineLines
+      engineInstanceTokens = words
+        $ map normalizeInstancePunctuation $ unlines engineLines
+      declaration start end = unlines
+        $ takeWhile (not . isInfixOf end)
+        $ dropWhile (not . isInfixOf start) engineLines
+      batchDeclaration = declaration
+        "data DetailedCandidateBatch ="
+        "-- | Candidate groups in their original engine order."
+      cursorDeclaration = declaration
+        "data DetailedSynthCursor ="
+        "-- | Invalid per-step batch requests."
+      normalize = unwords . words
+      newSurface =
+        [ "DetailedCandidateBatch"
+        , "detailedCandidateBatchGroups"
+        , "detailedCandidateBatchNotes"
+        , "DetailedSynthCursor"
+        , "DetailedSynthCursorError"
+        , "DetailedSynthCursorStep"
+        , "startDetailedSynthCursor"
+        , "advanceDetailedSynthCursor"
+        , "forceDetailedSynthCursorStep"
+        , "DetailedSynthCursorBatchSizeNotPositive"
+        , "DetailedSynthCursorBatchSizeLimitExceeded"
+        , "DetailedSynthCursorCandidateBatch"
+        , "DetailedSynthCursorNaturallyExhausted"
+        , "DetailedSynthCursorHardCapReached"
+        , "DetailedSynthCursorEngineFailed"
+        , "DetailedSynthCursorRefuted"
+        , "DetailedSynthCursorNoTerm"
+        ]
+      forbiddenInstanceHeads =
+        [ words $
+            "instance " ++ className ++ " " ++ qualification ++ typeName
+        | className <- ["Eq", "Show"]
+        , qualification <- ["", "Engine.", "Leant.Synth.Engine."]
+        , typeName <- ["DetailedCandidateBatch", "DetailedSynthCursor"]
+        ]
+  mapM_ (\opaqueExport -> assertBool
+      ("Engine omitted exact opaque export " ++ opaqueExport)
+      $ ("  , " ++ opaqueExport) `elem` lines exportHeader)
+    ["DetailedCandidateBatch", "DetailedSynthCursor"]
+  mapM_ (\name -> assertBool
+      ("Engine omitted detailed cursor export " ++ name)
+      $ name `isInfixOf` exportHeader)
+    [ "DetailedCandidateBatch"
+    , "detailedCandidateBatchGroups"
+    , "detailedCandidateBatchNotes"
+    , "DetailedSynthCursor"
+    , "DetailedSynthCursorError (..)"
+    , "DetailedSynthCursorStep (..)"
+    , "startDetailedSynthCursor"
+    , "advanceDetailedSynthCursor"
+    , "forceDetailedSynthCursorStep"
+    ]
+  mapM_ (\exposed -> assertBool
+      ("Engine exposed an opaque detailed cursor constructor: " ++ exposed)
+      $ not $ exposed `isInfixOf` exportHeader)
+    [ "DetailedCandidateBatch (..)"
+    , "DetailedSynthCursor (..)"
+    ]
+  assertBool "DetailedCandidateBatch stopped being positional and lazy"
+    $ "data DetailedCandidateBatch = DetailedCandidateBatch \
+      \[DetailedCandidateGroup] [String]"
+        `isInfixOf` normalize batchDeclaration
+  assertBool "DetailedSynthCursor stopped being positional and lazy"
+    $ "data DetailedSynthCursor = DetailedSynthCursor Int \
+      \(Either String DetailedSynthOutcome)"
+        `isInfixOf` normalize cursorDeclaration
+  mapM_ (\(label, source) -> mapM_ (\forbidden -> assertBool
+      (label ++ " acquired a frozen representation feature " ++ forbidden)
+      $ not $ forbidden `isInfixOf` source)
+      ["{", "!", "deriving", "instance Eq", "instance Show"])
+    [ ("DetailedCandidateBatch", batchDeclaration)
+    , ("DetailedSynthCursor", cursorDeclaration)
+    ]
+  mapM_ (\instanceHead -> assertBool
+      ("Engine added a frozen cursor instance head "
+        ++ unwords instanceHead)
+      $ not $ any (instanceHead `isPrefixOf`) $ tails engineInstanceTokens)
+    forbiddenInstanceHeads
+  mapM_ (\name -> assertBool
+      ("Main prematurely coupled scheduling to " ++ name)
+      $ not $ name `isInfixOf` mainSource)
+    newSurface
+ where
+  normalizeInstancePunctuation character
+    | character == '(' || character == ')' = ' '
+    | otherwise = character
 
 data LengthCounterexampleBankAdapterFixture =
   LengthCounterexampleBankAdapterFixture
