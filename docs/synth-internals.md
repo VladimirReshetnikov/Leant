@@ -878,7 +878,12 @@ boundary. The Length ranker now retains each receipt's safe original index;
 package-private `Ranking.Internal` and `PostVerification.Internal` modules
 thread each batch-scoped occurrence handle as the only receipt-bearing field
 in transient ranking state through preparation, live assessment, stable
-partitioning, atomic fallback, and the final seal. The
+partitioning, atomic fallback, and the final seal. That control flow is
+written once, in `Leant.Synth.Length.Ranking.Generic`, over a closed
+`LengthRankingDomain` class; the scalar and binary-product `Ranking.Internal`
+modules are its two instances and keep their nominal assessment, failure,
+policy, and receipt types by wrapping the shared structure in domain
+newtypes. The
 ordinary `Ranking` facade exports neither the associated plan nor its
 projector, while the public configuration surface exports no associated
 runner and its post-verification assessment entry points return only sealed
