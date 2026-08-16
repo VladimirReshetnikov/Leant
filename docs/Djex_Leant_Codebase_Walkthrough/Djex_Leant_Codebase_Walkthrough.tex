@@ -85,7 +85,7 @@
 \newcommand{\RepoDjex}{\href{https://github.com/VladimirReshetnikov/Djex}{Djex}}
 \newcommand{\RepoLeant}{\href{https://github.com/VladimirReshetnikov/Leant}{Leant}}
 \def\DjexBase{https://github.com/VladimirReshetnikov/Djex/blob/a9150c77623767f187d64af5d3cd75ec1194f67b/}
-\def\LeantBase{https://github.com/VladimirReshetnikov/Leant/blob/23671c7321d49c3b04c071d6604ed6b96ff911ee/}
+\def\LeantBase{https://github.com/VladimirReshetnikov/Leant/blob/918f5581d7b2d09fef4d39ebe315e863970b1286/}
 \newcommand{\dpath}[1]{\href{\DjexBase#1}{\nolinkurl{#1}}}
 \newcommand{\lpath}[1]{\href{\LeantBase#1}{\nolinkurl{#1}}}
 \newcommand{\dsym}[2]{\code{#2} in \dpath{#1}}
@@ -183,7 +183,7 @@ and practical extension paths\par}
 \small
 \begin{tabularx}{\textwidth}{@{}L{0.18\textwidth}Y@{}}
 \textbf{Djex snapshot} & \commitid{a9150c77623767f187d64af5d3cd75ec1194f67b} \\
-\textbf{Leant snapshot} & \commitid{23671c7321d49c3b04c071d6604ed6b96ff911ee} \\
+\textbf{Leant snapshot} & \commitid{918f5581d7b2d09fef4d39ebe315e863970b1286} \\
 \textbf{Relationship} & Leant's \filepath{lib/Djex} submodule is pinned to the same Djex revision. \\
 \textbf{Prepared} & August 15, 2026 \\
 \end{tabularx}
@@ -305,7 +305,20 @@ A replayed counterexample need not come from a live solver response: the query-o
 
 \section*{The binary-product mirror and the newer ranking mechanics}
 
-The canonical-\code{Prod} path mirrors the scalar ranking and selection stacks through \code{Leant.Synth.Length.SpinePair.Ranking}, \code{Leant.Synth.Length.SpinePair.Ranking.Internal}, \code{Leant.Synth.Length.SpinePair.PostVerification}, \code{Leant.Synth.Length.SpinePair.PostVerification.Internal}, \code{Leant.Synth.Length.SpinePair.Selection}, and \code{Leant.Synth.Length.SpinePair.Selection.Internal}. On the Djex side, \filepath{synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length/SMTLib/Protocol/SpinePair.hs} is deliberately thin: the scalar and product protocol modules now share one phase machine, framing validation, write rendering, and fingerprint construction, parameterized by the \code{LengthSMTLibProtocolIdentity} record in \filepath{.../Semantic/Length/SMTLib/Protocol.hs}. The SpinePair wrapper contributes only what distinguishes the product domain---its schema tags, plan fingerprint role, and exact product-query projections---while its nominal plan, receiver, decoded, retention, rejection, and selection types remain distinct from their scalar siblings, so evidence sealed under one domain cannot be presented under the other even when the rendered wire bytes coincide.
+The canonical-\code{Prod} path mirrors the scalar ranking, post-verification,
+and selection stacks under
+\filepath{src/Leant/Synth/Length/SpinePair}; each public module has a
+package-private \code{Internal} sibling. On the Djex side,
+\filepath{synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length/SMTLib/Protocol/SpinePair.hs}
+is deliberately thin: the scalar and product protocol modules share one phase
+machine, framing validation, write rendering, and fingerprint construction,
+parameterized by the \code{LengthSMTLibProtocolIdentity} record in
+\filepath{.../Semantic/Length/SMTLib/Protocol.hs}. The SpinePair wrapper
+contributes only what distinguishes the product domain---its schema tags, plan
+fingerprint role, and exact product-query projections---while its nominal plan,
+receiver, decoded, retention, rejection, and selection types remain distinct
+from their scalar siblings, so evidence sealed under one domain cannot be
+presented under the other even when the rendered wire bytes coincide.
 
 Before any later live call inside one assessment scope, the internal ranking modules consult a bounded MRU input replay bank: at most four exact counterexample input vectors, kept newest-first with exact-vector deduplication. Each vector is independently validated and replayed against that candidate's own checked query; a hit yields an ordinary validated counterexample receipt, avoids one live query, and promotes the vector to the MRU end. The bank stores only input vectors---no cached verdicts, solver statuses, receipts, or proofs---and it never crosses an assessment batch.
 
@@ -2469,9 +2482,9 @@ The integration corpus includes prove/suggest and synth/prove transcripts. These
 
 \section{Unit tests}
 
-\lpath{test-unit/Spec.hs} is a broad unit suite covering JSON, classifiers, snapshot metadata and publication, replay decisions, fragment parsing and analysis, provider queries and cache behavior, Djex translations, assignment fitting, rendering, candidate grouping, and many regressions around rank-N providers and recursive families. On the pinned branch the suite has 17{,}724 lines and 392 exact \code{testCase} tokens, 391 of which execute as suite cases; its single largest area is the Length/SpinePair behavioral-assessment layer: the current versionless scalar/product startup decoder, contract-only decoding, guarded recursive piecewise-affine applicable-domain behavior, the checked handoff, ranking, post-verification sealing, presentation notes, and live execution against the \code{djex-fake-z3} fixture. The guarded conditional case decodes nominal scalar and product startup documents, establishes matching provider-independent \code{[[2]]} receipts with 1/3/3/3 counts, pins both presentation notes, and proves the missing executable and event path remain untouched.
-The focused current applicable-domain group passes 8/8 and the complete Leant
-unit suite passes 391/391.
+\lpath{test-unit/Spec.hs} is a broad unit suite covering JSON, classifiers, snapshot metadata and publication, replay decisions, fragment parsing and analysis, provider queries and cache behavior, Djex translations, assignment fitting, rendering, candidate grouping, and many regressions around rank-N providers and recursive families. On the pinned branch the suite has 19{,}065 lines and 410 exact \code{testCase} tokens, 409 of which execute as suite cases; its single largest area is the Length/SpinePair behavioral-assessment layer: the current versionless scalar/product startup decoder, exact \code{:synth} behavior-mode and contract grammar, disabled-before-I/O authorization, guarded recursive piecewise-affine applicable-domain behavior, the checked handoff, ranking, replay-authorized selection, post-verification and total-partition sealing, association-safe presentation, scalar/product dispatch, all-rejected control flow, and live execution against the \code{djex-fake-z3} fixture. The guarded conditional case decodes nominal scalar and product startup documents, establishes matching provider-independent \code{[[2]]} receipts with 1/3/3/3 counts, pins both presentation notes, and proves the missing executable and event path remain untouched.
+The focused exact command-parser case passes 1/1, the explicit Length-assessment
+integration group passes 14/14, and the complete Leant unit suite passes 409/409.
 
 Because several production modules are pure, tests can construct exact \code{Frag}, generated AST, provider metadata, and history values without launching Lean. This is where boundary invariants should be tested exhaustively.
 
@@ -3136,7 +3149,7 @@ Use state-transition boundaries rather than arbitrary line ranges.
 
 \begin{itemize}
   \item Djex pinned tree: \href{https://github.com/VladimirReshetnikov/Djex/tree/a9150c77623767f187d64af5d3cd75ec1194f67b}{\nolinkurl{github.com/VladimirReshetnikov/Djex/tree/a9150c7...}}
-  \item Leant pinned tree: \href{https://github.com/VladimirReshetnikov/Leant/tree/23671c7321d49c3b04c071d6604ed6b96ff911ee}{\nolinkurl{github.com/VladimirReshetnikov/Leant/tree/23671c7...}}
+  \item Leant pinned tree: \href{https://github.com/VladimirReshetnikov/Leant/tree/918f5581d7b2d09fef4d39ebe315e863970b1286}{\nolinkurl{github.com/VladimirReshetnikov/Leant/tree/918f558...}}
   \item Leant's submodule declaration: \lpath{.gitmodules}
   \item Leant's multi-package build: \lpath{cabal.project}
 \end{itemize}

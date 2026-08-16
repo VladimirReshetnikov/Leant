@@ -341,14 +341,13 @@ environment.
 \cmdrow{:synth TYPE}{synthesize verified terms of \code{TYPE};
   candidates are bound as \code{it1} (= \code{it}), \code{it2}, \dots
   (\S\ref{sec:synth})}
-\cmdrow{:synth --behavior-mode rank|filter -- TYPE}{explicitly choose the
-  operation; disabled \code{rank} is identity, while filtering uses the
-  activated startup Length contract and requires its policy}
-\cmdrow{:synth --length-contract P -- TYPE}{use one passive Length contract
-  file for this command only; an optional preceding behavior mode selects
-  \code{rank} or \code{filter}, omitted mode means \code{rank}, the standalone
-  delimiter is mandatory, and every contract form requires the startup policy
-  opt-in
+\cmdrow{behavior option}{\code{-{}-behavior-mode rank|filter} explicitly
+  chooses the operation; disabled \code{rank} is identity, while filtering
+  uses the activated startup Length contract and requires its policy}
+\cmdrow{contract option}{\code{-{}-length-contract PATH} supplies one passive
+  Length contract file for this command only; an optional preceding behavior
+  mode selects \code{rank} or \code{filter}, omitted mode means \code{rank},
+  and every contract form requires the startup policy opt-in
   (\S\ref{sec:engines})}
 \cmdrow{:set synth-engine E}{\code{djinn} (default) $\mid$
   \code{exference} $\mid$ \code{both}}
@@ -359,6 +358,12 @@ environment.
   inductives (\code{on}$\mid$\code{off}, default on;
   \S\ref{sec:synth-library})}
 \end{cmdtable}
+
+\noindent\textbf{Exact option-bearing grammar}
+\begin{center}
+\small\code{:synth [-{}-behavior-mode rank|filter]
+  [-{}-length-contract PATH] -{}- TYPE}
+\end{center}
 
 \subsection{Persistence and utility}
 \begin{cmdtable}
