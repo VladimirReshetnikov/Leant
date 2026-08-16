@@ -288,7 +288,8 @@ import Leant.Synth.Length.Configuration.File.Acquire
   , mkLengthRankingConfigurationFileRequest
   )
 import Leant.Synth.Length.Command
-  ( LengthSynthCommand (..)
+  ( LengthBehaviorMode (..)
+  , LengthSynthCommand (..)
   , LengthSynthCommandError (..)
   , parseLengthSynthCommand
   )
@@ -344,8 +345,10 @@ import Leant.Synth.Length.Integration
   , lengthAssessmentModeExecutableLaunchStrategy
   , lengthAssessmentPostVerificationResult
   , lengthAssessmentRanking
+  , lengthAssessmentSelectionResult
   , lengthAssessmentSpinePairPostVerificationResult
   , lengthAssessmentSpinePairRanking
+  , lengthAssessmentSpinePairSelectionResult
   , loadLengthAssessmentMode
   )
 import Leant.Synth.Length.PostVerification
@@ -379,20 +382,25 @@ import Leant.Synth.Length.Selection
   )
 import Leant.Synth.Length.Presentation
   ( LengthCandidatePresentation
+  , lengthCandidateRejectionPresentationNote
+  , lengthCandidateRejectionPresentationText
   , lengthCandidatePresentationNote
   , lengthCandidatePresentationText
   , maximumLengthCounterexampleNoteCharacters
   , presentLengthAssessment
+  , presentLengthAssessmentRejections
   , presentLengthPostVerificationResult
   , presentLengthSpinePairPostVerificationResult
   , renderLengthApplicableDomainValidationNote
   , renderLengthCounterexampleNote
   , renderLengthCounterexampleSimplificationNote
   , renderLengthInputBoxValidationNote
+  , renderLengthSelectionRejectionNote
   , renderLengthSpinePairApplicableDomainValidationNote
   , renderLengthSpinePairCounterexampleNote
   , renderLengthSpinePairCounterexampleSimplificationNote
   , renderLengthSpinePairInputBoxValidationNote
+  , renderLengthSpinePairSelectionRejectionNote
   )
 import Leant.Synth.Length.Ranking
   ( LengthRanking
@@ -8022,34 +8030,68 @@ lengthContractFileTests = testGroup
 
 assertLengthSynthCommandParsing :: IO ()
 assertLengthSynthCommandParsing = do
-  parseLengthSynthCommand "List Nat -> List Nat" @?= Right
-    LengthSynthCommand
-      { lengthSynthCommandContractPath = Nothing
-      , lengthSynthCommandGoal = "List Nat -> List Nat"
-      }
+  let command behavior path goal = Right LengthSynthCommand
+        { lengthSynthCommandBehaviorMode = behavior
+        , lengthSynthCommandContractPath = path
+        , lengthSynthCommandGoal = goal
+        }
+  parseLengthSynthCommand "List Nat -> List Nat" @?=
+    command LengthBehaviorRank Nothing "List Nat -> List Nat"
+  parseLengthSynthCommand " --behavior-mode rank -- List Nat " @?=
+    command LengthBehaviorRank Nothing "List Nat"
+  parseLengthSynthCommand "--behavior-mode filter -- List Nat" @?=
+    command LengthBehaviorFilter Nothing "List Nat"
   parseLengthSynthCommand
-      " --length-contract /tmp/my contract.json -- List Nat -- List Nat " @?=
-    Right LengthSynthCommand
-      { lengthSynthCommandContractPath = Just "/tmp/my contract.json"
-      , lengthSynthCommandGoal = "List Nat -- List Nat"
-      }
+      " --behavior-mode filter --length-contract /tmp/my contract.json -- \
+      \List Nat -- List Nat " @?=
+    command LengthBehaviorFilter (Just "/tmp/my contract.json")
+      "List Nat -- List Nat"
+  -- A contract alone retains the established ranking behavior.
   parseLengthSynthCommand "--length-contract /tmp/request.json --" @?=
-    Right LengthSynthCommand
-      { lengthSynthCommandContractPath = Just "/tmp/request.json"
-      , lengthSynthCommandGoal = ""
-      }
-  parseLengthSynthCommand "--length-contract -- List Nat" @?= Left
-    LengthSynthCommandContractPathMissing
-  parseLengthSynthCommand "--length-contract /tmp/request.json List Nat" @?=
-    Left LengthSynthCommandDelimiterMissing
-  -- Ordinary goal text beginning with a longer identifier is not an option.
-  parseLengthSynthCommand "--length-contractual" @?= Right
-    LengthSynthCommand
-      { lengthSynthCommandContractPath = Nothing
-      , lengthSynthCommandGoal = "--length-contractual"
-      }
+    command LengthBehaviorRank (Just "/tmp/request.json") ""
+
+  mapM_ (\source -> parseLengthSynthCommand source @?= Left
+      LengthSynthCommandBehaviorModeMissing)
+    ["--behavior-mode", "--behavior-mode -- List Nat"]
+  parseLengthSynthCommand "--behavior-mode prune -- List Nat" @?= Left
+    LengthSynthCommandBehaviorModeInvalid
+  parseLengthSynthCommand
+      "--behavior-mode --length-contract /tmp/request.json -- List Nat" @?=
+    Left LengthSynthCommandBehaviorModeInvalid
+  mapM_ (\source -> parseLengthSynthCommand source @?= Left
+      LengthSynthCommandDelimiterMissing)
+    [ "--behavior-mode filter List Nat"
+    , "--behavior-mode rank --- List Nat"
+    , "--behavior-mode filter --behavior-mode rank -- List Nat"
+    , "--length-contract /tmp/request.json List Nat"
+    , "--length-contract /tmp/request.json --behavior-mode filter List Nat"
+    ]
+  mapM_ (\source -> parseLengthSynthCommand source @?= Left
+      LengthSynthCommandContractPathMissing)
+    [ "--length-contract -- List Nat"
+    , "--length-contract --behavior-mode filter -- List Nat"
+    , "--behavior-mode filter --length-contract -- List Nat"
+    ]
+  parseLengthSynthCommand
+      "--length-contract /tmp/request.json --behavior-mode filter -- List Nat"
+    @?= Left LengthSynthCommandBehaviorModeMustPrecedeContract
+  parseLengthSynthCommand
+      "--behavior-mode filter --length-contract /tmp/request.json \
+      \--behavior-mode rank -- List Nat" @?=
+    Left LengthSynthCommandBehaviorModeMustPrecedeContract
+
+  -- Exact option tokens are recognized only at the start. Longer lookalikes
+  -- and option-looking tokens inside an ordinary Lean goal remain opaque.
+  mapM_ (\goal -> parseLengthSynthCommand goal @?=
+      command LengthBehaviorRank Nothing goal)
+    [ "--length-contractual"
+    , "--behavior-model filter -- List Nat"
+    , "--behavior-mode=filter -- List Nat"
+    , "List Nat --behavior-mode filter --length-contract ignored -- Bool"
+    ]
+
   productive <- timeout 1000000 $ evaluate $ parseLengthSynthCommand
-    $ "--length-contract /tmp/request.json"
+    $ "--behavior-mode filter --length-contract /tmp/request.json"
         ++ replicate 131072 ' ' ++ "not-a-delimiter"
   productive @?= Just (Left LengthSynthCommandDelimiterMissing)
 
@@ -8545,6 +8587,15 @@ lengthAssessmentIntegrationTests = testGroup
       assertLengthAssessmentDisabled
   , testCase "reject one-shot contracts before file IO when disabled"
       assertLengthAssessmentExplicitDisabled
+  , testCase
+      "dispatch rank and filter through startup and one-shot scalar requests"
+      assertLengthAssessmentScalarFilterDispatch
+  , testCase
+      "dispatch startup and one-shot product filters without sticky state"
+      assertLengthAssessmentSpinePairFilterDispatch
+  , testCase
+      "handle all-rejected filters without binding or stale it splices"
+      assertLengthAssessmentMainFilterBoundary
   , testCase "admit setup before IO or activation"
       assertLengthAssessmentSetupAdmission
   , testCase "load one fixed contract and assess through the sealed adapter"
@@ -8630,17 +8681,354 @@ assertLengthAssessmentDisabled = do
 
 assertLengthAssessmentExplicitDisabled :: IO ()
 assertLengthAssessmentExplicitDisabled = do
-  case authorizeExplicitLengthAssessmentRequest disabledLengthAssessmentMode of
+  case authorizeExplicitLengthAssessmentRequest LengthBehaviorRank
+      disabledLengthAssessmentMode of
     Left failure -> failure @?=
       LengthAssessmentExplicitContractRequiresActivatedPolicy
     Right _ -> assertFailure "disabled mode authorized a one-shot contract"
-  let disabledRequest = startupLengthAssessmentRequest
-        disabledLengthAssessmentMode
+  case authorizeExplicitLengthAssessmentRequest LengthBehaviorFilter
+      disabledLengthAssessmentMode of
+    Left failure -> failure @?=
+      LengthAssessmentFilteringRequiresActivatedPolicy
+    Right _ -> assertFailure "disabled mode authorized a one-shot filter"
+  case startupLengthAssessmentRequest LengthBehaviorFilter
+      disabledLengthAssessmentMode of
+    Left failure -> failure @?=
+      LengthAssessmentFilteringRequiresActivatedPolicy
+    Right _ -> assertFailure "disabled mode enabled startup filtering"
+  disabledRequest <- expectRight $ startupLengthAssessmentRequest
+    LengthBehaviorRank disabledLengthAssessmentMode
   lazyResult <- assessLengthVerificationRequest disabledRequest
     (error "disabled command request forced its verification batch")
   lengthAssessmentFailure lazyResult @?= Nothing
   assertBool "disabled command request retained a ranking"
     $ isNothing $ lengthAssessmentRanking lazyResult
+
+assertLengthAssessmentScalarFilterDispatch :: IO ()
+assertLengthAssessmentScalarFilterDispatch
+  | os == "mingw32" = pure ()
+  | otherwise = do
+      (baseContract, scaled, identity) <- buildScaledProviderReplayFixture
+      withTemporaryDirectory "leant-filter-command-scalar" $ \root -> do
+        let executable = root </> "missing-z3"
+            configurationPath = root </> "filter-command-scalar-config.json"
+            contractPath = root </> "filter-command-scalar-contract.json"
+            input = jsonLengthInput 0
+            guardedDomain = jsonLengthAtMost
+              (jsonLengthIf
+                (jsonLengthAtMost input $ jsonLengthLiteral 2)
+                input
+                (jsonLengthLiteral 5))
+              (jsonLengthLiteral 3)
+            scalarContractValue expected = addJsonField []
+              ("candidateCasePolicy", Json.JStr "cases-rejected")
+              $ jsonRoleAwareLengthContract ["observed-spine"]
+                  guardedDomain
+                  (jsonLengthEqual jsonLengthResult expected)
+              [ jsonLengthProviderLaw "Demo.scaleList" ["spine"]
+                  $ jsonLengthScale 2 $ jsonLengthArgument 0
+              ]
+            configuration = setJsonField ["contract"]
+              (scalarContractValue input)
+              $ currentApplicableDomainScalarDocument executable 2000
+            renderVerified = detailedVerificationVariantText
+              . verifiedCandidate
+            original = [scaled, identity]
+        ByteString.writeFile configurationPath
+          $ encodeLengthRankingConfigurationFile configuration
+        loaded <- loadLengthAssessmentMode PermitUnpinnedExecutable
+          $ LengthRankingConfigurationFileSource configurationPath 1000
+        mode <- case loaded of
+          Left failure -> assertFailure (show failure) >> error "unreachable"
+          Right configured -> pure configured
+        verification <- verificationBatchFromReceipts original
+
+        rankRequest <- expectRight $ startupLengthAssessmentRequest
+          LengthBehaviorRank mode
+        ranked <- expectLengthAssessmentWithin
+          $ assessLengthVerificationRequest rankRequest verification
+        length (lengthAssessmentCandidates ranked) @?= length original
+        sortOn id (map renderVerified $ lengthAssessmentCandidates ranked) @?=
+          sortOn id (map renderVerified original)
+        assertBool "rank request acquired scalar selection authority"
+          $ isNothing $ lengthAssessmentSelectionResult ranked
+        assertBool "rank request emitted rejection rows"
+          $ null $ presentLengthAssessmentRejections ranked
+
+        filterRequest <- expectRight $ startupLengthAssessmentRequest
+          LengthBehaviorFilter mode
+        filtered <- expectLengthAssessmentWithin
+          $ assessLengthVerificationRequest filterRequest verification
+        lengthAssessmentFailure filtered @?= Nothing
+        lengthAssessmentCandidates filtered @?= [identity]
+        assertBool "scalar filter retained a ranking projection"
+          $ isNothing $ lengthAssessmentRanking filtered
+        assertBool "scalar filter retained a post-verification projection"
+          $ isNothing $ lengthAssessmentPostVerificationResult filtered
+        scalarResult <- case lengthAssessmentSelectionResult filtered of
+          Nothing -> assertFailure "scalar filter lost its selection result"
+            >> error "unreachable"
+          Just selected -> pure selected
+        lengthSelectionCandidates scalarResult @?= [identity]
+        selected <- expectLengthSelectionSelected scalarResult
+        rejected <- expectLengthSelectionRejected scalarResult
+        map behaviorallySelectedVerified selected @?= [identity]
+        map behaviorallyRejectedVerified rejected @?= [scaled]
+        map lengthCandidatePresentationText
+            (presentLengthAssessment filtered) @?=
+          map renderVerified [identity]
+        case (rejected, presentLengthAssessmentRejections filtered) of
+          ([removed], [presentation]) -> do
+            lengthCandidateRejectionPresentationText presentation @?=
+              renderVerified scaled
+            lengthCandidateRejectionPresentationNote presentation @?=
+              renderLengthSelectionRejectionNote
+                (behaviorallyRejectedReason removed)
+            assertBool "scalar rejection note lost its result association"
+              $ "result spine length = 2" `isInfixOf`
+                lengthCandidateRejectionPresentationNote presentation
+          pair -> assertFailure $ "unexpected scalar rejection presentation: "
+            ++ show (length $ fst pair, length $ snd pair)
+
+        permission <- case authorizeExplicitLengthAssessmentRequest
+            LengthBehaviorFilter mode of
+          Left failure -> assertFailure (show failure) >> error "unreachable"
+          Right authorized -> pure authorized
+        ByteString.writeFile contractPath
+          $ encodeLengthRankingConfigurationFile
+          $ lengthContractFileFixture "scalar"
+          $ scalarContractValue $ jsonLengthScale 2 input
+        contractRequest <- expectLengthContractFileRequest contractPath
+        loadedContract <- loadLengthContractFile contractRequest >>= either
+          (\failure -> assertFailure (show failure) >> error "unreachable")
+          pure
+        let oneShotRequest = explicitLengthAssessmentRequest
+              permission loadedContract
+        ByteString.writeFile contractPath $ BS.pack "{"
+        oneShot <- expectLengthAssessmentWithin
+          $ assessLengthVerificationRequest oneShotRequest verification
+        lengthAssessmentCandidates oneShot @?= [scaled]
+        assertBool "one-shot scalar filter used the pair projection"
+          $ isNothing $ lengthAssessmentSpinePairSelectionResult oneShot
+
+        -- The mode, contract, and replay bank are request-local: returning to
+        -- the startup request must reproduce its original partition after a
+        -- different one-shot filter has run.
+        repeated <- expectLengthAssessmentWithin
+          $ assessLengthVerificationRequest filterRequest verification
+        lengthAssessmentCandidates repeated @?= [identity]
+
+        let maximumCandidates =
+              Djex.defaultLengthSMTLibLiveSessionMaximumQueries
+            oversizedCount = fromIntegral maximumCandidates + 1
+        oversizedVerification <- verificationBatchFromReceipts
+          $ replicate oversizedCount scaled
+        preserved <- expectLengthAssessmentWithin
+          $ assessLengthVerificationRequest filterRequest oversizedVerification
+        case lengthAssessmentFailure preserved of
+          Just (LengthAssessmentSelectionFailed
+              (LengthSelectionPostVerificationFailed
+                (LengthPostVerificationInputRejected
+                  (LengthRankingInputLimitExceeded maximumValue observed)))) ->
+                    (maximumValue, observed) @?=
+                      (maximumCandidates, maximumCandidates + 1)
+          failure -> assertFailure $ "unexpected filter admission failure: "
+            ++ show failure
+        lengthAssessmentCandidates preserved @?=
+          verifiedCandidateReceipts oversizedVerification
+        preservedResult <- case lengthAssessmentSelectionResult preserved of
+          Nothing -> assertFailure
+            "filter admission failure discarded its preserve-all result"
+              >> error "unreachable"
+          Just result -> pure result
+        assertBool "filter admission failure exposed selected associations"
+          $ isNothing $ lengthSelectionSelected preservedResult
+        assertBool "filter admission failure exposed rejected associations"
+          $ isNothing $ lengthSelectionRejected preservedResult
+        length (presentLengthAssessment preserved) @?= oversizedCount
+        assertBool "filter admission failure emitted rejection rows"
+          $ null $ presentLengthAssessmentRejections preserved
+
+        allRejectedVerification <- verificationBatchFromReceipts original
+        let guardedFormula = LengthAtMost
+              (LengthIf
+                (LengthAtMost
+                  (LengthVariable $ LengthInput 0)
+                  (LengthLiteral 2))
+                (LengthVariable $ LengthInput 0)
+                (LengthLiteral 5))
+              (LengthLiteral 3)
+            allRejectedContract = baseContract
+              { leanLengthContractSource = LengthContractSource
+                  { lengthContractPrecondition = guardedFormula
+                  , lengthContractPostcondition = LengthEqual
+                      (LengthVariable LengthResult) (LengthLiteral 99)
+                  }
+              }
+        let allRejectedRequest = explicitLengthAssessmentRequest permission
+              $ LeanLengthScalarContractSelection allRejectedContract
+        allRejected <- expectLengthAssessmentWithin
+          $ assessLengthVerificationRequest allRejectedRequest
+              allRejectedVerification
+        lengthAssessmentFailure allRejected @?= Nothing
+        lengthAssessmentCandidates allRejected @?= []
+        assertBool "all-rejected scalar filter exposed survivor rows"
+          $ null $ presentLengthAssessment allRejected
+        let rejectionRows = presentLengthAssessmentRejections allRejected
+        map lengthCandidateRejectionPresentationText rejectionRows @?=
+          map renderVerified original
+        length rejectionRows @?= 2
+        doesFileExist executable >>= (@?= False)
+        doesFileExist (executable ++ ".events") >>= (@?= False)
+
+assertLengthAssessmentSpinePairFilterDispatch :: IO ()
+assertLengthAssessmentSpinePairFilterDispatch
+  | os == "mingw32" = pure ()
+  | otherwise = do
+      (duplicatedInput, inputAndZero) <- buildLengthSpinePairRankingFixture
+      withTemporaryDirectory "leant-filter-command-pair" $ \root -> do
+        let executable = root </> "missing-z3"
+            configurationPath = root </> "filter-command-pair-config.json"
+            contractPath = root </> "filter-command-pair-contract.json"
+            input = jsonLengthInput 0
+            guardedDomain = jsonLengthAtMost
+              (jsonLengthIf
+                (jsonLengthAtMost input $ jsonLengthLiteral 2)
+                input
+                (jsonLengthLiteral 5))
+              (jsonLengthLiteral 3)
+            pairContract expected = jsonLengthSpinePairContract
+              ["observed-spine"] "cases-rejected"
+              guardedDomain
+              (jsonLengthAll
+                [ jsonLengthEqual jsonLengthSpinePairResultFirst
+                    input
+                , jsonLengthEqual jsonLengthSpinePairResultSecond
+                    expected
+                ])
+              [ jsonLengthProviderLaw "Demo.zeroList" []
+                  $ jsonLengthLiteral 0
+              ]
+            configuration = setJsonField ["contract"]
+              (pairContract $ jsonLengthLiteral 0)
+              $ currentApplicableDomainPairDocument executable 2000
+            renderVerified = detailedVerificationVariantText
+              . verifiedCandidate
+            original = [duplicatedInput, inputAndZero]
+        ByteString.writeFile configurationPath
+          $ encodeLengthRankingConfigurationFile configuration
+        loaded <- loadLengthAssessmentMode PermitUnpinnedExecutable
+          $ LengthRankingConfigurationFileSource configurationPath 1000
+        mode <- case loaded of
+          Left failure -> assertFailure (show failure) >> error "unreachable"
+          Right configured -> pure configured
+        verification <- verificationBatchFromReceipts original
+        startupRequest <- expectRight $ startupLengthAssessmentRequest
+          LengthBehaviorFilter mode
+        startup <- expectLengthAssessmentWithin
+          $ assessLengthVerificationRequest startupRequest verification
+        lengthAssessmentFailure startup @?= Nothing
+        lengthAssessmentCandidates startup @?= [inputAndZero]
+        assertBool "pair filter used the scalar selection projection"
+          $ isNothing $ lengthAssessmentSelectionResult startup
+        pairResult <- case lengthAssessmentSpinePairSelectionResult startup of
+          Nothing -> assertFailure "pair filter lost its selection result"
+            >> error "unreachable"
+          Just selected -> pure selected
+        pairRejected <- expectLengthSpinePairSelectionRejected pairResult
+        map behaviorallyRejectedVerified pairRejected @?= [duplicatedInput]
+        case (pairRejected, presentLengthAssessmentRejections startup) of
+          ([removed], [presentation]) -> do
+            lengthCandidateRejectionPresentationText presentation @?=
+              renderVerified duplicatedInput
+            lengthCandidateRejectionPresentationNote presentation @?=
+              renderLengthSpinePairSelectionRejectionNote
+                (behaviorallyRejectedReason removed)
+          pair -> assertFailure $ "unexpected pair rejection presentation: "
+            ++ show (length $ fst pair, length $ snd pair)
+
+        permission <- case authorizeExplicitLengthAssessmentRequest
+            LengthBehaviorFilter mode of
+          Left failure -> assertFailure (show failure) >> error "unreachable"
+          Right authorized -> pure authorized
+        ByteString.writeFile contractPath
+          $ encodeLengthRankingConfigurationFile
+          $ lengthContractFileFixture "binary-product" $ pairContract input
+        contractRequest <- expectLengthContractFileRequest contractPath
+        loadedContract <- loadLengthContractFile contractRequest >>= either
+          (\failure -> assertFailure (show failure) >> error "unreachable")
+          pure
+        ByteString.writeFile contractPath $ BS.pack "{"
+        oneShot <- expectLengthAssessmentWithin
+          $ assessLengthVerificationRequest
+              (explicitLengthAssessmentRequest permission loadedContract)
+              verification
+        lengthAssessmentCandidates oneShot @?= [duplicatedInput]
+        assertBool "one-shot pair filter used the scalar projection"
+          $ isNothing $ lengthAssessmentSelectionResult oneShot
+        assertBool "one-shot pair filter lost the pair projection"
+          $ not $ isNothing $ lengthAssessmentSpinePairSelectionResult oneShot
+
+        repeated <- expectLengthAssessmentWithin
+          $ assessLengthVerificationRequest startupRequest verification
+        lengthAssessmentCandidates repeated @?= [inputAndZero]
+        doesFileExist executable >>= (@?= False)
+        doesFileExist (executable ++ ".events") >>= (@?= False)
+
+assertLengthAssessmentMainFilterBoundary :: IO ()
+assertLengthAssessmentMainFilterBoundary = do
+  source <- readFile "src/Main.hs"
+  let section = takeWhile (not . isInfixOf "synthBind ::")
+        $ dropWhile (not . isInfixOf "verifyAndDisplay assessmentRequest")
+        $ lines source
+      positions fragment =
+        [index | (index, line) <- zip [0 :: Int ..] section
+        , fragment `isInfixOf` line]
+      firstPosition fragment = case positions fragment of
+        index : _ -> pure index
+        [] -> assertFailure
+          ("Main filter boundary omitted " ++ show fragment)
+            >> error "unreachable"
+  nullShown <- firstPosition "if null shown"
+  nullRejections <- firstPosition "then if null rejections"
+  clearedIts <- firstPosition "rsSynthIts = []"
+  clearedProve <- firstPosition "rsSynthItsProve = False"
+  survivorBind <- firstPosition
+    "counters <- mapM (synthBind st goal) (reverse shown)"
+  assertBool "all-rejected handling did not follow the empty survivor test"
+    $ nullShown < nullRejections
+  assertBool "all-rejected handling could bind an itN before clearing splices"
+    $ clearedIts < survivorBind && clearedProve < survivorBind
+  let reports = positions "reportLengthAssessmentRejections st rejections"
+      handled = positions "pure True"
+  assertBool "Main did not report both all and partial rejection partitions"
+    $ any (< survivorBind) reports && any (> survivorBind) reports
+  assertBool "the all-rejected branch can fall through as verification loss"
+    $ any (\index -> clearedProve < index && index < survivorBind) handled
+  assertBool "partial rejection did not bind survivor presentations only"
+    $ "shown = map lengthCandidatePresentationText presentations"
+        `isInfixOf` unlines section
+      && not ("shown = map lengthCandidateRejectionPresentationText"
+        `isInfixOf` unlines section)
+  let requestSection = takeWhile (not . isInfixOf "synthRun ::")
+        $ dropWhile
+            (not . isInfixOf "lengthAssessmentRequestForCommand state command")
+        $ lines source
+      requestPosition fragment = case
+          [ index
+          | (index, line) <- zip [0 :: Int ..] requestSection
+          , fragment `isInfixOf` line
+          ] of
+        index : _ -> pure index
+        [] -> assertFailure
+          ("Main request boundary omitted " ++ show fragment)
+            >> error "unreachable"
+  authorization <- requestPosition
+    "authorizeExplicitLengthAssessmentRequest behavior mode"
+  admission <- requestPosition "mkLengthContractFileRequest"
+  acquisition <- requestPosition "loadLengthContractFile"
+  assertBool "one-shot filtering can touch its path before authorization"
+    $ authorization < admission && admission < acquisition
 
 assertLengthAssessmentSetupAdmission :: IO ()
 assertLengthAssessmentSetupAdmission = do
@@ -8848,7 +9236,8 @@ assertLengthAssessmentExplicitContracts
         mode <- case loaded of
           Left failure -> assertFailure (show failure) >> error "unreachable"
           Right configured -> pure configured
-        permission <- case authorizeExplicitLengthAssessmentRequest mode of
+        permission <- case authorizeExplicitLengthAssessmentRequest
+            LengthBehaviorRank mode of
           Left failure -> assertFailure (show failure) >> error "unreachable"
           Right authorized -> pure authorized
         let writeContract expected = ByteString.writeFile contractPath
@@ -8913,9 +9302,11 @@ assertLengthAssessmentExplicitContracts
               (explicitLengthAssessmentRequest permission
                 moduloContract)
               verification
+        startupRequest <- expectRight $ startupLengthAssessmentRequest
+          LengthBehaviorRank mode
         startup <- expectLengthAssessmentWithin
           $ assessLengthVerificationRequest
-              (startupLengthAssessmentRequest mode)
+              startupRequest
               verification
         repeatedFirst <- expectLengthAssessmentWithin
           $ assessLengthVerificationRequest
@@ -9116,7 +9507,8 @@ assertLengthAssessmentRoleAwareMap
         mode <- case loadedMode of
           Left failure -> assertFailure (show failure) >> error "unreachable"
           Right configured -> pure configured
-        permission <- case authorizeExplicitLengthAssessmentRequest mode of
+        permission <- case authorizeExplicitLengthAssessmentRequest
+            LengthBehaviorRank mode of
           Left failure -> assertFailure (show failure) >> error "unreachable"
           Right authorized -> pure authorized
         ByteString.writeFile contractPath
@@ -9138,11 +9530,13 @@ assertLengthAssessmentRoleAwareMap
         verification <- verificationBatchFromReceipts [verified]
         let explicitRequest = explicitLengthAssessmentRequest
               permission loadedContract
+        startupRequest <- expectRight $ startupLengthAssessmentRequest
+          LengthBehaviorRank mode
         assessed <- expectLengthAssessmentWithin
           $ assessLengthVerificationRequest explicitRequest verification
         startup <- expectLengthAssessmentWithin
           $ assessLengthVerificationRequest
-              (startupLengthAssessmentRequest mode) verification
+              startupRequest verification
         repeated <- expectLengthAssessmentWithin
           $ assessLengthVerificationRequest explicitRequest verification
         map lengthAssessmentFailure [assessed, startup, repeated] @?=
@@ -9395,7 +9789,8 @@ assertLengthAssessmentExactSpineCase
         mode <- case loadedMode of
           Left failure -> assertFailure (show failure) >> error "unreachable"
           Right configured -> pure configured
-        permission <- case authorizeExplicitLengthAssessmentRequest mode of
+        permission <- case authorizeExplicitLengthAssessmentRequest
+            LengthBehaviorRank mode of
           Left failure -> assertFailure (show failure) >> error "unreachable"
           Right authorized -> pure authorized
         ByteString.writeFile contractPath
@@ -9433,11 +9828,13 @@ assertLengthAssessmentExactSpineCase
                   " retained unexpected assessments: " ++ show unexpected
             assertUnassessed label assessed =
               assessments label assessed >>= (@?= [Unassessed])
+        startupRequest <- expectRight $ startupLengthAssessmentRequest
+          LengthBehaviorRank mode
         assessed <- expectLengthAssessmentWithin
           $ assessLengthVerificationRequest exactRequest verification
         startup <- expectLengthAssessmentWithin
           $ assessLengthVerificationRequest
-              (startupLengthAssessmentRequest mode) verification
+              startupRequest verification
         casesRejected <- expectLengthAssessmentWithin
           $ assessLengthVerificationRequest
               casesRejectedRequest verification
@@ -9590,6 +9987,31 @@ assertLengthAssessmentFailureFallback
           Nothing -> assertFailure
             "live integration fallback discarded its sealed result"
           Just result -> assertLengthPostVerificationSealed result
+
+        filterRequest <- expectRight $ startupLengthAssessmentRequest
+          LengthBehaviorFilter mode
+        filtered <- expectLengthAssessmentWithin
+          $ assessLengthVerificationRequest filterRequest verification
+        case lengthAssessmentFailure filtered of
+          Just (LengthAssessmentSelectionFailed
+              LengthSelectionRankingFailed{}) -> pure ()
+          failure -> assertFailure $ "unexpected filter fallback failure: "
+            ++ show failure
+        lengthAssessmentCandidates filtered @?= original
+        selection <- case lengthAssessmentSelectionResult filtered of
+          Nothing -> assertFailure
+            "filter fallback discarded its preserve-all result"
+              >> error "unreachable"
+          Just result -> pure result
+        assertBool "filter fallback exposed partial selected associations"
+          $ isNothing $ lengthSelectionSelected selection
+        assertBool "filter fallback exposed partial rejected associations"
+          $ isNothing $ lengthSelectionRejected selection
+        map lengthCandidatePresentationText
+            (presentLengthAssessment filtered) @?=
+          map (detailedVerificationVariantText . verifiedCandidate) original
+        assertBool "filter fallback emitted rejection rows"
+          $ null $ presentLengthAssessmentRejections filtered
 
 assertLengthPresentationAssociations
   :: [LengthCandidatePresentation]
@@ -9792,7 +10214,8 @@ assertLengthAssessmentSpinePairDispatch
           notes -> assertFailure $ "pair occurrence notes drifted: " ++
             show notes
 
-        permission <- case authorizeExplicitLengthAssessmentRequest mode of
+        permission <- case authorizeExplicitLengthAssessmentRequest
+            LengthBehaviorRank mode of
           Left failure -> assertFailure (show failure) >> error "unreachable"
           Right authorized -> pure authorized
         ByteString.writeFile contractPath
@@ -9885,10 +10308,15 @@ assertLengthAssessmentSpinePairDisabled = do
     $ isNothing $ lengthAssessmentPostVerificationResult result
   assertBool "disabled pair-aware integration retained a product result"
     $ isNothing $ lengthAssessmentSpinePairPostVerificationResult result
+  assertBool "disabled pair-aware integration retained scalar selection"
+    $ isNothing $ lengthAssessmentSelectionResult result
+  assertBool "disabled pair-aware integration retained product selection"
+    $ isNothing $ lengthAssessmentSpinePairSelectionResult result
   parseLengthSynthCommand
       "--length-contract /tmp/pair-current.json -- List Nat -> Prod (List Nat) (List Nat)"
     @?= Right LengthSynthCommand
-      { lengthSynthCommandContractPath = Just "/tmp/pair-current.json"
+      { lengthSynthCommandBehaviorMode = LengthBehaviorRank
+      , lengthSynthCommandContractPath = Just "/tmp/pair-current.json"
       , lengthSynthCommandGoal = "List Nat -> Prod (List Nat) (List Nat)"
       }
   options <- expectOptions
