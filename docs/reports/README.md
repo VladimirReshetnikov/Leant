@@ -177,3 +177,12 @@ a forward-looking proposal rather than a dated record:
   [formalization study](djex_leant_lean_formalization_report/djex_leant_lean_formalization_report.pdf)
   above, which asks instead what a Lean checker could certify about the
   existing Haskell implementation.
+- [Z3 from First Principles: A Beginner's Guide for Leant and Djex](../Z3_for_Leant_and_Djex/Z3_for_Leant_and_Djex.pdf)
+  (August 16, 2026; [LaTeX source](../Z3_for_Leant_and_Djex/Z3_for_Leant_and_Djex.tex))
+  — the conceptual prerequisite to the two documents above and to the
+  Length reports here: satisfiability, models, and the three solver
+  answers from zero; SMT-LIB through cores, optimization, and Horn
+  clauses; what a robust solver boundary needs; a module-by-module trace
+  of the implemented Length domain and Leant's rank and filter modes; the
+  planned extensions and the Z3 capabilities each needs; and a reading and
+  troubleshooting guide.

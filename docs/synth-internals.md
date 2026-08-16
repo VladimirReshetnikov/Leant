@@ -160,6 +160,13 @@ This is deliberately a solver-neutral identity seam, not behavioral evidence.
 
 ## Length handoff and problem sealing
 
+The Length sections that follow assume the reader knows what a satisfiable
+formula, a model, and an `unsat` answer are and how a candidate becomes a
+`QF_LIA` query; [Z3 from First Principles](Z3_for_Leant_and_Djex/Z3_for_Leant_and_Djex.pdf)
+teaches that background from zero and then walks these same modules in a
+maintainer's source map, so it is the place to start when this material is
+new.
+
 `Leant.Synth.Length.Handoff` binds callback-accepted text back to its exact
 typed origin, original Exference renderer ordinal and exact re-rendered variant,
 family provenance, an opaque Djex session which owns the exact inventory and

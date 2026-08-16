@@ -63,6 +63,14 @@ Companion documents:
   Length counterexample-ranking and replay-authorized filtering reference;
 - **[docs/synth-internals.md](docs/synth-internals.md)** — the design
   boundaries and dated-report index behind `:synth`;
+- **[Z3 from First Principles](docs/Z3_for_Leant_and_Djex/Z3_for_Leant_and_Djex.pdf)**
+  — a beginner's guide to Z3 for this codebase, assuming no logic
+  background: what satisfiability, models, and `unsat` mean, SMT-LIB from
+  syntax to models, cores, and Horn clauses, why a solver boundary needs
+  fingerprints, process ownership, and replay, and then a module-by-module
+  trace of how the current Length domain and Leant's rank and filter modes
+  actually use Z3, plus a reading and troubleshooting guide
+  ([LaTeX source](docs/Z3_for_Leant_and_Djex/Z3_for_Leant_and_Djex.tex));
 - the **[Z3 behavioral synthesis proposal](docs/Z3_Behavioral_Synthesis_Proposal/Z3_Behavioral_Synthesis_Proposal.pdf)**
   — where the behavioral layer goes next: counterexample-guided search,
   typed sketch completion, semantic pruning, and Lean-checked proof
