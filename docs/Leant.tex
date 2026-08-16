@@ -1615,6 +1615,11 @@ opening, live query, post-\code{unsat} input-box, scoped-budget, and stable
 preference boundaries remain unchanged. The four-vector MRU is local to one
 verified batch; a later candidate must independently replay a vector against
 its own checked problem, and the next batch starts empty.
+The vendored Djex revision separately exposes candidate-independent scalar and
+binary-product bank scopes with bounded immutable input stores. Leant does not
+import, construct, or consult those stores, and there is no automatic
+bank-replay-to-receipt bridge. They are a dormant library foundation, not a
+command-local bank or a change to this active batch-local MRU.
 
 Filtering runs the same scalar or nominal pair assessor, maps every report
 back to its exact callback occurrence by the retained original index, and
@@ -1629,14 +1634,28 @@ occurrence keeps its exact counterexample or simplification note. If all
 verified occurrences are rejected, the result is handled: Leant prints the
 rejections, creates no \code{itN} binding, clears its previous synthesis-splice
 cache, does not call them Lean-verification failures, and does not continue
-into a later provider or classical lane. Behavior mode, selection results, and
-the MRU are never persistent REPL state. This is not the proposal's full
-command-local CEGIS loop: no bank or candidate crosses a lane, and no engine,
-verification module, scheduler-result type, or REPL state changed. The current
-reference is \code{docs/length-ranking.md}; the command-authority predecessor
-and current refill checkpoint are recorded in
+into a later provider or classical lane.
+
+Main now records one bounded lane in private lazy outcome types rather than
+collapsing these cases into a Boolean. The outcome keeps the complete bounded
+rendered-spelling frontier used for provider deduplication separate from the
+exact variants which reached Lean callbacks. Verification and its one Length
+assessment perform no candidate presentation or synthesis-splice mutation. A
+pure classifier distinguishes no verified receipt, survivors, all behavioral
+rejections, and preserve-all assessment failure; one finalizer owns metrics,
+warnings, binding and cache effects, rows, and handled-lane notes. Only the
+empty-verified-receipt disposition can continue to another provider or
+classical lane, so the refactor changes no scheduling or output behavior.
+
+Behavior mode, selection results, both kinds of replay-input store, and the
+lane outcomes are never persistent REPL state. This is not the proposal's full
+command-local CEGIS loop: no bank or candidate crosses a lane, and no public
+API, engine, verification module, or REPL state changed. The current reference
+is \code{docs/length-ranking.md}; the command-authority predecessor, current
+refill checkpoint, and private outcome seam are recorded in
 \code{docs/reports/2026-08-15-command-authorized-length-filtering.md} and
-\code{docs/reports/2026-08-15-lane-local-length-survivor-refill.md}. Dated
+\code{docs/reports/2026-08-15-lane-local-length-survivor-refill.md}, and
+\code{docs/reports/2026-08-16-explicit-synthesis-lane-outcomes.md}. Dated
 reports under \code{docs/reports/} are historical engineering records rather
 than current file contracts. When assessment is disabled, an ordinary or
 explicit no-contract \code{rank} remains the exact identity and leaves no

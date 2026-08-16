@@ -29,7 +29,11 @@ at five accepted groups, while filter mode assesses one already bounded 12-,
 24-, or excluded-middle 6-group lane once, presents at most five survivors,
 and reports every bounded rejection. An all-rejected result remains handled
 and does not continue into another lane; there is still no persistent or
-cross-lane CEGIS bank.
+cross-lane CEGIS bank. Main now retains one private four-way lane disposition,
+with the complete bounded provider-dedup spelling frontier separate from the
+exact callback-attempt trace, but only the no-verified-receipt disposition can
+continue. Djex's vendored candidate-independent bank types remain an unused
+library foundation: Leant has no runtime owner or replay bridge for them.
 The [README](../../README.md) and
 [Length ranking reference](../length-ranking.md) describe the current tree.
 
@@ -101,6 +105,7 @@ Reports are listed oldest first.
 - 2026-08-15 — [Behavioral-selection occurrence partition seal](2026-08-15-behavioral-selection-partition-seal.md)
 - 2026-08-15 — [Command-authorized replay-backed Length filtering](2026-08-15-command-authorized-length-filtering.md)
 - 2026-08-15 — [Lane-local bounded Length survivor refill](2026-08-15-lane-local-length-survivor-refill.md)
+- 2026-08-16 — [Explicit synthesis-lane outcomes](2026-08-16-explicit-synthesis-lane-outcomes.md)
 
 ## Standalone PDF reports
 

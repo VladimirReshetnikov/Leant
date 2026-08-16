@@ -261,6 +261,16 @@ and preparation refusals do not mutate the bank. The bank never contains a
 cached solver result, verdict, query, receipt, provider-law basis, proof,
 solver status, or durable cache entry.
 
+The vendored Djex snapshot also exposes nominal candidate-independent scalar
+and binary-product bank scopes and bounded immutable input stores. That public
+foundation is separate from this active ranking-local MRU. No Leant module
+imports it, no Leant command owns one of its banks, and Djex supplies no bridge
+that automatically inserts observations or replays a stored vector into a
+fresh receipt. Scope matching would authorize only a replay attempt, not reuse
+of a verdict. The exact foundation and its absent runtime integration are
+recorded in Djex's
+[nominal bank report](../lib/Djex/docs/reports/2026-08-16-nominal-length-counterexample-bank-foundation.md).
+
 ### Current applicable-domain validation
 
 Leant has one applicable-domain policy in the current tree. The programmatic
@@ -891,14 +901,15 @@ successful filter returns only sealed survivors, while every selection failure
 returns the complete original batch. `lengthAssessmentFailure` maps both
 selection failure families into the mode-neutral Main warning path.
 
-### Main's bounded lane-local refill
+### Main's bounded lane outcome and local refill
 
-Each `verifyAndDisplay` caller now passes the exact group bound it already owns.
-Main immediately takes that prefix and returns `False` on an empty result before
-projecting the request's behavior mode. Ordinary, universe-retry, provider, and
-full double-negation calls pass `synthVerificationWindow` for the current
-engine: 12 for either standalone engine and 24 for `EngineBoth`. The cheaper
-excluded-middle route passes half of `synthMaxTried`, currently 6.
+Each `verifySynthLane` caller passes the exact group bound it already owns.
+Main immediately takes that prefix and returns a lazy unassessed
+`SynthLaneOutcome` on an empty result before projecting the request's behavior
+mode. Ordinary, universe-retry, provider, and full double-negation calls pass
+`synthVerificationWindow` for the current engine: 12 for either standalone
+engine and 24 for `EngineBoth`. The cheaper excluded-middle route passes half
+of `synthMaxTried`, currently 6.
 
 Private `synthVerify` receives a mode-dependent successful-group quota. Ranking
 keeps `synthMaxShown`, currently 5. Filtering receives the caller's complete
@@ -907,16 +918,57 @@ lane bound. The prior finite `take` is mandatory because
 lazy or cyclic tail escape the lane limit. `Leant.Synth.Verification` itself is
 unchanged.
 
-The resulting filter `VerificationBatch` is assessed once, so one fresh
-four-entry MRU can carry replay inputs from early rejected occurrences to
-later occurrences within that batch. Main then applies `take synthMaxShown` to
-the survivor presentation only. It binds and displays at most five survivors,
-but reports the complete bounded rejection projection. Preserve-all failure
-retains the enlarged batch internally and displays at most five original
-candidates. An accepted all-rejected result remains handled `True`; provider
-and classical scheduling therefore stop rather than opening another lane.
-There is no cross-lane candidate continuation, persistent bank, scheduler
-outcome ADT, or `Engine`, `Verification`, or `ReplState` change.
+`SynthLaneOutcome` retains two noninterchangeable histories. The complete
+bounded `concatMap detailedCandidateGroupVariants` spelling frontier is the
+existing provider-deduplication authority. It includes every variant in the
+bounded groups even when lazy callback verification does not reach it. The
+separate `[DetailedVerificationVariant]` trace is appended immediately before
+each backend callback; it contains failed variants before an acceptance, but
+not later siblings of an accepted group or groups beyond the success quota.
+Current scheduling uses only the complete spelling frontier. The exact callback
+trace is retained for later accounting and cannot silently narrow provider
+deduplication.
+
+The resulting `VerificationBatch` is assessed exactly once and retained beside
+that assessment in a private `AssessedSynthLane`. `verifySynthLane` owns the
+Lean callbacks and optional Length work but emits no result metrics, warning,
+candidate or rejection row, or engine note; it neither binds a candidate nor
+changes the synthesis-splice cache. Its fields remain lazy, and the private
+types deliberately derive neither `Eq` nor `Show`.
+
+The pure `synthLaneDisposition` classifies four cases:
+
+- `SynthLaneNoVerified` for an unassessed empty lane or, as the first and sole
+  assessed-lane gate, an empty `verifiedCandidateReceipts` batch;
+- `SynthLaneSurvivors` for an ordinary accepted presentation, carrying the
+  at-most-five survivors and complete rejection projection;
+- `SynthLaneAllBehaviorallyRejected` when an accepted assessment has only
+  rejection rows; and
+- `SynthLaneAssessmentPreserved` when assessment failure preserves the
+  original verified batch.
+
+The defensive callback-verified/no-presentation branch is terminal
+`SynthLaneSurvivors [] []`, never no-verification. This keeps a future
+presentation-contract regression from gaining provider/classical continuation
+authority.
+
+`finalizeSynthLaneOutcome` is the single effect owner after classification. It
+reports observations, emits the mode-neutral preserve-all warning, performs
+reverse binding and splice-cache replacement for survivor/preserved outcomes,
+clears the cache for an all-rejected outcome, prints survivor rows and the
+complete bounded rejection projection, and emits notes for every handled lane.
+For an intermediate no-verification lane it emits observations but withholds
+engine notes; the final report prints the Lean-verification error before those
+stored notes. A previously checked lane is reused rather than reverified or
+finalized twice.
+
+Only `SynthLaneNoVerified` continues through provider stages or from excluded
+middle to double negation. Survivors, all behavioral rejections, and
+preserve-all assessment failure remain terminal exactly as before. Thus the
+new Main-private outcome spine changes neither command output nor cross-lane
+scheduling. It introduces no public API, command-local bank owner, cross-lane
+candidate continuation, persistent state, or `Engine`, `Verification`, or
+`ReplState` change.
 
 The current reset is recorded in the
 [versionless Length contract report](reports/2026-08-15-versionless-length-contract.md).
@@ -924,6 +976,8 @@ The behavior request and selection dispatch are recorded in the
 [command-authorized Length filtering report](reports/2026-08-15-command-authorized-length-filtering.md).
 Its bounded lane-local refill successor is recorded in the
 [lane-local Length survivor-refill report](reports/2026-08-15-lane-local-length-survivor-refill.md).
+The private behavior-preserving outcome seam is recorded in the
+[explicit synthesis-lane outcome report](reports/2026-08-16-explicit-synthesis-lane-outcomes.md).
 The older [one-shot contract report](reports/2026-08-13-one-shot-length-contract.md)
 and the reports below remain useful landing history, but their version routing
 and public API names are not current contracts. The historical modulo QF_LIA

@@ -55,6 +55,14 @@ persists a bank across batches. Persistent sample banks, cross-lane candidate
 enumeration, typed sketch completion, sound prefix pruning, further behavioral
 domains, and Lean-checked proof artifacts remain proposed work.
 
+The vendored Djex revision now contains candidate-independent scalar and
+binary-product counterexample-bank scopes plus bounded immutable input stores.
+That additive library foundation is dormant in Leant: no Leant module imports
+it, no command constructs or consults it, and it has no replay-to-receipt
+integration. Unless this document explicitly says otherwise, “replay bank”
+therefore means Leant's existing fresh four-vector, one-assessment MRU below,
+not the unused Djex store.
+
 Everything below this line describes the exact behavior of the current tree:
 the startup-configuration schema, the current contract-file schema, the
 binary-product extension, the replay bank, the origin probe, bounded
@@ -281,13 +289,14 @@ snapshots, or another command.
 
 ### Bounded lane-local survivor refill
 
-The verification/display seam receives an exact group limit from its current
-synthesis caller and takes that prefix before it inspects the assessment
-request. An empty prefix therefore returns without projecting the behavior mode
-or forcing a retained lazy contract. Ordinary, universe-retry, provider, and
-double-negation lanes use the engine's established limit: 12 groups for a
-standalone Djinn or Exference lane and 24 for a combined lane. The cheaper
-excluded-middle classical route uses half of `synthMaxTried`, currently 6.
+Main's private `verifySynthLane` seam receives an exact group limit from its
+current synthesis caller and takes that prefix before it inspects the
+assessment request. An empty prefix therefore produces an unassessed lane
+without projecting the behavior mode or forcing a retained lazy contract.
+Ordinary, universe-retry, provider, and double-negation lanes use the engine's
+established limit: 12 groups for a standalone Djinn or Exference lane and 24
+for a combined lane. The cheaper excluded-middle classical route uses half of
+`synthMaxTried`, currently 6.
 
 Ranking retains the historical quota of five callback-accepted groups. Filter
 mode instead gives verification the complete caller-owned lane limit. Because
@@ -298,6 +307,16 @@ complete verified filter frontier is then assessed once, so its four-entry MRU
 bank can replay a counterexample learned from an early rejected occurrence
 against a later occurrence in that same batch.
 
+The lane result retains two deliberately noninterchangeable histories. Its
+checked spelling frontier is every rendered variant in the complete bounded
+group prefix, including variants that lazy verification never needed to call;
+that remains the exact provider-deduplication and scheduling authority. Its
+callback-attempt trace instead records each detailed variant immediately before
+the Lean backend call. It excludes the later siblings of an accepted group and
+every group beyond the successful-group quota. The exact trace is retained for
+later accounting, but current provider scheduling never substitutes it for the
+full spelling frontier.
+
 Only after assessment does Main take at most five survivor presentations for
 display and `itN` binding. It does not cap the rejection projection: every
 rejected occurrence in the bounded assessed batch is reported. A preserve-all
@@ -306,12 +325,24 @@ internally but shows at most five unannotated original candidates beside its
 warning. Thus an early run of five behavioral rejections can be refilled by
 later same-lane survivors without expanding interactive output.
 
-This scheduling is intentionally local. An accepted all-rejected batch remains
-handled output and returns `True`, so structural filtering does not continue
-into provider lanes and an all-rejected excluded-middle batch does not continue
-into the double-negation lane. No candidate from a later lane enters the
-assessment, and this increment adds no `Engine`, `Verification`, or `ReplState`
-change, persistent bank, provider continuation, or cross-lane scheduler result.
+After verification and its one assessment, the pure private classifier returns
+one of four dispositions: no verified receipt, survivors, all behaviorally
+rejected, or assessment failure with every verified candidate preserved. An
+empty verified-receipt batch is the first and sole assessed-lane route to the
+no-verification disposition. Verification and assessment emit no candidate
+rows and mutate no synthesis-splice state; one finalizer owns observations,
+the preserve-all warning, reverse binding, cache replacement or clearing,
+survivor rows, every bounded rejection row, and handled-lane notes.
+
+This scheduling remains intentionally local and behavior-preserving. Only the
+no-verification disposition permits provider or classical continuation. An
+accepted all-rejected batch is the distinct terminal all-behaviorally-rejected
+disposition, so structural filtering still does not enter provider lanes and
+an all-rejected excluded-middle batch still does not enter the double-negation
+lane. No candidate from a later lane enters the assessment. The new outcome
+types are private to Main; they add no public API, `Engine`, `Verification`, or
+`ReplState` change, persistent runtime bank, provider continuation, or
+cross-lane CEGIS scheduling.
 
 ### Stable partition, failure, and Main behavior
 
@@ -352,6 +383,8 @@ The structural and command-authority predecessor is recorded in the historical
 [command-authorized Length filtering report](reports/2026-08-15-command-authorized-length-filtering.md).
 The current refill checkpoint and its exact test surface are recorded in the
 [lane-local Length survivor-refill report](reports/2026-08-15-lane-local-length-survivor-refill.md).
+Its behavior-preserving outcome-seam successor is recorded in the
+[explicit synthesis-lane outcome report](reports/2026-08-16-explicit-synthesis-lane-outcomes.md).
 
 ## One-shot contract-only files
 
