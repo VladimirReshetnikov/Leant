@@ -326,17 +326,20 @@ the current validator:
 direct literal -> positive affine -> relational -> strict relational
   -> positive-literal quotient -> root extrema -> root monus
   -> Boolean finite union / atomic branching
-  -> recursive piecewise-affine fallback
+  -> guarded recursive piecewise-affine fallback
 ```
 
 Each leaf first uses the complete atomic scanner. Recursive expansion runs only
 for its singleton ignored alternative when the relation still contains
-minimum, maximum, or natural monus, so an earlier exact result remains
-authoritative. The recursive grammar admits compact inputs, natural literals,
-normalized sums, positive scales, minimum, maximum, and monus. A quotient,
-modulo, conditional, result reference, out-of-range input, retained zero
-scale, or another unsupported child rejects that fallback atom; an earlier
-private stage may still have handled the complete leaf.
+minimum, maximum, natural monus, or a conditional, so an earlier exact result
+remains authoritative. The recursive grammar admits compact inputs, natural
+literals, normalized sums, positive scales, minimum, maximum, monus, and
+`LengthIf condition trueArm falseArm`. A conditional is all-or-nothing: every
+leaf in both condition polarities and every descendant in both selected arms
+must be supported. A quotient, modulo, result reference, out-of-range input,
+retained zero scale, or another unsupported child rejects the complete
+fallback atom; an earlier private stage may still have handled the complete
+leaf.
 
 For child values `L` and `R`, the exact alternatives are:
 
@@ -344,9 +347,15 @@ For child values `L` and `R`, the exact alternatives are:
 min(L,R)  -> [L <= R;     value L] | [R + 1 <= L; value R]
 max(L,R)  -> [R <= L;     value L] | [L + 1 <= R; value R]
 L monus R -> [L <= R;     value 0] | [R + 1 <= L; value L - R]
+if F then T else E
+          -> [positive F guards; value T]
+           | [negative F guards; value E]
 ```
 
-The first case owns equality. Left-child alternatives precede right-child
+The first extrema/monus case owns equality. Conditional true-arm alternatives
+precede false-arm alternatives; inside an arm, condition-DNF alternatives are
+outermost, the selected expression is innermost, and condition guards precede
+selected-arm guards. Left-child alternatives otherwise precede right-child
 alternatives, descendant guards precede the current selector, and the final
 relation rule comes last. Signed coefficients produced by positive monus
 branches transfer exactly into the natural positive-sided rule
@@ -354,7 +363,9 @@ representation. The closure uses one immutable snapshot per pass and fires
 each source-ordered rule at most once.
 
 Generated-branch admission counts the raw formula-DNF and recursive-alternative
-Cartesian product before cleanup. Canonical original literal sets are
+Cartesian product before cleanup, including impossible conditional guards that
+collapse only when the enclosing relation forms branch coverage. Canonical
+original literal sets are
 re-expanded in set order before rule and closure accounting. Every surviving
 branch must bound every compact input. Bounded branches form a
 lexicographically ordered, componentwise-maximal box antichain; incomparable
@@ -363,11 +374,15 @@ deduplicates assignments, and Djex replays the original checked precondition
 and postcondition once per assignment in global lexicographic order. Derived
 guards, rules, boxes, and solver status never replace this query-owned replay.
 
-The scalar discriminator retains `[[2,3],[3,2]]` with two boxes, 24 visits,
-15 unique assignments, and ten applicable assignments. The product
-discriminator retains `[[2,2]]` with 1/9/9/9 box, visit, unique, and
-applicable counts; its 32 raw alternatives distinguish branch caps 31 and 32
-before contradictory cases disappear.
+The one-input discriminator `(if x <= 2 then x else 5) <= 3` retains
+`[[2]]` with 1/3/3/3 box, visit, unique, and applicable counts; its two raw
+alternatives distinguish branch caps one and two. A negative equality guard
+retains all three complement alternatives. The nested discriminator
+`y <= 2` and `(if x <= 1 then max(x,y) else x monus y) <= 2` retains
+`[[4,2]]` with 1/15/15/12 counts. Its four raw alternatives precede rule and
+closure admission, and an independent wider-rectangle replay oracle checks
+that no satisfying assignment is omitted. Replacing either arm with an
+unsupported modulo or quotient descendant rejects the whole fallback atom.
 
 Under deferred opening the MRU/domain/origin prefix remains before process IO.
 A pure establishment or counterexample opens no worker. The first live miss
@@ -378,6 +393,9 @@ recorded in the
 The detailed grammar, cap precedence, receipt identity, and replay authority
 are owned by Djex's
 [current applicable-domain surface report](../lib/Djex/docs/reports/2026-08-15-current-length-applicable-domain-surface.md).
+The guarded extension and inherited native process ownership are recorded in
+the
+[guarded conditional Length ranking report](reports/2026-08-15-guarded-conditional-length-ranking.md).
 The older strategy reports are non-normative development history.
 
 ### The origin probe
@@ -600,11 +618,32 @@ policy and configured-mode projections reveal only the fourth closed
 classifier, not descriptors, credentials, check results, requested staging
 flags, or runtime admission.
 
+All three native descriptor launch variants share the same lower ownership
+transition. A resource-producing deadline worker stays masked until it
+publishes one terminal `Either` through one completion cell as its final
+effect. Cancellation, deadline loss, or an exception in the controller kills
+that worker, joins by reading the same completion, and rolls back any returned
+resource; there is no separately visible outcome followed by a lagging done
+signal. Source descriptors, staged images, portable `createProcess` results,
+and native spawn results use this masked-publication entrance.
+
+After native spawn, a shared masked handoff retains rollback ownership of the
+raw child, stdin, stdout, and stderr bundle across one restored asynchronous-
+exception checkpoint. The consumer is entered masked; it allocates the opaque
+process owner before restoring interruptible initialization, after which that
+process value owns cleanup. The exec-status `Handle` has its own masked
+`finally`, so EOF, a child-reported exec failure, synchronous read failure,
+deadline cancellation, and asynchronous interruption all close it before
+child-and-stdio cleanup proceeds. This changes neither public process types nor
+behavioral evidence; it closes leak windows in the inherited runtime. See
+Djex's
+[descriptor spawn resource-ownership report](../lib/Djex/docs/reports/2026-08-15-descriptor-spawn-resource-ownership.md).
+
 The retained policy builders are persistent and orthogonal for programmatic
 callers. Applicable-domain construction has only the short current builder;
 its lower analysis stages are private inside Djex. The startup decoder always
 enables the input box, origin probe, both non-vacuous
-preferences, recursive piecewise-affine applicable-domain validation,
+preferences, guarded recursive piecewise-affine applicable-domain validation,
 counterexample simplification, deferred opening, and the scoped/checkpointed
 usable-work owner on top of the execve-check descriptor launcher. Only numeric
 limits and the genuine scalar-or-binary-product domain choice remain in the
@@ -682,7 +721,7 @@ candidate, contract, provider, literal, fingerprint, or evaluation authority.
 
 The document exposes only numeric parameters and genuine choices. The current
 execve-check descriptor launcher is fixed, so `execution` has no
-`executableLaunch` member. The current recursive piecewise-affine algorithm is
+`executableLaunch` member. The current guarded recursive piecewise-affine algorithm is
 fixed, so `applicableDomainValidation` has no `strategy` member.
 Counterexample simplification and the scoped-v2 budget likewise omit their
 one-choice `strategy` fields. The origin probe, both non-vacuous preferences,
@@ -726,7 +765,7 @@ Every accepted startup file constructs the same operational bundle:
   descriptor check;
 - the four-entry MRU bank and all-zero origin probe;
 - independent post-`unsat` input-box traversal;
-- current recursive piecewise-affine applicable-domain traversal;
+- current guarded recursive piecewise-affine applicable-domain traversal;
 - non-vacuous preference for both positive-evidence families;
 - componentwise-lexicographic counterexample simplification;
 - deferred worker opening; and
@@ -748,12 +787,12 @@ original-order atomic fallback.
 
 The current schema reset and deleted compatibility surface are recorded in the
 [versionless startup configuration report](reports/2026-08-15-versionless-length-ranking-configuration.md).
-The recursive semantic and evidence boundary is recorded in the historical
-[recursive piecewise-affine Length ranking report](reports/2026-08-15-recursive-piecewise-affine-length-ranking.md)
+The current semantic and evidence boundary is recorded in the
+[guarded conditional Length ranking report](reports/2026-08-15-guarded-conditional-length-ranking.md)
 and Djex's
-[recursive piecewise-affine applicable-domain report](../lib/Djex/docs/reports/2026-08-15-recursive-piecewise-affine-length-applicable-domain.md).
-The former report's startup-number discussion describes its landing checkpoint,
-not the current grammar.
+[guarded conditional applicable-domain report](../lib/Djex/docs/reports/2026-08-15-guarded-conditional-length-applicable-domain.md).
+The earlier recursive reports and their startup-number discussion describe
+their landing checkpoint, not the current grammar.
 
 ### File acquisition
 

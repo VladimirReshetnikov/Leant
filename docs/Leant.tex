@@ -1552,7 +1552,7 @@ startup grammar is one current strict, versionless shape selected by
 current strict, versionless \code{\{format, rankingDomain, contract\}} shape.
 It is parsed once with no migration fallback and carries only the command-local
 passive scalar or binary-product contract, never startup execution policy. The
-startup policy fixes one recursive piecewise-affine applicable-domain
+startup policy fixes one guarded recursive piecewise-affine applicable-domain
 algorithm. Programmatic callers have one short builder,
 \nolinkurl{enableLengthRankingApplicableDomainValidation}, and the current
 assessments are \code{ApplicableDomainEstablished} and
@@ -1561,7 +1561,16 @@ assessments are \code{ApplicableDomainEstablished} and
 \nolinkurl{renderLengthSpinePairApplicableDomainValidationNote}. Djex keeps the
 direct, affine, relational,
 strict, quotient, extrema, monus, Boolean-union, and atomic analyses as private
-ordered fallbacks; they are not separately selectable Leant contracts. Their
+ordered fallbacks; they are not separately selectable Leant contracts. Its
+recursive expression grammar includes an all-or-nothing code{LengthIf}:
+both condition polarities and both arms must be fully supported, the true arm
+precedes the false arm, and raw guard alternatives consume the existing branch
+budget before contradictions collapse. For example,
+code{(if x <= 2 then x else 5) <= 3} establishes the provider-independent
+box code{[[2]]} with three visits, three unique assignments, and three
+applicable assignments entirely before process IO; an unsupported arm makes
+the whole fallback atom inapplicable. The original checked problem is still
+replayed over every unique assignment and remains semantic authority. The
 former public aliases were deleted without migration because Leant is
 experimental and promises no stability or backward compatibility. This API
 reset does not alter the versionless file shapes or the seven numeric limits
@@ -1572,6 +1581,16 @@ current reference is \code{docs/length-ranking.md}; dated
 reports under \code{docs/reports/} are historical engineering records rather
 than current file contracts. Everything in this paragraph
 is off by default and leaves no trace when disabled.
+
+When live work is required, the fixed execve-check launcher inherits Djex's
+current descriptor ownership rule. Resource-producing worker results are
+published masked through one terminal completion cell; every native descriptor
+strategy shares one rollback-protected raw-child handoff; and interruptible
+initialization resumes only after the opaque process has accepted cleanup
+ownership. The child exec-status handle is closed on every normal,
+synchronous-failure, deadline, and asynchronous-interruption exit. These rules
+prevent leaked children and handles; they do not strengthen executable
+attestation, solver status, or behavioral evidence.
 
 The pure searches answer in microseconds to milliseconds; the cost
 center is backend verification, a few hundred milliseconds per

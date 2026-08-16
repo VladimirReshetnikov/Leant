@@ -13,10 +13,11 @@ landing checkpoints; the current contract-only decoder accepts one versionless
 `{format, rankingDomain, contract}` root and performs no migration.
 Reports from directly bounded through recursive piecewise-affine applicable-
 domain ranking likewise preserve a superseded public strategy ladder. The
-current tree exposes one short recursive applicable-domain policy; its lower
-analysis stages are private Djex fallbacks, and the predecessor builders,
+current tree exposes one short guarded recursive applicable-domain policy; its
+lower analysis stages are private Djex fallbacks, and the predecessor builders,
 assessments, failures, receipts, renderers, and schema tags have no aliases or
-migration surface.
+migration surface. Fully supported expression conditionals now participate in
+that one current policy rather than selecting another schema or strategy.
 The [README](../../README.md) and
 [Length ranking reference](../length-ranking.md) describe the current tree.
 
@@ -84,6 +85,7 @@ Reports are listed oldest first.
 - 2026-08-15 — [Versionless live Length ranking configuration](2026-08-15-versionless-length-ranking-configuration.md)
 - 2026-08-15 — [Versionless command-local Length contract](2026-08-15-versionless-length-contract.md)
 - 2026-08-15 — [Current-only Length applicable-domain policy](2026-08-15-current-length-applicable-domain-policy.md)
+- 2026-08-15 — [Guarded conditional Length ranking](2026-08-15-guarded-conditional-length-ranking.md)
 
 ## Standalone PDF reports
 

@@ -63,7 +63,7 @@ first.
   - [Canonical `Prod` eligibility and the serializer boundary](#canonical-prod-eligibility-and-the-serializer-boundary)
   - [Library-level pair query handoff](#library-level-pair-query-handoff)
   - [Live pair ranking and non-vacuous bounded-positive preference](#live-pair-ranking-and-non-vacuous-bounded-positive-preference)
-  - [Current recursive applicable-domain validation](#current-recursive-applicable-domain-validation)
+  - [Current guarded recursive applicable-domain validation](#current-guarded-recursive-applicable-domain-validation)
   - [Shared usable-work budget (v1)](#shared-usable-work-budget-v1)
   - [Scoped usable-work lease (v2)](#scoped-usable-work-lease-v2)
   - [Counterexample simplification](#counterexample-simplification)
@@ -97,7 +97,7 @@ accepted startup file selects the current policy bundle:
 - descriptor-bound execve-check executable access;
 - the four-entry MRU replay bank followed by the all-zero origin probe;
 - independent post-`unsat` input-box validation;
-- current recursive piecewise-affine applicable-domain validation;
+- current guarded recursive piecewise-affine applicable-domain validation;
 - non-vacuous preference for both applicable-domain and input-box receipts;
 - componentwise-lexicographic counterexample simplification;
 - deferred session opening; and
@@ -106,11 +106,15 @@ accepted startup file selects the current policy bundle:
 
 The three bounded traversal authorities remain independent: input-box,
 applicable-domain, and simplification limits cannot substitute for one another.
-The recursive applicable-domain algorithm first uses its complete private atomic
-predecessor and recursively expands only otherwise ignored relational leaves
-whose supported signed-affine summaries contain minimum, maximum, or monus.
-Quotient, modulo, conditional, result-reference, zero-scale, and other
-unsupported descendants reject the complete recursive fallback atom.
+The guarded recursive applicable-domain algorithm first uses its complete
+private atomic predecessor and recursively expands only otherwise ignored
+relational leaves whose supported signed-affine summaries contain minimum,
+maximum, monus, or a guarded conditional. A conditional is all-or-nothing:
+both polarities of its condition and both selected arms must be wholly
+supported. Quotient, modulo, result-reference, zero-scale, and other
+unsupported descendants reject the complete recursive fallback atom; an
+unsupported descendant in either conditional arm rejects the whole atom even
+when the other arm alone would establish a finite box.
 
 This reset deliberately removed the historical startup selectors and their
 parallel schemas. A historical file is not migrated or dispatched through an
@@ -140,7 +144,7 @@ budget (default 5,000 ms, maximum 60,000 ms). No option discovers a file or
 solver. POSIX configuration-file descriptor acquisition is implemented;
 Windows currently fails
 closed. The current route completes admission and preparation, then runs each
-candidate's pure MRU, recursive applicable-domain, and origin prefix before IO.
+candidate's pure MRU, guarded applicable-domain, and origin prefix before IO.
 An all-pure batch opens no process; the first live miss opens one lexical
 session for that query and the remaining suffix. The batch captures one
 dynamically scoped usable-work owner after the 64-candidate admission gate and
@@ -151,6 +155,17 @@ the established atomic fallback.
 The opaque activated mode retains the exact require-pin or permit-unpinned
 decision that released it, and Main derives its startup notice from that mode
 rather than reinterpreting the raw command-line flag.
+
+The inherited native descriptor launcher keeps every resource-producing
+acquisition masked through publication to one terminal completion cell. Its
+three descriptor strategies then share one rollback-protected transfer from
+the raw child-and-stdio bundle to the opaque process owner: an asynchronous
+exception before the consumer accepts ownership cleans the raw child and
+stdio, while initialization becomes interruptible only after the process value
+owns that cleanup. The child exec-status handle is independently closed in a
+masked finalizer on EOF, child-reported exec failure, synchronous read failure,
+deadline cancellation, or asynchronous interruption. These are lifecycle and
+leak-prevention guarantees, not executable, solver, or behavioral evidence.
 
 ### Candidate eligibility
 
@@ -443,7 +458,7 @@ independent. Without
 `enableLengthRankingNonVacuousInputBoxPreference`, completed positive receipts
 retain their historical neutral ordering.
 
-### Current recursive applicable-domain validation
+### Current guarded recursive applicable-domain validation
 
 Leant exposes one applicable-domain policy for current code. Programmatic
 callers enable it with
@@ -489,7 +504,7 @@ pairAssessment <- assessVerifiedLengthSpinePairCandidatesWithPolicy
 These persistent builders control orthogonal dimensions except that the last
 usable-work builder determines its single budget strategy. The current
 versionless startup decoder constructs this complete bundle directly: the
-current applicable domain, input-box traversal, origin probe, both
+current guarded applicable domain, input-box traversal, origin probe, both
 non-vacuous preferences, counterexample simplification, deferred opening, and
 the scoped usable-work owner. A contract-only document replaces only the
 request contract and never selects ranking, execution, replay, or opening
@@ -557,7 +572,7 @@ structure. Every normalized leaf follows one private ordered fallback:
 direct literal -> positive affine -> relational -> strict relational
   -> positive-literal quotient -> root extrema -> root monus
   -> Boolean finite union / atomic branching
-  -> recursive piecewise-affine fallback
+  -> guarded recursive piecewise-affine fallback
 ```
 
 The direct stage recognizes normalized `input <= literal` coverage. The
@@ -625,8 +640,10 @@ leaf's affine constant and is never borrowed from closure state.
 
 The Boolean layer owns outer polarity: positive conjunction is a Cartesian
 conjunction, negative conjunction is a union, `not` flips polarity, and
-negative equality splits into the two strict alternatives. It does not treat
-expression conditionals or arithmetic disjunction as general Boolean syntax.
+negative equality splits into the two strict alternatives. It does not add a
+general arithmetic-disjunction expression form. The guarded recursive
+fallback does reuse this exact Boolean expansion for an expression
+conditional's condition and complement.
 Before recursive descent, the atomic stage adds these exact immediate-root
 alternatives in written order:
 
@@ -647,21 +664,24 @@ C <= (A monus B)    -> [C <= 0] | [B + C <= A]
 The monus equality rule applies in either source orientation. Each required
 operand must summarize independently as positive affine; nested, embedded,
 both-root, mixed, conditional, or otherwise unsupported shapes remain one
-ignored atomic alternative for the recursive fallback.
+ignored atomic alternative for the guarded recursive fallback.
 
 An earlier exact result is retained. Recursive interpretation runs only when
 the complete atomic scanner returns its singleton ignored alternative and the
-relation still contains minimum, maximum, or natural monus. This atomic-first
-boundary preserves exact lower-level handling without making it selectable
-Leant policy.
+relation still contains minimum, maximum, natural monus, or a conditional.
+This atomic-first boundary preserves exact lower-level handling without making
+it selectable Leant policy.
 
-The recursive grammar admits compact inputs, natural literals, normalized
-sums, retained positive scales, binary minimum, binary maximum, and binary
-monus. It does not recursively descend through quotient, modulo, a
-conditional, a result reference, an out-of-range input, a retained zero scale,
-or another unsupported child; an earlier private stage can still have handled
-the complete leaf exactly. Unsupported descendants leave the fallback atom
-ignored rather than approximated.
+The recursive expression grammar admits compact inputs, natural literals,
+normalized sums, retained positive scales, binary minimum, binary maximum,
+binary monus, and `if F then E else E`. A conditional is admitted only when
+every leaf in both the positive and negative Boolean expansion of `F` and
+every descendant in both arms is supported. It does not recursively descend
+through quotient, modulo, a result reference, an out-of-range input, a
+retained zero scale, or another unsupported child; an earlier private stage
+can still have handled the complete leaf exactly. Unsupported descendants
+leave the complete fallback atom ignored rather than approximated or accepting
+only the apparently reachable arm.
 
 For selected child values `L` and `R`, the exact cases are:
 
@@ -672,19 +692,28 @@ max(L,R)  -> [R <= L;     value L]
            | [L + 1 <= R; value R]
 L monus R -> [L <= R;     value 0]
            | [R + 1 <= L; value L - R]
+if F then T else E
+           -> [positive F guards; value T]
+            | [negative F guards; value E]
 ```
 
-The first choice owns equality. Left-child cases precede right-child cases,
-descendant guards precede the current selector, and the relation appends its
-at-most, immediate strict complement, or two equality rules last. Signed
-coefficients created by a positive monus branch transfer exactly across the
-inequality into the established natural positive-sided rule representation.
-No checked formula is manufactured, and no selector or relation rule is
-deduplicated.
+The first extrema/monus choice owns equality. A conditional emits its true arm
+before its false arm. Within one arm, condition-DNF alternatives are outermost
+and selected-expression alternatives are innermost; condition guards precede
+selected-arm guards. More generally, left-child cases precede right-child
+cases, descendant guards precede the current selector, and the enclosing
+relation appends its at-most, immediate strict complement, or two equality
+rules last. Signed coefficients created by a positive monus branch transfer
+exactly across the inequality into the established natural positive-sided rule
+representation. No checked formula is manufactured, and no selector,
+conditional guard, or relation rule is deduplicated.
 
 Raw generated-branch admission counts the complete formula DNF by recursive-
-alternative Cartesian product before formula cleanup, guard contradiction,
-rule collection, closure, or box cleanup. Original literal sets are then
+alternative Cartesian product before formula cleanup, conditional-guard or
+selector contradiction, rule collection, closure, or box cleanup. An
+impossible conditional guard therefore still keeps its selected value in the
+raw Cartesian product and is collapsed only when the enclosing relation forms
+branch coverage. Original literal sets are then
 canonicalized: duplicate literals disappear, an exact literal/complement
 branch drops, equal sets deduplicate, and strict supersets are absorbed.
 Survivors are re-expanded in set and recursive-alternative order. Branch and
@@ -713,15 +742,24 @@ assignments; and the original checked precondition and postcondition are
 replayed once in global lexicographic order. Derived guards, rules, boxes, and
 solver status never replace that replay.
 
-The scalar characterization
-`max(x,y) <= 3 monus min(x,y), x <= 3, y <= 3` retains
-`[[2,3],[3,2]]`: two boxes, 24 visits, 15 unique assignments, and ten
-applicable assignments. The product characterization with
-`u = min(x,y) + (x monus y)`,
-`v = min(x,y) + (y monus x)`, and `max(u,v) <= 2` retains
-`[[2,2]]` with 1/9/9/9 box, visit, unique, and applicable counts. Its 32 raw
-alternatives distinguish branch caps 31 and 32 before contradictory cases
-disappear.
+The one-input characterization
+`(if x <= 2 then x else 5) <= 3` retains `[[2]]` with one box, three
+visits, three unique assignments, and three applicable assignments; its two
+raw guard alternatives make a generated-branch cap of one report that two
+were observed. Replacing the guard with `x = 0` and the arms with `1` and `x`
+retains the same receipt but preserves all three negative-equality
+alternatives, so a cap of two observes three.
+
+The nested characterization
+`y <= 2` and `(if x <= 1 then max(x,y) else x monus y) <= 2` retains
+`[[4,2]]`: one box, 15 visits, 15 unique assignments, and 12 applicable
+assignments. Its four raw alternatives pin branch admission before its
+four-rule and closure boundaries; an independent replay oracle over the wider
+`[0..5] x [0..3]` rectangle confirms that every one of the 12 satisfying
+assignments is covered by a retained box. Replacing only the false arm with
+`x modulo 2` makes the complete atom inapplicable. Scalar and nominal product
+query association retain the same guarded receipt without changing query
+fingerprints or bytes.
 
 #### Lifecycle and ordering
 
@@ -757,6 +795,9 @@ The current Leant reset is recorded in the
 Djex owns the detailed grammar, cap precedence, receipt identity, and replay
 authority described in its
 [current applicable-domain surface report](../lib/Djex/docs/reports/2026-08-15-current-length-applicable-domain-surface.md).
+The guarded extension and its Leant tandem characterization are recorded in
+the
+[guarded conditional Length ranking report](reports/2026-08-15-guarded-conditional-length-ranking.md).
 The earlier
 [recursive piecewise-affine Length ranking report](reports/2026-08-15-recursive-piecewise-affine-length-ranking.md)
 is non-normative development history.
@@ -1174,7 +1215,7 @@ The operational objects expose numeric parameters and genuine choices only:
 
 - `execution` fixes the current descriptor-bound execve-check launcher; there
   is no `executableLaunch` field.
-- `applicableDomainValidation` fixes the current recursive piecewise-affine
+- `applicableDomainValidation` fixes the current guarded recursive piecewise-affine
   algorithm; there is no `strategy` field. Its limits are, in order,
   maximum inputs, generated branches, rules per branch, closure inspections per
   branch, retained boxes, assignment visits, and unique assignments. Their
@@ -1254,13 +1295,17 @@ and
 Their startup-version discussions describe the checkpoints at which those
 reports landed and are not current file documentation.
 
-The current recursive validator and its inherited lifecycle are recorded in the
-[recursive piecewise-affine Length ranking report](reports/2026-08-15-recursive-piecewise-affine-length-ranking.md).
-That report also predates the schema reset; its v33/v34 routing discussion is
-historical, while its semantic examples and authority boundary remain useful.
-Djex's current recursive grammar, selector guards, signed-affine transfer,
-raw-case accounting, exact union replay, and receipt authority are recorded in
-the
+The current guarded recursive validator and its inherited descriptor ownership
+lifecycle are recorded in the
+[guarded conditional Length ranking report](reports/2026-08-15-guarded-conditional-length-ranking.md).
+The earlier
+[recursive piecewise-affine Length ranking report](reports/2026-08-15-recursive-piecewise-affine-length-ranking.md)
+predates both this extension and the schema reset; its v33/v34 routing
+discussion is historical, while its earlier semantic examples and authority
+boundary remain useful.
+Djex's pre-conditional recursive grammar, selector guards, signed-affine
+transfer, raw-case accounting, exact union replay, and receipt authority are
+recorded in the historical
 [recursive piecewise-affine applicable-domain report](../lib/Djex/docs/reports/2026-08-15-recursive-piecewise-affine-length-applicable-domain.md).
 The inherited source/staged executable-check lifecycle and its narrow authority
 are in the
