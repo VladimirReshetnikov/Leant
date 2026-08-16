@@ -239,8 +239,10 @@ The proposal has eight principal conclusions.
 
 \item \textbf{Z3 Optimize, unsat cores, and Spacer are secondary engines, not replacements for ordinary SAT checks.} Optimize is useful for choosing among sketches after hard behavioral constraints; unsat cores can learn grammar nogoods and explain inconsistent contracts; Spacer can search for inductive invariants of recursive relational semantics. Each requires its own versioned protocol and status taxonomy.
 
-\item \textbf{The implementation should remain additive.} Existing Length configuration files, scalar and pair contracts, startup behavior, and ranking output can remain byte-for-byte compatible. A new generic behavioral layer can wrap the current Length implementation, while new hard-filter and CEGIS commands are opt-in and separately fingerprinted.
+\item \textbf{The implementation should remain additive.} The current Length contract and configuration schemas, startup behavior, and ranking output need not change: when no behavior mode is selected, the existing scalar and pair paths run exactly as they do today. A new generic behavioral layer can wrap the current Length implementation, while new hard-filter and CEGIS commands are opt-in and separately fingerprinted.
 \end{enumerate}
+
+Readers who know Z3 but not this codebase should read \cref{sec:terminology} first; the rest of the document uses the project's vocabulary (providers, occurrences, certificates, sealing, replay) without further definition. Readers who know the codebase can skip to \cref{chap:architecture}.
 
 \begin{summarybox}
 \textbf{Recommended order of construction:}
@@ -281,6 +283,49 @@ The requested problem is synthesis from a type signature plus a behavioral const
 
 The proposal covers architecture, semantic contracts, Z3 encodings, algorithms, trust, proof artifacts, APIs, diagnostics, performance controls, testing, and an implementation roadmap. It does not propose to translate arbitrary Lean dependent types, effects, quotient types, proof irrelevance, or nontermination wholesale into SMT. Those features remain at the Lean boundary unless a particular behavioral domain supplies a precise model.
 
+\section{Terminology}
+\label{sec:terminology}
+
+This document uses \Leant's and \Djex's own vocabulary throughout. \cref{tab:terminology} fixes the meaning of the terms that recur most often; each entry says what the word means \emph{here}, which is sometimes narrower than its general use.
+
+\begin{longtable}{@{}L{0.21\textwidth}L{0.73\textwidth}@{}}
+\caption{Project vocabulary used in this proposal.}\label{tab:terminology}\\
+\toprule
+Term & Meaning in this document \\
+\midrule
+\endfirsthead
+\toprule
+Term & Meaning in this document \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Provider & A Lean declaration (function, constructor, projection, instance-derived operation) that the synthesis inventory makes available for building candidates. The \emph{provider inventory} is the goal-relevant subset retained for one target. \\
+Inventory & The checked collection of type families, constructors, providers and bindings one synthesis request may use, sealed under a fingerprint. Every later artifact names the inventory it was checked against. \\
+Occurrence & One particular use of a provider or constructor inside a candidate graph, together with its exact type arguments. Two uses of the same provider are two occurrences; authority is granted per occurrence, never per name. \\
+Certificate & \Djex evidence attached to a provider occurrence recording how its type arguments, constraints and instances were resolved. ``Occurrence-specific certificate'' means the certificate of that one use. \\
+Ground discharge & Establishing that a provider's class constraints hold at the exact ground types of an occurrence. Some provider laws are admitted only \emph{conditional on} such a discharge. \\
+Provider law / transfer & An explicit, user-supplied assumption about how a provider transforms an observation (for example, ``\code{List.reverse} preserves length''). Never inferred from names, source text or tests; classified as assumed uniformly, conditional on ground discharge, or Lean-proved. \\
+Spine, spine family & A unary recursive datatype such as \code{List} with one \emph{zero} constructor (\code{List.nil}) and one \emph{step} constructor (\code{List.cons}). The Length domain observes only the spine, that is, the length; elements are opaque. \\
+Role, role vector & The source-ordered assignment of one modeling role to each target argument (observed spine, opaque value, callback, \ldots). Roles are declared explicitly in the contract and arity-checked; they are never inferred from a type constructor name. \\
+Callback (verification) & \Leant's re-elaboration of each candidate spelling by the Lean backend against the exact requested type. The first spelling the backend accepts yields the \code{Verified} receipt. \\
+Callback (argument) & A function-typed input of the target, such as \code{f} in \code{(a -> Option b)}. Behavioral domains model such arguments relationally (as uninterpreted functions or call events); they never evaluate them. Context makes clear which sense is meant. \\
+\code{Verified} receipt & An opaque value proving that the verification callback accepted one specific candidate occurrence. It is the only admission ticket to post-verification stages and is never upgraded in place into behavioral evidence. \\
+Exact typed origin & The \code{ExactTypedVariantOrigin} sidecar tying an accepted spelling back to the typed candidate graph, the checked inventory, the source and search goals and the provider bindings that produced it. Behavioral domains consume this, not rendered text. \\
+Sealing, sealed & Constructing an opaque checked value through its single authorized constructor after every check has passed. Session, contract and candidate problem are sealed in that order; nothing downstream can forge or reassociate them. \\
+Handoff & \code{Leant.Synth.Length.Handoff}: the sole conversion of one \code{Verified} receipt plus one passive contract into a checked \Djex Length problem. It refuses mismatches instead of trusting caller-supplied graphs or names. \\
+Fingerprint & The canonical, collision-resistant identity of a checked artifact (inventory, encoding, candidate, contract, problem, query). Evidence is bound to the tuple of fingerprints named in \cref{chap:goals}, never to a rendered term or a hash of one. \\
+Post-verification boundary & \code{Leant.Synth.PostVerification}: the stage after callback verification. Today it admits only a sealed \emph{permutation} of the verified receipts, which is why ranking can reorder but never remove candidates. \\
+Replay & Independent re-evaluation of a decoded solver model by the domain's own evaluator against the exact sealed problem. A model becomes a counterexample only after replay reproduces the contract violation; raw solver output never does. \\
+Applicable domain & The set of inputs satisfying a contract's precondition. Applicable-domain validation enumerates a bounded part of it exhaustively; its receipts record how many assignments were applicable, so a vacuous contract is distinguishable from a satisfied one. \\
+Monus & Truncated natural subtraction, $n \mathbin{\dot{-}} m = \max(n-m,0)$; the arithmetic of a \code{List.cons} step case read backwards. \\
+\CEGIS & Counterexample-guided inductive synthesis: alternately propose a candidate consistent with all known samples and search for a new counterexample; stop when none is found or a budget ends. \\
+Sketch & A partial program with holes. Here always a \Djex-prepared, type-correct DAG of alternatives; \Zthree chooses among the alternatives, it never invents syntax. \\
+Nogood & A learned clause forbidding a combination of choices that has been shown infeasible, scoped to the exact grammar and sample bank under which it was learned. \\
+\CHC, Spacer & Constrained Horn clauses, and \Zthree's fixedpoint engine for them, which returns either a derivation of the ``bad'' state or an inductive invariant. \\
+Over-/under-approximation & A summary of a set of behaviors that contains at least (respectively at most) every real behavior. Only an over-approximation can justify pruning; an under-approximation can only produce witnesses. \\
+\end{longtable}
+
 \section{Exact repository revisions}
 \label{sec:revisions}
 
@@ -302,6 +347,10 @@ Repository & Commit & Commit time (UTC) & Relevant state \\
 \end{table}
 
 The repositories are cited by immutable commit URLs in the bibliography. Statements about current module ownership are based primarily on \Leant's \path{README.md}, \path{docs/synth-internals.md}, and \path{src/Leant/Synth/Length/*}, and on \Djex's \path{synthesis/README.md} and \path{docs/semantic-foundations.md}. Z3 capabilities are referenced to the official online guide and repository.
+
+\paragraph{Changes since the pinned revisions.} Later on the same day \Leant replaced its numbered Length schemas with versionless ones: the startup configuration in commit \code{4fa5c0a1} and the command-local contract file in \code{d4104c91}, documented in \code{dd87538a} and \path{docs/reports/2026-08-15-versionless-length-contract.md}. The current root is one \code{format} literal, one \code{rankingDomain} discriminator (\code{scalar} or \code{binary-product}) and one \code{contract} object, with no \code{version} member, no migration decoder and an explicit statement that the experimental entrance carries no compatibility commitment. Neither change touches \Djex's checked semantics, the solver protocol, replay or evidence authority, so the architectural claims below stand unchanged. Where this proposal mentions ``existing file versions'' the phrase should be read as ``the current versionless schemas'', and its compatibility statements as ``the current schemas need not change'', not as a promise to freeze them; \cref{sec:contract-envelope} discusses how the versioned envelope proposed here relates to that policy. \Djex advanced from \code{0501e72e} to \code{43ec4f70} through refactoring and documentation moves only.
+
+\paragraph{What was executed.} The Lean listings in \cref{chap:examples,chap:proofs} whose definitions appear in the text (the reverse, one-layer case, state-bind, \code{Option.bind} and provider-hypothesis theorems, and the accumulator-invariant proof shape) were type-checked with Lean 4.33.0. The six SMT-LIB scripts of \cref{app:smt} were executed with Z3 5.0.0 and the observed answers are quoted after each listing. The Haskell interfaces are conceptual and were not compiled.
 
 \section{What Leant and Djex already do}
 
@@ -329,7 +378,17 @@ The current Length layer is already a deep implementation of the trust pattern n
 
 \subsection{Occurrence-sealed handoff}
 
-\code{prepare\allowbreak Checked\allowbreak Length\allowbreak Problem} accepts a passive contract and one callback-accepted \code{Verified} \code{Detailed\allowbreak Verification\allowbreak Variant}. It requires the typed rendering route and exact semantic sidecar, checks that source and search fragments were not retargeted, requires the expected premise and request shape, rerenders the original variant, resolves the exact family and providers, seals a session with one interpretation policy, seals the contract in that session, and finally asks \Djex to seal the whole typed candidate into a candidate-specific problem. The product-domain analogue additionally requires a canonical Lean \code{Prod} result whose two fields are the configured spine.
+\code{prepare\allowbreak Checked\allowbreak Length\allowbreak Problem} accepts a passive contract and one callback-accepted \code{Verified} \code{Detailed\allowbreak Verification\allowbreak Variant}, and turns them into a \Djex problem through a fixed sequence of fail-closed checks, each with its own refusal constructor:
+
+\begin{enumerate}[leftmargin=2em]
+\item the accepted variant must have come through the typed rendering route and carry the exact semantic sidecar (a Djinn text-only variant is refused, not guessed at);
+\item the source and search fragments recorded in the sidecar must still be the ones the command targeted, and the request must have the plain shape the domain models: no caller or constructor premises and no request contexts, because a spine length observed under extra hypotheses would mean something else;
+\item the original variant is rerendered and must reproduce the accepted text at the same renderer ordinal, so the graph being interpreted is the graph Lean accepted;
+\item the contract's spine family, its constructors and every named provider are resolved against the retained provenance of that exact inventory (an unavailable or ambiguous name is a refusal, never a best match);
+\item a \Djex session is sealed with one interpretation policy, the contract is sealed inside that session, and finally the whole typed candidate is sealed into a candidate-specific problem.
+\end{enumerate}
+
+The product-domain analogue additionally requires a canonical Lean \code{Prod} result whose two fields are the configured spine.
 
 \subsection{Typed symbolic interpretation}
 
@@ -423,7 +482,7 @@ The first several phases should explicitly avoid the following goals.
 \item Inferring provider behavior by symbol name, documentation, source text, or testing alone.
 \item Solving unbounded higher-order extensional equality in general.
 \item Using one universal semantic IR for lists, state, bit-vectors, costs, recursion, and effects.
-\item Preserving every current textual configuration shape while simultaneously declaring a stable public contract language. Existing formats can remain compatible; new formats should remain experimental and versioned until the semantics settles.
+\item Preserving every current textual configuration shape while simultaneously declaring a stable public contract language. \Leant's current Length schemas are experimental and carry no compatibility commitment (\cref{sec:revisions}); the proposal does not ask to freeze them. New formats should likewise remain experimental until their semantics settles.
 \end{itemize}
 
 \section{Governing invariants}
@@ -689,6 +748,7 @@ A command-line flag such as ``preserve length'' is enough for one demonstration 
 The language should be declarative and solver-neutral. A source file describes the intended behavior. It does not contain SMT-LIB snippets, Z3 parameters, graph identifiers, private Djex names, or proof receipts.
 
 \section{A versioned outer envelope}
+\label{sec:contract-envelope}
 
 A proposed outer JSON envelope is shown in \cref{lst:contract-envelope}. JSON is not semantically privileged; it is merely practical for the existing file-acquisition model. The checked in-memory source should be a nominal Haskell type.
 
@@ -712,7 +772,7 @@ A proposed outer JSON envelope is shown in \cref{lst:contract-envelope}. JSON is
         "body": {
           "eq": [
             { "nth": ["result", "i"] },
-            { "nth": ["xs", { "sub": [{"len":"xs"}, 1, "i"] }] }
+            { "nth": ["xs", { "sub": [{"len":"xs"}, 1, "i"] }] }  // xs[len(xs) - 1 - i]
           ]
         }
     }}
@@ -727,6 +787,8 @@ A proposed outer JSON envelope is shown in \cref{lst:contract-envelope}. JSON is
 \end{lstlisting}
 
 The outer version governs field grammar and default behavior. The domain version governs semantic interpretation. Execution profiles and Z3 parameters are separate activated policy files, as they are for Length today; a passive contract must not grant process-launch authority.
+
+A remark on versioning is needed because the current Length entrances deliberately carry none. Since the pinned revision, \Leant's startup and contract-only schemas are each a single versionless document: one \code{format} literal, one \code{rankingDomain} discriminator and one nested object, with no migration decoder and no compatibility promise (\cref{sec:revisions}). That is the right choice for an experimental single-domain entrance: a version field whose only reader is a rejection branch is dead weight. The envelope above asks for versions for a different reason. In a contract language spanning several domains, \code{domain.version} is a \emph{semantic-model identifier}: it enters session and problem fingerprints so that two contracts with identical text under different domain versions are different problems, and it lets a domain change its exactness statement without silently changing the meaning of stored samples, nogoods and proof receipts. The outer \code{version}, by contrast, only matters if more than one field grammar is ever accepted at once. If the project keeps its present policy, the outer version can be dropped in favor of the same format-literal-plus-discriminator shape Length now uses, and the domain version can be folded into the domain identifier; nothing else in this proposal depends on numeric file versions.
 
 \section{Contract core}
 
@@ -974,7 +1036,7 @@ The second role should be used cautiously. Djex already has a checked typed gram
 Z3 sequences provide concatenation, length, extraction, indexing and related operations over an arbitrary element sort \cite{z3-sequences}. They can make bounded sequence contracts concise, but two caveats matter:
 
 \begin{itemize}[leftmargin=2em]
-\item out-of-bounds \code{seq.nth} is underspecified, so every index observation must carry and preserve an explicit bounds guard;
+\item out-of-bounds \code{seq.nth} is under-specified (the guide says the result is treated as a fresh variable), so every index observation must carry and preserve an explicit bounds guard;
 \item solver behavior for quantified sequence properties can be less predictable than a domain-specific array-plus-length encoding.
 \end{itemize}
 
@@ -1010,11 +1072,11 @@ A query for \code{Bad} can find a counterexample or infer an inductive invariant
 
 \section{Synthesiz3 as an adjacent research direction}
 
-The official Z3 documentation repository contains the 2025 Synthesiz3 artifact \cite{synthesiz3}, which encodes synthesis specifications of the shape
+The official Z3 documentation repository contains the artifact of Synthesiz3 \cite{synthesiz3}, published at FMCAD 2025, which encodes synthesis specifications of the shape
 \[
   \forall \vec{c}.\;\exists y.\;\forall \vec{u}.\;F(\vec{c},y,\vec{u})
 \]
-using an extended SMT-LIB command and a set of ``uncomputable'' symbols. This work is relevant because it demonstrates synthesis-oriented reasoning on top of Z3, especially when specifications contain symbols that may be used logically but not in the synthesized term.
+using an extended SMT-LIB command, \code{assert-synth}, together with a \code{:uncomputable} option naming the symbols $\vec{u}$ that may appear in the specification but not in the synthesized term. This work is relevant because it demonstrates synthesis-oriented reasoning on top of Z3, especially when specifications contain symbols that may be used logically but not in the synthesized term.
 
 For \Leant/\Djex it should be treated as a research backend, not the first production dependency. The typed-sketch selector encoding proposed here is smaller, uses the existing Z3 process protocol, and keeps term grammar ownership in Djex. A later experimental backend can translate a first-order checked grammar and contract into Synthesiz3's problem shape and compare quality and performance on the same benchmark corpus.
 
@@ -1093,7 +1155,7 @@ Hard filtering becomes \CEGIS when counterexamples learned from one candidate ar
 
 \begin{enumerate}[leftmargin=2em]
 \item enumerate the next type-correct candidate from Djinn or Exference;
-\item Lean-verifies it;
+\item let Lean verify it;
 \item replay the current bank;
 \item if it survives, ask the domain for a new counterexample;
 \item on a replayed counterexample, add the sample and continue enumeration;
@@ -1267,9 +1329,9 @@ Only exact-model blocking is required for correctness. Stronger blocks are optim
 Three grammar sources should be supported progressively.
 
 \begin{description}[leftmargin=2.2em,style=nextline]
-\item[Bounded normal forms.] Generate beta-normal, eta-long structural alternatives for the target. Best for plumbing terms and logic.
-\item[Exference frontier extraction.] Reuse Exference's rated providers and partial search states to create a goal-relevant grammar. Best for library composition.
-\item[Template families.] Domain-specific skeletons such as folds, maps, affine arithmetic, bit tricks, case splits, or state-threading forms. Best for deep behavior with a small combinatorial shell.
+\item[Bounded normal forms.] Generate beta-normal, eta-long structural alternatives for the target: introduce the target's binders, then at each hole offer the locals of the right type, one-layer case splits on locals of a modeled family, constructor applications and tuple formation, up to a node bound. No provider is needed. Best for plumbing terms and logic such as state threading or \code{Option.bind}.
+\item[Exference frontier extraction.] Reuse Exference's rated providers and partial search states to create a goal-relevant grammar: the prepared provider occurrences Exference would try at a goal, already type-checked and certificate-associated, become the alternatives of a node of that goal type, and its rating order becomes the alternative order. Best for library composition, where the useful terms are applications of a few loaded functions.
+\item[Template families.] Domain-specific skeletons such as folds, maps, affine arithmetic, bit tricks, case splits, or state-threading forms, with parameter slots where the domain expects constants, coefficients or selectors. Best for deep behavior with a small combinatorial shell, such as saturating arithmetic or a clamp.
 \end{description}
 
 A sketch identifies the grammar source and all bounds in its fingerprint. ``No sketch'' means no satisfying term in that finite grammar, not uninhabitation of the type or impossibility of the contract in Lean.
@@ -1303,6 +1365,21 @@ Examples of sound summaries include:
 \item lower and upper bounds on cost;
 \item a regular tree grammar of possible shapes.
 \end{itemize}
+
+\subsection{A worked example}
+
+Take the target \code{List a -> List a}, the contract $\operatorname{len}(f(xs))=\operatorname{len}(xs)$, and a bank holding one sample, the empty list ($n=0$). Suppose Exference is at the partial state
+\[
+  \code{fun xs => List.cons ?h}_1\ \code{?h}_2,
+  \qquad \code{?h}_1 : a,\quad \code{?h}_2 : \code{List a}.
+\]
+The Size/Shape domain knows nothing about what will fill \code{?h}$_2$ except its type, so its summary is the weakest sound statement: the completion has \emph{some} length $t\in\Nat$. Composing that with the exact step case gives the prefix summary $\operatorname{len}(\text{result}) = 1 + t$, and the pruning query on the bank is
+\[
+  1 + t = 0 \;\land\; t \ge 0,
+\]
+which is unsatisfiable. Every completion of the prefix returns a nonempty list on the empty input, so the prefix and its whole subtree can be pruned, and the receipt records the summary (``$t\ge 0$ for hole \code{?h}$_2$''), the exact bank identity, and the grammar fingerprint that scoped it.
+
+The polarity rule matters here. Had the domain instead summarized \code{?h}$_2$ by the completions it happened to enumerate first, say ``one of the locals'', giving $\operatorname{len}(\text{result})=1+n$, the query on a bank holding a length-one sample would read $1+1=1$ and would also be unsatisfiable, but that would prune a prefix which the completion \code{?h}$_2 :=$ \code{[]} satisfies on that sample. An under-approximation can report ``here is a completion that works'', never ``no completion works''. The over-approximate summary $t\ge0$ correctly leaves the length-one sample satisfiable ($t=0$).
 
 \subsection{Nominal approximation polarity}
 
@@ -1770,7 +1847,7 @@ admits many programs. Behavioral constraints can be layered to move from a broad
   \forall xs.\;\operatorname{len}(f(xs))=\operatorname{len}(xs).
 \]
 
-This rejects constant empty, singleton, drop and duplicate-length-changing candidates. It retains identity, reverse, rotations, arbitrary permutations, element replacement and some duplicate/delete combinations of equal net length.
+This rejects every candidate whose output length can differ from the input length: constant empty or singleton results, functions that drop or duplicate elements without compensation, and truncations. It retains identity, reverse, rotations, arbitrary permutations, element replacement, and duplicate/delete combinations whose net length change is zero.
 
 The existing Length domain can already rank candidates by counterexamples to this law. The first proposed hard-filter milestone can reject replayed violators.
 
@@ -1949,7 +2026,7 @@ the contract is
 r[i]&=g(xs[i])\quad(0\le i<\operatorname{len}(xs)).
 \end{align*}
 
-The callback $g$ becomes an uninterpreted function $G:E_\alpha\to E_\beta$. A candidate which ignores $g$ cannot generally inhabit the polymorphic result type without another provider, but a candidate which applies $g$ to the wrong element or reverses the list is distinguishable by a symbolic index and atom model.
+The callback $g$ becomes an uninterpreted function $G:E_\alpha\to E_\beta$. A candidate which ignores $g$ can build a \code{List b} only from constructors and providers that need no $\beta$ value, such as the constant empty list, and the length clause already rejects those; a candidate which applies $g$ to the wrong element, applies it twice to one element, or reverses the list is distinguishable by a symbolic index and atom model.
 
 When the selected candidate is \code{List.map}, Leant can generate a proof by reflexivity after unfolding the alias. A fold-based implementation may require induction and standard list lemmas. Provider laws can be either assumed or linked to Lean theorems.
 
@@ -2066,7 +2143,7 @@ Module & Responsibility \\
 \code{Leant.Synth.Behavior.Session} & Snapshot companion data for persistent contracts, samples and proof artifacts under exact fingerprints. \\
 \end{longtable}
 
-The existing \code{Leant.Synth.Length.*} hierarchy should not be renamed immediately. \code{Behavior.Handoff} can dispatch the Size/Shape-v1 selection to the current Length handoff. Once the generic orchestration proves stable, internal factoring can remove duplication without changing public file versions.
+The existing \code{Leant.Synth.Length.*} hierarchy should not be renamed immediately. \code{Behavior.Handoff} can dispatch the Size/Shape-v1 selection to the current Length handoff. Once the generic orchestration proves stable, internal factoring can remove duplication without changing the public file schemas.
 
 \section{Core types}
 
@@ -2180,7 +2257,7 @@ lengthBehaviorDomain = SomeBehavioralDomain
   }
 \end{lstlisting}
 
-The adapter should preserve existing scalar/product nominal distinctions, exact configuration versions, fingerprint bytes, executable policy, refusal constructors and ranking behavior. New selection/CEGIS modes consume the adapter through new code paths; ordinary ranking remains unchanged.
+The adapter should preserve existing scalar/product nominal distinctions, the exact configuration schemas, fingerprint bytes, executable policy, refusal constructors and ranking behavior. New selection/CEGIS modes consume the adapter through new code paths; ordinary ranking remains unchanged.
 
 \section{Term-graph requirements for sketches and domains}
 
@@ -2321,8 +2398,8 @@ Obligation profile & Initial tactics & Notes \\
 \endfoot
 Definitional equality & \code{rfl}, \code{simp} & Best for selected providers, projections and direct case expressions. \\
 Propositional finite cases & \code{decide}, cases, simp & Constructor/tag contracts and finite enums. \\
-Presburger arithmetic & \code{omega}, simp, norm\_num & Natural/integer affine obligations; unfold only named candidate/provider definitions. \\
-Bit-vector equality & \code{bv\_decide}, simp & Requires exact width/source semantics. \\
+Presburger arithmetic & \code{omega}, simp (\code{norm\_num} where Mathlib is imported) & Natural/integer affine obligations, including monus, \code{min}/\code{max} and quotient/modulo by literals, which \code{omega} handles natively; \code{if-then-else} must be split first. Unfold only named candidate/provider definitions. \\
+Bit-vector equality & \code{bv\_decide}, simp & Requires exact width/source semantics; \code{bv\_decide} lives in core Lean but needs \code{import Std.Tactic.BVDecide} in the active environment. \\
 List/tree structural property & induction, simp\_all, omega & Z3/Spacer may propose the invariant or generalized induction hypothesis. \\
 Equality using library provider & simp [candidate, provider theorem] & Prefer checked source theorem references over re-proving provider internals. \\
 Finite bounded domain & \code{native\_decide} or explicit enumeration & Appropriate only when the theorem itself states the bound/finite type. \\
@@ -2330,7 +2407,7 @@ Relational state wiring & rfl, simp, cases on tuple result & Uninterpreted-funct
 CHC invariant & induction/well-founded induction + arithmetic tactics & Solver invariant is translated and checked before use. \\
 \end{longtable}
 
-The proof runner should retain Leant's present crash/restart and exact environment replay behavior. Proof-state suggestions are not authority; only successful declaration submission produces a receipt.
+All tactics named in the table except \code{norm\_num} are part of core Lean at the referenced toolchain; \code{grind}, also in core, is a reasonable later addition to the arithmetic and structural rows once its behavior on generated obligations has been measured. The proof runner should retain Leant's present crash/restart and exact environment replay behavior. Proof-state suggestions are not authority; only successful declaration submission produces a receipt.
 
 \section{Reconstructing QF-LIA unsatisfiability in Lean}
 
@@ -2348,12 +2425,36 @@ Rather than import a Z3 proof, generate this universal proposition using the sam
 \begin{itemize}[leftmargin=2em]
 \item one shared normalized expression algebra with separately verified Lean and SMT renderers;
 \item differential tests comparing bounded evaluation of both projections;
-\item explicit expansion or lemmas for monus, min/max, quotient and modulo profiles not directly handled by \code{omega};
+\item a pre-processing step for the one construct \code{omega} does not handle: it decides linear arithmetic over \code{Nat}/\code{Int} including natural subtraction, \code{min}/\code{max} and division or modulo by numeric literals, but it does not case-split \code{if-then-else}, so the $\operatorname{caseLen}$ conditional must be split first (\code{split <;> omega}) or rendered as two equations;
 \item provider transfer laws as theorem hypotheses or checked theorem references;
 \item exact candidate interpretation theorem connecting the synthesized term to the arithmetic result expression.
 \end{itemize}
 
 The last item is the difficult one. The current symbolic interpreter derives an arithmetic expression from a typed graph, but a Lean theorem must connect that graph interpretation to the actual term. For simple constructor/provider fragments, Leant can generate a structural proof by unfolding the candidate and provider-law theorems. This should be the first proof-producing subset.
+
+A complete small instance shows the two halves. For the candidate
+\begin{lstlisting}[language=LeanX]
+def it1 {a : Type u} : List a -> List a :=
+  fun xs => match xs with
+    | [] => []
+    | x :: rest => x :: rest
+\end{lstlisting}
+the Length interpreter derives $r(n)=\operatorname{caseLen}(n,0,(n\mathbin{\dot{-}}1)+1)$, and Z3 reports \texttt{unsat} for $r(n)\ne n$. The arithmetic half of the reconstructed theorem is the universal form of that query, and the connecting half relates the term to its interpretation:
+\begin{lstlisting}[language=LeanX,caption={Reconstructed obligation for a length-preserving one-layer case.}]
+theorem it1_len_arith (n : Nat) :
+    (if n = 0 then 0 else (n - 1) + 1) = n := by
+  split <;> omega
+
+theorem it1_len {a : Type u} (xs : List a) :
+    (it1 xs).length =
+      (if xs.length = 0 then 0 else (xs.length - 1) + 1) := by
+  cases xs <;> simp [it1]
+
+theorem it1_contract {a : Type u} (xs : List a) :
+    (it1 xs).length = xs.length := by
+  rw [it1_len]; exact it1_len_arith _
+\end{lstlisting}
+The first theorem is what \Zthree's \texttt{unsat} corresponds to; the second is what the symbolic interpreter silently assumed; only the third is the user-facing claim, and it is accepted by Lean, not by the solver.
 
 \section{Provider assumptions as hypotheses}
 
@@ -2377,7 +2478,24 @@ theorem it1_contract
 
 In ordinary Lean environments the system should prefer linking the actual library theorem. Explicit hypotheses remain useful for opaque project providers.
 
+\section{Reusing Leant's existing proof machinery}
+\label{sec:proof-reuse}
+
+\Leant already contains most of the runtime this chapter needs, and the proposal should be read as a client of it rather than a second implementation. Its \code{:prove} mode drives the backend's proof-state protocol: every line is a tactic run against an immutable proof state, goals reprint after each step, and a Lean-verified suggestion is computed by actually running candidate tactics against that state. The probes are ordered from quick finishers (\code{rfl}, \code{assumption}, \code{contradiction}, \code{trivial}, \code{decide}, \code{omega}) through goal-shaped structural steps (\code{intro}, \code{cases}/\code{obtain}, \code{left}/\code{right}, \code{induction}) to chained forms such as \code{induction l <;> simp\_all [myLen] <;> omega}, which is how a one-line suggestion can already be a finished induction. \code{:auto} tries an ordered finisher list (\code{rfl}, \code{trivial}, \code{decide}, \code{simp}, \code{omega}, \code{exact?}, and \code{aesop} where the project imports it), and \code{:qed NAME} turns the accumulated script into a theorem saved in the session. Proof-state identifiers belong to one backend process; if that process stops, \Leant leaves prove mode and prints the script instead of submitting a stale identifier after restart.
+
+Four consequences follow for behavioral proof mode:
+
+\begin{enumerate}[leftmargin=2em]
+\item the portfolio in \cref{tab:proof-tactics} is a domain-indexed refinement of \code{:auto}'s list and should run through the same proof-state protocol, inheriting its per-tactic timeouts and its rule that only an accepted tactic counts;
+\item an obligation the portfolio does not close is not a dead end: \code{:behavior-proof} can open the generated statement in \code{:prove}, so the user finishes it interactively with the same suggestions, and \code{:qed} produces the theorem;
+\item \code{:qed}'s save path is the natural producer of the \code{LeanProofReceipt} of \cref{sec:proof-receipts}, because it already threads the environment generation and snapshot identity that the receipt must record;
+\item the one-process rule for proof-state identifiers is exactly the crash/restart discipline a proof receipt must inherit; a receipt minted under a backend that has since restarted is replayed or invalidated by the normal environment logic, never trusted by name.
+\end{enumerate}
+
+Suggestions remain advisory, as they are today. Only successful declaration submission produces a receipt.
+
 \section{Proof receipts and theorem identity}
+\label{sec:proof-receipts}
 
 A \code{LeanProofReceipt} should retain:
 
@@ -2489,7 +2607,7 @@ Add commands analogous to type and environment inspection:
 :behavior-proof it1 [THEOREM_NAME]
 \end{lstlisting}
 
-\code{:behavior-check} performs acquisition, target correspondence and domain sealing without running synthesis or Z3. It reports exact modeled arguments, source families, provider laws, theory profile, proof strategy and all refusals. This prevents expensive debugging through a full synthesis command.
+\code{:behavior-check} performs acquisition, target correspondence and domain sealing without running synthesis or Z3. It reports exact modeled arguments, source families, provider laws, theory profile, proof strategy and all refusals. This prevents expensive debugging through a full synthesis command. \code{:behavior-proof} shows the generated obligation and its receipt for a named candidate; when the obligation is unproved it opens the statement in \code{:prove} (\cref{sec:proof-reuse}) so the user can finish it interactively.
 
 \section{Candidate presentation}
 
@@ -2659,6 +2777,8 @@ The current Length design deliberately uses a scoped, capability-probed worker a
 \item[Separate process per protocol family.] Stronger isolation and simpler state machines; recommended for fixedpoint/Spacer and perhaps Optimize initially.
 \item[Portfolio processes.] Run several Z3 parameter profiles or theory encodings in parallel. Useful later, but each observation carries its exact process/profile identity and only replayed evidence can win a race.
 \end{description}
+
+One observation made while checking \cref{app:smt} argues for the second option more strongly than isolation alone. Z3 module parameters set with \code{set-option} are process-global, not context-local: after \code{(set-option :smt.core.minimize true)} has been issued once, as the core-producing scope in \cref{lst:smt-core} does, the fixedpoint query of \cref{lst:smt-chc} answers \texttt{unknown} in a fresh context of the same Z3 5.0.0 process, whereas in an untouched process it answers \texttt{sat} with the expected invariant. A single shared process therefore needs not only per-scope resets but a proof that no protocol family's parameters can reach another's, which is exactly the cross-mode misuse the protocol identities are meant to exclude. Until such a proof exists, one process per protocol family is the safer default.
 
 A process crash or protocol mismatch invalidates the worker, not the verified candidates or counterexample inputs already independently replayed.
 
@@ -3073,7 +3193,7 @@ The roadmap is organized as vertical slices. Each milestone ends with an end-to-
 \textbf{Acceptance criteria:}
 
 \begin{itemize}[leftmargin=2em]
-\item all existing Length fingerprints, file versions, refusals and ranking transcripts remain unchanged;
+\item all existing Length fingerprints, file schemas, refusals and ranking transcripts remain unchanged;
 \item the same checked Length problem can be reached through the compatibility and generic adapters and has identical identity;
 \item an intentionally foreign domain value cannot be combined through representation coercion or existential unpacking.
 \end{itemize}
@@ -3609,7 +3729,7 @@ The proof module should refuse to render a theorem if the domain cannot express 
 \chapter{Concrete SMT-LIB encodings}
 \label{app:smt}
 
-These examples are schematic. Production queries should use the typed internal command IR, canonical renderer, exact symbol-role table, and bounded response schema.
+These examples are schematic. Production queries should use the typed internal command IR, canonical renderer, exact symbol-role table, and bounded response schema. Each script was nevertheless run as written against Z3 5.0.0 (each in its own fresh process; see \cref{chap:performance} for why that matters), and the answer observed is quoted after the listing.
 
 \section{Length-preservation counterexample}
 
@@ -3630,7 +3750,7 @@ The contract requires $r(n)=n$ for all $n\in\Nat$. The counterexample query is:
 (get-value (input_0))
 \end{lstlisting}
 
-A model such as \code{input\_0 = 1} is decoded to natural one and replayed by the exact checked Length problem. The \code{define-fun} layout shown here is illustrative; the current canonical query plan may inline terms or use a different symbol policy.
+Z3 5.0.0 answers \texttt{sat} with \code{((input\_0 1))}. That model is decoded to natural one and replayed by the exact checked Length problem. The \code{define-fun} layout shown here is illustrative; the current canonical query plan may inline terms or use a different symbol policy.
 
 \section{State-bind wiring counterexample}
 
@@ -3658,7 +3778,7 @@ Use uninterpreted sorts and tuple datatypes:
 (get-value (s0 s1 actual expected))
 \end{lstlisting}
 
-A production query should request only values required by its model decoder. Often the domain can replay using equality/disequality observations without decoding the full function interpretation. The response schema must not depend on Z3's arbitrary names for uninterpreted elements.
+Z3 5.0.0 answers \texttt{sat} with a model in which \code{s0} and \code{s1} are distinct fresh elements of \code{S} and \code{actual}, \code{expected} are pairs differing in their first component: exactly the separating interpretation the text predicts. A production query should request only values required by its model decoder. Often the domain can replay using equality/disequality observations without decoding the full function interpretation. The response schema must not depend on Z3's arbitrary names for uninterpreted elements.
 
 \section{Typed selector sketch}
 
@@ -3689,7 +3809,7 @@ Consider a root with three prepared alternatives on a length sample $n$:
 (get-value (s_root))
 \end{lstlisting}
 
-Z3 selects alternative zero. Djex maps selector zero to the exact prepared graph alternative. No source term is reconstructed from \code{eval\_root}.
+Z3 5.0.0 answers \texttt{sat} with \code{((s\_root 0))}: alternative zero, the only one consistent with both samples. Djex maps selector zero to the exact prepared graph alternative. No source term is reconstructed from \code{eval\_root}.
 
 \section{Assumption-literal core for grammar choices}
 
@@ -3712,7 +3832,7 @@ Suppose a partial search selected alternatives $a_1,a_2,a_3$. Track their conseq
 (get-unsat-core)
 \end{lstlisting}
 
-A core \code{(a1 a2)} yields the learned clause $\neg a_1\lor\neg a_2$. The decoder verifies that every returned symbol is one of the exact assumptions issued for this query and canonicalizes the set before creating a nogood receipt.
+Z3 5.0.0 answers \texttt{unsat} and returns the core \code{(a2 a1)}; \code{a3} is correctly absent. The core yields the learned clause $\neg a_1\lor\neg a_2$. Note that the solver printed the assumptions in a different order from the one issued; the decoder verifies that every returned symbol is one of the exact assumptions issued for this query and canonicalizes the set before creating a nogood receipt, so print order never reaches the receipt.
 
 \section{Optimization of a sketch}
 
@@ -3734,7 +3854,7 @@ A core \code{(a1 a2)} yields the learned clause $\neg a_1\lor\neg a_2$. The deco
 (get-objectives)
 \end{lstlisting}
 
-The production protocol must bind objective order and priority mode. An iterative SAT implementation can instead first solve for \code{use\_case = false}, then provider count, then binary-search or linearly tighten node count.
+Z3 5.0.0 answers \texttt{sat} with \code{use\_case = false}, \code{use\_provider = false}, \code{node\_count = 1} and reports the three objective values \code{0}, \code{0}, \code{1} in declaration order. The production protocol must bind objective order and priority mode. An iterative SAT implementation can instead first solve for \code{use\_case = false}, then provider count, then binary-search or linearly tighten node count.
 
 \section{CHC safety query}
 
@@ -3766,7 +3886,9 @@ A relational length abstraction for accumulator reverse can be expressed without
 (get-model)
 \end{lstlisting}
 
-In practice a fixedpoint-specific command plan may use \code{declare-rel}, \code{rule}, and \code{query}. The domain owns translation from any returned invariant to a checked arithmetic predicate before Lean proof generation.
+In a fresh Z3 5.0.0 process this answers \texttt{sat}, and \code{get-model} returns an interpretation of \code{revAccLen} equivalent to $n + a - r = 0$, printed as the conjunction $\neg(n+a-r\le -1)\land\neg(n+a-r\ge 1)$: the affine invariant of \cref{sec:chc-synthesis}, which the domain would normalize to $r = n + a$ before handing it to Lean. In practice a fixedpoint-specific command plan may use \code{declare-rel}, \code{rule}, and \code{query}. The domain owns translation from any returned invariant to a checked arithmetic predicate before Lean proof generation.
+
+The two front ends report the same fact with opposite words, and the protocol decoder must not let that leak. Under the SMT-LIB \textsc{horn} encoding above, \texttt{sat} means Spacer found a model of all clauses, that is, an inductive invariant for \code{revAccLen}, so the bad state is unreachable and \code{get-model} returns the invariant; \texttt{unsat} means the clauses derive \texttt{false} and a concrete refutation trace exists. Under the legacy fixedpoint front end the answer to \code{(query Bad)} is \texttt{sat} when the query is \emph{derivable}, that is, when the bad state is reachable, and \texttt{unsat} when it is not. A fixedpoint protocol must therefore commit to one front end and name outcomes by meaning, ``safe with invariant artifact'' or ``bad state reachable with trace'', and never surface a raw \texttt{sat}/\texttt{unsat} to the layers above.
 
 \chapter{Contract grammar and normalization}
 \label{app:grammar}
@@ -3880,7 +4002,7 @@ Finite exhaustive receipt & Every admitted finite assignment was replayed & Unbo
 Over-approximate prefix unsat receipt & No completion represented by sound over-approximation satisfies constraints & General impossibility outside grammar/summary & Prune exact prefix; learn scoped nogood & ``prefix infeasible under checked completion abstraction'' \\
 Sketch model & Selector/parameter assignment satisfies current sketch constraints & Lean-valid term or universal behavior & Decode/materialize then verify & ``sketch model found'' \\
 Lean-verified sketch candidate & Materialized candidate elaborates at exact target & Behavioral theorem & Run replay/query/proof & ``typed candidate synthesized'' \\
-Spacer safe/unsat observation & CHC bad state not reachable under solver/encoding & Lean induction theorem, termination, exact source semantics & Propose invariant; rank & ``CHC solver found no bad state'' \\
+Spacer ``safe'' observation (\texttt{sat} in the \textsc{horn} encoding, \texttt{unsat} for a fixedpoint \code{query}) & CHC bad state not reachable under solver/encoding & Lean induction theorem, termination, exact source semantics & Propose invariant; rank & ``CHC solver found no bad state'' \\
 Lean proof receipt & Lean accepted generated theorem in exact environment & Claims stronger than theorem statement & Stop proof-required search; cache under environment identity & ``behavior proved in Lean'' \\
 \end{longtable}
 \end{landscape}
@@ -3915,7 +4037,7 @@ Path & Relevance \\
 \path{src/Leant/Synth/Length/Integration.hs} & Explicit configuration activation, disabled identity path, command-local contract choice and post-verification assessment. \\
 \path{src/Leant/Synth/Length/Ranking*.hs} & Stable semantic ranking, failures and receipts. \\
 \path{src/Leant/Synth/Length/PostVerification*.hs} & Binding of ranking to exact verified batches and preservation on failures. \\
-\path{src/Leant/Synth/Length/Configuration*.hs} & Versioned execution, replay, applicable-domain and launcher policies. \\
+\path{src/Leant/Synth/Length/Configuration*.hs} & Startup execution, replay, applicable-domain and launcher policies (schema-versioned at this commit; one versionless schema since \code{4fa5c0a1}). \\
 \end{longtable}
 
 \section{Djex}
@@ -3969,7 +4091,7 @@ Before a new domain or synthesis mode is enabled outside tests, reviewers should
 \section{Contract and source identity}
 
 \begin{itemize}[leftmargin=2em]
-\item Is the passive source grammar versioned and bounded before normalization?
+\item Is the passive source grammar bounded, and its semantic model identified (by a domain version or an exact domain identifier), before normalization?
 \item Are all source names resolved against an exact retained inventory/provenance map?
 \item Are argument/result roles explicit, ordered and arity checked?
 \item Are hard requirements separate from preferences?
@@ -4165,9 +4287,9 @@ Z3 Project.
 \newblock \url{https://microsoft.github.io/z3guide/docs/fixedpoints/engineforpdr/}.
 
 \bibitem{synthesiz3}
-P. Hozzova and N. Bjorner.
-\newblock \emph{Synthesiz3 This: an SMT-Based Approach for Synthesis with Uncomputable Symbols}, artifact for an FMCAD 2025 submission.
-\newblock \url{https://github.com/Z3Prover/doc/tree/master/synthesiz3}.
+Petra Hozzov\'a and Nikolaj Bj\o rner.
+\newblock Synthesiz3 This: an SMT-Based Approach for Synthesis with Uncomputable Symbols.
+\newblock In \emph{FMCAD 2025}, pp.~215--225. \url{https://doi.org/10.34727/2025/isbn.978-3-85448-084-6_28}; preprint \url{https://arxiv.org/abs/2504.16536}; artifact \url{https://github.com/Z3Prover/doc/tree/master/synthesiz3}.
 
 \bibitem{sketching}
 Armando Solar-Lezama, Liviu Tancau, Rastislav Bodik, Sanjit Seshia, and Vijay Saraswat.
