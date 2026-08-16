@@ -19,6 +19,9 @@ import Leant.Synth.Length.Integration
   , LengthRankingConfigurationFileSource (..)
   )
 
+-- | Parsed command-line options.  'optTranscript' is @Just Nothing@ for a
+-- transcript at the default location and @Just (Just path)@ for an explicit
+-- one.
 data Options = Options
   { optProject :: Maybe FilePath
   , optPlain :: Bool

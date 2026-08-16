@@ -346,23 +346,36 @@ data FailureClassView d
   | ViewApplicableDomainValidationFailed !(DomainError d)
   | ViewCounterexampleSimplificationFailed !(SimplificationError d)
 
+-- | Why replaying one input vector produced no verdict: the domain's
+-- evaluator refused the inputs, or they did not belong to this exact query
+-- (an association mismatch).  Seed-bank replay skips a rejected seed; the
+-- origin probe reports either rejection as a batch failure.
 data ReplayRejection d
   = ReplayEvaluationRejected !(EvaluationError d)
   | ReplayAssociationRejected
 
+-- | Why a complete applicable-domain traversal did not establish a domain:
+-- Djex's validator refused, or the query association did not match.
 data DomainRejection d
   = DomainValidationRejected !(DomainError d)
   | DomainAssociationRejected
 
+-- | The result of one admitted applicable-domain traversal: the domain is
+-- not applicable to this query, the traversal found an exact
+-- counterexample, or it established a complete applicable domain.
 data DomainOutcome d
   = DomainInapplicable
   | DomainCounterexample !(Counterexample d)
   | DomainEstablished !(ApplicableDomain d)
 
+-- | Why finite input-box validation after a live @unsat@ produced no
+-- verdict: Djex's validator refused, or the query association did not match.
 data BoxRejection d
   = BoxValidationRejected !(InputBoxError d)
   | BoxAssociationRejected
 
+-- | The result of one admitted input-box validation: an exact
+-- counterexample inside the box, or a validated bounded-positive box.
 data BoxOutcome d
   = BoxCounterexample !(Counterexample d)
   | BoxValidated !(InputBox d)
@@ -375,6 +388,9 @@ data SimplificationRejection d
   | SimplificationRejected !(SimplificationError d)
   | SimplificationAssociationRejected
 
+-- | Why a live solver observation was refused before replay: it carried a
+-- different query fingerprint or a different evidence problem than the one
+-- this candidate prepared.
 data ObservationRejection
   = ObservationQueryFingerprintMismatch
   | ObservationEvidenceProblemMismatch
@@ -446,12 +462,16 @@ candidateAssessment state = case state of
   CandidatePreparationRefused _ -> buildAssessment @d ViewUnassessed
   CandidateAssessed assessment _ -> assessment
 
+-- | The sanitized preparation refusal, when the candidate never reached
+-- assessment.
 candidatePreparationRefusal
   :: CandidateAssessment d -> Maybe LengthPreparationRefusalClass
 candidatePreparationRefusal state = case state of
   CandidatePreparationRefused refusal -> Just refusal
   CandidateAssessed _ _ -> Nothing
 
+-- | The bounded strict simplification attempted for an assessed
+-- candidate's counterexample, when the policy enabled one.
 candidateSimplification :: CandidateAssessment d -> Maybe (Simplification d)
 candidateSimplification state = case state of
   CandidatePreparationRefused _ -> Nothing
@@ -585,6 +605,11 @@ data UsableWorkSnapshot d association = UsableWorkSnapshot
 
 type role UsableWorkSnapshot nominal nominal
 
+-- | Rank under one shared usable-work budget whose deadline is captured
+-- after admission and before preparation.  When the budget expires, the
+-- receipt is rebuilt from the retained preparation snapshot with every
+-- candidate unassessed and one deadline failure; @finish@ and @forceResult@
+-- let the nominal caller wrap and force the result inside the budget scope.
 rankAssociatedCandidatesWithUsableWorkBudget
   :: forall d association result. LengthRankingDomain d
   => LengthSMTLibLiveUsableWorkBudget
@@ -636,6 +661,9 @@ rankAssociatedCandidatesWithUsableWorkBudget budget finish forceResult
           _ <- evaluate $ forceResult result
           pure $ Right result
 
+-- | The additive same-thread scoped/checkpointed sibling of
+-- 'rankAssociatedCandidatesWithUsableWorkBudget': the deadline is checked
+-- at each checkpoint on the ranking thread instead of by an outer observer.
 rankAssociatedCandidatesWithScopedUsableWorkBudget
   :: forall d association result. LengthRankingDomain d
   => LengthSMTLibLiveUsableWorkBudget
@@ -1056,6 +1084,10 @@ rankAssociatedCandidates policies execution evaluation contract
     LengthLiveSessionOpeningEager execution evaluation contract verifiedFor
     associations
 
+-- | The complete generic ranking run: admit at most the live session's
+-- maximum query count, prepare every candidate, and, when at least one is
+-- eligible, assess them under the given policies, opening the lexical live
+-- session eagerly or only at the first candidate that needs a live query.
 rankAssociatedCandidatesWithLiveSessionOpening
   :: forall d association. LengthRankingDomain d
   => RankingPolicies
@@ -1691,12 +1723,13 @@ queryRankingFailure index failure = buildFailure @d
 
 -- Forcing ---------------------------------------------------------------------
 
--- Force only ranking-owned structure.  Caller-owned verified receipts and
+-- | Force only ranking-owned structure.  Caller-owned verified receipts and
 -- occurrence associations retain their established WHNF boundary.
 forceRankingOwnedResult :: forall d. LengthRankingDomain d => Ranking d -> ()
 forceRankingOwnedResult (Ranking candidates failure) =
   forceRankedCandidates candidates `seq` forceMaybeFailure @d failure
 
+-- | Occurrence-associated sibling of 'forceRankingOwnedResult'.
 forceAssociatedRankingOwnedResult
   :: forall d association. LengthRankingDomain d
   => AssociatedRanking d association -> ()

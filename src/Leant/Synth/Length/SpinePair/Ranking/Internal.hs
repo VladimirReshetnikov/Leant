@@ -267,6 +267,8 @@ newtype AssociatedRankedLengthSpinePairCandidate association =
 
 type role AssociatedRankedLengthSpinePairCandidate nominal
 
+-- | The caller-owned association (for example a batch-scoped occurrence
+-- handle) carried unchanged beside one ranked candidate.
 associatedRankedLengthSpinePairCandidateAssociation
   :: AssociatedRankedLengthSpinePairCandidate association
   -> association
@@ -280,6 +282,8 @@ newtype AssociatedLengthSpinePairRanking association =
 
 type role AssociatedLengthSpinePairRanking nominal
 
+-- | The ranked candidates in their proposed order, each still carrying its
+-- association.
 associatedLengthSpinePairRankingCandidates
   :: AssociatedLengthSpinePairRanking association
   -> [AssociatedRankedLengthSpinePairCandidate association]
@@ -306,12 +310,16 @@ sealPostVerificationLengthSpinePairRanking maximumCandidates input
   PostVerificationLengthSpinePairRanking
     <$> sealPostVerificationRanking maximumCandidates input associated
 
+-- | The sealed receipt batch: the sole owner of verified receipts inside a
+-- post-verification ranking.
 postVerificationLengthSpinePairRankingBatch
   :: PostVerificationLengthSpinePairRanking
   -> PostVerificationBatch DetailedVerificationVariant
 postVerificationLengthSpinePairRankingBatch
     (PostVerificationLengthSpinePairRanking (PostVerificationRanking batch _ _)) = batch
 
+-- | The batch-wide ranking failure, if the run ended in one, without
+-- materializing the receipt-bearing report.
 postVerificationLengthSpinePairRankingFailure
   :: PostVerificationLengthSpinePairRanking
   -> Maybe LengthSpinePairRankingFailure
@@ -1040,6 +1048,9 @@ lengthSpinePairHandoffPreparationRefusalClass refusal = case refusal of
   LengthSpinePairHandoffProblemRejected _ ->
     LengthPreparationCandidateSemanticsRejected
 
+-- | Reduce a pair-domain canonical-query construction refusal to its
+-- payload-free phase.  Like the handoff classifier, this is exhaustive and
+-- does not inspect fields.
 lengthSpinePairQueryPreparationRefusalClass
   :: LengthSpinePairSMTLibQueryError
   -> LengthPreparationRefusalClass

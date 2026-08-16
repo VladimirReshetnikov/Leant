@@ -57,6 +57,8 @@ data SnapshotFingerprint = SnapshotFingerprint
   }
   deriving (Eq, Show)
 
+-- | The synthesis-ready sibling pickled beside a main snapshot, bound to
+-- its content fingerprint and to the tooling ABI that produced it.
 data SnapshotCompanion = SnapshotCompanion
   { snapshotCompanionFile :: FilePath
   , snapshotCompanionFingerprint :: SnapshotFingerprint
@@ -64,6 +66,9 @@ data SnapshotCompanion = SnapshotCompanion
   }
   deriving (Eq, Show)
 
+-- | The JSON sidecar written beside a main snapshot: the @it@ counter to
+-- restore, the main artifact's fingerprint, and the optional synthesis
+-- companion.
 data SnapshotMetadata = SnapshotMetadata
   { snapshotItCounter :: Int
   , snapshotMainFingerprint :: SnapshotFingerprint

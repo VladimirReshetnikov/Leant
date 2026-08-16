@@ -51,6 +51,9 @@ import Leant.Synth.Verification
   , verifiedCandidateReceipts
   )
 
+-- | Why the pair-domain post-verification adapter rejected a batch: the
+-- ranking input itself was refused, or the ranking's proposed permutation
+-- failed the bounded seal.
 data LengthSpinePairPostVerificationFailure
   = LengthSpinePairPostVerificationInputRejected !LengthRankingInputError
   | LengthSpinePairPostVerificationProposalRejected !PostVerificationError
@@ -67,6 +70,8 @@ data LengthSpinePairPostVerificationResult
   | LengthSpinePairPostVerificationAccepted
       !PostVerificationLengthSpinePairRanking
 
+-- | The verified receipts to present: the untouched callback order for a
+-- rejected result, or the sealed post-assessment order for an accepted one.
 lengthSpinePairPostVerificationCandidates
   :: LengthSpinePairPostVerificationResult
   -> [Verified DetailedVerificationVariant]
@@ -86,6 +91,7 @@ lengthSpinePairPostVerificationSealedBatch result = case result of
   LengthSpinePairPostVerificationAccepted retained -> Just
     $ postVerificationLengthSpinePairRankingBatch retained
 
+-- | The adapter's own rejection, present exactly for a rejected result.
 lengthSpinePairPostVerificationAdapterFailure
   :: LengthSpinePairPostVerificationResult
   -> Maybe LengthSpinePairPostVerificationFailure
@@ -93,6 +99,9 @@ lengthSpinePairPostVerificationAdapterFailure result = case result of
   LengthSpinePairPostVerificationRejected _ failure -> Just failure
   LengthSpinePairPostVerificationAccepted {} -> Nothing
 
+-- | The receipt-bearing pair-domain ranking of an accepted result,
+-- materialized on demand and forced to weak head normal form before it is
+-- returned; 'Nothing' for a rejected result.
 lengthSpinePairPostVerificationRanking
   :: LengthSpinePairPostVerificationResult
   -> Maybe LengthSpinePairRanking

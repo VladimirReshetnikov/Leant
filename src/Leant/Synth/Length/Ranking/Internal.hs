@@ -272,6 +272,8 @@ newtype AssociatedRankedLengthCandidate association =
 
 type role AssociatedRankedLengthCandidate nominal
 
+-- | The caller-owned association (for example a batch-scoped occurrence
+-- handle) carried unchanged beside one ranked candidate.
 associatedRankedLengthCandidateAssociation
   :: AssociatedRankedLengthCandidate association
   -> association
@@ -285,6 +287,8 @@ newtype AssociatedLengthRanking association =
 
 type role AssociatedLengthRanking nominal
 
+-- | The ranked candidates in their proposed order, each still carrying its
+-- association.
 associatedLengthRankingCandidates
   :: AssociatedLengthRanking association
   -> [AssociatedRankedLengthCandidate association]
@@ -311,12 +315,16 @@ sealPostVerificationLengthRanking maximumCandidates input
   PostVerificationLengthRanking
     <$> sealPostVerificationRanking maximumCandidates input associated
 
+-- | The sealed receipt batch: the sole owner of verified receipts inside a
+-- post-verification ranking.
 postVerificationLengthRankingBatch
   :: PostVerificationLengthRanking
   -> PostVerificationBatch DetailedVerificationVariant
 postVerificationLengthRankingBatch
     (PostVerificationLengthRanking (PostVerificationRanking batch _ _)) = batch
 
+-- | The batch-wide ranking failure, if the run ended in one, without
+-- materializing the receipt-bearing report.
 postVerificationLengthRankingFailure
   :: PostVerificationLengthRanking
   -> Maybe LengthRankingFailure

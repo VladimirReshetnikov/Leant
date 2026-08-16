@@ -112,6 +112,7 @@ import Leant.Synth.Length.Configuration
   , lengthRankingPolicyFromValidatedComponents
   )
 
+-- | The exact @format@ string a startup document must carry.
 lengthRankingConfigurationFileFormat :: Text
 lengthRankingConfigurationFileFormat =
   "leant-live-length-ranking-configuration"
@@ -132,6 +133,9 @@ lengthRankingConfigurationFileJsonLimits = BoundedJsonLimits
   , boundedJsonMaximumNumberBytes = 80
   }
 
+-- | Which object of the startup grammar a structural refusal names; a
+-- provider-law object carries its zero-based index in the @providerLaws@
+-- array.
 data LengthRankingConfigurationFileObject
   = LengthRankingConfigurationRootObject
   | LengthRankingConfigurationExecutionAdmissionObject
@@ -147,6 +151,8 @@ data LengthRankingConfigurationFileObject
   | LengthRankingConfigurationProviderLawObject !Natural
   deriving (Eq, Ord, Show)
 
+-- | Which field of the startup grammar a refusal names; provider-law fields
+-- carry the zero-based index of their law.
 data LengthRankingConfigurationFileField
   = LengthRankingConfigurationFormatField
   | LengthRankingConfigurationRankingDomainField
@@ -201,6 +207,7 @@ data LengthRankingConfigurationFileField
   | LengthRankingConfigurationUsableWorkBudgetMillisecondsField
   deriving (Eq, Ord, Show)
 
+-- | The JSON value shape a field required when a type mismatch is reported.
 data LengthRankingConfigurationFileValueType
   = LengthRankingConfigurationObjectValue
   | LengthRankingConfigurationArrayValue
@@ -210,17 +217,26 @@ data LengthRankingConfigurationFileValueType
   | LengthRankingConfigurationNullOrStringValue
   deriving (Bounded, Enum, Eq, Ord, Show)
 
+-- | Which measure of a text field a text-limit refusal reports: Unicode
+-- scalar values or UTF-8 bytes.
 data LengthRankingConfigurationFileTextMeasure
   = LengthRankingConfigurationUnicodeScalars
   | LengthRankingConfigurationUtf8Bytes
   deriving (Bounded, Enum, Eq, Ord, Show)
 
+-- | Which formula or expression a syntax refusal arose in: the contract's
+-- precondition or postcondition, or the transfer expression of the
+-- provider law with the given index.
 data LengthRankingConfigurationSyntaxPhase
   = LengthRankingConfigurationPreconditionSyntax
   | LengthRankingConfigurationPostconditionSyntax
   | LengthRankingConfigurationProviderTransferSyntax !Natural
   deriving (Eq, Ord, Show)
 
+-- | Which hard limit of the arithmetic grammar a syntax-limit refusal
+-- names: nesting depth, total nodes, formula clauses, sum terms, @all@
+-- clauses, literal width in bits, contract input index, provider argument
+-- index, or provider argument index against the law's declared role count.
 data LengthRankingConfigurationSyntaxLimit
   = LengthRankingConfigurationSemanticDepth
   | LengthRankingConfigurationSyntaxNodes
@@ -233,6 +249,11 @@ data LengthRankingConfigurationSyntaxLimit
   | LengthRankingConfigurationProviderArgumentRoleCount
   deriving (Bounded, Enum, Eq, Ord, Show)
 
+-- | Sanitized rejection of one tagged-array syntax node.  A tag-arity
+-- mismatch carries the expected argument count and the observed count capped
+-- at expected plus one; a limit
+-- refusal carries the limit, its maximum, and the observed value capped at
+-- maximum plus one.  No tag text is retained.
 data LengthRankingConfigurationSyntaxError
   = LengthRankingConfigurationExpectedTaggedArray
   | LengthRankingConfigurationExpectedTag
@@ -300,11 +321,15 @@ data DisabledLengthAssessmentConfiguration =
     !LengthRankingPolicy
     LeanLengthContractSelection
 
+-- | The caller's explicit decision on executables without a SHA-256 pin:
+-- refuse them, or permit them.
 data LengthRankingConfigurationActivationPolicy
   = RequirePinnedExecutable
   | PermitUnpinnedExecutable
   deriving (Bounded, Enum, Eq, Ord, Show)
 
+-- | Activation refused because the policy demanded a pinned executable and
+-- the decoded execution policy carries no digest expectation.
 data LengthRankingConfigurationActivationError
   = LengthRankingConfigurationExecutablePinRequired
   deriving (Bounded, Enum, Eq, Ord, Show)
@@ -329,6 +354,14 @@ activateLengthAssessmentConfiguration policy
           Right (rankingPolicy, selection)
     PermitUnpinnedExecutable -> Right (rankingPolicy, selection)
 
+-- | Decode one complete startup document without IO: bounded JSON, then
+-- @format@, then @rankingDomain@, then the exact root field set, then each
+-- policy section in root order (execution admission, execution,
+-- evaluation, input-box validation, applicable-domain validation,
+-- counterexample simplification, usable-work budget), then the contract in
+-- the selected domain's grammar.  The result enables every optional ranking
+-- policy the sections describe but grants no permission to run the solver
+-- until 'activateLengthAssessmentConfiguration'.
 decodeLengthAssessmentConfigurationFile
   :: ByteString
   -> Either

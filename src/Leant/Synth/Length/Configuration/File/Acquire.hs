@@ -41,14 +41,21 @@ import Leant.Synth.Length.File.Acquire
   , mkLengthFileRequest
   )
 
+-- | The shared file boundary's path-length ceiling, restated in
+-- configuration-file vocabulary.
 lengthRankingConfigurationFileMaximumPathCharacters :: Natural
 lengthRankingConfigurationFileMaximumPathCharacters =
   lengthFileMaximumPathCharacters
 
+-- | The shared file boundary's timeout ceiling, restated in
+-- configuration-file vocabulary.
 lengthRankingConfigurationFileMaximumTimeoutMilliseconds :: Int
 lengthRankingConfigurationFileMaximumTimeoutMilliseconds =
   lengthFileMaximumTimeoutMilliseconds
 
+-- | Most bytes one startup file may occupy: exactly the bounded JSON
+-- grammar's total-byte limit, so acquisition never reads a document the
+-- decoder would refuse for size.
 lengthRankingConfigurationFileLoadMaximumBytes :: Natural
 lengthRankingConfigurationFileLoadMaximumBytes =
   boundedJsonMaximumTotalBytes lengthRankingConfigurationFileJsonLimits
@@ -61,6 +68,11 @@ data LengthRankingConfigurationFileSource =
     , lengthRankingConfigurationFileSourceTimeoutMilliseconds :: Int
     }
 
+-- | Pure refusal of one 'LengthRankingConfigurationFileSource', in the
+-- shared boundary's admission order (path length, empty path, embedded
+-- NUL, relative path, non-positive timeout, timeout above the ceiling);
+-- limit refusals carry the maximum and the observed count capped at
+-- maximum plus one.
 data LengthRankingConfigurationFileAdmissionError
   = LengthRankingConfigurationFilePathCharacterLimitExceeded
       !Natural !Natural
@@ -76,6 +88,9 @@ data LengthRankingConfigurationFileAdmissionError
 data LengthRankingConfigurationFileRequest =
   LengthRankingConfigurationFileRequest !LengthFileRequest
 
+-- | Sanitized primary reason one startup-file load failed; the shared
+-- boundary's classes restated one-for-one, with the decoder's rejection
+-- carried as 'LengthRankingConfigurationFileDecodeRejected'.
 data LengthRankingConfigurationFileLoadErrorClass
   = LengthRankingConfigurationFilePlatformUnsupported
   | LengthRankingConfigurationFileOpenFailed
@@ -89,24 +104,31 @@ data LengthRankingConfigurationFileLoadErrorClass
   | LengthRankingConfigurationFileCleanupFailed
   deriving (Eq, Ord, Show)
 
+-- | One startup-file load failure: its primary class plus whether
+-- descriptor cleanup was left incomplete.
 data LengthRankingConfigurationFileLoadError =
   LengthRankingConfigurationFileLoadError
     !LengthRankingConfigurationFileLoadErrorClass
     !Bool
   deriving (Eq, Ord, Show)
 
+-- | The primary failure class.
 lengthRankingConfigurationFileLoadErrorClass
   :: LengthRankingConfigurationFileLoadError
   -> LengthRankingConfigurationFileLoadErrorClass
 lengthRankingConfigurationFileLoadErrorClass
     (LengthRankingConfigurationFileLoadError failure _) = failure
 
+-- | Whether the opened descriptor could not be closed before the failure
+-- was returned.
 lengthRankingConfigurationFileLoadCleanupIncomplete
   :: LengthRankingConfigurationFileLoadError
   -> Bool
 lengthRankingConfigurationFileLoadCleanupIncomplete
     (LengthRankingConfigurationFileLoadError _ incomplete) = incomplete
 
+-- | Admit a startup source through the shared boundary without IO,
+-- reporting refusals in configuration-file vocabulary.
 mkLengthRankingConfigurationFileRequest
   :: LengthRankingConfigurationFileSource
   -> Either

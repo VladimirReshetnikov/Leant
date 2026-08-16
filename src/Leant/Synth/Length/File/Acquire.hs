@@ -57,9 +57,12 @@ import System.Posix.Types (Fd)
 import System.Timeout (timeout)
 #endif
 
+-- | Longest admitted path, in characters; a longer path is refused before
+-- any other admission check and observed only up to this maximum plus one.
 lengthFileMaximumPathCharacters :: Natural
 lengthFileMaximumPathCharacters = 4096
 
+-- | Longest admitted same-process load timeout, in milliseconds.
 lengthFileMaximumTimeoutMilliseconds :: Int
 lengthFileMaximumTimeoutMilliseconds = 60000
 
@@ -70,6 +73,11 @@ data LengthFileSource = LengthFileSource
   , lengthFileSourceTimeoutMilliseconds :: Int
   }
 
+-- | Pure refusal of one 'LengthFileSource', reported in admission order:
+-- path length, empty path, embedded NUL, relative path, non-positive
+-- timeout, then timeout above 'lengthFileMaximumTimeoutMilliseconds'.
+-- Limit refusals carry the maximum and the observed count capped at
+-- maximum plus one; no path text is retained.
 data LengthFileAdmissionError
   = LengthFilePathCharacterLimitExceeded !Natural !Natural
   | LengthFilePathEmpty
@@ -79,8 +87,18 @@ data LengthFileAdmissionError
   | LengthFileTimeoutLimitExceeded !Int !Int
   deriving (Eq, Ord, Show)
 
+-- | An admitted absolute path and positive timeout.  Only
+-- 'mkLengthFileRequest' constructs one, so 'loadLengthFile' never sees an
+-- unadmitted source.
 data LengthFileRequest = LengthFileRequest !FilePath !Int
 
+-- | Sanitized primary reason one load failed: unsupported platform, open,
+-- descriptor inspection, not a regular file, read, byte limit (the maximum
+-- and the observed count capped at maximum plus one; checked against the
+-- reported size before reading and again while reading), the caller's
+-- decoder rejection, the same-process deadline, or a close that failed
+-- after an otherwise successful load.  No path, errno text, or source byte
+-- is retained.
 data LengthFileLoadErrorClass decodeError
   = LengthFilePlatformUnsupported
   | LengthFileOpenFailed
@@ -93,19 +111,28 @@ data LengthFileLoadErrorClass decodeError
   | LengthFileCleanupFailed
   deriving (Eq, Ord, Show)
 
+-- | One load failure: its primary class plus whether descriptor cleanup
+-- was left incomplete when the failure escaped.
 data LengthFileLoadError decodeError = LengthFileLoadError
   !(LengthFileLoadErrorClass decodeError)
   !Bool
   deriving (Eq, Ord, Show)
 
+-- | The primary failure class.
 lengthFileLoadErrorClass
   :: LengthFileLoadError decodeError
   -> LengthFileLoadErrorClass decodeError
 lengthFileLoadErrorClass (LengthFileLoadError primary _) = primary
 
+-- | Whether the opened descriptor could not be closed before the failure
+-- was returned.
 lengthFileLoadCleanupIncomplete :: LengthFileLoadError decodeError -> Bool
 lengthFileLoadCleanupIncomplete (LengthFileLoadError _ incomplete) = incomplete
 
+-- | Admit a caller-supplied source without IO, in the fixed order listed on
+-- 'LengthFileAdmissionError'.  Path admission is productive: an
+-- unboundedly long path is rejected after observing at most the maximum
+-- plus one characters, and before the timeout field is inspected.
 mkLengthFileRequest
   :: LengthFileSource
   -> Either LengthFileAdmissionError LengthFileRequest
@@ -143,6 +170,12 @@ observedPathCharacters maximumValue = go 0
     | observed >= maximumValue = maximumValue + 1
     | otherwise = go (observed + 1) remaining
 
+-- | Read at most the given number of bytes from an admitted request and
+-- run the caller's strict decoder on them, all within the request's
+-- same-process timeout.  The decoder's rejection is wrapped as
+-- 'LengthFileDecodeRejected'; every other failure is the loader's own
+-- sanitized class.  On Windows this fails closed with
+-- 'LengthFilePlatformUnsupported'.
 loadLengthFile
   :: Natural
   -> (ByteString -> Either decodeError value)

@@ -44,6 +44,7 @@ data BoundedJsonLimits = BoundedJsonLimits
   }
   deriving (Eq, Ord, Show)
 
+-- | Which 'BoundedJsonLimits' bound a document exceeded.
 data BoundedJsonLimit
   = BoundedJsonTotalBytes
   | BoundedJsonNestingDepth
@@ -77,6 +78,10 @@ data BoundedJsonErrorKind
   | BoundedJsonDuplicateObjectKey
   deriving (Bounded, Enum, Eq, Ord, Show)
 
+-- | Sanitized parse rejection.  A limit refusal carries the limit, its
+-- maximum, the observed count saturated at maximum plus one, and the byte
+-- offset reached; a syntax refusal carries its closed kind and byte offset.
+-- No document text is retained.
 data BoundedJsonError
   = BoundedJsonLimitExceeded
       !BoundedJsonLimit !Natural !Natural !Natural
