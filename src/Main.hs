@@ -146,10 +146,12 @@ import Leant.Synth.Length.Integration
   , lengthAssessmentFailure
   , lengthAssessmentModeActivationPolicy
   , lengthAssessmentModeExecutableLaunchStrategy
+  , lengthAssessmentRequestBehaviorMode
   , loadLengthAssessmentMode
   )
 import Leant.Synth.Length.Command
-  ( LengthSynthCommand (..)
+  ( LengthBehaviorMode (..)
+  , LengthSynthCommand (..)
   , parseLengthSynthCommand
   )
 import Leant.Synth.Length.Contract.File.Acquire
@@ -2317,7 +2319,7 @@ synthGo' assessmentRequest st args retriedVars goal parsed = do
         \(i, group) ->
           forM_ (detailedCandidateGroupVariants group) $ \variant ->
           emitLn st =<< cDim st ("debug " ++ show i ++ ": " ++ variant)
-    verifyAndDisplay assessmentRequest st args goal (take groupLimit groups)
+    verifyAndDisplay assessmentRequest groupLimit st args goal groups
 
   reportNotes notes =
     forM_ notes $ \note -> emitLn st =<< cDim st ("note: " ++ note)
@@ -2617,7 +2619,8 @@ synthClassical assessmentRequest st args goal parsed =
             Just (Right (DetailedSynthCandidates groups _)) ->
               take (synthMaxTried `div` 2) groups
             _ -> []
-    shownEm <- verifyAndDisplay assessmentRequest st args goal emGroups
+    shownEm <- verifyAndDisplay assessmentRequest
+      (synthMaxTried `div` 2) st args goal emGroups
     if shownEm
       then pure True
       else do
@@ -2640,10 +2643,10 @@ synthClassical assessmentRequest st args goal parsed =
             nnFrag nnFrag)
         case bounded of
           Just (Right (DetailedSynthCandidates groups _)) ->
-            verifyAndDisplay assessmentRequest st args goal
+            verifyAndDisplay assessmentRequest groupLimit st args goal
               (map
                 (mapDetailedCandidateGroupVariantsDroppingSemanticSidecar wrap)
-                (take groupLimit groups))
+                groups)
           _ -> pure False
 
 -- | Verify candidate groups, bind the survivors as `it1`, `it2`, ...,
@@ -2654,79 +2657,89 @@ synthClassical assessmentRequest st args goal parsed =
 -- was shown.
 verifyAndDisplay
   :: LengthAssessmentRequest
+  -> Int
   -> St
   -> [String]
   -> String
   -> [DetailedCandidateGroup]
   -> IO Bool
-verifyAndDisplay _ _ _ _ [] = pure False
-verifyAndDisplay assessmentRequest st args goal groups = do
-  verification <- synthVerify st goal
-    (map detailedCandidateGroupVerificationVariants groups)
-  let observations =
-        candidateRenderingRouteObservations
-          (map detailedCandidateGroupRoute groups)
-        <> verificationObservations verification
-  debug <- lookupEnv "LEANT_SYNTH_DEBUG"
-  when (isJust debug) $
-    forM_ (leantObservationCodeEntries observations) $ \(code, count) ->
-      emitLn st =<< cDim st
-        ("debug metric: " ++ code ++ "=" ++ show count)
-  assessment <- assessLengthVerificationRequest assessmentRequest verification
-  forM_ (lengthAssessmentFailure assessment) $ \failure -> do
-    prefix <- cYellow st "warning: "
-    emitLn st $ prefix ++
-      "finite-spine Length behavioral assessment preserved all verified " ++
-      "candidates: " ++
-      show failure
-  let presentations = presentLengthAssessment assessment
-      rejections = presentLengthAssessmentRejections assessment
-      -- Keep callback acceptance, semantic origin, and original renderer
-      -- ordinal together through semantic presentation. Candidate text and
-      -- any model-relative note are projected from one opaque ranked or
-      -- selected receipt;
-      -- rsSynthIts intentionally remains the established user-facing
-      -- text/splice cache rather than a trust store.
-      shown = map lengthCandidatePresentationText presentations
-  if null shown
-    then if null rejections
-      then pure False
-      else do
-        -- An accepted filter can intentionally remove the whole verified
-        -- batch.  This is a handled synthesis result, but it creates no itN
-        -- bindings and invalidates the previous synthesis splice cache.
-        modifyIORef' st (\s -> s
-          { rsSynthIts = [], rsSynthItsProve = False })
-        reportLengthAssessmentRejections st rejections
-        pure True
-    else do
-      proving <- isJust . rsProve <$> readIORef st
-      splices <-
-        if proving
-          then pure
-            [ case args of
-                [] -> "(" ++ term ++ ")"
-                _ -> "((" ++ term ++ ") " ++ unwords args ++ ")"
-            | term <- shown
-            ]
+verifyAndDisplay assessmentRequest groupLimit st args goal groups =
+  case take groupLimit groups of
+    [] -> pure False
+    boundedGroups -> do
+      let successQuota = case
+            lengthAssessmentRequestBehaviorMode assessmentRequest of
+              LengthBehaviorRank -> synthMaxShown
+              LengthBehaviorFilter -> groupLimit
+      verification <- synthVerify successQuota st goal
+        (map detailedCandidateGroupVerificationVariants boundedGroups)
+      let observations =
+            candidateRenderingRouteObservations
+              (map detailedCandidateGroupRoute boundedGroups)
+            <> verificationObservations verification
+      debug <- lookupEnv "LEANT_SYNTH_DEBUG"
+      when (isJust debug) $
+        forM_ (leantObservationCodeEntries observations) $ \(code, count) ->
+          emitLn st =<< cDim st
+            ("debug metric: " ++ code ++ "=" ++ show count)
+      assessment <-
+        assessLengthVerificationRequest assessmentRequest verification
+      forM_ (lengthAssessmentFailure assessment) $ \failure -> do
+        prefix <- cYellow st "warning: "
+        emitLn st $ prefix ++
+          "finite-spine Length behavioral assessment preserved all verified " ++
+          "candidates: " ++
+          show failure
+      let presentations = take synthMaxShown
+            $ presentLengthAssessment assessment
+          rejections = presentLengthAssessmentRejections assessment
+          -- Keep callback acceptance, semantic origin, and original renderer
+          -- ordinal together through semantic presentation. Candidate text
+          -- and any model-relative note are projected from one opaque ranked
+          -- or selected receipt; rsSynthIts intentionally remains the
+          -- established user-facing text/splice cache rather than a trust
+          -- store.
+          shown = map lengthCandidatePresentationText presentations
+      if null shown
+        then if null rejections
+          then pure False
           else do
-            -- bind worst-first, so the newest binding - bare `it` -
-            -- is the best candidate
-            counters <- mapM (synthBind st goal) (reverse shown)
-            pure
-              [ maybe ("(" ++ term ++ ")") itName counter
-              | (term, counter) <- zip shown (reverse counters)
-              ]
-      modifyIORef' st (\s -> s
-        { rsSynthIts = splices, rsSynthItsProve = proving })
-      forM_ (zip [1 :: Int ..] presentations) $ \(i, presentation) -> do
-        label <- cBold st ("it" ++ show i)
-        let term = lengthCandidatePresentationText presentation
-        emitLn st ("  " ++ label ++ "  " ++ term)
-        forM_ (lengthCandidatePresentationNote presentation) $ \note ->
-          emitLn st ("       " ++ note)
-      reportLengthAssessmentRejections st rejections
-      pure True
+            -- An accepted filter can intentionally remove the whole verified
+            -- batch.  This is a handled synthesis result, but it creates no
+            -- itN bindings and invalidates the previous synthesis splice
+            -- cache.
+            modifyIORef' st (\s -> s
+              { rsSynthIts = [], rsSynthItsProve = False })
+            reportLengthAssessmentRejections st rejections
+            pure True
+        else do
+          proving <- isJust . rsProve <$> readIORef st
+          splices <-
+            if proving
+              then pure
+                [ case args of
+                    [] -> "(" ++ term ++ ")"
+                    _ -> "((" ++ term ++ ") " ++ unwords args ++ ")"
+                | term <- shown
+                ]
+              else do
+                -- bind worst-first, so the newest binding - bare `it` -
+                -- is the best candidate
+                counters <- mapM (synthBind st goal) (reverse shown)
+                pure
+                  [ maybe ("(" ++ term ++ ")") itName counter
+                  | (term, counter) <- zip shown (reverse counters)
+                  ]
+          modifyIORef' st (\s -> s
+            { rsSynthIts = splices, rsSynthItsProve = proving })
+          forM_ (zip [1 :: Int ..] presentations) $ \(i, presentation) -> do
+            label <- cBold st ("it" ++ show i)
+            let term = lengthCandidatePresentationText presentation
+            emitLn st ("  " ++ label ++ "  " ++ term)
+            forM_ (lengthCandidatePresentationNote presentation) $ \note ->
+              emitLn st ("       " ++ note)
+          reportLengthAssessmentRejections st rejections
+          pure True
 
 reportLengthAssessmentRejections
   :: St
@@ -2783,11 +2796,13 @@ synthBind st goal term = do
 -- elaborates represents the group.  Failure classification is deliberately
 -- ordered: transport, fatal response, error diagnostic, then a `sorry`.
 synthVerify
-  :: St
+  :: Int
+  -> St
   -> String
   -> [[DetailedVerificationVariant]]
   -> IO (VerificationBatch DetailedVerificationVariant)
-synthVerify st goal = verifyCandidateGroups synthMaxShown verifyVariant
+synthVerify successQuota st goal =
+  verifyCandidateGroups successQuota verifyVariant
  where
   verifyVariant variant = do
     let term = detailedVerificationVariantText variant

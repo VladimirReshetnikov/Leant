@@ -24,6 +24,7 @@ module Leant.Synth.Length.Integration
   , LengthAssessmentRequestError (..)
   , ExplicitLengthAssessmentPermission
   , LengthAssessmentRequest
+  , lengthAssessmentRequestBehaviorMode
   , startupLengthAssessmentRequest
   , authorizeExplicitLengthAssessmentRequest
   , explicitLengthAssessmentRequest
@@ -162,6 +163,17 @@ data LengthAssessmentRequest
       !LengthBehaviorMode
       !LengthRankingPolicy
       LeanLengthContractSelection
+
+-- | The exact command-local behavior selected for this request.  Disabled
+-- assessment is the established ranking identity.  The enabled projection
+-- inspects only its strict behavior tag and does not force the retained lazy
+-- contract.
+lengthAssessmentRequestBehaviorMode
+  :: LengthAssessmentRequest
+  -> LengthBehaviorMode
+lengthAssessmentRequestBehaviorMode request = case request of
+  LengthAssessmentRequestDisabled -> LengthBehaviorRank
+  LengthAssessmentEnabledRequest behavior _ _ -> behavior
 
 disabledLengthAssessmentMode :: LengthAssessmentMode
 disabledLengthAssessmentMode = LengthAssessmentDisabled
