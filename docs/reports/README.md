@@ -24,24 +24,28 @@ every other assessment is retained, every selection failure preserves the
 complete verified batch, and omitted occurrences remain separately presented.
 The earlier behavioral-selection report correctly says its structural seal was
 not connected at that landing checkpoint; the later command-authorized report
-records the connection. The current lane-local refill successor keeps ranking
-at five accepted groups, while filter mode assesses one already bounded 12-,
-24-, or excluded-middle 6-group lane once, presents at most five survivors,
-and reports every bounded rejection. An all-rejected result remains handled
-and does not continue into another lane; there is still no persistent or
-cross-lane CEGIS bank. Main now retains one private four-way lane disposition,
-with the complete bounded provider-dedup spelling frontier separate from the
-exact callback-attempt trace, but only the no-verified-receipt disposition can
-continue. Djex's vendored candidate-independent bank types are no longer
-merely an unused runtime foundation: Leant's additive context-aware filter path now
-threads package-private nominal scalar/product banks through Configuration,
-Selection, and internal Ranking. Established rank and direct Selection
-compatibility paths keep their raw four-vector MRU. Integration can introduce one
-rank-2 reusable filter context, but its compatibility assessor creates a fresh
-context per call and Main still calls that entrance separately for each lane.
-There is therefore no Main-owned cross-lane or full-command bank, `ReplState`
-field, serialization, snapshot restoration, or persistence. Preserve-all
-candidate fallback does not roll back already completed cache transitions.
+records the connection. Ranking still stops after five accepted groups, while
+filter mode assesses each already bounded 12-, 24-, or excluded-middle
+6-group lane once and presents at most five survivors. Main now introduces one
+rank-2 assessment context before translation and reuses its nominal scalar or
+product filter bank through universe retry and every ordinary, provider, and
+classical lane. Established rank and direct Selection compatibility paths keep
+their raw four-vector MRU; rank contexts contain no bank.
+
+Main retains private four-way lane outcomes with the complete bounded provider-
+dedup spelling frontier separate from the exact callback-attempt trace. It
+prepends every actual result to one lazy reverse command accumulation. Both no-
+verified and all-behaviorally-rejected dispositions continue and union the full
+frontier; survivor and preserve-all dispositions terminate. This is not cross-
+lane five-survivor quota filling: the first survivor stops. One deferred plural
+finalizer owns chronological metrics, effective warnings, at most one state
+action, terminal candidate rows, accumulated rejection rows, and handled notes.
+Structural/classical and abnormal diagnostics remain separately gated.
+
+There is still no `ReplState` field, serialization, snapshot restoration,
+session bank, or persistence, and no new engine-side counterexample request,
+typed prefix pruning, or complete Level-2 CEGIS loop. Preserve-all candidate
+fallback does not roll back already completed cache transitions.
 The [README](../../README.md) and
 [Length ranking reference](../length-ranking.md) describe the current tree.
 
@@ -116,6 +120,7 @@ Reports are listed oldest first.
 - 2026-08-16 — [Explicit synthesis-lane outcomes](2026-08-16-explicit-synthesis-lane-outcomes.md)
 - 2026-08-16 — [Package-private nominal Length counterexample-bank state](2026-08-16-nominal-length-counterexample-bank-state.md)
 - 2026-08-16 — [Filter-only nominal Length counterexample-bank context runner](2026-08-16-filter-only-length-counterexample-bank-context-runner.md)
+- 2026-08-16 — [Command-local Length counterexample-bank scheduler](2026-08-16-command-local-length-counterexample-bank-scheduler.md)
 
 ## Standalone PDF reports
 

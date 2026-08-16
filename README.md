@@ -153,32 +153,49 @@ ranking and its historical five-success verification frontier. An explicit
 `:synth --behavior-mode filter -- TYPE` may instead omit only candidates with
 an independently replayed counterexample to the activated startup contract;
 adding `--length-contract ABSOLUTE-PATH` uses that passive contract for this
-command. Filtering verifies and assesses one already bounded synthesis lane as
-one batch—at most 12 groups for a standalone engine, 24 for `both`, or 6 for
-the excluded-middle classical route—so later same-lane survivors can replace
-early behavioral rejections. The context-aware filter assessor owns one
-nominal scalar or product counterexample bank for that assessment, tries its
-retained samples newest first, and freshly replays every attempted sample
-against the later same-scope candidate. Ordinary and explicit
-ranking keep the established raw four-vector, batch-local MRU path unchanged.
-Main still invokes the compatibility assessor once for each bounded lane, and
-that entrance creates a fresh filter context for every call; no bank therefore
-continues into another lane. Filtering still shows and binds at most five
-survivors, while every rejection from the bounded assessed batch remains
-visible. Raw `sat`, `unsat`, and `unknown`, preparation refusal, unassessed
-input, and positive bounded evidence never authorize rejection. Any adapter,
-ranking, association, or partition-seal failure preserves the complete
-internal verified batch and presents at most five candidates, although
-already completed bank transitions are cache effects and are not rolled back.
-An all-rejected batch is handled output and does not continue into another
-provider or classical lane. This is bounded lane-local refill, not a persistent
-or cross-lane CEGIS loop; no bank enters `ReplState`, history, or snapshots.
+command. Filtering verifies and assesses each already bounded synthesis lane
+as one batch—at most 12 groups for a standalone engine, 24 for `both`, or 6
+for the excluded-middle classical route—so later same-lane survivors can
+replace early behavioral rejections. Before goal translation, Main now
+introduces one rank-2 assessment context for the admitted command. Its lexical
+lifetime spans universe retries and every ordinary, provider, and classical
+lane. A filter context therefore owns one nominal scalar or product
+counterexample bank for the complete command, tries retained samples newest
+first, and freshly replays every attempt against the later same-scope
+candidate. Ordinary and explicit ranking keep the established raw four-vector
+MRU path unchanged; their contexts contain no bank.
+
+Failure to verify any candidate and successful behavioral all-rejection are
+distinct continuing lane results. Either lets the existing scheduler enter its
+next provider or classical lane, and either contributes the complete bounded
+spelling frontier to provider deduplication. A survivor or preserve-all
+assessment result remains terminal. This does not fill a five-survivor quota
+across lanes: the first later lane with any survivor stops scheduling, display
+and binding remain capped at five, and every rejection accumulated before that
+terminal lane stays visible. Raw `sat`, `unsat`, and `unknown`, preparation
+refusal, unassessed input, and positive bounded evidence never authorize
+rejection or continuation as all-rejected. Any adapter, ranking, association,
+or partition-seal failure preserves the complete internal verified batch and
+presents at most five candidates, although already completed bank transitions
+are cache effects and are not rolled back.
+
+One deferred command finalizer owns result metrics, warnings, bindings, cache
+mutation, candidate and rejection rows, and handled-lane notes. Ordinary
+all-rejected exhaustion suppresses an unrelated no-term or Lean-verification
+diagnostic. A retained structural refutation still gates classical search and
+masks provider timeout/error as before, while completed lane outcomes remain
+accounted for; without that fallback, completed outcomes are finalized before
+the unchanged abnormal diagnostic. This is a bounded command-local reuse and
+continuation slice, not a persistent or quota-filling CEGIS loop. No context or
+bank enters `ReplState`, history, snapshots, or another command.
 The complete reference — including the fixed command grammar, current
 versionless startup and contract-only schemas (`rankingDomain` is `scalar` or
-`binary-product`), unchanged raw rank MRU, fresh-per-assessment Integration
-filter-context bank,
-origin probe, bounded validation, rejection rules, and presentation — is
+`binary-product`), unchanged raw rank MRU, one lexical command assessment
+context and filter bank, origin probe, bounded validation, rejection rules,
+and presentation — is
 [docs/length-ranking.md](docs/length-ranking.md).
+The exact Main scheduler landing and validation evidence are recorded in the
+[command-local counterexample-bank scheduler report](docs/reports/2026-08-16-command-local-length-counterexample-bank-scheduler.md).
 
 Applicable-domain ranking now has one current recursive piecewise-affine
 algorithm. Library callers use
@@ -726,9 +743,11 @@ translation had to hide structure behind an opaque atom, the verdict
 backs off to "no term found within bounds". The proof is complete for the
 provider-free structural calculus, but it is only a fallback with respect to
 the live Lean environment. Leant still runs its bounded constructive provider
-lanes, and the first candidate that Lean verifies wins. If provider discovery
-is empty or unavailable, times out, or yields no verified candidate, Leant
-restores the original proof-backed refutation. Provider discovery is
+lanes, and the first candidate retained by behavioral assessment wins. If
+provider discovery is empty or unavailable, times out, errors, yields no
+verified candidate, or has every verified candidate independently rejected,
+Leant restores the original proof-backed control-flow fallback. Completed
+behavioral outcomes remain accumulated. Provider discovery is
 intentionally bounded and best-effort, so that verdict is not an exhaustive
 claim about every axiom or declaration in the environment.
 
@@ -746,8 +765,10 @@ rank-N assignment, and retention of refutation for an unusable provider.
 After those constructive provider lanes fail, refuted `Prop` goals get a
 classical attempt
 (disable with `:set synth-classical off`): first with an
-excluded-middle case split per atomic subformula, then via the Glivenko
-double-negation translation wrapped in `Classical.byContradiction`.
+excluded-middle case split per atomic subformula, then—after either no
+verification or complete behavioral all-rejection—via the Glivenko double-
+negation translation wrapped in `Classical.byContradiction`. Both attempts use
+the same command-local assessment context and are finalized together.
 Peirce's law has no constructive inhabitant — `:synth` proves that,
 then answers the classical question with a term whose spelling shows
 exactly what was used:
@@ -1037,11 +1058,15 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   complete, terminating LJT search.
 - Every engine mode gives a structurally accepted goal a provider-free
   baseline lane. Its rendered candidates are checked by Lean first, and live
-  providers are discovered whenever no baseline term verifies. A complete
+  providers are discovered whenever no baseline term verifies or an authorized
+  filter rejects every verified baseline occurrence. The same command-local
+  filter bank and accumulated rejection history cross those lanes. A complete
   Djinn refutation is retained provisionally while the constructive provider
-  lanes run: the first Lean-verified provider candidate wins, while empty,
-  unavailable, timed-out, or unsuccessful provider search restores the
-  proof-backed refutation. Only then does the explicit classical fallback run.
+  lanes run: the first lane with any surviving or preserve-all result wins,
+  while empty, all-rejected, unavailable, timed-out, or unsuccessful provider
+  search restores the proof-backed control-flow fallback. Completed provider
+  outcomes are not discarded. Only then does the explicit classical fallback
+  run.
   Provider-eligible atomic/refused goals go directly to provider search.
   Djinn first isolates the highest-ranked provider, then widens through the
   first 4 and 16 providers before the full bounded inventory after verified
@@ -1049,9 +1074,11 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   mode runs both engines for the singleton and full lanes but uses Djinn alone
   for the intermediate prefixes. All lanes consume one command-wide
   `LEANT_SYNTH_TIMEOUT` deadline. Before a later lane is forced or capped,
-  spellings that already failed Lean are removed from each source stream and
-  newly empty groups are dropped. Rediscovered failures therefore consume no
-  fresh quota. This policy
+  every spelling in an earlier no-verified or all-rejected bounded frontier is
+  removed from each source stream and newly empty groups are dropped.
+  Rediscovered candidates therefore consume no fresh lane quota. Continuation
+  does not collect five survivors across lanes: one survivor is terminal. This
+  policy
   deliberately favors a structural solution over breadth: provider
   alternatives are not enumerated after a baseline term succeeds. See the
   dated
@@ -1167,13 +1194,15 @@ A `:synth` query passes through checked stages. A Lean metaprogram
 serializes it into the engine's fragment; the fragment translator accepts
 it or refuses with a reason. The engine first searches without providers
 and the backend re-elaborates its rendered candidates against the original
-goal; only if no provider-free term verifies does a second metaprogram build
-the bounded live-provider inventory and run the fallback lanes described
+goal; only if no provider-free term verifies, or an authorized filter rejects
+all verified baseline occurrences, does a second metaprogram build the bounded
+live-provider inventory and run the fallback lanes described
 under [Engines, budgets, and the fine print](#engines-budgets-and-the-fine-print).
 A complete Djinn refutation is kept as a sound fallback while those
-constructive lanes run and restored if they find nothing. Constructor and
+constructive lanes run and restored if they find no survivor. Constructor and
 exact provider names are restored and binders named by role before every
-verification; only survivors are shown and bound.
+verification; only survivors are bound, while accumulated behavioral
+rejections remain separately visible.
 
 The synthesis side environment tracks exactly which session history it
 has replayed. An unchanged history reuses it directly; an append replays

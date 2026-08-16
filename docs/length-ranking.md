@@ -29,14 +29,16 @@ Five rules define the current authority boundary:
   `--behavior-mode filter` selects hard filtering, and only an independently
   replayed counterexample may enter its rejected partition. Rejections remain
   separately visible but are not bound as `itN`.
-- **Filtering can refill only inside the current bounded lane.** Ranking keeps
-  its historical five-success verifier frontier. Filtering instead assesses
-  the verified output of one already bounded 12-, 24-, or excluded-middle
-  6-group lane as one batch. That filter assessment owns one nominal scalar or
-  product counterexample bank, then shows and binds at most five survivors
-  while reporting every rejection from that batch. Main creates a fresh
-  context for each such assessment; it does not carry that bank to another
-  lane.
+- **Filtering reuses one bank across the command's bounded lanes.** Ranking
+  keeps its historical five-success verifier frontier. Filtering assesses each
+  already bounded 12-, 24-, or excluded-middle 6-group lane as one batch. Main
+  introduces one nominal scalar or product filter context before translation
+  and carries it through retries and all synthesis lanes. A no-verified or
+  all-rejected lane may therefore enter the next existing lane with the same
+  nominal owner (subject to exact scope reset); a survivor or preserve-all lane
+  remains terminal. This is not quota
+  filling: the first survivor stops scheduling, at most five are shown and
+  bound, and every accumulated rejection remains visible.
 - **Raw solver status has no authority.** `sat`, `unsat`, and `unknown` are
   heuristics. Preparation refusal, unassessed input, heuristic status,
   independently completed finite-box evidence, and established applicable-
@@ -50,14 +52,16 @@ The ranking stage was the first behavioral increment. The current tree also
 implements the command-authorized Level-1 hard-filter slice described by the
 [Z3 behavioral synthesis proposal](Z3_Behavioral_Synthesis_Proposal/Z3_Behavioral_Synthesis_Proposal.pdf)
 (August 2026): a bounded total occurrence partition whose only negative
-Length decision is an exact replayed counterexample. The current lane-local
-refill lets that filter consume the remainder of one already bounded synthesis
-lane after early behavioral rejections, but it is not the proposal's Level-2
-command-local CEGIS loop: it neither requests candidates from another lane nor
-keeps a context across Main's assessment calls. Cross-lane candidate
-enumeration, a command- or session-persistent bank, typed sketch completion,
-sound prefix pruning, further behavioral domains, and Lean-checked proof
-artifacts remain proposed work.
+Length decision is an exact replayed counterexample. Same-lane refill consumes
+the remainder of one already bounded lane after early rejections. The new
+command-local successor additionally reuses the filter bank and continues only
+after a complete no-verified or all-rejected lane through Main's already
+existing provider and classical schedule. This is a bounded Level-2 slice, not
+the proposal's complete CEGIS design: it does not ask an engine to synthesize a
+counterexample-directed replacement, fill a survivor quota across lanes, prune
+a typed prefix, or persist a bank. New engine-side enumeration, a session-
+persistent bank, typed sketch completion, sound prefix pruning, further
+behavioral domains, and Lean-checked proof artifacts remain proposed work.
 
 The vendored Djex revision now contains candidate-independent scalar and
 binary-product counterexample-bank scopes, bounded immutable input stores, and
@@ -72,17 +76,16 @@ Configuration, Selection, and internal Ranking now uses that context in place
 of the raw four-vector MRU. Established rank runners and the direct scalar/product
 Selection compatibility APIs still construct the fresh raw `[[Natural]]` MRU
 for every batch; their APIs and behavior are unchanged. Integration's
-compatibility wrapper remains raw on rank calls but creates a fresh context for
-each filter call.
+compatibility wrapper remains raw on rank calls and creates a fresh context for
+each filter call, but Main no longer uses that one-batch wrapper.
 
-Integration can introduce a nominal rank-2 `LengthAssessmentContext` and
+Integration introduces a nominal rank-2 `LengthAssessmentContext` and may
 assess more than one batch through it. Reuse of a filter context reuses its one
-bank; rank contexts intentionally contain no bank. The compatibility
-`assessLengthVerificationRequest` entrance, which is the only entrance Main
-calls, introduces a fresh context for each assessment call. Main, its lane
-scheduler, `ReplState`, history, snapshots, and persistence are unchanged, so
-the current command path still has no true cross-lane or full-command bank
-lifetime.
+bank; rank contexts intentionally contain no bank. Main now opens exactly one
+such context inside `synthRun`, before initial goal translation, and passes it
+through universe narrowing and every ordinary, provider, excluded-middle, and
+double-negation lane. The owner is lexical to that command: `ReplState`,
+history, snapshots, later commands, and persistence remain unchanged.
 
 Everything below this line describes the exact behavior of the current tree:
 the startup-configuration schema, the current contract-file schema, the
@@ -106,7 +109,7 @@ first.
 - [Command-level ranking and hard filtering](#command-level-ranking-and-hard-filtering)
   - [Exact grammar, defaults, and authority](#exact-grammar-defaults-and-authority)
   - [Retention and rejection taxonomy](#retention-and-rejection-taxonomy)
-  - [Bounded lane-local survivor refill](#bounded-lane-local-survivor-refill)
+  - [Bounded lane assessment and command-local continuation](#bounded-lane-assessment-and-command-local-continuation)
   - [Stable partition, failure, and Main behavior](#stable-partition-failure-and-main-behavior)
 - [One-shot contract-only files](#one-shot-contract-only-files)
   - [Command syntax, admission, and lifetime](#command-syntax-admission-and-lifetime)
@@ -277,8 +280,10 @@ Z3 and a contract-only file cannot supply execution authority. Main first asks
 the already activated startup mode for permission. A disabled filter request,
 and any disabled request with a contract path, fails before path admission or
 file IO. With permission, the selected startup or command-local contract and
-the one activated policy travel only on that command's stack through ordinary,
-universe-retry, provider, and classical synthesis lanes.
+the one activated policy enter one rank-2 context before goal translation.
+That context travels only on the command's stack through initial translation,
+universe narrowing and retranslation, and ordinary, provider, and classical
+synthesis lanes.
 
 ### Retention and rejection taxonomy
 
@@ -309,16 +314,17 @@ input-vector MRU local to one assessment batch. Integration's additive
 context-aware filter entrance uses the nominal bank instead. Either kind of
 retained sample can seed a later candidate only after that candidate
 independently evaluates and
-associates the exact vector with its own checked problem. Main's compatibility
-assessment entrance creates a fresh filter context for every call, so the next
-lane assessment still starts empty. No bank, behavior mode, or selection result
-is retained in `ReplState`, history, snapshots, or another command.
+associates the exact vector with its own checked problem. Main assesses every
+lane through its one callback-scoped command context, so the next same-scope
+filter lane sees the bank successor established by earlier lanes. No bank,
+behavior mode, context, or selection result is retained in `ReplState`,
+history, snapshots, or another command.
 
-### Bounded lane-local survivor refill
+### Bounded lane assessment and command-local continuation
 
 Main's private `verifySynthLane` seam receives an exact group limit from its
 current synthesis caller and takes that prefix before it inspects the
-assessment request. An empty prefix therefore produces an unassessed lane
+assessment context. An empty prefix therefore produces an unassessed lane
 without projecting the behavior mode or forcing a retained lazy contract.
 Ordinary, universe-retry, provider, and double-negation lanes use the engine's
 established limit: 12 groups for a standalone Djinn or Exference lane and 24
@@ -330,9 +336,10 @@ mode instead gives verification the complete caller-owned lane limit. Because
 the verification quota counts accepted groups rather than attempted groups,
 the prior `take` is a separate productivity boundary: failed groups do not
 allow traversal beyond the finite 12-, 24-, or 6-group lane prefix. The
-complete verified filter frontier is then assessed once through one fresh
-nominal context, so its bounded bank can replay a counterexample learned from
-an early rejected occurrence against a later occurrence in that same batch.
+complete verified filter frontier is then assessed once through the command's
+nominal context. Its bounded bank can replay a counterexample learned from an
+early occurrence against both a later occurrence in that batch and a later
+same-scope lane.
 
 The lane result retains two deliberately noninterchangeable histories. Its
 checked spelling frontier is every rendered variant in the complete bounded
@@ -341,8 +348,9 @@ that remains the exact provider-deduplication and scheduling authority. Its
 callback-attempt trace instead records each detailed variant immediately before
 the Lean backend call. It excludes the later siblings of an accepted group and
 every group beyond the successful-group quota. The exact trace is retained for
-later accounting, but current provider scheduling never substitutes it for the
-full spelling frontier.
+later accounting, but provider scheduling never substitutes it for the full
+spelling frontier. Both no-verification and all-rejection union that complete
+frontier into the checked set before the next provider stage.
 
 Only after assessment does Main take at most five survivor presentations for
 display and `itN` binding. It does not cap the rejection projection: every
@@ -357,20 +365,62 @@ one of four dispositions: no verified receipt, survivors, all behaviorally
 rejected, or assessment failure with every verified candidate preserved. An
 empty verified-receipt batch is the first and sole assessed-lane route to the
 no-verification disposition. Verification and assessment emit no candidate
-rows and mutate no synthesis-splice state; one finalizer owns observations,
-the preserve-all warning, reverse binding, cache replacement or clearing,
-survivor rows, every bounded rejection row, and handled-lane notes.
+rows and mutate no synthesis-splice state. Main prepends every actual outcome
+to one private lazy `SynthLaneAccumulation`, whose list is reverse attempt
+order. This owner is lexical to the command and is neither a scheduler API nor
+persistent state.
 
-This scheduling remains intentionally local and behavior-preserving. Only the
-no-verification disposition permits provider or classical continuation. An
-accepted all-rejected batch is the distinct terminal all-behaviorally-rejected
-disposition, so structural filtering still does not enter provider lanes and
-an all-rejected excluded-middle batch still does not enter the double-negation
-lane. No candidate from a later lane enters the assessment. The outcome types
-are private to Main; they add no `Engine`, `Verification`, or `ReplState`
-change, persistent command/session bank, provider continuation, or cross-lane
-CEGIS scheduling. The reusable Integration context is an additive
-package-internal seam and is not retained by this scheduler.
+No-verification and all-behaviorally-rejected are distinct continuing
+dispositions. A baseline or provider result in either class may enter the next
+provider stage; an all-rejected excluded-middle result may enter double
+negation just like no-verification. Survivors and assessment-preserved remain
+terminal. Continuation never fills a presentation quota across lanes: the
+first terminal lane stops even if it supplies only one survivor. The engine,
+verification module, lane bounds, and rank-five quota are unchanged.
+
+One deferred `finalizeSynthLaneAccumulation` owns all result effects. It emits
+debug metrics in chronological order for every retained outcome, then uses the
+chronological prefix through the first terminal disposition for warnings, at
+most one cache or binding action, aggregate rows, and handled notes. A terminal
+lane's candidate rows print first. Rejection rows then contain every prior continuing
+all-rejected projection followed by that terminal lane's rejections. Notes are
+likewise chronological for all-rejected lanes and the first terminal lane;
+no-verification contributes no handled note. A final aggregate all-rejection
+clears the synthesis-splice cache once, while survivor or preserve-all output
+runs its binding batch and replaces the cache once. The defensive fold ignores
+effects after a first terminal disposition, although the scheduler never
+appends such an outcome.
+
+Final reporting distinguishes completed behavioral work from the engine's
+structural or operational result. On ordinary candidate, no-term, or non-sound-
+refutation exhaustion, aggregate all-rejection is already handled output and
+suppresses the generic no-survivor/no-term diagnostic and its otherwise final
+engine notes. Aggregate no-verification keeps the established diagnostic path.
+On a timeout or engine error without a retained structural fallback, Main
+finalizes completed outcomes first and then prints the unchanged abnormal
+diagnostic; the timeout keeps its existing hint, and no generic lane notes are
+appended afterward.
+
+A sound provider-free Djinn refutation remains the control-flow fallback for
+empty, unavailable, timed-out, errored, no-verified, or all-rejected provider
+search. Timeout/error is still masked on that path, but completed provider
+outcomes remain in the accumulation. If classical search is enabled and the
+Glivenko split exists, its excluded-middle outcome is always accumulated;
+either no-verification or all-rejection enters the double-negation route, while
+survivor or preserve-all stops. The sound-refutation caller alone finalizes the
+completed accumulation.
+With aggregate no-verification it preserves the established “provably
+uninhabited” claim, then any unresolved-universe annotation, then the
+constructive/classical hint. Aggregate all-rejection suppresses the claim and
+hint as unrelated to the handled behavioral result, but the existing goal-
+qualified unresolved-universe annotation remains. A terminal classical result
+likewise keeps that annotation after its rows.
+
+This bounded command-local continuation is not survivor-quota filling or a
+complete counterexample-guided engine loop. It neither asks an engine for a
+counterexample-directed replacement nor prunes a typed prefix. The outcome
+types and context add no `Engine`, `Verification`, or `ReplState` field,
+session bank, serialization, snapshot, restoration, or persistence.
 
 ### Stable partition, failure, and Main behavior
 
@@ -405,20 +455,25 @@ Survivors with independently completed input-box or applicable-domain receipts
 retain the existing bounded positive notes. Each omitted occurrence is printed
 separately as `rejected` with the exact existing bounded counterexample or
 counterexample-simplification note. Only survivors are bound as `it1`, `it2`,
-and so on. If every verified candidate is rejected, the command is still a
-handled synthesis result: it prints the rejection rows, creates no new `itN`
-bindings, clears the previous synthesis-splice cache, and does not emit the
-unrelated “none survived Lean verification” diagnostic or continue into a
-later provider or classical lane.
+and so on. If every verified candidate in one lane is rejected, that lane
+contributes its rejection projection and may continue. If later lanes also
+exhaust as no-verified or all-rejected, aggregate all-rejection is still a
+handled synthesis result: the command prints every accumulated rejection,
+creates no new `itN` binding, clears the previous synthesis-splice cache once,
+and suppresses an unrelated “none survived Lean verification” or no-term
+diagnostic. A later survivor or preserve-all terminal prints its candidate rows
+first and retains every earlier rejection row.
 
 The structural and command-authority predecessor is recorded in the historical
 [command-authorized Length filtering report](reports/2026-08-15-command-authorized-length-filtering.md).
-The current refill checkpoint and its exact test surface are recorded in the
+The historical refill checkpoint and its exact test surface are recorded in the
 [lane-local Length survivor-refill report](reports/2026-08-15-lane-local-length-survivor-refill.md).
 Its behavior-preserving outcome-seam successor is recorded in the
 [explicit synthesis-lane outcome report](reports/2026-08-16-explicit-synthesis-lane-outcomes.md).
 The filter-only nominal-bank runner is recorded in the
 [filter-only counterexample-bank context runner report](reports/2026-08-16-filter-only-length-counterexample-bank-context-runner.md).
+The command-local scheduler successor is recorded in the
+[command-local counterexample-bank scheduler report](reports/2026-08-16-command-local-length-counterexample-bank-scheduler.md).
 
 ## One-shot contract-only files
 
@@ -465,14 +520,14 @@ cache, and later commands return to the startup-fixed contract unless they name
 their own file. Malformed option syntax is rejected rather than silently
 treated as a goal.
 
-The request value can travel through several scheduler lanes, but Main calls
-`assessLengthVerificationRequest` separately for each verified lane. That
-compatibility entrance introduces and closes one fresh nominal assessment
-context per call. The additive rank-2
-`withLengthAssessmentRequestContext`/`assessLengthVerificationContext` seam can
-reuse a filter bank across several batches when one caller deliberately keeps
-the callback-scoped context, but Main does not use that seam and no such owner
-is stored in command or REPL state.
+Main passes the request to `synthRun`, which calls
+`withLengthAssessmentRequestContext` once before initial goal translation.
+Every later `assessLengthVerificationContext` call for that command therefore
+uses the same callback-scoped context across universe retry and ordinary,
+provider, and classical lanes. The context is the command-local owner but is
+not a field of a command value or REPL state; the rank-2 type prevents it from
+escaping the callback. The compatibility `assessLengthVerificationRequest`
+entrance still creates a fresh one-batch context for non-Main callers.
 
 ### Scalar contract example
 

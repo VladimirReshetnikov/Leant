@@ -1316,7 +1316,11 @@ propositional logic. The findings are rendered as \code{Classical.em}
 case splits. If that misses, the goal's double-negation translation runs
 instead (complete by Glivenko's theorem) and the candidate is wrapped
 in \code{Classical.byContradiction}. Both kinds are verified like any
-other candidate. The whole behavior sits behind a switch:
+other candidate. An explicit behavioral filter uses the same command-local
+bank in both routes: either no verification or complete all-rejection in the
+excluded-middle lane enters double negation, while any survivor or
+preserve-all result stops. The sound-refutation caller accumulates both attempts and
+finalizes them only once. The whole behavior sits behind a switch:
 
 \begin{session}
 λ> :set synth-classical off
@@ -1494,12 +1498,15 @@ note: exference: search truncated: step limit reached, queue limit pruned 36194
 
 Every engine mode first gives a structurally accepted goal a
 provider-free lane and asks Lean to verify its candidates. When no
-provider-free term verifies, Lean discovers at most 80 live term providers
-under the namespaces used by the target (plus exact session declarations).
-A complete Djinn refutation is retained as a sound fallback while those
-constructive provider lanes run: the first candidate accepted by Lean wins;
-an empty, unavailable, timed-out, or unsuccessful provider search restores
-the refutation before any classical retry.
+provider-free term verifies, or an authorized behavioral filter rejects every
+verified occurrence, Lean discovers at most 80 live term providers under the
+namespaces used by the target (plus exact session declarations). The command's
+filter bank and accumulated rejection rows cross those lanes. A complete Djinn
+refutation is retained as a sound control-flow fallback while constructive
+provider lanes run: the first survivor or preserve-all result wins; an empty,
+all-rejected, unavailable, timed-out, or unsuccessful provider search restores
+the refutation before any classical retry, without discarding completed lane
+accounting.
 The focused \code{synth-provider-refutation-fallback} transcript checks exact
 rank-N overrides under Djinn, Exference, and combined mode. It also enables
 classical search for a Peirce-shaped goal and confirms that an exact
@@ -1542,10 +1549,10 @@ Lean still reconstructs every dictionary
 during final elaboration---only the closed kind/type vector crosses the bridge.
 
 Exact rendered spellings keep their first scheduled occurrence. Before a
-later provider lane is forced or capped, spellings already rejected by Lean
-are removed from each engine's source stream and newly empty groups are
-dropped. Rediscovered failures therefore spend none of that lane's 12- or
-24-group fresh frontier.
+later provider lane is forced or capped, every spelling in an earlier complete
+no-verified or all-behaviorally-rejected bounded frontier is removed from each
+engine's source stream and newly empty groups are dropped. Rediscovered
+candidates therefore spend none of that lane's 12- or 24-group fresh frontier.
 
 An entirely optional last stage can consult Z3.  Passing
 \code{-{}-length-ranking-config} at startup (\S\ref{sec:start}) activates
@@ -1564,17 +1571,19 @@ one separately as rejected, and binds only survivors. A raw \code{sat},
 preparation refusal, unassessed input, heuristic status, completed finite box,
 or established applicable domain.
 
-The refill boundary is deliberately finite and lane-local. A rank request asks
-Lean for at most five successful groups. A filter request first bounds its
-input, then may verify and assess up to all 12 groups in a standalone lane, all
-24 in a combined lane, or all 6 in the cheaper excluded-middle classical
-route. That verified filter frontier enters one assessment batch, allowing its
-fresh nominal scalar or product context bank to replay an early
-counterexample against a later occurrence. Existing ranking and direct
-Selection compatibility paths keep the raw four-vector MRU unchanged. Only
-after selection does Leant take at most five survivor
-presentations for display and binding; every rejection from the bounded batch
-is still printed.
+Every assessment remains deliberately lane-bounded. A rank request asks Lean
+for at most five successful groups. A filter request first bounds its input,
+then may verify and assess up to all 12 groups in a standalone lane, all 24 in
+a combined lane, or all 6 in the cheaper excluded-middle classical route. Main
+introduces one rank-2 context before goal translation and carries it through
+universe retries and every ordinary, provider, and classical lane. Each
+verified frontier enters one assessment batch, while the filter context's one
+nominal scalar or product bank can replay an earlier counterexample against a
+later occurrence or same-scope lane. Existing ranking and direct Selection
+compatibility paths keep the raw four-vector MRU unchanged; rank contexts have
+no bank. Only after a terminal selection does Leant take at most five survivor
+presentations for display and binding; every accumulated rejection is still
+printed.
 
 The exact option-bearing grammar is
 \code{:synth [-{}-behavior-mode rank|filter]
@@ -1636,11 +1645,12 @@ reduction; every strict reduction records under simplification origin. The
 candidate keeps its pre-record final receipt. Completed cache transitions survive a later
 candidate-report fallback.
 
-Integration can introduce one reusable rank-2
+Integration introduces one reusable rank-2
 \code{LengthAssessmentContext}; repeated context assessments reuse its filter
-bank, while rank contexts contain no bank. Its compatibility request assessor
-creates a fresh context per call. Main still calls that wrapper once for each
-bounded lane and retains no context, so a later lane starts fresh.
+bank, while rank contexts contain no bank. Main now opens one context inside
+\code{synthRun} before initial translation and supplies it to every lane. Its
+fresh-per-call compatibility request assessor remains for other callers. The
+rank-2 owner dies when the command returns and cannot enter REPL state.
 
 Filtering runs the same scalar or nominal pair assessor, maps every report
 back to its exact callback occurrence by the retained original index, and
@@ -1654,28 +1664,49 @@ roll back bank replay, promotion, or recording transitions which already
 completed. A
 surviving bounded-positive receipt keeps its established note. A rejected
 occurrence keeps its exact counterexample or simplification note. If all
-verified occurrences are rejected, the result is handled: Leant prints the
-rejections, creates no \code{itN} binding, clears its previous synthesis-splice
-cache, does not call them Lean-verification failures, and does not continue
-into a later provider or classical lane.
+verified occurrences are rejected, the lane is handled but not yet finalized:
+like a no-verified lane, it may enter the next provider or classical route with
+the same bank and its complete spelling frontier in the deduplication set.
+Survivor and preserve-all results remain terminal.
 
-Main now records one bounded lane in private lazy outcome types rather than
-collapsing these cases into a Boolean. The outcome keeps the complete bounded
-rendered-spelling frontier used for provider deduplication separate from the
-exact variants which reached Lean callbacks. Verification and its one Length
-assessment perform no candidate presentation or synthesis-splice mutation. A
-pure classifier distinguishes no verified receipt, survivors, all behavioral
-rejections, and preserve-all assessment failure; one finalizer owns metrics,
-warnings, binding and cache effects, rows, and handled-lane notes. Only the
-empty-verified-receipt disposition can continue to another provider or
-classical lane, so the refactor changes no scheduling or output behavior.
+Main prepends each actual lane outcome to one private lazy accumulation in
+reverse attempt order. Each outcome keeps the complete bounded
+rendered-spelling frontier separate from the exact variants which reached Lean
+callbacks. Verification and assessment perform no candidate presentation or
+synthesis-splice mutation. A pure fold distinguishes no verified receipt,
+survivors, aggregate all-rejection, and preserve-all failure, stopping at the
+first terminal result. One deferred finalizer owns metrics, warnings, binding
+and cache effects, rows, and handled-lane notes. Terminal candidate rows print
+first; rejection rows are every earlier all-rejected projection followed by
+the terminal lane's rejections; handled notes retain that chronological order.
+No-verification contributes only its debug metrics. Final all-rejection clears
+the old splice cache once; survivor or preserve-all output replaces it once.
+
+Continuation does not fill a five-survivor quota across lanes. The first lane
+with even one survivor stops scheduling, ranking retains its historical
+five-success quota, and filtering retains each 12/24/6 bound. On ordinary
+all-rejected exhaustion the accumulated rejection output suppresses an
+unrelated no-term or Lean-verification diagnostic. Without a retained sound
+refutation, timeout or engine error finalizes completed outcomes first and then
+prints its unchanged abnormal diagnostic.
+
+A provider-free sound Djinn refutation still masks provider timeout/error and
+controls the later classical path, but completed provider outcomes stay in the
+accumulation. When the Glivenko split exists, excluded-middle no-verification
+or all-rejection enters double negation; survivor or preserve-all stops. The
+sound-refutation caller finalizes once. Aggregate no-verification keeps the
+existing provably-uninhabited claim, unresolved-universe annotation, and
+constructive/classical hint in that order. Aggregate all-rejection suppresses
+the unrelated claim and hint while keeping the goal-qualified annotation.
 
 Behavior mode, assessment contexts, selection results, both kinds of
-replay-input store, and the lane outcomes are never persistent REPL state. This
-is not the proposal's full command-local CEGIS loop: Main carries no context or
-candidate across a lane, and no engine, verification module, scheduler, or REPL
-state changed. The current reference
-is \code{docs/length-ranking.md}; the command-authority predecessor, current
+replay-input store, accumulation, and lane outcomes are never persistent REPL
+state. This is a bounded command-local reuse and continuation slice, not quota
+filling or the proposal's complete CEGIS loop: no engine accepts a
+counterexample-directed replacement request, no typed prefix is pruned, and no
+context survives the command. No engine, verification module, or REPL state
+contract changed. The current reference
+is \code{docs/length-ranking.md}; the command-authority predecessor, historical
 refill checkpoint, and private outcome seam are recorded in
 \code{docs/reports/2026-08-15-command-authorized-length-filtering.md} and
 \code{docs/reports/2026-08-15-lane-local-length-survivor-refill.md}, and
@@ -1684,6 +1715,8 @@ historical nominal-state foundation is recorded in
 \code{docs/reports/2026-08-16-nominal-length-counterexample-bank-state.md}; its
 runtime successor is
 \code{docs/reports/2026-08-16-filter-only-length-counterexample-bank-context-runner.md}.
+The command-local scheduler successor is
+\code{docs/reports/2026-08-16-command-local-length-counterexample-bank-scheduler.md}.
 Dated
 reports under \code{docs/reports/} are historical engineering records rather
 than current file contracts. When assessment is disabled, an ordinary or
