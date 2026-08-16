@@ -2653,8 +2653,12 @@ synthClassical assessmentRequest st args goal parsed =
 -- and display them.  In the session the candidates become real
 -- definitions (bound best-last, so bare `it` is `it1`); in prove mode
 -- `itN` becomes a splice of the candidate applied to the goal's
--- hypotheses, so `exact it1` closes the goal.  'True' when anything
--- was shown.
+-- hypotheses, so `exact it1` closes the goal.  The caller owns the exact
+-- one-lane group bound.  Ranking retains the historical five-success verifier
+-- frontier; filtering may verify the rest of that already bounded lane so a
+-- later same-lane survivor can replace an earlier behavioral rejection.  No
+-- candidate from a later lane enters this assessment.  'True' when anything
+-- was shown or an accepted filter handled an all-rejected batch.
 verifyAndDisplay
   :: LengthAssessmentRequest
   -> Int
