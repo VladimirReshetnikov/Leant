@@ -27,8 +27,7 @@ who wants the *what* can stop at the paragraph.
   - [Interpretation policy and session-owned sealing](#interpretation-policy-and-session-owned-sealing)
   - [Adapter and canonical query sealing](#adapter-and-canonical-query-sealing)
 - [Ranking foundation](#ranking-foundation)
-  - [Direct applicable-domain validation](#direct-applicable-domain-validation)
-  - [Positive-affine through recursive piecewise-affine extractors](#positive-affine-through-recursive-piecewise-affine-extractors)
+  - [Current applicable-domain validation](#current-applicable-domain-validation)
   - [The origin probe](#the-origin-probe)
   - [Live input-box validation and query-first replay](#live-input-box-validation-and-query-first-replay)
   - [Refusals, atomic fallback, and lifecycle owners](#refusals-atomic-fallback-and-lifecycle-owners)
@@ -261,305 +260,125 @@ and preparation refusals do not mutate the bank. The bank never contains a
 cached solver result, verdict, query, receipt, provider-law basis, proof,
 solver status, or durable cache entry.
 
-### Direct applicable-domain validation
+### Current applicable-domain validation
 
-The programmatic
-`enableLengthRankingApplicableDomainValidation inputBoxLimits` policy inserts
-Djex's directly bounded pass after those MRU misses. Djex scans only the exact
-checked normalized top-level precondition for direct `input <= literal`
-clauses, selects the tightest duplicate for each compact input, and requires
-every nonnullary input to be covered. Missing coverage is an ordinary
-inapplicable result and continues to the next stage. A nullary query derives
-maxima `[]` and validates its single assignment `[]`. Width, maximum-
-value, and assignment-count admission refusals are likewise ordinary misses.
-Exact admitted coverage drives a solver-independent tight-box traversal. A
-violation becomes the
-ordinary `Counterexample` and enters the MRU bank; complete traversal becomes
-`ApplicableDomainEstablished`, carries an opaque model/provider-relative
-receipt, and skips origin and live execution. Its vacuous form remains neutral.
-Only the separate
-`enableLengthRankingNonVacuousApplicableDomainPreference` moves an established
-receipt with a positive applicable-assignment count into a stable preferred
-partition. Direct-v1 validation remains programmatic-only. The current startup
-schema instead selects the recursive piecewise-affine successor and enables
-the non-vacuous preference.
-Contract-only files select constraints rather than ranking policy.
+Leant has one applicable-domain policy in the current tree. The programmatic
+builder is
+`enableLengthRankingApplicableDomainValidation inputBoxLimits unionLimits`;
+the current startup decoder installs the same policy directly. The
+`LengthInputBoxLimits` value bounds compact-input width and unique
+assignments. The retained `LengthBooleanFiniteUnionLimits` value bounds raw
+generated branches, rules per branch, closure inspections per branch, retained
+boxes, and raw assignment visits. Its name identifies the resource-cap record,
+not a selectable predecessor strategy.
 
-### Positive-affine through recursive piecewise-affine extractors
+The policy runs after the four-entry newest-first MRU replay and before the
+origin probe. An ordinary inapplicable result or any width, generated-branch,
+rule, closure, retained-box, maximum-value, visit, or unique-assignment
+admission refusal is a pure miss and continues through origin and live
+execution. A replayed violation becomes the ordinary `Counterexample`.
+Complete traversal becomes `ApplicableDomainEstablished` for the scalar
+domain or `LengthSpinePairApplicableDomainEstablished` for the nominal
+binary-product domain and skips the later stages. Assignment evaluation,
+internal enumeration invariants, and exact evidence/query association remain
+indexed atomic failures.
 
-`enableLengthRankingPositiveAffineApplicableDomainValidation` is a separate,
-mutually exclusive extractor. It scans the precondition itself or immediate
-flat top-level conjunction clauses and recognizes only compact inputs, natural
-literals, sums, and positive-literal scales in `A <= k`, `A == k`, or `k == A`.
-For `c + sum(ai*xi) <= k`, each positive coefficient derives
-`xi <= (k-c) quot ai`; equality grants the same necessary upper bound, and
-duplicate bounds take the minimum. Unsupported clauses grant no bound but stay
-in the actual replayed precondition. A literal false, unequal constant-only
-equality in either orientation, or recognized affine constant `c > k` is a
-syntactic contradiction which overrides missing coverage. A contradictory
-nonnullary query validates the one all-zero assignment, yielding maxima all
-zero, total count 1, and applicable count 0. A true constant equality is
-non-binding. A nullary query skips coverage extraction, validates `[]`, and
-records applicable count 1 or 0. This and the direct-v1 builder remain
-available to programmatic callers; the current startup schema selects the
-recursive successor described below.
+The independent
+`enableLengthRankingNonVacuousApplicableDomainPreference` moves only a
+completed receipt whose applicable-assignment count is positive. It does not
+enable validation or alter its evidence. With both current preferences enabled,
+the stable partitions are non-vacuous applicable-domain evidence, non-vacuous
+explicit-box evidence, neutral and vacuous assessments, then counterexamples.
 
-`enableLengthRankingRelationalPositiveAffineApplicableDomainValidation` is the
-third mutually exclusive extractor. It accepts the same positive-affine
-expression grammar on both sides of a top-level inequality or equality,
-cancels common constants and coefficients, and propagates maxima through
-directed relations. Equality contributes both directions. Bounds advance in
-immutable synchronous snapshots, and every eligible rule fires at most once;
-the sound result is deliberately not a numeric least fixed point. Unsupported
-clauses grant no coverage rule, unresolved inputs remain ordinary
-inapplicability, and the actual normalized precondition is still replayed over
-the complete derived box. Its nominal scalar/product receipt family remains
-available through the explicit builder.
+Scalar validation delegates to
+`validateLengthSMTLibQueryApplicableDomain`; product validation delegates to
+`validateLengthSpinePairSMTLibQueryApplicableDomain`. Their closed query error
+families are `LengthSMTLibApplicableDomainValidationError` and
+`LengthSpinePairSMTLibApplicableDomainValidationError`; the checked-problem
+entrances are `validateLengthProblemApplicableDomain` and
+`validateLengthSpinePairProblemApplicableDomain`. Successful assessments
+carry `ValidatedLengthApplicableDomain` or
+`ValidatedLengthSpinePairApplicableDomain`. Their six public projections are
+the domain-specific `InclusiveMaximumBoxes`, `BoxCount`,
+`AssignmentVisitCount`, `AssignmentCount`,
+`ApplicableAssignmentCount`, and `Basis` projections. Presentation uses
+only `renderLengthApplicableDomainValidationNote` or
+`renderLengthSpinePairApplicableDomainValidationNote`. The operational
+failures are `LengthRankingApplicableDomainValidationFailed` and
+`LengthSpinePairRankingApplicableDomainValidationFailed`, carrying the short
+Djex error families `LengthApplicableDomainValidationError` and
+`LengthSpinePairApplicableDomainValidationError`.
 
-`enableLengthRankingStrictRelationalPositiveAffineApplicableDomainValidation`
-is the fourth mutually exclusive extractor. It retains those ordinary
-relations and additionally treats only an immediate normalized top-level
-`not (L <= R)` as the exact natural rule `R + 1 <= L`, applying the successor
-before ordinary coefficient cancellation. It is not general negation handling:
-negated equality, nested logical structure, and unsupported positive-affine
-subtrees contribute no rule or partial bound. Its nominal scalar/product
-receipt family remains available through the explicit builder.
+The earlier direct, positive-affine, relational, strict, quotient, extrema,
+monus, Boolean-union, atomic-branching, and long recursive builders,
+assessments, failures, renderers, Djex receipt families, and public schema tags
+were deleted. There are no aliases or migration adapters. Leant is
+experimental, promises no stability or backward compatibility, and has no
+userbase requiring that historical choice ladder. Dated reports retain the
+engineering sequence but do not describe current imports.
 
-`enableLengthRankingStrictRelationalPositiveAffineQuotientApplicableDomainValidation`
-is the fifth mutually exclusive extractor. It delegates every quotient-free
-clause to that strict predecessor and recognizes only one positive-literal
-Natural quotient at the root of exactly one relation operand. The four exact
-directed laws are the two non-strict and two immediate-negated implications
-shown above; equality emits the two non-strict directions in source order.
-The inherited synchronous rule-once closure handles propagation. Nested,
-embedded, and two-root quotient shapes and unsupported whole clauses grant no
-partial rule, and actual precondition replay remains authoritative. Its nominal
-scalar/product receipt families remain available through the explicit builder.
+#### Private fallback semantics
 
-`enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidation`
-is the sixth mutually exclusive extractor. It delegates every root-extrema-free
-clause literally to the quotient predecessor. For positive-affine `A`, `B`,
-and `C`, it adds only these atomic rule pairs:
+Djex retains the former analyses only as one private ordered fallback inside
+the current validator:
 
 ```text
-max(A,B) <= C        => A <= C       and B <= C
-C <= min(A,B)        => C <= A       and C <= B
-not (min(A,B) <= C)  => C + 1 <= A   and C + 1 <= B
-not (C <= max(A,B))  => A + 1 <= C   and B + 1 <= C
+direct literal -> positive affine -> relational -> strict relational
+  -> positive-literal quotient -> root extrema -> root monus
+  -> Boolean finite union / atomic branching
+  -> recursive piecewise-affine fallback
 ```
 
-Equality in either source orientation emits only the corresponding necessary
-pair: maximum equality emits the first pair and minimum equality the second.
-There is no converse direction. Exactly one relation side may contain one
-immediate binary extremum at its operand root. Nested or effectively n-ary
-extrema, extrema at both roots, mixed roots, embedded extrema, wrong or
-disjunctive orientations, negated equality, unsupported operands, and
-unsupported whole formulas grant no partial rule. Both rules are emitted or
-the entire clause is ignored. Accepted clauses and operands retain normalized
-canonical order through the immutable-snapshot, merge-after-pass rule-once
-closure. Contradiction precedes missing coverage; otherwise the first compact
-missing input wins. The original normalized formula remains replay authority.
-Only complete query-owned replay
-can release
-`StrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainEstablished`
-or
-`LengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainEstablished`;
-their notes use
-`renderLengthStrictRelationalPositiveAffineQuotientRootExtremaApplicableDomainValidationNote`
-and its `LengthSpinePair` sibling. The Leant boundary is recorded in the
-[root-extrema Length ranking report](reports/2026-08-15-root-extrema-length-ranking.md);
-Djex's extraction and receipt authority are recorded in its
-[root-extrema applicable-domain report](../lib/Djex/docs/reports/2026-08-15-root-extrema-length-applicable-domain.md).
+Each leaf first uses the complete atomic scanner. Recursive expansion runs only
+for its singleton ignored alternative when the relation still contains
+minimum, maximum, or natural monus, so an earlier exact result remains
+authoritative. The recursive grammar admits compact inputs, natural literals,
+normalized sums, positive scales, minimum, maximum, and monus. A quotient,
+modulo, conditional, result reference, out-of-range input, retained zero
+scale, or another unsupported child rejects that fallback atom; an earlier
+private stage may still have handled the complete leaf.
 
-`enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainValidation`
-is the seventh mutually exclusive extractor. It delegates every clause without
-an immediate root monus literally to the root-extrema predecessor. For
-`M = A monus B = max(A-B,0)` and the exact opposite affine summary
-`C = c + sum(k_i*x_i)`, it admits only these five normalized shapes:
+For child values `L` and `R`, the exact alternatives are:
 
 ```text
-M <= C        <=> A <= B + C
-C <= M        <=> B + C <= A                    when c > 0
-not (M <= C)  <=> B + C + 1 <= A
-not (C <= M)  <=> 1 <= C and A + 1 <= B + C
-M = C or C=M  =>  A <= B + C; also B + C <= A  when c > 0
+min(L,R)  -> [L <= R;     value L] | [R + 1 <= L; value R]
+max(L,R)  -> [R <= L;     value L] | [L + 1 <= R; value R]
+L monus R -> [L <= R;     value 0] | [R + 1 <= L; value L - R]
 ```
 
-For `C <= M`, identically-zero `C` is tautological and emits nothing; a
-may-zero affine `C` is the exact disjunction `C=0 or B+C<=A`, so the whole
-clause is ignored. Equality always retains the necessary first consequence,
-including the exact `A<=B` when `C` is identically zero, and appends the reverse
-only for uniform positivity. It does not claim that the necessary half is
-sufficient. Positivity comes only from this clause's exact affine constant;
-the closure has no lower-bound fact store and borrows nothing from another
-clause.
+The first case owns equality. Left-child alternatives precede right-child
+alternatives, descendant guards precede the current selector, and the final
+relation rule comes last. Signed coefficients produced by positive monus
+branches transfer exactly into the natural positive-sided rule
+representation. The closure uses one immutable snapshot per pass and fires
+each source-ordered rule at most once.
 
-The scanner summarizes `A`, `B`, and `C` before retaining any rule. The reverse
-strict case emits `1<=C` before `A+1<=B+C`; equality emits `A<=B+C` before its
-conditional reverse. Both-root, nested, embedded, mixed
-monus/quotient/extrema, unsupported-child, negated-equality, and nested-Boolean
-forms grant no partial rule. Normalization may fold literal monus, `A monus 0`,
-or `A monus A` away before this scanner sees the clause. The inherited
-canonical-order, immutable-snapshot, merge-after-pass, rule-once closure and
-contradiction-before-missing precedence remain unchanged. The original
-normalized formula remains exhaustive replay authority. Only complete
-query-owned replay can
-release
-`StrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainEstablished`
-or
-`LengthSpinePairStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainEstablished`;
-their notes use
-`renderLengthStrictRelationalPositiveAffineQuotientRootExtremaMonusApplicableDomainValidationNote`
-and its `LengthSpinePair` sibling. The Leant boundary is recorded in the
-[root-monus Length ranking report](reports/2026-08-15-root-monus-length-ranking.md);
-Djex's extraction and receipt authority are recorded in its
-[root-monus applicable-domain report](../lib/Djex/docs/reports/2026-08-15-root-monus-length-applicable-domain.md).
-
-`enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainValidation`
-is the eighth mutually exclusive extractor. It keeps the root-monus scanner as
-the exact signed-leaf authority and adds bounded proof-polarity DNF. Positive
-conjunction forms a Cartesian conjunction, negative conjunction forms a union,
-`not` flips polarity, and negative equality splits exactly into
-`not (A<=B)` or `not (B<=A)`. It does not descend into expression-level
-conditionals or treat an arithmetic disjunction as general Boolean syntax.
-
-The raw generated-branch cap precedes cleanup. Canonicalization sorts and
-deduplicates signed literals, removes literal/complement branches, deduplicates
-branches, and drops strict literal-set supersets. Each retained branch then has
-independent rule and immutable-snapshot closure-inspection caps and delegates
-every leaf to the predecessor scanner. Contradictory branches are discarded;
-every live branch must bound every compact input or the complete attempt is an
-ordinary miss. Resulting zero-origin boxes are deduplicated and reduced only by
-componentwise containment. Incomparable boxes such as `[1,3]` and `[3,1]`
-remain separate and are never widened to `[3,3]`.
-
-The receipt distinguishes raw assignment visits from the deduplicated global
-assignment count. Enumeration inserts every retained box into one `Set` and
-replays `Set.toAscList` once, so overlaps run once and the first failure is
-globally lexicographic. Empty unions have no boxes and zero visits or
-assignments; nullary truth has the singleton box `[[]]`. The original checked
-formula remains the replay authority. Width, branch, rule, closure, retained-
-box, maximum-value, visit, and unique-assignment caps are ordinary candidate
-misses in Leant. Assignment-evaluation and internal-enumeration failures and
-association mismatch remain indexed atomic failures. The nominal
-scalar/product receipt family remains available through its explicit builder.
-A pure establishment or
-counterexample can complete before a worker is demanded. The scoped owner
-still captures and checks its deadline clock, while an all-pure batch performs
-no executable, access-check, staging, or worker IO. Only complete query-owned
-replay can release
-`StrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionApplicableDomainEstablished`
-or its `LengthSpinePair` sibling. Their bounded renderers report box, visit,
-unique, and applicable counts plus a two-box/two-maximum prefix without
-claiming a hull, proof, solver status, or pruning authority. See the
-[Boolean finite-union Length ranking report](reports/2026-08-15-boolean-finite-union-length-ranking.md)
-and Djex's
-[Boolean finite-union applicable-domain report](../lib/Djex/docs/reports/2026-08-15-boolean-finite-union-length-applicable-domain.md).
-
-`enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainValidation`
-is the ninth mutually exclusive extractor. It retains the formula-polarity DNF
-and adds two exact alternatives for these immediate binary root shapes, with
-normalized first-child/second-child and zero/bound order:
-
-```text
-C<=max(A,B)       -> [C<=A] | [C<=B]
-min(A,B)<=C       -> [A<=C] | [B<=C]
-not(max(A,B)<=C)  -> [C+1<=A] | [C+1<=B]
-not(C<=min(A,B))  -> [A+1<=C] | [B+1<=C]
-max(A,B)=C        -> [A<=C,B<=C,C<=A] | [A<=C,B<=C,C<=B]
-min(A,B)=C        -> [C<=A,C<=B,A<=C] | [C<=A,C<=B,B<=C]
-C<=(A monus B)    -> [C<=0] | [B+C<=A]                 -- C may be zero
-(A monus B)=C     -> [A<=B+C,C<=0] | [A<=B+C,B+C<=A]  -- either orientation
-```
-
-The equality common rule stays first and the zero branch is not simplified.
-Constant-positive and identically-zero monus cases and all already exact
-extremum/monus orientations remain singleton predecessor alternatives. All
-three operands must summarize independently as normalized positive-affine
-expressions. Both-root, nested, embedded, mixed, effectively n-ary,
-conditional, or otherwise unsupported shapes are ignored atomically.
-
-The generated-branch cap now counts the lazy complete product of formula-DNF
-branches and per-atom alternatives before canonical cleanup. After admission,
-the predecessor canonicalizer operates on sets of original checked literals;
-each surviving set is then re-expanded in `Set` order into explicit ignored,
-contradictory, or ordered-rule alternatives. No replacement formula or proof-
-rule set is manufactured, and rule/closure indices address this expanded
-canonical stream. The same `LengthBooleanFiniteUnionLimits` and error types
-apply: rule caps of two/one observe three/two for extremum/monus equality, and
-the default 64-rule ceiling observes 65 at its first excess.
-
-Box antichain and global replay behavior is unchanged. The extremum example
-retains `[[1,3],[3,1]]` with 16 visits and 12 unique/applicable assignments;
-the may-zero relation retains `[[0,4],[3,3]]` with 21 visits, 17 unique and 11
-applicable assignments, or five applicable assignments for equality. No hull
-is created and the original formula remains replay authority. The atomic
-builder selects the nominal scalar/product receipt families and reuses the existing Boolean finite-
-union ranking failure constructors and admission classifiers. Complete replay
-alone releases
-`StrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingApplicableDomainEstablished`
-or its `LengthSpinePair` sibling; the two matching bounded renderers distinguish
-that evidence without altering contract, problem, query, wire, fingerprint,
-association, executable, worker, run, or scoped-owner identity. See the
-[atomic-branching Length ranking report](reports/2026-08-15-atomic-branching-length-ranking.md)
-and Djex's
-[atomic-branching applicable-domain report](../lib/Djex/docs/reports/2026-08-15-atomic-branching-length-applicable-domain.md).
-
-`enableLengthRankingStrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineApplicableDomainValidation`
-is the tenth mutually exclusive extractor. Each signed relation leaf first
-uses the complete atomic predecessor. Only an exact singleton ignored result
-which still contains an extremum or monus enters the recursive fallback, so
-every already supported predecessor rule stream remains the current parity
-reference.
-
-The fallback recursively expands compact inputs, literals, normalized sums,
-positive scales, binary minimum, binary maximum, and binary monus into ordered
-guarded signed-affine values. Descendant guards precede each node's selector:
-
-```text
-min(L,R) -> [L<=R; L] | [R+1<=L; R]
-max(L,R) -> [R<=L; L] | [L+1<=R; R]
-L monus R -> [L<=R; 0] | [R+1<=L; L-R]
-```
-
-The first choice owns equality. Left-child cases precede right-child cases,
-and the final relation appends at-most, strict-complement, or two equality
-rules after all guards. Signed coefficients are transferred exactly across
-each inequality into the established natural positive-sided rule type. No
-checked formula is manufactured and no selector or relation rule is
-deduplicated.
-
-Any required quotient, modulo, conditional, result reference, out-of-range
-variable, retained zero scale, or other unsupported child rejects the whole
-recursive fallback atom. Within the admitted grammar the successor handles
-nested, embedded, both-root, mixed, and normalized effectively n-ary extrema/
-monus shapes.
-
-Raw admission still counts the complete formula-DNF by recursive-alternative
-Cartesian product before formula cleanup, guard contradiction, proof-rule
-collection, closure, or box cleanup. Original literal sets are then
-canonicalized and re-expanded in `Set` order. The same per-branch closure,
-zero-origin box antichain, raw visits, globally deduplicated lexicographic
-assignment set, and original-formula replay remain authoritative.
+Generated-branch admission counts the raw formula-DNF and recursive-alternative
+Cartesian product before cleanup. Canonical original literal sets are
+re-expanded in set order before rule and closure accounting. Every surviving
+branch must bound every compact input. Bounded branches form a
+lexicographically ordered, componentwise-maximal box antichain; incomparable
+boxes are never replaced by a hull. Visits count overlaps, a global bounded set
+deduplicates assignments, and Djex replays the original checked precondition
+and postcondition once per assignment in global lexicographic order. Derived
+guards, rules, boxes, and solver status never replace this query-owned replay.
 
 The scalar discriminator retains `[[2,3],[3,2]]` with two boxes, 24 visits,
-15 unique assignments, and 10 applicable assignments; its atomic control
-retains `[[3,3]]` with 1/16/16/10. The product discriminator retains
-`[[2,2]]` with 1/9/9/9; its atomic control retains `[[3,3]]` with
-1/16/16/9. The nested product has 32 raw cases, distinguishing branch caps 31
-and 32 before contradictory-case cleanup. The current startup schema selects
-these nominal scalar/product recursive receipts together with execve-check
-launch, the scoped-v2 owner, deferred opening, both preferences, and
-simplification. It reuses the Boolean finite-union
-limits, admission classifiers, and ranking failures. Complete replay alone
-releases
-`StrictRelationalPositiveAffineQuotientRootExtremaMonusBooleanFiniteUnionAtomicBranchingRecursivePiecewiseAffineApplicableDomainEstablished`
-or its `LengthSpinePair` sibling; the two recursive renderers preserve the
-384-character bounded presentation seam. The exact Leant boundary is in the
-[recursive piecewise-affine Length ranking report](reports/2026-08-15-recursive-piecewise-affine-length-ranking.md),
-and Djex's grammar, ordering, signed transfer, precedence, and receipt
-authority are in the
-[recursive piecewise-affine applicable-domain report](../lib/Djex/docs/reports/2026-08-15-recursive-piecewise-affine-length-applicable-domain.md).
+15 unique assignments, and ten applicable assignments. The product
+discriminator retains `[[2,2]]` with 1/9/9/9 box, visit, unique, and
+applicable counts; its 32 raw alternatives distinguish branch caps 31 and 32
+before contradictory cases disappear.
+
+Under deferred opening the MRU/domain/origin prefix remains before process IO.
+A pure establishment or counterexample opens no worker. The first live miss
+opens one lexical session without repeating the prefix; the remaining
+candidates stay in that scope. The current policy and deletion rationale are
+recorded in the
+[current applicable-domain policy report](reports/2026-08-15-current-length-applicable-domain-policy.md).
+The detailed grammar, cap precedence, receipt identity, and replay authority
+are owned by Djex's
+[current applicable-domain surface report](../lib/Djex/docs/reports/2026-08-15-current-length-applicable-domain-surface.md).
+The older strategy reports are non-normative development history.
 
 ### The origin probe
 
@@ -656,9 +475,12 @@ receipt, and additive configuration grammar are detailed in the
 The separately enabled stable preference for non-vacuous positive receipts is
 detailed in the
 [non-vacuous bounded-positive ordering report](reports/2026-08-14-non-vacuous-bounded-positive-ordering.md).
-The directly bounded pre-live pass, separate non-vacuous preference, and
-unchanged configuration boundary are recorded in the
+The historical directly bounded pre-live checkpoint and its separate
+non-vacuous preference are recorded in the
 [directly bounded applicable-domain report](reports/2026-08-14-directly-bounded-length-applicable-domain.md).
+Its public validator family has been superseded by the one current algorithm
+documented in the
+[current applicable-domain policy report](reports/2026-08-15-current-length-applicable-domain-policy.md).
 
 ## SpinePair ranking and post-verification
 
@@ -684,15 +506,7 @@ admission, complete execution source (absolute Z3 path, optional SHA-256
 expectation, solver/host budgets, artifact policy, and response limits), and
 replay-limit source. After validation, `LengthRankingPolicy` retains the
 opaque sealed Djex execution configuration and evaluation limits plus a
-private selected direct-v1, positive-affine-v1,
-relational-positive-affine-v1, strict-relational-positive-affine-v1,
-strict-relational-positive-affine-quotient-v1,
-strict-relational-positive-affine-quotient-root-extrema-v1,
-strict-relational-positive-affine-quotient-root-extrema-monus-v1,
-strict-relational-positive-affine-quotient-root-extrema-monus-boolean-finite-union-v1,
-strict-relational-positive-affine-quotient-root-extrema-monus-boolean-finite-union-atomic-branching-v1,
-or strict-relational-positive-affine-quotient-root-extrema-monus-boolean-finite-union-atomic-branching-recursive-piecewise-affine-v1
-applicable-domain pass,
+private disabled-or-current applicable-domain pass,
 optional origin probe, independent optional finite-input-box orchestration,
 optional counterexample simplification, orthogonal non-vacuous ordering
 preferences for applicable-domain and explicit-box receipts, and an eager or
@@ -786,9 +600,10 @@ policy and configured-mode projections reveal only the fourth closed
 classifier, not descriptors, credentials, check results, requested staging
 flags, or runtime admission.
 
-The lower-level builders remain persistent and orthogonal for programmatic
-callers. The startup decoder deliberately exposes none of that historical
-choice matrix. It always enables the input box, origin probe, both non-vacuous
+The retained policy builders are persistent and orthogonal for programmatic
+callers. Applicable-domain construction has only the short current builder;
+its lower analysis stages are private inside Djex. The startup decoder always
+enables the input box, origin probe, both non-vacuous
 preferences, recursive piecewise-affine applicable-domain validation,
 counterexample simplification, deferred opening, and the scoped/checkpointed
 usable-work owner on top of the execve-check descriptor launcher. Only numeric
@@ -867,7 +682,7 @@ candidate, contract, provider, literal, fingerprint, or evaluation authority.
 
 The document exposes only numeric parameters and genuine choices. The current
 execve-check descriptor launcher is fixed, so `execution` has no
-`executableLaunch` member. Recursive piecewise-affine atomic branching is
+`executableLaunch` member. The current recursive piecewise-affine algorithm is
 fixed, so `applicableDomainValidation` has no `strategy` member.
 Counterexample simplification and the scoped-v2 budget likewise omit their
 one-choice `strategy` fields. The origin probe, both non-vacuous preferences,
@@ -911,7 +726,7 @@ Every accepted startup file constructs the same operational bundle:
   descriptor check;
 - the four-entry MRU bank and all-zero origin probe;
 - independent post-`unsat` input-box traversal;
-- recursive piecewise-affine Boolean finite-union applicable-domain traversal;
+- current recursive piecewise-affine applicable-domain traversal;
 - non-vacuous preference for both positive-evidence families;
 - componentwise-lexicographic counterexample simplification;
 - deferred worker opening; and

@@ -11,6 +11,12 @@ those roots are no longer accepted by the current versionless startup decoder.
 Reports describing contract-only versions 1 through 6 likewise preserve their
 landing checkpoints; the current contract-only decoder accepts one versionless
 `{format, rankingDomain, contract}` root and performs no migration.
+Reports from directly bounded through recursive piecewise-affine applicable-
+domain ranking likewise preserve a superseded public strategy ladder. The
+current tree exposes one short recursive applicable-domain policy; its lower
+analysis stages are private Djex fallbacks, and the predecessor builders,
+assessments, failures, receipts, renderers, and schema tags have no aliases or
+migration surface.
 The [README](../../README.md) and
 [Length ranking reference](../length-ranking.md) describe the current tree.
 
@@ -77,6 +83,7 @@ Reports are listed oldest first.
 - 2026-08-15 — [Recursive piecewise-affine branching for Length ranking](2026-08-15-recursive-piecewise-affine-length-ranking.md)
 - 2026-08-15 — [Versionless live Length ranking configuration](2026-08-15-versionless-length-ranking-configuration.md)
 - 2026-08-15 — [Versionless command-local Length contract](2026-08-15-versionless-length-contract.md)
+- 2026-08-15 — [Current-only Length applicable-domain policy](2026-08-15-current-length-applicable-domain-policy.md)
 
 ## Standalone PDF reports
 

@@ -145,6 +145,21 @@ the current versionless startup and contract-only schemas (`rankingDomain` is
 origin probe, bounded validation, and presentation notes — is
 [docs/length-ranking.md](docs/length-ranking.md).
 
+Applicable-domain ranking now has one current recursive piecewise-affine
+algorithm. Library callers use
+`enableLengthRankingApplicableDomainValidation`, receive
+`ApplicableDomainEstablished` or
+`LengthSpinePairApplicableDomainEstablished`, and
+render with `renderLengthApplicableDomainValidationNote` or
+`renderLengthSpinePairApplicableDomainValidationNote`. Djex's direct-through-atomic
+analyses remain private fallback stages inside that algorithm. The former
+stage-specific public builders, assessments, failures, receipts, and renderers
+were deleted without aliases or migration: Leant is experimental and promises
+no API or output compatibility. This surface reset does not change the exact
+versionless startup or contract-only schemas, including the seven numeric
+members of `applicableDomainValidation`; see the
+[current applicable-domain policy report](docs/reports/2026-08-15-current-length-applicable-domain-policy.md).
+
 | Command | Meaning |
 |---|---|
 | `:help`, `:h`, `:?` | show help |
