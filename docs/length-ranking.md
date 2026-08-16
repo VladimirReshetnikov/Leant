@@ -1,9 +1,11 @@
-# Length counterexample ranking
+# Length behavioral ranking and replay-authorized filtering
 
 *An optional, opt-in last stage of `:synth` that consults Z3 about the
-behavior of already-verified candidates and stably reorders them. This
-document is the complete reference; the [README](../README.md) gives the
-one-paragraph overview and the [manual](Leant.pdf) the user-level tour.*
+behavior of already-verified candidates. Its default operation stably ranks
+the complete verified batch; an explicit command mode may instead omit only
+independently replayed counterexamples. This document is the complete
+reference; the [README](../README.md) gives the one-paragraph overview and the
+[manual](Leant.pdf) the user-level tour.*
 
 ## What it is, in one screen
 
@@ -17,23 +19,33 @@ canonical `QF_LIA` query, a scoped Z3 worker is consulted, and any
 counterexample Z3 reports is independently re-executed by Leant's vendored
 Djex engine against the exact checked problem before it is believed.
 
-Three rules make this safe to use:
+Four rules define the current authority boundary:
 
-- **Nothing is pruned.** A candidate that fails the contract is stably moved
-  after the ones that do not; it is still shown, still bound.
+- **Ranking remains the default and never prunes.** Ordinary `:synth TYPE`,
+  explicit `--behavior-mode rank`, and `--length-contract` without an explicit
+  behavior mode all use stable ranking. A replayed counterexample moves after
+  the retained candidates but is still shown and bound.
+- **Filtering requires explicit command authority.** Only
+  `--behavior-mode filter` selects hard filtering, and only an independently
+  replayed counterexample may enter its rejected partition. Rejections remain
+  separately visible but are not bound as `itN`.
 - **Raw solver status has no authority.** `sat`, `unsat`, and `unknown` are
-  heuristics. Only an independently replayed counterexample (or, under an
-  explicit opt-in, an independently completed bounded validation) can move
-  a candidate.
-- **It is off unless you turn it on.** Without `--length-ranking-config`,
-  none of this code runs and no worker is ever launched.
+  heuristics. Preparation refusal, unassessed input, heuristic status,
+  independently completed finite-box evidence, and established applicable-
+  domain evidence all retain a candidate in filter mode.
+- **It is off unless you activate a policy.** Without
+  `--length-ranking-config`, ordinary ranking is the lazy identity. A filter
+  request is rejected before contract-path admission or file IO, and no worker
+  is launched.
 
-This ranking stage is deliberately the *first* behavioral increment. The
+The ranking stage was the first behavioral increment. The current tree also
+implements the command-authorized Level-1 hard-filter slice described by the
 [Z3 behavioral synthesis proposal](Z3_Behavioral_Synthesis_Proposal/Z3_Behavioral_Synthesis_Proposal.pdf)
-(August 2026) starts from exactly this implemented layer and lays out the
-next ones — an opt-in hard filter and counterexample-guided loop, typed
-sketch completion, sound prefix pruning, further behavioral domains, and
-Lean-checked proof artifacts — while keeping the same trust boundaries.
+(August 2026): a bounded total occurrence partition whose only negative
+Length decision is an exact replayed counterexample. Persistent sample banks,
+a counterexample-guided loop, typed sketch completion, sound prefix pruning,
+further behavioral domains, and Lean-checked proof artifacts remain proposed
+work.
 
 Everything below this line describes the exact behavior of the current tree:
 the startup-configuration schema, the current contract-file schema, the
@@ -54,6 +66,10 @@ first.
   - [One current schema and fixed policy](#one-current-schema-and-fixed-policy)
   - [Activation, pinning, and worker lifecycle](#activation-pinning-and-worker-lifecycle)
   - [Candidate eligibility](#candidate-eligibility)
+- [Command-level ranking and hard filtering](#command-level-ranking-and-hard-filtering)
+  - [Exact grammar, defaults, and authority](#exact-grammar-defaults-and-authority)
+  - [Retention and rejection taxonomy](#retention-and-rejection-taxonomy)
+  - [Stable partition, failure, and Main behavior](#stable-partition-failure-and-main-behavior)
 - [One-shot contract-only files](#one-shot-contract-only-files)
   - [Command syntax, admission, and lifetime](#command-syntax-admission-and-lifetime)
   - [Scalar contract example](#scalar-contract-example)
@@ -176,22 +192,140 @@ worker by themselves. The default `djinn` synthesis engine supplies no typed
 graph; select `:set synth-engine exference` or `both` to produce candidates
 which may reach this ranking path.
 
+## Command-level ranking and hard filtering
+
+### Exact grammar, defaults, and authority
+
+The option-bearing command grammar is exactly:
+
+```text
+:synth [--behavior-mode rank|filter] [--length-contract ABSOLUTE-PATH] -- TYPE
+```
+
+The behavior mode, when present, must precede the contract option. The
+standalone `--` is mandatory for every option-bearing form and leaves the
+remaining text as opaque Lean goal syntax. The ordinary no-option form stays
+delimiter-free:
+
+```text
+:synth TYPE
+```
+
+The current choices have these meanings:
+
+| Command form | Operation | Contract |
+| --- | --- | --- |
+| `:synth TYPE` | rank | activated startup contract, or lazy identity when assessment is disabled |
+| `:synth --behavior-mode rank -- TYPE` | rank | activated startup contract, or lazy identity when assessment is disabled |
+| `:synth --behavior-mode filter -- TYPE` | filter | activated startup contract; rejected before IO when assessment is disabled |
+| `:synth --length-contract PATH -- TYPE` | rank | command-local contract; requires an activated startup policy |
+| `:synth --behavior-mode rank --length-contract PATH -- TYPE` | rank | command-local contract; requires an activated startup policy |
+| `:synth --behavior-mode filter --length-contract PATH -- TYPE` | filter | command-local contract; requires an activated startup policy |
+
+Only the exact option tokens are special. Longer lookalikes such as
+`--behavior-model` and `--length-contractual` remain ordinary goal text.
+After exact `--behavior-mode`, an absent value, a value other than `rank` or
+`filter`, or a missing delimiter is rejected as command syntax. An empty
+contract path is rejected before a misplaced mode token; otherwise an exact
+`--behavior-mode` appearing in the contract span is rejected because the mode
+must come first. A contract path may contain spaces, but a standalone `--`
+inside it terminates the path.
+
+The command selects behavior, not execution policy. `filter` does not activate
+Z3 and a contract-only file cannot supply execution authority. Main first asks
+the already activated startup mode for permission. A disabled filter request,
+and any disabled request with a contract path, fails before path admission or
+file IO. With permission, the selected startup or command-local contract and
+the one activated policy travel only on that command's stack through ordinary,
+universe-retry, provider, and classical synthesis lanes.
+
+### Retention and rejection taxonomy
+
+The scalar `Leant.Synth.Length.Selection` adapter and nominally separate
+`Leant.Synth.Length.SpinePair.Selection` adapter consume the existing complete
+ranking assessment. They map each report back to the matching callback
+occurrence by its private original index, then apply this closed rule:
+
+| Ranking report | Filter decision |
+| --- | --- |
+| candidate-local preparation refusal | retain with the exact refusal class |
+| `Unassessed` | retain |
+| `Heuristic status` | retain, including raw `sat`, `unsat`, and `unknown` |
+| `BoundedPositive receipt` | retain with the independently completed finite-box receipt |
+| `ApplicableDomainEstablished receipt` | retain with the independently established applicable-domain receipt |
+| `Counterexample receipt` | reject with that independently replayed counterexample and its optional simplification metadata |
+
+Preparation refusal is checked before the assessment. No solver status,
+derived formula, inferred box, ordering preference, or generic partition
+wrapper can reject. The negative payload is nominally scalar or pair-specific
+and always carries the ordinary final replayed counterexample; simplification
+is optional metadata owned by that same occurrence. The selection adapter does
+not introduce another query runner, executable policy, counterexample
+validator, or evidence format.
+
+The four-entry newest-first input-vector bank remains local to one assessment
+batch. A replayed violation from an earlier candidate can seed a later
+candidate only after the later candidate independently evaluates and associates
+that vector with its own checked problem. A new batch starts empty. No bank,
+behavior mode, or selection result is retained in `ReplState`, history,
+snapshots, or another command.
+
+### Stable partition, failure, and Main behavior
+
+`Leant.Synth.BehavioralSelection` mints a fresh rank-2 occurrence epoch for
+the exact `VerificationBatch`. Package-internal selection adapters may attach
+one retention or rejection payload to a supplied handle but cannot construct
+or reindex a handle. The bounded seal requires exactly one decision for every
+admitted occurrence, rejects length, range, duplicate, and limit errors, and
+reconstructs both partitions from the original verified receipts. Survivors
+and rejections therefore each appear in original callback order, independent
+of ranking order or decision order. Equal candidate texts remain distinct
+occurrences. Filter mode is a stable subsequence selection; it does not rank
+the survivors after filtering.
+
+Post-verification failure, ranking failure or absence, an impossible
+original-index mismatch, candidate/decision admission failure, or partition-
+seal failure atomically preserves the complete original verified batch in
+original order. Such a result exposes no accepted selection wrappers and no
+rejections. Main displays a mode-neutral warning that behavioral assessment
+preserved all verified candidates and then presents the unannotated original
+batch. Exceptions still propagate after owned cleanup rather than becoming a
+filter result.
+
+On accepted selection, presentation traverses the associated survivor and
+rejection wrappers directly; it never zips detached candidates and evidence.
+Survivors with independently completed input-box or applicable-domain receipts
+retain the existing bounded positive notes. Each omitted occurrence is printed
+separately as `rejected` with the exact existing bounded counterexample or
+counterexample-simplification note. Only survivors are bound as `it1`, `it2`,
+and so on. If every verified candidate is rejected, the command is still a
+handled synthesis result: it prints the rejection rows, creates no new `itN`
+bindings, clears the previous synthesis-splice cache, and does not emit the
+unrelated “none survived Lean verification” diagnostic.
+
+The implementation checkpoint and its exact test surface are recorded in the
+[command-authorized Length filtering report](reports/2026-08-15-command-authorized-length-filtering.md).
+
 ## One-shot contract-only files
 
 ### Command syntax, admission, and lifetime
 
 After startup activation, one command may replace only the fixed startup
-contract selection with an explicitly named contract-only document:
+contract selection with an explicitly named contract-only document. Omitting
+the behavior option keeps the default ranking operation; an explicit filter
+selects replay-authorized rejection:
 
 ```text
 :synth --length-contract ABSOLUTE-PATH -- TYPE
+:synth --behavior-mode filter --length-contract ABSOLUTE-PATH -- TYPE
 ```
 
 The standalone `--` is mandatory and keeps the remaining text opaque Lean goal
-syntax. The path may contain spaces, but a standalone `--` inside it is
-reserved as the delimiter. Leant first requires an activated startup policy;
-when ranking is disabled it rejects the option before path admission or file
-IO. Otherwise it admits and reads that absolute POSIX path once, before goal
+syntax. When both options are present, `--behavior-mode` must come first. The
+path may contain spaces, but a standalone `--` inside it is reserved as the
+delimiter. Leant first requires an activated startup policy; when assessment
+is disabled it rejects either contract form before path admission or file IO.
+Otherwise it admits and reads that absolute POSIX path once, before goal
 translation, using a fixed 5,000-ms interruption budget and the same 256-KiB
 JSON ceiling as the startup file. The separate contract-only root has exactly
 `format`, `rankingDomain`, and `contract`; it has no `version` member. `format`
@@ -315,8 +449,8 @@ case shape fails closed.
 
 This remains a bounded model-relative interpretation. It does not prove Lean
 purity, totality, termination, strictness, source-level equivalence, or a
-provider law, and it grants no pruning authority. The selection is command-local
-and leaves no role or case-policy state behind.
+provider law. The passive contract choice is command-local, leaves no role or
+case-policy state behind, and grants no rejection authority by itself.
 
 The current expression grammar includes input/result or provider-argument
 variables, natural literals, sums, scaling, monus, minimum, maximum,
@@ -341,12 +475,13 @@ the selected decoder admits the exact six-member nested shape and checks spine,
 roles, case policy, precondition, postcondition, and provider laws in that
 order. JSON object-member order does not alter this precedence.
 
-The command-local selection contains no execution, ranking, replay,
+The command-local selection contains no execution, ranking, filtering, replay,
 simplification, ordering, or budget policy. Its file is read once before goal
-translation and the same request is carried through ordinary, retry, provider,
-and classical lanes. It never enters `ReplState`, history, snapshots, or a
-cache; a later command returns to the startup-fixed contract unless it names
-another file.
+translation and the same mode-plus-contract request is carried through
+ordinary, retry, provider, and classical lanes. It never enters `ReplState`,
+history, snapshots, or a cache; a later command returns to the startup-fixed
+contract unless it names another file, and behavior mode is parsed afresh for
+every command.
 
 ## Binary-product Length queries
 
@@ -788,7 +923,10 @@ and restores the admitted batch in original order.
 With both current preferences enabled, stable order is non-vacuous applicable-
 domain evidence, non-vacuous explicit-box evidence, neutral and vacuous
 assessments, then replayed counterexamples. Original order is retained inside
-each partition; no candidate or occurrence handle is dropped.
+each ranking partition; ranking drops no candidate or occurrence handle. The
+explicit filter adapter consumes the same report but maps every occurrence
+back through its original index and returns stable original-order survivor and
+rejection subsequences instead of that ranking order.
 
 The current Leant reset is recorded in the
 [current applicable-domain policy report](reports/2026-08-15-current-length-applicable-domain-policy.md).
@@ -973,10 +1111,10 @@ pair query, query-first observation replay, and—only when that live observatio
 has no counterexample and reports `unsat`—the optional exact input-box
 traversal. An applicable-domain counterexample or establishment skips the
 origin and live transaction for that candidate. An inapplicable result simply
-continues to the origin/live stages. Under the historical/default policy, a
-freshly replayed
-and associated pair counterexample is the only assessment which moves: it
-enters the stable demoted partition and can supply an MRU input vector.
+continues to the origin/live stages. In ranking mode, a freshly replayed and
+associated pair counterexample enters the stable demoted partition and can
+supply an MRU input vector. In filter mode, that same exact report is the only
+assessment which enters the rejected partition.
 When simplification is enabled, the finalized receipt and its final input
 vector take those same roles; acquisition order and live transaction order do
 not change.
@@ -1000,7 +1138,9 @@ or live-query failure, live-observation association or replay failure,
 an admitted query-owned applicable-domain evaluation/association failure,
 origin failure, or input-box failure atomically restores the
 admitted batch in original order as unassessed. Candidate-local pure preparation
-refusals stay local, and no result grants pruning authority.
+refusals stay local. None of those statuses or failures grants rejection
+authority; only the later explicit selection adapter may turn the final
+replayed `Counterexample` assessment into a rejection.
 
 The current startup route therefore fixes the source order as MRU → recursive
 piecewise-affine applicable domain → origin → live replay → post-`unsat`
@@ -1283,7 +1423,9 @@ another domain.
 
 A binary-product startup file selects which nominal runner Main calls. It does
 not infer a contract from the Lean type, bypass the exact canonical-`Prod`
-handoff, turn solver status into evidence, or grant pruning authority. The
+handoff, turn solver status into evidence, or itself grant rejection
+authority. Only an explicit filter command may route an independently replayed
+pair counterexample through the nominal pair-selection adapter. The
 current startup reset is recorded in the
 [versionless startup configuration report](reports/2026-08-15-versionless-length-ranking-configuration.md).
 The matching command-local reset is recorded in the
@@ -1317,26 +1459,37 @@ explicitly.
 
 ## Presentation notes on the Main path
 
-After a successful occurrence seal, Main dispatches presentation through the
-selected scalar or pair domain and prints a subordinate note only for a
-candidate carrying independently validated evidence. A scalar counterexample
-note summarizes its observed input and result spine lengths; a pair note keeps
-the first and second result lengths source ordered. Both call the receipt
-replayed and model-relative and report only the number of assumed provider laws
-used by that candidate. Independently completed finite-box notes instead give
-the bounded maxima and checked/applicable assignment counts.
+After a successful ranking or selection seal, Main dispatches presentation
+through the selected scalar or pair domain. It projects candidate text and
+evidence only from their shared opaque ranked, selected, or rejected wrapper.
+A scalar counterexample note summarizes its observed input and result spine
+lengths; a pair note keeps the first and second result lengths source ordered.
+Both call the receipt replayed and model-relative and report only the number of
+assumed provider laws used by that candidate. If simplification found a strict
+reduction, the existing bounded simplification renderer instead reports the
+original and final vectors and inspected lower-box count. Filter rejection
+reuses these exact renderers verbatim rather than manufacturing a second
+diagnostic vocabulary.
 
-Applicable-domain assessments use
+In ranking mode the counterexample note is subordinate to a still-visible,
+still-bound demoted candidate. In filter mode it is subordinate to a separate
+`rejected` row, and that occurrence receives no `itN` binding. Independently
+completed finite-box notes instead give the bounded maxima and checked/
+applicable assignment counts; applicable-domain survivor notes use
 `renderLengthApplicableDomainValidationNote` or
-`renderLengthSpinePairApplicableDomainValidationNote`. These are the only
-public applicable-domain renderers. They report the canonical maxima antichain,
-box and assignment counts, model/provider-relative basis, and explicit vacuity
-from `ApplicableDomainEstablished` or
+`renderLengthSpinePairApplicableDomainValidationNote`.
+
+Those are the only public applicable-domain renderers. They report the
+canonical maxima antichain, box and assignment counts, model/provider-relative
+basis, and explicit vacuity from `ApplicableDomainEstablished` or
 `LengthSpinePairApplicableDomainEstablished`; they do not expose the private
 fallback stage which established the receipt.
 
 The semantic note never projects the receipt's private provider-name list.
-Disabled assessment, rejected input, heuristic status, and atomic operational
-fallback add no semantic note. The note can explain a stable demotion; it never
-proves, prunes, or claims concrete Lean behavior. Historical stage-specific
-renderer names are not aliases and are not part of the current library API.
+Disabled assessment, candidate-local preparation refusal, unassessed input,
+heuristic status, and atomic preserve-all fallback add no semantic note. A note
+reports exact bounded model-relative evidence; it never proves or claims
+unmodeled concrete Lean behavior. Rejection authority comes from the selection
+adapter's replay-only taxonomy and sealed occurrence association, not from
+rendered text. Historical stage-specific renderer names are not aliases and
+are not part of the current library API.

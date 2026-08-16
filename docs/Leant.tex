@@ -266,8 +266,8 @@ bare-stdlib session shown above.  \code{-i MOD} (also
 it, default 300); \code{-{}-time} shows per-command timing;
 \code{-{}-transcript [FILE]} and \code{-{}-timestamps} start transcript
 recording; \code{-{}-lake PATH} selects the lake executable.  The three
-\code{-{}-length-ranking} options opt into finite-list-spine Length
-counterexample ranking (\S\ref{sec:engines}): the configuration file is
+\code{-{}-length-ranking} options activate finite-list-spine Length
+behavioral assessment (\S\ref{sec:engines}): the configuration file is
 admitted once at startup from an explicitly chosen absolute path, the
 timeout bounds only the file-load interruption budget (default
 5{,}000\,ms, at most 60{,}000\,ms), and both auxiliary options are
@@ -341,9 +341,14 @@ environment.
 \cmdrow{:synth TYPE}{synthesize verified terms of \code{TYPE};
   candidates are bound as \code{it1} (= \code{it}), \code{it2}, \dots
   (\S\ref{sec:synth})}
-\cmdrow{:synth --length-contract P -- TYPE}{use one passive Length
-  contract file for this command only; the standalone \code{-{}-} is
-  mandatory and requires the startup ranking opt-in
+\cmdrow{:synth --behavior-mode rank|filter -- TYPE}{explicitly choose the
+  operation; disabled \code{rank} is identity, while filtering uses the
+  activated startup Length contract and requires its policy}
+\cmdrow{:synth --length-contract P -- TYPE}{use one passive Length contract
+  file for this command only; an optional preceding behavior mode selects
+  \code{rank} or \code{filter}, omitted mode means \code{rank}, the standalone
+  delimiter is mandatory, and every contract form requires the startup policy
+  opt-in
   (\S\ref{sec:engines})}
 \cmdrow{:set synth-engine E}{\code{djinn} (default) $\mid$
   \code{exference} $\mid$ \code{both}}
@@ -1536,17 +1541,31 @@ dropped. Rediscovered failures therefore spend none of that lane's 12- or
 24-group fresh frontier.
 
 An entirely optional last stage can consult Z3.  Passing
-\code{-{}-length-ranking-config} at startup (\S\ref{sec:start}) opts
-into finite-list-spine \emph{Length} counterexample ranking: a passive
+\code{-{}-length-ranking-config} at startup (\S\ref{sec:start}) activates
+finite-list-spine \emph{Length} behavioral assessment: a passive
 JSON contract states a law over the lengths of list-spine arguments and
 results, eligible verified candidates are translated into canonical
-\code{QF\_LIA} queries, and a scoped Z3 worker is consulted once per
-batch.  Only a counterexample that Leant's vendored Djex engine has
+\code{QF\_LIA} queries, and at most one scoped Z3 worker is opened per
+batch when pure replay does not finish the assessment. Only a counterexample
+that Leant's vendored Djex engine has
 independently replayed against the exact checked problem can move a
-candidate --- such candidates are stably demoted, never pruned --- and a
-raw \code{sat}, \code{unsat}, or \code{unknown} has no authority at
-all.  A per-command variant, \code{:synth -{}-length-contract PATH
--{}- TYPE}, swaps in one contract file for a single command.  The
+candidate. In the default \code{rank} operation such candidates are stably
+demoted, never pruned. An explicit \code{-{}-behavior-mode filter} operation
+instead omits exactly those replayed-counterexample occurrences, prints each
+one separately as rejected, and binds only survivors. A raw \code{sat},
+\code{unsat}, or \code{unknown} has no authority at all; neither do a
+preparation refusal, unassessed input, heuristic status, completed finite box,
+or established applicable domain.
+
+The exact option-bearing grammar is
+\code{:synth [-{}-behavior-mode rank|filter]
+[-{}-length-contract PATH] -{}- TYPE}; mode must precede contract and the
+standalone delimiter is mandatory. Ordinary \code{:synth TYPE} remains
+delimiter-free. Omitting behavior mode selects \code{rank}. A per-command
+contract swaps in one passive scalar-or-pair assertion for that command;
+filter without a contract uses the startup contract. Filtering and every
+contract form require the already activated startup policy and are rejected
+before contract-path admission or file IO when it is absent. The
 startup grammar is one current strict, versionless shape selected by
 \code{rankingDomain}; the separate contract-only grammar is likewise one
 current strict, versionless \code{\{format, rankingDomain, contract\}} shape.
@@ -1562,12 +1581,12 @@ assessments are \code{ApplicableDomainEstablished} and
 direct, affine, relational,
 strict, quotient, extrema, monus, Boolean-union, and atomic analyses as private
 ordered fallbacks; they are not separately selectable Leant contracts. Its
-recursive expression grammar includes an all-or-nothing code{LengthIf}:
+recursive expression grammar includes an all-or-nothing \code{LengthIf}:
 both condition polarities and both arms must be fully supported, the true arm
 precedes the false arm, and raw guard alternatives consume the existing branch
 budget before contradictions collapse. For example,
-code{(if x <= 2 then x else 5) <= 3} establishes the provider-independent
-box code{[[2]]} with three visits, three unique assignments, and three
+\code{(if x <= 2 then x else 5) <= 3} establishes the provider-independent
+box \code{[[2]]} with three visits, three unique assignments, and three
 applicable assignments entirely before process IO; an unsupported arm makes
 the whole fallback atom inapplicable. The original checked problem is still
 replayed over every unique assignment and remains semantic authority. The
@@ -1576,11 +1595,31 @@ experimental and promises no stability or backward compatibility. This API
 reset does not alter the versionless file shapes or the seven numeric limits
 inside \code{applicableDomainValidation}. The MRU, domain, origin, deferred
 opening, live query, post-\code{unsat} input-box, scoped-budget, and stable
-preference boundaries remain unchanged. The
-current reference is \code{docs/length-ranking.md}; dated
+preference boundaries remain unchanged. The four-vector MRU is local to one
+verified batch; a later candidate must independently replay a vector against
+its own checked problem, and the next batch starts empty.
+
+Filtering runs the same scalar or nominal pair assessor, maps every report
+back to its exact callback occurrence by the retained original index, and
+seals one bounded total partition. Both survivors and rejections are restored
+to original callback order; filter mode does not inherit ranking order. Any
+batch-wide post-verification-adapter, ranking, evidence-association,
+admission-limit, or partition-seal failure preserves the complete original
+verified batch and exposes no partial rejection. A
+surviving bounded-positive receipt keeps its established note. A rejected
+occurrence keeps its exact counterexample or simplification note. If all
+verified occurrences are rejected, the result is handled: Leant prints the
+rejections, creates no \code{itN} binding, clears its previous synthesis-splice
+cache, and does not call them Lean-verification failures. Behavior mode,
+selection results, and the MRU are never persistent REPL state. The
+current reference is \code{docs/length-ranking.md}; the connected checkpoint
+is recorded in
+\code{docs/reports/2026-08-15-command-authorized-length-filtering.md}. Dated
 reports under \code{docs/reports/} are historical engineering records rather
-than current file contracts. Everything in this paragraph
-is off by default and leaves no trace when disabled.
+than current file contracts. When assessment is disabled, an ordinary or
+explicit no-contract \code{rank} remains the exact identity and leaves no
+trace; explicit \code{filter} and every contract form instead return their
+pre-IO request errors.
 
 When live work is required, the fixed execve-check launcher inherits Djex's
 current descriptor ownership rule. Resource-producing worker results are

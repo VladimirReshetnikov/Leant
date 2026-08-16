@@ -18,6 +18,13 @@ lower analysis stages are private Djex fallbacks, and the predecessor builders,
 assessments, failures, receipts, renderers, and schema tags have no aliases or
 migration surface. Fully supported expression conditionals now participate in
 that one current policy rather than selecting another schema or strategy.
+The current command layer also has an explicit `--behavior-mode filter` path:
+only independently replayed scalar or pair counterexamples are rejected;
+every other assessment is retained, every selection failure preserves the
+complete verified batch, and omitted occurrences remain separately presented.
+The earlier behavioral-selection report correctly says its structural seal was
+not connected at that landing checkpoint; the later command-authorized report
+records the current connection.
 The [README](../../README.md) and
 [Length ranking reference](../length-ranking.md) describe the current tree.
 
@@ -87,6 +94,7 @@ Reports are listed oldest first.
 - 2026-08-15 — [Current-only Length applicable-domain policy](2026-08-15-current-length-applicable-domain-policy.md)
 - 2026-08-15 — [Guarded conditional Length ranking](2026-08-15-guarded-conditional-length-ranking.md)
 - 2026-08-15 — [Behavioral-selection occurrence partition seal](2026-08-15-behavioral-selection-partition-seal.md)
+- 2026-08-15 — [Command-authorized replay-backed Length filtering](2026-08-15-command-authorized-length-filtering.md)
 
 ## Standalone PDF reports
 

@@ -31,7 +31,7 @@ who wants the *what* can stop at the paragraph.
   - [The origin probe](#the-origin-probe)
   - [Live input-box validation and query-first replay](#live-input-box-validation-and-query-first-replay)
   - [Refusals, atomic fallback, and lifecycle owners](#refusals-atomic-fallback-and-lifecycle-owners)
-- [SpinePair ranking and post-verification](#spinepair-ranking-and-post-verification)
+- [SpinePair ranking, post-verification, and selection](#spinepair-ranking-post-verification-and-selection)
 - [Configuration and its file grammar](#configuration-and-its-file-grammar)
   - [Policy builders and usable-work budgets](#policy-builders-and-usable-work-budgets)
   - [`Configuration.File`: the current versionless JSON grammar](#configurationfile-the-current-versionless-json-grammar)
@@ -42,7 +42,7 @@ who wants the *what* can stop at the paragraph.
 - [Contract vocabulary and module ownership](#contract-vocabulary-and-module-ownership)
 - [Post-verification sealing](#post-verification-sealing)
   - [The behavioral-selection partition seal](#the-behavioral-selection-partition-seal)
-  - [The Length domain adapter](#the-length-domain-adapter)
+  - [The Length ranking and selection adapters](#the-length-ranking-and-selection-adapters)
 - [Provider instantiation evidence](#provider-instantiation-evidence)
   - [Exact provider assignment vectors](#exact-provider-assignment-vectors)
 - [Proper-type applications and family plans](#proper-type-applications-and-family-plans)
@@ -456,7 +456,8 @@ text with a detached evidence list.
 
 ### Refusals, atomic fallback, and lifecycle owners
 
-Nothing is pruned. A candidate-local handoff or query-construction refusal
+The ranking foundation never prunes. A candidate-local handoff or query-
+construction refusal
 still projects through the compatible `Unassessed` assessment, but now also
 retains one bounded payload-free `LengthPreparationRefusalClass` with a fixed
 machine code. The exhaustive classifiers inspect only the outer refusal
@@ -501,7 +502,7 @@ Its public validator family has been superseded by the one current algorithm
 documented in the
 [current applicable-domain policy report](reports/2026-08-15-current-length-applicable-domain-policy.md).
 
-## SpinePair ranking and post-verification
+## SpinePair ranking, post-verification, and selection
 
 `Leant.Synth.Length.SpinePair.Ranking` and
 `Leant.Synth.Length.SpinePair.PostVerification` supply the nominal
@@ -516,6 +517,10 @@ authority. Pair-safe terminal projection lives in
 `presentLengthSpinePairPostVerificationResult`; the complete checkpoint is
 recorded in the
 [live binary-product Length ranking report](reports/2026-08-14-live-binary-product-length-ranking.md).
+The later nominal `Leant.Synth.Length.SpinePair.Selection` adapter consumes
+only this pair report, rejects only an independently replayed pair
+counterexample, and otherwise follows the preserve-all and stable original-
+order selection rules described below.
 
 ## Configuration and its file grammar
 
@@ -842,29 +847,52 @@ enum values, and syntax tags are case-sensitive.
 
 The `Contract.File.Acquire` facade uses the same path, descriptor, and timeout
 owner as startup acquisition, but maps failures into contract-only closed
-vocabulary. `Leant.Synth.Length.Command` recognizes only the exact
-`--length-contract` spelling and requires a standalone `--`, so malformed
-request syntax cannot disappear into Lean goal text.
+vocabulary. `Leant.Synth.Length.Command` owns the exact option-bearing grammar
+
+```text
+:synth [--behavior-mode rank|filter] [--length-contract PATH] -- TYPE
+```
+
+while keeping ordinary `:synth TYPE` delimiter-free. Only the exact option
+tokens are recognized; longer lookalike prefixes remain goal text. The mode
+must precede the contract, every recognized option form requires the standalone
+delimiter, the behavior value is exactly `rank` or `filter`, and an empty path
+is rejected before a misplaced exact mode token in the contract span.
+Omitting the behavior mode defaults to `rank`.
 
 ### Integration and one-shot contracts
 
-`Leant.Synth.Length.Integration` authorizes an explicit request from the
-already activated policy before Main admits or opens its contract path. The
-result is an opaque command-local choice containing either the disabled
-identity or one strict policy beside one lazy scalar-or-pair selection.
-`LeanLengthContractSelection` is passive and nominal: dispatch chooses exactly
-one scalar or pair occurrence-sealed assessor, and the two ranking/evidence
-result types remain separate. Startup and one-shot contracts enter the same
-lifetime owner; the request does not remember a second policy/contract origin
-tag. Main calls `loadLengthContractFile` and then
-`explicitLengthAssessmentRequest` once before translating the goal and threads
-that value through every retry and synthesis lane. It never writes the request
-to interactive state or a snapshot. The selection-suffixed entrances have been
-removed; the unsuffixed decoder, loader, and request names now carry the
-nominal scalar-or-pair selection instead of their former scalar-only types.
+`Leant.Synth.Length.Integration` carries the parsed strict
+`LengthBehaviorMode` beside the already activated policy and lazy passive
+contract selection. `LengthBehaviorRank` dispatches to the scalar or pair
+permutation-sealed ranking adapter; `LengthBehaviorFilter` dispatches to the
+matching scalar or pair selection adapter. Startup and one-shot contracts
+enter the same lifetime owner; the request does not remember a second policy/
+contract origin tag.
+
+The disabled rank request is the established non-strict identity. A disabled
+filter request returns `LengthAssessmentFilteringRequiresActivatedPolicy`.
+For a command-local contract, Integration authorizes mode-plus-policy before
+Main admits or opens the path: disabled rank returns the established explicit-
+contract activation refusal and disabled filter returns the filtering refusal.
+Only after permission does Main call `loadLengthContractFile` and
+`explicitLengthAssessmentRequest`, before goal translation, then thread the
+request through every retry and synthesis lane. It never writes behavior mode,
+the request, a replay bank, or a selection result to interactive state or a
+snapshot.
+
+`LengthAssessmentResult` keeps scalar ranking, pair ranking, scalar selection,
+and pair selection nominally disjoint. Ranking projections return `Nothing`
+for selection results and selection projections return `Nothing` for ranking.
+`lengthAssessmentCandidates` is the common effective-candidate projection: a
+successful filter returns only sealed survivors, while every selection failure
+returns the complete original batch. `lengthAssessmentFailure` maps both
+selection failure families into the mode-neutral Main warning path.
 
 The current reset is recorded in the
 [versionless Length contract report](reports/2026-08-15-versionless-length-contract.md).
+The behavior request and selection dispatch are recorded in the
+[command-authorized Length filtering report](reports/2026-08-15-command-authorized-length-filtering.md).
 The older [one-shot contract report](reports/2026-08-13-one-shot-length-contract.md)
 and the reports below remain useful landing history, but their version routing
 and public API names are not current contracts. The historical modulo QF_LIA
@@ -900,7 +928,8 @@ explicit. Without the startup opt-in, Main sends the opaque, nominal
 `VerificationBatch` through the exact non-strict disabled identity path, which
 performs no IO, cannot start a worker, and claims no validated ordering
 authority. With the opt-in, the Length assessor instead gives
-`sealPostVerificationBatch` opaque occurrence handles minted from that batch
+`sealPostVerificationBatch` opaque occurrence handles for ranking, minted from
+that batch
 inside a rank-2 `PostVerificationInput` epoch. Handle constructors and original
 indices are private, and nominal roles prevent coercion; handles from another
 batch inhabit a different abstract epoch and cannot be mixed without an
@@ -910,11 +939,13 @@ or over-limit tail without comparing or forcing candidate payloads. Only
 success can construct the opaque `PostVerificationBatch`, which therefore
 carries a complete occurrence permutation rather than a pruned, duplicated,
 manufactured, substituted, or reassociated candidate batch.
+An explicit filter operation uses the distinct total-partition seal below; it
+does not weaken or overload this permutation contract.
 
 ### The behavioral-selection partition seal
 
-`Leant.Synth.BehavioralSelection` is a separate structural boundary for a
-future hard-selection path. `withBehavioralSelectionInput` mints private
+`Leant.Synth.BehavioralSelection` is the separate structural boundary used by
+the hard-selection path. `withBehavioralSelectionInput` mints private
 occurrence handles from one exact `VerificationBatch` inside a fresh rank-2
 epoch. The public facade keeps the input, handle, decision, selected receipt,
 rejected receipt, and batch constructors opaque and exports no decision
@@ -940,15 +971,20 @@ association with the original callback receipts. In particular,
 `BehaviorallyRejected` is not behavioral evidence: the generic layer does not
 fingerprint, replay, or validate its rejection payload, apply an
 unknown/inapplicable policy, inspect solver status, or establish a Lean proof.
-The seal is not yet connected to Main, Length assessment, configuration, or
-presentation and cannot by itself authorize filtering. Those policy and
-evidence checks belong to the later domain adapter described by the
-[behavioral-selection partition report](reports/2026-08-15-behavioral-selection-partition-seal.md).
+The seal therefore cannot by itself authorize filtering. The current Length
+selection adapters supply the narrower replay-only decision taxonomy, and
+Integration plus Main require explicit per-command filter authority before
+using their result. The generic boundary itself remains domain-neutral. Its
+structural landing checkpoint is described by the
+[behavioral-selection partition report](reports/2026-08-15-behavioral-selection-partition-seal.md),
+while the connected Length path is recorded in the
+[command-authorized filtering report](reports/2026-08-15-command-authorized-length-filtering.md).
 
-### The Length domain adapter
+### The Length ranking and selection adapters
 
-`Leant.Synth.Length.PostVerification` is the first domain adapter for that
-boundary. The Length ranker now retains each receipt's safe original index;
+`Leant.Synth.Length.PostVerification` is the scalar ranking adapter for the
+permutation boundary. The Length ranker retains each receipt's safe original
+index;
 package-private `Ranking.Internal` and `PostVerification.Internal` modules
 thread each batch-scoped occurrence handle as the only receipt-bearing field
 in transient ranking state through preparation, live assessment, stable
@@ -967,22 +1003,67 @@ that batch and summary only when projected. Policy callers may supply a
 request-owned contract. The startup bundle fixes its decoded domain-selected
 contract, while an exact
 `:synth --length-contract ... --` request can reuse that activated policy with
-one separately decoded command-local contract.
+one separately decoded command-local contract. The nominal pair stack mirrors
+these rules in `Leant.Synth.Length.SpinePair.PostVerification`.
 Input or proposal failure preserves the original opaque verification batch,
 exposes no sealed output, and withholds the unsealed associated plan.
 Operational ranking failure already
 produces an original-order all-`Unassessed` ranking and passes through the same
 seal. Main selects this path only for an explicitly loaded and activated
-policy; without one, even an explicit command contract is rejected before file
-IO and the historical no-option identity path is exact. Replayed
+policy, except that an ordinary or explicit rank command with no contract keeps
+the disabled identity when no policy is active. Without activation, any
+explicit command contract is rejected before file IO. Replayed
 counterexamples may rank and receive a bounded model-relative note, and an
 explicitly enabled complete finite-box traversal may receive a separate bounded
-positive note with checked/applicable counts and visible vacuity. Neither can
-prune or prove source behavior; raw `sat`, `unsat`, and `unknown` grant no proof
-authority. See the
+positive note with checked/applicable counts and visible vacuity. Ranking never
+prunes or proves source behavior; raw `sat`, `unsat`, and `unknown` grant no
+proof authority.
+
+`Leant.Synth.Length.Selection` and
+`Leant.Synth.Length.SpinePair.Selection` are nominal hard-selection adapters
+over those existing assessors. Each opens a fresh behavioral-selection epoch,
+uses the ranking report's safe original index to select the matching private
+occurrence handle, and makes one total decision. Candidate-local preparation
+refusal, `Unassessed`, every heuristic solver status, `BoundedPositive`, and
+`ApplicableDomainEstablished` are explicit retention classes. Only an
+independently replayed `Counterexample` becomes a rejection, carrying that
+domain's exact final replay receipt and optional simplification metadata. A raw
+`sat`, `unsat`, or `unknown` never rejects.
+
+The adapter then invokes the generic total-partition seal. Success exposes
+opaque, intrinsically associated `BehaviorallySelected` and
+`BehaviorallyRejected` wrappers in original callback order. Decision order and
+the ranking permutation have no selection-order authority. Every
+post-verification, ranking, ranking-absence, original-index, candidate/decision
+limit, or seal failure instead returns one preserve-all result containing the
+literal original `VerificationBatch`; no partial rejection escapes. Scalar and
+pair retentions, rejections, failures, and results cannot be cast across the
+domain boundary.
+
+`Leant.Synth.Length.Presentation` traverses selected and rejected wrappers
+directly, without zipping candidate text to detached evidence. Retained finite-
+box and applicable-domain evidence keeps the existing positive note. Rejection
+uses the existing bounded counterexample or simplification renderer verbatim.
+Main binds only the survivor presentations as `itN` and prints omitted
+occurrences separately as `rejected`. An accepted all-rejected partition is a
+handled result: Main prints every rejection, creates no new binding, clears the
+old synthesis-splice cache, and returns before the unrelated Lean-verification
+empty-result fallback. Partial and zero-rejection selections use the same
+path. Assessment failure prints one mode-neutral preserve-all warning and then
+shows the unannotated original candidates.
+
+The four-entry input-vector MRU used to obtain the underlying assessments is
+still one fresh batch-local value. It stores only vectors; a later occurrence
+must independently replay and associate a vector against its own checked
+problem before it can be rejected. No behavior mode, replay bank, contract
+request, or selection result enters `ReplState`.
+
+The ranking foundation is detailed in the
 [post-verification assessment seam report](reports/2026-08-11-post-verification-assessment-seam.md)
 and the
 [explicit integration report](reports/2026-08-12-explicit-length-ranking-integration.md).
+The hard-selection adapter and command integration are specified by the
+[command-authorized Length filtering report](reports/2026-08-15-command-authorized-length-filtering.md).
 
 ## Provider instantiation evidence
 

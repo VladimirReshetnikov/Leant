@@ -60,7 +60,7 @@ Companion documents:
 
 - the **[manual](docs/Leant.pdf)** — tutorial and `:synth` tour;
 - **[docs/length-ranking.md](docs/length-ranking.md)** — the complete
-  Length counterexample-ranking reference;
+  Length counterexample-ranking and replay-authorized filtering reference;
 - **[docs/synth-internals.md](docs/synth-internals.md)** — the design
   boundaries and dated-report index behind `:synth`;
 - the **[Z3 behavioral synthesis proposal](docs/Z3_Behavioral_Synthesis_Proposal/Z3_Behavioral_Synthesis_Proposal.pdf)**
@@ -144,13 +144,22 @@ bare stdlib session with subsecond startup. Expressions evaluate via
 `inductive`, `open`, …) run verbatim and, on success, advance the
 session environment; `#`-commands pass straight through.
 
-Finite-list-spine **Length counterexample ranking** is an optional last
-stage that consults Z3 about the behavior of verified candidates and stably
-reorders them; it is off unless you pass `--length-ranking-config`, it never
-prunes, and raw solver status carries no authority. The complete reference —
-the current versionless startup and contract-only schemas (`rankingDomain` is
-`scalar` or `binary-product`), replay bank,
-origin probe, bounded validation, and presentation notes — is
+Finite-list-spine **Length behavioral assessment** is an optional last stage
+that consults Z3 about already verified candidates. Passing
+`--length-ranking-config` activates one startup policy and scalar-or-pair
+contract. Ordinary `:synth TYPE`, explicit `--behavior-mode rank`, and a
+contract-only command with no behavior mode all keep the established stable
+ranking: every verified candidate remains visible. An explicit
+`:synth --behavior-mode filter -- TYPE` may instead omit only candidates with
+an independently replayed counterexample to the activated startup contract;
+adding `--length-contract ABSOLUTE-PATH` uses that passive contract for this
+command. Raw `sat`, `unsat`, and `unknown`, preparation refusal, unassessed
+input, and positive bounded evidence never authorize rejection. Any adapter,
+ranking, association, or partition-seal failure preserves the complete
+verified batch. The complete reference — including the fixed command grammar,
+current versionless startup and contract-only schemas (`rankingDomain` is
+`scalar` or `binary-product`), batch-local replay bank, origin probe, bounded
+validation, rejection rules, and presentation — is
 [docs/length-ranking.md](docs/length-ranking.md).
 
 Applicable-domain ranking now has one current recursive piecewise-affine
@@ -183,7 +192,8 @@ members of `applicableDomainValidation`; see the
 | `:search TEXT` | case-insensitive name search over the environment |
 | `:search? TYPE` | proof search: what proves TYPE? (via `exact?`) |
 | `:synth TYPE` | verified term synthesis (see below) |
-| `:synth --length-contract ABSOLUTE-PATH -- TYPE` | use one passive scalar-or-pair Length contract selection for this synthesis command |
+| `:synth --behavior-mode rank\|filter -- TYPE` | explicitly choose the operation; disabled `rank` is identity, while `filter` requires an activated startup Length policy |
+| `:synth [--behavior-mode rank\|filter] --length-contract ABSOLUTE-PATH -- TYPE` | use one passive scalar-or-pair Length contract for this command; omitted mode means `rank` |
 | `:prove [PROP]` | interactive prove mode; bare form resumes the last `sorry` |
 | `:set OPT VAL` | `set_option` persisting in the session |
 | `:undo` | revert the last state-changing command |
