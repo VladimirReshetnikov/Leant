@@ -86,3 +86,13 @@ Longer typeset surveys live in their own subdirectories:
 - [Machine-Checked Correctness for Djex and Leant](djex_leant_lean_formalization_report/djex_leant_lean_formalization_report.pdf) ([LaTeX source](djex_leant_lean_formalization_report/djex_leant_lean_formalization_report.tex))
 - [Proof-Producing Automation for Lean 4](lean_proof_automation_future_directions/lean_proof_automation_future_directions.pdf) ([LaTeX source](lean_proof_automation_future_directions/lean_proof_automation_future_directions.tex))
 - [Refinement-Guided Behavioral Program Synthesis: Integrating Z3 with Djex and Leant](z3_djex_leant_integration_report/z3_djex_leant_integration_report.pdf) ([LaTeX source](z3_djex_leant_integration_report/z3_djex_leant_integration_report.tex))
+
+Its successor lives beside this directory rather than in it, because it is
+a forward-looking proposal rather than a dated record:
+
+- [Precise Behavioral Code Synthesis in Leant and Djex with Z3](../Z3_Behavioral_Synthesis_Proposal/Z3_Behavioral_Synthesis_Proposal.pdf)
+  (August 15, 2026; [LaTeX source](../Z3_Behavioral_Synthesis_Proposal/Z3_Behavioral_Synthesis_Proposal.tex))
+  — starts from the implemented Length layer and proposes the next
+  increments: counterexample-guided search, typed sketch completion,
+  semantic pruning, more behavioral domains, and Lean-checked proof
+  artifacts.

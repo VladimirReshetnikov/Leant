@@ -28,6 +28,13 @@ Three rules make this safe to use:
 - **It is off unless you turn it on.** Without `--length-ranking-config`,
   none of this code runs and no worker is ever launched.
 
+This ranking stage is deliberately the *first* behavioral increment. The
+[Z3 behavioral synthesis proposal](Z3_Behavioral_Synthesis_Proposal/Z3_Behavioral_Synthesis_Proposal.pdf)
+(August 2026) starts from exactly this implemented layer and lays out the
+next ones — an opt-in hard filter and counterexample-guided loop, typed
+sketch completion, sound prefix pruning, further behavioral domains, and
+Lean-checked proof artifacts — while keeping the same trust boundaries.
+
 Everything below this line describes the exact behavior of the current tree:
 the startup-configuration schema, the current contract-file schema, the
 binary-product extension, the replay bank, the origin probe, bounded
