@@ -240,9 +240,50 @@ remains forward-looking for command-local bank ownership, cross-lane
 enumeration, typed sketch completion, prefix pruning, broader domains, and
 Lean-checked proof artifacts.
 
-This documentation-source checkpoint intentionally does not claim regenerated
-PDFs or final walkthrough source pins. `docs/Leant.tex` and the walkthrough TeX
-source have changed, so their checked-in PDFs still describe the preceding
-snapshot until a narrow follow-up artifact commit rebuilds them and pins the
-walkthrough to this frozen source documentation and the exact vendored Djex
-revision.
+The documentation source was frozen and pushed at
+`30bbb0ae73ae7ceea2d24e1b7ca0cd80be2f2507`. The artifact-only successor then
+changed the walkthrough's snapshot fields and links to that exact Leant commit
+and to vendored Djex
+`d3a57beff39fb7895a15b4d1111736dd7c99c852`, advanced its prepared date to
+August 16, 2026, completed this evidence section, and regenerated only the two
+maintained PDFs. The final manual TeX has 1,798 lines and SHA-256
+`a30606aba9d6f02e5c85f427186c7002380b3447ee6fb485291879c5f6664c0a`;
+the final pinned walkthrough TeX has 3,244 lines and SHA-256
+`e5b0480f6baef609139a39e63fbb46fadc68388b2af722995336c934c9964b95`.
+
+Both artifacts were rebuilt from clean temporary directories with three
+fail-fast passes apiece: LuaLaTeX for the manual and pdfLaTeX for the
+walkthrough. Their final measurements are:
+
+- `docs/Leant.pdf`: 30 pages, 184,779 bytes, SHA-256
+  `32c18181409ab0b9f21818b2e8bc64fa5979c69b960c66e406a41400d4f0411b`;
+- `docs/Djex_Leant_Codebase_Walkthrough/Djex_Leant_Codebase_Walkthrough.pdf`:
+  117 pages, 769,443 bytes, SHA-256
+  `ace85303dcee12eedb5a4b72def33edbc137e64496c04d3b8fb6e2296d54aa31`.
+
+The final logs contain no undefined citation or reference, rerun request,
+missing glyph, package warning, fatal diagnostic, or TeX error. The remaining
+non-fatal layout diagnostics are three underfull manual paragraphs and four
+underfull walkthrough lines in the fixed descriptor-launch quotation, plus one
+pre-existing overfull walkthrough paragraph containing long fixed code
+identifiers. Every PDF font is embedded and subsetted with Unicode mappings.
+
+Extracted text pins the dormant Djex bank distinction, private four-way lane
+outcomes, distinct spelling/callback histories, 19,532/418/417 test metrics,
+417/417 result, exact source snapshots, and August 16 date. URL extraction
+finds eleven manual annotations, whose ten relative report targets all exist,
+and 236 walkthrough annotations. All 179 Djex source links use the exact
+`d3a57be` blob root, all 50 Leant source links use the exact `30bbb0a` blob
+root, and the two repository-tree links use those same full commits. No
+`a9150c` or `6802674` walkthrough pin remains in source, extracted text, or
+annotations.
+
+The manual's physical PDF page 27 and the walkthrough's physical pages 1, 11,
+20, 25, 89, 93, and 116 were raster-inspected. The updated manual narrative,
+title snapshot table, behavioral addendum, counterexample-bank module row,
+current opt-in summary, candidate funnel and disposition explanation, test
+metrics, and pinned-tree appendix are readable without clipping or overlap.
+The final artifact delta remains limited to this report, the walkthrough TeX
+pin refresh, and the two regenerated PDFs; it changes no production, test,
+manual TeX, normative Markdown reference, historical report, or vendored
+dependency.
