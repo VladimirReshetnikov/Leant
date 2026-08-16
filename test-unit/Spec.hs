@@ -1466,6 +1466,45 @@ verificationObservabilityTests = testGroup "verification observability"
       failedCandidateGroups batch @?= 1
       observationCount LeanVariantAttempted
         (verificationObservations batch) @?= 3
+  , testCase
+      "separate the bounded spelling frontier from the exact callback trace" $
+      do
+        attemptsRef <- newIORef ([] :: [String])
+        let boundedGroups =
+              [ ["first-rejected", "first-accepted", "first-skipped"]
+              , ["failed-group"]
+              , ["second-accepted", "second-skipped"]
+              , ["quota-skipped"]
+              ]
+            checkedFrontier = concat boundedGroups
+            verdict candidate = do
+              modifyIORef' attemptsRef (++ [candidate])
+              pure $ case candidate of
+                "first-rejected" -> VariantRejected LeanErrorDiagnostic
+                "failed-group" -> VariantRejected LeanErrorDiagnostic
+                _ -> VariantAccepted
+        batch <- verifyCandidateGroups 2 verdict boundedGroups
+        attempted <- readIORef attemptsRef
+        checkedFrontier @?=
+          [ "first-rejected"
+          , "first-accepted"
+          , "first-skipped"
+          , "failed-group"
+          , "second-accepted"
+          , "second-skipped"
+          , "quota-skipped"
+          ]
+        attempted @?=
+          [ "first-rejected"
+          , "first-accepted"
+          , "failed-group"
+          , "second-accepted"
+          ]
+        verifiedCandidates batch @?=
+          ["first-accepted", "second-accepted"]
+        failedCandidateGroups batch @?= 1
+        observationCount LeanVariantAttempted
+          (verificationObservations batch) @?= 4
   , testCase "empty groups fail without recording a variant attempt" $ do
       batch <- verifyCandidateGroups 1 (const (pure VariantAccepted))
         [[], ["accepted"]]
@@ -8634,8 +8673,17 @@ lengthAssessmentIntegrationTests = testGroup
       "refill through five rejections to seven ordered survivors in one batch"
       assertLengthAssessmentFilterSurvivorRefill
   , testCase
-      "handle all-rejected filters without binding or stale it splices"
-      assertLengthAssessmentMainFilterBoundary
+      "separate bounded lane verification from outcome finalization"
+      assertLengthAssessmentMainLaneSeam
+  , testCase
+      "finalize every terminal lane without weakening splice ownership"
+      assertLengthAssessmentMainLaneFinalization
+  , testCase
+      "continue providers and classical retries only after no verification"
+      assertLengthAssessmentMainLaneScheduling
+  , testCase
+      "authorize command-local filtering before contract path IO"
+      assertLengthAssessmentMainCommandAdmission
   , testCase "admit setup before IO or activation"
       assertLengthAssessmentSetupAdmission
   , testCase "load one fixed contract and assess through the sealed adapter"
@@ -9095,99 +9143,357 @@ assertLengthAssessmentSpinePairFilterDispatch
         doesFileExist executable >>= (@?= False)
         doesFileExist (executable ++ ".events") >>= (@?= False)
 
-assertLengthAssessmentMainFilterBoundary :: IO ()
-assertLengthAssessmentMainFilterBoundary = do
-  source <- readFile "src/Main.hs"
-  let sourceLines = lines source
-      sourceWords = unwords $ words source
-      section = takeWhile
-          (not . isInfixOf "reportLengthAssessmentRejections ::")
-        $ dropWhile (not . isInfixOf
-            "verifyAndDisplay assessmentRequest groupLimit st args goal groups =")
-        $ lines source
-      positions fragment =
-        [index | (index, line) <- zip [0 :: Int ..] section
-        , fragment `isInfixOf` line]
-      firstPosition fragment = case positions fragment of
-        index : _ -> pure index
-        [] -> assertFailure
-          ("Main filter boundary omitted " ++ show fragment)
-            >> error "unreachable"
-  boundedPrefix <- firstPosition "case take groupLimit groups of"
-  projectedMode <- firstPosition
-    "lengthAssessmentRequestBehaviorMode assessmentRequest"
-  rankQuota <- firstPosition "LengthBehaviorRank -> synthMaxShown"
-  filterQuota <- firstPosition "LengthBehaviorFilter -> groupLimit"
-  verifier <- firstPosition "verification <- synthVerify successQuota st goal"
-  presentationCap <- firstPosition "let presentations = take synthMaxShown"
-  fullRejections <- firstPosition
-    "rejections = presentLengthAssessmentRejections assessment"
-  nullShown <- firstPosition "if null shown"
-  nullRejections <- firstPosition "then if null rejections"
-  clearedIts <- firstPosition "rsSynthIts = []"
-  clearedProve <- firstPosition "rsSynthItsProve = False"
-  survivorBind <- firstPosition
-    "counters <- mapM (synthBind st goal) (reverse shown)"
-  assertBool "Main chose a quota before bounding the candidate stream"
-    $ boundedPrefix < projectedMode
-  assertBool "Main did not keep rank at exactly five verified candidates"
-    $ projectedMode < rankQuota && rankQuota < verifier
-  assertBool "Main did not give filtering the complete bounded lane prefix"
-    $ projectedMode < filterQuota && filterQuota < verifier
-  assertBool "Main did not cap survivor presentation before binding"
-    $ verifier < presentationCap && presentationCap < survivorBind
-  assertBool "Main truncated rejection diagnostics to the survivor cap"
-    $ verifier < fullRejections && fullRejections < survivorBind
-      && not ("take synthMaxShown $ presentLengthAssessmentRejections"
-        `isInfixOf` unlines section)
-  assertBool "all-rejected handling did not follow the empty survivor test"
-    $ nullShown < nullRejections
-  assertBool "all-rejected handling could bind an itN before clearing splices"
-    $ clearedIts < survivorBind && clearedProve < survivorBind
-  let reports = positions "reportLengthAssessmentRejections st rejections"
-      handled = positions "pure True"
-  assertBool "Main did not report both all and partial rejection partitions"
-    $ any (< survivorBind) reports && any (> survivorBind) reports
-  assertBool "the all-rejected branch can fall through as verification loss"
-    $ any (\index -> clearedProve < index && index < survivorBind) handled
-  assertBool "partial rejection did not bind survivor presentations only"
-    $ "shown = map lengthCandidatePresentationText presentations"
-        `isInfixOf` unlines section
-      && not ("shown = map lengthCandidateRejectionPresentationText"
-        `isInfixOf` unlines section)
-  mapM_ (\fragment -> assertBool
-      ("Main refill scheduling omitted " ++ show fragment)
-      $ fragment `isInfixOf` sourceWords)
-    [ "let groupLimit = synthVerificationWindow laneEngine"
-    , "shown <- verifyGroups groupLimit checkedGroups"
-    , "verifyAndDisplay assessmentRequest groupLimit st args goal groups"
-    , "shownEm <- verifyAndDisplay assessmentRequest (synthMaxTried `div` 2) st args goal emGroups"
-    , "verifyAndDisplay assessmentRequest groupLimit st args goal (map"
+mainSourceSection :: String -> String -> [String] -> [String]
+mainSourceSection start end =
+  takeWhile (not . isInfixOf end) . dropWhile (not . isInfixOf start)
+
+mainSourcePositions :: String -> [String] -> [Int]
+mainSourcePositions fragment section =
+  [ index
+  | (index, line) <- zip [0 :: Int ..] section
+  , fragment `isInfixOf` line
+  ]
+
+expectMainSourcePosition :: String -> String -> [String] -> IO Int
+expectMainSourcePosition boundary fragment section =
+  case mainSourcePositions fragment section of
+    index : _ -> pure index
+    [] -> assertFailure
+      ("Main " ++ boundary ++ " omitted " ++ show fragment)
+        >> error "unreachable"
+
+assertMainSourceContains :: String -> [String] -> String -> IO ()
+assertMainSourceContains boundary section fragment =
+  assertBool ("Main " ++ boundary ++ " omitted " ++ show fragment)
+    $ fragment `isInfixOf` unwords (words $ unlines section)
+
+assertLengthAssessmentMainLaneSeam :: IO ()
+assertLengthAssessmentMainLaneSeam = do
+  sourceLines <- lines <$> readFile "src/Main.hs"
+  let declarationSection = mainSourceSection
+        "data SynthLaneOutcome =" "-- Output (" sourceLines
+      verificationSection = mainSourceSection
+        "verifySynthLane assessmentRequest groupLimit st goal notes groups ="
+        "synthLaneDisposition ::" sourceLines
+      dispositionSection = mainSourceSection
+        "synthLaneDisposition outcome ="
+        "finalizeSynthLaneOutcome" sourceLines
+      callbackSection = mainSourceSection
+        "synthVerify successQuota st goal groups ="
+        "completionCandidates ::" sourceLines
+      verificationText = unlines verificationSection
+      dispositionText = unlines dispositionSection
+  mapM_ (assertMainSourceContains "lane outcome declaration"
+      declarationSection)
+    [ "synthLaneCheckedFrontierSpellings :: [String]"
+    , "synthLaneCallbackAttemptVariants :: [DetailedVerificationVariant]"
+    , "synthLaneOutcomeObservations :: LeantObservations"
+    , "synthLaneOutcomeNotes :: [String]"
+    , "synthLaneAssessed :: Maybe AssessedSynthLane"
+    , "assessedSynthLaneVerification :: VerificationBatch DetailedVerificationVariant"
+    , "assessedSynthLaneLengthAssessment :: LengthAssessmentResult"
+    , "SynthLaneNoVerified"
+    , "SynthLaneSurvivors [LengthCandidatePresentation] [LengthCandidateRejectionPresentation]"
+    , "SynthLaneAllBehaviorallyRejected [LengthCandidateRejectionPresentation]"
+    , "SynthLaneAssessmentPreserved [LengthCandidatePresentation] [LengthCandidateRejectionPresentation]"
     ]
-  let providerSection = takeWhile
-        (not . isInfixOf "tryCandidates groupLimit bounded")
-        $ dropWhile (not . isInfixOf "runProviderLanes fallback")
-        $ sourceLines
-  assertBool "provider lanes discarded their engine-specific refill bound"
-    $ "let groupLimit = synthVerificationWindow laneEngine"
-        `isInfixOf` unlines providerSection
-  let requestSection = takeWhile (not . isInfixOf "synthRun ::")
-        $ dropWhile
-            (not . isInfixOf "lengthAssessmentRequestForCommand state command")
-        $ lines source
-      requestPosition fragment = case
-          [ index
-          | (index, line) <- zip [0 :: Int ..] requestSection
-          , fragment `isInfixOf` line
-          ] of
-        index : _ -> pure index
-        [] -> assertFailure
-          ("Main request boundary omitted " ++ show fragment)
-            >> error "unreachable"
-  authorization <- requestPosition
-    "authorizeExplicitLengthAssessmentRequest behavior mode"
-  admission <- requestPosition "mkLengthContractFileRequest"
-  acquisition <- requestPosition "loadLengthContractFile"
+  assertBool "Main made a private lane-outcome field strict"
+    $ not ("!" `isInfixOf` unlines declarationSection)
+
+  boundedPrefix <- expectMainSourcePosition "lane verifier"
+    "case take groupLimit groups of" verificationSection
+  projectedMode <- expectMainSourcePosition "lane verifier"
+    "lengthAssessmentRequestBehaviorMode assessmentRequest"
+      verificationSection
+  rankQuota <- expectMainSourcePosition "lane verifier"
+    "LengthBehaviorRank -> synthMaxShown" verificationSection
+  filterQuota <- expectMainSourcePosition "lane verifier"
+    "LengthBehaviorFilter -> groupLimit" verificationSection
+  callback <- expectMainSourcePosition "lane verifier"
+    "(verification, callbackAttempts) <- synthVerify successQuota st goal"
+      verificationSection
+  assessment <- expectMainSourcePosition "lane verifier"
+    "assessLengthVerificationRequest assessmentRequest verification"
+      verificationSection
+  assertBool "Main projected behavior mode before bounding the lane"
+    $ boundedPrefix < projectedMode
+  assertBool "Main changed the five-success ranking frontier"
+    $ projectedMode < rankQuota && rankQuota < callback
+  assertBool "Main did not give filtering the complete bounded lane quota"
+    $ projectedMode < filterQuota && filterQuota < callback
+  assertBool "Main assessed candidates before callback verification"
+    $ callback < assessment
+  mapM_ (assertMainSourceContains "lane verifier" verificationSection)
+    [ "synthLaneCheckedFrontierSpellings = []"
+    , "synthLaneCallbackAttemptVariants = []"
+    , "synthLaneAssessed = Nothing"
+    , "concatMap detailedCandidateGroupVariants boundedGroups"
+    , "synthLaneCallbackAttemptVariants = callbackAttempts"
+    , "map detailedCandidateGroupVerificationVariants boundedGroups"
+    , "synthLaneAssessed = Just AssessedSynthLane"
+    ]
+  mapM_ (\fragment -> assertBool
+      ("verification-only lane seam retained side effect " ++ show fragment)
+      $ not $ fragment `isInfixOf` verificationText)
+    [ "emitLn st"
+    , "synthBind st"
+    , "rsSynthIts"
+    , "modifyIORef' st"
+    , "reportLengthAssessmentRejections"
+    , "reportSynthLaneNotes"
+    , "finalizeSynthLaneOutcome"
+    ]
+
+  mapM_ (assertMainSourceContains "callback trace" callbackSection)
+    [ "reverseAttempts <- newIORef []"
+    , "verification <- verifyCandidateGroups successQuota (verifyVariant reverseAttempts) groups"
+    , "attempts <- reverse <$> readIORef reverseAttempts"
+    , "pure (verification, attempts)"
+    , "modifyIORef' reverseAttempts (variant :)"
+    , "result <- runCurrentCmd st (candidateVerificationProgram goal term)"
+    ]
+  traceAppend <- expectMainSourcePosition "callback trace"
+    "modifyIORef' reverseAttempts (variant :)" callbackSection
+  backendAttempt <- expectMainSourcePosition "callback trace"
+    "result <- runCurrentCmd st" callbackSection
+  assertBool "Main recorded a callback only after attempting the backend"
+    $ traceAppend < backendAttempt
+  assertBool "Main substituted the full checked frontier for callback attempts"
+    $ not ("concatMap detailedCandidateGroupVariants"
+      `isInfixOf` unlines callbackSection)
+
+  mapM_ (assertMainSourceContains "lane disposition" dispositionSection)
+    [ "Nothing -> SynthLaneNoVerified"
+    , "null $ verifiedCandidateReceipts $ assessedSynthLaneVerification assessed -> SynthLaneNoVerified"
+    , "take synthMaxShown $ presentLengthAssessment assessment"
+    , "rejections = presentLengthAssessmentRejections assessment"
+    , "Just _ -> SynthLaneAssessmentPreserved presentations rejections"
+    , "SynthLaneSurvivors presentations rejections"
+    , "SynthLaneAllBehaviorallyRejected rejections"
+    , "SynthLaneSurvivors [] []"
+    ]
+  assertBool "an assessed lane can become NoVerified without an empty receipt batch"
+    $ length (mainSourcePositions "SynthLaneNoVerified" dispositionSection)
+      == 2
+  assertBool "Main capped behavioral rejection rows with survivor output"
+    $ not ("take synthMaxShown $ presentLengthAssessmentRejections"
+      `isInfixOf` dispositionText)
+  receiptGate <- expectMainSourcePosition "lane disposition"
+    "verifiedCandidateReceipts" dispositionSection
+  failureGate <- expectMainSourcePosition "lane disposition"
+    "case lengthAssessmentFailure assessment of" dispositionSection
+  assertBool "Main classified behavioral outcomes before proving verification"
+    $ receiptGate < failureGate
+
+  synthMaxShown @?= 5
+  synthMaxTried @?= 12
+  synthVerificationWindow EngineDjinn @?= 12
+  synthVerificationWindow EngineExference @?= 12
+  synthVerificationWindow EngineBoth @?= 24
+  synthMaxTried `div` 2 @?= 6
+
+assertLengthAssessmentMainLaneFinalization :: IO ()
+assertLengthAssessmentMainLaneFinalization = do
+  sourceLines <- lines <$> readFile "src/Main.hs"
+  let verificationSection = mainSourceSection
+        "verifySynthLane assessmentRequest groupLimit st goal notes groups ="
+        "synthLaneDisposition ::" sourceLines
+      dispositionSection = mainSourceSection
+        "synthLaneDisposition outcome ="
+        "finalizeSynthLaneOutcome" sourceLines
+      finalizerSection = mainSourceSection
+        "finalizeSynthLaneOutcome st args goal outcome = do"
+        "finalizeSynthLanePresentations st args goal presentations rejections = do"
+        sourceLines
+      presentationSection = mainSourceSection
+        "finalizeSynthLanePresentations st args goal presentations rejections = do"
+        "reportSynthLaneNotes ::" sourceLines
+      noVerifiedBranch = takeWhile
+          (not . isInfixOf "SynthLaneSurvivors presentations rejections ->")
+        $ dropWhile (not . isInfixOf "SynthLaneNoVerified -> pure ()")
+          finalizerSection
+      allRejectedBranch = takeWhile
+          (not . isInfixOf
+            "SynthLaneAssessmentPreserved presentations rejections ->")
+        $ dropWhile (not . isInfixOf
+            "SynthLaneAllBehaviorallyRejected rejections -> do")
+          finalizerSection
+      finalizerText = unlines finalizerSection
+      presentationText = unlines presentationSection
+  mapM_ (assertMainSourceContains "lane finalizer" finalizerSection)
+    [ "leantObservationCodeEntries $ synthLaneOutcomeObservations outcome"
+    , "lengthAssessmentFailure $ assessedSynthLaneLengthAssessment assessed"
+    , "let disposition = synthLaneDisposition outcome"
+    , "SynthLaneNoVerified -> pure ()"
+    , "SynthLaneSurvivors presentations rejections -> finalizeSynthLanePresentations st args goal presentations rejections"
+    , "SynthLaneAllBehaviorallyRejected rejections -> do"
+    , "rsSynthIts = [], rsSynthItsProve = False"
+    , "SynthLaneAssessmentPreserved presentations rejections -> finalizeSynthLanePresentations st args goal presentations rejections"
+    , "SynthLaneNoVerified -> pure () SynthLaneSurvivors _ _ -> reportSynthLaneNotes st (synthLaneOutcomeNotes outcome)"
+    ]
+  assertBool "NoVerified cleared or replaced stale synthesis splices"
+    $ not ("rsSynthIts" `isInfixOf` unlines noVerifiedBranch)
+  mapM_ (assertMainSourceContains "all-rejected finalizer"
+      allRejectedBranch)
+    [ "rsSynthIts = []"
+    , "rsSynthItsProve = False"
+    , "reportLengthAssessmentRejections st rejections"
+    ]
+  assertBool "all-rejected behavioral output attempted to bind a candidate"
+    $ not ("synthBind" `isInfixOf` unlines allRejectedBranch)
+  length (mainSourcePositions "rsSynthIts = []" finalizerSection) @?= 1
+  length (mainSourcePositions "rsSynthItsProve = False" finalizerSection)
+    @?= 1
+  length (mainSourcePositions "reportSynthLaneNotes st" finalizerSection)
+    @?= 3
+
+  mapM_ (assertMainSourceContains "survivor finalizer"
+      presentationSection)
+    [ "shown = map lengthCandidatePresentationText presentations"
+    , "counters <- mapM (synthBind st goal) (reverse shown)"
+    , "zip shown (reverse counters)"
+    , "rsSynthIts = splices, rsSynthItsProve = proving"
+    , "forM_ (zip [1 :: Int ..] presentations)"
+    , "reportLengthAssessmentRejections st rejections"
+    ]
+  reverseBinding <- expectMainSourcePosition "survivor finalizer"
+    "counters <- mapM (synthBind st goal) (reverse shown)"
+      presentationSection
+  cacheMutation <- expectMainSourcePosition "survivor finalizer"
+    "rsSynthIts = splices" presentationSection
+  survivorRows <- expectMainSourcePosition "survivor finalizer"
+    "forM_ (zip [1 :: Int ..] presentations)" presentationSection
+  rejectionRows <- expectMainSourcePosition "survivor finalizer"
+    "reportLengthAssessmentRejections st rejections" presentationSection
+  assertBool "Main changed reverse binding or output ordering"
+    $ reverseBinding < cacheMutation
+      && cacheMutation < survivorRows
+      && survivorRows < rejectionRows
+  assertBool "survivor finalization projected text from rejection rows"
+    $ not ("lengthCandidateRejectionPresentationText"
+      `isInfixOf` presentationText)
+
+  warning <- expectMainSourcePosition "lane finalizer"
+    "lengthAssessmentFailure" finalizerSection
+  disposition <- expectMainSourcePosition "lane finalizer"
+    "let disposition = synthLaneDisposition outcome" finalizerSection
+  allRejectedRows <- expectMainSourcePosition "lane finalizer"
+    "reportLengthAssessmentRejections st rejections" finalizerSection
+  handledNotes <- expectMainSourcePosition "lane finalizer"
+    "reportSynthLaneNotes st" finalizerSection
+  assertBool "Main emitted handled-lane notes before terminal output"
+    $ warning < disposition
+      && disposition < allRejectedRows
+      && allRejectedRows < handledNotes
+  mapM_ (\fragment -> assertBool
+      ("verification/disposition seam retained finalizer effect "
+        ++ show fragment)
+      $ not $ fragment `isInfixOf`
+          (unlines verificationSection ++ unlines dispositionSection))
+    [ "emitLn st"
+    , "synthBind st"
+    , "rsSynthIts"
+    , "modifyIORef' st"
+    , "reportLengthAssessmentRejections"
+    , "reportSynthLaneNotes"
+    ]
+  assertBool "the finalizer re-capped already sealed survivor presentations"
+    $ not ("take synthMaxShown" `isInfixOf` finalizerText)
+
+assertLengthAssessmentMainLaneScheduling :: IO ()
+assertLengthAssessmentMainLaneScheduling = do
+  sourceLines <- lines <$> readFile "src/Main.hs"
+  let schedulerSection = mainSourceSection
+        "synthGo' assessmentRequest st args retriedVars goal parsed = do"
+        "loadSynthProviders ::" sourceLines
+      reportSection = mainSourceSection
+        "report groupLimit checkedOutcome (Just outcome) = case outcome of"
+        "verifyGroups groupLimit notes groups = do" schedulerSection
+      classicalSection = mainSourceSection
+        "synthClassical assessmentRequest st args goal parsed ="
+        "verifySynthLane assessmentRequest groupLimit st goal notes groups ="
+        sourceLines
+      schedulerText = unlines schedulerSection
+      classicalText = unlines classicalSection
+  mapM_ (assertMainSourceContains "lane scheduler" schedulerSection)
+    [ "let baselineLimit = synthVerificationWindow engine"
+    , "let groupLimit = synthVerificationWindow laneEngine"
+    , "let checkedGroups = take groupLimit groups"
+    , "(checkedOutcome, disposition) <- tryCandidates baselineLimit baseline"
+    , "case disposition of SynthLaneNoVerified -> do"
+    , "SynthLaneSurvivors _ _ -> pure ()"
+    , "SynthLaneAllBehaviorallyRejected _ -> pure ()"
+    , "SynthLaneAssessmentPreserved _ _ -> pure ()"
+    , "synthLaneCheckedFrontierSpellings checkedOutcome"
+    , "Just previous -> pure (previous, synthLaneDisposition previous)"
+    , "report fallbackLimit Nothing fallbackOutcome"
+    , "outcome <- verifySynthLane assessmentRequest groupLimit st goal notes groups"
+    , "disposition <- finalizeSynthLaneOutcome st args goal outcome"
+    ]
+  assertBool "provider dedup lost one bounded structural/provider frontier"
+    $ length (mainSourcePositions
+        "synthLaneCheckedFrontierSpellings checkedOutcome" schedulerSection)
+      == 2
+  assertBool "provider dedup substituted callback attempts for the full frontier"
+    $ not ("synthLaneCallbackAttemptVariants checkedOutcome"
+      `isInfixOf` schedulerText)
+  assertBool "the old Bool handled boundary survived the lane outcome refactor"
+    $ not ("verifyAndDisplay" `isInfixOf` schedulerText)
+
+  noVerifiedError <- expectMainSourcePosition "candidate report"
+    "the engine proposed " reportSection
+  finalNotes <- expectMainSourcePosition "candidate report"
+    "reportSynthLaneNotes st (synthLaneOutcomeNotes lane)" reportSection
+  assertBool "a final NoVerified lane emitted notes before its error"
+    $ noVerifiedError < finalNotes
+  refuted <- expectMainSourcePosition "lane scheduler"
+    "Just (Right (DetailedSynthRefuted True))" schedulerSection
+  providerDiscovery <- expectMainSourcePosition "lane scheduler"
+    "then loadSynthProviders st" schedulerSection
+  providerFallback <- expectMainSourcePosition "lane scheduler"
+    "runProviderLanes (Just (baselineLimit, baseline))" schedulerSection
+  assertBool "Main reported a structural refutation before provider discovery"
+    $ refuted < providerDiscovery && providerDiscovery < providerFallback
+
+  mapM_ (assertMainSourceContains "classical lane scheduler"
+      classicalSection)
+    [ "Nothing -> pure SynthLaneNoVerified"
+    , "take (synthMaxTried `div` 2) groups"
+    , "emOutcome <- verifySynthLane assessmentRequest (synthMaxTried `div` 2) st goal [] emGroups"
+    , "emDisposition <- finalizeSynthLaneOutcome st args goal emOutcome"
+    , "case emDisposition of SynthLaneNoVerified -> do"
+    , "let groupLimit = synthVerificationWindow engine"
+    , "nnOutcome <- verifySynthLane assessmentRequest groupLimit st goal [] $ map"
+    , "finalizeSynthLaneOutcome st args goal nnOutcome"
+    , "SynthLaneSurvivors _ _ -> pure emDisposition"
+    , "SynthLaneAllBehaviorallyRejected _ -> pure emDisposition"
+    , "SynthLaneAssessmentPreserved _ _ -> pure emDisposition"
+    ]
+  assertMainSourceContains "classical lane signature" sourceLines
+    "-> IO SynthLaneDisposition"
+  emFinalizer <- expectMainSourcePosition "classical lane scheduler"
+    "emDisposition <- finalizeSynthLaneOutcome" classicalSection
+  noVerified <- expectMainSourcePosition "classical lane scheduler"
+    "SynthLaneNoVerified -> do" classicalSection
+  doubleNegation <- expectMainSourcePosition "classical lane scheduler"
+    "let nnFrag =" classicalSection
+  assertBool "double-negation ran before the excluded-middle lane finalized"
+    $ emFinalizer < noVerified && noVerified < doubleNegation
+  assertBool "classical scheduling retained a Bool handled result"
+    $ not ("IO Bool" `isInfixOf` classicalText)
+
+assertLengthAssessmentMainCommandAdmission :: IO ()
+assertLengthAssessmentMainCommandAdmission = do
+  sourceLines <- lines <$> readFile "src/Main.hs"
+  let requestSection = mainSourceSection
+        "lengthAssessmentRequestForCommand state command"
+        "synthRun ::" sourceLines
+  authorization <- expectMainSourcePosition "request boundary"
+    "authorizeExplicitLengthAssessmentRequest behavior mode" requestSection
+  admission <- expectMainSourcePosition "request boundary"
+    "mkLengthContractFileRequest" requestSection
+  acquisition <- expectMainSourcePosition "request boundary"
+    "loadLengthContractFile" requestSection
   assertBool "one-shot filtering can touch its path before authorization"
     $ authorization < admission && admission < acquisition
 
