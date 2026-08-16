@@ -95,18 +95,25 @@ import Leant.Session.Snapshot
   )
 import Leant.Synth.Engine
   ( DetailedCandidateGroup
+  , DetailedSynthCursor
+  , DetailedSynthCursorError (..)
+  , DetailedSynthCursorStep (..)
   , DetailedVerificationVariant
   , DetailedSynthOutcome (..)
   , SynthEngine (..)
+  , advanceDetailedSynthCursor
   , candidateWindow
+  , detailedCandidateBatchGroups
+  , detailedCandidateBatchNotes
   , detailedCandidateGroupRoute
   , detailedCandidateGroupVariants
   , detailedCandidateGroupVerificationVariants
   , detailedVerificationVariantText
-  , forceDetailedOutcome
+  , forceDetailedSynthCursorStep
   , mapDetailedCandidateGroupVariantsDroppingSemanticSidecar
   , parseSynthEngine
   , providerStages
+  , startDetailedSynthCursor
   , synthMaxShown
   , synthMaxTried
   , synthVerificationWindow
@@ -446,6 +453,45 @@ data SynthLaneDisposition
   | SynthLaneAssessmentPreserved
       [LengthCandidatePresentation]
       [LengthCandidateRejectionPresentation]
+
+-- | One engine run's private cursor policy.  The batch size is admitted by
+-- Engine's opaque cursor.  A filter-enabled ordinary lane may consume the
+-- returned successor once; rank, disabled, and excluded-middle lanes stop
+-- after their first candidate batch.  Run notes belong to ordinary lanes but
+-- remain silent for both classical fallbacks.
+data SynthLaneCursorPolicy = SynthLaneCursorPolicy
+  { synthLaneCursorBatchSize :: Int
+  , synthLaneCursorAllowsFilterSuccessor :: Bool
+  , synthLaneCursorRetainsRunNotes :: Bool
+  }
+
+-- | Why observation of one lazy engine outcome stopped.  Batch-policy
+-- completion is deliberately distinct from natural exhaustion and the
+-- product-wide cursor cap: after the admitted one or two candidate batches,
+-- Main never probes the successor merely to classify its tail.
+data SynthLaneRunEnd
+  = SynthLaneRunStoppedByDisposition
+  | SynthLaneRunBatchPolicyReached
+  | SynthLaneRunNaturallyExhausted
+  | SynthLaneRunHardCapReached
+  | SynthLaneRunTimedOut
+  | SynthLaneRunCursorAdmissionFailed DetailedSynthCursorError
+  | SynthLaneRunEngineFailed String
+  | SynthLaneRunRefuted Bool
+  | SynthLaneRunNoTerm
+
+-- | Complete command-local receipt for one engine outcome.  The accumulated
+-- lane outcomes are already in the command's reverse history; the spelling
+-- frontier and count cover only this engine run and retain attempt order.
+-- Fields stay lazy and the type intentionally has no equality or rendering
+-- instance, so it cannot become a persistence or diagnostics protocol.
+data SynthLaneRun = SynthLaneRun
+  { synthLaneRunAccumulation :: SynthLaneAccumulation
+  , synthLaneRunCheckedFrontierSpellings :: [String]
+  , synthLaneRunCandidateGroupCount :: Int
+  , synthLaneRunNotes :: [String]
+  , synthLaneRunEnd :: SynthLaneRunEnd
+  }
 
 -- Output (all user-visible text flows through emit so transcripts capture
 -- the whole session) --------------------------------------------------------
@@ -2213,9 +2259,8 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
   let deadline
         | limit <= 0 = Nothing
         | otherwise = Just (addUTCTime (fromIntegral limit) started)
-      runSynthesis includeLibrary checked laneEngine providers =
-        let groupLimit = synthVerificationWindow laneEngine
-            base = synthesizeWithProvidersSkippingDetailed
+      runSynthesis includeLibrary checked laneEngine providers accumulation =
+        let base = synthesizeWithProvidersSkippingDetailed
               laneEngine (rsSynthSteps state) checked providers fragment
             -- Library premises are an isolated, deliberately budgeted
             -- extension of the structural lane.  Their candidates lead the
@@ -2232,70 +2277,42 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
                       ]
                       (stripRecCtors fragment) fragment)
               | otherwise = base
-        in runEngineBefore groupLimit deadline outcome
+        in runSynthLaneCursor assessmentContext
+          (ordinarySynthLaneCursorPolicy assessmentContext laneEngine)
+          deadline st goal id outcome accumulation
   if structuralFirst
     then do
-      let baselineLimit = synthVerificationWindow engine
       baseline <- runSynthesis True Set.empty engine []
-      case baseline of
+        emptySynthLaneAccumulation
+      case synthLaneRunEnd baseline of
         -- A provider inventory cannot repair an engine failure, and the two
         -- lanes share one wall-clock deadline.  Preserve the baseline
         -- diagnostic instead of spending another full timeout and replacing
         -- it with a less informative fallback result.
-        Nothing -> report emptySynthLaneAccumulation
-          baselineLimit Nothing baseline
-        Just (Left _) -> report emptySynthLaneAccumulation
-          baselineLimit Nothing baseline
+        SynthLaneRunTimedOut -> report deadline baseline
+        SynthLaneRunCursorAdmissionFailed _ -> report deadline baseline
+        SynthLaneRunEngineFailed _ -> report deadline baseline
         -- A complete Djinn refutation proves the provider-free structural
         -- environment impossible, but a live declaration may still inhabit
         -- the goal.  Keep the proof-backed result as the fallback for empty,
         -- unavailable, timed-out, or unsuccessful provider search.  Reporting
         -- it (and therefore any classical retry) is delayed until those
         -- constructive lanes have failed.
-        Just (Right (DetailedSynthRefuted True)) -> do
+        SynthLaneRunRefuted True -> do
           providers <-
             if discoverProviders
               then loadSynthProviders st (pgProviderQuery parsed)
               else pure []
           if null providers
-            then report emptySynthLaneAccumulation baselineLimit
-              Nothing baseline
-            else runProviderLanes (Just (baselineLimit, baseline))
-              (runSynthesis False) Set.empty emptySynthLaneAccumulation
+            then report deadline baseline
+            else runProviderLanes deadline (Just baseline)
+              (runSynthesis False) Set.empty
+              (synthLaneRunAccumulation baseline)
               (providerStages engine providers)
-        _ -> do
-          (checkedOutcome, disposition) <-
-            tryCandidates baselineLimit baseline
-          let accumulation = maybe emptySynthLaneAccumulation
-                (`accumulateSynthLaneOutcome` emptySynthLaneAccumulation)
-                checkedOutcome
-              checked = Set.fromList $ maybe []
-                synthLaneCheckedFrontierSpellings checkedOutcome
-          case disposition of
-            SynthLaneNoVerified -> do
-              providers <-
-                if discoverProviders
-                  then loadSynthProviders st (pgProviderQuery parsed)
-                  else pure []
-              if null providers
-                then report accumulation baselineLimit
-                  checkedOutcome baseline
-                else runProviderLanes Nothing (runSynthesis False)
-                  checked accumulation
-                  (providerStages engine providers)
-            SynthLaneAllBehaviorallyRejected _ -> do
-              providers <-
-                if discoverProviders
-                  then loadSynthProviders st (pgProviderQuery parsed)
-                  else pure []
-              if null providers
-                then report accumulation baselineLimit
-                  checkedOutcome baseline
-                else runProviderLanes Nothing (runSynthesis False)
-                  checked accumulation
-                  (providerStages engine providers)
-            SynthLaneSurvivors _ _ -> finalize accumulation
-            SynthLaneAssessmentPreserved _ _ -> finalize accumulation
+        SynthLaneRunStoppedByDisposition ->
+          finalize (synthLaneRunAccumulation baseline)
+        _ -> continueAfterBaseline deadline runSynthesis discoverProviders
+          engine baseline
     else do
       providers <-
         if discoverProviders
@@ -2305,38 +2322,47 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
         Just reason
           | not (fragProviderMayOpen fragment && not (null providers)) ->
               emitLn st =<< cRed st ("out of fragment: " ++ reason)
-        _ -> runProviderLanes Nothing (runSynthesis False) Set.empty
+        _ -> runProviderLanes deadline Nothing (runSynthesis False) Set.empty
           emptySynthLaneAccumulation
           (providerStages engine providers)
  where
-  runProviderLanes fallback runLane checked accumulation lanes = case lanes of
-    [] -> finish accumulation synthMaxTried Nothing
-      (Just (Right (DetailedSynthNoTerm [])))
+  continueAfterBaseline runDeadline runLane discover laneEngine baseline = do
+    providers <-
+      if discover
+        then loadSynthProviders st (pgProviderQuery parsed)
+        else pure []
+    let accumulation = synthLaneRunAccumulation baseline
+        checked = Set.fromList
+          (synthLaneRunCheckedFrontierSpellings baseline)
+    if null providers
+      then report runDeadline baseline
+      else runProviderLanes runDeadline Nothing (runLane False)
+        checked accumulation (providerStages laneEngine providers)
+
+  runProviderLanes runDeadline fallback runLane checked accumulation lanes =
+    case lanes of
+    [] -> finish SynthLaneRun
+      { synthLaneRunAccumulation = accumulation
+      , synthLaneRunCheckedFrontierSpellings = []
+      , synthLaneRunCandidateGroupCount = 0
+      , synthLaneRunNotes = []
+      , synthLaneRunEnd = SynthLaneRunNoTerm
+      }
     (laneEngine, providers) : remaining -> do
-      let groupLimit = synthVerificationWindow laneEngine
-      fresh <- runLane checked laneEngine providers
-      case fresh of
-        Nothing -> finish accumulation groupLimit Nothing fresh
-        Just (Left _) -> finish accumulation groupLimit Nothing fresh
-        _ -> do
-          (checkedOutcome, disposition) <- tryCandidates groupLimit fresh
-          let accumulation' = maybe accumulation
-                (`accumulateSynthLaneOutcome` accumulation) checkedOutcome
-              checked' = Set.union checked $ Set.fromList $ maybe []
-                synthLaneCheckedFrontierSpellings checkedOutcome
-          case disposition of
-            SynthLaneNoVerified ->
-              if null remaining
-                then finish accumulation' groupLimit checkedOutcome fresh
-                else runProviderLanes fallback runLane
-                  checked' accumulation' remaining
-            SynthLaneAllBehaviorallyRejected _ ->
-              if null remaining
-                then finish accumulation' groupLimit checkedOutcome fresh
-                else runProviderLanes fallback runLane
-                  checked' accumulation' remaining
-            SynthLaneSurvivors _ _ -> finalize accumulation'
-            SynthLaneAssessmentPreserved _ _ -> finalize accumulation'
+      fresh <- runLane checked laneEngine providers accumulation
+      case synthLaneRunEnd fresh of
+        SynthLaneRunTimedOut -> finish fresh
+        SynthLaneRunCursorAdmissionFailed _ -> finish fresh
+        SynthLaneRunEngineFailed _ -> finish fresh
+        SynthLaneRunStoppedByDisposition ->
+          finalize (synthLaneRunAccumulation fresh)
+        _ ->
+          if null remaining
+            then finish fresh
+            else runProviderLanes runDeadline fallback runLane
+              (Set.union checked $ Set.fromList
+                $ synthLaneRunCheckedFrontierSpellings fresh)
+              (synthLaneRunAccumulation fresh) remaining
    where
     -- Once the provider-free lane has proved a sound refutation, every
     -- provider-side miss is weaker structural evidence.  Retain that result as
@@ -2344,18 +2370,11 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
     -- behavioral output.  'report' is also the sole classical entry point, so
     -- this ordering keeps classical search strictly after constructive
     -- provider search.
-    finish finalAccumulation groupLimit checkedOutcome bounded = case fallback of
-      Just (fallbackLimit, fallbackOutcome) ->
-        report finalAccumulation fallbackLimit Nothing fallbackOutcome
-      Nothing -> report finalAccumulation groupLimit checkedOutcome bounded
-
-  tryCandidates groupLimit bounded = case bounded of
-    Just (Right (DetailedSynthCandidates groups notes)) -> do
-      let checkedGroups = take groupLimit groups
-      (outcome, disposition) <- verifyGroups groupLimit notes checkedGroups
-      pure
-        (Just outcome, disposition)
-    _ -> pure (Nothing, SynthLaneNoVerified)
+    finish fresh = case fallback of
+      Just fallbackRun -> report runDeadline
+        (fallbackRun
+          { synthLaneRunAccumulation = synthLaneRunAccumulation fresh })
+      Nothing -> report runDeadline fresh
 
   finalize accumulation = do
     _ <- finalizeSynthLaneAccumulation st args goal accumulation
@@ -2364,8 +2383,10 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
   -- Abnormal engine completion remains visible even if an earlier lane was
   -- behaviorally rejected.  Completed lane effects are finalized first, and
   -- no weaker lane notes are appended to the abnormal diagnostic.
-  report accumulation _ _ Nothing = do
-    _ <- finalizeSynthLaneAccumulation st args goal accumulation
+  report _ laneRun@SynthLaneRun
+      { synthLaneRunEnd = SynthLaneRunTimedOut } = do
+    _ <- finalizeSynthLaneAccumulation st args goal
+      (synthLaneRunAccumulation laneRun)
     limit <- synthTimeoutSeconds
     emitLn st =<< cYellow st
       ("the engine did not finish within " ++ show limit
@@ -2374,35 +2395,26 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
       ("(bounded hypothesis instantiation can widen the search a lot; "
        ++ "set LEANT_SYNTH_TIMEOUT to another number of seconds, "
        ++ "or 0 to wait indefinitely)")
-  report accumulation groupLimit checkedOutcome (Just outcome) = case outcome of
-    Left err -> do
-      _ <- finalizeSynthLaneAccumulation st args goal accumulation
-      emitLn st =<< cRed st ("synthesis engine error: " ++ err)
-    Right (DetailedSynthCandidates groups notes) -> do
-      (accumulation', lane) <- case checkedOutcome of
-        Just previous -> pure (accumulation, previous)
-        Nothing -> do
-          (freshLane, _) <- verifyGroups groupLimit notes groups
-          pure
-            (accumulateSynthLaneOutcome freshLane accumulation, freshLane)
-      disposition <- finalizeSynthLaneAccumulation
-        st args goal accumulation'
-      case disposition of
-        SynthLaneNoVerified -> do
-          emitLn st =<< cRed st
-            ("the engine proposed " ++ show (length (take groupLimit groups))
-             ++ " candidate(s) but none survived Lean verification")
-          reportSynthLaneNotes st (synthLaneOutcomeNotes lane)
-        SynthLaneSurvivors _ _ -> pure ()
-        SynthLaneAllBehaviorallyRejected _ -> pure ()
-        SynthLaneAssessmentPreserved _ _ -> pure ()
-    Right (DetailedSynthRefuted sound)
-      | sound -> do
+  report _ laneRun@SynthLaneRun
+      { synthLaneRunEnd = SynthLaneRunCursorAdmissionFailed err } = do
+    _ <- finalizeSynthLaneAccumulation st args goal
+      (synthLaneRunAccumulation laneRun)
+    emitLn st =<< cRed st
+      ("synthesis engine error: detailed cursor admission failed: " ++ show err)
+  report _ laneRun@SynthLaneRun
+      { synthLaneRunEnd = SynthLaneRunEngineFailed err } = do
+    _ <- finalizeSynthLaneAccumulation st args goal
+      (synthLaneRunAccumulation laneRun)
+    emitLn st =<< cRed st ("synthesis engine error: " ++ err)
+  report runDeadline laneRun@SynthLaneRun
+      { synthLaneRunEnd = SynthLaneRunRefuted sound }
+    | sound = do
           wantClassical <- rsSynthClassical <$> readIORef st
           classicalAccumulation <-
             if wantClassical
-              then synthClassical assessmentContext st goal parsed accumulation
-              else pure accumulation
+              then synthClassical assessmentContext runDeadline
+                st goal parsed (synthLaneRunAccumulation laneRun)
+              else pure (synthLaneRunAccumulation laneRun)
           classical <- finalizeSynthLaneAccumulation
             st args goal classicalAccumulation
           case classical of
@@ -2427,9 +2439,9 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
             SynthLaneSurvivors _ _ -> pure ()
             SynthLaneAllBehaviorallyRejected _ -> pure ()
             SynthLaneAssessmentPreserved _ _ -> pure ()
-      | otherwise -> do
+    | otherwise = do
           disposition <- finalizeSynthLaneAccumulation
-            st args goal accumulation
+            st args goal (synthLaneRunAccumulation laneRun)
           case disposition of
             SynthLaneNoVerified -> do
               let atoms = fragUnsafeAtoms (pgFrag parsed)
@@ -2441,28 +2453,35 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
             SynthLaneSurvivors _ _ -> pure ()
             SynthLaneAllBehaviorallyRejected _ -> pure ()
             SynthLaneAssessmentPreserved _ _ -> pure ()
-    Right (DetailedSynthNoTerm notes) -> do
-      disposition <- finalizeSynthLaneAccumulation st args goal accumulation
+  report _ laneRun@SynthLaneRun
+      { synthLaneRunEnd = SynthLaneRunNoTerm } = do
+      disposition <- finalizeSynthLaneAccumulation st args goal
+        (synthLaneRunAccumulation laneRun)
       case disposition of
         SynthLaneNoVerified -> do
           emitLn st =<< cYellow st "no term found within the search bounds"
-          reportSynthLaneNotes st notes
+          reportSynthLaneNotes st (synthLaneRunNotes laneRun)
         SynthLaneSurvivors _ _ -> pure ()
         SynthLaneAllBehaviorallyRejected _ -> pure ()
         SynthLaneAssessmentPreserved _ _ -> pure ()
+  report _ laneRun@SynthLaneRun
+      { synthLaneRunEnd = SynthLaneRunStoppedByDisposition } =
+    finalize (synthLaneRunAccumulation laneRun)
+  report _ laneRun = reportCandidateCompletion laneRun
 
-  verifyGroups groupLimit notes groups = do
-    -- LEANT_SYNTH_DEBUG shows the engine's rendered variants before
-    -- verification; the pipeline is otherwise opaque when a candidate is
-    -- dropped.
-    debug <- lookupEnv "LEANT_SYNTH_DEBUG"
-    when (isJust debug) $
-      forM_ (zip [1 :: Int ..] (take groupLimit groups)) $
-        \(i, group) ->
-          forM_ (detailedCandidateGroupVariants group) $ \variant ->
-          emitLn st =<< cDim st ("debug " ++ show i ++ ": " ++ variant)
-    outcome <- verifySynthLane assessmentContext groupLimit st goal notes groups
-    pure (outcome, synthLaneDisposition outcome)
+  reportCandidateCompletion laneRun = do
+    disposition <- finalizeSynthLaneAccumulation st args goal
+      (synthLaneRunAccumulation laneRun)
+    case disposition of
+      SynthLaneNoVerified -> do
+        emitLn st =<< cRed st
+          ("the engine proposed "
+           ++ show (synthLaneRunCandidateGroupCount laneRun)
+           ++ " candidate(s) but none survived Lean verification")
+        reportSynthLaneNotes st (synthLaneRunNotes laneRun)
+      SynthLaneSurvivors _ _ -> pure ()
+      SynthLaneAllBehaviorallyRejected _ -> pure ()
+      SynthLaneAssessmentPreserved _ _ -> pure ()
 
 -- | Ask Lean for the bounded value inventory relevant to this goal.  A
 -- provider failure degrades to structural synthesis: inventory discovery is
@@ -2650,42 +2669,184 @@ mergeLibraryDetailedOutcomes base lib = case (base, lib) of
     DetailedSynthNoTerm notes -> notes
     DetailedSynthRefuted _ -> []
 
--- | Run the pure engine under the wall-clock guard, forcing enough of
--- the outcome that the whole search happens inside the guard (the
--- engine is lazy; see 'forceDetailedOutcome').  'Nothing' means the guard
--- fired.  The excluded-middle retry passes its deliberately cheap frontier;
--- the full double-negation retry preserves the ordinary per-engine window.
-runEngineBounded
-  :: Int -> Int -> Either String DetailedSynthOutcome
-  -> IO (Maybe (Either String DetailedSynthOutcome))
-runEngineBounded groupLimit limit outcome
-  | limit <= 0 =
-      Just outcome <$ evaluate (forceDetailedOutcome groupLimit outcome)
-  | otherwise = do
-      done <- timeout (limit * 1000000)
-        (evaluate (forceDetailedOutcome groupLimit outcome))
-      pure (outcome <$ done)
+-- | Ordinary rank and disabled commands retain one established verification
+-- window.  Filtering may consume exactly one returned successor, giving
+-- standalone engines 12+12 groups and the combined engine 24+24 without
+-- rerunning either search.
+ordinarySynthLaneCursorPolicy
+  :: LengthAssessmentContext command
+  -> SynthEngine
+  -> SynthLaneCursorPolicy
+ordinarySynthLaneCursorPolicy assessmentContext engine =
+  SynthLaneCursorPolicy
+    { synthLaneCursorBatchSize = synthVerificationWindow engine
+    , synthLaneCursorAllowsFilterSuccessor = case
+        lengthAssessmentContextBehaviorMode assessmentContext of
+          LengthBehaviorRank -> False
+          LengthBehaviorFilter -> True
+    , synthLaneCursorRetainsRunNotes = True
+    }
 
--- | Run an engine lane before one command-wide deadline.  Structural search
--- may fall through to one or more provider-enriched lanes; all searches,
--- provider discovery, and intervening Lean verification consume the same
--- configured wall-clock allowance rather than receiving a fresh timeout each.
--- 'Nothing' as the deadline retains the explicit wait-forever setting.
-runEngineBefore
-  :: Int -> Maybe UTCTime -> Either String DetailedSynthOutcome
-  -> IO (Maybe (Either String DetailedSynthOutcome))
-runEngineBefore groupLimit Nothing outcome =
-  Just outcome <$ evaluate (forceDetailedOutcome groupLimit outcome)
-runEngineBefore groupLimit (Just deadline) outcome = do
-  now <- getCurrentTime
-  let remainingMicros = floor
-        (realToFrac (diffUTCTime deadline now) * 1000000 :: Double)
-  if remainingMicros <= 0
-    then pure Nothing
-    else do
-      done <- timeout remainingMicros
-        (evaluate (forceDetailedOutcome groupLimit outcome))
-      pure (outcome <$ done)
+-- | Admit and force one opaque cursor step before the command's absolute
+-- deadline.  Admission stays outside the timeout and, by Engine's contract,
+-- does not demand the cursor.  A missing deadline retains the explicit
+-- @LEANT_SYNTH_TIMEOUT=0@ wait-forever behavior.
+runDetailedSynthCursorBefore
+  :: Int
+  -> Maybe UTCTime
+  -> DetailedSynthCursor
+  -> IO
+      (Maybe
+        (Either DetailedSynthCursorError DetailedSynthCursorStep))
+runDetailedSynthCursorBefore requested deadline cursor =
+  case advanceDetailedSynthCursor requested cursor of
+    Left err -> pure (Just (Left err))
+    Right step -> case deadline of
+      Nothing ->
+        Just (Right step) <$ evaluate (forceDetailedSynthCursorStep step)
+      Just absoluteDeadline -> do
+        now <- getCurrentTime
+        let remainingMicros = floor
+              (realToFrac (diffUTCTime absoluteDeadline now) * 1000000
+                :: Double)
+        if remainingMicros <= 0
+          then pure Nothing
+          else do
+            done <- timeout remainingMicros
+              (evaluate (forceDetailedSynthCursorStep step))
+            pure (Right step <$ done)
+
+-- | Filtering owns one command-wide deadline, including both classical
+-- routes.  Rank and disabled commands retain their historical classical
+-- budgets: excluded middle and double negation each capture a fresh full
+-- configured duration when that route begins.  The explicit zero setting
+-- remains an unbounded wait in either policy.
+classicalSynthLaneDeadline
+  :: LengthAssessmentContext command
+  -> Maybe UTCTime
+  -> IO (Maybe UTCTime)
+classicalSynthLaneDeadline assessmentContext commandDeadline =
+  case lengthAssessmentContextBehaviorMode assessmentContext of
+    LengthBehaviorFilter -> pure commandDeadline
+    LengthBehaviorRank -> do
+      limit <- synthTimeoutSeconds
+      if limit <= 0
+        then pure Nothing
+        else do
+          started <- getCurrentTime
+          pure $ Just (addUTCTime (fromIntegral limit) started)
+
+-- | Consume one lazy detailed outcome under a lane policy.  Every nonempty
+-- cursor batch is verified and behaviorally assessed exactly once.  Only an
+-- ordinary filter lane may request a successor, and then only after its first
+-- batch produced no verified term or rejected every verified term.  The
+-- second candidate batch ends by policy without a third tail probe.
+runSynthLaneCursor
+  :: LengthAssessmentContext command
+  -> SynthLaneCursorPolicy
+  -> Maybe UTCTime
+  -> St
+  -> String
+  -> (DetailedCandidateGroup -> DetailedCandidateGroup)
+  -> Either String DetailedSynthOutcome
+  -> SynthLaneAccumulation
+  -> IO SynthLaneRun
+runSynthLaneCursor assessmentContext policy deadline st goal transform outcome
+    initialAccumulation =
+  observe (1 :: Int) 0 [] [] (startDetailedSynthCursor outcome)
+ where
+  observe batchOrdinal groupCount reverseOutcomes runNotes cursor = do
+    forced <- runDetailedSynthCursorBefore
+      (synthLaneCursorBatchSize policy) deadline cursor
+    case forced of
+      Nothing -> finish reverseOutcomes groupCount runNotes
+        SynthLaneRunTimedOut
+      Just (Left err) -> finish reverseOutcomes groupCount runNotes
+        (SynthLaneRunCursorAdmissionFailed err)
+      Just (Right step) -> case step of
+        DetailedSynthCursorCandidateBatch batch successor -> do
+          let groups = map transform (detailedCandidateBatchGroups batch)
+              notes = detailedCandidateBatchNotes batch
+              nextCount = groupCount + length groups
+          when (synthLaneCursorRetainsRunNotes policy) $
+            debugSynthLaneGroups st groupCount groups
+          lane <- verifySynthLane assessmentContext
+            (synthLaneCursorBatchSize policy) st goal [] groups
+          let reverseOutcomes' = lane : reverseOutcomes
+          case synthLaneDisposition lane of
+            SynthLaneSurvivors _ _ ->
+              finish reverseOutcomes' nextCount notes
+                SynthLaneRunStoppedByDisposition
+            SynthLaneAssessmentPreserved _ _ ->
+              finish reverseOutcomes' nextCount notes
+                SynthLaneRunStoppedByDisposition
+            SynthLaneNoVerified -> continueOrStop batchOrdinal nextCount
+              reverseOutcomes' notes successor
+            SynthLaneAllBehaviorallyRejected _ ->
+              continueOrStop batchOrdinal nextCount reverseOutcomes' notes
+                successor
+        DetailedSynthCursorNaturallyExhausted notes ->
+          finish reverseOutcomes groupCount notes
+            SynthLaneRunNaturallyExhausted
+        DetailedSynthCursorHardCapReached notes ->
+          finish reverseOutcomes groupCount notes SynthLaneRunHardCapReached
+        DetailedSynthCursorEngineFailed err ->
+          finish reverseOutcomes groupCount runNotes
+            (SynthLaneRunEngineFailed err)
+        DetailedSynthCursorRefuted sound ->
+          finish reverseOutcomes groupCount runNotes
+            (SynthLaneRunRefuted sound)
+        DetailedSynthCursorNoTerm notes ->
+          finish reverseOutcomes groupCount notes SynthLaneRunNoTerm
+
+  continueOrStop batchOrdinal groupCount reverseOutcomes notes successor
+    | synthLaneCursorAllowsFilterSuccessor policy && batchOrdinal < 2 =
+        observe (batchOrdinal + 1) groupCount reverseOutcomes notes successor
+    | otherwise = finish reverseOutcomes groupCount notes
+        SynthLaneRunBatchPolicyReached
+
+  finish reverseOutcomes groupCount notes runEnd =
+    let noteOwnedReverseOutcomes
+          | synthLaneCursorRetainsRunNotes policy =
+              attachNotesToRightmostHandled notes reverseOutcomes
+          | otherwise = reverseOutcomes
+        chronologicalOutcomes = reverse noteOwnedReverseOutcomes
+        accumulation = foldl
+          (flip accumulateSynthLaneOutcome)
+          initialAccumulation chronologicalOutcomes
+    in pure SynthLaneRun
+      { synthLaneRunAccumulation = accumulation
+      , synthLaneRunCheckedFrontierSpellings = concatMap
+          synthLaneCheckedFrontierSpellings chronologicalOutcomes
+      , synthLaneRunCandidateGroupCount = groupCount
+      , synthLaneRunNotes = notes
+      , synthLaneRunEnd = runEnd
+      }
+
+  -- Outcomes are buffered only for this run (at most two).  Ordinary notes
+  -- attach once to the latest handled result.  If every batch is a Lean miss,
+  -- they stay solely on the run receipt for the final diagnostic.
+  attachNotesToRightmostHandled _ [] = []
+  attachNotesToRightmostHandled notes (lane : earlier) =
+    case synthLaneDisposition lane of
+      SynthLaneNoVerified ->
+        lane : attachNotesToRightmostHandled notes earlier
+      SynthLaneSurvivors _ _ ->
+        lane { synthLaneOutcomeNotes = notes } : earlier
+      SynthLaneAllBehaviorallyRejected _ ->
+        lane { synthLaneOutcomeNotes = notes } : earlier
+      SynthLaneAssessmentPreserved _ _ ->
+        lane { synthLaneOutcomeNotes = notes } : earlier
+
+-- | Debug candidate ordinals cover the complete same-run sequence rather
+-- than restarting at one for a filter successor batch.
+debugSynthLaneGroups :: St -> Int -> [DetailedCandidateGroup] -> IO ()
+debugSynthLaneGroups st priorGroupCount groups = do
+  debug <- lookupEnv "LEANT_SYNTH_DEBUG"
+  when (isJust debug) $
+    forM_ (zip [priorGroupCount + 1 ..] groups) $ \(i, group) ->
+      forM_ (detailedCandidateGroupVariants group) $ \variant ->
+        emitLn st =<< cDim st ("debug " ++ show i ++ ": " ++ variant)
 
 -- | The Glivenko fallback (SYNTHESIS_PROPOSAL.md \167 7 B): a sound
 -- constructive refutation of a goal with a quantifier-free body may
@@ -2703,16 +2864,16 @@ runEngineBefore groupLimit (Just deadline) outcome = do
 -- refutation caller remains the sole output and state-effect boundary.
 synthClassical
   :: LengthAssessmentContext command
+  -> Maybe UTCTime
   -> St
   -> String
   -> ParsedGoal
   -> SynthLaneAccumulation
   -> IO SynthLaneAccumulation
-synthClassical assessmentContext st goal parsed accumulation =
+synthClassical assessmentContext commandDeadline st goal parsed accumulation =
   case glivenkoSplit (pgFrag parsed) of
   Nothing -> pure accumulation
   Just (prefix, body) -> do
-    limit <- synthTimeoutSeconds
     state <- readIORef st
     let engine = rsSynthEngine state
         steps = rsSynthSteps state
@@ -2731,53 +2892,35 @@ synthClassical assessmentContext st goal parsed accumulation =
         -- the premises itself, and the prefix's binders stay free
         -- opaque variables
         emEngineFrag = body
-    emGroups <-
-      if null atoms || length atoms > 5
-        then pure []
-        else do
-          -- excluded-middle premises multiply the proof space, so this
-          -- search runs under a choice-point budget: memory stays
-          -- bounded, and losing completeness costs nothing here (a
-          -- miss falls through to the complete ¬¬ route, and negative
-          -- verdicts from this run are discarded anyway)
-          bounded <- runEngineBounded synthMaxTried limit
-            (synthesizeTunedDetailed engine steps
-              (synthMaxTried, Just 100000)
-              emPremises emEngineFrag (pgFrag parsed))
-          debug <- lookupEnv "LEANT_SYNTH_DEBUG"
-          when (isJust debug) $ emitLn st =<< cDim st
-            ("debug em outcome: " ++ case bounded of
-              Nothing -> "timeout"
-              Just (Left err) -> "error: " ++ err
-              Just (Right (DetailedSynthCandidates groups _)) ->
-                show (length groups) ++ " groups: "
-                  ++ show
-                    (take 3
-                      (map (take 2 . detailedCandidateGroupVariants) groups))
-              Just (Right (DetailedSynthRefuted _)) -> "refuted"
-              Just (Right (DetailedSynthNoTerm notes)) ->
-                "no term: " ++ show notes)
-          -- half the usual group budget: every failed verification
-          -- leaks an environment in the backend, and a systematically
-          -- failing em batch (a goal whose atoms are not Props, say)
-          -- should stay cheap before the ¬¬ route takes over
-          pure $ case bounded of
-            Just (Right (DetailedSynthCandidates groups _)) ->
-              take (synthMaxTried `div` 2) groups
-            _ -> []
-    emOutcome <- verifySynthLane assessmentContext
-      (synthMaxTried `div` 2) st goal [] emGroups
-    let accumulation' = accumulateSynthLaneOutcome emOutcome accumulation
-        emDisposition = synthLaneDisposition emOutcome
-    case emDisposition of
-      SynthLaneNoVerified ->
-        runDoubleNegation limit engine steps prefix body accumulation'
-      SynthLaneAllBehaviorallyRejected _ ->
-        runDoubleNegation limit engine steps prefix body accumulation'
-      SynthLaneSurvivors _ _ -> pure accumulation'
-      SynthLaneAssessmentPreserved _ _ -> pure accumulation'
+    if null atoms || length atoms > 5
+      then runDoubleNegation engine steps prefix body accumulation
+      else do
+        -- Excluded-middle premises multiply the proof space, so this search
+        -- retains its established choice-point cutoff and half-window.  It
+        -- never consumes a successor, including in filter mode.
+        emDeadline <- classicalSynthLaneDeadline
+          assessmentContext commandDeadline
+        emRun <- runSynthLaneCursor assessmentContext
+          SynthLaneCursorPolicy
+            { synthLaneCursorBatchSize = synthMaxTried `div` 2
+            , synthLaneCursorAllowsFilterSuccessor = False
+            , synthLaneCursorRetainsRunNotes = False
+            }
+          emDeadline st goal id
+          (synthesizeTunedDetailed engine steps
+            (synthMaxTried, Just 100000)
+            emPremises emEngineFrag (pgFrag parsed))
+          accumulation
+        debug <- lookupEnv "LEANT_SYNTH_DEBUG"
+        when (isJust debug) $ emitLn st =<< cDim st
+          ("debug em outcome: " ++ debugSynthLaneRun emRun)
+        case synthLaneRunEnd emRun of
+          SynthLaneRunStoppedByDisposition ->
+            pure (synthLaneRunAccumulation emRun)
+          _ -> runDoubleNegation engine steps prefix body
+            (synthLaneRunAccumulation emRun)
  where
-  runDoubleNegation limit engine steps prefix body accumulation' = do
+  runDoubleNegation engine steps prefix body accumulation' = do
       -- route 2: the double-negation translation, wrapped in
       -- Classical.byContradiction (complete by Glivenko's theorem)
       let nnFrag =
@@ -2791,18 +2934,39 @@ synthClassical assessmentContext st goal parsed accumulation =
             | otherwise = "fun " ++ unwords binders
                 ++ " => Classical.byContradiction ((" ++ term ++ ") "
                 ++ unwords binders ++ ")"
-          groupLimit = synthVerificationWindow engine
-      bounded <- runEngineBounded groupLimit limit
-        (synthesizeTunedDetailed engine steps (synthMaxTried, Nothing) []
-          nnFrag nnFrag)
-      case bounded of
-        Just (Right (DetailedSynthCandidates groups _)) -> do
-          nnOutcome <- verifySynthLane assessmentContext groupLimit st goal []
-            $ map
-              (mapDetailedCandidateGroupVariantsDroppingSemanticSidecar wrap)
-              groups
-          pure $ accumulateSynthLaneOutcome nnOutcome accumulation'
-        _ -> pure accumulation'
+          djinnCandidateCutoff = case
+              lengthAssessmentContextBehaviorMode assessmentContext of
+            LengthBehaviorRank -> synthMaxTried
+            LengthBehaviorFilter -> candidateWindow
+          ordinaryPolicy = ordinarySynthLaneCursorPolicy
+            assessmentContext engine
+          nnPolicy = ordinaryPolicy
+            { synthLaneCursorRetainsRunNotes = False }
+      nnDeadline <- classicalSynthLaneDeadline
+        assessmentContext commandDeadline
+      nnRun <- runSynthLaneCursor assessmentContext nnPolicy nnDeadline st goal
+        (mapDetailedCandidateGroupVariantsDroppingSemanticSidecar wrap)
+        (synthesizeTunedDetailed engine steps
+          (djinnCandidateCutoff, Nothing) [] nnFrag nnFrag)
+        accumulation'
+      pure (synthLaneRunAccumulation nnRun)
+
+  debugSynthLaneRun laneRun
+    | synthLaneRunCandidateGroupCount laneRun > 0 =
+        show (synthLaneRunCandidateGroupCount laneRun) ++ " groups: "
+          ++ show (take 6 $ synthLaneRunCheckedFrontierSpellings laneRun)
+    | otherwise = case synthLaneRunEnd laneRun of
+        SynthLaneRunStoppedByDisposition -> "0 groups"
+        SynthLaneRunBatchPolicyReached -> "0 groups"
+        SynthLaneRunNaturallyExhausted -> "0 groups (exhausted)"
+        SynthLaneRunHardCapReached -> "0 groups (candidate limit reached)"
+        SynthLaneRunTimedOut -> "timeout"
+        SynthLaneRunCursorAdmissionFailed err ->
+          "cursor admission error: " ++ show err
+        SynthLaneRunEngineFailed err -> "error: " ++ err
+        SynthLaneRunRefuted _ -> "refuted"
+        SynthLaneRunNoTerm ->
+          "no term: " ++ show (synthLaneRunNotes laneRun)
 
 -- | Verify and behaviorally assess one caller-bounded lane without emitting
 -- result metrics, warnings, candidate rows, or engine notes, and without
