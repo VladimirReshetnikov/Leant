@@ -868,7 +868,9 @@ contract selection. `LengthBehaviorRank` dispatches to the scalar or pair
 permutation-sealed ranking adapter; `LengthBehaviorFilter` dispatches to the
 matching scalar or pair selection adapter. Startup and one-shot contracts
 enter the same lifetime owner; the request does not remember a second policy/
-contract origin tag.
+contract origin tag. `lengthAssessmentRequestBehaviorMode` projects only the
+strict mode tag: disabled assessment projects `LengthBehaviorRank`, and an
+enabled projection does not force its retained lazy contract.
 
 The disabled rank request is the established non-strict identity. A disabled
 filter request returns `LengthAssessmentFilteringRequiresActivatedPolicy`.
@@ -889,10 +891,39 @@ successful filter returns only sealed survivors, while every selection failure
 returns the complete original batch. `lengthAssessmentFailure` maps both
 selection failure families into the mode-neutral Main warning path.
 
+### Main's bounded lane-local refill
+
+Each `verifyAndDisplay` caller now passes the exact group bound it already owns.
+Main immediately takes that prefix and returns `False` on an empty result before
+projecting the request's behavior mode. Ordinary, universe-retry, provider, and
+full double-negation calls pass `synthVerificationWindow` for the current
+engine: 12 for either standalone engine and 24 for `EngineBoth`. The cheaper
+excluded-middle route passes half of `synthMaxTried`, currently 6.
+
+Private `synthVerify` receives a mode-dependent successful-group quota. Ranking
+keeps `synthMaxShown`, currently 5. Filtering receives the caller's complete
+lane bound. The prior finite `take` is mandatory because
+`verifyCandidateGroups` counts successful groups; a failed group must not let a
+lazy or cyclic tail escape the lane limit. `Leant.Synth.Verification` itself is
+unchanged.
+
+The resulting filter `VerificationBatch` is assessed once, so one fresh
+four-entry MRU can carry replay inputs from early rejected occurrences to
+later occurrences within that batch. Main then applies `take synthMaxShown` to
+the survivor presentation only. It binds and displays at most five survivors,
+but reports the complete bounded rejection projection. Preserve-all failure
+retains the enlarged batch internally and displays at most five original
+candidates. An accepted all-rejected result remains handled `True`; provider
+and classical scheduling therefore stop rather than opening another lane.
+There is no cross-lane candidate continuation, persistent bank, scheduler
+outcome ADT, or `Engine`, `Verification`, or `ReplState` change.
+
 The current reset is recorded in the
 [versionless Length contract report](reports/2026-08-15-versionless-length-contract.md).
 The behavior request and selection dispatch are recorded in the
 [command-authorized Length filtering report](reports/2026-08-15-command-authorized-length-filtering.md).
+Its bounded lane-local refill successor is recorded in the
+[lane-local Length survivor-refill report](reports/2026-08-15-lane-local-length-survivor-refill.md).
 The older [one-shot contract report](reports/2026-08-13-one-shot-length-contract.md)
 and the reports below remain useful landing history, but their version routing
 and public API names are not current contracts. The historical modulo QF_LIA
@@ -1048,9 +1079,10 @@ Main binds only the survivor presentations as `itN` and prints omitted
 occurrences separately as `rejected`. An accepted all-rejected partition is a
 handled result: Main prints every rejection, creates no new binding, clears the
 old synthesis-splice cache, and returns before the unrelated Lean-verification
-empty-result fallback. Partial and zero-rejection selections use the same
-path. Assessment failure prints one mode-neutral preserve-all warning and then
-shows the unannotated original candidates.
+empty-result fallback or another provider/classical lane. Partial and zero-
+rejection selections use the same path. Assessment failure prints one mode-
+neutral preserve-all warning, retains the complete verification batch, and
+shows at most five unannotated original candidates.
 
 The four-entry input-vector MRU used to obtain the underlying assessments is
 still one fresh batch-local value. It stores only vectors; a later occurrence
@@ -1063,7 +1095,9 @@ The ranking foundation is detailed in the
 and the
 [explicit integration report](reports/2026-08-12-explicit-length-ranking-integration.md).
 The hard-selection adapter and command integration are specified by the
-[command-authorized Length filtering report](reports/2026-08-15-command-authorized-length-filtering.md).
+[command-authorized Length filtering report](reports/2026-08-15-command-authorized-length-filtering.md),
+with current lane-local scheduling in the
+[survivor-refill report](reports/2026-08-15-lane-local-length-survivor-refill.md).
 
 ## Provider instantiation evidence
 

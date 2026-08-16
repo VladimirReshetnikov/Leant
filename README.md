@@ -149,17 +149,25 @@ that consults Z3 about already verified candidates. Passing
 `--length-ranking-config` activates one startup policy and scalar-or-pair
 contract. Ordinary `:synth TYPE`, explicit `--behavior-mode rank`, and a
 contract-only command with no behavior mode all keep the established stable
-ranking: every verified candidate remains visible. An explicit
+ranking and its historical five-success verification frontier. An explicit
 `:synth --behavior-mode filter -- TYPE` may instead omit only candidates with
 an independently replayed counterexample to the activated startup contract;
 adding `--length-contract ABSOLUTE-PATH` uses that passive contract for this
-command. Raw `sat`, `unsat`, and `unknown`, preparation refusal, unassessed
-input, and positive bounded evidence never authorize rejection. Any adapter,
-ranking, association, or partition-seal failure preserves the complete
-verified batch. The complete reference — including the fixed command grammar,
-current versionless startup and contract-only schemas (`rankingDomain` is
-`scalar` or `binary-product`), batch-local replay bank, origin probe, bounded
-validation, rejection rules, and presentation — is
+command. Filtering verifies and assesses one already bounded synthesis lane as
+one batch—at most 12 groups for a standalone engine, 24 for `both`, or 6 for
+the excluded-middle classical route—so later same-lane survivors can replace
+early behavioral rejections. It still shows and binds at most five survivors,
+while every rejection from the bounded assessed batch remains visible. Raw
+`sat`, `unsat`, and `unknown`, preparation refusal, unassessed input, and
+positive bounded evidence never authorize rejection. Any adapter, ranking,
+association, or partition-seal failure preserves the complete internal
+verified batch and presents at most five candidates. An all-rejected batch is
+handled output and does not continue into another provider or classical lane.
+This is bounded lane-local refill, not a persistent or cross-lane CEGIS loop.
+The complete reference — including the fixed command grammar, current
+versionless startup and contract-only schemas (`rankingDomain` is `scalar` or
+`binary-product`), batch-local replay bank, origin probe, bounded validation,
+rejection rules, and presentation — is
 [docs/length-ranking.md](docs/length-ranking.md).
 
 Applicable-domain ranking now has one current recursive piecewise-affine
@@ -1008,8 +1016,10 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   before applying the internal 60-candidate collection window. The first
   spelling remains authoritative, while repeated backend derivations cannot
   consume slots ahead of later distinct terms; the outer 12/24-group
-  verification frontiers then apply as above. Combined exact-text deduplication
-  likewise keeps the first display occurrence. If that occurrence has no typed
+  frontiers then apply as above. Ranking stops after five accepted groups;
+  filtering may verify and assess that complete same-lane prefix before its
+  five-survivor presentation cap. Combined exact-text deduplication likewise
+  keeps the first display occurrence. If that occurrence has no typed
   authority, the exact spelling may lazily retain the first bounded later
   Exference origin solely for checked behavioral preparation; route metrics,
   ordinals, sibling variants, and displayed order do not change.

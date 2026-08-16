@@ -24,7 +24,12 @@ every other assessment is retained, every selection failure preserves the
 complete verified batch, and omitted occurrences remain separately presented.
 The earlier behavioral-selection report correctly says its structural seal was
 not connected at that landing checkpoint; the later command-authorized report
-records the current connection.
+records the connection. The current lane-local refill successor keeps ranking
+at five accepted groups, while filter mode assesses one already bounded 12-,
+24-, or excluded-middle 6-group lane once, presents at most five survivors,
+and reports every bounded rejection. An all-rejected result remains handled
+and does not continue into another lane; there is still no persistent or
+cross-lane CEGIS bank.
 The [README](../../README.md) and
 [Length ranking reference](../length-ranking.md) describe the current tree.
 
@@ -95,6 +100,7 @@ Reports are listed oldest first.
 - 2026-08-15 — [Guarded conditional Length ranking](2026-08-15-guarded-conditional-length-ranking.md)
 - 2026-08-15 — [Behavioral-selection occurrence partition seal](2026-08-15-behavioral-selection-partition-seal.md)
 - 2026-08-15 — [Command-authorized replay-backed Length filtering](2026-08-15-command-authorized-length-filtering.md)
+- 2026-08-15 — [Lane-local bounded Length survivor refill](2026-08-15-lane-local-length-survivor-refill.md)
 
 ## Standalone PDF reports
 

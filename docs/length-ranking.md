@@ -19,7 +19,7 @@ canonical `QF_LIA` query, a scoped Z3 worker is consulted, and any
 counterexample Z3 reports is independently re-executed by Leant's vendored
 Djex engine against the exact checked problem before it is believed.
 
-Four rules define the current authority boundary:
+Five rules define the current authority boundary:
 
 - **Ranking remains the default and never prunes.** Ordinary `:synth TYPE`,
   explicit `--behavior-mode rank`, and `--length-contract` without an explicit
@@ -29,6 +29,11 @@ Four rules define the current authority boundary:
   `--behavior-mode filter` selects hard filtering, and only an independently
   replayed counterexample may enter its rejected partition. Rejections remain
   separately visible but are not bound as `itN`.
+- **Filtering can refill only inside the current bounded lane.** Ranking keeps
+  its historical five-success verifier frontier. Filtering instead assesses
+  the verified output of one already bounded 12-, 24-, or excluded-middle
+  6-group lane as one batch, then shows and binds at most five survivors while
+  reporting every rejection from that batch.
 - **Raw solver status has no authority.** `sat`, `unsat`, and `unknown` are
   heuristics. Preparation refusal, unassessed input, heuristic status,
   independently completed finite-box evidence, and established applicable-
@@ -42,10 +47,13 @@ The ranking stage was the first behavioral increment. The current tree also
 implements the command-authorized Level-1 hard-filter slice described by the
 [Z3 behavioral synthesis proposal](Z3_Behavioral_Synthesis_Proposal/Z3_Behavioral_Synthesis_Proposal.pdf)
 (August 2026): a bounded total occurrence partition whose only negative
-Length decision is an exact replayed counterexample. Persistent sample banks,
-a counterexample-guided loop, typed sketch completion, sound prefix pruning,
-further behavioral domains, and Lean-checked proof artifacts remain proposed
-work.
+Length decision is an exact replayed counterexample. The current lane-local
+refill lets that filter consume the remainder of one already bounded synthesis
+lane after early behavioral rejections, but it is not the proposal's Level-2
+command-local CEGIS loop: it neither requests candidates from another lane nor
+persists a bank across batches. Persistent sample banks, cross-lane candidate
+enumeration, typed sketch completion, sound prefix pruning, further behavioral
+domains, and Lean-checked proof artifacts remain proposed work.
 
 Everything below this line describes the exact behavior of the current tree:
 the startup-configuration schema, the current contract-file schema, the
@@ -69,6 +77,7 @@ first.
 - [Command-level ranking and hard filtering](#command-level-ranking-and-hard-filtering)
   - [Exact grammar, defaults, and authority](#exact-grammar-defaults-and-authority)
   - [Retention and rejection taxonomy](#retention-and-rejection-taxonomy)
+  - [Bounded lane-local survivor refill](#bounded-lane-local-survivor-refill)
   - [Stable partition, failure, and Main behavior](#stable-partition-failure-and-main-behavior)
 - [One-shot contract-only files](#one-shot-contract-only-files)
   - [Command syntax, admission, and lifetime](#command-syntax-admission-and-lifetime)
@@ -270,6 +279,40 @@ that vector with its own checked problem. A new batch starts empty. No bank,
 behavior mode, or selection result is retained in `ReplState`, history,
 snapshots, or another command.
 
+### Bounded lane-local survivor refill
+
+The verification/display seam receives an exact group limit from its current
+synthesis caller and takes that prefix before it inspects the assessment
+request. An empty prefix therefore returns without projecting the behavior mode
+or forcing a retained lazy contract. Ordinary, universe-retry, provider, and
+double-negation lanes use the engine's established limit: 12 groups for a
+standalone Djinn or Exference lane and 24 for a combined lane. The cheaper
+excluded-middle classical route uses half of `synthMaxTried`, currently 6.
+
+Ranking retains the historical quota of five callback-accepted groups. Filter
+mode instead gives verification the complete caller-owned lane limit. Because
+the verification quota counts accepted groups rather than attempted groups,
+the prior `take` is a separate productivity boundary: failed groups do not
+allow traversal beyond the finite 12-, 24-, or 6-group lane prefix. The
+complete verified filter frontier is then assessed once, so its four-entry MRU
+bank can replay a counterexample learned from an early rejected occurrence
+against a later occurrence in that same batch.
+
+Only after assessment does Main take at most five survivor presentations for
+display and `itN` binding. It does not cap the rejection projection: every
+rejected occurrence in the bounded assessed batch is reported. A preserve-all
+selection failure likewise retains the entire enlarged verified batch
+internally but shows at most five unannotated original candidates beside its
+warning. Thus an early run of five behavioral rejections can be refilled by
+later same-lane survivors without expanding interactive output.
+
+This scheduling is intentionally local. An accepted all-rejected batch remains
+handled output and returns `True`, so structural filtering does not continue
+into provider lanes and an all-rejected excluded-middle batch does not continue
+into the double-negation lane. No candidate from a later lane enters the
+assessment, and this increment adds no `Engine`, `Verification`, or `ReplState`
+change, persistent bank, provider continuation, or cross-lane scheduler result.
+
 ### Stable partition, failure, and Main behavior
 
 `Leant.Synth.BehavioralSelection` mints a fresh rank-2 occurrence epoch for
@@ -288,9 +331,10 @@ original-index mismatch, candidate/decision admission failure, or partition-
 seal failure atomically preserves the complete original verified batch in
 original order. Such a result exposes no accepted selection wrappers and no
 rejections. Main displays a mode-neutral warning that behavioral assessment
-preserved all verified candidates and then presents the unannotated original
-batch. Exceptions still propagate after owned cleanup rather than becoming a
-filter result.
+preserved all verified candidates and then presents at most five unannotated
+original candidates. The complete preserved batch remains the internal
+failure result. Exceptions still propagate after owned cleanup rather than
+becoming a filter result.
 
 On accepted selection, presentation traverses the associated survivor and
 rejection wrappers directly; it never zips detached candidates and evidence.
@@ -301,10 +345,13 @@ counterexample-simplification note. Only survivors are bound as `it1`, `it2`,
 and so on. If every verified candidate is rejected, the command is still a
 handled synthesis result: it prints the rejection rows, creates no new `itN`
 bindings, clears the previous synthesis-splice cache, and does not emit the
-unrelated “none survived Lean verification” diagnostic.
+unrelated “none survived Lean verification” diagnostic or continue into a
+later provider or classical lane.
 
-The implementation checkpoint and its exact test surface are recorded in the
+The structural and command-authority predecessor is recorded in the historical
 [command-authorized Length filtering report](reports/2026-08-15-command-authorized-length-filtering.md).
+The current refill checkpoint and its exact test surface are recorded in the
+[lane-local Length survivor-refill report](reports/2026-08-15-lane-local-length-survivor-refill.md).
 
 ## One-shot contract-only files
 

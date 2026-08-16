@@ -1474,10 +1474,12 @@ alternating tails. Within each Exference invocation, Leant
 stable-deduplicates rendered groups before applying the internal 60-candidate
 collection window. The first spelling remains authoritative, while repeated
 backend histories cannot hide later distinct terms behind the bound; the
-outer 12- and 24-group verification frontiers then apply.  Whatever the
-frontier verifies, at most five candidates are ever displayed and bound;
-the rest of the frontier exists to survive Lean's rejections.  Exference
-runs under
+outer 12- and 24-group verification frontiers then apply.  Ordinary ranking
+retains its historical verifier stop after five accepted groups.  An explicit
+behavioral filter may instead verify the rest of that same bounded lane, assess
+the verified occurrences once, and refill early behavioral rejections from
+later same-lane survivors.  In either operation at most five candidates are
+displayed and bound.  Exference runs under
 explicit budgets
 (\code{:set synth-steps}, default 4096), and truncation is always
 reported:
@@ -1562,6 +1564,16 @@ one separately as rejected, and binds only survivors. A raw \code{sat},
 preparation refusal, unassessed input, heuristic status, completed finite box,
 or established applicable domain.
 
+The refill boundary is deliberately finite and lane-local. A rank request asks
+Lean for at most five successful groups. A filter request first bounds its
+input, then may verify and assess up to all 12 groups in a standalone lane, all
+24 in a combined lane, or all 6 in the cheaper excluded-middle classical
+route. That verified filter frontier enters one assessment batch, allowing its
+four-entry MRU input bank to replay an early counterexample against a later
+occurrence. Only after selection does Leant take at most five survivor
+presentations for display and binding; every rejection from the bounded batch
+is still printed.
+
 The exact option-bearing grammar is
 \code{:synth [-{}-behavior-mode rank|filter]
 [-{}-length-contract PATH] -{}- TYPE}; mode must precede contract and the
@@ -1610,16 +1622,21 @@ seals one bounded total partition. Both survivors and rejections are restored
 to original callback order; filter mode does not inherit ranking order. Any
 batch-wide post-verification-adapter, ranking, evidence-association,
 admission-limit, or partition-seal failure preserves the complete original
-verified batch and exposes no partial rejection. A
+verified batch and exposes no partial rejection; the warning path still
+displays at most five original candidates. A
 surviving bounded-positive receipt keeps its established note. A rejected
 occurrence keeps its exact counterexample or simplification note. If all
 verified occurrences are rejected, the result is handled: Leant prints the
 rejections, creates no \code{itN} binding, clears its previous synthesis-splice
-cache, and does not call them Lean-verification failures. Behavior mode,
-selection results, and the MRU are never persistent REPL state. The
-current reference is \code{docs/length-ranking.md}; the connected checkpoint
-is recorded in
-\code{docs/reports/2026-08-15-command-authorized-length-filtering.md}. Dated
+cache, does not call them Lean-verification failures, and does not continue
+into a later provider or classical lane. Behavior mode, selection results, and
+the MRU are never persistent REPL state. This is not the proposal's full
+command-local CEGIS loop: no bank or candidate crosses a lane, and no engine,
+verification module, scheduler-result type, or REPL state changed. The current
+reference is \code{docs/length-ranking.md}; the command-authority predecessor
+and current refill checkpoint are recorded in
+\code{docs/reports/2026-08-15-command-authorized-length-filtering.md} and
+\code{docs/reports/2026-08-15-lane-local-length-survivor-refill.md}. Dated
 reports under \code{docs/reports/} are historical engineering records rather
 than current file contracts. When assessment is disabled, an ordinary or
 explicit no-contract \code{rank} remains the exact identity and leaves no
