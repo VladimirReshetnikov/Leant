@@ -58,9 +58,13 @@ There is a manual: **[docs/Leant.pdf](https://raw.githubusercontent.com/Vladimir
 
 Companion documents: the **[manual](docs/Leant.pdf)** (tutorial and
 `:synth` tour), **[docs/length-ranking.md](docs/length-ranking.md)** (the
-complete Length counterexample-ranking reference), and
+complete Length counterexample-ranking reference),
 **[docs/synth-internals.md](docs/synth-internals.md)** (the design
-boundaries and dated-report index behind `:synth`).
+boundaries and dated-report index behind `:synth`), and the
+**[Z3 behavioral synthesis proposal](docs/Z3_Behavioral_Synthesis_Proposal/Z3_Behavioral_Synthesis_Proposal.pdf)**
+(where the behavioral layer goes next: counterexample-guided search, typed
+sketch completion, semantic pruning, and Lean-checked proof artifacts;
+[LaTeX source](docs/Z3_Behavioral_Synthesis_Proposal/Z3_Behavioral_Synthesis_Proposal.tex)).
 
 ## Highlights
 
