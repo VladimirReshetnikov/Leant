@@ -210,6 +210,8 @@ import Leant.Synth.Fragment
 import Leant.Synth.BehavioralSelection
   ( BehavioralSelectionCollection (..)
   , BehavioralSelectionError (..)
+  , BehaviorallyRejected
+  , BehaviorallySelected
   , behavioralSelectionBatchRejected
   , behavioralSelectionBatchSelected
   , behavioralSelectionCandidateVerified
@@ -356,6 +358,25 @@ import Leant.Synth.Length.PostVerification
   , lengthPostVerificationRankingFailure
   , lengthPostVerificationSealedBatch
   )
+import Leant.Synth.Length.Selection
+  ( LengthSelectionFailure (..)
+  , LengthSelectionRejection
+  , LengthSelectionResult
+  , LengthSelectionRetention
+  , LengthSelectionRetentionClass (..)
+  , lengthSelectionCandidates
+  , lengthSelectionFailure
+  , lengthSelectionRejected
+  , lengthSelectionRejectionCounterexample
+  , lengthSelectionRejectionCounterexampleSimplification
+  , lengthSelectionRetentionApplicableDomain
+  , lengthSelectionRetentionClass
+  , lengthSelectionRetentionInputBox
+  , lengthSelectionRetentionPreparationRefusal
+  , lengthSelectionRetentionSolverStatus
+  , lengthSelectionSelected
+  , selectVerifiedLengthCandidatesWithPolicy
+  )
 import Leant.Synth.Length.Presentation
   ( LengthCandidatePresentation
   , lengthCandidatePresentationNote
@@ -424,6 +445,25 @@ import Leant.Synth.Length.SpinePair.PostVerification
   , lengthSpinePairPostVerificationRanking
   , lengthSpinePairPostVerificationRankingFailure
   , lengthSpinePairPostVerificationSealedBatch
+  )
+import Leant.Synth.Length.SpinePair.Selection
+  ( LengthSpinePairSelectionFailure (..)
+  , LengthSpinePairSelectionRejection
+  , LengthSpinePairSelectionResult
+  , LengthSpinePairSelectionRetention
+  , LengthSpinePairSelectionRetentionClass (..)
+  , lengthSpinePairSelectionCandidates
+  , lengthSpinePairSelectionFailure
+  , lengthSpinePairSelectionRejected
+  , lengthSpinePairSelectionRejectionCounterexample
+  , lengthSpinePairSelectionRejectionCounterexampleSimplification
+  , lengthSpinePairSelectionRetentionApplicableDomain
+  , lengthSpinePairSelectionRetentionClass
+  , lengthSpinePairSelectionRetentionInputBox
+  , lengthSpinePairSelectionRetentionPreparationRefusal
+  , lengthSpinePairSelectionRetentionSolverStatus
+  , lengthSpinePairSelectionSelected
+  , selectVerifiedLengthSpinePairCandidatesWithPolicy
   )
 import Leant.Synth.Observability
   ( CandidateRenderingRoute (..)
@@ -520,6 +560,7 @@ main = do
       , verificationObservabilityTests
       , postVerificationTests
       , behavioralSelectionTests
+      , lengthSelectionTests
       , providerParserTests
       , instanceImplicitTests
       , providerEngineTests
@@ -1820,6 +1861,612 @@ assertBehavioralSelectionError expected result = case result of
   Left actual -> actual @?= expected
   Right _ -> assertFailure $
     "behavioral selection was admitted; expected: " ++ show expected
+
+lengthSelectionTests :: TestTree
+lengthSelectionTests = testGroup "hard Length behavioral selection"
+  [ testCase
+      "reject a pure guarded scalar counterexample without opening Z3"
+      assertLengthSelectionGuardedPure
+  , testCase
+      "reuse replay only within one selection and preserve occurrence order"
+      assertLengthSelectionLiveMRU
+  , testCase
+      "retain raw sat, unsat, unknown, and preparation refusals explicitly"
+      assertLengthSelectionNeutralStatuses
+  , testCase
+      "retain bounded positives and reject only their replayed sibling"
+      assertLengthSelectionBoundedPositive
+  , testCase
+      "atomically preserve every candidate on adapter and live failures"
+      assertLengthSelectionPreserveAllFailures
+  , testCase
+      "seal nominal pair evidence and keep both partitions in source order"
+      assertLengthSpinePairSelection
+  , testCase "preserve pair unknowns and atomically reset pair live failure"
+      assertLengthSpinePairSelectionNeutralAndFailure
+  , testCase "keep scalar and pair selection evidence opaque and distinct"
+      assertLengthSelectionFacadeOpacity
+  ]
+
+assertLengthSelectionGuardedPure :: IO ()
+assertLengthSelectionGuardedPure = do
+  (baseContract, scaled, identity) <- buildScaledProviderReplayFixture
+  withTemporaryDirectory "leant-length-selection-guarded" $ \root -> do
+    let executable = root </> "missing-z3"
+        input = LengthVariable $ LengthInput 0
+        guardedDomain = LengthAtMost
+          (LengthIf
+            (LengthAtMost input $ LengthLiteral 2)
+            input
+            (LengthLiteral 5))
+          (LengthLiteral 3)
+        contract = baseContract
+          { leanLengthContractSource = LengthContractSource
+              { lengthContractPrecondition = guardedDomain
+              , lengthContractPostcondition = LengthEqual
+                  (LengthVariable LengthResult) input
+              }
+          }
+    (policy, _) <- expectCurrentApplicableDomainPolicy
+      $ currentApplicableDomainScalarDocument executable 2000
+    verification <- verificationBatchFromReceipts [scaled, identity]
+    let original = verifiedCandidateReceipts verification
+    result <- expectLengthSelectionWithin "guarded pure scalar"
+      $ selectVerifiedLengthCandidatesWithPolicy policy contract verification
+    lengthSelectionFailure result @?= Nothing
+    selected <- expectLengthSelectionSelected result
+    rejected <- expectLengthSelectionRejected result
+    case original of
+      [verifiedScaled, verifiedIdentity] -> do
+        lengthSelectionCandidates result @?= [verifiedIdentity]
+        map behaviorallySelectedVerified selected @?= [verifiedIdentity]
+        map behaviorallyRejectedVerified rejected @?= [verifiedScaled]
+      _ -> assertFailure "guarded scalar verification cardinality changed"
+    case selected of
+      [retained] -> do
+        let evidence = behaviorallySelectedRetention retained
+        lengthSelectionRetentionClass evidence @?=
+          LengthSelectionApplicableDomainEstablished
+        lengthSelectionRetentionPreparationRefusal evidence @?= Nothing
+        lengthSelectionRetentionSolverStatus evidence @?= Nothing
+        lengthSelectionRetentionInputBox evidence @?= Nothing
+        receipt <- case lengthSelectionRetentionApplicableDomain evidence of
+          Nothing -> assertFailure
+            "guarded scalar survivor lost its applicable-domain receipt"
+              >> error "unreachable"
+          Just value -> pure value
+        Djex.validatedLengthApplicableDomainInclusiveMaximumBoxes receipt @?=
+          [[2]]
+        Djex.validatedLengthApplicableDomainApplicableAssignmentCount receipt
+          @?= 3
+      retained -> assertFailure $ "guarded scalar retained "
+        ++ show (length retained) ++ " candidates"
+    case rejected of
+      [removed] -> do
+        let evidence = behaviorallyRejectedReason removed
+            receipt = lengthSelectionRejectionCounterexample evidence
+        Djex.validatedLengthCounterexampleInputs receipt @?= [1]
+        Djex.validatedLengthCounterexampleResult receipt @?= 2
+        lengthSelectionRejectionCounterexampleSimplification evidence @?=
+          Nothing
+      removed -> assertFailure $ "guarded scalar rejected "
+        ++ show (length removed) ++ " candidates"
+    doesFileExist executable >>= (@?= False)
+    doesFileExist (executable ++ ".events") >>= (@?= False)
+
+assertLengthSelectionLiveMRU :: IO ()
+assertLengthSelectionLiveMRU = do
+  identity <- buildOneInputLengthRankingCandidate
+  retainedFirst <- syntheticLengthRankingCandidate
+    "selection-live-retained-first"
+  retainedSecond <- syntheticLengthRankingCandidate
+    "selection-live-retained-second"
+  let input = LengthVariable $ LengthInput 0
+      contract = (lengthRankingContractWithObservedInputs 1 2)
+        { leanLengthContractSource = LengthContractSource
+            { lengthContractPrecondition = LengthAtMost
+                (LengthLiteral 1) input
+            , lengthContractPostcondition = LengthEqual
+                (LengthVariable LengthResult) (LengthLiteral 2)
+            }
+        }
+  withFakeLengthSolver "healthy" $ \executable -> do
+    base <- expectRight $ mkLengthRankingPolicy
+      $ explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits
+          (explicitLengthRankingExecutionSource executable Nothing
+            Djex.LengthSMTLibInputValuesAfterSatisfiable)
+          Djex.defaultLengthEvaluationLimitSource
+    simplificationLimits <- explicitLengthInputBoxLimits 1 4
+    let policy = enableLengthRankingCounterexampleSimplification
+          simplificationLimits base
+    verification <- verificationBatchFromReceipts
+      [identity, retainedFirst, identity, retainedSecond]
+    let original = verifiedCandidateReceipts verification
+    result <- expectLengthSelectionWithin "live scalar MRU"
+      $ selectVerifiedLengthCandidatesWithPolicy policy contract verification
+    lengthSelectionFailure result @?= Nothing
+    selected <- expectLengthSelectionSelected result
+    rejected <- expectLengthSelectionRejected result
+    case original of
+      [verifiedIdentityFirst, verifiedRetainedFirst,
+          verifiedIdentitySecond, verifiedRetainedSecond] -> do
+        lengthSelectionCandidates result @?=
+          [verifiedRetainedFirst, verifiedRetainedSecond]
+        map behaviorallySelectedVerified selected @?=
+          [verifiedRetainedFirst, verifiedRetainedSecond]
+        map behaviorallyRejectedVerified rejected @?=
+          [verifiedIdentityFirst, verifiedIdentitySecond]
+      _ -> assertFailure "live scalar verification cardinality changed"
+    map (lengthSelectionRetentionClass . behaviorallySelectedRetention)
+        selected @?=
+      replicate 2 LengthSelectionPreparationRefused
+    map (lengthSelectionRetentionPreparationRefusal
+          . behaviorallySelectedRetention) selected @?=
+      replicate 2 (Just LengthPreparationTypedAuthorityUnavailable)
+    let evidence = map behaviorallyRejectedReason rejected
+        receipts = map lengthSelectionRejectionCounterexample evidence
+        simplifications = map
+          lengthSelectionRejectionCounterexampleSimplification evidence
+    map Djex.validatedLengthCounterexampleInputs receipts @?=
+      [[1], [1]]
+    map Djex.validatedLengthCounterexampleResult receipts @?= [1, 1]
+    case simplifications of
+      [Just simplified, Nothing] -> do
+        Djex.validatedLengthCounterexampleSimplificationOriginalInputs
+            simplified @?= [3]
+        Djex.validatedLengthCounterexampleSimplificationInputs simplified @?=
+          [1]
+        Djex.validatedLengthCounterexampleSimplificationResult simplified @?=
+          1
+      other -> assertFailure $ "selection reassociated simplification: "
+        ++ show other
+    firstEvents <- BS.readFile $ executable ++ ".events"
+    assertFakeLengthQueryEvents [0] [0] firstEvents
+
+    -- The MRU bank belongs to one ranking invocation.  Reusing the immutable
+    -- policy for a fresh verification batch must open a new ordinal-zero
+    -- query instead of treating the prior batch's vector as authority.
+    freshVerification <- verificationBatchFromReceipts [identity]
+    fresh <- expectLengthSelectionWithin "fresh scalar MRU scope"
+      $ selectVerifiedLengthCandidatesWithPolicy
+          policy contract freshVerification
+    lengthSelectionCandidates fresh @?= []
+    freshSelected <- expectLengthSelectionSelected fresh
+    freshRejected <- expectLengthSelectionRejected fresh
+    length freshSelected @?= 0
+    case freshRejected of
+      [removed] -> case
+          lengthSelectionRejectionCounterexampleSimplification
+            $ behaviorallyRejectedReason removed of
+        Just simplified ->
+          Djex.validatedLengthCounterexampleSimplificationOriginalInputs
+              simplified @?= [3]
+        Nothing -> assertFailure
+          "fresh scalar invocation reused earlier simplification metadata"
+      removed -> assertFailure $ "fresh scalar selection rejected "
+        ++ show (length removed) ++ " candidates"
+    secondEvents <- BS.readFile $ executable ++ ".events"
+    assertFakeLengthQueryEvents [0] [0] secondEvents
+
+assertLengthSelectionNeutralStatuses :: IO ()
+assertLengthSelectionNeutralStatuses = do
+  fixture <- buildLengthRankingLiveFixture
+  refused <- syntheticLengthRankingCandidate "selection-status-refused"
+  let candidates =
+        [ lengthRankingFixtureZero fixture
+        , refused
+        , lengthRankingFixtureOne fixture
+        ]
+      cases =
+        [ ("healthy", Djex.SolverSatisfiable)
+        , ("query-unsat", Djex.SolverUnsatisfiable)
+        , ("query-unknown", Djex.SolverUnknown)
+        ]
+  verification <- verificationBatchFromReceipts candidates
+  let original = verifiedCandidateReceipts verification
+  mapM_ (assertStatusCase verification original) cases
+ where
+  assertStatusCase verification original (mode, expectedStatus) =
+    withFakeLengthSolver mode $ \executable -> do
+      policy <- expectRight $ statusOnlyLengthRankingPolicy executable
+      result <- expectLengthSelectionWithin ("status-only " ++ mode)
+        $ selectVerifiedLengthCandidatesWithPolicy policy
+            (lengthRankingContract 0) verification
+      lengthSelectionFailure result @?= Nothing
+      lengthSelectionCandidates result @?= original
+      selected <- expectLengthSelectionSelected result
+      rejected <- expectLengthSelectionRejected result
+      map behaviorallySelectedVerified selected @?= original
+      length rejected @?= 0
+      let evidence = map behaviorallySelectedRetention selected
+      map lengthSelectionRetentionClass evidence @?=
+        [ LengthSelectionHeuristic
+        , LengthSelectionPreparationRefused
+        , LengthSelectionHeuristic
+        ]
+      map lengthSelectionRetentionSolverStatus evidence @?=
+        [Just expectedStatus, Nothing, Just expectedStatus]
+      map lengthSelectionRetentionPreparationRefusal evidence @?=
+        [ Nothing
+        , Just LengthPreparationTypedAuthorityUnavailable
+        , Nothing
+        ]
+      map lengthSelectionRetentionInputBox evidence @?=
+        replicate 3 Nothing
+      map lengthSelectionRetentionApplicableDomain evidence @?=
+        replicate 3 Nothing
+      assertFakeLengthQueryEvents [0, 1] [] =<<
+        BS.readFile (executable ++ ".events")
+
+assertLengthSelectionBoundedPositive :: IO ()
+assertLengthSelectionBoundedPositive = do
+  fixture <- buildLengthRankingLiveFixture
+  limits <- explicitLengthInputBoxLimits 0 1
+  let one = lengthRankingFixtureOne fixture
+      zero = lengthRankingFixtureZero fixture
+  verification <- verificationBatchFromReceipts [one, zero]
+  let original = verifiedCandidateReceipts verification
+  withFakeLengthSolver "query-unsat" $ \executable -> do
+    base <- expectRight $ statusOnlyLengthRankingPolicy executable
+    let policy = enableLengthRankingInputBoxValidation limits [] base
+    result <- expectLengthSelectionWithin "bounded-positive scalar"
+      $ selectVerifiedLengthCandidatesWithPolicy policy
+          (lengthRankingContract 0) verification
+    selected <- expectLengthSelectionSelected result
+    rejected <- expectLengthSelectionRejected result
+    case original of
+      [verifiedOne, verifiedZero] -> do
+        lengthSelectionCandidates result @?= [verifiedZero]
+        map behaviorallySelectedVerified selected @?= [verifiedZero]
+        map behaviorallyRejectedVerified rejected @?= [verifiedOne]
+      _ -> assertFailure "bounded-positive verification cardinality changed"
+    case selected of
+      [retained] -> do
+        let evidence = behaviorallySelectedRetention retained
+        lengthSelectionRetentionClass evidence @?=
+          LengthSelectionBoundedPositive
+        receipt <- case lengthSelectionRetentionInputBox evidence of
+          Nothing -> assertFailure
+            "bounded-positive selection lost its exact receipt"
+              >> error "unreachable"
+          Just value -> pure value
+        Djex.validatedLengthInputBoxAssignmentCount receipt @?= 1
+        Djex.validatedLengthInputBoxApplicableAssignmentCount receipt @?= 1
+      retained -> assertFailure $ "bounded-positive selection retained "
+        ++ show (length retained) ++ " candidates"
+    case rejected of
+      [removed] -> do
+        let receipt = lengthSelectionRejectionCounterexample
+              $ behaviorallyRejectedReason removed
+        Djex.validatedLengthCounterexampleInputs receipt @?= []
+        Djex.validatedLengthCounterexampleResult receipt @?= 1
+      removed -> assertFailure $ "bounded-positive selection rejected "
+        ++ show (length removed) ++ " candidates"
+    assertFakeLengthQueryEvents [0, 1] [] =<<
+      BS.readFile (executable ++ ".events")
+
+assertLengthSelectionPreserveAllFailures :: IO ()
+assertLengthSelectionPreserveAllFailures = do
+  identity <- buildOneInputLengthRankingCandidate
+  let maximumCandidates =
+        Djex.defaultLengthSMTLibLiveSessionMaximumQueries
+      oversizedCount = fromIntegral maximumCandidates + 1
+  oversized <- verificationBatchFromReceipts
+    $ replicate oversizedCount identity
+  withTemporaryDirectory "leant-length-selection-input-failure" $ \root -> do
+    policy <- expectRight $ statusOnlyLengthRankingPolicy
+      $ root </> "missing-z3"
+    result <- expectLengthSelectionWithin "maximum-plus-one input"
+      $ selectVerifiedLengthCandidatesWithPolicy policy
+          (error "selection input admission forced its contract") oversized
+    case lengthSelectionFailure result of
+      Just (LengthSelectionPostVerificationFailed
+          (LengthPostVerificationInputRejected
+            (LengthRankingInputLimitExceeded maximumValue observed))) ->
+        (maximumValue, observed) @?=
+          (maximumCandidates, maximumCandidates + 1)
+      failure -> assertFailure $ "unexpected selection input failure: "
+        ++ show failure
+    assertLengthSelectionPreserved
+      (verifiedCandidateReceipts oversized) result
+
+  fixture <- buildLengthRankingLiveFixture
+  trailing <- syntheticLengthRankingCandidate
+    "selection-invalid-replay-trailing"
+  invalidReplay <- verificationBatchFromReceipts
+    [ lengthRankingFixtureOne fixture
+    , lengthRankingFixtureZero fixture
+    , trailing
+    ]
+  withFakeLengthSolver "healthy" $ \executable -> do
+    policy <- expectRight $ mkLengthRankingPolicy
+      $ explicitLengthRankingPolicySource
+          Djex.defaultLengthSMTLibExecutionLimits
+          (explicitLengthRankingExecutionSource executable Nothing
+            Djex.LengthSMTLibInputValuesAfterSatisfiable)
+          Djex.defaultLengthEvaluationLimitSource
+    result <- expectLengthSelectionWithin "invalid satisfiable replay"
+      $ selectVerifiedLengthCandidatesWithPolicy policy
+          (lengthRankingContract 0) invalidReplay
+    assertLengthSelectionRankingPreserved
+      (verifiedCandidateReceipts invalidReplay) result
+
+  sessionVerification <- verificationBatchFromReceipts
+    [lengthRankingFixtureOne fixture]
+  withTemporaryDirectory "leant-length-selection-session-failure" $ \root ->
+    do
+      let executable = root </> "missing-z3"
+      policy <- expectRight $ statusOnlyLengthRankingPolicy executable
+      result <- expectLengthSelectionWithin "missing live session"
+        $ selectVerifiedLengthCandidatesWithPolicy policy
+            (lengthRankingContract 0) sessionVerification
+      assertLengthSelectionRankingPreserved
+        (verifiedCandidateReceipts sessionVerification) result
+      doesFileExist (executable ++ ".events") >>= (@?= False)
+
+  assertLiveFailure fixture "query-hang-status"
+    Djex.LengthSMTLibStatusOnly
+  assertLiveFailure fixture "query-stale-prewrite"
+    Djex.LengthSMTLibInputValuesAfterSatisfiable
+ where
+  assertLiveFailure fixture mode artifactPolicy =
+    withFakeLengthSolver mode $ \executable -> do
+      policy <- expectRight $ mkLengthRankingPolicy
+        $ explicitLengthRankingPolicySource
+            Djex.defaultLengthSMTLibExecutionLimits
+            (explicitLengthRankingExecutionSource executable Nothing
+              artifactPolicy)
+            Djex.defaultLengthEvaluationLimitSource
+      verification <- verificationBatchFromReceipts
+        [lengthRankingFixtureOne fixture]
+      result <- expectLengthSelectionWithin ("live failure " ++ mode)
+        $ selectVerifiedLengthCandidatesWithPolicy policy
+            (lengthRankingContract 0) verification
+      assertLengthSelectionRankingPreserved
+        (verifiedCandidateReceipts verification) result
+
+assertLengthSpinePairSelection :: IO ()
+assertLengthSpinePairSelection = do
+  (duplicatedInput, inputAndZero) <- buildLengthSpinePairRankingFixture
+  refused <- syntheticLengthRankingCandidate "pair-selection-refused"
+  withTemporaryDirectory "leant-length-pair-selection" $ \root -> do
+    let executable = root </> "missing-z3"
+        input = LengthVariable $ Djex.LengthSpinePairInput 0
+        guardedDomain = LengthAtMost
+          (LengthIf
+            (LengthAtMost input $ LengthLiteral 2)
+            input
+            (LengthLiteral 5))
+          (LengthLiteral 3)
+        contract = lengthSpinePairRankingContract
+          { leanLengthSpinePairContractSource =
+              (leanLengthSpinePairContractSource
+                lengthSpinePairRankingContract)
+                { Djex.lengthSpinePairContractPrecondition = guardedDomain
+                }
+          }
+    (policy, _) <- expectCurrentApplicableDomainPolicy
+      $ currentApplicableDomainPairDocument executable 2000
+    verification <- verificationBatchFromReceipts
+      [duplicatedInput, refused, inputAndZero, duplicatedInput]
+    let original = verifiedCandidateReceipts verification
+    result <- expectLengthSpinePairSelectionWithin
+      $ selectVerifiedLengthSpinePairCandidatesWithPolicy
+          policy contract verification
+    lengthSpinePairSelectionFailure result @?= Nothing
+    selected <- expectLengthSpinePairSelectionSelected result
+    rejected <- expectLengthSpinePairSelectionRejected result
+    case original of
+      [verifiedDuplicateFirst, verifiedRefused,
+          verifiedInputAndZero, verifiedDuplicateSecond] -> do
+        lengthSpinePairSelectionCandidates result @?=
+          [verifiedRefused, verifiedInputAndZero]
+        map behaviorallySelectedVerified selected @?=
+          [verifiedRefused, verifiedInputAndZero]
+        map behaviorallyRejectedVerified rejected @?=
+          [verifiedDuplicateFirst, verifiedDuplicateSecond]
+      _ -> assertFailure "pair selection verification cardinality changed"
+    let retainedEvidence = map behaviorallySelectedRetention selected
+    map lengthSpinePairSelectionRetentionClass retainedEvidence @?=
+      [ LengthSpinePairSelectionPreparationRefused
+      , LengthSpinePairSelectionApplicableDomainEstablished
+      ]
+    map lengthSpinePairSelectionRetentionPreparationRefusal
+        retainedEvidence @?=
+      [Just LengthPreparationTypedAuthorityUnavailable, Nothing]
+    map lengthSpinePairSelectionRetentionSolverStatus retainedEvidence @?=
+      [Nothing, Nothing]
+    map lengthSpinePairSelectionRetentionInputBox retainedEvidence @?=
+      [Nothing, Nothing]
+    case map lengthSpinePairSelectionRetentionApplicableDomain
+        retainedEvidence of
+      [Nothing, Just receipt] -> do
+        Djex.validatedLengthSpinePairApplicableDomainInclusiveMaximumBoxes
+            receipt @?= [[2]]
+        Djex.validatedLengthSpinePairApplicableDomainApplicableAssignmentCount
+            receipt @?= 3
+      receipts -> assertFailure $ "pair retention evidence drifted: "
+        ++ show receipts
+    let rejectionEvidence = map behaviorallyRejectedReason rejected
+        receipts = map
+          lengthSpinePairSelectionRejectionCounterexample rejectionEvidence
+    map Djex.validatedLengthSpinePairCounterexampleInputs receipts @?=
+      [[1], [1]]
+    map Djex.validatedLengthSpinePairCounterexampleResult receipts @?=
+      replicate 2 (Djex.LengthSpinePair 1 1)
+    map lengthSpinePairSelectionRejectionCounterexampleSimplification
+        rejectionEvidence @?= replicate 2 Nothing
+    doesFileExist executable >>= (@?= False)
+    doesFileExist (executable ++ ".events") >>= (@?= False)
+
+assertLengthSpinePairSelectionNeutralAndFailure :: IO ()
+assertLengthSpinePairSelectionNeutralAndFailure = do
+  (duplicatedInput, _) <- buildLengthSpinePairRankingFixture
+  refused <- syntheticLengthRankingCandidate "pair-selection-unknown-refused"
+  verification <- verificationBatchFromReceipts [duplicatedInput, refused]
+  let original = verifiedCandidateReceipts verification
+  withFakeLengthSolver "query-unknown" $ \executable -> do
+    policy <- expectRight $ statusOnlyLengthRankingPolicy executable
+    result <- expectLengthSpinePairSelectionWithin
+      $ selectVerifiedLengthSpinePairCandidatesWithPolicy
+          policy lengthSpinePairSecondOneContract verification
+    lengthSpinePairSelectionFailure result @?= Nothing
+    lengthSpinePairSelectionCandidates result @?= original
+    selected <- expectLengthSpinePairSelectionSelected result
+    rejected <- expectLengthSpinePairSelectionRejected result
+    map behaviorallySelectedVerified selected @?= original
+    length rejected @?= 0
+    let evidence = map behaviorallySelectedRetention selected
+    map lengthSpinePairSelectionRetentionClass evidence @?=
+      [ LengthSpinePairSelectionHeuristic
+      , LengthSpinePairSelectionPreparationRefused
+      ]
+    map lengthSpinePairSelectionRetentionSolverStatus evidence @?=
+      [Just Djex.SolverUnknown, Nothing]
+    map lengthSpinePairSelectionRetentionPreparationRefusal evidence @?=
+      [Nothing, Just LengthPreparationTypedAuthorityUnavailable]
+    assertFakeLengthQueryEvents [0] [] =<<
+      BS.readFile (executable ++ ".events")
+
+  failingVerification <- verificationBatchFromReceipts [duplicatedInput]
+  let failingOriginal = verifiedCandidateReceipts failingVerification
+  withFakeLengthSolver "query-hang-status" $ \executable -> do
+    policy <- expectRight $ statusOnlyLengthRankingPolicy executable
+    result <- expectLengthSpinePairSelectionWithin
+      $ selectVerifiedLengthSpinePairCandidatesWithPolicy
+          policy lengthSpinePairSecondOneContract failingVerification
+    case lengthSpinePairSelectionFailure result of
+      Just LengthSpinePairSelectionRankingFailed{} -> pure ()
+      failure -> assertFailure $ "unexpected pair selection failure: "
+        ++ show failure
+    lengthSpinePairSelectionCandidates result @?= failingOriginal
+    assertBool "pair failure exposed selected associations"
+      $ isNothing $ lengthSpinePairSelectionSelected result
+    assertBool "pair failure exposed rejected associations"
+      $ isNothing $ lengthSpinePairSelectionRejected result
+
+assertLengthSelectionFacadeOpacity :: IO ()
+assertLengthSelectionFacadeOpacity = do
+  scalarSource <- readFile "src/Leant/Synth/Length/Selection.hs"
+  pairSource <- readFile
+    "src/Leant/Synth/Length/SpinePair/Selection.hs"
+  let exportHeader = unlines
+        . takeWhile (not . isInfixOf ") where")
+        . lines
+      scalarExports = exportHeader scalarSource
+      pairExports = exportHeader pairSource
+      opaqueScalar =
+        [ "LengthSelectionRetention"
+        , "LengthSelectionRejection"
+        , "LengthSelectionResult"
+        ]
+      opaquePair =
+        [ "LengthSpinePairSelectionRetention"
+        , "LengthSpinePairSelectionRejection"
+        , "LengthSpinePairSelectionResult"
+        ]
+  mapM_ (assertOpaque "scalar" scalarExports) opaqueScalar
+  mapM_ (assertOpaque "pair" pairExports) opaquePair
+  assertBool "scalar facade omitted its nominal rejection type"
+    $ "LengthSelectionRejection" `isInfixOf` scalarExports
+  assertBool "pair facade omitted its nominal rejection type"
+    $ "LengthSpinePairSelectionRejection" `isInfixOf` pairExports
+  assertBool "scalar facade exposed the pair rejection type"
+    $ not $ "LengthSpinePairSelectionRejection" `isInfixOf` scalarExports
+  assertBool "pair facade reused the scalar rejection type"
+    $ not $ "\n  , LengthSelectionRejection" `isInfixOf` pairExports
+ where
+  assertOpaque domain exports name = assertBool
+    (domain ++ " selection facade exposed constructor for " ++ name)
+    $ not $ (name ++ " (..)") `isInfixOf` exports
+
+expectLengthSelectionWithin
+  :: String
+  -> IO LengthSelectionResult
+  -> IO LengthSelectionResult
+expectLengthSelectionWithin label action = do
+  bounded <- timeout 8000000 action
+  case bounded of
+    Nothing -> assertFailure
+      ("Length selection " ++ label ++ " exceeded its outer bound")
+        >> error "unreachable"
+    Just result -> pure result
+
+expectLengthSelectionSelected
+  :: LengthSelectionResult
+  -> IO
+      [BehaviorallySelected
+        DetailedVerificationVariant LengthSelectionRetention]
+expectLengthSelectionSelected result = case lengthSelectionSelected result of
+  Nothing -> assertFailure "Length selection discarded its selected seal"
+    >> error "unreachable"
+  Just selected -> pure selected
+
+expectLengthSelectionRejected
+  :: LengthSelectionResult
+  -> IO
+      [BehaviorallyRejected
+        DetailedVerificationVariant LengthSelectionRejection]
+expectLengthSelectionRejected result = case lengthSelectionRejected result of
+  Nothing -> assertFailure "Length selection discarded its rejected seal"
+    >> error "unreachable"
+  Just rejected -> pure rejected
+
+assertLengthSelectionPreserved
+  :: [Verified DetailedVerificationVariant]
+  -> LengthSelectionResult
+  -> IO ()
+assertLengthSelectionPreserved original result = do
+  lengthSelectionCandidates result @?= original
+  assertBool "preserved Length selection exposed selected associations"
+    $ isNothing $ lengthSelectionSelected result
+  assertBool "preserved Length selection exposed rejected associations"
+    $ isNothing $ lengthSelectionRejected result
+
+assertLengthSelectionRankingPreserved
+  :: [Verified DetailedVerificationVariant]
+  -> LengthSelectionResult
+  -> IO ()
+assertLengthSelectionRankingPreserved original result = do
+  case lengthSelectionFailure result of
+    Just LengthSelectionRankingFailed{} -> pure ()
+    failure -> assertFailure $ "unexpected preserved ranking failure: "
+      ++ show failure
+  assertLengthSelectionPreserved original result
+
+expectLengthSpinePairSelectionWithin
+  :: IO LengthSpinePairSelectionResult
+  -> IO LengthSpinePairSelectionResult
+expectLengthSpinePairSelectionWithin action = do
+  bounded <- timeout 8000000 action
+  case bounded of
+    Nothing -> assertFailure
+      "Length pair selection exceeded its outer bound"
+        >> error "unreachable"
+    Just result -> pure result
+
+expectLengthSpinePairSelectionSelected
+  :: LengthSpinePairSelectionResult
+  -> IO
+      [BehaviorallySelected
+        DetailedVerificationVariant LengthSpinePairSelectionRetention]
+expectLengthSpinePairSelectionSelected result = case
+    lengthSpinePairSelectionSelected result of
+  Nothing -> assertFailure "pair selection discarded its selected seal"
+    >> error "unreachable"
+  Just selected -> pure selected
+
+expectLengthSpinePairSelectionRejected
+  :: LengthSpinePairSelectionResult
+  -> IO
+      [BehaviorallyRejected
+        DetailedVerificationVariant LengthSpinePairSelectionRejection]
+expectLengthSpinePairSelectionRejected result = case
+    lengthSpinePairSelectionRejected result of
+  Nothing -> assertFailure "pair selection discarded its rejected seal"
+    >> error "unreachable"
+  Just rejected -> pure rejected
 
 replayPlanTests :: TestTree
 replayPlanTests = testGroup "synthesis history replay"
