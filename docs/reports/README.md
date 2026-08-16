@@ -33,7 +33,9 @@ cross-lane CEGIS bank. Main now retains one private four-way lane disposition,
 with the complete bounded provider-dedup spelling frontier separate from the
 exact callback-attempt trace, but only the no-verified-receipt disposition can
 continue. Djex's vendored candidate-independent bank types remain an unused
-library foundation: Leant has no runtime owner or replay bridge for them.
+runtime foundation: Leant now has pure package-private scalar/product state
+over Djex's fresh replay bridge, but no Ranking, Selection, Integration, Main,
+command-lifetime, persistence, or cross-lane caller uses it.
 The [README](../../README.md) and
 [Length ranking reference](../length-ranking.md) describe the current tree.
 
@@ -106,6 +108,7 @@ Reports are listed oldest first.
 - 2026-08-15 — [Command-authorized replay-backed Length filtering](2026-08-15-command-authorized-length-filtering.md)
 - 2026-08-15 — [Lane-local bounded Length survivor refill](2026-08-15-lane-local-length-survivor-refill.md)
 - 2026-08-16 — [Explicit synthesis-lane outcomes](2026-08-16-explicit-synthesis-lane-outcomes.md)
+- 2026-08-16 — [Package-private nominal Length counterexample-bank state](2026-08-16-nominal-length-counterexample-bank-state.md)
 
 ## Standalone PDF reports
 

@@ -27,6 +27,7 @@ who wants the *what* can stop at the paragraph.
   - [Interpretation policy and session-owned sealing](#interpretation-policy-and-session-owned-sealing)
   - [Adapter and canonical query sealing](#adapter-and-canonical-query-sealing)
 - [Ranking foundation](#ranking-foundation)
+  - [Package-private nominal counterexample-bank state](#package-private-nominal-counterexample-bank-state)
   - [Current applicable-domain validation](#current-applicable-domain-validation)
   - [The origin probe](#the-origin-probe)
   - [Live input-box validation and query-first replay](#live-input-box-validation-and-query-first-replay)
@@ -261,15 +262,52 @@ and preparation refusals do not mutate the bank. The bank never contains a
 cached solver result, verdict, query, receipt, provider-law basis, proof,
 solver status, or durable cache entry.
 
-The vendored Djex snapshot also exposes nominal candidate-independent scalar
-and binary-product bank scopes and bounded immutable input stores. That public
-foundation is separate from this active ranking-local MRU. No Leant module
-imports it, no Leant command owns one of its banks, and Djex supplies no bridge
-that automatically inserts observations or replays a stored vector into a
-fresh receipt. Scope matching would authorize only a replay attempt, not reuse
-of a verdict. The exact foundation and its absent runtime integration are
-recorded in Djex's
-[nominal bank report](../lib/Djex/docs/reports/2026-08-16-nominal-length-counterexample-bank-foundation.md).
+### Package-private nominal counterexample-bank state
+
+The vendored Djex snapshot exposes nominal candidate-independent scalar and
+binary-product scopes, bounded immutable input stores, and pure query-owned
+bridges which fresh-replay a receipt before recording its inputs or replay one
+exact retained sample against a later same-scope query. A same-scope match
+authorizes only that fresh attempt; neither an old receipt nor a stored vector
+is a reusable verdict.
+
+`Leant.Synth.Length.CounterexampleBank.Internal` is the package-private state
+owner over those Djex primitives. The scalar and product state types are
+nominal and distinct. Each retains validated limits and zero or one active
+bank. Its empty and default constructors leave that bank absent without
+forcing the limits. The first replay or record operation initializes from the
+exact query-owned scope. A same-scope query retains the bank; scope drift
+replaces it with one empty bank under the original limits and does not inspect
+the discarded samples.
+
+Whole-bank replay traverses exact opaque samples newest first. Every admitted
+attempt accepts Djex's returned charged successor as authoritative. Evaluation
+or association refusal is retained in attempt order and traversal continues;
+an ordinary non-counterexample also continues. Exhaustion is an ordinary miss,
+and attempt-cap exhaustion is ordinary bounded unavailability. A hit returns
+an opaque sample/scope association plus the fresh current-query receipt but
+does not promote implicitly. Promotion is a separate membership- and
+scope-checked input-only insertion under the solver-independent replay origin,
+so it performs no second evaluation.
+
+Recording accepts a previously validated receipt only as an input-vector
+source. Djex first fresh-replays it once through the current query, and Leant
+records only a reproduced counterexample under one closed coarse origin: live
+model, solver-independent replay, or simplification replay. Evaluation,
+association, non-reproduction, attempt-limit, and insertion-limit outcomes
+remain explicit, and every bridge-returned successor is threaded even when a
+later step refuses the operation.
+
+This module has no caller in Ranking, Selection, Integration, or Main. It owns
+no `IORef`, process, solver, candidate scheduler, command lifetime, snapshot,
+or persistent state, and it does not replace the active four-vector
+assessment-local MRU described above. The package-private checkpoint is
+recorded in Leant's
+[nominal bank-state report](reports/2026-08-16-nominal-length-counterexample-bank-state.md).
+Djex's storage and fresh-replay boundaries are recorded separately in its
+[nominal bank report](../lib/Djex/docs/reports/2026-08-16-nominal-length-counterexample-bank-foundation.md)
+and
+[query-replay bridge report](../lib/Djex/docs/reports/2026-08-16-length-counterexample-bank-query-replay-bridge.md).
 
 ### Current applicable-domain validation
 

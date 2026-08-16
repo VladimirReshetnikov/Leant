@@ -56,12 +56,18 @@ enumeration, typed sketch completion, sound prefix pruning, further behavioral
 domains, and Lean-checked proof artifacts remain proposed work.
 
 The vendored Djex revision now contains candidate-independent scalar and
-binary-product counterexample-bank scopes plus bounded immutable input stores.
-That additive library foundation is dormant in Leant: no Leant module imports
-it, no command constructs or consults it, and it has no replay-to-receipt
-integration. Unless this document explicitly says otherwise, “replay bank”
-therefore means Leant's existing fresh four-vector, one-assessment MRU below,
-not the unused Djex store.
+binary-product counterexample-bank scopes, bounded immutable input stores, and
+exact query-owned operations for fresh receipt recording and retained-sample
+replay. Leant wraps that bridge in one package-private, nominally separated
+scalar/product state module. Each pure state retains validated limits and at
+most one active scope, initializes lazily, resets on exact scope drift, threads
+charged successors through ordered replay refusals, and keeps hit promotion an
+explicit evaluation-free operation. This is still a dormant runtime
+foundation: no Ranking, Selection, Integration, Main, command-state, or
+persistence path constructs or consults the state. Unless this document
+explicitly says otherwise, “replay bank” therefore means Leant's existing
+fresh four-vector, one-assessment MRU below, not the package-private nominal
+state.
 
 Everything below this line describes the exact behavior of the current tree:
 the startup-configuration schema, the current contract-file schema, the

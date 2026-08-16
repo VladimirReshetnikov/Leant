@@ -1616,10 +1616,14 @@ preference boundaries remain unchanged. The four-vector MRU is local to one
 verified batch; a later candidate must independently replay a vector against
 its own checked problem, and the next batch starts empty.
 The vendored Djex revision separately exposes candidate-independent scalar and
-binary-product bank scopes with bounded immutable input stores. Leant does not
-import, construct, or consult those stores, and there is no automatic
-bank-replay-to-receipt bridge. They are a dormant library foundation, not a
-command-local bank or a change to this active batch-local MRU.
+binary-product bank scopes, bounded immutable input stores, and exact
+query-owned fresh replay. Leant now has a package-private pure state adapter
+over that bridge: each nominal domain retains validated limits and at most one
+active scope, resets on exact scope drift, threads charged successors through
+newest-first replay, and separates a replay hit from evaluation-free
+promotion. No ranking, filtering, integration, command, or persistent-state
+path calls the adapter. It is therefore a dormant runtime foundation, not a
+command-local bank or a change to the active batch-local MRU.
 
 Filtering runs the same scalar or nominal pair assessor, maps every report
 back to its exact callback occurrence by the retained original index, and
@@ -1655,7 +1659,10 @@ is \code{docs/length-ranking.md}; the command-authority predecessor, current
 refill checkpoint, and private outcome seam are recorded in
 \code{docs/reports/2026-08-15-command-authorized-length-filtering.md} and
 \code{docs/reports/2026-08-15-lane-local-length-survivor-refill.md}, and
-\code{docs/reports/2026-08-16-explicit-synthesis-lane-outcomes.md}. Dated
+\code{docs/reports/2026-08-16-explicit-synthesis-lane-outcomes.md}. The dormant
+nominal state foundation is recorded in
+\code{docs/reports/2026-08-16-nominal-length-counterexample-bank-state.md}.
+Dated
 reports under \code{docs/reports/} are historical engineering records rather
 than current file contracts. When assessment is disabled, an ordinary or
 explicit no-contract \code{rank} remains the exact identity and leaves no
