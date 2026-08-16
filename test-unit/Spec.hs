@@ -5804,6 +5804,9 @@ lengthApplicableDomainTests =
         "establish fixed current scalar and product domain receipts"
         assertCurrentLengthApplicableDomainPureRanking
     , testCase
+        "decode guarded conditionals into nominal pure domain receipts"
+        assertCurrentLengthApplicableDomainGuardedConditional
+    , testCase
         "retain counterexample simplification and only its final MRU vector"
         assertCurrentLengthApplicableDomainSimplificationMRU
     , testCase
@@ -6370,6 +6373,124 @@ assertCurrentLengthApplicableDomainPureRanking = do
           rawReceipt @?= 16
       Djex.validatedLengthApplicableDomainApplicableAssignmentCount
           rawReceipt @?= 16
+      doesFileExist (executable ++ ".events") >>= (@?= False)
+
+assertCurrentLengthApplicableDomainGuardedConditional :: IO ()
+assertCurrentLengthApplicableDomainGuardedConditional = do
+  scalarCandidate <- buildOneInputLengthRankingCandidate
+  (pairCandidate, _) <- buildLengthSpinePairRankingFixture
+  let conditionalPrecondition = jsonLengthAtMost
+        (jsonLengthIf
+          (jsonLengthAtMost (jsonLengthInput 0) $ jsonLengthLiteral 2)
+          (jsonLengthInput 0)
+          (jsonLengthLiteral 5))
+        (jsonLengthLiteral 3)
+      scalarContractValue = addJsonField []
+        ("candidateCasePolicy", Json.JStr "cases-rejected")
+        $ jsonRoleAwareLengthContract
+            ["observed-spine"] conditionalPrecondition
+            (jsonLengthTruth True) []
+      pairContractValue = jsonLengthSpinePairContract
+        ["observed-spine"] "cases-rejected" conditionalPrecondition
+        (jsonLengthTruth True) []
+      expectedScalarPrecondition = LengthAtMost
+        (LengthIf
+          (LengthAtMost scalarInput $ LengthLiteral 2)
+          scalarInput
+          (LengthLiteral 5))
+        (LengthLiteral 3)
+      expectedPairPrecondition = LengthAtMost
+        (LengthIf
+          (LengthAtMost pairInput $ LengthLiteral 2)
+          pairInput
+          (LengthLiteral 5))
+        (LengthLiteral 3)
+      scalarInput = LengthVariable $ LengthInput 0
+      pairInput = LengthVariable $ Djex.LengthSpinePairInput 0
+      scalarNote =
+        "complete finite-spine Length Boolean finite-union atomic-branching "
+          ++ "recursive piecewise-affine domain under strict relational "
+          ++ "positive-affine quotient/root-extrema/monus coverage within "
+          ++ "admitted bounds (model/provider-relative; provider-independent; "
+          ++ "no global proof or solver authority): boxes = 1; visits = 3; "
+          ++ "unique = 3; applicable = 3; maxima = [[2]]"
+      pairNote =
+        "complete binary-product finite-spine Length Boolean finite-union "
+          ++ "atomic-branching recursive piecewise-affine domain under strict "
+          ++ "relational positive-affine quotient/root-extrema/monus coverage "
+          ++ "within admitted bounds (model/provider-relative; "
+          ++ "provider-independent; no global proof or solver authority): "
+          ++ "boxes = 1; visits = 3; unique = 3; applicable = 3; maxima = [[2]]"
+  withTemporaryDirectory "leant-length-guarded-conditional-domain"
+    $ \root -> do
+      let executable = root </> "missing-z3"
+          scalarDocument = setJsonField ["contract"] scalarContractValue
+            $ currentApplicableDomainScalarDocument executable 2000
+          pairDocument = setJsonField ["contract"] pairContractValue
+            $ currentApplicableDomainPairDocument executable 2000
+      (scalarPolicy, scalarSelection) <-
+        expectCurrentApplicableDomainPolicy scalarDocument
+      scalarContract <- case scalarSelection of
+        LeanLengthScalarContractSelection contract -> pure contract
+        LeanLengthSpinePairContractSelection _ -> assertFailure
+          "guarded scalar startup selected the product domain"
+            >> error "unreachable"
+      lengthContractPrecondition (leanLengthContractSource scalarContract) @?=
+        expectedScalarPrecondition
+      scalar <- expectLengthRankingWithin "current guarded scalar domain"
+        $ rankVerifiedLengthCandidatesWithPolicy scalarPolicy scalarContract
+            [scalarCandidate]
+      scalarReceipt <- case map rankedLengthCandidateAssessment
+          $ lengthRankingCandidates scalar of
+        [ApplicableDomainEstablished receipt] -> pure receipt
+        assessments -> assertFailure
+          ("current guarded scalar domain produced " ++ show assessments)
+            >> error "unreachable"
+      Djex.validatedLengthApplicableDomainInclusiveMaximumBoxes
+          scalarReceipt @?= [[2]]
+      Djex.validatedLengthApplicableDomainBoxCount scalarReceipt @?= 1
+      Djex.validatedLengthApplicableDomainAssignmentVisitCount
+          scalarReceipt @?= 3
+      Djex.validatedLengthApplicableDomainAssignmentCount scalarReceipt @?= 3
+      Djex.validatedLengthApplicableDomainApplicableAssignmentCount
+          scalarReceipt @?= 3
+      Djex.validatedLengthApplicableDomainBasis scalarReceipt @?=
+        Djex.ProviderIndependentFiniteSpineModel
+      renderLengthApplicableDomainValidationNote scalarReceipt @?= scalarNote
+
+      (pairPolicy, pairSelection) <-
+        expectCurrentApplicableDomainPolicy pairDocument
+      pairContract <- case pairSelection of
+        LeanLengthSpinePairContractSelection contract -> pure contract
+        LeanLengthScalarContractSelection _ -> assertFailure
+          "guarded product startup selected the scalar domain"
+            >> error "unreachable"
+      Djex.lengthSpinePairContractPrecondition
+          (leanLengthSpinePairContractSource pairContract) @?=
+        expectedPairPrecondition
+      pair <- expectRight =<<
+        rankVerifiedLengthSpinePairCandidatesWithPolicy pairPolicy pairContract
+          [pairCandidate]
+      pairReceipt <- case map rankedLengthSpinePairCandidateAssessment
+          $ lengthSpinePairRankingCandidates pair of
+        [LengthSpinePairApplicableDomainEstablished receipt] -> pure receipt
+        assessments -> assertFailure
+          ("current guarded product domain produced " ++ show assessments)
+            >> error "unreachable"
+      Djex.validatedLengthSpinePairApplicableDomainInclusiveMaximumBoxes
+          pairReceipt @?= [[2]]
+      Djex.validatedLengthSpinePairApplicableDomainBoxCount pairReceipt @?= 1
+      Djex.validatedLengthSpinePairApplicableDomainAssignmentVisitCount
+          pairReceipt @?= 3
+      Djex.validatedLengthSpinePairApplicableDomainAssignmentCount
+          pairReceipt @?= 3
+      Djex.validatedLengthSpinePairApplicableDomainApplicableAssignmentCount
+          pairReceipt @?= 3
+      Djex.validatedLengthSpinePairApplicableDomainBasis pairReceipt @?=
+        Djex.ProviderIndependentFiniteSpineModel
+      renderLengthSpinePairApplicableDomainValidationNote pairReceipt @?=
+        pairNote
+      doesFileExist executable >>= (@?= False)
       doesFileExist (executable ++ ".events") >>= (@?= False)
 
 assertCurrentLengthApplicableDomainSimplificationMRU :: IO ()
