@@ -4995,7 +4995,7 @@ expectScalarAdapterRecord
       , Djex.ValidatedLengthCounterexample
       )
 expectScalarAdapterRecord (state, outcome) = case outcome of
-  Right (LengthCounterexampleBank.LengthCounterexampleBankRecorded receipt) ->
+  Right (LengthCounterexampleBank.BankRecorded receipt) ->
     pure (state, receipt)
   Left failure -> assertFailure
     ("scalar adapter record failed: " ++ show failure)
@@ -5016,7 +5016,7 @@ expectPairAdapterRecord
       )
 expectPairAdapterRecord (state, outcome) = case outcome of
   Right
-      (LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecorded
+      (LengthCounterexampleBank.BankRecorded
         receipt) -> pure (state, receipt)
   Left failure -> assertFailure
     ("product adapter record failed: " ++ show failure)
@@ -5033,7 +5033,7 @@ populateScalarAdapterState fixture = do
     scalarAdapterReceiptTriple fixture
   let query = counterexampleBankScalarSourceQuery fixture
       origin =
-        LengthCounterexampleBank.LengthCounterexampleBankReceiptFromLiveModel
+        LengthCounterexampleBank.BankReceiptFromLiveModel
       record receipt state = expectScalarAdapterRecord
         $ LengthCounterexampleBank.recordLengthCounterexampleBankReceipt
             defaultLengthEvaluationLimits query origin receipt state
@@ -5049,7 +5049,7 @@ populatePairAdapterState fixture = do
   (firstReceipt, secondReceipt, thirdReceipt) <- pairAdapterReceiptTriple fixture
   let query = counterexampleBankPairSourceQuery fixture
       origin =
-        LengthCounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromLiveModel
+        LengthCounterexampleBank.BankReceiptFromLiveModel
       record receipt state = expectPairAdapterRecord
         $ LengthCounterexampleBank.recordLengthSpinePairCounterexampleBankReceipt
             defaultLengthEvaluationLimits query origin receipt state
@@ -5126,7 +5126,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 LengthCounterexampleBank.defaultLengthCounterexampleBankState
         case scalarOutcome of
           Right
-              (LengthCounterexampleBank.LengthCounterexampleBankReplayMiss
+              (LengthCounterexampleBank.BankReplayMiss
                 []) -> pure ()
           Left failure -> assertFailure
             $ "scalar lazy initialization failed: " ++ show failure
@@ -5143,7 +5143,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 LengthCounterexampleBank.defaultLengthSpinePairCounterexampleBankState
         case pairOutcome of
           Right
-              (LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayMiss
+              (LengthCounterexampleBank.BankReplayMiss
                 []) -> pure ()
           Left failure -> assertFailure
             $ "product lazy initialization failed: " ++ show failure
@@ -5162,13 +5162,13 @@ lengthCounterexampleBankAdapterTests = withResource
             $ LengthCounterexampleBank.recordLengthCounterexampleBankReceipt
                 defaultLengthEvaluationLimits scalarQuery origin receipt state
       (scalarLive, liveFresh) <- recordScalar
-        LengthCounterexampleBank.LengthCounterexampleBankReceiptFromLiveModel
+        LengthCounterexampleBank.BankReceiptFromLiveModel
         scalarFirst LengthCounterexampleBank.defaultLengthCounterexampleBankState
       (scalarReplay, replayFresh) <- recordScalar
-        LengthCounterexampleBank.LengthCounterexampleBankReceiptFromSolverIndependentReplay
+        LengthCounterexampleBank.BankReceiptFromSolverIndependentReplay
         scalarSecond scalarLive
       (scalarRecorded, simplifiedFresh) <- recordScalar
-        LengthCounterexampleBank.LengthCounterexampleBankReceiptFromSimplificationReplay
+        LengthCounterexampleBank.BankReceiptFromSimplificationReplay
         scalarThird scalarReplay
       map Djex.validatedLengthCounterexampleInputs
           [liveFresh, replayFresh, simplifiedFresh] @?= [[1], [2], [3]]
@@ -5192,14 +5192,14 @@ lengthCounterexampleBankAdapterTests = withResource
             $ LengthCounterexampleBank.recordLengthSpinePairCounterexampleBankReceipt
                 defaultLengthEvaluationLimits pairQuery origin receipt state
       (pairLive, pairLiveFresh) <- recordPair
-        LengthCounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromLiveModel
+        LengthCounterexampleBank.BankReceiptFromLiveModel
         pairFirst
         LengthCounterexampleBank.defaultLengthSpinePairCounterexampleBankState
       (pairReplay, pairReplayFresh) <- recordPair
-        LengthCounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromSolverIndependentReplay
+        LengthCounterexampleBank.BankReceiptFromSolverIndependentReplay
         pairSecond pairLive
       (pairRecorded, pairSimplifiedFresh) <- recordPair
-        LengthCounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromSimplificationReplay
+        LengthCounterexampleBank.BankReceiptFromSimplificationReplay
         pairThird pairReplay
       map Djex.validatedLengthSpinePairCounterexampleInputs
           [pairLiveFresh, pairReplayFresh, pairSimplifiedFresh] @?=
@@ -5233,7 +5233,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 defaultLengthEvaluationLimits
                 (counterexampleBankScalarTargetQuery retained) populated
         hit <- case replayOutcome of
-          Right (LengthCounterexampleBank.LengthCounterexampleBankReplayHit
+          Right (LengthCounterexampleBank.BankReplayHit
               [] retainedHit) -> pure retainedHit
           Left failure -> assertFailure
             ("scalar newest-first replay failed: " ++ show failure)
@@ -5283,7 +5283,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 (counterexampleBankPairTargetQuery retained) populated
         hit <- case replayOutcome of
           Right
-              (LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayHit
+              (LengthCounterexampleBank.BankReplayHit
                 [] retainedHit) -> pure retainedHit
           Left failure -> assertFailure
             ("product newest-first replay failed: " ++ show failure)
@@ -5334,7 +5334,7 @@ lengthCounterexampleBankAdapterTests = withResource
             targetQuery = counterexampleBankScalarTargetQuery retained
             foreignQuery = counterexampleBankScalarForeignQuery retained
             live =
-              LengthCounterexampleBank.LengthCounterexampleBankReceiptFromLiveModel
+              LengthCounterexampleBank.BankReceiptFromLiveModel
             customLimits =
               scalarCounterexampleBankAdapterLimits 2 1 8 4096 2
             customInitial =
@@ -5348,7 +5348,7 @@ lengthCounterexampleBankAdapterTests = withResource
               LengthCounterexampleBank.replayLengthCounterexampleBank
                 defaultLengthEvaluationLimits targetQuery recorded
         hit <- case replayOutcome of
-          Right (LengthCounterexampleBank.LengthCounterexampleBankReplayHit
+          Right (LengthCounterexampleBank.BankReplayHit
               [] retainedHit) -> pure retainedHit
           other -> assertFailure
             ("scalar one-sample replay did not hit: " ++ showReplayShape other)
@@ -5378,7 +5378,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 foreignQuery promotedOnce
         case resetOutcome of
           Right
-              (LengthCounterexampleBank.LengthCounterexampleBankReplayMiss
+              (LengthCounterexampleBank.BankReplayMiss
                 []) -> pure ()
           Left failure -> assertFailure
             $ "scalar scope reset failed: " ++ show failure
@@ -5391,7 +5391,7 @@ lengthCounterexampleBankAdapterTests = withResource
               LengthCounterexampleBank.promoteLengthCounterexampleBankReplayHit
                 hit reset
         staleScopeOutcome @?= Left
-          LengthCounterexampleBank.LengthCounterexampleBankPromotionScopeInvariant
+          LengthCounterexampleBank.BankPromotionScopeInvariant
         staleScopeBank <- expectScalarAdapterBank staleScope
         scalarAdapterBankStats staleScopeBank @?= (0, 0, 0, 0, 0, 0)
 
@@ -5410,7 +5410,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 (error "reset scalar cap demanded receipt")
                 afterResetSecond
         afterResetCapOutcome @?= Right
-          (LengthCounterexampleBank.LengthCounterexampleBankRecordAttemptUnavailable
+          (LengthCounterexampleBank.BankRecordAttemptUnavailable
             $ Djex.LengthCounterexampleBankReplayAttemptLimitExceeded 2 3)
         afterResetCappedBank <- expectScalarAdapterBank afterResetCapped
         scalarAdapterBankStats afterResetCappedBank @?=
@@ -5429,14 +5429,14 @@ lengthCounterexampleBankAdapterTests = withResource
                 LengthCounterexampleBank.defaultLengthCounterexampleBankState
         case sameScopeOutcome of
           Right
-              (LengthCounterexampleBank.LengthCounterexampleBankReplayMiss
+              (LengthCounterexampleBank.BankReplayMiss
                 []) -> pure ()
           _ -> assertFailure "scalar same-scope empty state did not miss"
         let (staleMember, staleMemberOutcome) =
               LengthCounterexampleBank.promoteLengthCounterexampleBankReplayHit
                 hit sameScopeEmpty
         staleMemberOutcome @?= Left
-          LengthCounterexampleBank.LengthCounterexampleBankPromotionMembershipInvariant
+          LengthCounterexampleBank.BankPromotionMembershipInvariant
         staleMemberBank <- expectScalarAdapterBank staleMember
         scalarAdapterBankStats staleMemberBank @?= (0, 0, 0, 0, 0, 0)
         Djex.validatedLengthCounterexampleInputs
@@ -5452,7 +5452,7 @@ lengthCounterexampleBankAdapterTests = withResource
             targetQuery = counterexampleBankPairTargetQuery retained
             foreignQuery = counterexampleBankPairForeignQuery retained
             live =
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromLiveModel
+              LengthCounterexampleBank.BankReceiptFromLiveModel
             customLimits =
               pairCounterexampleBankAdapterLimits 2 1 8 4096 2
             customInitial =
@@ -5467,7 +5467,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 defaultLengthEvaluationLimits targetQuery recorded
         hit <- case replayOutcome of
           Right
-              (LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayHit
+              (LengthCounterexampleBank.BankReplayHit
                 [] retainedHit) -> pure retainedHit
           other -> assertFailure
             ("product one-sample replay did not hit: " ++
@@ -5497,7 +5497,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 foreignQuery promotedOnce
         case resetOutcome of
           Right
-              (LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayMiss
+              (LengthCounterexampleBank.BankReplayMiss
                 []) -> pure ()
           Left failure -> assertFailure
             $ "product scope reset failed: " ++ show failure
@@ -5510,7 +5510,7 @@ lengthCounterexampleBankAdapterTests = withResource
               LengthCounterexampleBank.promoteLengthSpinePairCounterexampleBankReplayHit
                 hit reset
         staleScopeOutcome @?= Left
-          LengthCounterexampleBank.LengthSpinePairCounterexampleBankPromotionScopeInvariant
+          LengthCounterexampleBank.BankPromotionScopeInvariant
         staleScopeBank <- expectPairAdapterBank staleScope
         pairAdapterBankStats staleScopeBank @?= (0, 0, 0, 0, 0, 0)
 
@@ -5529,7 +5529,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 (error "reset product cap demanded receipt")
                 afterResetSecond
         afterResetCapOutcome @?= Right
-          (LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordAttemptUnavailable
+          (LengthCounterexampleBank.BankRecordAttemptUnavailable
             $ Djex.LengthSpinePairCounterexampleBankReplayAttemptLimitExceeded
                 2 3)
         afterResetCappedBank <- expectPairAdapterBank afterResetCapped
@@ -5549,14 +5549,14 @@ lengthCounterexampleBankAdapterTests = withResource
                 LengthCounterexampleBank.defaultLengthSpinePairCounterexampleBankState
         case sameScopeOutcome of
           Right
-              (LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayMiss
+              (LengthCounterexampleBank.BankReplayMiss
                 []) -> pure ()
           _ -> assertFailure "product same-scope empty state did not miss"
         let (staleMember, staleMemberOutcome) =
               LengthCounterexampleBank.promoteLengthSpinePairCounterexampleBankReplayHit
                 hit sameScopeEmpty
         staleMemberOutcome @?= Left
-          LengthCounterexampleBank.LengthSpinePairCounterexampleBankPromotionMembershipInvariant
+          LengthCounterexampleBank.BankPromotionMembershipInvariant
         staleMemberBank <- expectPairAdapterBank staleMember
         pairAdapterBankStats staleMemberBank @?= (0, 0, 0, 0, 0, 0)
         Djex.validatedLengthSpinePairCounterexampleInputs
@@ -5570,7 +5570,7 @@ lengthCounterexampleBankAdapterTests = withResource
         (firstReceipt, _, thirdReceipt) <- scalarAdapterReceiptTriple retained
         let sourceQuery = counterexampleBankScalarSourceQuery retained
             live =
-              LengthCounterexampleBank.LengthCounterexampleBankReceiptFromLiveModel
+              LengthCounterexampleBank.BankReceiptFromLiveModel
             expectedEvaluation =
               Djex.LengthEvaluationValueBitLimitExceeded
                 (Djex.LengthProblemInputValue 0) 1 2
@@ -5586,8 +5586,8 @@ lengthCounterexampleBankAdapterTests = withResource
               LengthCounterexampleBank.replayLengthCounterexampleBank
                 counterexampleBankTightEvaluationLimits sourceQuery recorded
         continuedHit <- case continuedOutcome of
-          Right (LengthCounterexampleBank.LengthCounterexampleBankReplayHit
-              [LengthCounterexampleBank.LengthCounterexampleBankReplayEvaluationRefused
+          Right (LengthCounterexampleBank.BankReplayHit
+              [LengthCounterexampleBank.BankReplayEvaluationRefused
                 actual] hit) -> do
                   actual @?= expectedEvaluation
                   pure hit
@@ -5625,8 +5625,8 @@ lengthCounterexampleBankAdapterTests = withResource
                 cappedRecorded
         case cappedOutcome of
           Right
-              (LengthCounterexampleBank.LengthCounterexampleBankReplayAttemptUnavailable
-                [LengthCounterexampleBank.LengthCounterexampleBankReplayEvaluationRefused
+              (LengthCounterexampleBank.BankReplayAttemptUnavailable
+                [LengthCounterexampleBank.BankReplayEvaluationRefused
                   refusal] actual) -> do
                     refusal @?= expectedEvaluation
                     actual @?=
@@ -5647,7 +5647,7 @@ lengthCounterexampleBankAdapterTests = withResource
         (firstReceipt, _, thirdReceipt) <- pairAdapterReceiptTriple retained
         let sourceQuery = counterexampleBankPairSourceQuery retained
             live =
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromLiveModel
+              LengthCounterexampleBank.BankReceiptFromLiveModel
             expectedEvaluation =
               Djex.LengthSpinePairEvaluationValueBitLimitExceeded
                 (Djex.LengthSpinePairProblemInputValue 0) 1 2
@@ -5664,8 +5664,8 @@ lengthCounterexampleBankAdapterTests = withResource
                 counterexampleBankTightEvaluationLimits sourceQuery recorded
         continuedHit <- case continuedOutcome of
           Right
-              (LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayHit
-                [LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayEvaluationRefused
+              (LengthCounterexampleBank.BankReplayHit
+                [LengthCounterexampleBank.BankReplayEvaluationRefused
                   actual] hit) -> do
                     actual @?= expectedEvaluation
                     pure hit
@@ -5703,8 +5703,8 @@ lengthCounterexampleBankAdapterTests = withResource
                 cappedRecorded
         case cappedOutcome of
           Right
-              (LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayAttemptUnavailable
-                [LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayEvaluationRefused
+              (LengthCounterexampleBank.BankReplayAttemptUnavailable
+                [LengthCounterexampleBank.BankReplayEvaluationRefused
                   refusal] actual) -> do
                     refusal @?= expectedEvaluation
                     actual @?=
@@ -5736,7 +5736,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 poisonOrigin thirdReceipt
                 LengthCounterexampleBank.defaultLengthCounterexampleBankState
         evaluationOutcome @?= Left
-          (LengthCounterexampleBank.LengthCounterexampleBankRecordEvaluationRejected
+          (LengthCounterexampleBank.BankRecordEvaluationRejected
             expectedEvaluation)
         evaluationBank <- expectScalarAdapterBank evaluationState
         Djex.lengthCounterexampleBankSamples evaluationBank @?= []
@@ -5749,7 +5749,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 firstReceipt
                 LengthCounterexampleBank.defaultLengthCounterexampleBankState
         missOutcome @?= Left
-          LengthCounterexampleBank.LengthCounterexampleBankRecordCounterexampleNotReproduced
+          LengthCounterexampleBank.BankRecordCounterexampleNotReproduced
         missBank <- expectScalarAdapterBank missState
         Djex.lengthCounterexampleBankSamples missBank @?= []
         scalarAdapterBankStats missBank @?= (0, 0, 0, 0, 0, 1)
@@ -5764,7 +5764,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 (error "scalar insertion rejection demanded its origin")
                 thirdReceipt insertionInitial
         insertionOutcome @?= Right
-          (LengthCounterexampleBank.LengthCounterexampleBankRecordInsertionUnavailable
+          (LengthCounterexampleBank.BankRecordInsertionUnavailable
             $ Djex.LengthCounterexampleBankEntryLimitExceeded 0 1)
         insertionBank <- expectScalarAdapterBank insertionState
         Djex.lengthCounterexampleBankSamples insertionBank @?= []
@@ -5790,7 +5790,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 poisonOrigin thirdReceipt
                 LengthCounterexampleBank.defaultLengthSpinePairCounterexampleBankState
         evaluationOutcome @?= Left
-          (LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordEvaluationRejected
+          (LengthCounterexampleBank.BankRecordEvaluationRejected
             expectedEvaluation)
         evaluationBank <- expectPairAdapterBank evaluationState
         Djex.lengthSpinePairCounterexampleBankSamples evaluationBank @?= []
@@ -5803,7 +5803,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 firstReceipt
                 LengthCounterexampleBank.defaultLengthSpinePairCounterexampleBankState
         missOutcome @?= Left
-          LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordCounterexampleNotReproduced
+          LengthCounterexampleBank.BankRecordCounterexampleNotReproduced
         missBank <- expectPairAdapterBank missState
         Djex.lengthSpinePairCounterexampleBankSamples missBank @?= []
         pairAdapterBankStats missBank @?= (0, 0, 0, 0, 0, 1)
@@ -5818,7 +5818,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 (error "product insertion rejection demanded its origin")
                 thirdReceipt insertionInitial
         insertionOutcome @?= Right
-          (LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordInsertionUnavailable
+          (LengthCounterexampleBank.BankRecordInsertionUnavailable
             $ Djex.LengthSpinePairCounterexampleBankEntryLimitExceeded 0 1)
         insertionBank <- expectPairAdapterBank insertionState
         Djex.lengthSpinePairCounterexampleBankSamples insertionBank @?= []
@@ -5844,7 +5844,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 scalarInitial
         scalarProductive <- timeout 1000000 $ evaluate $ case snd scalarResult of
           Right
-              (LengthCounterexampleBank.LengthCounterexampleBankRecordAttemptUnavailable
+              (LengthCounterexampleBank.BankRecordAttemptUnavailable
                 failure) -> failure ==
                   Djex.LengthCounterexampleBankReplayAttemptLimitExceeded 0 1
           _ -> False
@@ -5866,7 +5866,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 pairInitial
         pairProductive <- timeout 1000000 $ evaluate $ case snd pairResult of
           Right
-              (LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordAttemptUnavailable
+              (LengthCounterexampleBank.BankRecordAttemptUnavailable
                 failure) -> failure ==
                   Djex.LengthSpinePairCounterexampleBankReplayAttemptLimitExceeded
                     0 1
@@ -5882,7 +5882,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 (counterexampleBankScalarTargetQuery retained) scalarInitial
         case scalarReplayOutcome of
           Right
-              (LengthCounterexampleBank.LengthCounterexampleBankReplayMiss
+              (LengthCounterexampleBank.BankReplayMiss
                 []) -> pure ()
           _ -> assertFailure "zero-limit scalar empty replay did not terminate"
         scalarReplayBank <- expectScalarAdapterBank scalarReplayState
@@ -5894,7 +5894,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 (counterexampleBankPairTargetQuery retained) pairInitial
         case pairReplayOutcome of
           Right
-              (LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayMiss
+              (LengthCounterexampleBank.BankReplayMiss
                 []) -> pure ()
           _ -> assertFailure "zero-limit product empty replay did not terminate"
         pairReplayBank <- expectPairAdapterBank pairReplayState
@@ -5908,7 +5908,7 @@ lengthCounterexampleBankAdapterTests = withResource
         let sourceQuery = counterexampleBankScalarSourceQuery retained
             targetQuery = counterexampleBankScalarTargetQuery retained
             live =
-              LengthCounterexampleBank.LengthCounterexampleBankReceiptFromLiveModel
+              LengthCounterexampleBank.BankReceiptFromLiveModel
         LengthCounterexampleBank.withDefaultLengthCounterexampleBankContext $
           \context -> do
             initial <-
@@ -5951,7 +5951,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 context
             case recorded of
               Right
-                  (LengthCounterexampleBank.LengthCounterexampleBankRecorded
+                  (LengthCounterexampleBank.BankRecorded
                     fresh) -> do
                       Djex.validatedLengthCounterexampleInputs fresh @?= [3]
                       Djex.validatedLengthCounterexampleResult fresh @?= 3
@@ -6021,7 +6021,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 defaultLengthEvaluationLimits targetQuery context
             hit <- case replayed of
               Right
-                  (LengthCounterexampleBank.LengthCounterexampleBankContextReplayHit
+                  (LengthCounterexampleBank.BankReplayHit
                     [] retainedHit) -> pure retainedHit
               Left failure -> assertFailure
                 ("scalar context replay failed: " ++ show failure)
@@ -6060,7 +6060,7 @@ lengthCounterexampleBankAdapterTests = withResource
         let sourceQuery = counterexampleBankPairSourceQuery retained
             targetQuery = counterexampleBankPairTargetQuery retained
             live =
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromLiveModel
+              LengthCounterexampleBank.BankReceiptFromLiveModel
         LengthCounterexampleBank.withDefaultLengthSpinePairCounterexampleBankContext $
           \context -> do
             initial <-
@@ -6103,7 +6103,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 context
             case recorded of
               Right
-                  (LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecorded
+                  (LengthCounterexampleBank.BankRecorded
                     fresh) -> do
                       Djex.validatedLengthSpinePairCounterexampleInputs fresh @?=
                         [3]
@@ -6175,7 +6175,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 defaultLengthEvaluationLimits targetQuery context
             hit <- case replayed of
               Right
-                  (LengthCounterexampleBank.LengthSpinePairCounterexampleBankContextReplayHit
+                  (LengthCounterexampleBank.BankReplayHit
                     [] retainedHit) -> pure retainedHit
               Left failure -> assertFailure
                 ("product context replay failed: " ++ show failure)
@@ -6225,11 +6225,16 @@ lengthCounterexampleBankAdapterTests = withResource
               , "LengthSpinePairCounterexampleBankContext"
               , "LengthSpinePairCounterexampleBankContextReplayHit"
               ]
+            -- Both domains' replay outcomes are one shared closed vocabulary
+            -- at each domain's own error and hit types, so the constructors
+            -- are exposed once.
             exposedOutcomes =
-              [ "LengthCounterexampleBankReplayOutcome (..)"
-              , "LengthCounterexampleBankContextReplayOutcome (..)"
-              , "LengthSpinePairCounterexampleBankReplayOutcome (..)"
-              , "LengthSpinePairCounterexampleBankContextReplayOutcome (..)"
+              [ "BankReplayOutcome (..)"
+              , "BankReplayRefusal (..)"
+              , "BankReplayFailure (..)"
+              , "BankPromotionFailure (..)"
+              , "BankRecordFailure (..)"
+              , "BankRecordOutcome (..)"
               ]
         mapM_ (\name -> assertBool
             ("counterexample-bank adapter exposed constructor for " ++ name)
@@ -6242,18 +6247,11 @@ lengthCounterexampleBankAdapterTests = withResource
         mapM_ (\roleLine -> assertBool
             ("counterexample-bank adapter lost nominal role: " ++ roleLine)
             $ roleLine `isInfixOf` source)
-          [ "type role LengthCounterexampleBankState nominal"
-          , "type role LengthCounterexampleBankReplayHit nominal"
-          , "type role LengthCounterexampleBankReplayOutcome nominal"
-          , "type role LengthCounterexampleBankContext nominal nominal"
-          , "type role LengthCounterexampleBankContextReplayHit nominal nominal"
-          , "type role LengthCounterexampleBankContextReplayOutcome nominal nominal"
-          , "type role LengthSpinePairCounterexampleBankState nominal"
-          , "type role LengthSpinePairCounterexampleBankReplayHit nominal"
-          , "type role LengthSpinePairCounterexampleBankReplayOutcome nominal"
-          , "type role LengthSpinePairCounterexampleBankContext nominal nominal"
-          , "type role LengthSpinePairCounterexampleBankContextReplayHit nominal nominal"
-          , "type role LengthSpinePairCounterexampleBankContextReplayOutcome\n  nominal nominal"
+          [ "type role BankState nominal nominal"
+          , "type role BankContext nominal nominal nominal"
+          , "type role BankReplayHit nominal nominal nominal"
+          , "type role BankReplayOutcome nominal nominal nominal"
+          , "type role BankContextReplayHit nominal nominal nominal nominal"
           ]
         mapM_ (\boundary -> assertBool
             ("counterexample-bank context lost its rank-2 boundary: "
@@ -6261,6 +6259,7 @@ lengthCounterexampleBankAdapterTests = withResource
             $ boundary `isInfixOf` source)
           [ "(forall command.\n      LengthCounterexampleBankContext command identity"
           , "(forall command.\n      LengthSpinePairCounterexampleBankContext command identity"
+          , "(forall command. BankContext command limits bank -> IO result)"
           , "modifyMVar state $ \\initial ->"
           , "rnf limits `seq` rnf active"
           ]
@@ -6268,45 +6267,43 @@ lengthCounterexampleBankAdapterTests = withResource
             ("counterexample-bank adapter lost source mapping: " ++ mapping)
             $ mapping `isInfixOf` source)
           [ "LengthSMTLibInputReplayAssociationRejected _ ->"
-          , "LengthCounterexampleBankReplayAssociationRefused"
-          , "Left LengthCounterexampleBankRecordAssociationRejected"
           , "LengthSpinePairSMTLibInputReplayAssociationRejected _ ->"
-          , "LengthSpinePairCounterexampleBankReplayAssociationRefused"
-          , "Left LengthSpinePairCounterexampleBankRecordAssociationRejected"
+          , "ReplayStepAssociationRefused"
+          , "RecordStepAssociationRejected -> Left BankRecordAssociationRejected"
           ]
 
         let scalarReplayFailureClass failure = case failure of
-              LengthCounterexampleBank.LengthCounterexampleBankReplayScopeInvariant ->
+              LengthCounterexampleBank.BankReplayScopeInvariant ->
                 "scope"
-              LengthCounterexampleBank.LengthCounterexampleBankReplayMembershipInvariant ->
+              LengthCounterexampleBank.BankReplayMembershipInvariant ->
                 "membership"
             scalarRefusalClass refusal = case refusal of
-              LengthCounterexampleBank.LengthCounterexampleBankReplayEvaluationRefused _ ->
+              LengthCounterexampleBank.BankReplayEvaluationRefused _ ->
                 "evaluation"
-              LengthCounterexampleBank.LengthCounterexampleBankReplayAssociationRefused ->
+              LengthCounterexampleBank.BankReplayAssociationRefused ->
                 "association"
             scalarPromotionClass failure = case failure of
-              LengthCounterexampleBank.LengthCounterexampleBankPromotionScopeInvariant ->
+              LengthCounterexampleBank.BankPromotionScopeInvariant ->
                 "scope"
-              LengthCounterexampleBank.LengthCounterexampleBankPromotionMembershipInvariant ->
+              LengthCounterexampleBank.BankPromotionMembershipInvariant ->
                 "membership"
-              LengthCounterexampleBank.LengthCounterexampleBankPromotionInsertionRejected _ ->
+              LengthCounterexampleBank.BankPromotionInsertionRejected _ ->
                 "insertion"
             scalarRecordFailureClass failure = case failure of
-              LengthCounterexampleBank.LengthCounterexampleBankRecordScopeInvariant ->
+              LengthCounterexampleBank.BankRecordScopeInvariant ->
                 "scope"
-              LengthCounterexampleBank.LengthCounterexampleBankRecordEvaluationRejected _ ->
+              LengthCounterexampleBank.BankRecordEvaluationRejected _ ->
                 "evaluation"
-              LengthCounterexampleBank.LengthCounterexampleBankRecordAssociationRejected ->
+              LengthCounterexampleBank.BankRecordAssociationRejected ->
                 "association"
-              LengthCounterexampleBank.LengthCounterexampleBankRecordCounterexampleNotReproduced ->
+              LengthCounterexampleBank.BankRecordCounterexampleNotReproduced ->
                 "not-reproduced"
             scalarRecordOutcomeClass outcome = case outcome of
-              LengthCounterexampleBank.LengthCounterexampleBankRecorded _ ->
+              LengthCounterexampleBank.BankRecorded _ ->
                 "recorded"
-              LengthCounterexampleBank.LengthCounterexampleBankRecordAttemptUnavailable _ ->
+              LengthCounterexampleBank.BankRecordAttemptUnavailable _ ->
                 "attempt"
-              LengthCounterexampleBank.LengthCounterexampleBankRecordInsertionUnavailable _ ->
+              LengthCounterexampleBank.BankRecordInsertionUnavailable _ ->
                 "insertion"
             scalarError =
               Djex.LengthCounterexampleBankReplayAttemptLimitExceeded 0 1
@@ -6314,74 +6311,74 @@ lengthCounterexampleBankAdapterTests = withResource
               Djex.LengthEvaluationValueBitLimitExceeded
                 (Djex.LengthProblemInputValue 0) 1 2
         map scalarReplayFailureClass
-          [ LengthCounterexampleBank.LengthCounterexampleBankReplayScopeInvariant
-          , LengthCounterexampleBank.LengthCounterexampleBankReplayMembershipInvariant
+          [ LengthCounterexampleBank.BankReplayScopeInvariant
+          , LengthCounterexampleBank.BankReplayMembershipInvariant
           ] @?= ["scope", "membership"]
         map scalarRefusalClass
-          [ LengthCounterexampleBank.LengthCounterexampleBankReplayEvaluationRefused
+          [ LengthCounterexampleBank.BankReplayEvaluationRefused
               scalarEvaluation
-          , LengthCounterexampleBank.LengthCounterexampleBankReplayAssociationRefused
+          , LengthCounterexampleBank.BankReplayAssociationRefused
           ] @?= ["evaluation", "association"]
         map scalarPromotionClass
-          [ LengthCounterexampleBank.LengthCounterexampleBankPromotionScopeInvariant
-          , LengthCounterexampleBank.LengthCounterexampleBankPromotionMembershipInvariant
-          , LengthCounterexampleBank.LengthCounterexampleBankPromotionInsertionRejected
+          [ LengthCounterexampleBank.BankPromotionScopeInvariant
+          , LengthCounterexampleBank.BankPromotionMembershipInvariant
+          , LengthCounterexampleBank.BankPromotionInsertionRejected
               scalarError
           ] @?= ["scope", "membership", "insertion"]
         map scalarRecordFailureClass
-          [ LengthCounterexampleBank.LengthCounterexampleBankRecordScopeInvariant
-          , LengthCounterexampleBank.LengthCounterexampleBankRecordEvaluationRejected
+          [ LengthCounterexampleBank.BankRecordScopeInvariant
+          , LengthCounterexampleBank.BankRecordEvaluationRejected
               scalarEvaluation
-          , LengthCounterexampleBank.LengthCounterexampleBankRecordAssociationRejected
-          , LengthCounterexampleBank.LengthCounterexampleBankRecordCounterexampleNotReproduced
+          , LengthCounterexampleBank.BankRecordAssociationRejected
+          , LengthCounterexampleBank.BankRecordCounterexampleNotReproduced
           ] @?= ["scope", "evaluation", "association", "not-reproduced"]
         map scalarRecordOutcomeClass
-          [ LengthCounterexampleBank.LengthCounterexampleBankRecorded
+          [ LengthCounterexampleBank.BankRecorded
               scalarReceipt
-          , LengthCounterexampleBank.LengthCounterexampleBankRecordAttemptUnavailable
+          , LengthCounterexampleBank.BankRecordAttemptUnavailable
               scalarError
-          , LengthCounterexampleBank.LengthCounterexampleBankRecordInsertionUnavailable
+          , LengthCounterexampleBank.BankRecordInsertionUnavailable
               scalarError
           ] @?= ["recorded", "attempt", "insertion"]
         ([minBound .. maxBound] ::
-            [LengthCounterexampleBank.LengthCounterexampleBankReceiptOrigin]) @?=
-          [ LengthCounterexampleBank.LengthCounterexampleBankReceiptFromLiveModel
-          , LengthCounterexampleBank.LengthCounterexampleBankReceiptFromSolverIndependentReplay
-          , LengthCounterexampleBank.LengthCounterexampleBankReceiptFromSimplificationReplay
+            [LengthCounterexampleBank.BankReceiptOrigin]) @?=
+          [ LengthCounterexampleBank.BankReceiptFromLiveModel
+          , LengthCounterexampleBank.BankReceiptFromSolverIndependentReplay
+          , LengthCounterexampleBank.BankReceiptFromSimplificationReplay
           ]
 
         let pairReplayFailureClass failure = case failure of
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayScopeInvariant ->
+              LengthCounterexampleBank.BankReplayScopeInvariant ->
                 "scope"
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayMembershipInvariant ->
+              LengthCounterexampleBank.BankReplayMembershipInvariant ->
                 "membership"
             pairRefusalClass refusal = case refusal of
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayEvaluationRefused _ ->
+              LengthCounterexampleBank.BankReplayEvaluationRefused _ ->
                 "evaluation"
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayAssociationRefused ->
+              LengthCounterexampleBank.BankReplayAssociationRefused ->
                 "association"
             pairPromotionClass failure = case failure of
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankPromotionScopeInvariant ->
+              LengthCounterexampleBank.BankPromotionScopeInvariant ->
                 "scope"
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankPromotionMembershipInvariant ->
+              LengthCounterexampleBank.BankPromotionMembershipInvariant ->
                 "membership"
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankPromotionInsertionRejected _ ->
+              LengthCounterexampleBank.BankPromotionInsertionRejected _ ->
                 "insertion"
             pairRecordFailureClass failure = case failure of
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordScopeInvariant ->
+              LengthCounterexampleBank.BankRecordScopeInvariant ->
                 "scope"
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordEvaluationRejected _ ->
+              LengthCounterexampleBank.BankRecordEvaluationRejected _ ->
                 "evaluation"
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordAssociationRejected ->
+              LengthCounterexampleBank.BankRecordAssociationRejected ->
                 "association"
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordCounterexampleNotReproduced ->
+              LengthCounterexampleBank.BankRecordCounterexampleNotReproduced ->
                 "not-reproduced"
             pairRecordOutcomeClass outcome = case outcome of
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecorded _ ->
+              LengthCounterexampleBank.BankRecorded _ ->
                 "recorded"
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordAttemptUnavailable _ ->
+              LengthCounterexampleBank.BankRecordAttemptUnavailable _ ->
                 "attempt"
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordInsertionUnavailable _ ->
+              LengthCounterexampleBank.BankRecordInsertionUnavailable _ ->
                 "insertion"
             pairError =
               Djex.LengthSpinePairCounterexampleBankReplayAttemptLimitExceeded
@@ -6390,40 +6387,40 @@ lengthCounterexampleBankAdapterTests = withResource
               Djex.LengthSpinePairEvaluationValueBitLimitExceeded
                 (Djex.LengthSpinePairProblemInputValue 0) 1 2
         map pairReplayFailureClass
-          [ LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayScopeInvariant
-          , LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayMembershipInvariant
+          [ LengthCounterexampleBank.BankReplayScopeInvariant
+          , LengthCounterexampleBank.BankReplayMembershipInvariant
           ] @?= ["scope", "membership"]
         map pairRefusalClass
-          [ LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayEvaluationRefused
+          [ LengthCounterexampleBank.BankReplayEvaluationRefused
               pairEvaluation
-          , LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayAssociationRefused
+          , LengthCounterexampleBank.BankReplayAssociationRefused
           ] @?= ["evaluation", "association"]
         map pairPromotionClass
-          [ LengthCounterexampleBank.LengthSpinePairCounterexampleBankPromotionScopeInvariant
-          , LengthCounterexampleBank.LengthSpinePairCounterexampleBankPromotionMembershipInvariant
-          , LengthCounterexampleBank.LengthSpinePairCounterexampleBankPromotionInsertionRejected
+          [ LengthCounterexampleBank.BankPromotionScopeInvariant
+          , LengthCounterexampleBank.BankPromotionMembershipInvariant
+          , LengthCounterexampleBank.BankPromotionInsertionRejected
               pairError
           ] @?= ["scope", "membership", "insertion"]
         map pairRecordFailureClass
-          [ LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordScopeInvariant
-          , LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordEvaluationRejected
+          [ LengthCounterexampleBank.BankRecordScopeInvariant
+          , LengthCounterexampleBank.BankRecordEvaluationRejected
               pairEvaluation
-          , LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordAssociationRejected
-          , LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordCounterexampleNotReproduced
+          , LengthCounterexampleBank.BankRecordAssociationRejected
+          , LengthCounterexampleBank.BankRecordCounterexampleNotReproduced
           ] @?= ["scope", "evaluation", "association", "not-reproduced"]
         map pairRecordOutcomeClass
-          [ LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecorded
+          [ LengthCounterexampleBank.BankRecorded
               pairReceipt
-          , LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordAttemptUnavailable
+          , LengthCounterexampleBank.BankRecordAttemptUnavailable
               pairError
-          , LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordInsertionUnavailable
+          , LengthCounterexampleBank.BankRecordInsertionUnavailable
               pairError
           ] @?= ["recorded", "attempt", "insertion"]
         ([minBound .. maxBound] ::
-            [LengthCounterexampleBank.LengthSpinePairCounterexampleBankReceiptOrigin]) @?=
-          [ LengthCounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromLiveModel
-          , LengthCounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromSolverIndependentReplay
-          , LengthCounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromSimplificationReplay
+            [LengthCounterexampleBank.BankReceiptOrigin]) @?=
+          [ LengthCounterexampleBank.BankReceiptFromLiveModel
+          , LengthCounterexampleBank.BankReceiptFromSolverIndependentReplay
+          , LengthCounterexampleBank.BankReceiptFromSimplificationReplay
           ]
     ]
 
@@ -7389,37 +7386,37 @@ assertPairIntegrationRejection result = do
 
 showReplayShape
   :: Either
-      LengthCounterexampleBank.LengthCounterexampleBankReplayFailure
+      LengthCounterexampleBank.BankReplayFailure
       (LengthCounterexampleBank.LengthCounterexampleBankReplayOutcome identity)
   -> String
 showReplayShape outcome = case outcome of
   Left failure -> "Left " ++ show failure
-  Right (LengthCounterexampleBank.LengthCounterexampleBankReplayMiss refusals) ->
+  Right (LengthCounterexampleBank.BankReplayMiss refusals) ->
     "ReplayMiss " ++ show refusals
   Right
-      (LengthCounterexampleBank.LengthCounterexampleBankReplayAttemptUnavailable
+      (LengthCounterexampleBank.BankReplayAttemptUnavailable
         refusals failure) ->
     "ReplayAttemptUnavailable " ++ show refusals ++ " " ++ show failure
-  Right (LengthCounterexampleBank.LengthCounterexampleBankReplayHit
+  Right (LengthCounterexampleBank.BankReplayHit
       refusals _) -> "ReplayHit " ++ show refusals
 
 showPairReplayShape
   :: Either
-      LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayFailure
+      LengthCounterexampleBank.BankReplayFailure
       (LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayOutcome
         identity)
   -> String
 showPairReplayShape outcome = case outcome of
   Left failure -> "Left " ++ show failure
   Right
-      (LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayMiss
+      (LengthCounterexampleBank.BankReplayMiss
         refusals) -> "ReplayMiss " ++ show refusals
   Right
-      (LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayAttemptUnavailable
+      (LengthCounterexampleBank.BankReplayAttemptUnavailable
         refusals failure) ->
     "ReplayAttemptUnavailable " ++ show refusals ++ " " ++ show failure
   Right
-      (LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayHit
+      (LengthCounterexampleBank.BankReplayHit
         refusals _) -> "ReplayHit " ++ show refusals
 
 lengthSpinePairBoundaryTests :: TestTree

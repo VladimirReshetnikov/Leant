@@ -600,7 +600,7 @@ data LengthCounterexampleAcquisition command
       !(CounterexampleBank.LengthCounterexampleBankContextReplayHit
           command ExferenceLocal)
   | LengthCounterexampleFresh
-      !CounterexampleBank.LengthCounterexampleBankReceiptOrigin
+      !CounterexampleBank.BankReceiptOrigin
 
 type role LengthCounterexampleAcquisition nominal
 
@@ -2058,7 +2058,7 @@ probeOriginCounterexample evaluation policy query = case policy of
 
 solverIndependentAcquisition :: LengthCounterexampleAcquisition command
 solverIndependentAcquisition = LengthCounterexampleFresh
-  CounterexampleBank.LengthCounterexampleBankReceiptFromSolverIndependentReplay
+  CounterexampleBank.BankReceiptFromSolverIndependentReplay
 
 -- | Replay either the literal compatibility MRU or the caller-owned nominal
 -- bank.  Expected per-sample refusals and bounded attempt unavailability are
@@ -2089,11 +2089,11 @@ replayLengthCounterexampleBankCursor evaluation index query cursor =
         Left _ -> Left $ localRankingFailure
           LengthRankingEvidenceReplayMismatch index
         Right outcome -> Right $ case outcome of
-          CounterexampleBank.LengthCounterexampleBankContextReplayMiss _ ->
+          CounterexampleBank.BankReplayMiss _ ->
             Nothing
-          CounterexampleBank.LengthCounterexampleBankContextReplayAttemptUnavailable
+          CounterexampleBank.BankReplayAttemptUnavailable
               _ _ -> Nothing
-          CounterexampleBank.LengthCounterexampleBankContextReplayHit _ hit ->
+          CounterexampleBank.BankReplayHit _ hit ->
             Just
               ( CounterexampleBank.lengthCounterexampleBankContextReplayHitCounterexample
                   hit
@@ -2157,13 +2157,13 @@ advanceLengthCounterexampleBankCursor evaluation index query acquisition
 
   receiptOrigin simplification = case simplification of
     Just _ ->
-      CounterexampleBank.LengthCounterexampleBankReceiptFromSimplificationReplay
+      CounterexampleBank.BankReceiptFromSimplificationReplay
     Nothing -> case acquisition of
       LengthCounterexampleFresh origin -> origin
       LengthCounterexampleFromBatchReplay _ ->
-        CounterexampleBank.LengthCounterexampleBankReceiptFromSolverIndependentReplay
+        CounterexampleBank.BankReceiptFromSolverIndependentReplay
       LengthCounterexampleFromCommandReplay _ ->
-        CounterexampleBank.LengthCounterexampleBankReceiptFromSolverIndependentReplay
+        CounterexampleBank.BankReceiptFromSolverIndependentReplay
 
 -- | Replay the batch-local seed bank against one checked query, MRU first,
 -- returning the first vector that independently yields a counterexample.
@@ -2270,7 +2270,7 @@ assessCandidateWithCounterexampleOrigin
       epoch ExferenceLocal ExferenceLocal
   -> Either LengthRankingFailure
       ( AssociatedRankedLengthCandidate association
-      , CounterexampleBank.LengthCounterexampleBankReceiptOrigin
+      , CounterexampleBank.BankReceiptOrigin
       )
 assessCandidateWithCounterexampleOrigin evaluation inputBoxPolicy
     simplificationPolicy index association
@@ -2285,7 +2285,7 @@ assessCandidateWithCounterexampleOrigin evaluation inputBoxPolicy
       $ lengthSMTLibLiveQueryObservationSolverStatus observation
     Right (Just receipt) -> Right
       ( Counterexample receipt
-      , CounterexampleBank.LengthCounterexampleBankReceiptFromLiveModel
+      , CounterexampleBank.BankReceiptFromLiveModel
       )
   case assessment of
     Counterexample receipt -> do
@@ -2312,16 +2312,16 @@ assessCandidateWithCounterexampleOrigin evaluation inputBoxPolicy
         Right (LengthInputBoxCounterexample receipt) ->
           Right
             ( Counterexample receipt
-            , CounterexampleBank.LengthCounterexampleBankReceiptFromSolverIndependentReplay
+            , CounterexampleBank.BankReceiptFromSolverIndependentReplay
             )
         Right (LengthInputBoxValidated receipt) ->
           Right
             ( BoundedPositive receipt
-            , CounterexampleBank.LengthCounterexampleBankReceiptFromSolverIndependentReplay
+            , CounterexampleBank.BankReceiptFromSolverIndependentReplay
             )
     _ -> Right
       ( Heuristic status
-      , CounterexampleBank.LengthCounterexampleBankReceiptFromLiveModel
+      , CounterexampleBank.BankReceiptFromLiveModel
       )
 
 stableCounterexampleDemotion

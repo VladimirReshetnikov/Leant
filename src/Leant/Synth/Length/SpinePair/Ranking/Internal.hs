@@ -541,7 +541,7 @@ data LengthSpinePairCounterexampleAcquisition command
       !(CounterexampleBank.LengthSpinePairCounterexampleBankContextReplayHit
           command ExferenceLocal)
   | LengthSpinePairCounterexampleFresh
-      !CounterexampleBank.LengthSpinePairCounterexampleBankReceiptOrigin
+      !CounterexampleBank.BankReceiptOrigin
 
 type role LengthSpinePairCounterexampleAcquisition nominal
 
@@ -2046,7 +2046,7 @@ lengthSpinePairSolverIndependentAcquisition
   :: LengthSpinePairCounterexampleAcquisition command
 lengthSpinePairSolverIndependentAcquisition =
   LengthSpinePairCounterexampleFresh
-    CounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromSolverIndependentReplay
+    CounterexampleBank.BankReceiptFromSolverIndependentReplay
 
 replayLengthSpinePairCounterexampleBankCursor
   :: LengthEvaluationLimits
@@ -2074,11 +2074,11 @@ replayLengthSpinePairCounterexampleBankCursor evaluation index query cursor =
         Left _ -> Left $ localLengthSpinePairRankingFailure
           LengthSpinePairRankingEvidenceReplayMismatch index
         Right outcome -> Right $ case outcome of
-          CounterexampleBank.LengthSpinePairCounterexampleBankContextReplayMiss
+          CounterexampleBank.BankReplayMiss
               _ -> Nothing
-          CounterexampleBank.LengthSpinePairCounterexampleBankContextReplayAttemptUnavailable
+          CounterexampleBank.BankReplayAttemptUnavailable
               _ _ -> Nothing
-          CounterexampleBank.LengthSpinePairCounterexampleBankContextReplayHit
+          CounterexampleBank.BankReplayHit
               _ hit -> Just
             ( CounterexampleBank.lengthSpinePairCounterexampleBankContextReplayHitCounterexample
                 hit
@@ -2142,13 +2142,13 @@ advanceLengthSpinePairCounterexampleBankCursor evaluation index query
 
   receiptOrigin simplification = case simplification of
     Just _ ->
-      CounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromSimplificationReplay
+      CounterexampleBank.BankReceiptFromSimplificationReplay
     Nothing -> case acquisition of
       LengthSpinePairCounterexampleFresh origin -> origin
       LengthSpinePairCounterexampleFromBatchReplay _ ->
-        CounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromSolverIndependentReplay
+        CounterexampleBank.BankReceiptFromSolverIndependentReplay
       LengthSpinePairCounterexampleFromCommandReplay _ ->
-        CounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromSolverIndependentReplay
+        CounterexampleBank.BankReceiptFromSolverIndependentReplay
 
 -- | Replay the batch-local seed bank against one checked pair query, MRU
 -- first, returning the first vector that independently yields a
@@ -2254,7 +2254,7 @@ assessLengthSpinePairCandidateWithCounterexampleOrigin
       epoch ExferenceLocal ExferenceLocal
   -> Either LengthSpinePairRankingFailure
       ( AssociatedRankedLengthSpinePairCandidate association
-      , CounterexampleBank.LengthSpinePairCounterexampleBankReceiptOrigin
+      , CounterexampleBank.BankReceiptOrigin
       )
 assessLengthSpinePairCandidateWithCounterexampleOrigin evaluation inputBoxPolicy
     simplificationPolicy index association query observation = do
@@ -2270,7 +2270,7 @@ assessLengthSpinePairCandidateWithCounterexampleOrigin evaluation inputBoxPolicy
       $ lengthSpinePairSMTLibLiveQueryObservationSolverStatus observation
     Right (Just receipt) -> Right
       ( LengthSpinePairCounterexample receipt
-      , CounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromLiveModel
+      , CounterexampleBank.BankReceiptFromLiveModel
       )
   case assessment of
     LengthSpinePairCounterexample receipt -> do
@@ -2297,15 +2297,15 @@ assessLengthSpinePairCandidateWithCounterexampleOrigin evaluation inputBoxPolicy
             LengthSpinePairRankingEvidenceReplayMismatch index
         Right (LengthInputBoxCounterexample receipt) -> Right
           ( LengthSpinePairCounterexample receipt
-          , CounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromSolverIndependentReplay
+          , CounterexampleBank.BankReceiptFromSolverIndependentReplay
           )
         Right (LengthInputBoxValidated receipt) -> Right
           ( LengthSpinePairBoundedPositive receipt
-          , CounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromSolverIndependentReplay
+          , CounterexampleBank.BankReceiptFromSolverIndependentReplay
           )
     _ -> Right
       ( LengthSpinePairHeuristic status
-      , CounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromLiveModel
+      , CounterexampleBank.BankReceiptFromLiveModel
       )
 
 stableLengthSpinePairCounterexampleDemotion
