@@ -84,8 +84,8 @@
 \newcommand{\commitid}[1]{{\ttfamily\footnotesize #1}}
 \newcommand{\RepoDjex}{\href{https://github.com/VladimirReshetnikov/Djex}{Djex}}
 \newcommand{\RepoLeant}{\href{https://github.com/VladimirReshetnikov/Leant}{Leant}}
-\def\DjexBase{https://github.com/VladimirReshetnikov/Djex/blob/f957549e36a63cd6003f5edef4ab8a867221813f/}
-\def\LeantBase{https://github.com/VladimirReshetnikov/Leant/blob/a18f3d0a99bb1b988f48747ecaadbe28b756e139/}
+\def\DjexBase{https://github.com/VladimirReshetnikov/Djex/blob/6493b29f3b19c6be65ee0e57c8ef30d996fe1e1c/}
+\def\LeantBase{https://github.com/VladimirReshetnikov/Leant/blob/e5841361208ef13eefea01bde0d65af1e528beb3/}
 \newcommand{\dpath}[1]{\href{\DjexBase#1}{\nolinkurl{#1}}}
 \newcommand{\lpath}[1]{\href{\LeantBase#1}{\nolinkurl{#1}}}
 \newcommand{\dsym}[2]{\code{#2} in \dpath{#1}}
@@ -182,10 +182,11 @@ and practical extension paths\par}
 \begin{tcolorbox}[width=0.86\textwidth,colback=SoftGray,colframe=RuleGray,boxrule=0.7pt,arc=1mm]
 \small
 \begin{tabularx}{\textwidth}{@{}L{0.18\textwidth}Y@{}}
-\textbf{Djex snapshot} & \commitid{f957549e36a63cd6003f5edef4ab8a867221813f} \\
-\textbf{Leant snapshot} & \commitid{a18f3d0a99bb1b988f48747ecaadbe28b756e139} \\
+\textbf{Djex snapshot} & \commitid{6493b29f3b19c6be65ee0e57c8ef30d996fe1e1c} \\
+\textbf{Leant snapshot} & \commitid{e5841361208ef13eefea01bde0d65af1e528beb3} \\
 \textbf{Relationship} & Leant's \filepath{lib/Djex} submodule is pinned to the same Djex revision. \\
-\textbf{Prepared} & August 16, 2026 \\
+\textbf{Prepared} & August 16, 2026; revised August 17, 2026 \\
+\textbf{Scope} & This is now the only maintainer walkthrough for either repository. The former Djex-only walkthrough was retired on August 17, 2026; its Djex material is covered by Parts~I--II here. \\
 \end{tabularx}
 \end{tcolorbox}
 \vfill
@@ -223,7 +224,7 @@ The notation \emph{authority type} means a type whose constructor is hidden and 
 
 The historical body of this walkthrough predates the typed behavioral-assessment layer. This addendum records the newer layer against the source snapshots named on the title page. Leant remains experimental: JSON shapes, names, tags, diagnostics, and output are current-tree descriptions rather than a public stability or backward-compatibility promise. The startup configuration and command-local contract file now each have one versionless schema whose explicit \code{rankingDomain} is \code{scalar} or \code{binary-product}; older numbered roots survive only in Git history and dated non-normative reports. Paths in this addendum are printed as current-tree file paths rather than through historical line-number references.
 
-The headline is intentionally modest: the repositories now have a checked insertion seam for one finite-list-spine Length model, a scoped Z3 execution boundary, an explicit startup policy opt-in, an optional one-command contract choice, and an explicit per-command choice between stable ranking and replay-authorized hard filtering in \filepath{src/Main.hs}. Without the startup opt-in the ordinary no-option and explicit-rank commands remain the exact non-strict identity path, while a filter request or requested command contract is refused before file IO. Main introduces one nominal rank-2 context before translation and reuses its filter bank across the complete command. It now consumes Engine's opaque 60-group cursor directly: one ordinary filter run may assess two ordered 12-group standalone or 24-group combined batches from the same lazy engine outcome, while excluded middle remains one six-group batch. Only no verification or complete behavioral rejection reaches the single successor; survivor and preserve-all stop, and Main never probes a third tail. Djex supplies the candidate-independent bounded replay-input bank and exact query-owned fresh replay. Established configured-rank and direct Selection compatibility paths retain their raw four-vector MRU; rank and disabled commands retain one engine batch. The scheduler keeps one lazy reverse outcome accumulation and finalizes it once. This is bounded command-local same-run progression, not persistent state, survivor-quota filling, an engine rerun, batch reassessment, counterexample-directed engine search, or the proposal's complete CEGIS loop. There is no claim here of general behavioral constraints, general program equivalence, a Lean-to-SMT semantics, solver-certified proofs, typed-sketch synthesis, or automatic Z3 integration.
+The headline is intentionally modest: the repositories now have a checked insertion seam for one finite-list-spine Length model, a scoped Z3 execution boundary, an explicit startup policy opt-in, an optional one-command contract choice, and an explicit per-command choice between stable ranking and replay-authorized hard filtering in \filepath{src/Main.hs}. Without the startup opt-in the ordinary no-option and explicit-rank commands remain the exact non-strict identity path, while a filter request or requested command contract is refused before file IO. Main introduces one nominal rank-2 context before translation and reuses its filter bank across the complete command. It now consumes Engine's opaque candidate cursor directly: one ordinary filter run may assess two ordered standalone or combined batches from the same lazy engine outcome, while excluded middle remains one half-width batch. Under the default session limits those widths are a 60-group cursor and 12-group, 24-group, and six-group batches; every one of them is a \code{:set} away from being something else (Appendix~\ref{app:limits}), so the numbers quoted throughout this addendum describe an unmodified session. Only no verification or complete behavioral rejection reaches the single successor; survivor and preserve-all stop, and Main never probes a third tail. Djex supplies the candidate-independent bounded replay-input bank and exact query-owned fresh replay. Established configured-rank and direct Selection compatibility paths retain their raw four-vector MRU; rank and disabled commands retain one engine batch. The scheduler keeps one lazy reverse outcome accumulation and finalizes it once. This is bounded command-local same-run progression, not persistent state, survivor-quota filling, an engine rerun, batch reassessment, counterexample-directed engine search, or the proposal's complete CEGIS loop. There is no claim here of general behavioral constraints, general program equivalence, a Lean-to-SMT semantics, solver-certified proofs, typed-sketch synthesis, or automatic Z3 integration.
 
 \section*{The current authority chain}
 
@@ -236,7 +237,7 @@ The newer path preserves one association across several independently checked bo
 
   Leant's \filepath{src/Leant/Synth/Engine.hs} first builds one prepared semantic-origin record. Search, renderer inputs, retained Exference authority, and later exact-origin rerendering project that same record; no post-search field-for-field preparation copy exists. Each provider binding is the sole prepared owner of its private declaration inputs, renderer metadata, and ordered instantiation assignments. Preparation derives the provider declaration list and one lazy strict-map projection shared by both renderer closures; later exact-origin rerendering and inspection derive that same provider-map projection at their use edges. Djinn, Exference, and inspection derive the aggregate assignment list in binding order. One private conversion maps that exact projection through the complete source-name table for the Exference search call, preserving provider order, provider-local order, kinds, and variable identities. The typed candidate's \code{TypedCandidateSemanticSidecar} retains the exact Exference inventory/session, prepared origin and provider bindings, source-name table, session policy, and request rather than caching either the converted assignment list or a converted source goal. Package-private inspection derives both historical projections lazily; the checked handoff performs its checked source-goal conversion at the use edge. It keeps no parallel graph-key cache: the exact graph remains owned by the opaque checked candidate, and Djex fingerprints it only while sealing an actual behavioral problem. Candidate grouping and renderer filtering preserve a group sidecar only while the group still denotes the same engine candidate. During combined-engine exact-text deduplication, an earlier compatibility-only spelling may instead retain a private variant-scoped witness to the first bounded later Exference occurrence with identical bytes. That witness keeps the Exference sidecar and source renderer ordinal separate from the display group's route, display ordinal, ordering, sidecar, and sibling variants. At the verification boundary, the display route, ordinal, and text are flattened into the callback candidate, which retains that spelling's exact typed origin once rather than keeping the scheduling-only variant and a parallel origin field. A wrapper such as the classical prove-mode transformation explicitly drops both direct and recovered authority.
 
-  \item \textbf{Lean callback acceptance is recorded, not inflated.} A rendered group carries its original renderer ordinal and semantic origin into \filepath{src/Leant/Synth/Verification.hs}. The bounded verifier tries variants lazily and mints an opaque nominal \code{Verified candidate} only when its callback returns \code{VariantAccepted}. Ranking consumes one engine batch and stops after five accepted groups. Filtering verifies a complete 12-group standalone or 24-group combined batch and, only after no verification or complete all-rejection, may verify one successor of the same width from that engine cursor. Excluded middle remains one six-group batch; double negation uses the ordinary policy. Every batch is verified and assessed once, the first survivor or preserve-all result stops, and no third tail is probed. In normal execution the callback asks the Lean backend to elaborate the generated verification program and rejects transport failures, fatal responses, diagnostics, and admitted \code{sorry} results. Nevertheless, the \code{Verified} type promises only callback acceptance at this boundary. It is not a Lean kernel proof object, behavioral evidence, or a solver certificate.
+  \item \textbf{Lean callback acceptance is recorded, not inflated.} A rendered group carries its original renderer ordinal and semantic origin into \filepath{src/Leant/Synth/Verification.hs}. The bounded verifier tries variants lazily and mints an opaque nominal \code{Verified candidate} only when its callback returns \code{VariantAccepted}. Ranking consumes one engine batch and stops after \code{synth-shown} accepted groups (five by default). Filtering verifies a complete standalone or combined batch --- 12 or 24 groups by default --- and, only after no verification or complete all-rejection, may verify one successor of the same width from that engine cursor. Excluded middle remains one half-width batch, six groups by default; double negation uses the ordinary policy. Every batch is verified and assessed once, the first survivor or preserve-all result stops, and no third tail is probed. In normal execution the callback asks the Lean backend to elaborate the generated verification program and rejects transport failures, fatal responses, diagnostics, and admitted \code{sorry} results. Nevertheless, the \code{Verified} type promises only callback acceptance at this boundary. It is not a Lean kernel proof object, behavioral evidence, or a solver certificate.
 
   \item \textbf{The Length handoff rechecks correspondence.} \code{prepareCheckedLengthProblem} in \filepath{src/Leant/Synth/Length/Handoff.hs} accepts the exact \code{Verified DetailedVerificationVariant}, not detached text. It fails closed unless that exact spelling has a direct or recovered typed Exference origin; engine and fitting fragments agree; no premise retargets the problem; source and search goals agree; every source variable converts through the retained name table; request contexts remain empty; and the request goal equals that derived source conversion. It then requires that the retained graph has not been lost and reruns the exact origin renderer. Every current startup or command-local contract explicitly chooses \code{cases-rejected} or \code{exact-spine-zero-step-v1} beside an exact source-ordered target-role vector. Case rejection preserves the singleton/ordinal-zero rule. The exact zero/step policy instead selects the retained renderer ordinal and checks that exact alternative against the callback-accepted text. A graph may have multiple valid Lean presentations under that explicit policy, but a recovered origin authorizes only its identical accepted spelling, not the Djinn group, a sibling variant, or another candidate.
 
@@ -417,7 +418,7 @@ The following paths are current-branch source locations, not links into the pinn
 \filepath{src/Leant/Synth/Length/SpinePair/Ranking.hs}, \filepath{Ranking/Internal.hs}, \filepath{PostVerification.hs}, \filepath{PostVerification/Internal.hs} & Nominal binary-product siblings of the scalar ranking and post-verification stack, including the separate raw/context cursor and full runner matrix, distinct end to end from their scalar counterparts. \\
 \filepath{src/Leant/Synth/Length/Selection.hs}, \filepath{Selection/Internal.hs}, and SpinePair siblings & Nominal replay-authorized hard-selection adapters: unchanged raw compatibility entrances plus additive context-aware entrances; only independently replayed counterexamples reject; every other assessment retains; any adapter/ranking/index/seal failure preserves the exact original batch without rewinding completed bank transitions. \\
 \filepath{src/Leant/Synth/Length/Presentation.hs} & Opaque same-ranked/selected/rejected-receipt candidate presentation, exact existing counterexample/simplification rejection notes, retained bounded-positive notes, and no detached evidence reassociation. \\
-\filepath{src/Main.hs} & Explicit startup opt-in, load-once command contract selection, one pre-translation rank-2 assessment context, per-command rank/filter dispatch, opaque same-run cursor consumption, filter-only 12+12/24+24 progression, single-batch rank/disabled and six-group excluded-middle policies, mode-sensitive classical deadlines, one verification and assessment per batch, chronological run frontiers and note ownership, private four-way batch classification and lazy reverse accumulation, no-verified/all-rejected continuation with full-frontier deduplication, first-survivor termination without quota filling or a third probe, one plural result finalizer, survivor-only \code{itN} binding, complete accumulated rejection rows, structural/classical and abnormal diagnostic gates, four-way descriptor-launch notices, and sanitized mode-neutral preserve-all warning. \\
+\filepath{src/Main.hs} & Explicit startup opt-in, load-once command contract selection, one pre-translation rank-2 assessment context, per-command rank/filter dispatch, opaque same-run cursor consumption, filter-only two-batch progression at the session's verification width (12+12 or 24+24 by default), single-batch rank/disabled and half-width excluded-middle policies, mode-sensitive classical deadlines, one verification and assessment per batch, chronological run frontiers and note ownership, private four-way batch classification and lazy reverse accumulation, no-verified/all-rejected continuation with full-frontier deduplication, first-survivor termination without quota filling or a third probe, one plural result finalizer, survivor-only \code{itN} binding, complete accumulated rejection rows, structural/classical and abnormal diagnostic gates, four-way descriptor-launch notices, and sanitized mode-neutral preserve-all warning. \\
 \bottomrule
 \end{longtable}
 
@@ -435,7 +436,7 @@ Every accepted startup document constructs one fixed operational bundle: descrip
 
 Only candidates with direct or exact-duplicate-recovered typed Exference authority whose retained graph and provenance match the selected startup contract are eligible. The default \code{djinn} engine supplies no typed graph, so actual eligibility requires \code{exference} or \code{both}. A successfully replayed counterexample receives the bounded model-relative note described above; an independently completed finite input box or applicable domain receives its bounded-positive note. Disabled, preparation-refused, unassessed, heuristic-only, and atomic-fallback survivor paths add no semantic note.
 
-Ranking keeps every verified occurrence and uses the established positive/neutral/counterexample order. It retains the historical five-success verification frontier, raw MRU, and one engine batch. Filtering instead constructs one total scalar or nominal pair partition for each selected cursor batch: at most 12 groups for a standalone engine, 24 for \code{both}, or 6 for the excluded-middle route. An ordinary filter run may select one same-width successor after no verification or complete all-rejection; excluded middle never does. It retains preparation refusals, unassessed candidates, every raw solver status, bounded-positive candidates, and applicable-domain establishments. Only an independently replayed counterexample becomes rejected. The generic partition seal restores both subsequences to original callback order and supplies association, not evidence. Any selection failure preserves the literal original batch and presents no rejection; Main still caps that terminal preserve-all presentation at five, while completed nominal-bank transitions remain committed. Main takes at most five survivor presentations from the first terminal batch but prints every rejection accumulated before and within that terminal result.
+Ranking keeps every verified occurrence and uses the established positive/neutral/counterexample order. It retains the historical success frontier of \code{synth-shown} groups, the raw MRU, and one engine batch. Filtering instead constructs one total scalar or nominal pair partition for each selected cursor batch: \code{synth-verify} groups for a standalone engine, twice that for \code{both}, or half that for the excluded-middle route --- 12, 24, and 6 under the defaults. An ordinary filter run may select one same-width successor after no verification or complete all-rejection; excluded middle never does. It retains preparation refusals, unassessed candidates, every raw solver status, bounded-positive candidates, and applicable-domain establishments. Only an independently replayed counterexample becomes rejected. The generic partition seal restores both subsequences to original callback order and supplies association, not evidence. Any selection failure preserves the literal original batch and presents no rejection; Main still caps that terminal preserve-all presentation at \code{synth-shown}, while completed nominal-bank transitions remain committed. Main takes at most \code{synth-shown} survivor presentations from the first terminal batch but prints every rejection accumulated before and within that terminal result.
 
 Main introduces one reusable rank-2 context before initial goal translation and carries it through universe retry, both same-run batches, and every baseline, provider, excluded-middle, and double-negation route. Rank contexts remain bank-free; filter contexts reuse one nominal bank, and every retained sample still requires independent replay against the later query. Main represents each bounded batch with a private lazy lane outcome: one field retains the complete bounded rendered-spelling frontier used for provider deduplication, while a separate trace contains only detailed variants recorded immediately before actual Lean callbacks. A private run receipt restores batch order, concatenates those complete frontiers, preserves cumulative debug accounting, and owns run-note placement. Verification and assessment perform no presentation or splice effects. A pure classifier distinguishes no verified receipt, survivors, all behavioral rejections, and preserve-all assessment failure. Main prepends actual batch outcomes to a lazy reverse accumulation; no-verified and all-rejected may consume the filter successor or enter a later route after the run finishes, while survivor and preserve-all stop. The first survivor is terminal even below five. One plural finalizer owns chronological metrics, effective-prefix warnings, one final binding/cache phase, terminal candidate rows, accumulated rejections, and handled notes. No context or bank crosses the command, and there is no third same-run probe, engine rerun, reassessment, quota filling, counterexample-directed engine search, persistence, or \code{ReplState} change.
 
@@ -1479,6 +1480,32 @@ The large \dpath{src/Language/Haskell/Djex/REPL.hs} coordinates the interactive 
 
 The top-level REPL maintains both source-facing state and backend sessions. A declaration update must rebuild or increment every dependent authority in a defined order. The REPL should never retain an Exference session built from environment version \(n\) while rendering against source scope version \(n+1\).
 
+\subsection{Settings are an enumeration, not a string table}
+
+Djex's own settings are worth studying before Leant's (Section~\ref{sec:leant-settings}), because the two REPLs solve the same problem differently and the difference trips people up.
+
+Djex names every option once, as a constructor of the \code{ReplSetting} type in \dpath{src/Language/Haskell/Djex/REPL/Command.hs}. The type derives \code{Bounded} and \code{Enum}, and \code{replSettingName} is a total function from constructor to spelling. Three consequences follow without any extra bookkeeping:
+
+\begin{itemize}
+  \item \code{:show settings} enumerates \code{[minBound .. maxBound]}, so a newly added setting is displayed the day it is added and cannot be forgotten;
+  \item tab completion and command execution consult the same list, so they cannot drift apart;
+  \item \code{replSettingIsBoolean} decides GHCi-style \code{+NAME}/\code{-NAME} eligibility on the setting type rather than at the parse site, so a newly added non-boolean option cannot accidentally accept \code{on} merely because the invocation used a sign.
+\end{itemize}
+
+Beside the long-standing backend, target, selection, rendering, qualification, prompt, search-limit, and axiom options, three settings deserve a note:
+
+\begin{itemize}
+  \item \code{:set timeout N} is a wall clock over the \emph{whole} command, not over one engine. It has to be, because the two backends do their work at different moments: Djinn searches when its \code{Either} result is matched, and Exference searches while its candidates are being printed. A timeout wrapped around either engine alone would expire in the wrong place.
+  \item \code{:set djinn-strategy depth-first|interleave} selects the LJT search order. The value travels from the REPL through \code{QueryOptions} to the one production \code{SearchMode}; the \code{Strategy} type is re-exported along \code{Core} $\rightarrow$ \code{Djinn/Internal/Request} $\rightarrow$ \code{Djex.Djinn} so that callers can name it without reaching into internals.
+  \item \code{:set heuristic NAME VALUE} sets one Exference scoring weight by name. The names come from \code{heuristicFields} and the writers from \code{heuristicAssignments}, which sit beside each other in \dpath{exference/src-core/Language/Haskell/Exference/Core/Internal/Options.hs} precisely so that a weight cannot gain a reader without also gaining a writer. The thirteen names are \code{goalVar}, \code{goalCons}, \code{goalArrow}, \code{goalApp}, \code{stepProvidedGood}, \code{stepProvidedBad}, \code{stepEnvGood}, \code{stepEnvBad}, \code{tempUnusedVarPenalty}, \code{tempMultiVarUsePenalty}, \code{functionGoalTransform}, \code{unusedVar}, and \code{solutionLength}.
+\end{itemize}
+
+\begin{pitfallbox}[title={Two REPL grammars that look alike}]
+The \code{:set} grammar is whitespace-separated, and the \emph{first} \code{=} in the argument is taken as part of the setting name. \code{:set heuristic goalVar=3.5} is therefore rejected as an unknown setting; write \code{:set heuristic goalVar 3.5}.
+
+A bare \code{:set NAME} is also not a getter in Djex --- it reports that the setting requires a value. Use \code{:show settings} instead. Leant's REPL made the opposite choice and does treat a bare known name as a getter, so a habit formed in one shell misfires in the other.
+\end{pitfallbox}
+
 \section{Commands and the CLI}
 
 \dpath{src/Language/Haskell/Djex/Command.hs} defines shared command structures, while \dpath{src/Language/Haskell/Djex/CLI.hs} handles process arguments, modes, files, and startup behavior. \dpath{src/Language/Haskell/Djex/Text.hs} centralizes bounded text helpers and presentation details.
@@ -1742,6 +1769,35 @@ Presentation state & Color mode, interactivity, timing, transcript capture, outp
 \end{longtable}
 
 The state record is mutable through Haskell updates, but many operations construct a complete replacement substate before installing it. The code is easiest to reason about when every field is assigned one of three roles: durable replay input, process-local handle, or derived cache.
+
+\section{Session settings and \code{:set}}\label{sec:leant-settings}
+
+A large part of the synthesis state is reachable from the prompt. \code{:set} is the single door, and understanding how it is dispatched removes most of the surprise from reading \filepath{src/Main.hs}.
+
+The command has four shapes:
+
+\begin{itemize}
+  \item \code{:set} alone prints every synthesis setting with its current value. This is the first thing to ask for when reproducing a report, because the defaults are not guaranteed to be in force.
+  \item \code{:set NAME} prints one setting. Leant treats a bare known name as a getter; this is worth noting because Djex's own REPL does not --- there a bare \code{:set NAME} is an error and \code{:show settings} is the getter.
+  \item \code{:set NAME VALUE} assigns one setting, after validating the value. A rejected value leaves the previous one in place and prints a usage line rather than failing the command.
+  \item \code{:set OPT VALUE} for any name Leant does not recognize is forwarded to the Lean backend as \code{set\_option OPT VALUE}. Leant's own settings are therefore \emph{intercepted} from a namespace it shares with Lean, which is why the recognized names all carry a \code{synth-} or \code{backend-} prefix: the prefix keeps the two namespaces from colliding as Lean gains options.
+\end{itemize}
+
+The settings divide into three groups by what they own.
+
+\textbf{Search shape.} \code{synth-engine} (\code{djinn}, \code{exference}, or \code{both}), \code{synth-steps} (the Exference step budget, default 4096), \code{synth-classical}, and \code{synth-library} choose which lanes run at all.
+
+\textbf{Search bounds.} \code{synth-shown}, \code{synth-verify}, \code{synth-window}, \code{synth-budget}, and \code{synth-queue} are the five fields of the \code{SynthLimits} record described in Appendix~\ref{app:limits}. \code{synth-timeout} is the wall clock one \code{:synth} may spend before answering ``no answer'' (default 20 seconds; \code{0} waits indefinitely; \code{LEANT\_SYNTH\_TIMEOUT} seeds it at startup). \code{synth-providers}, \code{synth-provider-cap} (default 80), and \code{synth-library-premises} (default 8) bound provider discovery and rated library offers. \code{backend-timeout} bounds one Lean request rather than one synthesis (default 300 seconds, seeded by \clicode{--timeout}).
+
+\textbf{Observation.} \code{synth-debug} prints fragments, providers, per-lane outcomes, and metrics; \code{synth-ratings} lists the rated library functions rather than setting anything.
+
+\begin{invariantbox}[title={Settings are session state, not replay input}]
+Every setting lives in \code{ReplState} and none of them enters replay history, the undo stack, or a snapshot. Reconstructing a session therefore reproduces its \emph{declarations}, not its tuning: after \code{:unpickle}, the search bounds are whatever the current session last set them to. This is deliberate --- a snapshot records what the Lean environment contains, and search policy is not part of that environment --- but it means a golden transcript is only reproducible together with the settings that produced it.
+\end{invariantbox}
+
+\begin{designbox}
+The settings were once compiled-in constants, and the migration deliberately kept \code{defaultSynthLimits} byte-compatible with them so that no existing transcript, golden file, or documented example changed meaning. When adding a new tunable, thread it through the existing policy records rather than adding an argument to an observation function: the characterization tests pin exact call sites, and a new positional argument on \code{runSynthLaneCursor} breaks the pinned one-liners while a new \code{SynthLaneCursorPolicy} field does not.
+\end{designbox}
 
 \section{Ordinary command execution}
 
@@ -2176,7 +2232,11 @@ Reset/load a different session & Yes/new root & The declaration universe is unre
 
 A candidate group is a list of Lean source spellings for one semantic neutral candidate. Grouping occurs before final verification because ambiguity may be purely syntactic: explicit constructor qualification, inserted type placeholders, or eta fitting can yield several plausible texts for the same generated term.
 
-The module sets bounded constants for backend candidate windows, combined verification frontiers, attempted groups, and shown successes. At this snapshot, ranking stops verification after five accepted groups and consumes one candidate batch. Filtering may consume two ordered batches from one ordinary lazy engine outcome: 12+12 groups for a standalone engine or 24+24 for a combined engine. Only no verification or complete all-rejection reaches the successor. Excluded middle remains one six-group batch, while double negation uses the ordinary policy and a filter-only Djinn candidate cutoff of 60. Every batch is verified and assessed once through the command context; survivor or preserve-all stops, and the second batch ends without a third tail probe. Only after a terminal outcome does Main take five survivor presentations. This is not a survivor quota within a run or across lanes: the first batch with one survivor is terminal. The batch prefix remains separate from the successful-group quota because a failed group does not consume that quota. The constants are named and centralized; code should not introduce ad hoc \code{take 5} operations that lose progress accounting.
+The module bounds backend candidate windows, combined verification frontiers, attempted groups, and shown successes. These are no longer compiled-in constants read directly at each use site. They are the five fields of one \code{SynthLimits} record, and \code{defaultSynthLimits} installs exactly the historical values, so an untouched session behaves as it always did while a REPL user may retune any field with \code{:set} (Appendix~\ref{app:limits}). Every number in the rest of this section is therefore the \emph{default}; read it as ``what an unmodified session does''.
+
+With the defaults in force, ranking stops verification after five accepted groups (\code{synth-shown}) and consumes one candidate batch. Filtering may consume two ordered batches from one ordinary lazy engine outcome: 12+12 groups for a standalone engine or 24+24 for a combined engine, since the combined engine doubles \code{synth-verify}. Only no verification or complete all-rejection reaches the successor. Excluded middle remains one six-group batch --- \code{synth-verify} halved --- while double negation uses the ordinary policy and a filter-only Djinn candidate cutoff of 60, which is \code{synth-window} rather than a separate constant. Every batch is verified and assessed once through the command context; survivor or preserve-all stops, and the second batch ends without a third tail probe. Only after a terminal outcome does Main take five survivor presentations. This is not a survivor quota within a run or across lanes: the first batch with one survivor is terminal. The batch prefix remains separate from the successful-group quota because a failed group does not consume that quota.
+
+Two maintenance rules follow from the record. First, the limits are threaded, not fetched: a lane receives its bounds as an argument, and code should not introduce ad hoc \code{take 5} operations that both lose progress accounting and ignore a retuned session. Second, one setting can silently narrow another --- a batch prefix wider than \code{synth-window} is clamped by \code{admissibleCursorBatch} --- so Main emits an explicit note when the admitted batch differs from the requested frontier rather than letting the two settings disagree in silence.
 
 \section{Opaque bounded observation of one detailed outcome}
 
@@ -2192,8 +2252,12 @@ successor observes the same retained detailed outcome and never launches the
 engine again.
 
 \nolinkurl{startDetailedSynthCursor} does not demand the outcome it wraps. An
-advance request is admitted only from 1 through the established
-\code{candidateWindow} of 60. Nonpositive and over-limit requests are rejected
+advance request is admitted only from 1 through the session's candidate window
+--- \code{synth-window}, 60 by default. The window is a plain argument to
+\nolinkurl{advanceDetailedSynthCursorWith} rather than a cursor field, so a
+cursor cannot carry a stale bound past a \code{:set}, and the laziness
+regressions that poison a cursor tail still observe the value the caller
+supplied. Nonpositive and over-limit requests are rejected
 before the cursor is evaluated, and the outer successful admission likewise
 does not demand it; only forcing the returned step observes the outcome. An
 ordinary step carries one nonempty batch plus a lazy successor. Engine failure,
@@ -2202,11 +2266,12 @@ terminal constructors rather than being flattened into an empty candidate
 batch.
 
 The cursor counts the actual groups returned, preserves their source order,
-and clamps a request near the cumulative 60-group cap to the remaining
+and clamps a request near the cumulative window cap to the remaining
 allowance. It reports natural exhaustion only after an advance before that cap
-observes an empty tail. Once group 60 has been returned, the next advance
-reports the hard cap without examining group 61. Consequently an exactly
-60-element stream is intentionally classified as capped, not naturally
+observes an empty tail. Once the window's last group has been returned, the
+next advance reports the hard cap without examining the group after it.
+Consequently a stream of exactly the window's length --- 60 elements under the
+default --- is intentionally classified as capped, not naturally
 exhausted, and a bottom or cyclic tail remains productive. Every candidate
 batch and each note-bearing completion retains the original notes unchanged;
 Main's private scheduler now decides their exactly-once presentation. The
@@ -2329,7 +2394,7 @@ admitted outer result and selected payload deliberately remain lazy.
 
 \section{Classical fallback}
 
-When enabled after a retained sound refutation and the Glivenko split admits the fragment, Leant first offers bounded excluded-middle premises, then applies a double-negation transformation when excluded middle has no verified candidate or is entirely behaviorally rejected. Both routes use the command's assessment context. Excluded middle is always one six-group batch. Filter-mode double negation follows the ordinary 12+12 or 24+24 policy and raises the tuned Djinn candidate cutoff to 60; rank and disabled modes retain one 12- or 24-group batch and the cutoff of 12. Filtering keeps the original absolute command deadline through both routes. Rank and disabled modes instead capture independent fresh configured-duration deadlines when EM and NN are actually reached; zero remains unbounded. A survivor or preserve-all result stops; every actual batch outcome is accumulated, but neither route contributes negative evidence because:
+When enabled after a retained sound refutation and the Glivenko split admits the fragment, Leant first offers bounded excluded-middle premises, then applies a double-negation transformation when excluded middle has no verified candidate or is entirely behaviorally rejected. Both routes use the command's assessment context. Excluded middle is always one batch of \code{synth-verify} halved --- six groups by default. Filter-mode double negation follows the ordinary 12+12 or 24+24 policy and raises the tuned Djinn candidate cutoff to \code{synth-window} (60 by default); rank and disabled modes retain one 12- or 24-group batch and a cutoff of \code{synth-verify} (12). The classical routes therefore inherit the session's retuning rather than pinning their own numbers. Filtering keeps the original absolute command deadline through both routes. Rank and disabled modes instead capture independent fresh configured-duration deadlines when EM and NN are actually reached; zero remains unbounded. A survivor or preserve-all result stops; every actual batch outcome is accumulated, but neither route contributes negative evidence because:
 
 \begin{itemize}
   \item the transformation covers a restricted source fragment;
@@ -2482,15 +2547,19 @@ The verification path lives in \code{Main.hs}. Candidate groups are tried best f
 
 Main's cursor driver supplies one exact bounded batch before verification
 chooses its successful-group quota. Ranking and disabled modes consume one
-batch; ranking stops after five acceptances. Filtering traverses a complete
-12-group standalone or 24-group combined batch and passes all callback
+batch; ranking stops after \code{synth-shown} acceptances, five by default.
+Filtering traverses a complete batch of \code{synth-verify} groups for a
+standalone engine or twice that for the combined engine --- 12 and 24 under
+the defaults --- and passes all callback
 acceptances to one behavioral assessment under the command's context. Only a
 no-verified or all-rejected disposition may consume one same-width successor
-from the same cursor. Excluded middle remains one six-group batch; double
+from the same cursor. Excluded middle remains one half-width batch, six groups
+by default; double
 negation uses the ordinary policy. Each batch is verified and assessed once,
 and a continuing second batch ends without a third probe. Failures can be
 retained for diagnostics but are not shown as candidates. After the first
-terminal filter outcome, at most five survivors are displayed and bound, while
+terminal filter outcome, at most \code{synth-shown} survivors are displayed and
+bound, while
 every accumulated rejection is reported. This is not quota filling: one
 survivor stops the scheduler.
 
@@ -2543,7 +2612,7 @@ before the unchanged abnormal diagnostic.
   \node[greenbox,below=12mm of verify,text width=34mm] (accepted) {Verified groups\\mode-owned quota};
   \node[redbox,below=12mm of render,text width=34mm] (reject) {Reject spelling; try\\next variant/group};
   \node[goldbox,below=of accepted,text width=34mm] (assess) {Optional Length\\batch assessment};
-  \node[graybox,left=of assess,text width=34mm] (bind) {Display and bind\\up to five survivors};
+  \node[graybox,left=of assess,text width=34mm] (bind) {Display and bind\\survivors up to the\\session's shown limit};
   \node[redbox,right=of assess,text width=34mm] (breject) {Report every bounded\\behavioral rejection};
 
   \draw[flow] (engine) -- (merge);
@@ -2556,7 +2625,7 @@ before the unchanged abnormal diagnostic.
   \draw[flow] (assess) -- (bind);
   \draw[flow] (assess) -- (breject);
 \end{tikzpicture}}
-\caption{The candidate funnel. The exact Lean target remains the acceptance gate; optional behavioral filtering partitions each bounded cursor batch, with at most one successor, before the five-survivor presentation cap.}
+\caption{The candidate funnel. The exact Lean target remains the acceptance gate; optional behavioral filtering partitions each bounded cursor batch, with at most one successor, before the presentation cap of \code{synth-shown} survivors (five by default).}
 \label{fig:candidate-funnel}
 \end{figure}
 
@@ -2573,7 +2642,8 @@ after that run finishes, enter another provider or classical route. Only final
 aggregate all-rejection prints every accumulated rejection and clears the
 earlier synthesis-splice cache. Preserve-all assessment failure has
 its own terminal disposition, keeps its complete internal batch, and presents
-at most five original candidates before retained earlier rejections. Neither
+at most \code{synth-shown} original candidates --- five by default --- before
+retained earlier rejections. Neither
 result signals Lean verification failure; continuation remains bounded to the
 existing lane schedule and is not survivor-quota filling.
 
@@ -3130,6 +3200,23 @@ This appendix is a practical source map. It is intentionally selective: it names
 
 The following values describe the pinned revisions. They are part implementation limits, part denial-of-service boundaries, and part search-policy contracts. Before changing one, find every validator, serializer, plan enumerator, renderer alternative bound, and test that assumes it.
 
+Two kinds of bound appear in the table, and it matters which one you are looking at. Most rows are \emph{structural}: the number is compiled in, a validator or plan enumerator depends on it, and changing it is a source change with test consequences. The rows marked \emph{session default} are different. Those are the Leant search bounds collected in the \code{SynthLimits} record (\lpath{src/Leant/Synth/Engine.hs}), and a REPL user retunes them for the rest of the session with \code{:set}. The value in the table is what \code{defaultSynthLimits} installs at startup, so an unmodified session behaves exactly as the surrounding chapters describe; a session that has issued \code{:set synth-verify 30} does not. When you are reading a bug report, ask for \code{:set} with no argument before assuming the defaults were in force.
+
+\begin{longtable}{@{}L{0.24\textwidth}L{0.24\textwidth}L{0.44\textwidth}@{}}
+\toprule
+\textbf{\code{SynthLimits} field} & \textbf{\code{:set} name} & \textbf{What it bounds} \\
+\midrule
+\endhead
+\code{synthLimitShown} & \code{synth-shown} & Accepted candidate groups shown and bound. \\
+\code{synthLimitTried} & \code{synth-verify} & Fresh groups Lean verifies per lane; the \code{both} engine doubles it, excluded middle halves it. \\
+\code{synthLimitWindow} & \code{synth-window} & Candidate groups one lane may observe; also the cursor's hard cap and the filter-mode double-negation cutoff. \\
+\code{synthLimitBudget} & \code{synth-budget} & Djinn choice-point budget of the ordinary and provider lanes; \code{off} is unbounded. \\
+\code{synthLimitQueue} & \code{synth-queue} & Exference queue bound. \\
+\bottomrule
+\end{longtable}
+
+Three further session settings sit beside them without living in \code{SynthLimits}: \code{synth-timeout} (the per-command wall clock), \code{synth-providers}/\code{synth-provider-cap} (live provider discovery), and \code{synth-library-premises} (rated library offers kept per goal). \code{synth-debug} toggles per-lane tracing. The library and classical lanes keep their own fixed budgets and are not retunable.
+
 \begin{longtable}{@{}L{0.40\textwidth}L{0.15\textwidth}L{0.35\textwidth}@{}}
 \toprule
 \textbf{Bound} & \textbf{Value} & \textbf{Why it exists} \\
@@ -3142,14 +3229,14 @@ Observed kind arity & 64 & Prevents unbounded higher-kinded head trees from sour
 Kind-tree node observation & 129 & Sentinel-style bound corresponding to a finite binary observation around the arity limit. \\
 Leant exact forall-domain tags & 128 & Bounds serialized exact provider-domain metadata. \\
 Djinn quintuple frontier cap & 512 per orientation & Bounds open/opaque plan combinations while remaining complete through eleven sites for quintuple choices. \\
-Exference queue capacity in Leant lane & 1024 & Keeps live provider/library search operational; exact pruning is reported. \\
-Leant backend candidate window & 60 & Gives renderer/verification room after deduplication and rejection. \\
-Leant combined batch prefix & 24 & Bounds cross-engine semantic groups; filter mode may consume two batches from one cursor, at most 48 groups. \\
-Leant standalone batch prefix & 12 & Bounds Djinn- or Exference-only groups; filter mode may consume two batches from one cursor, at most 24 groups. \\
-Leant excluded-middle batch prefix & 6 & Keeps the first classical route cheap; it never consumes a successor. \\
-Double-negation Djinn candidate cutoff & 12 rank/disabled; 60 filter & Lets filter mode expose a successor while retaining the historical one-batch classical policy elsewhere. \\
-Leant ranking accepted-group quota & 5 & Preserves the historical rank verifier frontier. \\
-Leant presented survivors & 5 & Caps bindings and interactive output after filtering without truncating rejection rows. \\
+Exference queue capacity in Leant lane & 1024 \emph{(session default, \code{synth-queue})} & Keeps live provider/library search operational; exact pruning is reported. \\
+Leant backend candidate window & 60 \emph{(session default, \code{synth-window})} & Gives renderer/verification room after deduplication and rejection; also the detailed cursor's cumulative hard cap. \\
+Leant combined batch prefix & 24 \emph{(session default: twice \code{synth-verify})} & Bounds cross-engine semantic groups; filter mode may consume two batches from one cursor, at most 48 groups. Clamped down to \code{synth-window} when that is smaller. \\
+Leant standalone batch prefix & 12 \emph{(session default, \code{synth-verify})} & Bounds Djinn- or Exference-only groups; filter mode may consume two batches from one cursor, at most 24 groups. Clamped down to \code{synth-window} when that is smaller. \\
+Leant excluded-middle batch prefix & 6 \emph{(session default: \code{synth-verify} halved)} & Keeps the first classical route cheap; it never consumes a successor. \\
+Double-negation Djinn candidate cutoff & 12 rank/disabled; 60 filter \emph{(session defaults: \code{synth-verify} and \code{synth-window})} & Lets filter mode expose a successor while retaining the historical one-batch classical policy elsewhere. \\
+Leant ranking accepted-group quota & 5 \emph{(session default, \code{synth-shown})} & Preserves the historical rank verifier frontier. \\
+Leant presented survivors & 5 \emph{(session default, \code{synth-shown})} & Caps bindings and interactive output after filtering without truncating rejection rows. \\
 Backend stderr capture & newest 64 KiB (bytes) & Continuous capture on a dedicated thread with a truncation flag; the death-path drain waits only briefly, so crash diagnostics cannot hang reconstruction. \\
 \bottomrule
 \end{longtable}
