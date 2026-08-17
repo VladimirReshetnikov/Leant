@@ -77,6 +77,7 @@ module Leant.Synth.Fragment
 
 import Data.Char (isSpace)
 import Data.List (intercalate, isPrefixOf, nub)
+import Data.Maybe (fromMaybe)
 import qualified Data.Set as Set
 import Text.Read (readMaybe)
 
@@ -1626,16 +1627,10 @@ parseProviderSexp text = do
         let provider = case evidenceMetadata of
               Just (ExactProviderInstantiations evidence) ->
                 ProviderFragWithEvidence name frag
-                (case binderMetadata of
-                  Nothing -> []
-                  Just names -> names)
-                evidence
+                  (fromMaybe [] binderMetadata) evidence
               Just (LegacyProviderCandidates candidates) ->
                 ProviderFragWithLegacyCandidates name frag
-                  (case binderMetadata of
-                    Nothing -> []
-                    Just names -> names)
-                  candidates
+                  (fromMaybe [] binderMetadata) candidates
               Nothing -> case binderMetadata of
                 Nothing -> ProviderFrag name frag
                 Just names -> ProviderFragWithBinders name frag names

@@ -146,7 +146,7 @@ discoverReplExe = do
     fmap concat . forM owners $ \owner -> do
       let replRoot = owner </> "repl"
       revs <- listSubdirs replRoot
-      flip filterM (map binaryIn revs) doesFileExist
+      filterM doesFileExist (map binaryIn revs)
 
   binaryIn rev = rev </> ".lake" </> "build" </> "bin" </> "repl.exe"
 

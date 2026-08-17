@@ -121,7 +121,7 @@ takeToken :: String -> Maybe (String, String)
 takeToken source = case dropWhile isSpace source of
   [] -> Nothing
   remaining ->
-    let (token, rest) = span (not . isSpace) remaining
+    let (token, rest) = break isSpace remaining
     in Just (token, dropWhile isSpace rest)
 
 consumeDelimiter :: String -> Maybe String

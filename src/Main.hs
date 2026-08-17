@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
 
 -- | leant - a GHCi-style interactive REPL for Lean 4.
@@ -10,7 +9,7 @@
 module Main (main) where
 
 import Control.Exception (SomeException, evaluate, finally, try)
-import Control.Monad (forM_, unless, when)
+import Control.Monad (forM_, unless, void, when)
 import Control.Monad.IO.Class (liftIO)
 import Data.Char
   (isAlpha, isAlphaNum, isAscii, isDigit, isLower, isSpace, isUpper, toLower)
@@ -26,7 +25,7 @@ import Data.List
   , stripPrefix
   , tails
   )
-import Data.Maybe (fromMaybe, isJust, listToMaybe)
+import Data.Maybe (fromMaybe, isJust, isNothing, listToMaybe, mapMaybe)
 import qualified Data.Set as Set
 import Data.Time.Clock (UTCTime, addUTCTime, diffUTCTime, getCurrentTime)
 import Data.Time.Format (defaultTimeLocale, formatTime)
@@ -768,7 +767,7 @@ respSorries v = fromMaybe [] $ do
 
 respFatal :: JValue -> Maybe String
 respFatal v = case jLookup "message" v of
-  Just (JStr m) | not (isJust (jLookup "env" v)) -> Just m
+  Just (JStr m) | isNothing (jLookup "env" v) -> Just m
   _ -> Nothing
 
 hasErrors :: JValue -> Bool
@@ -1146,7 +1145,7 @@ evalExpression st text = do
       checkResult <- runCurrentCmd st ("#check (" ++ text ++ ")")
       case checkResult of
         Right v | not (hasErrors v), Nothing <- respFatal v ->
-          () <$ printResponse st Nothing v
+          void (printResponse st Nothing v)
         _ -> do
           rawResult <- runCurrentCmd st text
           case rawResult of
@@ -1156,7 +1155,7 @@ evalExpression st text = do
             _ -> do
               printed <- printBuiltinInfo st text
               unless printed $ case evalResult of
-                Right v -> () <$ printResponse st Nothing v
+                Right v -> void (printResponse st Nothing v)
 
 printBuiltinInfo :: St -> String -> IO Bool
 printBuiltinInfo st token = case builtinInfo token of
@@ -1391,7 +1390,7 @@ dispatchCommand st line = do
           value "0 removes the limit"
           (\n s -> s { rsTimeout = if n <= 0 then Nothing else Just n })
         ["backend-timeout"] -> showSynthTimeoutLimit st "backend-timeout"
-          (maybe 0 id . rsTimeout)
+          (fromMaybe 0 . rsTimeout)
         [] -> showSynthSettings st
         _ -> do
           result <- runCurrentCmd st ("set_option " ++ arg)
@@ -1456,7 +1455,7 @@ dispatchCommand st line = do
       forM_ (rsSnapshotBase state) $ \snapshot ->
         emitLn st =<< cDim st ("(history starts after snapshot base "
           ++ snapshotSourcePath snapshot ++ ")")
-      let history = filter (not . isJust . generatedItBinding)
+      let history = filter (isNothing . generatedItBinding)
             (rsHistory state)
       if null history
         then emitLn st =<< cDim st "(empty)"
@@ -1525,8 +1524,8 @@ cmdType st rawArg
         Right v
           | hasErrors v || isJust (respFatal v) -> do
               printed <- printBuiltinInfo st arg
-              unless printed (() <$ printResponse st Nothing v)
-          | otherwise -> () <$ printResponse st Nothing v
+              unless printed (void (printResponse st Nothing v))
+          | otherwise -> void (printResponse st Nothing v)
 
 cmdInfo :: St -> String -> IO ()
 cmdInfo st arg
@@ -1540,12 +1539,12 @@ cmdInfo st arg
               checkResult <- runCurrentCmd st ("#check (" ++ arg ++ ")")
               case checkResult of
                 Right cv | not (hasErrors cv), Nothing <- respFatal cv ->
-                  () <$ printResponse st Nothing cv
+                  void (printResponse st Nothing cv)
                 _ -> do
                   printed <- printBuiltinInfo st arg
-                  unless printed (() <$ printResponse st Nothing v)
-          | otherwise -> () <$ printResponse st
-              (Just (\t -> formatInfo t `orElse` indentDefBody t)) v
+                  unless printed (void (printResponse st Nothing v))
+          | otherwise -> void (printResponse st
+              (Just (\t -> formatInfo t `orElse` indentDefBody t)) v)
  where
   orElse (Just x) _ = Just x
   orElse Nothing y = y
@@ -1797,7 +1796,7 @@ cmdDoc st rawArg = do
           result <- runCmd st (Just env) program
           case result of
             Left err -> emitLn st =<< cRed st err
-            Right v -> () <$ printResponse st Nothing v
+            Right v -> void (printResponse st Nothing v)
 
 cmdSearch :: St -> Bool -> String -> IO ()
 cmdSearch st byType arg
@@ -1812,7 +1811,7 @@ cmdSearch st byType arg
             message <- cRed st ":search? needs the `exact?` tactic \8212 "
             hint <- cBold st ":import Mathlib.Tactic"
             emitLn st (message ++ "try " ++ hint)
-          | otherwise -> () <$ printResponse st Nothing v
+          | otherwise -> void (printResponse st Nothing v)
   | otherwise = do
       envOr <- ensureBrowseEnv st
       case envOr of
@@ -1845,7 +1844,7 @@ cmdSearch st byType arg
           result <- runCmd st (Just env) program
           case result of
             Left err -> emitLn st =<< cRed st err
-            Right v -> () <$ printResponse st Nothing v
+            Right v -> void (printResponse st Nothing v)
           history <- rsHistory <$> readIORef st
           let matching = [ n | n <- concatMap sessionDeclNames history
                          , lower arg `isInfixOf` lower n ]
@@ -2074,7 +2073,7 @@ showSynthSettings st = do
   row "synth-providers" (onOffLabel (rsSynthProviders state))
   row "synth-provider-cap" (show (rsSynthProviderCap state))
   row "synth-timeout" (showSynthTimeout (rsSynthTimeout state))
-  row "backend-timeout" (showSynthTimeout (maybe 0 id (rsTimeout state)))
+  row "backend-timeout" (showSynthTimeout (fromMaybe 0 (rsTimeout state)))
   row "synth-debug" (onOffLabel (rsSynthDebug state))
 
 -- | How a setting names itself in its own report: the option spelling with
@@ -2393,7 +2392,7 @@ mentionsMarker marker text = any ends (tails text)
 autoShapedTokens :: String -> [String]
 autoShapedTokens text = nub (go Nothing text)
  where
-  go prev s = case span (not . identChar) s of
+  go prev s = case break identChar s of
     (_, []) -> []
     (skipped, s') ->
       let (t, rest) = span identChar s'
@@ -2475,7 +2474,7 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
       -- verified provider candidate must still get a chance to win.  Atomic/
       -- provider-open refusals go straight to the provider lane because the
       -- baseline has no usable structure.
-      structuralFirst = refusal == Nothing
+      structuralFirst = isNothing refusal
   debug <- synthDebugEnabled st
   when (structuralFirst && debug) $
     forM_ libraryPremises $ \(name, premise) ->
@@ -2720,9 +2719,7 @@ loadSynthProviders st query = do
     let (result, cache') = lookupProviderCache
           (rsProviderWorld state) query (rsProviderCache state)
     in (state { rsProviderCache = cache' }, result)
-  case cached of
-    Just providers -> pure providers
-    Nothing -> discover
+  maybe discover pure cached
  where
   discover = do
     envOr <- ensureSynthEnv st
@@ -3592,7 +3589,7 @@ cmdBrowse st showAll rawArg
             (browseProgram showAll nameComponents)
           case result of
             Left err -> emitLn st =<< cRed st err
-            Right v -> () <$ printResponse st Nothing v
+            Right v -> void (printResponse st Nothing v)
       -- the browse environment predates session declarations; list those
       -- separately from the recorded history
       history <- rsHistory <$> readIORef st
@@ -3637,7 +3634,7 @@ sessionDeclNames entry =
   declName _ = Nothing
 
   isIdentStart s = case s of
-    c : _ -> not (c `elem` "({[:=")
+    c : _ -> c `notElem` "({[:="
     [] -> False
   isIdentChar c = not (isSpace c) && c `notElem` "({[:="
 
@@ -4263,7 +4260,7 @@ goalCandidates g = concat
     , name `elem` targetIdents
     ]
   isInductionTy ty =
-    typeConnective ty == Nothing
+    isNothing (typeConnective ty)
     && case words (trim ty) of
          hd@(c0 : _) : _ ->
            isUpper c0 && hd `notElem` ["Bool", "Prop", "Type", "Sort"]
@@ -4315,7 +4312,7 @@ suggestionHeartbeatLimit = 20000
 respGoals :: JValue -> [String]
 respGoals v = fromMaybe [] $ do
   gs <- jLookup "goals" v >>= jArray
-  pure [g | Just g <- map jString gs]
+  pure (mapMaybe jString gs)
 
 respProofState :: JValue -> Maybe Integer
 respProofState v = jLookup "proofState" v >>= jInt
@@ -4407,7 +4404,7 @@ goalDefNames g = case goalTarget g of
                        "do", "by", "at", "in", "have", "show", "this"]
       ]
  where
-  dotted = filter (all (/= '.')) . tokens
+  dotted = filter ('.' `notElem`) . tokens
   tokens s = case dropWhile (not . dottedChar) s of
     "" -> []
     s' -> let (tok, rest) = span dottedChar s' in tok : tokens rest
@@ -5003,7 +5000,7 @@ replLoop st = do
       EvalIncomplete -> do
         extra <- readContinuationLines st []
         if null extra
-          then () <$ liftIO (evalInput st False text)
+          then void (liftIO (evalInput st False text))
           else evalWithRetry (text ++ "\n" ++ intercalate "\n" extra)
 
 -- Read one line, handling prompt display, echo, and transcript capture for

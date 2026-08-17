@@ -31,6 +31,7 @@ module Leant.Synth.Length.File.Acquire
   , lengthFileLoadCleanupIncomplete
   ) where
 
+import Control.Monad (unless, when)
 #ifndef mingw32_HOST_OS
 import Control.Exception (evaluate, mask, onException)
 import Control.Monad (void)
@@ -139,28 +140,19 @@ mkLengthFileRequest
 mkLengthFileRequest source = do
   let path = lengthFileSourcePath source
       observed = observedPathCharacters lengthFileMaximumPathCharacters path
-  if observed > lengthFileMaximumPathCharacters
-    then Left $ LengthFilePathCharacterLimitExceeded
+  when (observed > lengthFileMaximumPathCharacters)
+    $ Left $ LengthFilePathCharacterLimitExceeded
       lengthFileMaximumPathCharacters (lengthFileMaximumPathCharacters + 1)
-    else pure ()
-  case path of
-    [] -> Left LengthFilePathEmpty
-    _ -> pure ()
-  if '\0' `elem` path
-    then Left LengthFilePathContainsNul
-    else pure ()
-  if isAbsolute path
-    then pure ()
-    else Left LengthFilePathNotAbsolute
+  when (null path) $ Left LengthFilePathEmpty
+  when ('\0' `elem` path) $ Left LengthFilePathContainsNul
+  unless (isAbsolute path) $ Left LengthFilePathNotAbsolute
   let timeoutMilliseconds = lengthFileSourceTimeoutMilliseconds source
-  if timeoutMilliseconds <= 0
-    then Left LengthFileTimeoutNotPositive
-    else pure ()
-  if timeoutMilliseconds > lengthFileMaximumTimeoutMilliseconds
-    then Left $ LengthFileTimeoutLimitExceeded
+  when (timeoutMilliseconds <= 0) $ Left LengthFileTimeoutNotPositive
+  when (timeoutMilliseconds > lengthFileMaximumTimeoutMilliseconds)
+    $ Left $ LengthFileTimeoutLimitExceeded
       lengthFileMaximumTimeoutMilliseconds
       (lengthFileMaximumTimeoutMilliseconds + 1)
-    else Right $ LengthFileRequest path timeoutMilliseconds
+  Right $ LengthFileRequest path timeoutMilliseconds
 
 observedPathCharacters :: Natural -> FilePath -> Natural
 observedPathCharacters maximumValue = go 0

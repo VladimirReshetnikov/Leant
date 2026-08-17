@@ -5,7 +5,7 @@ module Leant.Format
   ) where
 
 import Data.Char (isSpace)
-import Data.List (isPrefixOf, isSuffixOf, stripPrefix)
+import Data.List (elemIndex, isPrefixOf, isSuffixOf, stripPrefix)
 import Data.Maybe (fromMaybe)
 
 -- | Reformat @#print@ output for inductives/structures/classes as a valid
@@ -45,7 +45,7 @@ emptySections :: Sections
 emptySections = Sections [] [] Nothing
 
 indexOfNumberOfParameters :: [String] -> Maybe Int
-indexOfNumberOfParameters ls = lookup True (zip matches [0 ..])
+indexOfNumberOfParameters ls = elemIndex True matches
  where
   matches = map isNumberOfParameters ls
   isNumberOfParameters ln = case stripPrefix "number of parameters: " (trim ln) of
@@ -109,7 +109,7 @@ trim = dropWhile isSpace . reverse . dropWhile isSpace . reverse
 indentDefBody :: String -> Maybe String
 indentDefBody text = do
   let ls = lines text
-  headerEnd <- lookup True (zip (map endsWithAssign ls) [0 ..])
+  headerEnd <- elemIndex True (map endsWithAssign ls)
   let body = drop (headerEnd + 1) ls
   if null body || all alreadyIndented body
     then Nothing

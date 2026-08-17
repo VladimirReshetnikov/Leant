@@ -18,7 +18,7 @@ module Leant.Json.Bounded
 
 import qualified Data.ByteString as BS
 import Data.ByteString (ByteString)
-import Data.Char (chr, ord)
+import Data.Char (chr, isDigit, ord)
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Data.Text (Text)
@@ -513,7 +513,7 @@ isJsonWhitespace character = character == ' '
   || character == '\r'
 
 isAsciiDigit :: Char -> Bool
-isAsciiDigit character = character >= '0' && character <= '9'
+isAsciiDigit = isDigit
 
 startsJsonValue :: Char -> Bool
 startsJsonValue character = character == '{'
@@ -535,7 +535,7 @@ isNumberCharacter character = isAsciiDigit character
 
 hexDigit :: Char -> Maybe Int
 hexDigit character
-  | character >= '0' && character <= '9' =
+  | isDigit character =
       Just $ ord character - ord '0'
   | character >= 'a' && character <= 'f' =
       Just $ ord character - ord 'a' + 10

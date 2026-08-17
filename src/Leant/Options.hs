@@ -10,7 +10,7 @@ module Leant.Options
   ) where
 
 import Data.List (isPrefixOf)
-import Data.Maybe (isJust, isNothing)
+import Data.Maybe (fromMaybe, isJust, isNothing)
 
 import Leant.Synth.Length.Configuration.File.Acquire
   ( lengthRankingConfigurationFileMaximumTimeoutMilliseconds )
@@ -62,7 +62,7 @@ lengthAssessmentSetup options = case optLengthRankingConfig options of
         then PermitUnpinnedExecutable
         else RequirePinnedExecutable
     , LengthRankingConfigurationFileSource path
-        $ maybe defaultLengthAssessmentLoadTimeoutMilliseconds id
+        $ fromMaybe defaultLengthAssessmentLoadTimeoutMilliseconds
         $ optLengthRankingLoadTimeout options
     )
 

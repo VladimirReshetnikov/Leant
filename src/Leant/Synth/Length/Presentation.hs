@@ -238,9 +238,8 @@ presentLengthAssessmentRejections
 presentLengthAssessmentRejections assessment = case
     lengthAssessmentSelectionResult assessment of
   Just selected -> presentLengthSelectionRejections selected
-  Nothing -> case lengthAssessmentSpinePairSelectionResult assessment of
-    Just selected -> presentLengthSpinePairSelectionRejections selected
-    Nothing -> []
+  Nothing -> maybe [] presentLengthSpinePairSelectionRejections
+    (lengthAssessmentSpinePairSelectionResult assessment)
 
 -- | Present one completed occurrence-sealed adapter result. Rejection has no
 -- ranking and therefore no semantic note; accepted output traverses the same

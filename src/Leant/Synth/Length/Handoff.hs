@@ -219,10 +219,9 @@ prepareCheckedLengthProblem source verified = do
   contract <- either (Left . LengthHandoffContractRejected) Right
     $ sealLengthContractInSession session convertedSource
         (leanLengthContractSource source)
-  problem <- either (Left . LengthHandoffProblemRejected) Right
+  either (Left . LengthHandoffProblemRejected) Right
     $ sealLengthTypedCandidateProblemInSession
         defaultLengthProblemLimits session contract candidate
-  pure problem
 
 -- | Prepare a product-domain problem only when the accepted goal result has a
 -- post-@whnfR@ saturated canonical Lean @Prod@ root and both source-ordered
@@ -309,11 +308,9 @@ prepareCheckedLengthSpinePairProblem source verified = do
     (Left . LengthSpinePairHandoffContractRejected) Right
     $ sealLengthSpinePairContractInSession session convertedSource
         (leanLengthSpinePairContractSource source)
-  problem <- either
-    (Left . LengthSpinePairHandoffProblemRejected) Right
+  either (Left . LengthSpinePairHandoffProblemRejected) Right
     $ sealLengthSpinePairTypedCandidateProblemInSession
         defaultLengthProblemLimits session contract candidate
-  pure problem
 
 -- | Peel only the target's introduction spine. A product nested within either
 -- component is therefore not mistaken for the binary result root.

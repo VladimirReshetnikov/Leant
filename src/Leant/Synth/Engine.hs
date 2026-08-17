@@ -105,6 +105,7 @@ module Leant.Synth.Engine
 
 import Data.Foldable (toList)
 import Data.List (intercalate, isPrefixOf, nub, nubBy, sortOn)
+import Data.Maybe (isNothing)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Data.Void (Void)
@@ -1305,7 +1306,7 @@ djinnRun window (cutoff, budget) frag projection render goal decls
            \was ambiguous or incompatible" : notes)
       | otherwise ->
           SynthRefuted
-            ( budget == Nothing
+            ( isNothing budget
               && projectionFragmentsComplete projection
               && fragmentProjectionComplete frag
             )
@@ -2406,10 +2407,10 @@ exactContextNominalUse source = case source of
  where
   canonicalHeadSupported spelling totalArity
     | elem spelling ["Prod", "Sum"] = totalArity == 2
-    | otherwise = not (elem spelling structuralHigherKindHeads)
+    | otherwise = spelling `notElem` structuralHigherKindHeads
   legacyHeadSupported spelling =
     not (null spelling)
-      && not (elem spelling structuralHigherKindHeads)
+      && spelling `notElem` structuralHigherKindHeads
 
 -- | Fragments below a higher-kinded exact nominal head that remain ordinary
 -- proper-type planning/rigidity roots.  The head itself is represented by an
@@ -3446,7 +3447,6 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
                           }
                       ] }))
               ctors
-            pure ()
 
       translate = do
         -- caller-supplied premises share the goal's variable table and
@@ -3809,7 +3809,7 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
       | elem spelling ["Prod", "Sum"] ->
           length supplied + remaining == 2
       | otherwise ->
-          remaining == 0 || not (elem spelling structuralHigherKindHeads)
+          remaining == 0 || spelling `notElem` structuralHigherKindHeads
     ProviderInstantiationExactArgument remaining _ _ -> remaining == 0
     ProviderInstantiationArgument remaining frag
       | remaining > 0 -> case frag of

@@ -35,7 +35,7 @@ module Leant.Synth.Length.Configuration.File
   ) where
 
 import Data.ByteString (ByteString)
-import Data.Char (ord)
+import Data.Char (isDigit, ord)
 import Data.List (find)
 import qualified Data.Text as Text
 import Data.Text (Text)
@@ -830,8 +830,7 @@ decodeExpectedDigest value = case value of
   rejected = Left $ LengthRankingConfigurationFieldValueRejected field
 
   isLowerHexDigit character =
-    ('0' <= character && character <= '9')
-      || ('a' <= character && character <= 'f')
+    isDigit character || ('a' <= character && character <= 'f')
 
   decodeHexBytes [] = Right []
   decodeHexBytes (high : low : remaining) =
@@ -840,7 +839,7 @@ decodeExpectedDigest value = case value of
   decodeHexBytes _ = rejected
 
   hexValue character
-    | '0' <= character && character <= '9' = ord character - ord '0'
+    | isDigit character = ord character - ord '0'
     | otherwise = ord character - ord 'a' + 10
 
 decodeArtifactPolicy
