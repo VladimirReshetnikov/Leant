@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- | leant - a GHCi-style interactive REPL for Lean 4.
 --
@@ -3562,7 +3563,7 @@ completionCandidates st prefix = do
               [ n | (sev, d) <- respMessages v, sev == "info"
               , n <- lines d, not (null n) ]
             Right (Left _) -> pure []
-            Left e -> const (pure []) (e :: SomeException)
+            Left (_ :: SomeException) -> pure []
       let merged = nub (sessionNames ++ backendNames)
       modifyIORef' st (\s -> s
         { rsComplCache = (prefix, merged) : rsComplCache s })
@@ -5078,7 +5079,7 @@ mkSettings st = Settings
         result <- try (completionCandidates st word)
         case result of
           Right cands -> pure (map simpleCompletion cands)
-          Left e -> const (pure []) (e :: SomeException)
+          Left (_ :: SomeException) -> pure []
     | otherwise = pure []
 
 trim :: String -> String
