@@ -333,6 +333,10 @@ data ReplState = ReplState
   , rsSynthLibrary :: Bool
     -- ^ :set synth-library on|off - seed the search with curated
     -- library functions over the goal's recursive inductives
+  , rsSynthTimeout :: Int
+    -- ^ :set synth-timeout N - wall-clock seconds one :synth command may
+    -- search before answering "no answer, not a verdict"; 0 waits
+    -- indefinitely.  Seeded from LEANT_SYNTH_TIMEOUT (default 20).
   , rsLengthAssessmentMode :: LengthAssessmentMode
     -- ^ Explicitly disabled by default. Enabled values come only from one
     -- bounded, activated configuration-file setup at process startup. Its
@@ -1181,6 +1185,9 @@ helpText = unlines
   , "                           (on|off, default on)"
   , "  :set synth-library B     library premises for recursive inductives"
   , "                           (on|off, default on)"
+  , "  :set synth-timeout N     seconds a :synth may search before answering"
+  , "                           \"no answer\" (0 waits indefinitely; default"
+  , "                           20, or LEANT_SYNTH_TIMEOUT at startup)"
   , "  :set OPT VAL             set_option OPT VAL (persists in the session)"
   , "  :undo                    revert the last state-changing command"
   , "  :reset                   clear definitions/snapshot (keeps imports)"
@@ -1289,6 +1296,15 @@ dispatchCommand st line = do
           enabled <- rsSynthLibrary <$> readIORef st
           emitLn st =<< cDim st
             ("synth library: " ++ if enabled then "on" else "off")
+        ["synth-timeout", value]
+          | [(n, "")] <- reads value, n >= (0 :: Int) -> do
+              modifyIORef' st (\s -> s { rsSynthTimeout = n })
+              emitLn st =<< cDim st ("synth timeout: " ++ showSynthTimeout n)
+          | otherwise -> emitLn st =<< cRed st
+              "usage: :set synth-timeout N   (seconds; 0 waits indefinitely)"
+        ["synth-timeout"] -> do
+          limit <- rsSynthTimeout <$> readIORef st
+          emitLn st =<< cDim st ("synth timeout: " ++ showSynthTimeout limit)
         _ | null arg ->
               emitLn st =<< cRed st "usage: :set OPTION VALUE"
           | otherwise -> do
@@ -1947,13 +1963,26 @@ providerCacheCapacity = 12
 -- | Wall-clock guard on the engine, in seconds (0 waits indefinitely).
 -- Propositional goals answer in microseconds, but bounded hypothesis
 -- instantiation can widen a quantified goal's space enough to run for
--- minutes, which an interactive REPL must not do silently.
-synthTimeoutSeconds :: IO Int
-synthTimeoutSeconds = do
+-- minutes, which an interactive REPL must not do silently.  The session
+-- setting is read at each :synth; ':set synth-timeout N' changes it and
+-- LEANT_SYNTH_TIMEOUT seeds it at startup.
+synthTimeoutSeconds :: St -> IO Int
+synthTimeoutSeconds st = rsSynthTimeout <$> readIORef st
+
+-- | How ':set synth-timeout' reports the setting.
+showSynthTimeout :: Int -> String
+showSynthTimeout n
+  | n <= 0 = "0 (wait indefinitely)"
+  | otherwise = show n ++ "s"
+
+-- | The startup value of the :synth wall clock: LEANT_SYNTH_TIMEOUT when it
+-- is a whole number of seconds (0 = wait indefinitely), otherwise 20.
+initialSynthTimeoutSeconds :: IO Int
+initialSynthTimeoutSeconds = do
   setting <- lookupEnv "LEANT_SYNTH_TIMEOUT"
   pure $ case setting >>= readMaybeInt of
-    Just n -> n
-    Nothing -> 20
+    Just n | n >= 0 -> n
+    _ -> 20
  where
   readMaybeInt text = case reads (trim text) of
     [(n, "")] -> Just n
@@ -2254,7 +2283,7 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
     forM_ libraryPremises $ \(name, premise) ->
       emitLn st =<< cDim st
         ("debug premise: " ++ name ++ " : " ++ show premise)
-  limit <- synthTimeoutSeconds
+  limit <- synthTimeoutSeconds st
   started <- getCurrentTime
   let deadline
         | limit <= 0 = Nothing
@@ -2387,13 +2416,13 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
       { synthLaneRunEnd = SynthLaneRunTimedOut } = do
     _ <- finalizeSynthLaneAccumulation st args goal
       (synthLaneRunAccumulation laneRun)
-    limit <- synthTimeoutSeconds
+    limit <- synthTimeoutSeconds st
     emitLn st =<< cYellow st
       ("the engine did not finish within " ++ show limit
        ++ "s \8212 no answer, not a verdict")
     emitLn st =<< cDim st
       ("(bounded hypothesis instantiation can widen the search a lot; "
-       ++ "set LEANT_SYNTH_TIMEOUT to another number of seconds, "
+       ++ ":set synth-timeout N chooses another number of seconds, "
        ++ "or 0 to wait indefinitely)")
   report _ laneRun@SynthLaneRun
       { synthLaneRunEnd = SynthLaneRunCursorAdmissionFailed err } = do
@@ -2724,12 +2753,13 @@ runDetailedSynthCursorBefore requested deadline cursor =
 classicalSynthLaneDeadline
   :: LengthAssessmentContext command
   -> Maybe UTCTime
+  -> St
   -> IO (Maybe UTCTime)
-classicalSynthLaneDeadline assessmentContext commandDeadline =
+classicalSynthLaneDeadline assessmentContext commandDeadline st =
   case lengthAssessmentContextBehaviorMode assessmentContext of
     LengthBehaviorFilter -> pure commandDeadline
     LengthBehaviorRank -> do
-      limit <- synthTimeoutSeconds
+      limit <- synthTimeoutSeconds st
       if limit <= 0
         then pure Nothing
         else do
@@ -2899,7 +2929,7 @@ synthClassical assessmentContext commandDeadline st goal parsed accumulation =
         -- retains its established choice-point cutoff and half-window.  It
         -- never consumes a successor, including in filter mode.
         emDeadline <- classicalSynthLaneDeadline
-          assessmentContext commandDeadline
+          assessmentContext commandDeadline st
         emRun <- runSynthLaneCursor assessmentContext
           SynthLaneCursorPolicy
             { synthLaneCursorBatchSize = synthMaxTried `div` 2
@@ -2943,7 +2973,7 @@ synthClassical assessmentContext commandDeadline st goal parsed accumulation =
           nnPolicy = ordinaryPolicy
             { synthLaneCursorRetainsRunNotes = False }
       nnDeadline <- classicalSynthLaneDeadline
-        assessmentContext commandDeadline
+        assessmentContext commandDeadline st
       nnRun <- runSynthLaneCursor assessmentContext nnPolicy nnDeadline st goal
         (mapDetailedCandidateGroupVariantsDroppingSemanticSidecar wrap)
         (synthesizeTunedDetailed engine steps
@@ -4904,6 +4934,7 @@ run opts = do
             , bcWorkingDir = workingDir
             }
       ratings <- loadRatings
+      synthTimeout <- initialSynthTimeoutSeconds
       st <- newIORef ReplState
         { rsBackend = Nothing
         , rsConfig = config
@@ -4934,6 +4965,7 @@ run opts = do
         , rsSynthSteps = 4096
         , rsSynthClassical = True
         , rsSynthLibrary = True
+        , rsSynthTimeout = synthTimeout
         , rsLengthAssessmentMode = lengthAssessmentMode
         , rsRatings = ratings
         , rsTimeout = if optTimeout opts <= 0 then Nothing

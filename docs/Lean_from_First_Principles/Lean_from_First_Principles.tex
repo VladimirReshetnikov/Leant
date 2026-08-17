@@ -2760,7 +2760,7 @@ excluded-middle atoms tolerated & 5 & \term{synthClassical} \\
 Exference steps (default) / queue & 4096 / 1024 & \term{rsSynthSteps}, \term{exferenceRun} \\
 fresh groups sent to Lean per lane & 12 (24 for \term{both}) & \term{synthMaxTried}, \term{synthVerificationWindow} \\
 accepted groups shown and bound & 5 & \term{synthMaxShown} \\
-wall-clock deadline & 20\,s (\term{LEANT_SYNTH_TIMEOUT}) & \term{synthTimeoutSeconds} \\
+wall-clock deadline & 20\,s (\term{LEANT_SYNTH_TIMEOUT}; \term{:set synth-timeout N} from the next revision) & \term{synthTimeoutSeconds} \\
 \bottomrule
 \end{tabularx}
 \end{center}
@@ -3006,7 +3006,7 @@ Those bounds are useful for positive synthesis: any resulting term is checked.  
 
 \section{Premise staging}
 
-Leant runs several search lanes in a fixed order, all under one command-wide wall-clock deadline (20\,s by default, \term{LEANT_SYNTH_TIMEOUT=N}, \term{0} waits forever):
+Leant runs several search lanes in a fixed order, all under one command-wide wall-clock deadline (20\,s by default; \term{LEANT_SYNTH_TIMEOUT=N} at startup or, from the revision after the pinned one, \term{:set synth-timeout N} in the session; \term{0} waits forever):
 
 \begin{enumerate}
 \item the \emph{baseline} lane: the goal's own structure and hypotheses, plus the library premises when \term{synth-library} is on; its rendered candidates are verified first, and one verified survivor is terminal;
@@ -3475,10 +3475,11 @@ The session settings that affect it are exactly four, all read by \term{:set} (a
 \item \term{:set synth-engine djinn|exference|both} (default \term{djinn}; case-sensitive);
 \item \term{:set synth-steps N} (Exference's step budget, default 4096, must be positive);
 \item \term{:set synth-classical on|off} (default \term{on}: classical candidates after a sound refutation);
-\item \term{:set synth-library on|off} (default \term{on}: rated library premises for recursive inductives).
+\item \term{:set synth-library on|off} (default \term{on}: rated library premises for recursive inductives);
+\item \term{:set synth-timeout N} (added in the revision after the pinned one: the wall-clock seconds one \term{:synth} may search, default 20, \term{0} unbounded; at the pinned revision itself the only control was the environment variable below).
 \end{itemize}
 
-Each setting given without a value prints its current state.  Two environment variables complete the picture: \term{LEANT_SYNTH_TIMEOUT} (seconds, default 20, \term{0} unbounded) and \term{LEANT_SYNTH_DEBUG}.  There is no setting for the number of results (five accepted groups), the candidate window (60), the verification frontier (12 or 24), Exference's queue bound (1024), or the provider cap (80); those are constants of the pinned revision.
+Each setting given without a value prints its current state.  Two environment variables complete the picture: \term{LEANT_SYNTH_TIMEOUT} (seconds, default 20, \term{0} unbounded; it seeds \term{synth-timeout} at startup) and \term{LEANT_SYNTH_DEBUG}.  There is no setting for the number of results (five accepted groups), the candidate window (60), the verification frontier (12 or 24), Exference's queue bound (1024), or the provider cap (80); those are constants of the pinned revision.
 
 The command is best suited to structurally informative types: adapters, combinators, product/sum rearrangements, polymorphic plumbing, constructor assembly, and applications of known providers.
 

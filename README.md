@@ -1118,7 +1118,7 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   misses; Exference keeps its internally rated full-inventory lane. Combined
   mode runs both engines for the singleton and full lanes but uses Djinn alone
   for the intermediate prefixes. Baseline and provider lanes consume one
-  command-wide `LEANT_SYNTH_TIMEOUT` deadline, including both batches of a
+  command-wide deadline (`:set synth-timeout`), including both batches of a
   filter run. Before a later provider lane is forced or capped, every spelling
   in an earlier completed no-verified or all-rejected run frontier is removed
   from each source stream and newly empty groups are dropped.
@@ -1190,7 +1190,8 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   namespace — are never shadowed.
 - The pure searches answer in microseconds; the cost center is backend
   verification, a few hundred milliseconds per candidate. A wall-clock
-  guard (default 20 s, `LEANT_SYNTH_TIMEOUT=N`, `0` waits indefinitely)
+  guard (default 20 s; `:set synth-timeout N` changes it for the session,
+  `LEANT_SYNTH_TIMEOUT=N` seeds it at startup, `0` waits indefinitely)
   covers quantified goals whose bounded instantiation widens the
   space. The same deadline covers the baseline and every provider fallback
   rather than restarting for each lane; filter mode carries that original

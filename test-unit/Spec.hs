@@ -12559,9 +12559,9 @@ assertLengthAssessmentMainCommandContext = do
   length (mainSourcePositions
       "runSynthLaneCursor assessmentContext" classicalSection) @?= 2
   mapM_ (assertMainSourceContains "classical context" classicalSection)
-    [ "emDeadline <- classicalSynthLaneDeadline assessmentContext commandDeadline"
+    [ "emDeadline <- classicalSynthLaneDeadline assessmentContext commandDeadline st"
     , "emRun <- runSynthLaneCursor assessmentContext"
-    , "nnDeadline <- classicalSynthLaneDeadline assessmentContext commandDeadline"
+    , "nnDeadline <- classicalSynthLaneDeadline assessmentContext commandDeadline st"
     , "nnRun <- runSynthLaneCursor assessmentContext nnPolicy nnDeadline st goal"
     ]
 
@@ -12922,7 +12922,7 @@ assertLengthAssessmentMainLaneScheduling = do
         "synthGo' assessmentContext st args retriedVars goal parsed = do"
         "loadSynthProviders ::" sourceLines
       constructiveSection = mainSourceSection
-        "limit <- synthTimeoutSeconds"
+        "limit <- synthTimeoutSeconds st"
         "if structuralFirst" schedulerSection
       baselineSection = mainSourceSection
         "if structuralFirst"
@@ -13084,7 +13084,7 @@ assertLengthAssessmentMainCursorDriver = do
         "runDetailedSynthCursorBefore requested deadline cursor =" sourceLines
       forcingSection = mainSourceSection
         "runDetailedSynthCursorBefore requested deadline cursor ="
-        "classicalSynthLaneDeadline assessmentContext commandDeadline ="
+        "classicalSynthLaneDeadline assessmentContext commandDeadline st ="
         sourceLines
       driverSection = mainSourceSection
         "runSynthLaneCursor assessmentContext policy deadline st goal transform outcome"
@@ -13234,7 +13234,7 @@ assertLengthAssessmentMainClassicalScheduling :: IO ()
 assertLengthAssessmentMainClassicalScheduling = do
   sourceLines <- lines <$> readFile "src/Main.hs"
   let deadlineSection = mainSourceSection
-        "classicalSynthLaneDeadline assessmentContext commandDeadline ="
+        "classicalSynthLaneDeadline assessmentContext commandDeadline st ="
         "runSynthLaneCursor assessmentContext policy deadline st goal transform outcome"
         sourceLines
       filterDeadlineSection = mainSourceSection
@@ -13253,7 +13253,7 @@ assertLengthAssessmentMainClassicalScheduling = do
     [ "case lengthAssessmentContextBehaviorMode assessmentContext of"
     , "LengthBehaviorFilter -> pure commandDeadline"
     , "LengthBehaviorRank -> do"
-    , "limit <- synthTimeoutSeconds"
+    , "limit <- synthTimeoutSeconds st"
     , "if limit <= 0 then pure Nothing"
     , "started <- getCurrentTime"
     , "Just (addUTCTime (fromIntegral limit) started)"
@@ -13262,7 +13262,7 @@ assertLengthAssessmentMainClassicalScheduling = do
     "case lengthAssessmentContextBehaviorMode assessmentContext of"
       deadlineSection
   timeoutRead <- expectMainSourcePosition "classical deadline ownership"
-    "limit <- synthTimeoutSeconds" deadlineSection
+    "limit <- synthTimeoutSeconds st" deadlineSection
   zeroGuard <- expectMainSourcePosition "classical deadline ownership"
     "if limit <= 0" deadlineSection
   clock <- expectMainSourcePosition "classical deadline ownership"
@@ -13278,7 +13278,7 @@ assertLengthAssessmentMainClassicalScheduling = do
     ]
   mapM_ (assertMainSourceContains "fresh rank route deadline"
       rankDeadlineSection)
-    [ "limit <- synthTimeoutSeconds"
+    [ "limit <- synthTimeoutSeconds st"
     , "if limit <= 0 then pure Nothing"
     , "started <- getCurrentTime"
     , "Just (addUTCTime (fromIntegral limit) started)"
@@ -13286,7 +13286,7 @@ assertLengthAssessmentMainClassicalScheduling = do
 
   mapM_ (assertMainSourceContains "classical cursor schedule"
       classicalSection)
-    [ "emDeadline <- classicalSynthLaneDeadline assessmentContext commandDeadline"
+    [ "emDeadline <- classicalSynthLaneDeadline assessmentContext commandDeadline st"
     , "if null atoms || length atoms > 5 then runDoubleNegation engine steps prefix body accumulation"
     , "emRun <- runSynthLaneCursor assessmentContext"
     , "synthLaneCursorBatchSize = synthMaxTried `div` 2"
@@ -13300,7 +13300,7 @@ assertLengthAssessmentMainClassicalScheduling = do
     , "LengthBehaviorFilter -> candidateWindow"
     , "ordinaryPolicy = ordinarySynthLaneCursorPolicy assessmentContext engine"
     , "nnPolicy = ordinaryPolicy { synthLaneCursorRetainsRunNotes = False }"
-    , "nnDeadline <- classicalSynthLaneDeadline assessmentContext commandDeadline"
+    , "nnDeadline <- classicalSynthLaneDeadline assessmentContext commandDeadline st"
     , "nnRun <- runSynthLaneCursor assessmentContext nnPolicy nnDeadline st goal"
     , "mapDetailedCandidateGroupVariantsDroppingSemanticSidecar wrap"
     , "synthesizeTunedDetailed engine steps (djinnCandidateCutoff, Nothing)"

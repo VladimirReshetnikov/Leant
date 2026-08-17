@@ -357,6 +357,9 @@ environment.
 \cmdrow{:set synth-library B}{library premises for recursive
   inductives (\code{on}$\mid$\code{off}, default on;
   \S\ref{sec:synth-library})}
+\cmdrow{:set synth-timeout N}{seconds one \code{:synth} may search before
+  answering ``no answer'' (default 20, or \code{LEANT\_SYNTH\_TIMEOUT} at
+  startup; \code{0} waits indefinitely)}
 \end{cmdtable}
 
 \noindent\textbf{Exact option-bearing grammar}
@@ -1798,8 +1801,9 @@ attestation, solver status, or behavioral evidence.
 
 The pure searches answer in microseconds to milliseconds; the cost
 center is backend verification, a few hundred milliseconds per
-candidate. A wall-clock guard (default 20\,s,
-\code{LEANT\_SYNTH\_TIMEOUT}) covers the quantified goals whose
+candidate. A wall-clock guard (default 20\,s; \code{:set synth-timeout N}
+changes it for the session and \code{LEANT\_SYNTH\_TIMEOUT} seeds it at
+startup) covers the quantified goals whose
 bounded instantiation can widen the space. Baseline and provider work share one
 absolute command deadline. Filter mode carries it through both batches and
 both classical routes; rank and disabled modes instead give each reached
