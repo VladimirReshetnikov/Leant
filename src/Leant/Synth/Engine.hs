@@ -105,7 +105,8 @@ module Leant.Synth.Engine
 
 import Data.Foldable (toList)
 import Data.List (intercalate, isPrefixOf, nub, nubBy, sortOn)
-import Data.Maybe (isNothing)
+import Data.Bifunctor (first, second)
+import Data.Maybe (catMaybes, isNothing)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Data.Void (Void)
@@ -2984,7 +2985,7 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
         ProviderInstantiationNominalArgument remaining spelling supplied ->
           nominalArgumentType remaining spelling supplied
         ProviderInstantiationExactArgument 0 frag _ -> go False frag
-        ProviderInstantiationExactArgument _ _ _ -> failT
+        ProviderInstantiationExactArgument {} -> failT
           "exact Lean provider argument is not proper-kinded"
         ProviderInstantiationArgument 0 frag -> go False frag
         ProviderInstantiationArgument remaining frag -> case frag of
@@ -3528,7 +3529,7 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
                         ))
                       translated)
                   assignmentVectors
-                pure [retained | Just retained <- discovered]
+                pure (catMaybes discovered)
               (True, SelectProviderGroundFacts _, True) -> mapM
                 (\(vectorIndex, arguments) -> do
                   translated@(_, _, argumentTypes) <-
@@ -3553,7 +3554,7 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
                       ((index, vectorIndex), retained, Nothing))
                         <$> translated)
                   assignmentVectors
-                pure [retained | Just retained <- fallback]
+                pure (catMaybes fallback)
               _ -> mapM
                 (\(vectorIndex, arguments) -> do
                   translated <- translateAssignment arguments
@@ -3836,7 +3837,7 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
   collectProviderArgumentFamilyUse uses argument = case argument of
     ProviderInstantiationNominalArgument remaining spelling supplied ->
       insertEvidenceUse spelling (length supplied + remaining) uses
-    ProviderInstantiationExactArgument _ _ _ -> uses
+    ProviderInstantiationExactArgument {} -> uses
     ProviderInstantiationArgument remaining frag
       | remaining > 0 -> case frag of
           FAtom _ spelling -> insertEvidenceUse spelling remaining uses
@@ -3908,7 +3909,7 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
                 exactRecursiveData projectionPolicy
               _ -> False
             accum'
-              | structural = (Set.insert key (fst accum), snd accum)
+              | structural = first (Set.insert key) accum
               | otherwise = accum
         -- The selected generic template fields are supplied separately above;
         -- occurrence-local inventories do not participate in the declaration.
@@ -4530,7 +4531,7 @@ replaceConstructorFields
   -> [(String, [Frag])]
   -> [(String, [Frag])]
 replaceConstructorFields replacements = map
-  (\(name, fields) -> (name, map (replaceFrag replacements) fields))
+  (second (map (replaceFrag replacements)))
 
 -- | Exact whole-fragment replacement, followed by structural descent only
 -- when no parameter matches the current node.  Matching the whole node first
@@ -4604,6 +4605,6 @@ replaceFrag replacements = go Set.empty
     recur = go shadowed
 
   mapCtorFields shadowed = map
-    (\(name, fields) -> (name, map (go shadowed) fields))
+    (second (map (go shadowed)))
 
   freshBinderName = freshFragBinderFrom "\0leant-bound:"

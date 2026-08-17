@@ -77,6 +77,7 @@ module Leant.Synth.Fragment
 
 import Data.Char (isSpace)
 import Data.List (intercalate, isPrefixOf, nub)
+import Data.Bifunctor (second)
 import Data.Maybe (fromMaybe)
 import qualified Data.Set as Set
 import Text.Read (readMaybe)
@@ -2386,4 +2387,4 @@ renameFragBinder old new frag = case frag of
   _ -> frag
  where
   go = renameFragBinder old new
-  mapCtorFields = map (\(name, fields) -> (name, map go fields))
+  mapCtorFields = map (second (map go))

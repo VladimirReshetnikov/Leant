@@ -2537,9 +2537,7 @@ forceLengthCandidateAssessment :: LengthCandidateAssessment -> ()
 forceLengthCandidateAssessment state = case state of
   LengthCandidatePreparationRefused refusal -> refusal `seq` ()
   LengthCandidateAssessed assessment simplification ->
-    forceLengthRankingAssessment assessment `seq` case simplification of
-      Nothing -> ()
-      Just receipt -> rnf receipt
+    forceLengthRankingAssessment assessment `seq` maybe () rnf simplification
 
 forceLengthRankingAssessment :: LengthRankingAssessment -> ()
 forceLengthRankingAssessment assessment = case assessment of
@@ -2647,9 +2645,9 @@ lengthQueryPreparationRefusalClass refusal = case refusal of
     LengthPreparationQueryConstructionRejected
   LengthSMTLibInputVariableOutOfRange _ _ ->
     LengthPreparationQueryConstructionRejected
-  LengthSMTLibNumeralBitLimitExceeded _ _ _ ->
+  LengthSMTLibNumeralBitLimitExceeded {} ->
     LengthPreparationQueryConstructionRejected
-  LengthSMTLibCommandByteLimitExceeded _ _ _ ->
+  LengthSMTLibCommandByteLimitExceeded {} ->
     LengthPreparationQueryConstructionRejected
   LengthSMTLibFingerprintByteLimitExceeded _ _ ->
     LengthPreparationQueryConstructionRejected

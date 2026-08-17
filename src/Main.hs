@@ -560,8 +560,8 @@ transcriptStart st mpath = do
       path <- case mpath of
         Just p -> pure p
         Nothing -> do
-          now <- getZonedTime
-          pure (formatTime defaultTimeLocale "leant-%Y%m%d-%H%M%S.log" now)
+          formatTime defaultTimeLocale "leant-%Y%m%d-%H%M%S.log"
+            <$> getZonedTime
       result <- try (openFile path AppendMode)
       case (result :: Either SomeException Handle) of
         Left err -> emitLn st =<< cRed st ("cannot open transcript file: " ++ show err)

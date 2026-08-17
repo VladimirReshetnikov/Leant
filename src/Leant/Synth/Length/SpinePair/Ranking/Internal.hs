@@ -2545,9 +2545,7 @@ forceLengthSpinePairCandidateAssessment state = case state of
   LengthSpinePairCandidatePreparationRefused refusal -> refusal `seq` ()
   LengthSpinePairCandidateAssessed assessment simplification ->
     forceLengthSpinePairRankingAssessment assessment `seq`
-      case simplification of
-        Nothing -> ()
-        Just receipt -> rnf receipt
+      maybe () rnf simplification
 
 forceLengthSpinePairRankingAssessment
   :: LengthSpinePairRankingAssessment
@@ -2629,8 +2627,8 @@ lengthSpinePairQueryPreparationRefusalClass refusal = case refusal of
   LengthSpinePairSMTLibInputVariableOutOfRange _ _ -> rejected
   LengthSpinePairSMTLibQuotientDivisorZero -> rejected
   LengthSpinePairSMTLibModuloDivisorZero -> rejected
-  LengthSpinePairSMTLibNumeralBitLimitExceeded _ _ _ -> rejected
-  LengthSpinePairSMTLibCommandByteLimitExceeded _ _ _ -> rejected
+  LengthSpinePairSMTLibNumeralBitLimitExceeded {} -> rejected
+  LengthSpinePairSMTLibCommandByteLimitExceeded {} -> rejected
   LengthSpinePairSMTLibFingerprintByteLimitExceeded _ _ -> rejected
  where
   rejected = LengthPreparationQueryConstructionRejected
