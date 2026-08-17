@@ -50,6 +50,8 @@ module Leant.Synth.Fragment
   , synthPrelude
   , serializerProgram
   , providerProgram
+  , providerProgramWith
+  , defaultProviderCap
   , candidateVerificationProgram
   , parseUniqueGoalTranslation
   , parseGoalSexp
@@ -1389,7 +1391,17 @@ serializerProgram goal = unlines
 -- The already-elaborated serializer query is the complete goal-dependent
 -- input; provider discovery does not elaborate the raw goal a second time.
 providerProgram :: [String] -> ProviderQuery -> String
-providerProgram sessionNames query = unlines
+providerProgram = providerProgramWith defaultProviderCap
+
+-- | The established number of providers one discovery run may serialize.
+defaultProviderCap :: Int
+defaultProviderCap = 80
+
+-- | 'providerProgram' with a retuned cap on serialized providers (the
+-- @:set synth-provider-cap@ setting); ranking and exclusion rules are the
+-- same, only the prefix length differs.
+providerProgramWith :: Int -> [String] -> ProviderQuery -> String
+providerProgramWith cap sessionNames query = unlines
   [ "open Lean Meta Elab Command in"
   , "set_option linter.unusedVariables false in"
   , "run_cmd do"
@@ -1463,7 +1475,8 @@ providerProgram sessionNames query = unlines
   , "            fallback := fallback.push n"
   , "    let chosen := (sessionPreferred.toList ++ preferred.toList"
   , "      ++ sessionFallback.toList ++ fallback.toList"
-  , "      ++ workerPreferred.toList ++ workerFallback.toList).take 80"
+  , "      ++ workerPreferred.toList ++ workerFallback.toList).take "
+      ++ show cap
   , "    let mut body := \"\""
   , "    for n in chosen do"
   , "      match env.find? n with"

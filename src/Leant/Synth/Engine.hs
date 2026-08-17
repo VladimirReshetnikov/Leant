@@ -86,6 +86,12 @@ module Leant.Synth.Engine
   , synthMaxTried
   , synthVerificationWindow
   , candidateWindow
+  , SynthLimits (..)
+  , defaultSynthLimits
+  , synthVerificationWindowWith
+  , synthesizeTunedDetailedWith
+  , synthesizeWithProvidersSkippingDetailedWith
+  , advanceDetailedSynthCursorWith
   , takeDistinct
   , takeDistinctOn
   , renderCandidateByAvailability
@@ -704,21 +710,32 @@ advanceDetailedSynthCursor
   :: Int
   -> DetailedSynthCursor
   -> Either DetailedSynthCursorError DetailedSynthCursorStep
-advanceDetailedSynthCursor requested cursor
+advanceDetailedSynthCursor = advanceDetailedSynthCursorWith candidateWindow
+
+-- | 'advanceDetailedSynthCursor' under a retuned hard cap on the total
+-- number of candidate groups the cursor may hand out ('synthLimitWindow');
+-- the cap is checked before the cursor is demanded, exactly as the default.
+advanceDetailedSynthCursorWith
+  :: Int
+  -> Int
+  -> DetailedSynthCursor
+  -> Either DetailedSynthCursorError DetailedSynthCursorStep
+advanceDetailedSynthCursorWith window requested cursor
   | requested <= 0 =
       Left $ DetailedSynthCursorBatchSizeNotPositive requested
-  | requested > candidateWindow =
+  | requested > window =
       Left $ DetailedSynthCursorBatchSizeLimitExceeded
-        candidateWindow requested
-  | otherwise = Right $ advanceValidDetailedSynthCursor requested cursor
+        window requested
+  | otherwise = Right $ advanceValidDetailedSynthCursor window requested cursor
 
 advanceValidDetailedSynthCursor
   :: Int
+  -> Int
   -> DetailedSynthCursor
   -> DetailedSynthCursorStep
-advanceValidDetailedSynthCursor requested
+advanceValidDetailedSynthCursor window requested
     (DetailedSynthCursor consumed outcome)
-  | consumed >= candidateWindow = hardCapStep outcome
+  | consumed >= window = hardCapStep outcome
   | otherwise = case outcome of
       Left err -> DetailedSynthCursorEngineFailed err
       Right (DetailedSynthRefuted sound) ->
@@ -733,7 +750,7 @@ advanceValidDetailedSynthCursor requested
             (Right $ DetailedSynthCandidates rest notes))
        where
         (batch, rest) = splitAt remainingRequest groups
-        remainingRequest = min requested (candidateWindow - consumed)
+        remainingRequest = min requested (window - consumed)
 
 -- The only reachable capped cursor follows at least one candidate batch, so
 -- its payload is a locally reconstructed candidate outcome.  Keeping the
@@ -773,6 +790,46 @@ synthVerificationWindow engine = case engine of
 -- sound.
 candidateWindow :: Int
 candidateWindow = 60
+
+-- | The per-command search bounds a REPL session may retune.  Every field
+-- defaults to the established constant, so 'defaultSynthLimits' reproduces
+-- the historical behaviour exactly; the ordinary lanes take their Djinn
+-- candidate cutoff and choice-point budget from here, while the library and
+-- classical lanes keep their own fixed budgets.
+data SynthLimits = SynthLimits
+  { synthLimitShown :: !Int
+    -- ^ accepted candidate groups shown and bound ('synthMaxShown')
+  , synthLimitTried :: !Int
+    -- ^ fresh groups verified per lane; the @both@ engine doubles it
+    -- ('synthMaxTried')
+  , synthLimitWindow :: !Int
+    -- ^ candidate groups one lane may observe before "candidate limit
+    -- reached" ('candidateWindow'); also the cursor's hard cap
+  , synthLimitBudget :: !(Maybe Integer)
+    -- ^ Djinn choice-point budget of the ordinary and provider lanes;
+    -- 'Nothing' is unbounded
+  , synthLimitQueue :: !Int
+    -- ^ Exference queue bound
+  }
+  deriving (Eq, Show)
+
+-- | The historical bounds: 5 shown, 12 tried, a 60-group window, no Djinn
+-- budget, and an Exference queue of 1024.
+defaultSynthLimits :: SynthLimits
+defaultSynthLimits = SynthLimits
+  { synthLimitShown = synthMaxShown
+  , synthLimitTried = synthMaxTried
+  , synthLimitWindow = candidateWindow
+  , synthLimitBudget = Nothing
+  , synthLimitQueue = 1024
+  }
+
+-- | 'synthVerificationWindow' under retuned limits.
+synthVerificationWindowWith :: SynthLimits -> SynthEngine -> Int
+synthVerificationWindowWith limits engine = case engine of
+  EngineBoth -> 2 * synthLimitTried limits
+  EngineDjinn -> synthLimitTried limits
+  EngineExference -> synthLimitTried limits
 
 -- | Retain the first bounded set of distinct values. Deduplication deliberately
 -- precedes the bound so repeated backend derivations cannot consume slots that
@@ -881,7 +938,7 @@ synthEngineName engine = case engine of
 -- candidate window can be crowded by a large environment even when a short
 -- prefix contains every declaration needed for a composition.  Give it sparse
 -- geometric prefixes before the complete bounded inventory: at most four
--- searches for the current eighty-provider discovery cap.  Exference keeps
+-- searches for the default eighty-provider discovery cap.  Exference keeps
 -- its rated full-inventory lane.  Combined mode preserves its existing
 -- singleton run and complete final run; intermediate prefixes are Djinn-only
 -- so widening does not repeatedly spend Exference's step budget.
@@ -935,9 +992,21 @@ synthesizeWithProvidersSkipping engine steps checked providers frag =
 synthesizeWithProvidersSkippingDetailed
   :: SynthEngine -> Int -> Set.Set String -> [ProviderFrag] -> Frag
   -> Either String DetailedSynthOutcome
-synthesizeWithProvidersSkippingDetailed engine steps checked providers frag =
-  synthesizeTunedWithProvidersDetailed engine steps
-    (candidateWindow, Nothing) checked providers [] frag frag
+synthesizeWithProvidersSkippingDetailed =
+  synthesizeWithProvidersSkippingDetailedWith defaultSynthLimits
+
+-- | 'synthesizeWithProvidersSkippingDetailed' under retuned limits: the
+-- Djinn cutoff and choice-point budget come from the limits, as do the
+-- Exference queue and candidate window.
+synthesizeWithProvidersSkippingDetailedWith
+  :: SynthLimits
+  -> SynthEngine -> Int -> Set.Set String -> [ProviderFrag] -> Frag
+  -> Either String DetailedSynthOutcome
+synthesizeWithProvidersSkippingDetailedWith limits engine steps checked
+    providers frag =
+  runTunedSynthesis limits True engine steps
+    (synthLimitWindow limits, synthLimitBudget limits)
+    checked providers [] frag frag
 
 -- | Package-private tuned counterpart used by focused boundary tests which
 -- need to retain a simple checked provider graph without changing the REPL's
@@ -949,7 +1018,7 @@ synthesizeWithProvidersSkippingDetailedWithMultiConstructorPatterns
   -> Either String DetailedSynthOutcome
 synthesizeWithProvidersSkippingDetailedWithMultiConstructorPatterns
     multiConstructorPatterns engine steps checked providers frag =
-  synthesizeTunedWithProvidersDetailedWithMultiConstructorPatterns
+  runTunedSynthesis defaultSynthLimits
     multiConstructorPatterns engine steps (candidateWindow, Nothing)
     checked providers [] frag frag
 
@@ -983,32 +1052,37 @@ synthesizeTuned engine steps limits extras engineFrag fitFrag =
 synthesizeTunedDetailed
   :: SynthEngine -> Int -> (Int, Maybe Integer) -> [(String, Frag)]
   -> Frag -> Frag -> Either String DetailedSynthOutcome
-synthesizeTunedDetailed engine steps limits extras engineFrag fitFrag =
-  synthesizeTunedWithProvidersDetailed engine steps limits Set.empty [] extras
+synthesizeTunedDetailed = synthesizeTunedDetailedWith defaultSynthLimits
+
+-- | 'synthesizeTunedDetailed' whose Exference queue, candidate window, and
+-- @both@-mode interleave come from retuned limits; the explicit Djinn
+-- cutoff/budget pair still belongs to the calling lane.
+synthesizeTunedDetailedWith
+  :: SynthLimits
+  -> SynthEngine -> Int -> (Int, Maybe Integer) -> [(String, Frag)]
+  -> Frag -> Frag -> Either String DetailedSynthOutcome
+synthesizeTunedDetailedWith limits engine steps djinnLimits extras engineFrag
+    fitFrag =
+  runTunedSynthesis limits True engine steps djinnLimits Set.empty [] extras
     engineFrag fitFrag
 
-synthesizeTunedWithProvidersDetailed
-  :: SynthEngine -> Int -> (Int, Maybe Integer) -> Set.Set String
-  -> [ProviderFrag] -> [(String, Frag)] -> Frag -> Frag
-  -> Either String DetailedSynthOutcome
-synthesizeTunedWithProvidersDetailed engine steps limits checked providers extras
-    engineFrag fitFrag =
-  synthesizeTunedWithProvidersDetailedWithMultiConstructorPatterns
-    True engine steps limits checked providers extras engineFrag fitFrag
-
-synthesizeTunedWithProvidersDetailedWithMultiConstructorPatterns
-  :: Bool
+-- | The one tuned search: Djinn under the lane's cutoff/budget pair,
+-- Exference under the limits' step, queue, and window bounds, or both merged
+-- under the limits' shown/tried interleave.
+runTunedSynthesis
+  :: SynthLimits
+  -> Bool
   -> SynthEngine -> Int -> (Int, Maybe Integer) -> Set.Set String
   -> [ProviderFrag] -> [(String, Frag)] -> Frag -> Frag
   -> Either String DetailedSynthOutcome
-synthesizeTunedWithProvidersDetailedWithMultiConstructorPatterns
-    multiConstructorPatterns engine steps limits checked providers extras
+runTunedSynthesis limits
+    multiConstructorPatterns engine steps djinnLimits checked providers extras
     engineFrag fitFrag = case engine of
   EngineDjinn -> do
     prepared <- prepareSynthesis djinnRecursiveProjection
       providers extras engineFrag fitFrag
     let origin = preparedSemanticOrigin prepared
-    outcome <- djinnRun limits fitFrag
+    outcome <- djinnRun (synthLimitWindow limits) djinnLimits fitFrag
       (semanticOriginProjectionCompleteness origin)
       (preparedRenderExpression prepared)
       (semanticOriginSearchGoal origin)
@@ -1020,13 +1094,13 @@ synthesizeTunedWithProvidersDetailedWithMultiConstructorPatterns
   EngineExference -> do
     prepared <- prepareSynthesis exferenceRecursiveProjection
       providers extras engineFrag fitFrag
-    outcome <- exferenceRun multiConstructorPatterns steps prepared
+    outcome <- exferenceRun limits multiConstructorPatterns steps prepared
     pure (withoutCheckedDetailedCandidates checked outcome)
   EngineBoth -> do
     djinnPrepared <- prepareSynthesis djinnRecursiveProjection
       providers extras engineFrag fitFrag
     let djinnOrigin = preparedSemanticOrigin djinnPrepared
-    djinnCompatibility <- djinnRun limits fitFrag
+    djinnCompatibility <- djinnRun (synthLimitWindow limits) djinnLimits fitFrag
       (semanticOriginProjectionCompleteness djinnOrigin)
       (preparedRenderExpression djinnPrepared)
       (semanticOriginSearchGoal djinnOrigin)
@@ -1035,8 +1109,9 @@ synthesizeTunedWithProvidersDetailedWithMultiConstructorPatterns
     let djinn = detailUnobservedOutcome djinnCompatibility
     exferencePrepared <- prepareSynthesis exferenceRecursiveProjection
       providers extras engineFrag fitFrag
-    exference <- exferenceRun multiConstructorPatterns steps exferencePrepared
-    pure (mergeDetailedOutcomesSkipping checked djinn exference)
+    exference <- exferenceRun limits multiConstructorPatterns steps
+      exferencePrepared
+    pure (mergeDetailedOutcomesSkippingWith limits checked djinn exference)
 
 -- | Prepare one engine-specific translation without erasing which goal came
 -- from the source fragment and which goal search actually receives. Premise
@@ -1173,7 +1248,8 @@ prepareProviderGroundFactTranslation recursiveProjection providers extras
 -- | The complete LJT search: candidates, or a refutation whose
 -- soundness depends on the translation having hidden nothing.
 djinnRun
-  :: (Int, Maybe Integer)
+  :: Int
+  -> (Int, Maybe Integer)
   -> Frag
   -> ProjectionCompleteness
   -> (Expression String -> Either String [String])
@@ -1181,7 +1257,8 @@ djinnRun
   -> [DjinnDecl]
   -> [KindedProviderInstantiationAssignment String]
   -> Either String SynthOutcome
-djinnRun (cutoff, budget) frag projection render goal decls instantiations = do
+djinnRun window (cutoff, budget) frag projection render goal decls
+    instantiations = do
   standard <- viaDiagnostic standardDjinnSession
   targetName <- viaShow (mkIdentifier "leantSynth")
   target <- viaShow (mkDefinitionName targetName)
@@ -1208,7 +1285,7 @@ djinnRun (cutoff, budget) frag projection render goal decls instantiations = do
     (runDjinnQueryWithKindedInstantiationAssignments
       session instantiations request)
   let batch = resultSearch result
-      notes = progressNotes (batchProgress batch)
+      notes = progressNotesWith window (batchProgress batch)
       -- Djinn ranks by unused-binder fraction, which happily puts a
       -- redundantly re-cased monster ahead of the obvious term.  Prefer
       -- smaller terms, keeping the engine's order as the tie-break, over
@@ -1241,11 +1318,12 @@ djinnRun (cutoff, budget) frag projection render goal decls instantiations = do
 -- converted to Exference's integer variable domain.  Candidates keep
 -- Exference's own ranking; there is never negative evidence.
 exferenceRun
-  :: Bool
+  :: SynthLimits
+  -> Bool
   -> Int
   -> PreparedSynthesis
   -> Either String DetailedSynthOutcome
-exferenceRun multiConstructorPatterns steps prepared = do
+exferenceRun limits multiConstructorPatterns steps prepared = do
   standard <- viaDiagnostic standardDjinnSession
   let semanticOrigin = preparedSemanticOrigin prepared
       render = preparedRenderExpression prepared
@@ -1300,7 +1378,7 @@ exferenceRun multiConstructorPatterns steps prepared = do
                     -- the queue is the memory hog; a modest bound keeps the
                     -- search interactive on small machines, reported honestly
                     -- as pruning
-                  , exferenceMaximumQueueSize = Just 1024
+                  , exferenceMaximumQueueSize = Just (synthLimitQueue limits)
                   }
               }
         request <- viaDiagnostic (mkExferenceRequest query)
@@ -1322,7 +1400,7 @@ exferenceRun multiConstructorPatterns steps prepared = do
             -- repetitions must not crowd later distinct candidates out of a
             -- bounded interactive response.
             groups = takeDistinctOn detailedCandidateGroupVariants
-              candidateWindow
+              (synthLimitWindow limits)
               [ DetailedCandidateGroup route
                   (indexDetailedCandidateVariants group) sidecar
               | candidate <- selectionCandidates selection
@@ -1338,7 +1416,8 @@ exferenceRun multiConstructorPatterns steps prepared = do
                       Left _ -> Nothing
               , Right group <- [rendered]
               ]
-            notes = maybe [] progressNotes (selectionProgress selection)
+            notes = maybe [] (progressNotesWith (synthLimitWindow limits))
+              (selectionProgress selection)
         pure (groups, notes)
   (strictGroups, strictNotes) <- runLane False
   if not (null strictGroups)
@@ -1386,14 +1465,23 @@ mergeDetailedCandidateGroups
   :: [DetailedCandidateGroup]
   -> [DetailedCandidateGroup]
   -> [DetailedCandidateGroup]
-mergeDetailedCandidateGroups djinnGroups exferenceGroups =
-  djinnHead (synthMaxShown - 1) Set.empty
+mergeDetailedCandidateGroups = mergeDetailedCandidateGroupsWith defaultSynthLimits
+
+-- | 'mergeDetailedCandidateGroups' interleaving under retuned shown/tried
+-- bounds.
+mergeDetailedCandidateGroupsWith
+  :: SynthLimits
+  -> [DetailedCandidateGroup]
+  -> [DetailedCandidateGroup]
+  -> [DetailedCandidateGroup]
+mergeDetailedCandidateGroupsWith limits djinnGroups exferenceGroups =
+  djinnHead (synthLimitShown limits - 1) Set.empty
     (map (retainExactExferenceVariantOrigins exferenceGroups) djinnGroups)
     exferenceGroups
  where
   djinnHead remaining seen djinn exference
     | remaining <= 0 =
-        exferenceFront synthMaxTried seen djinn exference
+        exferenceFront (synthLimitTried limits) seen djinn exference
     | otherwise = case nextFresh seen djinn of
         Just (group, seen', djinn') ->
           group : djinnHead (remaining - 1) seen' djinn' exference
@@ -1401,7 +1489,8 @@ mergeDetailedCandidateGroups djinnGroups exferenceGroups =
 
   exferenceFront remaining seen djinn exference
     | remaining <= 0 = djinnFront
-        (synthMaxTried - (synthMaxShown - 1)) seen djinn exference
+        (synthLimitTried limits - (synthLimitShown limits - 1)) seen djinn
+        exference
     | otherwise = case nextFresh seen exference of
         Just (group, seen', exference') ->
           group : exferenceFront (remaining - 1) seen' djinn exference'
@@ -1551,11 +1640,20 @@ mergeDetailedOutcomesSkipping
   -> DetailedSynthOutcome
   -> DetailedSynthOutcome
   -> DetailedSynthOutcome
-mergeDetailedOutcomesSkipping checked djinn0 exference0 =
+mergeDetailedOutcomesSkipping = mergeDetailedOutcomesSkippingWith defaultSynthLimits
+
+-- | 'mergeDetailedOutcomesSkipping' under retuned shown/tried bounds.
+mergeDetailedOutcomesSkippingWith
+  :: SynthLimits
+  -> Set.Set String
+  -> DetailedSynthOutcome
+  -> DetailedSynthOutcome
+  -> DetailedSynthOutcome
+mergeDetailedOutcomesSkippingWith limits checked djinn0 exference0 =
   case (djinn, exference) of
     (DetailedSynthCandidates a na, DetailedSynthCandidates b nb) ->
       DetailedSynthCandidates
-        (mergeDetailedCandidateGroups a b) (na ++ tag nb)
+        (mergeDetailedCandidateGroupsWith limits a b) (na ++ tag nb)
     (DetailedSynthCandidates a na, other) ->
       DetailedSynthCandidates a (na ++ tag (notesOf other))
     (other, DetailedSynthCandidates b nb) ->
@@ -1577,7 +1675,7 @@ mergeDetailedOutcomesSkipping checked djinn0 exference0 =
   normalize outcome = case outcome of
     DetailedSynthCandidates groups notes ->
       candidatesOr (DetailedSynthNoTerm notes)
-        (mergeDetailedCandidateGroups groups []) notes
+        (mergeDetailedCandidateGroupsWith limits groups []) notes
     other -> other
 
   notesOf outcome = case outcome of
@@ -1611,8 +1709,10 @@ viaDiagnostic = either (Left . renderDiagnostic) Right
 viaShow :: Show e => Either e a -> Either String a
 viaShow = either (Left . show) Right
 
-progressNotes :: Progress -> [String]
-progressNotes progress = case progress of
+-- | Human-readable notes for one engine progress report, naming the
+-- candidate window in its cap note.
+progressNotesWith :: Int -> Progress -> [String]
+progressNotesWith window progress = case progress of
   Completed Finished -> []
   Completed (Truncated reasons) ->
     [ "search truncated: "
@@ -1623,7 +1723,7 @@ progressNotes progress = case progress of
     StepLimitReached -> "step limit reached"
     ChoicePointLimitReached -> "choice-point limit reached"
     CandidateLimitReached ->
-      "candidate limit reached (" ++ show candidateWindow ++ ")"
+      "candidate limit reached (" ++ show window ++ ")"
     IdentifierSpaceExhausted -> "identifier space exhausted"
     QueueLimitPruned n -> "queue limit pruned " ++ show n
     DepthLimitPruned n -> "depth limit pruned " ++ show n

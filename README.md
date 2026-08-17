@@ -1083,18 +1083,22 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   to Djex's ranked heuristic search (explicit budgets, no negative
   verdicts; `:set synth-steps N` bounds it, default 4096), and `both`
   runs the two together. Standalone lanes send at most 12 fresh candidate
-  groups to Lean; a combined lane gets 24 and preserves both standalone
-  frontiers. Writing `D` and `E` for fresh Djinn and Exference groups, its
-  order is `D1–D4, E1–E12, D5–D12`, followed by alternating tails.
+  groups to Lean (`:set synth-verify N`); a combined lane gets twice that
+  and preserves both standalone frontiers. Writing `D` and `E` for fresh
+  Djinn and Exference groups, its order is `D1–D4, E1–E12, D5–D12`, followed
+  by alternating tails: the Djinn head is one short of `synth-shown` and each
+  front runs to `synth-verify`, so retuning either setting reshapes the
+  interleave accordingly.
   Within each Exference invocation, Leant stable-deduplicates rendered groups
-  before applying the internal 60-candidate collection window. The first
+  before applying the internal 60-candidate collection window
+  (`:set synth-window N`). The first
   spelling remains authoritative, while repeated backend derivations cannot
   consume slots ahead of later distinct terms. Ranking and disabled commands
   retain one outer 12/24-group batch and ranking stops after five accepted
-  groups. Filtering may consume one successor of the same width after a first
-  no-verification or all-rejected batch, for a 12+12 standalone or 24+24
-  combined maximum from the same engine outcome, before its five-survivor
-  presentation cap. There is no third probe. Combined exact-text deduplication
+  groups (`:set synth-shown N`). Filtering may consume one successor of the
+  same width after a first no-verification or all-rejected batch, for a
+  12+12 standalone or 24+24 combined maximum from the same engine outcome,
+  before its five-survivor presentation cap. There is no third probe. Combined exact-text deduplication
   likewise keeps the first display occurrence. If that occurrence has no typed
   authority, the exact spelling may lazily retain the first bounded later
   Exference origin solely for checked behavioral preparation; route metrics,
@@ -1104,7 +1108,9 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
 - Every engine mode gives a structurally accepted goal a provider-free
   baseline lane. Its rendered candidates are checked by Lean first, and live
   providers are discovered whenever no baseline term verifies or an authorized
-  filter rejects every verified baseline occurrence. The same command-local
+  filter rejects every verified baseline occurrence (`:set synth-providers
+  off` skips discovery; `:set synth-provider-cap N` bounds how many providers
+  one discovery serializes, default 80). The same command-local
   filter bank and accumulated rejection history cross those runs. A complete
   Djinn refutation is retained provisionally while the constructive provider
   lanes run: the first batch with any surviving or preserve-all result wins,
@@ -1134,7 +1140,7 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   by the target, plus exact declarations from the current session;
   rejects generated names; prioritizes exact-result session and public
   declarations before unrelated session values; and serializes at most
-  80 term providers. Declarations whose fully peeled result is a sort
+  80 term providers (`:set synth-provider-cap N`). Declarations whose fully peeled result is a sort
   (type constructors and type families) are excluded before search.
   Conventional implementation workers ending in `TR`,
   `Impl`, or `Aux` (or a `.go`/`.loop` component) remain eligible but
@@ -1200,10 +1206,34 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   an independent fresh configured duration at each classical route actually
   reached. Hitting any such boundary is reported as "no answer", never as a
   verdict.
-- `LEANT_SYNTH_DEBUG=1` prints the translated fragment, discovered providers,
-  rendered variants, and stable `code=count` verification metrics — the
-  fastest way to see why a candidate was dropped and how much Lean work the
-  lane performed.
+- `:set synth-debug on` (or `LEANT_SYNTH_DEBUG=1` at startup) prints the
+  translated fragment, discovered providers, rendered variants, and stable
+  `code=count` verification metrics — the fastest way to see why a candidate
+  was dropped and how much Lean work the lane performed.
+
+### Session settings
+
+Every knob above is a `:set` setting; given without a value it prints its
+current state, and a bare `:set` prints them all. Defaults reproduce the
+historical constants, so a fresh session behaves exactly as documented.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `synth-engine djinn\|exference\|both` | `djinn` | which Djex search runs |
+| `synth-steps N` | 4096 | Exference step budget |
+| `synth-queue N` | 1024 | Exference queue bound |
+| `synth-budget N\|off` | `off` | Djinn choice-point budget of the ordinary and provider lanes |
+| `synth-window N` | 60 | candidate groups one lane may observe |
+| `synth-verify N` | 12 | fresh candidate groups Lean checks per lane (`both` sends twice that, and the batch is clamped to `synth-window`) |
+| `synth-shown N` | 5 | accepted groups shown, and the ranking stop |
+| `synth-classical on\|off` | `on` | excluded-middle and double-negation fallbacks |
+| `synth-library on\|off` | `on` | rated library premises for recursive inductives |
+| `synth-library-premises N` | 8 | rated offers kept per goal (`:set synth-ratings` lists the inventory) |
+| `synth-providers on\|off` | `on` | discover live providers after the structural lane |
+| `synth-provider-cap N` | 80 | providers one discovery may serialize |
+| `synth-timeout N` | 20 (`LEANT_SYNTH_TIMEOUT`) | wall-clock seconds per `:synth`; `0` waits indefinitely |
+| `backend-timeout N` | 300 (`--timeout`) | seconds per Lean request; `0` none |
+| `synth-debug on\|off` | `off` (`LEANT_SYNTH_DEBUG`) | fragment, provider, lane, and metric diagnostics |
 
 ## How it works
 
@@ -1277,7 +1307,10 @@ cabal test leant-synth-tests --test-show-details=direct
 Golden transcript tests live in [test/](test/): `bash test/run-tests.sh`
 passes each `*.txt` through `leant --plain` and diffs the filtered
 output against the checked-in `*.golden`; `-u` regenerates the goldens
-after an intentional behavior change. These end-to-end goldens require
+after an intentional behavior change. The runner raises the `:synth` wall
+clock to 600 s so a transcript records what the engines answer rather than
+how fast the machine answers it; export `LEANT_SYNTH_TIMEOUT` to override.
+These end-to-end goldens require
 the Lake project to provide the backend executable (`repl` or
 `repl.exe`); the focused suite remains runnable when that backend is not
 installed. Ideas under consideration are tracked in

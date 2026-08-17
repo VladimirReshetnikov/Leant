@@ -2587,7 +2587,7 @@ The Haskell state tracks, among other things:
 \item the current Lean environment identifier and the undo stack of earlier identifiers (\term{rsEnvStack});
 \item the replayable command history, the import list, and any snapshot base loaded by \term{:unpickle};
 \item the synthesized \term{it}, \term{it1}, \term{it2}, \dots{} bindings (\term{rsItCounter}, \term{rsSynthIts});
-\item the engine selection \term{rsSynthEngine} (\term{:set synth-engine}) and Exference's step budget \term{rsSynthSteps} (\term{:set synth-steps}); the queue bound, the candidate window, the verification frontier, and the five-result display quota are compiled-in constants, not settings;
+\item the engine selection \term{rsSynthEngine} (\term{:set synth-engine}) and Exference's step budget \term{rsSynthSteps} (\term{:set synth-steps}); at the pinned revision the queue bound, the candidate window, the verification frontier, and the five-result display quota are compiled-in constants rather than settings, and a later revision collected exactly those four into one \term{rsSynthLimits} record reached by \term{:set synth-queue}, \term{:set synth-window}, \term{:set synth-verify}, and \term{:set synth-shown} (Chapter~\ref{ch:repl});
 \item the cached synthesis side environment (\term{rsSynthBase}, \term{rsSynthEnv}), the provider world generation and the twelve-entry provider cache (\term{rsProviderWorld}, \term{rsProviderCache});
 \item the \term{synth-library} and \term{synth-classical} toggles, the rated library inventory, and the startup-only Length assessment mode;
 \item proof-mode state (\term{rsProve}) and the last \term{sorry} goal that a bare \term{:synth} may target.
@@ -2764,6 +2764,23 @@ wall-clock deadline & 20\,s (\term{LEANT_SYNTH_TIMEOUT}; \term{:set synth-timeou
 \bottomrule
 \end{tabularx}
 \end{center}
+
+Every row is a constant of the pinned revision, and each is quoted as such
+throughout this document.  Revisions after the pinned one turned eight of them
+into session settings whose defaults are the values above: providers
+serialized per query (\term{:set synth-provider-cap N}), the Djinn candidate
+window (\term{:set synth-window N}), library premises kept
+(\term{:set synth-library-premises N}), the Exference queue
+(\term{:set synth-queue N}), fresh groups sent to Lean per lane
+(\term{:set synth-verify N}), accepted groups shown and bound
+(\term{:set synth-shown N}), the wall-clock deadline
+(\term{:set synth-timeout N}), and the ordinary and provider lanes' Djinn
+choice-point budget, unbounded at the pinned revision
+(\term{:set synth-budget N|off}; the library and excluded-middle lanes keep
+the fixed 100\,000).  Chapter~\ref{ch:repl} lists them together.  The
+remaining rows --- serializer fuel, the provider prefix schedule, the cache
+size, the per-provider instantiation bounds, the excluded-middle atom
+tolerance --- are still compiled in.
 
 
 \begin{sourcebox}
@@ -3073,7 +3090,7 @@ Its options record (\term{ExferenceOptions} in \path{exference/src-core/Language
 
 \begin{itemize}
 \item \term{exferenceMaximumSteps}: processed search nodes; Leant passes \term{rsSynthSteps}, default 4096 (\term{:set synth-steps N});
-\item \term{exferenceMaximumQueueSize}: Leant fixes \term{Just 1024} (Djex's default is 8192) to keep memory interactive; hitting it is reported as \term{queue limit pruned N};
+\item \term{exferenceMaximumQueueSize}: Leant passes \term{Just 1024} where Djex's default is 8192, to keep memory interactive (\term{:set synth-queue N} from a later revision); hitting it is reported as \term{queue limit pruned N};
 \item \term{exferenceMaximumDepth}: optional heuristic-depth cap, left at Djex's default (none);
 \item \term{exferenceAllowUnused}: whether a candidate may ignore an introduced binder; Leant first runs a strict lane and, only if it yields nothing, a relaxed one;
 \item \term{exferenceAllowResidualConstraints}/\term{exferenceConstraintDeferralSteps}: whether and how long unresolved class constraints may be deferred (defaults);
@@ -3255,7 +3272,7 @@ Candidates arrive in semantic groups.  Verification proceeds lazily:
 \item stop once the success quota is reached or the stream ends.
 \end{enumerate}
 
-The numbers are fixed in \path{src/Leant/Synth/Engine.hs}: a lane hands at most \term{synthMaxTried} $= 12$ fresh groups to Lean (24 in \term{both} mode, so that neither engine's standalone frontier is lost), and \term{synthMaxShown} $= 5$ accepted groups are displayed and bound; the excluded-middle classical lane uses a six-group frontier.  \term{verifyCandidateGroups} in \path{src/Leant/Synth/Verification.hs} is the pure driver and \term{synthVerify} in \path{src/Main.hs} supplies the backend callback.  This avoids eagerly compiling a potentially large candidate stream and gives users five usable answers rather than five attempts.
+The numbers live in \path{src/Leant/Synth/Engine.hs}: a lane hands at most \term{synthMaxTried} $= 12$ fresh groups to Lean (24 in \term{both} mode, so that neither engine's standalone frontier is lost), and \term{synthMaxShown} $= 5$ accepted groups are displayed and bound; the excluded-middle classical lane uses a six-group frontier.  They are constants at the pinned revision and the defaults of \term{:set synth-verify N} and \term{:set synth-shown N} from a later one, which also makes the excluded-middle frontier half of \term{synth-verify}.  \term{verifyCandidateGroups} in \path{src/Leant/Synth/Verification.hs} is the pure driver and \term{synthVerify} in \path{src/Main.hs} supplies the backend callback.  This avoids eagerly compiling a potentially large candidate stream and gives users five usable answers rather than five attempts.
 
 \section{What positive verification guarantees}
 
@@ -3479,7 +3496,9 @@ The session settings that affect it are exactly four, all read by \term{:set} (a
 \item \term{:set synth-timeout N} (added in the revision after the pinned one: the wall-clock seconds one \term{:synth} may search, default 20, \term{0} unbounded; at the pinned revision itself the only control was the environment variable below).
 \end{itemize}
 
-Each setting given without a value prints its current state.  Two environment variables complete the picture: \term{LEANT_SYNTH_TIMEOUT} (seconds, default 20, \term{0} unbounded; it seeds \term{synth-timeout} at startup) and \term{LEANT_SYNTH_DEBUG}.  There is no setting for the number of results (five accepted groups), the candidate window (60), the verification frontier (12 or 24), Exference's queue bound (1024), or the provider cap (80); those are constants of the pinned revision.
+Each setting given without a value prints its current state.  Two environment variables complete the picture: \term{LEANT_SYNTH_TIMEOUT} (seconds, default 20, \term{0} unbounded; it seeds \term{synth-timeout} at startup) and \term{LEANT_SYNTH_DEBUG}.  At the pinned revision there is no setting for the number of results (five accepted groups), the candidate window (60), the verification frontier (12 or 24), Exference's queue bound (1024), or the provider cap (80); those are constants there, and settings (with the same defaults) only in the revision after it, as the next paragraph lists.
+
+A still later revision made the remaining constants of this document session settings with unchanged defaults: \term{:set synth-shown N} (accepted groups shown, 5), \term{:set synth-verify N} (fresh groups Lean checks per lane, 12), \term{:set synth-window N} (the collection window, 60), \term{:set synth-budget N|off} (Djinn choice points, off), \term{:set synth-queue N} (Exference's queue bound, 1024), \term{:set synth-providers on|off} and \term{:set synth-provider-cap N} (provider discovery and its cap, 80), \term{:set synth-library-premises N} (rated offers kept per goal, 8; \term{:set synth-ratings} lists them), \term{:set synth-debug on|off}, \term{:set backend-timeout N} (seconds per Lean request), and a bare \term{:set} that prints them all.  Wherever this document states one of those numbers --- the bounds table of Chapter~\ref{ch:pipeline} above all --- read it as that revision's default rather than as a compiled-in constant.  The verification frontier is clamped to the candidate window, so a window below the frontier narrows the batch instead of failing.
 
 The command is best suited to structurally informative types: adapters, combinators, product/sum rearrangements, polymorphic plumbing, constructor assembly, and applications of known providers.
 
@@ -4676,7 +4695,7 @@ bounded-positive Length receipt & no violation under the exact supported domain/
 \item[Auto-bound implicit] A variable Lean binds automatically when it is mentioned but not declared (Lean's \term{autoImplicit}); \term{:synth (a → a → a)} relies on it, and \term{:synth} retries stuck Sort-polymorphic variables at \term{Type}.
 \item[Binder information] Lean metadata marking a binder explicit, implicit, strict implicit, or instance implicit.
 \item[Candidate group] One semantic candidate together with bounded alternative Lean renderings.
-\item[Candidate window] The at most 60 distinct engine candidates one \term{:synth} lane retains before verification (\term{candidateWindow}); at most five verified ones are shown and bound (\term{synthMaxShown}).
+\item[Candidate window] The at most 60 distinct engine candidates one \term{:synth} lane retains before verification (\term{candidateWindow}); at most five verified ones are shown and bound (\term{synthMaxShown}).  Both are defaults of \term{:set synth-window N} and \term{:set synth-shown N} in revisions after the pinned one.
 \item[Classical fallback] The excluded-middle and double-negation lanes \term{:synth} runs after a sound constructive refutation when \term{synth-classical} is on (the default); their terms mention \term{Classical.em} or \term{Classical.byContradiction}.
 \item[Calculus of Constructions (CoC)] A dependent lambda calculus supporting all axes of the lambda cube.
 \item[Calculus of Inductive Constructions (CIC)] A CoC-family theory extended with inductive families and eliminators.

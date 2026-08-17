@@ -348,18 +348,18 @@ a handled outcome. The current schedule is:
 | excluded-middle classical | one batch of at most 6 | one batch of at most 6 |
 | double-negation classical | one batch of at most 12 or 24 by engine | the ordinary at-most-two-batch policy |
 
-The double-negation Djinn search uses `synthMaxTried`, currently 12, as its
-candidate cutoff in rank and disabled modes. Filter mode raises that tuned
-Djinn cutoff to `candidateWindow`, currently 60, so a successor batch can
-exist. Exference keeps its own bounded search, while `EngineBoth` applies the
+The double-negation Djinn search uses `synthLimitTried`, default 12
+(`:set synth-verify`), as its candidate cutoff in rank and disabled modes.
+Filter mode raises that tuned Djinn cutoff to `synthLimitWindow`, default 60
+(`:set synth-window`), so a successor batch can exist. Exference keeps its own bounded search, while `EngineBoth` applies the
 cutoff to its Djinn half. The largest Main policy, 24+24, remains below the
 cursor's cumulative 60-group hard cap.
 
 `runDetailedSynthCursorBefore` admits an advance before installing a clock;
 Engine guarantees that valid admission does not demand the cursor. Main then
 forces the selected `DetailedSynthCursorStep` under the applicable absolute
-deadline. A missing deadline preserves `LEANT_SYNTH_TIMEOUT=0` as an unbounded
-wait. The selected batch, its routes, spelling `String` spines, and run-note
+deadline. A missing deadline preserves `:set synth-timeout 0`
+(or `LEANT_SYNTH_TIMEOUT=0` at startup) as an unbounded wait. The selected batch, its routes, spelling `String` spines, and run-note
 `String` spines are therefore demanded inside that boundary, while the
 successor and unselected tail remain lazy.
 

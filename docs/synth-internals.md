@@ -1048,12 +1048,13 @@ but advancing any cursor observes the already retained outcome and never
 reruns an engine.
 
 `startDetailedSynthCursor` wraps its outcome without demanding the verdict or
-candidate stream. `advanceDetailedSynthCursor` first validates the requested
-per-step size independently of its cursor. Zero and negative requests return
-`DetailedSynthCursorBatchSizeNotPositive`; requests above
-`candidateWindow`, currently 60, return
-`DetailedSynthCursorBatchSizeLimitExceeded` with the maximum followed by the
-observed request. Both errors precede even a bottom cursor. For an admitted
+candidate stream. `advanceDetailedSynthCursorWith` first validates the
+requested per-step size independently of its cursor. Zero and negative
+requests return `DetailedSynthCursorBatchSizeNotPositive`; requests above the
+window it is given — `synthLimitWindow`, default 60, from `:set synth-window`
+— return `DetailedSynthCursorBatchSizeLimitExceeded` with that maximum
+followed by the observed request. `advanceDetailedSynthCursor` is the same
+walk under `candidateWindow`. Both errors precede even a bottom cursor. For an admitted
 request, the outer `Right` is likewise available without demanding the cursor;
 forcing its `DetailedSynthCursorStep` performs the first outcome observation.
 
@@ -1110,17 +1111,22 @@ timeout, cursor-admission failure, engine failure, refutation, and no term.
 same-run spelling frontier, cumulative candidate-group count, run notes, and
 that terminal reason. None is exported or stored in `ReplState`.
 
-`ordinarySynthLaneCursorPolicy` uses `synthVerificationWindow`: 12 for either
-standalone engine and 24 for `EngineBoth`. Rank and disabled contexts disallow
-a successor. Filter contexts allow one. The excluded-middle policy always uses
-half of `synthMaxTried`, currently 6, and disallows a successor. Double
-negation uses the ordinary policy; its tuned Djinn candidate cutoff remains 12
-for rank and disabled modes and becomes `candidateWindow`, currently 60, for
-filter mode. Thus filter-mode standalone and combined runs observe at most
+`ordinarySynthLaneCursorPolicy` uses `synthVerificationWindowWith`:
+`synthLimitTried`, default 12, for either standalone engine and twice that for
+`EngineBoth`. Rank and disabled contexts disallow a successor. Filter contexts
+allow one. The excluded-middle policy always uses half of `synthLimitTried`,
+default 6, and disallows a successor. Both batch sizes pass through
+`admissibleCursorBatch`, which keeps them positive and no wider than
+`synthLimitWindow`, so a session that lowers `:set synth-window` below the
+frontier narrows the batch instead of failing admission. Double negation uses
+the ordinary policy; its tuned Djinn candidate cutoff remains
+`synthLimitTried` for rank and disabled modes and becomes `synthLimitWindow`,
+default 60, for filter mode. Thus filter-mode standalone and combined runs observe at most
 12+12 and 24+24 groups respectively, while EM remains six. The 48-group maximum
 stays below Engine's cumulative 60-group cap.
 
-`runDetailedSynthCursorBefore` calls `advanceDetailedSynthCursor` before the
+`runDetailedSynthCursorBefore` calls `advanceDetailedSynthCursorWith` before
+the
 timeout branch. Valid admission is non-demanding by Engine's contract. With no
 deadline it forces the selected step directly; otherwise it computes the
 remaining duration from the supplied absolute deadline and evaluates
@@ -1144,8 +1150,8 @@ driver maps every other terminal cursor step and a timeout/admission failure to
 the matching `SynthLaneRunEnd` without flattening the result.
 
 Each `verifySynthLane` call takes its supplied batch bound before projecting
-behavior mode. Private `synthVerify` receives `synthMaxShown`, currently 5, in
-rank mode and the complete current batch width in filter mode. The exact
+behavior mode. Private `synthVerify` receives `synthLimitShown`, default 5,
+in rank mode and the complete current batch width in filter mode. The exact
 `VerificationBatch` is assessed once and retained with its one
 `LengthAssessmentResult` in `AssessedSynthLane`. The driver contains no engine
 invocation and no verification or assessment path around its one
@@ -1189,8 +1195,9 @@ or no-term diagnostic. Both classical policies disable handled-note retention.
 `classicalSynthLaneDeadline` is behavior-mode sensitive. Filter mode returns
 the original command deadline without reading the environment or clock, so
 ordinary work, both batches, excluded middle, and double negation share one
-absolute budget. Rank and disabled modes read `LEANT_SYNTH_TIMEOUT` and capture
-a fresh full duration independently at each reached EM and NN entry. A skipped
+absolute budget. Rank and disabled modes read the session's `synth-timeout`
+(`:set synth-timeout N`, seeded from `LEANT_SYNTH_TIMEOUT`) and capture a fresh
+full duration independently at each reached EM and NN entry. A skipped
 route captures nothing, a terminal EM prevents the NN capture, and a nonpositive
 configured duration returns the established unbounded `Nothing`.
 

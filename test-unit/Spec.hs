@@ -12553,7 +12553,7 @@ assertLengthAssessmentMainCommandContext = do
     "synthGo' assessmentContext st args retriedVars goal parsed"
   mapM_ (assertMainSourceContains "constructive context" schedulerSection)
     [ "runSynthLaneCursor assessmentContext"
-    , "ordinarySynthLaneCursorPolicy assessmentContext laneEngine"
+    , "ordinarySynthLaneCursorPolicy assessmentContext laneEngine limits"
     , "synthClassical assessmentContext runDeadline st goal parsed"
     ]
   length (mainSourcePositions
@@ -12583,9 +12583,9 @@ assertLengthAssessmentMainLaneSeam = do
         "data SynthLaneOutcome =" "-- Output (" sourceLines
       verificationSection = mainSourceSection
         "verifySynthLane assessmentContext groupLimit st goal notes groups ="
-        "synthLaneDisposition ::" sourceLines
+        "synthLaneDispositionWith ::" sourceLines
       dispositionSection = mainSourceSection
-        "synthLaneDisposition outcome ="
+        "synthLaneDispositionWith shown outcome ="
         "synthLaneAccumulationDisposition" sourceLines
       callbackSection = mainSourceSection
         "synthVerify successQuota st goal groups ="
@@ -12615,7 +12615,7 @@ assertLengthAssessmentMainLaneSeam = do
     "lengthAssessmentContextBehaviorMode assessmentContext"
       verificationSection
   rankQuota <- expectMainSourcePosition "lane verifier"
-    "LengthBehaviorRank -> synthMaxShown" verificationSection
+    "LengthBehaviorRank -> shown" verificationSection
   filterQuota <- expectMainSourcePosition "lane verifier"
     "LengthBehaviorFilter -> groupLimit" verificationSection
   callback <- expectMainSourcePosition "lane verifier"
@@ -12676,7 +12676,7 @@ assertLengthAssessmentMainLaneSeam = do
   mapM_ (assertMainSourceContains "lane disposition" dispositionSection)
     [ "Nothing -> SynthLaneNoVerified"
     , "null $ verifiedCandidateReceipts $ assessedSynthLaneVerification assessed -> SynthLaneNoVerified"
-    , "take synthMaxShown $ presentLengthAssessment assessment"
+    , "take shown $ presentLengthAssessment assessment"
     , "rejections = presentLengthAssessmentRejections assessment"
     , "Just _ -> SynthLaneAssessmentPreserved presentations rejections"
     , "SynthLaneSurvivors presentations rejections"
@@ -12743,7 +12743,7 @@ assertLengthAssessmentMainLaneAccumulation = do
   chronologicalFold <- expectMainSourcePosition "lane accumulation fold"
     "foldl accumulateDisposition SynthLaneNoVerified" foldSection
   chronologicalInput <- expectMainSourcePosition "lane accumulation fold"
-    "map synthLaneDisposition $ reverse reverseOutcomes" foldSection
+    "map (synthLaneDispositionWith shown) $ reverse reverseOutcomes" foldSection
   assertBool "Main stopped folding the reverse history chronologically"
     $ chronologicalFold < chronologicalInput
   mapM_ (assertMainSourceContains "lane accumulation fold" foldSection)
@@ -12787,9 +12787,9 @@ assertLengthAssessmentMainLaneFinalization = do
   let sourceText = unlines sourceLines
       verificationSection = mainSourceSection
         "verifySynthLane assessmentContext groupLimit st goal notes groups ="
-        "synthLaneDisposition ::" sourceLines
+        "synthLaneDispositionWith ::" sourceLines
       dispositionSection = mainSourceSection
-        "synthLaneDisposition outcome ="
+        "synthLaneDispositionWith shown outcome ="
         "synthLaneAccumulationDisposition" sourceLines
       finalizerSection = mainSourceSection
         "accumulation@(SynthLaneAccumulation reverseOutcomes) = do"
@@ -12812,12 +12812,12 @@ assertLengthAssessmentMainLaneFinalization = do
       presentationText = unlines presentationSection
   mapM_ (assertMainSourceContains "lane finalizer" finalizerSection)
     [ "let outcomes = reverse reverseOutcomes"
-    , "dispositions = map synthLaneDisposition outcomes"
+    , "dispositions = map (synthLaneDispositionWith shown) outcomes"
     , "effectiveLanes = throughFirstTerminal $ zip outcomes dispositions"
     , "forM_ outcomes $ \\outcome -> forM_ (leantObservationCodeEntries $ synthLaneOutcomeObservations outcome)"
     , "forM_ (map fst effectiveLanes) $ \\outcome -> case synthLaneAssessed outcome of"
     , "lengthAssessmentFailure $ assessedSynthLaneLengthAssessment assessed"
-    , "let disposition = synthLaneAccumulationDisposition accumulation"
+    , "let disposition = synthLaneAccumulationDisposition shown accumulation"
     , "SynthLaneNoVerified -> pure ()"
     , "SynthLaneSurvivors presentations rejections -> finalizeSynthLanePresentations st args goal presentations rejections"
     , "SynthLaneAllBehaviorallyRejected rejections -> do"
@@ -12888,7 +12888,7 @@ assertLengthAssessmentMainLaneFinalization = do
   warnings <- expectMainSourcePosition "lane finalizer"
     "forM_ (map fst effectiveLanes)" finalizerSection
   disposition <- expectMainSourcePosition "lane finalizer"
-    "let disposition = synthLaneAccumulationDisposition accumulation"
+    "let disposition = synthLaneAccumulationDisposition shown accumulation"
       finalizerSection
   stateAndRows <- expectMainSourcePosition "lane finalizer"
     "case disposition of" finalizerSection
@@ -12940,9 +12940,9 @@ assertLengthAssessmentMainLaneScheduling = do
       constructiveSection)
     [ "let deadline"
     , "runSynthesis includeLibrary checked laneEngine providers accumulation ="
-    , "base = synthesizeWithProvidersSkippingDetailed laneEngine (rsSynthSteps state) checked providers fragment"
+    , "base = synthesizeWithProvidersSkippingDetailedWith limits laneEngine (rsSynthSteps state) checked providers fragment"
     , "in runSynthLaneCursor assessmentContext"
-    , "ordinarySynthLaneCursorPolicy assessmentContext laneEngine"
+    , "ordinarySynthLaneCursorPolicy assessmentContext laneEngine limits"
     , "deadline st goal id outcome accumulation"
     ]
   assertBool "one constructive lane split its engine outcome across reruns"
@@ -13080,10 +13080,10 @@ assertLengthAssessmentMainCursorDriver = do
   sourceLines <- lines <$> readFile "src/Main.hs"
   let sourceText = unlines sourceLines
       policySection = mainSourceSection
-        "ordinarySynthLaneCursorPolicy assessmentContext engine ="
-        "runDetailedSynthCursorBefore requested deadline cursor =" sourceLines
+        "ordinarySynthLaneCursorPolicy assessmentContext engine limits ="
+        "runDetailedSynthCursorBefore requested window deadline cursor =" sourceLines
       forcingSection = mainSourceSection
-        "runDetailedSynthCursorBefore requested deadline cursor ="
+        "runDetailedSynthCursorBefore requested window deadline cursor ="
         "classicalSynthLaneDeadline assessmentContext commandDeadline st ="
         sourceLines
       driverSection = mainSourceSection
@@ -13094,17 +13094,17 @@ assertLengthAssessmentMainCursorDriver = do
         "-- | The Glivenko fallback" sourceLines
       verificationSection = mainSourceSection
         "verifySynthLane assessmentContext groupLimit st goal notes groups ="
-        "synthLaneDisposition ::" sourceLines
+        "synthLaneDispositionWith ::" sourceLines
       driverText = unlines driverSection
   mapM_ (assertMainSourceContains "ordinary cursor policy" policySection)
-    [ "synthLaneCursorBatchSize = synthVerificationWindow engine"
+    [ "admissibleCursorBatch limits (synthVerificationWindowWith limits engine)"
     , "LengthBehaviorRank -> False"
     , "LengthBehaviorFilter -> True"
     , "synthLaneCursorRetainsRunNotes = True"
     ]
 
   admission <- expectMainSourcePosition "cursor deadline helper"
-    "case advanceDetailedSynthCursor requested cursor of" forcingSection
+    "case advanceDetailedSynthCursorWith window requested cursor of" forcingSection
   deadlineCase <- expectMainSourcePosition "cursor deadline helper"
     "Right step -> case deadline of" forcingSection
   forceForever <- expectMainSourcePosition "cursor deadline helper"
@@ -13134,7 +13134,7 @@ assertLengthAssessmentMainCursorDriver = do
 
   mapM_ (assertMainSourceContains "progressive cursor driver" driverSection)
     [ "observe (1 :: Int) 0 [] [] (startDetailedSynthCursor outcome)"
-    , "forced <- runDetailedSynthCursorBefore (synthLaneCursorBatchSize policy) deadline cursor"
+    , "forced <- runDetailedSynthCursorBefore"
     , "DetailedSynthCursorCandidateBatch batch successor -> do"
     , "groups = map transform (detailedCandidateBatchGroups batch)"
     , "notes = detailedCandidateBatchNotes batch"
@@ -13165,7 +13165,7 @@ assertLengthAssessmentMainCursorDriver = do
   length (mainSourcePositions
       "advanceDetailedSynthCursor" sourceLines) @?= 2
   length (mainSourcePositions
-      "advanceDetailedSynthCursor requested cursor" forcingSection) @?= 1
+      "advanceDetailedSynthCursorWith window requested cursor" forcingSection) @?= 1
   length (mainSourcePositions
       "forceDetailedSynthCursorStep" sourceLines) @?= 3
   length (mainSourcePositions
@@ -13289,21 +13289,21 @@ assertLengthAssessmentMainClassicalScheduling = do
     [ "emDeadline <- classicalSynthLaneDeadline assessmentContext commandDeadline st"
     , "if null atoms || length atoms > 5 then runDoubleNegation engine steps prefix body accumulation"
     , "emRun <- runSynthLaneCursor assessmentContext"
-    , "synthLaneCursorBatchSize = synthMaxTried `div` 2"
+    , "admissibleCursorBatch limits (synthLimitTried limits `div` 2)"
     , "synthLaneCursorAllowsFilterSuccessor = False"
     , "synthLaneCursorRetainsRunNotes = False"
     , "emDeadline st goal id"
-    , "synthesizeTunedDetailed engine steps (synthMaxTried, Just 100000)"
+    , "synthesizeTunedDetailedWith limits engine steps (synthLimitTried limits, Just 100000)"
     , "SynthLaneRunStoppedByDisposition -> pure (synthLaneRunAccumulation emRun)"
     , "_ -> runDoubleNegation engine steps prefix body (synthLaneRunAccumulation emRun)"
-    , "LengthBehaviorRank -> synthMaxTried"
-    , "LengthBehaviorFilter -> candidateWindow"
-    , "ordinaryPolicy = ordinarySynthLaneCursorPolicy assessmentContext engine"
+    , "LengthBehaviorRank -> synthLimitTried limits"
+    , "LengthBehaviorFilter -> synthLimitWindow limits"
+    , "ordinaryPolicy = ordinarySynthLaneCursorPolicy assessmentContext engine limits"
     , "nnPolicy = ordinaryPolicy { synthLaneCursorRetainsRunNotes = False }"
     , "nnDeadline <- classicalSynthLaneDeadline assessmentContext commandDeadline st"
     , "nnRun <- runSynthLaneCursor assessmentContext nnPolicy nnDeadline st goal"
     , "mapDetailedCandidateGroupVariantsDroppingSemanticSidecar wrap"
-    , "synthesizeTunedDetailed engine steps (djinnCandidateCutoff, Nothing)"
+    , "synthesizeTunedDetailedWith limits engine steps (djinnCandidateCutoff, Nothing)"
     , "pure (synthLaneRunAccumulation nnRun)"
     ]
   length (mainSourcePositions
