@@ -36,24 +36,12 @@ import Language.Haskell.Djex
   , ValidatedLengthCounterexample
   , ValidatedLengthCounterexampleSimplification
   , ValidatedLengthInputBox
-  , defaultLengthSMTLibLiveSessionMaximumQueries
   )
 
 import Leant.Synth.BehavioralSelection.Internal
-  ( BehavioralSelectionBatch
-  , BehavioralSelectionCandidate
-  , BehavioralSelectionDecision
-  , BehavioralSelectionError
+  ( BehavioralSelectionError
   , BehaviorallyRejected
   , BehaviorallySelected
-  , behavioralSelectionBatchRejected
-  , behavioralSelectionBatchSelected
-  , behavioralSelectionInputCandidates
-  , behaviorallySelectedVerified
-  , rejectBehavioralSelectionCandidate
-  , retainBehavioralSelectionCandidate
-  , sealBehavioralSelectionBatch
-  , withBehavioralSelectionInput
   )
 import Leant.Synth.Engine (DetailedVerificationVariant)
 import Leant.Synth.Length.Configuration
@@ -62,6 +50,7 @@ import Leant.Synth.Length.Configuration
   , assessVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext
   )
 import Leant.Synth.Length.Contract (LeanLengthContract)
+import qualified Leant.Synth.Length.Selection.Generic as Generic
 import qualified Leant.Synth.Length.CounterexampleBank.Internal
   as CounterexampleBank
 import Leant.Synth.Length.PostVerification
@@ -82,11 +71,7 @@ import Leant.Synth.Length.Ranking
   , rankedLengthCandidateOriginalIndex
   , rankedLengthCandidatePreparationRefusal
   )
-import Leant.Synth.Verification
-  ( VerificationBatch
-  , Verified
-  , verifiedCandidateReceipts
-  )
+import Leant.Synth.Verification (VerificationBatch, Verified)
 
 -- | Closed reason class for a candidate which the hard filter retained.
 -- None of these cases is negative behavioral evidence.
@@ -98,19 +83,13 @@ data LengthSelectionRetentionClass
   | LengthSelectionApplicableDomainEstablished
   deriving (Bounded, Enum, Eq, Ord, Show)
 
--- | Domain-specific retention explanation.  Its constructor stays private so
--- an explanation cannot be forged and attached through the private decision
--- builders.  The projections below expose the exact diagnostic or positive
--- receipt carried by the corresponding closed class.
-data LengthSelectionRetention
-  = LengthSelectionRetainedPreparationRefusal
-      !LengthPreparationRefusalClass
-  | LengthSelectionRetainedUnassessed
-  | LengthSelectionRetainedHeuristic !SolverStatus
-  | LengthSelectionRetainedBoundedPositive !ValidatedLengthInputBox
-  | LengthSelectionRetainedApplicableDomainEstablished
-      !ValidatedLengthApplicableDomain
-  deriving (Eq, Show)
+-- | Domain-specific retention explanation.  It is the shared explanation at
+-- the scalar receipts, so it cannot be confused with a binary-product one,
+-- and its constructors stay private to this module and its facade.
+type LengthSelectionRetention =
+  Generic.SelectionRetention
+    ValidatedLengthInputBox
+    ValidatedLengthApplicableDomain
 
 -- | The closed reason class of a retention explanation.  At most one of the
 -- payload projections below returns 'Just' for a given explanation, and none
@@ -119,77 +98,65 @@ lengthSelectionRetentionClass
   :: LengthSelectionRetention
   -> LengthSelectionRetentionClass
 lengthSelectionRetentionClass retention = case retention of
-  LengthSelectionRetainedPreparationRefusal _ ->
+  Generic.RetainedPreparationRefusal _ ->
     LengthSelectionPreparationRefused
-  LengthSelectionRetainedUnassessed -> LengthSelectionUnassessed
-  LengthSelectionRetainedHeuristic _ -> LengthSelectionHeuristic
-  LengthSelectionRetainedBoundedPositive _ -> LengthSelectionBoundedPositive
-  LengthSelectionRetainedApplicableDomainEstablished _ ->
+  Generic.RetainedUnassessed -> LengthSelectionUnassessed
+  Generic.RetainedHeuristic _ -> LengthSelectionHeuristic
+  Generic.RetainedBoundedPositive _ -> LengthSelectionBoundedPositive
+  Generic.RetainedApplicableDomainEstablished _ ->
     LengthSelectionApplicableDomainEstablished
 
--- | The preparation refusal diagnostic of a
--- 'LengthSelectionPreparationRefused' retention; 'Nothing' for every other
--- class.
+-- | The diagnostic of a 'LengthSelectionPreparationRefused' retention.
 lengthSelectionRetentionPreparationRefusal
   :: LengthSelectionRetention
   -> Maybe LengthPreparationRefusalClass
-lengthSelectionRetentionPreparationRefusal retention = case retention of
-  LengthSelectionRetainedPreparationRefusal refusal -> Just refusal
-  _ -> Nothing
+lengthSelectionRetentionPreparationRefusal =
+  Generic.selectionRetentionPreparationRefusal
 
--- | The raw solver status of a 'LengthSelectionHeuristic' retention;
--- 'Nothing' for every other class.  A status is a diagnostic, never negative
--- behavioral evidence.
+-- | The raw status of a 'LengthSelectionHeuristic' retention, which is a
+-- diagnostic and never negative behavioral evidence.
 lengthSelectionRetentionSolverStatus
   :: LengthSelectionRetention
   -> Maybe SolverStatus
-lengthSelectionRetentionSolverStatus retention = case retention of
-  LengthSelectionRetainedHeuristic status -> Just status
-  _ -> Nothing
+lengthSelectionRetentionSolverStatus =
+  Generic.selectionRetentionSolverStatus
 
--- | The finite input-box receipt of a 'LengthSelectionBoundedPositive'
--- retention; 'Nothing' for every other class.
+-- | The receipt of a 'LengthSelectionBoundedPositive' retention.
 lengthSelectionRetentionInputBox
   :: LengthSelectionRetention
   -> Maybe ValidatedLengthInputBox
-lengthSelectionRetentionInputBox retention = case retention of
-  LengthSelectionRetainedBoundedPositive receipt -> Just receipt
-  _ -> Nothing
+lengthSelectionRetentionInputBox = Generic.selectionRetentionInputBox
 
--- | The applicable-domain receipt of a
--- 'LengthSelectionApplicableDomainEstablished' retention; 'Nothing' for every
--- other class.
+-- | The receipt of a 'LengthSelectionApplicableDomainEstablished' retention.
 lengthSelectionRetentionApplicableDomain
   :: LengthSelectionRetention
   -> Maybe ValidatedLengthApplicableDomain
-lengthSelectionRetentionApplicableDomain retention = case retention of
-  LengthSelectionRetainedApplicableDomainEstablished receipt -> Just receipt
-  _ -> Nothing
+lengthSelectionRetentionApplicableDomain =
+  Generic.selectionRetentionApplicableDomain
 
--- | Exact scalar replay authority for one rejected occurrence.  The nominal
--- scalar type and private constructor prevent confusion with binary-product
--- receipts.  Simplification is optional metadata; the ordinary receipt is
--- always the final independently replayed counterexample.
-data LengthSelectionRejection = LengthSelectionRejection
-  !ValidatedLengthCounterexample
-  !(Maybe ValidatedLengthCounterexampleSimplification)
-  deriving (Eq, Show)
+-- | Exact scalar replay authority for one rejected occurrence.  The shared
+-- rejection at the scalar receipts is a distinct type from the
+-- binary-product one, so the two cannot be confused.  Simplification is
+-- optional metadata; the ordinary receipt is always the final independently
+-- replayed counterexample.
+type LengthSelectionRejection =
+  Generic.SelectionRejection
+    ValidatedLengthCounterexample
+    ValidatedLengthCounterexampleSimplification
 
--- | The independently replayed scalar counterexample which rejected the
--- occurrence; the ordinary receipt regardless of any simplification.
+-- | The scalar counterexample which rejected the occurrence.
 lengthSelectionRejectionCounterexample
   :: LengthSelectionRejection
   -> ValidatedLengthCounterexample
-lengthSelectionRejectionCounterexample
-    (LengthSelectionRejection receipt _) = receipt
+lengthSelectionRejectionCounterexample =
+  Generic.selectionRejectionCounterexample
 
--- | The optional simplification metadata carried by the same ranked
--- candidate as the rejecting counterexample.
+-- | The optional simplification carried by the rejecting candidate.
 lengthSelectionRejectionCounterexampleSimplification
   :: LengthSelectionRejection
   -> Maybe ValidatedLengthCounterexampleSimplification
-lengthSelectionRejectionCounterexampleSimplification
-    (LengthSelectionRejection _ simplification) = simplification
+lengthSelectionRejectionCounterexampleSimplification =
+  Generic.selectionRejectionSimplification
 
 -- | Fail-closed reasons which preserve the complete original verification
 -- batch.  The index failure is an internal association inconsistency: a
@@ -204,62 +171,43 @@ data LengthSelectionFailure
   deriving (Eq, Ord, Show)
 
 -- | Either the untouched callback batch plus a sanitized failure, or one
--- sealed total partition.  The constructors stay private so a caller cannot
--- present an unsealed partition as accepted selection authority.
-data LengthSelectionResult
-  = LengthSelectionPreserved
-      (VerificationBatch DetailedVerificationVariant)
-      !LengthSelectionFailure
-  | LengthSelectionAccepted
-      !(BehavioralSelectionBatch
-          DetailedVerificationVariant
-          LengthSelectionRetention
-          LengthSelectionRejection)
+-- sealed total partition.  The shared result at this domain's explanation and
+-- rejection types; its constructors stay private, so a caller cannot present
+-- an unsealed partition as accepted selection authority.
+type LengthSelectionResult =
+  Generic.SelectionResult
+    LengthSelectionFailure
+    LengthSelectionRetention
+    LengthSelectionRejection
 
--- | Effective candidates after selection.  On every failure this is exactly
--- the original callback batch in original order; on success it is exactly the
--- selected partition in original callback order.
+-- | Effective candidates after selection: the original batch on failure, the
+-- selected partition on success, both in original callback order.
 lengthSelectionCandidates
   :: LengthSelectionResult
   -> [Verified DetailedVerificationVariant]
-lengthSelectionCandidates result = case result of
-  LengthSelectionPreserved verification _ ->
-    verifiedCandidateReceipts verification
-  LengthSelectionAccepted batch ->
-    map behaviorallySelectedVerified $ behavioralSelectionBatchSelected batch
+lengthSelectionCandidates = Generic.selectionCandidates
 
--- | Intrinsically associated selected occurrences, available only after the
--- total partition seal succeeded.
+-- | Selected occurrences, available only after the partition seal succeeded.
 lengthSelectionSelected
   :: LengthSelectionResult
   -> Maybe
       [BehaviorallySelected
         DetailedVerificationVariant LengthSelectionRetention]
-lengthSelectionSelected result = case result of
-  LengthSelectionPreserved {} -> Nothing
-  LengthSelectionAccepted batch -> Just
-    $ behavioralSelectionBatchSelected batch
+lengthSelectionSelected = Generic.selectionSelected
 
--- | Intrinsically associated rejected occurrences, available only after the
--- total partition seal succeeded.
+-- | Rejected occurrences, available only after the partition seal succeeded.
 lengthSelectionRejected
   :: LengthSelectionResult
   -> Maybe
       [BehaviorallyRejected
         DetailedVerificationVariant LengthSelectionRejection]
-lengthSelectionRejected result = case result of
-  LengthSelectionPreserved {} -> Nothing
-  LengthSelectionAccepted batch -> Just
-    $ behavioralSelectionBatchRejected batch
+lengthSelectionRejected = Generic.selectionRejected
 
--- | The sanitized failure which preserved the original batch, or 'Nothing'
--- when the total partition was sealed.
+-- | The sanitized failure which preserved the original batch.
 lengthSelectionFailure
   :: LengthSelectionResult
   -> Maybe LengthSelectionFailure
-lengthSelectionFailure result = case result of
-  LengthSelectionPreserved _ failure -> Just failure
-  LengthSelectionAccepted {} -> Nothing
+lengthSelectionFailure = Generic.selectionFailure
 
 -- | Run the complete current live-capable scalar assessment pipeline, then
 -- reject only candidates carrying independently replayed counterexamples.
@@ -298,96 +246,49 @@ selectVerifiedLengthCandidatesWithAssessment
       -> IO LengthPostVerificationResult)
   -> VerificationBatch DetailedVerificationVariant
   -> IO LengthSelectionResult
-selectVerifiedLengthCandidatesWithAssessment assess verification = do
-  assessed <- assess verification
-  pure $ case lengthPostVerificationAdapterFailure assessed of
-    Just failure -> preserve
-      $ LengthSelectionPostVerificationFailed failure
-    Nothing -> case lengthPostVerificationRankingFailure assessed of
-      Just failure -> preserve $ LengthSelectionRankingFailed failure
-      Nothing -> case lengthPostVerificationRanking assessed of
-        Nothing -> preserve LengthSelectionRankingUnavailable
-        Just ranking -> withBehavioralSelectionInput verification $ \input ->
-          let candidates = behavioralSelectionInputCandidates input
-              candidateCount = count candidates
-          in case buildDecisions candidateCount candidates
-              $ lengthRankingCandidates ranking of
-            Left failure -> preserve failure
-            Right decisions -> case sealBehavioralSelectionBatch
-                defaultLengthSMTLibLiveSessionMaximumQueries
-                input decisions of
-              Left failure -> preserve $ LengthSelectionSealFailed failure
-              Right batch -> LengthSelectionAccepted batch
- where
-  preserve = LengthSelectionPreserved verification
+selectVerifiedLengthCandidatesWithAssessment =
+  Generic.runSelectionWithAssessment scalarSelectionDomain
 
-buildDecisions
-  :: Natural
-  -> [BehavioralSelectionCandidate
-        epoch DetailedVerificationVariant]
-  -> [RankedLengthCandidate]
-  -> Either
+-- | What the scalar domain contributes to the shared selection pipeline: how
+-- to read its assessed batch, how it names each fail-closed reason, and which
+-- assessment rejects.  Only an independently replayed counterexample does.
+scalarSelectionDomain
+  :: Generic.SelectionDomain
+      LengthPostVerificationResult
+      RankedLengthCandidate
       LengthSelectionFailure
-      [BehavioralSelectionDecision
-        epoch
-        DetailedVerificationVariant
-        LengthSelectionRetention
-        LengthSelectionRejection]
-buildDecisions candidateCount candidates = go []
- where
-  go reversed remaining = case remaining of
-    [] -> Right $ reverse reversed
-    ranked : rest -> do
-      candidate <- selectCandidate candidateCount candidates
-        $ rankedLengthCandidateOriginalIndex ranked
-      let decision = classifyCandidate candidate ranked
-      decision `seq` go (decision : reversed) rest
-
-classifyCandidate
-  :: BehavioralSelectionCandidate epoch DetailedVerificationVariant
-  -> RankedLengthCandidate
-  -> BehavioralSelectionDecision
-      epoch
-      DetailedVerificationVariant
       LengthSelectionRetention
       LengthSelectionRejection
-classifyCandidate candidate ranked =
+scalarSelectionDomain = Generic.SelectionDomain
+  { Generic.selectionAdapterFailure = fmap LengthSelectionPostVerificationFailed
+      . lengthPostVerificationAdapterFailure
+  , Generic.selectionRankingFailure = fmap LengthSelectionRankingFailed
+      . lengthPostVerificationRankingFailure
+  , Generic.selectionRanking =
+      fmap lengthRankingCandidates . lengthPostVerificationRanking
+  , Generic.selectionRankingUnavailable = LengthSelectionRankingUnavailable
+  , Generic.selectionIndexOutOfRange = LengthSelectionCandidateIndexOutOfRange
+  , Generic.selectionSealFailed = LengthSelectionSealFailed
+  , Generic.selectionOriginalIndex = rankedLengthCandidateOriginalIndex
+  , Generic.selectionClassify = classifyCandidate
+  }
+
+-- | The scalar reading of one ranked report: 'Left' only for an exact
+-- independently replayed counterexample, 'Right' with the explanation for
+-- every other assessment.
+classifyCandidate
+  :: RankedLengthCandidate
+  -> Either LengthSelectionRejection LengthSelectionRetention
+classifyCandidate ranked =
   case rankedLengthCandidatePreparationRefusal ranked of
-    Just refusal -> retainBehavioralSelectionCandidate candidate
-      $ LengthSelectionRetainedPreparationRefusal refusal
+    Just refusal -> Right $ Generic.RetainedPreparationRefusal refusal
     Nothing -> case rankedLengthCandidateAssessment ranked of
-      Unassessed -> retainBehavioralSelectionCandidate candidate
-        LengthSelectionRetainedUnassessed
-      Heuristic status -> retainBehavioralSelectionCandidate candidate
-        $ LengthSelectionRetainedHeuristic status
-      Counterexample receipt -> rejectBehavioralSelectionCandidate candidate
-        $ LengthSelectionRejection receipt
+      Unassessed -> Right Generic.RetainedUnassessed
+      Heuristic status -> Right $ Generic.RetainedHeuristic status
+      Counterexample receipt -> Left
+        $ Generic.SelectionRejection receipt
         $ rankedLengthCandidateCounterexampleSimplification ranked
-      BoundedPositive receipt -> retainBehavioralSelectionCandidate candidate
-        $ LengthSelectionRetainedBoundedPositive receipt
+      BoundedPositive receipt ->
+        Right $ Generic.RetainedBoundedPositive receipt
       ApplicableDomainEstablished receipt ->
-        retainBehavioralSelectionCandidate candidate
-          $ LengthSelectionRetainedApplicableDomainEstablished receipt
-
-selectCandidate
-  :: Natural
-  -> [BehavioralSelectionCandidate
-        epoch DetailedVerificationVariant]
-  -> Natural
-  -> Either
-      LengthSelectionFailure
-      (BehavioralSelectionCandidate epoch DetailedVerificationVariant)
-selectCandidate candidateCount = go 0
- where
-  go _ [] requested = Left $ LengthSelectionCandidateIndexOutOfRange
-    candidateCount requested
-  go index (candidate : rest) requested
-    | index == requested = Right candidate
-    | otherwise = go (index + 1) rest requested
-
-count :: [value] -> Natural
-count = go 0
- where
-  go result remaining = case remaining of
-    [] -> result
-    _ : rest -> go (result + 1) rest
+        Right $ Generic.RetainedApplicableDomainEstablished receipt

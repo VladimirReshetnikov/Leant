@@ -6551,6 +6551,8 @@ assertCounterexampleBankRunnerArchitecture = do
     "src/Leant/Synth/Length/Selection/Internal.hs"
   pairSelection <- readFile
     "src/Leant/Synth/Length/SpinePair/Selection/Internal.hs"
+  genericSelection <- readFile
+    "src/Leant/Synth/Length/Selection/Generic.hs"
   integration <- readFile "src/Leant/Synth/Length/Integration.hs"
   publicScalarRanking <- readFile "src/Leant/Synth/Length/Ranking.hs"
   publicPairRanking <- readFile
@@ -6564,6 +6566,7 @@ assertCounterexampleBankRunnerArchitecture = do
       pairText = normalized pairRanking
       scalarSelectionText = normalized scalarSelection
       pairSelectionText = normalized pairSelection
+      genericSelectionText = normalized genericSelection
       integrationText = normalized integration
       integrationExports = unlines
         . takeWhile (not . isInfixOf ") where")
@@ -6587,26 +6590,38 @@ assertCounterexampleBankRunnerArchitecture = do
     , "case simplifyLengthSpinePairCounterexampleAssessment evaluation simplificationPolicy index association query receipt of Left failure -> pure $ PreparedLengthSpinePairCandidatesFailed failure Right assessed -> continueAssessed"
     , "continueAssessed reversed cursor index query acquisition rest assessed = do advanced <- advanceLengthSpinePairCounterexampleBankCursor"
     ]
+  -- Both domains select through one shared pipeline, so preserve-before-seal
+  -- ordering is pinned once where it lives, and each domain is pinned to name
+  -- every fail-closed reason in its own failure type instead of repeating the
+  -- control flow.
+  mapM_ (\fragment -> assertBool
+      ("shared selection lost preserve/seal ordering: " ++ fragment)
+      $ normalized fragment `isInfixOf` genericSelectionText)
+    [ "assessed <- assess verification pure $ case selectionAdapterFailure domain assessed of"
+    , "Nothing -> preserve $ selectionRankingUnavailable domain"
+    , "Left failure -> preserve $ selectionSealFailed domain failure"
+    , "preserve = SelectionPreserved verification"
+    ]
   mapM_ (\(domain, sourceText, fragments) ->
       mapM_ (\fragment -> assertBool
-          (domain ++ " selection lost preserve/seal ordering: " ++ fragment)
+          (domain ++ " selection lost its failure naming: " ++ fragment)
           $ normalized fragment `isInfixOf` sourceText) fragments)
     [ ( "scalar"
       , scalarSelectionText
-      , [ "assessed <- assess verification pure $ case lengthPostVerificationAdapterFailure assessed of"
-        , "Just failure -> preserve $ LengthSelectionPostVerificationFailed failure"
-        , "Just failure -> preserve $ LengthSelectionRankingFailed failure"
-        , "Left failure -> preserve $ LengthSelectionSealFailed failure"
-        , "preserve = LengthSelectionPreserved verification"
+      , [ "Generic.selectionAdapterFailure = fmap LengthSelectionPostVerificationFailed"
+        , "Generic.selectionRankingFailure = fmap LengthSelectionRankingFailed"
+        , "Generic.selectionRankingUnavailable = LengthSelectionRankingUnavailable"
+        , "Generic.selectionSealFailed = LengthSelectionSealFailed"
+        , "Counterexample receipt -> Left $ Generic.SelectionRejection receipt"
         ]
       )
     , ( "product"
       , pairSelectionText
-      , [ "assessed <- assess verification pure $ case lengthSpinePairPostVerificationAdapterFailure assessed of"
-        , "Just failure -> preserve $ LengthSpinePairSelectionPostVerificationFailed failure"
-        , "Just failure -> preserve $ LengthSpinePairSelectionRankingFailed failure"
-        , "Left failure -> preserve $ LengthSpinePairSelectionSealFailed failure"
-        , "preserve = LengthSpinePairSelectionPreserved verification"
+      , [ "Generic.selectionAdapterFailure = fmap LengthSpinePairSelectionPostVerificationFailed"
+        , "Generic.selectionRankingFailure = fmap LengthSpinePairSelectionRankingFailed"
+        , "Generic.selectionRankingUnavailable = LengthSpinePairSelectionRankingUnavailable"
+        , "Generic.selectionSealFailed = LengthSpinePairSelectionSealFailed"
+        , "LengthSpinePairCounterexample receipt -> Left $ Generic.SelectionRejection receipt"
         ]
       )
     ]
