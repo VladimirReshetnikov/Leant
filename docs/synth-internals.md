@@ -1121,9 +1121,11 @@ default 6, and disallows a successor. Both batch sizes pass through
 frontier narrows the batch instead of failing admission. Double negation uses
 the ordinary policy; its tuned Djinn candidate cutoff remains
 `synthLimitTried` for rank and disabled modes and becomes `synthLimitWindow`,
-default 60, for filter mode. Thus filter-mode standalone and combined runs observe at most
-12+12 and 24+24 groups respectively, while EM remains six. The 48-group maximum
-stays below Engine's cumulative 60-group cap.
+default 60, for filter mode. Thus filter-mode standalone and combined runs observe at most two batches of
+the frontier each, 12+12 and 24+24 at the default bounds, while EM remains
+half a frontier. `admissibleCursorBatch` is what keeps a batch within the
+window, at any setting; the arithmetic between the two defaults is not an
+invariant.
 
 `runDetailedSynthCursorBefore` calls `advanceDetailedSynthCursorWith` before
 the

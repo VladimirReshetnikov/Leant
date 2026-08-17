@@ -1313,7 +1313,27 @@ how fast the machine answers it; export `LEANT_SYNTH_TIMEOUT` to override.
 These end-to-end goldens require
 the Lake project to provide the backend executable (`repl` or
 `repl.exe`); the focused suite remains runnable when that backend is not
-installed. Ideas under consideration are tracked in
+installed.
+
+Two things make a fresh run easier to read. First, the Windows baseline is
+452 of 454, not 454 of 454: `decode the one current scalar and binary-product
+grammar` and `admit and acquire current scalar and product selections` both
+assert POSIX absolute-path semantics that a Windows path does not satisfy, so
+they fail on Windows and pass everywhere else. A third case, `compose a
+persistent last-wins builder and admit before clock capture`, races a fake
+solver's start-up against a 700 ms budget and fails on a slow or loaded
+machine. Treat any *other* failure as a regression. Second, nineteen tests
+read production source text and assert on it — twelve on
+[src/Main.hs](src/Main.hs) and one or two each on `Synth/Engine.hs`,
+`Synth/BehavioralSelection.hs`, `Length/Selection.hs`,
+`Length/Selection/Generic.hs`, `Length/Ranking.hs`, `Length/Integration.hs`
+and `Length/Handoff.hs`. They pin the shape of decisions that must not move
+silently, such as which deadline a classical route owns and that selection
+preserves the batch before it seals. A refactor of those files has to be
+re-run against the focused suite even when it is provably behaviour
+preserving; when a lint or a cleanup fights one of those pins, the pin wins.
+
+Ideas under consideration are tracked in
 [docs/PROPOSALS.md](docs/PROPOSALS.md) and
 [docs/SYNTHESIS_PROPOSAL.md](docs/SYNTHESIS_PROPOSAL.md).
 

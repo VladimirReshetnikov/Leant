@@ -341,19 +341,25 @@ outcome. Its private `SynthLaneCursorPolicy` chooses a batch width, whether one
 filter successor is allowed, and whether ordinary run notes may be attached to
 a handled outcome. The current schedule is:
 
+Write *F* for the verification frontier a lane requests: `synthLimitTried`
+(`:set synth-verify`, default 12) for a standalone engine and twice that for
+`EngineBoth`, each clamped to `synthLimitWindow` (`:set synth-window`,
+default 60) by `admissibleCursorBatch`.
+
 | Route | Rank or disabled | Explicit filter |
 | --- | --- | --- |
-| ordinary, universe-retry, or provider; standalone engine | one batch of at most 12 | at most two ordered 12-group batches, 24 groups total |
-| ordinary, universe-retry, or provider; `EngineBoth` | one batch of at most 24 | at most two ordered 24-group batches, 48 groups total |
-| excluded-middle classical | one batch of at most 6 | one batch of at most 6 |
-| double-negation classical | one batch of at most 12 or 24 by engine | the ordinary at-most-two-batch policy |
+| ordinary, universe-retry, or provider; standalone engine | one batch of at most *F* | at most two ordered *F*-group batches |
+| ordinary, universe-retry, or provider; `EngineBoth` | one batch of at most *F* | at most two ordered *F*-group batches |
+| excluded-middle classical | one batch of at most *F*/2 | one batch of at most *F*/2 |
+| double-negation classical | one batch of at most *F* by engine | the ordinary at-most-two-batch policy |
 
 The double-negation Djinn search uses `synthLimitTried`, default 12
 (`:set synth-verify`), as its candidate cutoff in rank and disabled modes.
 Filter mode raises that tuned Djinn cutoff to `synthLimitWindow`, default 60
 (`:set synth-window`), so a successor batch can exist. Exference keeps its own bounded search, while `EngineBoth` applies the
-cutoff to its Djinn half. The largest Main policy, 24+24, remains below the
-cursor's cumulative 60-group hard cap.
+cutoff to its Djinn half. No batch can exceed the window, because
+`admissibleCursorBatch` clamps every request to it before the cursor admits
+the advance.
 
 `runDetailedSynthCursorBefore` admits an advance before installing a clock;
 Engine guarantees that valid admission does not demand the cursor. Main then

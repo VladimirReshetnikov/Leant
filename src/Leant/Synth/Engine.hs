@@ -2939,16 +2939,7 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
     providerAssignmentFamilyUses planningRoots
 
   structuralTemplateFragments =
-    [ field
-    | plan <- Map.elems plans
-    , template <- case plan of
-        StructuralFamily selected -> [selected]
-        RecursiveStructuralFamily selected
-          | exactRecursiveData recursiveProjection -> [selected]
-        _ -> []
-    , (_, fields) <- templateConstructors template
-    , field <- fields
-    ]
+    structuralPlanFields recursiveProjection plans
 
   (recursiveSelfKeys, recursiveFieldAtoms) =
     recursiveStructuralAtoms recursiveProjection plans
@@ -4035,6 +4026,26 @@ fragmentProjectionComplete frag =
 -- head becomes one shared abstract family.  Otherwise a structural template
 -- is accepted only when one unique schema can be recovered and specializing
 -- it reproduces every serialized occurrence exactly.
+-- | The fields of every selected structural template in a plan map: the
+-- fragments a plan selection commits to translating.  The plan-selection rule
+-- and the atom scan which must agree with it both read exactly this list, so
+-- neither can drift from the other.
+structuralPlanFields
+  :: RecursiveProjection
+  -> Map.Map String ExactFamilyPlan
+  -> [Frag]
+structuralPlanFields recursiveProjection plans =
+    [ field
+    | plan <- Map.elems plans
+    , template <- case plan of
+        StructuralFamily selected -> [selected]
+        RecursiveStructuralFamily selected
+          | exactRecursiveData recursiveProjection -> [selected]
+        _ -> []
+    , (_, fields) <- templateConstructors template
+    , field <- fields
+    ]
+
 exactFamilyPlans
   :: RecursiveProjection
   -> Map.Map String [ExactFamilyUse]
@@ -4061,17 +4072,7 @@ exactFamilyPlans recursiveProjection evidenceUses roots = settle initialUses
           (collectExactFamilyUses recursiveProjection True) uses fields
     in if uses' == uses then plans else settle uses'
 
-  structuralFields plans =
-    [ field
-    | plan <- Map.elems plans
-    , template <- case plan of
-        StructuralFamily selected -> [selected]
-        RecursiveStructuralFamily selected
-          | exactRecursiveData recursiveProjection -> [selected]
-        _ -> []
-    , (_, fields) <- templateConstructors template
-    , field <- fields
-    ]
+  structuralFields plans = structuralPlanFields recursiveProjection plans
 
   recursivePremiseFields plans uses =
     [ field

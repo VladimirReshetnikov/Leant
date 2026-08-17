@@ -1682,18 +1682,7 @@ browseProgram showAll nameComponents = unlines $
   ]
   ++ (if showAll then
   [ "  let keep (n : Name) : Bool := !n.isInternal" ]
-  else
-  [ "  let aux : List String :="
-  , "    [\"rec\", \"recOn\", \"casesOn\", \"brecOn\", \"binductionOn\","
-  , "     \"below\", \"ibelow\", \"noConfusion\", \"noConfusionType\","
-  , "     \"ctorElim\", \"ctorElimType\", \"ctorIdx\", \"sizeOf_spec\","
-  , "     \"injEq\", \"inj\", \"eq_def\", \"decEq\"]"
-  , "  let keep (n : Name) : Bool :="
-  , "    !n.isInternalDetail &&"
-  , "    !n.components.any fun c => match c with"
-  , "      | .str _ s => aux.contains s"
-  , "      | _ => false"
-  ])
+  else generatedFilterLines)
   ++
   [ "  let names := env.constants.fold (init := #[]) fun a n _ =>"
   , "    if pre.isPrefixOf n && keep n then a.push n else a"

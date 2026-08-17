@@ -284,15 +284,7 @@ mkLengthRankingPolicy source = do
       (lengthRankingPolicyEvaluationSource source) of
     Left failure -> Left $ LengthRankingEvaluationLimitsRejected failure
     Right validated -> Right validated
-  pure $ LengthRankingPolicy execution evaluation
-    LengthRankingInputBoxValidationDisabled
-    LengthRankingApplicableDomainValidationDisabled
-    LengthRankingOriginProbeDisabled
-    LengthRankingCounterexampleSimplificationDisabled
-    LengthRankingNonVacuousInputBoxPreferenceDisabled
-    LengthRankingNonVacuousApplicableDomainPreferenceDisabled
-    LengthRankingLiveSessionOpeningEager
-    LengthRankingUsableWorkBudgetDisabled
+  pure $ lengthRankingPolicyFromValidatedComponents execution evaluation
 
 -- | Validate the same reusable policy while selecting Djex's additive
 -- descriptor-bound executable launch.  Construction remains pure and retains
