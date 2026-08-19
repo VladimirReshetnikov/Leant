@@ -938,8 +938,9 @@ cleanup bit rather than paths, errno text, or file content. The timeout is an
 interruption budget rather than a hard kernel deadline, final-component
 no-follow does not exclude ancestor symlinks or in-place mutation, and Windows
 fails closed until an equivalent native handle implementation exists. Main
-uses `loadLengthAssessmentConfigurationFile` for its explicit startup CLI path;
-there is no scalar-only startup loader. There is still no discovery or default
+reaches `loadLengthAssessmentConfigurationFile` through Integration's
+`loadLengthAssessmentMode` for its explicit startup CLI path; there is no
+scalar-only startup loader. There is still no discovery or default
 path, and loading/activation alone never launches a solver. See the historical
 [bounded acquisition report](reports/2026-08-11-bounded-live-length-ranking-configuration-acquisition.md).
 
@@ -1105,7 +1106,9 @@ remain in Main.
 
 Main adds three private, lazy representation boundaries with no `Eq` or `Show`
 instance. `SynthLaneCursorPolicy` owns the batch width, the filter-successor
-permission, and ordinary-note retention. `SynthLaneRunEnd` distinguishes
+permission, ordinary-note retention, and the session's two cursor bounds —
+the hard cap on observed candidate groups (`:set synth-window`) and the
+accepted groups one batch may keep (`:set synth-shown`). `SynthLaneRunEnd` distinguishes
 stopped-by-disposition, policy completion, natural exhaustion, hard cap,
 timeout, cursor-admission failure, engine failure, refutation, and no term.
 `SynthLaneRun` retains the updated command accumulation, chronological
@@ -1172,12 +1175,14 @@ order, folds them into the command's reverse accumulation, and concatenates
 their complete frontiers in that same order. Later provider deduplication uses
 only the run frontier; callback attempts never become scheduling authority.
 
-The pure `synthLaneDisposition` remains four-way:
+The pure `synthLaneDispositionWith`, applied to that shown-group cap,
+remains four-way:
 
 - `SynthLaneNoVerified` for an unassessed empty batch or an assessed batch with
   no verified receipt;
-- `SynthLaneSurvivors` for an accepted presentation, carrying at most five
-  survivors and its complete rejection projection;
+- `SynthLaneSurvivors` for an accepted presentation, carrying at most
+  `synth-shown` (default five) survivors and its complete rejection
+  projection;
 - `SynthLaneAllBehaviorallyRejected` when an accepted assessment has only
   rejection rows; and
 - `SynthLaneAssessmentPreserved` when assessment failure preserves the
@@ -1804,10 +1809,12 @@ recursive rediscovery of equivalent structural trees while preserving scoped
 or environment product reuse at arbitrary depth. Standalone Djinn, standalone
 Exference, and combined mode all return the direct nested-product term.
 Exference does so at the unchanged 4096-step/1024-queue bounds, and its
-independently checked candidate is admitted at search step 30. The live run
-nevertheless continues along its bounded ranked tail and reports
-`queue limit pruned 36475` when the step limit is reached; that note records an
-incomplete tail, not a failure to find or check the displayed candidate.
+independently checked candidate is admitted early in that search. The live
+run nevertheless continues along its bounded ranked tail and reports
+`queue limit pruned 39308` when the step limit is reached (see
+[test/synth-quartic-rankn.golden](../test/synth-quartic-rankn.golden)); that
+note records an incomplete tail, not a failure to find or check the displayed
+candidate.
 
 The live
 [`synth-quintic-rankn`](../test/synth-quintic-rankn.txt) transcript is the exact
