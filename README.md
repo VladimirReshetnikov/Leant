@@ -169,91 +169,43 @@ bare stdlib session with subsecond startup. Expressions evaluate via
 `inductive`, `open`, …) run verbatim and, on success, advance the
 session environment; `#`-commands pass straight through.
 
-Finite-list-spine **Length behavioral assessment** is an optional last stage
-that consults Z3 about already verified candidates. Passing
-`--length-ranking-config` activates one startup policy and scalar-or-pair
-contract. Ordinary `:synth TYPE`, explicit `--behavior-mode rank`, and a
-contract-only command with no behavior mode all keep the established stable
-ranking and its historical five-success verification frontier. An explicit
-`:synth --behavior-mode filter -- TYPE` may instead omit only candidates with
-an independently replayed counterexample to the activated startup contract;
-adding `--length-contract ABSOLUTE-PATH` uses that passive contract for this
-command. Filtering consumes each ordinary lazy engine result through one
-opaque cursor. It verifies and assesses a first batch of at most 12 groups for
-a standalone engine or 24 for `both`; only no verification or complete
-behavioral rejection may request one successor batch of the same width. Thus
-an ordinary filter run can inspect at most 12+12 or 24+24 groups without
-rerunning synthesis. The excluded-middle classical route remains one six-group
-batch, while double negation uses the ordinary policy and a filter-only Djinn
-candidate cutoff of 60. Rank and disabled commands retain one batch. Every
-returned batch is verified and assessed exactly once, so a later same-run
-survivor can replace early behavioral rejections without reassessing earlier
-work. Before goal translation, Main introduces one rank-2 assessment context
-for the admitted command. Its lexical
-lifetime spans universe retries and every ordinary, provider, and classical
-lane. A filter context therefore owns one nominal scalar or product
-counterexample bank for the complete command, tries retained samples newest
-first, and freshly replays every attempt against the later same-scope
-candidate. Ordinary and explicit ranking keep the established raw four-vector
-MRU path unchanged; their contexts contain no bank.
+**Length behavioral assessment** is an optional last stage that asks Z3
+about candidates Lean has already verified. It is off unless the session
+started with `--length-ranking-config`, which activates one startup policy
+and one scalar-or-pair contract. Once active:
 
-Failure to verify any candidate and successful behavioral all-rejection are
-distinct continuing batch results. In the first ordinary filter batch, either
-may consume the one same-run successor. Only after that run finishes may its
-continuing result enter the next provider or classical route, carrying the
-complete chronological spelling frontier into provider deduplication. A
-survivor or preserve-all assessment result remains terminal. This does not fill
-a five-survivor quota within a run or across routes: the first batch with any
-survivor stops scheduling, display and binding remain capped at five, and every
-rejection accumulated before that terminal batch stays visible. Raw `sat`,
-`unsat`, and `unknown`, preparation
-refusal, unassessed input, and positive bounded evidence never authorize
-rejection or continuation as all-rejected. Any adapter, ranking, association,
-or partition-seal failure preserves the complete internal verified batch and
-presents at most five candidates, although already completed bank transitions
-are cache effects and are not rolled back.
+- plain `:synth TYPE` (and `--behavior-mode rank`) keeps the usual stable
+  ranking, moving only candidates with a replayed counterexample after the
+  rest, never dropping any;
+- `:synth --behavior-mode filter -- TYPE` additionally *omits* candidates that
+  Z3 refuted against the activated contract — and only those: a raw `sat`,
+  `unsat`, or `unknown`, an unassessed input, or a positive bounded-evidence
+  receipt never causes a rejection;
+- `--length-contract ABSOLUTE-PATH` swaps in a passive contract for one
+  command.
 
-One deferred command finalizer owns result metrics, warnings, bindings, cache
-mutation, candidate and rejection rows, and handled-batch notes. Complete
-spelling frontiers, observations, and debug group ordinals remain chronological
-across the at-most-two batches. Ordinary run notes attach once to the rightmost
-handled batch; an all-no-verification run retains them only for its final
-diagnostic, and classical handled outcomes remain note-free. Ordinary
-all-rejected exhaustion suppresses an unrelated no-term or Lean-verification
-diagnostic. A retained structural refutation still gates classical search and
-masks provider timeout/error as before, while completed batch outcomes remain
-accounted for; without that fallback, completed outcomes are finalized before
-the unchanged abnormal diagnostic. Filter mode keeps the original absolute
-command deadline through both batches and both classical routes. Rank and
-disabled modes retain the historical classical policy: each reached excluded-
-middle and double-negation route independently receives a fresh configured-
-duration deadline; a zero timeout remains unbounded. This is a bounded command-
-local reuse and continuation slice, not a persistent or quota-filling CEGIS
-loop. There is no third cursor probe, engine rerun, batch reassessment, or
-survivor quota fill, and no context or bank enters `ReplState`, history,
-snapshots, or another command.
-The complete reference — including the fixed command grammar, current
-versionless startup and contract-only schemas (`rankingDomain` is `scalar` or
-`binary-product`), unchanged raw rank MRU, one lexical command assessment
-context and filter bank, origin probe, bounded validation, rejection rules,
-and presentation — is
-[docs/length-ranking.md](docs/length-ranking.md).
-The exact progressive Main landing and validation evidence are recorded in the
+A filter command works through one lazy engine result in at most two batches
+of `:set synth-verify` groups (twice that for `both`), reusing one
+command-local counterexample bank across every lane of that command, and
+stops at the first batch with a survivor; at most `:set synth-shown`
+survivors are shown and bound, every rejection stays visible, and nothing
+from the assessment enters `ReplState`, history, or snapshots. Any adapter or
+solver failure preserves the complete verified batch instead of guessing. The
+batch schedule, deadlines, rejection taxonomy, schemas, and presentation are
+specified in [docs/length-ranking.md](docs/length-ranking.md); the Main
+landing is recorded in the
 [progressive same-run Length filter batching report](docs/reports/2026-08-16-progressive-same-run-length-filter-batching.md).
 
-Applicable-domain ranking now has one current recursive piecewise-affine
-algorithm. Library callers use
+Applicable-domain ranking has one current recursive piecewise-affine
+algorithm: library callers use
 `enableLengthRankingApplicableDomainValidation`, receive
-`ApplicableDomainEstablished` or
-`LengthSpinePairApplicableDomainEstablished`, and
-render with `renderLengthApplicableDomainValidationNote` or
-`renderLengthSpinePairApplicableDomainValidationNote`. Djex's direct-through-atomic
-analyses remain private fallback stages inside that algorithm. The former
-stage-specific public builders, assessments, failures, receipts, and renderers
-were deleted without aliases or migration: Leant is experimental and promises
-no API or output compatibility. This surface reset does not change the exact
-versionless startup or contract-only schemas, including the seven numeric
-members of `applicableDomainValidation`; see the
+`ApplicableDomainEstablished` or `LengthSpinePairApplicableDomainEstablished`,
+and render with `renderLengthApplicableDomainValidationNote` or its
+`SpinePair` sibling. The former stage-specific builders, receipts, and
+renderers were deleted without aliases (Leant promises no API or output
+compatibility); the versionless startup and contract-only schemas, including
+the seven numeric members of `applicableDomainValidation`, did not change.
+See the
 [current applicable-domain policy report](docs/reports/2026-08-15-current-length-applicable-domain-policy.md).
 
 | Command | Meaning |
@@ -1101,11 +1053,12 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   (`:set synth-window N`). The first
   spelling remains authoritative, while repeated backend derivations cannot
   consume slots ahead of later distinct terms. Ranking and disabled commands
-  retain one outer 12/24-group batch and ranking stops after five accepted
-  groups (`:set synth-shown N`). Filtering may consume one successor of the
-  same width after a first no-verification or all-rejected batch, for a
-  12+12 standalone or 24+24 combined maximum from the same engine outcome,
-  before its five-survivor presentation cap. There is no third probe. Combined exact-text deduplication
+  retain one outer batch of `synth-verify` groups (default 12, or 24 for
+  `both`) and ranking stops after `synth-shown` accepted groups (default
+  five). Filtering may consume one successor of the same width after a first
+  no-verification or all-rejected batch, for a 12+12 standalone or 24+24
+  combined maximum at the defaults from the same engine outcome, before its
+  `synth-shown` presentation cap. There is no third probe. Combined exact-text deduplication
   likewise keeps the first display occurrence. If that occurrence has no typed
   authority, the exact spelling may lazily retain the first bounded later
   Exference origin solely for checked behavioral preparation; route metrics,
