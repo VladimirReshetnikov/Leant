@@ -4860,35 +4860,39 @@ buildLengthCounterexampleBankAdapterFixture = do
     expectRight (prepareCheckedLengthSpinePairQuery contract verified)
       >>= expectRight
 
+-- | One shared body for the scalar and product fixture-replay helpers: the
+-- domain contributes only its label and its query-owned replay entrance.
+adapterCounterexample
+  :: Show failure
+  => String
+  -> (query -> [Natural] -> Either failure (Maybe receipt))
+  -> query
+  -> Natural
+  -> IO receipt
+adapterCounterexample label replay query input = case replay query [input] of
+  Left failure -> assertFailure
+    (label ++ " adapter fixture replay failed: " ++ show failure)
+      >> error "unreachable"
+  Right Nothing -> assertFailure
+    (label ++ " adapter fixture input was not a counterexample: "
+      ++ show input)
+      >> error "unreachable"
+  Right (Just receipt) -> pure receipt
+
 scalarAdapterCounterexample
   :: CheckedLengthQuery
   -> Natural
   -> IO Djex.ValidatedLengthCounterexample
-scalarAdapterCounterexample query input = case
-    Djex.replayLengthSMTLibCounterexampleInputs
-      defaultLengthEvaluationLimits query [input] of
-  Left failure -> assertFailure
-    ("scalar adapter fixture replay failed: " ++ show failure)
-      >> error "unreachable"
-  Right Nothing -> assertFailure
-    ("scalar adapter fixture input was not a counterexample: " ++ show input)
-      >> error "unreachable"
-  Right (Just receipt) -> pure receipt
+scalarAdapterCounterexample = adapterCounterexample "scalar"
+  $ Djex.replayLengthSMTLibCounterexampleInputs defaultLengthEvaluationLimits
 
 pairAdapterCounterexample
   :: CheckedLengthSpinePairQuery
   -> Natural
   -> IO Djex.ValidatedLengthSpinePairCounterexample
-pairAdapterCounterexample query input = case
-    Djex.replayLengthSpinePairSMTLibCounterexampleInputs
-      defaultLengthEvaluationLimits query [input] of
-  Left failure -> assertFailure
-    ("product adapter fixture replay failed: " ++ show failure)
-      >> error "unreachable"
-  Right Nothing -> assertFailure
-    ("product adapter fixture input was not a counterexample: " ++ show input)
-      >> error "unreachable"
-  Right (Just receipt) -> pure receipt
+pairAdapterCounterexample = adapterCounterexample "product"
+  $ Djex.replayLengthSpinePairSMTLibCounterexampleInputs
+      defaultLengthEvaluationLimits
 
 type ScalarCounterexampleBankAdapterState =
   LengthCounterexampleBank.LengthCounterexampleBankState Djex.ExferenceLocal
@@ -4897,6 +4901,18 @@ type PairCounterexampleBankAdapterState =
   LengthCounterexampleBank.LengthSpinePairCounterexampleBankState
     Djex.ExferenceLocal
 
+adapterReceiptTriple
+  :: String
+  -> (LengthCounterexampleBankAdapterFixture -> [receipt])
+  -> LengthCounterexampleBankAdapterFixture
+  -> IO (receipt, receipt, receipt)
+adapterReceiptTriple label receipts fixture = case receipts fixture of
+  [first, second, third] -> pure (first, second, third)
+  retained -> assertFailure
+    ("unexpected " ++ label ++ " adapter receipt count: "
+      ++ show (length retained))
+      >> error "unreachable"
+
 scalarAdapterReceiptTriple
   :: LengthCounterexampleBankAdapterFixture
   -> IO
@@ -4904,12 +4920,8 @@ scalarAdapterReceiptTriple
       , Djex.ValidatedLengthCounterexample
       , Djex.ValidatedLengthCounterexample
       )
-scalarAdapterReceiptTriple fixture = case
-    counterexampleBankScalarSourceReceipts fixture of
-  [first, second, third] -> pure (first, second, third)
-  receipts -> assertFailure
-    ("unexpected scalar adapter receipt count: " ++ show (length receipts))
-      >> error "unreachable"
+scalarAdapterReceiptTriple = adapterReceiptTriple "scalar"
+  counterexampleBankScalarSourceReceipts
 
 pairAdapterReceiptTriple
   :: LengthCounterexampleBankAdapterFixture
@@ -4918,31 +4930,27 @@ pairAdapterReceiptTriple
       , Djex.ValidatedLengthSpinePairCounterexample
       , Djex.ValidatedLengthSpinePairCounterexample
       )
-pairAdapterReceiptTriple fixture = case
-    counterexampleBankPairSourceReceipts fixture of
-  [first, second, third] -> pure (first, second, third)
-  receipts -> assertFailure
-    ("unexpected product adapter receipt count: " ++ show (length receipts))
+pairAdapterReceiptTriple = adapterReceiptTriple "product"
+  counterexampleBankPairSourceReceipts
+
+expectAdapterBank :: String -> Maybe bank -> IO bank
+expectAdapterBank label active = case active of
+  Nothing -> assertFailure
+    (label ++ " adapter state remained uninitialized")
       >> error "unreachable"
+  Just bank -> pure bank
 
 expectScalarAdapterBank
   :: ScalarCounterexampleBankAdapterState
   -> IO (Djex.LengthCounterexampleBank Djex.ExferenceLocal)
-expectScalarAdapterBank state = case
-    LengthCounterexampleBank.lengthCounterexampleBankStateActiveBank state of
-  Nothing -> assertFailure "scalar adapter state remained uninitialized"
-    >> error "unreachable"
-  Just bank -> pure bank
+expectScalarAdapterBank = expectAdapterBank "scalar"
+  . LengthCounterexampleBank.lengthCounterexampleBankStateActiveBank
 
 expectPairAdapterBank
   :: PairCounterexampleBankAdapterState
   -> IO (Djex.LengthSpinePairCounterexampleBank Djex.ExferenceLocal)
-expectPairAdapterBank state = case
-    LengthCounterexampleBank.lengthSpinePairCounterexampleBankStateActiveBank
-      state of
-  Nothing -> assertFailure "product adapter state remained uninitialized"
-    >> error "unreachable"
-  Just bank -> pure bank
+expectPairAdapterBank = expectAdapterBank "product"
+  . LengthCounterexampleBank.lengthSpinePairCounterexampleBankStateActiveBank
 
 scalarAdapterBankStats
   :: Djex.LengthCounterexampleBank identity
@@ -4984,6 +4992,24 @@ pairAdapterBankEncodedBytes = sum
   . map Djex.lengthSpinePairCounterexampleBankSampleEncodedByteCount
   . Djex.lengthSpinePairCounterexampleBankSamples
 
+expectAdapterRecord
+  :: (Show failure, Show receipt, Show bankError)
+  => String
+  -> ( state
+     , Either failure
+        (LengthCounterexampleBank.BankRecordOutcome receipt bankError)
+     )
+  -> IO (state, receipt)
+expectAdapterRecord label (state, outcome) = case outcome of
+  Right (LengthCounterexampleBank.BankRecorded receipt) ->
+    pure (state, receipt)
+  Left failure -> assertFailure
+    (label ++ " adapter record failed: " ++ show failure)
+      >> error "unreachable"
+  Right unavailable -> assertFailure
+    (label ++ " adapter record was unavailable: " ++ show unavailable)
+      >> error "unreachable"
+
 expectScalarAdapterRecord
   :: ( ScalarCounterexampleBankAdapterState
      , Either
@@ -4994,15 +5020,7 @@ expectScalarAdapterRecord
       ( ScalarCounterexampleBankAdapterState
       , Djex.ValidatedLengthCounterexample
       )
-expectScalarAdapterRecord (state, outcome) = case outcome of
-  Right (LengthCounterexampleBank.BankRecorded receipt) ->
-    pure (state, receipt)
-  Left failure -> assertFailure
-    ("scalar adapter record failed: " ++ show failure)
-      >> error "unreachable"
-  Right unavailable -> assertFailure
-    ("scalar adapter record was unavailable: " ++ show unavailable)
-      >> error "unreachable"
+expectScalarAdapterRecord = expectAdapterRecord "scalar"
 
 expectPairAdapterRecord
   :: ( PairCounterexampleBankAdapterState
@@ -5014,49 +5032,45 @@ expectPairAdapterRecord
       ( PairCounterexampleBankAdapterState
       , Djex.ValidatedLengthSpinePairCounterexample
       )
-expectPairAdapterRecord (state, outcome) = case outcome of
-  Right
-      (LengthCounterexampleBank.BankRecorded
-        receipt) -> pure (state, receipt)
-  Left failure -> assertFailure
-    ("product adapter record failed: " ++ show failure)
-      >> error "unreachable"
-  Right unavailable -> assertFailure
-    ("product adapter record was unavailable: " ++ show unavailable)
-      >> error "unreachable"
+expectPairAdapterRecord = expectAdapterRecord "product"
+
+-- | Record a receipt triple newest-first (third, second, first) so the
+-- populated bank retains the first receipt as its newest sample.
+populateAdapterState
+  :: (receipt, receipt, receipt)
+  -> (receipt -> state -> IO (state, receipt))
+  -> state
+  -> IO state
+populateAdapterState (first, second, third) record initial = do
+  (recordedThird, _) <- record third initial
+  (recordedSecond, _) <- record second recordedThird
+  fst <$> record first recordedSecond
 
 populateScalarAdapterState
   :: LengthCounterexampleBankAdapterFixture
   -> IO ScalarCounterexampleBankAdapterState
 populateScalarAdapterState fixture = do
-  (firstReceipt, secondReceipt, thirdReceipt) <-
-    scalarAdapterReceiptTriple fixture
+  triple <- scalarAdapterReceiptTriple fixture
   let query = counterexampleBankScalarSourceQuery fixture
-      origin =
-        LengthCounterexampleBank.BankReceiptFromLiveModel
       record receipt state = expectScalarAdapterRecord
         $ LengthCounterexampleBank.recordLengthCounterexampleBankReceipt
-            defaultLengthEvaluationLimits query origin receipt state
-  (first, _) <- record thirdReceipt
+            defaultLengthEvaluationLimits query
+            LengthCounterexampleBank.BankReceiptFromLiveModel receipt state
+  populateAdapterState triple record
     LengthCounterexampleBank.defaultLengthCounterexampleBankState
-  (second, _) <- record secondReceipt first
-  fst <$> record firstReceipt second
 
 populatePairAdapterState
   :: LengthCounterexampleBankAdapterFixture
   -> IO PairCounterexampleBankAdapterState
 populatePairAdapterState fixture = do
-  (firstReceipt, secondReceipt, thirdReceipt) <- pairAdapterReceiptTriple fixture
+  triple <- pairAdapterReceiptTriple fixture
   let query = counterexampleBankPairSourceQuery fixture
-      origin =
-        LengthCounterexampleBank.BankReceiptFromLiveModel
       record receipt state = expectPairAdapterRecord
         $ LengthCounterexampleBank.recordLengthSpinePairCounterexampleBankReceipt
-            defaultLengthEvaluationLimits query origin receipt state
-  (first, _) <- record thirdReceipt
+            defaultLengthEvaluationLimits query
+            LengthCounterexampleBank.BankReceiptFromLiveModel receipt state
+  populateAdapterState triple record
     LengthCounterexampleBank.defaultLengthSpinePairCounterexampleBankState
-  (second, _) <- record secondReceipt first
-  fst <$> record firstReceipt second
 
 counterexampleBankTightEvaluationLimits :: Djex.LengthEvaluationLimits
 counterexampleBankTightEvaluationLimits = case
@@ -7406,10 +7420,15 @@ assertPairIntegrationRejection result = do
   assertBool "Integration product filter used the scalar projection"
     $ isNothing $ lengthAssessmentSelectionResult result
 
+-- | Both domains' replay outcomes are the shared 'BankReplayOutcome' at
+-- different hit types, so one shape printer serves the scalar and product
+-- assertions alike (the hit payload is deliberately elided).
 showReplayShape
-  :: Either
+  :: (Show evaluationError, Show bankError)
+  => Either
       LengthCounterexampleBank.BankReplayFailure
-      (LengthCounterexampleBank.LengthCounterexampleBankReplayOutcome identity)
+      (LengthCounterexampleBank.BankReplayOutcome
+        evaluationError bankError hit)
   -> String
 showReplayShape outcome = case outcome of
   Left failure -> "Left " ++ show failure
@@ -7428,18 +7447,7 @@ showPairReplayShape
       (LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayOutcome
         identity)
   -> String
-showPairReplayShape outcome = case outcome of
-  Left failure -> "Left " ++ show failure
-  Right
-      (LengthCounterexampleBank.BankReplayMiss
-        refusals) -> "ReplayMiss " ++ show refusals
-  Right
-      (LengthCounterexampleBank.BankReplayAttemptUnavailable
-        refusals failure) ->
-    "ReplayAttemptUnavailable " ++ show refusals ++ " " ++ show failure
-  Right
-      (LengthCounterexampleBank.BankReplayHit
-        refusals _) -> "ReplayHit " ++ show refusals
+showPairReplayShape = showReplayShape
 
 lengthSpinePairBoundaryTests :: TestTree
 lengthSpinePairBoundaryTests = testGroup
