@@ -197,12 +197,13 @@ six-binder successor in `2026-08-10-six-binder-instantiation.md`:
   `global («a» := Nat)`. Intervening class binders remain implicit for Lean's
   instance search. Specified quantified arguments use a shared closed,
   alpha-normalized representation distinct from the inferred placeholder, so
-  Leant can render `global («a» := (∀ (a0_0 : _), a0_0 → a0_0))`
+  Leant renders a named global's quantified argument with the provider's own
+  binder domain — `global («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))` —
   structurally while preserving nested shadowing. A positional local
-  application receives bounded `_`, `Type _`, and `Prop` binder-domain
-  variants because Lean may lack enough expected-type information to solve the
-  quantified argument's universe from `_` alone; backend verification chooses
-  the first elaborating spelling. Named globals retain their source-directed
+  application instead receives bounded `_`, `Type _`, and `Prop`
+  binder-domain variants because Lean may lack enough expected-type
+  information to solve the quantified argument's universe from `_` alone;
+  backend verification chooses the first elaborating spelling. Named globals retain their source-directed
   rendering. Each of the inferred, `Type _`, and `Prop` lanes retains its own
   12 site-and-style variants, so selective local instantiation sites remain
   reachable under a hard 36-spelling bound; domain-insensitive duplicates

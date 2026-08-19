@@ -85,6 +85,13 @@ Companion documents:
   — where the behavioral layer goes next: counterexample-guided search,
   typed sketch completion, semantic pruning, and Lean-checked proof
   artifacts ([LaTeX source](docs/Z3_Behavioral_Synthesis_Proposal/Z3_Behavioral_Synthesis_Proposal.tex));
+- the **[codebase walkthrough](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Djex_Leant_Codebase_Walkthrough/Djex_Leant_Codebase_Walkthrough.pdf)**
+  — the maintainer's tour of both repositories against a pinned pair of
+  revisions: the build graph, Djex's opaque authority types, Djinn's
+  proof-producing search, Exference's typed-hole search and independent
+  checker, and Leant's backend protocol, translation, rendering, and
+  verification, with end-to-end traces and change recipes
+  ([LaTeX source](docs/Djex_Leant_Codebase_Walkthrough/Djex_Leant_Codebase_Walkthrough.tex));
 - the **[Lean 4 rewrite analysis](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Leant_Djex_Lean4_Rewrite_Analysis/Leant_Djex_Lean4_Rewrite_Analysis.pdf)**
   — a feasibility study of reimplementing Leant and Djex in Lean itself:
   which of today's boundaries would survive, what a Lean host makes
@@ -147,7 +154,7 @@ environment variable.
 ## Usage
 
 ```text
-leant [FILE] [--project DIR] [--plain] [-i MOD]
+leant [FILE] [-p|--project DIR] [--plain] [-i|--import MOD] [--help]
       [--timeout N] [--time] [--transcript [FILE]] [--timestamps]
       [--repl-exe PATH] [--lake PATH]
       [--length-ranking-config ABSOLUTE-PATH]
@@ -603,15 +610,15 @@ binder and leaves dictionary reconstruction to Lean:
 
 Closed, context-free quantified choices follow the same path instead of
 collapsing to an inferred `_`. Djex keeps their binders alpha-safe, and Leant
-uses stable local names plus `_` binder domains so the provider's expected
-universe remains authoritative:
+gives them stable local names while rendering the provider's own binder
+domain, so the expected universe stays visible in the printed argument:
 
 ```text
 λ> class Demo.PolyC (a : Type 1) : Prop where witness : True
 λ> instance : Demo.PolyC (∀ x : Type, x → x) := ⟨True.intro⟩
 λ> axiom Demo.polyGlobal {a : Type 1} [Demo.PolyC a] : Demo.Token
 λ> :synth ((∀ x : Type, x → x) → Demo.Token)
-  it1  fun _ => Demo.polyGlobal («a» := (∀ (a0_0 : _), a0_0 → a0_0))
+  it1  fun _ => Demo.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
 ```
 
 The choice need not occur in the query when Lean's active instance heads prove
@@ -627,15 +634,15 @@ then both checked Djex runners retain the same explicit application:
 λ> :set synth-engine djinn
 synth engine: djinn
 λ> :synth Gap.Token
-  it1  Gap.polyGlobal («a» := (∀ (a0_0 : _), a0_0 → a0_0))
+  it1  Gap.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
 λ> :set synth-engine exference
 synth engine: exference
 λ> :synth Gap.Token
-  it1  Gap.polyGlobal («a» := (∀ (a0_0 : _), a0_0 → a0_0))
+  it1  Gap.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
 λ> :set synth-engine both
 synth engine: both
 λ> :synth Gap.Token
-  it1  Gap.polyGlobal («a» := (∀ (a0_0 : _), a0_0 → a0_0))
+  it1  Gap.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
 ```
 
 The instance may determine a higher-kinded binder which never occurs in the
@@ -1245,10 +1252,11 @@ projects in Lean itself.
 
 Leant implements the backend protocol directly
 ([src/Leant/Backend.hs](src/Leant/Backend.hs)): JSON over stdin/stdout
-with blank-line framing, spawned as `lake env repl.exe` inside the Lake
-project. The JSON codec is hand-rolled
-([src/Leant/Json.hs](src/Leant/Json.hs)), so the REPL core builds with
-GHC boot libraries only — no Hackage downloads. On backend death,
+with blank-line framing, spawned as `lake env repl` (`repl.exe` on
+Windows) inside the Lake project. The JSON codec is hand-rolled
+([src/Leant/Json.hs](src/Leant/Json.hs)), so the REPL core itself needs
+only GHC boot libraries; the sole Hackage dependency, `haskell-src-exts`,
+arrives through the vendored Djex. On backend death,
 timeout, or Ctrl+C, the process is killed and the session (imports +
 history) replays automatically on the next command. The Haskeline
 front-end provides the interrupt-safe step loop, logical multi-line
@@ -1322,12 +1330,14 @@ assert POSIX absolute-path semantics that a Windows path does not satisfy, so
 they fail on Windows and pass everywhere else. A third case, `compose a
 persistent last-wins builder and admit before clock capture`, races a fake
 solver's start-up against a 700 ms budget and fails on a slow or loaded
-machine. Treat any *other* failure as a regression. Second, nineteen tests
+machine. Treat any *other* failure as a regression. Second, sixteen tests
 read production source text and assert on it — twelve on
-[src/Main.hs](src/Main.hs) and one or two each on `Synth/Engine.hs`,
-`Synth/BehavioralSelection.hs`, `Length/Selection.hs`,
-`Length/Selection/Generic.hs`, `Length/Ranking.hs`,
-`Length/Ranking/Generic.hs`, `Length/Integration.hs` and `Length/Handoff.hs`.
+[src/Main.hs](src/Main.hs), and one or two each on `Synth/Engine.hs`,
+`Synth/BehavioralSelection.hs` (and its `Internal`), the scalar and
+`SpinePair` `Length/Ranking` and `Length/Selection` modules together with
+`Ranking/Generic.hs` and `Selection/Generic.hs`,
+`Length/CounterexampleBank/Internal.hs`, `Length/Integration.hs` and
+`Length/Handoff.hs` (all under `src/Leant/` unless shown otherwise).
 They pin the shape of decisions that must not move
 silently, such as which deadline a classical route owns and that selection
 preserves the batch before it seals. A refactor of those files has to be
