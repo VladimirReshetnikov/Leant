@@ -234,7 +234,16 @@
   exact boundaries.  The successor proposal,
   \emph{Precise Behavioral Code Synthesis in Leant and Djex with Z3}
   (\code{docs/Z3\_Behavioral\_Synthesis\_Proposal/}, 15 August 2026), starts
-  from that implemented layer and lays out those next increments.}
+  from that implemented layer and lays out those next increments.
+
+  \emph{Status, 19 August 2026:} the opt-in semantic post-filter proposed as
+  level 1 has also shipped: \code{:synth --behavior-mode filter} performs
+  command-authorized hard Length filtering in which only an independently
+  replayed counterexample rejects a candidate and every other assessment
+  retains it, supported by command-local counterexample banks and progressive
+  same-run filter batching; the default rank lane still reorders without
+  pruning.  Levels 2 and 3 (typed sketch completion and semantic branch
+  pruning) remain future work.}
 \end{titlepage}
 
 \pagenumbering{roman}
