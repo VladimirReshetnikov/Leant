@@ -9,7 +9,7 @@ import qualified Data.ByteString.Char8 as BS
 import Data.Char (isAlphaNum, toLower)
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef)
 import Data.List (isInfixOf, isPrefixOf, sortOn, tails)
-import Data.Maybe (isJust, isNothing)
+import Data.Maybe (fromMaybe, isJust, isNothing)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -3005,7 +3005,7 @@ translationPreparationTests = testGroup "prepared synthesis translation"
         bindings -> assertFailure $
           "legacy preparation retained unexpected bindings: " ++ show bindings
       assertBool "legacy preparation accidentally retained a context class"
-        $ all (/= contextClass)
+        $ notElem contextClass
         $ [ className
           | ClassDeclaration () className _ _ _ <-
               inspectedDeclarations legacyPrepared
@@ -3127,7 +3127,7 @@ translationPreparationTests = testGroup "prepared synthesis translation"
         Right (SynthCandidates groups _) -> assertBool
           ("context-erased Djinn compatibility found no provider: "
             ++ show groups)
-          $ any ("Demo.contextual" `isInfixOf`) $ concat groups
+          $ any (any ("Demo.contextual" `isInfixOf`)) groups
         outcome -> assertFailure $
           "context-erased Djinn compatibility failed: " ++ show outcome
 
@@ -4510,7 +4510,7 @@ detailedSynthCursorTests = testGroup "bounded detailed synthesis cursor"
             "the authentic safe cursor step changed to "
               ++ detailedSynthCursorStepTag other
   , testCase
-      "keep cursor and batch representations opaque behind Main accessors" $
+      "keep cursor and batch representations opaque behind Main accessors"
       assertDetailedSynthCursorArchitecture
   ]
 
@@ -13717,7 +13717,7 @@ assertLengthAssessmentConfigured
         map lengthCandidatePresentationText presentations @?=
           map lengthCandidatePresentationText
             (presentLengthPostVerificationResult
-              $ maybe (error "configured presentation lost its result") id
+              $ fromMaybe (error "configured presentation lost its result")
               $ lengthAssessmentPostVerificationResult assessed)
         assertLengthPresentationAssociations presentations [Nothing, Just 0,
           Just 1]
@@ -17222,9 +17222,9 @@ assertLengthRankingOriginProbeOrdering = do
   lengthRankingFailure replayRanking @?= Nothing
   map rankedLengthCandidateOriginalIndex
       (lengthRankingCandidates replayRanking) @?= [0, 1, 2, 3]
-  replayReceipts <- mapM expectOriginCounterexample
-    $ map rankedLengthCandidateAssessment
-    $ lengthRankingCandidates replayRanking
+  replayReceipts <- mapM
+    (expectOriginCounterexample . rankedLengthCandidateAssessment)
+    (lengthRankingCandidates replayRanking)
   map Djex.validatedLengthCounterexampleInputs replayReceipts @?=
     replicate 4 [0]
   map Djex.validatedLengthCounterexampleResult replayReceipts @?=
@@ -20264,7 +20264,7 @@ providerEngineTests = testGroup "foreign providers"
                 ("the exact provider did not override the empty-family \
                  \refutation in " ++ synthEngineName engine ++ ": "
                    ++ show groups)
-                (any exact (concat groups))
+                (any (any exact) groups)
             Right other -> assertFailure $
               "unexpected exact provider-refutation outcome from "
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
@@ -21622,7 +21622,7 @@ typeApplicationTests = testGroup "retained type applications"
           check provider' engine = case
               synthesizeWithProviders engine 512 [provider'] token of
             Right (SynthCandidates groups _)
-              | any (anyContextMarker `isInfixOf`) (concat groups) ->
+              | any (any (anyContextMarker `isInfixOf`)) groups ->
                   assertFailure $ "unsupported contextual assignment reached "
                     ++ show engine ++ ": " ++ show groups
             Right _ -> pure ()
@@ -21933,7 +21933,7 @@ typeApplicationTests = testGroup "retained type applications"
               assertBool
                 ("ordered four-argument assignment was lost in "
                   ++ synthEngineName engine ++ ": " ++ show groups)
-                (any exact (concat groups))
+                (any (any exact) groups)
             Right other -> assertFailure $
               "unexpected ordered-assignment outcome from "
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
@@ -21972,7 +21972,7 @@ typeApplicationTests = testGroup "retained type applications"
               assertBool
                 ("ordered five-argument assignment was lost in "
                   ++ synthEngineName engine ++ ": " ++ show groups)
-                (any exact (concat groups))
+                (any (any exact) groups)
             Right other -> assertFailure $
               "unexpected five-argument assignment outcome from "
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
@@ -22013,7 +22013,7 @@ typeApplicationTests = testGroup "retained type applications"
               assertBool
                 ("ordered six-argument assignment was lost in "
                   ++ synthEngineName engine ++ ": " ++ show groups)
-                (any exact (concat groups))
+                (any (any exact) groups)
             Right other -> assertFailure $
               "unexpected six-argument assignment outcome from "
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
@@ -22040,7 +22040,7 @@ typeApplicationTests = testGroup "retained type applications"
             Right (SynthCandidates groups _) -> assertBool
               ("over-wide assignment became visible in "
                 ++ synthEngineName engine ++ ": " ++ show groups)
-              (all (not . isInfixOf "«p1» :=") (concat groups))
+              (all (all (not . isInfixOf "«p1» :=")) groups)
             Right _ -> pure ()
       mapM_ check [EngineDjinn, EngineExference, EngineBoth]
   , testCase "do not enter provider evidence beyond the aggregate bound" $
@@ -22073,7 +22073,7 @@ typeApplicationTests = testGroup "retained type applications"
               assertBool
                 ("a later provider donated rank-N evidence to Gap.first in "
                   ++ synthEngineName engine ++ ": " ++ show groups)
-                (not (any donated (concat groups)))
+                (not (any (any donated) groups))
             Right _ -> pure ()
             Left err -> assertFailure err
       mapM_ check [EngineDjinn, EngineExference, EngineBoth]
@@ -22091,8 +22091,7 @@ typeApplicationTests = testGroup "retained type applications"
                 ("scoped quantified application fell outside the first "
                   ++ show synthMaxTried ++ " " ++ synthEngineName engine
                   ++ " groups: " ++ show (take synthMaxTried groups))
-                $ any quantifiedTypeVariant
-                $ concat $ take synthMaxTried groups
+                $ any (any quantifiedTypeVariant) (take synthMaxTried groups)
             Right other -> assertFailure $
               "unexpected scoped-provider outcome from "
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
@@ -22176,10 +22175,10 @@ typeApplicationTests = testGroup "retained type applications"
   , testCase "poison refutations with the complete nominal application" $ do
       let target = wrap "Demo.Wrap ((b : Type) \8594 b \8594 b)" polytype
       fragRefusal target @?= Just
-        ("the goal is a single opaque type application \
+        "the goal is a single opaque type application \
          \`Demo.Wrap ((b : Type) \8594 b \8594 b)` \8212 :synth can transport \
          \and instantiate retained type applications, but cannot construct \
-         \an unknown Lean family")
+         \an unknown Lean family"
       fragUnsafeAtoms target
         @?= ["Demo.Wrap ((b : Type) \8594 b \8594 b)"]
       case synthesizeWithProviders EngineDjinn 0 [] target of
@@ -22204,7 +22203,7 @@ typeApplicationTests = testGroup "retained type applications"
     (variableApp "F a" "F" (FVar "a"))
   expectTerm needle outcome = case outcome of
     Right (SynthCandidates groups _) ->
-      if any (needle `isInfixOf`) (concat groups)
+      if any (any (needle `isInfixOf`)) groups
         then pure ()
         else assertFailure $
           "expected a candidate containing " ++ show needle
