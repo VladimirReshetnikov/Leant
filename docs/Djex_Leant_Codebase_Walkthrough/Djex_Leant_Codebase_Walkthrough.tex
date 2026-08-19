@@ -84,8 +84,8 @@
 \newcommand{\commitid}[1]{{\ttfamily\footnotesize #1}}
 \newcommand{\RepoDjex}{\href{https://github.com/VladimirReshetnikov/Djex}{Djex}}
 \newcommand{\RepoLeant}{\href{https://github.com/VladimirReshetnikov/Leant}{Leant}}
-\def\DjexBase{https://github.com/VladimirReshetnikov/Djex/blob/6493b29f3b19c6be65ee0e57c8ef30d996fe1e1c/}
-\def\LeantBase{https://github.com/VladimirReshetnikov/Leant/blob/e5841361208ef13eefea01bde0d65af1e528beb3/}
+\def\DjexBase{https://github.com/VladimirReshetnikov/Djex/blob/3ee8cb24cc95b7c863b3f40960648c275ec9d824/}
+\def\LeantBase{https://github.com/VladimirReshetnikov/Leant/blob/f72db83bb44891a28f55e4f38f1a664613ed68b2/}
 \newcommand{\dpath}[1]{\href{\DjexBase#1}{\nolinkurl{#1}}}
 \newcommand{\lpath}[1]{\href{\LeantBase#1}{\nolinkurl{#1}}}
 \newcommand{\dsym}[2]{\code{#2} in \dpath{#1}}
@@ -182,8 +182,8 @@ and practical extension paths\par}
 \begin{tcolorbox}[width=0.86\textwidth,colback=SoftGray,colframe=RuleGray,boxrule=0.7pt,arc=1mm]
 \small
 \begin{tabularx}{\textwidth}{@{}L{0.18\textwidth}Y@{}}
-\textbf{Djex snapshot} & \commitid{6493b29f3b19c6be65ee0e57c8ef30d996fe1e1c} \\
-\textbf{Leant snapshot} & \commitid{e5841361208ef13eefea01bde0d65af1e528beb3} \\
+\textbf{Djex snapshot} & \commitid{3ee8cb24cc95b7c863b3f40960648c275ec9d824} \\
+\textbf{Leant snapshot} & \commitid{f72db83bb44891a28f55e4f38f1a664613ed68b2} \\
 \textbf{Relationship} & Leant's \filepath{lib/Djex} submodule is pinned to the same Djex revision. \\
 \textbf{Prepared} & August 16, 2026; revised August 17, 2026 \\
 \textbf{Scope} & This is now the only maintainer walkthrough for either repository. The former Djex-only walkthrough was retired on August 17, 2026; its Djex material is covered by Parts~I--II here. \\
@@ -351,7 +351,17 @@ A replayed counterexample need not come from a live solver response: the query-o
 The canonical-\code{Prod} path mirrors the scalar ranking, post-verification,
 and selection stacks under
 \filepath{src/Leant/Synth/Length/SpinePair}; each public module has a
-package-private \code{Internal} sibling. On the Djex side,
+package-private \code{Internal} sibling. Since the two ranking and the two
+selection siblings ran the same control flow in two vocabularies, that flow
+now lives once---in \filepath{src/Leant/Synth/Length/Ranking/Generic.hs} over
+the closed \code{LengthRankingDomain} class and in
+\filepath{src/Leant/Synth/Length/Selection/Generic.hs} over a
+\code{SelectionDomain} record---and each \code{Internal} sibling is the
+domain's instance: it keeps its nominal assessment, failure, policy, receipt,
+and result types and its own Djex vocabulary, so a product receipt still
+cannot be presented as a scalar one. The nominal counterexample-bank states
+and contexts are likewise one implementation parameterized by each domain's
+limits, bank, scope, sample, receipt, and error types. On the Djex side,
 \filepath{synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length/SMTLib/Protocol/SpinePair.hs}
 is deliberately thin: the scalar and product protocol modules share one phase
 machine, framing validation, write rendering, and fingerprint construction,
@@ -451,14 +461,15 @@ The following paths are current-branch source locations, not links into the pinn
 \filepath{src/Leant/Options.hs} & Pure CLI admission, pin-policy choice, and bounded configuration-load timeout ownership. \\
 \filepath{src/Leant/Json/Bounded.hs} & Shared strict bounded JSON syntax, scalar decoding, and closed-object validation used by both configuration and contract-only roots. \\
 \filepath{src/Leant/Synth/Length/Ranking.hs} & Association-free ranking facade: complete reports, sanitized failures and refusals, the documented four-vector MRU replay behavior, an additive input-box-validation runner beside the historical runner, and no associated-plan projector. \\
-\filepath{src/Leant/Synth/Length/Ranking/Internal.hs} & Package-private preparation orchestration, single-owner receipt-association/query state, scoped serial execution, a raw-four-vector or nominal-context replay cursor threaded through eager/deferred and unbudgeted/v1/scoped runners, the query-owned all-zero origin probe, \code{unsat}-triggered finite input-box validation, one complete guarded recursive piecewise-affine applicable-domain route, exact promotion/record timing, query-owned evidence replay, handle-preserving no-prune ordering, and candidate-report fallback without cache rollback. \\
-\filepath{src/Leant/Synth/Length/CounterexampleBank/Internal.hs} & Package-private nominal scalar/product state and command-tagged contexts over Djex's query-owned replay bridge: validated limits, lazy one-scope ownership and reset, newest-first charged traversal, ordered bounded refusals, explicit evaluation-free promotion, fresh-replayed origin-aware recording, immutable snapshots, and serialized exception-restoring commit after full successor-state and classification-WHNF forcing. \\
+\filepath{src/Leant/Synth/Length/Ranking/Generic.hs} & The ranking control flow written once over the closed \code{LengthRankingDomain} class: package-private preparation orchestration, single-owner receipt-association/query state, scoped serial execution, a raw-four-vector or nominal-context replay cursor threaded through eager/deferred and unbudgeted/v1/scoped runners, the query-owned all-zero origin probe, \code{unsat}-triggered finite input-box validation, one complete guarded recursive piecewise-affine applicable-domain route, exact promotion/record timing, query-owned evidence replay, handle-preserving no-prune ordering, and candidate-report fallback without cache rollback. Each Djex outcome the flow inspects arrives through a small shared view, so the core never names a domain's constructors. \\
+\filepath{src/Leant/Synth/Length/Ranking/Internal.hs} & The scalar instance of that core: the nominal assessment, failure, policy, and opaque receipt types as newtypes over the shared structure, the handoff and query refusal classifiers, the scalar bank surface and bridge, and the established public entrances (including the three command-local bank-context entrances) with byte-identical signatures. \\
+\filepath{src/Leant/Synth/Length/CounterexampleBank/Internal.hs} & One package-private bank implementation over Djex's query-owned replay bridge, parameterized by each domain's limits, bank, scope, sample, receipt, and error types, with nominal scalar and product states, command-tagged contexts, and domain-named wrappers around it: validated limits, lazy one-scope ownership and reset, newest-first charged traversal, ordered bounded refusals, explicit evaluation-free promotion, fresh-replayed origin-aware recording, immutable snapshots, and serialized exception-restoring commit after full successor-state and classification-WHNF forcing. Each domain contributes only a query-free \code{BankSurface} and a query-owned \code{BankBridge}. \\
 \filepath{src/Leant/Synth/PostVerification.hs} & Domain-neutral generative occurrence handles and bounded exact-permutation seal. \\
 \filepath{src/Leant/Synth/BehavioralSelection.hs}, \filepath{BehavioralSelection/Internal.hs} & Domain-neutral rank-2 occurrence handles, package-internal retain/reject builders, and bounded total-partition seal; structural association only, with no behavioral authority by itself. \\
 \filepath{src/Leant/Synth/Length/PostVerification.hs} & Safe Length-specific facade exposing only policy-plus-contract sealed assessment. \\
 \filepath{src/Leant/Synth/Length/PostVerification/Internal.hs} & Package-private rank-2 adapter retaining the sealed batch as sole receipt owner beside a receipt-free summary and materializing the compatibility ranking view on projection. \\
-\filepath{src/Leant/Synth/Length/SpinePair/Ranking.hs}, \filepath{Ranking/Internal.hs}, \filepath{PostVerification.hs}, \filepath{PostVerification/Internal.hs} & Nominal binary-product siblings of the scalar ranking and post-verification stack, including the separate raw/context cursor and full runner matrix, distinct end to end from their scalar counterparts. \\
-\filepath{src/Leant/Synth/Length/Selection.hs}, \filepath{Selection/Internal.hs}, and SpinePair siblings & Nominal replay-authorized hard-selection adapters: unchanged raw compatibility entrances plus additive context-aware entrances; only independently replayed counterexamples reject; every other assessment retains; any adapter/ranking/index/seal failure preserves the exact original batch without rewinding completed bank transitions. \\
+\filepath{src/Leant/Synth/Length/SpinePair/Ranking.hs}, \filepath{Ranking/Internal.hs}, \filepath{PostVerification.hs}, \filepath{PostVerification/Internal.hs} & Nominal binary-product siblings of the scalar ranking and post-verification stack. \filepath{Ranking/Internal.hs} is the product instance of the shared ranking core---its own leaf types, refusal classifiers, and bank vocabulary over the one runner matrix and cursor---while the post-verification pair remains a distinct nominal twin; product receipts stay distinct types from scalar ones end to end. \\
+\filepath{src/Leant/Synth/Length/Selection.hs}, \filepath{Selection/Internal.hs}, \filepath{Selection/Generic.hs}, and SpinePair siblings & Nominal replay-authorized hard-selection adapters over one shared pipeline (\filepath{Selection/Generic.hs}, whose explanation, rejection, and result types take each domain's receipts as parameters and whose \code{SelectionDomain} record carries the per-domain failure naming): unchanged raw compatibility entrances plus additive context-aware entrances; only independently replayed counterexamples reject; every other assessment retains; any adapter/ranking/index/seal failure preserves the exact original batch without rewinding completed bank transitions. \\
 \filepath{src/Leant/Synth/Length/Presentation.hs} & Opaque same-ranked/selected/rejected-receipt candidate presentation, exact existing counterexample/simplification rejection notes, retained bounded-positive notes, and no detached evidence reassociation. \\
 \filepath{src/Main.hs} & Explicit startup opt-in, load-once command contract selection, one pre-translation rank-2 assessment context, per-command rank/filter dispatch, opaque same-run cursor consumption, filter-only two-batch progression at the session's verification width (12+12 or 24+24 by default), single-batch rank/disabled and half-width excluded-middle policies, mode-sensitive classical deadlines, one verification and assessment per batch, chronological run frontiers and note ownership, private four-way batch classification and lazy reverse accumulation, no-verified/all-rejected continuation with full-frontier deduplication, first-survivor termination without quota filling or a third probe, one plural result finalizer, survivor-only \code{itN} binding, complete accumulated rejection rows, structural/classical and abnormal diagnostic gates, four-way descriptor-launch notices, and sanitized mode-neutral preserve-all warning. \\
 \bottomrule
