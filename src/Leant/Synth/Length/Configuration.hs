@@ -274,8 +274,20 @@ data LengthRankingConfigurationError
 mkLengthRankingPolicy
   :: LengthRankingPolicySource
   -> Either LengthRankingConfigurationError LengthRankingPolicy
-mkLengthRankingPolicy source = do
-  execution <- case mkLengthSMTLibExecutionConfig
+mkLengthRankingPolicy = mkLengthRankingPolicyVia mkLengthSMTLibExecutionConfig
+
+-- | Shared body of the four launch-flavored policy makers: validate the
+-- flavor's execution config, then the replay limits, in that order, and
+-- assemble the reusable policy with the origin probe and finite-box
+-- validation disabled.
+mkLengthRankingPolicyVia
+  :: (LengthSMTLibExecutionLimits
+      -> LengthSMTLibExecutionConfigSource
+      -> Either LengthSMTLibExecutionConfigError LengthSMTLibExecutionConfig)
+  -> LengthRankingPolicySource
+  -> Either LengthRankingConfigurationError LengthRankingPolicy
+mkLengthRankingPolicyVia mkExecution source = do
+  execution <- case mkExecution
       (lengthRankingPolicyExecutionLimits source)
       (lengthRankingPolicyExecutionSource source) of
     Left failure -> Left $ LengthRankingExecutionConfigurationRejected failure
@@ -294,17 +306,8 @@ mkLengthRankingPolicy source = do
 mkLengthRankingPolicyWithDescriptorBoundExecutableLaunch
   :: LengthRankingPolicySource
   -> Either LengthRankingConfigurationError LengthRankingPolicy
-mkLengthRankingPolicyWithDescriptorBoundExecutableLaunch source = do
-  execution <- case mkLengthSMTLibDescriptorBoundExecutionConfig
-      (lengthRankingPolicyExecutionLimits source)
-      (lengthRankingPolicyExecutionSource source) of
-    Left failure -> Left $ LengthRankingExecutionConfigurationRejected failure
-    Right validated -> Right validated
-  evaluation <- case mkLengthEvaluationLimits
-      (lengthRankingPolicyEvaluationSource source) of
-    Left failure -> Left $ LengthRankingEvaluationLimitsRejected failure
-    Right validated -> Right validated
-  pure $ lengthRankingPolicyFromValidatedComponents execution evaluation
+mkLengthRankingPolicyWithDescriptorBoundExecutableLaunch =
+  mkLengthRankingPolicyVia mkLengthSMTLibDescriptorBoundExecutionConfig
 
 -- | Validate the same reusable policy while selecting Djex's additive
 -- descriptor-bound effective-ID executable-access launch.  Construction
@@ -314,19 +317,9 @@ mkLengthRankingPolicyWithDescriptorBoundExecutableLaunch source = do
 mkLengthRankingPolicyWithDescriptorBoundEffectiveIDExecutableAccessLaunch
   :: LengthRankingPolicySource
   -> Either LengthRankingConfigurationError LengthRankingPolicy
-mkLengthRankingPolicyWithDescriptorBoundEffectiveIDExecutableAccessLaunch
-    source = do
-  execution <- case
-      mkLengthSMTLibDescriptorBoundEffectiveIDExecutableAccessExecutionConfig
-        (lengthRankingPolicyExecutionLimits source)
-        (lengthRankingPolicyExecutionSource source) of
-    Left failure -> Left $ LengthRankingExecutionConfigurationRejected failure
-    Right validated -> Right validated
-  evaluation <- case mkLengthEvaluationLimits
-      (lengthRankingPolicyEvaluationSource source) of
-    Left failure -> Left $ LengthRankingEvaluationLimitsRejected failure
-    Right validated -> Right validated
-  pure $ lengthRankingPolicyFromValidatedComponents execution evaluation
+mkLengthRankingPolicyWithDescriptorBoundEffectiveIDExecutableAccessLaunch =
+  mkLengthRankingPolicyVia
+    mkLengthSMTLibDescriptorBoundEffectiveIDExecutableAccessExecutionConfig
 
 -- | Validate the same reusable policy while selecting Djex's additive
 -- descriptor-bound execve-check executable-access launch.  Construction
@@ -337,19 +330,9 @@ mkLengthRankingPolicyWithDescriptorBoundEffectiveIDExecutableAccessLaunch
 mkLengthRankingPolicyWithDescriptorBoundExecveCheckExecutableAccessLaunch
   :: LengthRankingPolicySource
   -> Either LengthRankingConfigurationError LengthRankingPolicy
-mkLengthRankingPolicyWithDescriptorBoundExecveCheckExecutableAccessLaunch
-    source = do
-  execution <- case
-      mkLengthSMTLibDescriptorBoundExecveCheckExecutableAccessExecutionConfig
-        (lengthRankingPolicyExecutionLimits source)
-        (lengthRankingPolicyExecutionSource source) of
-    Left failure -> Left $ LengthRankingExecutionConfigurationRejected failure
-    Right validated -> Right validated
-  evaluation <- case mkLengthEvaluationLimits
-      (lengthRankingPolicyEvaluationSource source) of
-    Left failure -> Left $ LengthRankingEvaluationLimitsRejected failure
-    Right validated -> Right validated
-  pure $ lengthRankingPolicyFromValidatedComponents execution evaluation
+mkLengthRankingPolicyWithDescriptorBoundExecveCheckExecutableAccessLaunch =
+  mkLengthRankingPolicyVia
+    mkLengthSMTLibDescriptorBoundExecveCheckExecutableAccessExecutionConfig
 
 -- | Assemble one reusable policy from already validated Djex execution and
 -- replay authorities with the origin probe and finite-box validation disabled.
