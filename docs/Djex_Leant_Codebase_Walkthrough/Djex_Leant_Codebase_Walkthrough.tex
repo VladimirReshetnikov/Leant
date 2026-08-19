@@ -84,8 +84,8 @@
 \newcommand{\commitid}[1]{{\ttfamily\footnotesize #1}}
 \newcommand{\RepoDjex}{\href{https://github.com/VladimirReshetnikov/Djex}{Djex}}
 \newcommand{\RepoLeant}{\href{https://github.com/VladimirReshetnikov/Leant}{Leant}}
-\def\DjexBase{https://github.com/VladimirReshetnikov/Djex/blob/3ee8cb24cc95b7c863b3f40960648c275ec9d824/}
-\def\LeantBase{https://github.com/VladimirReshetnikov/Leant/blob/f72db83bb44891a28f55e4f38f1a664613ed68b2/}
+\def\DjexBase{https://github.com/VladimirReshetnikov/Djex/blob/f50ae24c39c380642fa457abd9904b77114843e8/}
+\def\LeantBase{https://github.com/VladimirReshetnikov/Leant/blob/859c36cec17cb5c093f7435ac43de1650667695e/}
 \newcommand{\dpath}[1]{\href{\DjexBase#1}{\nolinkurl{#1}}}
 \newcommand{\lpath}[1]{\href{\LeantBase#1}{\nolinkurl{#1}}}
 \newcommand{\dsym}[2]{\code{#2} in \dpath{#1}}
@@ -182,8 +182,8 @@ and practical extension paths\par}
 \begin{tcolorbox}[width=0.86\textwidth,colback=SoftGray,colframe=RuleGray,boxrule=0.7pt,arc=1mm]
 \small
 \begin{tabularx}{\textwidth}{@{}L{0.18\textwidth}Y@{}}
-\textbf{Djex snapshot} & \commitid{3ee8cb24cc95b7c863b3f40960648c275ec9d824} \\
-\textbf{Leant snapshot} & \commitid{f72db83bb44891a28f55e4f38f1a664613ed68b2} \\
+\textbf{Djex snapshot} & \commitid{f50ae24c39c380642fa457abd9904b77114843e8} \\
+\textbf{Leant snapshot} & \commitid{859c36cec17cb5c093f7435ac43de1650667695e} \\
 \textbf{Relationship} & Leant's \filepath{lib/Djex} submodule is pinned to the same Djex revision. \\
 \textbf{Prepared} & August 16, 2026; revised August 17, 2026 \\
 \textbf{Scope} & This is now the only maintainer walkthrough for either repository. The former Djex-only walkthrough was retired on August 17, 2026; its Djex material is covered by Parts~I--II here. \\
@@ -415,7 +415,7 @@ The following paths are current-branch source locations, not links into the pinn
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/CounterexampleBank.hs} & Nominal scalar/product candidate-independent scope identities and bounded immutable input-vector stores; matching permits an attempted fresh replay and grants no verdict or evidence. \\
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/Problem.hs} & Atomic checked session with session-owned provider inventory, separately revalidated contract, candidate semantics, complete Length problem, and retained candidate-independent bank scope. \\
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/Evaluate.hs} & Bounded concrete natural-number evaluator and the only constructor path for validated Length counterexamples. \\
-\filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib.hs} & Transient typed QF\_LIA planning, canonical bounded bytes, structurally complete query fingerprint, retained problem-scope projection, exact same-scope fresh-record and retained-sample replay bridges, and model-binding validation. \\
+\filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib.hs} & Transient typed QF\_LIA planning, canonical bounded bytes, structurally complete query fingerprint, retained problem-scope projection, exact same-scope fresh-record and retained-sample replay bridges, and model-binding validation. Internally the scalar and product boundaries share one plan sealer, one fingerprint builder over a role/schema/logic vocabulary, and one model reader over each domain's error constructors, while every public query, fingerprint, and error type stays nominally per-domain. \\
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib/Observation.hs} & Query-specific association over one retained raw report, derived status and conservative strength, and exact problem-plus-query replay. \\
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib/Execution.hs} & Length compatibility policy wrapping the shared launch profile with both Length schema tags, artifact and response policy, the sole fingerprint budget, and the complete Length identity; byte-free digest-expectation presence classification. \\
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib/Live.hs} & Sanitized rank-2 live-session facade retaining one private whole status-indexed run observation, with unchanged status/strength/use projections and exact query-first evidence consumption. \\
@@ -435,7 +435,7 @@ The following paths are current-branch source locations, not links into the pinn
 \filepath{synthesis/internal/Language/Haskell/Synthesis/Internal/SMTLib/Z3/Process.hs} & Opaque raw Z3 owner with the established pathname-snapshot launcher, sealed-main-image branch, effective-ID executable-access sibling, and execve-check successor: two raw descriptor-based \code{faccessat2} observations, two source and one staged \code{AT\_EXECVE\_CHECK} observations for the newest strategy, bounded one-pass source hash/copy, optional pin admission, fixed staged \code{0500}, verified anonymous-file seals, descriptor-only execution, one masked raw-child-to-process ownership transfer shared by all three native strategies, signal/process-group ownership, and fail-closed cleanup without pathname or strategy retry. \\
 \filepath{synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length/SMTLib/Session/Process.hs} & Strict one-field Length compatibility facade retaining only the shared process, with exhaustive sanitized mapping and on-demand derivation of the unchanged raw-process v2 root from its associated observation and process-owned limits. \\
 \filepath{synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length/SMTLib/Session/Transport.hs} & Private adapter binding one Length process, cancellation token, and deadline to the generic driver. \\
-\filepath{synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length/SMTLib/Session.hs} & V4 ready-worker identity, strict post-launch query policy without structured launch/profile authority, process-owned limit projection, plan-owned replay inputs, one private five-way replay result feeding unchanged identity fields, and a completed run with one status-indexed evidence observation rather than split status/evidence or a decoded-binding cache; scoped serial ordinals, poisoning, and cleanup remain owner-controlled. \\
+\filepath{synthesis/internal/Language/Haskell/Synthesis/Internal/Semantic/Length/SMTLib/Session.hs} & V4 ready-worker identity, strict post-launch query policy without structured launch/profile authority, process-owned limit projection, plan-owned replay inputs, one private five-way replay result feeding unchanged identity fields, and a completed run with one status-indexed evidence observation rather than split status/evidence or a decoded-binding cache; scoped serial ordinals, poisoning, and cleanup remain owner-controlled. The scalar and product query runs execute one private pipeline parameterized by a per-domain record (role prefix, schema tags, plan sealer, replay validator), with each domain's nominal failure and run types rebuilt at its public entrance. \\
 \filepath{src/Language/Haskell/Djex.hs} & Curated public re-export of the typed-candidate, semantic Length, SMT-LIB, and scoped live surfaces. \\
 \bottomrule
 \end{longtable}
