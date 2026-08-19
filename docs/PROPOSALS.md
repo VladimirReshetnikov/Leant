@@ -98,7 +98,10 @@ wants the same setup (e.g. always `-i Mathlib.Tactic.Ring`).
 (keep a redo stack cleared on new input). The env-stack machinery
 already exists; this is bookkeeping.
 
-### 10. Richer `:set`/`:show` — S
+### 10. Richer `:set`/`:show` — S (`:set` half implemented)
+Bare `:set` now lists every session setting with its current value, and the
+synthesis bounds are session settings rather than compiled-in constants; the
+`:show` family below is still open.
 `:show options` (run `#print options`... actually: track the session's
 `set_option` history and display it), `:show imports`, `:show env`,
 `:show paths` (project, backend, toolchain). GHCi users expect `:show`.
