@@ -9790,52 +9790,82 @@ lengthDescriptorBoundEffectiveIDExecutableAccessTests = testGroup
 
 assertLengthDescriptorBoundEffectiveIDExecutableAccessProjections :: IO ()
 assertLengthDescriptorBoundEffectiveIDExecutableAccessProjections =
-  withTemporaryDirectory "leant-length-effective-access-policy" $ \root -> do
+  assertDescriptorBoundAccessProjections
+    "leant-length-effective-access-policy" "effective-access"
+    mkLengthRankingPolicyWithDescriptorBoundEffectiveIDExecutableAccessLaunch
+    Djex.mkLengthSMTLibDescriptorBoundEffectiveIDExecutableAccessExecutionConfig
+    Djex.LengthSMTLibDescriptorBoundEffectiveIDExecutableAccessLaunch
+    []
+
+-- | Shared body of the per-launch access-authority projection tests: the
+-- maker under test joins the direct and plain descriptor-bound makers (plus
+-- any earlier access-checked makers), every policy projects its own launch
+-- strategy, the digest expectation stays absent, the validated-component
+-- bridge preserves the strategy, a relative executable path is rejected with
+-- the unchanged execution failure before evaluation limits are forced, and
+-- the disabled assessment mode still projects no strategy.
+assertDescriptorBoundAccessProjections
+  :: String
+  -> String
+  -> (LengthRankingPolicySource
+      -> Either LengthRankingConfigurationError LengthRankingPolicy)
+  -> (Djex.LengthSMTLibExecutionLimits
+      -> Djex.LengthSMTLibExecutionConfigSource
+      -> Either
+          Djex.LengthSMTLibExecutionConfigError
+          Djex.LengthSMTLibExecutionConfig)
+  -> Djex.LengthSMTLibExecutableLaunchStrategy
+  -> [( LengthRankingPolicySource
+        -> Either LengthRankingConfigurationError LengthRankingPolicy
+      , Djex.LengthSMTLibExecutableLaunchStrategy
+      )]
+  -> IO ()
+assertDescriptorBoundAccessProjections temporaryName tag mkPolicy
+    mkExecutionConfig expectedStrategy earlierAccessMakers =
+  withTemporaryDirectory temporaryName $ \root -> do
     let executable = root </> "missing-z3"
         executionSource = explicitLengthRankingExecutionSource executable
           Nothing Djex.LengthSMTLibStatusOnly
         source = explicitLengthRankingPolicySource
           Djex.defaultLengthSMTLibExecutionLimits executionSource
           Djex.defaultLengthEvaluationLimitSource
-    direct <- expectRight $ mkLengthRankingPolicy source
-    descriptor <- expectRight
-      $ mkLengthRankingPolicyWithDescriptorBoundExecutableLaunch source
-    effectiveAccess <- expectRight
-      $ mkLengthRankingPolicyWithDescriptorBoundEffectiveIDExecutableAccessLaunch
-          source
-    map lengthRankingPolicyExecutableLaunchStrategy
-        [direct, descriptor, effectiveAccess] @?=
-      [ Djex.LengthSMTLibPathSnapshotThenDirectSpawn
-      , Djex.LengthSMTLibDescriptorBoundExecutableLaunch
-      , Djex.LengthSMTLibDescriptorBoundEffectiveIDExecutableAccessLaunch
-      ]
-    lengthRankingPolicyExecutableDigestExpectation effectiveAccess @?=
+        makers =
+          [ ( mkLengthRankingPolicy
+            , Djex.LengthSMTLibPathSnapshotThenDirectSpawn
+            )
+          , ( mkLengthRankingPolicyWithDescriptorBoundExecutableLaunch
+            , Djex.LengthSMTLibDescriptorBoundExecutableLaunch
+            )
+          ]
+          ++ earlierAccessMakers
+          ++ [(mkPolicy, expectedStrategy)]
+    policies <- mapM (expectRight . ($ source) . fst) makers
+    map lengthRankingPolicyExecutableLaunchStrategy policies @?=
+      map snd makers
+    accessChecked <- expectRight $ mkPolicy source
+    lengthRankingPolicyExecutableDigestExpectation accessChecked @?=
       Djex.LengthSMTLibExecutableDigestExpectationAbsent
 
-    execution <- expectRight
-      $ Djex.mkLengthSMTLibDescriptorBoundEffectiveIDExecutableAccessExecutionConfig
-          Djex.defaultLengthSMTLibExecutionLimits executionSource
+    execution <- expectRight $ mkExecutionConfig
+      Djex.defaultLengthSMTLibExecutionLimits executionSource
     evaluation <- expectRight $ Djex.mkLengthEvaluationLimits
       Djex.defaultLengthEvaluationLimitSource
     let bridged = lengthRankingPolicyFromValidatedComponents
           execution evaluation
-    lengthRankingPolicyExecutableLaunchStrategy bridged @?=
-      Djex.LengthSMTLibDescriptorBoundEffectiveIDExecutableAccessLaunch
+    lengthRankingPolicyExecutableLaunchStrategy bridged @?= expectedStrategy
 
     let invalidSource = explicitLengthRankingPolicySource
           Djex.defaultLengthSMTLibExecutionLimits
           (explicitLengthRankingExecutionSource "relative-z3" Nothing
             Djex.LengthSMTLibStatusOnly)
-          (error "effective-access maker forced evaluation after execution")
-    case
-        mkLengthRankingPolicyWithDescriptorBoundEffectiveIDExecutableAccessLaunch
-          invalidSource of
+          (error $ tag ++ " maker forced evaluation after execution")
+    case mkPolicy invalidSource of
       Left (LengthRankingExecutionConfigurationRejected
           Djex.LengthSMTLibExecutionExecutablePathNotAbsolute) -> pure ()
       Left failure -> assertFailure
-        $ "effective-access maker changed execution failure: " ++ show failure
+        $ tag ++ " maker changed execution failure: " ++ show failure
       Right _ -> assertFailure
-        "effective-access maker accepted a relative executable path"
+        $ tag ++ " maker accepted a relative executable path"
 
     lengthAssessmentModeExecutableLaunchStrategy
       disabledLengthAssessmentMode @?= Nothing
@@ -9878,59 +9908,15 @@ lengthDescriptorBoundExecveCheckExecutableAccessTests = testGroup
 
 assertLengthDescriptorBoundExecveCheckExecutableAccessProjections :: IO ()
 assertLengthDescriptorBoundExecveCheckExecutableAccessProjections =
-  withTemporaryDirectory "leant-length-execve-check-policy" $ \root -> do
-    let executable = root </> "missing-z3"
-        executionSource = explicitLengthRankingExecutionSource executable
-          Nothing Djex.LengthSMTLibStatusOnly
-        source = explicitLengthRankingPolicySource
-          Djex.defaultLengthSMTLibExecutionLimits executionSource
-          Djex.defaultLengthEvaluationLimitSource
-    direct <- expectRight $ mkLengthRankingPolicy source
-    descriptor <- expectRight
-      $ mkLengthRankingPolicyWithDescriptorBoundExecutableLaunch source
-    effectiveAccess <- expectRight
-      $ mkLengthRankingPolicyWithDescriptorBoundEffectiveIDExecutableAccessLaunch
-          source
-    execveCheck <- expectRight
-      $ mkLengthRankingPolicyWithDescriptorBoundExecveCheckExecutableAccessLaunch
-          source
-    map lengthRankingPolicyExecutableLaunchStrategy
-        [direct, descriptor, effectiveAccess, execveCheck] @?=
-      [ Djex.LengthSMTLibPathSnapshotThenDirectSpawn
-      , Djex.LengthSMTLibDescriptorBoundExecutableLaunch
+  assertDescriptorBoundAccessProjections
+    "leant-length-execve-check-policy" "execve-check"
+    mkLengthRankingPolicyWithDescriptorBoundExecveCheckExecutableAccessLaunch
+    Djex.mkLengthSMTLibDescriptorBoundExecveCheckExecutableAccessExecutionConfig
+    Djex.LengthSMTLibDescriptorBoundExecveCheckExecutableAccessLaunch
+    [ ( mkLengthRankingPolicyWithDescriptorBoundEffectiveIDExecutableAccessLaunch
       , Djex.LengthSMTLibDescriptorBoundEffectiveIDExecutableAccessLaunch
-      , Djex.LengthSMTLibDescriptorBoundExecveCheckExecutableAccessLaunch
-      ]
-    lengthRankingPolicyExecutableDigestExpectation execveCheck @?=
-      Djex.LengthSMTLibExecutableDigestExpectationAbsent
-
-    execution <- expectRight
-      $ Djex.mkLengthSMTLibDescriptorBoundExecveCheckExecutableAccessExecutionConfig
-          Djex.defaultLengthSMTLibExecutionLimits executionSource
-    evaluation <- expectRight $ Djex.mkLengthEvaluationLimits
-      Djex.defaultLengthEvaluationLimitSource
-    let bridged = lengthRankingPolicyFromValidatedComponents
-          execution evaluation
-    lengthRankingPolicyExecutableLaunchStrategy bridged @?=
-      Djex.LengthSMTLibDescriptorBoundExecveCheckExecutableAccessLaunch
-
-    let invalidSource = explicitLengthRankingPolicySource
-          Djex.defaultLengthSMTLibExecutionLimits
-          (explicitLengthRankingExecutionSource "relative-z3" Nothing
-            Djex.LengthSMTLibStatusOnly)
-          (error "execve-check maker forced evaluation after execution")
-    case
-        mkLengthRankingPolicyWithDescriptorBoundExecveCheckExecutableAccessLaunch
-          invalidSource of
-      Left (LengthRankingExecutionConfigurationRejected
-          Djex.LengthSMTLibExecutionExecutablePathNotAbsolute) -> pure ()
-      Left failure -> assertFailure
-        $ "execve-check maker changed execution failure: " ++ show failure
-      Right _ -> assertFailure
-        "execve-check maker accepted a relative executable path"
-
-    lengthAssessmentModeExecutableLaunchStrategy
-      disabledLengthAssessmentMode @?= Nothing
+      )
+    ]
 
 descriptorBoundExecveCheckLaunchPubliclyReachable :: IO Bool
 descriptorBoundExecveCheckLaunchPubliclyReachable
