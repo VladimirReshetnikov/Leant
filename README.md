@@ -1326,8 +1326,9 @@ machine. Treat any *other* failure as a regression. Second, nineteen tests
 read production source text and assert on it — twelve on
 [src/Main.hs](src/Main.hs) and one or two each on `Synth/Engine.hs`,
 `Synth/BehavioralSelection.hs`, `Length/Selection.hs`,
-`Length/Selection/Generic.hs`, `Length/Ranking.hs`, `Length/Integration.hs`
-and `Length/Handoff.hs`. They pin the shape of decisions that must not move
+`Length/Selection/Generic.hs`, `Length/Ranking.hs`,
+`Length/Ranking/Generic.hs`, `Length/Integration.hs` and `Length/Handoff.hs`.
+They pin the shape of decisions that must not move
 silently, such as which deadline a classical route owns and that selection
 preserves the batch before it seals. A refactor of those files has to be
 re-run against the focused suite even when it is provably behaviour

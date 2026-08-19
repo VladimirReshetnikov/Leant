@@ -37,10 +37,18 @@ module Leant.Synth.Length.CounterexampleBank.Internal
   , BankReplayHit
   , BankReplayOutcome (..)
   , BankContextReplayHit
+  , bankContextReplayHitCounterexample
+  , replayBankInContext
   , BankPromotionFailure (..)
+  , promoteBankReplayHitInContext
   , BankReceiptOrigin (..)
   , BankRecordFailure (..)
   , BankRecordOutcome (..)
+  , recordBankReceiptInContext
+  , scalarBankSurface
+  , scalarBankBridge
+  , spinePairBankSurface
+  , spinePairBankBridge
   , LengthCounterexampleBankState
   , emptyLengthCounterexampleBankState
   , defaultLengthCounterexampleBankState

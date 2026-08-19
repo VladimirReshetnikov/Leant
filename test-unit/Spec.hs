@@ -6550,6 +6550,7 @@ assertCounterexampleBankRunnerArchitecture = do
     "src/Leant/Synth/Length/SpinePair/Selection/Internal.hs"
   genericSelection <- readFile
     "src/Leant/Synth/Length/Selection/Generic.hs"
+  genericRanking <- readFile "src/Leant/Synth/Length/Ranking/Generic.hs"
   integration <- readFile "src/Leant/Synth/Length/Integration.hs"
   publicScalarRanking <- readFile "src/Leant/Synth/Length/Ranking.hs"
   publicPairRanking <- readFile
@@ -6564,28 +6565,49 @@ assertCounterexampleBankRunnerArchitecture = do
       scalarSelectionText = normalized scalarSelection
       pairSelectionText = normalized pairSelection
       genericSelectionText = normalized genericSelection
+      genericRankingText = normalized genericRanking
       integrationText = normalized integration
       integrationExports = unlines
         . takeWhile (not . isInfixOf ") where")
         $ lines integration
+  -- Both domains rank through one shared core, so the cursor's nominal
+  -- command tag, the fail-closed bank transitions, and the replay-then-advance
+  -- order are pinned once where they live; each domain is pinned to name the
+  -- evidence-mismatch failure in its own failure type and to supply its own
+  -- bank vocabulary.
   mapM_ (\fragment -> assertBool
-      ("scalar bank runner lost its nominal/failure boundary: " ++ fragment)
-      $ normalized fragment `isInfixOf` scalarText)
-    [ "type role LengthCounterexampleBankCursor nominal"
-    , "type role LengthCounterexampleAcquisition nominal"
-    , "Left _ -> Left $ localRankingFailure LengthRankingEvidenceReplayMismatch index"
-    , "Left _ -> Left $ localRankingFailure LengthRankingEvidenceReplayMismatch index Right () -> Right cursor"
-    , "case simplifyCounterexampleAssessment evaluation simplificationPolicy index association query receipt of Left failure -> pure $ PreparedLengthCandidatesFailed failure Right assessed -> continueAssessed"
-    , "continueAssessed reversed cursor index query acquisition rest assessed = do advanced <- advanceLengthCounterexampleBankCursor"
+      ("shared bank runner lost its nominal/failure boundary: " ++ fragment)
+      $ normalized fragment `isInfixOf` genericRankingText)
+    [ "type role CounterexampleBankCursor nominal nominal"
+    , "type role CounterexampleAcquisition nominal nominal"
+    , "mismatch = Left $ localRankingFailure @d ViewEvidenceReplayMismatch index"
+    , "Left _ -> Left $ localRankingFailure @d ViewEvidenceReplayMismatch index"
+    , "Left _ -> mismatch Right () -> Right cursor"
+    , "case simplifyCounterexampleAssessment evaluation simplificationPolicy index association query receipt of Left failure -> pure $ PreparedCandidatesFailed failure Right assessed -> continueAssessed"
+    , "continueAssessed reversed cursor index query acquisition rest assessed = do advanced <- advanceCounterexampleBankCursor @d"
     ]
-  mapM_ (\fragment -> assertBool
-      ("product bank runner lost its nominal/failure boundary: " ++ fragment)
-      $ normalized fragment `isInfixOf` pairText)
-    [ "type role LengthSpinePairCounterexampleBankCursor nominal"
-    , "type role LengthSpinePairCounterexampleAcquisition nominal"
-    , "Left _ -> Left $ localLengthSpinePairRankingFailure LengthSpinePairRankingEvidenceReplayMismatch index"
-    , "case simplifyLengthSpinePairCounterexampleAssessment evaluation simplificationPolicy index association query receipt of Left failure -> pure $ PreparedLengthSpinePairCandidatesFailed failure Right assessed -> continueAssessed"
-    , "continueAssessed reversed cursor index query acquisition rest assessed = do advanced <- advanceLengthSpinePairCounterexampleBankCursor"
+  mapM_ (\(domain, sourceText, fragments) ->
+      mapM_ (\fragment -> assertBool
+          (domain ++ " ranking lost its failure naming: " ++ fragment)
+          $ normalized fragment `isInfixOf` sourceText) fragments)
+    [ ( "scalar"
+      , scalarText
+      , [ "instance LengthRankingDomain ScalarLength where"
+        , "ViewEvidenceReplayMismatch -> LengthRankingEvidenceReplayMismatch"
+        , "ViewQueryAssociationMismatch -> LengthRankingQueryAssociationMismatch"
+        , "bankSurface = CounterexampleBank.scalarBankSurface"
+        , "bankBridge = CounterexampleBank.scalarBankBridge"
+        ]
+      )
+    , ( "product"
+      , pairText
+      , [ "instance LengthRankingDomain PairLength where"
+        , "ViewEvidenceReplayMismatch -> LengthSpinePairRankingEvidenceReplayMismatch"
+        , "ViewQueryAssociationMismatch -> LengthSpinePairRankingQueryAssociationMismatch"
+        , "bankSurface = CounterexampleBank.spinePairBankSurface"
+        , "bankBridge = CounterexampleBank.spinePairBankBridge"
+        ]
+      )
     ]
   -- Both domains select through one shared pipeline, so preserve-before-seal
   -- ordering is pinned once where it lives, and each domain is pinned to name

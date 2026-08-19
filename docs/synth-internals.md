@@ -334,9 +334,10 @@ ordinary refusal, miss, attempt-cap, and insertion-cap results. Ranking,
 simplification, worker IO, and the rest of the candidate loop remain outside
 the cell's masking and serialization boundary.
 
-`Ranking.Internal` now has an additive scalar cursor which is either the
-historical raw `[[Natural]]` MRU or one supplied nominal context; the pair
-module mirrors it. Existing ranking and compatibility selection entrances
+The shared ranking core (`Ranking.Generic`, instantiated by the scalar and
+pair `Ranking.Internal` modules) threads an additive cursor which is either
+the historical raw `[[Natural]]` MRU or one supplied nominal context of the
+instantiating domain. Existing ranking and compatibility selection entrances
 always choose the raw cursor. Only the context-aware Configuration and
 Selection entrances used by Integration's filter context choose the nominal
 cursor. The cursor is threaded through eager/deferred opening and unbudgeted,
@@ -1337,9 +1338,18 @@ index;
 package-private `Ranking.Internal` and `PostVerification.Internal` modules
 thread each batch-scoped occurrence handle as the only receipt-bearing field
 in transient ranking state through preparation, live assessment, stable
-partitioning, atomic fallback, and the final seal. The scalar and
-binary-product `Ranking.Internal` modules carry that control flow as nominal
-siblings with their own assessment, failure, policy, and receipt types. The
+partitioning, atomic fallback, and the final seal. That control flow is
+written once, in `Leant.Synth.Length.Ranking.Generic`, over a closed
+`LengthRankingDomain` class whose associated types name each domain's Djex
+vocabulary (queries, receipts, validators, the live observation, and the
+counterexample-bank limits, bank, scope, sample, and error). The scalar and
+binary-product `Ranking.Internal` modules are its two instances: each keeps
+its nominal assessment, failure, policy, and receipt types by wrapping the
+shared structure in domain newtypes, supplies its own handoff and query
+refusal classifiers, and hands the shared runners its bank surface and bridge
+from `CounterexampleBank.Internal`. The replay cursor (batch-local raw MRU or
+command-local nominal context) and every runner in the eager/deferred and
+unbudgeted/v1/scoped matrix therefore exist once. The
 ordinary `Ranking` facade exports neither the associated plan nor its
 projector, while the public configuration surface exports no associated
 runner and its post-verification assessment entry points return only sealed
