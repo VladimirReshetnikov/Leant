@@ -1,6 +1,7 @@
 module Main (main) where
 
 import Control.Concurrent (threadDelay)
+import Control.Monad (replicateM, unless, when, zipWithM_)
 import Control.DeepSeq (rnf)
 import Control.Exception (SomeException, evaluate, finally, try)
 import qualified Data.ByteString as ByteString
@@ -8,7 +9,7 @@ import qualified Data.ByteString.Char8 as BS
 import Data.Char (isAlphaNum, toLower)
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef)
 import Data.List (isInfixOf, isPrefixOf, sortOn, tails)
-import Data.Maybe (isNothing)
+import Data.Maybe (isJust, isNothing)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -773,7 +774,7 @@ backendStderrFloodHelper = do
  where
   consumeInput = do
     bytes <- ByteString.hGetSome stdin 4096
-    if ByteString.null bytes then pure () else consumeInput
+    unless (ByteString.null bytes) consumeInput
 
 withTemporaryDirectory :: String -> (FilePath -> IO a) -> IO a
 withTemporaryDirectory template action = do
@@ -1824,7 +1825,7 @@ behavioralSelectionTests = testGroup "behavioral selection occurrence seal"
                     (error "decision admission forced retention evidence")
             bounded <- timeout 1000000 $ evaluate
               $ sealBehavioralSelectionBatch 3 input
-              $ cycle [poisonDecision]
+              $ repeat poisonDecision
             case bounded of
               Just result -> assertBehavioralSelectionError
                 (BehavioralSelectionCollectionLimitExceeded
@@ -3958,7 +3959,7 @@ instanceImplicitTests = testGroup "instance-implicit synthesis"
  where
   expectInstanceTerm expected outcome = case outcome of
     Right (SynthCandidates groups _) ->
-      if any (== expected) (concat groups)
+      if elem expected (concat groups)
         then pure ()
         else assertFailure $
           "expected instance-aware candidate " ++ show expected
@@ -6505,7 +6506,7 @@ buildSameScopeScalarCounterexampleBankRunnerFixture = do
       | group <- groups
       , [spelling] <- [detailedCandidateGroupVariants group]
       , providerName `isInfixOf` spelling
-      , not $ isNothing $ detailedCandidateGroupSemanticSidecar group
+      , isJust (detailedCandidateGroupSemanticSidecar group)
       ] of
     group : _ -> pure group
     [] -> assertFailure "same-scope scalar bank fixture lacked its provider"
@@ -6515,7 +6516,7 @@ buildSameScopeScalarCounterexampleBankRunnerFixture = do
       | group <- groups
       , providerIndependentProjectionSpelling 1 `elem`
           detailedCandidateGroupVariants group
-      , not $ isNothing $ detailedCandidateGroupSemanticSidecar group
+      , isJust (detailedCandidateGroupSemanticSidecar group)
       ] of
     group : _ -> pure group
     [] -> assertFailure "same-scope scalar bank fixture lacked its identity"
@@ -7675,7 +7676,7 @@ verifiedFirstDirectTypedCandidate goal = do
         [ retained
         | retained <- groups
         , detailedCandidateGroupRoute retained == RouteTypedCandidate
-        , not $ isNothing $ detailedCandidateGroupSemanticSidecar retained
+        , isJust (detailedCandidateGroupSemanticSidecar retained)
         , [_] <- [detailedCandidateGroupVariants retained]
         ] of
       retained : _ -> pure retained
@@ -9971,7 +9972,7 @@ whenDescriptorBoundExecveCheckLaunchPubliclyReachable
   -> IO ()
 whenDescriptorBoundExecveCheckLaunchPubliclyReachable action = do
   supported <- descriptorBoundExecveCheckLaunchPubliclyReachable
-  if supported then action else pure ()
+  when supported action
 
 withCurrentApplicableDomainLimit
   :: String
@@ -12462,7 +12463,7 @@ assertLengthAssessmentSpinePairFilterDispatch
         assertBool "one-shot pair filter used the scalar projection"
           $ isNothing $ lengthAssessmentSelectionResult oneShot
         assertBool "one-shot pair filter lost the pair projection"
-          $ not $ isNothing $ lengthAssessmentSpinePairSelectionResult oneShot
+          $ isJust (lengthAssessmentSpinePairSelectionResult oneShot)
 
         repeated <- expectLengthAssessmentWithin
           $ assessLengthVerificationRequest startupRequest verification
@@ -13757,9 +13758,8 @@ assertLengthAssessmentConfigured
         assertBool "rejected integration input retained a ranking"
           $ isNothing $ lengthAssessmentRanking rejected
         assertBool "rejected integration input exposed semantic notes"
-          $ all isNothing
-          $ map lengthCandidatePresentationNote
-          $ presentLengthAssessment rejected
+          $ all (isNothing . lengthCandidatePresentationNote)
+              (presentLengthAssessment rejected)
         case lengthAssessmentPostVerificationResult rejected of
           Nothing -> assertFailure
             "enabled input rejection discarded its adapter result"
@@ -14212,7 +14212,7 @@ buildRoleAwareMapFixture = do
         | group <- groups
         , spelling <- detailedCandidateGroupVariants group
         , "Demo.mapList" `isInfixOf` spelling
-        , not $ isNothing $ detailedCandidateGroupSemanticSidecar group
+        , isJust (detailedCandidateGroupSemanticSidecar group)
         ] of
       match : _ -> pure match
       [] -> assertFailure ("higher-order map provider produced no typed " ++
@@ -14539,9 +14539,8 @@ assertLengthAssessmentFailureFallback
                 (lengthRankingCandidates ranking) @?=
               replicate (length original) Unassessed
             assertBool "live integration fallback exposed stale evidence"
-              $ all isNothing
-              $ map lengthCandidatePresentationNote
-              $ presentLengthAssessment assessed
+              $ all (isNothing . lengthCandidatePresentationNote)
+                  (presentLengthAssessment assessed)
         case lengthAssessmentFailure assessed of
           Just (LengthAssessmentRankingFailed failure) -> do
             lengthRankingFailureOriginalIndex failure @?= Nothing
@@ -14638,7 +14637,7 @@ assertLengthCounterexamplePresentation = do
           , Just note <- [lengthCandidatePresentationNote presentation]
           ]
     length notes @?= 3
-    sequence_ $ zipWith (\receipt note -> do
+    zipWithM_ (\receipt note -> do
         assertBool "counterexample note omitted model qualification"
           $ "replayed finite-list-spine Length counterexample "
               `isInfixOf` note
@@ -14677,9 +14676,8 @@ assertLengthCounterexamplePresentation = do
       $ assessVerifiedLengthCandidatesWithPolicy statusPolicy statusContract
           statusVerification
     assertBool "status-only ranking emitted a counterexample claim"
-      $ all isNothing
-      $ map lengthCandidatePresentationNote
-      $ presentLengthPostVerificationResult statusResult
+      $ all (isNothing . lengthCandidatePresentationNote)
+          (presentLengthPostVerificationResult statusResult)
 
   providerIndependent <- buildProviderIndependentCounterexampleReceipt
     (2 ^ (4095 :: Int))
@@ -14819,8 +14817,8 @@ assertLengthAssessmentSpinePairDispatch
               Nothing -> False
               Just _ -> True
         assertBool "atomic pair failure emitted a semantic note"
-          $ all isNothing $ map lengthCandidatePresentationNote
-          $ presentLengthAssessment failed
+          $ all (isNothing . lengthCandidatePresentationNote)
+              (presentLengthAssessment failed)
 
         scalar <- expectLengthAssessmentWithin
           $ assessLengthVerificationRequest
@@ -18062,7 +18060,7 @@ buildLengthProjectionRankingCandidate inputArity = do
     DetailedSynthCandidates groups _ -> case
       [ (retained, spelling)
       | retained <- groups
-        , not $ isNothing $ detailedCandidateGroupSemanticSidecar retained
+        , isJust (detailedCandidateGroupSemanticSidecar retained)
         , spelling <- detailedCandidateGroupVariants retained
         , spelling == expectedSpelling
         ] of
@@ -18156,8 +18154,7 @@ buildLengthSeedBankArityFixture = do
           [ retained
           | retained <- groups
           , detailedCandidateGroupVariants retained == [providerName arity]
-          , not $ isNothing
-              $ detailedCandidateGroupSemanticSidecar retained
+          , isJust (detailedCandidateGroupSemanticSidecar retained)
           ] of
         retained : _ -> pure retained
         [] -> assertFailure
@@ -18219,7 +18216,7 @@ buildScaledProviderReplayFixture = do
       | group <- scaledGroups
       , [spelling] <- [detailedCandidateGroupVariants group]
       , "Demo.scaleList" `isInfixOf` spelling
-      , not $ isNothing $ detailedCandidateGroupSemanticSidecar group
+      , isJust (detailedCandidateGroupSemanticSidecar group)
       ] of
     group : _ -> pure group
     [] -> assertFailure
@@ -18239,7 +18236,7 @@ buildScaledProviderReplayFixture = do
       | group <- independentGroups
       , providerIndependentProjectionSpelling 1 `elem`
           detailedCandidateGroupVariants group
-      , not $ isNothing $ detailedCandidateGroupSemanticSidecar group
+      , isJust (detailedCandidateGroupSemanticSidecar group)
       ] of
     group : _ -> pure group
     [] -> assertFailure
@@ -18524,7 +18521,7 @@ buildLengthRankingLiveFixture = do
  where
   directProvider spelling = filter $ \group ->
     detailedCandidateGroupVariants group == [spelling]
-      && not (isNothing $ detailedCandidateGroupSemanticSidecar group)
+      && isJust (detailedCandidateGroupSemanticSidecar group)
 
 verifySingleLengthRankingGroup
   :: DetailedCandidateGroup
@@ -18813,7 +18810,7 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
               [ group
               | group <- groups
               , detailedCandidateGroupVariants group == ["Demo.emptyList"]
-              , not $ isNothing $ detailedCandidateGroupSemanticSidecar group
+              , isJust (detailedCandidateGroupSemanticSidecar group)
               ] of
             origin : _ -> do
               let compatibilityGroup = detailedCandidateGroup
@@ -19185,7 +19182,7 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
             | group <- groups
             , [variant] <- [detailedCandidateGroupVariants group]
             , "Demo.emptyPolyList" `isInfixOf` variant
-            , not $ isNothing $ detailedCandidateGroupSemanticSidecar group
+            , isJust (detailedCandidateGroupSemanticSidecar group)
             ] of
           origin : _ -> do
             semantic <- case detailedCandidateGroupSemanticSidecar origin of
@@ -20038,13 +20035,11 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
             detailedCandidateGroupRoute displayed @?= RouteTypedCandidate
             assertBool
               "the earlier typed owner lost its group sidecar"
-              (not $ isNothing
-                $ detailedCandidateGroupSemanticSidecar displayed)
+              (isJust (detailedCandidateGroupSemanticSidecar displayed))
             assertBool
               "the earlier typed owner lost a verification sidecar"
               (all
-                (not . isNothing
-                  . detailedVerificationVariantSemanticSidecar)
+                (isJust . detailedVerificationVariantSemanticSidecar)
                 (detailedCandidateGroupVerificationVariants displayed))
           groups -> assertFailure $
             "the reverse duplicate changed the displayed group structure: "
@@ -20110,7 +20105,7 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
         Right (DetailedSynthCandidates (origin : _) _) -> do
           assertBool
             "expected an originating typed semantic sidecar"
-            (not $ isNothing $ detailedCandidateGroupSemanticSidecar origin)
+            (isJust (detailedCandidateGroupSemanticSidecar origin))
           let wrap term = "Classical.byContradiction (" ++ term ++ ")"
               wrapped =
                 mapDetailedCandidateGroupVariantsDroppingSemanticSidecar
@@ -20248,7 +20243,7 @@ providerEngineTests = testGroup "foreign providers"
               assertBool
                 ("the provider did not override the provider-free refutation \
                  \in " ++ synthEngineName engine ++ ": " ++ show groups)
-                (any (== "Demo.falseProof") (concat groups))
+                (elem "Demo.falseProof" (concat groups))
             Right other -> assertFailure $
               "unexpected provider-refutation outcome from "
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
@@ -20821,8 +20816,7 @@ typeApplicationTests = testGroup "retained type applications"
       let mixed = FAll True "A" $ FAll True "B" $ FAll True "C" $
             FArr (FVar "A") $ FArr (FVar "B") $
               FArr (FVar "C") (FAtom False "Result")
-          domains = take 17 $ sequence $ replicate 3
-            [ ProviderForallDomainProp
+          domains = take 17 $ replicateM 3 [ ProviderForallDomainProp
             , ProviderForallDomainType
             , ProviderForallDomainSort
             ]
@@ -21780,7 +21774,7 @@ typeApplicationTests = testGroup "retained type applications"
               assertBool
                 ("mixed higher-kinded assignment was lost in "
                   ++ synthEngineName engine ++ ": " ++ show groups)
-                (any (== expected) (concat groups))
+                (elem expected (concat groups))
             Right other -> assertFailure $
               "unexpected mixed higher-kinded assignment outcome from "
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
@@ -21807,7 +21801,7 @@ typeApplicationTests = testGroup "retained type applications"
               assertBool
                 ("partial higher-kinded assignment was lost in "
                   ++ synthEngineName engine ++ ": " ++ show groups)
-                (any (== expected) (concat groups))
+                (elem expected (concat groups))
             Right other -> assertFailure $
               "unexpected partial higher-kinded assignment outcome from "
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
@@ -21825,7 +21819,7 @@ typeApplicationTests = testGroup "retained type applications"
               assertBool
                 ("vacuous higher-kinded assignment was lost in "
                   ++ synthEngineName engine ++ ": " ++ show groups)
-                (any (== expected) (concat groups))
+                (elem expected (concat groups))
             Right other -> assertFailure $
               "unexpected vacuous higher-kinded assignment outcome from "
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
@@ -21848,7 +21842,7 @@ typeApplicationTests = testGroup "retained type applications"
               assertBool
                 ("later provider evidence was lost in "
                   ++ synthEngineName engine ++ ": " ++ show groups)
-                (any (== expected) (concat groups))
+                (elem expected (concat groups))
             Right other -> assertFailure $
               "unexpected over-limit provider outcome from "
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
@@ -21873,7 +21867,7 @@ typeApplicationTests = testGroup "retained type applications"
               assertBool
                 ("multi-vacuous heterogeneous assignment was lost in "
                   ++ synthEngineName engine ++ ": " ++ show groups)
-                (any (== expected) (concat groups))
+                (elem expected (concat groups))
             Right other -> assertFailure $
               "unexpected multi-vacuous assignment outcome from "
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
@@ -22392,10 +22386,9 @@ parametricFamilyEngineTests = testGroup "parametric family engine projection"
       if not (any ("done" `isInfixOf`) candidates)
         then assertFailure $ "native recursive base constructor was lost: "
           ++ show candidates
-        else if any ("again" `isInfixOf`) candidates
-          then assertFailure $ "Djinn reopened native recursion below its "
+        else when (any ("again" `isInfixOf`) candidates)
+          $ assertFailure $ "Djinn reopened native recursion below its "
             ++ "first constructor layer: " ++ show candidates
-          else pure ()
   , testCase "withhold evidence after native recursive atomization" $ do
       let parameter = FVar "p"
           recursive = nativeRecursive "Demo.NativeRec p" parameter
@@ -22492,10 +22485,9 @@ parametricFamilyEngineTests = testGroup "parametric family engine projection"
       if not (any (".done" `isInfixOf`) candidates)
         then assertFailure $ "structured native constructor was lost: "
           ++ show candidates
-        else if any (".again" `isInfixOf`) candidates
-          then assertFailure $ "structured recursive family fell back to "
+        else when (any (".again" `isInfixOf`) candidates)
+          $ assertFailure $ "structured recursive family fell back to "
             ++ "reopenable constructor premises: " ++ show candidates
-          else pure ()
   , testCase "share fixed opaque constructor fields without free variables" $
       expectExactFamilyTerm "fun x => x _"
         (synthesizeWithProviders EngineExference 1024 [] guardRankNGoal)
@@ -22757,12 +22749,11 @@ parametricFamilyEngineTests = testGroup "parametric family engine projection"
           candidates = allFamilyCandidates
             (synthesizeWithProviders EngineDjinn 0 []
               (FAll True "a" (FArr source target)))
-      if any (== "fun _ x => x") candidates
+      if elem "fun _ x => x" candidates
         then assertFailure $ "distinct heads transported directly: "
           ++ show candidates
-        else if null candidates
-          then assertFailure "distinct structural heads lost all conversions"
-          else pure ()
+        else when (null candidates)
+          $ assertFailure "distinct structural heads lost all conversions"
   , testCase "never conflate recursive heads sharing keys and constructors" $
       let parameter = FVar "a"
           family headName = FParamRec True headName "same display key"
@@ -22778,10 +22769,9 @@ parametricFamilyEngineTests = testGroup "parametric family engine projection"
           check engine =
             let candidates = allFamilyCandidates
                   (synthesizeWithProviders engine 1024 [] goal)
-            in if any direct candidates
-                then assertFailure $ "distinct recursive heads shared an "
-                  ++ "identity in " ++ show engine ++ ": " ++ show candidates
-                else pure ()
+            in (when (any direct candidates)
+                  $ assertFailure $ "distinct recursive heads shared an "
+                  ++ "identity in " ++ show engine ++ ": " ++ show candidates)
       in mapM_ check [EngineDjinn, EngineExference]
   , testCase "normalize recursive knots and ignore unused outer metadata" $ do
       let result = FVar "r"
