@@ -18565,6 +18565,23 @@ runLengthRankingWithFakeTraceWithEvaluation
   -> IO (LengthRanking, BS.ByteString)
 runLengthRankingWithFakeTraceWithEvaluation
     mode policy evaluation contract candidates =
+  runLengthRankingWithFakeUsing "" mode policy $ \execution ->
+    rankVerifiedLengthCandidates execution evaluation contract candidates
+
+-- | Shared harness of the fake-solver ranking runners: one execution config
+-- (100 ms solver timeout, resource limit 4242, 1 s host deadline, the
+-- caller's artifact policy), an eight-second outer bound, and the recorded
+-- fake-solver event trace.  The caller contributes only the ranking
+-- entrance under test and the tag naming it in the timeout message.
+runLengthRankingWithFakeUsing
+  :: Show failure
+  => String
+  -> String
+  -> Djex.LengthSMTLibArtifactPolicy
+  -> (Djex.LengthSMTLibExecutionConfig
+      -> IO (Either failure LengthRanking))
+  -> IO (LengthRanking, BS.ByteString)
+runLengthRankingWithFakeUsing tag mode policy rank =
   withFakeLengthSolver mode $ \executable -> do
     execution <- expectRight $ Djex.mkLengthSMTLibExecutionConfig
       Djex.defaultLengthSMTLibExecutionLimits
@@ -18576,11 +18593,10 @@ runLengthRankingWithFakeTraceWithEvaluation
               1000
           , Djex.lengthSMTLibExecutionConfigSourceArtifactPolicy = policy
           }
-    bounded <- timeout 8000000 $ rankVerifiedLengthCandidates execution
-      evaluation contract candidates
+    bounded <- timeout 8000000 $ rank execution
     case bounded of
-      Nothing -> assertFailure $ "Length ranking mode exceeded its bound: " ++
-        mode
+      Nothing -> assertFailure $ "Length " ++ tag
+        ++ "ranking mode exceeded its bound: " ++ mode
       Just result -> do
         ranking <- expectRight result
         events <- BS.readFile $ executable ++ ".events"
@@ -18595,28 +18611,9 @@ runLengthRankingWithFakeTraceWithOriginProbe
   -> IO (LengthRanking, BS.ByteString)
 runLengthRankingWithFakeTraceWithOriginProbe
     mode policy evaluation contract candidates =
-  withFakeLengthSolver mode $ \executable -> do
-    execution <- expectRight $ Djex.mkLengthSMTLibExecutionConfig
-      Djex.defaultLengthSMTLibExecutionLimits
-      $ (Djex.defaultLengthSMTLibExecutionConfigSource executable Nothing)
-          { Djex.lengthSMTLibExecutionConfigSourceSolverTimeoutMilliseconds =
-              100
-          , Djex.lengthSMTLibExecutionConfigSourceSolverResourceLimit = 4242
-          , Djex.lengthSMTLibExecutionConfigSourceHostDeadlineMilliseconds =
-              1000
-          , Djex.lengthSMTLibExecutionConfigSourceArtifactPolicy = policy
-          }
-    bounded <- timeout 8000000
-      $ LengthRankingInternal.rankVerifiedLengthCandidatesWithOriginProbe
-          execution evaluation contract candidates
-    case bounded of
-      Nothing -> assertFailure
-        ("Length origin-probe ranking mode exceeded its bound: " ++ mode)
-          >> error "unreachable"
-      Just result -> do
-        ranking <- expectRight result
-        events <- BS.readFile $ executable ++ ".events"
-        pure (ranking, events)
+  runLengthRankingWithFakeUsing "origin-probe " mode policy $ \execution ->
+    LengthRankingInternal.rankVerifiedLengthCandidatesWithOriginProbe
+      execution evaluation contract candidates
 
 explicitLengthInputBoxLimits
   :: Int
@@ -18638,30 +18635,11 @@ runLengthRankingWithFakeTraceWithInputBox
   -> [Verified DetailedVerificationVariant]
   -> IO (LengthRanking, BS.ByteString)
 runLengthRankingWithFakeTraceWithInputBox
-    mode artifactPolicy evaluation inputBoxLimits maximums contract candidates =
-  withFakeLengthSolver mode $ \executable -> do
-    execution <- expectRight $ Djex.mkLengthSMTLibExecutionConfig
-      Djex.defaultLengthSMTLibExecutionLimits
-      $ (Djex.defaultLengthSMTLibExecutionConfigSource executable Nothing)
-          { Djex.lengthSMTLibExecutionConfigSourceSolverTimeoutMilliseconds =
-              100
-          , Djex.lengthSMTLibExecutionConfigSourceSolverResourceLimit = 4242
-          , Djex.lengthSMTLibExecutionConfigSourceHostDeadlineMilliseconds =
-              1000
-          , Djex.lengthSMTLibExecutionConfigSourceArtifactPolicy =
-              artifactPolicy
-          }
-    bounded <- timeout 8000000
-      $ rankVerifiedLengthCandidatesWithInputBoxValidation
-          execution evaluation inputBoxLimits maximums contract candidates
-    case bounded of
-      Nothing -> assertFailure
-        ("Length input-box ranking mode exceeded its bound: " ++ mode)
-          >> error "unreachable"
-      Just result -> do
-        ranking <- expectRight result
-        events <- BS.readFile $ executable ++ ".events"
-        pure (ranking, events)
+    mode artifactPolicy evaluation inputBoxLimits maximums contract
+    candidates =
+  runLengthRankingWithFakeUsing "input-box " mode artifactPolicy
+    $ \execution -> rankVerifiedLengthCandidatesWithInputBoxValidation
+        execution evaluation inputBoxLimits maximums contract candidates
 
 assertFakeLengthQueryEvents :: [Int] -> [Int] -> BS.ByteString -> IO ()
 assertFakeLengthQueryEvents expectedChecks expectedValues events = do
