@@ -225,6 +225,7 @@ See the
 | `:synth TYPE` | verified term synthesis (see below) |
 | `:synth --behavior-mode rank\|filter -- TYPE` | explicitly choose the operation; disabled `rank` is identity, while `filter` requires an activated startup Length policy |
 | `:synth [--behavior-mode rank\|filter] --length-contract ABSOLUTE-PATH -- TYPE` | use one passive scalar-or-pair Length contract for this command; omitted mode means `rank` |
+| `:synth --behavior-mode filter --length-model list-scalar-exact-cases\|list-binary-product-exact-cases --length-inputs arg0[,argN...] --where CLAUSE -- TYPE` | state the contract inline in the bounded where-clause syntax; filter-only, built-in `List` spine with exact cases |
 | `:prove [PROP]` | interactive prove mode; bare form resumes the last `sorry` |
 | `:set OPT VAL` | `set_option` persisting in the session |
 | `:undo` | revert the last state-changing command |
@@ -1289,16 +1290,15 @@ failures now spell their absolute fixture paths per platform), with one
 caveat: `compose a persistent last-wins builder and admit before clock
 capture` races a fake solver's start-up against a 700 ms budget and can
 fail on a slow or loaded machine while passing in isolation. Treat any
-*other* failure as a regression. Second, seventeen tests
-read production source text and assert on it — thirteen on
-[src/Main.hs](src/Main.hs), and one or two each on `Synth/Engine.hs`,
-`Synth/BehavioralSelection.hs` (and its `Internal`), the scalar and
-`SpinePair` `Length/Ranking` and `Length/Selection` modules together with
-`Ranking/Generic.hs` and `Selection/Generic.hs`,
-`Length/CounterexampleBank/Internal.hs`, `Length/Integration.hs`,
-`Length/Handoff.hs`, and — for the passive inline `--where` frontier —
-`Length/Command.hs` and `Length/Where.hs` (all under `src/Leant/` unless
-shown otherwise).
+*other* failure as a regression. Second, a set of
+characterization tests read production source text and assert on it —
+currently twenty-six read sites, thirteen of them on
+[src/Main.hs](src/Main.hs) and the rest across `Synth/Engine.hs`,
+`Synth/BehavioralSelection.hs`, and the `Length` modules
+(`Command.hs`, `Configuration.hs`, `Handoff.hs`, `Integration.hs`,
+`Ranking.hs`, `Ranking/Generic.hs`, `Selection.hs`, `Where.hs`, all
+under `src/Leant/`); `grep -c 'readFile "src/' test-unit/Spec.hs`
+recounts them.
 They pin the shape of decisions that must not move
 silently, such as which deadline a classical route owns and that selection
 preserves the batch before it seals. A refactor of those files has to be

@@ -129,6 +129,7 @@ first.
   - [Progressive same-run assessment and command-local continuation](#progressive-same-run-assessment-and-command-local-continuation)
   - [Stable partition, failure, and Main behavior](#stable-partition-failure-and-main-behavior)
 - [One-shot contract-only files](#one-shot-contract-only-files)
+- [Inline where-clause constraints](#inline-where-clause-constraints)
   - [Command syntax, admission, and lifetime](#command-syntax-admission-and-lifetime)
   - [Scalar contract example](#scalar-contract-example)
   - [Binary-product contract example](#binary-product-contract-example)
@@ -707,6 +708,46 @@ ordinary, retry, provider, and classical lanes. It never enters `ReplState`,
 history, snapshots, or a cache; a later command returns to the startup-fixed
 contract unless it names another file, and behavior mode is parsed afresh for
 every command.
+
+## Inline where-clause constraints
+
+One command may also state its contract inline, without any file, through
+the bounded ASCII where-clause syntax:
+
+```text
+:synth --behavior-mode filter --length-model list-scalar-exact-cases --length-inputs arg0[,argN...] --where CLAUSE -- TYPE
+:synth --behavior-mode filter --length-model list-binary-product-exact-cases --length-inputs arg0[,argN...] --where CLAUSE -- TYPE
+```
+
+The inline form is filter-only and mutually exclusive with
+`--length-contract`; options keep the fixed order shown, none may repeat,
+and the standalone `--` again ends the options and starts the opaque Lean
+goal. `--length-inputs` names the observed physical arrow arguments as a
+nonempty, strictly increasing `argI` list; every other target argument is
+carried opaquely. The two models both use the built-in `List`
+(`List.nil`/`List.cons`) spine under the exact zero/step case policy with
+no provider laws, in the scalar or the binary-product evidence domain.
+
+`CLAUSE` is one relation between two arithmetic expressions over natural
+literals, `len(argN)` for the named observed inputs, and `len(result)`
+(scalar) or `len(result.first)`/`len(result.second)` (binary-product),
+with `+`, truncated `-`, `*`, `/` and `%` by a positive literal divisor,
+`min`/`max`, parentheses, and `=`, `!=`, `<=`, `>=`, `<`, `>`; the parser
+admits at most 16,384 ASCII bytes and 64 nesting levels, and its errors
+carry byte offsets but never source bytes
+([docs/semantic-foundations.md in
+Djex](../lib/Djex/docs/semantic-foundations.md#bounded-where-clause-surface-syntax)
+records the exact grammar and authority split). Physical references are
+mapped onto compact observed indices only after Lean translation supplies
+the target's arrow arity, so a clause naming an unobserved or
+out-of-range argument is rejected then, before any file or solver
+activity.
+
+As with the file forms, an activated startup policy is required: when
+assessment is disabled the inline request is rejected before goal
+translation or IO, and the assembled contract then flows through exactly
+the command-local filter pipeline described above -- only an
+independently replayed counterexample rejects a candidate.
 
 ## Binary-product Length queries
 
