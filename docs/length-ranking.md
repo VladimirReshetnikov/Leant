@@ -131,6 +131,7 @@ first.
 - [Command-level ranking and hard filtering](#command-level-ranking-and-hard-filtering)
   - [Exact grammar, defaults, and authority](#exact-grammar-defaults-and-authority)
   - [Inline where-clause syntax, profiles, and lifetime](#inline-where-clause-syntax-profiles-and-lifetime)
+  - [Planned host-native shorthand and Djex REPL parity](#planned-host-native-shorthand-and-djex-repl-parity)
   - [Retention and rejection taxonomy](#retention-and-rejection-taxonomy)
   - [Progressive same-run assessment and command-local continuation](#progressive-same-run-assessment-and-command-local-continuation)
   - [Stable partition, failure, and Main behavior](#stable-partition-failure-and-main-behavior)
@@ -371,6 +372,57 @@ exactly one nominal scalar or product context and run every ordinary, provider,
 excluded-middle, and double-negation lane through it. A refusal before that
 last step creates no counterexample bank. No part of the request, source, role
 vector, or context enters interactive state or persistence.
+
+### Planned host-native shorthand and Djex REPL parity
+
+The fixed `len(...)` form above is implemented and remains the explicit
+compatibility surface, but it is too verbose and too detached from Lean for
+the ordinary case. The next command-surface checkpoint will accept:
+
+```text
+:synth --where List.length result = List.length arg0 -- List Nat -> List Nat
+:synth --where List.length result.1 + List.length result.2 = 2 * List.length arg0 -- List Nat -> Prod (List Nat) (List Nat)
+```
+
+These examples are planned and are not parsed by the current command. Their
+defaults are intentionally useful only when the checked target makes them
+unambiguous:
+
+- the presence of `--where` is itself explicit filter intent, so a separate
+  `--behavior-mode filter` is unnecessary;
+- `List.length` selects the built-in `List`/`List.nil`/`List.cons` exact-case
+  profile, while scalar versus product output must agree with the translated
+  result shape and the result expression;
+- every eligible physical `List` argument is observed in source order, not
+  merely the arguments mentioned by the clause, so an unmentioned input used
+  by a candidate can still refute it;
+- the activated safe execution policy is reused. A session with no policy
+  needs one short activation command first; the clause never discovers or
+  authorizes an executable itself.
+
+Custom spines, mixed or ambiguous result shapes, explicit observation roles,
+provider laws, and richer contracts continue to require the full command or a
+contract file. Defaults fail closed rather than guessing. The host-shaped
+parser lowers to the existing bounded Djex Length source, so normalization,
+fingerprints, replay, rejection authority, and limits do not fork. The
+current ASCII `len(...)` form stays available while migration tests and help
+text establish parity.
+
+This is a joint frontend milestone. The standalone Djex REPL will gain the
+corresponding Haskell-shaped form at the same time:
+
+```text
+:synth --where length result == length arg0 -- [a] -> [a]
+:synth --where length (fst result) + length (snd result) == 2 * length arg0 -- [a] -> ([a], [a])
+```
+
+Djex will use Haskell application, projection, comparison, `div`, and `mod`
+notation; Leant will use Lean notation. Both adapt into the same checked
+semantic vocabulary rather than sharing an ad hoc text grammar or executing
+host expressions. This parity work is scheduled before new `--law`,
+`--example`, typed-sketch, or additional behavioral-domain syntax. Both REPLs
+will lead with these examples in `:help synth` and show the defaults they
+resolved.
 
 ### Retention and rejection taxonomy
 

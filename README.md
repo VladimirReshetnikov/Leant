@@ -183,7 +183,7 @@ and one scalar-or-pair contract. Once active:
   receipt never causes a rejection;
 - `--length-contract ABSOLUTE-PATH` swaps in a passive contract for one
   command;
-- an inline constraint can instead select one of the two fixed exact-case
+- the current explicit inline constraint can instead select one of the two fixed exact-case
   `List` profiles, declare the observed physical source-arrow arguments, and
   write one bounded ASCII Length relation directly:
 
@@ -196,6 +196,29 @@ and one scalar-or-pair contract. Once active:
   require literal `filter`, are mutually exclusive with `--length-contract`,
   and reuse the already activated startup execution policy; they cannot
   activate Z3 or introduce provider laws.
+
+The next convenience checkpoint makes the common case host-native and short:
+
+```text
+:synth --where List.length result = List.length arg0 -- List Nat -> List Nat
+:synth --where List.length result.1 + List.length result.2 = 2 * List.length arg0 -- List Nat -> Prod (List Nat) (List Nat)
+```
+
+These are planned spellings, not commands accepted by the current release.
+For an unambiguous built-in `List` target, `--where` will itself request
+filtering, the exact scalar or product profile will follow the checked target
+and result notation, and every eligible list input will be observed in source
+order. The shorthand will reuse a safe activated policy; a session without one
+will need one short policy-activation line first. Ambiguous/custom targets
+will fail closed and require the explicit form instead of guessing a model,
+role, provider law, or solver authority. The existing `len(...)` grammar
+remains the compatibility/library entrance while `:help synth` leads with
+Lean's `List.length` notation.
+
+The same milestone adds a Haskell-shaped `length arg0` surface to the
+standalone Djex REPL. Behavioral synthesis is a first-class use case of both
+repositories, not a Leant-only frontend over a Djex library. See the
+[near-term shorthand and Djex parity plan](docs/length-ranking.md#planned-host-native-shorthand-and-djex-repl-parity).
 
 A filter command works through one lazy engine result in at most two batches
 of `:set synth-verify` groups (twice that for `both`), reusing one

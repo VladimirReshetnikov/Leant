@@ -2605,29 +2605,54 @@ Mode meanings:
 \item[prove.] Require a Lean-accepted behavioral theorem before reporting a candidate as successful; may still display unproved survivors in a separate section if configured.
 \end{description}
 
-The mode must be specified explicitly for any behavior that can remove candidates or launch a sketch/CHC session. A contract file alone should not silently change existing \code{:synth} semantics.
+A bare type or contract file must not silently remove candidates. The planned
+host-native \code{--where} form is itself an explicit request for behavioral
+filtering, so it may default the omitted mode to \code{filter}; modes that
+launch CEGIS, sketch, proof, or CHC work remain explicit. A clause still grants
+no execution authority by itself.
 
 \section{Interactive contract forms}
 
 File contracts are appropriate for rich specifications, but common cases deserve compact syntax:
 
 \begin{lstlisting}[language={}]
+:synth --where List.length result = List.length arg0 -- List a -> List a
+:synth --where length result == length arg0 -- [a] -> [a]
 :synth --behavior-mode filter --length-model list-scalar-exact-cases --length-inputs arg0 --where len(result)=len(arg0) -- List a -> List a
 :synth --law state-bind -- TYPE
 :synth --law option-bind -- TYPE
 :synth --example "[1,2] => [2,1]" -- List Nat -> List Nat
 \end{lstlisting}
 
-The first line is now implemented: the Length clause is unquoted and ends at
-the standalone delimiter, and quote characters are rejected rather than
-interpreted as a string. The displayed scalar profile has the explicit
-\code{list-binary-product-exact-cases} sibling for product results. Both
-construct the same passive contract vocabulary used by files and receive
-execution authority only from the activated startup policy. The \code{--law}
-and \code{--example} forms remain proposed frontends. They must not implement
-independent semantics. Names such as \code{state-bind} would resolve to
-versioned built-in contract templates, and the expanded contract fingerprint
-would be shown in diagnostics.
+The first two lines are the next host-native shorthand milestone, not current
+syntax. The first belongs to Leant and uses Lean's \code{List.length},
+relations, and projections. The second belongs to Djex's standalone Haskell
+REPL and uses ordinary Haskell application and comparison notation. The third
+line is the currently implemented Leant compatibility form: its Length clause
+is unquoted and ends at the standalone delimiter, and quote characters are
+rejected rather than interpreted as a string. Its scalar profile has the
+explicit \code{list-binary-product-exact-cases} sibling for product results.
+
+For a simple, unambiguous built-in-list target, the shorthand defaults
+\code{--where} to filter mode, chooses the host's standard list spine,
+requires the scalar or pair result domain to agree with both expression and
+checked target, and observes every eligible list argument in source order---not
+only referenced arguments. It reuses a safe activated execution policy; an
+unconfigured session needs one short activation command first. Ambiguous or
+custom shapes fail closed and require the explicit form. Neither frontend
+executes its host expression: both lower into the same bounded passive contract
+vocabulary and therefore share normalization, fingerprints, replay, limits,
+and rejection authority.
+
+Djex REPL parity is part of this immediate surface checkpoint, before new
+\code{--law}, \code{--example}, typed-sketch, or additional-domain grammar.
+This is a product requirement: Djex's standalone Haskell applications must not
+depend on Leant as their only interactive behavioral frontend. Both REPLs
+should expose the examples and resolved defaults in their synthesis help.
+The \code{--law} and \code{--example} forms remain proposed frontends and must
+not implement independent semantics. Names such as \code{state-bind} would
+resolve to versioned built-in contract templates, and the expanded contract
+fingerprint would be shown in diagnostics.
 
 \section{Contract inspection}
 
