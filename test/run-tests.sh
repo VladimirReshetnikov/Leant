@@ -52,6 +52,13 @@ filter() {
               -e '^backend responding' -e '^replaying session'
 }
 
+normalize_volatile_search_counts() {
+  # Exference's queue-pruning total is diagnostic telemetry, not part of the
+  # bounded-search result.  It can differ across otherwise identical builds
+  # on different machines, so compare its presence without pinning the count.
+  sed 's/queue limit pruned [0-9][0-9]*/queue limit pruned <machine-dependent>/'
+}
+
 failures=0
 ran=0
 for input in *.txt; do
@@ -68,7 +75,9 @@ for input in *.txt; do
   elif [ ! -f "$golden" ]; then
     echo "MISSING $golden (run with -u to create)"
     failures=$((failures + 1))
-  elif ! diff_out=$(printf '%s\n' "$actual" | diff -u "$golden" -); then
+  elif ! diff_out=$(diff -u \
+      <(normalize_volatile_search_counts < "$golden") \
+      <(printf '%s\n' "$actual" | normalize_volatile_search_counts)); then
     echo "FAIL $input"
     printf '%s\n' "$diff_out"
     failures=$((failures + 1))
