@@ -2,7 +2,7 @@
 
 *Status: phases 0–2 implemented (`:synth` in this repository, engines =
 in-process Djex Djinn/LJT and Exference; see
-[README.md](../README.md#synth-automatic-term-synthesis)). A bounded
+[README.md](../README.md#synth--automatic-term-synthesis)). A bounded
 first slice of phase 3 is also implemented: live goal-relevant Lean
 providers, exact global rendering, relevance-preserving ratings, curated rated
 `List`/`Nat` library premises, and one-layer recursive elimination, backed by a
