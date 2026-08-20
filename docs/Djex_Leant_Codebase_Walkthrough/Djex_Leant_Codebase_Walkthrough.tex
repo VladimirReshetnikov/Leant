@@ -84,8 +84,8 @@
 \newcommand{\commitid}[1]{{\ttfamily\footnotesize #1}}
 \newcommand{\RepoDjex}{\href{https://github.com/VladimirReshetnikov/Djex}{Djex}}
 \newcommand{\RepoLeant}{\href{https://github.com/VladimirReshetnikov/Leant}{Leant}}
-\def\DjexBase{https://github.com/VladimirReshetnikov/Djex/blob/f50ae24c39c380642fa457abd9904b77114843e8/}
-\def\LeantBase{https://github.com/VladimirReshetnikov/Leant/blob/859c36cec17cb5c093f7435ac43de1650667695e/}
+\def\DjexBase{https://github.com/VladimirReshetnikov/Djex/blob/51c5bc8f1ff90879f94763228fe626972dd5b60c/}
+\def\LeantBase{https://github.com/VladimirReshetnikov/Leant/blob/238b9a6e4e4ed505402a3ebff7ee2fb07574c066/}
 \newcommand{\dpath}[1]{\href{\DjexBase#1}{\nolinkurl{#1}}}
 \newcommand{\lpath}[1]{\href{\LeantBase#1}{\nolinkurl{#1}}}
 \newcommand{\dsym}[2]{\code{#2} in \dpath{#1}}
@@ -182,8 +182,8 @@ and practical extension paths\par}
 \begin{tcolorbox}[width=0.86\textwidth,colback=SoftGray,colframe=RuleGray,boxrule=0.7pt,arc=1mm]
 \small
 \begin{tabularx}{\textwidth}{@{}L{0.18\textwidth}Y@{}}
-\textbf{Djex snapshot} & \commitid{f50ae24c39c380642fa457abd9904b77114843e8} \\
-\textbf{Leant snapshot} & \commitid{859c36cec17cb5c093f7435ac43de1650667695e} \\
+\textbf{Djex snapshot} & \commitid{51c5bc8f1ff90879f94763228fe626972dd5b60c} \\
+\textbf{Leant snapshot} & \commitid{238b9a6e4e4ed505402a3ebff7ee2fb07574c066} \\
 \textbf{Relationship} & Leant's \filepath{lib/Djex} submodule is pinned to the same Djex revision. \\
 \textbf{Prepared} & August 16, 2026; revised August 17, 2026 \\
 \textbf{Scope} & This is now the only maintainer walkthrough for either repository. The former Djex-only walkthrough was retired on August 17, 2026; its Djex material is covered by Parts~I--II here. \\
@@ -414,8 +414,8 @@ The following paths are current-branch source locations, not links into the pinn
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length.hs} & Versioned finite-list-spine Length domain, limits, expressions, formulas, spine and provider vocabulary. \\
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/CounterexampleBank.hs} & Nominal scalar/product candidate-independent scope identities and bounded immutable input-vector stores; matching permits an attempted fresh replay and grants no verdict or evidence. \\
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/Problem.hs} & Atomic checked session with session-owned provider inventory, separately revalidated contract, candidate semantics, complete Length problem, and retained candidate-independent bank scope. \\
-\filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/Evaluate.hs} & Bounded concrete natural-number evaluator and the only constructor path for validated Length counterexamples. \\
-\filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib.hs} & Transient typed QF\_LIA planning, canonical bounded bytes, structurally complete query fingerprint, retained problem-scope projection, exact same-scope fresh-record and retained-sample replay bridges, and model-binding validation. Internally the scalar and product boundaries share one plan sealer, one fingerprint builder over a role/schema/logic vocabulary, and one model reader over each domain's error constructors, while every public query, fingerprint, and error type stays nominally per-domain. \\
+\filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/Evaluate.hs} & Bounded concrete natural-number evaluator and the only constructor path for validated Length counterexamples. The scalar and product counterexample, finite input-box, simplification, and applicable-domain families run once over a private per-domain record with a shared three-way replay view; only the two assignment-replay implementations and the contract evaluators stay per-domain (the product side evaluates two result components). \\
+\filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib.hs} & Transient typed QF\_LIA planning, canonical bounded bytes, structurally complete query fingerprint, retained problem-scope projection, exact same-scope fresh-record and retained-sample replay bridges, and model-binding validation. Internally the scalar and product boundaries share one plan sealer, one fingerprint builder over a role/schema/logic vocabulary, and one model reader over each domain's error constructors, and the eight query-owned operation pairs (model validation, input replay, the origin probe, bank recording and retained-sample replay, and the validation associations) run once over a private query-surface record, while every public query, fingerprint, and error type stays nominally per-domain. \\
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib/Observation.hs} & Query-specific association over one retained raw report, derived status and conservative strength, and exact problem-plus-query replay. \\
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib/Execution.hs} & Length compatibility policy wrapping the shared launch profile with both Length schema tags, artifact and response policy, the sole fingerprint budget, and the complete Length identity; byte-free digest-expectation presence classification. \\
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib/Live.hs} & Sanitized rank-2 live-session facade retaining one private whole status-indexed run observation, with unchanged status/strength/use projections and exact query-first evidence consumption. \\
