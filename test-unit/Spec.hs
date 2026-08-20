@@ -2771,10 +2771,16 @@ translationPreparationTests = testGroup "prepared synthesis translation"
       let providerMap = inspectedProviderMap prepared
           privateSpellings = map inspectedProviderPrivateSpelling bindings
       Map.keys providerMap @?= privateSpellings
+      (firstBinding, secondBinding) <- case bindings of
+        [one, two] -> pure (one, two)
+        retained -> assertFailure
+          ("expected exactly two provider bindings, got "
+            ++ show (length retained))
+          >> error "unreachable"
       expectedFirst <- expectedProviderInfo first
-        [[argument "Nat"], [argument "Bool"]] (bindings !! 0)
+        [[argument "Nat"], [argument "Bool"]] firstBinding
       expectedSecond <- expectedProviderInfo second
-        [[argument "Char"]] (bindings !! 1)
+        [[argument "Char"]] secondBinding
       map
           (\binding -> Map.lookup
             (inspectedProviderPrivateSpelling binding)
@@ -12198,7 +12204,7 @@ assertLengthAssessmentScalarFilterDispatch
         map behaviorallyRejectedVerified rejected @?= [scaled]
         map lengthCandidatePresentationText
             (presentLengthAssessment filtered) @?=
-          map renderVerified [identity]
+          [renderVerified identity]
         case (rejected, presentLengthAssessmentRejections filtered) of
           ([removed], [presentation]) -> do
             lengthCandidateRejectionPresentationText presentation @?=
