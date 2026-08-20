@@ -68,6 +68,7 @@ Executable leant
     Leant.Synth.Length.SpinePair.Ranking.Internal
     Leant.Synth.Length.SpinePair.Selection
     Leant.Synth.Length.SpinePair.Selection.Internal
+    Leant.Synth.Length.Where
     Leant.Synth.Observability
     Leant.Synth.PostVerification
     Leant.Synth.ProviderCache
@@ -133,6 +134,7 @@ Test-Suite leant-synth-tests
     Leant.Synth.Length.SpinePair.Ranking.Internal
     Leant.Synth.Length.SpinePair.Selection
     Leant.Synth.Length.SpinePair.Selection.Internal
+    Leant.Synth.Length.Where
     Leant.Synth.Observability
     Leant.Synth.PostVerification
     Leant.Synth.ProviderCache
