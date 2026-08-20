@@ -2,10 +2,17 @@
 
 module Main (main) where
 
-import Control.Concurrent (threadDelay)
+import Control.Concurrent
+  ( newEmptyMVar
+  , putMVar
+  , readMVar
+  , takeMVar
+  , threadDelay
+  )
+import Control.Concurrent.Async (async, cancel, waitCatch)
 import Control.Monad (replicateM, unless, void, when, zipWithM_)
 import Control.DeepSeq (rnf)
-import Control.Exception (SomeException, evaluate, finally, try)
+import Control.Exception (SomeException, evaluate, finally, throwIO, try)
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as BS
 import Data.Char (isAlphaNum, toLower)
@@ -144,6 +151,7 @@ import Leant.Synth.Engine
   , ProviderBindingInspection (..)
   , SemanticFamilyBindingInspection (..)
   , SynthEngine (..)
+  , SynthLimits (..)
   , SynthOutcome (..)
   , TranslatedPremise (..)
   , detailedCandidateGroup
@@ -158,6 +166,7 @@ import Leant.Synth.Engine
   , detailedVerificationVariantRoute
   , detailedVerificationVariantSemanticSidecar
   , detailedVerificationVariantText
+  , defaultSynthLimits
   , forceDetailedOutcome
   , forceDetailedSynthCursorStep
   , inspectExferencePreparation
@@ -191,6 +200,7 @@ import Leant.Synth.Engine
   , withoutCheckedCandidates
   , withoutCheckedDetailedCandidates
   )
+import Leant.Synth.Engine.Parallel (runParallelEitherPairOrdered)
 import Leant.Synth.Fragment
   ( AppHead (..)
   , ExactContextArgument (..)
@@ -603,6 +613,7 @@ main = do
       , translationPreparationTests
       , providerScheduleTests
       , combinedEngineMergeTests
+      , parallelEnginePairTests
       , detailedSynthCursorTests
       , typedCandidateRoutingTests
       , lengthCounterexampleBankAdapterTests
@@ -4185,6 +4196,119 @@ combinedEngineMergeTests = testGroup "combined-engine verification frontier"
         @?= SynthCandidates [["e1"]]
           ["bounded", "exference: rated"]
   ]
+
+parallelEnginePairTests :: TestTree
+parallelEnginePairTests = testGroup
+  "scoped ordered combined-engine workers"
+  [ testCase "start both workers before observing either result" $ do
+      leftStarted <- newEmptyMVar
+      rightStarted <- newEmptyMVar
+      let left :: IO (Either String String)
+          left = do
+            putMVar leftStarted ()
+            readMVar rightStarted
+            pure (Right "djinn")
+          right :: IO (Either String String)
+          right = do
+            putMVar rightStarted ()
+            readMVar leftStarted
+            pure (Right "exference")
+      observed <- expectParallelPairWithin "simultaneous worker start"
+        $ runParallelEitherPairOrdered left right
+      observed @?= Right ("djinn", "exference")
+  , testCase "retain left-right values after the right action finishes first" $ do
+      rightFinished <- newEmptyMVar
+      let left :: IO (Either String String)
+          left = do
+            readMVar rightFinished
+            pure (Right "djinn")
+          right :: IO (Either String String)
+          right = pure (Right "exference")
+            `finally` putMVar rightFinished ()
+      observed <- expectParallelPairWithin "right-first ordered result"
+        $ runParallelEitherPairOrdered left right
+      observed @?= Right ("djinn", "exference")
+  , testCase
+      "keep a normal left failure after the right worker has already thrown" $ do
+      rightExited <- newEmptyMVar
+      let left :: IO (Either String String)
+          left = do
+            readMVar rightExited
+            pure (Left "djinn failure")
+          right :: IO (Either String String)
+          right = throwIO (userError "suppressed exference exception")
+            `finally` putMVar rightExited ()
+      observed <- expectParallelPairWithin "left failure precedence"
+        (try (runParallelEitherPairOrdered left right) ::
+          IO
+            (Either SomeException
+              (Either String (String, String))))
+      case observed of
+        Right (Left err) -> err @?= "djinn failure"
+        Right (Right values) -> assertFailure
+          $ "right exception unexpectedly yielded values: " ++ show values
+        Left failure -> assertFailure
+          $ "right exception escaped normal left failure: " ++ show failure
+      expectParallelPairWithin "right worker cleanup" $ readMVar rightExited
+  , testCase "cancel the caller only after both workers are joined" $ do
+      blocked <- newEmptyMVar
+      leftStarted <- newEmptyMVar
+      rightStarted <- newEmptyMVar
+      leftCleaned <- newEmptyMVar
+      rightCleaned <- newEmptyMVar
+      let lane started cleaned value =
+            (do
+              putMVar started ()
+              _ <- takeMVar blocked
+              pure (Right value))
+              `finally` putMVar cleaned ()
+          left :: IO (Either String String)
+          left = lane leftStarted leftCleaned "djinn"
+          right :: IO (Either String String)
+          right = lane rightStarted rightCleaned "exference"
+      caller <- async $ runParallelEitherPairOrdered left right
+      expectParallelPairWithin "left worker admission" $ readMVar leftStarted
+      expectParallelPairWithin "right worker admission" $ readMVar rightStarted
+      joined <- expectParallelPairWithin "caller cancellation and join" $ do
+        cancel caller
+        waitCatch caller
+      case joined of
+        Left _ -> pure ()
+        Right value -> assertFailure
+          $ "cancelled pair returned normally: " ++ show value
+      expectParallelPairWithin "left cancellation cleanup"
+        $ readMVar leftCleaned
+      expectParallelPairWithin "right cancellation cleanup"
+        $ readMVar rightCleaned
+  , testCase "propagate the right exception after the left action succeeds" $ do
+      leftFinished <- newEmptyMVar
+      let left :: IO (Either String String)
+          left = pure (Right "djinn")
+            `finally` putMVar leftFinished ()
+          right :: IO (Either String String)
+          right = do
+            readMVar leftFinished
+            throwIO (userError "observed exference exception")
+      observed <- expectParallelPairWithin "right exception propagation"
+        (try (runParallelEitherPairOrdered left right) ::
+          IO
+            (Either SomeException
+              (Either String (String, String))))
+      case observed of
+        Left failure -> assertBool
+          "the propagated right exception lost its identity"
+          $ "observed exference exception" `isInfixOf` show failure
+        Right value -> assertFailure
+          $ "right exception was converted to a value: " ++ show value
+  ]
+
+expectParallelPairWithin :: String -> IO value -> IO value
+expectParallelPairWithin label action = do
+  bounded <- timeout 3000000 action
+  case bounded of
+    Just value -> pure value
+    Nothing -> assertFailure
+      (label ++ " exceeded the deadlock guard") >> error "unreachable"
 
 detailedSynthCursorTests :: TestTree
 detailedSynthCursorTests = testGroup "bounded detailed synthesis cursor"
@@ -13064,6 +13188,9 @@ lengthAssessmentIntegrationTests = testGroup
       "continue providers and classical retries after every nonterminal lane"
       assertLengthAssessmentMainLaneScheduling
   , testCase
+      "scope parallel EngineBoth work to the default structural baseline"
+      assertLengthAssessmentMainParallelBaseline
+  , testCase
       "keep progressive cursor policies and run receipts private"
       assertLengthAssessmentMainProgressiveDeclarations
   , testCase
@@ -14319,12 +14446,16 @@ assertLengthAssessmentMainLaneScheduling = do
     , "ordinarySynthLaneCursorPolicy assessmentContext laneEngine limits"
     , "deadline st goal id outcome accumulation"
     ]
-  assertBool "one constructive lane split its engine outcome across reruns"
+  assertBool
+      "constructive scheduling lost its one serial and one parallel cursor"
     $ length (mainSourcePositions
-        "runSynthLaneCursor assessmentContext" constructiveSection) == 1
+        "runSynthLaneCursor assessmentContext" constructiveSection) == 2
 
   mapM_ (assertMainSourceContains "baseline run routing" baselineSection)
-    [ "baseline <- runSynthesis True Set.empty engine [] emptySynthLaneAccumulation"
+    [ "baseline <- if parallelBaselineStaticallyEligible then do"
+    , "capabilities <- getNumCapabilities"
+    , "if capabilities >= 2 then runParallelStructuralBaseline emptySynthLaneAccumulation"
+    , "else runSynthesis True Set.empty engine [] emptySynthLaneAccumulation"
     , "case synthLaneRunEnd baseline of"
     , "SynthLaneRunTimedOut -> report deadline baseline"
     , "SynthLaneRunCursorAdmissionFailed _ -> report deadline baseline"
@@ -14378,6 +14509,200 @@ assertLengthAssessmentMainLaneScheduling = do
       `isInfixOf` unlines providerSection)
   assertBool "the scheduler reran an engine to obtain a cursor successor"
     $ not ("startDetailedSynthCursor" `isInfixOf` schedulerText)
+
+assertLengthAssessmentMainParallelBaseline :: IO ()
+assertLengthAssessmentMainParallelBaseline = do
+  sourceLines <- lines <$> readFile "src/Main.hs"
+  engineLines <- lines <$> readFile "src/Leant/Synth/Engine.hs"
+  let schedulerSection = mainSourceSection
+        "synthGo' assessmentContext st args retriedVars goal parsed = do"
+        "loadSynthProviders ::" sourceLines
+      constructiveSection = mainSourceSection
+        "limit <- synthTimeoutSeconds st"
+        "if structuralFirst" schedulerSection
+      serialSection = mainSourceSection
+        "runSynthesis includeLibrary checked laneEngine providers accumulation ="
+        "-- This first checkpoint is limited" constructiveSection
+      parallelSection = mainSourceSection
+        "-- This first checkpoint is limited"
+        "if structuralFirst" constructiveSection
+      routingSection = mainSourceSection
+        "if structuralFirst"
+        "case synthLaneRunEnd baseline of" schedulerSection
+      timeoutReceiptSection = mainSourceSection
+        "Nothing -> pure SynthLaneRun"
+        "Just branches ->" parallelSection
+      pairForceSection = mainSourceSection
+        "forceDetailedSynthPairBefore requested deadline djinn exference ="
+        "-- | Filtering owns one command-wide deadline" sourceLines
+      providerSection = mainSourceSection
+        "runProviderLanes runDeadline fallback runLane checked accumulation lanes ="
+        "finalize accumulation = do" schedulerSection
+      classicalSection = mainSourceSection
+        "synthClassical assessmentContext commandDeadline st goal parsed accumulation ="
+        "verifySynthLane assessmentContext groupLimit st goal notes groups ="
+        sourceLines
+      engineBothSection = mainSourceSection
+        "EngineBoth -> do"
+        "-- | Prepare one engine-specific translation" engineLines
+      excludedSerialSections =
+        [ ("ordinary/library/provider callback", serialSection)
+        , ("provider widening", providerSection)
+        , ("classical retries", classicalSection)
+        ]
+
+  length (mainSourcePositions
+      "runSynthLaneCursor assessmentContext" constructiveSection) @?= 2
+  length (mainSourcePositions
+      "runSynthLaneCursor assessmentContext" serialSection) @?= 1
+  length (mainSourcePositions
+      "runSynthLaneCursor assessmentContext" parallelSection) @?= 1
+
+  mapM_ (assertMainSourceContains "parallel baseline eligibility"
+      parallelSection)
+    [ "baselinePolicy = ordinarySynthLaneCursorPolicy assessmentContext EngineBoth limits"
+    , "parallelBaselineStaticallyEligible = engine == EngineBoth"
+    , "&& limits == defaultSynthLimits"
+    , "&& null libraryPremises"
+    , "&& not (synthLaneCursorAllowsFilterSuccessor baselinePolicy)"
+    ]
+  staticGate <- expectMainSourcePosition "parallel baseline routing"
+    "if parallelBaselineStaticallyEligible" routingSection
+  capabilityRead <- expectMainSourcePosition "parallel baseline routing"
+    "capabilities <- getNumCapabilities" routingSection
+  capabilityGate <- expectMainSourcePosition "parallel baseline routing"
+    "if capabilities >= 2" routingSection
+  parallelRoute <- expectMainSourcePosition "parallel baseline routing"
+    "then runParallelStructuralBaseline emptySynthLaneAccumulation"
+      routingSection
+  serialRoute <- expectMainSourcePosition "parallel baseline routing"
+    "else runSynthesis True Set.empty engine []" routingSection
+  assertBool "RTS capabilities were inspected before static admission"
+    $ staticGate < capabilityRead
+      && capabilityRead < capabilityGate
+      && capabilityGate < parallelRoute
+      && parallelRoute < serialRoute
+  length (mainSourcePositions "getNumCapabilities" schedulerSection) @?= 1
+  length (mainSourcePositions
+      "runParallelStructuralBaseline emptySynthLaneAccumulation"
+      routingSection) @?= 1
+  length (mainSourcePositions
+      "runSynthesis True Set.empty engine []" routingSection) @?= 2
+
+  mapM_ (assertMainSourceContains "parallel structural branches"
+      parallelSection)
+    [ "runBranch laneEngine = synthesizeWithProvidersSkippingDetailedWith limits laneEngine (rsSynthSteps state) Set.empty [] fragment"
+    , "prepared <- forceDetailedSynthPairBefore (synthLimitTried limits) deadline"
+    , "(runBranch EngineDjinn) (runBranch EngineExference)"
+    , "let outcome = fmap (uncurry $ mergeDetailedOutcomesSkipping Set.empty) branches"
+    , "in runSynthLaneCursor assessmentContext baselinePolicy deadline st goal id outcome accumulation"
+    ]
+  synthLimitTried defaultSynthLimits @?= 12
+  synthLimitTried defaultSynthLimits @?= synthMaxTried
+  synthVerificationWindow EngineBoth @?= 24
+  assertBool "parallel workers forced a combined rather than per-engine prefix"
+    $ synthLimitTried defaultSynthLimits
+      < synthVerificationWindow EngineBoth
+  branchDefinition <- expectMainSourcePosition "parallel structural branches"
+    "let runBranch laneEngine" parallelSection
+  djinnBranch <- expectMainSourcePosition "parallel structural branches"
+    "(runBranch EngineDjinn)" parallelSection
+  exferenceBranch <- expectMainSourcePosition "parallel structural branches"
+    "(runBranch EngineExference)" parallelSection
+  defaultMerge <- expectMainSourcePosition "parallel structural branches"
+    "mergeDetailedOutcomesSkipping Set.empty" parallelSection
+  mergedCursor <- expectMainSourcePosition "parallel structural branches"
+    "in runSynthLaneCursor assessmentContext baselinePolicy deadline"
+      parallelSection
+  assertBool "parallel branches or their default merge changed order"
+    $ branchDefinition < djinnBranch
+      && djinnBranch <= exferenceBranch
+      && exferenceBranch < defaultMerge
+      && defaultMerge < mergedCursor
+
+  mapM_ (assertMainSourceContains "empty parallel timeout receipt"
+      timeoutReceiptSection)
+    [ "synthLaneRunAccumulation = accumulation"
+    , "synthLaneRunCheckedFrontierSpellings = []"
+    , "synthLaneRunCandidateGroupCount = 0"
+    , "synthLaneRunNotes = []"
+    , "synthLaneRunEnd = SynthLaneRunTimedOut"
+    ]
+  mapM_ (\forbidden -> assertBool
+      ("parallel timeout receipt probed unavailable work " ++ forbidden)
+      $ not $ forbidden `isInfixOf` unlines timeoutReceiptSection)
+    [ "branches"
+    , "outcome"
+    , "mergeDetailedOutcomesSkipping"
+    , "runSynthLaneCursor"
+    ]
+
+  mapM_ (assertMainSourceContains "bounded parallel prefix ownership"
+      pairForceSection)
+    [ "beforeDeadline $ runParallelEitherPairOrdered (strictPrefix djinn) (strictPrefix exference)"
+    , "strictPrefix outcome = outcome <$ evaluate (forceDetailedOutcome requested outcome)"
+    , "beforeDeadline action = case deadline of"
+    , "Nothing -> Just <$> action"
+    , "Just absoluteDeadline -> do"
+    , "now <- getCurrentTime"
+    , "diffUTCTime absoluteDeadline now"
+    , "if remainingMicros <= 0 then pure Nothing else timeout remainingMicros action"
+    ]
+  length (mainSourcePositions "forceDetailedOutcome" sourceLines) @?= 2
+  length (mainSourcePositions
+      "forceDetailedOutcome requested outcome" pairForceSection) @?= 1
+  length (mainSourcePositions
+      "runParallelEitherPairOrdered" sourceLines) @?= 2
+  length (mainSourcePositions
+      "runParallelEitherPairOrdered" pairForceSection) @?= 1
+  mapM_ (\deferredOwner -> assertBool
+      ("bounded pair helper eagerly acquired merged demand via "
+        ++ deferredOwner)
+      $ not $ deferredOwner `isInfixOf` unlines pairForceSection)
+    [ "mergeDetailedOutcomesSkipping"
+    , "startDetailedSynthCursor"
+    , "forceDetailedSynthCursorStep"
+    , "candidateWindow"
+    ]
+  pairForce <- expectMainSourcePosition "parallel structural branches"
+    "prepared <- forceDetailedSynthPairBefore" parallelSection
+  pairDeadline <- expectMainSourcePosition "parallel structural branches"
+    "(synthLimitTried limits) deadline" parallelSection
+  assertBool "bounded pair work escaped the command deadline"
+    $ pairForce <= pairDeadline && pairDeadline < mergedCursor
+
+  mapM_ (\(label, section) -> mapM_ (\parallelToken -> assertBool
+      (label ++ " unexpectedly entered parallel scheduling via "
+        ++ parallelToken)
+      $ not $ parallelToken `isInfixOf` unlines section)
+      [ "runParallelStructuralBaseline"
+      , "forceDetailedSynthPairBefore"
+      , "runParallelEitherPairOrdered"
+      , "getNumCapabilities"
+      ]) excludedSerialSections
+  mapM_ (assertMainSourceContains "serial ordinary/library lane"
+      serialSection)
+    [ "base = synthesizeWithProvidersSkippingDetailedWith limits laneEngine (rsSynthSteps state) checked providers fragment"
+    , "includeLibrary && not (null libraryPremises)"
+    , "mergeLibraryDetailedOutcomes base"
+    , "synthesizeTunedDetailedWith limits laneEngine"
+    ]
+  mapM_ (assertMainSourceContains "serial EngineBoth implementation"
+      engineBothSection)
+    [ "djinnPrepared <- prepareSynthesis djinnRecursiveProjection"
+    , "djinnCompatibility <- djinnRun"
+    , "exferencePrepared <- prepareSynthesis exferenceRecursiveProjection"
+    , "exference <- exferenceRun"
+    , "mergeDetailedOutcomesSkippingWith limits checked djinn exference"
+    ]
+  mapM_ (\parallelToken -> assertBool
+      ("pure EngineBoth unexpectedly owns concurrency via " ++ parallelToken)
+      $ not $ parallelToken `isInfixOf` unlines engineBothSection)
+    [ "runParallelEitherPairOrdered"
+    , "withAsync"
+    , "async"
+    , "getNumCapabilities"
+    ]
 
 assertLengthAssessmentMainProgressiveDeclarations :: IO ()
 assertLengthAssessmentMainProgressiveDeclarations = do
@@ -14458,7 +14783,7 @@ assertLengthAssessmentMainCursorDriver = do
         "runDetailedSynthCursorBefore requested window deadline cursor =" sourceLines
       forcingSection = mainSourceSection
         "runDetailedSynthCursorBefore requested window deadline cursor ="
-        "classicalSynthLaneDeadline assessmentContext commandDeadline st ="
+        "forceDetailedSynthPairBefore"
         sourceLines
       driverSection = mainSourceSection
         "runSynthLaneCursor assessmentContext policy deadline st goal transform outcome"
@@ -14545,7 +14870,7 @@ assertLengthAssessmentMainCursorDriver = do
   length (mainSourcePositions
       "runDetailedSynthCursorBefore" driverSection) @?= 1
   length (mainSourcePositions
-      "runSynthLaneCursor" sourceLines) @?= 5
+      "runSynthLaneCursor" sourceLines) @?= 6
   length (mainSourcePositions
       "verifySynthLane assessmentContext" driverSection) @?= 1
   length (mainSourcePositions
@@ -14601,7 +14926,6 @@ assertLengthAssessmentMainCursorDriver = do
       $ not $ oldHelper `isInfixOf` sourceText)
     [ "runEngineBefore"
     , "runEngineBounded"
-    , "forceDetailedOutcome"
     ]
 
 assertLengthAssessmentMainClassicalScheduling :: IO ()

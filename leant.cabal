@@ -42,6 +42,7 @@ Executable leant
     Leant.Synth.BehavioralSelection
     Leant.Synth.BehavioralSelection.Internal
     Leant.Synth.Engine
+    Leant.Synth.Engine.Parallel
     Leant.Synth.Fragment
     Leant.Synth.Length.Adapter
     Leant.Synth.Length.Command
@@ -87,6 +88,7 @@ Executable leant
     -Wunused-packages
     -threaded
   Build-Depends:
+    async      >= 2.2.6 && < 2.3,
     base       >= 4.19 && < 5,
     bytestring >= 0.11 && < 0.13,
     containers >= 0.6  && < 0.9,
@@ -112,6 +114,7 @@ Test-Suite leant-synth-tests
     Leant.Synth.BehavioralSelection
     Leant.Synth.BehavioralSelection.Internal
     Leant.Synth.Engine
+    Leant.Synth.Engine.Parallel
     Leant.Synth.Fragment
     Leant.Synth.Length.Adapter
     Leant.Synth.Length.Command
@@ -159,9 +162,11 @@ Test-Suite leant-synth-tests
     -Wpartial-fields
     -Wredundant-constraints
     -Wunused-packages
+    -threaded
   Build-Tool-Depends:
     djex:djex-fake-z3
   Build-Depends:
+    async       >= 2.2.6 && < 2.3,
     base        >= 4.19  && < 5,
     bytestring  >= 0.11  && < 0.13,
     containers  >= 0.6   && < 0.9,
