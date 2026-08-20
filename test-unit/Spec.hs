@@ -11618,7 +11618,8 @@ assertLengthContractFileCurrentGrammar = do
     disabled <- expectLengthAssessmentConfigurationFile
       $ setJsonField ["contract"] contract
       $ setJsonField ["rankingDomain"] (Json.JStr domain)
-      $ lengthRankingConfigurationFileFixture "/tmp/not-opened-z3" Nothing
+      $ lengthRankingConfigurationFileFixture
+          (fixtureAbsolutePath "/tmp/not-opened-z3") Nothing
     case activateLengthAssessmentConfiguration
         PermitUnpinnedExecutable disabled of
       Left failure -> assertFailure
@@ -11789,6 +11790,15 @@ assertLengthContractFileCurrentSchema = do
       assertBool "contract error exposed a private domain"
         $ not $ "private-domain" `isInfixOf` show failure
 
+-- | An absolute-by-construction fixture path on the current platform.  The
+-- pure admission tests below never open it; POSIX keeps the historical
+-- spelling and Windows maps it under a drive so the path-absoluteness gate
+-- admits it and the check under test is the one that fires.
+fixtureAbsolutePath :: FilePath -> FilePath
+fixtureAbsolutePath posix
+  | os == "mingw32" = "C:" ++ map (\c -> if c == '/' then '\\' else c) posix
+  | otherwise = posix
+
 assertLengthContractFileAcquisition :: IO ()
 assertLengthContractFileAcquisition = do
   lengthContractFileDefaultTimeoutMilliseconds @?= 5000
@@ -11803,7 +11813,7 @@ assertLengthContractFileAcquisition = do
       ++ show failure
     Right _ -> assertFailure "relative contract path was admitted"
   case mkLengthContractFileRequest $ LengthContractFileSource
-      "/tmp/request.json" 0 of
+      (fixtureAbsolutePath "/tmp/request.json") 0 of
     Left LengthContractFileTimeoutNotPositive -> pure ()
     Left failure -> assertFailure $ "unexpected contract timeout failure: "
       ++ show failure
@@ -11815,7 +11825,7 @@ assertLengthContractFileAcquisition = do
       show failure
     Right _ -> assertFailure "oversized contract path was admitted"
   case mkLengthContractFileRequest $ LengthContractFileSource
-      "/tmp/request.json" 60001 of
+      (fixtureAbsolutePath "/tmp/request.json") 60001 of
     Left (LengthContractFileTimeoutLimitExceeded 60000 60001) -> pure ()
     Left failure -> assertFailure $ "unexpected contract timeout limit: " ++
       show failure
