@@ -987,8 +987,8 @@ Omitting the behavior mode defaults to `rank`.
 
 ### Inline where-clause command and activation
 
-`Leant.Synth.Length.Command` gives the active inline grammar a separate,
-fixed-order structural parser:
+`Leant.Synth.Length.Command` gives the fully explicit inline grammar a
+separate, fixed-order structural parser:
 
 ```text
 :synth --behavior-mode filter --length-model list-scalar-exact-cases|list-binary-product-exact-cases --length-inputs arg0[,argN...] --where CLAUSE -- TYPE
@@ -1035,6 +1035,38 @@ it is never rejected merely for needing a provider. Established startup and
 contract-file requests deliberately retain their older lifetime: `synthRun`
 opens their context before translation and keeps it through retry and all
 lanes. Neither path writes request or context state into `ReplState`.
+
+#### Concise Lean-native defaults
+
+The common case has a second, higher-precedence command parser:
+
+```text
+:synth --where List.length result = List.length arg0 -- List Nat -> List Nat
+```
+
+`parseLengthSynthNativeInlineCommand` owns only an exact leading `--where`,
+slices the raw clause at the first standalone `--`, and otherwise delegates
+unchanged to the explicit and established parsers. Presence of this concise
+form is literal filter intent. Main resolves the goal, authorizes
+`LengthBehaviorFilter`, and only then calls `parseLeanNativeLengthWhereSource`,
+which uses Djex's nominally separate `parseLeanLengthWhereSource` grammar.
+
+After translation, `resolveLeanNativeLengthWhereSource` derives a complete
+conservative profile from semantic fragments rather than display text. Only
+`SlotArrow` domains count as physical inputs. Every domain that is an exact
+unary nominal `List` application becomes `LengthObservedSpine`; every other
+arrow is unobserved. An exact unary `List` result chooses the scalar model,
+and only a canonical `FLeanProd` whose two components are exact unary `List`s
+chooses the pair model. All other result shapes fail closed. The fixed spine,
+exact zero/step policy, true precondition, empty provider-law set, policy
+authorization, context lifetime, Handoff checks, replay authority, scheduler,
+and deadline behavior are identical to the explicit inline path.
+
+The long form therefore remains useful whenever callers need an explicit role
+vector or model. The short form supplies reasonable defaults without making
+the clause responsible for policy, type, provider, or solver authority. Djex's
+standalone REPL independently offers the Haskell-shaped sibling
+`:exference --where length result == length arg0 -- [a] -> [a]`.
 
 ### Integration and one-shot contracts
 

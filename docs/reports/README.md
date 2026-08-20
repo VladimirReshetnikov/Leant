@@ -33,10 +33,14 @@ ordinary policy with a filter-only Djinn cutoff of 60; excluded middle remains
 one six-group batch. Established startup/file commands introduce one rank-2
 assessment context before translation and reuse its nominal scalar or product
 filter bank through both batches, universe retry, and every ordinary, provider,
-and classical route. The active inline `--where` entrance instead resolves its
-goal, authorizes and parses its bounded clause, reports inaccessible hypotheses
-and premise scope, translates/retries, and resolves physical `SlotArrow` roles
-before it creates exactly one context for the same complete scheduler.
+and classical route. The active explicit inline `--where` entrance instead
+resolves its goal, authorizes and parses its bounded clause, reports
+inaccessible hypotheses and premise scope, translates/retries, and resolves
+physical `SlotArrow` roles before it creates exactly one context for the same
+complete scheduler. The concise Lean-shaped sibling accepts `List.length`,
+implies filter intent, and derives only conservative built-in-`List` roles and
+scalar/canonical-`Prod` result defaults after translation; unsupported shapes
+fail closed.
 Established rank and direct Selection compatibility paths keep their raw four-
 vector MRU; rank contexts contain no bank.
 
@@ -153,6 +157,7 @@ Reports are listed oldest first.
 - 2026-08-16 — [Opaque detailed synthesis cursor foundation](2026-08-16-opaque-detailed-synthesis-cursor-foundation.md)
 - 2026-08-16 — [Progressive same-run Length filter batching](2026-08-16-progressive-same-run-length-filter-batching.md)
 - 2026-08-20 — [Inline Length where-clause runtime activation](2026-08-20-inline-length-where-runtime.md)
+- 2026-08-20 — [Host-native behavioral constraints in both REPLs](2026-08-20-host-native-behavioral-constraints.md)
 
 ## Standalone PDF reports
 
