@@ -85,7 +85,7 @@
 \newcommand{\RepoDjex}{\href{https://github.com/VladimirReshetnikov/Djex}{Djex}}
 \newcommand{\RepoLeant}{\href{https://github.com/VladimirReshetnikov/Leant}{Leant}}
 \def\DjexBase{https://github.com/VladimirReshetnikov/Djex/blob/2f90509ea5b3025ad32ec46f03e0cf4725a8ce77/}
-\def\LeantBase{https://github.com/VladimirReshetnikov/Leant/blob/893c4a1b7e9685f1da1a9a5b83b1616a7cd8ee9c/}
+\def\LeantBase{https://github.com/VladimirReshetnikov/Leant/blob/fa83ead1bd9670a83440b44e23f80dfb259d683f/}
 \newcommand{\dpath}[1]{\href{\DjexBase#1}{\nolinkurl{#1}}}
 \newcommand{\lpath}[1]{\href{\LeantBase#1}{\nolinkurl{#1}}}
 \newcommand{\dsym}[2]{\code{#2} in \dpath{#1}}
@@ -183,7 +183,7 @@ and practical extension paths\par}
 \small
 \begin{tabularx}{\textwidth}{@{}L{0.18\textwidth}Y@{}}
 \textbf{Djex snapshot} & \commitid{2f90509ea5b3025ad32ec46f03e0cf4725a8ce77} \\
-\textbf{Leant snapshot} & \commitid{893c4a1b7e9685f1da1a9a5b83b1616a7cd8ee9c} \\
+\textbf{Leant snapshot} & \commitid{fa83ead1bd9670a83440b44e23f80dfb259d683f} \\
 \textbf{Relationship} & Leant's \filepath{lib/Djex} submodule is pinned to the same Djex revision. \\
 \textbf{Prepared} & August 16, 2026; revised August 17, 2026 \\
 \textbf{Scope} & This is now the only maintainer walkthrough for either repository. The former Djex-only walkthrough was retired on August 17, 2026; its Djex material is covered by Parts~I--II here. \\
@@ -416,6 +416,7 @@ The following paths are current-branch source locations, not links into the pinn
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/Problem.hs} & Atomic checked session with session-owned provider inventory, separately revalidated contract, candidate semantics, complete Length problem, and retained candidate-independent bank scope. \\
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/Evaluate.hs} & Bounded concrete natural-number evaluator and the only constructor path for validated Length counterexamples. The scalar and product counterexample, finite input-box, simplification, and applicable-domain families run once over a private per-domain record with a shared three-way replay view; only the two assignment-replay implementations and the contract evaluators stay per-domain (the product side evaluates two result components). \\
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib.hs} & Transient typed QF\_LIA planning, canonical bounded bytes, structurally complete query fingerprint, retained problem-scope projection, exact same-scope fresh-record and retained-sample replay bridges, and model-binding validation. Internally the scalar and product boundaries share one plan sealer, one fingerprint builder over a role/schema/logic vocabulary, and one model reader over each domain's error constructors, and the eight query-owned operation pairs (model validation, input replay, the origin probe, bank recording and retained-sample replay, and the validation associations) run once over a private query-surface record, while every public query, fingerprint, and error type stays nominally per-domain. \\
+\filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/Where.hs} & Bounded ASCII where-clause surface syntax for one Length postcondition: a byte- and nesting-bounded parser producing an opaque, source-free parsed value, and a separate elaborator requiring the caller's explicit scalar/binary-product domain and complete source-ordered role vector before lowering observed physical \code{argN} references onto the existing passive contract-source vocabulary; no spine, role, provider, solver, or execution authority is inferred. \\
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib/Observation.hs} & Query-specific association over one retained raw report, derived status and conservative strength, and exact problem-plus-query replay. \\
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib/Execution.hs} & Length compatibility policy wrapping the shared launch profile with both Length schema tags, artifact and response policy, the sole fingerprint budget, and the complete Length identity; byte-free digest-expectation presence classification. \\
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib/Live.hs} & Sanitized rank-2 live-session facade retaining one private whole status-indexed run observation, with unchanged status/strength/use projections and exact query-first evidence consumption. \\
@@ -456,7 +457,8 @@ The following paths are current-branch source locations, not links into the pinn
 \filepath{src/Leant/Synth/Length/Configuration/File/Acquire.hs} & Startup-configuration failure mapper over shared acquisition; one generalized assessment loader, no scalar-only loader, discovery, or activation. \\
 \filepath{src/Leant/Synth/Length/Contract/File.hs} & Exact versionless contract-only root \code{\{format, rankingDomain, contract\}}. One bounded parse selects the current scalar or canonical-\code{Prod} grammar; both require roles and case policy, admit modulo and positive-literal quotient, and contain no execution-policy or \code{resultShape} field. \\
 \filepath{src/Leant/Synth/Length/Contract/File/Acquire.hs} & One-command contract facade over shared bounded acquisition. \\
-\filepath{src/Leant/Synth/Length/Command.hs} & Exact fixed-order \code{:synth [-{}-behavior-mode rank|filter] [-{}-length-contract PATH] -{}- TYPE} parser, with ordinary no-option goals left delimiter-free and opaque. \\
+\filepath{src/Leant/Synth/Length/Command.hs} & Exact fixed-order \code{:synth [-{}-behavior-mode rank|filter] [-{}-length-contract PATH] -{}- TYPE} parser, with ordinary no-option goals left delimiter-free and opaque. A separate passive entrance parses the inline \code{-{}-length-model}/\code{-{}-length-inputs}/\code{-{}-where} form into an opaque plan; \filepath{src/Main.hs} does not yet consume it, so a line spelling those options is currently ordinary goal text. \\
+\filepath{src/Leant/Synth/Length/Where.hs} & Passive Leant profiles over Djex's bounded where-clause syntax: two fixed exact-case list models, ASCII input-index admission, and a resolver that builds the complete source-ordered role vector from the Lean-translated physical arity before elaboration; every stage is passive data and no step infers authority from the clause or the target. \\
 \filepath{src/Leant/Synth/Length/Integration.hs} & Opaque disabled/configured mode, startup admission--load--activation setup, retained activation disposition, byte-free executable-launch classification, pre-IO explicit-contract permission, and one command-local mode-plus-policy-plus-lazy-contract request; a rank-2 \code{LengthAssessmentContext} whose filter branches own one nominal bank and rank branches own none; reusable context assessment used around Main's complete command scheduler and every progressive batch plus a fresh-per-call compatibility wrapper for other callers. \\
 \filepath{src/Leant/Options.hs} & Pure CLI admission, pin-policy choice, and bounded configuration-load timeout ownership. \\
 \filepath{src/Leant/Json/Bounded.hs} & Shared strict bounded JSON syntax, scalar decoding, and closed-object validation used by both configuration and contract-only roots. \\
@@ -3453,7 +3455,7 @@ Use state-transition boundaries rather than arbitrary line ranges.
 
 \begin{itemize}
   \item Djex pinned tree: \href{https://github.com/VladimirReshetnikov/Djex/tree/2f90509ea5b3025ad32ec46f03e0cf4725a8ce77}{\nolinkurl{github.com/VladimirReshetnikov/Djex/tree/2f90509...}}
-  \item Leant pinned tree: \href{https://github.com/VladimirReshetnikov/Leant/tree/893c4a1b7e9685f1da1a9a5b83b1616a7cd8ee9c}{\nolinkurl{github.com/VladimirReshetnikov/Leant/tree/893c4a1...}}
+  \item Leant pinned tree: \href{https://github.com/VladimirReshetnikov/Leant/tree/fa83ead1bd9670a83440b44e23f80dfb259d683f}{\nolinkurl{github.com/VladimirReshetnikov/Leant/tree/893c4a1...}}
   \item Leant's submodule declaration: \lpath{.gitmodules}
   \item Leant's multi-package build: \lpath{cabal.project}
 \end{itemize}
