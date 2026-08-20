@@ -152,6 +152,9 @@
   {\endgroup\par\vspace{0.3\baselineskip}}
 \newcommand{\cmdrow}[2]{%
   \makebox[11.5em][l]{\code{#1}}\parbox[t]{\dimexpr\linewidth-12em}{#2}\par}
+\newcommand{\cmdrowbreak}[3]{%
+  \parbox[t]{11.5em}{\code{#1}\\\code{#2}}\hspace{0.5em}%
+  \parbox[t]{\dimexpr\linewidth-12em}{#3}\par}
 
 %--------------------------------------------------------------- hyperlinks --
 \hypersetup{
@@ -376,9 +379,9 @@ environment.
 \cmdrow{:set synth-queue N}{Exference queue bound (default 1024)}
 \cmdrow{:set synth-providers B}{discover live providers after the
   structural lane (\code{on}$\mid$\code{off}, default on)}
-\cmdrow{:set synth-provider-cap N}{providers one discovery may serialize
+\cmdrowbreak{:set synth-provider-}{cap N}{providers one discovery may serialize
   (default 80)}
-\cmdrow{:set synth-library-premises N}{rated library offers kept per goal
+\cmdrowbreak{:set synth-library-}{premises N}{rated library offers kept per goal
   (default 8); \code{:set synth-ratings} lists the rated inventory}
 \cmdrow{:set synth-debug B}{fragment, provider, lane-outcome, and metric
   diagnostics (\code{on}$\mid$\code{off}; \code{LEANT\_SYNTH\_DEBUG} at
