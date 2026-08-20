@@ -1,24 +1,28 @@
 -- | Leant profiles for the bounded Djex Length @where@ syntax.
 --
--- This module deliberately separates three decisions.  The command parser
--- admits one explicit model and a complete, source-ordered set of observed
--- physical arguments.  Only after command-local policy authorization does
--- 'parseLeanLengthWhereSource' enter the bounded Djex parser.  Finally, after
--- Lean translation supplies the physical arrow arity,
--- 'resolveLeanLengthWhereSource' builds the complete role vector and expands
--- the fixed Leant profile.  No step infers authority from the clause or the
--- translated target.
+-- This module deliberately separates policy authority, bounded syntax, and
+-- translated-target association.  The explicit surface carries its model and
+-- complete observed-input set.  The concise Lean-shaped surface instead
+-- derives conservative fixed defaults after translation: every exact @List@
+-- source arrow is observed, and only an exact @List@ result or canonical Lean
+-- @Prod@ of two exact @List@s selects the scalar or pair model.  Neither path
+-- infers execution authority from the clause or target.
 module Leant.Synth.Length.Where
   ( LeanLengthWhereModel (..)
   , LeanLengthWhereInputSource
   , LeanLengthWhereInputSourceError (..)
   , LeanLengthWherePlan
   , LeanLengthWhereSource
+  , LeanNativeLengthWherePlan
+  , LeanNativeLengthWhereSource
   , LeanLengthWhereSourceError (..)
   , parseLeanLengthWhereInputSource
   , mkLeanLengthWherePlan
+  , mkLeanNativeLengthWherePlan
   , parseLeanLengthWhereSource
+  , parseLeanNativeLengthWhereSource
   , resolveLeanLengthWhereSource
+  , resolveLeanNativeLengthWhereSource
   ) where
 
 import Control.Monad (when)
@@ -39,6 +43,13 @@ import Language.Haskell.Djex
 import qualified Language.Haskell.Djex as Djex
 import Numeric.Natural (Natural)
 
+import Leant.Synth.Fragment
+  ( AppHead (AppNominal)
+  , Frag (..)
+  , ParsedGoal (..)
+  , Slot (SlotArrow)
+  , fragSpine
+  )
 import Leant.Synth.Length.Contract
   ( LeanLengthCandidateCasePolicy (LeanLengthExactSpineZeroStepV1)
   , LeanLengthContract (..)
@@ -84,12 +95,26 @@ data LeanLengthWhereSource = LeanLengthWhereSource
   !LeanLengthWhereInputSource
   Djex.LengthWhereSource
 
+-- | The concise command's raw Lean-shaped clause.  It carries no model or
+-- role choice: those defaults are derived only from the translated target.
+-- The constructor and text remain private and there is deliberately no
+-- diagnostic instance.
+newtype LeanNativeLengthWherePlan = LeanNativeLengthWherePlan String
+
+-- | A bounded Lean-shaped source awaiting translated-target defaulting.
+-- The opaque Djex value contains no raw clause bytes and grants no authority.
+newtype LeanNativeLengthWhereSource = LeanNativeLengthWhereSource
+  Djex.LengthWhereSource
+
 -- | Sanitized refusal across the post-authorization parse and
 -- post-translation resolution boundaries.
 data LeanLengthWhereSourceError
   = LeanLengthWhereParseRejected !LengthWhereParseError
   | LeanLengthWherePhysicalArrowLimitExceeded !Natural !Natural
   | LeanLengthWhereInputOutOfRange !Natural !Natural
+  | LeanLengthWhereNativeResultUnsupported
+  | LeanLengthWhereNativeProductComponentUnsupported
+      !Djex.LengthSpinePairComponent
   | LeanLengthWhereElaborationRejected !LengthWhereElaborationError
   deriving (Eq, Ord, Show)
 
@@ -133,6 +158,11 @@ mkLeanLengthWherePlan
   -> LeanLengthWherePlan
 mkLeanLengthWherePlan = LeanLengthWherePlan
 
+-- | Retain one concise Lean-shaped clause until command-local policy
+-- authorization permits bounded parsing.
+mkLeanNativeLengthWherePlan :: String -> LeanNativeLengthWherePlan
+mkLeanNativeLengthWherePlan = LeanNativeLengthWherePlan
+
 -- | Enter the bounded Djex parser after the caller has authorized the inline
 -- request.  Haskeline has already decoded terminal input to 'String'; this is
 -- the single UTF-8 encoding boundary used for exact Djex byte offsets.
@@ -144,6 +174,18 @@ parseLeanLengthWhereSource (LeanLengthWherePlan model inputs clause) =
       $ TextEncoding.encodeUtf8 $ Text.pack clause of
     Left failure -> Left $ LeanLengthWhereParseRejected failure
     Right source -> Right $ LeanLengthWhereSource model inputs source
+
+-- | Enter Djex's bounded Lean-shaped parser after command-local policy
+-- authorization.  This is syntax admission only; the translated target still
+-- owns the model and complete physical-role defaults.
+parseLeanNativeLengthWhereSource
+  :: LeanNativeLengthWherePlan
+  -> Either LeanLengthWhereSourceError LeanNativeLengthWhereSource
+parseLeanNativeLengthWhereSource (LeanNativeLengthWherePlan clause) =
+  case Djex.parseLeanLengthWhereSource defaultLengthLimits
+      $ TextEncoding.encodeUtf8 $ Text.pack clause of
+    Left failure -> Left $ LeanLengthWhereParseRejected failure
+    Right source -> Right $ LeanNativeLengthWhereSource source
 
 -- | Resolve one parsed source against the authoritative number of physical
 -- arrow slots from Lean translation.  The target supplies only that arity: the
@@ -176,6 +218,61 @@ resolveLeanLengthWhereSource arity
   roleAt index
     | index `elem` observedInputs = LengthObservedSpine
     | otherwise = LengthUnobservedTarget
+
+-- | Resolve concise defaults from the successfully translated Lean target.
+-- Only exact unary @List@ applications are observed.  The result must be that
+-- same scalar spine or a canonical Lean @Prod@ of two such spines; every other
+-- shape fails closed and requires the explicit surface.
+resolveLeanNativeLengthWhereSource
+  :: ParsedGoal
+  -> LeanNativeLengthWhereSource
+  -> Either LeanLengthWhereSourceError LeanLengthContractSelection
+resolveLeanNativeLengthWhereSource parsed
+    (LeanNativeLengthWhereSource source) = do
+  let physicalArguments =
+        [argument | SlotArrow argument <- fragSpine $ pgFrag parsed]
+      arity = fromIntegral $ length physicalArguments
+      maximumArity = fromIntegral
+        $ lengthContractInputLimit defaultLengthLimits
+  when (arity > maximumArity)
+    $ Left $ LeanLengthWherePhysicalArrowLimitExceeded maximumArity arity
+  let roles = map defaultRole physicalArguments
+  domain <- defaultDomain $ translatedResultFragment $ pgFrag parsed
+  elaborated <- case elaborateLengthWhereSource domain roles source of
+    Left failure -> Left $ LeanLengthWhereElaborationRejected failure
+    Right value -> Right value
+  pure $ expandProfile elaborated
+ where
+  defaultRole fragment
+    | exactBuiltinListApplication fragment = LengthObservedSpine
+    | otherwise = LengthUnobservedTarget
+
+  defaultDomain result
+    | exactBuiltinListApplication result = Right LengthWhereScalar
+  defaultDomain (FLeanProd first second)
+    | not $ exactBuiltinListApplication first =
+        Left $ LeanLengthWhereNativeProductComponentUnsupported
+          Djex.LengthSpinePairFirst
+    | not $ exactBuiltinListApplication second =
+        Left $ LeanLengthWhereNativeProductComponentUnsupported
+          Djex.LengthSpinePairSecond
+    | otherwise = Right LengthWhereBinaryProduct
+  defaultDomain _ = Left LeanLengthWhereNativeResultUnsupported
+
+translatedResultFragment :: Frag -> Frag
+translatedResultFragment fragment = case fragment of
+  FArr _ result -> translatedResultFragment result
+  FAll _ _ result -> translatedResultFragment result
+  FInst _ result -> translatedResultFragment result
+  FExactContext _ _ result -> translatedResultFragment result
+  result -> result
+
+exactBuiltinListApplication :: Frag -> Bool
+exactBuiltinListApplication fragment = case fragment of
+  FParamInd family _ [_] _ -> family == "List"
+  FParamRec _ family _ [_] _ -> family == "List"
+  FApp _ _ (AppNominal family) [_] -> family == "List"
+  _ -> False
 
 -- | Expand only the two explicit built-in profiles.  Existing Handoff code
 -- later checks these exact names against translation provenance.

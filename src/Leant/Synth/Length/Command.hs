@@ -2,11 +2,11 @@
 --
 -- Ordinary goals remain opaque, delimiter-free text.  Once an exact current
 -- option token is recognized, the standalone @--@ delimiter is mandatory.
--- The established parser keeps its fixed behavior-mode/contract order.  The
--- additive inline parser is deliberately separate: Main gives it precedence,
--- then resolves the goal, authorizes, parses, reports scope, translates,
--- resolves, and activates the resulting passive request through the
--- command-local runtime boundary.
+-- The established parser keeps its fixed behavior-mode/contract order.  Two
+-- additive inline parsers remain deliberately separate: the concise leading
+-- @--where@ form first, then the fully explicit model/input form.  Main
+-- resolves the goal, authorizes, parses, reports scope, translates, resolves,
+-- and activates either passive request through the command-local boundary.
 module Leant.Synth.Length.Command
   ( LengthBehaviorMode (..)
   , LengthSynthCommand (..)
@@ -17,6 +17,11 @@ module Leant.Synth.Length.Command
   , lengthSynthInlineCommandWherePlan
   , lengthSynthInlineCommandGoal
   , parseLengthSynthInlineCommand
+  , LengthSynthNativeInlineCommand
+  , LengthSynthNativeInlineCommandError (..)
+  , lengthSynthNativeInlineCommandWherePlan
+  , lengthSynthNativeInlineCommandGoal
+  , parseLengthSynthNativeInlineCommand
   ) where
 
 import Data.Char (isSpace)
@@ -27,7 +32,9 @@ import Leant.Synth.Length.Where
   ( LeanLengthWhereInputSourceError (..)
   , LeanLengthWhereModel (..)
   , LeanLengthWherePlan
+  , LeanNativeLengthWherePlan
   , mkLeanLengthWherePlan
+  , mkLeanNativeLengthWherePlan
   , parseLeanLengthWhereInputSource
   )
 
@@ -74,6 +81,13 @@ data LengthSynthInlineCommand = LengthSynthInlineCommand
   LeanLengthWherePlan
   String
 
+-- | One concise Lean-shaped @--where CLAUSE -- GOAL@ request.  The private
+-- constructor keeps the raw clause inside the opaque plan until policy
+-- authorization; no model or role option exists on this shorthand path.
+data LengthSynthNativeInlineCommand = LengthSynthNativeInlineCommand
+  LeanNativeLengthWherePlan
+  String
+
 -- | Closed command-layer failures.  These diagnose only option structure and
 -- the bounded physical-input token; the clause itself is parsed later, after
 -- command-local policy authorization.
@@ -90,6 +104,13 @@ data LengthSynthInlineCommandError
   | LengthSynthCommandOptionOrderInvalid
   | LengthSynthCommandInlineDelimiterMissing
   deriving (Eq, Ord, Show)
+
+-- | Closed outer-structure failures for the concise command.  Clause syntax
+-- remains owned by the bounded Djex parser after policy authorization.
+data LengthSynthNativeInlineCommandError
+  = LengthSynthCommandNativeWhereMissing
+  | LengthSynthCommandNativeDelimiterMissing
+  deriving (Bounded, Enum, Eq, Ord, Show)
 
 -- | Split one @:synth@ argument line.  A trimmed line that starts with an
 -- exact @--behavior-mode@ token names @rank@ or @filter@ next; a line that
@@ -154,6 +175,40 @@ lengthSynthInlineCommandWherePlan (LengthSynthInlineCommand plan _) = plan
 -- | The trimmed goal text following the inline clause's delimiter.
 lengthSynthInlineCommandGoal :: LengthSynthInlineCommand -> String
 lengthSynthInlineCommandGoal (LengthSynthInlineCommand _ goal) = goal
+
+-- | Project the still-unparsed Lean-shaped plan without exposing its text.
+lengthSynthNativeInlineCommandWherePlan
+  :: LengthSynthNativeInlineCommand
+  -> LeanNativeLengthWherePlan
+lengthSynthNativeInlineCommandWherePlan
+    (LengthSynthNativeInlineCommand plan _) = plan
+
+-- | The trimmed goal following the concise command's standalone delimiter.
+lengthSynthNativeInlineCommandGoal
+  :: LengthSynthNativeInlineCommand
+  -> String
+lengthSynthNativeInlineCommandGoal
+    (LengthSynthNativeInlineCommand _ goal) = goal
+
+-- | Recognize only a leading exact @--where@ token.  Presence of that token
+-- is explicit filter intent.  The bounded Lean clause stays opaque here and
+-- ends at the first standalone @--@; longer lookalikes remain ordinary goals.
+parseLengthSynthNativeInlineCommand
+  :: String
+  -> Either
+      LengthSynthNativeInlineCommandError
+      (Maybe LengthSynthNativeInlineCommand)
+parseLengthSynthNativeInlineCommand source =
+  case exactOptionTail lengthWhereOption $ trim source of
+    Nothing -> Right Nothing
+    Just afterWhere -> case splitDelimiter afterWhere of
+      Nothing
+        | null afterWhere -> Left LengthSynthCommandNativeWhereMissing
+        | otherwise -> Left LengthSynthCommandNativeDelimiterMissing
+      Just (clause, goal)
+        | null clause -> Left LengthSynthCommandNativeWhereMissing
+        | otherwise -> Right $ Just $ LengthSynthNativeInlineCommand
+            (mkLeanNativeLengthWherePlan clause) (trim goal)
 
 -- | Recognize only the fixed-order inline form.  Main calls this parser first;
 -- 'Nothing' delegates the command to the unchanged established parser.

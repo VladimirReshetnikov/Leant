@@ -168,9 +168,13 @@ import Leant.Synth.Length.Command
   ( LengthBehaviorMode (..)
   , LengthSynthCommand (..)
   , LengthSynthInlineCommand
+  , LengthSynthNativeInlineCommand
   , lengthSynthInlineCommandGoal
   , lengthSynthInlineCommandWherePlan
+  , lengthSynthNativeInlineCommandGoal
+  , lengthSynthNativeInlineCommandWherePlan
   , parseLengthSynthInlineCommand
+  , parseLengthSynthNativeInlineCommand
   , parseLengthSynthCommand
   )
 import Leant.Synth.Length.Contract.File.Acquire
@@ -191,8 +195,11 @@ import Leant.Synth.Length.Presentation
   )
 import Leant.Synth.Length.Where
   ( LeanLengthWhereSource
+  , LeanNativeLengthWhereSource
   , parseLeanLengthWhereSource
+  , parseLeanNativeLengthWhereSource
   , resolveLeanLengthWhereSource
+  , resolveLeanNativeLengthWhereSource
   )
 import Leant.Synth.Observability
   ( LeantObservations
@@ -1209,6 +1216,8 @@ helpText = unlines
   , "  :synth TYPE              synthesize verified terms of TYPE (LJT engine)"
   , "  :synth --behavior-mode filter -- TYPE"
   , "                           filter with the activated startup contract"
+  , "  :synth --where List.length result = List.length arg0 -- TYPE"
+  , "                           infer the fixed List profile and filter"
   , "  :synth [--behavior-mode rank|filter]"
   , "         --length-contract ABSOLUTE-PATH -- TYPE"
   , "                           use one contract file for this command only"
@@ -2190,16 +2199,23 @@ initialSynthTimeoutSeconds = do
     _ -> Nothing
 
 cmdSynth :: St -> String -> IO ()
-cmdSynth st rawArg = case parseLengthSynthInlineCommand rawArg of
+cmdSynth st rawArg = case parseLengthSynthNativeInlineCommand rawArg of
   Left failure -> do
     emitLn st =<< cRed st
       ("inline finite-spine Length command rejected: " ++ show failure)
     emitLn st =<< cRed st
-      ("usage: :synth --behavior-mode filter --length-model " ++
-       "list-scalar-exact-cases|list-binary-product-exact-cases " ++
-       "--length-inputs arg0[,argN...] --where CLAUSE -- TYPE")
-  Right (Just command) -> runInline command
-  Right Nothing -> runEstablished
+      ("usage: :synth --where LEAN-LENGTH-CLAUSE -- TYPE")
+  Right (Just command) -> runNativeInline command
+  Right Nothing -> case parseLengthSynthInlineCommand rawArg of
+    Left failure -> do
+      emitLn st =<< cRed st
+        ("inline finite-spine Length command rejected: " ++ show failure)
+      emitLn st =<< cRed st
+        ("usage: :synth --behavior-mode filter --length-model " ++
+         "list-scalar-exact-cases|list-binary-product-exact-cases " ++
+         "--length-inputs arg0[,argN...] --where CLAUSE -- TYPE")
+    Right (Just command) -> runInline command
+    Right Nothing -> runEstablished
  where
   runEstablished :: IO ()
   runEstablished = case parseLengthSynthCommand rawArg of
@@ -2239,6 +2255,28 @@ cmdSynth st rawArg = case parseLengthSynthInlineCommand rawArg of
               Right source -> do
                 reportSynthCommandScope st args skipped
                 synthInlineRun permission source st args goal
+
+  runNativeInline :: LengthSynthNativeInlineCommand -> IO ()
+  runNativeInline command = do
+    state <- readIORef st
+    case resolveSynthCommandGoal state
+        $ lengthSynthNativeInlineCommandGoal command of
+      Left err -> emitLn st =<< cRed st err
+      Right (goal, args, skipped) ->
+        case authorizeExplicitLengthAssessmentRequest
+            LengthBehaviorFilter (rsLengthAssessmentMode state) of
+          Left failure -> emitLn st =<< cRed st
+            ("finite-spine Length request rejected before IO: " ++
+             show failure)
+          Right permission ->
+            case parseLeanNativeLengthWhereSource
+                $ lengthSynthNativeInlineCommandWherePlan command of
+              Left failure -> emitLn st =<< cRed st
+                ("inline finite-spine Length where clause rejected: " ++
+                 show failure)
+              Right source -> do
+                reportSynthCommandScope st args skipped
+                synthNativeInlineRun permission source st args goal
 
 -- | Resolve the ordinary explicit goal or the current prove/sorry goal before
 -- any Length request authority is selected.  The result retains the same
@@ -2331,6 +2369,29 @@ synthInlineRun permission source st args goal =
     $ \retriedVars translatedGoal parsed ->
       case resolveLeanLengthWhereSource
           (translatedPhysicalArrowArity parsed) source of
+        Left failure -> emitLn st =<< cRed st
+          ("inline finite-spine Length where target rejected: " ++
+           show failure)
+        Right selection ->
+          withLengthAssessmentRequestContext
+              (explicitLengthAssessmentRequest permission selection)
+            $ \assessmentContext ->
+                synthGo assessmentContext st args retriedVars
+                  translatedGoal parsed
+
+-- | Activate the concise source after translation supplies the exact List
+-- arguments and scalar-or-product result shape used for conservative defaults.
+synthNativeInlineRun
+  :: ExplicitLengthAssessmentPermission
+  -> LeanNativeLengthWhereSource
+  -> St
+  -> [String]
+  -> String
+  -> IO ()
+synthNativeInlineRun permission source st args goal =
+  translateSynthGoalWithRetry st goal
+    $ \retriedVars translatedGoal parsed ->
+      case resolveLeanNativeLengthWhereSource parsed source of
         Left failure -> emitLn st =<< cRed st
           ("inline finite-spine Length where target rejected: " ++
            show failure)
@@ -4257,6 +4318,8 @@ proveHelp = unlines
   , "                     as premises (then `exact it1` records the step)"
   , "  :synth --behavior-mode filter --"
   , "                     filter with the activated startup Length contract"
+  , "  :synth --where List.length result = List.length arg0 --"
+  , "                     infer the fixed List profile for this goal"
   , "  :synth [--behavior-mode rank|filter]"
   , "         --length-contract ABSOLUTE-PATH --"
   , "                     use one Length contract for this command's goal"
