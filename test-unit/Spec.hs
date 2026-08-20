@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 module Main (main) where
 
 import Control.Concurrent (threadDelay)
@@ -3414,7 +3416,7 @@ translationPreparationTests = testGroup "prepared synthesis translation"
           "planned fallback retained unexpected bindings: " ++ show bindings
       assertBool "planned fallback lost its structural family"
         $ any
-          (\declaration -> case declaration of
+          (\case
             DataTypeDeclaration () typeName [_] [_] ->
               (Djex.nameSpelling typeName >>=
                 (`Map.lookup` inspectedTypeMap expected)) ==
