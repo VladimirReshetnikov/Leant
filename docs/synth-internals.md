@@ -39,6 +39,7 @@ who wants the *what* can stop at the paragraph.
   - [Fixed startup policy and domain selection](#fixed-startup-policy-and-domain-selection)
   - [File acquisition](#file-acquisition)
   - [Contract-only files and the length-contract command](#contract-only-files-and-the-length-contract-command)
+  - [Inline where-clause command and activation](#inline-where-clause-command-and-activation)
   - [Integration and one-shot contracts](#integration-and-one-shot-contracts)
 - [Opaque detailed synthesis cursor foundation](#opaque-detailed-synthesis-cursor-foundation)
 - [Main's progressive same-run cursor scheduler](#mains-progressive-same-run-cursor-scheduler)
@@ -984,6 +985,57 @@ delimiter, the behavior value is exactly `rank` or `filter`, and an empty path
 is rejected before a misplaced exact mode token in the contract span.
 Omitting the behavior mode defaults to `rank`.
 
+### Inline where-clause command and activation
+
+`Leant.Synth.Length.Command` gives the active inline grammar a separate,
+fixed-order structural parser:
+
+```text
+:synth --behavior-mode filter --length-model list-scalar-exact-cases|list-binary-product-exact-cases --length-inputs arg0[,argN...] --where CLAUSE -- TYPE
+```
+
+The bar shows two alternative literal model tokens, not syntax accepted in one
+command. The mode must be exactly `filter`; `--length-contract` is mutually
+exclusive; every inline option occurs once in the displayed order; and the
+standalone `--` separates the unquoted clause from opaque Lean goal text.
+Quotes are ordinary rejected clause characters, not a quoting mechanism. The
+input token is a nonempty, strictly increasing comma-separated sequence from
+`arg0` through `arg7`; gaps and declared-but-unused inputs are valid. Leading
+zeroes are numeric aliases, and every clause `argN` reference must name a
+declared input within the translated physical arity.
+
+The structural parser retains the raw clause only inside an opaque plan with no
+`Show` instance. Main resolves the explicit or prove/`sorry` goal, obtains
+`ExplicitLengthAssessmentPermission` for literal `LengthBehaviorFilter`, and
+only then calls `Leant.Synth.Length.Where.parseLeanLengthWhereSource`. That
+function crosses the single UTF-8 boundary into Djex's source-free bounded
+ASCII parser. Its relation grammar and its 16,384-byte and 64-nesting limits
+are owned by Djex; closed failures retain offsets and limit observations but no
+clause bytes.
+
+After parsing, Main emits the established inaccessible-hypothesis and
+premise-scope report. After the ordinary Lean translation/universe-retry state
+machine succeeds, Main counts only `SlotArrow` entries in the translated fragment spine.
+`forall`, instance, and contextual slots are excluded. The Where resolver
+checks that physical arity, marks the explicitly listed source arrows observed,
+marks every omitted arrow unobserved, and compacts observed Length inputs in
+source order. It then expands only the selected built-in profile: fixed
+`List`/`List.nil`/`List.cons` identity, exact zero/step case policy, true
+precondition, scalar or canonical-`Prod` result domain, and no provider laws.
+Neither clause nor target infers a model, role, spine identity, case policy,
+provider law, or execution permission.
+
+Resolution returns the ordinary passive `LeanLengthContractSelection`. Main
+pairs it with the previously granted permission, opens exactly one matching
+nominal filter context, and passes that context through the complete scheduler.
+Every structural, authorization, clause, translation, arity, or elaboration
+refusal occurs before the context exists. A provider-dependent candidate not
+covered by the empty provider-law set is retained with its preparation refusal;
+it is never rejected merely for needing a provider. Established startup and
+contract-file requests deliberately retain their older lifetime: `synthRun`
+opens their context before translation and keeps it through retry and all
+lanes. Neither path writes request or context state into `ReplState`.
+
 ### Integration and one-shot contracts
 
 `Leant.Synth.Length.Integration` carries the parsed strict
@@ -1248,6 +1300,9 @@ The later Engine-only observation seam is recorded in the
 [opaque detailed synthesis cursor report](reports/2026-08-16-opaque-detailed-synthesis-cursor-foundation.md).
 Its progressive Main runtime successor is recorded in the
 [same-run Length filter batching report](reports/2026-08-16-progressive-same-run-length-filter-batching.md).
+The active inline parser/profile boundary and its later context lifetime are
+recorded in the
+[inline Length where-clause runtime report](reports/2026-08-20-inline-length-where-runtime.md).
 The older [one-shot contract report](reports/2026-08-13-one-shot-length-contract.md)
 and the reports below remain useful landing history, but their version routing
 and public API names are not current contracts. The historical modulo QF_LIA
@@ -1269,6 +1324,11 @@ The passive finite-spine source vocabulary now lives in
 `Leant.Synth.Length.Contract`. Modules that need only those assertions no
 longer depend on the full synthesis engine. `Leant.Synth.Engine` owns neutral
 synthesis and retained candidate provenance;
+`Leant.Synth.Length.Command` owns both the established file grammar and the
+separate inline structural parser. `Leant.Synth.Length.Where` owns the two
+fixed list profiles, bounded-input admission, and physical-role resolution
+over Djex's bounded parser/elaborator. Main alone orders authorization,
+translation, resolution, and context creation for the active inline path.
 `Leant.Synth.Length.Handoff` derives the opaque verified origin and owns the
 candidate-specific correspondence checks and Djex problem sealing. Ranking
 reaches that preparation through `Leant.Synth.Length.Adapter` and imports the
@@ -1369,7 +1429,10 @@ that batch and summary only when projected. Policy callers may supply a
 request-owned contract. The startup bundle fixes its decoded domain-selected
 contract, while an exact
 `:synth --length-contract ... --` request can reuse that activated policy with
-one separately decoded command-local contract. The nominal pair stack mirrors
+one separately decoded command-local contract. The inline filter request can
+instead supply one resolved fixed-profile selection through the same authorized
+request constructor; its empty provider-law set means unsupported
+provider-dependent candidates retain a preparation refusal. The nominal pair stack mirrors
 these rules in `Leant.Synth.Length.SpinePair.PostVerification`.
 Input or proposal failure preserves the original opaque verification batch,
 exposes no sealed output, and withholds the unsealed associated plan.

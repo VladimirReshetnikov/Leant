@@ -3,8 +3,10 @@
 -- Ordinary goals remain opaque, delimiter-free text.  Once an exact current
 -- option token is recognized, the standalone @--@ delimiter is mandatory.
 -- The established parser keeps its fixed behavior-mode/contract order.  The
--- additive inline parser is deliberately separate and passive until Main has
--- authorized and resolved the request in a later checkpoint.
+-- additive inline parser is deliberately separate: Main gives it precedence,
+-- then resolves the goal, authorizes, parses, reports scope, translates,
+-- resolves, and activates the resulting passive request through the
+-- command-local runtime boundary.
 module Leant.Synth.Length.Command
   ( LengthBehaviorMode (..)
   , LengthSynthCommand (..)
@@ -141,9 +143,9 @@ parseLengthSynthCommand source = case exactOptionTail behaviorModeOption trimmed
     , lengthSynthCommandGoal = trim goal
     }
 
--- | Project the passive inline plan without exposing its constructor or raw
--- clause.  Runtime code must first obtain command-local policy authority before
--- passing this value to @parseLeanLengthWhereSource@.
+-- | Project the still-passive inline plan without exposing its constructor or
+-- raw clause.  Main first obtains command-local policy authority, then passes
+-- this value to @parseLeanLengthWhereSource@.
 lengthSynthInlineCommandWherePlan
   :: LengthSynthInlineCommand
   -> LeanLengthWherePlan
@@ -153,9 +155,8 @@ lengthSynthInlineCommandWherePlan (LengthSynthInlineCommand plan _) = plan
 lengthSynthInlineCommandGoal :: LengthSynthInlineCommand -> String
 lengthSynthInlineCommandGoal (LengthSynthInlineCommand _ goal) = goal
 
--- | Recognize only the new fixed-order inline form.  'Nothing' means the
--- command belongs to the established parser, which remains unchanged and is
--- still the sole parser called by Main in this passive checkpoint.
+-- | Recognize only the fixed-order inline form.  Main calls this parser first;
+-- 'Nothing' delegates the command to the unchanged established parser.
 --
 -- Structural order, repetition, and file/inline exclusion are checked before
 -- model and input token contents.  The clause is merely sliced here; its Djex

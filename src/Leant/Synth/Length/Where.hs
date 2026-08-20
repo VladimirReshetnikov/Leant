@@ -1,4 +1,4 @@
--- | Passive Leant profiles for the bounded Djex Length @where@ syntax.
+-- | Leant profiles for the bounded Djex Length @where@ syntax.
 --
 -- This module deliberately separates three decisions.  The command parser
 -- admits one explicit model and a complete, source-ordered set of observed
@@ -76,7 +76,9 @@ data LeanLengthWherePlan = LeanLengthWherePlan
   String
 
 -- | A bounded Djex source associated with the same explicit model and input
--- declaration.  It remains passive and carries no solver or policy authority.
+-- declaration.  It is passive contract source and carries no solver or policy
+-- authority; Main later activates the resolved selection inside one authorized
+-- command-local assessment context.
 data LeanLengthWhereSource = LeanLengthWhereSource
   !LeanLengthWhereModel
   !LeanLengthWhereInputSource

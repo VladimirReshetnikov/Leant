@@ -3483,7 +3483,13 @@ The synthesis command asks for whole terms inhabiting a goal.  The forms accepte
 \item \term{:synth TYPE}: synthesize inhabitants of \term{TYPE}, elaborated with \term{autoImplicit}; unresolved short variables are retried at \term{Type} when the universe unifier gets stuck;
 \item \term{:synth} with no argument: in prove mode, target the current goal with its accessible hypotheses as premises; otherwise target the last \term{sorry};
 \item \term{:synth --behavior-mode filter -- TYPE}: filter the candidates with the Length behavioral contract activated at startup;
-\item \term{:synth [--behavior-mode rank|filter] --length-contract ABSOLUTE-PATH -- TYPE}: use one contract file for this command only.  Both forms are rejected unless a startup configuration activated the Length assessment mode.
+\item \term{:synth [--behavior-mode rank|filter] --length-contract ABSOLUTE-PATH -- TYPE}: use one contract file for this command only.  Both forms are rejected unless a startup configuration activated the Length assessment mode;
+\item in the post-snapshot current tree,
+  \term{:synth --behavior-mode filter --length-model
+  list-scalar-exact-cases|list-binary-product-exact-cases --length-inputs
+  arg0[,argN...] --where CLAUSE -- TYPE}: use one unquoted bounded inline
+  Length postcondition under a fixed explicit list profile. The bar presents
+  two alternative literal model tokens.
 \end{itemize}
 
 The session settings that affect it are exactly four, all read by \term{:set} (any other \term{:set OPT VAL} is forwarded to Lean as \term{set_option}):
@@ -4152,7 +4158,7 @@ A candidate may be type-correct and behaviorally rejected; another may be behavi
 \end{keyidea}
 \section{Activation, modes, and the rejection rule in the pinned tree}
 
-The layer is off unless a startup policy is activated, and even then it changes the ordering of candidates by default and their presence only on explicit request.  The facts below are those of \path{docs/length-ranking.md} and \path{src/Main.hs} at \LeantCommit\ (the current tree, inspected for this guide, is the same on every point):
+The layer is off unless a startup policy is activated, and even then it changes the ordering of candidates by default and their presence only on explicit request.  The facts below are those of \path{docs/length-ranking.md} and \path{src/Main.hs} at \LeantCommit; the post-snapshot inline addition is described immediately afterward rather than being projected backward into this pinned account:
 
 \begin{itemize}
 \item \textbf{Activation.}  \texttt{leant -\kern0pt-length-ranking-config /absolute/path.json} reads one versionless configuration file at startup (root member \term{rankingDomain} is \term{"scalar"} or \term{"binary-product"}; an executable SHA-256 expectation is required unless \texttt{-\kern0pt-length-ranking-allow-unpinned} is given; \texttt{-\kern0pt-length-ranking-config-timeout} bounds only the file load, default 5\,000\,ms).  Without it, ranking is the lazy identity and no worker is ever launched.  File acquisition is POSIX-only; a Windows build fails closed at startup.
@@ -4165,6 +4171,41 @@ The layer is off unless a startup policy is activated, and even then it changes 
 \end{itemize}
 
 What is \emph{not} in the pinned tree, and should not be read into it: counterexample-directed generation of new candidates, filling a survivor quota across lanes, sound pruning of typed prefixes, a session-persistent bank, further behavioral domains, or Lean-checked proof artifacts.
+
+\subsection{The inline Length addition after the pin}
+
+The later current tree adds exactly:
+
+\begin{quote}
+\term{:synth --behavior-mode filter --length-model
+list-scalar-exact-cases|list-binary-product-exact-cases --length-inputs
+arg0[,argN...] --where CLAUSE -- TYPE}
+\end{quote}
+
+The clause is unquoted and ends at the standalone delimiter; quote characters
+are rejected clause input. The model is one of the two displayed literal
+tokens, and the inline form is mutually exclusive with a contract file.
+\term{--length-inputs} is a nonempty strictly increasing subset of physical
+\term{arg0} through \term{arg7}; gaps and declared-but-unused inputs are valid.
+Only translated source-arrow slots count, not universal, instance, or
+contextual binders. Listed arrows become observed roles compacted in source
+order, and omitted arrows remain unobserved.
+
+The fixed expansion uses \term{List}, \term{List.nil}, \term{List.cons}, exact
+zero/step cases, a true precondition, the explicit scalar or canonical-product
+result model, and no provider laws. It infers none of these from the target or
+clause and grants no execution authority. A provider-dependent candidate
+unsupported by the empty law set is retained with its ordinary preparation
+refusal.
+
+Main's order is structural inline parse, explicit/current goal selection,
+literal-filter authorization, bounded ASCII clause parse, the established
+inaccessible-hypothesis and premise-scope report, Lean translation/universe
+retry, \term{SlotArrow}-only physical-arity resolution, then exactly one
+nominal context for every ordinary, provider, excluded-middle, and
+double-negation lane. Authorization precedes clause parsing, and
+translation/resolution precede context creation. The established startup/file
+path deliberately keeps the pinned context-before-translation lifetime.
 
 
 \begin{sourcebox}
@@ -4658,7 +4699,9 @@ Message & Meaning & Does not mean & Try next \\
 \term{(synthesizing with hypotheses p q h hp as premises)} & inside \term{:prove}, the visible hypotheses were added as premises and \term{itN} splices name them & that the term is closed & \term{exact it1} \\
 \term{  rejected  TERM} + note & only under \texttt{-\kern0pt-behavior-mode filter}: an independently replayed Length counterexample; the row is shown but not bound & ill-typedness; a general semantic verdict; anything under \term{rank} mode & inspect the note's input lengths; tighten the contract \\
 \term{warning: finite-spine Length behavioral assessment preserved all verified candidates: ...} & the Length stage failed closed and changed nothing & anything about the candidates' behavior & see \path{docs/length-ranking.md} \\
-\term{finite-spine Length request rejected before IO: ...} & filter mode or a contract path was requested without an activated startup policy & anything about the goal & start Leant with \texttt{-\kern0pt-length-ranking-config} (POSIX only at this commit) \\
+\term{finite-spine Length request rejected before IO: ...} & filter mode, a post-snapshot inline constraint, or a contract path was requested without an activated startup policy & anything about the goal & start Leant with \texttt{-\kern0pt-length-ranking-config} (POSIX only at this commit) \\
+\term{inline finite-spine Length command rejected: ...} & the post-snapshot fixed-order model/input/where form was incomplete, reordered, repeated, quoted as an option value, or combined with a contract file & anything about the clause or goal & use the exact unquoted grammar in the preceding section \\
+\term{inline finite-spine Length where clause rejected: ...} or \term{... where target rejected: ...} & bounded ASCII syntax/limit failure or physical-role/result-domain mismatch & anything about candidate behavior & match \term{arg0} through \term{arg7} to physical arrows and the scalar/product model \\
 \bottomrule
 \end{longtable}
 
@@ -4714,7 +4757,7 @@ bounded-positive Length receipt & no violation under the exact supported domain/
 \item[Inhabitant] A term having a given type.
 \item[Instance implicit] A binder whose argument is synthesized by Lean's type-class resolver.
 \item[Lane] One engine run of \term{:synth} over one premise set: the structural lane, the library lane, provider lanes, and the classical lanes; a verified candidate in an earlier lane stops the later ones.
-\item[Length contract] A passive JSON law over the list-spine lengths of a candidate's inputs and result, assessed by the optional Z3-backed stage; \emph{rank} mode reorders, \emph{filter} mode may omit only replayed counterexamples.
+\item[Length contract] A passive law over the list-spine lengths of a candidate's inputs and result, supplied by JSON or, in the post-snapshot current tree, the fixed inline where-clause profile; assessed by the optional Z3-backed stage, where \emph{rank} reorders and \emph{filter} may omit only replayed counterexamples.
 \item[Library premise] A curated recursive combinator (\term{List.map}, \term{List.foldr}, \ldots) that \term{synth-library on} (the default) adds as a premise when the goal mentions the corresponding recursive inductive.
 \item[LJT] Dyckhoff's contraction-free sequent calculus for intuitionistic propositional logic, used by Djinn.
 \item[Metavariable] A temporary elaboration-time unknown with a context and expected type.
@@ -4753,6 +4796,15 @@ bounded-positive Length receipt & no violation under the exact supported domain/
 \item[\path{src/Leant/Synth/Length/}] \path{Command.hs} (the \term{:synth} option grammar), \path{Integration.hs} (request authorization and the per-command assessment context), \path{Selection.hs} and \path{Ranking.hs} (retention/rejection taxonomy), \path{Presentation.hs} (candidate and rejection notes), \path{Handoff.hs} (typed-origin eligibility).
 \item[\path{src/Leant/Synth/BehavioralSelection.hs}] The generic occurrence-sealed partition that filter mode uses; it checks membership and order, never behavior.
 \end{description}
+
+Those entries remain a guide to \LeantCommit. In the post-snapshot current
+tree, \path{src/Leant/Synth/Length/Command.hs} also owns the separate inline
+structural parser, new \path{src/Leant/Synth/Length/Where.hs} owns the two fixed
+list profiles and physical-role resolution over Djex's bounded clause
+frontend, and \path{src/Main.hs} alone owns authorization, scope reporting,
+translation/retry, \term{SlotArrow} arity, resolution, and one-context
+activation. These paths are listed without changing the pinned repository URL
+below.
 
 Repository root: \url{https://github.com/VladimirReshetnikov/Leant/tree/49c8f9f100a644b5a32b3c942bc6565a3a3ba6a0}
 

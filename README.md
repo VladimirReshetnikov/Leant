@@ -182,7 +182,20 @@ and one scalar-or-pair contract. Once active:
   `unsat`, or `unknown`, an unassessed input, or a positive bounded-evidence
   receipt never causes a rejection;
 - `--length-contract ABSOLUTE-PATH` swaps in a passive contract for one
-  command.
+  command;
+- an inline constraint can instead select one of the two fixed exact-case
+  `List` profiles, declare the observed physical source-arrow arguments, and
+  write one bounded ASCII Length relation directly:
+
+  ```text
+  :synth --behavior-mode filter --length-model list-scalar-exact-cases --length-inputs arg0 --where len(result)=len(arg0)+min(len(arg0),1) -- List Nat -> List Nat
+  :synth --behavior-mode filter --length-model list-binary-product-exact-cases --length-inputs arg0 --where len(result.first)+len(result.second)=2*len(arg0) -- List Nat -> Prod (List Nat) (List Nat)
+  ```
+
+  The clause is unquoted and ends at the standalone `--`. Inline constraints
+  require literal `filter`, are mutually exclusive with `--length-contract`,
+  and reuse the already activated startup execution policy; they cannot
+  activate Z3 or introduce provider laws.
 
 A filter command works through one lazy engine result in at most two batches
 of `:set synth-verify` groups (twice that for `both`), reusing one
@@ -194,7 +207,7 @@ solver failure preserves the complete verified batch instead of guessing. The
 batch schedule, deadlines, rejection taxonomy, schemas, and presentation are
 specified in [docs/length-ranking.md](docs/length-ranking.md); the Main
 landing is recorded in the
-[progressive same-run Length filter batching report](docs/reports/2026-08-16-progressive-same-run-length-filter-batching.md).
+[inline Length where-clause runtime report](docs/reports/2026-08-20-inline-length-where-runtime.md).
 
 Applicable-domain ranking has one current recursive piecewise-affine
 algorithm: library callers use
@@ -225,6 +238,7 @@ See the
 | `:synth TYPE` | verified term synthesis (see below) |
 | `:synth --behavior-mode rank\|filter -- TYPE` | explicitly choose the operation; disabled `rank` is identity, while `filter` requires an activated startup Length policy |
 | `:synth [--behavior-mode rank\|filter] --length-contract ABSOLUTE-PATH -- TYPE` | use one passive scalar-or-pair Length contract for this command; omitted mode means `rank` |
+| `:synth --behavior-mode filter --length-model list-scalar-exact-cases\|list-binary-product-exact-cases --length-inputs arg0[,argN...] --where CLAUSE -- TYPE` | use one inline, unquoted, bounded Length postcondition with explicit list model and observed physical arguments; requires the activated startup policy |
 | `:prove [PROP]` | interactive prove mode; bare form resumes the last `sorry` |
 | `:set OPT VAL` | `set_option` persisting in the session |
 | `:undo` | revert the last state-changing command |
@@ -1246,6 +1260,17 @@ exact provider names are restored and binders named by role before every
 verification; only survivors are bound, while accumulated behavioral
 rejections remain separately visible.
 
+For startup and contract-file commands, Main opens the one rank-2 Length
+context before goal translation, preserving the established lifetime through
+universe retry and every synthesis lane. For the inline form, Main first owns
+the fixed-order command parse, goal selection, literal-filter authorization,
+bounded clause parse, the established inaccessible-hypothesis and premise-scope
+report, Lean translation/retry, and `SlotArrow`-only physical arity resolution.
+It opens exactly one scalar or product context only after resolution succeeds,
+then passes the same context through every ordinary, provider, excluded-middle,
+and double-negation lane. Quantifiers, instance binders, and contextual slots
+do not count as physical `argN` positions.
+
 The synthesis side environment tracks exactly which session history it
 has replayed. An unchanged history reuses it directly; an append replays
 only the new suffix; undo or another non-prefix change rebuilds from the
@@ -1296,7 +1321,7 @@ read production source text and assert on it — thirteen on
 `SpinePair` `Length/Ranking` and `Length/Selection` modules together with
 `Ranking/Generic.hs` and `Selection/Generic.hs`,
 `Length/CounterexampleBank/Internal.hs`, `Length/Integration.hs`,
-`Length/Handoff.hs`, and — for the passive inline `--where` frontier —
+`Length/Handoff.hs`, and — for the active inline `--where` runtime —
 `Length/Command.hs` and `Length/Where.hs` (all under `src/Leant/` unless
 shown otherwise).
 They pin the shape of decisions that must not move

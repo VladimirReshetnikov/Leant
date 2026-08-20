@@ -349,6 +349,11 @@ environment.
   mode selects \code{rank} or \code{filter}, omitted mode means \code{rank},
   and every contract form requires the startup policy opt-in
   (\S\ref{sec:engines})}
+\cmdrow{inline Length constraint}{\code{-{}-behavior-mode filter
+  -{}-length-model MODEL -{}-length-inputs arg0[,argN...]
+  -{}-where CLAUSE -{}- TYPE} selects one fixed exact-case list profile and
+  one unquoted bounded postcondition; it is exclusive with a contract file and
+  requires the startup policy (\S\ref{sec:engines})}
 \cmdrow{:set synth-engine E}{\code{djinn} (default) $\mid$
   \code{exference} $\mid$ \code{both}}
 \cmdrow{:set synth-steps N}{Exference's step budget (default 4096)}
@@ -387,6 +392,10 @@ environment.
 \begin{center}
 \small\code{:synth [-{}-behavior-mode rank|filter]
   [-{}-length-contract PATH] -{}- TYPE}
+
+\small\code{:synth -{}-behavior-mode filter -{}-length-model
+  list-scalar-exact-cases|list-binary-product-exact-cases
+  -{}-length-inputs arg0[,argN...] -{}-where CLAUSE -{}- TYPE}
 \end{center}
 
 \subsection{Persistence and utility}
@@ -1612,8 +1621,8 @@ candidates therefore spend none of that lane's 12- or 24-group fresh frontier.
 
 An entirely optional last stage can consult Z3.  Passing
 \code{-{}-length-ranking-config} at startup (\S\ref{sec:start}) activates
-finite-list-spine \emph{Length} behavioral assessment: a passive
-JSON contract states a law over the lengths of list-spine arguments and
+finite-list-spine \emph{Length} behavioral assessment: a passive JSON contract
+or the fixed inline \code{-{}-where} surface states a law over the lengths of list-spine arguments and
 results, eligible verified candidates are translated into canonical
 \code{QF\_LIA} queries, and at most one scoped Z3 worker is opened per
 batch when pure replay does not finish the assessment. Only a counterexample
@@ -1633,9 +1642,10 @@ request may verify and assess two 12-group standalone or two 24-group combined
 batches from one cursor. The second is admitted only after no verification or
 complete all-rejection. Excluded middle stays one six-group batch; double
 negation uses the ordinary at-most-two-batch policy and a filter-mode Djinn
-candidate cutoff of 60. Main introduces one rank-2 context before goal
-translation and carries it through both batches, universe retries, and every
-ordinary, provider, and classical route. Each verified frontier enters exactly
+candidate cutoff of 60. Established startup/file requests introduce one
+rank-2 context before goal translation. An inline request creates its context
+only after translation and physical-arrow resolution. Both carry that one
+context through every ordinary, provider, and classical route. Each verified frontier enters exactly
 one assessment, while the filter context's one nominal scalar or product bank
 can replay an earlier counterexample against a later occurrence, successor
 batch, or same-scope lane. Existing ranking and direct Selection
@@ -1644,7 +1654,7 @@ no bank. Only after a terminal selection does Leant take at most five survivor
 presentations for display and binding; every accumulated rejection is still
 printed.
 
-The exact option-bearing grammar is
+The established startup/file option-bearing grammar is
 \code{:synth [-{}-behavior-mode rank|filter]
 [-{}-length-contract PATH] -{}- TYPE}; mode must precede contract and the
 standalone delimiter is mandatory. Ordinary \code{:synth TYPE} remains
@@ -1657,8 +1667,32 @@ startup grammar is one current strict, versionless shape selected by
 \code{rankingDomain}; the separate contract-only grammar is likewise one
 current strict, versionless \code{\{format, rankingDomain, contract\}} shape.
 It is parsed once with no migration fallback and carries only the command-local
-passive scalar or binary-product contract, never startup execution policy. The
-startup policy fixes one guarded recursive piecewise-affine applicable-domain
+passive scalar or binary-product contract, never startup execution policy.
+
+The separate inline grammar is exactly
+\code{:synth -{}-behavior-mode filter -{}-length-model
+list-scalar-exact-cases|list-binary-product-exact-cases
+-{}-length-inputs arg0[,argN...] -{}-where CLAUSE -{}- TYPE}. The bar presents
+two alternative model tokens. The clause is unquoted; quotes are rejected
+clause characters, and the standalone delimiter ends it. Inputs are a nonempty
+strictly increasing subset of physical \code{arg0} through \code{arg7}; gaps
+and unused declarations are allowed. Only translated source-arrow slots count,
+not universal, instance, or contextual binders. Listed arrows become observed
+roles in source order and omitted arrows become unobserved. The fixed profile
+uses \code{List}/\code{List.nil}/\code{List.cons}, exact zero/step cases, true
+precondition, and no provider laws; neither clause nor target infers authority
+or semantic roles.
+
+Main validates inline structure, selects the explicit or current goal,
+authorizes literal filter mode, and enters Djex's bounded ASCII clause parser
+before emitting the established inaccessible-hypothesis and premise-scope
+report and starting Lean translation. Translation and its universe retry
+supply the physical arrow arity; resolution precedes exactly one nominal
+context shared by all lanes. A refusal before resolution creates no bank.
+Provider-dependent candidates unsupported by the empty provider-law set are
+retained as preparation refusals, never rejected merely for that dependency.
+
+The startup policy fixes one guarded recursive piecewise-affine applicable-domain
 algorithm. Programmatic callers have one short builder,
 \nolinkurl{enableLengthRankingApplicableDomainValidation}, and the current
 assessments are \code{ApplicableDomainEstablished} and
@@ -1706,9 +1740,10 @@ candidate-report fallback.
 
 Integration introduces one reusable rank-2
 \code{LengthAssessmentContext}; repeated context assessments reuse its filter
-bank, while rank contexts contain no bank. Main now opens one context inside
-\code{synthRun} before initial translation and supplies it to every cursor
-batch and later route. Its
+bank, while rank contexts contain no bank. Main opens an established request's
+context inside \code{synthRun} before initial translation; the inline entrance
+opens its one context only after successful translation and resolution. Each
+supplies its context to every cursor batch and later route. The
 fresh-per-call compatibility request assessor remains for other callers. The
 rank-2 owner dies when the command returns and cannot enter REPL state.
 

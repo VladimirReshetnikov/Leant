@@ -202,7 +202,7 @@ type signatures plus behavioral contracts\par}
 \chapter*{Abstract}
 \addcontentsline{toc}{chapter}{Abstract}
 
-\Leant and \Djex already solve the type-directed half of program synthesis unusually well: they combine terminating logical proof search, ranked heuristic search, exact source-to-engine provenance, typed candidate graphs, provider instantiation evidence, and mandatory re-elaboration by the Lean backend. They also already contain a serious first behavioral layer. The current finite-spine \emph{Length} domain can associate a verified candidate with an exact inventory and contract, symbolically interpret a checked candidate graph, lower the resulting counterexample problem to bounded canonical \QFLIA, run a capability-probed \Zthree worker, and accept model input only after independent replay. In \Leant today this layer is deliberately a post-verification ranking stage: it may reorder candidates but does not prune them, and raw solver status carries no authority.
+\Leant and \Djex already solve the type-directed half of program synthesis unusually well: they combine terminating logical proof search, ranked heuristic search, exact source-to-engine provenance, typed candidate graphs, provider instantiation evidence, and mandatory re-elaboration by the Lean backend. They also already contain a serious first behavioral layer. The finite-spine \emph{Length} domain can associate a verified candidate with an exact inventory and contract, symbolically interpret a checked candidate graph, lower the resulting counterexample problem to bounded canonical \QFLIA, run a capability-probed \Zthree worker, and accept model input only after independent replay. At the revisions inspected for this proposal the \Leant integration was deliberately a post-verification ranking stage: it could reorder candidates but not prune them, and raw solver status carried no authority. Since those snapshots, explicit replay-authorized filtering and a fixed-profile inline Length where-clause frontend have shipped; the snapshot-relative proposal below and the later status notes keep those milestones distinct.
 
 This proposal starts from that implemented state rather than from the older idea of merely ``adding Z3.'' It describes a next-generation synthesis architecture in which behavioral information participates progressively earlier in the search while preserving the present trust boundaries. The core recommendation is a three-way division of responsibility:
 
@@ -212,7 +212,7 @@ This proposal starts from that implemented state rather than from the older idea
 \item \Lean owns source elaboration, universe and type-class reconstruction, termination checking, and any final proof artifact that is advertised as established behavior.
 \end{itemize}
 
-The proposed system is staged. The first increment turns the existing Length machinery into an opt-in hard behavioral filter and a counterexample-guided inductive synthesis loop without changing the term grammar. The next increment lets \Zthree solve finite \emph{typed sketches}: Djex constructs a bounded, type-correct choice graph; Z3 selects productions that satisfy accumulated examples; Djex materializes a candidate; Lean re-elaborates it; and the behavioral domain searches for a fresh counterexample. Later increments add sound prefix pruning through over-approximate summaries, domain families for sequences, bags, constructor behavior, bit-precise arithmetic, state transitions and costs, and a constrained-Horn-clause path for recursive programs. Positive claims remain stratified: finite exhaustive replay can establish a bounded fact; a replayed model can refute a modeled contract; a Z3 \texttt{unsat} answer is a solver observation unless converted into a Lean-checkable obligation; and assumptions about provider behavior remain explicit hypotheses.
+The proposed system is staged. Its first shipped slice turns the existing Length machinery into an opt-in hard behavioral filter without changing the term grammar; the remaining part of that increment is a counterexample-guided inductive synthesis loop. The next increment lets \Zthree solve finite \emph{typed sketches}: Djex constructs a bounded, type-correct choice graph; Z3 selects productions that satisfy accumulated examples; Djex materializes a candidate; Lean re-elaborates it; and the behavioral domain searches for a fresh counterexample. Later increments add sound prefix pruning through over-approximate summaries, domain families for sequences, bags, constructor behavior, bit-precise arithmetic, state transitions and costs, and a constrained-Horn-clause path for recursive programs. Positive claims remain stratified: finite exhaustive replay can establish a bounded fact; a replayed model can refute a modeled contract; a Z3 \texttt{unsat} answer is a solver observation unless converted into a Lean-checkable obligation; and assumptions about provider behavior remain explicit hypotheses.
 
 The result is not a monolithic translation of Lean into SMT. It is an extensible family of narrow, versioned behavioral abstractions, each with a checked source language, an exactness statement, a symbolic evaluator, a Z3 lowering, a replay procedure, and a Lean proof-obligation generator. This permits useful precision without pretending to solve arbitrary higher-order dependent program synthesis in one encoding.
 
@@ -314,7 +314,7 @@ Callback (argument) & A function-typed input of the target, such as \code{f} in 
 \code{Verified} receipt & An opaque value proving that the verification callback accepted one specific candidate occurrence. It is the only admission ticket to post-verification stages and is never upgraded in place into behavioral evidence. \\
 Exact typed origin & The \code{ExactTypedVariantOrigin} sidecar tying an accepted spelling back to the typed candidate graph, the checked inventory, the source and search goals and the provider bindings that produced it. Behavioral domains consume this, not rendered text. \\
 Sealing, sealed & Constructing an opaque checked value through its single authorized constructor after every check has passed. Session, contract and candidate problem are sealed in that order; nothing downstream can forge or reassociate them. \\
-Handoff & \code{Leant.Synth.Length.Handoff}: the sole conversion of one \code{Verified} receipt plus one passive contract into a checked \Djex Length problem. It refuses mismatches instead of trusting caller-supplied graphs or names. \\
+Handoff & \code{Leant.Synth.Length.Handoff}: the sole conversion of one \code{Verified} receipt plus one passive contract selection (file-backed or resolved from the later inline frontend) into a checked \Djex Length problem. It refuses mismatches instead of trusting caller-supplied graphs or names. \\
 Fingerprint & The canonical, collision-resistant identity of a checked artifact (inventory, encoding, candidate, contract, problem, query). Evidence is bound to the tuple of fingerprints named in \cref{chap:goals}, never to a rendered term or a hash of one. \\
 Post-verification boundary & \code{Leant.Synth.PostVerification}: the stage after callback verification. Today it admits only a sealed \emph{permutation} of the verified receipts, which is why ranking can reorder but never remove candidates. \\
 Replay & Independent re-evaluation of a decoded solver model by the domain's own evaluator against the exact sealed problem. A model becomes a counterexample only after replay reproduces the contract violation; raw solver output never does. \\
@@ -352,6 +352,21 @@ The repositories are cited by immutable commit URLs in the bibliography. Stateme
 \paragraph{Changes since the pinned revisions.} Later on the same day \Leant replaced its numbered Length schemas with versionless ones: the startup configuration in commit \code{4fa5c0a1} and the command-local contract file in \code{d4104c91}, documented in \code{dd87538a} and \path{docs/reports/2026-08-15-versionless-length-contract.md}. The current root is one \code{format} literal, one \code{rankingDomain} discriminator (\code{scalar} or \code{binary-product}) and one \code{contract} object, with no \code{version} member, no migration decoder and an explicit statement that the experimental entrance carries no compatibility commitment. Neither change touches \Djex's checked semantics, the solver protocol, replay or evidence authority, so the architectural claims below stand unchanged. Where this proposal mentions ``existing file versions'' the phrase should be read as ``the current versionless schemas'', and its compatibility statements as ``the current schemas need not change'', not as a promise to freeze them; \cref{sec:contract-envelope} discusses how the versioned envelope proposed here relates to that policy. \Djex advanced from \code{0501e72e} to \code{43ec4f70} through refactoring and documentation moves only.
 
 \paragraph{Implemented since the pinned revisions (19 August 2026).} The first increment recommended in this proposal has since shipped: \code{:synth --behavior-mode filter} (\cref{sec:hard-filter}) performs command-authorized hard Length filtering over verified candidates, in which only an independently replayed counterexample rejects a candidate, every other assessment (including \texttt{unknown} and heuristic \texttt{sat}/\texttt{unsat}) conservatively retains it, and rejection rows are reported rather than silently dropped. Command-local counterexample banks retain replayed input vectors for reuse inside one command, and the filter lane refills progressively within a single run; the dated reports under \path{docs/reports/} in both repositories record the exact boundaries. The typed-sketch CEGIS lane, sound prefix pruning, the wider domain families, and proof-producing positive verification remain unimplemented.
+
+\paragraph{Implemented since the pinned revisions (20 August 2026).} The fixed
+inline Length frontend now reaches that filter runtime through the exact
+unquoted form
+\code{:synth -{}-behavior-mode filter -{}-length-model
+list-scalar-exact-cases|list-binary-product-exact-cases
+-{}-length-inputs arg0[,argN...] -{}-where CLAUSE -{}- TYPE}. It requires
+explicit filter authority, is exclusive with a contract file, parses one
+bounded ASCII relation, counts only translated physical source-arrow slots,
+and expands one fixed \code{List} exact-case profile with explicit roles and no
+provider laws. Main authorizes and parses, emits the established premise-scope
+report, then translates; it resolves the profile after translation/retry and
+only then opens one nominal context for all lanes. This remains a passive
+contract frontend over the existing checked handoff, not a general Lean
+semantics or execution-authority inference.
 
 \paragraph{What was executed.} The Lean listings in \cref{chap:examples,chap:proofs} whose definitions appear in the text (the reverse, one-layer case, state-bind, \code{Option.bind} and provider-hypothesis theorems, and the accumulator-invariant proof shape) were type-checked with Lean 4.33.0. The six SMT-LIB scripts of \cref{app:smt} were executed with Z3 5.0.0 and the observed answers are quoted after each listing. The Haskell interfaces are conceptual and were not compiled.
 
@@ -408,11 +423,18 @@ where $\dot{-}$ is natural monus. Both branches are interpreted, and provider-la
 
 A checked problem is lowered to a bounded canonical \QFLIA counterexample query. The live stack owns executable admission, process identity, capability probing, reset/check/value transactions, causal framing, bounded parsing, cancellation, deadlines, and a shared query lease. A raw \texttt{sat}, \texttt{unsat}, or \texttt{unknown} reply is associated with exact problem fingerprints but remains heuristic. Model values are accepted only after the exact sealed problem independently evaluates them and reproduces a contract violation.
 
-\subsection{Ranking, not pruning}
+\subsection{Ranking, not pruning, at the inspected snapshot}
 
 In \Leant the current integration occurs after Lean callback verification. \code{Leant.Synth.PostVerification} permits only a sealed permutation of the exact verified receipts. Length assessment may replay a small MRU bank of counterexamples, perform bounded solver-independent domain validation, or run Z3, and then stably reorder candidates. It never omits a candidate. If assessment fails, callback order is preserved.
 
 This conservative behavior is appropriate for a first semantic layer, but it also identifies the next architectural step: introduce a separately authorized \emph{selection} boundary for opt-in hard constraints, rather than overloading the permutation-only ranking boundary.
+
+That architectural step has since shipped exactly as a separate selection
+boundary. The historical permutation path remains the ranking mode; explicit
+filter mode alone may omit an occurrence, and then only with an independently
+replayed counterexample. The later inline where-clause frontend constructs one
+fixed passive contract source for that selection path and does not weaken the
+handoff or partition seals.
 
 \section{The actual gap}
 
@@ -2590,13 +2612,22 @@ The mode must be specified explicitly for any behavior that can remove candidate
 File contracts are appropriate for rich specifications, but common cases deserve compact syntax:
 
 \begin{lstlisting}[language={}]
-:synth --where "len(result) = len(xs)" -- List a -> List a
+:synth --behavior-mode filter --length-model list-scalar-exact-cases --length-inputs arg0 --where len(result)=len(arg0) -- List a -> List a
 :synth --law state-bind -- TYPE
 :synth --law option-bind -- TYPE
 :synth --example "[1,2] => [2,1]" -- List Nat -> List Nat
 \end{lstlisting}
 
-These are frontends that construct the same passive source AST as a file. They must not implement independent semantics. Names such as \code{state-bind} resolve to versioned built-in contract templates, and the expanded contract fingerprint is shown in diagnostics.
+The first line is now implemented: the Length clause is unquoted and ends at
+the standalone delimiter, and quote characters are rejected rather than
+interpreted as a string. The displayed scalar profile has the explicit
+\code{list-binary-product-exact-cases} sibling for product results. Both
+construct the same passive contract vocabulary used by files and receive
+execution authority only from the activated startup policy. The \code{--law}
+and \code{--example} forms remain proposed frontends. They must not implement
+independent semantics. Names such as \code{state-bind} would resolve to
+versioned built-in contract templates, and the expanded contract fingerprint
+would be shown in diagnostics.
 
 \section{Contract inspection}
 
@@ -4042,6 +4073,17 @@ Path & Relevance \\
 \path{src/Leant/Synth/Length/PostVerification*.hs} & Binding of ranking to exact verified batches and preservation on failures. \\
 \path{src/Leant/Synth/Length/Configuration*.hs} & Startup execution, replay, applicable-domain and launcher policies (schema-versioned at this commit; one versionless schema since \code{4fa5c0a1}). \\
 \end{longtable}
+
+The table deliberately remains a map of commit \code{b701ee5}. After that
+snapshot, \path{src/Leant/Synth/Length/Command.hs} gained the separate
+fixed-order inline parser,
+\path{src/Leant/Synth/Length/Where.hs} gained the two fixed list profiles and
+physical-role resolver over Djex's bounded where parser, and
+\path{src/Main.hs} activated them with structure--goal--authorization--bounded
+parse--scope-report--translation/retry--physical-arrow
+resolution--one-context ordering.
+Those additions still feed the same Handoff and nominal ranking/selection
+adapters listed above.
 
 \section{Djex}
 

@@ -16,9 +16,9 @@ through the source, module by module.*
 After `:synth` has produced candidates and Lean has verified each one, Leant
 can additionally ask whether a candidate *behaves* the way you meant. The
 first — and so far only — behavioral dialect is **finite list-spine
-lengths**: a passive JSON contract states a law over the lengths of a
-candidate's list-spine inputs and result (for example, "the result has the
-same length as the input"). Each eligible candidate is translated into a
+lengths**: a passive JSON contract or the fixed inline `--where` surface states
+a law over the lengths of a candidate's list-spine inputs and result (for
+example, "the result has the same length as the input"). Each eligible candidate is translated into a
 canonical `QF_LIA` query, a scoped Z3 worker is consulted, and any
 counterexample Z3 reports is independently re-executed by Leant's vendored
 Djex engine against the exact checked problem before it is believed.
@@ -32,7 +32,9 @@ Five rules define the current authority boundary:
 - **Filtering requires explicit command authority.** Only
   `--behavior-mode filter` selects hard filtering, and only an independently
   replayed counterexample may enter its rejected partition. Rejections remain
-  separately visible but are not bound as `itN`.
+  separately visible but are not bound as `itN`. Inline constraints require
+  that literal mode and the already activated startup policy; they cannot be
+  combined with `--length-contract` or grant execution authority.
 - **Filtering reuses one bank across progressive bounded batches.** Ranking
   keeps its historical five-success verifier frontier and one engine batch.
   Filtering consumes an ordinary engine outcome as one *F*-group batch —
@@ -40,9 +42,10 @@ Five rules define the current authority boundary:
   run — and may request exactly one same-width successor after no
   verification or complete all-rejection. Excluded middle remains one
   *F*/2-group batch (six by default); double negation uses the ordinary
-  policy. Main introduces one nominal scalar or product
-  filter context before translation and carries it through retries, both
-  same-run batches, and all synthesis routes. A continuing batch or completed
+  policy. Established startup/file commands introduce one nominal scalar or
+  product filter context before translation. Inline commands introduce it
+  only after translation and physical-arrow resolution. Both carry that one
+  context through both same-run batches and all synthesis routes. A continuing batch or completed
   run may therefore reach the next bounded batch or existing lane with the same
   nominal owner (subject to exact scope reset); a survivor or preserve-all
   batch remains terminal. This is not quota
@@ -55,8 +58,8 @@ Five rules define the current authority boundary:
   domain evidence all retain a candidate in filter mode.
 - **It is off unless you activate a policy.** Without
   `--length-ranking-config`, ordinary ranking is the lazy identity. A filter
-  request is rejected before contract-path admission or file IO, and no worker
-  is launched.
+  request is rejected before contract-path admission, inline clause parsing,
+  or file IO, and no worker is launched.
 
 The ranking stage was the first behavioral increment. The current tree also
 implements the command-authorized Level-1 hard-filter slice described by the
@@ -98,11 +101,13 @@ each filter call, but Main no longer uses that one-batch wrapper.
 
 Integration introduces a nominal rank-2 `LengthAssessmentContext` and may
 assess more than one batch through it. Reuse of a filter context reuses its one
-bank; rank contexts intentionally contain no bank. Main now opens exactly one
-such context inside `synthRun`, before initial goal translation, and passes it
-through universe narrowing and every ordinary, provider, excluded-middle, and
-double-negation lane. The owner is lexical to that command: `ReplState`,
-history, snapshots, later commands, and persistence remain unchanged.
+bank; rank contexts intentionally contain no bank. Established startup and
+contract-file requests open exactly one such context inside `synthRun`, before
+initial goal translation. The inline entrance translates and resolves its
+passive source first, then opens exactly one context. In both cases Main passes
+the context through every ordinary, provider, excluded-middle, and double-
+negation lane. The owner is lexical to that command: `ReplState`, history,
+snapshots, later commands, and persistence remain unchanged.
 
 Everything below this line describes the exact behavior of the current tree:
 the startup-configuration schema, the current contract-file schema, the
@@ -125,6 +130,7 @@ first.
   - [Candidate eligibility](#candidate-eligibility)
 - [Command-level ranking and hard filtering](#command-level-ranking-and-hard-filtering)
   - [Exact grammar, defaults, and authority](#exact-grammar-defaults-and-authority)
+  - [Inline where-clause syntax, profiles, and lifetime](#inline-where-clause-syntax-profiles-and-lifetime)
   - [Retention and rejection taxonomy](#retention-and-rejection-taxonomy)
   - [Progressive same-run assessment and command-local continuation](#progressive-same-run-assessment-and-command-local-continuation)
   - [Stable partition, failure, and Main behavior](#stable-partition-failure-and-main-behavior)
@@ -257,14 +263,14 @@ which may reach this ranking path.
 
 ### Exact grammar, defaults, and authority
 
-The option-bearing command grammar is exactly:
+The established startup/contract-file option-bearing grammar is exactly:
 
 ```text
 :synth [--behavior-mode rank|filter] [--length-contract ABSOLUTE-PATH] -- TYPE
 ```
 
 The behavior mode, when present, must precede the contract option. The
-standalone `--` is mandatory for every option-bearing form and leaves the
+standalone `--` is mandatory for every established option-bearing form and leaves the
 remaining text as opaque Lean goal syntax. The ordinary no-option form stays
 delimiter-free:
 
@@ -282,6 +288,7 @@ The current choices have these meanings:
 | `:synth --length-contract PATH -- TYPE` | rank | command-local contract; requires an activated startup policy |
 | `:synth --behavior-mode rank --length-contract PATH -- TYPE` | rank | command-local contract; requires an activated startup policy |
 | `:synth --behavior-mode filter --length-contract PATH -- TYPE` | filter | command-local contract; requires an activated startup policy |
+| `:synth --behavior-mode filter --length-model MODEL --length-inputs INPUTS --where CLAUSE -- TYPE` | filter | inline fixed list profile; requires an activated startup policy |
 
 Only the exact option tokens are special. Longer lookalikes such as
 `--behavior-model` and `--length-contractual` remain ordinary goal text.
@@ -296,11 +303,70 @@ The command selects behavior, not execution policy. `filter` does not activate
 Z3 and a contract-only file cannot supply execution authority. Main first asks
 the already activated startup mode for permission. A disabled filter request,
 and any disabled request with a contract path, fails before path admission or
-file IO. With permission, the selected startup or command-local contract and
+file IO. With permission, a selected startup or command-local file contract and
 the one activated policy enter one rank-2 context before goal translation.
 That context travels only on the command's stack through initial translation,
 universe narrowing and retranslation, and ordinary, provider, and classical
-synthesis lanes.
+synthesis lanes. The inline form has a deliberately later context boundary,
+described next.
+
+### Inline where-clause syntax, profiles, and lifetime
+
+The inline grammar is exactly this fixed-order, unquoted form:
+
+```text
+:synth --behavior-mode filter --length-model list-scalar-exact-cases|list-binary-product-exact-cases --length-inputs arg0[,argN...] --where CLAUSE -- TYPE
+```
+
+The vertical bar above presents the two literal model choices; one command
+contains exactly one. `--behavior-mode filter` is mandatory, and
+`--length-contract` is mutually exclusive with all three inline options. The
+model, inputs, and where options must each appear exactly once in that order.
+The first standalone `--` ends `CLAUSE` and leaves `TYPE` as opaque Lean goal
+text. Quotes are not delimiters or string syntax: quote characters become
+clause bytes and are rejected by the bounded grammar.
+
+`--length-inputs` is one nonempty comma-separated token. Its entries are
+physical source-arrow positions `arg0` through `arg7`, in strictly increasing
+numeric order. Leading zeroes are accepted as numeric aliases, so alias
+duplicates and descending aliases are rejected after decoding. Gaps and listed
+inputs unused by the clause are permitted. Every listed arrow becomes an
+observed list spine; every omitted arrow becomes an unobserved target argument.
+Every `len(argN)` clause reference must name a listed input and fall within the
+translated physical arity. The observed inputs are compacted in the same source
+order for the checked Length vocabulary. Lean translation supplies the
+authoritative physical arity: only `SlotArrow` entries count, while `forall`
+slots, instance binders, and contextual slots do not.
+
+The clause is one ASCII relation between arithmetic expressions. It admits
+natural literals; `len(argN)`; scalar `len(result)` or product
+`len(result.first)` and `len(result.second)`; `+`, truncated `-`, `*`, `/`,
+`%`, `min`, `max`, and parentheses; and `=`, `!=`, `<=`, `>=`, `<`, or `>`.
+Division and remainder require a direct positive literal divisor, products
+must remain linear, and chained comparisons are rejected. Admission is capped
+at 16,384 UTF-8 bytes and 64 parser-nesting levels across parentheses,
+`len`, `min`, and `max`, with the ordinary syntax, formula, collection,
+literal, and input limits underneath. Errors are closed, sanitized, and never
+echo clause text.
+
+The two models expand to fixed profiles only: `List`, `List.nil`, `List.cons`,
+the exact zero/step candidate-case policy, a true precondition, the chosen
+scalar or canonical-`Prod` result domain, the explicit role vector, and an
+empty provider-law set. The clause and translated target infer none of these
+choices. In particular, a provider-dependent candidate that cannot be prepared
+without a provider law is retained with its preparation refusal; it is not
+rejected.
+
+Main owns the complete activation order: recognize and structurally validate
+the inline form; resolve the explicit or current prove/`sorry` goal; authorize
+literal filter mode against the activated startup policy; parse the bounded
+clause; emit the established inaccessible-hypothesis and premise-scope report;
+translate the Lean target, including the established universe retry; count
+physical `SlotArrow` entries and resolve roles/result references; then open
+exactly one nominal scalar or product context and run every ordinary, provider,
+excluded-middle, and double-negation lane through it. A refusal before that
+last step creates no counterexample bank. No part of the request, source, role
+vector, or context enters interactive state or persistence.
 
 ### Retention and rejection taxonomy
 
@@ -521,6 +587,8 @@ The later Engine-only observation foundation is recorded in the
 [opaque detailed synthesis cursor report](reports/2026-08-16-opaque-detailed-synthesis-cursor-foundation.md).
 Its Main runtime successor is recorded in the
 [progressive same-run Length filter batching report](reports/2026-08-16-progressive-same-run-length-filter-batching.md).
+The fixed inline profile foundation and its active Main runtime are recorded in
+the [inline Length where-clause runtime report](reports/2026-08-20-inline-length-where-runtime.md).
 
 ## One-shot contract-only files
 

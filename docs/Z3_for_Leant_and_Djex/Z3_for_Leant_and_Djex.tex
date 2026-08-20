@@ -306,6 +306,11 @@ Each \emph{Mental model} box compresses a concept to one sentence. Each \emph{In
 
 \begin{currentstate}
 The older Z3 behavioral-synthesis proposal described Length as ranking-only at its August 15 snapshot. The Leant tree inspected here has already added an explicit \code{--behavior-mode filter} path, occurrence-sealed hard selection, command-local counterexample banks, and progressive same-run filtering. This document therefore treats hard filtering as \emph{implemented but narrow}, while full CEGIS, solver-selected typed sketches, sound prefix pruning, richer domains, and proof-producing positive verification remain future work.
+
+Since this document's pinned August 16 snapshots, Leant has also activated the
+fixed-profile inline Length where-clause frontend. Current-tree additions are
+identified explicitly below; the immutable source links and their
+point-in-time claims remain pinned.
 \end{currentstate}
 
 \tableofcontents
@@ -3300,7 +3305,8 @@ There are three distinct moments: \emph{decode the file}, \emph{authorize its ex
 
 \section{Request syntax}
 
-The current command parser recognizes two request-scoped options in a fixed order:
+At the inspected snapshot, the command parser recognized two request-scoped
+options in a fixed order:
 
 \begin{lstlisting}[language={},caption={Current Length-aware \code{:synth} forms.}]
 :synth --length-contract /absolute/path/contract.json -- TYPE
@@ -3319,6 +3325,31 @@ The \code{--behavior-mode} option, when present, must precede \code{--length-con
 \end{lstlisting}
 
 A request-scoped contract is passive. It reuses the already activated startup execution/replay policy. It cannot introduce a second executable policy or activate a disabled process.
+
+The post-snapshot current tree adds this exact fixed-order form:
+
+\begin{lstlisting}[language={},caption={Current inline Length constraint form.}]
+:synth --behavior-mode filter --length-model list-scalar-exact-cases|list-binary-product-exact-cases --length-inputs arg0[,argN...] --where CLAUSE -- TYPE
+\end{lstlisting}
+
+The bar presents two alternative literal model tokens. The clause is unquoted
+and ends at the standalone delimiter; quotes are rejected clause characters.
+The input token is a nonempty strictly increasing subset of physical
+\code{arg0} through \code{arg7}. Gaps and unused declarations are valid.
+Only translated source-arrow slots count, not universal, instance, or
+contextual binders. Listed arrows become compact observed inputs in source
+order; omitted arrows are unobserved.
+
+The two fixed profiles supply \code{List}/\code{List.nil}/\code{List.cons},
+exact zero/step cases, true precondition, scalar or canonical-product result,
+and no provider laws. Neither clause nor target infers those choices. The
+inline form requires the activated startup policy and literal filter mode and
+is mutually exclusive with \code{--length-contract}. Main validates structure,
+selects the goal, authorizes filter mode, parses the bounded ASCII clause,
+reports inaccessible hypotheses and premise scope, translates/retries, counts
+physical arrow slots, resolves the profile, and only then introduces exactly
+one nominal assessment context for every lane. A provider preparation refusal
+under the empty law set remains retained.
 
 \section{Ranking mode}
 
@@ -3452,6 +3483,7 @@ Independent model replay & Implemented & Required before a satisfying assignment
 Post-verification ranking & Implemented & Stable permutation; no pruning. \\
 Opt-in hard filtering & Implemented, narrow & Rejects only exact replayed Length counterexamples. \\
 Same-request counterexample bank & Implemented & Progressive batches can reuse validated input vectors. \\
+Fixed inline Length constraint & Implemented since the pinned snapshot & Unquoted bounded ASCII clause, explicit list model and physical inputs, literal filter authority, no provider-law inference. \\
 Solver-guided candidate generation & Not yet & Z3 does not currently choose Djex productions. \\
 General CEGIS loop & Not yet & Enumeration is not yet driven by accumulated behavioral samples. \\
 Richer semantic domains & Proposed & Sequence, bag, scalar, bit-vector, state, cost, and others. \\
@@ -3460,7 +3492,18 @@ CHC/Spacer recursion path & Proposed & Intended for recursive relational semanti
 \end{longtable}
 
 \begin{sourcebox}
-Request parser: \lpath{src/Leant/Synth/Length/Command.hs}. Startup options: \lpath{src/Leant/Options.hs}. Configuration decoding and activation: \lpath{src/Leant/Synth/Length/Configuration/File.hs} and \lpath{src/Leant/Synth/Length/Integration.hs}. Ranking: \lpath{src/Leant/Synth/Length/Ranking.hs}. Generic occurrence-sealed selection: \lpath{src/Leant/Synth/BehavioralSelection.hs}. Scalar filter policy: \lpath{src/Leant/Synth/Length/Selection.hs}; the binary-product sibling is under \filepath{SpinePair/Selection.hs}. Main's progressive scheduler and presentation are in \lpath{src/Main.hs}.
+Request parser at the pin: \lpath{src/Leant/Synth/Length/Command.hs}. The
+post-snapshot current-tree profile resolver is
+\filepath{src/Leant/Synth/Length/Where.hs}. Startup options:
+\lpath{src/Leant/Options.hs}. Configuration decoding and activation:
+\lpath{src/Leant/Synth/Length/Configuration/File.hs} and
+\lpath{src/Leant/Synth/Length/Integration.hs}. Ranking:
+\lpath{src/Leant/Synth/Length/Ranking.hs}. Generic occurrence-sealed selection:
+\lpath{src/Leant/Synth/BehavioralSelection.hs}. Scalar filter policy:
+\lpath{src/Leant/Synth/Length/Selection.hs}; the binary-product sibling is
+under \filepath{SpinePair/Selection.hs}. Main's progressive scheduler is in
+\lpath{src/Main.hs}; its later inline activation is a current-tree addition to
+that same path.
 \end{sourcebox}
 
 \chapter{A maintainer's source map for one assessment}
@@ -3479,6 +3522,16 @@ When debugging a Length-aware synthesis command, follow this order:
 \item \lpath{src/Main.hs}: which synthesis lane and batches were generated, verified, assessed, and displayed?
 \item \lpath{src/Leant/Synth/Verification.hs}: which candidate variants did the callback actually attempt, and which occurrence received a \code{Verified} receipt?
 \end{enumerate}
+
+For a post-snapshot inline request, refine steps 4--6: current-tree
+\filepath{src/Leant/Synth/Length/Command.hs} validates the fixed inline
+structure; Main resolves the goal and asks Integration for literal filter
+permission; current-tree \filepath{src/Leant/Synth/Length/Where.hs} enters the
+bounded parser; Main reports inaccessible hypotheses and premise scope,
+translates/retries, and counts only \code{SlotArrow} entries; Where resolves
+the explicit role vector and fixed profile; only then does Main introduce one
+context and enter the common scheduler. Established startup/file requests keep
+their context-before-translation lifetime.
 
 Do not begin by inspecting Z3 output. Many candidates never become eligible for a Length query, and many eligible candidates can be classified from pure replay.
 
@@ -3532,7 +3585,9 @@ File acquisition & \lpath{src/Leant/Synth/Length/Configuration/File/Acquire.hs} 
 Decoding & \lpath{src/Leant/Synth/Length/Configuration/File.hs} & \code{LengthRankingConfigurationFileError}: bounded-JSON, format, \code{rankingDomain}, exact ten-member root, then per-section field errors & startup refused \\
 Activation & \lpath{src/Leant/Synth/Length/Integration.hs} & \code{LengthAssessmentActivationRejected} (no digest pin without \code{--length-ranking-allow-unpinned}) & startup refused \\
 Command syntax & \lpath{src/Leant/Synth/Length/Command.hs} & \code{LengthSynthCommandError}: mode missing/invalid, delimiter missing, contract path missing, mode after contract & command refused \\
+Inline syntax (post-snapshot) & current-tree \filepath{src/Leant/Synth/Length/Command.hs} and \filepath{src/Main.hs} & \code{inline finite-spine Length command rejected:} plus closed \code{LengthSynthInlineCommandError}: literal filter/model/inputs/where/order/delimiter/file-exclusion refusal & command refused \\
 Request admission & \lpath{src/Leant/Synth/Length/Integration.hs} & \code{LengthAssessmentRequestError}: an explicit contract path or a filter request without an activated startup policy & command refused before file IO \\
+Inline clause/target (post-snapshot) & current-tree \filepath{src/Leant/Synth/Length/Where.hs} and \filepath{src/Main.hs} & sanitized \code{inline finite-spine Length where clause rejected:} or \code{... where target rejected:}; byte/ASCII/syntax/limit, physical-arity/role, or result-domain refusal, with no clause echo & command refused before context creation \\
 Batch admission & \lpath{src/Leant/Synth/Length/Ranking/Internal.hs} & \code{LengthRankingInputLimitExceeded} (more than 64 candidates) & batch \\
 Handoff & \lpath{src/Leant/Synth/Length/Handoff.hs} & \code{LengthHandoffRefusal}, surfaced as the codes \code{unsupported-route}, \code{typed-authority-unavailable}, \code{candidate-association-rejected}, \code{rendering-association-rejected}, \code{spine-binding-unavailable}, \code{provider-binding-unavailable}, \code{session-rejected}, \code{contract-rejected}, \code{candidate-semantics-rejected} & candidate-local \\
 Query sealing & \lpath{src/Leant/Synth/Length/Adapter.hs} calling Djex \code{sealLengthSMTLibQuery} & \code{LengthSMTLibQueryError} (result variable leaked, input out of range, zero divisor, numeral-bit, command-byte, or fingerprint-byte limit), surfaced as \code{query-construction-rejected} & candidate-local \\
@@ -5496,7 +5551,9 @@ Leant exits before the prompt with \code{error: finite-spine Length counterexamp
 \ldots{} \bcode{LengthRankingConfigurationFieldValueRejected} \bcode{LengthRankingConfigurationExpectedExecutableSha256Field} & Digest is not 64 lowercase hex characters (uppercase hex is rejected) & same file, \bcode{decodeExpectedDigest} & Use \code{sha256sum} output verbatim, or \code{null} plus \bcode{--length-ranking-allow-unpinned}. \\
 \ldots{} \bcode{LengthAssessmentActivationRejected} \bcode{LengthRankingConfigurationExecutablePinRequired} & \bcode{expectedExecutableSha256} is \code{null} without the allow-unpinned flag & \lpath{src/Leant/Synth/Length/Integration.hs} & Supply the digest or add the flag deliberately. \\
 \code{:synth} answers \code{usage: :synth TYPE | :synth [--behavior-mode rank|filter] [--length-contract ABSOLUTE-PATH] -- TYPE} & Mode word missing or not \code{rank}/\code{filter}; \bcode{--} delimiter missing; empty path; mode after contract & \lpath{src/Leant/Synth/Length/Command.hs} & Order is mode, then contract, then a standalone \bcode{--}. \\
-\code{finite-spine Length request rejected before IO:} \bcode{LengthAssessmentFilteringRequiresActivatedPolicy} or \bcode{LengthAssessmentExplicitContractRequiresActivatedPolicy} & Filter mode or a contract file requested while assessment is disabled & \lpath{src/Leant/Synth/Length/Integration.hs}, \bcode{startupLengthAssessmentRequest} & Start Leant with \bcode{--length-ranking-config}; a contract file cannot activate Z3. \\
+\code{inline finite-spine Length command rejected:} \ldots{} & Inline option absent, repeated, out of order, combined with \bcode{--length-contract}, not preceded by literal filter, or missing its standalone delimiter & current-tree \filepath{src/Leant/Synth/Length/Command.hs} & Use exactly \bcode{--behavior-mode filter --length-model MODEL --length-inputs arg0[,argN...] --where CLAUSE -- TYPE}; do not quote the clause. \\
+\code{finite-spine Length request rejected before IO:} \bcode{LengthAssessmentFilteringRequiresActivatedPolicy} or \bcode{LengthAssessmentExplicitContractRequiresActivatedPolicy} & Filter mode, an inline clause, or a contract file requested while assessment is disabled & \lpath{src/Leant/Synth/Length/Integration.hs}, \bcode{startupLengthAssessmentRequest} & Start Leant with \bcode{--length-ranking-config}; neither a contract file nor inline clause can activate Z3. \\
+\code{inline finite-spine Length where clause rejected:} or \code{... where target rejected:} & Non-ASCII/quoted/malformed or over-limit relation; undeclared/out-of-range \bcode{argN}; wrong scalar/product result reference; or more than eight physical arrows & current-tree \filepath{src/Leant/Synth/Length/Where.hs}, \filepath{src/Main.hs} & Use an unquoted bounded relation, declare a strictly increasing subset of \bcode{arg0} through \bcode{arg7}, and match result references to the explicit model. \\
 \code{one-shot finite-spine Length contract admission failed:} or \code{... load failed:} & Contract path not absolute, or the document is not the exact three-member \bcode{leant-finite-list-spine-length-contract} root with a six-member \code{contract} & \lpath{src/Leant/Synth/Length/Contract/File.hs} & Follow the schema in \filepath{docs/length-ranking.md}; \code{rankingDomain} must match the result references the expressions use. \\
 Every candidate is shown, no notes, no warning & Default \code{djinn} engine (no typed origin), or every candidate refused preparation & \lpath{src/Main.hs} (\code{rsSynthEngine}), \lpath{src/Leant/Synth/Length/Handoff.hs} & \code{:set synth-engine exference} (or \code{both}); confirm with \bcode{LEANT_SYNTH_DEBUG=1}. \\
 \code{warning: finite-spine Length behavioral assessment preserved all verified candidates:} \ldots{} \bcode{LengthRankingLiveSessionFailed} \bcode{LengthSMTLibLiveSessionLaunchFailed} \ldots{} & Non-Linux build, or a Linux kernel without \bcode{AT_EXECVE_CHECK}; the fixed launcher has no fallback & \dpath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib/Live.hs}, \bcode{sessionProcessFailure} & Use Linux with a kernel providing \bcode{AT_EXECVE_CHECK} (upstream 6.14 or later). \\
@@ -5707,14 +5764,16 @@ A survivor means ``not rejected under this exact configured evidence policy,'' n
 \section{Leant refuses at startup or at the prompt}
 \label{sec:ts-startup}
 
-Every refusal before a worker exists is a pure decision printed with its constructor name; there is no hidden state to inspect. Three places can refuse.
+Every refusal before a worker exists is a pure decision printed with its constructor name; there is no hidden state to inspect. Several ordered places can refuse.
 
 \begin{description}
 \item[Startup.] \lpath{src/Leant/Options.hs} accepts \bcode{--length-ranking-config PATH}, \bcode{--length-ranking-config-timeout MS} (1\ldots60\,000, default 5\,000; refused without the config option), and \bcode{--length-ranking-allow-unpinned} (likewise). \lpath{src/Main.hs} then calls \code{loadLengthAssessmentMode}; any \code{Left} prints \code{error: finite-spine Length counterexample ranking setup failed:} followed by one of \code{LengthAssessmentFileAdmissionRejected} (path length, empty path, embedded NUL, relative path, timeout out of range: no IO has happened), \code{LengthAssessmentFileLoadRejected} (platform unsupported, open/inspect/read failure, not a regular file, more than 256\,KiB, deadline, cleanup, or the decoder's \code{LengthRankingConfigurationFileError}), or \code{LengthAssessmentActivationRejected LengthRankingConfigurationExecutablePinRequired}, and exits with status~1. The decoder validates in a fixed order: bounded JSON, \code{format} (\code{leant-live-length-ranking-configuration}), \code{rankingDomain} (\code{scalar} or \code{binary-product}), the exact ten-member root, then \code{executionAdmission}, \code{execution}, \code{evaluation}, \code{inputBoxValidation}, \code{applicableDomainValidation}, \code{counterexampleSimplification}, \code{usableWorkBudget}, and finally the domain-selected \code{contract}. An unexpected member is reported before a missing one, so a leftover historical \code{version} key surfaces as \code{LengthRankingConfigurationUnexpectedField LengthRankingConfigurationRootObject}. Success prints the enabled-mode banner, the launch-strategy line, and the engine hint, and nothing else; no process has been started.
 
-\item[The \code{:synth} line.] \lpath{src/Leant/Synth/Length/Command.hs} parses only two exact tokens. \bcode{--behavior-mode} without a following word is \code{LengthSynthCommandBehaviorModeMissing}; a word other than \code{rank}/\code{filter} is \code{...BehaviorModeInvalid}; either option without a later standalone \bcode{--} is \code{...DelimiterMissing}; \bcode{--length-contract} directly followed by \bcode{--} is \code{...ContractPathMissing}; and a mode token after the contract option is \code{...BehaviorModeMustPrecedeContract}. Main prints the single \code{usage:} line for all five. Longer look-alikes such as \bcode{--behavior-model} are ordinary goal text and are handed to Lean.
+\item[The \code{:synth} line.] At the pin, \lpath{src/Leant/Synth/Length/Command.hs} parses only two exact tokens. \bcode{--behavior-mode} without a following word is \code{LengthSynthCommandBehaviorModeMissing}; a word other than \code{rank}/\code{filter} is \code{...BehaviorModeInvalid}; either option without a later standalone \bcode{--} is \code{...DelimiterMissing}; \bcode{--length-contract} directly followed by \bcode{--} is \code{...ContractPathMissing}; and a mode token after the contract option is \code{...BehaviorModeMustPrecedeContract}. Main prints the single established \code{usage:} line for all five. Longer look-alikes such as \bcode{--behavior-model} are ordinary goal text and are handed to Lean. The post-snapshot current tree first recognizes the separate fixed-order inline form. Missing, repeated, reordered, non-filter, or file-mixed inline options produce \code{inline finite-spine Length command rejected:} plus one closed \code{LengthSynthInlineCommandError} and the exact inline usage line; no retained clause is shown.
 
-\item[Request authorization.] Before any contract path is admitted, \lpath{src/Leant/Synth/Length/Integration.hs} asks the activated mode for permission. With assessment disabled, \bcode{--behavior-mode filter} yields \code{LengthAssessmentFilteringRequiresActivatedPolicy} and \bcode{--length-contract} yields \code{LengthAssessmentExplicitContractRequiresActivatedPolicy}; both are printed after \code{finite-spine Length request rejected before IO:}. Only then is a named contract file admitted (\code{one-shot finite-spine Length contract admission failed:}) and read (\code{... load failed:}); its decoder mirrors the startup one but expects the three-member \code{leant-finite-list-spine-length-contract} root and can never supply execution authority.
+\item[Request authorization.] Before any contract path is admitted, \lpath{src/Leant/Synth/Length/Integration.hs} asks the activated mode for permission. With assessment disabled, \bcode{--behavior-mode filter} yields \code{LengthAssessmentFilteringRequiresActivatedPolicy} and \bcode{--length-contract} yields \code{LengthAssessmentExplicitContractRequiresActivatedPolicy}; both are printed after \code{finite-spine Length request rejected before IO:}. The post-snapshot inline path resolves its goal source, then asks for the same literal-filter permission before parsing the clause. Only after permission is a named contract file admitted (\code{one-shot finite-spine Length contract admission failed:}) and read (\code{... load failed:}), or an inline clause entered through the bounded parser. A file decoder can never supply execution authority.
+
+\item[Inline clause and target.] Current-tree \filepath{src/Leant/Synth/Length/Where.hs} parses the authorized clause into source-free bounded data. Main then emits the established inaccessible-hypothesis and premise-scope report and translates/retries before the resolver receives the \code{SlotArrow}-only arity. Clause failures use \code{inline finite-spine Length where clause rejected:}; physical-input, role, or scalar/product result-association failures use \code{... where target rejected:}. Both are sanitized and occur before the one nominal context exists.
 \end{description}
 
 \section{A batch-wide warning says assessment preserved all verified candidates}
@@ -6535,7 +6594,7 @@ Document & Best use & Relationship to this introduction \\
 \lpath{docs/Z3_Behavioral_Synthesis_Proposal/Z3_Behavioral_Synthesis_Proposal.tex} & Detailed proposal for precise behavioral synthesis & The closest companion. It develops architecture and domains at expert level; this introduction teaches Z3 first, updates the current hard-filter status, and explains every proposal mechanism from beginner principles. \\
 \end{longtable}
 
-The proposal was tied to an August 15 snapshot at which Length was described as ranking-only. The Leant snapshot inspected for this document has already implemented the narrow replay-authorized filter path. Full solver-guided sketches, general CEGIS, richer domains, CHCs, and proof artifacts remain planned.
+The proposal was tied to an August 15 snapshot at which Length was described as ranking-only. The Leant snapshot inspected for this document has already implemented the narrow replay-authorized filter path. Since this document's August 16 pin, the fixed-profile inline Length constraint has also shipped through the same filter authority and checked handoff. Full solver-guided sketches, general CEGIS, richer domains, CHCs, and proof artifacts remain planned.
 
 \section{Recommended reading paths}
 
@@ -6621,6 +6680,13 @@ Reading a query, troubleshooting, crosswalk & Chapters~\ref{chap:read-query}, \r
 \item \lpath{src/Leant/Synth/Length/File/Acquire.hs}: shared bounded file acquisition (POSIX only; Windows fails closed).
 \item \lpath{src/Leant/Synth/Length/Adapter.hs}: checked query wrapper and detailed refusal mapping.
 \end{itemize}
+
+Post-snapshot current-tree additions, intentionally not linked through the
+pinned base, are \filepath{src/Leant/Synth/Length/Command.hs} (the separate
+inline structural parser), \filepath{src/Leant/Synth/Length/Where.hs} (fixed
+profiles, bounded clause boundary, and physical-role resolver), and
+\filepath{src/Main.hs} (authorization, scope reporting, translation/retry,
+\code{SlotArrow} arity, resolution, and one-context activation).
 
 \subsection{Djex}
 
