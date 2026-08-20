@@ -310,9 +310,14 @@ import Leant.Synth.Length.Command
   , LengthSynthCommandError (..)
   , LengthSynthInlineCommand
   , LengthSynthInlineCommandError (..)
+  , LengthSynthNativeInlineCommand
+  , LengthSynthNativeInlineCommandError (..)
   , lengthSynthInlineCommandGoal
   , lengthSynthInlineCommandWherePlan
+  , lengthSynthNativeInlineCommandGoal
+  , lengthSynthNativeInlineCommandWherePlan
   , parseLengthSynthInlineCommand
+  , parseLengthSynthNativeInlineCommand
   , parseLengthSynthCommand
   )
 import Leant.Synth.Length.Contract
@@ -357,10 +362,14 @@ import Leant.Synth.Length.Where
   , LeanLengthWhereModel (..)
   , LeanLengthWherePlan
   , LeanLengthWhereSource
+  , LeanNativeLengthWherePlan
+  , LeanNativeLengthWhereSource
   , LeanLengthWhereSourceError (..)
   , mkLeanLengthWherePlan
   , parseLeanLengthWhereInputSource
+  , parseLeanNativeLengthWhereSource
   , parseLeanLengthWhereSource
+  , resolveLeanNativeLengthWhereSource
   , resolveLeanLengthWhereSource
   )
 import Leant.Synth.Length.Integration
@@ -11443,7 +11452,19 @@ lengthContractFileTests = testGroup
 lengthSynthInlineWhereTests :: TestTree
 lengthSynthInlineWhereTests = testGroup
   "active inline Length where profiles"
-  [ testCase "parse and project the exact scalar form"
+  [ testCase "parse and resolve concise scalar defaults"
+      assertLengthSynthNativeScalarForm
+  , testCase "parse and resolve concise product defaults"
+      assertLengthSynthNativePairForm
+  , testCase "observe every translated List argument in source order"
+      assertLengthSynthNativeRoleDefaults
+  , testCase "fail closed on unsupported concise target shapes"
+      assertLengthSynthNativeTargetRefusals
+  , testCase "own only the exact concise command envelope"
+      assertLengthSynthNativeCommandBoundary
+  , testCase "retain bounded parser and result-domain refusals"
+      assertLengthSynthNativeClauseRefusals
+  , testCase "parse and project the exact scalar form"
       assertLengthSynthInlineScalarForm
   , testCase "parse and project the exact binary-product form"
       assertLengthSynthInlinePairForm
@@ -11486,6 +11507,151 @@ lengthSynthInlineWhereTests = testGroup
   , testCase "pin Main precedence, arity, and command-context lifetime"
       assertLeanLengthWhereRuntimeArchitecture
   ]
+
+assertLengthSynthNativeScalarForm :: IO ()
+assertLengthSynthNativeScalarForm = do
+  let source =
+        "--where List.length result = List.length arg0 -- " ++
+        "List Nat -> List Nat"
+  command <- expectLengthSynthNativeInlineCommand source
+  lengthSynthNativeInlineCommandGoal command @?= "List Nat -> List Nat"
+  resolved <- resolveLengthSynthNativeInlineCommand
+    (nativeParsedGoal $ FArr nativeListFragment nativeListFragment)
+    command
+  resolved @?= inlineScalarSelection [LengthObservedSpine]
+    (LengthEqual
+      (LengthVariable LengthResult)
+      (LengthVariable $ LengthInput 0))
+
+assertLengthSynthNativePairForm :: IO ()
+assertLengthSynthNativePairForm = do
+  let source =
+        "--where List.length result.1 + List.length result.2 = " ++
+        "2 * List.length arg0 -- " ++
+        "List Nat -> Prod (List Nat) (List Nat)"
+  command <- expectLengthSynthNativeInlineCommand source
+  lengthSynthNativeInlineCommandGoal command @?=
+    "List Nat -> Prod (List Nat) (List Nat)"
+  resolved <- resolveLengthSynthNativeInlineCommand
+    (nativeParsedGoal $ FArr nativeListFragment
+      $ FLeanProd nativeListFragment nativeListFragment)
+    command
+  resolved @?= inlinePairSelection [LengthObservedSpine]
+    (Djex.LengthEqual
+      (Djex.LengthSum
+        [ Djex.LengthVariable $ Djex.LengthSpinePairResult
+            Djex.LengthSpinePairFirst
+        , Djex.LengthVariable $ Djex.LengthSpinePairResult
+            Djex.LengthSpinePairSecond
+        ])
+      (Djex.LengthScale 2
+        $ Djex.LengthVariable $ Djex.LengthSpinePairInput 0))
+
+assertLengthSynthNativeRoleDefaults :: IO ()
+assertLengthSynthNativeRoleDefaults = do
+  let target = FAll True "u" $ FInst "inst" $ FArr nativeListFragment
+        $ FArr (FAtom False "Nat")
+        $ FArr nativeListFragment nativeListFragment
+      source =
+        "--where List.length result = List.length arg2 + " ++
+        "List.length arg0 -- Goal"
+  resolved <- expectLengthSynthNativeInlineSelection
+    (nativeParsedGoal target) source
+  resolved @?= inlineScalarSelection
+    [ LengthObservedSpine
+    , LengthUnobservedTarget
+    , LengthObservedSpine
+    ]
+    (LengthEqual
+      (LengthVariable LengthResult)
+      (LengthSum
+        [ LengthVariable $ LengthInput 0
+        , LengthVariable $ LengthInput 1
+        ]))
+
+assertLengthSynthNativeTargetRefusals :: IO ()
+assertLengthSynthNativeTargetRefusals = do
+  assertLengthSynthNativeResolutionError
+    LeanLengthWhereNativeResultUnsupported
+    (nativeParsedGoal $ FArr nativeListFragment $ FAtom False "Nat")
+    "--where List.length result = 0 -- Goal"
+  assertLengthSynthNativeResolutionError
+    LeanLengthWhereNativeResultUnsupported
+    (nativeParsedGoal $ FArr nativeListFragment
+      $ FProd nativeListFragment nativeListFragment)
+    "--where List.length result = 0 -- Goal"
+  assertLengthSynthNativeResolutionError
+    (LeanLengthWhereNativeProductComponentUnsupported
+      Djex.LengthSpinePairSecond)
+    (nativeParsedGoal $ FArr nativeListFragment
+      $ FLeanProd nativeListFragment $ FAtom False "Nat")
+    "--where List.length result.1 = 0 -- Goal"
+  assertLengthSynthNativeResolutionError
+    (LeanLengthWherePhysicalArrowLimitExceeded 8 9)
+    (nativeParsedGoal $ foldr FArr (FAtom False "unsupported result")
+      $ replicate 9 nativeListFragment)
+    "--where List.length result = 0 -- Goal"
+
+assertLengthSynthNativeCommandBoundary :: IO ()
+assertLengthSynthNativeCommandBoundary = do
+  mapM_ (assertLengthSynthNativeInlineError
+      LengthSynthCommandNativeWhereMissing)
+    [ "--where"
+    , "--where -- Goal"
+    ]
+  assertLengthSynthNativeInlineError
+    LengthSynthCommandNativeDelimiterMissing
+    "--where List.length result = 0"
+  mapM_ assertLengthSynthNativeInlineNothing
+    [ "--wherever List.length result = 0 -- Goal"
+    , "Goal --where List.length result = 0 -- Other"
+    , scalarInlineLengthCommand "arg0" "len(result)=len(arg0)" "Goal"
+    ]
+  command <- expectLengthSynthNativeInlineCommand $
+    "--where List.length result = 0 -- " ++
+    "--length-model ignored --where opaque"
+  lengthSynthNativeInlineCommandGoal command @?=
+    "--length-model ignored --where opaque"
+
+assertLengthSynthNativeClauseRefusals :: IO ()
+assertLengthSynthNativeClauseRefusals = do
+  command <- expectLengthSynthNativeInlineCommand
+    "--where List.length result = \955 -- Goal"
+  case parseLeanNativeLengthWhereSource
+      $ lengthSynthNativeInlineCommandWherePlan command of
+    Left actual -> actual @?= LeanLengthWhereParseRejected
+      (Djex.LengthWhereNonAsciiByte 21)
+    Right _ -> assertFailure "non-ASCII Lean Length clause was admitted"
+  assertLengthSynthNativeResolutionError
+    (LeanLengthWhereElaborationRejected
+      $ Djex.LengthWhereScalarDomainPairResult
+          Djex.LengthSpinePairFirst)
+    (nativeParsedGoal $ FArr nativeListFragment nativeListFragment)
+    "--where List.length result.1 = 0 -- Goal"
+  assertLengthSynthNativeResolutionError
+    (LeanLengthWhereElaborationRejected
+      Djex.LengthWhereBinaryProductDomainScalarResult)
+    (nativeParsedGoal $ FArr nativeListFragment
+      $ FLeanProd nativeListFragment nativeListFragment)
+    "--where List.length result = 0 -- Goal"
+  assertLengthSynthNativeResolutionError
+    (LeanLengthWhereElaborationRejected
+      $ Djex.LengthWherePhysicalArgumentNotObserved 0)
+    (nativeParsedGoal $ FArr (FAtom False "Nat") nativeListFragment)
+    "--where List.length result = List.length arg0 -- Goal"
+
+nativeListFragment :: Frag
+nativeListFragment = FParamRec True "List" listKey [natural]
+  [ ("List.nil", [])
+  , ("List.cons", [natural, FAtom False listKey])
+  ]
+ where
+  natural = FAtom False "Nat"
+  listKey = "List Nat"
+
+nativeParsedGoal :: Frag -> ParsedGoal
+nativeParsedGoal fragment = ParsedGoal GoalType
+  (ProviderQuery ["List"] $ Just "List") fragment []
 
 assertLengthSynthInlineScalarForm :: IO ()
 assertLengthSynthInlineScalarForm = do
@@ -11786,9 +11952,16 @@ assertLeanLengthWhereOpacity = do
         [ ( "LengthSynthInlineCommand"
           , commandSource
           , declaration "data LengthSynthInlineCommand ="
-              "-- | Closed command-layer failures." commandSource
+              "-- | One concise Lean-shaped" commandSource
           , "data LengthSynthInlineCommand = LengthSynthInlineCommand " ++
               "LeanLengthWherePlan String"
+          )
+        , ( "LengthSynthNativeInlineCommand"
+          , commandSource
+          , declaration "data LengthSynthNativeInlineCommand ="
+              "-- | Closed command-layer failures." commandSource
+          , "data LengthSynthNativeInlineCommand = " ++
+              "LengthSynthNativeInlineCommand LeanNativeLengthWherePlan String"
           )
         , ( "LeanLengthWhereInputSource"
           , whereSource
@@ -11807,10 +11980,24 @@ assertLeanLengthWhereOpacity = do
         , ( "LeanLengthWhereSource"
           , whereSource
           , declaration "data LeanLengthWhereSource ="
-              "-- | Sanitized refusal" whereSource
+              "-- | The concise command's raw" whereSource
           , "data LeanLengthWhereSource = LeanLengthWhereSource " ++
               "!LeanLengthWhereModel !LeanLengthWhereInputSource " ++
               "Djex.LengthWhereSource"
+          )
+        , ( "LeanNativeLengthWherePlan"
+          , whereSource
+          , declaration "newtype LeanNativeLengthWherePlan ="
+              "-- | A bounded Lean-shaped source" whereSource
+          , "newtype LeanNativeLengthWherePlan = " ++
+              "LeanNativeLengthWherePlan String"
+          )
+        , ( "LeanNativeLengthWhereSource"
+          , whereSource
+          , declaration "newtype LeanNativeLengthWhereSource ="
+              "-- | Sanitized refusal" whereSource
+          , "newtype LeanNativeLengthWhereSource = " ++
+              "LeanNativeLengthWhereSource Djex.LengthWhereSource"
           )
         ]
   mapM_ (\(name, source, rawDeclaration, representation) -> do
@@ -11836,6 +12023,7 @@ assertLeanLengthWhereOpacity = do
 assertLeanLengthWhereRuntimeArchitecture :: IO ()
 assertLeanLengthWhereRuntimeArchitecture = do
   mainLines <- lines <$> readFile "src/Main.hs"
+  whereSource <- readFile "src/Leant/Synth/Length/Where.hs"
   integrationSource <- readFile "src/Leant/Synth/Length/Integration.hs"
   configurationSource <- readFile "src/Leant/Synth/Length/Configuration.hs"
   handoffSource <- readFile "src/Leant/Synth/Length/Handoff.hs"
@@ -11846,8 +12034,20 @@ assertLeanLengthWhereRuntimeArchitecture = do
       commandSection = mainSourceSection
         "cmdSynth :: St -> String -> IO ()"
         "-- | Resolve the ordinary explicit goal" mainLines
-      inlineSection = mainSourceSection
+      explicitCommandSection = mainSourceSection
+        "  runInline ::"
+        "  runNativeInline ::" mainLines
+      nativeCommandSection = mainSourceSection
+        "  runNativeInline ::"
+        "-- | Resolve the ordinary explicit goal" mainLines
+      establishedRunSection = mainSourceSection
+        "synthRun ::"
+        "-- | Activate one already authorized" mainLines
+      explicitInlineSection = mainSourceSection
         "-- | Activate one already authorized"
+        "-- | Activate the concise source" mainLines
+      nativeInlineSection = mainSourceSection
+        "-- | Activate the concise source"
         "-- | Translate once and preserve" mainLines
       translationSection = mainSourceSection
         "-- | Translate once and preserve"
@@ -11859,9 +12059,13 @@ assertLeanLengthWhereRuntimeArchitecture = do
         "-- | Auto-bound variables get"
         "-- | Whether an error text names this marker universe" mainLines
       lowerLayerNames =
-        [ "parseLengthSynthInlineCommand"
+        [ "parseLengthSynthNativeInlineCommand"
+        , "parseLengthSynthInlineCommand"
+        , "lengthSynthNativeInlineCommandWherePlan"
         , "lengthSynthInlineCommandWherePlan"
+        , "parseLeanNativeLengthWhereSource"
         , "parseLeanLengthWhereSource"
+        , "resolveLeanNativeLengthWhereSource"
         , "resolveLeanLengthWhereSource"
         ]
       lowerLayers =
@@ -11879,53 +12083,115 @@ assertLeanLengthWhereRuntimeArchitecture = do
   mapM_ (assertMainSourceContains "active command import"
       $ lines commandImport)
     [ "LengthSynthInlineCommand"
+    , "LengthSynthNativeInlineCommand"
+    , "parseLengthSynthNativeInlineCommand"
     , "parseLengthSynthInlineCommand"
+    , "lengthSynthNativeInlineCommandWherePlan"
     , "lengthSynthInlineCommandWherePlan"
     ]
   mapM_ (assertMainSourceContains "active where import" mainLines)
     [ "Leant.Synth.Length.Where"
+    , "parseLeanNativeLengthWhereSource"
     , "parseLeanLengthWhereSource"
+    , "resolveLeanNativeLengthWhereSource"
     , "resolveLeanLengthWhereSource"
     ]
   assertBool "Main stopped importing the established parser"
     $ "parseLengthSynthCommand" `isInfixOf` commandImport
-  inlineParse <- expectMainSourcePosition "inline command precedence"
+  nativeParse <- expectMainSourcePosition "inline command precedence"
+    "case parseLengthSynthNativeInlineCommand rawArg of" commandSection
+  explicitParse <- expectMainSourcePosition "inline command precedence"
     "case parseLengthSynthInlineCommand rawArg of" commandSection
   establishedParse <- expectMainSourcePosition "inline command precedence"
     "runEstablished = case parseLengthSynthCommand rawArg of" commandSection
-  let goalResolutions = mainSourcePositions
-        "case resolveSynthCommandGoal state" commandSection
-  length goalResolutions @?= 2
-  goalResolution <- case goalResolutions of
-    [_, inlineGoal] -> pure inlineGoal
-    _ -> assertFailure "Main lost one of its two command goal sources"
-      >> error "unreachable"
-  authorization <- expectMainSourcePosition "inline command precedence"
-    "case authorizeExplicitLengthAssessmentRequest" commandSection
-  boundedParse <- expectMainSourcePosition "inline command precedence"
-    "case parseLeanLengthWhereSource" commandSection
-  inlineRun <- expectMainSourcePosition "inline command precedence"
-    "synthInlineRun permission source st args goal" commandSection
-  assertBool "Main changed inline command admission precedence"
-    $ inlineParse < establishedParse
-      && inlineParse < goalResolution
-      && goalResolution < authorization
-      && authorization < boundedParse
-      && boundedParse < inlineRun
-
-  translation <- expectMainSourcePosition "inline context lifetime"
-    "translateSynthGoalWithRetry st goal" inlineSection
-  resolution <- expectMainSourcePosition "inline context lifetime"
-    "case resolveLeanLengthWhereSource" inlineSection
-  contextOpen <- expectMainSourcePosition "inline context lifetime"
-    "withLengthAssessmentRequestContext" inlineSection
-  scheduler <- expectMainSourcePosition "inline context lifetime"
-    "synthGo assessmentContext st args retriedVars" inlineSection
+  assertBool "Main changed concise/explicit/legacy parser precedence"
+    $ nativeParse < explicitParse && explicitParse < establishedParse
   length (mainSourcePositions
-      "withLengthAssessmentRequestContext" inlineSection) @?= 1
-  assertBool "inline translation, resolution, and context order changed"
-    $ translation < resolution && resolution < contextOpen
-      && contextOpen < scheduler
+      "case resolveSynthCommandGoal state" commandSection) @?= 3
+
+  explicitGoal <- expectMainSourcePosition "explicit command precedence"
+    "case resolveSynthCommandGoal state" explicitCommandSection
+  explicitAuthorization <- expectMainSourcePosition
+    "explicit command precedence"
+    "case authorizeExplicitLengthAssessmentRequest" explicitCommandSection
+  explicitBoundedParse <- expectMainSourcePosition
+    "explicit command precedence"
+    "case parseLeanLengthWhereSource" explicitCommandSection
+  explicitRun <- expectMainSourcePosition "explicit command precedence"
+    "synthInlineRun permission source st args goal" explicitCommandSection
+  assertBool "Main changed explicit inline admission precedence"
+    $ explicitGoal < explicitAuthorization
+      && explicitAuthorization < explicitBoundedParse
+      && explicitBoundedParse < explicitRun
+  assertMainSourceContains "explicit filter authority" explicitCommandSection
+    "LengthBehaviorFilter"
+
+  nativeGoal <- expectMainSourcePosition "concise command precedence"
+    "case resolveSynthCommandGoal state" nativeCommandSection
+  nativeAuthorization <- expectMainSourcePosition "concise command precedence"
+    "case authorizeExplicitLengthAssessmentRequest" nativeCommandSection
+  nativeBoundedParse <- expectMainSourcePosition "concise command precedence"
+    "case parseLeanNativeLengthWhereSource" nativeCommandSection
+  nativeRun <- expectMainSourcePosition "concise command precedence"
+    "synthNativeInlineRun permission source st args goal"
+    nativeCommandSection
+  assertBool "Main changed concise inline admission precedence"
+    $ nativeGoal < nativeAuthorization
+      && nativeAuthorization < nativeBoundedParse
+      && nativeBoundedParse < nativeRun
+  assertMainSourceContains "concise filter authority" nativeCommandSection
+    "LengthBehaviorFilter"
+
+  explicitTranslation <- expectMainSourcePosition
+    "explicit inline context lifetime"
+    "translateSynthGoalWithRetry st goal" explicitInlineSection
+  explicitResolution <- expectMainSourcePosition
+    "explicit inline context lifetime"
+    "case resolveLeanLengthWhereSource" explicitInlineSection
+  explicitContextOpen <- expectMainSourcePosition
+    "explicit inline context lifetime"
+    "withLengthAssessmentRequestContext" explicitInlineSection
+  explicitScheduler <- expectMainSourcePosition
+    "explicit inline context lifetime"
+    "synthGo assessmentContext st args retriedVars" explicitInlineSection
+  length (mainSourcePositions
+      "withLengthAssessmentRequestContext" explicitInlineSection) @?= 1
+  assertBool "explicit translation, resolution, and context order changed"
+    $ explicitTranslation < explicitResolution
+      && explicitResolution < explicitContextOpen
+      && explicitContextOpen < explicitScheduler
+  assertMainSourceContains "explicit request association"
+    explicitInlineSection
+    "explicitLengthAssessmentRequest permission selection"
+
+  nativeTranslation <- expectMainSourcePosition
+    "concise inline context lifetime"
+    "translateSynthGoalWithRetry st goal" nativeInlineSection
+  nativeResolution <- expectMainSourcePosition
+    "concise inline context lifetime"
+    "case resolveLeanNativeLengthWhereSource parsed source"
+    nativeInlineSection
+  nativeContextOpen <- expectMainSourcePosition
+    "concise inline context lifetime"
+    "withLengthAssessmentRequestContext" nativeInlineSection
+  nativeScheduler <- expectMainSourcePosition
+    "concise inline context lifetime"
+    "synthGo assessmentContext st args retriedVars" nativeInlineSection
+  length (mainSourcePositions
+      "withLengthAssessmentRequestContext" nativeInlineSection) @?= 1
+  assertBool "concise translation, resolution, and context order changed"
+    $ nativeTranslation < nativeResolution
+      && nativeResolution < nativeContextOpen
+      && nativeContextOpen < nativeScheduler
+  assertMainSourceContains "concise request association" nativeInlineSection
+    "explicitLengthAssessmentRequest permission selection"
+
+  legacyContext <- expectMainSourcePosition "legacy context lifetime"
+    "withLengthAssessmentRequestContext" establishedRunSection
+  legacyTranslation <- expectMainSourcePosition "legacy context lifetime"
+    "translateSynthGoalWithRetry" establishedRunSection
+  assertBool "legacy context stopped enclosing translation"
+    $ legacyContext < legacyTranslation
 
   mapM_ (assertMainSourceContains "physical arrow arity" mainLines)
     [ "Slot (SlotArrow)"
@@ -11939,11 +12205,19 @@ assertLeanLengthWhereRuntimeArchitecture = do
     [ "SlotAll"
     , "SlotInst"
     ]
-
-  assertMainSourceContains "inline filter authority" commandSection
-    "authorizeExplicitLengthAssessmentRequest LengthBehaviorFilter"
-  assertMainSourceContains "inline request association" inlineSection
-    "explicitLengthAssessmentRequest permission selection"
+  mapM_ (\(label, present) -> assertBool
+      ("concise target defaulting lost " ++ label) present)
+    [ ( "physical arrow extraction"
+      , "[argument | SlotArrow argument <- fragSpine $ pgFrag parsed]"
+          `isInfixOf` whereSource
+      )
+    , ( "complete role derivation"
+      , "map defaultRole physicalArguments" `isInfixOf` whereSource
+      )
+    , ( "exact List recognition"
+      , "exactBuiltinListApplication" `isInfixOf` whereSource
+      )
+    ]
 
   assertMainSourceContains "translation continuation" translationSection
     "(Maybe [String] -> String -> ParsedGoal -> IO ())"
@@ -11957,7 +12231,7 @@ assertLeanLengthWhereRuntimeArchitecture = do
     ]
   assertBool "generalized translation retry reacquired a Length context"
     $ not $ "assessmentContext" `isInfixOf` unlines retrySection
-  assertBool "Main retained the former passive-only architecture"
+  assertBool "Main lost one of its command-local inline seams"
     $ all (`isInfixOf` mainSource) lowerLayerNames
 
 inlineLengthOptionGroups :: [String]
@@ -11982,6 +12256,84 @@ pairInlineLengthCommand inputs clause goal =
   "--behavior-mode filter " ++
   "--length-model list-binary-product-exact-cases " ++
   "--length-inputs " ++ inputs ++ " --where " ++ clause ++ " -- " ++ goal
+
+expectLengthSynthNativeInlineCommand
+  :: String
+  -> IO LengthSynthNativeInlineCommand
+expectLengthSynthNativeInlineCommand source =
+  case parseLengthSynthNativeInlineCommand source of
+    Left failure -> assertFailure
+      ("unexpected concise Length command rejection: " ++ show failure)
+        >> error "unreachable"
+    Right Nothing -> assertFailure
+      "concise Length command was not recognized" >> error "unreachable"
+    Right (Just command) -> pure command
+
+assertLengthSynthNativeInlineError
+  :: LengthSynthNativeInlineCommandError
+  -> String
+  -> IO ()
+assertLengthSynthNativeInlineError expected source =
+  case parseLengthSynthNativeInlineCommand source of
+    Left actual -> actual @?= expected
+    Right Nothing -> assertFailure
+      $ "concise Length command was unowned; expected " ++ show expected
+    Right (Just _) -> assertFailure
+      $ "concise Length command was admitted; expected " ++ show expected
+
+assertLengthSynthNativeInlineNothing :: String -> IO ()
+assertLengthSynthNativeInlineNothing source =
+  case parseLengthSynthNativeInlineCommand source of
+    Left failure -> assertFailure
+      $ "opaque goal was rejected as concise Length syntax: " ++ show failure
+    Right Nothing -> pure ()
+    Right (Just _) -> assertFailure
+      "opaque goal was claimed as concise Length syntax"
+
+expectLeanNativeLengthWhereSource
+  :: LeanNativeLengthWherePlan
+  -> IO LeanNativeLengthWhereSource
+expectLeanNativeLengthWhereSource plan =
+  case parseLeanNativeLengthWhereSource plan of
+    Left failure -> assertFailure
+      ("unexpected concise Length where rejection: " ++ show failure)
+        >> error "unreachable"
+    Right source -> pure source
+
+resolveLengthSynthNativeInlineCommand
+  :: ParsedGoal
+  -> LengthSynthNativeInlineCommand
+  -> IO LeanLengthContractSelection
+resolveLengthSynthNativeInlineCommand parsed command = do
+  source <- expectLeanNativeLengthWhereSource
+    $ lengthSynthNativeInlineCommandWherePlan command
+  case resolveLeanNativeLengthWhereSource parsed source of
+    Left failure -> assertFailure
+      ("unexpected concise Length resolution refusal: " ++ show failure)
+        >> error "unreachable"
+    Right selection -> pure selection
+
+expectLengthSynthNativeInlineSelection
+  :: ParsedGoal
+  -> String
+  -> IO LeanLengthContractSelection
+expectLengthSynthNativeInlineSelection parsed source =
+  expectLengthSynthNativeInlineCommand source >>=
+    resolveLengthSynthNativeInlineCommand parsed
+
+assertLengthSynthNativeResolutionError
+  :: LeanLengthWhereSourceError
+  -> ParsedGoal
+  -> String
+  -> IO ()
+assertLengthSynthNativeResolutionError expected parsed source = do
+  command <- expectLengthSynthNativeInlineCommand source
+  bounded <- expectLeanNativeLengthWhereSource
+    $ lengthSynthNativeInlineCommandWherePlan command
+  case resolveLeanNativeLengthWhereSource parsed bounded of
+    Left actual -> actual @?= expected
+    Right _ -> assertFailure
+      $ "concise Length source resolved; expected " ++ show expected
 
 expectLengthSynthInlineCommand :: String -> IO LengthSynthInlineCommand
 expectLengthSynthInlineCommand source =
@@ -13459,8 +13811,11 @@ assertLengthAssessmentMainCommandContext = do
       runSection = mainSourceSection
         "synthRun :: LengthAssessmentRequest"
         "-- | Activate one already authorized" sourceLines
-      inlineSection = mainSourceSection
+      explicitInlineSection = mainSourceSection
         "-- | Activate one already authorized"
+        "-- | Activate the concise source" sourceLines
+      nativeInlineSection = mainSourceSection
+        "-- | Activate the concise source"
         "-- | Translate once and preserve" sourceLines
       translationSection = mainSourceSection
         "-- | Translate once and preserve"
@@ -13506,7 +13861,7 @@ assertLengthAssessmentMainCommandContext = do
     @?= 1
   length (mainSourcePositions
       "withLengthAssessmentRequestContext"
-      $ dropWhile (not . isInfixOf "synthRun ::") sourceLines) @?= 2
+      $ dropWhile (not . isInfixOf "synthRun ::") sourceLines) @?= 3
   length (mainSourcePositions
       ":: LengthAssessmentContext command" sourceLines)
     @?= 7
@@ -13526,20 +13881,35 @@ assertLengthAssessmentMainCommandContext = do
   assertBool "the established context did not enclose translation and retry"
     $ contextOpen < translation && translation < direct
 
-  inlineTranslation <- expectMainSourcePosition "inline context"
-    "translateSynthGoalWithRetry st goal" inlineSection
-  inlineResolution <- expectMainSourcePosition "inline context"
-    "case resolveLeanLengthWhereSource" inlineSection
-  inlineContext <- expectMainSourcePosition "inline context"
-    "withLengthAssessmentRequestContext" inlineSection
-  inlineScheduler <- expectMainSourcePosition "inline context"
-    "synthGo assessmentContext st args retriedVars" inlineSection
+  inlineTranslation <- expectMainSourcePosition "explicit inline context"
+    "translateSynthGoalWithRetry st goal" explicitInlineSection
+  inlineResolution <- expectMainSourcePosition "explicit inline context"
+    "case resolveLeanLengthWhereSource" explicitInlineSection
+  inlineContext <- expectMainSourcePosition "explicit inline context"
+    "withLengthAssessmentRequestContext" explicitInlineSection
+  inlineScheduler <- expectMainSourcePosition "explicit inline context"
+    "synthGo assessmentContext st args retriedVars" explicitInlineSection
   length (mainSourcePositions
-      "withLengthAssessmentRequestContext" inlineSection) @?= 1
-  assertBool "the inline context opened before translation or resolution"
+      "withLengthAssessmentRequestContext" explicitInlineSection) @?= 1
+  assertBool "the explicit inline context opened before translation or resolution"
     $ inlineTranslation < inlineResolution
       && inlineResolution < inlineContext
       && inlineContext < inlineScheduler
+
+  nativeTranslation <- expectMainSourcePosition "concise inline context"
+    "translateSynthGoalWithRetry st goal" nativeInlineSection
+  nativeResolution <- expectMainSourcePosition "concise inline context"
+    "case resolveLeanNativeLengthWhereSource" nativeInlineSection
+  nativeContext <- expectMainSourcePosition "concise inline context"
+    "withLengthAssessmentRequestContext" nativeInlineSection
+  nativeScheduler <- expectMainSourcePosition "concise inline context"
+    "synthGo assessmentContext st args retriedVars" nativeInlineSection
+  length (mainSourcePositions
+      "withLengthAssessmentRequestContext" nativeInlineSection) @?= 1
+  assertBool "the concise inline context opened before translation or resolution"
+    $ nativeTranslation < nativeResolution
+      && nativeResolution < nativeContext
+      && nativeContext < nativeScheduler
 
   assertMainSourceContains "generalized translation retry" translationSection
     "synthUniverseRetry st goal errors continuation"
