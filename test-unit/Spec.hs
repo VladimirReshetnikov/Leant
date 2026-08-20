@@ -1,7 +1,7 @@
 module Main (main) where
 
 import Control.Concurrent (threadDelay)
-import Control.Monad (replicateM, unless, when, zipWithM_)
+import Control.Monad (replicateM, unless, void, when, zipWithM_)
 import Control.DeepSeq (rnf)
 import Control.Exception (SomeException, evaluate, finally, try)
 import qualified Data.ByteString as ByteString
@@ -11605,7 +11605,7 @@ assertLengthSynthInlineOptionPermutations =
   assertPermutation ordered =
     let source = unwords $ ordered ++ ["--", "Goal"]
     in if ordered == inlineLengthOptionGroups
-      then expectLengthSynthInlineCommand source >> pure ()
+      then void $ expectLengthSynthInlineCommand source
       else assertLengthSynthInlineError
         LengthSynthCommandOptionOrderInvalid source
 
