@@ -31,6 +31,7 @@ import qualified Data.Set as Set
 import Data.Time.Clock (UTCTime, addUTCTime, diffUTCTime, getCurrentTime)
 import Data.Time.Format (defaultTimeLocale, formatTime)
 import Data.Time.LocalTime (getZonedTime)
+import Numeric.Natural (Natural)
 import System.Console.Haskeline
 import System.Directory
   ( copyFile
@@ -126,8 +127,10 @@ import Leant.Synth.Fragment
   , ParsedGoal (..)
   , ProviderFrag
   , ProviderQuery
+  , Slot (SlotArrow)
   , candidateVerificationProgram
   , fragProviderMayOpen
+  , fragSpine
   , fragHasDepth
   , fragRecKeys
   , fragRefusal
@@ -143,7 +146,8 @@ import Leant.Synth.Fragment
   , synthPrelude
   )
 import Leant.Synth.Length.Integration
-  ( LengthAssessmentContext
+  ( ExplicitLengthAssessmentPermission
+  , LengthAssessmentContext
   , LengthAssessmentMode
   , LengthAssessmentRequest
   , LengthAssessmentResult
@@ -163,6 +167,10 @@ import Leant.Synth.Length.Integration
 import Leant.Synth.Length.Command
   ( LengthBehaviorMode (..)
   , LengthSynthCommand (..)
+  , LengthSynthInlineCommand
+  , lengthSynthInlineCommandGoal
+  , lengthSynthInlineCommandWherePlan
+  , parseLengthSynthInlineCommand
   , parseLengthSynthCommand
   )
 import Leant.Synth.Length.Contract.File.Acquire
@@ -180,6 +188,11 @@ import Leant.Synth.Length.Presentation
   , lengthCandidateRejectionPresentationText
   , presentLengthAssessment
   , presentLengthAssessmentRejections
+  )
+import Leant.Synth.Length.Where
+  ( LeanLengthWhereSource
+  , parseLeanLengthWhereSource
+  , resolveLeanLengthWhereSource
   )
 import Leant.Synth.Observability
   ( LeantObservations
@@ -1199,6 +1212,10 @@ helpText = unlines
   , "  :synth [--behavior-mode rank|filter]"
   , "         --length-contract ABSOLUTE-PATH -- TYPE"
   , "                           use one contract file for this command only"
+  , "  :synth --behavior-mode filter"
+  , "         --length-model list-scalar-exact-cases"
+  , "         --length-inputs arg0[,argN...] --where CLAUSE -- TYPE"
+  , "                           use one inline Length constraint"
   , "                           candidates are bound as it1 (= it), it2, ..."
   , "  :set synth-engine E      djinn (default) | exference | both"
   , "  :set synth-steps N       Exference step budget (default 4096)"
@@ -2173,46 +2190,88 @@ initialSynthTimeoutSeconds = do
     _ -> Nothing
 
 cmdSynth :: St -> String -> IO ()
-cmdSynth st rawArg = do
-  case parseLengthSynthCommand rawArg of
+cmdSynth st rawArg = case parseLengthSynthInlineCommand rawArg of
+  Left failure -> do
+    emitLn st =<< cRed st
+      ("inline finite-spine Length command rejected: " ++ show failure)
+    emitLn st =<< cRed st
+      ("usage: :synth --behavior-mode filter --length-model " ++
+       "list-scalar-exact-cases|list-binary-product-exact-cases " ++
+       "--length-inputs arg0[,argN...] --where CLAUSE -- TYPE")
+  Right (Just command) -> runInline command
+  Right Nothing -> runEstablished
+ where
+  runEstablished :: IO ()
+  runEstablished = case parseLengthSynthCommand rawArg of
     Left _ -> emitLn st =<< cRed st
       ("usage: :synth TYPE | :synth [--behavior-mode rank|filter] " ++
        "[--length-contract ABSOLUTE-PATH] -- TYPE " ++
        "(TYPE may be empty in prove mode / after a `sorry`)")
     Right command -> do
       state <- readIORef st
-      let arg = lengthSynthCommandGoal command
-      goalOr <-
-        if not (null arg)
-          then pure
-            (Right (substIt (rsItCounter state) (rsSynthIts state) arg
-            , [], []))
-          else case rsProve state of
-            Just pv | (_, goal : _, _) : _ <- pvStack pv ->
-              pure $ case wrapGoal goal of
-                Just t -> Right t
-                Nothing -> Left "cannot extract the goal target"
-            _ -> case rsLastSorry state of
-              Just (_, goal) -> pure $ case wrapGoal goal of
-                Just t -> Right t
-                Nothing -> Left "cannot extract the goal target"
-              Nothing -> pure (Left
-                ("usage: :synth TYPE   (or bare :synth in prove mode / "
-                 ++ "after a `sorry`)"))
-      case goalOr of
+      case resolveSynthCommandGoal state $ lengthSynthCommandGoal command of
         Left err -> emitLn st =<< cRed st err
         Right (goal, args, skipped) -> do
           requestOr <- lengthAssessmentRequestForCommand state command
           case requestOr of
             Left failure -> emitLn st =<< cRed st failure
             Right assessmentRequest -> do
-              unless (null skipped) $ emitLn st =<< cDim st
-                ("(inaccessible hypotheses are not visible to :synth: "
-                 ++ unwords skipped ++ ")")
-              unless (null args) $ emitLn st =<< cDim st
-                ("(synthesizing with hypotheses " ++ unwords args
-                 ++ " as premises)")
+              reportSynthCommandScope st args skipped
               synthRun assessmentRequest st args goal
+
+  runInline :: LengthSynthInlineCommand -> IO ()
+  runInline command = do
+    state <- readIORef st
+    case resolveSynthCommandGoal state $ lengthSynthInlineCommandGoal command of
+      Left err -> emitLn st =<< cRed st err
+      Right (goal, args, skipped) ->
+        case authorizeExplicitLengthAssessmentRequest
+            LengthBehaviorFilter (rsLengthAssessmentMode state) of
+          Left failure -> emitLn st =<< cRed st
+            ("finite-spine Length request rejected before IO: " ++
+             show failure)
+          Right permission ->
+            case parseLeanLengthWhereSource
+                $ lengthSynthInlineCommandWherePlan command of
+              Left failure -> emitLn st =<< cRed st
+                ("inline finite-spine Length where clause rejected: " ++
+                 show failure)
+              Right source -> do
+                reportSynthCommandScope st args skipped
+                synthInlineRun permission source st args goal
+
+-- | Resolve the ordinary explicit goal or the current prove/sorry goal before
+-- any Length request authority is selected.  The result retains the same
+-- inaccessible-hypothesis accounting used by every synthesis entrance.
+resolveSynthCommandGoal
+  :: ReplState
+  -> String
+  -> Either String (String, [String], [String])
+resolveSynthCommandGoal state arg
+  | not (null arg) = Right
+      (substIt (rsItCounter state) (rsSynthIts state) arg, [], [])
+  | otherwise = case rsProve state of
+      Just pv | (_, goal : _, _) : _ <- pvStack pv -> extract goal
+      _ -> case rsLastSorry state of
+        Just (_, goal) -> extract goal
+        Nothing -> Left
+          ("usage: :synth TYPE   (or bare :synth in prove mode / " ++
+           "after a `sorry`)")
+ where
+  extract goal = case wrapGoal goal of
+    Just resolved -> Right resolved
+    Nothing -> Left "cannot extract the goal target"
+
+-- | Report only after the command-local Length request has been admitted.
+-- This preserves the established ordering for file-backed and startup
+-- requests and gives the inline entrance the same premise diagnostics.
+reportSynthCommandScope :: St -> [String] -> [String] -> IO ()
+reportSynthCommandScope st args skipped = do
+  unless (null skipped) $ emitLn st =<< cDim st
+    ("(inaccessible hypotheses are not visible to :synth: " ++
+     unwords skipped ++ ")")
+  unless (null args) $ emitLn st =<< cDim st
+    ("(synthesizing with hypotheses " ++ unwords args ++ " as premises)")
 
 -- | Select one command-local assessment authority.  Explicit requests must
 -- first obtain permission from the already activated mode; only then is the
@@ -2253,15 +2312,61 @@ lengthAssessmentRequestForCommand state command =
 synthRun :: LengthAssessmentRequest -> St -> [String] -> String -> IO ()
 synthRun assessmentRequest st args goal =
   withLengthAssessmentRequestContext assessmentRequest $ \assessmentContext -> do
-    outcome <- translateGoal st goal
-    case outcome of
-      Right parsed -> synthGo assessmentContext st args Nothing goal parsed
-      Left errors
-        | any stuckUniverse errors ->
-            synthUniverseRetry assessmentContext st args goal errors
-        | otherwise -> reportTranslationErrors st errors
+    translateSynthGoalWithRetry st goal
+      $ synthGo assessmentContext st args
+
+-- | Activate one already authorized and bounded inline source only after Lean
+-- translation has supplied the physical arrow arity.  Failed translation or
+-- target association creates no counterexample bank; success creates exactly
+-- one nominal context shared by every synthesis lane.
+synthInlineRun
+  :: ExplicitLengthAssessmentPermission
+  -> LeanLengthWhereSource
+  -> St
+  -> [String]
+  -> String
+  -> IO ()
+synthInlineRun permission source st args goal =
+  translateSynthGoalWithRetry st goal
+    $ \retriedVars translatedGoal parsed ->
+      case resolveLeanLengthWhereSource
+          (translatedPhysicalArrowArity parsed) source of
+        Left failure -> emitLn st =<< cRed st
+          ("inline finite-spine Length where target rejected: " ++
+           show failure)
+        Right selection ->
+          withLengthAssessmentRequestContext
+              (explicitLengthAssessmentRequest permission selection)
+            $ \assessmentContext ->
+                synthGo assessmentContext st args retriedVars
+                  translatedGoal parsed
+
+-- | Translate once and preserve the existing narrowing retry state machine,
+-- while letting each request entrance choose when its nominal Length context
+-- begins.  The continuation is invoked exactly once on the first successful
+-- direct or narrowed translation.
+translateSynthGoalWithRetry
+  :: St
+  -> String
+  -> (Maybe [String] -> String -> ParsedGoal -> IO ())
+  -> IO ()
+translateSynthGoalWithRetry st goal continuation = do
+  outcome <- translateGoal st goal
+  case outcome of
+    Right parsed -> continuation Nothing goal parsed
+    Left errors
+      | any stuckUniverse errors ->
+          synthUniverseRetry st goal errors continuation
+      | otherwise -> reportTranslationErrors st errors
  where
   stuckUniverse = ("stuck at solving universe constraint" `isInfixOf`)
+
+-- | Count only source arrows.  Type quantifiers, instance binders, and exact
+-- contexts remain part of the renderer layout but are not physical target
+-- arguments in a Length contract.
+translatedPhysicalArrowArity :: ParsedGoal -> Natural
+translatedPhysicalArrowArity parsed = fromIntegral $ length
+  [() | SlotArrow _ <- fragSpine $ pgFrag parsed]
 
 -- | Run the serializer on one goal; 'Left' carries the error texts.
 -- An error next to an emitted translation means Lean recovered from a
@@ -2304,13 +2409,12 @@ reportTranslationErrors st errors = do
 -- the new errors; such variables are dropped and the retry narrows
 -- until it translates or no candidates remain.
 synthUniverseRetry
-  :: LengthAssessmentContext command
-  -> St
-  -> [String]
+  :: St
   -> String
   -> [String]
+  -> (Maybe [String] -> String -> ParsedGoal -> IO ())
   -> IO ()
-synthUniverseRetry assessmentContext st args goal originalErrors = do
+synthUniverseRetry st goal originalErrors continuation = do
   let vars = autoShapedTokens goal
   unknowns <- if null vars then pure [] else do
     envOr <- ensureSynthEnv st
@@ -2333,8 +2437,7 @@ synthUniverseRetry assessmentContext st args goal originalErrors = do
       ++ " : Type \8212 Sort-polymorphic elaboration was stuck)")
     outcome <- translateGoal st wrapped
     case outcome of
-      Right parsed ->
-        synthGo assessmentContext st args (Just wrapVars) wrapped parsed
+      Right parsed -> continuation (Just wrapVars) wrapped parsed
       Left retryErrors -> do
         let misplaced =
               [ v | v <- wrapVars
@@ -4157,6 +4260,10 @@ proveHelp = unlines
   , "  :synth [--behavior-mode rank|filter]"
   , "         --length-contract ABSOLUTE-PATH --"
   , "                     use one Length contract for this command's goal"
+  , "  :synth --behavior-mode filter"
+  , "         --length-model list-scalar-exact-cases"
+  , "         --length-inputs arg0[,argN...] --where CLAUSE --"
+  , "                     use one inline Length constraint for this goal"
   , "  :qed [NAME]        finish - save as `theorem NAME` in the session"
   , "                     (a `def` if the statement is not a proposition)"
   , "  :abort             leave prove mode (the script is printed, not lost)"
