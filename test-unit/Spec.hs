@@ -8,7 +8,7 @@ import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as BS
 import Data.Char (isAlphaNum, toLower)
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef)
-import Data.List (isInfixOf, isPrefixOf, sortOn, tails)
+import Data.List (isInfixOf, isPrefixOf, permutations, sortOn, tails)
 import Data.Maybe (fromMaybe, isJust, isNothing)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -306,6 +306,11 @@ import Leant.Synth.Length.Command
   ( LengthBehaviorMode (..)
   , LengthSynthCommand (..)
   , LengthSynthCommandError (..)
+  , LengthSynthInlineCommand
+  , LengthSynthInlineCommandError (..)
+  , lengthSynthInlineCommandGoal
+  , lengthSynthInlineCommandWherePlan
+  , parseLengthSynthInlineCommand
   , parseLengthSynthCommand
   )
 import Leant.Synth.Length.Contract
@@ -343,6 +348,18 @@ import Leant.Synth.Length.Handoff
   , LengthSpinePairHandoffRefusal (..)
   , prepareCheckedLengthProblem
   , prepareCheckedLengthSpinePairProblem
+  )
+import Leant.Synth.Length.Where
+  ( LeanLengthWhereInputSource
+  , LeanLengthWhereInputSourceError (..)
+  , LeanLengthWhereModel (..)
+  , LeanLengthWherePlan
+  , LeanLengthWhereSource
+  , LeanLengthWhereSourceError (..)
+  , mkLeanLengthWherePlan
+  , parseLeanLengthWhereInputSource
+  , parseLeanLengthWhereSource
+  , resolveLeanLengthWhereSource
   )
 import Leant.Synth.Length.Integration
   ( LengthAssessmentFailure (..)
@@ -11410,7 +11427,8 @@ lengthRankingConfigurationFileTests = testGroup
 lengthContractFileTests :: TestTree
 lengthContractFileTests = testGroup
   "one-shot bounded Length contract file"
-  [ testCase "parse explicit command paths without opening Lean goal syntax"
+  [ lengthSynthInlineWhereTests
+  , testCase "parse explicit command paths without opening Lean goal syntax"
       assertLengthSynthCommandParsing
   , testCase "decode the one current scalar and binary-product grammar"
       assertLengthContractFileCurrentGrammar
@@ -11419,6 +11437,584 @@ lengthContractFileTests = testGroup
   , testCase "admit and acquire current scalar and product selections"
       assertLengthContractFileAcquisition
   ]
+
+lengthSynthInlineWhereTests :: TestTree
+lengthSynthInlineWhereTests = testGroup
+  "passive inline Length where profiles"
+  [ testCase "parse and project the exact scalar form"
+      assertLengthSynthInlineScalarForm
+  , testCase "parse and project the exact binary-product form"
+      assertLengthSynthInlinePairForm
+  , testCase "leave every established command result unchanged"
+      assertLengthSynthInlineLegacyIsolation
+  , testCase "diagnose missing and invalid model fields exactly"
+      assertLengthSynthInlineModelErrors
+  , testCase "diagnose missing and malformed input fields exactly"
+      assertLengthSynthInlineInputErrors
+  , testCase "diagnose missing where clauses and delimiters exactly"
+      assertLengthSynthInlineWhereErrors
+  , testCase "require explicit filter and reject explicit rank"
+      assertLengthSynthInlineFilterRequirement
+  , testCase "reject every noncanonical option permutation"
+      assertLengthSynthInlineOptionPermutations
+  , testCase "reject every repeated owned option"
+      assertLengthSynthInlineOptionRepetitions
+  , testCase "reject file and inline contracts in both apparent orders"
+      assertLengthSynthInlineContractExclusion
+  , testCase "keep longer lookalikes and opaque-goal options unowned"
+      assertLengthSynthInlineExactOwnership
+  , testCase "admit arg0, arg1, arg7, and source-ordered gaps"
+      assertLeanLengthWhereInputAcceptance
+  , testCase "reject empty, malformed, duplicate, and descending inputs"
+      assertLeanLengthWhereInputRefusals
+  , testCase "bound arg8 and a hostile digit run productively and exactly"
+      assertLeanLengthWhereInputBound
+  , testCase "slice separator whitespace and retain exact UTF-8 byte offsets"
+      assertLeanLengthWhereClauseBytes
+  , testCase "expand physical roles and compact arg2 to contract input1"
+      assertLeanLengthWhereRoleCompaction
+  , testCase "retain an explicitly observed but unused physical input"
+      assertLeanLengthWhereUnusedObservedInput
+  , testCase "separate omitted, out-of-range, and arity-limit refusals"
+      assertLeanLengthWhereResolutionRefusals
+  , testCase "reject scalar and pair result namespaces nominally"
+      assertLeanLengthWhereResultDomains
+  , testCase "keep raw plans and sources positional, opaque, and instance-free"
+      assertLeanLengthWhereOpacity
+  , testCase "keep the new parser out of Main and Integration"
+      assertLeanLengthWherePassiveArchitecture
+  ]
+
+assertLengthSynthInlineScalarForm :: IO ()
+assertLengthSynthInlineScalarForm = do
+  let source = scalarInlineLengthCommand "arg0"
+        "len(result)=len(arg0)+1" "List Nat -> List Nat"
+  command <- expectLengthSynthInlineCommand source
+  lengthSynthInlineCommandGoal command @?= "List Nat -> List Nat"
+  resolved <- resolveLengthSynthInlineCommand 1 command
+  resolved @?= inlineScalarSelection [LengthObservedSpine]
+    (LengthEqual
+      (LengthVariable LengthResult)
+      (LengthSum
+        [ LengthVariable $ LengthInput 0
+        , LengthLiteral 1
+        ]))
+
+assertLengthSynthInlinePairForm :: IO ()
+assertLengthSynthInlinePairForm = do
+  let source = pairInlineLengthCommand "arg0"
+        "len(result.first)=len(arg0)+1"
+        "List Nat -> Prod (List Nat) (List Nat)"
+  command <- expectLengthSynthInlineCommand source
+  lengthSynthInlineCommandGoal command @?=
+    "List Nat -> Prod (List Nat) (List Nat)"
+  resolved <- resolveLengthSynthInlineCommand 1 command
+  resolved @?= inlinePairSelection [LengthObservedSpine]
+    (Djex.LengthEqual
+      (Djex.LengthVariable $ Djex.LengthSpinePairResult
+        Djex.LengthSpinePairFirst)
+      (Djex.LengthSum
+        [ Djex.LengthVariable $ Djex.LengthSpinePairInput 0
+        , Djex.LengthLiteral 1
+        ]))
+
+assertLengthSynthInlineLegacyIsolation :: IO ()
+assertLengthSynthInlineLegacyIsolation = do
+  let inlineSource = scalarInlineLengthCommand "arg0"
+        "len(result)=len(arg0)" "List Nat"
+      inlineWithoutMode =
+        "--length-model list-scalar-exact-cases --length-inputs arg0 " ++
+        "--where len(result)=len(arg0) -- List Nat"
+  parseLengthSynthCommand inlineSource @?=
+    Left LengthSynthCommandDelimiterMissing
+  parseLengthSynthCommand inlineWithoutMode @?= Right LengthSynthCommand
+    { lengthSynthCommandBehaviorMode = LengthBehaviorRank
+    , lengthSynthCommandContractPath = Nothing
+    , lengthSynthCommandGoal = inlineWithoutMode
+    }
+  parseLengthSynthCommand "--behavior-mode filter -- List Nat" @?=
+    Right LengthSynthCommand
+      { lengthSynthCommandBehaviorMode = LengthBehaviorFilter
+      , lengthSynthCommandContractPath = Nothing
+      , lengthSynthCommandGoal = "List Nat"
+      }
+  parseLengthSynthCommand
+      "--length-contract /tmp/current.json -- List Nat" @?=
+    Right LengthSynthCommand
+      { lengthSynthCommandBehaviorMode = LengthBehaviorRank
+      , lengthSynthCommandContractPath = Just "/tmp/current.json"
+      , lengthSynthCommandGoal = "List Nat"
+      }
+
+assertLengthSynthInlineModelErrors :: IO ()
+assertLengthSynthInlineModelErrors = do
+  mapM_ (assertLengthSynthInlineError
+      LengthSynthCommandLengthModelMissing)
+    [ "--behavior-mode filter --length-inputs arg0 --where 0=0 -- Goal"
+    , "--behavior-mode filter --length-model --length-inputs arg0 " ++
+        "--where 0=0 -- Goal"
+    ]
+  assertLengthSynthInlineError LengthSynthCommandLengthModelInvalid
+    $ "--behavior-mode filter --length-model inferred " ++
+        "--length-inputs arg0 --where 0=0 -- Goal"
+
+assertLengthSynthInlineInputErrors :: IO ()
+assertLengthSynthInlineInputErrors = do
+  mapM_ (assertLengthSynthInlineError
+      LengthSynthCommandLengthInputsMissing)
+    [ "--behavior-mode filter --length-model list-scalar-exact-cases"
+    , "--behavior-mode filter --length-model list-scalar-exact-cases " ++
+        "--length-inputs --where 0=0 -- Goal"
+    ]
+  mapM_ (assertLengthSynthInlineError
+      LengthSynthCommandLengthInputsMalformed)
+    [ scalarInlineLengthCommand "argx" "0=0" "Goal"
+    , scalarInlineLengthCommand "arg0," "0=0" "Goal"
+    ]
+
+assertLengthSynthInlineWhereErrors :: IO ()
+assertLengthSynthInlineWhereErrors = do
+  let prefix = "--behavior-mode filter " ++
+        "--length-model list-scalar-exact-cases --length-inputs arg0"
+  mapM_ (assertLengthSynthInlineError LengthSynthCommandWhereMissing)
+    [ prefix
+    , prefix ++ " --where"
+    , prefix ++ " --where -- Goal"
+    ]
+  mapM_ (assertLengthSynthInlineError
+      LengthSynthCommandInlineDelimiterMissing)
+    [ prefix ++ " --where 0=0"
+    , prefix ++ " --where 0=0 --- Goal"
+    ]
+
+assertLengthSynthInlineFilterRequirement :: IO ()
+assertLengthSynthInlineFilterRequirement = do
+  assertLengthSynthInlineError
+    LengthSynthCommandInlineRequiresExplicitFilter
+    $ "--length-model list-scalar-exact-cases " ++
+        "--length-inputs arg0 --where 0=0 -- Goal"
+  assertLengthSynthInlineError
+    LengthSynthCommandInlineRequiresExplicitFilter
+    $ "--behavior-mode rank --length-model list-scalar-exact-cases " ++
+        "--length-inputs arg0 --where 0=0 -- Goal"
+
+assertLengthSynthInlineOptionPermutations :: IO ()
+assertLengthSynthInlineOptionPermutations =
+  mapM_ assertPermutation $ permutations inlineLengthOptionGroups
+ where
+  assertPermutation ordered =
+    let source = unwords $ ordered ++ ["--", "Goal"]
+    in if ordered == inlineLengthOptionGroups
+      then expectLengthSynthInlineCommand source >> pure ()
+      else assertLengthSynthInlineError
+        LengthSynthCommandOptionOrderInvalid source
+
+assertLengthSynthInlineOptionRepetitions :: IO ()
+assertLengthSynthInlineOptionRepetitions =
+  mapM_ (assertLengthSynthInlineError LengthSynthCommandOptionOrderInvalid
+      . inlineLengthCommandFromGroups)
+    [ take index inlineLengthOptionGroups ++ [option, option] ++
+        drop (index + 1) inlineLengthOptionGroups
+    | (index, option) <- zip [0 ..] inlineLengthOptionGroups
+    ]
+
+assertLengthSynthInlineContractExclusion :: IO ()
+assertLengthSynthInlineContractExclusion =
+  mapM_ (assertLengthSynthInlineError
+      LengthSynthCommandContractSourcesMutuallyExclusive)
+    [ "--length-contract /tmp/request.json --behavior-mode filter " ++
+        "--length-model list-scalar-exact-cases --length-inputs arg0 " ++
+        "--where 0=0 -- Goal"
+    , "--behavior-mode filter --length-model list-scalar-exact-cases " ++
+        "--length-inputs arg0 --length-contract /tmp/request.json " ++
+        "--where 0=0 -- Goal"
+    ]
+
+assertLengthSynthInlineExactOwnership :: IO ()
+assertLengthSynthInlineExactOwnership = do
+  mapM_ assertLengthSynthInlineNothing
+    [ "--length-modelled list-scalar-exact-cases --length-inputs arg0 " ++
+        "--where 0=0 -- Goal"
+    , "--behavior-mode filter --length-model=list-scalar-exact-cases " ++
+        "--length-inputs=arg0 --where=0=0 -- Goal"
+    , "List Nat --length-model list-scalar-exact-cases " ++
+        "--length-inputs arg0 --where 0=0 -- Goal"
+    , "--behavior-mode filter -- List Nat --length-model " ++
+        "list-scalar-exact-cases --length-inputs arg0 --where 0=0"
+    ]
+  command <- expectLengthSynthInlineCommand $ scalarInlineLengthCommand
+    "arg0" "0=0"
+    "--length-model --length-inputs --where --length-contract"
+  lengthSynthInlineCommandGoal command @?=
+    "--length-model --length-inputs --where --length-contract"
+
+assertLeanLengthWhereInputAcceptance :: IO ()
+assertLeanLengthWhereInputAcceptance = do
+  inputs <- expectLeanLengthWhereInputSource "arg0,arg1,arg7"
+  source <- expectLeanLengthWhereSource
+    $ mkLeanLengthWherePlan LeanListScalarExactCases inputs
+    "len(result)=len(arg7)"
+  resolveLeanLengthWhereSource 8 source @?=
+    Right (inlineScalarSelection
+      [ LengthObservedSpine
+      , LengthObservedSpine
+      , LengthUnobservedTarget
+      , LengthUnobservedTarget
+      , LengthUnobservedTarget
+      , LengthUnobservedTarget
+      , LengthUnobservedTarget
+      , LengthObservedSpine
+      ]
+      (LengthEqual
+        (LengthVariable LengthResult)
+        (LengthVariable $ LengthInput 2)))
+  _ <- expectLeanLengthWhereInputSource "arg0,arg2,arg7"
+  pure ()
+
+assertLeanLengthWhereInputRefusals :: IO ()
+assertLeanLengthWhereInputRefusals = do
+  mapM_ (assertLeanLengthWhereInputError LeanLengthWhereInputMalformed)
+    ["", "arg", "arg-1", "arg0,", ",arg0", "arg0,,arg1", "arg0;arg1"]
+  mapM_ (assertLeanLengthWhereInputError
+      LeanLengthWhereInputsNotStrictlyIncreasing)
+    ["arg0,arg0", "arg2,arg1", "arg0,arg00"]
+
+assertLeanLengthWhereInputBound :: IO ()
+assertLeanLengthWhereInputBound = do
+  assertLeanLengthWhereInputError
+    (LeanLengthWhereInputLimitExceeded 7 8) "arg8"
+  let huge = "arg" ++ replicate 131072 '9'
+      commandSource = scalarInlineLengthCommand huge "0=0" "Goal"
+  productive <- timeout 1000000 $ evaluate
+    $ parseLengthSynthInlineCommand commandSource
+  case productive of
+    Nothing -> assertFailure "hostile inline Length input did not terminate"
+    Just (Left actual) -> actual @?=
+      LengthSynthCommandLengthInputLimitExceeded 7 8
+    Just (Right _) -> assertFailure "hostile inline Length input was admitted"
+
+assertLeanLengthWhereClauseBytes :: IO ()
+assertLeanLengthWhereClauseBytes = do
+  let externalWhitespace =
+        "--behavior-mode filter --length-model list-scalar-exact-cases " ++
+        "--length-inputs arg0 --where \r\n\t " ++
+        "len(result) = len(arg0) \t\r\n -- Goal"
+  resolved <- expectLengthSynthInlineSelection 1 externalWhitespace
+  resolved @?= inlineScalarSelection [LengthObservedSpine]
+    (LengthEqual
+      (LengthVariable LengthResult)
+      (LengthVariable $ LengthInput 0))
+
+  let internalWhitespace =
+        "--behavior-mode filter --length-model list-scalar-exact-cases " ++
+        "--length-inputs arg0 --where \r\n\t 0=0 \t \955 \r\n -- Goal"
+  command <- expectLengthSynthInlineCommand internalWhitespace
+  case parseLeanLengthWhereSource
+      $ lengthSynthInlineCommandWherePlan command of
+    Left actual -> actual @?= LeanLengthWhereParseRejected
+      (Djex.LengthWhereNonAsciiByte 6)
+    Right _ -> assertFailure "non-ASCII inline Length clause was admitted"
+
+assertLeanLengthWhereRoleCompaction :: IO ()
+assertLeanLengthWhereRoleCompaction = do
+  resolved <- expectLengthSynthInlineSelection 3
+    $ scalarInlineLengthCommand "arg0,arg2"
+        "len(result)=len(arg2)+len(arg0)" "Goal"
+  resolved @?= inlineScalarSelection
+    [LengthObservedSpine, LengthUnobservedTarget, LengthObservedSpine]
+    (LengthEqual
+      (LengthVariable LengthResult)
+      (LengthSum
+        [ LengthVariable $ LengthInput 0
+        , LengthVariable $ LengthInput 1
+        ]))
+
+assertLeanLengthWhereUnusedObservedInput :: IO ()
+assertLeanLengthWhereUnusedObservedInput = do
+  resolved <- expectLengthSynthInlineSelection 3
+    $ scalarInlineLengthCommand "arg0,arg2"
+        "len(result)=len(arg0)" "Goal"
+  resolved @?= inlineScalarSelection
+    [LengthObservedSpine, LengthUnobservedTarget, LengthObservedSpine]
+    (LengthEqual
+      (LengthVariable LengthResult)
+      (LengthVariable $ LengthInput 0))
+
+assertLeanLengthWhereResolutionRefusals :: IO ()
+assertLeanLengthWhereResolutionRefusals = do
+  assertLengthSynthInlineResolutionError
+    (LeanLengthWhereElaborationRejected
+      $ Djex.LengthWherePhysicalArgumentNotObserved 1)
+    3 $ scalarInlineLengthCommand "arg0"
+      "len(result)=len(arg1)" "Goal"
+  assertLengthSynthInlineResolutionError
+    (LeanLengthWhereInputOutOfRange 2 2)
+    2 $ scalarInlineLengthCommand "arg2" "0=0" "Goal"
+  assertLengthSynthInlineResolutionError
+    (LeanLengthWherePhysicalArrowLimitExceeded 8 9)
+    9 $ scalarInlineLengthCommand "arg7"
+      "len(result.first)=0" "Goal"
+
+assertLeanLengthWhereResultDomains :: IO ()
+assertLeanLengthWhereResultDomains = do
+  assertLengthSynthInlineResolutionError
+    (LeanLengthWhereElaborationRejected
+      $ Djex.LengthWhereScalarDomainPairResult
+          Djex.LengthSpinePairFirst)
+    1 $ scalarInlineLengthCommand "arg0"
+      "len(result.first)=0" "Goal"
+  assertLengthSynthInlineResolutionError
+    (LeanLengthWhereElaborationRejected
+      Djex.LengthWhereBinaryProductDomainScalarResult)
+    1 $ pairInlineLengthCommand "arg0" "len(result)=0" "Goal"
+
+assertLeanLengthWhereOpacity :: IO ()
+assertLeanLengthWhereOpacity = do
+  commandSource <- readFile "src/Leant/Synth/Length/Command.hs"
+  whereSource <- readFile "src/Leant/Synth/Length/Where.hs"
+  let exportHeader source = unlines
+        . takeWhile (not . isInfixOf ") where")
+        $ lines source
+      declaration start end source = unlines
+        . takeWhile (not . isInfixOf end)
+        . dropWhile (not . isInfixOf start)
+        $ lines source
+      normalize = unwords . words
+      rawTypes =
+        [ ( "LengthSynthInlineCommand"
+          , commandSource
+          , declaration "data LengthSynthInlineCommand ="
+              "-- | Closed command-layer failures." commandSource
+          , "data LengthSynthInlineCommand = LengthSynthInlineCommand " ++
+              "LeanLengthWherePlan String"
+          )
+        , ( "LeanLengthWhereInputSource"
+          , whereSource
+          , declaration "newtype LeanLengthWhereInputSource ="
+              "-- | Closed lexical refusals" whereSource
+          , "newtype LeanLengthWhereInputSource = " ++
+              "LeanLengthWhereInputSource [Natural]"
+          )
+        , ( "LeanLengthWherePlan"
+          , whereSource
+          , declaration "data LeanLengthWherePlan ="
+              "-- | A bounded Djex source" whereSource
+          , "data LeanLengthWherePlan = LeanLengthWherePlan " ++
+              "!LeanLengthWhereModel !LeanLengthWhereInputSource String"
+          )
+        , ( "LeanLengthWhereSource"
+          , whereSource
+          , declaration "data LeanLengthWhereSource ="
+              "-- | Sanitized refusal" whereSource
+          , "data LeanLengthWhereSource = LeanLengthWhereSource " ++
+              "!LeanLengthWhereModel !LeanLengthWhereInputSource " ++
+              "Djex.LengthWhereSource"
+          )
+        ]
+  mapM_ (\(name, source, rawDeclaration, representation) -> do
+      let exports = exportHeader source
+          normalizedDeclaration = normalize rawDeclaration
+      assertBool (name ++ " is not exported opaquely")
+        $ ("  , " ++ name) `elem` lines exports
+      assertBool (name ++ " exposed its constructor")
+        $ not $ (name ++ " (..)") `isInfixOf` exports
+      assertBool (name ++ " stopped using the intended positional form")
+        $ normalize representation `isInfixOf` normalizedDeclaration
+      assertBool (name ++ " acquired record fields")
+        $ not $ "{" `isInfixOf` rawDeclaration
+      assertBool (name ++ " acquired a deriving clause")
+        $ not $ "deriving" `isInfixOf` rawDeclaration
+      mapM_ (\className -> assertBool
+          (name ++ " acquired a " ++ className ++ " instance")
+          $ not $ ("instance " ++ className ++ " " ++ name)
+              `isInfixOf` source)
+        ["Eq", "Show", "Generic"])
+    rawTypes
+
+assertLeanLengthWherePassiveArchitecture :: IO ()
+assertLeanLengthWherePassiveArchitecture = do
+  mainLines <- lines <$> readFile "src/Main.hs"
+  integrationSource <- readFile "src/Leant/Synth/Length/Integration.hs"
+  let mainSource = unlines mainLines
+      commandImport = unlines $ mainSourceSection
+        "import Leant.Synth.Length.Command"
+        "import Leant.Synth.Length.Contract.File.Acquire" mainLines
+      passiveNames =
+        [ "parseLengthSynthInlineCommand"
+        , "lengthSynthInlineCommandWherePlan"
+        , "parseLeanLengthWhereSource"
+        , "resolveLeanLengthWhereSource"
+        ]
+  mapM_ (\(label, source) -> mapM_ (\name -> assertBool
+      (label ++ " referenced passive inline authority " ++ name)
+      $ not $ name `isInfixOf` source) passiveNames)
+    [("Main", mainSource), ("Integration", integrationSource)]
+  assertBool "Main imported the passive Length where module"
+    $ not $ "Leant.Synth.Length.Where" `isInfixOf` mainSource
+  assertBool "Integration imported the passive Length where module"
+    $ not $ "Leant.Synth.Length.Where" `isInfixOf` integrationSource
+  assertBool "Main stopped importing the established parser"
+    $ "parseLengthSynthCommand" `isInfixOf` commandImport
+  assertBool "Main stopped calling only the established parser"
+    $ "case parseLengthSynthCommand rawArg of" `isInfixOf` mainSource
+
+inlineLengthOptionGroups :: [String]
+inlineLengthOptionGroups =
+  [ "--behavior-mode filter"
+  , "--length-model list-scalar-exact-cases"
+  , "--length-inputs arg0"
+  , "--where len(result)=len(arg0)"
+  ]
+
+inlineLengthCommandFromGroups :: [String] -> String
+inlineLengthCommandFromGroups groups =
+  unwords $ groups ++ ["--", "Goal"]
+
+scalarInlineLengthCommand :: String -> String -> String -> String
+scalarInlineLengthCommand inputs clause goal =
+  "--behavior-mode filter --length-model list-scalar-exact-cases " ++
+  "--length-inputs " ++ inputs ++ " --where " ++ clause ++ " -- " ++ goal
+
+pairInlineLengthCommand :: String -> String -> String -> String
+pairInlineLengthCommand inputs clause goal =
+  "--behavior-mode filter " ++
+  "--length-model list-binary-product-exact-cases " ++
+  "--length-inputs " ++ inputs ++ " --where " ++ clause ++ " -- " ++ goal
+
+expectLengthSynthInlineCommand :: String -> IO LengthSynthInlineCommand
+expectLengthSynthInlineCommand source =
+  case parseLengthSynthInlineCommand source of
+    Left failure -> assertFailure
+      ("unexpected inline Length command rejection: " ++ show failure)
+        >> error "unreachable"
+    Right Nothing -> assertFailure "inline Length command was not recognized"
+      >> error "unreachable"
+    Right (Just command) -> pure command
+
+assertLengthSynthInlineError
+  :: LengthSynthInlineCommandError
+  -> String
+  -> IO ()
+assertLengthSynthInlineError expected source =
+  case parseLengthSynthInlineCommand source of
+    Left actual -> actual @?= expected
+    Right Nothing -> assertFailure
+      $ "inline Length command was unowned; expected " ++ show expected
+    Right (Just _) -> assertFailure
+      $ "inline Length command was admitted; expected " ++ show expected
+
+assertLengthSynthInlineNothing :: String -> IO ()
+assertLengthSynthInlineNothing source =
+  case parseLengthSynthInlineCommand source of
+    Left failure -> assertFailure
+      $ "opaque goal was rejected as inline Length syntax: " ++ show failure
+    Right Nothing -> pure ()
+    Right (Just _) -> assertFailure "opaque goal was claimed as inline Length syntax"
+
+expectLeanLengthWhereInputSource
+  :: String
+  -> IO LeanLengthWhereInputSource
+expectLeanLengthWhereInputSource source =
+  case parseLeanLengthWhereInputSource source of
+    Left failure -> assertFailure
+      ("unexpected inline Length input rejection: " ++ show failure)
+        >> error "unreachable"
+    Right inputs -> pure inputs
+
+assertLeanLengthWhereInputError
+  :: LeanLengthWhereInputSourceError
+  -> String
+  -> IO ()
+assertLeanLengthWhereInputError expected source =
+  case parseLeanLengthWhereInputSource source of
+    Left actual -> actual @?= expected
+    Right _ -> assertFailure
+      $ "inline Length inputs were admitted; expected " ++ show expected
+
+expectLeanLengthWhereSource
+  :: LeanLengthWherePlan
+  -> IO LeanLengthWhereSource
+expectLeanLengthWhereSource plan = case parseLeanLengthWhereSource plan of
+  Left failure -> assertFailure
+    ("unexpected inline Length where rejection: " ++ show failure)
+      >> error "unreachable"
+  Right source -> pure source
+
+resolveLengthSynthInlineCommand
+  :: Natural
+  -> LengthSynthInlineCommand
+  -> IO LeanLengthContractSelection
+resolveLengthSynthInlineCommand arity command = do
+  source <- expectLeanLengthWhereSource
+    $ lengthSynthInlineCommandWherePlan command
+  case resolveLeanLengthWhereSource arity source of
+    Left failure -> assertFailure
+      ("unexpected inline Length resolution refusal: " ++ show failure)
+        >> error "unreachable"
+    Right selection -> pure selection
+
+expectLengthSynthInlineSelection
+  :: Natural
+  -> String
+  -> IO LeanLengthContractSelection
+expectLengthSynthInlineSelection arity source =
+  expectLengthSynthInlineCommand source >>=
+    resolveLengthSynthInlineCommand arity
+
+assertLengthSynthInlineResolutionError
+  :: LeanLengthWhereSourceError
+  -> Natural
+  -> String
+  -> IO ()
+assertLengthSynthInlineResolutionError expected arity source = do
+  command <- expectLengthSynthInlineCommand source
+  parsed <- expectLeanLengthWhereSource
+    $ lengthSynthInlineCommandWherePlan command
+  case resolveLeanLengthWhereSource arity parsed of
+    Left actual -> actual @?= expected
+    Right _ -> assertFailure
+      $ "inline Length source resolved; expected " ++ show expected
+
+inlineScalarSelection
+  :: [LengthTargetArgumentRole]
+  -> LengthFormula LengthContractVariable
+  -> LeanLengthContractSelection
+inlineScalarSelection roles postcondition =
+  LeanLengthScalarContractSelection LeanLengthContract
+    { leanLengthContractSpine = inlineLengthListSpine
+    , leanLengthContractTargetArgumentRoles = roles
+    , leanLengthContractCandidateCasePolicy =
+        LeanLengthExactSpineZeroStepV1
+    , leanLengthContractSource = LengthContractSource
+        { lengthContractPrecondition = LengthTruth True
+        , lengthContractPostcondition = postcondition
+        }
+    , leanLengthContractProviderLaws = []
+    }
+
+inlinePairSelection
+  :: [LengthTargetArgumentRole]
+  -> Djex.LengthFormula Djex.LengthSpinePairContractVariable
+  -> LeanLengthContractSelection
+inlinePairSelection roles postcondition =
+  LeanLengthSpinePairContractSelection LeanLengthSpinePairContract
+    { leanLengthSpinePairContractSpine = inlineLengthListSpine
+    , leanLengthSpinePairContractTargetArgumentRoles = roles
+    , leanLengthSpinePairContractCandidateCasePolicy =
+        LeanLengthExactSpineZeroStepV1
+    , leanLengthSpinePairContractSource = Djex.LengthSpinePairContractSource
+        { Djex.lengthSpinePairContractPrecondition = Djex.LengthTruth True
+        , Djex.lengthSpinePairContractPostcondition = postcondition
+        }
+    , leanLengthSpinePairContractProviderLaws = []
+    }
+
+inlineLengthListSpine :: LeanLengthSpineIdentity
+inlineLengthListSpine = LeanLengthSpineIdentity
+  { leanLengthSpineFamilyName = "List"
+  , leanLengthSpineZeroConstructorName = "List.nil"
+  , leanLengthSpineStepConstructorName = "List.cons"
+  }
 
 assertLengthSynthCommandParsing :: IO ()
 assertLengthSynthCommandParsing = do

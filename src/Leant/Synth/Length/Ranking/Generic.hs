@@ -130,9 +130,6 @@ import Leant.Synth.Length.CounterexampleBank.Internal
   ( BankBridge
   , BankContext
   , BankContextReplayHit
-  , BankPromotionFailure
-  , BankRecordFailure
-  , BankRecordOutcome (..)
   , BankReceiptOrigin (..)
   , BankReplayOutcome (..)
   , BankSurface

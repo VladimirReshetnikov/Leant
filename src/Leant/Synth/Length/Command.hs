@@ -1,18 +1,33 @@
 -- | Pure parsing for the request-scoped @:synth@ Length behavior options.
 --
--- Ordinary goals remain opaque, delimiter-free text.  Once either exact
+-- Ordinary goals remain opaque, delimiter-free text.  Once an exact current
 -- option token is recognized, the standalone @--@ delimiter is mandatory.
--- The order is fixed: behavior mode, then contract.  A contract without an
--- explicit mode keeps the established ranking operation.
+-- The established parser keeps its fixed behavior-mode/contract order.  The
+-- additive inline parser is deliberately separate and passive until Main has
+-- authorized and resolved the request in a later checkpoint.
 module Leant.Synth.Length.Command
   ( LengthBehaviorMode (..)
   , LengthSynthCommand (..)
   , LengthSynthCommandError (..)
   , parseLengthSynthCommand
+  , LengthSynthInlineCommand
+  , LengthSynthInlineCommandError (..)
+  , lengthSynthInlineCommandWherePlan
+  , lengthSynthInlineCommandGoal
+  , parseLengthSynthInlineCommand
   ) where
 
 import Data.Char (isSpace)
 import Data.List (stripPrefix)
+import Numeric.Natural (Natural)
+
+import Leant.Synth.Length.Where
+  ( LeanLengthWhereInputSourceError (..)
+  , LeanLengthWhereModel (..)
+  , LeanLengthWherePlan
+  , mkLeanLengthWherePlan
+  , parseLeanLengthWhereInputSource
+  )
 
 -- | Closed behavior-changing authority understood by the current Length
 -- integration.  Ranking retains every verified candidate; filtering may
@@ -49,6 +64,30 @@ data LengthSynthCommandError
   | LengthSynthCommandBehaviorModeMustPrecedeContract
     -- ^ @--behavior-mode@ appeared after @--length-contract@
   deriving (Bounded, Enum, Eq, Ord, Show)
+
+-- | One lexically complete inline request.  The private constructor prevents
+-- callers from bypassing the model/input parser, and the type deliberately has
+-- no 'Show' instance which could echo the retained clause.
+data LengthSynthInlineCommand = LengthSynthInlineCommand
+  LeanLengthWherePlan
+  String
+
+-- | Closed command-layer failures.  These diagnose only option structure and
+-- the bounded physical-input token; the clause itself is parsed later, after
+-- command-local policy authorization.
+data LengthSynthInlineCommandError
+  = LengthSynthCommandInlineRequiresExplicitFilter
+  | LengthSynthCommandLengthModelMissing
+  | LengthSynthCommandLengthModelInvalid
+  | LengthSynthCommandLengthInputsMissing
+  | LengthSynthCommandLengthInputsMalformed
+  | LengthSynthCommandLengthInputsNotStrictlyIncreasing
+  | LengthSynthCommandLengthInputLimitExceeded !Natural !Natural
+  | LengthSynthCommandWhereMissing
+  | LengthSynthCommandContractSourcesMutuallyExclusive
+  | LengthSynthCommandOptionOrderInvalid
+  | LengthSynthCommandInlineDelimiterMissing
+  deriving (Eq, Ord, Show)
 
 -- | Split one @:synth@ argument line.  A trimmed line that starts with an
 -- exact @--behavior-mode@ token names @rank@ or @filter@ next; a line that
@@ -102,11 +141,183 @@ parseLengthSynthCommand source = case exactOptionTail behaviorModeOption trimmed
     , lengthSynthCommandGoal = trim goal
     }
 
+-- | Project the passive inline plan without exposing its constructor or raw
+-- clause.  Runtime code must first obtain command-local policy authority before
+-- passing this value to @parseLeanLengthWhereSource@.
+lengthSynthInlineCommandWherePlan
+  :: LengthSynthInlineCommand
+  -> LeanLengthWherePlan
+lengthSynthInlineCommandWherePlan (LengthSynthInlineCommand plan _) = plan
+
+lengthSynthInlineCommandGoal :: LengthSynthInlineCommand -> String
+lengthSynthInlineCommandGoal (LengthSynthInlineCommand _ goal) = goal
+
+-- | Recognize only the new fixed-order inline form.  'Nothing' means the
+-- command belongs to the established parser, which remains unchanged and is
+-- still the sole parser called by Main in this passive checkpoint.
+--
+-- Structural order, repetition, and file/inline exclusion are checked before
+-- model and input token contents.  The clause is merely sliced here; its Djex
+-- grammar and byte limits are intentionally not duplicated in Leant.
+parseLengthSynthInlineCommand
+  :: String
+  -> Either
+      LengthSynthInlineCommandError
+      (Maybe LengthSynthInlineCommand)
+parseLengthSynthInlineCommand source =
+  case exactOptionTail behaviorModeOption trimmed of
+    Just afterBehavior -> case takeToken afterBehavior of
+      Just ("filter", afterMode)
+        | hasInlineOption optionPrefix -> do
+            validateInlineStructure optionPrefix
+            Just <$> parseAfterFilter afterMode
+        | otherwise -> Right Nothing
+      Just ("rank", _)
+        | hasInlineOption optionPrefix -> do
+            validateInlineStructure optionPrefix
+            Left LengthSynthCommandInlineRequiresExplicitFilter
+        | otherwise -> Right Nothing
+      _ -> Right Nothing
+    Nothing
+      | startsInlineOption trimmed -> do
+          validateInlineStructure optionPrefix
+          Left LengthSynthCommandInlineRequiresExplicitFilter
+      | startsContractOption trimmed && hasInlineOption optionPrefix -> do
+          validateInlineStructure optionPrefix
+          Left LengthSynthCommandContractSourcesMutuallyExclusive
+      | otherwise -> Right Nothing
+ where
+  trimmed = trim source
+  optionPrefix = commandPrefix trimmed
+
+  parseAfterFilter afterMode = case exactOptionTail lengthModelOption afterMode of
+    Nothing -> Left LengthSynthCommandLengthModelMissing
+    Just afterModel -> do
+      (model, afterModelToken) <- parseModel afterModel
+      afterInputsOption <- case exactOptionTail lengthInputsOption
+          afterModelToken of
+        Just value -> Right value
+        Nothing -> Left LengthSynthCommandLengthInputsMissing
+      (inputToken, afterInputToken) <- case takeToken afterInputsOption of
+        Just (token, rest)
+          | not (isOwnedOption token) -> Right (token, rest)
+        _ -> Left LengthSynthCommandLengthInputsMissing
+      inputs <- case parseLeanLengthWhereInputSource inputToken of
+        Left LeanLengthWhereInputMalformed ->
+          Left LengthSynthCommandLengthInputsMalformed
+        Left LeanLengthWhereInputsNotStrictlyIncreasing ->
+          Left LengthSynthCommandLengthInputsNotStrictlyIncreasing
+        Left (LeanLengthWhereInputLimitExceeded maximumIndex observed) ->
+          Left $ LengthSynthCommandLengthInputLimitExceeded
+            maximumIndex observed
+        Right value -> Right value
+      afterWhere <- case exactOptionTail lengthWhereOption afterInputToken of
+        Just value -> Right value
+        Nothing -> Left LengthSynthCommandWhereMissing
+      case splitDelimiter afterWhere of
+        Nothing
+          | null afterWhere -> Left LengthSynthCommandWhereMissing
+          | otherwise -> Left LengthSynthCommandInlineDelimiterMissing
+        Just (clause, goal)
+          | null clause -> Left LengthSynthCommandWhereMissing
+          | otherwise -> Right $ LengthSynthInlineCommand
+              (mkLeanLengthWherePlan model inputs clause) (trim goal)
+
+  parseModel sourceAfterOption = case takeToken sourceAfterOption of
+    Nothing -> Left LengthSynthCommandLengthModelMissing
+    Just (token, _)
+      | isOwnedOption token -> Left LengthSynthCommandLengthModelMissing
+    Just (token, rest) -> case token of
+      "list-scalar-exact-cases" ->
+        Right (LeanListScalarExactCases, rest)
+      "list-binary-product-exact-cases" ->
+        Right (LeanListBinaryProductExactCases, rest)
+      _ -> Left LengthSynthCommandLengthModelInvalid
+
 behaviorModeOption :: String
 behaviorModeOption = "--behavior-mode"
 
 lengthContractOption :: String
 lengthContractOption = "--length-contract"
+
+lengthModelOption, lengthInputsOption, lengthWhereOption :: String
+lengthModelOption = "--length-model"
+lengthInputsOption = "--length-inputs"
+lengthWhereOption = "--where"
+
+inlineOptions :: [String]
+inlineOptions = [lengthModelOption, lengthInputsOption, lengthWhereOption]
+
+allOwnedOptions :: [String]
+allOwnedOptions = behaviorModeOption : lengthContractOption : inlineOptions
+
+startsInlineOption :: String -> Bool
+startsInlineOption source = any hasTail inlineOptions
+ where
+  hasTail option = case exactOptionTail option source of
+    Just _ -> True
+    Nothing -> False
+
+startsContractOption :: String -> Bool
+startsContractOption source = case exactOptionTail lengthContractOption source of
+  Just _ -> True
+  Nothing -> False
+
+hasInlineOption :: String -> Bool
+hasInlineOption source = any (`elem` inlineOptions) $ words source
+
+isOwnedOption :: String -> Bool
+isOwnedOption token = token `elem` allOwnedOptions || token == "--"
+
+-- | Validate only structural properties whose precedence is earlier than
+-- model/input contents.  Missing options are left to the precise field parser.
+validateInlineStructure
+  :: String
+  -> Either LengthSynthInlineCommandError ()
+validateInlineStructure source
+  | lengthContractOption `elem` tokens =
+      Left LengthSynthCommandContractSourcesMutuallyExclusive
+  | any repeated allInlineOptions =
+      Left LengthSynthCommandOptionOrderInvalid
+  | not $ increasing presentPositions =
+      Left LengthSynthCommandOptionOrderInvalid
+  | otherwise = Right ()
+ where
+  tokens = words source
+  allInlineOptions = behaviorModeOption : inlineOptions
+  repeated option = count option tokens > 1
+  presentPositions =
+    [ position
+    | option <- allInlineOptions
+    , Just position <- [firstPosition option tokens]
+    ]
+
+count :: Eq value => value -> [value] -> Int
+count sought = length . filter (== sought)
+
+firstPosition :: Eq value => value -> [value] -> Maybe Int
+firstPosition sought = go 0
+ where
+  go _ [] = Nothing
+  go index (value : rest)
+    | value == sought = Just index
+    | otherwise = go (index + 1) rest
+
+increasing :: Ord value => [value] -> Bool
+increasing values = case values of
+  [] -> True
+  first : rest -> go first rest
+ where
+  go _ [] = True
+  go previous (current : remaining) =
+    previous < current && go current remaining
+
+-- | Text before the first standalone delimiter.  Option-like words in the
+-- opaque Lean goal therefore never participate in command ownership.
+commandPrefix :: String -> String
+commandPrefix source = case splitDelimiter source of
+  Just (prefix, _) -> prefix
+  Nothing -> source
 
 -- | Match one exact option token and trim the separating whitespace.  Longer
 -- lookalike prefixes remain ordinary goal text.
