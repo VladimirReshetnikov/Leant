@@ -1186,6 +1186,62 @@ deduplication, note-presentation policy, survivor quota, `ReplState` field, or
 counterexample-directed engine request; those private orchestration choices
 remain in Main.
 
+## Scoped parallel `EngineBoth` structural baseline
+
+The first concurrency checkpoint lives in Main rather than in the pure Engine
+API. `runTunedSynthesis` and its `EngineBoth` branch remain serial and retain
+their established left-to-right failure behavior. Main admits the private
+parallel path only for the initial, provider-free structural baseline when all
+of these conditions hold:
+
+- the selected engine is `EngineBoth`;
+- `SynthLimits` equals `defaultSynthLimits`: 5 shown, 12 verified per
+  standalone lane, a 60-group observation window, no Djinn choice-point
+  budget, and an Exference queue bound of 1024;
+- the goal selected no rated library premise;
+- the assessment policy is disabled or rank, so the lane is one-batch and
+  cannot request a filter successor; and
+- `getNumCapabilities` reports at least two RTS capabilities.
+
+`rsSynthSteps` is not part of `SynthLimits`, so `:set synth-steps N` remains
+eligible. Provider discovery may also remain enabled: eligibility concerns the
+provider-free first lane, not whether a later serial provider stage can be
+reached. Conversely, an applicable selected library premise, filter mode, a
+retuned shown/verify/window/budget/queue setting, a provider lane, or a
+classical lane stays on the established serial path. Lean verification and
+post-verification behavioral assessment are serial in every case.
+
+For an admitted baseline, Main constructs the existing standalone Djinn and
+Exference outcomes and passes two strict-prefix actions to the private
+`runParallelEitherPairOrdered` helper. Nested `withAsync` scopes start both
+workers before either result is observed. Main waits for Djinn first and then
+Exference, preserving the established left-first value/error precedence.
+Leaving either scope cancels and joins unfinished work; the same cleanup owns
+normal left failure, worker exceptions, command timeout, and caller
+cancellation. Each worker forces only `synthLimitTried`, 12 groups at the
+defaults, rather than its complete lazy trace.
+
+The whole pair is forced beneath the command's already captured absolute
+deadline. A timeout returns a genuine empty `SynthLaneRunTimedOut` receipt:
+no outcome, notes, checked-frontier spelling, or group count is probed from
+the cancelled work. Successful branches are joined before Main applies the
+existing `mergeDetailedOutcomesSkipping Set.empty`, so combined ordering and
+exact-text deduplication remain Engine-owned and deterministic. Cross-lane
+duplicates can make the merged cursor demand a worker tail beyond its forced
+12-group prefix. That extra demand happens serially after the workers have
+joined, when the unchanged cursor driver forces the combined batch beneath
+the remaining part of the same absolute deadline.
+
+The executable is built with the threaded runtime but has no default
+`-with-rtsopts=-N2` and exposes no `:set synth-jobs` control. With one
+capability, including an explicit `+RTS -N1 -RTS`, Main bypasses pair
+construction and calls the exact pre-existing serial `EngineBoth` path. With
+at least two capabilities the narrow path above is eligible; the initial
+quartic benchmark found it slower, so the checkpoint establishes scoped
+ownership and deterministic equivalence rather than a performance claim. See
+the dated
+[scoped parallel baseline report](reports/2026-08-20-scoped-parallel-engine-both-baseline.md).
+
 ## Main's progressive same-run cursor scheduler
 
 Main adds three private, lazy representation boundaries with no `Eq` or `Show`

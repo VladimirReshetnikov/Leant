@@ -1086,6 +1086,22 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   by alternating tails: the Djinn head is one short of `synth-shown` and each
   front runs to `synth-verify`, so retuning either setting reshapes the
   interleave accordingly.
+  The first multicore checkpoint overlaps those two searches only for the
+  provider-free structural baseline when `both` is selected, no library
+  premises were selected for the goal, the five `SynthLimits` settings retain
+  their defaults (shown 5, verify 12, window 60, budget off, queue 1024), the
+  behavioral mode is disabled or ranking, and the RTS exposes at least two
+  capabilities. `synth-steps` is deliberately independent of that gate and
+  may still be retuned. Each scoped worker prepares 12 groups; Leant then uses
+  the same deterministic merge and performs Lean verification serially. All
+  provider, library-premise, filter-successor, classical, and retuned-limit
+  lanes remain serial. The executable is threaded but does not select `-N2`
+  by default and there is no public synthesis-jobs setting: start it with
+  `+RTS -N2 -RTS` to admit this checkpoint, or `+RTS -N1 -RTS` to take the
+  exact original serial path. The initial quartic benchmark was about 10.1%
+  slower at `-N2`, so this is cancellation-safe groundwork, not a speedup
+  claim; see the
+  [scoped parallel baseline report](docs/reports/2026-08-20-scoped-parallel-engine-both-baseline.md).
   Within each Exference invocation, Leant stable-deduplicates rendered groups
   before applying the internal 60-candidate collection window
   (`:set synth-window N`). The first

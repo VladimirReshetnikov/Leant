@@ -31,7 +31,10 @@ engines and a validated one-layer eliminator in Exference. That eliminator
 preserves the established strict candidate prefix, retrying with intentionally
 unused inputs only after a strict search miss and rendering omitted fields as
 Lean wildcards. Phase 4 and a persistent Mathlib-scale inventory remain future
-work; the implemented post-phase-2 increments are detailed in §7. Companion to
+work. One bounded concurrency checkpoint now overlaps the independent Djinn
+and Exference halves of an eligible provider-free `EngineBoth` baseline, but
+its first benchmark is slower and does not support a speedup claim. The
+implemented post-phase-2 increments are detailed in §7. Companion to
 [PROPOSALS.md](PROPOSALS.md).*
 
 Djex — vendored read-only in this repository as the
@@ -680,6 +683,34 @@ This pair is independent of the provider-free/provider-enriched orchestration
 above; if both provider passes are reached, each invocation applies the same
 strict-first rule within the one shared command deadline.
 
+### Scoped parallel combined baseline (implemented checkpoint)
+
+Main now overlaps Djinn and Exference only for the provider-free structural
+baseline of `EngineBoth` when no library premise was selected, the ordinary
+lane is disabled/rank one-batch, all five `SynthLimits` values retain their
+defaults (shown 5, verify 12, window 60, budget off, queue 1024), and the RTS
+offers at least two capabilities. `synth-steps` remains independently
+retunable. Providers, selected library premises, filter successors, classical
+routes, retuned limits, Lean verification, and behavioral assessment all keep
+their serial scheduling.
+
+Two scoped async workers force 12 standalone groups each under the already
+captured command deadline. Results are observed Djinn-first; scope exit cancels
+and joins unfinished work. The workers join before the established
+deterministic combined merge. If cross-lane exact-text duplicates require a
+tail beyond either forced prefix, that tail is demanded serially by the cursor
+under the remaining same deadline. A pair timeout yields an empty timeout
+receipt without probing cancelled work. `+RTS -N1 -RTS` bypasses construction
+of the pair and enters the exact historical serial `EngineBoth` path.
+
+This is an ownership and equivalence foundation, not a default performance
+feature. The executable has no default `-N2` and there is no public jobs
+setting. On the fixed quartic rank-N workload, five `-N2` samples produced a
+0.908x serial/parallel median ratio: the parallel path was about 10.1% slower.
+More granular search or verification parallelism needs separate measurement
+and design. The checkpoint and benchmark are recorded in the
+[scoped parallel baseline report](reports/2026-08-20-scoped-parallel-engine-both-baseline.md).
+
 Design rules, all inherited from Djex:
 
 1. **Checked boundaries.** The translator refuses anything outside the
@@ -885,8 +916,10 @@ Design rules, all inherited from Djex:
   opaque-type-plus-constructor-premise behavior.
 - **Phase 4 — research horizon (not scheduled).** Dependent goals,
   `Decidable` instance synthesis, interaction with `exact?` as a
-  sub-oracle inside the search (Djex's `both` backend mode suggests the
-  UX: run LJT and the heuristic in parallel, label the sources).
+  sub-oracle inside the search, and broader measured concurrency across
+  provider, engine-internal, or isolated-verification work. The narrow
+  provider-free `EngineBoth` overlap in §3 is implemented groundwork, not
+  evidence that those wider designs will be faster.
 
 ## 5. Honest limitations
 
@@ -1026,6 +1059,9 @@ LRU now removes repeated inventory round-trips without changing startup
 discipline, and synthesis-history appends replay only their suffix. The
 next phase-3 work should measure those latency gains and improve relevance
 beyond a single target root; stable project-local ratings are already exposed.
+The first scoped `EngineBoth` overlap is also implemented, but its quartic
+benchmark regressed, so it should remain opt-in through RTS capabilities while
+later parallel seams are designed and measured independently.
 
 ## 7. Post-phase-2 proposals
 
