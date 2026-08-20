@@ -11897,7 +11897,7 @@ assertLeanLengthWhereRuntimeArchitecture = do
         "case resolveSynthCommandGoal state" commandSection
   length goalResolutions @?= 2
   goalResolution <- case goalResolutions of
-    _ : inlineGoal : [] -> pure inlineGoal
+    [_, inlineGoal] -> pure inlineGoal
     _ -> assertFailure "Main lost one of its two command goal sources"
       >> error "unreachable"
   authorization <- expectMainSourcePosition "inline command precedence"
@@ -13047,7 +13047,7 @@ assertLengthAssessmentScalarFilterDispatch
 
         inlineSelection <- expectLengthSynthInlineSelection 1
           $ scalarInlineLengthCommand "arg0"
-              ("len(result)=len(arg0)+min(len(arg0),1)")
+              "len(result)=len(arg0)+min(len(arg0),1)"
               "List Nat -> List Nat"
         inlineContract <- case inlineSelection of
           LeanLengthScalarContractSelection contract -> pure contract
