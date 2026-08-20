@@ -80,7 +80,11 @@ Executable leant
   Ghc-Options:
     -Wall
     -Wcompat
+    -Wincomplete-record-updates
     -Wincomplete-uni-patterns
+    -Wpartial-fields
+    -Wredundant-constraints
+    -Wunused-packages
     -threaded
   Build-Depends:
     base       >= 4.19 && < 5,
@@ -94,9 +98,7 @@ Executable leant
     process    >= 1.6  && < 1.7,
     text       >= 2.0  && < 2.2,
     time       >= 1.12 && < 1.15
-  if os(windows)
-    Build-Depends: Win32 >= 2.13 && < 2.15
-  else
+  if !os(windows)
     Build-Depends: unix >= 2.8 && < 2.9
 
 Test-Suite leant-synth-tests
@@ -152,7 +154,11 @@ Test-Suite leant-synth-tests
   Ghc-Options:
     -Wall
     -Wcompat
+    -Wincomplete-record-updates
     -Wincomplete-uni-patterns
+    -Wpartial-fields
+    -Wredundant-constraints
+    -Wunused-packages
   Build-Tool-Depends:
     djex:djex-fake-z3
   Build-Depends:
