@@ -34,6 +34,13 @@ for arg in "$@"; do
   esac
 done
 
+# A transcript records what the engines answer, not how fast this machine
+# answers it.  The interactive 20-second wall clock would turn a slow box, a
+# cold cache, or a loaded CI runner into a "did not finish" line and a failed
+# golden, so the suite searches under a deliberately generous budget instead.
+# Export a different LEANT_SYNTH_TIMEOUT to override it (0 waits forever).
+export LEANT_SYNTH_TIMEOUT="${LEANT_SYNTH_TIMEOUT:-600}"
+
 filter() {
   # Drop the volatile startup lines, and any CR a Windows checkout may
   # still introduce.  Normalize prompt-only continuation lines too: the REPL

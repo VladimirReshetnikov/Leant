@@ -35,6 +35,7 @@ import Leant.Synth.Length.Contract
   ( LeanLengthContractSelection (..)
   )
 
+-- | The exact @format@ string a contract-only document must carry.
 lengthContractFileFormat :: Text
 lengthContractFileFormat = "leant-finite-list-spine-length-contract"
 
@@ -44,12 +45,15 @@ lengthContractFileFormat = "leant-finite-list-spine-length-contract"
 lengthContractFileJsonLimits :: BoundedJsonLimits
 lengthContractFileJsonLimits = lengthRankingConfigurationFileJsonLimits
 
+-- | Which root field of the contract-only grammar a refusal names.
 data LengthContractFileField
   = LengthContractFileFormatField
   | LengthContractFileRankingDomainField
   | LengthContractFileContractField
   deriving (Bounded, Enum, Eq, Ord, Show)
 
+-- | The JSON value shape a root field required when a type mismatch is
+-- reported.
 data LengthContractFileValueType
   = LengthContractFileObjectValue
   | LengthContractFileStringValue

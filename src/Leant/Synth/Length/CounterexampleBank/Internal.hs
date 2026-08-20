@@ -16,8 +16,40 @@
 -- separate input-only insertion which performs no second evaluation.  Fresh
 -- established or simplified receipts likewise cross Djex's recording bridge
 -- exactly once before their inputs may be retained.
+--
+-- Both Length domains own, replay, promote and record through exactly this
+-- control flow; they differ only in the Djex vocabulary each spells.  The
+-- shared section below holds the flow once, over types parameterized by the
+-- domain's own limits, bank, scope, sample, receipt and error types -- so a
+-- scalar state and a binary-product state remain distinct types which no
+-- transition can confuse -- and each domain supplies one 'BankBridge' saying
+-- how Djex answers for it.
+
 module Leant.Synth.Length.CounterexampleBank.Internal
-  ( LengthCounterexampleBankState
+  ( BankState
+  , BankContext
+  , BankSurface (..)
+  , BankBridge (..)
+  , BankReplayStep (..)
+  , BankRecordStep (..)
+  , BankReplayFailure (..)
+  , BankReplayRefusal (..)
+  , BankReplayHit
+  , BankReplayOutcome (..)
+  , BankContextReplayHit
+  , bankContextReplayHitCounterexample
+  , replayBankInContext
+  , BankPromotionFailure (..)
+  , promoteBankReplayHitInContext
+  , BankReceiptOrigin (..)
+  , BankRecordFailure (..)
+  , BankRecordOutcome (..)
+  , recordBankReceiptInContext
+  , scalarBankSurface
+  , scalarBankBridge
+  , spinePairBankSurface
+  , spinePairBankBridge
+  , LengthCounterexampleBankState
   , emptyLengthCounterexampleBankState
   , defaultLengthCounterexampleBankState
   , lengthCounterexampleBankStateActiveBank
@@ -25,22 +57,20 @@ module Leant.Synth.Length.CounterexampleBank.Internal
   , withLengthCounterexampleBankContext
   , withDefaultLengthCounterexampleBankContext
   , readLengthCounterexampleBankContextState
-  , LengthCounterexampleBankReplayFailure (..)
-  , LengthCounterexampleBankReplayRefusal (..)
+  , LengthCounterexampleBankReplayRefusal
   , LengthCounterexampleBankReplayHit
   , lengthCounterexampleBankReplayHitCounterexample
-  , LengthCounterexampleBankReplayOutcome (..)
+  , LengthCounterexampleBankReplayOutcome
   , replayLengthCounterexampleBank
   , LengthCounterexampleBankContextReplayHit
   , lengthCounterexampleBankContextReplayHitCounterexample
-  , LengthCounterexampleBankContextReplayOutcome (..)
+  , LengthCounterexampleBankContextReplayOutcome
   , replayLengthCounterexampleBankInContext
-  , LengthCounterexampleBankPromotionFailure (..)
+  , LengthCounterexampleBankPromotionFailure
   , promoteLengthCounterexampleBankReplayHit
   , promoteLengthCounterexampleBankReplayHitInContext
-  , LengthCounterexampleBankReceiptOrigin (..)
-  , LengthCounterexampleBankRecordFailure (..)
-  , LengthCounterexampleBankRecordOutcome (..)
+  , LengthCounterexampleBankRecordFailure
+  , LengthCounterexampleBankRecordOutcome
   , recordLengthCounterexampleBankReceipt
   , recordLengthCounterexampleBankReceiptInContext
   , LengthSpinePairCounterexampleBankState
@@ -51,28 +81,26 @@ module Leant.Synth.Length.CounterexampleBank.Internal
   , withLengthSpinePairCounterexampleBankContext
   , withDefaultLengthSpinePairCounterexampleBankContext
   , readLengthSpinePairCounterexampleBankContextState
-  , LengthSpinePairCounterexampleBankReplayFailure (..)
-  , LengthSpinePairCounterexampleBankReplayRefusal (..)
+  , LengthSpinePairCounterexampleBankReplayRefusal
   , LengthSpinePairCounterexampleBankReplayHit
   , lengthSpinePairCounterexampleBankReplayHitCounterexample
-  , LengthSpinePairCounterexampleBankReplayOutcome (..)
+  , LengthSpinePairCounterexampleBankReplayOutcome
   , replayLengthSpinePairCounterexampleBank
   , LengthSpinePairCounterexampleBankContextReplayHit
   , lengthSpinePairCounterexampleBankContextReplayHitCounterexample
-  , LengthSpinePairCounterexampleBankContextReplayOutcome (..)
+  , LengthSpinePairCounterexampleBankContextReplayOutcome
   , replayLengthSpinePairCounterexampleBankInContext
-  , LengthSpinePairCounterexampleBankPromotionFailure (..)
+  , LengthSpinePairCounterexampleBankPromotionFailure
   , promoteLengthSpinePairCounterexampleBankReplayHit
   , promoteLengthSpinePairCounterexampleBankReplayHitInContext
-  , LengthSpinePairCounterexampleBankReceiptOrigin (..)
-  , LengthSpinePairCounterexampleBankRecordFailure (..)
-  , LengthSpinePairCounterexampleBankRecordOutcome (..)
+  , LengthSpinePairCounterexampleBankRecordFailure
+  , LengthSpinePairCounterexampleBankRecordOutcome
   , recordLengthSpinePairCounterexampleBankReceipt
   , recordLengthSpinePairCounterexampleBankReceiptInContext
   ) where
 
 import Control.Concurrent.MVar (MVar, modifyMVar, newMVar, readMVar)
-import Control.DeepSeq (rnf)
+import Control.DeepSeq (NFData, rnf)
 import Control.Exception (evaluate)
 
 import Language.Haskell.Djex
@@ -127,237 +155,232 @@ import Language.Haskell.Djex
   , replayLengthSpinePairSMTLibCounterexampleBankSample
   )
 
--- Scalar ownership ---------------------------------------------------------
+-- Shared ownership --------------------------------------------------------
 
--- | Validated scalar limits and zero or one active same-scope bank.
+-- | Validated limits and zero or one active same-scope bank.
 --
--- Both fields deliberately remain lazy.  Constructing an empty state does
--- not inspect the limits and requires no query from which to obtain a scope.
-data LengthCounterexampleBankState identity =
-  LengthCounterexampleBankState
-    LengthCounterexampleBankLimits
-    (Maybe (LengthCounterexampleBank identity))
+-- Both fields deliberately remain lazy.  Constructing an empty state does not
+-- inspect the limits and requires no query from which to obtain a scope.  The
+-- limits and bank types are the domain's own, so a scalar state and a
+-- binary-product state remain distinct types.
+data BankState limits bank = BankState limits (Maybe bank)
 
-type role LengthCounterexampleBankState nominal
+type role BankState nominal nominal
 
-emptyLengthCounterexampleBankState
-  :: LengthCounterexampleBankLimits
-  -> LengthCounterexampleBankState identity
-emptyLengthCounterexampleBankState limits =
-  LengthCounterexampleBankState limits Nothing
+-- | An uninitialized state owning the supplied validated limits and no active
+-- bank.  The limits are not inspected; the first replay or recording
+-- transition supplies the scope of the bank it creates.
+emptyBankState :: limits -> BankState limits bank
+emptyBankState limits = BankState limits Nothing
 
-defaultLengthCounterexampleBankState
-  :: LengthCounterexampleBankState identity
-defaultLengthCounterexampleBankState = emptyLengthCounterexampleBankState
-  defaultLengthCounterexampleBankLimits
+-- | The state's sole active bank, or 'Nothing' until a replay or recording
+-- transition has ensured one for a query's scope.
+bankStateActiveBank :: BankState limits bank -> Maybe bank
+bankStateActiveBank (BankState _ active) = active
 
-lengthCounterexampleBankStateActiveBank
-  :: LengthCounterexampleBankState identity
-  -> Maybe (LengthCounterexampleBank identity)
-lengthCounterexampleBankStateActiveBank
-    (LengthCounterexampleBankState _ active) = active
+-- | One command-owned mutable bank.  The fresh nominal command tag prevents a
+-- replay hit from one owner from being promoted through another owner even
+-- when both banks share Djex's semantic identity parameter.  Mutation remains
+-- private to the transition functions below.
+newtype BankContext command limits bank =
+  BankContext (MVar (BankState limits bank))
 
--- | One command-owned mutable scalar bank.  The fresh nominal command tag
--- prevents a replay hit from one owner from being promoted through another
--- owner even when both banks share Djex's semantic identity parameter.
--- Mutation remains private to the transition functions below.
-newtype LengthCounterexampleBankContext command identity =
-  LengthCounterexampleBankContext
-    (MVar (LengthCounterexampleBankState identity))
+type role BankContext nominal nominal nominal
 
-type role LengthCounterexampleBankContext nominal nominal
-
--- | Introduce a fresh empty scalar owner with caller-validated limits.
-withLengthCounterexampleBankContext
-  :: LengthCounterexampleBankLimits
-  -> (forall command.
-      LengthCounterexampleBankContext command identity -> IO result)
+-- | Introduce a fresh empty owner with caller-validated limits.
+withBankContext
+  :: limits
+  -> (forall command. BankContext command limits bank -> IO result)
   -> IO result
-withLengthCounterexampleBankContext limits action = do
-  state <- newMVar $ emptyLengthCounterexampleBankState limits
-  action $ LengthCounterexampleBankContext state
-
-withDefaultLengthCounterexampleBankContext
-  :: (forall command.
-      LengthCounterexampleBankContext command identity -> IO result)
-  -> IO result
-withDefaultLengthCounterexampleBankContext =
-  withLengthCounterexampleBankContext defaultLengthCounterexampleBankLimits
+withBankContext limits action = do
+  state <- newMVar $ emptyBankState limits
+  action $ BankContext state
 
 -- | Take an immutable diagnostic snapshot.  There is deliberately no setter
 -- and no context constructor which accepts an earlier snapshot.
-readLengthCounterexampleBankContextState
-  :: LengthCounterexampleBankContext command identity
-  -> IO (LengthCounterexampleBankState identity)
-readLengthCounterexampleBankContextState
-    (LengthCounterexampleBankContext state) = readMVar state
+readBankContextState
+  :: BankContext command limits bank
+  -> IO (BankState limits bank)
+readBankContextState (BankContext state) = readMVar state
 
-ensureLengthCounterexampleBankState
-  :: LengthSMTLibQuery identity local
-  -> LengthCounterexampleBankState identity
-  -> LengthCounterexampleBankState identity
-ensureLengthCounterexampleBankState query
-    state@(LengthCounterexampleBankState limits active) =
-  case active of
-    Just bank
-      | lengthCounterexampleBankMatchesScope scope bank -> state
-    _ -> LengthCounterexampleBankState limits
-      $ Just $ emptyLengthCounterexampleBank limits scope
+-- | The part of one domain's Djex bank vocabulary which needs no query.
+-- Promotion is exactly this much, which is why it keeps its query-free
+-- signature.
+data BankSurface bank scope sample bankError = BankSurface
+  { surfaceMatchesScope :: scope -> bank -> Bool
+  , surfaceSamples :: bank -> [sample]
+  , surfaceInsertReplayedSample :: sample -> bank -> Either bankError bank
+    -- ^ input-only reinsertion under the solver-independent replay origin,
+    -- performing no second evaluation
+  }
+
+-- | Everything one Length domain spells for itself, with the evaluation
+-- limits and the current query already captured.  The shared transitions
+-- below call exactly these; each domain builds one per call.
+data BankBridge limits bank scope sample counterexample bankError
+    evaluationError =
+  BankBridge
+    { bridgeSurface :: BankSurface bank scope sample bankError
+    , bridgeQueryScope :: scope
+      -- ^ the candidate-independent bank scope of the current query
+    , bridgeEmptyBank :: limits -> scope -> bank
+    , bridgeReplaySample
+        :: sample
+        -> bank
+        -> (bank, BankReplayStep evaluationError bankError counterexample)
+      -- ^ one query-owned replay attempt; the returned bank is authoritative
+      -- even on failure
+    , bridgeRecordReceipt
+        :: BankReceiptOrigin
+        -> counterexample
+        -> bank
+        -> (bank, BankRecordStep evaluationError bankError counterexample)
+    }
+
+-- | How one domain's replay bridge answered, in the vocabulary the shared
+-- walk classifies.  The two invariant cases are structural failures; the
+-- refusals are ordinary and traversal continues past them.
+data BankReplayStep evaluationError bankError counterexample
+  = ReplayStepScopeMismatch
+  | ReplayStepSampleNotRetained
+  | ReplayStepAttemptRejected !bankError
+  | ReplayStepEvaluationRefused !evaluationError
+  | ReplayStepAssociationRefused
+  | ReplayStepNoCounterexample
+  | ReplayStepCounterexample !counterexample
+
+-- | How one domain's recording bridge answered.
+data BankRecordStep evaluationError bankError counterexample
+  = RecordStepScopeMismatch
+  | RecordStepAttemptRejected !bankError
+  | RecordStepEvaluationRejected !evaluationError
+  | RecordStepAssociationRejected
+  | RecordStepCounterexampleNotReproduced
+  | RecordStepInsertionRejected !bankError
+  | RecordStepRecorded !counterexample
+
+ensureBankState
+  :: BankBridge limits bank scope sample counterexample bankError
+      evaluationError
+  -> BankState limits bank
+  -> BankState limits bank
+ensureBankState bridge state@(BankState limits active) = case active of
+  Just bank
+    | surfaceMatchesScope (bridgeSurface bridge) scope bank -> state
+  _ -> BankState limits $ Just $ bridgeEmptyBank bridge limits scope
  where
-  scope = lengthSMTLibQueryCounterexampleBankScope query
+  scope = bridgeQueryScope bridge
 
-replaceLengthCounterexampleBank
-  :: LengthCounterexampleBank identity
-  -> LengthCounterexampleBankState identity
-  -> LengthCounterexampleBankState identity
-replaceLengthCounterexampleBank bank
-    (LengthCounterexampleBankState limits _) =
-  LengthCounterexampleBankState limits $ Just bank
+replaceBank :: bank -> BankState limits bank -> BankState limits bank
+replaceBank bank (BankState limits _) = BankState limits $ Just bank
 
--- Scalar replay ------------------------------------------------------------
+-- Shared replay ------------------------------------------------------------
 
 -- | A post-ensure structural invariant failure while traversing exact
--- retained scalar samples.
-data LengthCounterexampleBankReplayFailure
-  = LengthCounterexampleBankReplayScopeInvariant
-  | LengthCounterexampleBankReplayMembershipInvariant
+-- retained samples.
+data BankReplayFailure
+  = BankReplayScopeInvariant
+  | BankReplayMembershipInvariant
   deriving (Eq, Ord, Show)
 
 -- | One ordinary per-sample refusal.  It is retained in newest-first attempt
 -- order while traversal continues with the charged successor bank.
-data LengthCounterexampleBankReplayRefusal
-  = LengthCounterexampleBankReplayEvaluationRefused !LengthEvaluationError
-  | LengthCounterexampleBankReplayAssociationRefused
+data BankReplayRefusal evaluationError
+  = BankReplayEvaluationRefused !evaluationError
+  | BankReplayAssociationRefused
   deriving (Eq, Ord, Show)
 
 -- | One exact retained sample and the fresh current-query receipt produced by
 -- replaying it.  The private scope/sample association is required for a later
 -- explicit no-evaluation promotion.
-data LengthCounterexampleBankReplayHit identity =
-  LengthCounterexampleBankReplayHitValue
-    (LengthCounterexampleBankScope identity)
-    LengthCounterexampleBankSample
-    ValidatedLengthCounterexample
+data BankReplayHit scope sample counterexample =
+  BankReplayHitValue scope sample counterexample
 
-type role LengthCounterexampleBankReplayHit nominal
+type role BankReplayHit nominal nominal nominal
 
-lengthCounterexampleBankReplayHitCounterexample
-  :: LengthCounterexampleBankReplayHit identity
-  -> ValidatedLengthCounterexample
-lengthCounterexampleBankReplayHitCounterexample
-    (LengthCounterexampleBankReplayHitValue _ _ counterexample) =
+-- | The fresh current-query receipt established by replaying the hit's
+-- retained sample.
+bankReplayHitCounterexample
+  :: BankReplayHit scope sample counterexample
+  -> counterexample
+bankReplayHitCounterexample (BankReplayHitValue _ _ counterexample) =
   counterexample
 
 -- | Whole-bank replay result.  Exhaustion is an ordinary miss and an attempt
 -- cap is ordinary bounded unavailability; neither supplies evidence.
-data LengthCounterexampleBankReplayOutcome identity
-  = LengthCounterexampleBankReplayMiss
-      [LengthCounterexampleBankReplayRefusal]
-  | LengthCounterexampleBankReplayAttemptUnavailable
-      [LengthCounterexampleBankReplayRefusal]
-      !LengthCounterexampleBankError
-  | LengthCounterexampleBankReplayHit
-      [LengthCounterexampleBankReplayRefusal]
-      !(LengthCounterexampleBankReplayHit identity)
+data BankReplayOutcome evaluationError bankError hit
+  = BankReplayMiss [BankReplayRefusal evaluationError]
+  | BankReplayAttemptUnavailable
+      [BankReplayRefusal evaluationError]
+      !bankError
+  | BankReplayHit [BankReplayRefusal evaluationError] !hit
 
-type role LengthCounterexampleBankReplayOutcome nominal
+type role BankReplayOutcome nominal nominal nominal
 
 -- | Replay the active bank's exact retained samples newest first.
 --
 -- Every bridge-returned bank replaces the active bank before its result is
 -- classified.  An ordinary non-counterexample continues with the next exact
 -- sample; a hit is returned without implicit promotion.
-replayLengthCounterexampleBank
-  :: LengthEvaluationLimits
-  -> LengthSMTLibQuery identity local
-  -> LengthCounterexampleBankState identity
-  -> ( LengthCounterexampleBankState identity
-     , Either LengthCounterexampleBankReplayFailure
-         (LengthCounterexampleBankReplayOutcome identity)
+replayBank
+  :: BankBridge limits bank scope sample counterexample bankError
+      evaluationError
+  -> BankState limits bank
+  -> ( BankState limits bank
+     , Either BankReplayFailure
+         (BankReplayOutcome evaluationError bankError
+           (BankReplayHit scope sample counterexample))
      )
-replayLengthCounterexampleBank evaluationLimits query initial =
-  case lengthCounterexampleBankStateActiveBank ensured of
-    Nothing ->
-      (ensured, Left LengthCounterexampleBankReplayScopeInvariant)
-    Just bank -> go [] ensured bank $ lengthCounterexampleBankSamples bank
+replayBank bridge initial = case bankStateActiveBank ensured of
+  Nothing -> (ensured, Left BankReplayScopeInvariant)
+  Just bank -> go [] ensured bank $ surfaceSamples (bridgeSurface bridge) bank
  where
-  ensured = ensureLengthCounterexampleBankState query initial
+  ensured = ensureBankState bridge initial
 
   go reversedRefusals state _ [] =
-    ( state
-    , Right $ LengthCounterexampleBankReplayMiss $ reverse reversedRefusals
-    )
+    (state, Right $ BankReplayMiss $ reverse reversedRefusals)
   go reversedRefusals state bank (sample : remaining) =
-    let (successor, replayed) =
-          replayLengthSMTLibCounterexampleBankSample
-            evaluationLimits query sample bank
-        successorState = replaceLengthCounterexampleBank successor state
+    let (successor, replayed) = bridgeReplaySample bridge sample bank
+        successorState = replaceBank successor state
+        continue refusal = go (refusal : reversedRefusals)
+          successorState successor remaining
     in case replayed of
-      Left LengthSMTLibCounterexampleBankSampleReplayScopeMismatch ->
+      ReplayStepScopeMismatch ->
+        (successorState, Left BankReplayScopeInvariant)
+      ReplayStepSampleNotRetained ->
+        (successorState, Left BankReplayMembershipInvariant)
+      ReplayStepAttemptRejected failure ->
         ( successorState
-        , Left LengthCounterexampleBankReplayScopeInvariant
-        )
-      Left LengthSMTLibCounterexampleBankSampleReplaySampleNotRetained ->
-        ( successorState
-        , Left LengthCounterexampleBankReplayMembershipInvariant
-        )
-      Left
-          (LengthSMTLibCounterexampleBankSampleReplayAttemptRejected failure) ->
-        ( successorState
-        , Right $ LengthCounterexampleBankReplayAttemptUnavailable
+        , Right $ BankReplayAttemptUnavailable
             (reverse reversedRefusals) failure
         )
-      Left (LengthSMTLibCounterexampleBankSampleReplayInputRejected failure) ->
-        case failure of
-          LengthSMTLibInputReplayEvaluationRejected evaluationFailure ->
-            go
-              (LengthCounterexampleBankReplayEvaluationRefused
-                evaluationFailure : reversedRefusals)
-              successorState successor remaining
-          LengthSMTLibInputReplayAssociationRejected _ ->
-            go
-              (LengthCounterexampleBankReplayAssociationRefused
-                : reversedRefusals)
-              successorState successor remaining
-      Right Nothing -> go reversedRefusals successorState successor remaining
-      Right (Just counterexample) ->
+      ReplayStepEvaluationRefused failure ->
+        continue $ BankReplayEvaluationRefused failure
+      ReplayStepAssociationRefused -> continue BankReplayAssociationRefused
+      ReplayStepNoCounterexample ->
+        go reversedRefusals successorState successor remaining
+      ReplayStepCounterexample counterexample ->
         ( successorState
-        , Right $ LengthCounterexampleBankReplayHit
-            (reverse reversedRefusals)
-            $ LengthCounterexampleBankReplayHitValue
-                (lengthSMTLibQueryCounterexampleBankScope query)
-                sample counterexample
+        , Right $ BankReplayHit (reverse reversedRefusals)
+            $ BankReplayHitValue
+                (bridgeQueryScope bridge) sample counterexample
         )
 
 -- | A replay hit tied to both the semantic bank identity and the fresh
 -- command owner which produced it.  Its constructor stays private so only a
 -- context replay can mint promotion authority.
-newtype LengthCounterexampleBankContextReplayHit command identity =
-  LengthCounterexampleBankContextReplayHitValue
-    (LengthCounterexampleBankReplayHit identity)
+newtype BankContextReplayHit command scope sample counterexample =
+  BankContextReplayHitValue (BankReplayHit scope sample counterexample)
 
-type role LengthCounterexampleBankContextReplayHit nominal nominal
+type role BankContextReplayHit nominal nominal nominal nominal
 
-lengthCounterexampleBankContextReplayHitCounterexample
-  :: LengthCounterexampleBankContextReplayHit command identity
-  -> ValidatedLengthCounterexample
-lengthCounterexampleBankContextReplayHitCounterexample
-    (LengthCounterexampleBankContextReplayHitValue hit) =
-  lengthCounterexampleBankReplayHitCounterexample hit
-
--- | Context replay keeps the established refusal and bounded-unavailability
--- vocabulary while making a successful hit command-nominal.
-data LengthCounterexampleBankContextReplayOutcome command identity
-  = LengthCounterexampleBankContextReplayMiss
-      [LengthCounterexampleBankReplayRefusal]
-  | LengthCounterexampleBankContextReplayAttemptUnavailable
-      [LengthCounterexampleBankReplayRefusal]
-      !LengthCounterexampleBankError
-  | LengthCounterexampleBankContextReplayHit
-      [LengthCounterexampleBankReplayRefusal]
-      !(LengthCounterexampleBankContextReplayHit command identity)
-
-type role LengthCounterexampleBankContextReplayOutcome nominal nominal
+-- | The fresh current-query receipt carried by a command-nominal replay hit;
+-- see 'bankReplayHitCounterexample'.
+bankContextReplayHitCounterexample
+  :: BankContextReplayHit command scope sample counterexample
+  -> counterexample
+bankContextReplayHitCounterexample (BankContextReplayHitValue hit) =
+  bankReplayHitCounterexample hit
 
 -- | Replay through one mutable owner.  Exactly one pure adapter transition is
 -- serialized, and its complete successor state and expected classification are
@@ -365,40 +388,38 @@ type role LengthCounterexampleBankContextReplayOutcome nominal nominal
 -- old state when synchronous or asynchronous forcing fails, then propagates
 -- that exception; completed expected classifications install their
 -- authoritative successor.
-replayLengthCounterexampleBankInContext
-  :: LengthEvaluationLimits
-  -> LengthSMTLibQuery identity local
-  -> LengthCounterexampleBankContext command identity
+replayBankInContext
+  :: (NFData limits, NFData bank)
+  => BankBridge limits bank scope sample counterexample bankError
+      evaluationError
+  -> BankContext command limits bank
   -> IO
-      (Either LengthCounterexampleBankReplayFailure
-        (LengthCounterexampleBankContextReplayOutcome command identity))
-replayLengthCounterexampleBankInContext evaluationLimits query
-    (LengthCounterexampleBankContext state) =
-  transitionLengthCounterexampleBankContext state $ \initial ->
-    let (successor, replayed) =
-          replayLengthCounterexampleBank evaluationLimits query initial
+      (Either BankReplayFailure
+        (BankReplayOutcome evaluationError bankError
+          (BankContextReplayHit command scope sample counterexample)))
+replayBankInContext bridge (BankContext state) =
+  transitionBankContext state $ \initial ->
+    let (successor, replayed) = replayBank bridge initial
     in (successor, fmap tagOutcome replayed)
  where
   tagOutcome replayed = case replayed of
-    LengthCounterexampleBankReplayMiss refusals ->
-      LengthCounterexampleBankContextReplayMiss refusals
-    LengthCounterexampleBankReplayAttemptUnavailable refusals failure ->
-      LengthCounterexampleBankContextReplayAttemptUnavailable
-        refusals failure
-    LengthCounterexampleBankReplayHit refusals hit ->
-      LengthCounterexampleBankContextReplayHit refusals
-        $ LengthCounterexampleBankContextReplayHitValue hit
+    BankReplayMiss refusals -> BankReplayMiss refusals
+    BankReplayAttemptUnavailable refusals failure ->
+      BankReplayAttemptUnavailable refusals failure
+    BankReplayHit refusals hit ->
+      BankReplayHit refusals $ BankContextReplayHitValue hit
 
-transitionLengthCounterexampleBankContext
-  :: MVar (LengthCounterexampleBankState identity)
-  -> (LengthCounterexampleBankState identity
-      -> (LengthCounterexampleBankState identity, Either failure outcome))
+transitionBankContext
+  :: (NFData limits, NFData bank)
+  => MVar (BankState limits bank)
+  -> (BankState limits bank
+      -> (BankState limits bank, Either failure outcome))
   -> IO (Either failure outcome)
-transitionLengthCounterexampleBankContext state transition =
+transitionBankContext state transition =
   modifyMVar state $ \initial ->
     case transition initial of
       (successor, outcome) -> do
-        _ <- evaluate $ forceLengthCounterexampleBankSuccessor successor
+        _ <- evaluate $ forceBankSuccessor successor
         _ <- evaluate $ forceEitherClassification outcome
         pure (successor, outcome)
 
@@ -407,588 +428,732 @@ transitionLengthCounterexampleBankContext state transition =
 -- bounded active bank are forced: no deferred limit, replay input, origin,
 -- sample, or statistic may cross the serialized context boundary.  An
 -- unexpected exception therefore leaves the old context state untouched.
-forceLengthCounterexampleBankSuccessor
-  :: LengthCounterexampleBankState identity
+forceBankSuccessor
+  :: (NFData limits, NFData bank)
+  => BankState limits bank
   -> ()
-forceLengthCounterexampleBankSuccessor
-    (LengthCounterexampleBankState limits active) =
-  rnf limits `seq` rnf active
+forceBankSuccessor (BankState limits active) = rnf limits `seq` rnf active
 
 forceEitherClassification :: Either failure outcome -> ()
 forceEitherClassification classified = case classified of
   Left failure -> failure `seq` ()
   Right outcome -> outcome `seq` ()
 
--- Scalar promotion ---------------------------------------------------------
+-- Shared promotion ---------------------------------------------------------
 
-data LengthCounterexampleBankPromotionFailure
-  = LengthCounterexampleBankPromotionScopeInvariant
-  | LengthCounterexampleBankPromotionMembershipInvariant
-  | LengthCounterexampleBankPromotionInsertionRejected
-      !LengthCounterexampleBankError
+-- | Why one explicit replay hit was not promoted.  The scope and membership
+-- cases are structural invariant failures: the hit's scope no longer matches
+-- the active bank, or its exact sample is no longer retained there.
+-- Insertion rejection carries Djex's bank error.  Every failure leaves the
+-- state unchanged.
+data BankPromotionFailure bankError
+  = BankPromotionScopeInvariant
+  | BankPromotionMembershipInvariant
+  | BankPromotionInsertionRejected !bankError
   deriving (Eq, Ord, Show)
+
+-- | Promote one explicit replay hit without replaying or recording it a
+-- second time.
+--
+-- The exact retained sample must still belong to the active same-scope bank.
+-- Direct insertion performs Djex's input-only deduplication and MRU
+-- promotion; this replay-established use receives the solver-independent
+-- replay origin.
+promoteBankReplayHit
+  :: Eq sample
+  => BankSurface bank scope sample bankError
+  -> BankReplayHit scope sample counterexample
+  -> BankState limits bank
+  -> (BankState limits bank, Either (BankPromotionFailure bankError) ())
+promoteBankReplayHit surface (BankReplayHitValue scope sample _counterexample)
+    state =
+  case bankStateActiveBank state of
+    Nothing -> (state, Left BankPromotionScopeInvariant)
+    Just bank
+      | not $ surfaceMatchesScope surface scope bank ->
+          (state, Left BankPromotionScopeInvariant)
+      | sample `notElem` surfaceSamples surface bank ->
+          (state, Left BankPromotionMembershipInvariant)
+      | otherwise -> case surfaceInsertReplayedSample surface sample bank of
+        Left failure ->
+          (state, Left $ BankPromotionInsertionRejected failure)
+        Right promoted -> (replaceBank promoted state, Right ())
+
+-- | 'promoteBankReplayHit' as one serialized transition of the owner which
+-- minted the hit.  The shared command tag ties the hit to that owner; a
+-- failure leaves the owner's state unchanged.
+promoteBankReplayHitInContext
+  :: (Eq sample, NFData limits, NFData bank)
+  => BankSurface bank scope sample bankError
+  -> BankContextReplayHit command scope sample counterexample
+  -> BankContext command limits bank
+  -> IO (Either (BankPromotionFailure bankError) ())
+promoteBankReplayHitInContext surface (BankContextReplayHitValue hit)
+    (BankContext state) =
+  transitionBankContext state $ promoteBankReplayHit surface hit
+
+-- Shared recording ---------------------------------------------------------
+
+-- | Coarse provenance for one freshly established receipt.  These labels
+-- carry no evidence authority; Djex freshly replays before insertion.
+data BankReceiptOrigin
+  = BankReceiptFromLiveModel
+  | BankReceiptFromSolverIndependentReplay
+  | BankReceiptFromSimplificationReplay
+  deriving (Bounded, Enum, Eq, Ord, Show)
+
+-- | Why one fresh receipt was not recorded.  Scope invariant is a structural
+-- failure after the active bank has been ensured; the remaining cases are
+-- Djex's input-replay refusals and a receipt whose fresh replay against the
+-- current query reproduced no counterexample.  Ordinary bounded
+-- unavailability is reported through 'BankRecordOutcome' instead.
+data BankRecordFailure evaluationError
+  = BankRecordScopeInvariant
+  | BankRecordEvaluationRejected !evaluationError
+  | BankRecordAssociationRejected
+  | BankRecordCounterexampleNotReproduced
+  deriving (Eq, Ord, Show)
+
+-- | Ordinary bounded recording outcomes.  Unavailable results retain no claim
+-- that the supplied receipt was fresh for the current query.
+data BankRecordOutcome counterexample bankError
+  = BankRecorded !counterexample
+  | BankRecordAttemptUnavailable !bankError
+  | BankRecordInsertionUnavailable !bankError
+  deriving (Eq, Show)
+
+-- | Record one freshly established receipt in the active same-scope bank.
+--
+-- The state is first ensured for the query's scope.  Djex freshly replays the
+-- receipt's inputs against the current query before inserting only those
+-- inputs under the mapped origin; the bank returned by that recording bridge
+-- replaces the active bank for every classification.
+recordBankReceipt
+  :: BankBridge limits bank scope sample counterexample bankError
+      evaluationError
+  -> BankReceiptOrigin
+  -> counterexample
+  -> BankState limits bank
+  -> ( BankState limits bank
+     , Either (BankRecordFailure evaluationError)
+         (BankRecordOutcome counterexample bankError)
+     )
+recordBankReceipt bridge origin counterexample initial =
+  case bankStateActiveBank ensured of
+    Nothing -> (ensured, Left BankRecordScopeInvariant)
+    Just bank ->
+      let (successor, recorded) =
+            bridgeRecordReceipt bridge origin counterexample bank
+          successorState = replaceBank successor ensured
+      in (successorState, mapRecordResult recorded)
+ where
+  ensured = ensureBankState bridge initial
+
+  mapRecordResult recorded = case recorded of
+    RecordStepScopeMismatch -> Left BankRecordScopeInvariant
+    RecordStepAttemptRejected failure ->
+      Right $ BankRecordAttemptUnavailable failure
+    RecordStepEvaluationRejected failure ->
+      Left $ BankRecordEvaluationRejected failure
+    RecordStepAssociationRejected -> Left BankRecordAssociationRejected
+    RecordStepCounterexampleNotReproduced ->
+      Left BankRecordCounterexampleNotReproduced
+    RecordStepInsertionRejected failure ->
+      Right $ BankRecordInsertionUnavailable failure
+    RecordStepRecorded fresh -> Right $ BankRecorded fresh
+
+-- | 'recordBankReceipt' as one serialized transition of a mutable owner.  The
+-- forced successor state is committed for both classifications.
+recordBankReceiptInContext
+  :: (NFData limits, NFData bank)
+  => BankBridge limits bank scope sample counterexample bankError
+      evaluationError
+  -> BankReceiptOrigin
+  -> counterexample
+  -> BankContext command limits bank
+  -> IO
+      (Either (BankRecordFailure evaluationError)
+        (BankRecordOutcome counterexample bankError))
+recordBankReceiptInContext bridge origin counterexample
+    (BankContext state) =
+  transitionBankContext state $ recordBankReceipt bridge origin counterexample
+
+-- Scalar ownership ---------------------------------------------------------
+
+-- | Validated scalar limits and zero or one active same-scope bank.
+type LengthCounterexampleBankState identity =
+  BankState LengthCounterexampleBankLimits (LengthCounterexampleBank identity)
+
+-- | An uninitialized scalar state owning the supplied validated limits and no
+-- active bank.
+emptyLengthCounterexampleBankState
+  :: LengthCounterexampleBankLimits
+  -> LengthCounterexampleBankState identity
+emptyLengthCounterexampleBankState = emptyBankState
+
+-- | 'emptyLengthCounterexampleBankState' at Djex's
+-- 'defaultLengthCounterexampleBankLimits'.
+defaultLengthCounterexampleBankState
+  :: LengthCounterexampleBankState identity
+defaultLengthCounterexampleBankState =
+  emptyBankState defaultLengthCounterexampleBankLimits
+
+-- | The scalar state's sole active bank.
+lengthCounterexampleBankStateActiveBank
+  :: LengthCounterexampleBankState identity
+  -> Maybe (LengthCounterexampleBank identity)
+lengthCounterexampleBankStateActiveBank = bankStateActiveBank
+
+-- | One command-owned mutable scalar bank.
+type LengthCounterexampleBankContext command identity =
+  BankContext
+    command LengthCounterexampleBankLimits (LengthCounterexampleBank identity)
+
+-- | Introduce a fresh empty scalar owner with caller-validated limits.
+withLengthCounterexampleBankContext
+  :: LengthCounterexampleBankLimits
+  -> (forall command.
+      LengthCounterexampleBankContext command identity -> IO result)
+  -> IO result
+withLengthCounterexampleBankContext = withBankContext
+
+-- | 'withLengthCounterexampleBankContext' at Djex's
+-- 'defaultLengthCounterexampleBankLimits'.
+withDefaultLengthCounterexampleBankContext
+  :: (forall command.
+      LengthCounterexampleBankContext command identity -> IO result)
+  -> IO result
+withDefaultLengthCounterexampleBankContext =
+  withBankContext defaultLengthCounterexampleBankLimits
+
+-- | Take an immutable diagnostic snapshot of a scalar owner.
+readLengthCounterexampleBankContextState
+  :: LengthCounterexampleBankContext command identity
+  -> IO (LengthCounterexampleBankState identity)
+readLengthCounterexampleBankContextState = readBankContextState
+
+-- | One ordinary per-sample scalar refusal.
+type LengthCounterexampleBankReplayRefusal =
+  BankReplayRefusal LengthEvaluationError
+
+-- | One exact retained scalar sample and the fresh current-query receipt
+-- produced by replaying it.
+type LengthCounterexampleBankReplayHit identity =
+  BankReplayHit
+    (LengthCounterexampleBankScope identity)
+    LengthCounterexampleBankSample
+    ValidatedLengthCounterexample
+
+-- | The fresh current-query receipt established by replaying the hit's
+-- retained scalar sample.
+lengthCounterexampleBankReplayHitCounterexample
+  :: LengthCounterexampleBankReplayHit identity
+  -> ValidatedLengthCounterexample
+lengthCounterexampleBankReplayHitCounterexample = bankReplayHitCounterexample
+
+-- | Whole-bank scalar replay result.
+type LengthCounterexampleBankReplayOutcome identity =
+  BankReplayOutcome
+    LengthEvaluationError
+    LengthCounterexampleBankError
+    (LengthCounterexampleBankReplayHit identity)
+
+-- | A scalar replay hit tied to the fresh command owner which produced it.
+type LengthCounterexampleBankContextReplayHit command identity =
+  BankContextReplayHit
+    command
+    (LengthCounterexampleBankScope identity)
+    LengthCounterexampleBankSample
+    ValidatedLengthCounterexample
+
+-- | The fresh current-query receipt carried by a command-nominal scalar
+-- replay hit.
+lengthCounterexampleBankContextReplayHitCounterexample
+  :: LengthCounterexampleBankContextReplayHit command identity
+  -> ValidatedLengthCounterexample
+lengthCounterexampleBankContextReplayHitCounterexample =
+  bankContextReplayHitCounterexample
+
+-- | Scalar context replay keeps the established refusal and
+-- bounded-unavailability vocabulary while making a successful hit
+-- command-nominal.
+type LengthCounterexampleBankContextReplayOutcome command identity =
+  BankReplayOutcome
+    LengthEvaluationError
+    LengthCounterexampleBankError
+    (LengthCounterexampleBankContextReplayHit command identity)
+
+-- | Why one explicit scalar replay hit was not promoted.
+type LengthCounterexampleBankPromotionFailure =
+  BankPromotionFailure LengthCounterexampleBankError
+
+-- | Why one fresh scalar receipt was not recorded.
+type LengthCounterexampleBankRecordFailure =
+  BankRecordFailure LengthEvaluationError
+
+-- | Ordinary bounded scalar recording outcomes.
+type LengthCounterexampleBankRecordOutcome =
+  BankRecordOutcome ValidatedLengthCounterexample LengthCounterexampleBankError
+
+-- | Djex's query-free scalar bank surface.
+scalarBankSurface
+  :: BankSurface
+      (LengthCounterexampleBank identity)
+      (LengthCounterexampleBankScope identity)
+      LengthCounterexampleBankSample
+      LengthCounterexampleBankError
+scalarBankSurface = BankSurface
+  { surfaceMatchesScope = lengthCounterexampleBankMatchesScope
+  , surfaceSamples = lengthCounterexampleBankSamples
+  , surfaceInsertReplayedSample = \sample ->
+      insertLengthCounterexampleBankSample
+        lengthCounterexampleBankSolverIndependentReplayOrigin
+        (lengthCounterexampleBankSampleInputs sample)
+  }
+
+-- | Djex's scalar bank vocabulary for one query: the bridges the shared
+-- transitions call, and the translation of Djex's scalar replay and recording
+-- refusals into the shared classification.
+scalarBankBridge
+  :: LengthEvaluationLimits
+  -> LengthSMTLibQuery identity local
+  -> BankBridge
+      LengthCounterexampleBankLimits
+      (LengthCounterexampleBank identity)
+      (LengthCounterexampleBankScope identity)
+      LengthCounterexampleBankSample
+      ValidatedLengthCounterexample
+      LengthCounterexampleBankError
+      LengthEvaluationError
+scalarBankBridge evaluationLimits query = BankBridge
+  { bridgeSurface = scalarBankSurface
+  , bridgeQueryScope = lengthSMTLibQueryCounterexampleBankScope query
+  , bridgeEmptyBank = emptyLengthCounterexampleBank
+  , bridgeReplaySample = \sample bank ->
+      classifyReplay
+        $ replayLengthSMTLibCounterexampleBankSample
+            evaluationLimits query sample bank
+  , bridgeRecordReceipt = \origin counterexample bank ->
+      classifyRecord
+        $ recordLengthSMTLibQueryCounterexampleInBank
+            evaluationLimits query (scalarReceiptOrigin origin)
+            counterexample bank
+  }
+ where
+  classifyReplay (successor, replayed) = (,) successor $ case replayed of
+    Left LengthSMTLibCounterexampleBankSampleReplayScopeMismatch ->
+      ReplayStepScopeMismatch
+    Left LengthSMTLibCounterexampleBankSampleReplaySampleNotRetained ->
+      ReplayStepSampleNotRetained
+    Left
+        (LengthSMTLibCounterexampleBankSampleReplayAttemptRejected failure) ->
+      ReplayStepAttemptRejected failure
+    Left (LengthSMTLibCounterexampleBankSampleReplayInputRejected failure) ->
+      case failure of
+        LengthSMTLibInputReplayEvaluationRejected evaluationFailure ->
+          ReplayStepEvaluationRefused evaluationFailure
+        LengthSMTLibInputReplayAssociationRejected _ ->
+          ReplayStepAssociationRefused
+    Right Nothing -> ReplayStepNoCounterexample
+    Right (Just counterexample) -> ReplayStepCounterexample counterexample
+
+  classifyRecord (successor, recorded) = (,) successor $ case recorded of
+    Left LengthSMTLibCounterexampleBankRecordScopeMismatch ->
+      RecordStepScopeMismatch
+    Left (LengthSMTLibCounterexampleBankRecordAttemptRejected failure) ->
+      RecordStepAttemptRejected failure
+    Left (LengthSMTLibCounterexampleBankRecordInputReplayRejected failure) ->
+      case failure of
+        LengthSMTLibInputReplayEvaluationRejected evaluationFailure ->
+          RecordStepEvaluationRejected evaluationFailure
+        LengthSMTLibInputReplayAssociationRejected _ ->
+          RecordStepAssociationRejected
+    Left LengthSMTLibCounterexampleBankRecordCounterexampleNotReproduced ->
+      RecordStepCounterexampleNotReproduced
+    Left (LengthSMTLibCounterexampleBankRecordInsertionRejected failure) ->
+      RecordStepInsertionRejected failure
+    Right fresh -> RecordStepRecorded fresh
+
+-- | Replay the active scalar bank's exact retained samples newest first.
+replayLengthCounterexampleBank
+  :: LengthEvaluationLimits
+  -> LengthSMTLibQuery identity local
+  -> LengthCounterexampleBankState identity
+  -> ( LengthCounterexampleBankState identity
+     , Either BankReplayFailure
+         (LengthCounterexampleBankReplayOutcome identity)
+     )
+replayLengthCounterexampleBank evaluationLimits query =
+  replayBank $ scalarBankBridge evaluationLimits query
+
+-- | Replay through one mutable scalar owner.
+replayLengthCounterexampleBankInContext
+  :: LengthEvaluationLimits
+  -> LengthSMTLibQuery identity local
+  -> LengthCounterexampleBankContext command identity
+  -> IO
+      (Either BankReplayFailure
+        (LengthCounterexampleBankContextReplayOutcome command identity))
+replayLengthCounterexampleBankInContext evaluationLimits query =
+  replayBankInContext $ scalarBankBridge evaluationLimits query
 
 -- | Promote one explicit scalar replay hit without replaying or recording it
 -- a second time.
---
--- The exact retained sample must still belong to the active same-scope bank.
--- Direct insertion performs Djex's input-only deduplication and MRU promotion;
--- this replay-established use receives the solver-independent replay origin.
 promoteLengthCounterexampleBankReplayHit
   :: LengthCounterexampleBankReplayHit identity
   -> LengthCounterexampleBankState identity
   -> ( LengthCounterexampleBankState identity
      , Either LengthCounterexampleBankPromotionFailure ()
      )
-promoteLengthCounterexampleBankReplayHit
-    (LengthCounterexampleBankReplayHitValue scope sample _counterexample)
-    state =
-  case lengthCounterexampleBankStateActiveBank state of
-    Nothing ->
-      (state, Left LengthCounterexampleBankPromotionScopeInvariant)
-    Just bank
-      | not $ lengthCounterexampleBankMatchesScope scope bank ->
-          (state, Left LengthCounterexampleBankPromotionScopeInvariant)
-      | sample `notElem` lengthCounterexampleBankSamples bank ->
-          (state, Left LengthCounterexampleBankPromotionMembershipInvariant)
-      | otherwise -> case insertLengthCounterexampleBankSample
-          lengthCounterexampleBankSolverIndependentReplayOrigin
-          (lengthCounterexampleBankSampleInputs sample) bank of
-        Left failure ->
-          ( state
-          , Left $ LengthCounterexampleBankPromotionInsertionRejected failure
-          )
-        Right promoted ->
-          (replaceLengthCounterexampleBank promoted state, Right ())
+promoteLengthCounterexampleBankReplayHit =
+  promoteBankReplayHit scalarBankSurface
 
+-- | 'promoteLengthCounterexampleBankReplayHit' as one serialized transition
+-- of the owner which minted the hit.
 promoteLengthCounterexampleBankReplayHitInContext
   :: LengthCounterexampleBankContextReplayHit command identity
   -> LengthCounterexampleBankContext command identity
   -> IO (Either LengthCounterexampleBankPromotionFailure ())
-promoteLengthCounterexampleBankReplayHitInContext
-    (LengthCounterexampleBankContextReplayHitValue hit)
-    (LengthCounterexampleBankContext state) =
-  transitionLengthCounterexampleBankContext state
-    $ promoteLengthCounterexampleBankReplayHit hit
+promoteLengthCounterexampleBankReplayHitInContext =
+  promoteBankReplayHitInContext scalarBankSurface
 
--- Scalar recording ---------------------------------------------------------
-
--- | Coarse provenance for one freshly established scalar receipt.  These
--- labels carry no evidence authority; Djex freshly replays before insertion.
-data LengthCounterexampleBankReceiptOrigin
-  = LengthCounterexampleBankReceiptFromLiveModel
-  | LengthCounterexampleBankReceiptFromSolverIndependentReplay
-  | LengthCounterexampleBankReceiptFromSimplificationReplay
-  deriving (Bounded, Enum, Eq, Ord, Show)
-
-data LengthCounterexampleBankRecordFailure
-  = LengthCounterexampleBankRecordScopeInvariant
-  | LengthCounterexampleBankRecordEvaluationRejected !LengthEvaluationError
-  | LengthCounterexampleBankRecordAssociationRejected
-  | LengthCounterexampleBankRecordCounterexampleNotReproduced
-  deriving (Eq, Ord, Show)
-
--- | Ordinary bounded recording outcomes.  Unavailable results retain no
--- claim that the supplied receipt was fresh for the current query.
-data LengthCounterexampleBankRecordOutcome
-  = LengthCounterexampleBankRecorded !ValidatedLengthCounterexample
-  | LengthCounterexampleBankRecordAttemptUnavailable
-      !LengthCounterexampleBankError
-  | LengthCounterexampleBankRecordInsertionUnavailable
-      !LengthCounterexampleBankError
-  deriving (Eq, Show)
-
+-- | Record one freshly established scalar receipt in the active same-scope
+-- bank.
 recordLengthCounterexampleBankReceipt
   :: LengthEvaluationLimits
   -> LengthSMTLibQuery identity local
-  -> LengthCounterexampleBankReceiptOrigin
+  -> BankReceiptOrigin
   -> ValidatedLengthCounterexample
   -> LengthCounterexampleBankState identity
   -> ( LengthCounterexampleBankState identity
      , Either LengthCounterexampleBankRecordFailure
          LengthCounterexampleBankRecordOutcome
      )
-recordLengthCounterexampleBankReceipt evaluationLimits query origin
-    counterexample initial =
-  case lengthCounterexampleBankStateActiveBank ensured of
-    Nothing ->
-      (ensured, Left LengthCounterexampleBankRecordScopeInvariant)
-    Just bank ->
-      let (successor, recorded) =
-            recordLengthSMTLibQueryCounterexampleInBank
-              evaluationLimits query (scalarReceiptOrigin origin)
-              counterexample bank
-          successorState = replaceLengthCounterexampleBank successor ensured
-      in (successorState, mapRecordResult recorded)
- where
-  ensured = ensureLengthCounterexampleBankState query initial
+recordLengthCounterexampleBankReceipt evaluationLimits query =
+  recordBankReceipt $ scalarBankBridge evaluationLimits query
 
-  mapRecordResult recorded = case recorded of
-    Left LengthSMTLibCounterexampleBankRecordScopeMismatch ->
-      Left LengthCounterexampleBankRecordScopeInvariant
-    Left (LengthSMTLibCounterexampleBankRecordAttemptRejected failure) ->
-      Right $ LengthCounterexampleBankRecordAttemptUnavailable failure
-    Left
-        (LengthSMTLibCounterexampleBankRecordInputReplayRejected failure) ->
-      case failure of
-        LengthSMTLibInputReplayEvaluationRejected evaluationFailure ->
-          Left $ LengthCounterexampleBankRecordEvaluationRejected
-            evaluationFailure
-        LengthSMTLibInputReplayAssociationRejected _ ->
-          Left LengthCounterexampleBankRecordAssociationRejected
-    Left LengthSMTLibCounterexampleBankRecordCounterexampleNotReproduced ->
-      Left LengthCounterexampleBankRecordCounterexampleNotReproduced
-    Left (LengthSMTLibCounterexampleBankRecordInsertionRejected failure) ->
-      Right $ LengthCounterexampleBankRecordInsertionUnavailable failure
-    Right fresh -> Right $ LengthCounterexampleBankRecorded fresh
-
+-- | 'recordLengthCounterexampleBankReceipt' as one serialized transition of a
+-- mutable scalar owner.
 recordLengthCounterexampleBankReceiptInContext
   :: LengthEvaluationLimits
   -> LengthSMTLibQuery identity local
-  -> LengthCounterexampleBankReceiptOrigin
+  -> BankReceiptOrigin
   -> ValidatedLengthCounterexample
   -> LengthCounterexampleBankContext command identity
   -> IO
       (Either LengthCounterexampleBankRecordFailure
         LengthCounterexampleBankRecordOutcome)
-recordLengthCounterexampleBankReceiptInContext evaluationLimits query origin
-    counterexample (LengthCounterexampleBankContext state) =
-  transitionLengthCounterexampleBankContext state
-    $ recordLengthCounterexampleBankReceipt
-        evaluationLimits query origin counterexample
+recordLengthCounterexampleBankReceiptInContext evaluationLimits query =
+  recordBankReceiptInContext $ scalarBankBridge evaluationLimits query
 
 scalarReceiptOrigin
-  :: LengthCounterexampleBankReceiptOrigin
+  :: BankReceiptOrigin
   -> LengthCounterexampleBankOrigin
 scalarReceiptOrigin origin = case origin of
-  LengthCounterexampleBankReceiptFromLiveModel ->
-    lengthCounterexampleBankLiveModelReplayOrigin
-  LengthCounterexampleBankReceiptFromSolverIndependentReplay ->
+  BankReceiptFromLiveModel -> lengthCounterexampleBankLiveModelReplayOrigin
+  BankReceiptFromSolverIndependentReplay ->
     lengthCounterexampleBankSolverIndependentReplayOrigin
-  LengthCounterexampleBankReceiptFromSimplificationReplay ->
+  BankReceiptFromSimplificationReplay ->
     lengthCounterexampleBankSimplificationReplayOrigin
 
 -- Binary-product ownership -------------------------------------------------
 
-data LengthSpinePairCounterexampleBankState identity =
-  LengthSpinePairCounterexampleBankState
+-- | Validated binary-product limits and zero or one active same-scope bank.
+type LengthSpinePairCounterexampleBankState identity =
+  BankState
     LengthSpinePairCounterexampleBankLimits
-    (Maybe (LengthSpinePairCounterexampleBank identity))
+    (LengthSpinePairCounterexampleBank identity)
 
-type role LengthSpinePairCounterexampleBankState nominal
-
+-- | An uninitialized binary-product state owning the supplied validated
+-- limits and no active bank.
 emptyLengthSpinePairCounterexampleBankState
   :: LengthSpinePairCounterexampleBankLimits
   -> LengthSpinePairCounterexampleBankState identity
-emptyLengthSpinePairCounterexampleBankState limits =
-  LengthSpinePairCounterexampleBankState limits Nothing
+emptyLengthSpinePairCounterexampleBankState = emptyBankState
 
+-- | 'emptyLengthSpinePairCounterexampleBankState' at Djex's
+-- 'defaultLengthSpinePairCounterexampleBankLimits'.
 defaultLengthSpinePairCounterexampleBankState
   :: LengthSpinePairCounterexampleBankState identity
 defaultLengthSpinePairCounterexampleBankState =
-  emptyLengthSpinePairCounterexampleBankState
-    defaultLengthSpinePairCounterexampleBankLimits
+  emptyBankState defaultLengthSpinePairCounterexampleBankLimits
 
+-- | The binary-product state's sole active bank.
 lengthSpinePairCounterexampleBankStateActiveBank
   :: LengthSpinePairCounterexampleBankState identity
   -> Maybe (LengthSpinePairCounterexampleBank identity)
-lengthSpinePairCounterexampleBankStateActiveBank
-    (LengthSpinePairCounterexampleBankState _ active) = active
+lengthSpinePairCounterexampleBankStateActiveBank = bankStateActiveBank
 
-newtype LengthSpinePairCounterexampleBankContext command identity =
-  LengthSpinePairCounterexampleBankContext
-    (MVar (LengthSpinePairCounterexampleBankState identity))
+-- | One command-owned mutable binary-product bank.
+type LengthSpinePairCounterexampleBankContext command identity =
+  BankContext
+    command
+    LengthSpinePairCounterexampleBankLimits
+    (LengthSpinePairCounterexampleBank identity)
 
-type role LengthSpinePairCounterexampleBankContext nominal nominal
-
+-- | Introduce a fresh empty binary-product owner with caller-validated limits.
 withLengthSpinePairCounterexampleBankContext
   :: LengthSpinePairCounterexampleBankLimits
   -> (forall command.
       LengthSpinePairCounterexampleBankContext command identity -> IO result)
   -> IO result
-withLengthSpinePairCounterexampleBankContext limits action = do
-  state <- newMVar $ emptyLengthSpinePairCounterexampleBankState limits
-  action $ LengthSpinePairCounterexampleBankContext state
+withLengthSpinePairCounterexampleBankContext = withBankContext
 
+-- | 'withLengthSpinePairCounterexampleBankContext' at Djex's
+-- 'defaultLengthSpinePairCounterexampleBankLimits'.
 withDefaultLengthSpinePairCounterexampleBankContext
   :: (forall command.
       LengthSpinePairCounterexampleBankContext command identity -> IO result)
   -> IO result
 withDefaultLengthSpinePairCounterexampleBankContext =
-  withLengthSpinePairCounterexampleBankContext
-    defaultLengthSpinePairCounterexampleBankLimits
+  withBankContext defaultLengthSpinePairCounterexampleBankLimits
 
+-- | Take an immutable diagnostic snapshot of a binary-product owner.
 readLengthSpinePairCounterexampleBankContextState
   :: LengthSpinePairCounterexampleBankContext command identity
   -> IO (LengthSpinePairCounterexampleBankState identity)
-readLengthSpinePairCounterexampleBankContextState
-    (LengthSpinePairCounterexampleBankContext state) = readMVar state
+readLengthSpinePairCounterexampleBankContextState = readBankContextState
 
-ensureLengthSpinePairCounterexampleBankState
-  :: LengthSpinePairSMTLibQuery identity local
-  -> LengthSpinePairCounterexampleBankState identity
-  -> LengthSpinePairCounterexampleBankState identity
-ensureLengthSpinePairCounterexampleBankState query
-    state@(LengthSpinePairCounterexampleBankState limits active) =
-  case active of
-    Just bank
-      | lengthSpinePairCounterexampleBankMatchesScope scope bank -> state
-    _ -> LengthSpinePairCounterexampleBankState limits
-      $ Just $ emptyLengthSpinePairCounterexampleBank limits scope
- where
-  scope = lengthSpinePairSMTLibQueryCounterexampleBankScope query
+-- | One ordinary per-sample binary-product refusal.
+type LengthSpinePairCounterexampleBankReplayRefusal =
+  BankReplayRefusal LengthSpinePairEvaluationError
 
-replaceLengthSpinePairCounterexampleBank
-  :: LengthSpinePairCounterexampleBank identity
-  -> LengthSpinePairCounterexampleBankState identity
-  -> LengthSpinePairCounterexampleBankState identity
-replaceLengthSpinePairCounterexampleBank bank
-    (LengthSpinePairCounterexampleBankState limits _) =
-  LengthSpinePairCounterexampleBankState limits $ Just bank
-
--- Binary-product replay ----------------------------------------------------
-
-data LengthSpinePairCounterexampleBankReplayFailure
-  = LengthSpinePairCounterexampleBankReplayScopeInvariant
-  | LengthSpinePairCounterexampleBankReplayMembershipInvariant
-  deriving (Eq, Ord, Show)
-
-data LengthSpinePairCounterexampleBankReplayRefusal
-  = LengthSpinePairCounterexampleBankReplayEvaluationRefused
-      !LengthSpinePairEvaluationError
-  | LengthSpinePairCounterexampleBankReplayAssociationRefused
-  deriving (Eq, Ord, Show)
-
-data LengthSpinePairCounterexampleBankReplayHit identity =
-  LengthSpinePairCounterexampleBankReplayHitValue
+-- | One exact retained binary-product sample and the fresh current-query
+-- receipt produced by replaying it.
+type LengthSpinePairCounterexampleBankReplayHit identity =
+  BankReplayHit
     (LengthSpinePairCounterexampleBankScope identity)
     LengthSpinePairCounterexampleBankSample
     ValidatedLengthSpinePairCounterexample
 
-type role LengthSpinePairCounterexampleBankReplayHit nominal
-
+-- | The fresh current-query receipt established by replaying the hit's
+-- retained binary-product sample.
 lengthSpinePairCounterexampleBankReplayHitCounterexample
   :: LengthSpinePairCounterexampleBankReplayHit identity
   -> ValidatedLengthSpinePairCounterexample
-lengthSpinePairCounterexampleBankReplayHitCounterexample
-    (LengthSpinePairCounterexampleBankReplayHitValue _ _ counterexample) =
-  counterexample
+lengthSpinePairCounterexampleBankReplayHitCounterexample =
+  bankReplayHitCounterexample
 
-data LengthSpinePairCounterexampleBankReplayOutcome identity
-  = LengthSpinePairCounterexampleBankReplayMiss
-      [LengthSpinePairCounterexampleBankReplayRefusal]
-  | LengthSpinePairCounterexampleBankReplayAttemptUnavailable
-      [LengthSpinePairCounterexampleBankReplayRefusal]
-      !LengthSpinePairCounterexampleBankError
-  | LengthSpinePairCounterexampleBankReplayHit
-      [LengthSpinePairCounterexampleBankReplayRefusal]
-      !(LengthSpinePairCounterexampleBankReplayHit identity)
+-- | Whole-bank binary-product replay result.
+type LengthSpinePairCounterexampleBankReplayOutcome identity =
+  BankReplayOutcome
+    LengthSpinePairEvaluationError
+    LengthSpinePairCounterexampleBankError
+    (LengthSpinePairCounterexampleBankReplayHit identity)
 
-type role LengthSpinePairCounterexampleBankReplayOutcome nominal
+-- | A binary-product replay hit tied to the fresh command owner which
+-- produced it.
+type LengthSpinePairCounterexampleBankContextReplayHit command identity =
+  BankContextReplayHit
+    command
+    (LengthSpinePairCounterexampleBankScope identity)
+    LengthSpinePairCounterexampleBankSample
+    ValidatedLengthSpinePairCounterexample
 
+-- | The fresh current-query receipt carried by a command-nominal
+-- binary-product replay hit.
+lengthSpinePairCounterexampleBankContextReplayHitCounterexample
+  :: LengthSpinePairCounterexampleBankContextReplayHit command identity
+  -> ValidatedLengthSpinePairCounterexample
+lengthSpinePairCounterexampleBankContextReplayHitCounterexample =
+  bankContextReplayHitCounterexample
+
+-- | Binary-product context replay keeps the established refusal and
+-- bounded-unavailability vocabulary while making a successful hit
+-- command-nominal.
+type LengthSpinePairCounterexampleBankContextReplayOutcome command identity =
+  BankReplayOutcome
+    LengthSpinePairEvaluationError
+    LengthSpinePairCounterexampleBankError
+    (LengthSpinePairCounterexampleBankContextReplayHit command identity)
+
+-- | Why one explicit binary-product replay hit was not promoted.
+type LengthSpinePairCounterexampleBankPromotionFailure =
+  BankPromotionFailure LengthSpinePairCounterexampleBankError
+
+-- | Why one fresh binary-product receipt was not recorded.
+type LengthSpinePairCounterexampleBankRecordFailure =
+  BankRecordFailure LengthSpinePairEvaluationError
+
+-- | Ordinary bounded binary-product recording outcomes.
+type LengthSpinePairCounterexampleBankRecordOutcome =
+  BankRecordOutcome
+    ValidatedLengthSpinePairCounterexample
+    LengthSpinePairCounterexampleBankError
+
+-- | Djex's query-free binary-product bank surface.
+spinePairBankSurface
+  :: BankSurface
+      (LengthSpinePairCounterexampleBank identity)
+      (LengthSpinePairCounterexampleBankScope identity)
+      LengthSpinePairCounterexampleBankSample
+      LengthSpinePairCounterexampleBankError
+spinePairBankSurface = BankSurface
+  { surfaceMatchesScope = lengthSpinePairCounterexampleBankMatchesScope
+  , surfaceSamples = lengthSpinePairCounterexampleBankSamples
+  , surfaceInsertReplayedSample = \sample ->
+      insertLengthSpinePairCounterexampleBankSample
+        lengthSpinePairCounterexampleBankSolverIndependentReplayOrigin
+        (lengthSpinePairCounterexampleBankSampleInputs sample)
+  }
+
+-- | Djex's binary-product bank vocabulary for one query: the bridges the
+-- shared transitions call, and the translation of Djex's binary-product
+-- replay and recording refusals into the shared classification.
+spinePairBankBridge
+  :: LengthEvaluationLimits
+  -> LengthSpinePairSMTLibQuery identity local
+  -> BankBridge
+      LengthSpinePairCounterexampleBankLimits
+      (LengthSpinePairCounterexampleBank identity)
+      (LengthSpinePairCounterexampleBankScope identity)
+      LengthSpinePairCounterexampleBankSample
+      ValidatedLengthSpinePairCounterexample
+      LengthSpinePairCounterexampleBankError
+      LengthSpinePairEvaluationError
+spinePairBankBridge evaluationLimits query = BankBridge
+  { bridgeSurface = spinePairBankSurface
+  , bridgeQueryScope = lengthSpinePairSMTLibQueryCounterexampleBankScope query
+  , bridgeEmptyBank = emptyLengthSpinePairCounterexampleBank
+  , bridgeReplaySample = \sample bank ->
+      classifyReplay
+        $ replayLengthSpinePairSMTLibCounterexampleBankSample
+            evaluationLimits query sample bank
+  , bridgeRecordReceipt = \origin counterexample bank ->
+      classifyRecord
+        $ recordLengthSpinePairSMTLibQueryCounterexampleInBank
+            evaluationLimits query (spinePairReceiptOrigin origin)
+            counterexample bank
+  }
+ where
+  classifyReplay (successor, replayed) = (,) successor $ case replayed of
+    Left LengthSpinePairSMTLibCounterexampleBankSampleReplayScopeMismatch ->
+      ReplayStepScopeMismatch
+    Left
+        LengthSpinePairSMTLibCounterexampleBankSampleReplaySampleNotRetained ->
+      ReplayStepSampleNotRetained
+    Left
+        (LengthSpinePairSMTLibCounterexampleBankSampleReplayAttemptRejected
+          failure) ->
+      ReplayStepAttemptRejected failure
+    Left
+        (LengthSpinePairSMTLibCounterexampleBankSampleReplayInputRejected
+          failure) ->
+      case failure of
+        LengthSpinePairSMTLibInputReplayEvaluationRejected evaluationFailure ->
+          ReplayStepEvaluationRefused evaluationFailure
+        LengthSpinePairSMTLibInputReplayAssociationRejected _ ->
+          ReplayStepAssociationRefused
+    Right Nothing -> ReplayStepNoCounterexample
+    Right (Just counterexample) -> ReplayStepCounterexample counterexample
+
+  classifyRecord (successor, recorded) = (,) successor $ case recorded of
+    Left LengthSpinePairSMTLibCounterexampleBankRecordScopeMismatch ->
+      RecordStepScopeMismatch
+    Left
+        (LengthSpinePairSMTLibCounterexampleBankRecordAttemptRejected
+          failure) ->
+      RecordStepAttemptRejected failure
+    Left
+        (LengthSpinePairSMTLibCounterexampleBankRecordInputReplayRejected
+          failure) ->
+      case failure of
+        LengthSpinePairSMTLibInputReplayEvaluationRejected evaluationFailure ->
+          RecordStepEvaluationRejected evaluationFailure
+        LengthSpinePairSMTLibInputReplayAssociationRejected _ ->
+          RecordStepAssociationRejected
+    Left
+        LengthSpinePairSMTLibCounterexampleBankRecordCounterexampleNotReproduced
+        ->
+      RecordStepCounterexampleNotReproduced
+    Left
+        (LengthSpinePairSMTLibCounterexampleBankRecordInsertionRejected
+          failure) ->
+      RecordStepInsertionRejected failure
+    Right fresh -> RecordStepRecorded fresh
+
+-- | Replay the active binary-product bank's exact retained samples newest
+-- first.
 replayLengthSpinePairCounterexampleBank
   :: LengthEvaluationLimits
   -> LengthSpinePairSMTLibQuery identity local
   -> LengthSpinePairCounterexampleBankState identity
   -> ( LengthSpinePairCounterexampleBankState identity
-     , Either LengthSpinePairCounterexampleBankReplayFailure
+     , Either BankReplayFailure
          (LengthSpinePairCounterexampleBankReplayOutcome identity)
      )
-replayLengthSpinePairCounterexampleBank evaluationLimits query initial =
-  case lengthSpinePairCounterexampleBankStateActiveBank ensured of
-    Nothing ->
-      (ensured, Left LengthSpinePairCounterexampleBankReplayScopeInvariant)
-    Just bank -> go [] ensured bank
-      $ lengthSpinePairCounterexampleBankSamples bank
- where
-  ensured = ensureLengthSpinePairCounterexampleBankState query initial
+replayLengthSpinePairCounterexampleBank evaluationLimits query =
+  replayBank $ spinePairBankBridge evaluationLimits query
 
-  go reversedRefusals state _ [] =
-    ( state
-    , Right $ LengthSpinePairCounterexampleBankReplayMiss
-        $ reverse reversedRefusals
-    )
-  go reversedRefusals state bank (sample : remaining) =
-    let (successor, replayed) =
-          replayLengthSpinePairSMTLibCounterexampleBankSample
-            evaluationLimits query sample bank
-        successorState = replaceLengthSpinePairCounterexampleBank
-          successor state
-    in case replayed of
-      Left
-          LengthSpinePairSMTLibCounterexampleBankSampleReplayScopeMismatch ->
-        ( successorState
-        , Left LengthSpinePairCounterexampleBankReplayScopeInvariant
-        )
-      Left
-          LengthSpinePairSMTLibCounterexampleBankSampleReplaySampleNotRetained ->
-        ( successorState
-        , Left LengthSpinePairCounterexampleBankReplayMembershipInvariant
-        )
-      Left
-          (LengthSpinePairSMTLibCounterexampleBankSampleReplayAttemptRejected
-            failure) ->
-        ( successorState
-        , Right
-            $ LengthSpinePairCounterexampleBankReplayAttemptUnavailable
-                (reverse reversedRefusals) failure
-        )
-      Left
-          (LengthSpinePairSMTLibCounterexampleBankSampleReplayInputRejected
-            failure) -> case failure of
-        LengthSpinePairSMTLibInputReplayEvaluationRejected
-            evaluationFailure ->
-          go
-            (LengthSpinePairCounterexampleBankReplayEvaluationRefused
-              evaluationFailure : reversedRefusals)
-            successorState successor remaining
-        LengthSpinePairSMTLibInputReplayAssociationRejected _ ->
-          go
-            (LengthSpinePairCounterexampleBankReplayAssociationRefused
-              : reversedRefusals)
-            successorState successor remaining
-      Right Nothing -> go reversedRefusals successorState successor remaining
-      Right (Just counterexample) ->
-        ( successorState
-        , Right $ LengthSpinePairCounterexampleBankReplayHit
-            (reverse reversedRefusals)
-            $ LengthSpinePairCounterexampleBankReplayHitValue
-                (lengthSpinePairSMTLibQueryCounterexampleBankScope query)
-                sample counterexample
-        )
-
-newtype LengthSpinePairCounterexampleBankContextReplayHit command identity =
-  LengthSpinePairCounterexampleBankContextReplayHitValue
-    (LengthSpinePairCounterexampleBankReplayHit identity)
-
-type role LengthSpinePairCounterexampleBankContextReplayHit nominal nominal
-
-lengthSpinePairCounterexampleBankContextReplayHitCounterexample
-  :: LengthSpinePairCounterexampleBankContextReplayHit command identity
-  -> ValidatedLengthSpinePairCounterexample
-lengthSpinePairCounterexampleBankContextReplayHitCounterexample
-    (LengthSpinePairCounterexampleBankContextReplayHitValue hit) =
-  lengthSpinePairCounterexampleBankReplayHitCounterexample hit
-
-data LengthSpinePairCounterexampleBankContextReplayOutcome command identity
-  = LengthSpinePairCounterexampleBankContextReplayMiss
-      [LengthSpinePairCounterexampleBankReplayRefusal]
-  | LengthSpinePairCounterexampleBankContextReplayAttemptUnavailable
-      [LengthSpinePairCounterexampleBankReplayRefusal]
-      !LengthSpinePairCounterexampleBankError
-  | LengthSpinePairCounterexampleBankContextReplayHit
-      [LengthSpinePairCounterexampleBankReplayRefusal]
-      !(LengthSpinePairCounterexampleBankContextReplayHit command identity)
-
-type role LengthSpinePairCounterexampleBankContextReplayOutcome
-  nominal nominal
-
+-- | Replay through one mutable binary-product owner.
 replayLengthSpinePairCounterexampleBankInContext
   :: LengthEvaluationLimits
   -> LengthSpinePairSMTLibQuery identity local
   -> LengthSpinePairCounterexampleBankContext command identity
   -> IO
-      (Either LengthSpinePairCounterexampleBankReplayFailure
+      (Either BankReplayFailure
         (LengthSpinePairCounterexampleBankContextReplayOutcome
           command identity))
-replayLengthSpinePairCounterexampleBankInContext evaluationLimits query
-    (LengthSpinePairCounterexampleBankContext state) =
-  transitionLengthSpinePairCounterexampleBankContext state $ \initial ->
-    let (successor, replayed) =
-          replayLengthSpinePairCounterexampleBank
-            evaluationLimits query initial
-    in (successor, fmap tagOutcome replayed)
- where
-  tagOutcome replayed = case replayed of
-    LengthSpinePairCounterexampleBankReplayMiss refusals ->
-      LengthSpinePairCounterexampleBankContextReplayMiss refusals
-    LengthSpinePairCounterexampleBankReplayAttemptUnavailable
-        refusals failure ->
-      LengthSpinePairCounterexampleBankContextReplayAttemptUnavailable
-        refusals failure
-    LengthSpinePairCounterexampleBankReplayHit refusals hit ->
-      LengthSpinePairCounterexampleBankContextReplayHit refusals
-        $ LengthSpinePairCounterexampleBankContextReplayHitValue hit
+replayLengthSpinePairCounterexampleBankInContext evaluationLimits query =
+  replayBankInContext $ spinePairBankBridge evaluationLimits query
 
-transitionLengthSpinePairCounterexampleBankContext
-  :: MVar (LengthSpinePairCounterexampleBankState identity)
-  -> (LengthSpinePairCounterexampleBankState identity
-      -> ( LengthSpinePairCounterexampleBankState identity
-         , Either failure outcome
-         ))
-  -> IO (Either failure outcome)
-transitionLengthSpinePairCounterexampleBankContext state transition =
-  modifyMVar state $ \initial ->
-    case transition initial of
-      (successor, outcome) -> do
-        _ <- evaluate $ forceLengthSpinePairCounterexampleBankSuccessor successor
-        _ <- evaluate $ forceEitherClassification outcome
-        pure (successor, outcome)
-
-forceLengthSpinePairCounterexampleBankSuccessor
-  :: LengthSpinePairCounterexampleBankState identity
-  -> ()
-forceLengthSpinePairCounterexampleBankSuccessor
-    (LengthSpinePairCounterexampleBankState limits active) =
-  rnf limits `seq` rnf active
-
--- Binary-product promotion -------------------------------------------------
-
-data LengthSpinePairCounterexampleBankPromotionFailure
-  = LengthSpinePairCounterexampleBankPromotionScopeInvariant
-  | LengthSpinePairCounterexampleBankPromotionMembershipInvariant
-  | LengthSpinePairCounterexampleBankPromotionInsertionRejected
-      !LengthSpinePairCounterexampleBankError
-  deriving (Eq, Ord, Show)
-
+-- | Promote one explicit binary-product replay hit without replaying or
+-- recording it a second time.
 promoteLengthSpinePairCounterexampleBankReplayHit
   :: LengthSpinePairCounterexampleBankReplayHit identity
   -> LengthSpinePairCounterexampleBankState identity
   -> ( LengthSpinePairCounterexampleBankState identity
      , Either LengthSpinePairCounterexampleBankPromotionFailure ()
      )
-promoteLengthSpinePairCounterexampleBankReplayHit
-    (LengthSpinePairCounterexampleBankReplayHitValue
-      scope sample _counterexample) state =
-  case lengthSpinePairCounterexampleBankStateActiveBank state of
-    Nothing ->
-      ( state
-      , Left LengthSpinePairCounterexampleBankPromotionScopeInvariant
-      )
-    Just bank
-      | not $ lengthSpinePairCounterexampleBankMatchesScope scope bank ->
-          ( state
-          , Left LengthSpinePairCounterexampleBankPromotionScopeInvariant
-          )
-      | sample `notElem` lengthSpinePairCounterexampleBankSamples bank ->
-          ( state
-          , Left LengthSpinePairCounterexampleBankPromotionMembershipInvariant
-          )
-      | otherwise -> case insertLengthSpinePairCounterexampleBankSample
-          lengthSpinePairCounterexampleBankSolverIndependentReplayOrigin
-          (lengthSpinePairCounterexampleBankSampleInputs sample) bank of
-        Left failure ->
-          ( state
-          , Left
-              $ LengthSpinePairCounterexampleBankPromotionInsertionRejected
-                  failure
-          )
-        Right promoted ->
-          (replaceLengthSpinePairCounterexampleBank promoted state, Right ())
+promoteLengthSpinePairCounterexampleBankReplayHit =
+  promoteBankReplayHit spinePairBankSurface
 
+-- | 'promoteLengthSpinePairCounterexampleBankReplayHit' as one serialized
+-- transition of the owner which minted the hit.
 promoteLengthSpinePairCounterexampleBankReplayHitInContext
   :: LengthSpinePairCounterexampleBankContextReplayHit command identity
   -> LengthSpinePairCounterexampleBankContext command identity
   -> IO (Either LengthSpinePairCounterexampleBankPromotionFailure ())
-promoteLengthSpinePairCounterexampleBankReplayHitInContext
-    (LengthSpinePairCounterexampleBankContextReplayHitValue hit)
-    (LengthSpinePairCounterexampleBankContext state) =
-  transitionLengthSpinePairCounterexampleBankContext state
-    $ promoteLengthSpinePairCounterexampleBankReplayHit hit
+promoteLengthSpinePairCounterexampleBankReplayHitInContext =
+  promoteBankReplayHitInContext spinePairBankSurface
 
--- Binary-product recording -------------------------------------------------
-
-data LengthSpinePairCounterexampleBankReceiptOrigin
-  = LengthSpinePairCounterexampleBankReceiptFromLiveModel
-  | LengthSpinePairCounterexampleBankReceiptFromSolverIndependentReplay
-  | LengthSpinePairCounterexampleBankReceiptFromSimplificationReplay
-  deriving (Bounded, Enum, Eq, Ord, Show)
-
-data LengthSpinePairCounterexampleBankRecordFailure
-  = LengthSpinePairCounterexampleBankRecordScopeInvariant
-  | LengthSpinePairCounterexampleBankRecordEvaluationRejected
-      !LengthSpinePairEvaluationError
-  | LengthSpinePairCounterexampleBankRecordAssociationRejected
-  | LengthSpinePairCounterexampleBankRecordCounterexampleNotReproduced
-  deriving (Eq, Ord, Show)
-
-data LengthSpinePairCounterexampleBankRecordOutcome
-  = LengthSpinePairCounterexampleBankRecorded
-      !ValidatedLengthSpinePairCounterexample
-  | LengthSpinePairCounterexampleBankRecordAttemptUnavailable
-      !LengthSpinePairCounterexampleBankError
-  | LengthSpinePairCounterexampleBankRecordInsertionUnavailable
-      !LengthSpinePairCounterexampleBankError
-  deriving (Eq, Show)
-
+-- | Record one freshly established binary-product receipt in the active
+-- same-scope bank.
 recordLengthSpinePairCounterexampleBankReceipt
   :: LengthEvaluationLimits
   -> LengthSpinePairSMTLibQuery identity local
-  -> LengthSpinePairCounterexampleBankReceiptOrigin
+  -> BankReceiptOrigin
   -> ValidatedLengthSpinePairCounterexample
   -> LengthSpinePairCounterexampleBankState identity
   -> ( LengthSpinePairCounterexampleBankState identity
      , Either LengthSpinePairCounterexampleBankRecordFailure
          LengthSpinePairCounterexampleBankRecordOutcome
      )
-recordLengthSpinePairCounterexampleBankReceipt evaluationLimits query origin
-    counterexample initial =
-  case lengthSpinePairCounterexampleBankStateActiveBank ensured of
-    Nothing ->
-      ( ensured
-      , Left LengthSpinePairCounterexampleBankRecordScopeInvariant
-      )
-    Just bank ->
-      let (successor, recorded) =
-            recordLengthSpinePairSMTLibQueryCounterexampleInBank
-              evaluationLimits query (spinePairReceiptOrigin origin)
-              counterexample bank
-          successorState = replaceLengthSpinePairCounterexampleBank
-            successor ensured
-      in (successorState, mapRecordResult recorded)
- where
-  ensured = ensureLengthSpinePairCounterexampleBankState query initial
+recordLengthSpinePairCounterexampleBankReceipt evaluationLimits query =
+  recordBankReceipt $ spinePairBankBridge evaluationLimits query
 
-  mapRecordResult recorded = case recorded of
-    Left LengthSpinePairSMTLibCounterexampleBankRecordScopeMismatch ->
-      Left LengthSpinePairCounterexampleBankRecordScopeInvariant
-    Left
-        (LengthSpinePairSMTLibCounterexampleBankRecordAttemptRejected
-          failure) ->
-      Right
-        $ LengthSpinePairCounterexampleBankRecordAttemptUnavailable failure
-    Left
-        (LengthSpinePairSMTLibCounterexampleBankRecordInputReplayRejected
-          failure) -> case failure of
-      LengthSpinePairSMTLibInputReplayEvaluationRejected evaluationFailure ->
-        Left $ LengthSpinePairCounterexampleBankRecordEvaluationRejected
-          evaluationFailure
-      LengthSpinePairSMTLibInputReplayAssociationRejected _ ->
-        Left LengthSpinePairCounterexampleBankRecordAssociationRejected
-    Left
-        LengthSpinePairSMTLibCounterexampleBankRecordCounterexampleNotReproduced ->
-      Left
-        LengthSpinePairCounterexampleBankRecordCounterexampleNotReproduced
-    Left
-        (LengthSpinePairSMTLibCounterexampleBankRecordInsertionRejected
-          failure) ->
-      Right
-        $ LengthSpinePairCounterexampleBankRecordInsertionUnavailable failure
-    Right fresh -> Right $ LengthSpinePairCounterexampleBankRecorded fresh
-
+-- | 'recordLengthSpinePairCounterexampleBankReceipt' as one serialized
+-- transition of a mutable binary-product owner.
 recordLengthSpinePairCounterexampleBankReceiptInContext
   :: LengthEvaluationLimits
   -> LengthSpinePairSMTLibQuery identity local
-  -> LengthSpinePairCounterexampleBankReceiptOrigin
+  -> BankReceiptOrigin
   -> ValidatedLengthSpinePairCounterexample
   -> LengthSpinePairCounterexampleBankContext command identity
   -> IO
       (Either LengthSpinePairCounterexampleBankRecordFailure
         LengthSpinePairCounterexampleBankRecordOutcome)
-recordLengthSpinePairCounterexampleBankReceiptInContext
-    evaluationLimits query origin counterexample
-    (LengthSpinePairCounterexampleBankContext state) =
-  transitionLengthSpinePairCounterexampleBankContext state
-    $ recordLengthSpinePairCounterexampleBankReceipt
-        evaluationLimits query origin counterexample
+recordLengthSpinePairCounterexampleBankReceiptInContext evaluationLimits
+    query =
+  recordBankReceiptInContext $ spinePairBankBridge evaluationLimits query
 
 spinePairReceiptOrigin
-  :: LengthSpinePairCounterexampleBankReceiptOrigin
+  :: BankReceiptOrigin
   -> LengthSpinePairCounterexampleBankOrigin
 spinePairReceiptOrigin origin = case origin of
-  LengthSpinePairCounterexampleBankReceiptFromLiveModel ->
+  BankReceiptFromLiveModel ->
     lengthSpinePairCounterexampleBankLiveModelReplayOrigin
-  LengthSpinePairCounterexampleBankReceiptFromSolverIndependentReplay ->
+  BankReceiptFromSolverIndependentReplay ->
     lengthSpinePairCounterexampleBankSolverIndependentReplayOrigin
-  LengthSpinePairCounterexampleBankReceiptFromSimplificationReplay ->
+  BankReceiptFromSimplificationReplay ->
     lengthSpinePairCounterexampleBankSimplificationReplayOrigin

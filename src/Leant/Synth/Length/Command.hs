@@ -37,19 +37,32 @@ data LengthBehaviorMode
   | LengthBehaviorFilter
   deriving (Bounded, Enum, Eq, Ord, Show)
 
+-- | One parsed @:synth@ argument line: the behavior mode (ranking unless
+-- @--behavior-mode filter@ was given), the optional request-scoped Length
+-- contract path, and the remaining goal text.  Path and goal are already
+-- trimmed of surrounding whitespace.
 data LengthSynthCommand = LengthSynthCommand
   { lengthSynthCommandBehaviorMode :: !LengthBehaviorMode
   , lengthSynthCommandContractPath :: Maybe FilePath
+    -- ^ present exactly when the line named @--length-contract@
   , lengthSynthCommandGoal :: String
+    -- ^ opaque Lean goal text; never inspected by this module
   }
   deriving (Eq, Show)
 
+-- | Why a line beginning with @--behavior-mode@ or @--length-contract@ was
+-- refused.  A line without either option never fails.
 data LengthSynthCommandError
   = LengthSynthCommandBehaviorModeMissing
+    -- ^ @--behavior-mode@ was not followed by a mode word
   | LengthSynthCommandBehaviorModeInvalid
+    -- ^ the mode word was neither @rank@ nor @filter@
   | LengthSynthCommandDelimiterMissing
+    -- ^ an option was recognized but no standalone @--@ delimiter followed
   | LengthSynthCommandContractPathMissing
+    -- ^ the @--@ delimiter was found but no path text preceded it
   | LengthSynthCommandBehaviorModeMustPrecedeContract
+    -- ^ @--behavior-mode@ appeared after @--length-contract@
   deriving (Bounded, Enum, Eq, Ord, Show)
 
 -- | One lexically complete inline request.  The private constructor prevents
@@ -76,6 +89,13 @@ data LengthSynthInlineCommandError
   | LengthSynthCommandInlineDelimiterMissing
   deriving (Eq, Ord, Show)
 
+-- | Split one @:synth@ argument line.  A trimmed line that starts with an
+-- exact @--behavior-mode@ token names @rank@ or @filter@ next; a line that
+-- starts with (or continues with) an exact @--length-contract@ token supplies
+-- a path up to the first standalone @--@ token; the text after that
+-- delimiter is the goal.  Either option makes the delimiter mandatory, the
+-- mode must precede the contract, and a line naming neither option is
+-- entirely the goal under the ranking mode.
 parseLengthSynthCommand
   :: String
   -> Either LengthSynthCommandError LengthSynthCommand
@@ -312,7 +332,7 @@ takeToken :: String -> Maybe (String, String)
 takeToken source = case dropWhile isSpace source of
   [] -> Nothing
   remaining ->
-    let (token, rest) = span (not . isSpace) remaining
+    let (token, rest) = break isSpace remaining
     in Just (token, dropWhile isSpace rest)
 
 consumeDelimiter :: String -> Maybe String

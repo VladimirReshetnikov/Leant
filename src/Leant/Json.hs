@@ -17,6 +17,8 @@ import Data.Char (chr, isDigit, isHexDigit, isSpace, ord)
 import Data.List (intercalate)
 import Numeric (showHex)
 
+-- | A parsed JSON document.  Integral numbers are kept exact as 'JInt';
+-- other numbers are 'JNum'.
 data JValue
   = JNull
   | JBool !Bool

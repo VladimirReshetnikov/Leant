@@ -35,24 +35,12 @@ import Language.Haskell.Djex
   , ValidatedLengthSpinePairCounterexample
   , ValidatedLengthSpinePairCounterexampleSimplification
   , ValidatedLengthSpinePairInputBox
-  , defaultLengthSMTLibLiveSessionMaximumQueries
   )
 
 import Leant.Synth.BehavioralSelection.Internal
-  ( BehavioralSelectionBatch
-  , BehavioralSelectionCandidate
-  , BehavioralSelectionDecision
-  , BehavioralSelectionError
+  ( BehavioralSelectionError
   , BehaviorallyRejected
   , BehaviorallySelected
-  , behavioralSelectionBatchRejected
-  , behavioralSelectionBatchSelected
-  , behavioralSelectionInputCandidates
-  , behaviorallySelectedVerified
-  , rejectBehavioralSelectionCandidate
-  , retainBehavioralSelectionCandidate
-  , sealBehavioralSelectionBatch
-  , withBehavioralSelectionInput
   )
 import Leant.Synth.Engine (DetailedVerificationVariant)
 import Leant.Synth.Length.Configuration
@@ -61,6 +49,7 @@ import Leant.Synth.Length.Configuration
   , assessVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
   )
 import Leant.Synth.Length.Contract (LeanLengthSpinePairContract)
+import qualified Leant.Synth.Length.Selection.Generic as Generic
 import qualified Leant.Synth.Length.CounterexampleBank.Internal
   as CounterexampleBank
 import Leant.Synth.Length.Ranking
@@ -82,11 +71,7 @@ import Leant.Synth.Length.SpinePair.Ranking
   , rankedLengthSpinePairCandidateOriginalIndex
   , rankedLengthSpinePairCandidatePreparationRefusal
   )
-import Leant.Synth.Verification
-  ( VerificationBatch
-  , Verified
-  , verifiedCandidateReceipts
-  )
+import Leant.Synth.Verification (VerificationBatch, Verified)
 
 -- | Closed pair-domain reason class for a retained candidate.
 data LengthSpinePairSelectionRetentionClass
@@ -97,87 +82,89 @@ data LengthSpinePairSelectionRetentionClass
   | LengthSpinePairSelectionApplicableDomainEstablished
   deriving (Bounded, Enum, Eq, Ord, Show)
 
--- | Exact pair-domain retention explanation.  The constructor stays private;
--- the closed projections expose the diagnostic or positive receipt without
--- permitting callers to forge a selection decision.
-data LengthSpinePairSelectionRetention
-  = LengthSpinePairSelectionRetainedPreparationRefusal
-      !LengthPreparationRefusalClass
-  | LengthSpinePairSelectionRetainedUnassessed
-  | LengthSpinePairSelectionRetainedHeuristic !SolverStatus
-  | LengthSpinePairSelectionRetainedBoundedPositive
-      !ValidatedLengthSpinePairInputBox
-  | LengthSpinePairSelectionRetainedApplicableDomainEstablished
-      !ValidatedLengthSpinePairApplicableDomain
-  deriving (Eq, Show)
+-- | Exact pair-domain retention explanation.  It is the shared explanation
+-- at the binary-product receipts, so it cannot be confused with a scalar one,
+-- and its constructors stay private to this module and its facade.
+type LengthSpinePairSelectionRetention =
+  Generic.SelectionRetention
+    ValidatedLengthSpinePairInputBox
+    ValidatedLengthSpinePairApplicableDomain
 
+-- | The closed reason class of a pair-domain retention explanation.  At most
+-- one of the payload projections below returns 'Just' for a given
+-- explanation, and none does for 'LengthSpinePairSelectionUnassessed'.
 lengthSpinePairSelectionRetentionClass
   :: LengthSpinePairSelectionRetention
   -> LengthSpinePairSelectionRetentionClass
 lengthSpinePairSelectionRetentionClass retention = case retention of
-  LengthSpinePairSelectionRetainedPreparationRefusal _ ->
+  Generic.RetainedPreparationRefusal _ ->
     LengthSpinePairSelectionPreparationRefused
-  LengthSpinePairSelectionRetainedUnassessed ->
-    LengthSpinePairSelectionUnassessed
-  LengthSpinePairSelectionRetainedHeuristic _ ->
-    LengthSpinePairSelectionHeuristic
-  LengthSpinePairSelectionRetainedBoundedPositive _ ->
+  Generic.RetainedUnassessed -> LengthSpinePairSelectionUnassessed
+  Generic.RetainedHeuristic _ -> LengthSpinePairSelectionHeuristic
+  Generic.RetainedBoundedPositive _ ->
     LengthSpinePairSelectionBoundedPositive
-  LengthSpinePairSelectionRetainedApplicableDomainEstablished _ ->
+  Generic.RetainedApplicableDomainEstablished _ ->
     LengthSpinePairSelectionApplicableDomainEstablished
 
+-- | The diagnostic of a 'LengthSpinePairSelectionPreparationRefused'
+-- retention.
 lengthSpinePairSelectionRetentionPreparationRefusal
   :: LengthSpinePairSelectionRetention
   -> Maybe LengthPreparationRefusalClass
-lengthSpinePairSelectionRetentionPreparationRefusal retention =
-  case retention of
-    LengthSpinePairSelectionRetainedPreparationRefusal refusal ->
-      Just refusal
-    _ -> Nothing
+lengthSpinePairSelectionRetentionPreparationRefusal =
+  Generic.selectionRetentionPreparationRefusal
 
+-- | The raw status of a 'LengthSpinePairSelectionHeuristic' retention, which
+-- is a diagnostic and never negative behavioral evidence.
 lengthSpinePairSelectionRetentionSolverStatus
   :: LengthSpinePairSelectionRetention
   -> Maybe SolverStatus
-lengthSpinePairSelectionRetentionSolverStatus retention = case retention of
-  LengthSpinePairSelectionRetainedHeuristic status -> Just status
-  _ -> Nothing
+lengthSpinePairSelectionRetentionSolverStatus =
+  Generic.selectionRetentionSolverStatus
 
+-- | The receipt of a 'LengthSpinePairSelectionBoundedPositive' retention.
 lengthSpinePairSelectionRetentionInputBox
   :: LengthSpinePairSelectionRetention
   -> Maybe ValidatedLengthSpinePairInputBox
-lengthSpinePairSelectionRetentionInputBox retention = case retention of
-  LengthSpinePairSelectionRetainedBoundedPositive receipt -> Just receipt
-  _ -> Nothing
+lengthSpinePairSelectionRetentionInputBox =
+  Generic.selectionRetentionInputBox
 
+-- | The receipt of a
+-- 'LengthSpinePairSelectionApplicableDomainEstablished' retention.
 lengthSpinePairSelectionRetentionApplicableDomain
   :: LengthSpinePairSelectionRetention
   -> Maybe ValidatedLengthSpinePairApplicableDomain
-lengthSpinePairSelectionRetentionApplicableDomain retention =
-  case retention of
-    LengthSpinePairSelectionRetainedApplicableDomainEstablished receipt ->
-      Just receipt
-    _ -> Nothing
+lengthSpinePairSelectionRetentionApplicableDomain =
+  Generic.selectionRetentionApplicableDomain
 
--- | Exact binary-product replay authority for one rejected occurrence.
--- Simplification remains optional metadata owned by that same ranked value.
-data LengthSpinePairSelectionRejection =
-  LengthSpinePairSelectionRejection
-    !ValidatedLengthSpinePairCounterexample
-    !(Maybe ValidatedLengthSpinePairCounterexampleSimplification)
-  deriving (Eq, Show)
+-- | Exact pair replay authority for one rejected occurrence.  The shared
+-- rejection at the binary-product receipts is a distinct type from the
+-- scalar one, so the two cannot be confused.  Simplification is optional
+-- metadata; the ordinary receipt is always the final independently replayed
+-- counterexample.
+type LengthSpinePairSelectionRejection =
+  Generic.SelectionRejection
+    ValidatedLengthSpinePairCounterexample
+    ValidatedLengthSpinePairCounterexampleSimplification
 
+-- | The pair counterexample which rejected the occurrence.
 lengthSpinePairSelectionRejectionCounterexample
   :: LengthSpinePairSelectionRejection
   -> ValidatedLengthSpinePairCounterexample
-lengthSpinePairSelectionRejectionCounterexample
-    (LengthSpinePairSelectionRejection receipt _) = receipt
+lengthSpinePairSelectionRejectionCounterexample =
+  Generic.selectionRejectionCounterexample
 
+-- | The optional simplification carried by the rejecting pair candidate.
 lengthSpinePairSelectionRejectionCounterexampleSimplification
   :: LengthSpinePairSelectionRejection
   -> Maybe ValidatedLengthSpinePairCounterexampleSimplification
-lengthSpinePairSelectionRejectionCounterexampleSimplification
-    (LengthSpinePairSelectionRejection _ simplification) = simplification
+lengthSpinePairSelectionRejectionCounterexampleSimplification =
+  Generic.selectionRejectionSimplification
 
+-- | Fail-closed pair-domain reasons which preserve the complete original
+-- verification batch.  The index failure is an internal association
+-- inconsistency: a ranking report named an occurrence outside the fresh
+-- selection input (candidate count, requested index).
 data LengthSpinePairSelectionFailure
   = LengthSpinePairSelectionPostVerificationFailed
       !LengthSpinePairPostVerificationFailure
@@ -188,54 +175,42 @@ data LengthSpinePairSelectionFailure
   | LengthSpinePairSelectionSealFailed !BehavioralSelectionError
   deriving (Eq, Ord, Show)
 
--- | Opaque preserve-all failure or sealed pair-domain partition.
-data LengthSpinePairSelectionResult
-  = LengthSpinePairSelectionPreserved
-      (VerificationBatch DetailedVerificationVariant)
-      !LengthSpinePairSelectionFailure
-  | LengthSpinePairSelectionAccepted
-      !(BehavioralSelectionBatch
-          DetailedVerificationVariant
-          LengthSpinePairSelectionRetention
-          LengthSpinePairSelectionRejection)
+-- | Opaque preserve-all failure or sealed pair-domain partition: the shared
+-- result at this domain's explanation and rejection types.
+type LengthSpinePairSelectionResult =
+  Generic.SelectionResult
+    LengthSpinePairSelectionFailure
+    LengthSpinePairSelectionRetention
+    LengthSpinePairSelectionRejection
 
--- | Effective candidates in original callback order.  Failures return the
--- complete original batch; success returns only the selected partition.
+-- | Effective candidates in original callback order: the original batch on
+-- failure, the selected partition on success.
 lengthSpinePairSelectionCandidates
   :: LengthSpinePairSelectionResult
   -> [Verified DetailedVerificationVariant]
-lengthSpinePairSelectionCandidates result = case result of
-  LengthSpinePairSelectionPreserved verification _ ->
-    verifiedCandidateReceipts verification
-  LengthSpinePairSelectionAccepted batch ->
-    map behaviorallySelectedVerified $ behavioralSelectionBatchSelected batch
+lengthSpinePairSelectionCandidates = Generic.selectionCandidates
 
+-- | Selected pair occurrences, available only after the seal succeeded.
 lengthSpinePairSelectionSelected
   :: LengthSpinePairSelectionResult
   -> Maybe
       [BehaviorallySelected
         DetailedVerificationVariant LengthSpinePairSelectionRetention]
-lengthSpinePairSelectionSelected result = case result of
-  LengthSpinePairSelectionPreserved {} -> Nothing
-  LengthSpinePairSelectionAccepted batch -> Just
-    $ behavioralSelectionBatchSelected batch
+lengthSpinePairSelectionSelected = Generic.selectionSelected
 
+-- | Rejected pair occurrences, available only after the seal succeeded.
 lengthSpinePairSelectionRejected
   :: LengthSpinePairSelectionResult
   -> Maybe
       [BehaviorallyRejected
         DetailedVerificationVariant LengthSpinePairSelectionRejection]
-lengthSpinePairSelectionRejected result = case result of
-  LengthSpinePairSelectionPreserved {} -> Nothing
-  LengthSpinePairSelectionAccepted batch -> Just
-    $ behavioralSelectionBatchRejected batch
+lengthSpinePairSelectionRejected = Generic.selectionRejected
 
+-- | The sanitized failure which preserved the original batch.
 lengthSpinePairSelectionFailure
   :: LengthSpinePairSelectionResult
   -> Maybe LengthSpinePairSelectionFailure
-lengthSpinePairSelectionFailure result = case result of
-  LengthSpinePairSelectionPreserved _ failure -> Just failure
-  LengthSpinePairSelectionAccepted {} -> Nothing
+lengthSpinePairSelectionFailure = Generic.selectionFailure
 
 -- | Run the complete pair-domain assessment pipeline and reject only exact
 -- independently replayed pair counterexamples.  All failures preserve the
@@ -251,6 +226,12 @@ selectVerifiedLengthSpinePairCandidatesWithPolicy
     (assessVerifiedLengthSpinePairCandidatesWithPolicy policy contract)
     verification
 
+-- | 'selectVerifiedLengthSpinePairCandidatesWithPolicy' whose assessment
+-- pipeline replays and records pair counterexamples through the supplied
+-- command-owned binary-product bank context instead of a batch-local bank.
+-- Selection semantics are otherwise identical: only an independently
+-- replayed pair counterexample rejects, and every failure preserves the
+-- supplied batch.
 selectVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
   :: LengthRankingPolicy
   -> CounterexampleBank.LengthSpinePairCounterexampleBankContext
@@ -269,103 +250,58 @@ selectVerifiedLengthSpinePairCandidatesWithAssessment
       -> IO LengthSpinePairPostVerificationResult)
   -> VerificationBatch DetailedVerificationVariant
   -> IO LengthSpinePairSelectionResult
-selectVerifiedLengthSpinePairCandidatesWithAssessment assess verification = do
-  assessed <- assess verification
-  pure $ case lengthSpinePairPostVerificationAdapterFailure assessed of
-    Just failure -> preserve
-      $ LengthSpinePairSelectionPostVerificationFailed failure
-    Nothing -> case lengthSpinePairPostVerificationRankingFailure assessed of
-      Just failure -> preserve
-        $ LengthSpinePairSelectionRankingFailed failure
-      Nothing -> case lengthSpinePairPostVerificationRanking assessed of
-        Nothing -> preserve LengthSpinePairSelectionRankingUnavailable
-        Just ranking -> withBehavioralSelectionInput verification $ \input ->
-          let candidates = behavioralSelectionInputCandidates input
-              candidateCount = count candidates
-          in case buildDecisions candidateCount candidates
-              $ lengthSpinePairRankingCandidates ranking of
-            Left failure -> preserve failure
-            Right decisions -> case sealBehavioralSelectionBatch
-                defaultLengthSMTLibLiveSessionMaximumQueries
-                input decisions of
-              Left failure -> preserve
-                $ LengthSpinePairSelectionSealFailed failure
-              Right batch -> LengthSpinePairSelectionAccepted batch
- where
-  preserve = LengthSpinePairSelectionPreserved verification
+selectVerifiedLengthSpinePairCandidatesWithAssessment =
+  Generic.runSelectionWithAssessment spinePairSelectionDomain
 
-buildDecisions
-  :: Natural
-  -> [BehavioralSelectionCandidate
-        epoch DetailedVerificationVariant]
-  -> [RankedLengthSpinePairCandidate]
-  -> Either
+-- | What the binary-product domain contributes to the shared selection
+-- pipeline: how to read its assessed batch, how it names each fail-closed
+-- reason, and which assessment rejects.  Only an independently replayed pair
+-- counterexample does.
+spinePairSelectionDomain
+  :: Generic.SelectionDomain
+      LengthSpinePairPostVerificationResult
+      RankedLengthSpinePairCandidate
       LengthSpinePairSelectionFailure
-      [BehavioralSelectionDecision
-        epoch
-        DetailedVerificationVariant
-        LengthSpinePairSelectionRetention
-        LengthSpinePairSelectionRejection]
-buildDecisions candidateCount candidates = go []
- where
-  go reversed remaining = case remaining of
-    [] -> Right $ reverse reversed
-    ranked : rest -> do
-      candidate <- selectCandidate candidateCount candidates
-        $ rankedLengthSpinePairCandidateOriginalIndex ranked
-      let decision = classifyCandidate candidate ranked
-      decision `seq` go (decision : reversed) rest
-
-classifyCandidate
-  :: BehavioralSelectionCandidate epoch DetailedVerificationVariant
-  -> RankedLengthSpinePairCandidate
-  -> BehavioralSelectionDecision
-      epoch
-      DetailedVerificationVariant
       LengthSpinePairSelectionRetention
       LengthSpinePairSelectionRejection
-classifyCandidate candidate ranked =
-  case rankedLengthSpinePairCandidatePreparationRefusal ranked of
-    Just refusal -> retainBehavioralSelectionCandidate candidate
-      $ LengthSpinePairSelectionRetainedPreparationRefusal refusal
-    Nothing -> case rankedLengthSpinePairCandidateAssessment ranked of
-      LengthSpinePairUnassessed ->
-        retainBehavioralSelectionCandidate candidate
-          LengthSpinePairSelectionRetainedUnassessed
-      LengthSpinePairHeuristic status ->
-        retainBehavioralSelectionCandidate candidate
-          $ LengthSpinePairSelectionRetainedHeuristic status
-      LengthSpinePairCounterexample receipt ->
-        rejectBehavioralSelectionCandidate candidate
-          $ LengthSpinePairSelectionRejection receipt
-          $ rankedLengthSpinePairCandidateCounterexampleSimplification ranked
-      LengthSpinePairBoundedPositive receipt ->
-        retainBehavioralSelectionCandidate candidate
-          $ LengthSpinePairSelectionRetainedBoundedPositive receipt
-      LengthSpinePairApplicableDomainEstablished receipt ->
-        retainBehavioralSelectionCandidate candidate
-          $ LengthSpinePairSelectionRetainedApplicableDomainEstablished receipt
+spinePairSelectionDomain = Generic.SelectionDomain
+  { Generic.selectionAdapterFailure =
+      fmap LengthSpinePairSelectionPostVerificationFailed
+        . lengthSpinePairPostVerificationAdapterFailure
+  , Generic.selectionRankingFailure =
+      fmap LengthSpinePairSelectionRankingFailed
+        . lengthSpinePairPostVerificationRankingFailure
+  , Generic.selectionRanking = fmap lengthSpinePairRankingCandidates
+      . lengthSpinePairPostVerificationRanking
+  , Generic.selectionRankingUnavailable =
+      LengthSpinePairSelectionRankingUnavailable
+  , Generic.selectionIndexOutOfRange =
+      LengthSpinePairSelectionCandidateIndexOutOfRange
+  , Generic.selectionSealFailed = LengthSpinePairSelectionSealFailed
+  , Generic.selectionOriginalIndex =
+      rankedLengthSpinePairCandidateOriginalIndex
+  , Generic.selectionClassify = classifyCandidate
+  }
 
-selectCandidate
-  :: Natural
-  -> [BehavioralSelectionCandidate
-        epoch DetailedVerificationVariant]
-  -> Natural
+-- | The pair reading of one ranked report: 'Left' only for an exact
+-- independently replayed pair counterexample, 'Right' with the explanation
+-- for every other assessment.
+classifyCandidate
+  :: RankedLengthSpinePairCandidate
   -> Either
-      LengthSpinePairSelectionFailure
-      (BehavioralSelectionCandidate epoch DetailedVerificationVariant)
-selectCandidate candidateCount = go 0
- where
-  go _ [] requested = Left
-    $ LengthSpinePairSelectionCandidateIndexOutOfRange
-      candidateCount requested
-  go index (candidate : rest) requested
-    | index == requested = Right candidate
-    | otherwise = go (index + 1) rest requested
-
-count :: [value] -> Natural
-count = go 0
- where
-  go result remaining = case remaining of
-    [] -> result
-    _ : rest -> go (result + 1) rest
+      LengthSpinePairSelectionRejection
+      LengthSpinePairSelectionRetention
+classifyCandidate ranked =
+  case rankedLengthSpinePairCandidatePreparationRefusal ranked of
+    Just refusal -> Right $ Generic.RetainedPreparationRefusal refusal
+    Nothing -> case rankedLengthSpinePairCandidateAssessment ranked of
+      LengthSpinePairUnassessed -> Right Generic.RetainedUnassessed
+      LengthSpinePairHeuristic status ->
+        Right $ Generic.RetainedHeuristic status
+      LengthSpinePairCounterexample receipt -> Left
+        $ Generic.SelectionRejection receipt
+        $ rankedLengthSpinePairCandidateCounterexampleSimplification ranked
+      LengthSpinePairBoundedPositive receipt ->
+        Right $ Generic.RetainedBoundedPositive receipt
+      LengthSpinePairApplicableDomainEstablished receipt ->
+        Right $ Generic.RetainedApplicableDomainEstablished receipt

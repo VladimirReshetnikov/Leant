@@ -86,6 +86,12 @@ module Leant.Synth.Engine
   , synthMaxTried
   , synthVerificationWindow
   , candidateWindow
+  , SynthLimits (..)
+  , defaultSynthLimits
+  , synthVerificationWindowWith
+  , synthesizeTunedDetailedWith
+  , synthesizeWithProvidersSkippingDetailedWith
+  , advanceDetailedSynthCursorWith
   , takeDistinct
   , takeDistinctOn
   , renderCandidateByAvailability
@@ -99,6 +105,8 @@ module Leant.Synth.Engine
 
 import Data.Foldable (toList)
 import Data.List (intercalate, isPrefixOf, nub, nubBy, sortOn)
+import Data.Bifunctor (first, second)
+import Data.Maybe (catMaybes, isNothing)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Data.Void (Void)
@@ -201,6 +209,7 @@ import Leant.Synth.Fragment
   ( AppHead (..)
   , ExactContextArgument (..)
   , Frag (..)
+  , fragChildren
   , ProviderFrag (..)
   , ProviderInstantiationArgument (..)
   , Slot (..)
@@ -549,6 +558,10 @@ detailedCandidateVariantExactTypedOrigin
 detailedCandidateVariantExactTypedOrigin
     (DetailedCandidateVariant _ _ exactOrigin) = exactOrigin
 
+-- | The exact typed origin whose recorded spelling is still this variant's
+-- accepted text.  A retained origin whose recorded text differs from the
+-- accepted spelling is answered with 'Nothing', so a caller never associates
+-- semantics with a different term.
 detailedVerificationVariantExactTypedOrigin
   :: DetailedVerificationVariant
   -> Maybe ExactTypedVariantOrigin
@@ -558,6 +571,9 @@ detailedVerificationVariantExactTypedOrigin
     | exactTypedVariantOriginText retained == text -> Just retained
   _ -> Nothing
 
+-- | Zero-based ordinal of the origin's spelling within the Exference
+-- renderer's alternative list, recorded before verification.  Handoffs use
+-- it to select the same alternative when the exact renderer is re-run.
 exactTypedVariantOriginOrdinal :: ExactTypedVariantOrigin -> Natural
 exactTypedVariantOriginOrdinal
     (ExactTypedVariantOrigin ordinal _ _) = ordinal
@@ -565,6 +581,9 @@ exactTypedVariantOriginOrdinal
 exactTypedVariantOriginText :: ExactTypedVariantOrigin -> String
 exactTypedVariantOriginText (ExactTypedVariantOrigin _ text _) = text
 
+-- | The checked Exference candidate and run authority retained by the
+-- origin.  This is the sidecar of the Exference candidate which produced the
+-- spelling, even when a Djinn group displayed the same text first.
 exactTypedVariantOriginSidecar
   :: ExactTypedVariantOrigin
   -> TypedCandidateSemanticSidecar
@@ -693,21 +712,32 @@ advanceDetailedSynthCursor
   :: Int
   -> DetailedSynthCursor
   -> Either DetailedSynthCursorError DetailedSynthCursorStep
-advanceDetailedSynthCursor requested cursor
+advanceDetailedSynthCursor = advanceDetailedSynthCursorWith candidateWindow
+
+-- | 'advanceDetailedSynthCursor' under a retuned hard cap on the total
+-- number of candidate groups the cursor may hand out ('synthLimitWindow');
+-- the cap is checked before the cursor is demanded, exactly as the default.
+advanceDetailedSynthCursorWith
+  :: Int
+  -> Int
+  -> DetailedSynthCursor
+  -> Either DetailedSynthCursorError DetailedSynthCursorStep
+advanceDetailedSynthCursorWith window requested cursor
   | requested <= 0 =
       Left $ DetailedSynthCursorBatchSizeNotPositive requested
-  | requested > candidateWindow =
+  | requested > window =
       Left $ DetailedSynthCursorBatchSizeLimitExceeded
-        candidateWindow requested
-  | otherwise = Right $ advanceValidDetailedSynthCursor requested cursor
+        window requested
+  | otherwise = Right $ advanceValidDetailedSynthCursor window requested cursor
 
 advanceValidDetailedSynthCursor
   :: Int
+  -> Int
   -> DetailedSynthCursor
   -> DetailedSynthCursorStep
-advanceValidDetailedSynthCursor requested
+advanceValidDetailedSynthCursor window requested
     (DetailedSynthCursor consumed outcome)
-  | consumed >= candidateWindow = hardCapStep outcome
+  | consumed >= window = hardCapStep outcome
   | otherwise = case outcome of
       Left err -> DetailedSynthCursorEngineFailed err
       Right (DetailedSynthRefuted sound) ->
@@ -722,7 +752,7 @@ advanceValidDetailedSynthCursor requested
             (Right $ DetailedSynthCandidates rest notes))
        where
         (batch, rest) = splitAt remainingRequest groups
-        remainingRequest = min requested (candidateWindow - consumed)
+        remainingRequest = min requested (window - consumed)
 
 -- The only reachable capped cursor follows at least one candidate batch, so
 -- its payload is a locally reconstructed candidate outcome.  Keeping the
@@ -762,6 +792,46 @@ synthVerificationWindow engine = case engine of
 -- sound.
 candidateWindow :: Int
 candidateWindow = 60
+
+-- | The per-command search bounds a REPL session may retune.  Every field
+-- defaults to the established constant, so 'defaultSynthLimits' reproduces
+-- the historical behaviour exactly; the ordinary lanes take their Djinn
+-- candidate cutoff and choice-point budget from here, while the library and
+-- classical lanes keep their own fixed budgets.
+data SynthLimits = SynthLimits
+  { synthLimitShown :: !Int
+    -- ^ accepted candidate groups shown and bound ('synthMaxShown')
+  , synthLimitTried :: !Int
+    -- ^ fresh groups verified per lane; the @both@ engine doubles it
+    -- ('synthMaxTried')
+  , synthLimitWindow :: !Int
+    -- ^ candidate groups one lane may observe before "candidate limit
+    -- reached" ('candidateWindow'); also the cursor's hard cap
+  , synthLimitBudget :: !(Maybe Integer)
+    -- ^ Djinn choice-point budget of the ordinary and provider lanes;
+    -- 'Nothing' is unbounded
+  , synthLimitQueue :: !Int
+    -- ^ Exference queue bound
+  }
+  deriving (Eq, Show)
+
+-- | The historical bounds: 5 shown, 12 tried, a 60-group window, no Djinn
+-- budget, and an Exference queue of 1024.
+defaultSynthLimits :: SynthLimits
+defaultSynthLimits = SynthLimits
+  { synthLimitShown = synthMaxShown
+  , synthLimitTried = synthMaxTried
+  , synthLimitWindow = candidateWindow
+  , synthLimitBudget = Nothing
+  , synthLimitQueue = 1024
+  }
+
+-- | 'synthVerificationWindow' under retuned limits.
+synthVerificationWindowWith :: SynthLimits -> SynthEngine -> Int
+synthVerificationWindowWith limits engine = case engine of
+  EngineBoth -> 2 * synthLimitTried limits
+  EngineDjinn -> synthLimitTried limits
+  EngineExference -> synthLimitTried limits
 
 -- | Retain the first bounded set of distinct values. Deduplication deliberately
 -- precedes the bound so repeated backend derivations cannot consume slots that
@@ -848,6 +918,9 @@ renderCandidateByAvailability
 data SynthEngine = EngineDjinn | EngineExference | EngineBoth
   deriving (Eq, Show)
 
+-- | Parse the user-facing engine name accepted by @:set synth-engine@:
+-- exactly @djinn@, @exference@, or @both@ (case-sensitive, untrimmed);
+-- anything else is 'Nothing'.  Inverse of 'synthEngineName'.
 parseSynthEngine :: String -> Maybe SynthEngine
 parseSynthEngine value = case value of
   "djinn" -> Just EngineDjinn
@@ -855,6 +928,8 @@ parseSynthEngine value = case value of
   "both" -> Just EngineBoth
   _ -> Nothing
 
+-- | The user-facing engine name shown by @:set synth-engine@ with no
+-- argument; 'parseSynthEngine' accepts exactly these spellings.
 synthEngineName :: SynthEngine -> String
 synthEngineName engine = case engine of
   EngineDjinn -> "djinn"
@@ -865,7 +940,7 @@ synthEngineName engine = case engine of
 -- candidate window can be crowded by a large environment even when a short
 -- prefix contains every declaration needed for a composition.  Give it sparse
 -- geometric prefixes before the complete bounded inventory: at most four
--- searches for the current eighty-provider discovery cap.  Exference keeps
+-- searches for the default eighty-provider discovery cap.  Exference keeps
 -- its rated full-inventory lane.  Combined mode preserves its existing
 -- singleton run and complete final run; intermediate prefixes are Djinn-only
 -- so widening does not repeatedly spend Exference's step budget.
@@ -919,9 +994,21 @@ synthesizeWithProvidersSkipping engine steps checked providers frag =
 synthesizeWithProvidersSkippingDetailed
   :: SynthEngine -> Int -> Set.Set String -> [ProviderFrag] -> Frag
   -> Either String DetailedSynthOutcome
-synthesizeWithProvidersSkippingDetailed engine steps checked providers frag =
-  synthesizeTunedWithProvidersDetailed engine steps
-    (candidateWindow, Nothing) checked providers [] frag frag
+synthesizeWithProvidersSkippingDetailed =
+  synthesizeWithProvidersSkippingDetailedWith defaultSynthLimits
+
+-- | 'synthesizeWithProvidersSkippingDetailed' under retuned limits: the
+-- Djinn cutoff and choice-point budget come from the limits, as do the
+-- Exference queue and candidate window.
+synthesizeWithProvidersSkippingDetailedWith
+  :: SynthLimits
+  -> SynthEngine -> Int -> Set.Set String -> [ProviderFrag] -> Frag
+  -> Either String DetailedSynthOutcome
+synthesizeWithProvidersSkippingDetailedWith limits engine steps checked
+    providers frag =
+  runTunedSynthesis limits True engine steps
+    (synthLimitWindow limits, synthLimitBudget limits)
+    checked providers [] frag frag
 
 -- | Package-private tuned counterpart used by focused boundary tests which
 -- need to retain a simple checked provider graph without changing the REPL's
@@ -933,7 +1020,7 @@ synthesizeWithProvidersSkippingDetailedWithMultiConstructorPatterns
   -> Either String DetailedSynthOutcome
 synthesizeWithProvidersSkippingDetailedWithMultiConstructorPatterns
     multiConstructorPatterns engine steps checked providers frag =
-  synthesizeTunedWithProvidersDetailedWithMultiConstructorPatterns
+  runTunedSynthesis defaultSynthLimits
     multiConstructorPatterns engine steps (candidateWindow, Nothing)
     checked providers [] frag frag
 
@@ -967,32 +1054,37 @@ synthesizeTuned engine steps limits extras engineFrag fitFrag =
 synthesizeTunedDetailed
   :: SynthEngine -> Int -> (Int, Maybe Integer) -> [(String, Frag)]
   -> Frag -> Frag -> Either String DetailedSynthOutcome
-synthesizeTunedDetailed engine steps limits extras engineFrag fitFrag =
-  synthesizeTunedWithProvidersDetailed engine steps limits Set.empty [] extras
+synthesizeTunedDetailed = synthesizeTunedDetailedWith defaultSynthLimits
+
+-- | 'synthesizeTunedDetailed' whose Exference queue, candidate window, and
+-- @both@-mode interleave come from retuned limits; the explicit Djinn
+-- cutoff/budget pair still belongs to the calling lane.
+synthesizeTunedDetailedWith
+  :: SynthLimits
+  -> SynthEngine -> Int -> (Int, Maybe Integer) -> [(String, Frag)]
+  -> Frag -> Frag -> Either String DetailedSynthOutcome
+synthesizeTunedDetailedWith limits engine steps djinnLimits extras engineFrag
+    fitFrag =
+  runTunedSynthesis limits True engine steps djinnLimits Set.empty [] extras
     engineFrag fitFrag
 
-synthesizeTunedWithProvidersDetailed
-  :: SynthEngine -> Int -> (Int, Maybe Integer) -> Set.Set String
-  -> [ProviderFrag] -> [(String, Frag)] -> Frag -> Frag
-  -> Either String DetailedSynthOutcome
-synthesizeTunedWithProvidersDetailed engine steps limits checked providers extras
-    engineFrag fitFrag =
-  synthesizeTunedWithProvidersDetailedWithMultiConstructorPatterns
-    True engine steps limits checked providers extras engineFrag fitFrag
-
-synthesizeTunedWithProvidersDetailedWithMultiConstructorPatterns
-  :: Bool
+-- | The one tuned search: Djinn under the lane's cutoff/budget pair,
+-- Exference under the limits' step, queue, and window bounds, or both merged
+-- under the limits' shown/tried interleave.
+runTunedSynthesis
+  :: SynthLimits
+  -> Bool
   -> SynthEngine -> Int -> (Int, Maybe Integer) -> Set.Set String
   -> [ProviderFrag] -> [(String, Frag)] -> Frag -> Frag
   -> Either String DetailedSynthOutcome
-synthesizeTunedWithProvidersDetailedWithMultiConstructorPatterns
-    multiConstructorPatterns engine steps limits checked providers extras
+runTunedSynthesis limits
+    multiConstructorPatterns engine steps djinnLimits checked providers extras
     engineFrag fitFrag = case engine of
   EngineDjinn -> do
     prepared <- prepareSynthesis djinnRecursiveProjection
       providers extras engineFrag fitFrag
     let origin = preparedSemanticOrigin prepared
-    outcome <- djinnRun limits fitFrag
+    outcome <- djinnRun (synthLimitWindow limits) djinnLimits fitFrag
       (semanticOriginProjectionCompleteness origin)
       (preparedRenderExpression prepared)
       (semanticOriginSearchGoal origin)
@@ -1004,13 +1096,13 @@ synthesizeTunedWithProvidersDetailedWithMultiConstructorPatterns
   EngineExference -> do
     prepared <- prepareSynthesis exferenceRecursiveProjection
       providers extras engineFrag fitFrag
-    outcome <- exferenceRun multiConstructorPatterns steps prepared
+    outcome <- exferenceRun limits multiConstructorPatterns steps prepared
     pure (withoutCheckedDetailedCandidates checked outcome)
   EngineBoth -> do
     djinnPrepared <- prepareSynthesis djinnRecursiveProjection
       providers extras engineFrag fitFrag
     let djinnOrigin = preparedSemanticOrigin djinnPrepared
-    djinnCompatibility <- djinnRun limits fitFrag
+    djinnCompatibility <- djinnRun (synthLimitWindow limits) djinnLimits fitFrag
       (semanticOriginProjectionCompleteness djinnOrigin)
       (preparedRenderExpression djinnPrepared)
       (semanticOriginSearchGoal djinnOrigin)
@@ -1019,8 +1111,9 @@ synthesizeTunedWithProvidersDetailedWithMultiConstructorPatterns
     let djinn = detailUnobservedOutcome djinnCompatibility
     exferencePrepared <- prepareSynthesis exferenceRecursiveProjection
       providers extras engineFrag fitFrag
-    exference <- exferenceRun multiConstructorPatterns steps exferencePrepared
-    pure (mergeDetailedOutcomesSkipping checked djinn exference)
+    exference <- exferenceRun limits multiConstructorPatterns steps
+      exferencePrepared
+    pure (mergeDetailedOutcomesSkippingWith limits checked djinn exference)
 
 -- | Prepare one engine-specific translation without erasing which goal came
 -- from the source fragment and which goal search actually receives. Premise
@@ -1157,7 +1250,8 @@ prepareProviderGroundFactTranslation recursiveProjection providers extras
 -- | The complete LJT search: candidates, or a refutation whose
 -- soundness depends on the translation having hidden nothing.
 djinnRun
-  :: (Int, Maybe Integer)
+  :: Int
+  -> (Int, Maybe Integer)
   -> Frag
   -> ProjectionCompleteness
   -> (Expression String -> Either String [String])
@@ -1165,7 +1259,8 @@ djinnRun
   -> [DjinnDecl]
   -> [KindedProviderInstantiationAssignment String]
   -> Either String SynthOutcome
-djinnRun (cutoff, budget) frag projection render goal decls instantiations = do
+djinnRun window (cutoff, budget) frag projection render goal decls
+    instantiations = do
   standard <- viaDiagnostic standardDjinnSession
   targetName <- viaShow (mkIdentifier "leantSynth")
   target <- viaShow (mkDefinitionName targetName)
@@ -1192,7 +1287,7 @@ djinnRun (cutoff, budget) frag projection render goal decls instantiations = do
     (runDjinnQueryWithKindedInstantiationAssignments
       session instantiations request)
   let batch = resultSearch result
-      notes = progressNotes (batchProgress batch)
+      notes = progressNotesWith window (batchProgress batch)
       -- Djinn ranks by unused-binder fraction, which happily puts a
       -- redundantly re-cased monster ahead of the obvious term.  Prefer
       -- smaller terms, keeping the engine's order as the tie-break, over
@@ -1212,7 +1307,7 @@ djinnRun (cutoff, budget) frag projection render goal decls instantiations = do
            \was ambiguous or incompatible" : notes)
       | otherwise ->
           SynthRefuted
-            ( budget == Nothing
+            ( isNothing budget
               && projectionFragmentsComplete projection
               && fragmentProjectionComplete frag
             )
@@ -1225,11 +1320,12 @@ djinnRun (cutoff, budget) frag projection render goal decls instantiations = do
 -- converted to Exference's integer variable domain.  Candidates keep
 -- Exference's own ranking; there is never negative evidence.
 exferenceRun
-  :: Bool
+  :: SynthLimits
+  -> Bool
   -> Int
   -> PreparedSynthesis
   -> Either String DetailedSynthOutcome
-exferenceRun multiConstructorPatterns steps prepared = do
+exferenceRun limits multiConstructorPatterns steps prepared = do
   standard <- viaDiagnostic standardDjinnSession
   let semanticOrigin = preparedSemanticOrigin prepared
       render = preparedRenderExpression prepared
@@ -1284,7 +1380,7 @@ exferenceRun multiConstructorPatterns steps prepared = do
                     -- the queue is the memory hog; a modest bound keeps the
                     -- search interactive on small machines, reported honestly
                     -- as pruning
-                  , exferenceMaximumQueueSize = Just 1024
+                  , exferenceMaximumQueueSize = Just (synthLimitQueue limits)
                   }
               }
         request <- viaDiagnostic (mkExferenceRequest query)
@@ -1306,7 +1402,7 @@ exferenceRun multiConstructorPatterns steps prepared = do
             -- repetitions must not crowd later distinct candidates out of a
             -- bounded interactive response.
             groups = takeDistinctOn detailedCandidateGroupVariants
-              candidateWindow
+              (synthLimitWindow limits)
               [ DetailedCandidateGroup route
                   (indexDetailedCandidateVariants group) sidecar
               | candidate <- selectionCandidates selection
@@ -1322,7 +1418,8 @@ exferenceRun multiConstructorPatterns steps prepared = do
                       Left _ -> Nothing
               , Right group <- [rendered]
               ]
-            notes = maybe [] progressNotes (selectionProgress selection)
+            notes = maybe [] (progressNotesWith (synthLimitWindow limits))
+              (selectionProgress selection)
         pure (groups, notes)
   (strictGroups, strictNotes) <- runLane False
   if not (null strictGroups)
@@ -1370,14 +1467,23 @@ mergeDetailedCandidateGroups
   :: [DetailedCandidateGroup]
   -> [DetailedCandidateGroup]
   -> [DetailedCandidateGroup]
-mergeDetailedCandidateGroups djinnGroups exferenceGroups =
-  djinnHead (synthMaxShown - 1) Set.empty
+mergeDetailedCandidateGroups = mergeDetailedCandidateGroupsWith defaultSynthLimits
+
+-- | 'mergeDetailedCandidateGroups' interleaving under retuned shown/tried
+-- bounds.
+mergeDetailedCandidateGroupsWith
+  :: SynthLimits
+  -> [DetailedCandidateGroup]
+  -> [DetailedCandidateGroup]
+  -> [DetailedCandidateGroup]
+mergeDetailedCandidateGroupsWith limits djinnGroups exferenceGroups =
+  djinnHead (synthLimitShown limits - 1) Set.empty
     (map (retainExactExferenceVariantOrigins exferenceGroups) djinnGroups)
     exferenceGroups
  where
   djinnHead remaining seen djinn exference
     | remaining <= 0 =
-        exferenceFront synthMaxTried seen djinn exference
+        exferenceFront (synthLimitTried limits) seen djinn exference
     | otherwise = case nextFresh seen djinn of
         Just (group, seen', djinn') ->
           group : djinnHead (remaining - 1) seen' djinn' exference
@@ -1385,7 +1491,8 @@ mergeDetailedCandidateGroups djinnGroups exferenceGroups =
 
   exferenceFront remaining seen djinn exference
     | remaining <= 0 = djinnFront
-        (synthMaxTried - (synthMaxShown - 1)) seen djinn exference
+        (synthLimitTried limits - (synthLimitShown limits - 1)) seen djinn
+        exference
     | otherwise = case nextFresh seen exference of
         Just (group, seen', exference') ->
           group : exferenceFront (remaining - 1) seen' djinn exference'
@@ -1535,11 +1642,20 @@ mergeDetailedOutcomesSkipping
   -> DetailedSynthOutcome
   -> DetailedSynthOutcome
   -> DetailedSynthOutcome
-mergeDetailedOutcomesSkipping checked djinn0 exference0 =
+mergeDetailedOutcomesSkipping = mergeDetailedOutcomesSkippingWith defaultSynthLimits
+
+-- | 'mergeDetailedOutcomesSkipping' under retuned shown/tried bounds.
+mergeDetailedOutcomesSkippingWith
+  :: SynthLimits
+  -> Set.Set String
+  -> DetailedSynthOutcome
+  -> DetailedSynthOutcome
+  -> DetailedSynthOutcome
+mergeDetailedOutcomesSkippingWith limits checked djinn0 exference0 =
   case (djinn, exference) of
     (DetailedSynthCandidates a na, DetailedSynthCandidates b nb) ->
       DetailedSynthCandidates
-        (mergeDetailedCandidateGroups a b) (na ++ tag nb)
+        (mergeDetailedCandidateGroupsWith limits a b) (na ++ tag nb)
     (DetailedSynthCandidates a na, other) ->
       DetailedSynthCandidates a (na ++ tag (notesOf other))
     (other, DetailedSynthCandidates b nb) ->
@@ -1561,7 +1677,7 @@ mergeDetailedOutcomesSkipping checked djinn0 exference0 =
   normalize outcome = case outcome of
     DetailedSynthCandidates groups notes ->
       candidatesOr (DetailedSynthNoTerm notes)
-        (mergeDetailedCandidateGroups groups []) notes
+        (mergeDetailedCandidateGroupsWith limits groups []) notes
     other -> other
 
   notesOf outcome = case outcome of
@@ -1595,8 +1711,10 @@ viaDiagnostic = either (Left . renderDiagnostic) Right
 viaShow :: Show e => Either e a -> Either String a
 viaShow = either (Left . show) Right
 
-progressNotes :: Progress -> [String]
-progressNotes progress = case progress of
+-- | Human-readable notes for one engine progress report, naming the
+-- candidate window in its cap note.
+progressNotesWith :: Int -> Progress -> [String]
+progressNotesWith window progress = case progress of
   Completed Finished -> []
   Completed (Truncated reasons) ->
     [ "search truncated: "
@@ -1607,7 +1725,7 @@ progressNotes progress = case progress of
     StepLimitReached -> "step limit reached"
     ChoicePointLimitReached -> "choice-point limit reached"
     CandidateLimitReached ->
-      "candidate limit reached (" ++ show candidateWindow ++ ")"
+      "candidate limit reached (" ++ show window ++ ")"
     IdentifierSpaceExhausted -> "identifier space exhausted"
     QueueLimitPruned n -> "queue limit pruned " ++ show n
     DepthLimitPruned n -> "depth limit pruned " ++ show n
@@ -2290,10 +2408,10 @@ exactContextNominalUse source = case source of
  where
   canonicalHeadSupported spelling totalArity
     | elem spelling ["Prod", "Sum"] = totalArity == 2
-    | otherwise = not (elem spelling structuralHigherKindHeads)
+    | otherwise = spelling `notElem` structuralHigherKindHeads
   legacyHeadSupported spelling =
     not (null spelling)
-      && not (elem spelling structuralHigherKindHeads)
+      && spelling `notElem` structuralHigherKindHeads
 
 -- | Fragments below a higher-kinded exact nominal head that remain ordinary
 -- proper-type planning/rigidity roots.  The head itself is represented by an
@@ -2518,24 +2636,8 @@ data ProviderContextProjection
 
 providerFragmentContainsExactContext :: Frag -> Bool
 providerFragmentContainsExactContext source = case source of
-  FArr parameter result -> descend [parameter, result]
-  FProd left right -> descend [left, right]
-  FLeanProd left right -> descend [left, right]
-  FSum left right -> descend [left, right]
-  FAll _ _ body -> providerFragmentContainsExactContext body
-  FInst _ body -> providerFragmentContainsExactContext body
   FExactContext{} -> True
-  FApp _ _ _ arguments -> descend arguments
-  FParamInd _ _ parameters constructors ->
-    descend $ parameters ++ concatMap snd constructors
-  FInd _ constructors -> descend $ concatMap snd constructors
-  FParamRec _ _ _ parameters constructors ->
-    descend $ parameters ++ concatMap snd constructors
-  FRec _ _ parameters constructors ->
-    descend $ parameters ++ concatMap snd constructors
-  _ -> False
- where
-  descend = any providerFragmentContainsExactContext
+  _ -> any providerFragmentContainsExactContext (fragChildren source)
 
 djinnRecursiveProjection :: RecursiveProjection
 djinnRecursiveProjection = RecursiveProjection
@@ -2837,16 +2939,7 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
     providerAssignmentFamilyUses planningRoots
 
   structuralTemplateFragments =
-    [ field
-    | plan <- Map.elems plans
-    , template <- case plan of
-        StructuralFamily selected -> [selected]
-        RecursiveStructuralFamily selected
-          | exactRecursiveData recursiveProjection -> [selected]
-        _ -> []
-    , (_, fields) <- templateConstructors template
-    , field <- fields
-    ]
+    structuralPlanFields recursiveProjection plans
 
   (recursiveSelfKeys, recursiveFieldAtoms) =
     recursiveStructuralAtoms recursiveProjection plans
@@ -2883,7 +2976,7 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
         ProviderInstantiationNominalArgument remaining spelling supplied ->
           nominalArgumentType remaining spelling supplied
         ProviderInstantiationExactArgument 0 frag _ -> go False frag
-        ProviderInstantiationExactArgument _ _ _ -> failT
+        ProviderInstantiationExactArgument {} -> failT
           "exact Lean provider argument is not proper-kinded"
         ProviderInstantiationArgument 0 frag -> go False frag
         ProviderInstantiationArgument remaining frag -> case frag of
@@ -3346,7 +3439,6 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
                           }
                       ] }))
               ctors
-            pure ()
 
       translate = do
         -- caller-supplied premises share the goal's variable table and
@@ -3428,7 +3520,7 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
                         ))
                       translated)
                   assignmentVectors
-                pure [retained | Just retained <- discovered]
+                pure (catMaybes discovered)
               (True, SelectProviderGroundFacts _, True) -> mapM
                 (\(vectorIndex, arguments) -> do
                   translated@(_, _, argumentTypes) <-
@@ -3453,7 +3545,7 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
                       ((index, vectorIndex), retained, Nothing))
                         <$> translated)
                   assignmentVectors
-                pure [retained | Just retained <- fallback]
+                pure (catMaybes fallback)
               _ -> mapM
                 (\(vectorIndex, arguments) -> do
                   translated <- translateAssignment arguments
@@ -3709,7 +3801,7 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
       | elem spelling ["Prod", "Sum"] ->
           length supplied + remaining == 2
       | otherwise ->
-          remaining == 0 || not (elem spelling structuralHigherKindHeads)
+          remaining == 0 || spelling `notElem` structuralHigherKindHeads
     ProviderInstantiationExactArgument remaining _ _ -> remaining == 0
     ProviderInstantiationArgument remaining frag
       | remaining > 0 -> case frag of
@@ -3736,7 +3828,7 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
   collectProviderArgumentFamilyUse uses argument = case argument of
     ProviderInstantiationNominalArgument remaining spelling supplied ->
       insertEvidenceUse spelling (length supplied + remaining) uses
-    ProviderInstantiationExactArgument _ _ _ -> uses
+    ProviderInstantiationExactArgument {} -> uses
     ProviderInstantiationArgument remaining frag
       | remaining > 0 -> case frag of
           FAtom _ spelling -> insertEvidenceUse spelling remaining uses
@@ -3808,7 +3900,7 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
                 exactRecursiveData projectionPolicy
               _ -> False
             accum'
-              | structural = (Set.insert key (fst accum), snd accum)
+              | structural = first (Set.insert key) accum
               | otherwise = accum
         -- The selected generic template fields are supplied separately above;
         -- occurrence-local inventories do not participate in the declaration.
@@ -3934,6 +4026,26 @@ fragmentProjectionComplete frag =
 -- head becomes one shared abstract family.  Otherwise a structural template
 -- is accepted only when one unique schema can be recovered and specializing
 -- it reproduces every serialized occurrence exactly.
+-- | The fields of every selected structural template in a plan map: the
+-- fragments a plan selection commits to translating.  The plan-selection rule
+-- and the atom scan which must agree with it both read exactly this list, so
+-- neither can drift from the other.
+structuralPlanFields
+  :: RecursiveProjection
+  -> Map.Map String ExactFamilyPlan
+  -> [Frag]
+structuralPlanFields recursiveProjection plans =
+    [ field
+    | plan <- Map.elems plans
+    , template <- case plan of
+        StructuralFamily selected -> [selected]
+        RecursiveStructuralFamily selected
+          | exactRecursiveData recursiveProjection -> [selected]
+        _ -> []
+    , (_, fields) <- templateConstructors template
+    , field <- fields
+    ]
+
 exactFamilyPlans
   :: RecursiveProjection
   -> Map.Map String [ExactFamilyUse]
@@ -3960,17 +4072,7 @@ exactFamilyPlans recursiveProjection evidenceUses roots = settle initialUses
           (collectExactFamilyUses recursiveProjection True) uses fields
     in if uses' == uses then plans else settle uses'
 
-  structuralFields plans =
-    [ field
-    | plan <- Map.elems plans
-    , template <- case plan of
-        StructuralFamily selected -> [selected]
-        RecursiveStructuralFamily selected
-          | exactRecursiveData recursiveProjection -> [selected]
-        _ -> []
-    , (_, fields) <- templateConstructors template
-    , field <- fields
-    ]
+  structuralFields plans = structuralPlanFields recursiveProjection plans
 
   recursivePremiseFields plans uses =
     [ field
@@ -4430,7 +4532,7 @@ replaceConstructorFields
   -> [(String, [Frag])]
   -> [(String, [Frag])]
 replaceConstructorFields replacements = map
-  (\(name, fields) -> (name, map (replaceFrag replacements) fields))
+  (second (map (replaceFrag replacements)))
 
 -- | Exact whole-fragment replacement, followed by structural descent only
 -- when no parameter matches the current node.  Matching the whole node first
@@ -4504,6 +4606,6 @@ replaceFrag replacements = go Set.empty
     recur = go shadowed
 
   mapCtorFields shadowed = map
-    (\(name, fields) -> (name, map (go shadowed) fields))
+    (second (map (go shadowed)))
 
   freshBinderName = freshFragBinderFrom "\0leant-bound:"

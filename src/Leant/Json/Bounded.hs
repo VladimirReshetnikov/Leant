@@ -18,7 +18,7 @@ module Leant.Json.Bounded
 
 import qualified Data.ByteString as BS
 import Data.ByteString (ByteString)
-import Data.Char (chr, ord)
+import Data.Char (chr, isDigit, ord)
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Data.Text (Text)
@@ -44,6 +44,7 @@ data BoundedJsonLimits = BoundedJsonLimits
   }
   deriving (Eq, Ord, Show)
 
+-- | Which 'BoundedJsonLimits' bound a document exceeded.
 data BoundedJsonLimit
   = BoundedJsonTotalBytes
   | BoundedJsonNestingDepth
@@ -77,6 +78,10 @@ data BoundedJsonErrorKind
   | BoundedJsonDuplicateObjectKey
   deriving (Bounded, Enum, Eq, Ord, Show)
 
+-- | Sanitized parse rejection.  A limit refusal carries the limit, its
+-- maximum, the observed count saturated at maximum plus one, and the byte
+-- offset reached; a syntax refusal carries its closed kind and byte offset.
+-- No document text is retained.
 data BoundedJsonError
   = BoundedJsonLimitExceeded
       !BoundedJsonLimit !Natural !Natural !Natural
@@ -508,7 +513,7 @@ isJsonWhitespace character = character == ' '
   || character == '\r'
 
 isAsciiDigit :: Char -> Bool
-isAsciiDigit character = character >= '0' && character <= '9'
+isAsciiDigit = isDigit
 
 startsJsonValue :: Char -> Bool
 startsJsonValue character = character == '{'
@@ -530,7 +535,7 @@ isNumberCharacter character = isAsciiDigit character
 
 hexDigit :: Char -> Maybe Int
 hexDigit character
-  | character >= '0' && character <= '9' =
+  | isDigit character =
       Just $ ord character - ord '0'
   | character >= 'a' && character <= 'f' =
       Just $ ord character - ord 'a' + 10

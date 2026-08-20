@@ -236,7 +236,13 @@
   ingredient has since shipped as the finite-list-spine Length contract
   dialect with live Z3 counterexample ranking; solver output remains
   untrusted and candidates are reordered, never pruned.  The Lean-side
-  proof-producing portfolio proposed in this report remains future work.}
+  proof-producing portfolio proposed in this report remains future work.
+
+  \emph{Status, 19 August 2026:} an opt-in filter lane has since joined the
+  rank lane: \code{:synth --behavior-mode filter} rejects a candidate only
+  on an independently replayed counterexample, retaining every other
+  assessment.  The default rank lane still reorders without pruning, and
+  raw solver output still carries no authority.}
 \end{titlepage}
 
 \hypersetup{pageanchor=true}

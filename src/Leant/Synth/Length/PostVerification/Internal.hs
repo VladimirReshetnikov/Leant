@@ -48,6 +48,9 @@ import Leant.Synth.Verification
   , verifiedCandidateReceipts
   )
 
+-- | Why the post-verification adapter rejected a batch: the ranking input
+-- itself was refused, or the ranking's proposed permutation failed the
+-- bounded seal.
 data LengthPostVerificationFailure
   = LengthPostVerificationInputRejected !LengthRankingInputError
   | LengthPostVerificationProposalRejected !PostVerificationError
@@ -64,6 +67,8 @@ data LengthPostVerificationResult
   | LengthPostVerificationAccepted
       !PostVerificationLengthRanking
 
+-- | The verified receipts to present: the untouched callback order for a
+-- rejected result, or the sealed post-assessment order for an accepted one.
 lengthPostVerificationCandidates
   :: LengthPostVerificationResult
   -> [Verified DetailedVerificationVariant]
@@ -83,6 +88,7 @@ lengthPostVerificationSealedBatch result = case result of
   LengthPostVerificationAccepted retained -> Just
     $ postVerificationLengthRankingBatch retained
 
+-- | The adapter's own rejection, present exactly for a rejected result.
 lengthPostVerificationAdapterFailure
   :: LengthPostVerificationResult
   -> Maybe LengthPostVerificationFailure
@@ -90,6 +96,9 @@ lengthPostVerificationAdapterFailure result = case result of
   LengthPostVerificationRejected _ failure -> Just failure
   LengthPostVerificationAccepted {} -> Nothing
 
+-- | The receipt-bearing compatibility ranking of an accepted result,
+-- materialized on demand and forced to weak head normal form before it is
+-- returned; 'Nothing' for a rejected result.
 lengthPostVerificationRanking
   :: LengthPostVerificationResult
   -> Maybe LengthRanking

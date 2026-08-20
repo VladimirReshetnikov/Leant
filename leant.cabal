@@ -59,8 +59,10 @@ Executable leant
     Leant.Synth.Length.PostVerification.Internal
     Leant.Synth.Length.Presentation
     Leant.Synth.Length.Ranking
+    Leant.Synth.Length.Ranking.Generic
     Leant.Synth.Length.Ranking.Internal
     Leant.Synth.Length.Selection
+    Leant.Synth.Length.Selection.Generic
     Leant.Synth.Length.Selection.Internal
     Leant.Synth.Length.SpinePair.PostVerification
     Leant.Synth.Length.SpinePair.PostVerification.Internal
@@ -125,8 +127,10 @@ Test-Suite leant-synth-tests
     Leant.Synth.Length.PostVerification.Internal
     Leant.Synth.Length.Presentation
     Leant.Synth.Length.Ranking
+    Leant.Synth.Length.Ranking.Generic
     Leant.Synth.Length.Ranking.Internal
     Leant.Synth.Length.Selection
+    Leant.Synth.Length.Selection.Generic
     Leant.Synth.Length.Selection.Internal
     Leant.Synth.Length.SpinePair.PostVerification
     Leant.Synth.Length.SpinePair.PostVerification.Internal

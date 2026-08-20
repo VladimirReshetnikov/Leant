@@ -5,15 +5,14 @@ module Leant.Builtins
   ) where
 
 import Data.Char (isSpace)
+import Data.Maybe (fromMaybe)
 
 -- | Help text if the token is a known built-in / keyword.
 builtinInfo :: String -> Maybe String
 builtinInfo token = lookup canonical builtinHelp
  where
   trimmed = dropWhile isSpace (reverse (dropWhile isSpace (reverse token)))
-  canonical = case lookup trimmed aliases of
-    Just target -> target
-    Nothing -> trimmed
+  canonical = fromMaybe trimmed (lookup trimmed aliases)
 
 aliases :: [(String, String)]
 aliases =

@@ -32,11 +32,18 @@ import Leant.Synth.Verification
   , verifiedCandidateReceipts
   )
 
+-- | Which of the two bounded lists a collection limit refusal names: the
+-- exact callback candidates or an assessor's proposed permutation.
 data PostVerificationCollection
   = PostVerificationCandidates
   | PostVerificationProposals
   deriving (Bounded, Enum, Eq, Ord, Show)
 
+-- | Why a proposed ordering was not sealed, in check order: a collection
+-- exceeded the caller's maximum (maximum and observed count capped at
+-- maximum plus one), the proposal length differs from the candidate count
+-- (candidate count, proposal count), a handle's index is out of range
+-- (candidate count, index), or an index was proposed twice.
 data PostVerificationError
   = PostVerificationCollectionLimitExceeded
       !PostVerificationCollection !Natural !Natural
@@ -72,11 +79,14 @@ withPostVerificationInput verification action = action $ PostVerificationInput
   $ zipWith PostVerificationCandidate [0 ..]
   $ verifiedCandidateReceipts verification
 
+-- | The batch's occurrence handles in original callback order; the only
+-- source of handles an assessor may return to 'sealPostVerificationBatch'.
 postVerificationInputCandidates
   :: PostVerificationInput epoch candidate
   -> [PostVerificationCandidate epoch candidate]
 postVerificationInputCandidates (PostVerificationInput candidates) = candidates
 
+-- | The opaque verified receipt behind one occurrence handle.
 postVerificationCandidateVerified
   :: PostVerificationCandidate epoch candidate
   -> Verified candidate
@@ -91,6 +101,7 @@ data PostVerificationBatch candidate = PostVerificationBatch
 
 type role PostVerificationBatch nominal
 
+-- | The sealed receipts in their admitted order.
 postVerificationBatchCandidates
   :: PostVerificationBatch candidate
   -> [Verified candidate]

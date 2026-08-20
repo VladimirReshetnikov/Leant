@@ -82,6 +82,13 @@ domains is recorded in the
 
 ## The Djex engine
 
+If dependent types, propositions-as-types, or how Lean elaborates and
+checks a term are unfamiliar, read
+[Lean from First Principles](Lean_from_First_Principles/Lean_from_First_Principles.pdf)
+first: it builds that background from zero and then follows the pipeline
+below chapter by chapter, from the fragment translation through search,
+rendering, verification, and negative evidence.
+
 The engine is the vendored [Djex](../lib/Djex) library, linked in-process.
 Djex began as a merger of two classic Haskell synthesizers — **Djinn**
 (complete, terminating proof search for intuitionistic propositional
@@ -159,6 +166,13 @@ they denote a new term.
 This is deliberately a solver-neutral identity seam, not behavioral evidence.
 
 ## Length handoff and problem sealing
+
+The Length sections that follow assume the reader knows what a satisfiable
+formula, a model, and an `unsat` answer are and how a candidate becomes a
+`QF_LIA` query; [Z3 from First Principles](Z3_for_Leant_and_Djex/Z3_for_Leant_and_Djex.pdf)
+teaches that background from zero and then walks these same modules in a
+maintainer's source map, so it is the place to start when this material is
+new.
 
 `Leant.Synth.Length.Handoff` binds callback-accepted text back to its exact
 typed origin, original Exference renderer ordinal and exact re-rendered variant,
@@ -320,9 +334,10 @@ ordinary refusal, miss, attempt-cap, and insertion-cap results. Ranking,
 simplification, worker IO, and the rest of the candidate loop remain outside
 the cell's masking and serialization boundary.
 
-`Ranking.Internal` now has an additive scalar cursor which is either the
-historical raw `[[Natural]]` MRU or one supplied nominal context; the pair
-module mirrors it. Existing ranking and compatibility selection entrances
+The shared ranking core (`Ranking.Generic`, instantiated by the scalar and
+pair `Ranking.Internal` modules) threads an additive cursor which is either
+the historical raw `[[Natural]]` MRU or one supplied nominal context of the
+instantiating domain. Existing ranking and compatibility selection entrances
 always choose the raw cursor. Only the context-aware Configuration and
 Selection entrances used by Integration's filter context choose the nominal
 cursor. The cursor is threaded through eager/deferred opening and unbudgeted,
@@ -923,8 +938,9 @@ cleanup bit rather than paths, errno text, or file content. The timeout is an
 interruption budget rather than a hard kernel deadline, final-component
 no-follow does not exclude ancestor symlinks or in-place mutation, and Windows
 fails closed until an equivalent native handle implementation exists. Main
-uses `loadLengthAssessmentConfigurationFile` for its explicit startup CLI path;
-there is no scalar-only startup loader. There is still no discovery or default
+reaches `loadLengthAssessmentConfigurationFile` through Integration's
+`loadLengthAssessmentMode` for its explicit startup CLI path; there is no
+scalar-only startup loader. There is still no discovery or default
 path, and loading/activation alone never launches a solver. See the historical
 [bounded acquisition report](reports/2026-08-11-bounded-live-length-ranking-configuration-acquisition.md).
 
@@ -1034,12 +1050,13 @@ but advancing any cursor observes the already retained outcome and never
 reruns an engine.
 
 `startDetailedSynthCursor` wraps its outcome without demanding the verdict or
-candidate stream. `advanceDetailedSynthCursor` first validates the requested
-per-step size independently of its cursor. Zero and negative requests return
-`DetailedSynthCursorBatchSizeNotPositive`; requests above
-`candidateWindow`, currently 60, return
-`DetailedSynthCursorBatchSizeLimitExceeded` with the maximum followed by the
-observed request. Both errors precede even a bottom cursor. For an admitted
+candidate stream. `advanceDetailedSynthCursorWith` first validates the
+requested per-step size independently of its cursor. Zero and negative
+requests return `DetailedSynthCursorBatchSizeNotPositive`; requests above the
+window it is given — `synthLimitWindow`, default 60, from `:set synth-window`
+— return `DetailedSynthCursorBatchSizeLimitExceeded` with that maximum
+followed by the observed request. `advanceDetailedSynthCursor` is the same
+walk under `candidateWindow`. Both errors precede even a bottom cursor. For an admitted
 request, the outer `Right` is likewise available without demanding the cursor;
 forcing its `DetailedSynthCursorStep` performs the first outcome observation.
 
@@ -1089,24 +1106,33 @@ remain in Main.
 
 Main adds three private, lazy representation boundaries with no `Eq` or `Show`
 instance. `SynthLaneCursorPolicy` owns the batch width, the filter-successor
-permission, and ordinary-note retention. `SynthLaneRunEnd` distinguishes
+permission, ordinary-note retention, and the session's two cursor bounds —
+the hard cap on observed candidate groups (`:set synth-window`) and the
+accepted groups one batch may keep (`:set synth-shown`). `SynthLaneRunEnd` distinguishes
 stopped-by-disposition, policy completion, natural exhaustion, hard cap,
 timeout, cursor-admission failure, engine failure, refutation, and no term.
 `SynthLaneRun` retains the updated command accumulation, chronological
 same-run spelling frontier, cumulative candidate-group count, run notes, and
 that terminal reason. None is exported or stored in `ReplState`.
 
-`ordinarySynthLaneCursorPolicy` uses `synthVerificationWindow`: 12 for either
-standalone engine and 24 for `EngineBoth`. Rank and disabled contexts disallow
-a successor. Filter contexts allow one. The excluded-middle policy always uses
-half of `synthMaxTried`, currently 6, and disallows a successor. Double
-negation uses the ordinary policy; its tuned Djinn candidate cutoff remains 12
-for rank and disabled modes and becomes `candidateWindow`, currently 60, for
-filter mode. Thus filter-mode standalone and combined runs observe at most
-12+12 and 24+24 groups respectively, while EM remains six. The 48-group maximum
-stays below Engine's cumulative 60-group cap.
+`ordinarySynthLaneCursorPolicy` uses `synthVerificationWindowWith`:
+`synthLimitTried`, default 12, for either standalone engine and twice that for
+`EngineBoth`. Rank and disabled contexts disallow a successor. Filter contexts
+allow one. The excluded-middle policy always uses half of `synthLimitTried`,
+default 6, and disallows a successor. Both batch sizes pass through
+`admissibleCursorBatch`, which keeps them positive and no wider than
+`synthLimitWindow`, so a session that lowers `:set synth-window` below the
+frontier narrows the batch instead of failing admission. Double negation uses
+the ordinary policy; its tuned Djinn candidate cutoff remains
+`synthLimitTried` for rank and disabled modes and becomes `synthLimitWindow`,
+default 60, for filter mode. Thus filter-mode standalone and combined runs observe at most two batches of
+the frontier each, 12+12 and 24+24 at the default bounds, while EM remains
+half a frontier. `admissibleCursorBatch` is what keeps a batch within the
+window, at any setting; the arithmetic between the two defaults is not an
+invariant.
 
-`runDetailedSynthCursorBefore` calls `advanceDetailedSynthCursor` before the
+`runDetailedSynthCursorBefore` calls `advanceDetailedSynthCursorWith` before
+the
 timeout branch. Valid admission is non-demanding by Engine's contract. With no
 deadline it forces the selected step directly; otherwise it computes the
 remaining duration from the supplied absolute deadline and evaluates
@@ -1130,8 +1156,8 @@ driver maps every other terminal cursor step and a timeout/admission failure to
 the matching `SynthLaneRunEnd` without flattening the result.
 
 Each `verifySynthLane` call takes its supplied batch bound before projecting
-behavior mode. Private `synthVerify` receives `synthMaxShown`, currently 5, in
-rank mode and the complete current batch width in filter mode. The exact
+behavior mode. Private `synthVerify` receives `synthLimitShown`, default 5,
+in rank mode and the complete current batch width in filter mode. The exact
 `VerificationBatch` is assessed once and retained with its one
 `LengthAssessmentResult` in `AssessedSynthLane`. The driver contains no engine
 invocation and no verification or assessment path around its one
@@ -1149,12 +1175,14 @@ order, folds them into the command's reverse accumulation, and concatenates
 their complete frontiers in that same order. Later provider deduplication uses
 only the run frontier; callback attempts never become scheduling authority.
 
-The pure `synthLaneDisposition` remains four-way:
+The pure `synthLaneDispositionWith`, applied to that shown-group cap,
+remains four-way:
 
 - `SynthLaneNoVerified` for an unassessed empty batch or an assessed batch with
   no verified receipt;
-- `SynthLaneSurvivors` for an accepted presentation, carrying at most five
-  survivors and its complete rejection projection;
+- `SynthLaneSurvivors` for an accepted presentation, carrying at most
+  `synth-shown` (default five) survivors and its complete rejection
+  projection;
 - `SynthLaneAllBehaviorallyRejected` when an accepted assessment has only
   rejection rows; and
 - `SynthLaneAssessmentPreserved` when assessment failure preserves the
@@ -1175,8 +1203,9 @@ or no-term diagnostic. Both classical policies disable handled-note retention.
 `classicalSynthLaneDeadline` is behavior-mode sensitive. Filter mode returns
 the original command deadline without reading the environment or clock, so
 ordinary work, both batches, excluded middle, and double negation share one
-absolute budget. Rank and disabled modes read `LEANT_SYNTH_TIMEOUT` and capture
-a fresh full duration independently at each reached EM and NN entry. A skipped
+absolute budget. Rank and disabled modes read the session's `synth-timeout`
+(`:set synth-timeout N`, seeded from `LEANT_SYNTH_TIMEOUT`) and capture a fresh
+full duration independently at each reached EM and NN entry. A skipped
 route captures nothing, a terminal EM prevents the NN capture, and a nonpositive
 configured duration returns the established unbounded `Nothing`.
 
@@ -1314,7 +1343,18 @@ index;
 package-private `Ranking.Internal` and `PostVerification.Internal` modules
 thread each batch-scoped occurrence handle as the only receipt-bearing field
 in transient ranking state through preparation, live assessment, stable
-partitioning, atomic fallback, and the final seal. The
+partitioning, atomic fallback, and the final seal. That control flow is
+written once, in `Leant.Synth.Length.Ranking.Generic`, over a closed
+`LengthRankingDomain` class whose associated types name each domain's Djex
+vocabulary (queries, receipts, validators, the live observation, and the
+counterexample-bank limits, bank, scope, sample, and error). The scalar and
+binary-product `Ranking.Internal` modules are its two instances: each keeps
+its nominal assessment, failure, policy, and receipt types by wrapping the
+shared structure in domain newtypes, supplies its own handoff and query
+refusal classifiers, and hands the shared runners its bank surface and bridge
+from `CounterexampleBank.Internal`. The replay cursor (batch-local raw MRU or
+command-local nominal context) and every runner in the eager/deferred and
+unbudgeted/v1/scoped matrix therefore exist once. The
 ordinary `Ranking` facade exports neither the associated plan nor its
 projector, while the public configuration surface exports no associated
 runner and its post-verification assessment entry points return only sealed
@@ -1769,10 +1809,12 @@ recursive rediscovery of equivalent structural trees while preserving scoped
 or environment product reuse at arbitrary depth. Standalone Djinn, standalone
 Exference, and combined mode all return the direct nested-product term.
 Exference does so at the unchanged 4096-step/1024-queue bounds, and its
-independently checked candidate is admitted at search step 30. The live run
-nevertheless continues along its bounded ranked tail and reports
-`queue limit pruned 36475` when the step limit is reached; that note records an
-incomplete tail, not a failure to find or check the displayed candidate.
+independently checked candidate is admitted early in that search. The live
+run nevertheless continues along its bounded ranked tail and reports
+`queue limit pruned 39308` when the step limit is reached (see
+[test/synth-quartic-rankn.golden](../test/synth-quartic-rankn.golden)); that
+note records an incomplete tail, not a failure to find or check the displayed
+candidate.
 
 The live
 [`synth-quintic-rankn`](../test/synth-quintic-rankn.txt) transcript is the exact

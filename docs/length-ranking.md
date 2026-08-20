@@ -5,7 +5,11 @@ behavior of already-verified candidates. Its default operation stably ranks
 the complete verified batch; an explicit command mode may instead omit only
 independently replayed counterexamples. This document is the complete
 reference; the [README](../README.md) gives the one-paragraph overview and the
-[manual](Leant.pdf) the user-level tour.*
+[manual](Leant_Overview/Leant_Overview.pdf) the user-level tour. If satisfiability, models, `unsat`,
+or SMT-LIB are unfamiliar, read
+[Z3 from First Principles](Z3_for_Leant_and_Djex/Z3_for_Leant_and_Djex.pdf)
+first: it teaches those ideas from zero and then traces this exact stage
+through the source, module by module.*
 
 ## What it is, in one screen
 
@@ -31,17 +35,20 @@ Five rules define the current authority boundary:
   separately visible but are not bound as `itN`.
 - **Filtering reuses one bank across progressive bounded batches.** Ranking
   keeps its historical five-success verifier frontier and one engine batch.
-  Filtering consumes an ordinary engine outcome as a 12- or 24-group batch and
-  may request exactly one same-width successor after no verification or complete
-  all-rejection. Excluded middle remains one six-group batch; double negation
-  uses the ordinary policy. Main introduces one nominal scalar or product
+  Filtering consumes an ordinary engine outcome as one *F*-group batch —
+  where *F* is `:set synth-verify` (default 12), doubled when both engines
+  run — and may request exactly one same-width successor after no
+  verification or complete all-rejection. Excluded middle remains one
+  *F*/2-group batch (six by default); double negation uses the ordinary
+  policy. Main introduces one nominal scalar or product
   filter context before translation and carries it through retries, both
   same-run batches, and all synthesis routes. A continuing batch or completed
   run may therefore reach the next bounded batch or existing lane with the same
   nominal owner (subject to exact scope reset); a survivor or preserve-all
   batch remains terminal. This is not quota
-  filling: the first survivor stops scheduling, at most five are shown and
-  bound, and every accumulated rejection remains visible.
+  filling: the first survivor stops scheduling, at most `:set synth-shown`
+  (default five) are shown and bound, and every accumulated rejection remains
+  visible.
 - **Raw solver status has no authority.** `sat`, `unsat`, and `unknown` are
   heuristics. Preparation refusal, unassessed input, heuristic status,
   independently completed finite-box evidence, and established applicable-
@@ -337,25 +344,31 @@ outcome. Its private `SynthLaneCursorPolicy` chooses a batch width, whether one
 filter successor is allowed, and whether ordinary run notes may be attached to
 a handled outcome. The current schedule is:
 
+Write *F* for the verification frontier a lane requests: `synthLimitTried`
+(`:set synth-verify`, default 12) for a standalone engine and twice that for
+`EngineBoth`, each clamped to `synthLimitWindow` (`:set synth-window`,
+default 60) by `admissibleCursorBatch`.
+
 | Route | Rank or disabled | Explicit filter |
 | --- | --- | --- |
-| ordinary, universe-retry, or provider; standalone engine | one batch of at most 12 | at most two ordered 12-group batches, 24 groups total |
-| ordinary, universe-retry, or provider; `EngineBoth` | one batch of at most 24 | at most two ordered 24-group batches, 48 groups total |
-| excluded-middle classical | one batch of at most 6 | one batch of at most 6 |
-| double-negation classical | one batch of at most 12 or 24 by engine | the ordinary at-most-two-batch policy |
+| ordinary, universe-retry, or provider; standalone engine | one batch of at most *F* | at most two ordered *F*-group batches |
+| ordinary, universe-retry, or provider; `EngineBoth` | one batch of at most *F* | at most two ordered *F*-group batches |
+| excluded-middle classical | one batch of at most *F*/2 | one batch of at most *F*/2 |
+| double-negation classical | one batch of at most *F* by engine | the ordinary at-most-two-batch policy |
 
-The double-negation Djinn search uses `synthMaxTried`, currently 12, as its
-candidate cutoff in rank and disabled modes. Filter mode raises that tuned
-Djinn cutoff to `candidateWindow`, currently 60, so a successor batch can
-exist. Exference keeps its own bounded search, while `EngineBoth` applies the
-cutoff to its Djinn half. The largest Main policy, 24+24, remains below the
-cursor's cumulative 60-group hard cap.
+The double-negation Djinn search uses `synthLimitTried`, default 12
+(`:set synth-verify`), as its candidate cutoff in rank and disabled modes.
+Filter mode raises that tuned Djinn cutoff to `synthLimitWindow`, default 60
+(`:set synth-window`), so a successor batch can exist. Exference keeps its own bounded search, while `EngineBoth` applies the
+cutoff to its Djinn half. No batch can exceed the window, because
+`admissibleCursorBatch` clamps every request to it before the cursor admits
+the advance.
 
 `runDetailedSynthCursorBefore` admits an advance before installing a clock;
 Engine guarantees that valid admission does not demand the cursor. Main then
 forces the selected `DetailedSynthCursorStep` under the applicable absolute
-deadline. A missing deadline preserves `LEANT_SYNTH_TIMEOUT=0` as an unbounded
-wait. The selected batch, its routes, spelling `String` spines, and run-note
+deadline. A missing deadline preserves `:set synth-timeout 0`
+(or `LEANT_SYNTH_TIMEOUT=0` at startup) as an unbounded wait. The selected batch, its routes, spelling `String` spines, and run-note
 `String` spines are therefore demanded inside that boundary, while the
 successor and unselected tail remain lazy.
 
@@ -365,10 +378,10 @@ The same command context and, in filter mode, the same nominal bank are reused
 for both batches. The driver contains no engine call or assessment call of its
 own beyond its one `verifySynthLane` seam per candidate batch: it cannot rerun
 synthesis, reverify an earlier batch, or reassess an earlier result.
-`verifySynthLane` still applies the supplied 12-, 24-, or
-6-group batch bound before it projects behavior mode. Ranking retains the
-historical five-callback-acceptance quota; filtering gives verification the
-complete current batch. A failed group therefore cannot pull an unbounded tail
+`verifySynthLane` still applies the supplied *F*-, 2*F*-, or *F*/2-group
+batch bound (12, 24, and 6 by default) before it projects behavior mode.
+Ranking retains the `synth-shown` callback-acceptance quota (five by
+default); filtering gives verification the complete current batch. A failed group therefore cannot pull an unbounded tail
 through verification.
 
 The disposition of the current batch alone controls same-run progression.
@@ -425,12 +438,12 @@ that path, but every completed batch outcome remains in the accumulation.
 Excluded-middle no-verification or all-rejection enters double negation;
 survivor or preserve-all stops.
 
-Only after assessment does Main take at most five survivor presentations for
-display and `itN` binding. Rejections are never capped. Continuing to a second
+Only after assessment does Main take at most `synth-shown` (five by default)
+survivor presentations for display and `itN` binding. Rejections are never capped. Continuing to a second
 batch or later engine run does not fill a presentation quota: the first batch
 with even one survivor is terminal. A preserve-all failure likewise retains
-its complete verified batch internally while presenting at most five original
-candidates.
+its complete verified batch internally while presenting at most that same
+number of original candidates.
 
 One deferred `finalizeSynthLaneAccumulation` remains the sole result-effect
 owner. It emits chronological metrics, then uses the prefix through the first
@@ -1278,7 +1291,8 @@ open. Wrong-thread or escaped use is the byte-free sanitized session failure
 configuration, workspace, or process demand; the owner closes admission on
 normal and exceptional exit. Leant's structured owner/checkpoint failure is an
 original-order atomic fallback: occurrences whose preparation already failed
-retain `LengthCandidatePreparationRefused`, while every eligible prepared
+retain their bounded `LengthPreparationRefusalClass` (readable through
+`rankedLengthCandidatePreparationRefusal`), while every eligible prepared
 candidate becomes `Unassessed`. Its safe original index is `Nothing`, and it
 preserves any nested cleanup-incomplete bit. A non-shared-deadline query failure
 may retain that candidate's safe original index only when the shared lease is

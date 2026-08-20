@@ -42,16 +42,25 @@ import Leant.Synth.Length.File.Acquire
   , mkLengthFileRequest
   )
 
+-- | Timeout a caller uses for a one-shot contract load when it supplies
+-- none of its own.
 lengthContractFileDefaultTimeoutMilliseconds :: Int
 lengthContractFileDefaultTimeoutMilliseconds = 5000
 
+-- | The shared file boundary's path-length ceiling, restated in
+-- contract-file vocabulary.
 lengthContractFileMaximumPathCharacters :: Natural
 lengthContractFileMaximumPathCharacters = lengthFileMaximumPathCharacters
 
+-- | The shared file boundary's timeout ceiling, restated in contract-file
+-- vocabulary.
 lengthContractFileMaximumTimeoutMilliseconds :: Int
 lengthContractFileMaximumTimeoutMilliseconds =
   lengthFileMaximumTimeoutMilliseconds
 
+-- | Most bytes one contract file may occupy: exactly the bounded JSON
+-- grammar's total-byte limit, so acquisition never reads a document the
+-- decoder would refuse for size.
 lengthContractFileLoadMaximumBytes :: Natural
 lengthContractFileLoadMaximumBytes =
   boundedJsonMaximumTotalBytes lengthContractFileJsonLimits
@@ -63,6 +72,11 @@ data LengthContractFileSource = LengthContractFileSource
   , lengthContractFileSourceTimeoutMilliseconds :: Int
   }
 
+-- | Pure refusal of one 'LengthContractFileSource', in the shared
+-- boundary's admission order (path length, empty path, embedded NUL,
+-- relative path, non-positive timeout, timeout above the ceiling); limit
+-- refusals carry the maximum and the observed count capped at maximum plus
+-- one.
 data LengthContractFileAdmissionError
   = LengthContractFilePathCharacterLimitExceeded !Natural !Natural
   | LengthContractFilePathEmpty
@@ -77,6 +91,9 @@ data LengthContractFileAdmissionError
 data LengthContractFileRequest =
   LengthContractFileRequest !LengthFileRequest
 
+-- | Sanitized primary reason one contract load failed; the shared
+-- boundary's classes restated one-for-one, with the decoder's rejection
+-- carried as 'LengthContractFileDecodeRejected'.
 data LengthContractFileLoadErrorClass
   = LengthContractFilePlatformUnsupported
   | LengthContractFileOpenFailed
@@ -89,23 +106,30 @@ data LengthContractFileLoadErrorClass
   | LengthContractFileCleanupFailed
   deriving (Eq, Ord, Show)
 
+-- | One contract load failure: its primary class plus whether descriptor
+-- cleanup was left incomplete.
 data LengthContractFileLoadError = LengthContractFileLoadError
   !LengthContractFileLoadErrorClass
   !Bool
   deriving (Eq, Ord, Show)
 
+-- | The primary failure class.
 lengthContractFileLoadErrorClass
   :: LengthContractFileLoadError
   -> LengthContractFileLoadErrorClass
 lengthContractFileLoadErrorClass
     (LengthContractFileLoadError failure _) = failure
 
+-- | Whether the opened descriptor could not be closed before the failure
+-- was returned.
 lengthContractFileLoadCleanupIncomplete
   :: LengthContractFileLoadError
   -> Bool
 lengthContractFileLoadCleanupIncomplete
     (LengthContractFileLoadError _ incomplete) = incomplete
 
+-- | Admit a one-shot source through the shared boundary without IO,
+-- reporting refusals in contract-file vocabulary.
 mkLengthContractFileRequest
   :: LengthContractFileSource
   -> Either LengthContractFileAdmissionError LengthContractFileRequest
@@ -116,6 +140,9 @@ mkLengthContractFileRequest source =
     Left failure -> Left $ mapAdmissionError failure
     Right request -> Right $ LengthContractFileRequest request
 
+-- | Read and decode one admitted contract file within its timeout, yielding
+-- the passive scalar-or-product contract selection; the loader's and the
+-- decoder's refusals are both returned in contract-file vocabulary.
 loadLengthContractFile
   :: LengthContractFileRequest
   -> IO (Either LengthContractFileLoadError LeanLengthContractSelection)

@@ -46,9 +46,12 @@ module Leant.Synth.Fragment
   , exactContextArgumentKindArity
   , exactContextArgumentPayloadFragments
   , mapExactContextArgumentFragments
+  , fragChildren
   , synthPrelude
   , serializerProgram
   , providerProgram
+  , providerProgramWith
+  , defaultProviderCap
   , candidateVerificationProgram
   , parseUniqueGoalTranslation
   , parseGoalSexp
@@ -74,6 +77,8 @@ module Leant.Synth.Fragment
 
 import Data.Char (isSpace)
 import Data.List (intercalate, isPrefixOf, nub)
+import Data.Bifunctor (second)
+import Data.Maybe (fromMaybe)
 import qualified Data.Set as Set
 import Text.Read (readMaybe)
 
@@ -103,6 +108,9 @@ data ExactContextArgument
   | ExactContextNominalArgument Int String [Frag]
   deriving (Eq, Show)
 
+-- | The retained kind arity of one exact context argument: the number of
+-- type arguments the payload still expects.  Zero marks a proper-type
+-- payload; for a nominal head it counts the arguments not yet supplied.
 exactContextArgumentKindArity :: ExactContextArgument -> Int
 exactContextArgumentKindArity argument = case argument of
   ExactContextFragmentArgument arity _ -> arity
@@ -116,6 +124,10 @@ exactContextArgumentPayloadFragments argument = case argument of
   ExactContextFragmentArgument _ frag -> [frag]
   ExactContextNominalArgument _ _ supplied -> supplied
 
+-- | Apply a fragment rewrite to every fragment payload of an exact context
+-- argument (the whole fragment of a proper-kind argument, or each supplied
+-- argument of a nominal head), keeping the arity and nominal head unchanged.
+-- Recursive fragment traversals use this to descend through 'FExactContext'.
 mapExactContextArgumentFragments
   :: (Frag -> Frag)
   -> ExactContextArgument
@@ -201,13 +213,21 @@ data Slot
   | SlotInst            -- ^ an erased instance binder that Lean must still bind
   deriving (Eq, Show)
 
+-- | Whether the serialized goal is a proposition ('GoalProp', Lean's
+-- @Meta.isProp@ held) or a type ('GoalType').  Main uses it to phrase a
+-- refutation as constructive rather than as a disproof.
 data GoalSort = GoalProp | GoalType
   deriving (Eq, Show)
 
+-- | The serializer's @(goal SORT QUERY FRAG PREMS)@ message decoded into its
+-- parts: sort, provider query, the goal's fragment, and offered premises.
 data ParsedGoal = ParsedGoal
   { pgSort :: GoalSort
+    -- ^ proposition or type, as reported by the serializer
   , pgProviderQuery :: ProviderQuery
+    -- ^ constant roots and result head used for provider discovery
   , pgFrag :: Frag
+    -- ^ the goal lowered to the synthesis fragment
   , pgPrems :: [(String, Frag)]
     -- ^ library premises the serializer offered (phase-3 vanguard):
     -- curated functions over the goal's recursive inductives,
@@ -228,6 +248,12 @@ data ProviderForallDomain
   | ProviderForallDomainSort
   deriving (Eq, Show)
 
+-- | One argument of an exact provider instantiation assignment, in the
+-- provider's leading 'FAll' order.  The kind arity is the number of type
+-- arguments the payload still expects: zero for a proper type, and for a
+-- nominal head the count of not-yet-supplied arguments.  The constructor
+-- records which wire form supplied the payload: a plain or @kinded@ fragment,
+-- an exact fragment with forall-domain tags, or a kinded nominal head.
 data ProviderInstantiationArgument
   = ProviderInstantiationArgument
       { providerInstantiationArgumentKindArity :: Int
@@ -1367,7 +1393,17 @@ serializerProgram goal = unlines
 -- The already-elaborated serializer query is the complete goal-dependent
 -- input; provider discovery does not elaborate the raw goal a second time.
 providerProgram :: [String] -> ProviderQuery -> String
-providerProgram sessionNames query = unlines
+providerProgram = providerProgramWith defaultProviderCap
+
+-- | The established number of providers one discovery run may serialize.
+defaultProviderCap :: Int
+defaultProviderCap = 80
+
+-- | 'providerProgram' with a retuned cap on serialized providers (the
+-- @:set synth-provider-cap@ setting); ranking and exclusion rules are the
+-- same, only the prefix length differs.
+providerProgramWith :: Int -> [String] -> ProviderQuery -> String
+providerProgramWith cap sessionNames query = unlines
   [ "open Lean Meta Elab Command in"
   , "set_option linter.unusedVariables false in"
   , "run_cmd do"
@@ -1441,7 +1477,8 @@ providerProgram sessionNames query = unlines
   , "            fallback := fallback.push n"
   , "    let chosen := (sessionPreferred.toList ++ preferred.toList"
   , "      ++ sessionFallback.toList ++ fallback.toList"
-  , "      ++ workerPreferred.toList ++ workerFallback.toList).take 80"
+  , "      ++ workerPreferred.toList ++ workerFallback.toList).take "
+      ++ show cap
   , "    let mut body := \"\""
   , "    for n in chosen do"
   , "      match env.find? n with"
@@ -1591,16 +1628,10 @@ parseProviderSexp text = do
         let provider = case evidenceMetadata of
               Just (ExactProviderInstantiations evidence) ->
                 ProviderFragWithEvidence name frag
-                (case binderMetadata of
-                  Nothing -> []
-                  Just names -> names)
-                evidence
+                  (fromMaybe [] binderMetadata) evidence
               Just (LegacyProviderCandidates candidates) ->
                 ProviderFragWithLegacyCandidates name frag
-                  (case binderMetadata of
-                    Nothing -> []
-                    Just names -> names)
-                  candidates
+                  (fromMaybe [] binderMetadata) candidates
               Nothing -> case binderMetadata of
                 Nothing -> ProviderFrag name frag
                 Just names -> ProviderFragWithBinders name frag names
@@ -1945,55 +1976,50 @@ fragVisibleForallVisibilities = collect []
 
   descend bound = fmap concat . mapM (collect bound)
 
+-- | The immediate sub-fragments of a node, in source order: both operands
+-- of a connective, the body under a binder, an exact context's payload
+-- fragments and then its body, an application's arguments, and a family's
+-- parameters followed by its constructor fields.  Leaves have none.
+--
+-- This is the descent shared by the whole-tree analyses below.  A traversal
+-- that must treat one position specially (skip a nested exact family's
+-- constructors, stop at an instance binder, track a binder) matches that
+-- constructor first and falls back to this for everything else.
+fragChildren :: Frag -> [Frag]
+fragChildren frag = case frag of
+  FArr parameter result -> [parameter, result]
+  FProd left right -> [left, right]
+  FLeanProd left right -> [left, right]
+  FSum left right -> [left, right]
+  FAll _ _ body -> [body]
+  FInst _ body -> [body]
+  FExactContext _ arguments body ->
+    concatMap exactContextArgumentPayloadFragments arguments ++ [body]
+  FApp _ _ _ arguments -> arguments
+  FParamInd _ _ parameters constructors ->
+    parameters ++ concatMap snd constructors
+  FInd _ constructors -> concatMap snd constructors
+  FParamRec _ _ _ parameters constructors ->
+    parameters ++ concatMap snd constructors
+  FRec _ _ parameters constructors ->
+    parameters ++ concatMap snd constructors
+  _ -> []
+
 -- | Whether translation exhausted its structural fuel anywhere in a
 -- fragment.  A live provider cannot repair missing type structure, so this
 -- predicate is shared by refusal and provider-admission logic.
 fragHasDepth :: Frag -> Bool
 fragHasDepth frag = case frag of
-  FArr a b -> fragHasDepth a || fragHasDepth b
-  FProd a b -> fragHasDepth a || fragHasDepth b
-  FLeanProd a b -> fragHasDepth a || fragHasDepth b
-  FSum a b -> fragHasDepth a || fragHasDepth b
-  FAll _ _ b -> fragHasDepth b
-  FInst _ b -> fragHasDepth b
-  FExactContext _ arguments body ->
-    any fragHasDepth
-      (concatMap exactContextArgumentPayloadFragments arguments)
-      || fragHasDepth body
-  FApp _ _ _ arguments -> any fragHasDepth arguments
-  FParamInd _ _ params ctors ->
-    any fragHasDepth params || any (any fragHasDepth . snd) ctors
-  FInd _ ctors -> any (any fragHasDepth . snd) ctors
-  FParamRec _ _ _ params ctors ->
-    any fragHasDepth params || any (any fragHasDepth . snd) ctors
-  FRec _ _ params ctors ->
-    any fragHasDepth params || any (any fragHasDepth . snd) ctors
   FDepth -> True
-  _ -> False
+  _ -> any fragHasDepth (fragChildren frag)
 
 -- | Whether a serialized type contains any contextual typeclass evidence.
 -- Both the legacy display-only marker and the semantic contextual node count.
 fragHasInstanceBinder :: Frag -> Bool
 fragHasInstanceBinder frag = case frag of
-  FArr a b -> fragHasInstanceBinder a || fragHasInstanceBinder b
-  FProd a b -> fragHasInstanceBinder a || fragHasInstanceBinder b
-  FLeanProd a b -> fragHasInstanceBinder a || fragHasInstanceBinder b
-  FSum a b -> fragHasInstanceBinder a || fragHasInstanceBinder b
-  FAll _ _ b -> fragHasInstanceBinder b
   FInst{} -> True
   FExactContext{} -> True
-  FApp _ _ _ arguments -> any fragHasInstanceBinder arguments
-  FParamInd _ _ params ctors ->
-    any fragHasInstanceBinder params
-      || any (any fragHasInstanceBinder . snd) ctors
-  FInd _ ctors -> any (any fragHasInstanceBinder . snd) ctors
-  FParamRec _ _ _ params ctors ->
-    any fragHasInstanceBinder params
-      || any (any fragHasInstanceBinder . snd) ctors
-  FRec _ _ params ctors ->
-    any fragHasInstanceBinder params
-      || any (any fragHasInstanceBinder . snd) ctors
-  _ -> False
+  _ -> any fragHasInstanceBinder (fragChildren frag)
 
 -- | Whether contextual evidence cannot be reconstructed from exact semantic
 -- data. Legacy 'FInst' stores only pretty text and therefore remains
@@ -2005,32 +2031,15 @@ fragHasUnsupportedInstanceBinder :: Frag -> Bool
 fragHasUnsupportedInstanceBinder = go []
  where
   go bound frag = case frag of
-    FArr a b -> go bound a || go bound b
-    FProd a b -> go bound a || go bound b
-    FLeanProd a b -> go bound a || go bound b
-    FSum a b -> go bound a || go bound b
     FAll _ binder body ->
       inconsistentBinderKinds binder body || go (binder : bound) body
     FInst{} -> True
-    FExactContext className arguments body ->
+    FExactContext className arguments _ ->
       null className
         || length arguments > maximumProviderExactContextArguments
         || any (unsupportedExactContextArgument bound) arguments
-        || any (go bound)
-          (concatMap exactContextArgumentPayloadFragments arguments)
-        || go bound body
-    FApp _ _ _ arguments -> any (go bound) arguments
-    FParamInd _ _ params ctors ->
-      any (go bound) params
-        || any (any (go bound) . snd) ctors
-    FInd _ ctors -> any (any (go bound) . snd) ctors
-    FParamRec _ _ _ params ctors ->
-      any (go bound) params
-        || any (any (go bound) . snd) ctors
-    FRec _ _ params ctors ->
-      any (go bound) params
-        || any (any (go bound) . snd) ctors
-    _ -> False
+        || any (go bound) (fragChildren frag)
+    _ -> any (go bound) (fragChildren frag)
 
   unsupportedExactContextArgument bound
       (ExactContextFragmentArgument remaining argument)
@@ -2061,34 +2070,20 @@ fragHasUnsupportedInstanceBinder = go []
     ["And", "Prod", "PProd", "Or", "Sum", "PSum", "Iff", "Not"]
 
   payloadVariablesBound bound frag = case frag of
-    FArr parameter result -> descend [parameter, result]
-    FProd left right -> descend [left, right]
-    FLeanProd left right -> descend [left, right]
-    FSum left right -> descend [left, right]
     FAll _ binder body -> payloadVariablesBound (binder : bound) body
     FInst{} -> False
-    FExactContext _ arguments body ->
-      all (payloadVariablesBound bound)
-        (concatMap exactContextArgumentPayloadFragments arguments)
-        && payloadVariablesBound bound body
     FVar variableName -> variableName `elem` bound
-    FAtom{} -> True
-    FApp _ _ head' arguments ->
+    FApp _ _ head' _ ->
       (case head' of
         AppVariable variableName -> variableName `elem` bound
         AppNominal name -> not (null name))
-        && descend arguments
-    FParamInd name _ parameters constructors ->
-      not (null name) && descend (parameters ++ concatMap snd constructors)
-    FInd _ constructors -> descend (concatMap snd constructors)
-    FParamRec _ name _ parameters constructors ->
-      not (null name) && descend (parameters ++ concatMap snd constructors)
-    FRec _ _ parameters constructors ->
-      descend (parameters ++ concatMap snd constructors)
+        && descend
+    FParamInd name _ _ _ -> not (null name) && descend
+    FParamRec _ name _ _ _ -> not (null name) && descend
     FDepth -> False
-    _ -> True
+    _ -> descend
    where
-    descend = all (payloadVariablesBound bound)
+    descend = all (payloadVariablesBound bound) (fragChildren frag)
 
   -- 'FAll' does not retain an explicit kind annotation.  Before admitting a
   -- scoped variable as a positive-arity exact-context argument, conservatively
@@ -2102,14 +2097,9 @@ fragHasUnsupportedInstanceBinder = go []
     length (nub (binderKindDemands binder body)) > 1
 
   binderKindDemands binder frag = case frag of
-    FArr parameter result -> descendProper [parameter, result]
-    FProd left right -> descendProper [left, right]
-    FLeanProd left right -> descendProper [left, right]
-    FSum left right -> descendProper [left, right]
     FAll _ nested body
       | nested == binder -> []
       | otherwise -> binderKindDemands binder body
-    FInst _ body -> binderKindDemands binder body
     FExactContext _ arguments body ->
       concatMap contextDemands arguments ++ binderKindDemands binder body
     FVar variableName
@@ -2121,14 +2111,7 @@ fragHasUnsupportedInstanceBinder = go []
           | variableName == binder ->
               length arguments : descendProper arguments
         _ -> descendProper arguments
-    FParamInd _ _ parameters constructors ->
-      descendProper (parameters ++ concatMap snd constructors)
-    FInd _ constructors -> descendProper (concatMap snd constructors)
-    FParamRec _ _ _ parameters constructors ->
-      descendProper (parameters ++ concatMap snd constructors)
-    FRec _ _ parameters constructors ->
-      descendProper (parameters ++ concatMap snd constructors)
-    _ -> []
+    _ -> descendProper (fragChildren frag)
    where
     descendProper = concatMap (binderKindDemands binder)
 
@@ -2187,25 +2170,12 @@ fragRefusal frag
 fragRecKeys :: Frag -> [String]
 fragRecKeys = nub . go
  where
-  go f = case f of
-    FArr a b -> go a ++ go b
-    FProd a b -> go a ++ go b
-    FLeanProd a b -> go a ++ go b
-    FSum a b -> go a ++ go b
-    FAll _ _ b -> go b
-    FInst _ b -> go b
-    FExactContext _ arguments body ->
-      concatMap (concatMap go . exactContextArgumentPayloadFragments)
-        arguments ++ go body
-    FApp _ _ _ arguments -> concatMap go arguments
-    FParamInd _ _ parameters ctors ->
-      concatMap go parameters ++ concatMap (concatMap go . snd) ctors
-    FInd _ ctors -> concatMap (concatMap go . snd) ctors
-    FParamRec _ _ key parameters ctors ->
-      key : concatMap go parameters ++ concatMap (concatMap go . snd) ctors
-    FRec _ key parameters ctors ->
-      key : concatMap go parameters ++ concatMap (concatMap go . snd) ctors
-    _ -> []
+  go f = here ++ concatMap go (fragChildren f)
+   where
+    here = case f of
+      FParamRec _ _ key _ _ -> [key]
+      FRec _ key _ _ -> [key]
+      _ -> []
 
 -- | The goal's leading binder spine (arrows and quantifiers, stopping
 -- at the first other connective).  Djinn models quantifiers as implicit
@@ -2324,61 +2294,29 @@ stripRecCtors f = case f of
 fragUnsafeAtoms :: Frag -> [String]
 fragUnsafeAtoms = nub . go
  where
-  go f = case f of
-    FArr a b -> go a ++ go b
-    FProd a b -> go a ++ go b
-    FLeanProd a b -> go a ++ go b
-    FSum a b -> go a ++ go b
-    FAll _ _ b -> go b
-    FInst key b -> key : go b
-    FExactContext className arguments body ->
-      className
-        : concatMap
-            (concatMap go . exactContextArgumentPayloadFragments)
-            arguments
-          ++ go body
-    FApp safe key _ arguments ->
-      (if safe then [] else [key]) ++ concatMap go arguments
-    FParamInd _ _ params ctors ->
-      concatMap go params ++ concatMap (concatMap go . snd) ctors
-    FInd _ ctors -> concatMap (concatMap go . snd) ctors
-    FParamRec _ _ key params ctors ->
-      key : concatMap go params ++ concatMap (concatMap go . snd) ctors
-    FRec _ key params ctors ->
-      key : concatMap go params ++ concatMap (concatMap go . snd) ctors
-    FAtom False key -> [key]
-    _ -> []
+  go f = here ++ concatMap go (fragChildren f)
+   where
+    here = case f of
+      FInst key _ -> [key]
+      FExactContext className _ _ -> [className]
+      FApp safe key _ _ -> [key | not safe]
+      FParamRec _ _ key _ _ -> [key]
+      FRec _ key _ _ -> [key]
+      FAtom False key -> [key]
+      _ -> []
 
 -- | Every syntactic variable and binder name in a fragment.  Exact nominal
 -- heads and display keys live in a separate namespace and need not constrain
 -- alpha-renaming.
 fragVariableNames :: Frag -> Set.Set String
-fragVariableNames frag = case frag of
-  FArr parameter result -> descend [parameter, result]
-  FProd left right -> descend [left, right]
-  FLeanProd left right -> descend [left, right]
-  FSum left right -> descend [left, right]
-  FAll _ binder body -> Set.insert binder (fragVariableNames body)
-  FInst _ body -> fragVariableNames body
-  FExactContext _ arguments body ->
-    descend
-      (concatMap exactContextArgumentPayloadFragments arguments ++ [body])
-  FVar variable -> Set.singleton variable
-  FApp _ _ head' arguments ->
-    let headNames = case head' of
-          AppVariable variable -> Set.singleton variable
-          AppNominal _ -> Set.empty
-    in headNames `Set.union` descend arguments
-  FParamInd _ _ parameters constructors ->
-    descend (parameters ++ concatMap snd constructors)
-  FInd _ constructors -> descend (concatMap snd constructors)
-  FParamRec _ _ _ parameters constructors ->
-    descend (parameters ++ concatMap snd constructors)
-  FRec _ _ parameters constructors ->
-    descend (parameters ++ concatMap snd constructors)
-  _ -> Set.empty
+fragVariableNames frag =
+  here `Set.union` Set.unions (map fragVariableNames (fragChildren frag))
  where
-  descend = Set.unions . map fragVariableNames
+  here = case frag of
+    FAll _ binder _ -> Set.singleton binder
+    FVar variable -> Set.singleton variable
+    FApp _ _ (AppVariable variable) _ -> Set.singleton variable
+    _ -> Set.empty
 
 -- | Variables occurring free in a fragment, below an initial set of bound
 -- spellings.  A nested exact family's constructors are validated by its own
@@ -2386,34 +2324,20 @@ fragVariableNames frag = case frag of
 -- descends only into its parameters.
 freeFragVariables :: Set.Set String -> Frag -> Set.Set String
 freeFragVariables bound frag = case frag of
-  FArr parameter result -> descend [parameter, result]
-  FProd left right -> descend [left, right]
-  FLeanProd left right -> descend [left, right]
-  FSum left right -> descend [left, right]
   FAll _ binder body -> freeFragVariables (Set.insert binder bound) body
-  FInst _ body -> freeFragVariables bound body
-  FExactContext _ arguments body ->
-    descend
-      (concatMap exactContextArgumentPayloadFragments arguments ++ [body])
-  FVar variable
-    | variable `Set.member` bound -> Set.empty
-    | otherwise -> Set.singleton variable
-  FApp _ _ head' arguments ->
+  FVar variable -> free variable
+  FApp _ _ head' _ ->
     let headVariables = case head' of
-          AppVariable variable
-            | variable `Set.member` bound -> Set.empty
-            | otherwise -> Set.singleton variable
+          AppVariable variable -> free variable
           AppNominal _ -> Set.empty
-    in headVariables `Set.union` descend arguments
+    in headVariables `Set.union` descend (fragChildren frag)
   FParamInd _ _ parameters _ -> descend parameters
-  FInd _ constructors -> descend (concatMap snd constructors)
-  FParamRec _ _ _ parameters constructors ->
-    descend (parameters ++ concatMap snd constructors)
-  FRec _ _ parameters constructors ->
-    descend (parameters ++ concatMap snd constructors)
-  _ -> Set.empty
+  _ -> descend (fragChildren frag)
  where
   descend = Set.unions . map (freeFragVariables bound)
+  free variable
+    | variable `Set.member` bound = Set.empty
+    | otherwise = Set.singleton variable
 
 -- | A binder spelling absent from @reserved@, drawn from a caller-owned
 -- NUL-prefixed sentinel namespace that cannot collide with Lean source
@@ -2463,4 +2387,4 @@ renameFragBinder old new frag = case frag of
   _ -> frag
  where
   go = renameFragBinder old new
-  mapCtorFields = map (\(name, fields) -> (name, map go fields))
+  mapCtorFields = map (second (map go))

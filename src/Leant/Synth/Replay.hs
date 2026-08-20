@@ -12,6 +12,9 @@ module Leant.Synth.Replay
 
 import Data.List (stripPrefix)
 
+-- | How to bring a cached environment up to date with the current history:
+-- reuse it as is, replay only the commands that follow the cached prefix,
+-- or replay everything because the cached history is not a prefix.
 data ReplayPlan a
   = Reuse
   | ReplaySuffix [a]

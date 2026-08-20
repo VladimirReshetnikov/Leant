@@ -233,6 +233,10 @@ withLengthAssessmentRequestContext request action = case request of
               $ LengthAssessmentSpinePairFilteringContext
                   policy contract context
 
+-- | The behavior selected by one command-local assessment context.  Filtering
+-- contexts (those owning a counterexample bank) report 'LengthBehaviorFilter';
+-- both ranking contexts and the disabled context report 'LengthBehaviorRank'.
+-- Only the constructor is inspected; no policy or lazy contract is forced.
 lengthAssessmentContextBehaviorMode
   :: LengthAssessmentContext command
   -> LengthBehaviorMode
@@ -254,6 +258,9 @@ lengthAssessmentRequestBehaviorMode request = case request of
   LengthAssessmentRequestDisabled -> LengthBehaviorRank
   LengthAssessmentEnabledRequest behavior _ _ -> behavior
 
+-- | The mode Main uses when no Length configuration file was named.  It
+-- holds no policy or contract, so assessment preserves callback order
+-- without IO and an explicit contract request is refused.
 disabledLengthAssessmentMode :: LengthAssessmentMode
 disabledLengthAssessmentMode = LengthAssessmentDisabled
 
@@ -472,6 +479,9 @@ lengthAssessmentSpinePairRanking result = case result of
   LengthAssessmentSelectionCompleted _ -> Nothing
   LengthAssessmentSpinePairSelectionCompleted _ -> Nothing
 
+-- | The underlying scalar-domain adapter result, present exactly when the
+-- assessment ran under a scalar contract; disabled and spine-pair
+-- assessments have none.
 lengthAssessmentPostVerificationResult
   :: LengthAssessmentResult
   -> Maybe LengthPostVerificationResult
@@ -482,6 +492,9 @@ lengthAssessmentPostVerificationResult result = case result of
   LengthAssessmentSelectionCompleted _ -> Nothing
   LengthAssessmentSpinePairSelectionCompleted _ -> Nothing
 
+-- | The underlying binary-product adapter result, present exactly when the
+-- assessment ran under a spine-pair contract; disabled and scalar
+-- assessments have none.
 lengthAssessmentSpinePairPostVerificationResult
   :: LengthAssessmentResult
   -> Maybe LengthSpinePairPostVerificationResult
@@ -516,6 +529,10 @@ lengthAssessmentSpinePairSelectionResult result = case result of
   LengthAssessmentSelectionCompleted _ -> Nothing
   LengthAssessmentSpinePairSelectionCompleted selected -> Just selected
 
+-- | The batch-wide reason a configured assessment kept callback order, if
+-- any.  An adapter rejection takes precedence over a ranking failure; a
+-- skipped (disabled) assessment reports nothing.  Main prints this as a
+-- warning beside the candidates.
 lengthAssessmentFailure
   :: LengthAssessmentResult
   -> Maybe LengthAssessmentFailure

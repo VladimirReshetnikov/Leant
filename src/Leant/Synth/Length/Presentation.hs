@@ -177,22 +177,33 @@ data LengthCandidatePresentation = LengthCandidatePresentation
 data LengthCandidateRejectionPresentation =
   LengthCandidateRejectionPresentation String String
 
+-- | The exact verified Lean spelling of the candidate to display; the same
+-- text that was passed to the backend verifier.
 lengthCandidatePresentationText
   :: LengthCandidatePresentation
   -> String
 lengthCandidatePresentationText (LengthCandidatePresentation text _) = text
 
+-- | The rendered Length note for this candidate, if its ranked assessment
+-- produced one (counterexample, simplification, bounded-positive, or
+-- applicable-domain claim).  Heuristic, unassessed, and unranked candidates
+-- have none.
 lengthCandidatePresentationNote
   :: LengthCandidatePresentation
   -> Maybe String
 lengthCandidatePresentationNote (LengthCandidatePresentation _ note) = note
 
+-- | The exact verified Lean spelling of the omitted candidate; the same text
+-- that was passed to the backend verifier.
 lengthCandidateRejectionPresentationText
   :: LengthCandidateRejectionPresentation
   -> String
 lengthCandidateRejectionPresentationText
     (LengthCandidateRejectionPresentation text _) = text
 
+-- | The rendered counterexample note which authorized this omission.  Unlike
+-- a survivor note it is always present: every rejection carries a replayed
+-- counterexample, and its simplified reduction is rendered when available.
 lengthCandidateRejectionPresentationNote
   :: LengthCandidateRejectionPresentation
   -> String
@@ -227,9 +238,8 @@ presentLengthAssessmentRejections
 presentLengthAssessmentRejections assessment = case
     lengthAssessmentSelectionResult assessment of
   Just selected -> presentLengthSelectionRejections selected
-  Nothing -> case lengthAssessmentSpinePairSelectionResult assessment of
-    Just selected -> presentLengthSpinePairSelectionRejections selected
-    Nothing -> []
+  Nothing -> maybe [] presentLengthSpinePairSelectionRejections
+    (lengthAssessmentSpinePairSelectionResult assessment)
 
 -- | Present one completed occurrence-sealed adapter result. Rejection has no
 -- ranking and therefore no semantic note; accepted output traverses the same
@@ -450,13 +460,11 @@ renderLengthCounterexampleNote
   :: ValidatedLengthCounterexample
   -> String
 renderLengthCounterexampleNote receipt =
-  take maximumLengthCounterexampleNoteCharacters $
-  "replayed finite-list-spine Length counterexample (model-relative; "
-    ++ renderBasis (validatedLengthCounterexampleBasis receipt)
-    ++ "): observed input spine lengths = "
-    ++ renderInputs (validatedLengthCounterexampleInputs receipt)
-    ++ "; result spine length = "
-    ++ renderNatural (validatedLengthCounterexampleResult receipt)
+  renderCounterexampleNote scalarFamily
+    (validatedLengthCounterexampleBasis receipt)
+    (validatedLengthCounterexampleInputs receipt)
+    ("; result spine length = "
+      ++ renderNatural (validatedLengthCounterexampleResult receipt))
 
 -- | Render only a strict, independently replayed reduction.  This describes
 -- the componentwise-bounded lexicographic search which Djex actually ran; it
@@ -465,25 +473,15 @@ renderLengthCounterexampleSimplificationNote
   :: ValidatedLengthCounterexampleSimplification
   -> String
 renderLengthCounterexampleSimplificationNote simplification =
-  take maximumLengthCounterexampleNoteCharacters $
-  "replayed bounded query-owned componentwise-lexicographic "
-    ++ "finite-list-spine Length counterexample (model-relative; "
-    ++ renderBasis
-        (validatedLengthCounterexampleSimplificationBasis simplification)
-    ++ "): inspected lower-box assignments = "
-    ++ renderNatural
-        (validatedLengthCounterexampleSimplificationInspectedAssignmentCount
-          simplification)
-    ++ "; input spine lengths reduced from "
-    ++ renderInputs
-        (validatedLengthCounterexampleSimplificationOriginalInputs
-          simplification)
-    ++ " to "
-    ++ renderInputs
-        (validatedLengthCounterexampleSimplificationInputs simplification)
-    ++ "; result spine length = "
-    ++ renderNatural
-        (validatedLengthCounterexampleSimplificationResult simplification)
+  renderSimplificationNote scalarFamily
+    (validatedLengthCounterexampleSimplificationBasis simplification)
+    (validatedLengthCounterexampleSimplificationInspectedAssignmentCount
+      simplification)
+    (validatedLengthCounterexampleSimplificationOriginalInputs simplification)
+    (validatedLengthCounterexampleSimplificationInputs simplification)
+    ("; result spine length = "
+      ++ renderNatural
+          (validatedLengthCounterexampleSimplificationResult simplification))
 
 -- | Render one sanitized positive bounded claim.  The note names the exact
 -- finite box and checked/applicable counts while retaining the same explicit
@@ -493,22 +491,11 @@ renderLengthInputBoxValidationNote
   :: ValidatedLengthInputBox
   -> String
 renderLengthInputBoxValidationNote receipt =
-  take maximumLengthCounterexampleNoteCharacters $
-  "independently checked finite-list-spine Length input box "
-    ++ "(bounded/model-relative; "
-    ++ renderBasis (validatedLengthInputBoxBasis receipt)
-    ++ "): inclusive input maxima = "
-    ++ renderInputs (validatedLengthInputBoxInclusiveMaximums receipt)
-    ++ "; checked assignments = "
-    ++ renderNatural (validatedLengthInputBoxAssignmentCount receipt)
-    ++ "; applicable assignments = "
-    ++ renderNatural (validatedLengthInputBoxApplicableAssignmentCount receipt)
-    ++ vacuity
- where
-  vacuity
-    | validatedLengthInputBoxApplicableAssignmentCount receipt == 0 =
-        "; vacuous within this box (no assignment met the precondition)"
-    | otherwise = ""
+  renderInputBoxNote scalarFamily
+    (validatedLengthInputBoxBasis receipt)
+    (validatedLengthInputBoxInclusiveMaximums receipt)
+    (validatedLengthInputBoxAssignmentCount receipt)
+    (validatedLengthInputBoxApplicableAssignmentCount receipt)
 
 -- | Render the current recursive piecewise-affine applicable domain
 -- without collapsing its canonical box antichain.  The inherited count order
@@ -517,31 +504,13 @@ renderLengthApplicableDomainValidationNote
   :: ValidatedLengthApplicableDomain
   -> String
 renderLengthApplicableDomainValidationNote receipt =
-  take maximumLengthCounterexampleNoteCharacters $
-  "complete finite-spine Length Boolean finite-union atomic-branching "
-    ++ "recursive piecewise-affine domain under strict relational positive-affine "
-    ++ "quotient/root-extrema/monus coverage within admitted bounds "
-    ++ "(model/provider-relative; "
-    ++ renderBasis (validatedLengthApplicableDomainBasis receipt)
-    ++ "; no global proof or solver authority): boxes = "
-    ++ renderNatural (validatedLengthApplicableDomainBoxCount receipt)
-    ++ "; visits = "
-    ++ renderNatural
-        (validatedLengthApplicableDomainAssignmentVisitCount receipt)
-    ++ "; unique = "
-    ++ renderNatural (validatedLengthApplicableDomainAssignmentCount receipt)
-    ++ "; applicable = "
-    ++ renderNatural
-        (validatedLengthApplicableDomainApplicableAssignmentCount receipt)
-    ++ vacuity
-    ++ "; maxima = "
-    ++ renderBooleanFiniteUnionMaximumBoxes
-        (validatedLengthApplicableDomainInclusiveMaximumBoxes receipt)
- where
-  vacuity
-    | validatedLengthApplicableDomainApplicableAssignmentCount receipt == 0 =
-        "; vacuous (no assignment met the precondition)"
-    | otherwise = ""
+  renderApplicableDomainNote "finite-spine"
+    (validatedLengthApplicableDomainBasis receipt)
+    (validatedLengthApplicableDomainBoxCount receipt)
+    (validatedLengthApplicableDomainAssignmentVisitCount receipt)
+    (validatedLengthApplicableDomainAssignmentCount receipt)
+    (validatedLengthApplicableDomainApplicableAssignmentCount receipt)
+    (validatedLengthApplicableDomainInclusiveMaximumBoxes receipt)
 
 -- | Render both source-ordered result components of one independently replayed
 -- product-domain counterexample.  The note remains model-relative and bounded.
@@ -551,16 +520,13 @@ renderLengthSpinePairCounterexampleNote
 renderLengthSpinePairCounterexampleNote receipt =
   let result :: LengthSpinePair Natural
       result = validatedLengthSpinePairCounterexampleResult receipt
-  in take maximumLengthCounterexampleNoteCharacters $
-    "replayed binary-product finite-spine Length counterexample "
-      ++ "(model-relative; "
-      ++ renderBasis (validatedLengthSpinePairCounterexampleBasis receipt)
-      ++ "): observed input spine lengths = "
-      ++ renderInputs (validatedLengthSpinePairCounterexampleInputs receipt)
-      ++ "; first result spine length = "
+  in renderCounterexampleNote pairFamily
+    (validatedLengthSpinePairCounterexampleBasis receipt)
+    (validatedLengthSpinePairCounterexampleInputs receipt)
+    ("; first result spine length = "
       ++ renderNatural (lengthSpinePairFirst result)
       ++ "; second result spine length = "
-      ++ renderNatural (lengthSpinePairSecond result)
+      ++ renderNatural (lengthSpinePairSecond result))
 
 -- | Nominal product-domain presentation of one strict bounded reduction.
 renderLengthSpinePairCounterexampleSimplificationNote
@@ -570,54 +536,29 @@ renderLengthSpinePairCounterexampleSimplificationNote simplification =
   let result :: LengthSpinePair Natural
       result = validatedLengthSpinePairCounterexampleSimplificationResult
         simplification
-  in take maximumLengthCounterexampleNoteCharacters $
-    "replayed bounded query-owned componentwise-lexicographic "
-      ++ "binary-product finite-spine Length counterexample (model-relative; "
-      ++ renderBasis
-          (validatedLengthSpinePairCounterexampleSimplificationBasis
-            simplification)
-      ++ "): inspected lower-box assignments = "
-      ++ renderNatural
-          (validatedLengthSpinePairCounterexampleSimplificationInspectedAssignmentCount
-            simplification)
-      ++ "; input spine lengths reduced from "
-      ++ renderInputs
-          (validatedLengthSpinePairCounterexampleSimplificationOriginalInputs
-            simplification)
-      ++ " to "
-      ++ renderInputs
-          (validatedLengthSpinePairCounterexampleSimplificationInputs
-            simplification)
-      ++ "; result spine lengths = ["
+  in renderSimplificationNote pairFamily
+    (validatedLengthSpinePairCounterexampleSimplificationBasis simplification)
+    (validatedLengthSpinePairCounterexampleSimplificationInspectedAssignmentCount
+      simplification)
+    (validatedLengthSpinePairCounterexampleSimplificationOriginalInputs
+      simplification)
+    (validatedLengthSpinePairCounterexampleSimplificationInputs simplification)
+    ("; result spine lengths = ["
       ++ renderNatural (lengthSpinePairFirst result)
       ++ ", "
       ++ renderNatural (lengthSpinePairSecond result)
-      ++ "]"
+      ++ "]")
 
 -- | Render one independently checked finite box for the product domain.
 renderLengthSpinePairInputBoxValidationNote
   :: ValidatedLengthSpinePairInputBox
   -> String
 renderLengthSpinePairInputBoxValidationNote receipt =
-  take maximumLengthCounterexampleNoteCharacters $
-  "independently checked binary-product finite-spine Length input box "
-    ++ "(bounded/model-relative; "
-    ++ renderBasis (validatedLengthSpinePairInputBoxBasis receipt)
-    ++ "): inclusive input maxima = "
-    ++ renderInputs
-        (validatedLengthSpinePairInputBoxInclusiveMaximums receipt)
-    ++ "; checked assignments = "
-    ++ renderNatural
-        (validatedLengthSpinePairInputBoxAssignmentCount receipt)
-    ++ "; applicable assignments = "
-    ++ renderNatural
-        (validatedLengthSpinePairInputBoxApplicableAssignmentCount receipt)
-    ++ vacuity
- where
-  vacuity
-    | validatedLengthSpinePairInputBoxApplicableAssignmentCount receipt == 0 =
-        "; vacuous within this box (no assignment met the precondition)"
-    | otherwise = ""
+  renderInputBoxNote pairFamily
+    (validatedLengthSpinePairInputBoxBasis receipt)
+    (validatedLengthSpinePairInputBoxInclusiveMaximums receipt)
+    (validatedLengthSpinePairInputBoxAssignmentCount receipt)
+    (validatedLengthSpinePairInputBoxApplicableAssignmentCount receipt)
 
 -- | Render the current recursive piecewise-affine product domain
 -- without collapsing its canonical box antichain.  The inherited count order
@@ -626,33 +567,117 @@ renderLengthSpinePairApplicableDomainValidationNote
   :: ValidatedLengthSpinePairApplicableDomain
   -> String
 renderLengthSpinePairApplicableDomainValidationNote receipt =
+  renderApplicableDomainNote pairFamily
+    (validatedLengthSpinePairApplicableDomainBasis receipt)
+    (validatedLengthSpinePairApplicableDomainBoxCount receipt)
+    (validatedLengthSpinePairApplicableDomainAssignmentVisitCount receipt)
+    (validatedLengthSpinePairApplicableDomainAssignmentCount receipt)
+    (validatedLengthSpinePairApplicableDomainApplicableAssignmentCount receipt)
+    (validatedLengthSpinePairApplicableDomainInclusiveMaximumBoxes receipt)
+
+-- Shared note renderers -------------------------------------------------------
+--
+-- The scalar and binary-product receipts are nominally distinct types with
+-- distinct accessors, but their notes differ only in the family phrase and,
+-- for counterexamples, in how the result component(s) are described.  Each
+-- public renderer above projects its receipt's fields and hands them to one
+-- of the renderers below, so the wording, field order and the terminal ceiling
+-- are stated once.
+
+-- | Family phrase of the scalar domain in counterexample and box notes.
+scalarFamily :: String
+scalarFamily = "finite-list-spine"
+
+-- | Family phrase of the binary-product domain in every note.
+pairFamily :: String
+pairFamily = "binary-product finite-spine"
+
+-- The result description begins with its own @"; "@ separator because the
+-- scalar and product domains describe one and two components differently.
+renderCounterexampleNote
+  :: String -> LengthCounterexampleBasis -> [Natural] -> String -> String
+renderCounterexampleNote family basis inputs resultDescription =
   take maximumLengthCounterexampleNoteCharacters $
-  "complete binary-product finite-spine Length Boolean finite-union "
-    ++ "atomic-branching recursive piecewise-affine domain under strict "
-    ++ "relational positive-affine quotient/root-extrema/monus coverage "
-    ++ "within admitted bounds (model/provider-relative; "
-    ++ renderBasis (validatedLengthSpinePairApplicableDomainBasis receipt)
-    ++ "; no global proof or solver authority): boxes = "
-    ++ renderNatural (validatedLengthSpinePairApplicableDomainBoxCount receipt)
-    ++ "; visits = "
-    ++ renderNatural
-        (validatedLengthSpinePairApplicableDomainAssignmentVisitCount receipt)
-    ++ "; unique = "
-    ++ renderNatural
-        (validatedLengthSpinePairApplicableDomainAssignmentCount receipt)
-    ++ "; applicable = "
-    ++ renderNatural
-        (validatedLengthSpinePairApplicableDomainApplicableAssignmentCount
-          receipt)
+  "replayed " ++ family ++ " Length counterexample (model-relative; "
+    ++ renderBasis basis
+    ++ "): observed input spine lengths = "
+    ++ renderInputs inputs
+    ++ resultDescription
+
+renderSimplificationNote
+  :: String
+  -> LengthCounterexampleBasis
+  -> Natural
+  -> [Natural]
+  -> [Natural]
+  -> String
+  -> String
+renderSimplificationNote family basis inspected original reduced
+    resultDescription =
+  take maximumLengthCounterexampleNoteCharacters $
+  "replayed bounded query-owned componentwise-lexicographic "
+    ++ family ++ " Length counterexample (model-relative; "
+    ++ renderBasis basis
+    ++ "): inspected lower-box assignments = "
+    ++ renderNatural inspected
+    ++ "; input spine lengths reduced from "
+    ++ renderInputs original
+    ++ " to "
+    ++ renderInputs reduced
+    ++ resultDescription
+
+renderInputBoxNote
+  :: String -> LengthCounterexampleBasis -> [Natural] -> Natural -> Natural
+  -> String
+renderInputBoxNote family basis maximums checked applicable =
+  take maximumLengthCounterexampleNoteCharacters $
+  "independently checked " ++ family ++ " Length input box "
+    ++ "(bounded/model-relative; "
+    ++ renderBasis basis
+    ++ "): inclusive input maxima = "
+    ++ renderInputs maximums
+    ++ "; checked assignments = "
+    ++ renderNatural checked
+    ++ "; applicable assignments = "
+    ++ renderNatural applicable
     ++ vacuity
-    ++ "; maxima = "
-    ++ renderBooleanFiniteUnionMaximumBoxes
-        (validatedLengthSpinePairApplicableDomainInclusiveMaximumBoxes receipt)
  where
   vacuity
-    | validatedLengthSpinePairApplicableDomainApplicableAssignmentCount
-        receipt == 0 =
-          "; vacuous (no assignment met the precondition)"
+    | applicable == 0 =
+        "; vacuous within this box (no assignment met the precondition)"
+    | otherwise = ""
+
+renderApplicableDomainNote
+  :: String
+  -> LengthCounterexampleBasis
+  -> Natural
+  -> Natural
+  -> Natural
+  -> Natural
+  -> [[Natural]]
+  -> String
+renderApplicableDomainNote family basis boxes visits unique applicable
+    maximumBoxes =
+  take maximumLengthCounterexampleNoteCharacters $
+  "complete " ++ family ++ " Length Boolean finite-union atomic-branching "
+    ++ "recursive piecewise-affine domain under strict relational positive-affine "
+    ++ "quotient/root-extrema/monus coverage within admitted bounds "
+    ++ "(model/provider-relative; "
+    ++ renderBasis basis
+    ++ "; no global proof or solver authority): boxes = "
+    ++ renderNatural boxes
+    ++ "; visits = "
+    ++ renderNatural visits
+    ++ "; unique = "
+    ++ renderNatural unique
+    ++ "; applicable = "
+    ++ renderNatural applicable
+    ++ vacuity
+    ++ "; maxima = "
+    ++ renderBooleanFiniteUnionMaximumBoxes maximumBoxes
+ where
+  vacuity
+    | applicable == 0 = "; vacuous (no assignment met the precondition)"
     | otherwise = ""
 
 -- | Hard terminal-output ceiling.  The supported file-format caps make a

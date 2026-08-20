@@ -35,7 +35,7 @@ module Leant.Synth.Length.Configuration.File
   ) where
 
 import Data.ByteString (ByteString)
-import Data.Char (ord)
+import Data.Char (isDigit, ord)
 import Data.List (find)
 import qualified Data.Text as Text
 import Data.Text (Text)
@@ -112,6 +112,7 @@ import Leant.Synth.Length.Configuration
   , lengthRankingPolicyFromValidatedComponents
   )
 
+-- | The exact @format@ string a startup document must carry.
 lengthRankingConfigurationFileFormat :: Text
 lengthRankingConfigurationFileFormat =
   "leant-live-length-ranking-configuration"
@@ -132,6 +133,9 @@ lengthRankingConfigurationFileJsonLimits = BoundedJsonLimits
   , boundedJsonMaximumNumberBytes = 80
   }
 
+-- | Which object of the startup grammar a structural refusal names; a
+-- provider-law object carries its zero-based index in the @providerLaws@
+-- array.
 data LengthRankingConfigurationFileObject
   = LengthRankingConfigurationRootObject
   | LengthRankingConfigurationExecutionAdmissionObject
@@ -147,6 +151,8 @@ data LengthRankingConfigurationFileObject
   | LengthRankingConfigurationProviderLawObject !Natural
   deriving (Eq, Ord, Show)
 
+-- | Which field of the startup grammar a refusal names; provider-law fields
+-- carry the zero-based index of their law.
 data LengthRankingConfigurationFileField
   = LengthRankingConfigurationFormatField
   | LengthRankingConfigurationRankingDomainField
@@ -201,6 +207,7 @@ data LengthRankingConfigurationFileField
   | LengthRankingConfigurationUsableWorkBudgetMillisecondsField
   deriving (Eq, Ord, Show)
 
+-- | The JSON value shape a field required when a type mismatch is reported.
 data LengthRankingConfigurationFileValueType
   = LengthRankingConfigurationObjectValue
   | LengthRankingConfigurationArrayValue
@@ -210,17 +217,26 @@ data LengthRankingConfigurationFileValueType
   | LengthRankingConfigurationNullOrStringValue
   deriving (Bounded, Enum, Eq, Ord, Show)
 
+-- | Which measure of a text field a text-limit refusal reports: Unicode
+-- scalar values or UTF-8 bytes.
 data LengthRankingConfigurationFileTextMeasure
   = LengthRankingConfigurationUnicodeScalars
   | LengthRankingConfigurationUtf8Bytes
   deriving (Bounded, Enum, Eq, Ord, Show)
 
+-- | Which formula or expression a syntax refusal arose in: the contract's
+-- precondition or postcondition, or the transfer expression of the
+-- provider law with the given index.
 data LengthRankingConfigurationSyntaxPhase
   = LengthRankingConfigurationPreconditionSyntax
   | LengthRankingConfigurationPostconditionSyntax
   | LengthRankingConfigurationProviderTransferSyntax !Natural
   deriving (Eq, Ord, Show)
 
+-- | Which hard limit of the arithmetic grammar a syntax-limit refusal
+-- names: nesting depth, total nodes, formula clauses, sum terms, @all@
+-- clauses, literal width in bits, contract input index, provider argument
+-- index, or provider argument index against the law's declared role count.
 data LengthRankingConfigurationSyntaxLimit
   = LengthRankingConfigurationSemanticDepth
   | LengthRankingConfigurationSyntaxNodes
@@ -233,6 +249,11 @@ data LengthRankingConfigurationSyntaxLimit
   | LengthRankingConfigurationProviderArgumentRoleCount
   deriving (Bounded, Enum, Eq, Ord, Show)
 
+-- | Sanitized rejection of one tagged-array syntax node.  A tag-arity
+-- mismatch carries the expected argument count and the observed count capped
+-- at expected plus one; a limit
+-- refusal carries the limit, its maximum, and the observed value capped at
+-- maximum plus one.  No tag text is retained.
 data LengthRankingConfigurationSyntaxError
   = LengthRankingConfigurationExpectedTaggedArray
   | LengthRankingConfigurationExpectedTag
@@ -300,11 +321,15 @@ data DisabledLengthAssessmentConfiguration =
     !LengthRankingPolicy
     LeanLengthContractSelection
 
+-- | The caller's explicit decision on executables without a SHA-256 pin:
+-- refuse them, or permit them.
 data LengthRankingConfigurationActivationPolicy
   = RequirePinnedExecutable
   | PermitUnpinnedExecutable
   deriving (Bounded, Enum, Eq, Ord, Show)
 
+-- | Activation refused because the policy demanded a pinned executable and
+-- the decoded execution policy carries no digest expectation.
 data LengthRankingConfigurationActivationError
   = LengthRankingConfigurationExecutablePinRequired
   deriving (Bounded, Enum, Eq, Ord, Show)
@@ -329,6 +354,14 @@ activateLengthAssessmentConfiguration policy
           Right (rankingPolicy, selection)
     PermitUnpinnedExecutable -> Right (rankingPolicy, selection)
 
+-- | Decode one complete startup document without IO: bounded JSON, then
+-- @format@, then @rankingDomain@, then the exact root field set, then each
+-- policy section in root order (execution admission, execution,
+-- evaluation, input-box validation, applicable-domain validation,
+-- counterexample simplification, usable-work budget), then the contract in
+-- the selected domain's grammar.  The result enables every optional ranking
+-- policy the sections describe but grants no permission to run the solver
+-- until 'activateLengthAssessmentConfiguration'.
 decodeLengthAssessmentConfigurationFile
   :: ByteString
   -> Either
@@ -797,8 +830,7 @@ decodeExpectedDigest value = case value of
   rejected = Left $ LengthRankingConfigurationFieldValueRejected field
 
   isLowerHexDigit character =
-    ('0' <= character && character <= '9')
-      || ('a' <= character && character <= 'f')
+    isDigit character || ('a' <= character && character <= 'f')
 
   decodeHexBytes [] = Right []
   decodeHexBytes (high : low : remaining) =
@@ -807,7 +839,7 @@ decodeExpectedDigest value = case value of
   decodeHexBytes _ = rejected
 
   hexValue character
-    | '0' <= character && character <= '9' = ord character - ord '0'
+    | isDigit character = ord character - ord '0'
     | otherwise = ord character - ord 'a' + 10
 
 decodeArtifactPolicy
@@ -1197,146 +1229,117 @@ maximumBooleanFiniteUnionClosureInspectionsPerBranch = 4096
 maximumBooleanFiniteUnionRetainedBoxes = 256
 maximumBooleanFiniteUnionAssignmentVisits = 262144
 
--- | Decode the current nominal scalar contract grammar shared by startup and
--- contract-only files.  Target roles and case policy are explicit, and the
--- complete current arithmetic grammar and hard limits are always active.
+-- | Decode the current nominal contract grammar shared by startup and
+-- contract-only files, once for both domains.  Target roles and case policy
+-- are explicit, and the complete current arithmetic grammar and hard limits
+-- are always active.  The scalar and binary-product grammars are the same
+-- object with the same fields, precedence, and limits; they differ only in
+-- the contract variable vocabulary of the two formulas and in the nominal
+-- record assembled from the decoded parts, so both are supplied here.
+decodeContractValueWith
+  :: VariableDecoder variable
+  -> (LeanLengthSpineIdentity
+      -> [LengthTargetArgumentRole]
+      -> LeanLengthCandidateCasePolicy
+      -> LengthFormula variable
+      -> LengthFormula variable
+      -> [LeanLengthProviderLaw]
+      -> contract)
+  -> BoundedJsonValue
+  -> Either LengthRankingConfigurationFileError contract
+decodeContractValueWith decodeVariable assemble value = do
+  object <- exactObject LengthRankingConfigurationContractObject
+    contractFields value
+  spineValue <- requiredField
+    LengthRankingConfigurationContractObject
+    LengthRankingConfigurationSpineField
+    "spine"
+    object
+  spine <- decodeSpine spineValue
+  rolesValue <- requiredField
+    LengthRankingConfigurationContractObject
+    LengthRankingConfigurationTargetArgumentRolesField
+    "targetArgumentRoles"
+    object
+  targetRoles <- decodeTargetRoles rolesValue
+  policyValue <- requiredField
+    LengthRankingConfigurationContractObject
+    LengthRankingConfigurationCandidateCasePolicyField
+    "candidateCasePolicy"
+    object
+  casePolicy <- decodeCandidateCasePolicy policyValue
+  preconditionValue <- requiredField
+    LengthRankingConfigurationContractObject
+    LengthRankingConfigurationPreconditionField
+    "precondition"
+    object
+  (precondition, afterPrecondition) <- parseLengthFormula
+    LengthRankingConfigurationPreconditionSyntax
+    decodeVariable
+    1
+    emptySyntaxUsage
+    preconditionValue
+  postconditionValue <- requiredField
+    LengthRankingConfigurationContractObject
+    LengthRankingConfigurationPostconditionField
+    "postcondition"
+    object
+  (postcondition, _) <- parseLengthFormula
+    LengthRankingConfigurationPostconditionSyntax
+    decodeVariable
+    1
+    afterPrecondition
+    postconditionValue
+  providerLawsValue <- requiredField
+    LengthRankingConfigurationContractObject
+    LengthRankingConfigurationProviderLawsField
+    "providerLaws"
+    object
+  lawValues <- arrayField LengthRankingConfigurationProviderLawsField
+    providerLawsValue
+  boundedCollection LengthRankingConfigurationProviderLawsField
+    maximumProviderLaws lawValues
+  providerLaws <- decodeProviderLaws 0 emptySyntaxUsage lawValues
+  pure $ assemble spine targetRoles casePolicy precondition postcondition
+    providerLaws
+
+-- | The current nominal scalar contract grammar.
 decodeLeanLengthContractValue
   :: BoundedJsonValue
   -> Either LengthRankingConfigurationFileError LeanLengthContract
-decodeLeanLengthContractValue value = do
-  object <- exactObject LengthRankingConfigurationContractObject
-    contractFields value
-  spineValue <- requiredField
-    LengthRankingConfigurationContractObject
-    LengthRankingConfigurationSpineField
-    "spine"
-    object
-  spine <- decodeSpine spineValue
-  rolesValue <- requiredField
-    LengthRankingConfigurationContractObject
-    LengthRankingConfigurationTargetArgumentRolesField
-    "targetArgumentRoles"
-    object
-  targetRoles <- decodeTargetRoles rolesValue
-  policyValue <- requiredField
-    LengthRankingConfigurationContractObject
-    LengthRankingConfigurationCandidateCasePolicyField
-    "candidateCasePolicy"
-    object
-  casePolicy <- decodeCandidateCasePolicy policyValue
-  preconditionValue <- requiredField
-    LengthRankingConfigurationContractObject
-    LengthRankingConfigurationPreconditionField
-    "precondition"
-    object
-  (precondition, afterPrecondition) <- parseLengthFormula
-    LengthRankingConfigurationPreconditionSyntax
-    contractVariable
-    1
-    emptySyntaxUsage
-    preconditionValue
-  postconditionValue <- requiredField
-    LengthRankingConfigurationContractObject
-    LengthRankingConfigurationPostconditionField
-    "postcondition"
-    object
-  (postcondition, _) <- parseLengthFormula
-    LengthRankingConfigurationPostconditionSyntax
-    contractVariable
-    1
-    afterPrecondition
-    postconditionValue
-  providerLawsValue <- requiredField
-    LengthRankingConfigurationContractObject
-    LengthRankingConfigurationProviderLawsField
-    "providerLaws"
-    object
-  lawValues <- arrayField LengthRankingConfigurationProviderLawsField
-    providerLawsValue
-  boundedCollection LengthRankingConfigurationProviderLawsField
-    maximumProviderLaws lawValues
-  providerLaws <- decodeProviderLaws 0 emptySyntaxUsage lawValues
-  pure LeanLengthContract
-    { leanLengthContractSpine = spine
-    , leanLengthContractTargetArgumentRoles = targetRoles
-    , leanLengthContractCandidateCasePolicy = casePolicy
-    , leanLengthContractSource = LengthContractSource
-        { lengthContractPrecondition = precondition
-        , lengthContractPostcondition = postcondition
-        }
-    , leanLengthContractProviderLaws = providerLaws
-    }
+decodeLeanLengthContractValue = decodeContractValueWith contractVariable
+  $ \spine targetRoles casePolicy precondition postcondition providerLaws ->
+    LeanLengthContract
+      { leanLengthContractSpine = spine
+      , leanLengthContractTargetArgumentRoles = targetRoles
+      , leanLengthContractCandidateCasePolicy = casePolicy
+      , leanLengthContractSource = LengthContractSource
+          { lengthContractPrecondition = precondition
+          , lengthContractPostcondition = postcondition
+          }
+      , leanLengthContractProviderLaws = providerLaws
+      }
 
--- | Decode the current nominal binary-product contract shared by startup and
--- contract-only files.  The enclosing @rankingDomain@ is the sole domain
--- discriminator; the nested grammar retains a distinct variable and passive
--- source type without a redundant result-shape field.
+-- | The current nominal binary-product contract grammar.  The enclosing
+-- @rankingDomain@ is the sole domain discriminator; the nested grammar
+-- retains a distinct variable and passive source type without a redundant
+-- result-shape field.
 decodeLeanLengthSpinePairContractValue
   :: BoundedJsonValue
   -> Either LengthRankingConfigurationFileError LeanLengthSpinePairContract
-decodeLeanLengthSpinePairContractValue value = do
-  object <- exactObject LengthRankingConfigurationContractObject
-    contractFields value
-  spineValue <- requiredField
-    LengthRankingConfigurationContractObject
-    LengthRankingConfigurationSpineField
-    "spine"
-    object
-  spine <- decodeSpine spineValue
-  rolesValue <- requiredField
-    LengthRankingConfigurationContractObject
-    LengthRankingConfigurationTargetArgumentRolesField
-    "targetArgumentRoles"
-    object
-  targetRoles <- decodeTargetRoles rolesValue
-  policyValue <- requiredField
-    LengthRankingConfigurationContractObject
-    LengthRankingConfigurationCandidateCasePolicyField
-    "candidateCasePolicy"
-    object
-  casePolicy <- decodeCandidateCasePolicy policyValue
-  preconditionValue <- requiredField
-    LengthRankingConfigurationContractObject
-    LengthRankingConfigurationPreconditionField
-    "precondition"
-    object
-  (precondition, afterPrecondition) <- parseLengthFormula
-    LengthRankingConfigurationPreconditionSyntax
-    spinePairContractVariable
-    1
-    emptySyntaxUsage
-    preconditionValue
-  postconditionValue <- requiredField
-    LengthRankingConfigurationContractObject
-    LengthRankingConfigurationPostconditionField
-    "postcondition"
-    object
-  (postcondition, _) <- parseLengthFormula
-    LengthRankingConfigurationPostconditionSyntax
-    spinePairContractVariable
-    1
-    afterPrecondition
-    postconditionValue
-  providerLawsValue <- requiredField
-    LengthRankingConfigurationContractObject
-    LengthRankingConfigurationProviderLawsField
-    "providerLaws"
-    object
-  lawValues <- arrayField LengthRankingConfigurationProviderLawsField
-    providerLawsValue
-  boundedCollection LengthRankingConfigurationProviderLawsField
-    maximumProviderLaws lawValues
-  providerLaws <- decodeProviderLaws 0 emptySyntaxUsage lawValues
-  pure LeanLengthSpinePairContract
-    { leanLengthSpinePairContractSpine = spine
-    , leanLengthSpinePairContractTargetArgumentRoles = targetRoles
-    , leanLengthSpinePairContractCandidateCasePolicy = casePolicy
-    , leanLengthSpinePairContractSource = LengthSpinePairContractSource
-        { lengthSpinePairContractPrecondition = precondition
-        , lengthSpinePairContractPostcondition = postcondition
+decodeLeanLengthSpinePairContractValue =
+  decodeContractValueWith spinePairContractVariable
+    $ \spine targetRoles casePolicy precondition postcondition providerLaws ->
+      LeanLengthSpinePairContract
+        { leanLengthSpinePairContractSpine = spine
+        , leanLengthSpinePairContractTargetArgumentRoles = targetRoles
+        , leanLengthSpinePairContractCandidateCasePolicy = casePolicy
+        , leanLengthSpinePairContractSource = LengthSpinePairContractSource
+            { lengthSpinePairContractPrecondition = precondition
+            , lengthSpinePairContractPostcondition = postcondition
+            }
+        , leanLengthSpinePairContractProviderLaws = providerLaws
         }
-    , leanLengthSpinePairContractProviderLaws = providerLaws
-    }
 
 contractFields :: [(Text, LengthRankingConfigurationFileField)]
 contractFields =
@@ -1655,8 +1658,9 @@ parseLengthExpression phase decodeVariable depth usage value = do
         terms <- syntax phase $ syntaxArray argument
         syntaxCollection phase LengthRankingConfigurationSumTerms
           maximumSyntaxCollection terms
-        (parsed, afterTerms) <- parseExpressions phase decodeVariable
-          (depth + 1) afterNode terms
+        (parsed, afterTerms) <- parseSequence
+          (parseLengthExpression phase decodeVariable $ depth + 1)
+          afterNode terms
         Right (LengthSum parsed, afterTerms)
       "scale" -> do
         (factorValue, expressionValue) <- syntax phase
@@ -1708,22 +1712,21 @@ parseLengthExpression phase decodeVariable depth usage value = do
       phase decodeVariable (depth + 1) afterLeft rightValue
     Right (constructor left right, afterRight)
 
-parseExpressions
-  :: LengthRankingConfigurationSyntaxPhase
-  -> VariableDecoder variable
-  -> Natural
+-- | Parse one bounded sequence of sibling nodes with the given node parser,
+-- threading the syntax usage left to right and stopping at the first
+-- rejection.  Sum terms and @all@ clauses both go through here.
+parseSequence
+  :: (SyntaxUsage
+      -> BoundedJsonValue
+      -> Either LengthRankingConfigurationFileError (node, SyntaxUsage))
   -> SyntaxUsage
   -> [BoundedJsonValue]
-  -> Either
-      LengthRankingConfigurationFileError
-      ([LengthExpression variable], SyntaxUsage)
-parseExpressions _ _ _ usage [] = Right ([], usage)
-parseExpressions phase decodeVariable depth usage (value : remaining) = do
-  (expression, afterExpression) <- parseLengthExpression
-    phase decodeVariable depth usage value
-  (following, afterFollowing) <- parseExpressions
-    phase decodeVariable depth afterExpression remaining
-  Right (expression : following, afterFollowing)
+  -> Either LengthRankingConfigurationFileError ([node], SyntaxUsage)
+parseSequence _ usage [] = Right ([], usage)
+parseSequence parseNode usage (value : remaining) = do
+  (node, afterNode) <- parseNode usage value
+  (following, afterFollowing) <- parseSequence parseNode afterNode remaining
+  Right (node : following, afterFollowing)
 
 parseLengthFormula
   :: LengthRankingConfigurationSyntaxPhase
@@ -1755,8 +1758,9 @@ parseLengthFormula phase decodeVariable depth usage value = do
       formulas <- syntax phase $ syntaxArray argument
       syntaxCollection phase LengthRankingConfigurationAllClauses
         maximumSyntaxCollection formulas
-      (parsed, afterFormulas) <- parseFormulas phase decodeVariable
-        (depth + 1) afterNode formulas
+      (parsed, afterFormulas) <- parseSequence
+        (parseLengthFormula phase decodeVariable $ depth + 1)
+        afterNode formulas
       Right (LengthAll parsed, afterFormulas)
     _ -> syntax phase $ Left LengthRankingConfigurationUnknownTag
  where
@@ -1768,23 +1772,6 @@ parseLengthFormula phase decodeVariable depth usage value = do
     (right, afterRight) <- parseLengthExpression
       phase decodeVariable (depth + 1) afterLeft rightValue
     Right (constructor left right, afterRight)
-
-parseFormulas
-  :: LengthRankingConfigurationSyntaxPhase
-  -> VariableDecoder variable
-  -> Natural
-  -> SyntaxUsage
-  -> [BoundedJsonValue]
-  -> Either
-      LengthRankingConfigurationFileError
-      ([LengthFormula variable], SyntaxUsage)
-parseFormulas _ _ _ usage [] = Right ([], usage)
-parseFormulas phase decodeVariable depth usage (value : remaining) = do
-  (formula, afterFormula) <- parseLengthFormula
-    phase decodeVariable depth usage value
-  (following, afterFollowing) <- parseFormulas
-    phase decodeVariable depth afterFormula remaining
-  Right (formula : following, afterFollowing)
 
 enterSyntax
   :: LengthRankingConfigurationSyntaxPhase

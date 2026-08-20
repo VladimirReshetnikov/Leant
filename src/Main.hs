@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- | leant - a GHCi-style interactive REPL for Lean 4.
 --
@@ -10,7 +10,7 @@
 module Main (main) where
 
 import Control.Exception (SomeException, evaluate, finally, try)
-import Control.Monad (forM_, unless, when)
+import Control.Monad (forM_, unless, void, when)
 import Control.Monad.IO.Class (liftIO)
 import Data.Char
   (isAlpha, isAlphaNum, isAscii, isDigit, isLower, isSpace, isUpper, toLower)
@@ -26,7 +26,7 @@ import Data.List
   , stripPrefix
   , tails
   )
-import Data.Maybe (fromMaybe, isJust, listToMaybe)
+import Data.Maybe (fromMaybe, isJust, isNothing, listToMaybe, mapMaybe)
 import qualified Data.Set as Set
 import Data.Time.Clock (UTCTime, addUTCTime, diffUTCTime, getCurrentTime)
 import Data.Time.Format (defaultTimeLocale, formatTime)
@@ -101,8 +101,6 @@ import Leant.Synth.Engine
   , DetailedVerificationVariant
   , DetailedSynthOutcome (..)
   , SynthEngine (..)
-  , advanceDetailedSynthCursor
-  , candidateWindow
   , detailedCandidateBatchGroups
   , detailedCandidateBatchNotes
   , detailedCandidateGroupRoute
@@ -114,12 +112,13 @@ import Leant.Synth.Engine
   , parseSynthEngine
   , providerStages
   , startDetailedSynthCursor
-  , synthMaxShown
-  , synthMaxTried
-  , synthVerificationWindow
+  , advanceDetailedSynthCursorWith
   , synthEngineName
-  , synthesizeWithProvidersSkippingDetailed
-  , synthesizeTunedDetailed
+  , synthesizeWithProvidersSkippingDetailedWith
+  , synthesizeTunedDetailedWith
+  , SynthLimits (..)
+  , defaultSynthLimits
+  , synthVerificationWindowWith
   )
 import Leant.Synth.Fragment
   ( Frag (..)
@@ -137,7 +136,8 @@ import Leant.Synth.Fragment
   , parseUniqueGoalTranslation
   , parseProviderSexp
   , propAtoms
-  , providerProgram
+  , providerProgramWith
+  , defaultProviderCap
   , serializerProgram
   , stripRecCtors
   , synthPrelude
@@ -333,6 +333,26 @@ data ReplState = ReplState
   , rsSynthLibrary :: Bool
     -- ^ :set synth-library on|off - seed the search with curated
     -- library functions over the goal's recursive inductives
+  , rsSynthTimeout :: Int
+    -- ^ :set synth-timeout N - wall-clock seconds one :synth command may
+    -- search before answering "no answer, not a verdict"; 0 waits
+    -- indefinitely.  Seeded from LEANT_SYNTH_TIMEOUT (default 20).
+  , rsSynthLimits :: SynthLimits
+    -- ^ :set synth-shown / synth-verify / synth-window / synth-budget /
+    -- synth-queue - the retunable search bounds; 'defaultSynthLimits'
+    -- reproduces the historical constants
+  , rsSynthProviders :: Bool
+    -- ^ :set synth-providers on|off - discover live providers after the
+    -- structural baseline lane
+  , rsSynthProviderCap :: Int
+    -- ^ :set synth-provider-cap N - providers one discovery run may
+    -- serialize (default 80)
+  , rsSynthLibraryPremises :: Int
+    -- ^ :set synth-library-premises N - rated library offers kept per goal
+    -- (default 8)
+  , rsSynthDebug :: Bool
+    -- ^ :set synth-debug on|off - print fragments, providers, per-lane
+    -- outcomes, and metrics; seeded from LEANT_SYNTH_DEBUG
   , rsLengthAssessmentMode :: LengthAssessmentMode
     -- ^ Explicitly disabled by default. Enabled values come only from one
     -- bounded, activated configuration-file setup at process startup. Its
@@ -463,6 +483,11 @@ data SynthLaneCursorPolicy = SynthLaneCursorPolicy
   { synthLaneCursorBatchSize :: Int
   , synthLaneCursorAllowsFilterSuccessor :: Bool
   , synthLaneCursorRetainsRunNotes :: Bool
+  , synthLaneCursorWindow :: Int
+    -- ^ the cursor's hard cap on observed candidate groups
+    -- (@:set synth-window@)
+  , synthLaneCursorShown :: Int
+    -- ^ accepted groups a batch may keep (@:set synth-shown@)
   }
 
 -- | Why observation of one lazy engine outcome stopped.  Batch-policy
@@ -536,8 +561,8 @@ transcriptStart st mpath = do
       path <- case mpath of
         Just p -> pure p
         Nothing -> do
-          now <- getZonedTime
-          pure (formatTime defaultTimeLocale "leant-%Y%m%d-%H%M%S.log" now)
+          formatTime defaultTimeLocale "leant-%Y%m%d-%H%M%S.log"
+            <$> getZonedTime
       result <- try (openFile path AppendMode)
       case (result :: Either SomeException Handle) of
         Left err -> emitLn st =<< cRed st ("cannot open transcript file: " ++ show err)
@@ -743,7 +768,7 @@ respSorries v = fromMaybe [] $ do
 
 respFatal :: JValue -> Maybe String
 respFatal v = case jLookup "message" v of
-  Just (JStr m) | not (isJust (jLookup "env" v)) -> Just m
+  Just (JStr m) | isNothing (jLookup "env" v) -> Just m
   _ -> Nothing
 
 hasErrors :: JValue -> Bool
@@ -1121,7 +1146,7 @@ evalExpression st text = do
       checkResult <- runCurrentCmd st ("#check (" ++ text ++ ")")
       case checkResult of
         Right v | not (hasErrors v), Nothing <- respFatal v ->
-          () <$ printResponse st Nothing v
+          void (printResponse st Nothing v)
         _ -> do
           rawResult <- runCurrentCmd st text
           case rawResult of
@@ -1131,7 +1156,7 @@ evalExpression st text = do
             _ -> do
               printed <- printBuiltinInfo st text
               unless printed $ case evalResult of
-                Right v -> () <$ printResponse st Nothing v
+                Right v -> void (printResponse st Nothing v)
 
 printBuiltinInfo :: St -> String -> IO Bool
 printBuiltinInfo st token = case builtinInfo token of
@@ -1181,6 +1206,28 @@ helpText = unlines
   , "                           (on|off, default on)"
   , "  :set synth-library B     library premises for recursive inductives"
   , "                           (on|off, default on)"
+  , "  :set synth-timeout N     seconds a :synth may search before answering"
+  , "                           \"no answer\" (0 waits indefinitely; default"
+  , "                           20, or LEANT_SYNTH_TIMEOUT at startup)"
+  , "  :set synth-shown N       accepted candidates shown and bound (default 5)"
+  , "  :set synth-verify N      fresh candidate groups Lean checks per lane"
+  , "                           (default 12; the both engine sends twice that)"
+  , "  :set synth-window N      candidate groups a lane may observe (default 60)"
+  , "  :set synth-budget N|off  Djinn choice-point budget of the ordinary and"
+  , "                           provider lanes (default off = unbounded)"
+  , "  :set synth-queue N       Exference queue bound (default 1024)"
+  , "  :set synth-providers B   discover live providers after the structural"
+  , "                           lane (on|off, default on)"
+  , "  :set synth-provider-cap N"
+  , "                           providers one discovery may serialize (80)"
+  , "  :set synth-library-premises N"
+  , "                           rated library offers kept per goal (default 8)"
+  , "  :set synth-ratings       list the rated library functions"
+  , "  :set synth-debug B       print fragments, providers, lane outcomes, and"
+  , "                           metrics (on|off; LEANT_SYNTH_DEBUG at startup)"
+  , "  :set backend-timeout N   seconds per Lean request (default 300, or"
+  , "                           --timeout at startup; 0 = none)"
+  , "  :set                     show every synth setting"
   , "  :set OPT VAL             set_option OPT VAL (persists in the session)"
   , "  :undo                    revert the last state-changing command"
   , "  :reset                   clear definitions/snapshot (keeps imports)"
@@ -1263,42 +1310,97 @@ dispatchCommand st line = do
         ["synth-steps"] -> do
           steps <- rsSynthSteps <$> readIORef st
           emitLn st =<< cDim st ("synth steps: " ++ show steps)
-        ["synth-classical", value]
-          | value `elem` ["on", "true"] -> do
-              modifyIORef' st (\s -> s { rsSynthClassical = True })
-              emitLn st =<< cDim st "synth classical: on"
-          | value `elem` ["off", "false"] -> do
-              modifyIORef' st (\s -> s { rsSynthClassical = False })
-              emitLn st =<< cDim st "synth classical: off"
+        ["synth-classical", value] -> setSynthFlag st "synth-classical" value
+          (\enabled s -> s { rsSynthClassical = enabled })
+        ["synth-classical"] -> showSynthFlag st "synth-classical"
+          rsSynthClassical
+        ["synth-library", value] -> setSynthFlag st "synth-library" value
+          (\enabled s -> s { rsSynthLibrary = enabled })
+        ["synth-library"] -> showSynthFlag st "synth-library" rsSynthLibrary
+        ["synth-timeout", value] -> setSynthTimeoutLimit st "synth-timeout"
+          value "0 waits indefinitely" (\n s -> s { rsSynthTimeout = n })
+        ["synth-timeout"] -> showSynthTimeoutLimit st "synth-timeout"
+          rsSynthTimeout
+        ["synth-shown", value] -> setSynthLimit st "synth-shown" value
+          (\n l -> l { synthLimitShown = n })
+        ["synth-shown"] -> showSynthLimit st "synth-shown" synthLimitShown
+        ["synth-verify", value] -> do
+          setSynthLimit st "synth-verify" value
+            (\n l -> l { synthLimitTried = n })
+          noteFrontierClamp st
+        ["synth-verify"] -> showSynthLimit st "synth-verify" synthLimitTried
+        ["synth-window", value] -> do
+          setSynthLimit st "synth-window" value
+            (\n l -> l { synthLimitWindow = n })
+          noteFrontierClamp st
+        ["synth-window"] -> showSynthLimit st "synth-window" synthLimitWindow
+        ["synth-queue", value] -> setSynthLimit st "synth-queue" value
+          (\n l -> l { synthLimitQueue = n })
+        ["synth-queue"] -> showSynthLimit st "synth-queue" synthLimitQueue
+        ["synth-budget", value]
+          | value `elem` ["off", "none", "unbounded"] -> do
+              modifyIORef' st (\s -> s { rsSynthLimits =
+                (rsSynthLimits s) { synthLimitBudget = Nothing } })
+              emitLn st =<< cDim st "synth budget: off (unbounded)"
+          | [(n, "")] <- reads value, n > (0 :: Integer) -> do
+              modifyIORef' st (\s -> s { rsSynthLimits =
+                (rsSynthLimits s) { synthLimitBudget = Just n } })
+              emitLn st =<< cDim st ("synth budget: " ++ show n)
           | otherwise -> emitLn st =<< cRed st
-              "usage: :set synth-classical on|off"
-        ["synth-classical"] -> do
-          enabled <- rsSynthClassical <$> readIORef st
-          emitLn st =<< cDim st
-            ("synth classical: " ++ if enabled then "on" else "off")
-        ["synth-library", value]
-          | value `elem` ["on", "true"] -> do
-              modifyIORef' st (\s -> s { rsSynthLibrary = True })
-              emitLn st =<< cDim st "synth library: on"
-          | value `elem` ["off", "false"] -> do
-              modifyIORef' st (\s -> s { rsSynthLibrary = False })
-              emitLn st =<< cDim st "synth library: off"
+              "usage: :set synth-budget N|off   (Djinn choice points)"
+        ["synth-budget"] -> do
+          budget <- synthLimitBudget <$> synthLimitsOf st
+          emitLn st =<< cDim st ("synth budget: " ++ showSynthBudget budget)
+        ["synth-providers", value] -> setSynthFlag st "synth-providers" value
+          (\enabled s -> s { rsSynthProviders = enabled })
+        ["synth-providers"] -> showSynthFlag st "synth-providers"
+          rsSynthProviders
+        ["synth-provider-cap", value]
+          | [(n, "")] <- reads value, n > (0 :: Int) -> do
+              -- The inventory cache is keyed by provider world and query, so
+              -- a cached answer would outlive the cap that produced it.
+              modifyIORef' st (\s -> s
+                { rsSynthProviderCap = n
+                , rsProviderCache = clearProviderCache (rsProviderCache s)
+                })
+              emitLn st =<< cDim st ("synth provider cap: " ++ show n)
           | otherwise -> emitLn st =<< cRed st
-              "usage: :set synth-library on|off"
-        ["synth-library"] -> do
-          enabled <- rsSynthLibrary <$> readIORef st
-          emitLn st =<< cDim st
-            ("synth library: " ++ if enabled then "on" else "off")
-        _ | null arg ->
-              emitLn st =<< cRed st "usage: :set OPTION VALUE"
-          | otherwise -> do
-              result <- runCurrentCmd st ("set_option " ++ arg)
-              case result of
-                Left err -> emitLn st =<< cRed st err
-                Right v -> do
-                  errored <- printResponse st Nothing v
-                  unless errored
-                    (advanceEnv st (respEnv v) ("set_option " ++ arg))
+              "usage: :set synth-provider-cap N   (a positive count)"
+        ["synth-provider-cap"] -> do
+          n <- rsSynthProviderCap <$> readIORef st
+          emitLn st =<< cDim st ("synth provider cap: " ++ show n)
+        ["synth-library-premises", value]
+          | [(n, "")] <- reads value, n >= (0 :: Int) -> do
+              modifyIORef' st (\s -> s { rsSynthLibraryPremises = n })
+              emitLn st =<< cDim st ("synth library premises: " ++ show n)
+          | otherwise -> emitLn st =<< cRed st
+              "usage: :set synth-library-premises N   (offers kept per goal)"
+        ["synth-library-premises"] -> do
+          n <- rsSynthLibraryPremises <$> readIORef st
+          emitLn st =<< cDim st ("synth library premises: " ++ show n)
+        ["synth-ratings"] -> do
+          ratings <- rsRatings <$> readIORef st
+          if null ratings
+            then emitLn st =<< cDim st "(no rated library functions)"
+            else forM_ ratings $ \(name, rating) ->
+              emitLn st =<< cDim st (name ++ "  " ++ show rating)
+        ["synth-debug", value] -> setSynthFlag st "synth-debug" value
+          (\enabled s -> s { rsSynthDebug = enabled })
+        ["synth-debug"] -> showSynthFlag st "synth-debug" rsSynthDebug
+        ["backend-timeout", value] -> setSynthTimeoutLimit st "backend-timeout"
+          value "0 removes the limit"
+          (\n s -> s { rsTimeout = if n <= 0 then Nothing else Just n })
+        ["backend-timeout"] -> showSynthTimeoutLimit st "backend-timeout"
+          (fromMaybe 0 . rsTimeout)
+        [] -> showSynthSettings st
+        _ -> do
+          result <- runCurrentCmd st ("set_option " ++ arg)
+          case result of
+            Left err -> emitLn st =<< cRed st err
+            Right v -> do
+              errored <- printResponse st Nothing v
+              unless errored
+                (advanceEnv st (respEnv v) ("set_option " ++ arg))
       pure True
     "undo" -> do
       state <- readIORef st
@@ -1354,7 +1456,7 @@ dispatchCommand st line = do
       forM_ (rsSnapshotBase state) $ \snapshot ->
         emitLn st =<< cDim st ("(history starts after snapshot base "
           ++ snapshotSourcePath snapshot ++ ")")
-      let history = filter (not . isJust . generatedItBinding)
+      let history = filter (isNothing . generatedItBinding)
             (rsHistory state)
       if null history
         then emitLn st =<< cDim st "(empty)"
@@ -1423,8 +1525,8 @@ cmdType st rawArg
         Right v
           | hasErrors v || isJust (respFatal v) -> do
               printed <- printBuiltinInfo st arg
-              unless printed (() <$ printResponse st Nothing v)
-          | otherwise -> () <$ printResponse st Nothing v
+              unless printed (void (printResponse st Nothing v))
+          | otherwise -> void (printResponse st Nothing v)
 
 cmdInfo :: St -> String -> IO ()
 cmdInfo st arg
@@ -1438,12 +1540,12 @@ cmdInfo st arg
               checkResult <- runCurrentCmd st ("#check (" ++ arg ++ ")")
               case checkResult of
                 Right cv | not (hasErrors cv), Nothing <- respFatal cv ->
-                  () <$ printResponse st Nothing cv
+                  void (printResponse st Nothing cv)
                 _ -> do
                   printed <- printBuiltinInfo st arg
-                  unless printed (() <$ printResponse st Nothing v)
-          | otherwise -> () <$ printResponse st
-              (Just (\t -> formatInfo t `orElse` indentDefBody t)) v
+                  unless printed (void (printResponse st Nothing v))
+          | otherwise -> void (printResponse st
+              (Just (\t -> formatInfo t `orElse` indentDefBody t)) v)
  where
   orElse (Just x) _ = Just x
   orElse Nothing y = y
@@ -1580,18 +1682,7 @@ browseProgram showAll nameComponents = unlines $
   ]
   ++ (if showAll then
   [ "  let keep (n : Name) : Bool := !n.isInternal" ]
-  else
-  [ "  let aux : List String :="
-  , "    [\"rec\", \"recOn\", \"casesOn\", \"brecOn\", \"binductionOn\","
-  , "     \"below\", \"ibelow\", \"noConfusion\", \"noConfusionType\","
-  , "     \"ctorElim\", \"ctorElimType\", \"ctorIdx\", \"sizeOf_spec\","
-  , "     \"injEq\", \"inj\", \"eq_def\", \"decEq\"]"
-  , "  let keep (n : Name) : Bool :="
-  , "    !n.isInternalDetail &&"
-  , "    !n.components.any fun c => match c with"
-  , "      | .str _ s => aux.contains s"
-  , "      | _ => false"
-  ])
+  else generatedFilterLines)
   ++
   [ "  let names := env.constants.fold (init := #[]) fun a n _ =>"
   , "    if pre.isPrefixOf n && keep n then a.push n else a"
@@ -1695,7 +1786,7 @@ cmdDoc st rawArg = do
           result <- runCmd st (Just env) program
           case result of
             Left err -> emitLn st =<< cRed st err
-            Right v -> () <$ printResponse st Nothing v
+            Right v -> void (printResponse st Nothing v)
 
 cmdSearch :: St -> Bool -> String -> IO ()
 cmdSearch st byType arg
@@ -1710,7 +1801,7 @@ cmdSearch st byType arg
             message <- cRed st ":search? needs the `exact?` tactic \8212 "
             hint <- cBold st ":import Mathlib.Tactic"
             emitLn st (message ++ "try " ++ hint)
-          | otherwise -> () <$ printResponse st Nothing v
+          | otherwise -> void (printResponse st Nothing v)
   | otherwise = do
       envOr <- ensureBrowseEnv st
       case envOr of
@@ -1743,7 +1834,7 @@ cmdSearch st byType arg
           result <- runCmd st (Just env) program
           case result of
             Left err -> emitLn st =<< cRed st err
-            Right v -> () <$ printResponse st Nothing v
+            Right v -> void (printResponse st Nothing v)
           history <- rsHistory <$> readIORef st
           let matching = [ n | n <- concatMap sessionDeclNames history
                          , lower arg `isInfixOf` lower n ]
@@ -1947,13 +2038,135 @@ providerCacheCapacity = 12
 -- | Wall-clock guard on the engine, in seconds (0 waits indefinitely).
 -- Propositional goals answer in microseconds, but bounded hypothesis
 -- instantiation can widen a quantified goal's space enough to run for
--- minutes, which an interactive REPL must not do silently.
-synthTimeoutSeconds :: IO Int
-synthTimeoutSeconds = do
+-- minutes, which an interactive REPL must not do silently.  The session
+-- setting is read at each :synth; ':set synth-timeout N' changes it and
+-- LEANT_SYNTH_TIMEOUT seeds it at startup.
+synthTimeoutSeconds :: St -> IO Int
+synthTimeoutSeconds st = rsSynthTimeout <$> readIORef st
+
+-- | Print every :synth session setting with its current value.
+showSynthSettings :: St -> IO ()
+showSynthSettings st = do
+  state <- readIORef st
+  let limits = rsSynthLimits state
+      row name value = emitLn st =<< cDim st (name ++ ": " ++ value)
+  row "synth-engine" (synthEngineName (rsSynthEngine state))
+  row "synth-steps" (show (rsSynthSteps state))
+  row "synth-queue" (show (synthLimitQueue limits))
+  row "synth-budget" (showSynthBudget (synthLimitBudget limits))
+  row "synth-window" (show (synthLimitWindow limits))
+  row "synth-verify" (show (synthLimitTried limits))
+  row "synth-shown" (show (synthLimitShown limits))
+  row "synth-classical" (onOffLabel (rsSynthClassical state))
+  row "synth-library" (onOffLabel (rsSynthLibrary state))
+  row "synth-library-premises" (show (rsSynthLibraryPremises state))
+  row "synth-providers" (onOffLabel (rsSynthProviders state))
+  row "synth-provider-cap" (show (rsSynthProviderCap state))
+  row "synth-timeout" (showSynthTimeout (rsSynthTimeout state))
+  row "backend-timeout" (showSynthTimeout (fromMaybe 0 (rsTimeout state)))
+  row "synth-debug" (onOffLabel (rsSynthDebug state))
+
+-- | How a setting names itself in its own report: the option spelling with
+-- its separators opened up, as every ':set' report has always printed it.
+settingLabel :: String -> String
+settingLabel = map (\c -> if c == '-' then ' ' else c)
+
+-- | Set one positive integer field of the retunable search bounds.
+setSynthLimit
+  :: St -> String -> String -> (Int -> SynthLimits -> SynthLimits) -> IO ()
+setSynthLimit st name value update = case reads value of
+  [(n, "")] | n > (0 :: Int) -> do
+    modifyIORef' st (\s -> s { rsSynthLimits = update n (rsSynthLimits s) })
+    emitLn st =<< cDim st (settingLabel name ++ ": " ++ show n)
+  _ -> emitLn st =<< cRed st
+    ("usage: :set " ++ name ++ " N   (a positive count)")
+
+-- | Show one field of the retunable search bounds.
+showSynthLimit :: St -> String -> (SynthLimits -> Int) -> IO ()
+showSynthLimit st name project = do
+  n <- project <$> synthLimitsOf st
+  emitLn st =<< cDim st (settingLabel name ++ ": " ++ show n)
+
+-- | Set one wall clock, in whole seconds; both clocks read @0@ as "no
+-- limit" and report themselves the same way.
+setSynthTimeoutLimit
+  :: St -> String -> String -> String -> (Int -> ReplState -> ReplState)
+  -> IO ()
+setSynthTimeoutLimit st name value zeroMeaning update = case reads value of
+  [(n, "")] | n >= (0 :: Int) -> do
+    modifyIORef' st (update n)
+    emitLn st =<< cDim st (settingLabel name ++ ": " ++ showSynthTimeout n)
+  _ -> emitLn st =<< cRed st
+    ("usage: :set " ++ name ++ " N   (seconds; " ++ zeroMeaning ++ ")")
+
+-- | Show one wall clock.
+showSynthTimeoutLimit :: St -> String -> (ReplState -> Int) -> IO ()
+showSynthTimeoutLimit st name project = do
+  limit <- project <$> readIORef st
+  emitLn st =<< cDim st (settingLabel name ++ ": " ++ showSynthTimeout limit)
+
+-- | Set one @on@ / @off@ session switch.
+setSynthFlag :: St -> String -> String -> (Bool -> ReplState -> ReplState)
+  -> IO ()
+setSynthFlag st name value update
+  | value `elem` ["on", "true"] = accept True
+  | value `elem` ["off", "false"] = accept False
+  | otherwise = emitLn st =<< cRed st ("usage: :set " ++ name ++ " on|off")
+ where
+  accept enabled = do
+    modifyIORef' st (update enabled)
+    emitLn st =<< cDim st (settingLabel name ++ ": " ++ onOffLabel enabled)
+
+-- | Show one @on@ / @off@ session switch.
+showSynthFlag :: St -> String -> (ReplState -> Bool) -> IO ()
+showSynthFlag st name project = do
+  enabled <- project <$> readIORef st
+  emitLn st =<< cDim st (settingLabel name ++ ": " ++ onOffLabel enabled)
+
+-- | How every switch reports its state.
+onOffLabel :: Bool -> String
+onOffLabel enabled = if enabled then "on" else "off"
+
+-- | Report the clamp when the candidate window is narrower than the
+-- verification frontier: 'admissibleCursorBatch' silently narrows the batch,
+-- so the two settings say so together rather than disagreeing in silence.
+noteFrontierClamp :: St -> IO ()
+noteFrontierClamp st = do
+  state <- readIORef st
+  let limits = rsSynthLimits state
+      frontier = synthVerificationWindowWith limits (rsSynthEngine state)
+      admitted = admissibleCursorBatch limits frontier
+  when (admitted /= frontier) $ emitLn st =<< cDim st
+    ("note: each lane verifies " ++ show admitted ++ " groups, clamped by "
+     ++ "synth-window " ++ show (synthLimitWindow limits))
+
+-- | How ':set synth-budget' reports the setting.
+showSynthBudget :: Maybe Integer -> String
+showSynthBudget = maybe "off (unbounded)" show
+
+-- | The session's retunable search bounds.
+synthLimitsOf :: St -> IO SynthLimits
+synthLimitsOf st = rsSynthLimits <$> readIORef st
+
+-- | Whether ':set synth-debug on' (or LEANT_SYNTH_DEBUG at startup) is in
+-- force for this session.
+synthDebugEnabled :: St -> IO Bool
+synthDebugEnabled = fmap rsSynthDebug . readIORef
+
+-- | How ':set synth-timeout' and ':set backend-timeout' report a limit.
+showSynthTimeout :: Int -> String
+showSynthTimeout n
+  | n <= 0 = "0 (wait indefinitely)"
+  | otherwise = show n ++ "s"
+
+-- | The startup value of the :synth wall clock: LEANT_SYNTH_TIMEOUT when it
+-- is a whole number of seconds (0 = wait indefinitely), otherwise 20.
+initialSynthTimeoutSeconds :: IO Int
+initialSynthTimeoutSeconds = do
   setting <- lookupEnv "LEANT_SYNTH_TIMEOUT"
   pure $ case setting >>= readMaybeInt of
-    Just n -> n
-    Nothing -> 20
+    Just n | n >= 0 -> n
+    _ -> 20
  where
   readMaybeInt text = case reads (trim text) of
     [(n, "")] -> Just n
@@ -2169,7 +2382,7 @@ mentionsMarker marker text = any ends (tails text)
 autoShapedTokens :: String -> [String]
 autoShapedTokens text = nub (go Nothing text)
  where
-  go prev s = case span (not . identChar) s of
+  go prev s = case break identChar s of
     (_, []) -> []
     (skipped, s') ->
       let (t, rest) = span identChar s'
@@ -2212,8 +2425,8 @@ synthGo
   -> ParsedGoal
   -> IO ()
 synthGo assessmentContext st args retriedVars goal parsed = do
-  debugFrag <- lookupEnv "LEANT_SYNTH_DEBUG"
-  when (isJust debugFrag) $
+  debugFrag <- synthDebugEnabled st
+  when debugFrag $
     emitLn st =<< cDim st ("debug fragment: " ++ show (pgFrag parsed))
   synthGo' assessmentContext st args retriedVars goal parsed
 
@@ -2230,17 +2443,20 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
   let fragment = pgFrag parsed
       engine = rsSynthEngine state
       refusal = fragRefusal fragment
+      limits = rsSynthLimits state
       libraryPremises
         | rsSynthLibrary state =
-            selectLibraryPremises (rsRatings state) parsed
+            selectLibraryPremises (rsSynthLibraryPremises state)
+              (rsRatings state) parsed
         | otherwise = []
       -- A live value can inhabit an otherwise opaque atomic goal, but it
       -- cannot repair a structural translation that stopped at FDepth.
-      discoverProviders = case refusal of
+      -- ':set synth-providers off' skips discovery altogether.
+      discoverProviders = rsSynthProviders state && case refusal of
         Nothing -> True
         Just _ -> fragProviderMayOpen fragment
-      -- A live provider inventory can add eighty values to either engine's
-      -- search.  Preserve the ordinary structural search as an isolated first
+      -- A live provider inventory can add a capped batch of values to
+      -- either engine's search (@:set synth-provider-cap@, default eighty).  Preserve the ordinary structural search as an isolated first
       -- lane: if one of its candidates survives Lean verification, discovering
       -- providers cannot improve whether the goal is solved and must not crowd
       -- that term out.  A provider-free Djinn refutation is retained as a
@@ -2248,19 +2464,19 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
       -- verified provider candidate must still get a chance to win.  Atomic/
       -- provider-open refusals go straight to the provider lane because the
       -- baseline has no usable structure.
-      structuralFirst = refusal == Nothing
-  debug <- lookupEnv "LEANT_SYNTH_DEBUG"
-  when (structuralFirst && isJust debug) $
+      structuralFirst = isNothing refusal
+  debug <- synthDebugEnabled st
+  when (structuralFirst && debug) $
     forM_ libraryPremises $ \(name, premise) ->
       emitLn st =<< cDim st
         ("debug premise: " ++ name ++ " : " ++ show premise)
-  limit <- synthTimeoutSeconds
+  limit <- synthTimeoutSeconds st
   started <- getCurrentTime
   let deadline
         | limit <= 0 = Nothing
         | otherwise = Just (addUTCTime (fromIntegral limit) started)
       runSynthesis includeLibrary checked laneEngine providers accumulation =
-        let base = synthesizeWithProvidersSkippingDetailed
+        let base = synthesizeWithProvidersSkippingDetailedWith limits
               laneEngine (rsSynthSteps state) checked providers fragment
             -- Library premises are an isolated, deliberately budgeted
             -- extension of the structural lane.  Their candidates lead the
@@ -2270,15 +2486,16 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
             outcome
               | includeLibrary && not (null libraryPremises) =
                   mergeLibraryDetailedOutcomes base
-                    (synthesizeTunedDetailed laneEngine (rsSynthSteps state)
-                      (candidateWindow, Just 100000)
+                    (synthesizeTunedDetailedWith limits laneEngine
+                      (rsSynthSteps state)
+                      (synthLimitWindow limits, Just 100000)
                       [ (name, stripRecCtors premise)
                       | (name, premise) <- libraryPremises
                       ]
                       (stripRecCtors fragment) fragment)
               | otherwise = base
         in runSynthLaneCursor assessmentContext
-          (ordinarySynthLaneCursorPolicy assessmentContext laneEngine)
+          (ordinarySynthLaneCursorPolicy assessmentContext laneEngine limits)
           deadline st goal id outcome accumulation
   if structuralFirst
     then do
@@ -2387,13 +2604,13 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
       { synthLaneRunEnd = SynthLaneRunTimedOut } = do
     _ <- finalizeSynthLaneAccumulation st args goal
       (synthLaneRunAccumulation laneRun)
-    limit <- synthTimeoutSeconds
+    limit <- synthTimeoutSeconds st
     emitLn st =<< cYellow st
       ("the engine did not finish within " ++ show limit
        ++ "s \8212 no answer, not a verdict")
     emitLn st =<< cDim st
       ("(bounded hypothesis instantiation can widen the search a lot; "
-       ++ "set LEANT_SYNTH_TIMEOUT to another number of seconds, "
+       ++ ":set synth-timeout N chooses another number of seconds, "
        ++ "or 0 to wait indefinitely)")
   report _ laneRun@SynthLaneRun
       { synthLaneRunEnd = SynthLaneRunCursorAdmissionFailed err } = do
@@ -2492,9 +2709,7 @@ loadSynthProviders st query = do
     let (result, cache') = lookupProviderCache
           (rsProviderWorld state) query (rsProviderCache state)
     in (state { rsProviderCache = cache' }, result)
-  case cached of
-    Just providers -> pure providers
-    Nothing -> discover
+  maybe discover pure cached
  where
   discover = do
     envOr <- ensureSynthEnv st
@@ -2505,7 +2720,8 @@ loadSynthProviders st query = do
         let world = rsProviderWorld state
             sessionNames = nub
               (concatMap sessionDeclNames (rsHistory state))
-        result <- runCmd st (Just env) (providerProgram sessionNames query)
+        result <- runCmd st (Just env)
+          (providerProgramWith (rsSynthProviderCap state) sessionNames query)
         case result of
           Right response
             | not (hasErrors response), Nothing <- respFatal response ->
@@ -2525,8 +2741,8 @@ loadSynthProviders st query = do
                                 (rsProviderCache current)
                             }
                           else current
-                      debug <- lookupEnv "LEANT_SYNTH_DEBUG"
-                      when (isJust debug) $
+                      debug <- synthDebugEnabled st
+                      when debug $
                         forM_ providers $ \provider ->
                           emitLn st =<< cDim st
                             ("debug provider: " ++ show provider)
@@ -2537,8 +2753,8 @@ loadSynthProviders st query = do
           Right _ -> unavailable "Lean rejected provider discovery"
 
   unavailable reason = do
-    debug <- lookupEnv "LEANT_SYNTH_DEBUG"
-    when (isJust debug) $
+    debug <- synthDebugEnabled st
+    when debug $
       emitLn st =<< cDim st ("provider inventory unavailable: " ++ reason)
     pure []
 
@@ -2614,8 +2830,9 @@ loadRatings = do
 -- arguments - breaking ties.  The order matters beyond the cap: the
 -- engine tries antecedents oldest-first, so the front of this list is
 -- the front of the search.
-selectLibraryPremises :: [(String, Double)] -> ParsedGoal -> [(String, Frag)]
-selectLibraryPremises ratings parsed = take 8 (sortOn rank offered)
+selectLibraryPremises
+  :: Int -> [(String, Double)] -> ParsedGoal -> [(String, Frag)]
+selectLibraryPremises kept ratings parsed = take kept (sortOn rank offered)
  where
   goalKeys = fragRecKeys (pgFrag parsed)
   offered = nubBy (\x y -> snd x == snd y)
@@ -2669,6 +2886,15 @@ mergeLibraryDetailedOutcomes base lib = case (base, lib) of
     DetailedSynthNoTerm notes -> notes
     DetailedSynthRefuted _ -> []
 
+-- | The batch a lane may request of its cursor: at least one group, and
+-- never more than the window the cursor observes through.  The two bounds
+-- are independent settings (@:set synth-verify@ and @:set synth-window@),
+-- so a session may name a window below the verification frontier; clamping
+-- keeps such a session searching instead of failing cursor admission.
+admissibleCursorBatch :: SynthLimits -> Int -> Int
+admissibleCursorBatch limits requested =
+  max 1 (min requested (synthLimitWindow limits))
+
 -- | Ordinary rank and disabled commands retain one established verification
 -- window.  Filtering may consume exactly one returned successor, giving
 -- standalone engines 12+12 groups and the combined engine 24+24 without
@@ -2676,15 +2902,19 @@ mergeLibraryDetailedOutcomes base lib = case (base, lib) of
 ordinarySynthLaneCursorPolicy
   :: LengthAssessmentContext command
   -> SynthEngine
+  -> SynthLimits
   -> SynthLaneCursorPolicy
-ordinarySynthLaneCursorPolicy assessmentContext engine =
+ordinarySynthLaneCursorPolicy assessmentContext engine limits =
   SynthLaneCursorPolicy
-    { synthLaneCursorBatchSize = synthVerificationWindow engine
+    { synthLaneCursorBatchSize =
+        admissibleCursorBatch limits (synthVerificationWindowWith limits engine)
     , synthLaneCursorAllowsFilterSuccessor = case
         lengthAssessmentContextBehaviorMode assessmentContext of
           LengthBehaviorRank -> False
           LengthBehaviorFilter -> True
     , synthLaneCursorRetainsRunNotes = True
+    , synthLaneCursorWindow = synthLimitWindow limits
+    , synthLaneCursorShown = synthLimitShown limits
     }
 
 -- | Admit and force one opaque cursor step before the command's absolute
@@ -2693,13 +2923,14 @@ ordinarySynthLaneCursorPolicy assessmentContext engine =
 -- @LEANT_SYNTH_TIMEOUT=0@ wait-forever behavior.
 runDetailedSynthCursorBefore
   :: Int
+  -> Int
   -> Maybe UTCTime
   -> DetailedSynthCursor
   -> IO
       (Maybe
         (Either DetailedSynthCursorError DetailedSynthCursorStep))
-runDetailedSynthCursorBefore requested deadline cursor =
-  case advanceDetailedSynthCursor requested cursor of
+runDetailedSynthCursorBefore requested window deadline cursor =
+  case advanceDetailedSynthCursorWith window requested cursor of
     Left err -> pure (Just (Left err))
     Right step -> case deadline of
       Nothing ->
@@ -2724,12 +2955,13 @@ runDetailedSynthCursorBefore requested deadline cursor =
 classicalSynthLaneDeadline
   :: LengthAssessmentContext command
   -> Maybe UTCTime
+  -> St
   -> IO (Maybe UTCTime)
-classicalSynthLaneDeadline assessmentContext commandDeadline =
+classicalSynthLaneDeadline assessmentContext commandDeadline st =
   case lengthAssessmentContextBehaviorMode assessmentContext of
     LengthBehaviorFilter -> pure commandDeadline
     LengthBehaviorRank -> do
-      limit <- synthTimeoutSeconds
+      limit <- synthTimeoutSeconds st
       if limit <= 0
         then pure Nothing
         else do
@@ -2757,7 +2989,8 @@ runSynthLaneCursor assessmentContext policy deadline st goal transform outcome
  where
   observe batchOrdinal groupCount reverseOutcomes runNotes cursor = do
     forced <- runDetailedSynthCursorBefore
-      (synthLaneCursorBatchSize policy) deadline cursor
+      (synthLaneCursorBatchSize policy) (synthLaneCursorWindow policy)
+      deadline cursor
     case forced of
       Nothing -> finish reverseOutcomes groupCount runNotes
         SynthLaneRunTimedOut
@@ -2773,18 +3006,15 @@ runSynthLaneCursor assessmentContext policy deadline st goal transform outcome
           lane <- verifySynthLane assessmentContext
             (synthLaneCursorBatchSize policy) st goal [] groups
           let reverseOutcomes' = lane : reverseOutcomes
-          case synthLaneDisposition lane of
+          case synthLaneDispositionWith (synthLaneCursorShown policy) lane of
             SynthLaneSurvivors _ _ ->
               finish reverseOutcomes' nextCount notes
                 SynthLaneRunStoppedByDisposition
             SynthLaneAssessmentPreserved _ _ ->
               finish reverseOutcomes' nextCount notes
                 SynthLaneRunStoppedByDisposition
-            SynthLaneNoVerified -> continueOrStop batchOrdinal nextCount
-              reverseOutcomes' notes successor
-            SynthLaneAllBehaviorallyRejected _ ->
-              continueOrStop batchOrdinal nextCount reverseOutcomes' notes
-                successor
+            SynthLaneNoVerified -> continueOrStop batchOrdinal nextCount reverseOutcomes' notes successor
+            SynthLaneAllBehaviorallyRejected _ -> continueOrStop batchOrdinal nextCount reverseOutcomes' notes successor
         DetailedSynthCursorNaturallyExhausted notes ->
           finish reverseOutcomes groupCount notes
             SynthLaneRunNaturallyExhausted
@@ -2828,7 +3058,7 @@ runSynthLaneCursor assessmentContext policy deadline st goal transform outcome
   -- they stay solely on the run receipt for the final diagnostic.
   attachNotesToRightmostHandled _ [] = []
   attachNotesToRightmostHandled notes (lane : earlier) =
-    case synthLaneDisposition lane of
+    case synthLaneDispositionWith (synthLaneCursorShown policy) lane of
       SynthLaneNoVerified ->
         lane : attachNotesToRightmostHandled notes earlier
       SynthLaneSurvivors _ _ ->
@@ -2842,8 +3072,8 @@ runSynthLaneCursor assessmentContext policy deadline st goal transform outcome
 -- than restarting at one for a filter successor batch.
 debugSynthLaneGroups :: St -> Int -> [DetailedCandidateGroup] -> IO ()
 debugSynthLaneGroups st priorGroupCount groups = do
-  debug <- lookupEnv "LEANT_SYNTH_DEBUG"
-  when (isJust debug) $
+  debug <- synthDebugEnabled st
+  when debug $
     forM_ (zip [priorGroupCount + 1 ..] groups) $ \(i, group) ->
       forM_ (detailedCandidateGroupVariants group) $ \variant ->
         emitLn st =<< cDim st ("debug " ++ show i ++ ": " ++ variant)
@@ -2877,6 +3107,7 @@ synthClassical assessmentContext commandDeadline st goal parsed accumulation =
     state <- readIORef st
     let engine = rsSynthEngine state
         steps = rsSynthSteps state
+        limits = rsSynthLimits state
         -- route 1: an excluded-middle premise per atomic subformula.
         -- For a propositional body, intuitionistic + atom-instances of
         -- em is exactly classical, so this is complete whenever the
@@ -2899,20 +3130,23 @@ synthClassical assessmentContext commandDeadline st goal parsed accumulation =
         -- retains its established choice-point cutoff and half-window.  It
         -- never consumes a successor, including in filter mode.
         emDeadline <- classicalSynthLaneDeadline
-          assessmentContext commandDeadline
+          assessmentContext commandDeadline st
         emRun <- runSynthLaneCursor assessmentContext
           SynthLaneCursorPolicy
-            { synthLaneCursorBatchSize = synthMaxTried `div` 2
+            { synthLaneCursorBatchSize =
+                admissibleCursorBatch limits (synthLimitTried limits `div` 2)
             , synthLaneCursorAllowsFilterSuccessor = False
             , synthLaneCursorRetainsRunNotes = False
+            , synthLaneCursorWindow = synthLimitWindow limits
+            , synthLaneCursorShown = synthLimitShown limits
             }
           emDeadline st goal id
-          (synthesizeTunedDetailed engine steps
-            (synthMaxTried, Just 100000)
+          (synthesizeTunedDetailedWith limits engine steps
+            (synthLimitTried limits, Just 100000)
             emPremises emEngineFrag (pgFrag parsed))
           accumulation
-        debug <- lookupEnv "LEANT_SYNTH_DEBUG"
-        when (isJust debug) $ emitLn st =<< cDim st
+        debug <- synthDebugEnabled st
+        when debug $ emitLn st =<< cDim st
           ("debug em outcome: " ++ debugSynthLaneRun emRun)
         case synthLaneRunEnd emRun of
           SynthLaneRunStoppedByDisposition ->
@@ -2921,6 +3155,7 @@ synthClassical assessmentContext commandDeadline st goal parsed accumulation =
             (synthLaneRunAccumulation emRun)
  where
   runDoubleNegation engine steps prefix body accumulation' = do
+      limits <- synthLimitsOf st
       -- route 2: the double-negation translation, wrapped in
       -- Classical.byContradiction (complete by Glivenko's theorem)
       let nnFrag =
@@ -2936,17 +3171,17 @@ synthClassical assessmentContext commandDeadline st goal parsed accumulation =
                 ++ unwords binders ++ ")"
           djinnCandidateCutoff = case
               lengthAssessmentContextBehaviorMode assessmentContext of
-            LengthBehaviorRank -> synthMaxTried
-            LengthBehaviorFilter -> candidateWindow
+            LengthBehaviorRank -> synthLimitTried limits
+            LengthBehaviorFilter -> synthLimitWindow limits
           ordinaryPolicy = ordinarySynthLaneCursorPolicy
-            assessmentContext engine
+            assessmentContext engine limits
           nnPolicy = ordinaryPolicy
             { synthLaneCursorRetainsRunNotes = False }
       nnDeadline <- classicalSynthLaneDeadline
-        assessmentContext commandDeadline
+        assessmentContext commandDeadline st
       nnRun <- runSynthLaneCursor assessmentContext nnPolicy nnDeadline st goal
         (mapDetailedCandidateGroupVariantsDroppingSemanticSidecar wrap)
-        (synthesizeTunedDetailed engine steps
+        (synthesizeTunedDetailedWith limits engine steps
           (djinnCandidateCutoff, Nothing) [] nnFrag nnFrag)
         accumulation'
       pure (synthLaneRunAccumulation nnRun)
@@ -2993,9 +3228,10 @@ verifySynthLane assessmentContext groupLimit st goal notes groups =
       , synthLaneAssessed = Nothing
       }
     boundedGroups -> do
+      shown <- synthLimitShown <$> synthLimitsOf st
       let successQuota = case
             lengthAssessmentContextBehaviorMode assessmentContext of
-              LengthBehaviorRank -> synthMaxShown
+              LengthBehaviorRank -> shown
               LengthBehaviorFilter -> groupLimit
       (verification, callbackAttempts) <- synthVerify successQuota st goal
         (map detailedCandidateGroupVerificationVariants boundedGroups)
@@ -3021,8 +3257,10 @@ verifySynthLane assessmentContext groupLimit st goal notes groups =
 -- only for survivor/preserve-all output; rejection rows retain the complete
 -- bounded projection.  The all-rejected constructor therefore remains
 -- inspectable before a future scheduler chooses whether to finalize it.
-synthLaneDisposition :: SynthLaneOutcome -> SynthLaneDisposition
-synthLaneDisposition outcome = case synthLaneAssessed outcome of
+-- | Presentation is capped at @shown@ survivors, the @:set synth-shown@
+-- setting, whose default is five.
+synthLaneDispositionWith :: Int -> SynthLaneOutcome -> SynthLaneDisposition
+synthLaneDispositionWith shown outcome = case synthLaneAssessed outcome of
   Nothing -> SynthLaneNoVerified
   Just assessed
     | null $ verifiedCandidateReceipts
@@ -3030,7 +3268,7 @@ synthLaneDisposition outcome = case synthLaneAssessed outcome of
     | otherwise ->
     let assessment = assessedSynthLaneLengthAssessment assessed
         presentations =
-          take synthMaxShown $ presentLengthAssessment assessment
+          take shown $ presentLengthAssessment assessment
         rejections = presentLengthAssessmentRejections assessment
     in case lengthAssessmentFailure assessment of
       Just _ -> SynthLaneAssessmentPreserved presentations rejections
@@ -3050,12 +3288,13 @@ synthLaneDisposition outcome = case synthLaneAssessed outcome of
 -- preserve-all lane supplies the sole candidate presentation while retaining
 -- those prior rejections ahead of its own.
 synthLaneAccumulationDisposition
-  :: SynthLaneAccumulation
+  :: Int
+  -> SynthLaneAccumulation
   -> SynthLaneDisposition
-synthLaneAccumulationDisposition
+synthLaneAccumulationDisposition shown
     (SynthLaneAccumulation reverseOutcomes) =
   foldl accumulateDisposition SynthLaneNoVerified
-    (map synthLaneDisposition $ reverse reverseOutcomes)
+    (map (synthLaneDispositionWith shown) $ reverse reverseOutcomes)
  where
   accumulateDisposition accumulated disposition = case accumulated of
     SynthLaneSurvivors _ _ -> accumulated
@@ -3099,11 +3338,12 @@ finalizeSynthLaneAccumulation
   -> IO SynthLaneDisposition
 finalizeSynthLaneAccumulation st args goal
     accumulation@(SynthLaneAccumulation reverseOutcomes) = do
+  shown <- synthLimitShown <$> synthLimitsOf st
   let outcomes = reverse reverseOutcomes
-      dispositions = map synthLaneDisposition outcomes
+      dispositions = map (synthLaneDispositionWith shown) outcomes
       effectiveLanes = throughFirstTerminal $ zip outcomes dispositions
-  debug <- lookupEnv "LEANT_SYNTH_DEBUG"
-  when (isJust debug) $ forM_ outcomes $ \outcome ->
+  debug <- synthDebugEnabled st
+  when debug $ forM_ outcomes $ \outcome ->
     forM_ (leantObservationCodeEntries
       $ synthLaneOutcomeObservations outcome) $ \(code, count) ->
       emitLn st =<< cDim st
@@ -3118,7 +3358,7 @@ finalizeSynthLaneAccumulation st args goal
         emitLn st $ prefix ++
           "finite-spine Length behavioral assessment preserved all verified "
           ++ "candidates: " ++ show failure
-  let disposition = synthLaneAccumulationDisposition accumulation
+  let disposition = synthLaneAccumulationDisposition shown accumulation
   case disposition of
     SynthLaneNoVerified -> pure ()
     SynthLaneSurvivors presentations rejections ->
@@ -3312,7 +3552,7 @@ completionCandidates st prefix = do
               [ n | (sev, d) <- respMessages v, sev == "info"
               , n <- lines d, not (null n) ]
             Right (Left _) -> pure []
-            Left e -> const (pure []) (e :: SomeException)
+            Left (_ :: SomeException) -> pure []
       let merged = nub (sessionNames ++ backendNames)
       modifyIORef' st (\s -> s
         { rsComplCache = (prefix, merged) : rsComplCache s })
@@ -3339,7 +3579,7 @@ cmdBrowse st showAll rawArg
             (browseProgram showAll nameComponents)
           case result of
             Left err -> emitLn st =<< cRed st err
-            Right v -> () <$ printResponse st Nothing v
+            Right v -> void (printResponse st Nothing v)
       -- the browse environment predates session declarations; list those
       -- separately from the recorded history
       history <- rsHistory <$> readIORef st
@@ -3384,7 +3624,7 @@ sessionDeclNames entry =
   declName _ = Nothing
 
   isIdentStart s = case s of
-    c : _ -> not (c `elem` "({[:=")
+    c : _ -> c `notElem` "({[:="
     [] -> False
   isIdentChar c = not (isSpace c) && c `notElem` "({[:="
 
@@ -4010,7 +4250,7 @@ goalCandidates g = concat
     , name `elem` targetIdents
     ]
   isInductionTy ty =
-    typeConnective ty == Nothing
+    isNothing (typeConnective ty)
     && case words (trim ty) of
          hd@(c0 : _) : _ ->
            isUpper c0 && hd `notElem` ["Bool", "Prop", "Type", "Sort"]
@@ -4062,7 +4302,7 @@ suggestionHeartbeatLimit = 20000
 respGoals :: JValue -> [String]
 respGoals v = fromMaybe [] $ do
   gs <- jLookup "goals" v >>= jArray
-  pure [g | Just g <- map jString gs]
+  pure (mapMaybe jString gs)
 
 respProofState :: JValue -> Maybe Integer
 respProofState v = jLookup "proofState" v >>= jInt
@@ -4154,7 +4394,7 @@ goalDefNames g = case goalTarget g of
                        "do", "by", "at", "in", "have", "show", "this"]
       ]
  where
-  dotted = filter (all (/= '.')) . tokens
+  dotted = filter ('.' `notElem`) . tokens
   tokens s = case dropWhile (not . dottedChar) s of
     "" -> []
     s' -> let (tok, rest) = span dottedChar s' in tok : tokens rest
@@ -4750,7 +4990,7 @@ replLoop st = do
       EvalIncomplete -> do
         extra <- readContinuationLines st []
         if null extra
-          then () <$ liftIO (evalInput st False text)
+          then void (liftIO (evalInput st False text))
           else evalWithRetry (text ++ "\n" ++ intercalate "\n" extra)
 
 -- Read one line, handling prompt display, echo, and transcript capture for
@@ -4828,12 +5068,16 @@ mkSettings st = Settings
         result <- try (completionCandidates st word)
         case result of
           Right cands -> pure (map simpleCompletion cands)
-          Left e -> const (pure []) (e :: SomeException)
+          Left (_ :: SomeException) -> pure []
     | otherwise = pure []
 
 trim :: String -> String
 trim = dropWhile isSpace . reverse . dropWhile isSpace . reverse
 
+-- | Entry point: set UTF-8 handles, parse the command line, and hand the
+-- options to 'run', which loads the optional Length ranking mode, locates and
+-- probes the Lean REPL backend, and drives the interactive loop until exit.
+-- A command-line parse failure prints the message and exits with status 2.
 main :: IO ()
 main = do
   hSetEncoding stdin utf8
@@ -4900,6 +5144,8 @@ run opts = do
             , bcWorkingDir = workingDir
             }
       ratings <- loadRatings
+      synthTimeout <- initialSynthTimeoutSeconds
+      synthDebug <- isJust <$> lookupEnv "LEANT_SYNTH_DEBUG"
       st <- newIORef ReplState
         { rsBackend = Nothing
         , rsConfig = config
@@ -4930,6 +5176,12 @@ run opts = do
         , rsSynthSteps = 4096
         , rsSynthClassical = True
         , rsSynthLibrary = True
+        , rsSynthTimeout = synthTimeout
+        , rsSynthLimits = defaultSynthLimits
+        , rsSynthProviders = True
+        , rsSynthProviderCap = defaultProviderCap
+        , rsSynthLibraryPremises = 8
+        , rsSynthDebug = synthDebug
         , rsLengthAssessmentMode = lengthAssessmentMode
         , rsRatings = ratings
         , rsTimeout = if optTimeout opts <= 0 then Nothing

@@ -6,7 +6,7 @@
 %  Leant is an experimental project in active development; this document
 %  describes the state of the tool at the date on the title page.
 %
-%  Build:  lualatex Leant.tex   (twice, for the table of contents)
+%  Build:  lualatex Leant_Overview.tex   (twice, for the table of contents)
 %
 %  The visual design (palette, fonts, code boxes) follows the typeset
 %  edition of "Counterexamples in Type Systems".
@@ -357,6 +357,30 @@ environment.
 \cmdrow{:set synth-library B}{library premises for recursive
   inductives (\code{on}$\mid$\code{off}, default on;
   \S\ref{sec:synth-library})}
+\cmdrow{:set synth-timeout N}{seconds one \code{:synth} may search before
+  answering ``no answer'' (default 20, or \code{LEANT\_SYNTH\_TIMEOUT} at
+  startup; \code{0} waits indefinitely)}
+\cmdrow{:set synth-shown N}{accepted candidate groups shown, and the
+  ranking stop (default 5)}
+\cmdrow{:set synth-verify N}{fresh candidate groups Lean checks per lane
+  (default 12; \code{both} sends twice that)}
+\cmdrow{:set synth-window N}{candidate groups one lane may observe
+  (default 60)}
+\cmdrow{:set synth-budget N|off}{Djinn choice-point budget of the ordinary
+  and provider lanes (default off)}
+\cmdrow{:set synth-queue N}{Exference queue bound (default 1024)}
+\cmdrow{:set synth-providers B}{discover live providers after the
+  structural lane (\code{on}$\mid$\code{off}, default on)}
+\cmdrow{:set synth-provider-cap N}{providers one discovery may serialize
+  (default 80)}
+\cmdrow{:set synth-library-premises N}{rated library offers kept per goal
+  (default 8); \code{:set synth-ratings} lists the rated inventory}
+\cmdrow{:set synth-debug B}{fragment, provider, lane-outcome, and metric
+  diagnostics (\code{on}$\mid$\code{off}; \code{LEANT\_SYNTH\_DEBUG} at
+  startup)}
+\cmdrow{:set backend-timeout N}{seconds per Lean request (default 300,
+  \code{--timeout} at startup; \code{0} none)}
+\cmdrow{:set}{print every synthesis setting with its current value}
 \end{cmdtable}
 
 \noindent\textbf{Exact option-bearing grammar}
@@ -1476,12 +1500,13 @@ The default engine is Djinn: complete, terminating, and the only
 source of refutations. \code{:set synth-engine exference} switches to
 the ranked heuristic search, and \code{both} runs the two together ---
 negative verdicts still come only from Djinn. One standalone batch sends at
-most 12 fresh candidate groups to Lean. A combined batch gets 24 and
+most 12 fresh candidate groups to Lean (\code{:set synth-verify N}). A
+combined batch gets 24 and
 retains both standalone frontiers: writing D and E for fresh Djinn and
 Exference groups, its order is \code{D1–D4, E1–E12, D5–D12}, then
 alternating tails. Within each Exference invocation, Leant
 stable-deduplicates rendered groups before applying the internal 60-candidate
-collection window. The first spelling remains authoritative, while repeated
+collection window (\code{:set synth-window N}). The first spelling remains authoritative, while repeated
 backend histories cannot hide later distinct terms behind the bound; the
 outer 12- and 24-group batch frontiers then apply.
 
@@ -1490,7 +1515,7 @@ lazy detailed outcome, and Main now consumes it for bounded filter
 progression.
 For a nonempty candidate outcome below the cap, an admitted request of 1
 through 60 returns a nonempty ordered batch and a lazy successor; cumulative
-observation stops at the existing product-wide 60-group hard cap. Natural
+observation stops at the configured 60-group hard cap. Natural
 exhaustion is distinct from reaching that cap: after group 60 the
 cursor reports the cap without probing group 61, even when the finite stream
 ended exactly there. Its force helper traverses the selected group-list and
@@ -1505,15 +1530,15 @@ visible step taxonomy, batch accessors, and cursor operations. It neither names
 the hidden batch type nor imports either hidden constructor.
 
 Ordinary ranking retains its historical verifier stop after five accepted
-groups and consumes one batch. An explicit behavioral filter verifies and
+groups (\code{:set synth-shown N}) and consumes one batch. An explicit behavioral filter verifies and
 assesses one complete 12-group standalone or 24-group combined batch. Only no
 verification or complete behavioral rejection may consume one successor of the
 same width from that cursor, giving 12+12 or 24+24 groups from one engine run.
 Every batch is verified and assessed exactly once through the same context;
 Main neither reruns the engine nor reassesses the first batch. Survivor and
 preserve-all stop immediately, and a continuing second batch stops without a
-third tail probe. In either operation at most five candidates are displayed and
-bound. Exference runs under
+third tail probe. In either operation at most five candidates
+(\code{:set synth-shown N}) are displayed and bound. Exference runs under
 explicit budgets
 (\code{:set synth-steps}, default 4096), and truncation is always
 reported:
@@ -1529,7 +1554,8 @@ note: exference: search truncated: step limit reached, queue limit pruned 36194
 Every engine mode first gives a structurally accepted goal a
 provider-free lane and asks Lean to verify its candidates. When no
 provider-free term verifies, or an authorized behavioral filter rejects every
-verified occurrence, Lean discovers at most 80 live term providers under the
+verified occurrence, Lean discovers at most 80 live term providers
+(\code{:set synth-provider-cap N}) under the
 namespaces used by the target (plus exact session declarations). The command's
 filter bank and accumulated rejection rows cross those lanes. A complete Djinn
 refutation is retained as a sound control-flow fallback while constructive
@@ -1798,8 +1824,9 @@ attestation, solver status, or behavioral evidence.
 
 The pure searches answer in microseconds to milliseconds; the cost
 center is backend verification, a few hundred milliseconds per
-candidate. A wall-clock guard (default 20\,s,
-\code{LEANT\_SYNTH\_TIMEOUT}) covers the quantified goals whose
+candidate. A wall-clock guard (default 20\,s; \code{:set synth-timeout N}
+changes it for the session and \code{LEANT\_SYNTH\_TIMEOUT} seeds it at
+startup) covers the quantified goals whose
 bounded instantiation can widen the space. Baseline and provider work share one
 absolute command deadline. Filter mode carries it through both batches and
 both classical routes; rank and disabled modes instead give each reached

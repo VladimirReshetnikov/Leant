@@ -31,9 +31,9 @@ where the unit of work is a line, not a file.
 **Leant is experimental and under active development.** Commands change
 shape between commits and output formats are not stable.
 
-There is a manual: **[docs/Leant.pdf](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Leant.pdf)**
+There is a manual: **[docs/Leant_Overview/Leant_Overview.pdf](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Leant_Overview/Leant_Overview.pdf)**
 — an overview and tutorial, with a detailed tour of `:synth`
-([LaTeX source](docs/Leant.tex)).
+([LaTeX source](docs/Leant_Overview/Leant_Overview.tex)).
 
 ## Contents
 
@@ -58,16 +58,41 @@ There is a manual: **[docs/Leant.pdf](https://raw.githubusercontent.com/Vladimir
 
 Companion documents:
 
-- the **[manual](docs/Leant.pdf)** — tutorial and `:synth` tour;
+- the **[manual](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Leant_Overview/Leant_Overview.pdf)** — tutorial and `:synth` tour;
 - **[docs/length-ranking.md](docs/length-ranking.md)** — the complete
   Length counterexample-ranking and replay-authorized filtering reference;
 - **[docs/synth-internals.md](docs/synth-internals.md)** — the design
   boundaries and dated-report index behind `:synth`;
-- the **[Z3 behavioral synthesis proposal](docs/Z3_Behavioral_Synthesis_Proposal/Z3_Behavioral_Synthesis_Proposal.pdf)**
+- **[Lean from First Principles](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Lean_from_First_Principles/Lean_from_First_Principles.pdf)**
+  — a beginner's path from "a term has a type" to verified type-directed
+  synthesis: reading Lean syntax, propositions as types, dependent
+  functions and pairs, universes, definitional equality, inductive types,
+  and the Calculus of Constructions; how Lean elaborates surface syntax
+  into kernel terms and what the kernel trusts; and then Leant and Djex
+  end to end — the smaller synthesis type world, the fragment
+  translation, the two search engines, rendering, verification, negative
+  evidence, and worked traces
+  ([LaTeX source](docs/Lean_from_First_Principles/Lean_from_First_Principles.tex));
+- **[Z3 from First Principles](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Z3_for_Leant_and_Djex/Z3_for_Leant_and_Djex.pdf)**
+  — a beginner's guide to Z3 for this codebase, assuming no logic
+  background: what satisfiability, models, and `unsat` mean, SMT-LIB from
+  syntax to models, cores, and Horn clauses, why a solver boundary needs
+  fingerprints, process ownership, and replay, and then a module-by-module
+  trace of how the current Length domain and Leant's rank and filter modes
+  actually use Z3, plus a reading and troubleshooting guide
+  ([LaTeX source](docs/Z3_for_Leant_and_Djex/Z3_for_Leant_and_Djex.tex));
+- the **[Z3 behavioral synthesis proposal](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Z3_Behavioral_Synthesis_Proposal/Z3_Behavioral_Synthesis_Proposal.pdf)**
   — where the behavioral layer goes next: counterexample-guided search,
   typed sketch completion, semantic pruning, and Lean-checked proof
   artifacts ([LaTeX source](docs/Z3_Behavioral_Synthesis_Proposal/Z3_Behavioral_Synthesis_Proposal.tex));
-- the **[Lean 4 rewrite analysis](docs/Leant_Djex_Lean4_Rewrite_Analysis/Leant_Djex_Lean4_Rewrite_Analysis.pdf)**
+- the **[codebase walkthrough](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Djex_Leant_Codebase_Walkthrough/Djex_Leant_Codebase_Walkthrough.pdf)**
+  — the maintainer's tour of both repositories against a pinned pair of
+  revisions: the build graph, Djex's opaque authority types, Djinn's
+  proof-producing search, Exference's typed-hole search and independent
+  checker, and Leant's backend protocol, translation, rendering, and
+  verification, with end-to-end traces and change recipes
+  ([LaTeX source](docs/Djex_Leant_Codebase_Walkthrough/Djex_Leant_Codebase_Walkthrough.tex));
+- the **[Lean 4 rewrite analysis](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Leant_Djex_Lean4_Rewrite_Analysis/Leant_Djex_Lean4_Rewrite_Analysis.pdf)**
   — a feasibility study of reimplementing Leant and Djex in Lean itself:
   which of today's boundaries would survive, what a Lean host makes
   simpler (elaborated goals staying `Expr`, kernel-checked candidates
@@ -129,7 +154,7 @@ environment variable.
 ## Usage
 
 ```text
-leant [FILE] [--project DIR] [--plain] [-i MOD]
+leant [FILE] [-p|--project DIR] [--plain] [-i|--import MOD] [--help]
       [--timeout N] [--time] [--transcript [FILE]] [--timestamps]
       [--repl-exe PATH] [--lake PATH]
       [--length-ranking-config ABSOLUTE-PATH]
@@ -144,91 +169,43 @@ bare stdlib session with subsecond startup. Expressions evaluate via
 `inductive`, `open`, …) run verbatim and, on success, advance the
 session environment; `#`-commands pass straight through.
 
-Finite-list-spine **Length behavioral assessment** is an optional last stage
-that consults Z3 about already verified candidates. Passing
-`--length-ranking-config` activates one startup policy and scalar-or-pair
-contract. Ordinary `:synth TYPE`, explicit `--behavior-mode rank`, and a
-contract-only command with no behavior mode all keep the established stable
-ranking and its historical five-success verification frontier. An explicit
-`:synth --behavior-mode filter -- TYPE` may instead omit only candidates with
-an independently replayed counterexample to the activated startup contract;
-adding `--length-contract ABSOLUTE-PATH` uses that passive contract for this
-command. Filtering consumes each ordinary lazy engine result through one
-opaque cursor. It verifies and assesses a first batch of at most 12 groups for
-a standalone engine or 24 for `both`; only no verification or complete
-behavioral rejection may request one successor batch of the same width. Thus
-an ordinary filter run can inspect at most 12+12 or 24+24 groups without
-rerunning synthesis. The excluded-middle classical route remains one six-group
-batch, while double negation uses the ordinary policy and a filter-only Djinn
-candidate cutoff of 60. Rank and disabled commands retain one batch. Every
-returned batch is verified and assessed exactly once, so a later same-run
-survivor can replace early behavioral rejections without reassessing earlier
-work. Before goal translation, Main introduces one rank-2 assessment context
-for the admitted command. Its lexical
-lifetime spans universe retries and every ordinary, provider, and classical
-lane. A filter context therefore owns one nominal scalar or product
-counterexample bank for the complete command, tries retained samples newest
-first, and freshly replays every attempt against the later same-scope
-candidate. Ordinary and explicit ranking keep the established raw four-vector
-MRU path unchanged; their contexts contain no bank.
+**Length behavioral assessment** is an optional last stage that asks Z3
+about candidates Lean has already verified. It is off unless the session
+started with `--length-ranking-config`, which activates one startup policy
+and one scalar-or-pair contract. Once active:
 
-Failure to verify any candidate and successful behavioral all-rejection are
-distinct continuing batch results. In the first ordinary filter batch, either
-may consume the one same-run successor. Only after that run finishes may its
-continuing result enter the next provider or classical route, carrying the
-complete chronological spelling frontier into provider deduplication. A
-survivor or preserve-all assessment result remains terminal. This does not fill
-a five-survivor quota within a run or across routes: the first batch with any
-survivor stops scheduling, display and binding remain capped at five, and every
-rejection accumulated before that terminal batch stays visible. Raw `sat`,
-`unsat`, and `unknown`, preparation
-refusal, unassessed input, and positive bounded evidence never authorize
-rejection or continuation as all-rejected. Any adapter, ranking, association,
-or partition-seal failure preserves the complete internal verified batch and
-presents at most five candidates, although already completed bank transitions
-are cache effects and are not rolled back.
+- plain `:synth TYPE` (and `--behavior-mode rank`) keeps the usual stable
+  ranking, moving only candidates with a replayed counterexample after the
+  rest, never dropping any;
+- `:synth --behavior-mode filter -- TYPE` additionally *omits* candidates that
+  Z3 refuted against the activated contract — and only those: a raw `sat`,
+  `unsat`, or `unknown`, an unassessed input, or a positive bounded-evidence
+  receipt never causes a rejection;
+- `--length-contract ABSOLUTE-PATH` swaps in a passive contract for one
+  command.
 
-One deferred command finalizer owns result metrics, warnings, bindings, cache
-mutation, candidate and rejection rows, and handled-batch notes. Complete
-spelling frontiers, observations, and debug group ordinals remain chronological
-across the at-most-two batches. Ordinary run notes attach once to the rightmost
-handled batch; an all-no-verification run retains them only for its final
-diagnostic, and classical handled outcomes remain note-free. Ordinary
-all-rejected exhaustion suppresses an unrelated no-term or Lean-verification
-diagnostic. A retained structural refutation still gates classical search and
-masks provider timeout/error as before, while completed batch outcomes remain
-accounted for; without that fallback, completed outcomes are finalized before
-the unchanged abnormal diagnostic. Filter mode keeps the original absolute
-command deadline through both batches and both classical routes. Rank and
-disabled modes retain the historical classical policy: each reached excluded-
-middle and double-negation route independently receives a fresh configured-
-duration deadline; a zero timeout remains unbounded. This is a bounded command-
-local reuse and continuation slice, not a persistent or quota-filling CEGIS
-loop. There is no third cursor probe, engine rerun, batch reassessment, or
-survivor quota fill, and no context or bank enters `ReplState`, history,
-snapshots, or another command.
-The complete reference — including the fixed command grammar, current
-versionless startup and contract-only schemas (`rankingDomain` is `scalar` or
-`binary-product`), unchanged raw rank MRU, one lexical command assessment
-context and filter bank, origin probe, bounded validation, rejection rules,
-and presentation — is
-[docs/length-ranking.md](docs/length-ranking.md).
-The exact progressive Main landing and validation evidence are recorded in the
+A filter command works through one lazy engine result in at most two batches
+of `:set synth-verify` groups (twice that for `both`), reusing one
+command-local counterexample bank across every lane of that command, and
+stops at the first batch with a survivor; at most `:set synth-shown`
+survivors are shown and bound, every rejection stays visible, and nothing
+from the assessment enters `ReplState`, history, or snapshots. Any adapter or
+solver failure preserves the complete verified batch instead of guessing. The
+batch schedule, deadlines, rejection taxonomy, schemas, and presentation are
+specified in [docs/length-ranking.md](docs/length-ranking.md); the Main
+landing is recorded in the
 [progressive same-run Length filter batching report](docs/reports/2026-08-16-progressive-same-run-length-filter-batching.md).
 
-Applicable-domain ranking now has one current recursive piecewise-affine
-algorithm. Library callers use
+Applicable-domain ranking has one current recursive piecewise-affine
+algorithm: library callers use
 `enableLengthRankingApplicableDomainValidation`, receive
-`ApplicableDomainEstablished` or
-`LengthSpinePairApplicableDomainEstablished`, and
-render with `renderLengthApplicableDomainValidationNote` or
-`renderLengthSpinePairApplicableDomainValidationNote`. Djex's direct-through-atomic
-analyses remain private fallback stages inside that algorithm. The former
-stage-specific public builders, assessments, failures, receipts, and renderers
-were deleted without aliases or migration: Leant is experimental and promises
-no API or output compatibility. This surface reset does not change the exact
-versionless startup or contract-only schemas, including the seven numeric
-members of `applicableDomainValidation`; see the
+`ApplicableDomainEstablished` or `LengthSpinePairApplicableDomainEstablished`,
+and render with `renderLengthApplicableDomainValidationNote` or its
+`SpinePair` sibling. The former stage-specific builders, receipts, and
+renderers were deleted without aliases (Leant promises no API or output
+compatibility); the versionless startup and contract-only schemas, including
+the seven numeric members of `applicableDomainValidation`, did not change.
+See the
 [current applicable-domain policy report](docs/reports/2026-08-15-current-length-applicable-domain-policy.md).
 
 | Command | Meaning |
@@ -585,15 +562,15 @@ binder and leaves dictionary reconstruction to Lean:
 
 Closed, context-free quantified choices follow the same path instead of
 collapsing to an inferred `_`. Djex keeps their binders alpha-safe, and Leant
-uses stable local names plus `_` binder domains so the provider's expected
-universe remains authoritative:
+gives them stable local names while rendering the provider's own binder
+domain, so the expected universe stays visible in the printed argument:
 
 ```text
 λ> class Demo.PolyC (a : Type 1) : Prop where witness : True
 λ> instance : Demo.PolyC (∀ x : Type, x → x) := ⟨True.intro⟩
 λ> axiom Demo.polyGlobal {a : Type 1} [Demo.PolyC a] : Demo.Token
 λ> :synth ((∀ x : Type, x → x) → Demo.Token)
-  it1  fun _ => Demo.polyGlobal («a» := (∀ (a0_0 : _), a0_0 → a0_0))
+  it1  fun _ => Demo.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
 ```
 
 The choice need not occur in the query when Lean's active instance heads prove
@@ -609,15 +586,15 @@ then both checked Djex runners retain the same explicit application:
 λ> :set synth-engine djinn
 synth engine: djinn
 λ> :synth Gap.Token
-  it1  Gap.polyGlobal («a» := (∀ (a0_0 : _), a0_0 → a0_0))
+  it1  Gap.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
 λ> :set synth-engine exference
 synth engine: exference
 λ> :synth Gap.Token
-  it1  Gap.polyGlobal («a» := (∀ (a0_0 : _), a0_0 → a0_0))
+  it1  Gap.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
 λ> :set synth-engine both
 synth engine: both
 λ> :synth Gap.Token
-  it1  Gap.polyGlobal («a» := (∀ (a0_0 : _), a0_0 → a0_0))
+  it1  Gap.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
 ```
 
 The instance may determine a higher-kinded binder which never occurs in the
@@ -1065,18 +1042,23 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   to Djex's ranked heuristic search (explicit budgets, no negative
   verdicts; `:set synth-steps N` bounds it, default 4096), and `both`
   runs the two together. Standalone lanes send at most 12 fresh candidate
-  groups to Lean; a combined lane gets 24 and preserves both standalone
-  frontiers. Writing `D` and `E` for fresh Djinn and Exference groups, its
-  order is `D1–D4, E1–E12, D5–D12`, followed by alternating tails.
+  groups to Lean (`:set synth-verify N`); a combined lane gets twice that
+  and preserves both standalone frontiers. Writing `D` and `E` for fresh
+  Djinn and Exference groups, its order is `D1–D4, E1–E12, D5–D12`, followed
+  by alternating tails: the Djinn head is one short of `synth-shown` and each
+  front runs to `synth-verify`, so retuning either setting reshapes the
+  interleave accordingly.
   Within each Exference invocation, Leant stable-deduplicates rendered groups
-  before applying the internal 60-candidate collection window. The first
+  before applying the internal 60-candidate collection window
+  (`:set synth-window N`). The first
   spelling remains authoritative, while repeated backend derivations cannot
   consume slots ahead of later distinct terms. Ranking and disabled commands
-  retain one outer 12/24-group batch and ranking stops after five accepted
-  groups. Filtering may consume one successor of the same width after a first
+  retain one outer batch of `synth-verify` groups (default 12, or 24 for
+  `both`) and ranking stops after `synth-shown` accepted groups (default
+  five). Filtering may consume one successor of the same width after a first
   no-verification or all-rejected batch, for a 12+12 standalone or 24+24
-  combined maximum from the same engine outcome, before its five-survivor
-  presentation cap. There is no third probe. Combined exact-text deduplication
+  combined maximum at the defaults from the same engine outcome, before its
+  `synth-shown` presentation cap. There is no third probe. Combined exact-text deduplication
   likewise keeps the first display occurrence. If that occurrence has no typed
   authority, the exact spelling may lazily retain the first bounded later
   Exference origin solely for checked behavioral preparation; route metrics,
@@ -1086,7 +1068,9 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
 - Every engine mode gives a structurally accepted goal a provider-free
   baseline lane. Its rendered candidates are checked by Lean first, and live
   providers are discovered whenever no baseline term verifies or an authorized
-  filter rejects every verified baseline occurrence. The same command-local
+  filter rejects every verified baseline occurrence (`:set synth-providers
+  off` skips discovery; `:set synth-provider-cap N` bounds how many providers
+  one discovery serializes, default 80). The same command-local
   filter bank and accumulated rejection history cross those runs. A complete
   Djinn refutation is retained provisionally while the constructive provider
   lanes run: the first batch with any surviving or preserve-all result wins,
@@ -1100,7 +1084,7 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   misses; Exference keeps its internally rated full-inventory lane. Combined
   mode runs both engines for the singleton and full lanes but uses Djinn alone
   for the intermediate prefixes. Baseline and provider lanes consume one
-  command-wide `LEANT_SYNTH_TIMEOUT` deadline, including both batches of a
+  command-wide deadline (`:set synth-timeout`), including both batches of a
   filter run. Before a later provider lane is forced or capped, every spelling
   in an earlier completed no-verified or all-rejected run frontier is removed
   from each source stream and newly empty groups are dropped.
@@ -1116,7 +1100,7 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   by the target, plus exact declarations from the current session;
   rejects generated names; prioritizes exact-result session and public
   declarations before unrelated session values; and serializes at most
-  80 term providers. Declarations whose fully peeled result is a sort
+  80 term providers (`:set synth-provider-cap N`). Declarations whose fully peeled result is a sort
   (type constructors and type families) are excluded before search.
   Conventional implementation workers ending in `TR`,
   `Impl`, or `Aux` (or a `.go`/`.loop` component) remain eligible but
@@ -1172,7 +1156,8 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   namespace — are never shadowed.
 - The pure searches answer in microseconds; the cost center is backend
   verification, a few hundred milliseconds per candidate. A wall-clock
-  guard (default 20 s, `LEANT_SYNTH_TIMEOUT=N`, `0` waits indefinitely)
+  guard (default 20 s; `:set synth-timeout N` changes it for the session,
+  `LEANT_SYNTH_TIMEOUT=N` seeds it at startup, `0` waits indefinitely)
   covers quantified goals whose bounded instantiation widens the
   space. The same deadline covers the baseline and every provider fallback
   rather than restarting for each lane; filter mode carries that original
@@ -1181,25 +1166,50 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   an independent fresh configured duration at each classical route actually
   reached. Hitting any such boundary is reported as "no answer", never as a
   verdict.
-- `LEANT_SYNTH_DEBUG=1` prints the translated fragment, discovered providers,
-  rendered variants, and stable `code=count` verification metrics — the
-  fastest way to see why a candidate was dropped and how much Lean work the
-  lane performed.
+- `:set synth-debug on` (or `LEANT_SYNTH_DEBUG=1` at startup) prints the
+  translated fragment, discovered providers, rendered variants, and stable
+  `code=count` verification metrics — the fastest way to see why a candidate
+  was dropped and how much Lean work the lane performed.
+
+### Session settings
+
+Every knob above is a `:set` setting; given without a value it prints its
+current state, and a bare `:set` prints them all. Defaults reproduce the
+historical constants, so a fresh session behaves exactly as documented.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `synth-engine djinn\|exference\|both` | `djinn` | which Djex search runs |
+| `synth-steps N` | 4096 | Exference step budget |
+| `synth-queue N` | 1024 | Exference queue bound |
+| `synth-budget N\|off` | `off` | Djinn choice-point budget of the ordinary and provider lanes |
+| `synth-window N` | 60 | candidate groups one lane may observe |
+| `synth-verify N` | 12 | fresh candidate groups Lean checks per lane (`both` sends twice that, and the batch is clamped to `synth-window`) |
+| `synth-shown N` | 5 | accepted groups shown, and the ranking stop |
+| `synth-classical on\|off` | `on` | excluded-middle and double-negation fallbacks |
+| `synth-library on\|off` | `on` | rated library premises for recursive inductives |
+| `synth-library-premises N` | 8 | rated offers kept per goal (`:set synth-ratings` lists the inventory) |
+| `synth-providers on\|off` | `on` | discover live providers after the structural lane |
+| `synth-provider-cap N` | 80 | providers one discovery may serialize |
+| `synth-timeout N` | 20 (`LEANT_SYNTH_TIMEOUT`) | wall-clock seconds per `:synth`; `0` waits indefinitely |
+| `backend-timeout N` | 300 (`--timeout`) | seconds per Lean request; `0` none |
+| `synth-debug on\|off` | `off` (`LEANT_SYNTH_DEBUG`) | fragment, provider, lane, and metric diagnostics |
 
 ## How it works
 
 The design below — a Haskell REPL and synthesis engine driving a Lean
 worker over a text protocol — is examined at length in the
-[Lean 4 rewrite analysis](docs/Leant_Djex_Lean4_Rewrite_Analysis/Leant_Djex_Lean4_Rewrite_Analysis.pdf),
+[Lean 4 rewrite analysis](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Leant_Djex_Lean4_Rewrite_Analysis/Leant_Djex_Lean4_Rewrite_Analysis.pdf),
 which asks which of these boundaries would survive reimplementing both
 projects in Lean itself.
 
 Leant implements the backend protocol directly
 ([src/Leant/Backend.hs](src/Leant/Backend.hs)): JSON over stdin/stdout
-with blank-line framing, spawned as `lake env repl.exe` inside the Lake
-project. The JSON codec is hand-rolled
-([src/Leant/Json.hs](src/Leant/Json.hs)), so the REPL core builds with
-GHC boot libraries only — no Hackage downloads. On backend death,
+with blank-line framing, spawned as `lake env repl` (`repl.exe` on
+Windows) inside the Lake project. The JSON codec is hand-rolled
+([src/Leant/Json.hs](src/Leant/Json.hs)), so the REPL core itself needs
+only GHC boot libraries; the sole Hackage dependency, `haskell-src-exts`,
+arrives through the vendored Djex. On backend death,
 timeout, or Ctrl+C, the process is killed and the session (imports +
 history) replays automatically on the next command. The Haskeline
 front-end provides the interrupt-safe step loop, logical multi-line
@@ -1258,10 +1268,36 @@ cabal test leant-synth-tests --test-show-details=direct
 Golden transcript tests live in [test/](test/): `bash test/run-tests.sh`
 passes each `*.txt` through `leant --plain` and diffs the filtered
 output against the checked-in `*.golden`; `-u` regenerates the goldens
-after an intentional behavior change. These end-to-end goldens require
+after an intentional behavior change. The runner raises the `:synth` wall
+clock to 600 s so a transcript records what the engines answer rather than
+how fast the machine answers it; export `LEANT_SYNTH_TIMEOUT` to override.
+These end-to-end goldens require
 the Lake project to provide the backend executable (`repl` or
 `repl.exe`); the focused suite remains runnable when that backend is not
-installed. Ideas under consideration are tracked in
+installed.
+
+Two things make a fresh run easier to read. First, the Windows baseline is
+452 of 454, not 454 of 454: `decode the one current scalar and binary-product
+grammar` and `admit and acquire current scalar and product selections` both
+assert POSIX absolute-path semantics that a Windows path does not satisfy, so
+they fail on Windows and pass everywhere else. A third case, `compose a
+persistent last-wins builder and admit before clock capture`, races a fake
+solver's start-up against a 700 ms budget and fails on a slow or loaded
+machine. Treat any *other* failure as a regression. Second, sixteen tests
+read production source text and assert on it — twelve on
+[src/Main.hs](src/Main.hs), and one or two each on `Synth/Engine.hs`,
+`Synth/BehavioralSelection.hs` (and its `Internal`), the scalar and
+`SpinePair` `Length/Ranking` and `Length/Selection` modules together with
+`Ranking/Generic.hs` and `Selection/Generic.hs`,
+`Length/CounterexampleBank/Internal.hs`, `Length/Integration.hs` and
+`Length/Handoff.hs` (all under `src/Leant/` unless shown otherwise).
+They pin the shape of decisions that must not move
+silently, such as which deadline a classical route owns and that selection
+preserves the batch before it seals. A refactor of those files has to be
+re-run against the focused suite even when it is provably behaviour
+preserving; when a lint or a cleanup fights one of those pins, the pin wins.
+
+Ideas under consideration are tracked in
 [docs/PROPOSALS.md](docs/PROPOSALS.md) and
 [docs/SYNTHESIS_PROPOSAL.md](docs/SYNTHESIS_PROPOSAL.md).
 

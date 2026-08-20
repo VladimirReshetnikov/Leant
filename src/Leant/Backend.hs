@@ -73,6 +73,8 @@ import System.Timeout (timeout)
 
 import Leant.Json (JValue, encodeJson, parseJson)
 
+-- | How to spawn the Lean REPL: the @lake@ executable, the repl executable
+-- to run under @lake env@, and the project directory to run it in.
 data BackendConfig = BackendConfig
   { bcLakePath :: FilePath
   , bcReplExe :: FilePath
@@ -80,6 +82,9 @@ data BackendConfig = BackendConfig
   }
   deriving (Show)
 
+-- | One running Lean REPL process: its stdio handles, its process handle,
+-- and the bounded stderr capture thread whose tail is reported when the
+-- backend dies.
 data Backend = Backend
   { beIn :: Handle
   , beOut :: Handle
@@ -95,6 +100,7 @@ data CapturedStderr = CapturedStderr
   , capturedStderrBytes :: !ByteString.ByteString
   }
 
+-- | Why one JSON request to the backend produced no usable response.
 data RequestError
   = ServerClosed String   -- ^ backend died; payload is its bounded stderr tail
   | RequestTimeout
@@ -140,7 +146,7 @@ discoverReplExe = do
     fmap concat . forM owners $ \owner -> do
       let replRoot = owner </> "repl"
       revs <- listSubdirs replRoot
-      flip filterM (map binaryIn revs) doesFileExist
+      filterM doesFileExist (map binaryIn revs)
 
   binaryIn rev = rev </> ".lake" </> "build" </> "bin" </> "repl.exe"
 

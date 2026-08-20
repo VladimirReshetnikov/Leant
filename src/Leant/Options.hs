@@ -10,7 +10,7 @@ module Leant.Options
   ) where
 
 import Data.List (isPrefixOf)
-import Data.Maybe (isJust, isNothing)
+import Data.Maybe (fromMaybe, isJust, isNothing)
 
 import Leant.Synth.Length.Configuration.File.Acquire
   ( lengthRankingConfigurationFileMaximumTimeoutMilliseconds )
@@ -19,6 +19,9 @@ import Leant.Synth.Length.Integration
   , LengthRankingConfigurationFileSource (..)
   )
 
+-- | Parsed command-line options.  'optTranscript' is @Just Nothing@ for a
+-- transcript at the default location and @Just (Just path)@ for an explicit
+-- one.
 data Options = Options
   { optProject :: Maybe FilePath
   , optPlain :: Bool
@@ -59,7 +62,7 @@ lengthAssessmentSetup options = case optLengthRankingConfig options of
         then PermitUnpinnedExecutable
         else RequirePinnedExecutable
     , LengthRankingConfigurationFileSource path
-        $ maybe defaultLengthAssessmentLoadTimeoutMilliseconds id
+        $ fromMaybe defaultLengthAssessmentLoadTimeoutMilliseconds
         $ optLengthRankingLoadTimeout options
     )
 

@@ -1,6 +1,7 @@
 module Main (main) where
 
 import Control.Concurrent (threadDelay)
+import Control.Monad (replicateM, unless, when, zipWithM_)
 import Control.DeepSeq (rnf)
 import Control.Exception (SomeException, evaluate, finally, try)
 import qualified Data.ByteString as ByteString
@@ -8,7 +9,7 @@ import qualified Data.ByteString.Char8 as BS
 import Data.Char (isAlphaNum, toLower)
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef)
 import Data.List (isInfixOf, isPrefixOf, permutations, sortOn, tails)
-import Data.Maybe (isNothing)
+import Data.Maybe (fromMaybe, isJust, isNothing)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -790,7 +791,7 @@ backendStderrFloodHelper = do
  where
   consumeInput = do
     bytes <- ByteString.hGetSome stdin 4096
-    if ByteString.null bytes then pure () else consumeInput
+    unless (ByteString.null bytes) consumeInput
 
 withTemporaryDirectory :: String -> (FilePath -> IO a) -> IO a
 withTemporaryDirectory template action = do
@@ -1841,7 +1842,7 @@ behavioralSelectionTests = testGroup "behavioral selection occurrence seal"
                     (error "decision admission forced retention evidence")
             bounded <- timeout 1000000 $ evaluate
               $ sealBehavioralSelectionBatch 3 input
-              $ cycle [poisonDecision]
+              $ repeat poisonDecision
             case bounded of
               Just result -> assertBehavioralSelectionError
                 (BehavioralSelectionCollectionLimitExceeded
@@ -3021,7 +3022,7 @@ translationPreparationTests = testGroup "prepared synthesis translation"
         bindings -> assertFailure $
           "legacy preparation retained unexpected bindings: " ++ show bindings
       assertBool "legacy preparation accidentally retained a context class"
-        $ all (/= contextClass)
+        $ notElem contextClass
         $ [ className
           | ClassDeclaration () className _ _ _ <-
               inspectedDeclarations legacyPrepared
@@ -3143,7 +3144,7 @@ translationPreparationTests = testGroup "prepared synthesis translation"
         Right (SynthCandidates groups _) -> assertBool
           ("context-erased Djinn compatibility found no provider: "
             ++ show groups)
-          $ any ("Demo.contextual" `isInfixOf`) $ concat groups
+          $ any (any ("Demo.contextual" `isInfixOf`)) groups
         outcome -> assertFailure $
           "context-erased Djinn compatibility failed: " ++ show outcome
 
@@ -3975,7 +3976,7 @@ instanceImplicitTests = testGroup "instance-implicit synthesis"
  where
   expectInstanceTerm expected outcome = case outcome of
     Right (SynthCandidates groups _) ->
-      if any (== expected) (concat groups)
+      if elem expected (concat groups)
         then pure ()
         else assertFailure $
           "expected instance-aware candidate " ++ show expected
@@ -4526,7 +4527,7 @@ detailedSynthCursorTests = testGroup "bounded detailed synthesis cursor"
             "the authentic safe cursor step changed to "
               ++ detailedSynthCursorStepTag other
   , testCase
-      "keep cursor and batch representations opaque behind Main accessors" $
+      "keep cursor and batch representations opaque behind Main accessors"
       assertDetailedSynthCursorArchitecture
   ]
 
@@ -4877,35 +4878,39 @@ buildLengthCounterexampleBankAdapterFixture = do
     expectRight (prepareCheckedLengthSpinePairQuery contract verified)
       >>= expectRight
 
+-- | One shared body for the scalar and product fixture-replay helpers: the
+-- domain contributes only its label and its query-owned replay entrance.
+adapterCounterexample
+  :: Show failure
+  => String
+  -> (query -> [Natural] -> Either failure (Maybe receipt))
+  -> query
+  -> Natural
+  -> IO receipt
+adapterCounterexample label replay query input = case replay query [input] of
+  Left failure -> assertFailure
+    (label ++ " adapter fixture replay failed: " ++ show failure)
+      >> error "unreachable"
+  Right Nothing -> assertFailure
+    (label ++ " adapter fixture input was not a counterexample: "
+      ++ show input)
+      >> error "unreachable"
+  Right (Just receipt) -> pure receipt
+
 scalarAdapterCounterexample
   :: CheckedLengthQuery
   -> Natural
   -> IO Djex.ValidatedLengthCounterexample
-scalarAdapterCounterexample query input = case
-    Djex.replayLengthSMTLibCounterexampleInputs
-      defaultLengthEvaluationLimits query [input] of
-  Left failure -> assertFailure
-    ("scalar adapter fixture replay failed: " ++ show failure)
-      >> error "unreachable"
-  Right Nothing -> assertFailure
-    ("scalar adapter fixture input was not a counterexample: " ++ show input)
-      >> error "unreachable"
-  Right (Just receipt) -> pure receipt
+scalarAdapterCounterexample = adapterCounterexample "scalar"
+  $ Djex.replayLengthSMTLibCounterexampleInputs defaultLengthEvaluationLimits
 
 pairAdapterCounterexample
   :: CheckedLengthSpinePairQuery
   -> Natural
   -> IO Djex.ValidatedLengthSpinePairCounterexample
-pairAdapterCounterexample query input = case
-    Djex.replayLengthSpinePairSMTLibCounterexampleInputs
-      defaultLengthEvaluationLimits query [input] of
-  Left failure -> assertFailure
-    ("product adapter fixture replay failed: " ++ show failure)
-      >> error "unreachable"
-  Right Nothing -> assertFailure
-    ("product adapter fixture input was not a counterexample: " ++ show input)
-      >> error "unreachable"
-  Right (Just receipt) -> pure receipt
+pairAdapterCounterexample = adapterCounterexample "product"
+  $ Djex.replayLengthSpinePairSMTLibCounterexampleInputs
+      defaultLengthEvaluationLimits
 
 type ScalarCounterexampleBankAdapterState =
   LengthCounterexampleBank.LengthCounterexampleBankState Djex.ExferenceLocal
@@ -4914,6 +4919,18 @@ type PairCounterexampleBankAdapterState =
   LengthCounterexampleBank.LengthSpinePairCounterexampleBankState
     Djex.ExferenceLocal
 
+adapterReceiptTriple
+  :: String
+  -> (LengthCounterexampleBankAdapterFixture -> [receipt])
+  -> LengthCounterexampleBankAdapterFixture
+  -> IO (receipt, receipt, receipt)
+adapterReceiptTriple label receipts fixture = case receipts fixture of
+  [first, second, third] -> pure (first, second, third)
+  retained -> assertFailure
+    ("unexpected " ++ label ++ " adapter receipt count: "
+      ++ show (length retained))
+      >> error "unreachable"
+
 scalarAdapterReceiptTriple
   :: LengthCounterexampleBankAdapterFixture
   -> IO
@@ -4921,12 +4938,8 @@ scalarAdapterReceiptTriple
       , Djex.ValidatedLengthCounterexample
       , Djex.ValidatedLengthCounterexample
       )
-scalarAdapterReceiptTriple fixture = case
-    counterexampleBankScalarSourceReceipts fixture of
-  [first, second, third] -> pure (first, second, third)
-  receipts -> assertFailure
-    ("unexpected scalar adapter receipt count: " ++ show (length receipts))
-      >> error "unreachable"
+scalarAdapterReceiptTriple = adapterReceiptTriple "scalar"
+  counterexampleBankScalarSourceReceipts
 
 pairAdapterReceiptTriple
   :: LengthCounterexampleBankAdapterFixture
@@ -4935,31 +4948,27 @@ pairAdapterReceiptTriple
       , Djex.ValidatedLengthSpinePairCounterexample
       , Djex.ValidatedLengthSpinePairCounterexample
       )
-pairAdapterReceiptTriple fixture = case
-    counterexampleBankPairSourceReceipts fixture of
-  [first, second, third] -> pure (first, second, third)
-  receipts -> assertFailure
-    ("unexpected product adapter receipt count: " ++ show (length receipts))
+pairAdapterReceiptTriple = adapterReceiptTriple "product"
+  counterexampleBankPairSourceReceipts
+
+expectAdapterBank :: String -> Maybe bank -> IO bank
+expectAdapterBank label active = case active of
+  Nothing -> assertFailure
+    (label ++ " adapter state remained uninitialized")
       >> error "unreachable"
+  Just bank -> pure bank
 
 expectScalarAdapterBank
   :: ScalarCounterexampleBankAdapterState
   -> IO (Djex.LengthCounterexampleBank Djex.ExferenceLocal)
-expectScalarAdapterBank state = case
-    LengthCounterexampleBank.lengthCounterexampleBankStateActiveBank state of
-  Nothing -> assertFailure "scalar adapter state remained uninitialized"
-    >> error "unreachable"
-  Just bank -> pure bank
+expectScalarAdapterBank = expectAdapterBank "scalar"
+  . LengthCounterexampleBank.lengthCounterexampleBankStateActiveBank
 
 expectPairAdapterBank
   :: PairCounterexampleBankAdapterState
   -> IO (Djex.LengthSpinePairCounterexampleBank Djex.ExferenceLocal)
-expectPairAdapterBank state = case
-    LengthCounterexampleBank.lengthSpinePairCounterexampleBankStateActiveBank
-      state of
-  Nothing -> assertFailure "product adapter state remained uninitialized"
-    >> error "unreachable"
-  Just bank -> pure bank
+expectPairAdapterBank = expectAdapterBank "product"
+  . LengthCounterexampleBank.lengthSpinePairCounterexampleBankStateActiveBank
 
 scalarAdapterBankStats
   :: Djex.LengthCounterexampleBank identity
@@ -5001,6 +5010,24 @@ pairAdapterBankEncodedBytes = sum
   . map Djex.lengthSpinePairCounterexampleBankSampleEncodedByteCount
   . Djex.lengthSpinePairCounterexampleBankSamples
 
+expectAdapterRecord
+  :: (Show failure, Show receipt, Show bankError)
+  => String
+  -> ( state
+     , Either failure
+        (LengthCounterexampleBank.BankRecordOutcome receipt bankError)
+     )
+  -> IO (state, receipt)
+expectAdapterRecord label (state, outcome) = case outcome of
+  Right (LengthCounterexampleBank.BankRecorded receipt) ->
+    pure (state, receipt)
+  Left failure -> assertFailure
+    (label ++ " adapter record failed: " ++ show failure)
+      >> error "unreachable"
+  Right unavailable -> assertFailure
+    (label ++ " adapter record was unavailable: " ++ show unavailable)
+      >> error "unreachable"
+
 expectScalarAdapterRecord
   :: ( ScalarCounterexampleBankAdapterState
      , Either
@@ -5011,15 +5038,7 @@ expectScalarAdapterRecord
       ( ScalarCounterexampleBankAdapterState
       , Djex.ValidatedLengthCounterexample
       )
-expectScalarAdapterRecord (state, outcome) = case outcome of
-  Right (LengthCounterexampleBank.LengthCounterexampleBankRecorded receipt) ->
-    pure (state, receipt)
-  Left failure -> assertFailure
-    ("scalar adapter record failed: " ++ show failure)
-      >> error "unreachable"
-  Right unavailable -> assertFailure
-    ("scalar adapter record was unavailable: " ++ show unavailable)
-      >> error "unreachable"
+expectScalarAdapterRecord = expectAdapterRecord "scalar"
 
 expectPairAdapterRecord
   :: ( PairCounterexampleBankAdapterState
@@ -5031,49 +5050,45 @@ expectPairAdapterRecord
       ( PairCounterexampleBankAdapterState
       , Djex.ValidatedLengthSpinePairCounterexample
       )
-expectPairAdapterRecord (state, outcome) = case outcome of
-  Right
-      (LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecorded
-        receipt) -> pure (state, receipt)
-  Left failure -> assertFailure
-    ("product adapter record failed: " ++ show failure)
-      >> error "unreachable"
-  Right unavailable -> assertFailure
-    ("product adapter record was unavailable: " ++ show unavailable)
-      >> error "unreachable"
+expectPairAdapterRecord = expectAdapterRecord "product"
+
+-- | Record a receipt triple newest-first (third, second, first) so the
+-- populated bank retains the first receipt as its newest sample.
+populateAdapterState
+  :: (receipt, receipt, receipt)
+  -> (receipt -> state -> IO (state, receipt))
+  -> state
+  -> IO state
+populateAdapterState (first, second, third) record initial = do
+  (recordedThird, _) <- record third initial
+  (recordedSecond, _) <- record second recordedThird
+  fst <$> record first recordedSecond
 
 populateScalarAdapterState
   :: LengthCounterexampleBankAdapterFixture
   -> IO ScalarCounterexampleBankAdapterState
 populateScalarAdapterState fixture = do
-  (firstReceipt, secondReceipt, thirdReceipt) <-
-    scalarAdapterReceiptTriple fixture
+  triple <- scalarAdapterReceiptTriple fixture
   let query = counterexampleBankScalarSourceQuery fixture
-      origin =
-        LengthCounterexampleBank.LengthCounterexampleBankReceiptFromLiveModel
       record receipt state = expectScalarAdapterRecord
         $ LengthCounterexampleBank.recordLengthCounterexampleBankReceipt
-            defaultLengthEvaluationLimits query origin receipt state
-  (first, _) <- record thirdReceipt
+            defaultLengthEvaluationLimits query
+            LengthCounterexampleBank.BankReceiptFromLiveModel receipt state
+  populateAdapterState triple record
     LengthCounterexampleBank.defaultLengthCounterexampleBankState
-  (second, _) <- record secondReceipt first
-  fst <$> record firstReceipt second
 
 populatePairAdapterState
   :: LengthCounterexampleBankAdapterFixture
   -> IO PairCounterexampleBankAdapterState
 populatePairAdapterState fixture = do
-  (firstReceipt, secondReceipt, thirdReceipt) <- pairAdapterReceiptTriple fixture
+  triple <- pairAdapterReceiptTriple fixture
   let query = counterexampleBankPairSourceQuery fixture
-      origin =
-        LengthCounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromLiveModel
       record receipt state = expectPairAdapterRecord
         $ LengthCounterexampleBank.recordLengthSpinePairCounterexampleBankReceipt
-            defaultLengthEvaluationLimits query origin receipt state
-  (first, _) <- record thirdReceipt
+            defaultLengthEvaluationLimits query
+            LengthCounterexampleBank.BankReceiptFromLiveModel receipt state
+  populateAdapterState triple record
     LengthCounterexampleBank.defaultLengthSpinePairCounterexampleBankState
-  (second, _) <- record secondReceipt first
-  fst <$> record firstReceipt second
 
 counterexampleBankTightEvaluationLimits :: Djex.LengthEvaluationLimits
 counterexampleBankTightEvaluationLimits = case
@@ -5143,7 +5158,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 LengthCounterexampleBank.defaultLengthCounterexampleBankState
         case scalarOutcome of
           Right
-              (LengthCounterexampleBank.LengthCounterexampleBankReplayMiss
+              (LengthCounterexampleBank.BankReplayMiss
                 []) -> pure ()
           Left failure -> assertFailure
             $ "scalar lazy initialization failed: " ++ show failure
@@ -5160,7 +5175,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 LengthCounterexampleBank.defaultLengthSpinePairCounterexampleBankState
         case pairOutcome of
           Right
-              (LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayMiss
+              (LengthCounterexampleBank.BankReplayMiss
                 []) -> pure ()
           Left failure -> assertFailure
             $ "product lazy initialization failed: " ++ show failure
@@ -5179,13 +5194,13 @@ lengthCounterexampleBankAdapterTests = withResource
             $ LengthCounterexampleBank.recordLengthCounterexampleBankReceipt
                 defaultLengthEvaluationLimits scalarQuery origin receipt state
       (scalarLive, liveFresh) <- recordScalar
-        LengthCounterexampleBank.LengthCounterexampleBankReceiptFromLiveModel
+        LengthCounterexampleBank.BankReceiptFromLiveModel
         scalarFirst LengthCounterexampleBank.defaultLengthCounterexampleBankState
       (scalarReplay, replayFresh) <- recordScalar
-        LengthCounterexampleBank.LengthCounterexampleBankReceiptFromSolverIndependentReplay
+        LengthCounterexampleBank.BankReceiptFromSolverIndependentReplay
         scalarSecond scalarLive
       (scalarRecorded, simplifiedFresh) <- recordScalar
-        LengthCounterexampleBank.LengthCounterexampleBankReceiptFromSimplificationReplay
+        LengthCounterexampleBank.BankReceiptFromSimplificationReplay
         scalarThird scalarReplay
       map Djex.validatedLengthCounterexampleInputs
           [liveFresh, replayFresh, simplifiedFresh] @?= [[1], [2], [3]]
@@ -5209,14 +5224,14 @@ lengthCounterexampleBankAdapterTests = withResource
             $ LengthCounterexampleBank.recordLengthSpinePairCounterexampleBankReceipt
                 defaultLengthEvaluationLimits pairQuery origin receipt state
       (pairLive, pairLiveFresh) <- recordPair
-        LengthCounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromLiveModel
+        LengthCounterexampleBank.BankReceiptFromLiveModel
         pairFirst
         LengthCounterexampleBank.defaultLengthSpinePairCounterexampleBankState
       (pairReplay, pairReplayFresh) <- recordPair
-        LengthCounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromSolverIndependentReplay
+        LengthCounterexampleBank.BankReceiptFromSolverIndependentReplay
         pairSecond pairLive
       (pairRecorded, pairSimplifiedFresh) <- recordPair
-        LengthCounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromSimplificationReplay
+        LengthCounterexampleBank.BankReceiptFromSimplificationReplay
         pairThird pairReplay
       map Djex.validatedLengthSpinePairCounterexampleInputs
           [pairLiveFresh, pairReplayFresh, pairSimplifiedFresh] @?=
@@ -5250,7 +5265,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 defaultLengthEvaluationLimits
                 (counterexampleBankScalarTargetQuery retained) populated
         hit <- case replayOutcome of
-          Right (LengthCounterexampleBank.LengthCounterexampleBankReplayHit
+          Right (LengthCounterexampleBank.BankReplayHit
               [] retainedHit) -> pure retainedHit
           Left failure -> assertFailure
             ("scalar newest-first replay failed: " ++ show failure)
@@ -5300,7 +5315,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 (counterexampleBankPairTargetQuery retained) populated
         hit <- case replayOutcome of
           Right
-              (LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayHit
+              (LengthCounterexampleBank.BankReplayHit
                 [] retainedHit) -> pure retainedHit
           Left failure -> assertFailure
             ("product newest-first replay failed: " ++ show failure)
@@ -5351,7 +5366,7 @@ lengthCounterexampleBankAdapterTests = withResource
             targetQuery = counterexampleBankScalarTargetQuery retained
             foreignQuery = counterexampleBankScalarForeignQuery retained
             live =
-              LengthCounterexampleBank.LengthCounterexampleBankReceiptFromLiveModel
+              LengthCounterexampleBank.BankReceiptFromLiveModel
             customLimits =
               scalarCounterexampleBankAdapterLimits 2 1 8 4096 2
             customInitial =
@@ -5365,7 +5380,7 @@ lengthCounterexampleBankAdapterTests = withResource
               LengthCounterexampleBank.replayLengthCounterexampleBank
                 defaultLengthEvaluationLimits targetQuery recorded
         hit <- case replayOutcome of
-          Right (LengthCounterexampleBank.LengthCounterexampleBankReplayHit
+          Right (LengthCounterexampleBank.BankReplayHit
               [] retainedHit) -> pure retainedHit
           other -> assertFailure
             ("scalar one-sample replay did not hit: " ++ showReplayShape other)
@@ -5395,7 +5410,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 foreignQuery promotedOnce
         case resetOutcome of
           Right
-              (LengthCounterexampleBank.LengthCounterexampleBankReplayMiss
+              (LengthCounterexampleBank.BankReplayMiss
                 []) -> pure ()
           Left failure -> assertFailure
             $ "scalar scope reset failed: " ++ show failure
@@ -5408,7 +5423,7 @@ lengthCounterexampleBankAdapterTests = withResource
               LengthCounterexampleBank.promoteLengthCounterexampleBankReplayHit
                 hit reset
         staleScopeOutcome @?= Left
-          LengthCounterexampleBank.LengthCounterexampleBankPromotionScopeInvariant
+          LengthCounterexampleBank.BankPromotionScopeInvariant
         staleScopeBank <- expectScalarAdapterBank staleScope
         scalarAdapterBankStats staleScopeBank @?= (0, 0, 0, 0, 0, 0)
 
@@ -5427,7 +5442,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 (error "reset scalar cap demanded receipt")
                 afterResetSecond
         afterResetCapOutcome @?= Right
-          (LengthCounterexampleBank.LengthCounterexampleBankRecordAttemptUnavailable
+          (LengthCounterexampleBank.BankRecordAttemptUnavailable
             $ Djex.LengthCounterexampleBankReplayAttemptLimitExceeded 2 3)
         afterResetCappedBank <- expectScalarAdapterBank afterResetCapped
         scalarAdapterBankStats afterResetCappedBank @?=
@@ -5446,14 +5461,14 @@ lengthCounterexampleBankAdapterTests = withResource
                 LengthCounterexampleBank.defaultLengthCounterexampleBankState
         case sameScopeOutcome of
           Right
-              (LengthCounterexampleBank.LengthCounterexampleBankReplayMiss
+              (LengthCounterexampleBank.BankReplayMiss
                 []) -> pure ()
           _ -> assertFailure "scalar same-scope empty state did not miss"
         let (staleMember, staleMemberOutcome) =
               LengthCounterexampleBank.promoteLengthCounterexampleBankReplayHit
                 hit sameScopeEmpty
         staleMemberOutcome @?= Left
-          LengthCounterexampleBank.LengthCounterexampleBankPromotionMembershipInvariant
+          LengthCounterexampleBank.BankPromotionMembershipInvariant
         staleMemberBank <- expectScalarAdapterBank staleMember
         scalarAdapterBankStats staleMemberBank @?= (0, 0, 0, 0, 0, 0)
         Djex.validatedLengthCounterexampleInputs
@@ -5469,7 +5484,7 @@ lengthCounterexampleBankAdapterTests = withResource
             targetQuery = counterexampleBankPairTargetQuery retained
             foreignQuery = counterexampleBankPairForeignQuery retained
             live =
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromLiveModel
+              LengthCounterexampleBank.BankReceiptFromLiveModel
             customLimits =
               pairCounterexampleBankAdapterLimits 2 1 8 4096 2
             customInitial =
@@ -5484,7 +5499,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 defaultLengthEvaluationLimits targetQuery recorded
         hit <- case replayOutcome of
           Right
-              (LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayHit
+              (LengthCounterexampleBank.BankReplayHit
                 [] retainedHit) -> pure retainedHit
           other -> assertFailure
             ("product one-sample replay did not hit: " ++
@@ -5514,7 +5529,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 foreignQuery promotedOnce
         case resetOutcome of
           Right
-              (LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayMiss
+              (LengthCounterexampleBank.BankReplayMiss
                 []) -> pure ()
           Left failure -> assertFailure
             $ "product scope reset failed: " ++ show failure
@@ -5527,7 +5542,7 @@ lengthCounterexampleBankAdapterTests = withResource
               LengthCounterexampleBank.promoteLengthSpinePairCounterexampleBankReplayHit
                 hit reset
         staleScopeOutcome @?= Left
-          LengthCounterexampleBank.LengthSpinePairCounterexampleBankPromotionScopeInvariant
+          LengthCounterexampleBank.BankPromotionScopeInvariant
         staleScopeBank <- expectPairAdapterBank staleScope
         pairAdapterBankStats staleScopeBank @?= (0, 0, 0, 0, 0, 0)
 
@@ -5546,7 +5561,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 (error "reset product cap demanded receipt")
                 afterResetSecond
         afterResetCapOutcome @?= Right
-          (LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordAttemptUnavailable
+          (LengthCounterexampleBank.BankRecordAttemptUnavailable
             $ Djex.LengthSpinePairCounterexampleBankReplayAttemptLimitExceeded
                 2 3)
         afterResetCappedBank <- expectPairAdapterBank afterResetCapped
@@ -5566,14 +5581,14 @@ lengthCounterexampleBankAdapterTests = withResource
                 LengthCounterexampleBank.defaultLengthSpinePairCounterexampleBankState
         case sameScopeOutcome of
           Right
-              (LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayMiss
+              (LengthCounterexampleBank.BankReplayMiss
                 []) -> pure ()
           _ -> assertFailure "product same-scope empty state did not miss"
         let (staleMember, staleMemberOutcome) =
               LengthCounterexampleBank.promoteLengthSpinePairCounterexampleBankReplayHit
                 hit sameScopeEmpty
         staleMemberOutcome @?= Left
-          LengthCounterexampleBank.LengthSpinePairCounterexampleBankPromotionMembershipInvariant
+          LengthCounterexampleBank.BankPromotionMembershipInvariant
         staleMemberBank <- expectPairAdapterBank staleMember
         pairAdapterBankStats staleMemberBank @?= (0, 0, 0, 0, 0, 0)
         Djex.validatedLengthSpinePairCounterexampleInputs
@@ -5587,7 +5602,7 @@ lengthCounterexampleBankAdapterTests = withResource
         (firstReceipt, _, thirdReceipt) <- scalarAdapterReceiptTriple retained
         let sourceQuery = counterexampleBankScalarSourceQuery retained
             live =
-              LengthCounterexampleBank.LengthCounterexampleBankReceiptFromLiveModel
+              LengthCounterexampleBank.BankReceiptFromLiveModel
             expectedEvaluation =
               Djex.LengthEvaluationValueBitLimitExceeded
                 (Djex.LengthProblemInputValue 0) 1 2
@@ -5603,8 +5618,8 @@ lengthCounterexampleBankAdapterTests = withResource
               LengthCounterexampleBank.replayLengthCounterexampleBank
                 counterexampleBankTightEvaluationLimits sourceQuery recorded
         continuedHit <- case continuedOutcome of
-          Right (LengthCounterexampleBank.LengthCounterexampleBankReplayHit
-              [LengthCounterexampleBank.LengthCounterexampleBankReplayEvaluationRefused
+          Right (LengthCounterexampleBank.BankReplayHit
+              [LengthCounterexampleBank.BankReplayEvaluationRefused
                 actual] hit) -> do
                   actual @?= expectedEvaluation
                   pure hit
@@ -5642,8 +5657,8 @@ lengthCounterexampleBankAdapterTests = withResource
                 cappedRecorded
         case cappedOutcome of
           Right
-              (LengthCounterexampleBank.LengthCounterexampleBankReplayAttemptUnavailable
-                [LengthCounterexampleBank.LengthCounterexampleBankReplayEvaluationRefused
+              (LengthCounterexampleBank.BankReplayAttemptUnavailable
+                [LengthCounterexampleBank.BankReplayEvaluationRefused
                   refusal] actual) -> do
                     refusal @?= expectedEvaluation
                     actual @?=
@@ -5664,7 +5679,7 @@ lengthCounterexampleBankAdapterTests = withResource
         (firstReceipt, _, thirdReceipt) <- pairAdapterReceiptTriple retained
         let sourceQuery = counterexampleBankPairSourceQuery retained
             live =
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromLiveModel
+              LengthCounterexampleBank.BankReceiptFromLiveModel
             expectedEvaluation =
               Djex.LengthSpinePairEvaluationValueBitLimitExceeded
                 (Djex.LengthSpinePairProblemInputValue 0) 1 2
@@ -5681,8 +5696,8 @@ lengthCounterexampleBankAdapterTests = withResource
                 counterexampleBankTightEvaluationLimits sourceQuery recorded
         continuedHit <- case continuedOutcome of
           Right
-              (LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayHit
-                [LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayEvaluationRefused
+              (LengthCounterexampleBank.BankReplayHit
+                [LengthCounterexampleBank.BankReplayEvaluationRefused
                   actual] hit) -> do
                     actual @?= expectedEvaluation
                     pure hit
@@ -5720,8 +5735,8 @@ lengthCounterexampleBankAdapterTests = withResource
                 cappedRecorded
         case cappedOutcome of
           Right
-              (LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayAttemptUnavailable
-                [LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayEvaluationRefused
+              (LengthCounterexampleBank.BankReplayAttemptUnavailable
+                [LengthCounterexampleBank.BankReplayEvaluationRefused
                   refusal] actual) -> do
                     refusal @?= expectedEvaluation
                     actual @?=
@@ -5753,7 +5768,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 poisonOrigin thirdReceipt
                 LengthCounterexampleBank.defaultLengthCounterexampleBankState
         evaluationOutcome @?= Left
-          (LengthCounterexampleBank.LengthCounterexampleBankRecordEvaluationRejected
+          (LengthCounterexampleBank.BankRecordEvaluationRejected
             expectedEvaluation)
         evaluationBank <- expectScalarAdapterBank evaluationState
         Djex.lengthCounterexampleBankSamples evaluationBank @?= []
@@ -5766,7 +5781,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 firstReceipt
                 LengthCounterexampleBank.defaultLengthCounterexampleBankState
         missOutcome @?= Left
-          LengthCounterexampleBank.LengthCounterexampleBankRecordCounterexampleNotReproduced
+          LengthCounterexampleBank.BankRecordCounterexampleNotReproduced
         missBank <- expectScalarAdapterBank missState
         Djex.lengthCounterexampleBankSamples missBank @?= []
         scalarAdapterBankStats missBank @?= (0, 0, 0, 0, 0, 1)
@@ -5781,7 +5796,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 (error "scalar insertion rejection demanded its origin")
                 thirdReceipt insertionInitial
         insertionOutcome @?= Right
-          (LengthCounterexampleBank.LengthCounterexampleBankRecordInsertionUnavailable
+          (LengthCounterexampleBank.BankRecordInsertionUnavailable
             $ Djex.LengthCounterexampleBankEntryLimitExceeded 0 1)
         insertionBank <- expectScalarAdapterBank insertionState
         Djex.lengthCounterexampleBankSamples insertionBank @?= []
@@ -5807,7 +5822,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 poisonOrigin thirdReceipt
                 LengthCounterexampleBank.defaultLengthSpinePairCounterexampleBankState
         evaluationOutcome @?= Left
-          (LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordEvaluationRejected
+          (LengthCounterexampleBank.BankRecordEvaluationRejected
             expectedEvaluation)
         evaluationBank <- expectPairAdapterBank evaluationState
         Djex.lengthSpinePairCounterexampleBankSamples evaluationBank @?= []
@@ -5820,7 +5835,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 firstReceipt
                 LengthCounterexampleBank.defaultLengthSpinePairCounterexampleBankState
         missOutcome @?= Left
-          LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordCounterexampleNotReproduced
+          LengthCounterexampleBank.BankRecordCounterexampleNotReproduced
         missBank <- expectPairAdapterBank missState
         Djex.lengthSpinePairCounterexampleBankSamples missBank @?= []
         pairAdapterBankStats missBank @?= (0, 0, 0, 0, 0, 1)
@@ -5835,7 +5850,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 (error "product insertion rejection demanded its origin")
                 thirdReceipt insertionInitial
         insertionOutcome @?= Right
-          (LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordInsertionUnavailable
+          (LengthCounterexampleBank.BankRecordInsertionUnavailable
             $ Djex.LengthSpinePairCounterexampleBankEntryLimitExceeded 0 1)
         insertionBank <- expectPairAdapterBank insertionState
         Djex.lengthSpinePairCounterexampleBankSamples insertionBank @?= []
@@ -5861,7 +5876,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 scalarInitial
         scalarProductive <- timeout 1000000 $ evaluate $ case snd scalarResult of
           Right
-              (LengthCounterexampleBank.LengthCounterexampleBankRecordAttemptUnavailable
+              (LengthCounterexampleBank.BankRecordAttemptUnavailable
                 failure) -> failure ==
                   Djex.LengthCounterexampleBankReplayAttemptLimitExceeded 0 1
           _ -> False
@@ -5883,7 +5898,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 pairInitial
         pairProductive <- timeout 1000000 $ evaluate $ case snd pairResult of
           Right
-              (LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordAttemptUnavailable
+              (LengthCounterexampleBank.BankRecordAttemptUnavailable
                 failure) -> failure ==
                   Djex.LengthSpinePairCounterexampleBankReplayAttemptLimitExceeded
                     0 1
@@ -5899,7 +5914,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 (counterexampleBankScalarTargetQuery retained) scalarInitial
         case scalarReplayOutcome of
           Right
-              (LengthCounterexampleBank.LengthCounterexampleBankReplayMiss
+              (LengthCounterexampleBank.BankReplayMiss
                 []) -> pure ()
           _ -> assertFailure "zero-limit scalar empty replay did not terminate"
         scalarReplayBank <- expectScalarAdapterBank scalarReplayState
@@ -5911,7 +5926,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 (counterexampleBankPairTargetQuery retained) pairInitial
         case pairReplayOutcome of
           Right
-              (LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayMiss
+              (LengthCounterexampleBank.BankReplayMiss
                 []) -> pure ()
           _ -> assertFailure "zero-limit product empty replay did not terminate"
         pairReplayBank <- expectPairAdapterBank pairReplayState
@@ -5925,7 +5940,7 @@ lengthCounterexampleBankAdapterTests = withResource
         let sourceQuery = counterexampleBankScalarSourceQuery retained
             targetQuery = counterexampleBankScalarTargetQuery retained
             live =
-              LengthCounterexampleBank.LengthCounterexampleBankReceiptFromLiveModel
+              LengthCounterexampleBank.BankReceiptFromLiveModel
         LengthCounterexampleBank.withDefaultLengthCounterexampleBankContext $
           \context -> do
             initial <-
@@ -5968,7 +5983,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 context
             case recorded of
               Right
-                  (LengthCounterexampleBank.LengthCounterexampleBankRecorded
+                  (LengthCounterexampleBank.BankRecorded
                     fresh) -> do
                       Djex.validatedLengthCounterexampleInputs fresh @?= [3]
                       Djex.validatedLengthCounterexampleResult fresh @?= 3
@@ -6038,7 +6053,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 defaultLengthEvaluationLimits targetQuery context
             hit <- case replayed of
               Right
-                  (LengthCounterexampleBank.LengthCounterexampleBankContextReplayHit
+                  (LengthCounterexampleBank.BankReplayHit
                     [] retainedHit) -> pure retainedHit
               Left failure -> assertFailure
                 ("scalar context replay failed: " ++ show failure)
@@ -6077,7 +6092,7 @@ lengthCounterexampleBankAdapterTests = withResource
         let sourceQuery = counterexampleBankPairSourceQuery retained
             targetQuery = counterexampleBankPairTargetQuery retained
             live =
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromLiveModel
+              LengthCounterexampleBank.BankReceiptFromLiveModel
         LengthCounterexampleBank.withDefaultLengthSpinePairCounterexampleBankContext $
           \context -> do
             initial <-
@@ -6120,7 +6135,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 context
             case recorded of
               Right
-                  (LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecorded
+                  (LengthCounterexampleBank.BankRecorded
                     fresh) -> do
                       Djex.validatedLengthSpinePairCounterexampleInputs fresh @?=
                         [3]
@@ -6192,7 +6207,7 @@ lengthCounterexampleBankAdapterTests = withResource
                 defaultLengthEvaluationLimits targetQuery context
             hit <- case replayed of
               Right
-                  (LengthCounterexampleBank.LengthSpinePairCounterexampleBankContextReplayHit
+                  (LengthCounterexampleBank.BankReplayHit
                     [] retainedHit) -> pure retainedHit
               Left failure -> assertFailure
                 ("product context replay failed: " ++ show failure)
@@ -6242,11 +6257,16 @@ lengthCounterexampleBankAdapterTests = withResource
               , "LengthSpinePairCounterexampleBankContext"
               , "LengthSpinePairCounterexampleBankContextReplayHit"
               ]
+            -- Both domains' replay outcomes are one shared closed vocabulary
+            -- at each domain's own error and hit types, so the constructors
+            -- are exposed once.
             exposedOutcomes =
-              [ "LengthCounterexampleBankReplayOutcome (..)"
-              , "LengthCounterexampleBankContextReplayOutcome (..)"
-              , "LengthSpinePairCounterexampleBankReplayOutcome (..)"
-              , "LengthSpinePairCounterexampleBankContextReplayOutcome (..)"
+              [ "BankReplayOutcome (..)"
+              , "BankReplayRefusal (..)"
+              , "BankReplayFailure (..)"
+              , "BankPromotionFailure (..)"
+              , "BankRecordFailure (..)"
+              , "BankRecordOutcome (..)"
               ]
         mapM_ (\name -> assertBool
             ("counterexample-bank adapter exposed constructor for " ++ name)
@@ -6259,18 +6279,11 @@ lengthCounterexampleBankAdapterTests = withResource
         mapM_ (\roleLine -> assertBool
             ("counterexample-bank adapter lost nominal role: " ++ roleLine)
             $ roleLine `isInfixOf` source)
-          [ "type role LengthCounterexampleBankState nominal"
-          , "type role LengthCounterexampleBankReplayHit nominal"
-          , "type role LengthCounterexampleBankReplayOutcome nominal"
-          , "type role LengthCounterexampleBankContext nominal nominal"
-          , "type role LengthCounterexampleBankContextReplayHit nominal nominal"
-          , "type role LengthCounterexampleBankContextReplayOutcome nominal nominal"
-          , "type role LengthSpinePairCounterexampleBankState nominal"
-          , "type role LengthSpinePairCounterexampleBankReplayHit nominal"
-          , "type role LengthSpinePairCounterexampleBankReplayOutcome nominal"
-          , "type role LengthSpinePairCounterexampleBankContext nominal nominal"
-          , "type role LengthSpinePairCounterexampleBankContextReplayHit nominal nominal"
-          , "type role LengthSpinePairCounterexampleBankContextReplayOutcome\n  nominal nominal"
+          [ "type role BankState nominal nominal"
+          , "type role BankContext nominal nominal nominal"
+          , "type role BankReplayHit nominal nominal nominal"
+          , "type role BankReplayOutcome nominal nominal nominal"
+          , "type role BankContextReplayHit nominal nominal nominal nominal"
           ]
         mapM_ (\boundary -> assertBool
             ("counterexample-bank context lost its rank-2 boundary: "
@@ -6278,6 +6291,7 @@ lengthCounterexampleBankAdapterTests = withResource
             $ boundary `isInfixOf` source)
           [ "(forall command.\n      LengthCounterexampleBankContext command identity"
           , "(forall command.\n      LengthSpinePairCounterexampleBankContext command identity"
+          , "(forall command. BankContext command limits bank -> IO result)"
           , "modifyMVar state $ \\initial ->"
           , "rnf limits `seq` rnf active"
           ]
@@ -6285,45 +6299,43 @@ lengthCounterexampleBankAdapterTests = withResource
             ("counterexample-bank adapter lost source mapping: " ++ mapping)
             $ mapping `isInfixOf` source)
           [ "LengthSMTLibInputReplayAssociationRejected _ ->"
-          , "LengthCounterexampleBankReplayAssociationRefused"
-          , "Left LengthCounterexampleBankRecordAssociationRejected"
           , "LengthSpinePairSMTLibInputReplayAssociationRejected _ ->"
-          , "LengthSpinePairCounterexampleBankReplayAssociationRefused"
-          , "Left LengthSpinePairCounterexampleBankRecordAssociationRejected"
+          , "ReplayStepAssociationRefused"
+          , "RecordStepAssociationRejected -> Left BankRecordAssociationRejected"
           ]
 
         let scalarReplayFailureClass failure = case failure of
-              LengthCounterexampleBank.LengthCounterexampleBankReplayScopeInvariant ->
+              LengthCounterexampleBank.BankReplayScopeInvariant ->
                 "scope"
-              LengthCounterexampleBank.LengthCounterexampleBankReplayMembershipInvariant ->
+              LengthCounterexampleBank.BankReplayMembershipInvariant ->
                 "membership"
             scalarRefusalClass refusal = case refusal of
-              LengthCounterexampleBank.LengthCounterexampleBankReplayEvaluationRefused _ ->
+              LengthCounterexampleBank.BankReplayEvaluationRefused _ ->
                 "evaluation"
-              LengthCounterexampleBank.LengthCounterexampleBankReplayAssociationRefused ->
+              LengthCounterexampleBank.BankReplayAssociationRefused ->
                 "association"
             scalarPromotionClass failure = case failure of
-              LengthCounterexampleBank.LengthCounterexampleBankPromotionScopeInvariant ->
+              LengthCounterexampleBank.BankPromotionScopeInvariant ->
                 "scope"
-              LengthCounterexampleBank.LengthCounterexampleBankPromotionMembershipInvariant ->
+              LengthCounterexampleBank.BankPromotionMembershipInvariant ->
                 "membership"
-              LengthCounterexampleBank.LengthCounterexampleBankPromotionInsertionRejected _ ->
+              LengthCounterexampleBank.BankPromotionInsertionRejected _ ->
                 "insertion"
             scalarRecordFailureClass failure = case failure of
-              LengthCounterexampleBank.LengthCounterexampleBankRecordScopeInvariant ->
+              LengthCounterexampleBank.BankRecordScopeInvariant ->
                 "scope"
-              LengthCounterexampleBank.LengthCounterexampleBankRecordEvaluationRejected _ ->
+              LengthCounterexampleBank.BankRecordEvaluationRejected _ ->
                 "evaluation"
-              LengthCounterexampleBank.LengthCounterexampleBankRecordAssociationRejected ->
+              LengthCounterexampleBank.BankRecordAssociationRejected ->
                 "association"
-              LengthCounterexampleBank.LengthCounterexampleBankRecordCounterexampleNotReproduced ->
+              LengthCounterexampleBank.BankRecordCounterexampleNotReproduced ->
                 "not-reproduced"
             scalarRecordOutcomeClass outcome = case outcome of
-              LengthCounterexampleBank.LengthCounterexampleBankRecorded _ ->
+              LengthCounterexampleBank.BankRecorded _ ->
                 "recorded"
-              LengthCounterexampleBank.LengthCounterexampleBankRecordAttemptUnavailable _ ->
+              LengthCounterexampleBank.BankRecordAttemptUnavailable _ ->
                 "attempt"
-              LengthCounterexampleBank.LengthCounterexampleBankRecordInsertionUnavailable _ ->
+              LengthCounterexampleBank.BankRecordInsertionUnavailable _ ->
                 "insertion"
             scalarError =
               Djex.LengthCounterexampleBankReplayAttemptLimitExceeded 0 1
@@ -6331,74 +6343,74 @@ lengthCounterexampleBankAdapterTests = withResource
               Djex.LengthEvaluationValueBitLimitExceeded
                 (Djex.LengthProblemInputValue 0) 1 2
         map scalarReplayFailureClass
-          [ LengthCounterexampleBank.LengthCounterexampleBankReplayScopeInvariant
-          , LengthCounterexampleBank.LengthCounterexampleBankReplayMembershipInvariant
+          [ LengthCounterexampleBank.BankReplayScopeInvariant
+          , LengthCounterexampleBank.BankReplayMembershipInvariant
           ] @?= ["scope", "membership"]
         map scalarRefusalClass
-          [ LengthCounterexampleBank.LengthCounterexampleBankReplayEvaluationRefused
+          [ LengthCounterexampleBank.BankReplayEvaluationRefused
               scalarEvaluation
-          , LengthCounterexampleBank.LengthCounterexampleBankReplayAssociationRefused
+          , LengthCounterexampleBank.BankReplayAssociationRefused
           ] @?= ["evaluation", "association"]
         map scalarPromotionClass
-          [ LengthCounterexampleBank.LengthCounterexampleBankPromotionScopeInvariant
-          , LengthCounterexampleBank.LengthCounterexampleBankPromotionMembershipInvariant
-          , LengthCounterexampleBank.LengthCounterexampleBankPromotionInsertionRejected
+          [ LengthCounterexampleBank.BankPromotionScopeInvariant
+          , LengthCounterexampleBank.BankPromotionMembershipInvariant
+          , LengthCounterexampleBank.BankPromotionInsertionRejected
               scalarError
           ] @?= ["scope", "membership", "insertion"]
         map scalarRecordFailureClass
-          [ LengthCounterexampleBank.LengthCounterexampleBankRecordScopeInvariant
-          , LengthCounterexampleBank.LengthCounterexampleBankRecordEvaluationRejected
+          [ LengthCounterexampleBank.BankRecordScopeInvariant
+          , LengthCounterexampleBank.BankRecordEvaluationRejected
               scalarEvaluation
-          , LengthCounterexampleBank.LengthCounterexampleBankRecordAssociationRejected
-          , LengthCounterexampleBank.LengthCounterexampleBankRecordCounterexampleNotReproduced
+          , LengthCounterexampleBank.BankRecordAssociationRejected
+          , LengthCounterexampleBank.BankRecordCounterexampleNotReproduced
           ] @?= ["scope", "evaluation", "association", "not-reproduced"]
         map scalarRecordOutcomeClass
-          [ LengthCounterexampleBank.LengthCounterexampleBankRecorded
+          [ LengthCounterexampleBank.BankRecorded
               scalarReceipt
-          , LengthCounterexampleBank.LengthCounterexampleBankRecordAttemptUnavailable
+          , LengthCounterexampleBank.BankRecordAttemptUnavailable
               scalarError
-          , LengthCounterexampleBank.LengthCounterexampleBankRecordInsertionUnavailable
+          , LengthCounterexampleBank.BankRecordInsertionUnavailable
               scalarError
           ] @?= ["recorded", "attempt", "insertion"]
         ([minBound .. maxBound] ::
-            [LengthCounterexampleBank.LengthCounterexampleBankReceiptOrigin]) @?=
-          [ LengthCounterexampleBank.LengthCounterexampleBankReceiptFromLiveModel
-          , LengthCounterexampleBank.LengthCounterexampleBankReceiptFromSolverIndependentReplay
-          , LengthCounterexampleBank.LengthCounterexampleBankReceiptFromSimplificationReplay
+            [LengthCounterexampleBank.BankReceiptOrigin]) @?=
+          [ LengthCounterexampleBank.BankReceiptFromLiveModel
+          , LengthCounterexampleBank.BankReceiptFromSolverIndependentReplay
+          , LengthCounterexampleBank.BankReceiptFromSimplificationReplay
           ]
 
         let pairReplayFailureClass failure = case failure of
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayScopeInvariant ->
+              LengthCounterexampleBank.BankReplayScopeInvariant ->
                 "scope"
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayMembershipInvariant ->
+              LengthCounterexampleBank.BankReplayMembershipInvariant ->
                 "membership"
             pairRefusalClass refusal = case refusal of
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayEvaluationRefused _ ->
+              LengthCounterexampleBank.BankReplayEvaluationRefused _ ->
                 "evaluation"
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayAssociationRefused ->
+              LengthCounterexampleBank.BankReplayAssociationRefused ->
                 "association"
             pairPromotionClass failure = case failure of
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankPromotionScopeInvariant ->
+              LengthCounterexampleBank.BankPromotionScopeInvariant ->
                 "scope"
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankPromotionMembershipInvariant ->
+              LengthCounterexampleBank.BankPromotionMembershipInvariant ->
                 "membership"
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankPromotionInsertionRejected _ ->
+              LengthCounterexampleBank.BankPromotionInsertionRejected _ ->
                 "insertion"
             pairRecordFailureClass failure = case failure of
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordScopeInvariant ->
+              LengthCounterexampleBank.BankRecordScopeInvariant ->
                 "scope"
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordEvaluationRejected _ ->
+              LengthCounterexampleBank.BankRecordEvaluationRejected _ ->
                 "evaluation"
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordAssociationRejected ->
+              LengthCounterexampleBank.BankRecordAssociationRejected ->
                 "association"
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordCounterexampleNotReproduced ->
+              LengthCounterexampleBank.BankRecordCounterexampleNotReproduced ->
                 "not-reproduced"
             pairRecordOutcomeClass outcome = case outcome of
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecorded _ ->
+              LengthCounterexampleBank.BankRecorded _ ->
                 "recorded"
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordAttemptUnavailable _ ->
+              LengthCounterexampleBank.BankRecordAttemptUnavailable _ ->
                 "attempt"
-              LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordInsertionUnavailable _ ->
+              LengthCounterexampleBank.BankRecordInsertionUnavailable _ ->
                 "insertion"
             pairError =
               Djex.LengthSpinePairCounterexampleBankReplayAttemptLimitExceeded
@@ -6407,40 +6419,40 @@ lengthCounterexampleBankAdapterTests = withResource
               Djex.LengthSpinePairEvaluationValueBitLimitExceeded
                 (Djex.LengthSpinePairProblemInputValue 0) 1 2
         map pairReplayFailureClass
-          [ LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayScopeInvariant
-          , LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayMembershipInvariant
+          [ LengthCounterexampleBank.BankReplayScopeInvariant
+          , LengthCounterexampleBank.BankReplayMembershipInvariant
           ] @?= ["scope", "membership"]
         map pairRefusalClass
-          [ LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayEvaluationRefused
+          [ LengthCounterexampleBank.BankReplayEvaluationRefused
               pairEvaluation
-          , LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayAssociationRefused
+          , LengthCounterexampleBank.BankReplayAssociationRefused
           ] @?= ["evaluation", "association"]
         map pairPromotionClass
-          [ LengthCounterexampleBank.LengthSpinePairCounterexampleBankPromotionScopeInvariant
-          , LengthCounterexampleBank.LengthSpinePairCounterexampleBankPromotionMembershipInvariant
-          , LengthCounterexampleBank.LengthSpinePairCounterexampleBankPromotionInsertionRejected
+          [ LengthCounterexampleBank.BankPromotionScopeInvariant
+          , LengthCounterexampleBank.BankPromotionMembershipInvariant
+          , LengthCounterexampleBank.BankPromotionInsertionRejected
               pairError
           ] @?= ["scope", "membership", "insertion"]
         map pairRecordFailureClass
-          [ LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordScopeInvariant
-          , LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordEvaluationRejected
+          [ LengthCounterexampleBank.BankRecordScopeInvariant
+          , LengthCounterexampleBank.BankRecordEvaluationRejected
               pairEvaluation
-          , LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordAssociationRejected
-          , LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordCounterexampleNotReproduced
+          , LengthCounterexampleBank.BankRecordAssociationRejected
+          , LengthCounterexampleBank.BankRecordCounterexampleNotReproduced
           ] @?= ["scope", "evaluation", "association", "not-reproduced"]
         map pairRecordOutcomeClass
-          [ LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecorded
+          [ LengthCounterexampleBank.BankRecorded
               pairReceipt
-          , LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordAttemptUnavailable
+          , LengthCounterexampleBank.BankRecordAttemptUnavailable
               pairError
-          , LengthCounterexampleBank.LengthSpinePairCounterexampleBankRecordInsertionUnavailable
+          , LengthCounterexampleBank.BankRecordInsertionUnavailable
               pairError
           ] @?= ["recorded", "attempt", "insertion"]
         ([minBound .. maxBound] ::
-            [LengthCounterexampleBank.LengthSpinePairCounterexampleBankReceiptOrigin]) @?=
-          [ LengthCounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromLiveModel
-          , LengthCounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromSolverIndependentReplay
-          , LengthCounterexampleBank.LengthSpinePairCounterexampleBankReceiptFromSimplificationReplay
+            [LengthCounterexampleBank.BankReceiptOrigin]) @?=
+          [ LengthCounterexampleBank.BankReceiptFromLiveModel
+          , LengthCounterexampleBank.BankReceiptFromSolverIndependentReplay
+          , LengthCounterexampleBank.BankReceiptFromSimplificationReplay
           ]
     ]
 
@@ -6511,7 +6523,7 @@ buildSameScopeScalarCounterexampleBankRunnerFixture = do
       | group <- groups
       , [spelling] <- [detailedCandidateGroupVariants group]
       , providerName `isInfixOf` spelling
-      , not $ isNothing $ detailedCandidateGroupSemanticSidecar group
+      , isJust (detailedCandidateGroupSemanticSidecar group)
       ] of
     group : _ -> pure group
     [] -> assertFailure "same-scope scalar bank fixture lacked its provider"
@@ -6521,7 +6533,7 @@ buildSameScopeScalarCounterexampleBankRunnerFixture = do
       | group <- groups
       , providerIndependentProjectionSpelling 1 `elem`
           detailedCandidateGroupVariants group
-      , not $ isNothing $ detailedCandidateGroupSemanticSidecar group
+      , isJust (detailedCandidateGroupSemanticSidecar group)
       ] of
     group : _ -> pure group
     [] -> assertFailure "same-scope scalar bank fixture lacked its identity"
@@ -6568,6 +6580,9 @@ assertCounterexampleBankRunnerArchitecture = do
     "src/Leant/Synth/Length/Selection/Internal.hs"
   pairSelection <- readFile
     "src/Leant/Synth/Length/SpinePair/Selection/Internal.hs"
+  genericSelection <- readFile
+    "src/Leant/Synth/Length/Selection/Generic.hs"
+  genericRanking <- readFile "src/Leant/Synth/Length/Ranking/Generic.hs"
   integration <- readFile "src/Leant/Synth/Length/Integration.hs"
   publicScalarRanking <- readFile "src/Leant/Synth/Length/Ranking.hs"
   publicPairRanking <- readFile
@@ -6581,49 +6596,83 @@ assertCounterexampleBankRunnerArchitecture = do
       pairText = normalized pairRanking
       scalarSelectionText = normalized scalarSelection
       pairSelectionText = normalized pairSelection
+      genericSelectionText = normalized genericSelection
+      genericRankingText = normalized genericRanking
       integrationText = normalized integration
       integrationExports = unlines
         . takeWhile (not . isInfixOf ") where")
         $ lines integration
+  -- Both domains rank through one shared core, so the cursor's nominal
+  -- command tag, the fail-closed bank transitions, and the replay-then-advance
+  -- order are pinned once where they live; each domain is pinned to name the
+  -- evidence-mismatch failure in its own failure type and to supply its own
+  -- bank vocabulary.
   mapM_ (\fragment -> assertBool
-      ("scalar bank runner lost its nominal/failure boundary: " ++ fragment)
-      $ normalized fragment `isInfixOf` scalarText)
-    [ "type role LengthCounterexampleBankCursor nominal"
-    , "type role LengthCounterexampleAcquisition nominal"
-    , "Left _ -> Left $ localRankingFailure LengthRankingEvidenceReplayMismatch index"
-    , "Left _ -> Left $ localRankingFailure LengthRankingEvidenceReplayMismatch index Right () -> Right cursor"
-    , "case simplifyCounterexampleAssessment evaluation simplificationPolicy index association query receipt of Left failure -> pure $ PreparedLengthCandidatesFailed failure Right assessed -> continueAssessed"
-    , "continueAssessed reversed cursor index query acquisition rest assessed = do advanced <- advanceLengthCounterexampleBankCursor"
-    ]
-  mapM_ (\fragment -> assertBool
-      ("product bank runner lost its nominal/failure boundary: " ++ fragment)
-      $ normalized fragment `isInfixOf` pairText)
-    [ "type role LengthSpinePairCounterexampleBankCursor nominal"
-    , "type role LengthSpinePairCounterexampleAcquisition nominal"
-    , "Left _ -> Left $ localLengthSpinePairRankingFailure LengthSpinePairRankingEvidenceReplayMismatch index"
-    , "case simplifyLengthSpinePairCounterexampleAssessment evaluation simplificationPolicy index association query receipt of Left failure -> pure $ PreparedLengthSpinePairCandidatesFailed failure Right assessed -> continueAssessed"
-    , "continueAssessed reversed cursor index query acquisition rest assessed = do advanced <- advanceLengthSpinePairCounterexampleBankCursor"
+      ("shared bank runner lost its nominal/failure boundary: " ++ fragment)
+      $ normalized fragment `isInfixOf` genericRankingText)
+    [ "type role CounterexampleBankCursor nominal nominal"
+    , "type role CounterexampleAcquisition nominal nominal"
+    , "mismatch = Left $ localRankingFailure @d ViewEvidenceReplayMismatch index"
+    , "Left _ -> Left $ localRankingFailure @d ViewEvidenceReplayMismatch index"
+    , "Left _ -> mismatch Right () -> Right cursor"
+    , "case simplifyCounterexampleAssessment evaluation simplificationPolicy index association query receipt of Left failure -> pure $ PreparedCandidatesFailed failure Right assessed -> continueAssessed"
+    , "continueAssessed reversed cursor index query acquisition rest assessed = do advanced <- advanceCounterexampleBankCursor @d"
     ]
   mapM_ (\(domain, sourceText, fragments) ->
       mapM_ (\fragment -> assertBool
-          (domain ++ " selection lost preserve/seal ordering: " ++ fragment)
+          (domain ++ " ranking lost its failure naming: " ++ fragment)
+          $ normalized fragment `isInfixOf` sourceText) fragments)
+    [ ( "scalar"
+      , scalarText
+      , [ "instance LengthRankingDomain ScalarLength where"
+        , "ViewEvidenceReplayMismatch -> LengthRankingEvidenceReplayMismatch"
+        , "ViewQueryAssociationMismatch -> LengthRankingQueryAssociationMismatch"
+        , "bankSurface = CounterexampleBank.scalarBankSurface"
+        , "bankBridge = CounterexampleBank.scalarBankBridge"
+        ]
+      )
+    , ( "product"
+      , pairText
+      , [ "instance LengthRankingDomain PairLength where"
+        , "ViewEvidenceReplayMismatch -> LengthSpinePairRankingEvidenceReplayMismatch"
+        , "ViewQueryAssociationMismatch -> LengthSpinePairRankingQueryAssociationMismatch"
+        , "bankSurface = CounterexampleBank.spinePairBankSurface"
+        , "bankBridge = CounterexampleBank.spinePairBankBridge"
+        ]
+      )
+    ]
+  -- Both domains select through one shared pipeline, so preserve-before-seal
+  -- ordering is pinned once where it lives, and each domain is pinned to name
+  -- every fail-closed reason in its own failure type instead of repeating the
+  -- control flow.
+  mapM_ (\fragment -> assertBool
+      ("shared selection lost preserve/seal ordering: " ++ fragment)
+      $ normalized fragment `isInfixOf` genericSelectionText)
+    [ "assessed <- assess verification pure $ case selectionAdapterFailure domain assessed of"
+    , "Nothing -> preserve $ selectionRankingUnavailable domain"
+    , "Left failure -> preserve $ selectionSealFailed domain failure"
+    , "preserve = SelectionPreserved verification"
+    ]
+  mapM_ (\(domain, sourceText, fragments) ->
+      mapM_ (\fragment -> assertBool
+          (domain ++ " selection lost its failure naming: " ++ fragment)
           $ normalized fragment `isInfixOf` sourceText) fragments)
     [ ( "scalar"
       , scalarSelectionText
-      , [ "assessed <- assess verification pure $ case lengthPostVerificationAdapterFailure assessed of"
-        , "Just failure -> preserve $ LengthSelectionPostVerificationFailed failure"
-        , "Just failure -> preserve $ LengthSelectionRankingFailed failure"
-        , "Left failure -> preserve $ LengthSelectionSealFailed failure"
-        , "preserve = LengthSelectionPreserved verification"
+      , [ "Generic.selectionAdapterFailure = fmap LengthSelectionPostVerificationFailed"
+        , "Generic.selectionRankingFailure = fmap LengthSelectionRankingFailed"
+        , "Generic.selectionRankingUnavailable = LengthSelectionRankingUnavailable"
+        , "Generic.selectionSealFailed = LengthSelectionSealFailed"
+        , "Counterexample receipt -> Left $ Generic.SelectionRejection receipt"
         ]
       )
     , ( "product"
       , pairSelectionText
-      , [ "assessed <- assess verification pure $ case lengthSpinePairPostVerificationAdapterFailure assessed of"
-        , "Just failure -> preserve $ LengthSpinePairSelectionPostVerificationFailed failure"
-        , "Just failure -> preserve $ LengthSpinePairSelectionRankingFailed failure"
-        , "Left failure -> preserve $ LengthSpinePairSelectionSealFailed failure"
-        , "preserve = LengthSpinePairSelectionPreserved verification"
+      , [ "Generic.selectionAdapterFailure = fmap LengthSpinePairSelectionPostVerificationFailed"
+        , "Generic.selectionRankingFailure = fmap LengthSpinePairSelectionRankingFailed"
+        , "Generic.selectionRankingUnavailable = LengthSpinePairSelectionRankingUnavailable"
+        , "Generic.selectionSealFailed = LengthSpinePairSelectionSealFailed"
+        , "LengthSpinePairCounterexample receipt -> Left $ Generic.SelectionRejection receipt"
         ]
       )
     ]
@@ -7389,40 +7438,34 @@ assertPairIntegrationRejection result = do
   assertBool "Integration product filter used the scalar projection"
     $ isNothing $ lengthAssessmentSelectionResult result
 
+-- | Both domains' replay outcomes are the shared 'BankReplayOutcome' at
+-- different hit types, so one shape printer serves the scalar and product
+-- assertions alike (the hit payload is deliberately elided).
 showReplayShape
-  :: Either
-      LengthCounterexampleBank.LengthCounterexampleBankReplayFailure
-      (LengthCounterexampleBank.LengthCounterexampleBankReplayOutcome identity)
+  :: (Show evaluationError, Show bankError)
+  => Either
+      LengthCounterexampleBank.BankReplayFailure
+      (LengthCounterexampleBank.BankReplayOutcome
+        evaluationError bankError hit)
   -> String
 showReplayShape outcome = case outcome of
   Left failure -> "Left " ++ show failure
-  Right (LengthCounterexampleBank.LengthCounterexampleBankReplayMiss refusals) ->
+  Right (LengthCounterexampleBank.BankReplayMiss refusals) ->
     "ReplayMiss " ++ show refusals
   Right
-      (LengthCounterexampleBank.LengthCounterexampleBankReplayAttemptUnavailable
+      (LengthCounterexampleBank.BankReplayAttemptUnavailable
         refusals failure) ->
     "ReplayAttemptUnavailable " ++ show refusals ++ " " ++ show failure
-  Right (LengthCounterexampleBank.LengthCounterexampleBankReplayHit
+  Right (LengthCounterexampleBank.BankReplayHit
       refusals _) -> "ReplayHit " ++ show refusals
 
 showPairReplayShape
   :: Either
-      LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayFailure
+      LengthCounterexampleBank.BankReplayFailure
       (LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayOutcome
         identity)
   -> String
-showPairReplayShape outcome = case outcome of
-  Left failure -> "Left " ++ show failure
-  Right
-      (LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayMiss
-        refusals) -> "ReplayMiss " ++ show refusals
-  Right
-      (LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayAttemptUnavailable
-        refusals failure) ->
-    "ReplayAttemptUnavailable " ++ show refusals ++ " " ++ show failure
-  Right
-      (LengthCounterexampleBank.LengthSpinePairCounterexampleBankReplayHit
-        refusals _) -> "ReplayHit " ++ show refusals
+showPairReplayShape = showReplayShape
 
 lengthSpinePairBoundaryTests :: TestTree
 lengthSpinePairBoundaryTests = testGroup
@@ -7650,7 +7693,7 @@ verifiedFirstDirectTypedCandidate goal = do
         [ retained
         | retained <- groups
         , detailedCandidateGroupRoute retained == RouteTypedCandidate
-        , not $ isNothing $ detailedCandidateGroupSemanticSidecar retained
+        , isJust (detailedCandidateGroupSemanticSidecar retained)
         , [_] <- [detailedCandidateGroupVariants retained]
         ] of
       retained : _ -> pure retained
@@ -9773,52 +9816,82 @@ lengthDescriptorBoundEffectiveIDExecutableAccessTests = testGroup
 
 assertLengthDescriptorBoundEffectiveIDExecutableAccessProjections :: IO ()
 assertLengthDescriptorBoundEffectiveIDExecutableAccessProjections =
-  withTemporaryDirectory "leant-length-effective-access-policy" $ \root -> do
+  assertDescriptorBoundAccessProjections
+    "leant-length-effective-access-policy" "effective-access"
+    mkLengthRankingPolicyWithDescriptorBoundEffectiveIDExecutableAccessLaunch
+    Djex.mkLengthSMTLibDescriptorBoundEffectiveIDExecutableAccessExecutionConfig
+    Djex.LengthSMTLibDescriptorBoundEffectiveIDExecutableAccessLaunch
+    []
+
+-- | Shared body of the per-launch access-authority projection tests: the
+-- maker under test joins the direct and plain descriptor-bound makers (plus
+-- any earlier access-checked makers), every policy projects its own launch
+-- strategy, the digest expectation stays absent, the validated-component
+-- bridge preserves the strategy, a relative executable path is rejected with
+-- the unchanged execution failure before evaluation limits are forced, and
+-- the disabled assessment mode still projects no strategy.
+assertDescriptorBoundAccessProjections
+  :: String
+  -> String
+  -> (LengthRankingPolicySource
+      -> Either LengthRankingConfigurationError LengthRankingPolicy)
+  -> (Djex.LengthSMTLibExecutionLimits
+      -> Djex.LengthSMTLibExecutionConfigSource
+      -> Either
+          Djex.LengthSMTLibExecutionConfigError
+          Djex.LengthSMTLibExecutionConfig)
+  -> Djex.LengthSMTLibExecutableLaunchStrategy
+  -> [( LengthRankingPolicySource
+        -> Either LengthRankingConfigurationError LengthRankingPolicy
+      , Djex.LengthSMTLibExecutableLaunchStrategy
+      )]
+  -> IO ()
+assertDescriptorBoundAccessProjections temporaryName tag mkPolicy
+    mkExecutionConfig expectedStrategy earlierAccessMakers =
+  withTemporaryDirectory temporaryName $ \root -> do
     let executable = root </> "missing-z3"
         executionSource = explicitLengthRankingExecutionSource executable
           Nothing Djex.LengthSMTLibStatusOnly
         source = explicitLengthRankingPolicySource
           Djex.defaultLengthSMTLibExecutionLimits executionSource
           Djex.defaultLengthEvaluationLimitSource
-    direct <- expectRight $ mkLengthRankingPolicy source
-    descriptor <- expectRight
-      $ mkLengthRankingPolicyWithDescriptorBoundExecutableLaunch source
-    effectiveAccess <- expectRight
-      $ mkLengthRankingPolicyWithDescriptorBoundEffectiveIDExecutableAccessLaunch
-          source
-    map lengthRankingPolicyExecutableLaunchStrategy
-        [direct, descriptor, effectiveAccess] @?=
-      [ Djex.LengthSMTLibPathSnapshotThenDirectSpawn
-      , Djex.LengthSMTLibDescriptorBoundExecutableLaunch
-      , Djex.LengthSMTLibDescriptorBoundEffectiveIDExecutableAccessLaunch
-      ]
-    lengthRankingPolicyExecutableDigestExpectation effectiveAccess @?=
+        makers =
+          [ ( mkLengthRankingPolicy
+            , Djex.LengthSMTLibPathSnapshotThenDirectSpawn
+            )
+          , ( mkLengthRankingPolicyWithDescriptorBoundExecutableLaunch
+            , Djex.LengthSMTLibDescriptorBoundExecutableLaunch
+            )
+          ]
+          ++ earlierAccessMakers
+          ++ [(mkPolicy, expectedStrategy)]
+    policies <- mapM (expectRight . ($ source) . fst) makers
+    map lengthRankingPolicyExecutableLaunchStrategy policies @?=
+      map snd makers
+    accessChecked <- expectRight $ mkPolicy source
+    lengthRankingPolicyExecutableDigestExpectation accessChecked @?=
       Djex.LengthSMTLibExecutableDigestExpectationAbsent
 
-    execution <- expectRight
-      $ Djex.mkLengthSMTLibDescriptorBoundEffectiveIDExecutableAccessExecutionConfig
-          Djex.defaultLengthSMTLibExecutionLimits executionSource
+    execution <- expectRight $ mkExecutionConfig
+      Djex.defaultLengthSMTLibExecutionLimits executionSource
     evaluation <- expectRight $ Djex.mkLengthEvaluationLimits
       Djex.defaultLengthEvaluationLimitSource
     let bridged = lengthRankingPolicyFromValidatedComponents
           execution evaluation
-    lengthRankingPolicyExecutableLaunchStrategy bridged @?=
-      Djex.LengthSMTLibDescriptorBoundEffectiveIDExecutableAccessLaunch
+    lengthRankingPolicyExecutableLaunchStrategy bridged @?= expectedStrategy
 
     let invalidSource = explicitLengthRankingPolicySource
           Djex.defaultLengthSMTLibExecutionLimits
           (explicitLengthRankingExecutionSource "relative-z3" Nothing
             Djex.LengthSMTLibStatusOnly)
-          (error "effective-access maker forced evaluation after execution")
-    case
-        mkLengthRankingPolicyWithDescriptorBoundEffectiveIDExecutableAccessLaunch
-          invalidSource of
+          (error $ tag ++ " maker forced evaluation after execution")
+    case mkPolicy invalidSource of
       Left (LengthRankingExecutionConfigurationRejected
           Djex.LengthSMTLibExecutionExecutablePathNotAbsolute) -> pure ()
       Left failure -> assertFailure
-        $ "effective-access maker changed execution failure: " ++ show failure
+        $ tag ++ " maker changed execution failure: " ++ show failure
       Right _ -> assertFailure
-        "effective-access maker accepted a relative executable path"
+        $ tag ++ " maker accepted a relative executable path"
 
     lengthAssessmentModeExecutableLaunchStrategy
       disabledLengthAssessmentMode @?= Nothing
@@ -9861,59 +9934,15 @@ lengthDescriptorBoundExecveCheckExecutableAccessTests = testGroup
 
 assertLengthDescriptorBoundExecveCheckExecutableAccessProjections :: IO ()
 assertLengthDescriptorBoundExecveCheckExecutableAccessProjections =
-  withTemporaryDirectory "leant-length-execve-check-policy" $ \root -> do
-    let executable = root </> "missing-z3"
-        executionSource = explicitLengthRankingExecutionSource executable
-          Nothing Djex.LengthSMTLibStatusOnly
-        source = explicitLengthRankingPolicySource
-          Djex.defaultLengthSMTLibExecutionLimits executionSource
-          Djex.defaultLengthEvaluationLimitSource
-    direct <- expectRight $ mkLengthRankingPolicy source
-    descriptor <- expectRight
-      $ mkLengthRankingPolicyWithDescriptorBoundExecutableLaunch source
-    effectiveAccess <- expectRight
-      $ mkLengthRankingPolicyWithDescriptorBoundEffectiveIDExecutableAccessLaunch
-          source
-    execveCheck <- expectRight
-      $ mkLengthRankingPolicyWithDescriptorBoundExecveCheckExecutableAccessLaunch
-          source
-    map lengthRankingPolicyExecutableLaunchStrategy
-        [direct, descriptor, effectiveAccess, execveCheck] @?=
-      [ Djex.LengthSMTLibPathSnapshotThenDirectSpawn
-      , Djex.LengthSMTLibDescriptorBoundExecutableLaunch
+  assertDescriptorBoundAccessProjections
+    "leant-length-execve-check-policy" "execve-check"
+    mkLengthRankingPolicyWithDescriptorBoundExecveCheckExecutableAccessLaunch
+    Djex.mkLengthSMTLibDescriptorBoundExecveCheckExecutableAccessExecutionConfig
+    Djex.LengthSMTLibDescriptorBoundExecveCheckExecutableAccessLaunch
+    [ ( mkLengthRankingPolicyWithDescriptorBoundEffectiveIDExecutableAccessLaunch
       , Djex.LengthSMTLibDescriptorBoundEffectiveIDExecutableAccessLaunch
-      , Djex.LengthSMTLibDescriptorBoundExecveCheckExecutableAccessLaunch
-      ]
-    lengthRankingPolicyExecutableDigestExpectation execveCheck @?=
-      Djex.LengthSMTLibExecutableDigestExpectationAbsent
-
-    execution <- expectRight
-      $ Djex.mkLengthSMTLibDescriptorBoundExecveCheckExecutableAccessExecutionConfig
-          Djex.defaultLengthSMTLibExecutionLimits executionSource
-    evaluation <- expectRight $ Djex.mkLengthEvaluationLimits
-      Djex.defaultLengthEvaluationLimitSource
-    let bridged = lengthRankingPolicyFromValidatedComponents
-          execution evaluation
-    lengthRankingPolicyExecutableLaunchStrategy bridged @?=
-      Djex.LengthSMTLibDescriptorBoundExecveCheckExecutableAccessLaunch
-
-    let invalidSource = explicitLengthRankingPolicySource
-          Djex.defaultLengthSMTLibExecutionLimits
-          (explicitLengthRankingExecutionSource "relative-z3" Nothing
-            Djex.LengthSMTLibStatusOnly)
-          (error "execve-check maker forced evaluation after execution")
-    case
-        mkLengthRankingPolicyWithDescriptorBoundExecveCheckExecutableAccessLaunch
-          invalidSource of
-      Left (LengthRankingExecutionConfigurationRejected
-          Djex.LengthSMTLibExecutionExecutablePathNotAbsolute) -> pure ()
-      Left failure -> assertFailure
-        $ "execve-check maker changed execution failure: " ++ show failure
-      Right _ -> assertFailure
-        "execve-check maker accepted a relative executable path"
-
-    lengthAssessmentModeExecutableLaunchStrategy
-      disabledLengthAssessmentMode @?= Nothing
+      )
+    ]
 
 descriptorBoundExecveCheckLaunchPubliclyReachable :: IO Bool
 descriptorBoundExecveCheckLaunchPubliclyReachable
@@ -9960,7 +9989,7 @@ whenDescriptorBoundExecveCheckLaunchPubliclyReachable
   -> IO ()
 whenDescriptorBoundExecveCheckLaunchPubliclyReachable action = do
   supported <- descriptorBoundExecveCheckLaunchPubliclyReachable
-  if supported then action else pure ()
+  when supported action
 
 withCurrentApplicableDomainLimit
   :: String
@@ -13030,7 +13059,7 @@ assertLengthAssessmentSpinePairFilterDispatch
         assertBool "one-shot pair filter used the scalar projection"
           $ isNothing $ lengthAssessmentSelectionResult oneShot
         assertBool "one-shot pair filter lost the pair projection"
-          $ not $ isNothing $ lengthAssessmentSpinePairSelectionResult oneShot
+          $ isJust (lengthAssessmentSpinePairSelectionResult oneShot)
 
         repeated <- expectLengthAssessmentWithin
           $ assessLengthVerificationRequest startupRequest verification
@@ -13149,15 +13178,15 @@ assertLengthAssessmentMainCommandContext = do
     "synthGo' assessmentContext st args retriedVars goal parsed"
   mapM_ (assertMainSourceContains "constructive context" schedulerSection)
     [ "runSynthLaneCursor assessmentContext"
-    , "ordinarySynthLaneCursorPolicy assessmentContext laneEngine"
+    , "ordinarySynthLaneCursorPolicy assessmentContext laneEngine limits"
     , "synthClassical assessmentContext runDeadline st goal parsed"
     ]
   length (mainSourcePositions
       "runSynthLaneCursor assessmentContext" classicalSection) @?= 2
   mapM_ (assertMainSourceContains "classical context" classicalSection)
-    [ "emDeadline <- classicalSynthLaneDeadline assessmentContext commandDeadline"
+    [ "emDeadline <- classicalSynthLaneDeadline assessmentContext commandDeadline st"
     , "emRun <- runSynthLaneCursor assessmentContext"
-    , "nnDeadline <- classicalSynthLaneDeadline assessmentContext commandDeadline"
+    , "nnDeadline <- classicalSynthLaneDeadline assessmentContext commandDeadline st"
     , "nnRun <- runSynthLaneCursor assessmentContext nnPolicy nnDeadline st goal"
     ]
 
@@ -13179,9 +13208,9 @@ assertLengthAssessmentMainLaneSeam = do
         "data SynthLaneOutcome =" "-- Output (" sourceLines
       verificationSection = mainSourceSection
         "verifySynthLane assessmentContext groupLimit st goal notes groups ="
-        "synthLaneDisposition ::" sourceLines
+        "synthLaneDispositionWith ::" sourceLines
       dispositionSection = mainSourceSection
-        "synthLaneDisposition outcome ="
+        "synthLaneDispositionWith shown outcome ="
         "synthLaneAccumulationDisposition" sourceLines
       callbackSection = mainSourceSection
         "synthVerify successQuota st goal groups ="
@@ -13211,7 +13240,7 @@ assertLengthAssessmentMainLaneSeam = do
     "lengthAssessmentContextBehaviorMode assessmentContext"
       verificationSection
   rankQuota <- expectMainSourcePosition "lane verifier"
-    "LengthBehaviorRank -> synthMaxShown" verificationSection
+    "LengthBehaviorRank -> shown" verificationSection
   filterQuota <- expectMainSourcePosition "lane verifier"
     "LengthBehaviorFilter -> groupLimit" verificationSection
   callback <- expectMainSourcePosition "lane verifier"
@@ -13272,7 +13301,7 @@ assertLengthAssessmentMainLaneSeam = do
   mapM_ (assertMainSourceContains "lane disposition" dispositionSection)
     [ "Nothing -> SynthLaneNoVerified"
     , "null $ verifiedCandidateReceipts $ assessedSynthLaneVerification assessed -> SynthLaneNoVerified"
-    , "take synthMaxShown $ presentLengthAssessment assessment"
+    , "take shown $ presentLengthAssessment assessment"
     , "rejections = presentLengthAssessmentRejections assessment"
     , "Just _ -> SynthLaneAssessmentPreserved presentations rejections"
     , "SynthLaneSurvivors presentations rejections"
@@ -13339,7 +13368,7 @@ assertLengthAssessmentMainLaneAccumulation = do
   chronologicalFold <- expectMainSourcePosition "lane accumulation fold"
     "foldl accumulateDisposition SynthLaneNoVerified" foldSection
   chronologicalInput <- expectMainSourcePosition "lane accumulation fold"
-    "map synthLaneDisposition $ reverse reverseOutcomes" foldSection
+    "map (synthLaneDispositionWith shown) $ reverse reverseOutcomes" foldSection
   assertBool "Main stopped folding the reverse history chronologically"
     $ chronologicalFold < chronologicalInput
   mapM_ (assertMainSourceContains "lane accumulation fold" foldSection)
@@ -13383,9 +13412,9 @@ assertLengthAssessmentMainLaneFinalization = do
   let sourceText = unlines sourceLines
       verificationSection = mainSourceSection
         "verifySynthLane assessmentContext groupLimit st goal notes groups ="
-        "synthLaneDisposition ::" sourceLines
+        "synthLaneDispositionWith ::" sourceLines
       dispositionSection = mainSourceSection
-        "synthLaneDisposition outcome ="
+        "synthLaneDispositionWith shown outcome ="
         "synthLaneAccumulationDisposition" sourceLines
       finalizerSection = mainSourceSection
         "accumulation@(SynthLaneAccumulation reverseOutcomes) = do"
@@ -13408,12 +13437,12 @@ assertLengthAssessmentMainLaneFinalization = do
       presentationText = unlines presentationSection
   mapM_ (assertMainSourceContains "lane finalizer" finalizerSection)
     [ "let outcomes = reverse reverseOutcomes"
-    , "dispositions = map synthLaneDisposition outcomes"
+    , "dispositions = map (synthLaneDispositionWith shown) outcomes"
     , "effectiveLanes = throughFirstTerminal $ zip outcomes dispositions"
     , "forM_ outcomes $ \\outcome -> forM_ (leantObservationCodeEntries $ synthLaneOutcomeObservations outcome)"
     , "forM_ (map fst effectiveLanes) $ \\outcome -> case synthLaneAssessed outcome of"
     , "lengthAssessmentFailure $ assessedSynthLaneLengthAssessment assessed"
-    , "let disposition = synthLaneAccumulationDisposition accumulation"
+    , "let disposition = synthLaneAccumulationDisposition shown accumulation"
     , "SynthLaneNoVerified -> pure ()"
     , "SynthLaneSurvivors presentations rejections -> finalizeSynthLanePresentations st args goal presentations rejections"
     , "SynthLaneAllBehaviorallyRejected rejections -> do"
@@ -13484,7 +13513,7 @@ assertLengthAssessmentMainLaneFinalization = do
   warnings <- expectMainSourcePosition "lane finalizer"
     "forM_ (map fst effectiveLanes)" finalizerSection
   disposition <- expectMainSourcePosition "lane finalizer"
-    "let disposition = synthLaneAccumulationDisposition accumulation"
+    "let disposition = synthLaneAccumulationDisposition shown accumulation"
       finalizerSection
   stateAndRows <- expectMainSourcePosition "lane finalizer"
     "case disposition of" finalizerSection
@@ -13518,7 +13547,7 @@ assertLengthAssessmentMainLaneScheduling = do
         "synthGo' assessmentContext st args retriedVars goal parsed = do"
         "loadSynthProviders ::" sourceLines
       constructiveSection = mainSourceSection
-        "limit <- synthTimeoutSeconds"
+        "limit <- synthTimeoutSeconds st"
         "if structuralFirst" schedulerSection
       baselineSection = mainSourceSection
         "if structuralFirst"
@@ -13536,9 +13565,9 @@ assertLengthAssessmentMainLaneScheduling = do
       constructiveSection)
     [ "let deadline"
     , "runSynthesis includeLibrary checked laneEngine providers accumulation ="
-    , "base = synthesizeWithProvidersSkippingDetailed laneEngine (rsSynthSteps state) checked providers fragment"
+    , "base = synthesizeWithProvidersSkippingDetailedWith limits laneEngine (rsSynthSteps state) checked providers fragment"
     , "in runSynthLaneCursor assessmentContext"
-    , "ordinarySynthLaneCursorPolicy assessmentContext laneEngine"
+    , "ordinarySynthLaneCursorPolicy assessmentContext laneEngine limits"
     , "deadline st goal id outcome accumulation"
     ]
   assertBool "one constructive lane split its engine outcome across reruns"
@@ -13676,11 +13705,11 @@ assertLengthAssessmentMainCursorDriver = do
   sourceLines <- lines <$> readFile "src/Main.hs"
   let sourceText = unlines sourceLines
       policySection = mainSourceSection
-        "ordinarySynthLaneCursorPolicy assessmentContext engine ="
-        "runDetailedSynthCursorBefore requested deadline cursor =" sourceLines
+        "ordinarySynthLaneCursorPolicy assessmentContext engine limits ="
+        "runDetailedSynthCursorBefore requested window deadline cursor =" sourceLines
       forcingSection = mainSourceSection
-        "runDetailedSynthCursorBefore requested deadline cursor ="
-        "classicalSynthLaneDeadline assessmentContext commandDeadline ="
+        "runDetailedSynthCursorBefore requested window deadline cursor ="
+        "classicalSynthLaneDeadline assessmentContext commandDeadline st ="
         sourceLines
       driverSection = mainSourceSection
         "runSynthLaneCursor assessmentContext policy deadline st goal transform outcome"
@@ -13690,17 +13719,17 @@ assertLengthAssessmentMainCursorDriver = do
         "-- | The Glivenko fallback" sourceLines
       verificationSection = mainSourceSection
         "verifySynthLane assessmentContext groupLimit st goal notes groups ="
-        "synthLaneDisposition ::" sourceLines
+        "synthLaneDispositionWith ::" sourceLines
       driverText = unlines driverSection
   mapM_ (assertMainSourceContains "ordinary cursor policy" policySection)
-    [ "synthLaneCursorBatchSize = synthVerificationWindow engine"
+    [ "admissibleCursorBatch limits (synthVerificationWindowWith limits engine)"
     , "LengthBehaviorRank -> False"
     , "LengthBehaviorFilter -> True"
     , "synthLaneCursorRetainsRunNotes = True"
     ]
 
   admission <- expectMainSourcePosition "cursor deadline helper"
-    "case advanceDetailedSynthCursor requested cursor of" forcingSection
+    "case advanceDetailedSynthCursorWith window requested cursor of" forcingSection
   deadlineCase <- expectMainSourcePosition "cursor deadline helper"
     "Right step -> case deadline of" forcingSection
   forceForever <- expectMainSourcePosition "cursor deadline helper"
@@ -13730,7 +13759,7 @@ assertLengthAssessmentMainCursorDriver = do
 
   mapM_ (assertMainSourceContains "progressive cursor driver" driverSection)
     [ "observe (1 :: Int) 0 [] [] (startDetailedSynthCursor outcome)"
-    , "forced <- runDetailedSynthCursorBefore (synthLaneCursorBatchSize policy) deadline cursor"
+    , "forced <- runDetailedSynthCursorBefore"
     , "DetailedSynthCursorCandidateBatch batch successor -> do"
     , "groups = map transform (detailedCandidateBatchGroups batch)"
     , "notes = detailedCandidateBatchNotes batch"
@@ -13761,7 +13790,7 @@ assertLengthAssessmentMainCursorDriver = do
   length (mainSourcePositions
       "advanceDetailedSynthCursor" sourceLines) @?= 2
   length (mainSourcePositions
-      "advanceDetailedSynthCursor requested cursor" forcingSection) @?= 1
+      "advanceDetailedSynthCursorWith window requested cursor" forcingSection) @?= 1
   length (mainSourcePositions
       "forceDetailedSynthCursorStep" sourceLines) @?= 3
   length (mainSourcePositions
@@ -13830,7 +13859,7 @@ assertLengthAssessmentMainClassicalScheduling :: IO ()
 assertLengthAssessmentMainClassicalScheduling = do
   sourceLines <- lines <$> readFile "src/Main.hs"
   let deadlineSection = mainSourceSection
-        "classicalSynthLaneDeadline assessmentContext commandDeadline ="
+        "classicalSynthLaneDeadline assessmentContext commandDeadline st ="
         "runSynthLaneCursor assessmentContext policy deadline st goal transform outcome"
         sourceLines
       filterDeadlineSection = mainSourceSection
@@ -13849,7 +13878,7 @@ assertLengthAssessmentMainClassicalScheduling = do
     [ "case lengthAssessmentContextBehaviorMode assessmentContext of"
     , "LengthBehaviorFilter -> pure commandDeadline"
     , "LengthBehaviorRank -> do"
-    , "limit <- synthTimeoutSeconds"
+    , "limit <- synthTimeoutSeconds st"
     , "if limit <= 0 then pure Nothing"
     , "started <- getCurrentTime"
     , "Just (addUTCTime (fromIntegral limit) started)"
@@ -13858,7 +13887,7 @@ assertLengthAssessmentMainClassicalScheduling = do
     "case lengthAssessmentContextBehaviorMode assessmentContext of"
       deadlineSection
   timeoutRead <- expectMainSourcePosition "classical deadline ownership"
-    "limit <- synthTimeoutSeconds" deadlineSection
+    "limit <- synthTimeoutSeconds st" deadlineSection
   zeroGuard <- expectMainSourcePosition "classical deadline ownership"
     "if limit <= 0" deadlineSection
   clock <- expectMainSourcePosition "classical deadline ownership"
@@ -13874,7 +13903,7 @@ assertLengthAssessmentMainClassicalScheduling = do
     ]
   mapM_ (assertMainSourceContains "fresh rank route deadline"
       rankDeadlineSection)
-    [ "limit <- synthTimeoutSeconds"
+    [ "limit <- synthTimeoutSeconds st"
     , "if limit <= 0 then pure Nothing"
     , "started <- getCurrentTime"
     , "Just (addUTCTime (fromIntegral limit) started)"
@@ -13882,24 +13911,24 @@ assertLengthAssessmentMainClassicalScheduling = do
 
   mapM_ (assertMainSourceContains "classical cursor schedule"
       classicalSection)
-    [ "emDeadline <- classicalSynthLaneDeadline assessmentContext commandDeadline"
+    [ "emDeadline <- classicalSynthLaneDeadline assessmentContext commandDeadline st"
     , "if null atoms || length atoms > 5 then runDoubleNegation engine steps prefix body accumulation"
     , "emRun <- runSynthLaneCursor assessmentContext"
-    , "synthLaneCursorBatchSize = synthMaxTried `div` 2"
+    , "admissibleCursorBatch limits (synthLimitTried limits `div` 2)"
     , "synthLaneCursorAllowsFilterSuccessor = False"
     , "synthLaneCursorRetainsRunNotes = False"
     , "emDeadline st goal id"
-    , "synthesizeTunedDetailed engine steps (synthMaxTried, Just 100000)"
+    , "synthesizeTunedDetailedWith limits engine steps (synthLimitTried limits, Just 100000)"
     , "SynthLaneRunStoppedByDisposition -> pure (synthLaneRunAccumulation emRun)"
     , "_ -> runDoubleNegation engine steps prefix body (synthLaneRunAccumulation emRun)"
-    , "LengthBehaviorRank -> synthMaxTried"
-    , "LengthBehaviorFilter -> candidateWindow"
-    , "ordinaryPolicy = ordinarySynthLaneCursorPolicy assessmentContext engine"
+    , "LengthBehaviorRank -> synthLimitTried limits"
+    , "LengthBehaviorFilter -> synthLimitWindow limits"
+    , "ordinaryPolicy = ordinarySynthLaneCursorPolicy assessmentContext engine limits"
     , "nnPolicy = ordinaryPolicy { synthLaneCursorRetainsRunNotes = False }"
-    , "nnDeadline <- classicalSynthLaneDeadline assessmentContext commandDeadline"
+    , "nnDeadline <- classicalSynthLaneDeadline assessmentContext commandDeadline st"
     , "nnRun <- runSynthLaneCursor assessmentContext nnPolicy nnDeadline st goal"
     , "mapDetailedCandidateGroupVariantsDroppingSemanticSidecar wrap"
-    , "synthesizeTunedDetailed engine steps (djinnCandidateCutoff, Nothing)"
+    , "synthesizeTunedDetailedWith limits engine steps (djinnCandidateCutoff, Nothing)"
     , "pure (synthLaneRunAccumulation nnRun)"
     ]
   length (mainSourcePositions
@@ -14284,7 +14313,7 @@ assertLengthAssessmentConfigured
         map lengthCandidatePresentationText presentations @?=
           map lengthCandidatePresentationText
             (presentLengthPostVerificationResult
-              $ maybe (error "configured presentation lost its result") id
+              $ fromMaybe (error "configured presentation lost its result")
               $ lengthAssessmentPostVerificationResult assessed)
         assertLengthPresentationAssociations presentations [Nothing, Just 0,
           Just 1]
@@ -14325,9 +14354,8 @@ assertLengthAssessmentConfigured
         assertBool "rejected integration input retained a ranking"
           $ isNothing $ lengthAssessmentRanking rejected
         assertBool "rejected integration input exposed semantic notes"
-          $ all isNothing
-          $ map lengthCandidatePresentationNote
-          $ presentLengthAssessment rejected
+          $ all (isNothing . lengthCandidatePresentationNote)
+              (presentLengthAssessment rejected)
         case lengthAssessmentPostVerificationResult rejected of
           Nothing -> assertFailure
             "enabled input rejection discarded its adapter result"
@@ -14780,7 +14808,7 @@ buildRoleAwareMapFixture = do
         | group <- groups
         , spelling <- detailedCandidateGroupVariants group
         , "Demo.mapList" `isInfixOf` spelling
-        , not $ isNothing $ detailedCandidateGroupSemanticSidecar group
+        , isJust (detailedCandidateGroupSemanticSidecar group)
         ] of
       match : _ -> pure match
       [] -> assertFailure ("higher-order map provider produced no typed " ++
@@ -15107,9 +15135,8 @@ assertLengthAssessmentFailureFallback
                 (lengthRankingCandidates ranking) @?=
               replicate (length original) Unassessed
             assertBool "live integration fallback exposed stale evidence"
-              $ all isNothing
-              $ map lengthCandidatePresentationNote
-              $ presentLengthAssessment assessed
+              $ all (isNothing . lengthCandidatePresentationNote)
+                  (presentLengthAssessment assessed)
         case lengthAssessmentFailure assessed of
           Just (LengthAssessmentRankingFailed failure) -> do
             lengthRankingFailureOriginalIndex failure @?= Nothing
@@ -15206,7 +15233,7 @@ assertLengthCounterexamplePresentation = do
           , Just note <- [lengthCandidatePresentationNote presentation]
           ]
     length notes @?= 3
-    sequence_ $ zipWith (\receipt note -> do
+    zipWithM_ (\receipt note -> do
         assertBool "counterexample note omitted model qualification"
           $ "replayed finite-list-spine Length counterexample "
               `isInfixOf` note
@@ -15245,9 +15272,8 @@ assertLengthCounterexamplePresentation = do
       $ assessVerifiedLengthCandidatesWithPolicy statusPolicy statusContract
           statusVerification
     assertBool "status-only ranking emitted a counterexample claim"
-      $ all isNothing
-      $ map lengthCandidatePresentationNote
-      $ presentLengthPostVerificationResult statusResult
+      $ all (isNothing . lengthCandidatePresentationNote)
+          (presentLengthPostVerificationResult statusResult)
 
   providerIndependent <- buildProviderIndependentCounterexampleReceipt
     (2 ^ (4095 :: Int))
@@ -15387,8 +15413,8 @@ assertLengthAssessmentSpinePairDispatch
               Nothing -> False
               Just _ -> True
         assertBool "atomic pair failure emitted a semantic note"
-          $ all isNothing $ map lengthCandidatePresentationNote
-          $ presentLengthAssessment failed
+          $ all (isNothing . lengthCandidatePresentationNote)
+              (presentLengthAssessment failed)
 
         scalar <- expectLengthAssessmentWithin
           $ assessLengthVerificationRequest
@@ -17792,9 +17818,9 @@ assertLengthRankingOriginProbeOrdering = do
   lengthRankingFailure replayRanking @?= Nothing
   map rankedLengthCandidateOriginalIndex
       (lengthRankingCandidates replayRanking) @?= [0, 1, 2, 3]
-  replayReceipts <- mapM expectOriginCounterexample
-    $ map rankedLengthCandidateAssessment
-    $ lengthRankingCandidates replayRanking
+  replayReceipts <- mapM
+    (expectOriginCounterexample . rankedLengthCandidateAssessment)
+    (lengthRankingCandidates replayRanking)
   map Djex.validatedLengthCounterexampleInputs replayReceipts @?=
     replicate 4 [0]
   map Djex.validatedLengthCounterexampleResult replayReceipts @?=
@@ -18630,7 +18656,7 @@ buildLengthProjectionRankingCandidate inputArity = do
     DetailedSynthCandidates groups _ -> case
       [ (retained, spelling)
       | retained <- groups
-        , not $ isNothing $ detailedCandidateGroupSemanticSidecar retained
+        , isJust (detailedCandidateGroupSemanticSidecar retained)
         , spelling <- detailedCandidateGroupVariants retained
         , spelling == expectedSpelling
         ] of
@@ -18724,8 +18750,7 @@ buildLengthSeedBankArityFixture = do
           [ retained
           | retained <- groups
           , detailedCandidateGroupVariants retained == [providerName arity]
-          , not $ isNothing
-              $ detailedCandidateGroupSemanticSidecar retained
+          , isJust (detailedCandidateGroupSemanticSidecar retained)
           ] of
         retained : _ -> pure retained
         [] -> assertFailure
@@ -18787,7 +18812,7 @@ buildScaledProviderReplayFixture = do
       | group <- scaledGroups
       , [spelling] <- [detailedCandidateGroupVariants group]
       , "Demo.scaleList" `isInfixOf` spelling
-      , not $ isNothing $ detailedCandidateGroupSemanticSidecar group
+      , isJust (detailedCandidateGroupSemanticSidecar group)
       ] of
     group : _ -> pure group
     [] -> assertFailure
@@ -18807,7 +18832,7 @@ buildScaledProviderReplayFixture = do
       | group <- independentGroups
       , providerIndependentProjectionSpelling 1 `elem`
           detailedCandidateGroupVariants group
-      , not $ isNothing $ detailedCandidateGroupSemanticSidecar group
+      , isJust (detailedCandidateGroupSemanticSidecar group)
       ] of
     group : _ -> pure group
     [] -> assertFailure
@@ -19092,7 +19117,7 @@ buildLengthRankingLiveFixture = do
  where
   directProvider spelling = filter $ \group ->
     detailedCandidateGroupVariants group == [spelling]
-      && not (isNothing $ detailedCandidateGroupSemanticSidecar group)
+      && isJust (detailedCandidateGroupSemanticSidecar group)
 
 verifySingleLengthRankingGroup
   :: DetailedCandidateGroup
@@ -19133,6 +19158,23 @@ runLengthRankingWithFakeTraceWithEvaluation
   -> IO (LengthRanking, BS.ByteString)
 runLengthRankingWithFakeTraceWithEvaluation
     mode policy evaluation contract candidates =
+  runLengthRankingWithFakeUsing "" mode policy $ \execution ->
+    rankVerifiedLengthCandidates execution evaluation contract candidates
+
+-- | Shared harness of the fake-solver ranking runners: one execution config
+-- (100 ms solver timeout, resource limit 4242, 1 s host deadline, the
+-- caller's artifact policy), an eight-second outer bound, and the recorded
+-- fake-solver event trace.  The caller contributes only the ranking
+-- entrance under test and the tag naming it in the timeout message.
+runLengthRankingWithFakeUsing
+  :: Show failure
+  => String
+  -> String
+  -> Djex.LengthSMTLibArtifactPolicy
+  -> (Djex.LengthSMTLibExecutionConfig
+      -> IO (Either failure LengthRanking))
+  -> IO (LengthRanking, BS.ByteString)
+runLengthRankingWithFakeUsing tag mode policy rank =
   withFakeLengthSolver mode $ \executable -> do
     execution <- expectRight $ Djex.mkLengthSMTLibExecutionConfig
       Djex.defaultLengthSMTLibExecutionLimits
@@ -19144,11 +19186,10 @@ runLengthRankingWithFakeTraceWithEvaluation
               1000
           , Djex.lengthSMTLibExecutionConfigSourceArtifactPolicy = policy
           }
-    bounded <- timeout 8000000 $ rankVerifiedLengthCandidates execution
-      evaluation contract candidates
+    bounded <- timeout 8000000 $ rank execution
     case bounded of
-      Nothing -> assertFailure $ "Length ranking mode exceeded its bound: " ++
-        mode
+      Nothing -> assertFailure $ "Length " ++ tag
+        ++ "ranking mode exceeded its bound: " ++ mode
       Just result -> do
         ranking <- expectRight result
         events <- BS.readFile $ executable ++ ".events"
@@ -19163,28 +19204,9 @@ runLengthRankingWithFakeTraceWithOriginProbe
   -> IO (LengthRanking, BS.ByteString)
 runLengthRankingWithFakeTraceWithOriginProbe
     mode policy evaluation contract candidates =
-  withFakeLengthSolver mode $ \executable -> do
-    execution <- expectRight $ Djex.mkLengthSMTLibExecutionConfig
-      Djex.defaultLengthSMTLibExecutionLimits
-      $ (Djex.defaultLengthSMTLibExecutionConfigSource executable Nothing)
-          { Djex.lengthSMTLibExecutionConfigSourceSolverTimeoutMilliseconds =
-              100
-          , Djex.lengthSMTLibExecutionConfigSourceSolverResourceLimit = 4242
-          , Djex.lengthSMTLibExecutionConfigSourceHostDeadlineMilliseconds =
-              1000
-          , Djex.lengthSMTLibExecutionConfigSourceArtifactPolicy = policy
-          }
-    bounded <- timeout 8000000
-      $ LengthRankingInternal.rankVerifiedLengthCandidatesWithOriginProbe
-          execution evaluation contract candidates
-    case bounded of
-      Nothing -> assertFailure
-        ("Length origin-probe ranking mode exceeded its bound: " ++ mode)
-          >> error "unreachable"
-      Just result -> do
-        ranking <- expectRight result
-        events <- BS.readFile $ executable ++ ".events"
-        pure (ranking, events)
+  runLengthRankingWithFakeUsing "origin-probe " mode policy $ \execution ->
+    LengthRankingInternal.rankVerifiedLengthCandidatesWithOriginProbe
+      execution evaluation contract candidates
 
 explicitLengthInputBoxLimits
   :: Int
@@ -19206,30 +19228,11 @@ runLengthRankingWithFakeTraceWithInputBox
   -> [Verified DetailedVerificationVariant]
   -> IO (LengthRanking, BS.ByteString)
 runLengthRankingWithFakeTraceWithInputBox
-    mode artifactPolicy evaluation inputBoxLimits maximums contract candidates =
-  withFakeLengthSolver mode $ \executable -> do
-    execution <- expectRight $ Djex.mkLengthSMTLibExecutionConfig
-      Djex.defaultLengthSMTLibExecutionLimits
-      $ (Djex.defaultLengthSMTLibExecutionConfigSource executable Nothing)
-          { Djex.lengthSMTLibExecutionConfigSourceSolverTimeoutMilliseconds =
-              100
-          , Djex.lengthSMTLibExecutionConfigSourceSolverResourceLimit = 4242
-          , Djex.lengthSMTLibExecutionConfigSourceHostDeadlineMilliseconds =
-              1000
-          , Djex.lengthSMTLibExecutionConfigSourceArtifactPolicy =
-              artifactPolicy
-          }
-    bounded <- timeout 8000000
-      $ rankVerifiedLengthCandidatesWithInputBoxValidation
-          execution evaluation inputBoxLimits maximums contract candidates
-    case bounded of
-      Nothing -> assertFailure
-        ("Length input-box ranking mode exceeded its bound: " ++ mode)
-          >> error "unreachable"
-      Just result -> do
-        ranking <- expectRight result
-        events <- BS.readFile $ executable ++ ".events"
-        pure (ranking, events)
+    mode artifactPolicy evaluation inputBoxLimits maximums contract
+    candidates =
+  runLengthRankingWithFakeUsing "input-box " mode artifactPolicy
+    $ \execution -> rankVerifiedLengthCandidatesWithInputBoxValidation
+        execution evaluation inputBoxLimits maximums contract candidates
 
 assertFakeLengthQueryEvents :: [Int] -> [Int] -> BS.ByteString -> IO ()
 assertFakeLengthQueryEvents expectedChecks expectedValues events = do
@@ -19403,7 +19406,7 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
               [ group
               | group <- groups
               , detailedCandidateGroupVariants group == ["Demo.emptyList"]
-              , not $ isNothing $ detailedCandidateGroupSemanticSidecar group
+              , isJust (detailedCandidateGroupSemanticSidecar group)
               ] of
             origin : _ -> do
               let compatibilityGroup = detailedCandidateGroup
@@ -19775,7 +19778,7 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
             | group <- groups
             , [variant] <- [detailedCandidateGroupVariants group]
             , "Demo.emptyPolyList" `isInfixOf` variant
-            , not $ isNothing $ detailedCandidateGroupSemanticSidecar group
+            , isJust (detailedCandidateGroupSemanticSidecar group)
             ] of
           origin : _ -> do
             semantic <- case detailedCandidateGroupSemanticSidecar origin of
@@ -20628,13 +20631,11 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
             detailedCandidateGroupRoute displayed @?= RouteTypedCandidate
             assertBool
               "the earlier typed owner lost its group sidecar"
-              (not $ isNothing
-                $ detailedCandidateGroupSemanticSidecar displayed)
+              (isJust (detailedCandidateGroupSemanticSidecar displayed))
             assertBool
               "the earlier typed owner lost a verification sidecar"
               (all
-                (not . isNothing
-                  . detailedVerificationVariantSemanticSidecar)
+                (isJust . detailedVerificationVariantSemanticSidecar)
                 (detailedCandidateGroupVerificationVariants displayed))
           groups -> assertFailure $
             "the reverse duplicate changed the displayed group structure: "
@@ -20700,7 +20701,7 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
         Right (DetailedSynthCandidates (origin : _) _) -> do
           assertBool
             "expected an originating typed semantic sidecar"
-            (not $ isNothing $ detailedCandidateGroupSemanticSidecar origin)
+            (isJust (detailedCandidateGroupSemanticSidecar origin))
           let wrap term = "Classical.byContradiction (" ++ term ++ ")"
               wrapped =
                 mapDetailedCandidateGroupVariantsDroppingSemanticSidecar
@@ -20838,7 +20839,7 @@ providerEngineTests = testGroup "foreign providers"
               assertBool
                 ("the provider did not override the provider-free refutation \
                  \in " ++ synthEngineName engine ++ ": " ++ show groups)
-                (any (== "Demo.falseProof") (concat groups))
+                (elem "Demo.falseProof" (concat groups))
             Right other -> assertFailure $
               "unexpected provider-refutation outcome from "
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
@@ -20859,7 +20860,7 @@ providerEngineTests = testGroup "foreign providers"
                 ("the exact provider did not override the empty-family \
                  \refutation in " ++ synthEngineName engine ++ ": "
                    ++ show groups)
-                (any exact (concat groups))
+                (any (any exact) groups)
             Right other -> assertFailure $
               "unexpected exact provider-refutation outcome from "
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
@@ -21411,8 +21412,7 @@ typeApplicationTests = testGroup "retained type applications"
       let mixed = FAll True "A" $ FAll True "B" $ FAll True "C" $
             FArr (FVar "A") $ FArr (FVar "B") $
               FArr (FVar "C") (FAtom False "Result")
-          domains = take 17 $ sequence $ replicate 3
-            [ ProviderForallDomainProp
+          domains = take 17 $ replicateM 3 [ ProviderForallDomainProp
             , ProviderForallDomainType
             , ProviderForallDomainSort
             ]
@@ -22218,7 +22218,7 @@ typeApplicationTests = testGroup "retained type applications"
           check provider' engine = case
               synthesizeWithProviders engine 512 [provider'] token of
             Right (SynthCandidates groups _)
-              | any (anyContextMarker `isInfixOf`) (concat groups) ->
+              | any (any (anyContextMarker `isInfixOf`)) groups ->
                   assertFailure $ "unsupported contextual assignment reached "
                     ++ show engine ++ ": " ++ show groups
             Right _ -> pure ()
@@ -22370,7 +22370,7 @@ typeApplicationTests = testGroup "retained type applications"
               assertBool
                 ("mixed higher-kinded assignment was lost in "
                   ++ synthEngineName engine ++ ": " ++ show groups)
-                (any (== expected) (concat groups))
+                (elem expected (concat groups))
             Right other -> assertFailure $
               "unexpected mixed higher-kinded assignment outcome from "
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
@@ -22397,7 +22397,7 @@ typeApplicationTests = testGroup "retained type applications"
               assertBool
                 ("partial higher-kinded assignment was lost in "
                   ++ synthEngineName engine ++ ": " ++ show groups)
-                (any (== expected) (concat groups))
+                (elem expected (concat groups))
             Right other -> assertFailure $
               "unexpected partial higher-kinded assignment outcome from "
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
@@ -22415,7 +22415,7 @@ typeApplicationTests = testGroup "retained type applications"
               assertBool
                 ("vacuous higher-kinded assignment was lost in "
                   ++ synthEngineName engine ++ ": " ++ show groups)
-                (any (== expected) (concat groups))
+                (elem expected (concat groups))
             Right other -> assertFailure $
               "unexpected vacuous higher-kinded assignment outcome from "
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
@@ -22438,7 +22438,7 @@ typeApplicationTests = testGroup "retained type applications"
               assertBool
                 ("later provider evidence was lost in "
                   ++ synthEngineName engine ++ ": " ++ show groups)
-                (any (== expected) (concat groups))
+                (elem expected (concat groups))
             Right other -> assertFailure $
               "unexpected over-limit provider outcome from "
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
@@ -22463,7 +22463,7 @@ typeApplicationTests = testGroup "retained type applications"
               assertBool
                 ("multi-vacuous heterogeneous assignment was lost in "
                   ++ synthEngineName engine ++ ": " ++ show groups)
-                (any (== expected) (concat groups))
+                (elem expected (concat groups))
             Right other -> assertFailure $
               "unexpected multi-vacuous assignment outcome from "
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
@@ -22529,7 +22529,7 @@ typeApplicationTests = testGroup "retained type applications"
               assertBool
                 ("ordered four-argument assignment was lost in "
                   ++ synthEngineName engine ++ ": " ++ show groups)
-                (any exact (concat groups))
+                (any (any exact) groups)
             Right other -> assertFailure $
               "unexpected ordered-assignment outcome from "
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
@@ -22568,7 +22568,7 @@ typeApplicationTests = testGroup "retained type applications"
               assertBool
                 ("ordered five-argument assignment was lost in "
                   ++ synthEngineName engine ++ ": " ++ show groups)
-                (any exact (concat groups))
+                (any (any exact) groups)
             Right other -> assertFailure $
               "unexpected five-argument assignment outcome from "
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
@@ -22609,7 +22609,7 @@ typeApplicationTests = testGroup "retained type applications"
               assertBool
                 ("ordered six-argument assignment was lost in "
                   ++ synthEngineName engine ++ ": " ++ show groups)
-                (any exact (concat groups))
+                (any (any exact) groups)
             Right other -> assertFailure $
               "unexpected six-argument assignment outcome from "
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
@@ -22636,7 +22636,7 @@ typeApplicationTests = testGroup "retained type applications"
             Right (SynthCandidates groups _) -> assertBool
               ("over-wide assignment became visible in "
                 ++ synthEngineName engine ++ ": " ++ show groups)
-              (all (not . isInfixOf "«p1» :=") (concat groups))
+              (all (all (not . isInfixOf "«p1» :=")) groups)
             Right _ -> pure ()
       mapM_ check [EngineDjinn, EngineExference, EngineBoth]
   , testCase "do not enter provider evidence beyond the aggregate bound" $
@@ -22669,7 +22669,7 @@ typeApplicationTests = testGroup "retained type applications"
               assertBool
                 ("a later provider donated rank-N evidence to Gap.first in "
                   ++ synthEngineName engine ++ ": " ++ show groups)
-                (not (any donated (concat groups)))
+                (not (any (any donated) groups))
             Right _ -> pure ()
             Left err -> assertFailure err
       mapM_ check [EngineDjinn, EngineExference, EngineBoth]
@@ -22687,8 +22687,7 @@ typeApplicationTests = testGroup "retained type applications"
                 ("scoped quantified application fell outside the first "
                   ++ show synthMaxTried ++ " " ++ synthEngineName engine
                   ++ " groups: " ++ show (take synthMaxTried groups))
-                $ any quantifiedTypeVariant
-                $ concat $ take synthMaxTried groups
+                $ any (any quantifiedTypeVariant) (take synthMaxTried groups)
             Right other -> assertFailure $
               "unexpected scoped-provider outcome from "
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
@@ -22772,10 +22771,10 @@ typeApplicationTests = testGroup "retained type applications"
   , testCase "poison refutations with the complete nominal application" $ do
       let target = wrap "Demo.Wrap ((b : Type) \8594 b \8594 b)" polytype
       fragRefusal target @?= Just
-        ("the goal is a single opaque type application \
+        "the goal is a single opaque type application \
          \`Demo.Wrap ((b : Type) \8594 b \8594 b)` \8212 :synth can transport \
          \and instantiate retained type applications, but cannot construct \
-         \an unknown Lean family")
+         \an unknown Lean family"
       fragUnsafeAtoms target
         @?= ["Demo.Wrap ((b : Type) \8594 b \8594 b)"]
       case synthesizeWithProviders EngineDjinn 0 [] target of
@@ -22800,7 +22799,7 @@ typeApplicationTests = testGroup "retained type applications"
     (variableApp "F a" "F" (FVar "a"))
   expectTerm needle outcome = case outcome of
     Right (SynthCandidates groups _) ->
-      if any (needle `isInfixOf`) (concat groups)
+      if any (any (needle `isInfixOf`)) groups
         then pure ()
         else assertFailure $
           "expected a candidate containing " ++ show needle
@@ -22982,10 +22981,9 @@ parametricFamilyEngineTests = testGroup "parametric family engine projection"
       if not (any ("done" `isInfixOf`) candidates)
         then assertFailure $ "native recursive base constructor was lost: "
           ++ show candidates
-        else if any ("again" `isInfixOf`) candidates
-          then assertFailure $ "Djinn reopened native recursion below its "
+        else when (any ("again" `isInfixOf`) candidates)
+          $ assertFailure $ "Djinn reopened native recursion below its "
             ++ "first constructor layer: " ++ show candidates
-          else pure ()
   , testCase "withhold evidence after native recursive atomization" $ do
       let parameter = FVar "p"
           recursive = nativeRecursive "Demo.NativeRec p" parameter
@@ -23082,10 +23080,9 @@ parametricFamilyEngineTests = testGroup "parametric family engine projection"
       if not (any (".done" `isInfixOf`) candidates)
         then assertFailure $ "structured native constructor was lost: "
           ++ show candidates
-        else if any (".again" `isInfixOf`) candidates
-          then assertFailure $ "structured recursive family fell back to "
+        else when (any (".again" `isInfixOf`) candidates)
+          $ assertFailure $ "structured recursive family fell back to "
             ++ "reopenable constructor premises: " ++ show candidates
-          else pure ()
   , testCase "share fixed opaque constructor fields without free variables" $
       expectExactFamilyTerm "fun x => x _"
         (synthesizeWithProviders EngineExference 1024 [] guardRankNGoal)
@@ -23347,12 +23344,11 @@ parametricFamilyEngineTests = testGroup "parametric family engine projection"
           candidates = allFamilyCandidates
             (synthesizeWithProviders EngineDjinn 0 []
               (FAll True "a" (FArr source target)))
-      if any (== "fun _ x => x") candidates
+      if elem "fun _ x => x" candidates
         then assertFailure $ "distinct heads transported directly: "
           ++ show candidates
-        else if null candidates
-          then assertFailure "distinct structural heads lost all conversions"
-          else pure ()
+        else when (null candidates)
+          $ assertFailure "distinct structural heads lost all conversions"
   , testCase "never conflate recursive heads sharing keys and constructors" $
       let parameter = FVar "a"
           family headName = FParamRec True headName "same display key"
@@ -23368,10 +23364,9 @@ parametricFamilyEngineTests = testGroup "parametric family engine projection"
           check engine =
             let candidates = allFamilyCandidates
                   (synthesizeWithProviders engine 1024 [] goal)
-            in if any direct candidates
-                then assertFailure $ "distinct recursive heads shared an "
-                  ++ "identity in " ++ show engine ++ ": " ++ show candidates
-                else pure ()
+            in (when (any direct candidates)
+                  $ assertFailure $ "distinct recursive heads shared an "
+                  ++ "identity in " ++ show engine ++ ": " ++ show candidates)
       in mapM_ check [EngineDjinn, EngineExference]
   , testCase "normalize recursive knots and ignore unused outer metadata" $ do
       let result = FVar "r"
