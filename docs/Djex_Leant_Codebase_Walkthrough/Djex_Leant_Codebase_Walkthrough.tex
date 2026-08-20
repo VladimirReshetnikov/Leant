@@ -84,8 +84,8 @@
 \newcommand{\commitid}[1]{{\ttfamily\footnotesize #1}}
 \newcommand{\RepoDjex}{\href{https://github.com/VladimirReshetnikov/Djex}{Djex}}
 \newcommand{\RepoLeant}{\href{https://github.com/VladimirReshetnikov/Leant}{Leant}}
-\def\DjexBase{https://github.com/VladimirReshetnikov/Djex/blob/2f90509ea5b3025ad32ec46f03e0cf4725a8ce77/}
-\def\LeantBase{https://github.com/VladimirReshetnikov/Leant/blob/aa36ca6b3c39d3fc54b0095125ee1bfd4e1da927/}
+\def\DjexBase{https://github.com/VladimirReshetnikov/Djex/blob/39c95a9b20e15f4e96c2b1447853943c98220c98/}
+\def\LeantBase{https://github.com/VladimirReshetnikov/Leant/blob/0ef02f855dbfed30752f2e5a1be745d8a43504d1/}
 \newcommand{\dpath}[1]{\href{\DjexBase#1}{\nolinkurl{#1}}}
 \newcommand{\lpath}[1]{\href{\LeantBase#1}{\nolinkurl{#1}}}
 \newcommand{\dsym}[2]{\code{#2} in \dpath{#1}}
@@ -182,8 +182,8 @@ and practical extension paths\par}
 \begin{tcolorbox}[width=0.86\textwidth,colback=SoftGray,colframe=RuleGray,boxrule=0.7pt,arc=1mm]
 \small
 \begin{tabularx}{\textwidth}{@{}L{0.18\textwidth}Y@{}}
-\textbf{Djex snapshot} & \commitid{2f90509ea5b3025ad32ec46f03e0cf4725a8ce77} \\
-\textbf{Leant snapshot} & \commitid{aa36ca6b3c39d3fc54b0095125ee1bfd4e1da927} \\
+\textbf{Djex snapshot} & \commitid{39c95a9b20e15f4e96c2b1447853943c98220c98} \\
+\textbf{Leant snapshot} & \commitid{0ef02f855dbfed30752f2e5a1be745d8a43504d1} \\
 \textbf{Relationship} & Leant's \filepath{lib/Djex} submodule is pinned to the same Djex revision. \\
 \textbf{Prepared} & August 16, 2026; revised August 17, 2026 \\
 \textbf{Scope} & This is now the only maintainer walkthrough for either repository. The former Djex-only walkthrough was retired on August 17, 2026; its Djex material is covered by Parts~I--II here. \\
@@ -218,16 +218,16 @@ A reader learning the system for the first time should read Chapters~\ref{ch:joi
 
 The notation \emph{authority type} means a type whose constructor is hidden and whose values can only be obtained through a validating smart constructor. This pattern is central to Djex. The notation \emph{proposal} means a term produced by search but not yet accepted by the final authority. In Djex, a proposal may first be checked by a backend-specific checker; in Leant, it must ultimately be elaborated by Lean.
 
-\chapter*{Post-snapshot addendum:\\typed behavioral assessment}
-\addcontentsline{toc}{chapter}{Post-snapshot addendum: typed behavioral assessment}
-\markboth{Post-snapshot addendum: typed behavioral assessment}{}
+\chapter*{Current-tree addendum:\\typed behavioral assessment}
+\addcontentsline{toc}{chapter}{Current-tree addendum: typed behavioral assessment}
+\markboth{Current-tree addendum: typed behavioral assessment}{}
 
-The historical body of this walkthrough predates the typed behavioral-assessment layer. This addendum records the newer layer against the source snapshots named on the title page and explicitly labels changes implemented after those snapshots. Leant remains experimental: JSON shapes, names, tags, diagnostics, and output are current-tree descriptions rather than a public stability or backward-compatibility promise. The startup configuration and command-local contract file now each have one versionless schema whose explicit \code{rankingDomain} is \code{scalar} or \code{binary-product}; older numbered roots survive only in Git history and dated non-normative reports. Paths in this addendum are printed as current-tree file paths rather than through historical line-number references.
+The historical body of this walkthrough predates the typed behavioral-assessment layer. This addendum records the newer layer against the current source snapshots named on the title page while retaining the historical landing commits that established it. Leant remains experimental: JSON shapes, names, tags, diagnostics, and output are current-tree descriptions rather than a public stability or backward-compatibility promise. The startup configuration and command-local contract file now each have one versionless schema whose explicit \code{rankingDomain} is \code{scalar} or \code{binary-product}; older numbered roots survive only in Git history and dated non-normative reports. Paths in this addendum are printed as current-tree file paths rather than through historical line-number references.
 
 
-  The headline is intentionally modest: the repositories now have a checked insertion seam for one finite-list-spine Length model, a scoped Z3 execution boundary, an explicit startup policy opt-in, an optional one-command contract choice, an active fixed-profile inline where-clause choice, and an explicit per-command choice between stable ranking and replay-authorized hard filtering in \filepath{src/Main.hs}. The active inline Main route was implemented after the Leant snapshot pinned on the title page; the pinned passive parser/profile foundation is preserved as its predecessor. Without the startup opt-in the ordinary no-option and explicit-rank commands remain the exact non-strict identity path, while a filter, inline, or requested command-contract request is refused before clause parsing or file IO.
+  The headline is intentionally modest: the repositories now have a checked insertion seam for one finite-list-spine Length model, a scoped Z3 execution boundary, an explicit startup policy opt-in, an optional one-command contract choice, an active fixed-profile inline where-clause choice, and an explicit per-command choice between stable ranking and replay-authorized hard filtering in \filepath{src/Main.hs}. The title-page Leant snapshot includes the active inline Main route and preserves the passive parser/profile foundation as its predecessor in history. Without the startup opt-in the ordinary no-option and explicit-rank commands remain the exact non-strict identity path, while a filter, inline, or requested command-contract request is refused before clause parsing or file IO.
 
-  \textbf{What one command actually does.} Established startup and contract-file requests introduce one nominal rank-2 context before translation. The post-snapshot inline route instead validates structure, selects the goal, authorizes literal filter mode, parses the bounded clause, reports inaccessible hypotheses and premise scope, translates and retries, resolves physical source-arrow roles, and only then introduces exactly one nominal context. Either route reuses its filter bank across the complete scheduler. Main consumes Engine's opaque candidate cursor directly: one ordinary filter run may assess two ordered standalone or combined batches from the same lazy engine outcome, while excluded middle remains one half-width batch. Under the default session limits those widths are a 60-group cursor and 12-group, 24-group, and six-group batches; every one of them is a \code{:set} away from being something else (Appendix~\ref{app:limits}), so the numbers quoted throughout this addendum describe an unmodified session. Only no verification or complete behavioral rejection reaches the single successor; survivor and preserve-all stop, and Main never probes a third tail. Djex supplies the candidate-independent bounded replay-input bank and exact query-owned fresh replay. Established configured-rank and direct Selection compatibility paths retain their raw four-vector MRU; rank and disabled commands retain one engine batch. The scheduler keeps one lazy reverse outcome accumulation and finalizes it once.
+  \textbf{What one command actually does.} Established startup and contract-file requests introduce one nominal rank-2 context before translation. The inline route instead validates structure, selects the goal, authorizes literal filter mode, parses the bounded clause, reports inaccessible hypotheses and premise scope, translates and retries, resolves physical source-arrow roles, and only then introduces exactly one nominal context. Either route reuses its filter bank across the complete scheduler. Main consumes Engine's opaque candidate cursor directly: one ordinary filter run may assess two ordered standalone or combined batches from the same lazy engine outcome, while excluded middle remains one half-width batch. Under the default session limits those widths are a 60-group cursor and 12-group, 24-group, and six-group batches; every one of them is a \code{:set} away from being something else (Appendix~\ref{app:limits}), so the numbers quoted throughout this addendum describe an unmodified session. Only no verification or complete behavioral rejection reaches the single successor; survivor and preserve-all stop, and Main never probes a third tail. Djex supplies the candidate-independent bounded replay-input bank and exact query-owned fresh replay. Established configured-rank and direct Selection compatibility paths retain their raw four-vector MRU; rank and disabled commands retain one engine batch. The scheduler keeps one lazy reverse outcome accumulation and finalizes it once.
 
   \textbf{And what it is not.} This is bounded command-local same-run progression, not persistent state, survivor-quota filling, an engine rerun, batch reassessment, counterexample-directed engine search, or the proposal's complete CEGIS loop. There is no claim here of general behavioral constraints, general program equivalence, a Lean-to-SMT semantics, solver-certified proofs, typed-sketch synthesis, or automatic Z3 integration.
 
@@ -259,10 +259,12 @@ The newer path preserves one association across several independently checked bo
 
   \textbf{Startup contract versus command contract.} Every activated startup file loads one explicit scalar or pair contract and rechecks later candidates against that fixed process-wide assertion. After activation, \texttt{:synth }\dashdash\texttt{length-contract ABSOLUTE-PATH }\dashdash\texttt{ TYPE} may instead load one command-local document whose exact root is \code{\{format, rankingDomain, contract\}}; an optional preceding \texttt{--behavior-mode rank|filter} selects what the command does with that contract. \code{rankingDomain = scalar} selects the full scalar grammar and \code{rankingDomain = binary-product} selects the separately typed canonical-\code{Prod} grammar; it is the sole discriminator and neither nested contract admits \code{resultShape}. Both nested grammars require exact \code{targetArgumentRoles} and \code{candidateCasePolicy}, and both admit current modulo and positive-literal quotient expressions. The bounded JSON input is parsed once, with no version dispatcher, migration, or alternate-domain retry.
 
-  \textbf{Post-snapshot inline contract source.} The active fixed-order form is
-  \code{:synth -{}-behavior-mode filter -{}-length-model
-  list-scalar-exact-cases|list-binary-product-exact-cases
-  -{}-length-inputs arg0[,argN...] -{}-where CLAUSE -{}- TYPE}. The bar presents
+  \textbf{Active inline contract source.} The fixed-order form is\par
+  \smallskip\noindent
+  \code{:synth} \code{-{}-behavior-mode filter} \code{-{}-length-model}
+  \nolinkurl{list-scalar-exact-cases|list-binary-product-exact-cases}
+  \code{-{}-length-inputs} \nolinkurl{arg0[,argN...]}
+  \code{-{}-where CLAUSE -{}- TYPE}. The bar presents
   two alternative literal model tokens. The clause is unquoted and ends at the
   standalone delimiter; quotes are rejected clause characters. The input token
   is a nonempty strictly increasing subset of physical \code{arg0} through
@@ -358,7 +360,7 @@ The only batch eligible for sealed post-verification presentation is the exact c
 
 In explicit filter mode, the same assessed occurrences enter a distinct total-partition seal. Preparation refusal, unassessed input, raw status, bounded-positive evidence, and applicable-domain establishment are retained. Only the exact replayed-counterexample report is rejected. Both output subsequences are restored to original callback order. Any adapter or seal failure preserves the literal original batch and exposes no rejection. Candidate text and evidence are projected from the same whole ranked, selected, or rejected wrapper, so equal spellings cannot exchange evidence.
 
-A replayed counterexample need not come from a live solver response: the query-owned origin probe or an input from the selected raw or nominal bank can yield the same receipt only after independent replay against that occurrence. Each counterexample first crosses the query-owned simplification seam. The raw rank/direct-Selection path retains only its final vector; the context-aware filter path promotes an unsimplified retained sample or records the final receipt under the appropriate coarse origin. Established startup/file requests introduce one filter context before goal translation; the post-snapshot inline route introduces it after translation and physical-arrow resolution. Either reuses exactly one context through every ordinary, provider, and classical lane. The compatibility assessor still creates a fresh context for each call made by other clients. Deferred lifecycle state, behavior mode, assessment contexts, and replay state are not evidence and do not enter persistent REPL state.
+A replayed counterexample need not come from a live solver response: the query-owned origin probe or an input from the selected raw or nominal bank can yield the same receipt only after independent replay against that occurrence. Each counterexample first crosses the query-owned simplification seam. The raw rank/direct-Selection path retains only its final vector; the context-aware filter path promotes an unsimplified retained sample or records the final receipt under the appropriate coarse origin. Established startup/file requests introduce one filter context before goal translation; the inline route introduces it after translation and physical-arrow resolution. Either reuses exactly one context through every ordinary, provider, and classical lane. The compatibility assessor still creates a fresh context for each call made by other clients. Deferred lifecycle state, behavior mode, assessment contexts, and replay state are not evidence and do not enter persistent REPL state.
 \end{invariantbox}
 
 \section*{The binary-product mirror and the newer ranking mechanics}
@@ -431,7 +433,7 @@ The following paths are current-branch source locations, not links into the pinn
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/Problem.hs} & Atomic checked session with session-owned provider inventory, separately revalidated contract, candidate semantics, complete Length problem, and retained candidate-independent bank scope. \\
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/Evaluate.hs} & Bounded concrete natural-number evaluator and the only constructor path for validated Length counterexamples. The scalar and product counterexample, finite input-box, simplification, and applicable-domain families run once over a private per-domain record with a shared three-way replay view; only the two assignment-replay implementations and the contract evaluators stay per-domain (the product side evaluates two result components). \\
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib.hs} & Transient typed QF\_LIA planning, canonical bounded bytes, structurally complete query fingerprint, retained problem-scope projection, exact same-scope fresh-record and retained-sample replay bridges, and model-binding validation. Internally the scalar and product boundaries share one plan sealer, one fingerprint builder over a role/schema/logic vocabulary, and one model reader over each domain's error constructors, and the eight query-owned operation pairs (model validation, input replay, the origin probe, bank recording and retained-sample replay, and the validation associations) run once over a private query-surface record, while every public query, fingerprint, and error type stays nominally per-domain. \\
-\filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/Where.hs} & Bounded ASCII where-clause surface syntax for one Length postcondition: a byte- and nesting-bounded parser producing an opaque, source-free parsed value, and a separate elaborator requiring the caller's explicit scalar/binary-product domain and complete source-ordered role vector before lowering observed physical \code{argN} references onto the existing passive contract-source vocabulary; no spine, role, provider, solver, or execution authority is inferred. The later Leant Main activation remains the authority-owning consumer, not a change to this passive Djex boundary. \\
+\filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/Where.hs} & Bounded ASCII where-clause surface syntax for one Length postcondition: a byte- and nesting-bounded parser producing an opaque, source-free parsed value, and a separate elaborator requiring the caller's explicit scalar/binary-product domain and complete source-ordered role vector before lowering observed physical \code{argN} references onto the existing passive contract-source vocabulary; no spine, role, provider, solver, or execution authority is inferred. Leant Main remains the authority-owning consumer, not a change to this passive Djex boundary. \\
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib/Observation.hs} & Query-specific association over one retained raw report, derived status and conservative strength, and exact problem-plus-query replay. \\
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib/Execution.hs} & Length compatibility policy wrapping the shared launch profile with both Length schema tags, artifact and response policy, the sole fingerprint budget, and the complete Length identity; byte-free digest-expectation presence classification. \\
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib/Live.hs} & Sanitized rank-2 live-session facade retaining one private whole status-indexed run observation, with unchanged status/strength/use projections and exact query-first evidence consumption. \\
@@ -488,7 +490,7 @@ The following paths are current-branch source locations, not links into the pinn
 \filepath{src/Leant/Synth/Length/SpinePair/Ranking.hs}, \filepath{Ranking/Internal.hs}, \filepath{PostVerification.hs}, \filepath{PostVerification/Internal.hs} & Nominal binary-product siblings of the scalar ranking and post-verification stack. \filepath{Ranking/Internal.hs} is the product instance of the shared ranking core---its own leaf types, refusal classifiers, and bank vocabulary over the one runner matrix and cursor---while the post-verification pair remains a distinct nominal twin; product receipts stay distinct types from scalar ones end to end. \\
 \filepath{src/Leant/Synth/Length/Selection.hs}, \filepath{Selection/Internal.hs}, \filepath{Selection/Generic.hs}, and SpinePair siblings & Nominal replay-authorized hard-selection adapters over one shared pipeline (\filepath{Selection/Generic.hs}, whose explanation, rejection, and result types take each domain's receipts as parameters and whose \code{SelectionDomain} record carries the per-domain failure naming): unchanged raw compatibility entrances plus additive context-aware entrances; only independently replayed counterexamples reject; every other assessment retains; any adapter/ranking/index/seal failure preserves the exact original batch without rewinding completed bank transitions. \\
 \filepath{src/Leant/Synth/Length/Presentation.hs} & Opaque same-ranked/selected/rejected-receipt candidate presentation, exact existing counterexample/simplification rejection notes, retained bounded-positive notes, and no detached evidence reassociation. \\
-\filepath{src/Main.hs} & Explicit startup opt-in, load-once command contract selection, established pre-translation request contexts, and the post-snapshot active inline route whose structure--goal--filter-authority--bounded-parse--scope-report--translation/retry--\code{SlotArrow} resolution order precedes exactly one context; per-command rank/filter dispatch, opaque same-run cursor consumption, filter-only two-batch progression at the session's verification width (12+12 or 24+24 by default), single-batch rank/disabled and half-width excluded-middle policies, mode-sensitive classical deadlines, one verification and assessment per batch, chronological run frontiers and note ownership, private four-way batch classification and lazy reverse accumulation, no-verified/all-rejected continuation with full-frontier deduplication, first-survivor termination without quota filling or a third probe, one plural result finalizer, survivor-only \code{itN} binding, complete accumulated rejection rows, structural/classical and abnormal diagnostic gates, four-way descriptor-launch notices, and sanitized mode-neutral preserve-all warning. \\
+\filepath{src/Main.hs} & Explicit startup opt-in, load-once command contract selection, established pre-translation request contexts, and the active inline route whose structure--goal--filter-authority--bounded-parse--scope-report--translation/retry--\code{SlotArrow} resolution order precedes exactly one context; per-command rank/filter dispatch, opaque same-run cursor consumption, filter-only two-batch progression at the session's verification width (12+12 or 24+24 by default), single-batch rank/disabled and half-width excluded-middle policies, mode-sensitive classical deadlines, one verification and assessment per batch, chronological run frontiers and note ownership, private four-way batch classification and lazy reverse accumulation, no-verified/all-rejected continuation with full-frontier deduplication, first-survivor termination without quota filling or a third probe, one plural result finalizer, survivor-only \code{itN} binding, complete accumulated rejection rows, structural/classical and abnormal diagnostic gates, four-way descriptor-launch notices, and sanitized mode-neutral preserve-all warning. \\
 \bottomrule
 \end{longtable}
 
@@ -500,7 +502,7 @@ The explicit startup opt-in requires a caller-supplied absolute configuration pa
 
 With that policy activated, the established option-bearing grammar is \code{:synth [-{}-behavior-mode rank|filter] [-{}-length-contract ABSOLUTE-PATH] -{}- TYPE}. Mode precedes contract and the standalone delimiter leaves \code{TYPE} opaque; omitted mode means ranking. Filter without a contract uses the startup contract. A contract form admits and reads one current contract-only document with format \code{leant-finite-list-spine-length-contract} once before goal translation. The exact root contains \code{format}, \code{rankingDomain}, and \code{contract}; \code{scalar} and \code{binary-product} select nominal nested grammars with the same six fields and no \code{resultShape}. Both require ordered target roles and an explicit case policy and admit modulo and positive-literal quotient. The decoder parses once and has no historical-version migration or fallback. Contract-only files contain no execution, filtering, replay, ordering, simplification, or usable-work policy. A decoded command contract and its separately parsed mode choose only that command's operation and passive contract; the activated policy remains process-fixed, and no request, assessment context, bank, or selection result enters \code{ReplState}, history, snapshots, or a cache.
 
-The post-snapshot inline grammar is \code{:synth}
+The active inline grammar is \code{:synth}
 \code{-{}-behavior-mode filter} \code{-{}-length-model}
 \nolinkurl{list-scalar-exact-cases|list-binary-product-exact-cases}
 \code{-{}-length-inputs} \nolinkurl{arg0[,argN...]}
@@ -2800,19 +2802,20 @@ golden transcripts pass byte-exact for this progressive checkpoint with exit
 status zero, no update mode, and no fixture drift. The 26 inputs, 26 golden
 files, and runner are unchanged.
 
-\textbf{Post-snapshot inline activation evidence.} The later production commit
+\textbf{Inline activation evidence.} The production commit
 \commitid{e078ca9168b71f8d8dab5cbe87d115384be855d5} connected the passive
 where-clause foundation to Main, and
 \commitid{0425ad9be5bcb8f8e3612b711e2fff94ad1c13be} characterized the runtime.
 At the initial reconciled documentation baseline
-\commitid{260d36d1dc2578ce7e470171c8591137569e455f}, with Djex
-\commitid{39c95a9b20e15f4e96c2b1447853943c98220c98}, the active inline group
+\commitid{260d36d1dc2578ce7e470171c8591137569e455f}, with the same Djex revision
+now pinned on the title page, the active inline group
 passes 21/21, Integration passes 24/24, and the full strict unit suite passes
 475/475. The strict all-target Cabal build and all 26 pinned-backend transcripts pass;
 the latter use comparison-only normalization for machine-dependent queue
 telemetry, without updating any golden fixture for inline activation. These
-figures describe work implemented after the six pinned snapshot references in
-this walkthrough; Stage~1 deliberately does not repin those historical links.
+figures describe the activation before its final documentation reconciliation.
+The title-page snapshots include the runtime, characterization, reconciled
+source documentation, and the matching Djex gitlink.
 
 Because several production modules are pure, tests can construct exact \code{Frag}, generated AST, provider metadata, and history values without launching Lean. This is where boundary invariants should be tested exhaustively.
 
@@ -3497,8 +3500,8 @@ Use state-transition boundaries rather than arbitrary line ranges.
 \section{Repository roots}
 
 \begin{itemize}
-  \item Djex pinned tree: \href{https://github.com/VladimirReshetnikov/Djex/tree/2f90509ea5b3025ad32ec46f03e0cf4725a8ce77}{\nolinkurl{github.com/VladimirReshetnikov/Djex/tree/2f90509...}}
-  \item Leant pinned tree: \href{https://github.com/VladimirReshetnikov/Leant/tree/aa36ca6b3c39d3fc54b0095125ee1bfd4e1da927}{\nolinkurl{github.com/VladimirReshetnikov/Leant/tree/893c4a1...}}
+  \item Djex pinned tree: \href{https://github.com/VladimirReshetnikov/Djex/tree/39c95a9b20e15f4e96c2b1447853943c98220c98}{\nolinkurl{github.com/VladimirReshetnikov/Djex/tree/39c95a9...}}
+  \item Leant pinned tree: \href{https://github.com/VladimirReshetnikov/Leant/tree/0ef02f855dbfed30752f2e5a1be745d8a43504d1}{\nolinkurl{github.com/VladimirReshetnikov/Leant/tree/0ef02f8...}}
   \item Leant's submodule declaration: \lpath{.gitmodules}
   \item Leant's multi-package build: \lpath{cabal.project}
 \end{itemize}
