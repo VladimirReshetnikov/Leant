@@ -1276,14 +1276,13 @@ the Lake project to provide the backend executable (`repl` or
 `repl.exe`); the focused suite remains runnable when that backend is not
 installed.
 
-Two things make a fresh run easier to read. First, the Windows baseline is
-452 of 454, not 454 of 454: `decode the one current scalar and binary-product
-grammar` and `admit and acquire current scalar and product selections` both
-assert POSIX absolute-path semantics that a Windows path does not satisfy, so
-they fail on Windows and pass everywhere else. A third case, `compose a
-persistent last-wins builder and admit before clock capture`, races a fake
-solver's start-up against a 700 ms budget and fails on a slow or loaded
-machine. Treat any *other* failure as a regression. Second, sixteen tests
+Two things make a fresh run easier to read. First, the suite passes in
+full on every platform (the two historical Windows path-admission
+failures now spell their absolute fixture paths per platform), with one
+caveat: `compose a persistent last-wins builder and admit before clock
+capture` races a fake solver's start-up against a 700 ms budget and can
+fail on a slow or loaded machine while passing in isolation. Treat any
+*other* failure as a regression. Second, sixteen tests
 read production source text and assert on it — twelve on
 [src/Main.hs](src/Main.hs), and one or two each on `Synth/Engine.hs`,
 `Synth/BehavioralSelection.hs` (and its `Internal`), the scalar and
