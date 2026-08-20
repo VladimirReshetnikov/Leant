@@ -61,7 +61,7 @@ synth engine: exference
   it2  fun x => match x with | Nat.zero => Demo.global («a» := Nat) | Nat.succ y => (match Nat.succ y with | Nat.zero => Demo.global («a» := Nat) | Nat.succ _ => Demo.global («a» := Nat))
   it3  fun x => match x with | Nat.zero => (match Nat.succ x with | Nat.zero => Demo.global («a» := Nat) | Nat.succ _ => Demo.global («a» := Nat)) | Nat.succ _ => Demo.global («a» := Nat)
   it4  fun x => match x with | Nat.zero => Demo.global («a» := Nat) | Nat.succ _ => (match Nat.succ x with | Nat.zero => Demo.global («a» := Nat) | Nat.succ _ => Demo.global («a» := Nat))
-note: search truncated: step limit reached, queue limit pruned 43420
+note: search truncated: step limit reached, queue limit pruned 44379
 λ> :set synth-engine djinn
 synth engine: djinn
 λ> :synth (Nat → Demo.Token)

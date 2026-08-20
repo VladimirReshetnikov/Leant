@@ -237,7 +237,7 @@ No runtime test expectation changed to accommodate this foundation.
 ## Documentation boundary
 
 The current internal contract is summarized in
-[`synth-internals.md`](../synth-internals.md#package-private-nominal-counterexample-bank-state),
+[`synth-internals.md`](../synth-internals.md#package-private-nominal-counterexample-bank-state-and-context),
 and the user-facing Length reference distinguishes this dormant state from the
 active assessment-local MRU in
 [`length-ranking.md`](../length-ranking.md).

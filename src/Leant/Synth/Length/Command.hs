@@ -149,6 +149,7 @@ lengthSynthInlineCommandWherePlan
   -> LeanLengthWherePlan
 lengthSynthInlineCommandWherePlan (LengthSynthInlineCommand plan _) = plan
 
+-- | The trimmed goal text following the inline clause's delimiter.
 lengthSynthInlineCommandGoal :: LengthSynthInlineCommand -> String
 lengthSynthInlineCommandGoal (LengthSynthInlineCommand _ goal) = goal
 
