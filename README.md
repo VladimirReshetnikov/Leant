@@ -216,9 +216,9 @@ remains the compatibility/library entrance while `:help synth` leads with
 Lean's `List.length` notation.
 
 The same milestone adds a Haskell-shaped `length arg0` surface to the
-standalone Djex REPL; that surface grammar has already landed there (inert
-until its checked runtime activation), so the milestone's open half is the
-Lean-notation shorthand on this side. Behavioral synthesis is a first-class use case of both
+standalone Djex REPL; that surface now runs end to end there under an
+activated policy, so the milestone's open half is the Lean-notation
+shorthand on this side. Behavioral synthesis is a first-class use case of both
 repositories, not a Leant-only frontend over a Djex library. See the
 [near-term shorthand and Djex parity plan](docs/length-ranking.md#planned-host-native-shorthand-and-djex-repl-parity).
 
