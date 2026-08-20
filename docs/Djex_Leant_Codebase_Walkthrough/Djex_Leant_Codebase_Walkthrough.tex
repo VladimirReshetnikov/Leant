@@ -85,7 +85,7 @@
 \newcommand{\RepoDjex}{\href{https://github.com/VladimirReshetnikov/Djex}{Djex}}
 \newcommand{\RepoLeant}{\href{https://github.com/VladimirReshetnikov/Leant}{Leant}}
 \def\DjexBase{https://github.com/VladimirReshetnikov/Djex/blob/2f90509ea5b3025ad32ec46f03e0cf4725a8ce77/}
-\def\LeantBase{https://github.com/VladimirReshetnikov/Leant/blob/fa83ead1bd9670a83440b44e23f80dfb259d683f/}
+\def\LeantBase{https://github.com/VladimirReshetnikov/Leant/blob/aa36ca6b3c39d3fc54b0095125ee1bfd4e1da927/}
 \newcommand{\dpath}[1]{\href{\DjexBase#1}{\nolinkurl{#1}}}
 \newcommand{\lpath}[1]{\href{\LeantBase#1}{\nolinkurl{#1}}}
 \newcommand{\dsym}[2]{\code{#2} in \dpath{#1}}
@@ -183,7 +183,7 @@ and practical extension paths\par}
 \small
 \begin{tabularx}{\textwidth}{@{}L{0.18\textwidth}Y@{}}
 \textbf{Djex snapshot} & \commitid{2f90509ea5b3025ad32ec46f03e0cf4725a8ce77} \\
-\textbf{Leant snapshot} & \commitid{fa83ead1bd9670a83440b44e23f80dfb259d683f} \\
+\textbf{Leant snapshot} & \commitid{aa36ca6b3c39d3fc54b0095125ee1bfd4e1da927} \\
 \textbf{Relationship} & Leant's \filepath{lib/Djex} submodule is pinned to the same Djex revision. \\
 \textbf{Prepared} & August 16, 2026; revised August 17, 2026 \\
 \textbf{Scope} & This is now the only maintainer walkthrough for either repository. The former Djex-only walkthrough was retired on August 17, 2026; its Djex material is covered by Parts~I--II here. \\
@@ -457,8 +457,8 @@ The following paths are current-branch source locations, not links into the pinn
 \filepath{src/Leant/Synth/Length/Configuration/File/Acquire.hs} & Startup-configuration failure mapper over shared acquisition; one generalized assessment loader, no scalar-only loader, discovery, or activation. \\
 \filepath{src/Leant/Synth/Length/Contract/File.hs} & Exact versionless contract-only root \code{\{format, rankingDomain, contract\}}. One bounded parse selects the current scalar or canonical-\code{Prod} grammar; both require roles and case policy, admit modulo and positive-literal quotient, and contain no execution-policy or \code{resultShape} field. \\
 \filepath{src/Leant/Synth/Length/Contract/File/Acquire.hs} & One-command contract facade over shared bounded acquisition. \\
-\filepath{src/Leant/Synth/Length/Command.hs} & Exact fixed-order \code{:synth [-{}-behavior-mode rank|filter] [-{}-length-contract PATH] -{}- TYPE} parser, with ordinary no-option goals left delimiter-free and opaque. A separate passive entrance parses the inline \code{-{}-length-model}/\code{-{}-length-inputs}/\code{-{}-where} form into an opaque plan; \filepath{src/Main.hs} does not yet consume it, so a line spelling those options is currently ordinary goal text. \\
-\filepath{src/Leant/Synth/Length/Where.hs} & Passive Leant profiles over Djex's bounded where-clause syntax: two fixed exact-case list models, ASCII input-index admission, and a resolver that builds the complete source-ordered role vector from the Lean-translated physical arity before elaboration; every stage is passive data and no step infers authority from the clause or the target. \\
+\filepath{src/Leant/Synth/Length/Command.hs} & Exact fixed-order \code{:synth [-{}-behavior-mode rank|filter] [-{}-length-contract PATH] -{}- TYPE} parser, with ordinary no-option goals left delimiter-free and opaque. A separate entrance parses the inline \code{-{}-length-model}/\code{-{}-length-inputs}/\code{-{}-where} form into an opaque plan, now consumed by \filepath{src/Main.hs}'s filter-only inline runner: fixed option order, no repetition, mutual exclusion with the contract-file option, and the same activated-startup-policy and delimiter rules as the file forms. \\
+\filepath{src/Leant/Synth/Length/Where.hs} & Leant profiles over Djex's bounded where-clause syntax: two fixed exact-case \code{List} models, ASCII input-index admission, and a resolver that builds the complete source-ordered role vector from the Lean-translated physical arity before elaboration expands the built-in profile (exact zero/step cases, no provider laws); every stage remains passive data and no step infers authority from the clause or the target. \\
 \filepath{src/Leant/Synth/Length/Integration.hs} & Opaque disabled/configured mode, startup admission--load--activation setup, retained activation disposition, byte-free executable-launch classification, pre-IO explicit-contract permission, and one command-local mode-plus-policy-plus-lazy-contract request; a rank-2 \code{LengthAssessmentContext} whose filter branches own one nominal bank and rank branches own none; reusable context assessment used around Main's complete command scheduler and every progressive batch plus a fresh-per-call compatibility wrapper for other callers. \\
 \filepath{src/Leant/Options.hs} & Pure CLI admission, pin-policy choice, and bounded configuration-load timeout ownership. \\
 \filepath{src/Leant/Json/Bounded.hs} & Shared strict bounded JSON syntax, scalar decoding, and closed-object validation used by both configuration and contract-only roots. \\
@@ -3455,7 +3455,7 @@ Use state-transition boundaries rather than arbitrary line ranges.
 
 \begin{itemize}
   \item Djex pinned tree: \href{https://github.com/VladimirReshetnikov/Djex/tree/2f90509ea5b3025ad32ec46f03e0cf4725a8ce77}{\nolinkurl{github.com/VladimirReshetnikov/Djex/tree/2f90509...}}
-  \item Leant pinned tree: \href{https://github.com/VladimirReshetnikov/Leant/tree/fa83ead1bd9670a83440b44e23f80dfb259d683f}{\nolinkurl{github.com/VladimirReshetnikov/Leant/tree/893c4a1...}}
+  \item Leant pinned tree: \href{https://github.com/VladimirReshetnikov/Leant/tree/aa36ca6b3c39d3fc54b0095125ee1bfd4e1da927}{\nolinkurl{github.com/VladimirReshetnikov/Leant/tree/893c4a1...}}
   \item Leant's submodule declaration: \lpath{.gitmodules}
   \item Leant's multi-package build: \lpath{cabal.project}
 \end{itemize}
