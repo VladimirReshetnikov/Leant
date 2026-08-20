@@ -21,7 +21,8 @@ module Leant.Synth.Length.Where
   , resolveLeanLengthWhereSource
   ) where
 
-import Data.Char (ord)
+import Control.Monad (when)
+import Data.Char (isDigit, ord)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as TextEncoding
 import Language.Haskell.Djex
@@ -155,10 +156,9 @@ resolveLeanLengthWhereSource arity
       (LeanLengthWhereInputSource observedInputs) source) = do
   let maximumArity = fromIntegral
         $ lengthContractInputLimit defaultLengthLimits
-  if arity > maximumArity
-    then Left $ LeanLengthWherePhysicalArrowLimitExceeded
-      maximumArity arity
-    else pure ()
+  when (arity > maximumArity)
+    $ Left $ LeanLengthWherePhysicalArrowLimitExceeded
+        maximumArity arity
   case [index | index <- observedInputs, index >= arity] of
     index : _ -> Left $ LeanLengthWhereInputOutOfRange index arity
     [] -> pure ()
@@ -223,7 +223,7 @@ nonemptyPieces source = go [] [] source
     go reversedPieces (character : reversedPiece) rest
 
 decimalDigit :: Char -> Bool
-decimalDigit character = character >= '0' && character <= '9'
+decimalDigit character = isDigit character
 
 boundedDecimal :: Natural -> String -> Either Natural Natural
 boundedDecimal firstUnavailable = go 0
