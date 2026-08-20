@@ -84,8 +84,8 @@
 \newcommand{\commitid}[1]{{\ttfamily\footnotesize #1}}
 \newcommand{\RepoDjex}{\href{https://github.com/VladimirReshetnikov/Djex}{Djex}}
 \newcommand{\RepoLeant}{\href{https://github.com/VladimirReshetnikov/Leant}{Leant}}
-\def\DjexBase{https://github.com/VladimirReshetnikov/Djex/blob/39c95a9b20e15f4e96c2b1447853943c98220c98/}
-\def\LeantBase{https://github.com/VladimirReshetnikov/Leant/blob/0ef02f855dbfed30752f2e5a1be745d8a43504d1/}
+\def\DjexBase{https://github.com/VladimirReshetnikov/Djex/blob/e454757d53ec057238c22fc6cd0d935b7d96b3dc/}
+\def\LeantBase{https://github.com/VladimirReshetnikov/Leant/blob/ada69d884480b93e74ee4b3daf77be38702ee07d/}
 \newcommand{\dpath}[1]{\href{\DjexBase#1}{\nolinkurl{#1}}}
 \newcommand{\lpath}[1]{\href{\LeantBase#1}{\nolinkurl{#1}}}
 \newcommand{\dsym}[2]{\code{#2} in \dpath{#1}}
@@ -182,8 +182,8 @@ and practical extension paths\par}
 \begin{tcolorbox}[width=0.86\textwidth,colback=SoftGray,colframe=RuleGray,boxrule=0.7pt,arc=1mm]
 \small
 \begin{tabularx}{\textwidth}{@{}L{0.18\textwidth}Y@{}}
-\textbf{Djex snapshot} & \commitid{39c95a9b20e15f4e96c2b1447853943c98220c98} \\
-\textbf{Leant snapshot} & \commitid{0ef02f855dbfed30752f2e5a1be745d8a43504d1} \\
+\textbf{Djex snapshot} & \commitid{e454757d53ec057238c22fc6cd0d935b7d96b3dc} \\
+\textbf{Leant snapshot} & \commitid{ada69d884480b93e74ee4b3daf77be38702ee07d} \\
 \textbf{Relationship} & Leant's \filepath{lib/Djex} submodule is pinned to the same Djex revision. \\
 \textbf{Prepared} & August 16, 2026; revised August 17, 2026 \\
 \textbf{Scope} & This is now the only maintainer walkthrough for either repository. The former Djex-only walkthrough was retired on August 17, 2026; its Djex material is covered by Parts~I--II here. \\
@@ -433,7 +433,7 @@ The following paths are current-branch source locations, not links into the pinn
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/Problem.hs} & Atomic checked session with session-owned provider inventory, separately revalidated contract, candidate semantics, complete Length problem, and retained candidate-independent bank scope. \\
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/Evaluate.hs} & Bounded concrete natural-number evaluator and the only constructor path for validated Length counterexamples. The scalar and product counterexample, finite input-box, simplification, and applicable-domain families run once over a private per-domain record with a shared three-way replay view; only the two assignment-replay implementations and the contract evaluators stay per-domain (the product side evaluates two result components). \\
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib.hs} & Transient typed QF\_LIA planning, canonical bounded bytes, structurally complete query fingerprint, retained problem-scope projection, exact same-scope fresh-record and retained-sample replay bridges, and model-binding validation. Internally the scalar and product boundaries share one plan sealer, one fingerprint builder over a role/schema/logic vocabulary, and one model reader over each domain's error constructors, and the eight query-owned operation pairs (model validation, input replay, the origin probe, bank recording and retained-sample replay, and the validation associations) run once over a private query-surface record, while every public query, fingerprint, and error type stays nominally per-domain. \\
-\filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/Where.hs} & Bounded ASCII where-clause surface syntax for one Length postcondition: a byte- and nesting-bounded parser producing an opaque, source-free parsed value, and a separate elaborator requiring the caller's explicit scalar/binary-product domain and complete source-ordered role vector before lowering observed physical \code{argN} references onto the existing passive contract-source vocabulary; no spine, role, provider, solver, or execution authority is inferred. Leant Main remains the authority-owning consumer, not a change to this passive Djex boundary. \\
+\filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/Where.hs} & Bounded ASCII where-clause surface syntax for one Length postcondition: two byte- and nesting-bounded parser entrances over one grammar core -- compact \code{len(...)} and Haskell-shaped \code{length}/\code{fst}/\code{snd} spellings, each rejecting the other's operators -- producing the same opaque, source-free parsed value, and a separate elaborator requiring the caller's explicit scalar/binary-product domain and complete source-ordered role vector before lowering observed physical \code{argN} references onto the existing passive contract-source vocabulary; no spine, role, provider, solver, or execution authority is inferred. Leant Main and the standalone Djex REPL are both authority-owning consumers; neither changes this passive Djex boundary. \\
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib/Observation.hs} & Query-specific association over one retained raw report, derived status and conservative strength, and exact problem-plus-query replay. \\
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib/Execution.hs} & Length compatibility policy wrapping the shared launch profile with both Length schema tags, artifact and response policy, the sole fingerprint budget, and the complete Length identity; byte-free digest-expectation presence classification. \\
 \filepath{synthesis/src/Language/Haskell/Synthesis/Semantic/Length/SMTLib/Live.hs} & Sanitized rank-2 live-session facade retaining one private whole status-indexed run observation, with unchanged status/strength/use projections and exact query-first evidence consumption. \\
@@ -996,7 +996,7 @@ The shared generated AST is neither Haskell source nor Lean source. It is a chec
 
 \dpath{synthesis/src/Language/Haskell/Synthesis/Diagnostic.hs} gives validation and search failures structured identities and renderings. The adapters use diagnostics instead of throwing ordinary exceptions for expected user errors. Pure rendering paths still contain exception boundaries around hostile or infinite user-supplied text, but asynchronous exceptions are preserved.
 
-\dpath{synthesis/src/Language/Haskell/Synthesis/Selection.hs} separates search generation from candidate selection. A backend may expose a lazy stream with scores and progress; a client chooses a bounded subset, filters it, and preserves the strongest progress observation. This is particularly important for Leant, which performs its own cross-engine merge and final verification window.
+\dpath{synthesis/src/Language/Haskell/Synthesis/Selection.hs} separates search generation from candidate selection. A backend may expose a lazy stream with scores and progress; a client chooses a bounded subset, filters it, and preserves the strongest progress observation. Admissibility can be checked purely or, through the monadic sibling selector, by an effectful check that runs once per candidate in encounter order while preserving the pure selector's batch boundaries and laziness. This is particularly important for Leant, which performs its own cross-engine merge and final verification window.
 
 \begin{summarybox}
 The shared layer establishes the vocabulary and the facts that both engines are allowed to assume. Its most important contribution is not code reuse but semantic compression: downstream code receives opaque values that stand for completed validation arguments.
@@ -1558,13 +1558,14 @@ The large \dpath{src/Language/Haskell/Djex/REPL.hs} coordinates the interactive 
 \textbf{Module} & \textbf{Responsibility} \\
 \midrule
 \endhead
-\dpath{src/Language/Haskell/Djex/REPL/Command.hs} & Command grammar, abbreviations, arguments, and command-level diagnostics. \\
+\dpath{src/Language/Haskell/Djex/REPL/Command.hs} & Command grammar, abbreviations, arguments, and command-level diagnostics, including the structured \code{-{}-where CLAUSE -{}- TYPE} query envelope retained with each type query. \\
 \dpath{src/Language/Haskell/Djex/REPL/Driver.hs} & Input loop, prompt, multiline behavior, output and exception boundary. \\
 \dpath{src/Language/Haskell/Djex/REPL/Scope.hs} & Visible declarations, qualification, ambiguity, namespace resolution, and import/export effects. \\
 \dpath{src/Language/Haskell/Djex/REPL/Type.hs} & Type parsing, normalization, checking, and user-facing type operations. \\
 \dpath{src/Language/Haskell/Djex/REPL/Kind.hs} & Kind queries and diagnostics. \\
 \dpath{src/Language/Haskell/Djex/REPL/Eval.hs} & Evaluation-oriented commands and source execution boundaries. \\
 \dpath{src/Language/Haskell/Djex/REPL/DjinnScope.hs} & Projection of the unified visible scope into Djinn-specific premise policy. \\
+\dpath{src/Language/Haskell/Djex/REPL/LengthWhere.hs} & Conservative built-in-list defaults for REPL Length constraints: observes every structural list argument of the elaborated target, accepts only a scalar list result or a boxed pair of list results, and seals the session and contract through the existing checked Length boundaries; inert until checked runtime activation. \\
 \dpath{src/Language/Haskell/Djex/REPL/Workspace.hs} & Workspace loading, module graph, package context, and reload behavior. \\
 \bottomrule
 \end{longtable}
@@ -3222,7 +3223,7 @@ This appendix is a practical source map. It is intentionally selective: it names
 \dpath{synthesis/src/Language/Haskell/Synthesis/Search.hs} & Search batches, progress, completion, truncation reasons. \\
 \dpath{synthesis/src/Language/Haskell/Synthesis/Candidate.hs} & Candidate, residual constraints, backend details, rendering boundary. \\
 \dpath{synthesis/src/Language/Haskell/Synthesis/Generated.hs} & Common generated expression/pattern/clause AST, scope, simplification. \\
-\dpath{synthesis/src/Language/Haskell/Synthesis/Selection.hs} & Bounded stream observation and candidate selection. \\
+\dpath{synthesis/src/Language/Haskell/Synthesis/Selection.hs} & Bounded stream observation and candidate selection, with pure and effectful admission variants. \\
 \dpath{synthesis/src/Language/Haskell/Synthesis/Diagnostic.hs} & Structured validation and search diagnostics. \\
 \bottomrule
 \end{longtable}
@@ -3500,8 +3501,8 @@ Use state-transition boundaries rather than arbitrary line ranges.
 \section{Repository roots}
 
 \begin{itemize}
-  \item Djex pinned tree: \href{https://github.com/VladimirReshetnikov/Djex/tree/39c95a9b20e15f4e96c2b1447853943c98220c98}{\nolinkurl{github.com/VladimirReshetnikov/Djex/tree/39c95a9...}}
-  \item Leant pinned tree: \href{https://github.com/VladimirReshetnikov/Leant/tree/0ef02f855dbfed30752f2e5a1be745d8a43504d1}{\nolinkurl{github.com/VladimirReshetnikov/Leant/tree/0ef02f8...}}
+  \item Djex pinned tree: \href{https://github.com/VladimirReshetnikov/Djex/tree/e454757d53ec057238c22fc6cd0d935b7d96b3dc}{\nolinkurl{github.com/VladimirReshetnikov/Djex/tree/e454757...}}
+  \item Leant pinned tree: \href{https://github.com/VladimirReshetnikov/Leant/tree/ada69d884480b93e74ee4b3daf77be38702ee07d}{\nolinkurl{github.com/VladimirReshetnikov/Leant/tree/ada69d8...}}
   \item Leant's submodule declaration: \lpath{.gitmodules}
   \item Leant's multi-package build: \lpath{cabal.project}
 \end{itemize}
