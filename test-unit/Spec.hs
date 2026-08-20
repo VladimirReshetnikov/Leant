@@ -20234,13 +20234,13 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
       do
         privateProviderZero <- expectRight $ mkIdentifier "leantProvider0"
         privateProviderOne <- expectRight $ mkIdentifier "leantProvider1"
-        let void = FParamInd "Demo.Void" "Demo.Void" [] []
+        let voidInd = FParamInd "Demo.Void" "Demo.Void" [] []
             identityType = FAll True "p"
               (FArr (FVar "p") (FVar "p"))
             constantType = FAll True "q"
               (FArr (FVar "q") (FArr (FVar "q") (FVar "q")))
             firstProvider = ProviderFragWithEvidence "Demo.impossibleZero"
-              (FAll False "F" $ FAll False "a" void) ["F", "a"]
+              (FAll False "F" $ FAll False "a" voidInd) ["F", "a"]
                 [ [ ProviderInstantiationArgument 1
                       (FAtom False "Demo.Wrap")
                   , ProviderInstantiationArgument 0 identityType
@@ -20251,14 +20251,14 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                   ]
                 ]
             secondProvider = ProviderFragWithEvidence "Demo.impossibleOne"
-              (FAll False "b" void) ["b"]
+              (FAll False "b" voidInd) ["b"]
                 [[ProviderInstantiationArgument 0 identityType]]
         expected <- expectRight $ inspectExferencePreparation
-          [firstProvider, secondProvider] [] void void
+          [firstProvider, secondProvider] [] voidInd voidInd
         detailed <- expectRight $
           synthesizeWithProvidersSkippingDetailed
             EngineExference 128 Set.empty
-              [firstProvider, secondProvider] void
+              [firstProvider, secondProvider] voidInd
         case detailed of
           DetailedSynthCandidates groups _ ->
             case
@@ -20864,15 +20864,15 @@ providerEngineTests = testGroup "foreign providers"
             Left err -> assertFailure err
       mapM_ check [EngineDjinn, EngineExference, EngineBoth]
   , testCase "override an empty-family refutation with exact rank-N evidence" $ do
-      let void = FParamInd "Demo.Void" "Demo.Void" [] []
+      let voidInd = FParamInd "Demo.Void" "Demo.Void" [] []
           polytype = FAll True "p" (FArr (FVar "p") (FVar "p"))
           provider = ProviderFragWithEvidence "Demo.impossible"
-            (FAll False "a" void) ["a"]
+            (FAll False "a" voidInd) ["a"]
               [[ProviderInstantiationArgument 0 polytype]]
           exact = (==
             "Demo.impossible («a» := (∀ (a0_0 : _), a0_0 → a0_0))")
           check engine = case
-              synthesizeWithProviders engine 128 [provider] void of
+              synthesizeWithProviders engine 128 [provider] voidInd of
             Right (SynthCandidates groups _) ->
               assertBool
                 ("the exact provider did not override the empty-family \

@@ -1,3 +1,10 @@
+-- The provider-instantiation constructors below share a sum type whose
+-- record fields exist only on their own constructor; every selector is
+-- used behind a matching pattern, and the field names double as the
+-- constructors' documentation.  The partial-fields warning is therefore
+-- waived for this module alone; new modules still get it.
+{-# OPTIONS_GHC -Wno-partial-fields #-}
+
 -- | The fragment translator for @:synth@ (SYNTHESIS_PROPOSAL.md, phase 1).
 --
 -- Translation /into/ the fragment happens on the Lean side: a @run_tac@
