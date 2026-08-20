@@ -11440,7 +11440,7 @@ lengthContractFileTests = testGroup
 
 lengthSynthInlineWhereTests :: TestTree
 lengthSynthInlineWhereTests = testGroup
-  "passive inline Length where profiles"
+  "active inline Length where profiles"
   [ testCase "parse and project the exact scalar form"
       assertLengthSynthInlineScalarForm
   , testCase "parse and project the exact binary-product form"
@@ -11481,8 +11481,8 @@ lengthSynthInlineWhereTests = testGroup
       assertLeanLengthWhereResultDomains
   , testCase "keep raw plans and sources positional, opaque, and instance-free"
       assertLeanLengthWhereOpacity
-  , testCase "keep the new parser out of Main and Integration"
-      assertLeanLengthWherePassiveArchitecture
+  , testCase "pin Main precedence, arity, and command-context lifetime"
+      assertLeanLengthWhereRuntimeArchitecture
   ]
 
 assertLengthSynthInlineScalarForm :: IO ()
@@ -11831,32 +11831,132 @@ assertLeanLengthWhereOpacity = do
         ["Eq", "Show", "Generic"])
     rawTypes
 
-assertLeanLengthWherePassiveArchitecture :: IO ()
-assertLeanLengthWherePassiveArchitecture = do
+assertLeanLengthWhereRuntimeArchitecture :: IO ()
+assertLeanLengthWhereRuntimeArchitecture = do
   mainLines <- lines <$> readFile "src/Main.hs"
   integrationSource <- readFile "src/Leant/Synth/Length/Integration.hs"
+  configurationSource <- readFile "src/Leant/Synth/Length/Configuration.hs"
+  handoffSource <- readFile "src/Leant/Synth/Length/Handoff.hs"
   let mainSource = unlines mainLines
       commandImport = unlines $ mainSourceSection
         "import Leant.Synth.Length.Command"
         "import Leant.Synth.Length.Contract.File.Acquire" mainLines
-      passiveNames =
+      commandSection = mainSourceSection
+        "cmdSynth :: St -> String -> IO ()"
+        "-- | Resolve the ordinary explicit goal" mainLines
+      inlineSection = mainSourceSection
+        "-- | Activate one already authorized"
+        "-- | Translate once and preserve" mainLines
+      translationSection = mainSourceSection
+        "-- | Translate once and preserve"
+        "-- | Count only source arrows" mainLines
+      aritySection = mainSourceSection
+        "translatedPhysicalArrowArity ::"
+        "-- | Run the serializer on one goal" mainLines
+      retrySection = mainSourceSection
+        "-- | Auto-bound variables get"
+        "-- | Whether an error text names this marker universe" mainLines
+      lowerLayerNames =
         [ "parseLengthSynthInlineCommand"
         , "lengthSynthInlineCommandWherePlan"
         , "parseLeanLengthWhereSource"
         , "resolveLeanLengthWhereSource"
         ]
-  mapM_ (\(label, source) -> mapM_ (\name -> assertBool
-      (label ++ " referenced passive inline authority " ++ name)
-      $ not $ name `isInfixOf` source) passiveNames)
-    [("Main", mainSource), ("Integration", integrationSource)]
-  assertBool "Main imported the passive Length where module"
-    $ not $ "Leant.Synth.Length.Where" `isInfixOf` mainSource
-  assertBool "Integration imported the passive Length where module"
-    $ not $ "Leant.Synth.Length.Where" `isInfixOf` integrationSource
+      lowerLayers =
+        [ ("Integration", integrationSource)
+        , ("Configuration", configurationSource)
+        , ("Handoff", handoffSource)
+        ]
+  mapM_ (\(label, source) -> do
+      assertBool (label ++ " imported the inline Length where layer")
+        $ not $ "Leant.Synth.Length.Where" `isInfixOf` source
+      mapM_ (\name -> assertBool
+          (label ++ " referenced Main-owned inline authority " ++ name)
+          $ not $ name `isInfixOf` source) lowerLayerNames)
+    lowerLayers
+  mapM_ (assertMainSourceContains "active command import"
+      $ lines commandImport)
+    [ "LengthSynthInlineCommand"
+    , "parseLengthSynthInlineCommand"
+    , "lengthSynthInlineCommandWherePlan"
+    ]
+  mapM_ (assertMainSourceContains "active where import" mainLines)
+    [ "Leant.Synth.Length.Where"
+    , "parseLeanLengthWhereSource"
+    , "resolveLeanLengthWhereSource"
+    ]
   assertBool "Main stopped importing the established parser"
     $ "parseLengthSynthCommand" `isInfixOf` commandImport
-  assertBool "Main stopped calling only the established parser"
-    $ "case parseLengthSynthCommand rawArg of" `isInfixOf` mainSource
+  inlineParse <- expectMainSourcePosition "inline command precedence"
+    "case parseLengthSynthInlineCommand rawArg of" commandSection
+  establishedParse <- expectMainSourcePosition "inline command precedence"
+    "runEstablished = case parseLengthSynthCommand rawArg of" commandSection
+  let goalResolutions = mainSourcePositions
+        "case resolveSynthCommandGoal state" commandSection
+  length goalResolutions @?= 2
+  goalResolution <- case goalResolutions of
+    _ : inlineGoal : [] -> pure inlineGoal
+    _ -> assertFailure "Main lost one of its two command goal sources"
+      >> error "unreachable"
+  authorization <- expectMainSourcePosition "inline command precedence"
+    "case authorizeExplicitLengthAssessmentRequest" commandSection
+  boundedParse <- expectMainSourcePosition "inline command precedence"
+    "case parseLeanLengthWhereSource" commandSection
+  inlineRun <- expectMainSourcePosition "inline command precedence"
+    "synthInlineRun permission source st args goal" commandSection
+  assertBool "Main changed inline command admission precedence"
+    $ inlineParse < establishedParse
+      && inlineParse < goalResolution
+      && goalResolution < authorization
+      && authorization < boundedParse
+      && boundedParse < inlineRun
+
+  translation <- expectMainSourcePosition "inline context lifetime"
+    "translateSynthGoalWithRetry st goal" inlineSection
+  resolution <- expectMainSourcePosition "inline context lifetime"
+    "case resolveLeanLengthWhereSource" inlineSection
+  contextOpen <- expectMainSourcePosition "inline context lifetime"
+    "withLengthAssessmentRequestContext" inlineSection
+  scheduler <- expectMainSourcePosition "inline context lifetime"
+    "synthGo assessmentContext st args retriedVars" inlineSection
+  length (mainSourcePositions
+      "withLengthAssessmentRequestContext" inlineSection) @?= 1
+  assertBool "inline translation, resolution, and context order changed"
+    $ translation < resolution && resolution < contextOpen
+      && contextOpen < scheduler
+
+  mapM_ (assertMainSourceContains "physical arrow arity" mainLines)
+    [ "Slot (SlotArrow)"
+    , "fragSpine"
+    ]
+  assertMainSourceContains "physical arrow arity" aritySection
+    "[() | SlotArrow _ <- fragSpine $ pgFrag parsed]"
+  mapM_ (\fragment -> assertBool
+      ("physical target arity counted a non-arrow slot " ++ fragment)
+      $ not $ fragment `isInfixOf` unlines aritySection)
+    [ "SlotAll"
+    , "SlotInst"
+    ]
+
+  assertMainSourceContains "inline filter authority" commandSection
+    "authorizeExplicitLengthAssessmentRequest LengthBehaviorFilter"
+  assertMainSourceContains "inline request association" inlineSection
+    "explicitLengthAssessmentRequest permission selection"
+
+  assertMainSourceContains "translation continuation" translationSection
+    "(Maybe [String] -> String -> ParsedGoal -> IO ())"
+  mapM_ (assertMainSourceContains "translation continuation" translationSection)
+    [ "continuation Nothing goal parsed"
+    , "synthUniverseRetry st goal errors continuation"
+    ]
+  mapM_ (assertMainSourceContains "universe retry continuation" retrySection)
+    [ "synthUniverseRetry st goal originalErrors continuation = do"
+    , "continuation (Just wrapVars) wrapped parsed"
+    ]
+  assertBool "generalized translation retry reacquired a Length context"
+    $ not $ "assessmentContext" `isInfixOf` unlines retrySection
+  assertBool "Main retained the former passive-only architecture"
+    $ all (`isInfixOf` mainSource) lowerLayerNames
 
 inlineLengthOptionGroups :: [String]
 inlineLengthOptionGroups =
@@ -12585,7 +12685,7 @@ lengthAssessmentIntegrationTests = testGroup
       "refill through five rejections to seven ordered survivors in one batch"
       assertLengthAssessmentFilterSurvivorRefill
   , testCase
-      "scope one assessment context across the complete synthesis command"
+      "scope one nominal context per established or inline command"
       assertLengthAssessmentMainCommandContext
   , testCase
       "separate bounded lane verification from command accumulation"
@@ -12724,6 +12824,94 @@ assertLengthAssessmentExplicitDisabled = do
   assertBool "disabled command request retained a ranking"
     $ isNothing $ lengthAssessmentRanking lazyResult
 
+-- Inline profiles intentionally declare no provider laws.  These fixtures
+-- therefore select only checked candidates whose sealed Djex authority is
+-- provider-free, so the integration assertions exercise actual filtering
+-- rather than preserve-on-preparation-refusal behavior.
+buildInlineScalarSelectionFixture
+  :: LeanLengthContract
+  -> IO
+      ( Verified DetailedVerificationVariant
+      , Verified DetailedVerificationVariant
+      )
+buildInlineScalarSelectionFixture contract = do
+  let sourceList = lengthSpinePairFixtureList
+  candidates <- verifiedInlineLengthCandidates True []
+    $ FArr sourceList sourceList
+  let prepared =
+        [ (verified, checkedLengthCandidateResult checked)
+        | verified <- candidates
+        , Right problem <- [prepareCheckedLengthProblem contract verified]
+        , let checked = checkedLengthProblemCandidate problem
+        , null $ checkedLengthCandidateUsedProviders checked
+        ]
+      input = LengthVariable $ LengthInput 0
+      zero = LengthLiteral 0
+      predecessor = LengthMonus input $ LengthLiteral 1
+      exactResult offset = LengthIf (LengthEqual input zero) input
+        $ LengthSum [LengthLiteral offset, predecessor]
+  identity <- choose "exact identity" (exactResult 1) prepared
+  incremented <- choose "exact positive-spine increment" (exactResult 2)
+    prepared
+  pure (identity, incremented)
+ where
+  choose label expected prepared = case
+      [verified | (verified, actual) <- prepared, actual == expected] of
+    verified : _ -> pure verified
+    [] -> assertFailure
+      ("provider-free inline scalar fixture lacked " ++ label ++ ": " ++
+       show (map snd prepared)) >> error "unreachable"
+
+buildInlineSpinePairSelectionFixture
+  :: LeanLengthSpinePairContract
+  -> IO
+      ( Verified DetailedVerificationVariant
+      , Verified DetailedVerificationVariant
+      )
+buildInlineSpinePairSelectionFixture contract = do
+  candidates <- verifiedInlineLengthCandidates False []
+    lengthSpinePairFixtureGoal
+  let prepared =
+        [ (verified, Djex.checkedLengthSpinePairCandidateResult checked)
+        | verified <- candidates
+        , Right problem <-
+            [prepareCheckedLengthSpinePairProblem contract verified]
+        , let checked = Djex.checkedLengthSpinePairProblemCandidate problem
+        , null $ Djex.checkedLengthSpinePairCandidateUsedProviders checked
+        ]
+      input :: LengthExpression LengthContractVariable
+      input = LengthVariable $ LengthInput 0
+  duplicated <- choose "duplicated input"
+    (Djex.LengthSpinePair input input) prepared
+  inputAndZero <- choose "input and zero"
+    (Djex.LengthSpinePair input $ LengthLiteral 0) prepared
+  pure (duplicated, inputAndZero)
+ where
+  choose label expected prepared = case
+      [verified | (verified, actual) <- prepared, actual == expected] of
+    verified : _ -> pure verified
+    [] -> assertFailure
+      ("provider-free inline product fixture lacked " ++ label ++ ": " ++
+       show (map snd prepared)) >> error "unreachable"
+
+verifiedInlineLengthCandidates
+  :: Bool
+  -> [ProviderFrag]
+  -> Frag
+  -> IO [Verified DetailedVerificationVariant]
+verifiedInlineLengthCandidates multiConstructorPatterns providers goal = do
+  detailed <- expectRight $
+    synthesizeWithProvidersSkippingDetailedWithMultiConstructorPatterns
+      multiConstructorPatterns EngineExference 512 Set.empty providers goal
+  groups <- case detailed of
+    DetailedSynthCandidates retained _ -> pure retained
+    other -> assertFailure
+      ("provider-free inline fixture synthesis failed: " ++ show other)
+        >> error "unreachable"
+  batch <- verifyCandidateGroups 512 (const $ pure VariantAccepted)
+    $ map detailedCandidateGroupVerificationVariants groups
+  pure $ verifiedCandidateReceipts batch
+
 assertLengthAssessmentScalarFilterDispatch :: IO ()
 assertLengthAssessmentScalarFilterDispatch
   | os == "mingw32" = pure ()
@@ -12748,6 +12936,10 @@ assertLengthAssessmentScalarFilterDispatch
               [ jsonLengthProviderLaw "Demo.scaleList" ["spine"]
                   $ jsonLengthScale 2 $ jsonLengthArgument 0
               ]
+            inlineScalarContractValue expected = setJsonField
+              ["candidateCasePolicy"]
+              (Json.JStr "exact-spine-zero-step-v1")
+              $ scalarContractValue expected
             configuration = setJsonField ["contract"]
               (scalarContractValue input)
               $ currentApplicableDomainScalarDocument executable 2000
@@ -12841,9 +13033,75 @@ assertLengthAssessmentScalarFilterDispatch
         assertBool "one-shot scalar filter used the pair projection"
           $ isNothing $ lengthAssessmentSpinePairSelectionResult oneShot
 
+        inlineSelection <- expectLengthSynthInlineSelection 1
+          $ scalarInlineLengthCommand "arg0"
+              ("len(result)=len(arg0)+min(len(arg0),1)")
+              "List Nat -> List Nat"
+        inlineContract <- case inlineSelection of
+          LeanLengthScalarContractSelection contract -> pure contract
+          LeanLengthSpinePairContractSelection _ -> assertFailure
+            "scalar inline command resolved to a product contract"
+              >> error "unreachable"
+        (inlineIdentity, inlineIncremented) <-
+          buildInlineScalarSelectionFixture inlineContract
+        inlineVerification <- verificationBatchFromReceipts
+          [inlineIdentity, inlineIncremented]
+        whenDescriptorBoundExecveCheckLaunchPubliclyReachable $
+          withFakeLengthSolver "healthy" $ \inlineExecutable -> do
+            let inlineConfigurationPath = takeDirectory inlineExecutable </>
+                  "filter-command-scalar-inline-config.json"
+                inlineConfiguration = setJsonField ["contract"]
+                  (inlineScalarContractValue input)
+                  $ currentApplicableDomainScalarDocument
+                      inlineExecutable 2000
+            ByteString.writeFile inlineConfigurationPath
+              $ encodeLengthRankingConfigurationFile inlineConfiguration
+            inlineLoaded <- loadLengthAssessmentMode PermitUnpinnedExecutable
+              $ LengthRankingConfigurationFileSource
+                  inlineConfigurationPath 1000
+            inlineMode <- case inlineLoaded of
+              Left failure -> assertFailure (show failure)
+                >> error "unreachable"
+              Right configured -> pure configured
+            inlineStartupRequest <- expectRight $
+              startupLengthAssessmentRequest LengthBehaviorFilter inlineMode
+            inlineStartup <- expectLengthAssessmentWithin
+              $ assessLengthVerificationRequest
+                  inlineStartupRequest inlineVerification
+            lengthAssessmentCandidates inlineStartup @?= [inlineIdentity]
+            inlinePermission <- case authorizeExplicitLengthAssessmentRequest
+                LengthBehaviorFilter inlineMode of
+              Left failure -> assertFailure (show failure)
+                >> error "unreachable"
+              Right authorized -> pure authorized
+            inline <- expectLengthAssessmentWithin
+              $ assessLengthVerificationRequest
+                  (explicitLengthAssessmentRequest
+                    inlinePermission inlineSelection)
+                  inlineVerification
+            lengthAssessmentFailure inline @?= Nothing
+            lengthAssessmentCandidates inline @?= [inlineIncremented]
+            inlineResult <- case lengthAssessmentSelectionResult inline of
+              Nothing -> assertFailure
+                "inline scalar filter lost its selection result"
+                  >> error "unreachable"
+              Just selectedResult -> pure selectedResult
+            inlineSelected <- expectLengthSelectionSelected inlineResult
+            inlineRejected <- expectLengthSelectionRejected inlineResult
+            map behaviorallySelectedVerified inlineSelected @?=
+              [inlineIncremented]
+            map behaviorallyRejectedVerified inlineRejected @?=
+              [inlineIdentity]
+            assertBool "inline scalar filter used the pair projection"
+              $ isNothing $ lengthAssessmentSpinePairSelectionResult inline
+            inlineRepeated <- expectLengthAssessmentWithin
+              $ assessLengthVerificationRequest
+                  inlineStartupRequest inlineVerification
+            lengthAssessmentCandidates inlineRepeated @?= [inlineIdentity]
+
         -- The mode, contract, and replay bank are request-local: returning to
         -- the startup request must reproduce its original partition after a
-        -- different one-shot filter has run.
+        -- file-backed and inline command-local filter have run.
         repeated <- expectLengthAssessmentWithin
           $ assessLengthVerificationRequest filterRequest verification
         lengthAssessmentCandidates repeated @?= [identity]
@@ -13007,6 +13265,10 @@ assertLengthAssessmentSpinePairFilterDispatch
               [ jsonLengthProviderLaw "Demo.zeroList" []
                   $ jsonLengthLiteral 0
               ]
+            inlinePairContract expected = setJsonField
+              ["candidateCasePolicy"]
+              (Json.JStr "exact-spine-zero-step-v1")
+              $ pairContract expected
             configuration = setJsonField ["contract"]
               (pairContract $ jsonLengthLiteral 0)
               $ currentApplicableDomainPairDocument executable 2000
@@ -13067,6 +13329,78 @@ assertLengthAssessmentSpinePairFilterDispatch
         assertBool "one-shot pair filter lost the pair projection"
           $ isJust (lengthAssessmentSpinePairSelectionResult oneShot)
 
+        inlineSelection <- expectLengthSynthInlineSelection 1
+          $ pairInlineLengthCommand "arg0"
+              ("len(result.first)+len(result.second)=" ++
+               "2*len(arg0)")
+              "List Nat -> Prod (List Nat) (List Nat)"
+        inlineContract <- case inlineSelection of
+          LeanLengthSpinePairContractSelection contract -> pure contract
+          LeanLengthScalarContractSelection _ -> assertFailure
+            "product inline command resolved to a scalar contract"
+              >> error "unreachable"
+        (inlineDuplicated, inlineInputAndZero) <-
+          buildInlineSpinePairSelectionFixture inlineContract
+        inlineVerification <- verificationBatchFromReceipts
+          [inlineDuplicated, inlineInputAndZero]
+        whenDescriptorBoundExecveCheckLaunchPubliclyReachable $
+          withFakeLengthSolver "healthy" $ \inlineExecutable -> do
+            let inlineConfigurationPath = takeDirectory inlineExecutable </>
+                  "filter-command-pair-inline-config.json"
+                inlineConfiguration = setJsonField ["contract"]
+                  (inlinePairContract $ jsonLengthLiteral 0)
+                  $ currentApplicableDomainPairDocument
+                      inlineExecutable 2000
+            ByteString.writeFile inlineConfigurationPath
+              $ encodeLengthRankingConfigurationFile inlineConfiguration
+            inlineLoaded <- loadLengthAssessmentMode PermitUnpinnedExecutable
+              $ LengthRankingConfigurationFileSource
+                  inlineConfigurationPath 1000
+            inlineMode <- case inlineLoaded of
+              Left failure -> assertFailure (show failure)
+                >> error "unreachable"
+              Right configured -> pure configured
+            inlineStartupRequest <- expectRight $
+              startupLengthAssessmentRequest LengthBehaviorFilter inlineMode
+            inlineStartup <- expectLengthAssessmentWithin
+              $ assessLengthVerificationRequest
+                  inlineStartupRequest inlineVerification
+            lengthAssessmentCandidates inlineStartup @?=
+              [inlineInputAndZero]
+            inlinePermission <- case authorizeExplicitLengthAssessmentRequest
+                LengthBehaviorFilter inlineMode of
+              Left failure -> assertFailure (show failure)
+                >> error "unreachable"
+              Right authorized -> pure authorized
+            inline <- expectLengthAssessmentWithin
+              $ assessLengthVerificationRequest
+                  (explicitLengthAssessmentRequest
+                    inlinePermission inlineSelection)
+                  inlineVerification
+            lengthAssessmentFailure inline @?= Nothing
+            lengthAssessmentCandidates inline @?= [inlineDuplicated]
+            assertBool "inline pair filter used the scalar projection"
+              $ isNothing $ lengthAssessmentSelectionResult inline
+            inlineResult <- case
+                lengthAssessmentSpinePairSelectionResult inline of
+              Nothing -> assertFailure
+                "inline pair filter lost its selection result"
+                  >> error "unreachable"
+              Just selectedResult -> pure selectedResult
+            inlineSelected <-
+              expectLengthSpinePairSelectionSelected inlineResult
+            inlineRejected <-
+              expectLengthSpinePairSelectionRejected inlineResult
+            map behaviorallySelectedVerified inlineSelected @?=
+              [inlineDuplicated]
+            map behaviorallyRejectedVerified inlineRejected @?=
+              [inlineInputAndZero]
+            inlineRepeated <- expectLengthAssessmentWithin
+              $ assessLengthVerificationRequest
+                  inlineStartupRequest inlineVerification
+            lengthAssessmentCandidates inlineRepeated @?=
+              [inlineInputAndZero]
+
         repeated <- expectLengthAssessmentWithin
           $ assessLengthVerificationRequest startupRequest verification
         lengthAssessmentCandidates repeated @?= [inputAndZero]
@@ -13112,9 +13446,15 @@ assertLengthAssessmentMainCommandContext = do
         "-- | Select one command-local assessment authority" sourceLines
       runSection = mainSourceSection
         "synthRun :: LengthAssessmentRequest"
-        "-- | Run the serializer on one goal" sourceLines
+        "-- | Activate one already authorized" sourceLines
+      inlineSection = mainSourceSection
+        "-- | Activate one already authorized"
+        "-- | Translate once and preserve" sourceLines
+      translationSection = mainSourceSection
+        "-- | Translate once and preserve"
+        "-- | Count only source arrows" sourceLines
       retrySection = mainSourceSection
-        "synthUniverseRetry assessmentContext st args goal originalErrors = do"
+        "-- | Auto-bound variables get"
         "-- | Whether an error text names this marker universe" sourceLines
       goSection = mainSourceSection
         "synthGo assessmentContext st args retriedVars goal parsed = do"
@@ -13153,8 +13493,11 @@ assertLengthAssessmentMainCommandContext = do
       "withLengthAssessmentRequestContext assessmentRequest" sourceLines)
     @?= 1
   length (mainSourcePositions
+      "withLengthAssessmentRequestContext"
+      $ dropWhile (not . isInfixOf "synthRun ::") sourceLines) @?= 2
+  length (mainSourcePositions
       ":: LengthAssessmentContext command" sourceLines)
-    @?= 8
+    @?= 7
 
   assertMainSourceContains "command entrance" commandSection
     "synthRun assessmentRequest st args goal"
@@ -13165,21 +13508,39 @@ assertLengthAssessmentMainCommandContext = do
     "withLengthAssessmentRequestContext assessmentRequest"
       runSection
   translation <- expectMainSourcePosition "synthRun context"
-    "outcome <- translateGoal st goal" runSection
+    "translateSynthGoalWithRetry st goal" runSection
   direct <- expectMainSourcePosition "synthRun context"
-    "synthGo assessmentContext st args Nothing goal parsed" runSection
-  retry <- expectMainSourcePosition "synthRun context"
-    "synthUniverseRetry assessmentContext st args goal errors" runSection
-  assertBool "the command context did not enclose translation and both exits"
-    $ contextOpen < translation && translation < direct && translation < retry
+    "$ synthGo assessmentContext st args" runSection
+  assertBool "the established context did not enclose translation and retry"
+    $ contextOpen < translation && translation < direct
+
+  inlineTranslation <- expectMainSourcePosition "inline context"
+    "translateSynthGoalWithRetry st goal" inlineSection
+  inlineResolution <- expectMainSourcePosition "inline context"
+    "case resolveLeanLengthWhereSource" inlineSection
+  inlineContext <- expectMainSourcePosition "inline context"
+    "withLengthAssessmentRequestContext" inlineSection
+  inlineScheduler <- expectMainSourcePosition "inline context"
+    "synthGo assessmentContext st args retriedVars" inlineSection
+  length (mainSourcePositions
+      "withLengthAssessmentRequestContext" inlineSection) @?= 1
+  assertBool "the inline context opened before translation or resolution"
+    $ inlineTranslation < inlineResolution
+      && inlineResolution < inlineContext
+      && inlineContext < inlineScheduler
+
+  assertMainSourceContains "generalized translation retry" translationSection
+    "synthUniverseRetry st goal errors continuation"
 
   retryTranslation <- expectMainSourcePosition "universe retry context"
     "outcome <- translateGoal st wrapped" retrySection
   retryScheduler <- expectMainSourcePosition "universe retry context"
-    "synthGo assessmentContext st args (Just wrapVars) wrapped parsed"
+    "continuation (Just wrapVars) wrapped parsed"
       retrySection
-  assertBool "the universe retry replaced its command context"
+  assertBool "the universe retry stopped forwarding its continuation"
     $ retryTranslation < retryScheduler
+  assertBool "the universe retry reacquired a nominal command context"
+    $ not $ "assessmentContext" `isInfixOf` unlines retrySection
   assertMainSourceContains "synthGo context forwarding" goSection
     "synthGo' assessmentContext st args retriedVars goal parsed"
   mapM_ (assertMainSourceContains "constructive context" schedulerSection)
