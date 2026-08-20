@@ -349,6 +349,10 @@ at 16,384 UTF-8 bytes and 64 parser-nesting levels across parentheses,
 literal, and input limits underneath. Errors are closed, sanitized, and never
 echo clause text.
 
+Djex's
+[bounded where-clause surface specification](../lib/Djex/docs/semantic-foundations.md#bounded-where-clause-surface-syntax)
+records the exact grammar and the parser/elaborator authority split.
+
 The two models expand to fixed profiles only: `List`, `List.nil`, `List.cons`,
 the exact zero/step candidate-case policy, a true precondition, the chosen
 scalar or canonical-`Prod` result domain, the explicit role vector, and an
