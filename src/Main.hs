@@ -2665,24 +2665,41 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
         in runSynthLaneCursor assessmentContext
           (ordinarySynthLaneCursorPolicy assessmentContext laneEngine limits)
           deadline st goal id outcome accumulation
-      -- This first checkpoint is limited to the ordinary provider-free
-      -- baseline.  Retuned schedules, library premises, filter successors,
-      -- provider widening, and classical lanes retain their exact serial path.
-      -- RTS capabilities are inspected only after this static policy admits
-      -- the structural baseline.
+      -- Scoped parallel work remains limited to an initial provider-free
+      -- structural lane with the default limits and a one-batch cursor.  The
+      -- no-library EngineBoth case overlaps its two engines; a nonempty
+      -- selected-library case instead overlaps the unchanged base and library
+      -- searches as one outer pair for any engine.  Provider widening,
+      -- filter successors, retuned schedules, and classical lanes retain
+      -- their exact serial path.  RTS capabilities are inspected only after
+      -- these static policies admit one of the two disjoint schedules.
       baselinePolicy =
-        ordinarySynthLaneCursorPolicy assessmentContext EngineBoth limits
-      parallelBaselineStaticallyEligible =
+        ordinarySynthLaneCursorPolicy assessmentContext engine limits
+      parallelStructuralBaselineStaticallyEligible =
         engine == EngineBoth
           && limits == defaultSynthLimits
           && null libraryPremises
           && not (synthLaneCursorAllowsFilterSuccessor baselinePolicy)
+      parallelLibraryBaselineStaticallyEligible =
+        structuralFirst
+          && limits == defaultSynthLimits
+          && not (null libraryPremises)
+          && not (synthLaneCursorAllowsFilterSuccessor baselinePolicy)
+      -- Select the serial route or one concrete parallel closure entirely
+      -- from command state.  Neither policy is reconsidered after the
+      -- scheduler inspects RTS capabilities.
+      initialBaselineSchedule
+        | parallelLibraryBaselineStaticallyEligible =
+            Just runParallelLibraryBaseline
+        | parallelStructuralBaselineStaticallyEligible =
+            Just runParallelStructuralBaseline
+        | otherwise = Nothing
       runParallelStructuralBaseline accumulation = do
         let runBranch laneEngine =
               synthesizeWithProvidersSkippingDetailedWith limits
                 laneEngine (rsSynthSteps state) Set.empty [] fragment
         prepared <- forceDetailedSynthPairBefore
-          (synthLimitTried limits) deadline
+          (synthLimitTried limits) (synthLimitTried limits) deadline
           (runBranch EngineDjinn) (runBranch EngineExference)
         case prepared of
           Nothing -> pure SynthLaneRun
@@ -2698,18 +2715,43 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
                   branches
             in runSynthLaneCursor assessmentContext baselinePolicy deadline
               st goal id outcome accumulation
+      runParallelLibraryBaseline accumulation = do
+        let base = synthesizeWithProvidersSkippingDetailedWith limits
+              engine (rsSynthSteps state) Set.empty [] fragment
+            library = synthesizeTunedDetailedWith limits engine
+              (rsSynthSteps state)
+              (synthLimitWindow limits, Just 100000)
+              [ (name, stripRecCtors premise)
+              | (name, premise) <- libraryPremises
+              ]
+              (stripRecCtors fragment) fragment
+        prepared <- forceDetailedSynthPairBefore
+          0 (synthVerificationWindowWith limits engine) deadline base library
+        case prepared of
+          Nothing -> pure SynthLaneRun
+            { synthLaneRunAccumulation = accumulation
+            , synthLaneRunCheckedFrontierSpellings = []
+            , synthLaneRunCandidateGroupCount = 0
+            , synthLaneRunNotes = []
+            , synthLaneRunEnd = SynthLaneRunTimedOut
+            }
+          Just branches ->
+            let outcome = branches >>= \(baseOutcome, libraryOutcome) ->
+                  mergeLibraryDetailedOutcomes
+                    (Right baseOutcome) (Right libraryOutcome)
+            in runSynthLaneCursor assessmentContext baselinePolicy deadline
+              st goal id outcome accumulation
   if structuralFirst
     then do
-      baseline <-
-        if parallelBaselineStaticallyEligible
-          then do
-            capabilities <- getNumCapabilities
-            if capabilities >= 2
-              then runParallelStructuralBaseline emptySynthLaneAccumulation
-              else runSynthesis True Set.empty engine []
-                emptySynthLaneAccumulation
-          else runSynthesis True Set.empty engine []
-            emptySynthLaneAccumulation
+      baseline <- case initialBaselineSchedule of
+        Nothing ->
+          runSynthesis True Set.empty engine [] emptySynthLaneAccumulation
+        Just runParallelBaseline -> do
+          capabilities <- getNumCapabilities
+          if capabilities >= 2
+            then runParallelBaseline emptySynthLaneAccumulation
+            else
+              runSynthesis True Set.empty engine [] emptySynthLaneAccumulation
       case synthLaneRunEnd baseline of
         -- A provider inventory cannot repair an engine failure, and the two
         -- lanes share one wall-clock deadline.  Preserve the baseline
@@ -3156,24 +3198,26 @@ runDetailedSynthCursorBefore requested window deadline cursor =
               (evaluate (forceDetailedSynthCursorStep step))
             pure (Right step <$ done)
 
--- | Force one bounded fresh prefix from each independent engine beneath the
--- command's existing absolute deadline.  The worker boundary is deliberately
--- one standalone verification frontier, not the engine's full bounded trace;
--- any additional demand introduced by cross-engine deduplication remains in
--- the merged cursor and is forced later beneath the remaining same deadline.
--- Normal engine failures are values, observed with Djinn/left precedence by
--- the scoped pair runner.  A timeout cancels and joins both workers.
+-- | Force independently chosen bounded prefixes from two independent searches
+-- beneath the command's existing absolute deadline.  The no-library combined
+-- schedule chooses one standalone frontier per engine.  The library schedule
+-- chooses a zero-group base prefix (forcing its verdict and notes without its
+-- candidate spine) and one verification frontier from the library search;
+-- later merged-cursor demand remains beneath the same deadline.  Normal engine
+-- failures are values, observed with left precedence by the scoped pair
+-- runner.  A timeout cancels and joins both workers.
 forceDetailedSynthPairBefore
   :: Int
+  -> Int
   -> Maybe UTCTime
   -> Either String DetailedSynthOutcome
   -> Either String DetailedSynthOutcome
   -> IO (Maybe (Either String (DetailedSynthOutcome, DetailedSynthOutcome)))
-forceDetailedSynthPairBefore requested deadline djinn exference =
+forceDetailedSynthPairBefore leftRequested rightRequested deadline left right =
   beforeDeadline $ runParallelEitherPairOrdered
-    (strictPrefix djinn) (strictPrefix exference)
+    (strictPrefix leftRequested left) (strictPrefix rightRequested right)
  where
-  strictPrefix outcome =
+  strictPrefix requested outcome =
     outcome <$ evaluate (forceDetailedOutcome requested outcome)
 
   beforeDeadline action = case deadline of

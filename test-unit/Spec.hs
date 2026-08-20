@@ -4300,6 +4300,40 @@ parallelEnginePairTests = testGroup
           $ "observed exference exception" `isInfixOf` show failure
         Right value -> assertFailure
           $ "right exception was converted to a value: " ++ show value
+  , testCase
+      "force a zero prefix through verdict and notes without the group spine" $
+      do
+        let poisonGroups = error
+              "zero-prefix base force entered the candidate-group spine"
+            notes = ["base verdict note"]
+            outcome = Right $ DetailedSynthCandidates poisonGroups notes
+        evaluate (forceDetailedOutcome 0 outcome)
+          >>= (@?= sum (map length notes))
+        assertDetailedOutcomeForceThrows "zero-prefix result constructor" 0
+          (Right $ error "zero-prefix force skipped the result constructor")
+        assertDetailedOutcomeForceThrows "zero-prefix refutation verdict" 0
+          (Right $ DetailedSynthRefuted
+            $ error "zero-prefix force skipped the refutation verdict")
+        assertDetailedOutcomeForceThrows "zero-prefix run notes" 0
+          (Right $ DetailedSynthCandidates poisonGroups
+            $ error "zero-prefix force skipped the run notes")
+  , testCase "force exactly a nonzero prefix before a poisoned tail" $ do
+      let selected =
+            [ detailedCandidateGroup RouteUnobserved ["library-1"]
+            , detailedCandidateGroup RouteUnobserved ["library-2"]
+            ]
+          poisonTail = error
+            "bounded library force entered the unselected group tail"
+          notes = ["library verdict note"]
+          outcome = Right $ DetailedSynthCandidates
+            (selected ++ poisonTail) notes
+          selectedSize = sum $ map length ["library-1", "library-2"]
+      evaluate (forceDetailedOutcome (length selected) outcome)
+        >>= (@?= selectedSize + sum (map length notes))
+      assertDetailedOutcomeForceThrows "selected nonzero prefix" 1
+        (Right $ DetailedSynthCandidates
+          (error "nonzero force skipped its selected group" : poisonTail)
+          notes)
   ]
 
 expectParallelPairWithin :: String -> IO value -> IO value
@@ -4309,6 +4343,21 @@ expectParallelPairWithin label action = do
     Just value -> pure value
     Nothing -> assertFailure
       (label ++ " exceeded the deadlock guard") >> error "unreachable"
+
+assertDetailedOutcomeForceThrows
+  :: String
+  -> Int
+  -> Either String DetailedSynthOutcome
+  -> IO ()
+assertDetailedOutcomeForceThrows label requested outcome = do
+  observed <- timeout 1000000
+    (try (evaluate $ forceDetailedOutcome requested outcome) ::
+      IO (Either SomeException Int))
+  case observed of
+    Just (Left _) -> pure ()
+    Just (Right forced) -> assertFailure $
+      label ++ " poison was not forced; observed " ++ show forced
+    Nothing -> assertFailure $ label ++ " poison force did not terminate"
 
 detailedSynthCursorTests :: TestTree
 detailedSynthCursorTests = testGroup "bounded detailed synthesis cursor"
@@ -13188,7 +13237,7 @@ lengthAssessmentIntegrationTests = testGroup
       "continue providers and classical retries after every nonterminal lane"
       assertLengthAssessmentMainLaneScheduling
   , testCase
-      "scope parallel EngineBoth work to the default structural baseline"
+      "scope parallel work to default structural engine or library pairs"
       assertLengthAssessmentMainParallelBaseline
   , testCase
       "keep progressive cursor policies and run receipts private"
@@ -14447,15 +14496,18 @@ assertLengthAssessmentMainLaneScheduling = do
     , "deadline st goal id outcome accumulation"
     ]
   assertBool
-      "constructive scheduling lost its one serial and one parallel cursor"
+      "constructive scheduling lost its serial or two parallel cursors"
     $ length (mainSourcePositions
-        "runSynthLaneCursor assessmentContext" constructiveSection) == 2
+        "runSynthLaneCursor assessmentContext" constructiveSection) == 3
 
   mapM_ (assertMainSourceContains "baseline run routing" baselineSection)
-    [ "baseline <- if parallelBaselineStaticallyEligible then do"
+    [ "baseline <- case initialBaselineSchedule of"
+    , "Nothing ->"
+    , "runSynthesis True Set.empty engine [] emptySynthLaneAccumulation"
+    , "Just runParallelBaseline -> do"
     , "capabilities <- getNumCapabilities"
-    , "if capabilities >= 2 then runParallelStructuralBaseline emptySynthLaneAccumulation"
-    , "else runSynthesis True Set.empty engine [] emptySynthLaneAccumulation"
+    , "if capabilities >= 2"
+    , "then runParallelBaseline emptySynthLaneAccumulation"
     , "case synthLaneRunEnd baseline of"
     , "SynthLaneRunTimedOut -> report deadline baseline"
     , "SynthLaneRunCursorAdmissionFailed _ -> report deadline baseline"
@@ -14522,18 +14574,30 @@ assertLengthAssessmentMainParallelBaseline = do
         "if structuralFirst" schedulerSection
       serialSection = mainSourceSection
         "runSynthesis includeLibrary checked laneEngine providers accumulation ="
-        "-- This first checkpoint is limited" constructiveSection
+        "-- Scoped parallel work remains limited" constructiveSection
       parallelSection = mainSourceSection
-        "-- This first checkpoint is limited"
+        "-- Scoped parallel work remains limited"
         "if structuralFirst" constructiveSection
+      structuralParallelSection = mainSourceSection
+        "runParallelStructuralBaseline accumulation = do"
+        "runParallelLibraryBaseline accumulation = do" parallelSection
+      libraryParallelSection = mainSourceSection
+        "runParallelLibraryBaseline accumulation = do"
+        "if structuralFirst" parallelSection
+      scheduleSelectionSection = mainSourceSection
+        "initialBaselineSchedule"
+        "runParallelStructuralBaseline accumulation = do" parallelSection
       routingSection = mainSourceSection
         "if structuralFirst"
         "case synthLaneRunEnd baseline of" schedulerSection
-      timeoutReceiptSection = mainSourceSection
+      structuralTimeoutReceiptSection = mainSourceSection
         "Nothing -> pure SynthLaneRun"
-        "Just branches ->" parallelSection
+        "Just branches ->" structuralParallelSection
+      libraryTimeoutReceiptSection = mainSourceSection
+        "Nothing -> pure SynthLaneRun"
+        "Just branches ->" libraryParallelSection
       pairForceSection = mainSourceSection
-        "forceDetailedSynthPairBefore requested deadline djinn exference ="
+        "forceDetailedSynthPairBefore leftRequested rightRequested deadline left right ="
         "-- | Filtering owns one command-wide deadline" sourceLines
       providerSection = mainSourceSection
         "runProviderLanes runDeadline fallback runLane checked accumulation lanes ="
@@ -14552,47 +14616,92 @@ assertLengthAssessmentMainParallelBaseline = do
         ]
 
   length (mainSourcePositions
-      "runSynthLaneCursor assessmentContext" constructiveSection) @?= 2
+      "runSynthLaneCursor assessmentContext" constructiveSection) @?= 3
   length (mainSourcePositions
       "runSynthLaneCursor assessmentContext" serialSection) @?= 1
   length (mainSourcePositions
-      "runSynthLaneCursor assessmentContext" parallelSection) @?= 1
+      "runSynthLaneCursor assessmentContext" structuralParallelSection) @?= 1
+  length (mainSourcePositions
+      "runSynthLaneCursor assessmentContext" libraryParallelSection) @?= 1
 
   mapM_ (assertMainSourceContains "parallel baseline eligibility"
       parallelSection)
-    [ "baselinePolicy = ordinarySynthLaneCursorPolicy assessmentContext EngineBoth limits"
-    , "parallelBaselineStaticallyEligible = engine == EngineBoth"
+    [ "baselinePolicy = ordinarySynthLaneCursorPolicy assessmentContext engine limits"
+    , "parallelStructuralBaselineStaticallyEligible = engine == EngineBoth"
     , "&& limits == defaultSynthLimits"
     , "&& null libraryPremises"
     , "&& not (synthLaneCursorAllowsFilterSuccessor baselinePolicy)"
+    , "parallelLibraryBaselineStaticallyEligible = structuralFirst"
+    , "&& limits == defaultSynthLimits"
+    , "&& not (null libraryPremises)"
+    , "initialBaselineSchedule"
+    , "| parallelLibraryBaselineStaticallyEligible = Just runParallelLibraryBaseline"
+    , "| parallelStructuralBaselineStaticallyEligible = Just runParallelStructuralBaseline"
+    , "| otherwise = Nothing"
     ]
-  staticGate <- expectMainSourcePosition "parallel baseline routing"
-    "if parallelBaselineStaticallyEligible" routingSection
+  mapM_ (\effect -> assertBool
+      ("pure initial baseline schedule performed " ++ effect)
+      $ not $ effect `isInfixOf` unlines scheduleSelectionSection)
+    [ "getNumCapabilities"
+    , "runSynthesis"
+    , "forceDetailedSynthPairBefore"
+    ]
+  let libraryEligibilitySection = mainSourceSection
+        "parallelLibraryBaselineStaticallyEligible ="
+        "initialBaselineSchedule" parallelSection
+  assertBool "library-pair admission was restricted to one engine"
+    $ not ("engine ==" `isInfixOf` unlines libraryEligibilitySection)
+
+  scheduleSelection <- expectMainSourcePosition "parallel baseline routing"
+    "case initialBaselineSchedule of" routingSection
+  serialSchedule <- expectMainSourcePosition "parallel baseline routing"
+    "Nothing ->" routingSection
+  serialScheduleRoute <- expectMainSourcePosition "parallel baseline routing"
+    "runSynthesis True Set.empty engine [] emptySynthLaneAccumulation"
+      routingSection
+  selectedParallelSchedule <- expectMainSourcePosition
+    "parallel baseline routing" "Just runParallelBaseline -> do"
+      routingSection
   capabilityRead <- expectMainSourcePosition "parallel baseline routing"
     "capabilities <- getNumCapabilities" routingSection
   capabilityGate <- expectMainSourcePosition "parallel baseline routing"
     "if capabilities >= 2" routingSection
-  parallelRoute <- expectMainSourcePosition "parallel baseline routing"
-    "then runParallelStructuralBaseline emptySynthLaneAccumulation"
+  parallelScheduleDispatch <- expectMainSourcePosition
+    "parallel baseline routing"
+      "then runParallelBaseline emptySynthLaneAccumulation"
       routingSection
-  serialRoute <- expectMainSourcePosition "parallel baseline routing"
-    "else runSynthesis True Set.empty engine []" routingSection
-  assertBool "RTS capabilities were inspected before static admission"
-    $ staticGate < capabilityRead
+  n1SerialRoute <- case mainSourcePositions
+      "runSynthesis True Set.empty engine [] emptySynthLaneAccumulation"
+      routingSection
+    of
+      _ : route : _ -> pure route
+      _ -> assertFailure "parallel baseline routing omitted its N1 serial route"
+        >> error "unreachable"
+  assertBool "RTS capabilities were inspected before concrete static selection"
+    $ scheduleSelection < serialSchedule
+      && serialSchedule < serialScheduleRoute
+      && serialScheduleRoute < selectedParallelSchedule
+      && selectedParallelSchedule < capabilityRead
       && capabilityRead < capabilityGate
-      && capabilityGate < parallelRoute
-      && parallelRoute < serialRoute
+      && capabilityGate < parallelScheduleDispatch
+      && parallelScheduleDispatch < n1SerialRoute
   length (mainSourcePositions "getNumCapabilities" schedulerSection) @?= 1
   length (mainSourcePositions
       "runParallelStructuralBaseline emptySynthLaneAccumulation"
+      routingSection) @?= 0
+  length (mainSourcePositions
+      "runParallelLibraryBaseline emptySynthLaneAccumulation"
+      routingSection) @?= 0
+  length (mainSourcePositions
+      "then runParallelBaseline emptySynthLaneAccumulation"
       routingSection) @?= 1
   length (mainSourcePositions
       "runSynthesis True Set.empty engine []" routingSection) @?= 2
 
   mapM_ (assertMainSourceContains "parallel structural branches"
-      parallelSection)
+      structuralParallelSection)
     [ "runBranch laneEngine = synthesizeWithProvidersSkippingDetailedWith limits laneEngine (rsSynthSteps state) Set.empty [] fragment"
-    , "prepared <- forceDetailedSynthPairBefore (synthLimitTried limits) deadline"
+    , "prepared <- forceDetailedSynthPairBefore (synthLimitTried limits) (synthLimitTried limits) deadline"
     , "(runBranch EngineDjinn) (runBranch EngineExference)"
     , "let outcome = fmap (uncurry $ mergeDetailedOutcomesSkipping Set.empty) branches"
     , "in runSynthLaneCursor assessmentContext baselinePolicy deadline st goal id outcome accumulation"
@@ -14604,43 +14713,85 @@ assertLengthAssessmentMainParallelBaseline = do
     $ synthLimitTried defaultSynthLimits
       < synthVerificationWindow EngineBoth
   branchDefinition <- expectMainSourcePosition "parallel structural branches"
-    "let runBranch laneEngine" parallelSection
+    "let runBranch laneEngine" structuralParallelSection
   djinnBranch <- expectMainSourcePosition "parallel structural branches"
-    "(runBranch EngineDjinn)" parallelSection
+    "(runBranch EngineDjinn)" structuralParallelSection
   exferenceBranch <- expectMainSourcePosition "parallel structural branches"
-    "(runBranch EngineExference)" parallelSection
+    "(runBranch EngineExference)" structuralParallelSection
   defaultMerge <- expectMainSourcePosition "parallel structural branches"
-    "mergeDetailedOutcomesSkipping Set.empty" parallelSection
+    "mergeDetailedOutcomesSkipping Set.empty" structuralParallelSection
   mergedCursor <- expectMainSourcePosition "parallel structural branches"
     "in runSynthLaneCursor assessmentContext baselinePolicy deadline"
-      parallelSection
+      structuralParallelSection
   assertBool "parallel branches or their default merge changed order"
     $ branchDefinition < djinnBranch
       && djinnBranch <= exferenceBranch
       && exferenceBranch < defaultMerge
       && defaultMerge < mergedCursor
 
-  mapM_ (assertMainSourceContains "empty parallel timeout receipt"
-      timeoutReceiptSection)
-    [ "synthLaneRunAccumulation = accumulation"
-    , "synthLaneRunCheckedFrontierSpellings = []"
-    , "synthLaneRunCandidateGroupCount = 0"
-    , "synthLaneRunNotes = []"
-    , "synthLaneRunEnd = SynthLaneRunTimedOut"
+  mapM_ (assertMainSourceContains "parallel library branches"
+      libraryParallelSection)
+    [ "base = synthesizeWithProvidersSkippingDetailedWith limits engine (rsSynthSteps state) Set.empty [] fragment"
+    , "library = synthesizeTunedDetailedWith limits engine (rsSynthSteps state) (synthLimitWindow limits, Just 100000)"
+    , "[ (name, stripRecCtors premise) | (name, premise) <- libraryPremises ]"
+    , "(stripRecCtors fragment) fragment"
+    , "prepared <- forceDetailedSynthPairBefore 0 (synthVerificationWindowWith limits engine) deadline base library"
+    , "let outcome = branches >>= \\(baseOutcome, libraryOutcome) -> mergeLibraryDetailedOutcomes (Right baseOutcome) (Right libraryOutcome)"
+    , "in runSynthLaneCursor assessmentContext baselinePolicy deadline st goal id outcome accumulation"
     ]
   mapM_ (\forbidden -> assertBool
-      ("parallel timeout receipt probed unavailable work " ++ forbidden)
-      $ not $ forbidden `isInfixOf` unlines timeoutReceiptSection)
-    [ "branches"
-    , "outcome"
-    , "mergeDetailedOutcomesSkipping"
-    , "runSynthLaneCursor"
+      ("outer library pair nested through " ++ forbidden)
+      $ not $ forbidden `isInfixOf` unlines libraryParallelSection)
+    [ "runParallelStructuralBaseline"
+    , "getNumCapabilities"
+    , "EngineDjinn"
+    , "EngineExference"
+    ]
+  libraryBase <- expectMainSourcePosition "parallel library branches"
+    "let base = synthesizeWithProvidersSkippingDetailedWith limits"
+      libraryParallelSection
+  librarySearch <- expectMainSourcePosition "parallel library branches"
+    "library = synthesizeTunedDetailedWith limits engine"
+      libraryParallelSection
+  libraryPair <- expectMainSourcePosition "parallel library branches"
+    "prepared <- forceDetailedSynthPairBefore" libraryParallelSection
+  libraryMerge <- expectMainSourcePosition "parallel library branches"
+    "mergeLibraryDetailedOutcomes" libraryParallelSection
+  libraryCursor <- expectMainSourcePosition "parallel library branches"
+    "in runSynthLaneCursor assessmentContext baselinePolicy deadline"
+      libraryParallelSection
+  assertBool "parallel library pair changed base-first merge/cursor order"
+    $ libraryBase < librarySearch
+      && librarySearch < libraryPair
+      && libraryPair < libraryMerge
+      && libraryMerge < libraryCursor
+
+  mapM_ (\(label, timeoutReceiptSection) -> do
+      mapM_ (assertMainSourceContains
+          ("empty " ++ label ++ " timeout receipt") timeoutReceiptSection)
+        [ "synthLaneRunAccumulation = accumulation"
+        , "synthLaneRunCheckedFrontierSpellings = []"
+        , "synthLaneRunCandidateGroupCount = 0"
+        , "synthLaneRunNotes = []"
+        , "synthLaneRunEnd = SynthLaneRunTimedOut"
+        ]
+      mapM_ (\forbidden -> assertBool
+          (label ++ " timeout receipt probed unavailable work " ++ forbidden)
+          $ not $ forbidden `isInfixOf` unlines timeoutReceiptSection)
+        [ "branches"
+        , "outcome"
+        , "mergeDetailedOutcomesSkipping"
+        , "mergeLibraryDetailedOutcomes"
+        , "runSynthLaneCursor"
+        ])
+    [ ("structural pair", structuralTimeoutReceiptSection)
+    , ("library pair", libraryTimeoutReceiptSection)
     ]
 
   mapM_ (assertMainSourceContains "bounded parallel prefix ownership"
       pairForceSection)
-    [ "beforeDeadline $ runParallelEitherPairOrdered (strictPrefix djinn) (strictPrefix exference)"
-    , "strictPrefix outcome = outcome <$ evaluate (forceDetailedOutcome requested outcome)"
+    [ "beforeDeadline $ runParallelEitherPairOrdered (strictPrefix leftRequested left) (strictPrefix rightRequested right)"
+    , "strictPrefix requested outcome = outcome <$ evaluate (forceDetailedOutcome requested outcome)"
     , "beforeDeadline action = case deadline of"
     , "Nothing -> Just <$> action"
     , "Just absoluteDeadline -> do"
@@ -14665,9 +14816,10 @@ assertLengthAssessmentMainParallelBaseline = do
     , "candidateWindow"
     ]
   pairForce <- expectMainSourcePosition "parallel structural branches"
-    "prepared <- forceDetailedSynthPairBefore" parallelSection
+    "prepared <- forceDetailedSynthPairBefore" structuralParallelSection
   pairDeadline <- expectMainSourcePosition "parallel structural branches"
-    "(synthLimitTried limits) deadline" parallelSection
+    "(synthLimitTried limits) (synthLimitTried limits) deadline"
+      structuralParallelSection
   assertBool "bounded pair work escaped the command deadline"
     $ pairForce <= pairDeadline && pairDeadline < mergedCursor
 
@@ -14676,6 +14828,7 @@ assertLengthAssessmentMainParallelBaseline = do
         ++ parallelToken)
       $ not $ parallelToken `isInfixOf` unlines section)
       [ "runParallelStructuralBaseline"
+      , "runParallelLibraryBaseline"
       , "forceDetailedSynthPairBefore"
       , "runParallelEitherPairOrdered"
       , "getNumCapabilities"
@@ -14686,6 +14839,12 @@ assertLengthAssessmentMainParallelBaseline = do
     , "includeLibrary && not (null libraryPremises)"
     , "mergeLibraryDetailedOutcomes base"
     , "synthesizeTunedDetailedWith limits laneEngine"
+    ]
+  mapM_ (\parallelToken -> assertBool
+      ("structural engine pair unexpectedly nested through " ++ parallelToken)
+      $ not $ parallelToken `isInfixOf` unlines structuralParallelSection)
+    [ "runParallelLibraryBaseline"
+    , "getNumCapabilities"
     ]
   mapM_ (assertMainSourceContains "serial EngineBoth implementation"
       engineBothSection)
@@ -14870,7 +15029,7 @@ assertLengthAssessmentMainCursorDriver = do
   length (mainSourcePositions
       "runDetailedSynthCursorBefore" driverSection) @?= 1
   length (mainSourcePositions
-      "runSynthLaneCursor" sourceLines) @?= 6
+      "runSynthLaneCursor" sourceLines) @?= 7
   length (mainSourcePositions
       "verifySynthLane assessmentContext" driverSection) @?= 1
   length (mainSourcePositions
