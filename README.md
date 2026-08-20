@@ -1274,7 +1274,14 @@ how fast the machine answers it; export `LEANT_SYNTH_TIMEOUT` to override.
 These end-to-end goldens require
 the Lake project to provide the backend executable (`repl` or
 `repl.exe`); the focused suite remains runnable when that backend is not
-installed.
+installed. On a machine without the LeanInteract cache the discovery
+scans (for example Linux), point `LEANT_BACKEND` at a built
+`repl` binary -- clone `augustepoiroux/repl` at the tag matching the
+cached Windows revision (currently
+`v1.3.18_lean-toolchain-v4.32.0`), run `lake build`, and export the
+path to `.lake/build/bin/repl`; the very first heavy `:synth` there may
+pay one cold-toolchain warm-up against the 300 s per-request backend
+timeout and succeed on retry.
 
 Two things make a fresh run easier to read. First, the suite passes in
 full on every platform (the two historical Windows path-admission
