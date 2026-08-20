@@ -419,7 +419,13 @@ corresponding Haskell-shaped form at the same time:
 Djex will use Haskell application, projection, comparison, `div`, and `mod`
 notation; Leant will use Lean notation. Both adapt into the same checked
 semantic vocabulary rather than sharing an ad hoc text grammar or executing
-host expressions. This parity work is scheduled before new `--law`,
+host expressions. The Djex side of this milestone has already landed in two
+layers: the vendored library's `parseHaskellLengthWhereSource` admits exactly
+the Haskell-shaped form and lowers it to the same opaque bounded source as
+the compact `len(...)` entrance, and the standalone Djex REPL parses the
+`--where CLAUSE -- TYPE` envelope with a pure `:set length-z3` policy seal,
+staying inert until its checked runtime activation lands. The remaining
+parity work is that runtime activation plus the Lean-notation adapter here. This parity work is scheduled before new `--law`,
 `--example`, typed-sketch, or additional behavioral-domain syntax. Both REPLs
 will lead with these examples in `:help synth` and show the defaults they
 resolved.
