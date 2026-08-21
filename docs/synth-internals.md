@@ -44,6 +44,7 @@ who wants the *what* can stop at the paragraph.
 - [Opaque detailed synthesis cursor foundation](#opaque-detailed-synthesis-cursor-foundation)
 - [Scoped parallel initial structural schedules](#scoped-parallel-initial-structural-schedules)
 - [Private ordered verification scheduler foundation](#private-ordered-verification-scheduler-foundation)
+- [Backend process-tree lifecycle prerequisite](#backend-process-tree-lifecycle-prerequisite)
 - [Main's progressive same-run cursor scheduler](#mains-progressive-same-run-cursor-scheduler)
 - [Contract vocabulary and module ownership](#contract-vocabulary-and-module-ownership)
 - [Post-verification sealing](#post-verification-sealing)
@@ -1300,6 +1301,67 @@ cloned from the command's current environment; a single backend pipe must not
 be shared concurrently. Production wiring and benchmarking remain future
 work. The exact contract, audit evidence, and boundary are recorded in the
 [ordered verification scheduler report](reports/2026-08-20-ordered-verification-scheduler-foundation.md).
+
+## Backend process-tree lifecycle prerequisite
+
+`Leant.Backend` now gives every `lake env repl` launch an owned process-tree
+boundary. The `CreateProcess` request sets both `create_group = True` and
+`use_process_jobs = True`, and captures the direct wrapper PID immediately
+after creation. Startup does not publish a `Backend` without that identifier.
+This preserves a stable address for inherited descendants even if the Lake
+wrapper exits before teardown begins. Backend-bearing components require
+`process >= 1.6.3`, the release in which `getPid` became available.
+
+On POSIX, the child leads a dedicated process group whose ID is the captured
+PID; Leant never signals its caller's or a global process group. Teardown sends
+`SIGTERM` to that owned group and probes it for a bounded grace period. If the
+group remains, teardown sends `SIGKILL`, boundedly reaps the direct wrapper,
+and boundedly requires the group probe to report disappearance. Only `ESRCH`
+means that the group is gone. Permission, invalid-argument, observation, and
+other I/O failures propagate, as do explicit noncompletion failures when the
+wrapper cannot be reaped or the group remains after `SIGKILL`.
+
+On Windows, `use_process_jobs` makes the `process` package place the launch in
+a Job. `terminateProcess` therefore terminates that Job rather than only the
+direct wrapper, and a bounded `waitForProcess` observes Job completion. If the
+first wait expires, Leant retries termination and one bounded wait; a second
+expiry is an explicit cleanup failure. This branch passed warning-as-error
+source compilation with the Windows CPP path forced, but it was not
+runtime-tested on Windows at this checkpoint.
+
+`killBackend` owns a masked shared cleanup attempt rather than tying cleanup
+to one waiting caller. Cancellation of a waiter does not cancel teardown;
+concurrent callers share the active result, successful cleanup remains
+memoized, and a failed attempt resets the gate only after all of its cleanup
+actions finish. The old completion cell still delivers that attempt's failure
+to its current waiters; a later caller may begin a retry just before that
+publication, but cannot overlap the completed resource cleanup. Complete
+startup, partial startup, and ordinary backend teardown all run their local
+cleanup actions even when the tree terminator fails. They attempt to close
+every available pipe, and
+ordinary teardown also gives the stderr pump a bounded drain window before
+killing it and boundedly waiting again. Actions run left to right and the
+first failure, normally the tree failure, is preserved after the remaining
+cleanup attempts.
+
+The deterministic lifecycle fixture runs the unit-test executable as a fake
+Lake wrapper. That wrapper launches an independently active heartbeat child
+through a path containing spaces, records that it has exited, and then exits
+before `killBackend`. On POSIX the child inherits an ignored `SIGTERM`, forcing
+the escalation path; it also self-expires after a finite interval as a leak
+guard. The test observes both wrapper exit and heartbeat activity, cancels an
+initial cleanup waiter, joins concurrent repeated callers, and requires the
+heartbeat to stabilize after cleanup returns. Wrapper-only termination would
+leave the observed child active and fail this characterization. The existing
+oversized-stderr regression remains in the same three-test lifecycle group.
+
+This checkpoint clears one prerequisite only. Production candidate
+verification still runs serially over one backend. Constructing an isolated
+backend pool, cloning each command environment into its workers, connecting
+the private ordered scheduler through Main, and measuring performance all
+remain future work. The implementation, audit repairs, and **508 of 508**
+strict-suite result are recorded in the
+[backend lifecycle report](reports/2026-08-20-backend-process-tree-lifecycle.md).
 
 ## Main's progressive same-run cursor scheduler
 

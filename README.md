@@ -1271,11 +1271,19 @@ projects in Lean itself.
 Leant implements the backend protocol directly
 ([src/Leant/Backend.hs](src/Leant/Backend.hs)): JSON over stdin/stdout
 with blank-line framing, spawned as `lake env repl` (`repl.exe` on
-Windows) inside the Lake project. The JSON codec is hand-rolled
-([src/Leant/Json.hs](src/Leant/Json.hs)), so the REPL core itself needs
-only GHC boot libraries; the sole Hackage dependency, `haskell-src-exts`,
-arrives through the vendored Djex. On backend death,
-timeout, or Ctrl+C, the process is killed and the session (imports +
+Windows) inside the Lake project. Each backend is born in an owned process
+tree: a dedicated process group on POSIX and a Job on Windows. Teardown keeps
+running if its caller is cancelled, waits boundedly for the complete owned
+tree, and still attempts local pipe and stderr-capture cleanup when termination
+reports an error. This clears a lifecycle prerequisite for future isolated
+verification workers; production verification remains serial over one
+backend. See the [internals](docs/synth-internals.md#backend-process-tree-lifecycle-prerequisite)
+and [lifecycle checkpoint](docs/reports/2026-08-20-backend-process-tree-lifecycle.md).
+The JSON codec is hand-rolled
+([src/Leant/Json.hs](src/Leant/Json.hs)). The direct external dependency
+surface stays small: `async` supplies scoped worker lifetime management, while
+`haskell-src-exts` arrives through the vendored Djex. On backend death,
+timeout, or Ctrl+C, the owned tree is terminated and the session (imports +
 history) replays automatically on the next command. The Haskeline
 front-end provides the interrupt-safe step loop, logical multi-line
 input, and completion.

@@ -101,6 +101,21 @@ import the module: Main, Backend, and the current Verification route are
 unchanged, so production verification remains serial and this checkpoint
 supports no speed claim. Isolated backend-pool construction is the next stage.
 
+The backend lifecycle prerequisite is now complete at commit `39901f3`.
+Every `lake env repl` launch owns a dedicated POSIX process group or Windows
+Job, retains its spawn-time identifier across wrapper exit, and uses bounded
+whole-tree termination and completion checks. Cleanup is shared across
+concurrent or cancelled callers, retries after failure, and unconditionally
+attempts to release local pipes and the stderr pump while preserving the
+primary tree failure. The deterministic fixture covers an exited fake wrapper
+and an independently active heartbeat grandchild that ignores `SIGTERM` on
+POSIX. The Windows path was strictly source-compiled, not runtime-tested on
+Windows.
+This clears only the lifecycle prerequisite: production verification remains
+serial, while isolated-pool construction, Main wiring, and performance work
+remain future. See the
+[backend process-tree lifecycle report](2026-08-20-backend-process-tree-lifecycle.md).
+
 There is still no `ReplState` field, serialization, snapshot restoration,
 session bank, or persistence, and no new engine-side counterexample request,
 typed prefix pruning, or complete Level-2 CEGIS loop. Preserve-all candidate
@@ -187,6 +202,7 @@ Reports are listed oldest first.
 - 2026-08-20 — [Scoped parallel `EngineBoth` structural baseline](2026-08-20-scoped-parallel-engine-both-baseline.md)
 - 2026-08-20 — [Parallel structural/library baseline](2026-08-20-parallel-library-baseline.md)
 - 2026-08-20 — [Private ordered verification scheduler foundation](2026-08-20-ordered-verification-scheduler-foundation.md)
+- 2026-08-20 — [Backend process-tree lifecycle prerequisite](2026-08-20-backend-process-tree-lifecycle.md)
 
 ## Standalone PDF reports
 

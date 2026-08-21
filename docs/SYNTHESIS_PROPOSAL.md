@@ -38,8 +38,10 @@ for any engine. The first small structural benchmark regressed; a substantive
 eight-premise library fixture measured a cautious 1.5x search-only gain for
 Exference and `EngineBoth` at `-N2`. Neither result is an end-to-end,
 verification, or default-`N2` claim. A package-private ordered success-quota
-scheduler is also implemented and characterized, but only tests import it:
-production verification and its single-backend route remain serial. The
+scheduler is also implemented and characterized, but only tests import it.
+The backend now owns and boundedly tears down each complete spawned process
+tree, clearing one prerequisite for isolated workers. Production verification
+and its single-backend route nevertheless remain serial. The
 implemented post-phase-2 increments
 are detailed in §7. Companion to
 [PROPOSALS.md](PROPOSALS.md).*
@@ -750,6 +752,40 @@ processes cloned from the same command environment before this scheduler can
 be connected safely. No verification-latency or end-to-end speed claim follows
 from the scheduler checkpoint. See the
 [ordered scheduler report](reports/2026-08-20-ordered-verification-scheduler-foundation.md).
+
+### Backend process-tree lifecycle prerequisite (implemented, no pool)
+
+The current backend launch owns the complete `lake env repl` process tree.
+POSIX launches lead a dedicated process group, retain its captured leader PID
+after the wrapper exits, send the group `SIGTERM`, and escalate to `SIGKILL`
+after a bounded grace period. Teardown then boundedly requires both direct
+wrapper reaping and owned-group disappearance; only `ESRCH` means the group is
+gone, while other signal, probe, and wait errors propagate. Windows launches
+use a `process` Job, terminate the Job, and require bounded `waitForProcess`
+completion, with one retry followed by explicit noncompletion. The Windows
+branch is warning-as-error source-compiled but not runtime-tested on Windows.
+Backend-bearing components consequently require `process >= 1.6.3` for the
+spawn-time PID capture.
+
+Cleanup is shared independently of any one caller: cancellation cannot abandon
+the active teardown, concurrent callers observe the same attempt, success is
+memoized, and failure reopens the gate for a later retry. Tree termination is
+the primary action, but every present pipe and the bounded stderr-pump cleanup
+are attempted unconditionally, preserving the first failure afterward.
+
+The fake-backend characterization covers an already-exited wrapper and an
+independently heartbeating grandchild reached through a path with spaces. On
+POSIX that child ignores `SIGTERM`, so the test exercises escalation before it
+requires all concurrent cleanup callers to return and the heartbeat to stop;
+the child also has a finite self-expiry leak guard. The complete strict unit
+suite passed **508 of 508** tests at commit `39901f3`. See the
+[backend lifecycle report](reports/2026-08-20-backend-process-tree-lifecycle.md).
+
+This is a lifecycle prerequisite, not verification parallelism or performance
+evidence. Production verification stays serial over one backend. Isolated
+pool construction and environment cloning, Main wiring to the ordered
+scheduler, end-to-end cancellation policy, and performance measurement remain
+future stages.
 
 Design rules, all inherited from Djex:
 
