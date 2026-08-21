@@ -1,0 +1,117 @@
+# Ordered isolated-verification benchmark
+
+This benchmark measures the end-to-end effect of Leant's ordered,
+process-isolated parallel Lean verifier. It compares the last serial-verifier
+baseline and the candidate worktree at both one and two RTS capabilities.
+Every run is a fresh Leant process; Lean startup, synthesis, verification, and
+presentation are all included.
+
+This is a release gate, not a microbenchmark. The script refuses to time a
+route until an untimed `strace` preflight proves the expected backend topology
+and byte-identical semantic output in all four cells.
+
+## Requirements
+
+- Linux with `/proc`
+- Python 3.10 or newer
+- `strace`
+- an executable Lean REPL backend compatible with this Leant checkout
+- optimized baseline and candidate Leant executables
+
+Build both Leant executables with the same compiler and explicit Cabal
+optimization profile. Repeat the profile on `list-bin`, because optimized and
+default-profile executables occupy different Cabal paths:
+
+```console
+cabal build exe:leant --enable-optimization=2 -j1 --ghc-options=-Werror
+cabal list-bin exe:leant --enable-optimization=2
+```
+
+For the 2026-08-21 checkpoint, the baseline is the clean tree at commit
+`57e44451c9e9d263b64ddb123239cbdc9802b326`. Build it in a detached worktree
+with its recorded Djex submodule, then build the candidate from the dirty or
+committed candidate tree with the same command.
+
+## Cells and workloads
+
+The four cells isolate capability effects from implementation effects:
+
+| Cell | Executable | RTS capabilities | Expected Lean processes |
+| --- | --- | ---: | ---: |
+| B1 | serial baseline | 1 | 1 |
+| B2 | serial baseline | 2 | 1 |
+| C1 | candidate | 1 | 1 |
+| C2 | candidate | 2 | 3: primary plus two isolated workers |
+
+The two primary fixtures are history-free, default-Djinn, five-result goals.
+Their baseline N1 and N2 search routes are identical, so B2/C2 isolates the
+new verification implementation cleanly:
+
+- `state-thread.txt`: a state-threading product result;
+- `continuation.txt`: a nested continuation result.
+
+`library-map.txt` is a contextual end-to-end control. Its N2 run also uses the
+already-published parallel base/library search route, so it is included in the
+geometric mean but not used as an isolated verification promotion workload.
+
+## Protocol
+
+An untimed preflight runs every workload in B1, B2, C1, and C2 with synthesis
+debug metrics and `strace -f -e execve`. It requires:
+
+- exactly `it1` through `it5`;
+- one `lean-variant-attempted=5` metric and one
+  `lean-candidate-verified=5` metric;
+- exactly 1/1/1/3 backend executions in B1/B2/C1/C2;
+- byte-identical normalized debug and semantic transcripts;
+- no `leant-parallel-verification*` artifact beneath the private temporary
+  directory.
+
+Timed runs disable debug and `strace`, use a fresh private `TMPDIR`, force
+`LEANT_SYNTH_TIMEOUT=600`, clear `GHCRTS`, and stabilize the locale and time
+zone. Two warmup cycles followed by 21 measured samples per cell is the
+release profile. Cell order follows a fixed four-row Latin square; workload
+order alternates between samples. Each timed run rechecks the preflight
+transcript hash and candidate count.
+
+Example:
+
+```console
+./bench-verification/benchmark.py \
+  --baseline /absolute/path/to/baseline/leant \
+  --candidate /absolute/path/to/candidate/leant \
+  --backend /absolute/path/to/repl \
+  --warmups 2 \
+  --samples 21 \
+  --results /absolute/path/to/results.tsv \
+  --artifacts /absolute/path/to/raw-artifacts \
+  --enforce
+```
+
+Use `--warmups 0 --samples 1` only to smoke-test the harness and
+`--warmups 1 --samples 5` for screening. Neither is release evidence.
+
+## Metrics and promotion rule
+
+The report includes median and nearest-rank p95 wall time, sampled total
+process-tree CPU, sampled peak aggregate RSS, and the root Haskell process's
+GHC allocation total. `/proc` is sampled every 20 ms by default. Aggregate RSS
+sums resident pages across processes and therefore double-counts shared pages;
+short-lived CPU or RSS peaks between samples can be missed. These limitations
+make the resource figures conservative comparison signals, not accounting
+measurements.
+
+The default enforced gate requires:
+
+- B2/C2 median wall speedup of at least 1.25x on each primary fixture;
+- C2 p95 no worse than B2 on each primary fixture;
+- C1/B1 median wall ratio no greater than 1.05 on each primary fixture;
+- C2/B2 median GHC allocation ratio no greater than 1.10;
+- C2/B2 median process-tree CPU and aggregate-RSS ratios no greater than 1.25;
+- a positive B2/C2 geometric-mean speedup across all three workloads.
+
+Any route, transcript, candidate-count, metric, timeout, or artifact-cleanup
+mismatch is an unconditional failure. Without `--enforce`, a completed run
+still prints `promotion: HOLD` but returns success so screening data can be
+collected. Do not claim acceleration from a screening run or from a result
+that prints `HOLD`.

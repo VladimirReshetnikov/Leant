@@ -30,9 +30,11 @@ import Control.Monad
   )
 import Control.DeepSeq (rnf)
 import Control.Exception
-  ( SomeException
+  ( AsyncException (ThreadKilled)
+  , SomeException
   , evaluate
   , finally
+  , fromException
   , throwIO
   , try
   )
@@ -246,7 +248,17 @@ import Leant.Synth.Engine
   , withoutCheckedDetailedCandidates
   )
 import Leant.Synth.Engine.Parallel (runParallelEitherPairOrdered)
-import Leant.Synth.Verification.Parallel (runOrderedSuccessQuota)
+import Leant.Synth.Verification.Parallel
+  ( runOrderedSuccessQuota
+  , verifyCandidateGroupsParallel
+  )
+import Leant.Synth.Verification.Runtime
+  ( ParallelFailureDisposition (..)
+  , ensureVerificationArtifactWith
+  , parallelVerificationFailureAllowsSerialFallback
+  , runVerificationBatchWith
+  , withVerificationArtifactRuntime
+  )
 import Leant.Synth.Fragment
   ( AppHead (..)
   , ExactContextArgument (..)
@@ -619,7 +631,8 @@ import Leant.Synth.Render
   , renderLeanTerm
   )
 import Leant.Synth.Verification
-  ( VariantVerdict (..)
+  ( GroupVerificationSummary
+  , VariantVerdict (..)
   , VerificationBatch
   , Verified
   , failedCandidateGroups
@@ -627,6 +640,7 @@ import Leant.Synth.Verification
   , verifiedCandidate
   , verifiedCandidateReceipts
   , verifiedCandidates
+  , verifyCandidateGroup
   , verifyCandidateGroups
   )
 import Leant.Session.Replay (itCounterAfterHistory, replayHistoryWith)
@@ -671,6 +685,7 @@ main = do
       , providerScheduleTests
       , combinedEngineMergeTests
       , parallelEnginePairTests
+      , parallelVerificationRuntimeTests
       , parallelVerificationSchedulerTests
       , detailedSynthCursorTests
       , typedCandidateRoutingTests
@@ -947,7 +962,161 @@ backendLifecycleTests = testGroup "Lean backend lifecycle"
 
 isolatedBackendPairTests :: TestTree
 isolatedBackendPairTests = testGroup "isolated Lean backend pair"
-  [ testCase "capture terminal status in the atomic close transition" $ do
+  [ testCase
+      "retire an exceptional or malformed primary protocol before reuse" $ do
+      sourceLines <- lines <$> readFile "src/Main.hs"
+      let spawnSection = mainSourceSection
+            "ensureBackendProcess st = do"
+            "abandonReplacementBackend ::" sourceLines
+          deathSection = mainSourceSection
+            "backendDied st = mask"
+            "-- Run a command in an exact backend-local environment"
+            sourceLines
+          requestSection = mainSourceSection
+            "runPayloadAfterBackend st makePayload = do"
+            "-- Response accessors" sourceLines
+      mapM_ (assertMainSourceContains "backend spawn exception boundary"
+          spawnSection)
+        [ "mask $ \\_ -> do"
+        , "result <- try (spawnBackend (rsConfig state))"
+        , "case (result :: Either IOException Backend) of"
+        , "modifyIORef' st (\\s -> s { rsBackend = Just backend })"
+        ]
+      assertBool "backend spawn swallowed caller cancellation"
+        $ not $ "Either SomeException Backend" `isInfixOf`
+          unlines spawnSection
+      spawnMask <- expectMainSourcePosition "backend spawn ownership"
+        "mask $ \\_ -> do" spawnSection
+      spawnCall <- expectMainSourcePosition "backend spawn ownership"
+        "result <- try (spawnBackend" spawnSection
+      spawnPublish <- expectMainSourcePosition "backend spawn ownership"
+        "modifyIORef' st" spawnSection
+      assertBool "primary backend publication escaped its masked handoff"
+        $ spawnMask < spawnCall && spawnCall < spawnPublish
+      mapM_ (assertMainSourceContains "primary request exception boundary"
+          requestSection)
+        [ "requestOutcome <- try $ request backend (rsTimeout state) (makePayload state)"
+        , "Left (primary :: SomeException) -> do"
+        , "_ <- try (backendDied st) :: IO (Either SomeException ())"
+        , "throwIO primary"
+        , "Left (BadResponse err) -> do"
+        , "backendDied st"
+        ]
+      requestStart <- expectMainSourcePosition "primary request exception"
+        "requestOutcome <- try" requestSection
+      exceptional <- expectMainSourcePosition "primary request exception"
+        "Left (primary :: SomeException)" requestSection
+      retirement <- expectMainSourcePosition "primary request exception"
+        "_ <- try (backendDied st)" requestSection
+      rethrow <- expectMainSourcePosition "primary request exception"
+        "throwIO primary" requestSection
+      assertBool "primary protocol retirement lost exception precedence"
+        $ requestStart < exceptional
+          && exceptional < retirement
+          && retirement < rethrow
+      mapM_ (assertMainSourceContains "backend death invalidation"
+          deathSection)
+        [ "backendDied st = mask $ \\restore -> do"
+        , "killed <- try $ restore $ forM_ (rsBackend state) killBackend"
+        , "`finally` modifyIORef' st"
+        , "rsBackend = Nothing, rsLastSorry = Nothing"
+        , "(Left primary, _) -> throwIO (primary :: SomeException)"
+        ]
+  , testCase
+      "scope one absolute snapshot to parity-safe command state" $ do
+      sourceLines <- lines <$> readFile "src/Main.hs"
+      let contextSection = mainSourceSection
+            "type SynthVerificationContext ="
+            "synthGo" sourceLines
+          wrapperSection = mainSourceSection
+            "synthGo' assessmentContext st args retriedVars goal parsed ="
+            ":: SynthVerificationContext" sourceLines
+          artifactSection = mainSourceSection
+            "ensureSynthVerificationArtifact context st ="
+            "synthGo" sourceLines
+          reservationSection = mainSourceSection
+            "freshSiblingPath :: FilePath"
+            "copyManagedArtifact ::" sourceLines
+      mapM_ (assertMainSourceContains "verification command owner"
+          contextSection)
+        [ "type SynthVerificationContext = VerificationArtifactRuntime FilePath"
+        , "withSynthVerificationContext = withVerificationArtifactRuntime removeFileIfExists"
+        ]
+      mapM_ (assertMainSourceContains "verification command wrapper"
+          wrapperSection)
+        [ "withSynthVerificationContext $ \\verificationContext ->"
+        , "synthGoWithVerification verificationContext assessmentContext"
+        ]
+      mapM_ (assertMainSourceContains "parallel verification admission"
+          artifactSection)
+        [ "ensureVerificationArtifactWith context sessionEligible getNumCapabilities acquire prepare"
+        , "session <- readIORef st"
+        , "isNothing (rsSnapshotBase session)"
+        , "isNothing (rsProve session)"
+        , "isNothing (rsLastSorry session)"
+        , "null (rsHistory session)"
+        , "environmentOr <- currentEnvironmentId st"
+        , "temporaryOr <- tryIOError $ getTemporaryDirectory >>= makeAbsolute"
+        , "reservedOr <- freshSiblingPath"
+        , "Right artifact -> Just (artifact, environment)"
+        , "pickled <- pickleEnvironment st artifact environment"
+        , "Left _ -> False"
+        , "Right () -> True"
+        ]
+      mapM_ (assertMainSourceContains "artifact reservation cancellation"
+          reservationSection)
+        [ "freshSiblingPath target = ioResult $ bracketOnError"
+        , "openBinaryTempFile"
+        , "hClose handle"
+        , "removeFile path"
+        , "cleanup (path, handle)"
+        ]
+  , testCase
+      "fallback only after the pair closes cleanly and disable later batches" $ do
+      sourceLines <- lines <$> readFile "src/Main.hs"
+      let verificationSection = mainSourceSection
+            "synthVerify verificationContext successQuota st goal groups"
+            "synthVerifySerial successQuota st goal groups = do" sourceLines
+          serialSection = mainSourceSection
+            "synthVerifySerial successQuota st goal groups = do"
+            "completionCandidates ::" sourceLines
+      mapM_ (assertMainSourceContains "parallel verification route"
+          verificationSection)
+        [ "runVerificationBatchWith verificationContext"
+        , "successQuota >= 2 && hasTwoGroups groups"
+        , "ensureSynthVerificationArtifact verificationContext st"
+        , "serialVerification"
+        , "parallelVerification"
+        , "classifyInfrastructureFailure"
+        , "withIsolatedBackendPair (rsConfig state) path (rsTimeout state)"
+        , "try $ verifyCandidateGroupsParallel 2 successQuota"
+        , "withIsolatedBackendLease pair"
+        , "verifyCandidateGroup (verifyIsolatedVariant lease) group"
+        , "runIsolatedBackendCommand lease"
+        , "Right response -> pure $ classifyVerificationResponse response"
+        , "parallelVerificationFailureAllowsSerialFallback failure"
+        , "FallbackSerial"
+        , "AbortParallel $ ParallelVerificationInfrastructureException failure"
+        ]
+      pairBracket <- expectMainSourcePosition "parallel verification route"
+        "attempted <- withIsolatedBackendPair" verificationSection
+      typedCatch <- expectMainSourcePosition "parallel verification route"
+        "try $ verifyCandidateGroupsParallel" verificationSection
+      classification <- expectMainSourcePosition "parallel verification route"
+        "pure $ case attempted of" verificationSection
+      assertBool "typed worker failures escaped pair cleanup"
+        $ pairBracket < typedCatch
+          && typedCatch < classification
+      mapM_ (assertMainSourceContains "literal serial verification oracle"
+          serialSection)
+        [ "verification <- verifyCandidateGroups successQuota"
+        , "modifyIORef' reverseAttempts (variant :)"
+        , "result <- runCurrentCmd st"
+        , "Right response -> classifyVerificationResponse response"
+        ]
+      length (mainSourcePositions
+        "withIsolatedBackendPair" verificationSection) @?= 1
+  , testCase "capture terminal status in the atomic close transition" $ do
       sourceLines <- lines <$> readFile "src/Leant/Backend/Isolated.hs"
       let pairBracket = unlines $ mainSourceSection
             "withIsolatedBackendPair config artifact requestTimeout callback ="
@@ -969,6 +1138,27 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
         $ "Right (terminalStatus, cleanupFailures)" `isInfixOf` pairBracket
       assertBool "close did not capture status and transition atomically"
         $ atomicClose `isInfixOf` closeSection
+  , testCase "start both restores before either restore completes" $
+      withTemporaryDirectory "leant isolated parallel setup" $ \root -> do
+        config <- isolatedFakeBackendConfig root "setup-gated-all" Nothing
+        callbackRan <- newIORef False
+        running <- async $ withIsolatedBackendPair config
+          (root </> "parallel setup snapshot") Nothing $ \_ ->
+            modifyIORef' callbackRan $ const True
+        bothEntered <- timeout 3000000 $ mapM_
+          (waitForHeartbeat . isolatedFakeSetupPath root) [1, 2]
+        bothEntered @?= Just ()
+        premature <- timeout 200000 $ waitCatch running
+        assertBool "pair completed while both setup requests were gated"
+          $ isNothing premature
+        writeFile (isolatedFakeSetupGatePath root) "open\n"
+        outcome <- timeout 5000000 $ waitCatch running
+        case outcome of
+          Just (Right (Right ())) -> pure ()
+          other -> assertFailure
+            $ "parallel setup did not finish cleanly: " ++ show other
+        readIORef callbackRan >>= (@?= True)
+        mapM_ (assertFakeWorkerStopped root) [1, 2]
   , testCase "restore two distinct workers and retain each leased environment" $
       withTemporaryDirectory "leant isolated backend" $ \root -> do
         let artifact = root </> "snapshot artifact with spaces.olean"
@@ -1034,8 +1224,6 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
         secondPath <- readFile $ isolatedFakeSetupPath root 2
         firstPath @?= artifact
         secondPath @?= artifact
-        setupOrder <- lines <$> readFile (root </> "setup-order.log")
-        setupOrder @?= ["1", "2"]
   , testCase "return fatal, error, and sorry JSON without poisoning" $
       withTemporaryDirectory "leant isolated valid responses" $ \root -> do
         config <- isolatedFakeBackendConfig root "healthy" Nothing
@@ -1056,8 +1244,13 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
                   Just (Json.JStr "fake command fatal")
                 assertBool "error response lost its messages"
                   $ isJust $ Json.jLookup "messages" errorResponse
-                assertBool "sorry response lost its sorries"
-                  $ isJust $ Json.jLookup "sorries" sorryResponse
+                Json.jLookup "sorries" sorryResponse @?= Just
+                  (Json.JArr
+                    [ Json.JObj
+                        [ ("proofState", Json.JInt 4242)
+                        , ("goal", Json.JStr "fake sorry goal")
+                        ]
+                    ])
                 worker <- requireJsonInteger "worker" finalResponse
                 seen <- requireJsonInteger "seenEnv" finalResponse
                 seen @?= isolatedFakeEnvironment worker
@@ -1114,15 +1307,18 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
           (root </> "lease serialization snapshot") Nothing $ \pair -> do
             leased <- withIsolatedBackendLease pair $ \lease -> do
               first <- async $ runIsolatedBackendCommand lease "gated"
-              received <- timeout 3000000 $ waitForHeartbeat
-                $ isolatedFakeCommandStartedPath root 1
-              received @?= Just ()
+              started <- timeout 3000000
+                $ waitForIsolatedFakeCommandWorker root "gated"
+              worker <- case started of
+                Just value -> pure value
+                Nothing -> assertFailure "gated command did not start"
+                  >> pure 0
               second <- async $ runIsolatedBackendCommand lease
                 "serialized-second"
               overlapped <- timeout 200000 $ waitForFakeCommandCount
-                (isolatedFakeCommandStartedPath root 1) 2
+                (isolatedFakeCommandStartedPath root worker) 2
               overlapped @?= Nothing
-              writeFile (isolatedFakeCommandGatePath root 1) "open\n"
+              writeFile (isolatedFakeCommandGatePath root worker) "open\n"
               completed <- timeout 5000000 $ do
                 firstResult <- waitCatch first
                 secondResult <- waitCatch second
@@ -1148,11 +1344,16 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
           (root </> "inflight release snapshot") Nothing $ \pair -> do
             callbackReturned <- newEmptyMVar
             childSlot <- newEmptyMVar
+            workerSlot <- newEmptyMVar
             firstLease <- async $ withIsolatedBackendLease pair $ \lease -> do
               child <- async $ runIsolatedBackendCommand lease "gated"
-              received <- timeout 3000000 $ waitForHeartbeat
-                $ isolatedFakeCommandStartedPath root 1
-              received @?= Just ()
+              started <- timeout 3000000
+                $ waitForIsolatedFakeCommandWorker root "gated"
+              worker <- case started of
+                Just value -> pure value
+                Nothing -> assertFailure "gated command did not start"
+                  >> pure 0
+              putMVar workerSlot worker
               putMVar childSlot child
               putMVar callbackReturned ()
             returned <- timeout 3000000 $ readMVar callbackReturned
@@ -1170,7 +1371,8 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
               runIsolatedBackendCommand lease "after-gated"
             premature <- timeout 200000 $ readMVar secondStarted
             premature @?= Nothing
-            writeFile (isolatedFakeCommandGatePath root 1) "open\n"
+            firstWorker <- readMVar workerSlot
+            writeFile (isolatedFakeCommandGatePath root firstWorker) "open\n"
             firstOutcome <- timeout 5000000 $ waitCatch firstLease
             case firstOutcome of
               Just (Right (Right ())) -> pure ()
@@ -1194,7 +1396,7 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
               Nothing -> assertFailure "second lease did not finish"
                 >> pure Json.JNull
             secondWorker <- requireJsonInteger "worker" secondResponse
-            secondWorker @?= 1
+            secondWorker @?= firstWorker
             putMVar releaseHolder ()
             holderOutcome <- timeout 3000000 $ waitCatch holder
             case holderOutcome of
@@ -1212,9 +1414,9 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
             callbackReturned <- newEmptyMVar
             releasing <- async $ withIsolatedBackendLease pair $ \lease -> do
               child <- async $ runIsolatedBackendCommand lease "gated"
-              received <- timeout 3000000 $ waitForHeartbeat
-                $ isolatedFakeCommandStartedPath root 1
-              received @?= Just ()
+              started <- timeout 3000000
+                $ waitForIsolatedFakeCommandWorker root "gated"
+              assertBool "gated command did not start" $ isJust started
               putMVar childSlot child
               putMVar callbackReturned ()
             returned <- timeout 3000000 $ readMVar callbackReturned
@@ -1241,34 +1443,34 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
         mapM_ (assertFakeWorkerStopped root) [1, 2]
   , testGroup "reject invalid setup responses"
       [ isolatedSetupFailureTest
-          "fatal" "setup-fatal-1" $ \case
+          "fatal" "setup-fatal-all" $ \case
             IsolatedBackendSetupFatal 1 "fake setup fatal" -> True
             _ -> False
       , isolatedSetupFailureTest
-          "error" "setup-error-1" $ \case
+          "error" "setup-error-all" $ \case
             IsolatedBackendSetupErrors 1 ["fake setup error"] -> True
             _ -> False
       , isolatedSetupFailureTest
-          "missing environment" "setup-missing-1" $ \case
+          "missing environment" "setup-missing-all" $ \case
             IsolatedBackendSetupMissingEnvironment 1 -> True
             _ -> False
       , isolatedSetupFailureTest
-          "timeout" "setup-timeout-1" $ \case
+          "timeout" "setup-timeout-all" $ \case
             IsolatedBackendSetupTransportFailure 1
               IsolatedBackendRequestTimeout -> True
             _ -> False
       , isolatedSetupFailureTest
-          "EOF" "setup-eof-1" $ \case
+          "EOF" "setup-eof-all" $ \case
             IsolatedBackendSetupTransportFailure 1
               (IsolatedBackendServerClosed _) -> True
             _ -> False
       , isolatedSetupFailureTest
-          "malformed JSON" "setup-malformed-1" $ \case
+          "malformed JSON" "setup-malformed-all" $ \case
             IsolatedBackendSetupTransportFailure 1
               (IsolatedBackendBadResponse _) -> True
             _ -> False
       ]
-  , testCase "clean the first worker after second-worker setup failure" $
+  , testCase "clean both workers after one concurrent setup failure" $
       withTemporaryDirectory "leant isolated partial setup" $ \root -> do
         config <- isolatedFakeBackendConfig root "setup-fatal-2" Nothing
         callbackRan <- newIORef False
@@ -1276,22 +1478,22 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
           (root </> "partial setup snapshot") (Just 1) $ \_ -> do
             modifyIORef' callbackRan $ const True
         case paired of
-          Left (IsolatedBackendSetupFatal 2 "fake setup fatal") -> pure ()
-          other -> assertFailure $ "wrong second-worker failure: " ++ show other
+          Left (IsolatedBackendSetupFatal ordinal "fake setup fatal")
+            | ordinal == 1 || ordinal == 2 -> pure ()
+          other -> assertFailure $ "wrong one-worker failure: " ++ show other
         callbackWasRun <- readIORef callbackRan
         callbackWasRun @?= False
         mapM_ (assertFakeWorkerStopped root) [1, 2]
-  , testCase "cancel second-worker setup and clean both workers" $
+  , testCase "cancel simultaneous setup and clean both workers" $
       withTemporaryDirectory "leant isolated setup cancellation" $ \root -> do
-        config <- isolatedFakeBackendConfig root "setup-timeout-2" Nothing
+        config <- isolatedFakeBackendConfig root "setup-gated-all" Nothing
         callbackRan <- newIORef False
         running <- async $ withIsolatedBackendPair config
           (root </> "cancelled setup snapshot") Nothing $ \_ ->
             modifyIORef' callbackRan $ const True
-        enteredSecondSetup <- timeout 3000000 $ do
-          waitForHeartbeat $ isolatedFakeHeartbeatPath root 2
-          waitForHeartbeat $ isolatedFakeSetupPath root 2
-        enteredSecondSetup @?= Just ()
+        bothEntered <- timeout 3000000 $ mapM_
+          (waitForHeartbeat . isolatedFakeSetupPath root) [1, 2]
+        bothEntered @?= Just ()
         cancelled <- timeout 5000000 $ cancel running
         cancelled @?= Just ()
         outcome <- waitCatch running
@@ -1302,23 +1504,19 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
         callbackWasRun <- readIORef callbackRan
         callbackWasRun @?= False
         mapM_ (assertFakeWorkerStopped root) [1, 2]
-  , testCase "clean the first worker after second-worker spawn failure" $
-      if os == "mingw32" then pure () else
-        withTemporaryDirectory "leant isolated partial spawn" $ \root -> do
-          executable <- getExecutablePath
-          let launcher = root </> "temporary fake lake launcher"
-          createFileLink executable launcher
-          config <- isolatedFakeBackendConfig root "healthy" $ Just launcher
-          callbackRan <- newIORef False
-          paired <- withIsolatedBackendPair config
-            (root </> "partial spawn snapshot") (Just 1) $ \_ ->
-              modifyIORef' callbackRan $ const True
-          case paired of
-            Left (IsolatedBackendSpawnFailure 2 _) -> pure ()
-            other -> assertFailure $ "wrong second-spawn failure: " ++ show other
-          callbackWasRun <- readIORef callbackRan
-          callbackWasRun @?= False
-          assertFakeWorkerStopped root 1
+  , testCase "prefer worker-one failure when both concurrent spawns fail" $
+      withTemporaryDirectory "leant isolated spawn precedence" $ \root -> do
+        healthyConfig <- isolatedFakeBackendConfig root "healthy" Nothing
+        let config = healthyConfig
+              { bcLakePath = root </> "missing fake lake launcher" }
+        callbackRan <- newIORef False
+        paired <- withIsolatedBackendPair config
+          (root </> "failed spawn snapshot") (Just 1) $ \_ ->
+            modifyIORef' callbackRan $ const True
+        case paired of
+          Left (IsolatedBackendSpawnFailure 1 _) -> pure ()
+          other -> assertFailure $ "wrong spawn precedence: " ++ show other
+        readIORef callbackRan >>= (@?= False)
   , testGroup "retire transport-failed workers without replacement"
       [ isolatedTransportFailureTest
           "timeout" IsolatedBackendRequestTimeout
@@ -1384,9 +1582,9 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
             lateRequest <- async $ withIsolatedBackendLease pair $ \lease ->
               runIsolatedBackendCommand lease "gated"
             putMVar lateRequestSlot lateRequest
-            received <- timeout 3000000 $ waitForHeartbeat
-              $ isolatedFakeCommandStartedPath root 1
-            received @?= Just ()
+            started <- timeout 3000000
+              $ waitForIsolatedFakeCommandWorker root "gated"
+            assertBool "late gated command did not start" $ isJust started
             -- Returning closes the pair before cleanup kills the backend and
             -- makes this already-admitted request fail.
             pure ()
@@ -1417,9 +1615,9 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
           (root </> "cancellation snapshot") Nothing $ \pair ->
             withIsolatedBackendLease pair $ \lease -> do
               runIsolatedBackendCommand lease "timeout"
-        started <- timeout 3000000 $ waitForHeartbeat
-          $ isolatedFakeCommandStartedPath root 1
-        started @?= Just ()
+        started <- timeout 3000000
+          $ waitForIsolatedFakeCommandWorker root "timeout"
+        assertBool "timed command did not start" $ isJust started
         mapM_ (waitForHeartbeat . isolatedFakeHeartbeatPath root) [1, 2]
         cancelled <- timeout 5000000 $ cancel running
         cancelled @?= Just ()
@@ -1449,7 +1647,7 @@ isolatedSetupFailureTest label scenario expected =
         other -> assertFailure $ "wrong setup result: " ++ show other
       callbackWasRun <- readIORef callbackRan
       callbackWasRun @?= False
-      assertFakeWorkerStopped root 1
+      mapM_ (assertFakeWorkerStopped root) [1, 2]
 
 isolatedTransportFailureTest
   :: String
@@ -1633,11 +1831,11 @@ isolatedFakeSetupResponse
   -> IO ()
 isolatedFakeSetupResponse root scenario maybeLauncher worker artifact = do
   writeFile (isolatedFakeSetupPath root worker) artifact
-  appendFile (root </> "setup-order.log") $ show worker ++ "\n"
   when (worker == 1) $ case maybeLauncher of
     Nothing -> pure ()
     Just launcher -> removeFile launcher
   let targeted prefix = scenario == prefix ++ "-" ++ show worker
+        || scenario == prefix ++ "-all"
       environment = isolatedFakeEnvironment worker
   case () of
     _ | targeted "setup-fatal" ->
@@ -1656,6 +1854,10 @@ isolatedFakeSetupResponse root scenario maybeLauncher worker artifact = do
       | targeted "setup-missing" ->
           isolatedFakeWriteResponse $ Json.JObj
             [("ok", Json.JBool True)]
+      | targeted "setup-gated" ->
+          waitForHeartbeat (isolatedFakeSetupGatePath root)
+            >> isolatedFakeWriteResponse (Json.JObj
+              [("env", Json.JInt environment)])
       | targeted "setup-timeout" -> threadDelay 30000000
       | targeted "setup-eof" -> isolatedFakeCloseOutput
       | targeted "setup-malformed" -> isolatedFakeWriteMalformed
@@ -1696,7 +1898,13 @@ isolatedFakeCommandResponse root scenario worker pid sequenceNumber
           ])
       ]
     "sorry" -> isolatedFakeWriteResponse $ Json.JObj
-      [("sorries", Json.JArr [Json.JObj []])]
+      [ ("sorries", Json.JArr
+          [ Json.JObj
+              [ ("proofState", Json.JInt 4242)
+              , ("goal", Json.JStr "fake sorry goal")
+              ]
+          ])
+      ]
     _ -> isolatedFakeWriteIdentity sequenceOrdinal
  where
   isolatedFakeWriteIdentity sequenceOrdinal =
@@ -1750,6 +1958,22 @@ isolatedFakeCommandStartedPath root worker =
 isolatedFakeCommandGatePath :: FilePath -> Integer -> FilePath
 isolatedFakeCommandGatePath root worker =
   root </> ("worker-" ++ show worker ++ ".command-gate")
+
+isolatedFakeSetupGatePath :: FilePath -> FilePath
+isolatedFakeSetupGatePath root = root </> "setup-gate"
+
+waitForIsolatedFakeCommandWorker :: FilePath -> String -> IO Integer
+waitForIsolatedFakeCommandWorker root command = do
+  matches <- forM [1, 2] $ \worker -> do
+    let path = isolatedFakeCommandStartedPath root worker
+    exists <- doesFileExist path
+    if not exists
+      then pure False
+      else elem command . lines <$> readFile path
+  case [worker | (worker, True) <- zip [1, 2] matches] of
+    worker : _ -> pure worker
+    [] -> threadDelay 10000
+      >> waitForIsolatedFakeCommandWorker root command
 
 waitForFakeCommandCount :: FilePath -> Int -> IO ()
 waitForFakeCommandCount path expected = do
@@ -5402,10 +5626,566 @@ parallelEnginePairTests = testGroup
           notes)
   ]
 
+parallelVerificationRuntimeTests :: TestTree
+parallelVerificationRuntimeTests = testGroup
+  "command-scoped parallel verification runtime"
+  [ testCase "leave an ineligible batch unprobed for a later batch" $ do
+      events <- newIORef ([] :: [String])
+      let record event = modifyIORef' events (++ [event])
+          serial label = record ("serial-" ++ label) >> pure label
+          ensure runtime = ensureVerificationArtifactWith runtime
+            (record "session" >> pure True)
+            (record "capabilities" >> pure 2)
+            (record "acquire" >> pure (Just ("artifact", ())))
+            (\_ _ -> record "prepare" >> pure True)
+          parallel artifact = do
+            record $ "parallel-" ++ artifact
+            pure $ Right "parallel"
+          classify :: String -> ParallelFailureDisposition IOError
+          classify _ = FallbackSerial
+          unreachedParallel :: String -> IO (Either String String)
+          unreachedParallel _ =
+            error "ineligible batch forced the parallel action"
+          unreachedClassifier :: String
+            -> ParallelFailureDisposition IOError
+          unreachedClassifier _ =
+            error "ineligible batch forced failure classification"
+      observed <- withVerificationArtifactRuntime
+        (\artifact -> record $ "cleanup-" ++ artifact) $ \runtime -> do
+          first <- runVerificationBatchWith runtime False
+            (error "ineligible batch forced artifact admission"
+              :: IO (Maybe String))
+            (serial "first")
+            unreachedParallel
+            unreachedClassifier
+          second <- runVerificationBatchWith runtime True
+            (ensure runtime)
+            (serial "second")
+            parallel
+            classify
+          pure (first, second)
+      observed @?= ("first", "parallel")
+      readIORef events >>= (@?=
+        [ "serial-first"
+        , "session"
+        , "capabilities"
+        , "acquire"
+        , "prepare"
+        , "parallel-artifact"
+        , "cleanup-artifact"
+        ])
+  , testCase "make every pre-artifact refusal sticky and ordered" $ do
+      let runScenario expected session capabilities acquire = do
+            events <- newIORef ([] :: [String])
+            let record event = modifyIORef' events (++ [event])
+                ensure runtime = ensureVerificationArtifactWith runtime
+                  (record "session" >> session)
+                  (record "capabilities" >> capabilities)
+                  (record "acquire" >> acquire)
+                  (\_ _ -> record "prepare" >> pure True)
+            observed <- withVerificationArtifactRuntime
+              (\_ -> record "cleanup") $ \runtime -> do
+                first <- ensure runtime
+                second <- ensureVerificationArtifactWith runtime
+                  (error "sticky refusal repeated the session gate")
+                  (error "sticky refusal repeated capabilities")
+                  (error "sticky refusal repeated acquisition")
+                  (error "sticky refusal reached preparation")
+                pure (first, second)
+            observed @?= (Nothing, Nothing :: Maybe String)
+            readIORef events >>= (@?= expected)
+      runScenario ["session"] (pure False)
+        (error "static refusal reached capabilities")
+        (error "static refusal reached acquisition")
+      runScenario ["session", "capabilities"] (pure True) (pure 1)
+        (error "N1 refusal reached acquisition")
+      runScenario ["session", "capabilities", "acquire"]
+        (pure True) (pure 2) (pure Nothing)
+  , testCase
+      "clear ownership after successful failed-preparation cleanup" $ do
+      events <- newIORef ([] :: [String])
+      let record event = modifyIORef' events (++ [event])
+          ensure runtime = ensureVerificationArtifactWith runtime
+            (record "session" >> pure True)
+            (record "capabilities" >> pure 2)
+            (record "acquire" >> pure (Just ("artifact", ())))
+            (\_ _ -> record "prepare-failed" >> pure False)
+      observed <- withVerificationArtifactRuntime
+        (\artifact -> record $ "cleanup-" ++ artifact) $ \runtime -> do
+          first <- ensure runtime
+          second <- ensureVerificationArtifactWith runtime
+            (error "failed preparation repeated the session gate")
+            (error "failed preparation repeated capabilities")
+            (error "failed preparation repeated acquisition")
+            (error "failed preparation repeated preparation")
+          pure (first, second)
+      observed @?= (Nothing, Nothing :: Maybe String)
+      readIORef events >>= (@?=
+        [ "session"
+        , "capabilities"
+        , "acquire"
+        , "prepare-failed"
+        , "cleanup-artifact"
+        ])
+  , testCase
+      "retain ownership when normal-failure cleanup needs a retry" $ do
+      cleanupCount <- newIORef (0 :: Int)
+      let cleanup _ = do
+            count <- atomicModifyIORef' cleanupCount $ \n ->
+              let next = n + 1 in (next, next)
+            when (count == 1) $ ioError $ userError "cleanup-retry"
+      observed <- withVerificationArtifactRuntime cleanup $ \runtime ->
+        ensureVerificationArtifactWith runtime
+          (pure True) (pure 2)
+          (pure $ Just ("artifact", ()))
+          (\_ _ -> pure False)
+      observed @?= (Nothing :: Maybe String)
+      readIORef cleanupCount >>= (@?= 2)
+  , testCase
+      "preserve a preparation exception while attempting cleanup twice" $ do
+      cleanups <- newIORef (0 :: Int)
+      let cleanup _ = do
+            modifyIORef' cleanups (+ 1)
+            ioError $ userError "cleanup-secondary"
+          action = withVerificationArtifactRuntime cleanup $ \runtime ->
+            ensureVerificationArtifactWith runtime
+              (pure True) (pure 2)
+              (pure $ Just ("artifact", ()))
+              (\_ _ -> ioError $ userError "prepare-primary")
+      observed <- try action :: IO
+        (Either SomeException (Maybe String))
+      case observed of
+        Left failure -> assertBool
+          "artifact cleanup replaced the preparation exception"
+          $ "prepare-primary" `isInfixOf` show failure
+        Right value -> assertFailure
+          $ "exceptional preparation returned " ++ show value
+      readIORef cleanups >>= (@?= 2)
+  , testCase
+      "retain cancellation through normal-failure early cleanup" $ do
+      cleanupCount <- newIORef (0 :: Int)
+      let cleanup _ = do
+            count <- atomicModifyIORef' cleanupCount $ \n ->
+              let next = n + 1 in (next, next)
+            when (count == 1) $ throwIO ThreadKilled
+          action = withVerificationArtifactRuntime cleanup $ \runtime ->
+            ensureVerificationArtifactWith runtime
+              (pure True) (pure 2)
+              (pure $ Just ("artifact", ()))
+              (\_ _ -> pure False)
+      observed <- try action :: IO
+        (Either SomeException (Maybe String))
+      case observed of
+        Left failure -> case fromException failure of
+          Just ThreadKilled -> pure ()
+          other -> assertFailure $ "unexpected cleanup exception: "
+            ++ show other ++ " / " ++ show failure
+        Right value -> assertFailure
+          $ "cleanup cancellation became serial availability: " ++ show value
+      readIORef cleanupCount >>= (@?= 2)
+  , testCase
+      "clean an interrupted preparation after recording ownership" $ do
+      prepared <- newEmptyMVar
+      blocked <- newEmptyMVar
+      cleanupCount <- newIORef (0 :: Int)
+      let cleanup _ = modifyIORef' cleanupCount (+ 1)
+          action = withVerificationArtifactRuntime cleanup $ \runtime ->
+            ensureVerificationArtifactWith runtime
+              (pure True) (pure 2)
+              (pure $ Just ("artifact", ()))
+              (\_ _ -> putMVar prepared () >> takeMVar blocked >> pure True)
+      worker <- async action
+      expectParallelPairWithin "artifact preparation admission"
+        $ readMVar prepared
+      cancel worker
+      outcome <- expectParallelPairWithin "artifact preparation cancellation"
+        $ waitCatch worker
+      case outcome of
+        Left _ -> pure ()
+        Right value -> assertFailure
+          $ "cancelled artifact preparation returned " ++ show value
+      readIORef cleanupCount >>= (@?= 1)
+  , testCase
+      "reuse one artifact while keeping parallel attempts batch-scoped" $ do
+      events <- newIORef ([] :: [String])
+      let record event = modifyIORef' events (++ [event])
+          ensure runtime = ensureVerificationArtifactWith runtime
+            (record "session" >> pure True)
+            (record "capabilities" >> pure 2)
+            (record "acquire" >> pure (Just ("artifact", ())))
+            (\_ _ -> record "prepare" >> pure True)
+          parallel label artifact = do
+            record $ label ++ "-" ++ artifact
+            pure $ Right label
+          classify :: String -> ParallelFailureDisposition IOError
+          classify _ = FallbackSerial
+      observed <- withVerificationArtifactRuntime
+        (\artifact -> record $ "cleanup-" ++ artifact) $ \runtime -> do
+          first <- runVerificationBatchWith runtime True (ensure runtime)
+            (error "successful first parallel batch reached serial")
+            (parallel "parallel-one") classify
+          second <- runVerificationBatchWith runtime True (ensure runtime)
+            (error "successful second parallel batch reached serial")
+            (parallel "parallel-two") classify
+          pure (first, second)
+      observed @?= ("parallel-one", "parallel-two")
+      readIORef events >>= (@?=
+        [ "session"
+        , "capabilities"
+        , "acquire"
+        , "prepare"
+        , "parallel-one-artifact"
+        , "parallel-two-artifact"
+        , "cleanup-artifact"
+        ])
+  , testCase
+      "close a failed parallel attempt before sticky serial replay" $ do
+      events <- newIORef ([] :: [String])
+      let record event = modifyIORef' events (++ [event])
+          ensure runtime = ensureVerificationArtifactWith runtime
+            (pure True) (pure 2)
+            (pure $ Just ("artifact", ()))
+            (\_ _ -> pure True)
+          serial label = record ("serial-" ++ label) >> pure label
+          failedParallel _ = do
+            record "parallel-closed"
+            pure $ Left "transport"
+          classify failure
+            | failure == "transport" = FallbackSerial
+            | otherwise = AbortParallel $ userError "unexpected failure"
+      observed <- withVerificationArtifactRuntime
+        (\_ -> record "artifact-cleaned") $ \runtime -> do
+          first <- runVerificationBatchWith runtime True (ensure runtime)
+            (serial "first") failedParallel classify
+          second <- runVerificationBatchWith runtime True
+            (ensureVerificationArtifactWith runtime
+              (error "sticky fallback repeated the session gate")
+              (error "sticky fallback repeated capabilities")
+              (error "sticky fallback repeated acquisition")
+              (error "sticky fallback repeated preparation"))
+            (serial "second")
+            (error "sticky fallback ran another parallel batch")
+            classify
+          pure (first, second)
+      observed @?= ("first", "second")
+      readIORef events >>= (@?=
+        [ "parallel-closed"
+        , "serial-first"
+        , "serial-second"
+        , "artifact-cleaned"
+        ])
+  , testCase "surface fatal classification without serial replay" $ do
+      serialCalls <- newIORef (0 :: Int)
+      cleanupCalls <- newIORef (0 :: Int)
+      let ensure runtime = ensureVerificationArtifactWith runtime
+            (pure True) (pure 2)
+            (pure $ Just ("artifact", ()))
+            (\_ _ -> pure True)
+          action = withVerificationArtifactRuntime
+            (\_ -> modifyIORef' cleanupCalls (+ 1)) $ \runtime ->
+              runVerificationBatchWith runtime True (ensure runtime)
+                (modifyIORef' serialCalls (+ 1) >> pure "serial")
+                (\_ -> pure $ Left "cleanup")
+                (\_ -> AbortParallel $ userError "parallel-fatal")
+      observed <- try action :: IO (Either SomeException String)
+      case observed of
+        Left failure -> assertBool "fatal route lost its identity"
+          $ "parallel-fatal" `isInfixOf` show failure
+        Right value -> assertFailure $ "fatal route returned " ++ value
+      readIORef serialCalls >>= (@?= 0)
+      readIORef cleanupCalls >>= (@?= 1)
+  , testCase
+      "propagate parallel exceptions and cancellation without fallback" $ do
+      let runScenario
+            :: (SomeException -> IO ())
+            -> (String -> IO (Either String String))
+            -> IO ()
+          runScenario expected runParallel = do
+            serialCalls <- newIORef (0 :: Int)
+            cleanupCalls <- newIORef (0 :: Int)
+            let ensure runtime = ensureVerificationArtifactWith runtime
+                  (pure True) (pure 2)
+                  (pure $ Just ("artifact", ()))
+                  (\_ _ -> pure True)
+                classify :: String -> ParallelFailureDisposition IOError
+                classify _ =
+                  error "parallel exception reached failure classification"
+                action = withVerificationArtifactRuntime
+                  (\_ -> modifyIORef' cleanupCalls (+ 1)) $ \runtime ->
+                    runVerificationBatchWith runtime True (ensure runtime)
+                      (modifyIORef' serialCalls (+ 1) >> pure "serial")
+                      runParallel
+                      classify
+            observed <- try action :: IO (Either SomeException String)
+            case observed of
+              Left failure -> expected failure
+              Right value -> assertFailure
+                $ "exceptional parallel action returned " ++ value
+            readIORef serialCalls >>= (@?= 0)
+            readIORef cleanupCalls >>= (@?= 1)
+      runScenario
+        (\failure -> assertBool "programmer exception lost its identity"
+          $ "parallel-programmer" `isInfixOf` show failure)
+        (\_ -> ioError $ userError "parallel-programmer")
+      runScenario
+        (\failure -> case fromException failure of
+          Just ThreadKilled -> pure ()
+          other -> assertFailure $ "parallel cancellation changed: "
+            ++ show other ++ " / " ++ show failure)
+        (\_ -> throwIO ThreadKilled)
+  , testCase "preserve action precedence over command-final cleanup" $ do
+      let prepare runtime = ensureVerificationArtifactWith runtime
+            (pure True) (pure 2)
+            (pure $ Just ("artifact", ()))
+            (\_ _ -> pure True)
+          cleanup _ = ioError $ userError "final-cleanup"
+          normal = withVerificationArtifactRuntime cleanup $ \runtime -> do
+            _ <- prepare runtime
+            pure "normal"
+          exceptional = withVerificationArtifactRuntime cleanup $ \runtime -> do
+            _ <- prepare runtime
+            ioError $ userError "action-primary"
+      normalOutcome <- try normal :: IO (Either SomeException String)
+      case normalOutcome of
+        Left failure -> assertBool "normal exit hid cleanup failure"
+          $ "final-cleanup" `isInfixOf` show failure
+        Right value -> assertFailure
+          $ "normal action escaped failed final cleanup: " ++ value
+      exceptionalOutcome <- try exceptional
+        :: IO (Either SomeException String)
+      case exceptionalOutcome of
+        Left failure -> do
+          assertBool "cleanup replaced the action exception"
+            $ "action-primary" `isInfixOf` show failure
+          assertBool "secondary cleanup leaked into the primary exception"
+            $ not $ "final-cleanup" `isInfixOf` show failure
+        Right value -> assertFailure
+          $ "exceptional action returned " ++ value
+  , testCase "classify every isolated infrastructure constructor" $ do
+      let timeoutCause = IsolatedBackendRequestTimeout
+          fallbackTransportCauses =
+            [ timeoutCause
+            , IsolatedBackendServerClosed "closed"
+            , IsolatedBackendBadResponse "malformed"
+            ]
+          fallbackFailures =
+            [ IsolatedBackendSpawnFailure 1 "spawn"
+            , IsolatedBackendSetupFatal 1 "fatal"
+            , IsolatedBackendSetupErrors 1 ["error"]
+            , IsolatedBackendSetupMissingEnvironment 1
+            ]
+            ++ [ IsolatedBackendSetupTransportFailure 1 cause
+               | cause <- fallbackTransportCauses ]
+            ++ [ IsolatedBackendRequestFailure cause
+               | cause <- fallbackTransportCauses ]
+            ++ [ IsolatedBackendPairPoisoned cause
+               | cause <- fallbackTransportCauses ]
+          fatalFailures =
+            [ IsolatedBackendCleanupFailure Nothing ["cleanup"]
+            , IsolatedBackendLeaseClosed
+            , IsolatedBackendLeaseRetired timeoutCause
+            , IsolatedBackendPairClosed
+            , IsolatedBackendSetupTransportFailure 1
+                IsolatedBackendRequestInterrupted
+            , IsolatedBackendRequestFailure
+                IsolatedBackendRequestInterrupted
+            , IsolatedBackendPairPoisoned
+                IsolatedBackendRequestInterrupted
+            ]
+      mapM_ (assertBool "operational failure did not permit serial replay"
+        . parallelVerificationFailureAllowsSerialFallback) fallbackFailures
+      mapM_ (assertBool "lifecycle invariant silently permitted replay"
+        . not . parallelVerificationFailureAllowsSerialFallback) fatalFailures
+  ]
+
 parallelVerificationSchedulerTests :: TestTree
 parallelVerificationSchedulerTests = testGroup
   "ordered success-quota verification workers"
-  [ testCase "start every admitted worker before observing the wave" $ do
+  [ testGroup "candidate-free group summary reconstruction"
+    [ testCase
+        "match the serial batch, attempts, and observations exactly" $ do
+        serialAttempts <- newIORef ([] :: [String])
+        let groups =
+              [ ["first-rejected", "first-accepted", "first-unreached"]
+              , []
+              , ["third-rejected"]
+              , ["fourth-accepted"]
+              , ["quota-unreached"]
+              ]
+            verdict candidate = pure $ case candidate of
+              "first-rejected" -> VariantRejected LeanErrorDiagnostic
+              "third-rejected" -> VariantRejected LeanContainsSorry
+              _ -> VariantAccepted
+            serialVerdict candidate = do
+              modifyIORef' serialAttempts (++ [candidate])
+              verdict candidate
+            verifyGroup = verifyCandidateGroup verdict
+        serialBatch <- verifyCandidateGroups 2 serialVerdict groups
+        (parallelBatch, parallelAttempts) <-
+          verifyCandidateGroupsParallel 2 2 verifyGroup groups
+        historicalAttempts <- readIORef serialAttempts
+        parallelBatch @?= serialBatch
+        parallelAttempts @?= historicalAttempts
+        verifiedCandidates parallelBatch @?=
+          ["first-accepted", "fourth-accepted"]
+        failedCandidateGroups parallelBatch @?= 2
+        verificationObservations parallelBatch @?=
+          verificationObservations serialBatch
+        leantObservationCodeEntries
+          (verificationObservations parallelBatch) @?=
+            [ ("lean-variant-attempted", 4)
+            , ("lean-verification-failure.error-diagnostic", 1)
+            , ("lean-verification-failure.contains-sorry", 1)
+            , ("lean-candidate-verified", 2)
+            ]
+    , testCase "count rejected and empty groups without phantom attempts" $ do
+        let verdict candidate = pure $ if candidate == "accepted"
+              then VariantAccepted
+              else VariantRejected BackendFatalResponse
+            groups =
+              [ []
+              , ["rejected-1", "rejected-2"]
+              , ["accepted"]
+              ]
+        (batch, attempts) <- verifyCandidateGroupsParallel 2 1
+          (verifyCandidateGroup verdict) groups
+        verifiedCandidates batch @?= ["accepted"]
+        failedCandidateGroups batch @?= 2
+        attempts @?= ["rejected-1", "rejected-2", "accepted"]
+        leantObservationCodeEntries (verificationObservations batch) @?=
+          [ ("lean-variant-attempted", 3)
+          , ("lean-verification-failure.backend-fatal-response", 2)
+          , ("lean-candidate-verified", 1)
+          ]
+    , testCase
+        "stop at the first accepted variant without forcing sidecars" $ do
+        let poisonousSidecar :: ()
+            poisonousSidecar = error
+              "parallel verification forced a candidate sidecar"
+            group =
+              ("rejected", poisonousSidecar)
+                : ("accepted", poisonousSidecar)
+                : error "accepted summary forced its variant tail"
+            groups = group
+              : error "accepted summary forced its candidate-group tail"
+            verdict (label, _) = pure $ if label == "accepted"
+              then VariantAccepted
+              else VariantRejected LeanErrorDiagnostic
+        (batch, attempts) <- verifyCandidateGroupsParallel 4 1
+          (verifyCandidateGroup verdict) groups
+        map fst (verifiedCandidates batch) @?= ["accepted"]
+        map fst attempts @?= ["rejected", "accepted"]
+        failedCandidateGroups batch @?= 0
+        observationCount LeanVariantAttempted
+          (verificationObservations batch) @?= 2
+    , testCase "leave zero-quota and success-cutoff tails untouched" $ do
+        let poisonedGroups :: [[String]]
+            poisonedGroups = error
+              "zero quota forced the candidate-group input"
+            poisonedVerifier :: [String] -> IO GroupVerificationSummary
+            poisonedVerifier = error "zero quota forced the group callback"
+        (zeroBatch, zeroAttempts) <- verifyCandidateGroupsParallel 0 0
+          poisonedVerifier poisonedGroups
+        verifiedCandidates zeroBatch @?= ([] :: [String])
+        zeroAttempts @?= []
+        verificationObservations zeroBatch @?= noObservations
+        let acceptedGroup = "accepted"
+              : error "success cutoff forced an accepted variant tail"
+            acceptedGroups = acceptedGroup
+              : error "success cutoff forced the candidate-group tail"
+        (oneBatch, oneAttempts) <- verifyCandidateGroupsParallel 4 1
+          (verifyCandidateGroup $ const $ pure VariantAccepted)
+          acceptedGroups
+        verifiedCandidates oneBatch @?= ["accepted"]
+        oneAttempts @?= ["accepted"]
+    , testCase
+        "reconstruct input order when the later group finishes first" $ do
+        firstStarted <- newEmptyMVar
+        secondFinished <- newEmptyMVar
+        let verdict candidate = case candidate of
+              "first" -> do
+                putMVar firstStarted ()
+                readMVar secondFinished
+                pure VariantAccepted
+              "second" -> do
+                readMVar firstStarted
+                pure VariantAccepted
+                  `finally` putMVar secondFinished ()
+              _ -> pure $ VariantRejected LeanErrorDiagnostic
+            groups = [["first"], ["second"]]
+        (batch, attempts) <- expectParallelPairWithin
+          "candidate-group right-first reconstruction"
+          $ verifyCandidateGroupsParallel 2 2
+              (verifyCandidateGroup verdict) groups
+        verifiedCandidates batch @?= ["first", "second"]
+        attempts @?= ["first", "second"]
+        failedCandidateGroups batch @?= 0
+    , testCase "force the complete candidate-free summary in its worker" $ do
+        let verdict candidate = pure $ case candidate of
+              "poison" -> VariantRejected $ error
+                "unforced candidate-group summary failure"
+              _ -> VariantAccepted
+            action = verifyCandidateGroupsParallel 1 1
+              (verifyCandidateGroup verdict)
+              [["poison"], ["would-be-accepted"]]
+        observed <- try action :: IO
+          (Either SomeException (VerificationBatch String, [String]))
+        case observed of
+          Left failure -> assertBool
+            "strict group-summary publication lost its payload poison"
+            $ "unforced candidate-group summary failure"
+                `isInfixOf` show failure
+          Right result -> assertFailure
+            $ "poisoned group summary was published: " ++ show result
+    , testCase
+        "force failures retained by an accepted summary in a parallel worker" $ do
+        let verdict candidate = pure $ case candidate of
+              "poisoned-rejection" -> VariantRejected $ error
+                "accepted group retained an unforced failure"
+              _ -> VariantAccepted
+            action = verifyCandidateGroupsParallel 2 2
+              (verifyCandidateGroup verdict)
+              [ ["poisoned-rejection", "accepted-after-rejection"]
+              , ["sibling-accepted"]
+              ]
+        observed <- try action :: IO
+          (Either SomeException (VerificationBatch String, [String]))
+        case observed of
+          Left failure -> assertBool
+            "parallel worker did not force an accepted summary's failures"
+            $ "accepted group retained an unforced failure"
+                `isInfixOf` show failure
+          Right result -> assertFailure
+            $ "accepted poisoned summary was published: " ++ show result
+    , testCase
+        "match literal worker-one results for every rejection class" $ do
+        let groups =
+              [ ["request"]
+              , ["fatal"]
+              , ["diagnostic"]
+              , ["sorry"]
+              , ["accepted"]
+              ]
+            verdict candidate = pure $ case candidate of
+              "request" -> VariantRejected BackendRequestFailure
+              "fatal" -> VariantRejected BackendFatalResponse
+              "diagnostic" -> VariantRejected LeanErrorDiagnostic
+              "sorry" -> VariantRejected LeanContainsSorry
+              _ -> VariantAccepted
+        serialAttempts <- newIORef ([] :: [String])
+        serialBatch <- verifyCandidateGroups 1
+          (\candidate -> do
+            modifyIORef' serialAttempts (++ [candidate])
+            verdict candidate)
+          groups
+        (workerOneBatch, workerOneAttempts) <-
+          verifyCandidateGroupsParallel 1 1
+            (verifyCandidateGroup verdict) groups
+        workerOneBatch @?= serialBatch
+        workerOneAttempts @?= ["request", "fatal", "diagnostic", "sorry", "accepted"]
+        readIORef serialAttempts >>= (@?= workerOneAttempts)
+    ]
+  , testCase "start every admitted worker before observing the wave" $ do
       firstStarted <- newEmptyMVar
       secondStarted <- newEmptyMVar
       let task input = case input of
@@ -15441,14 +16221,18 @@ assertLengthAssessmentMainCommandContext = do
         "-- | Whether an error text names this marker universe" sourceLines
       goSection = mainSourceSection
         "synthGo assessmentContext st args retriedVars goal parsed = do"
-        "synthGo' assessmentContext st args retriedVars goal parsed = do"
+        "synthGo' assessmentContext st args retriedVars goal parsed ="
+        sourceLines
+      verificationWrapperSection = mainSourceSection
+        "synthGo' assessmentContext st args retriedVars goal parsed ="
+        ":: SynthVerificationContext"
         sourceLines
       schedulerSection = mainSourceSection
-        "synthGo' assessmentContext st args retriedVars goal parsed = do"
+        "synthGoWithVerification verificationContext assessmentContext"
         "loadSynthProviders ::" sourceLines
       classicalSection = mainSourceSection
-        "synthClassical assessmentContext commandDeadline st goal parsed accumulation ="
-        "verifySynthLane assessmentContext groupLimit st goal notes groups ="
+        "synthClassical verificationContext assessmentContext commandDeadline"
+        "verifySynthLane verificationContext assessmentContext groupLimit"
         sourceLines
   mapM_ (assertMainSourceContains "Length Integration import" importSection)
     [ "LengthAssessmentContext"
@@ -15478,9 +16262,8 @@ assertLengthAssessmentMainCommandContext = do
   length (mainSourcePositions
       "withLengthAssessmentRequestContext"
       $ dropWhile (not . isInfixOf "synthRun ::") sourceLines) @?= 3
-  length (mainSourcePositions
-      ":: LengthAssessmentContext command" sourceLines)
-    @?= 7
+  length (mainSourcePositions "LengthAssessmentContext command" sourceLines)
+    @?= 8
 
   assertMainSourceContains "command entrance" commandSection
     "synthRun assessmentRequest st args goal"
@@ -15541,18 +16324,24 @@ assertLengthAssessmentMainCommandContext = do
     $ not $ "assessmentContext" `isInfixOf` unlines retrySection
   assertMainSourceContains "synthGo context forwarding" goSection
     "synthGo' assessmentContext st args retriedVars goal parsed"
+  mapM_ (assertMainSourceContains "verification command scope"
+      verificationWrapperSection)
+    [ "withSynthVerificationContext $ \\verificationContext ->"
+    , "synthGoWithVerification verificationContext assessmentContext"
+    ]
   mapM_ (assertMainSourceContains "constructive context" schedulerSection)
-    [ "runSynthLaneCursor assessmentContext"
+    [ "runSynthLaneCursor verificationContext assessmentContext"
     , "ordinarySynthLaneCursorPolicy assessmentContext laneEngine limits"
-    , "synthClassical assessmentContext runDeadline st goal parsed"
+    , "synthClassical verificationContext assessmentContext runDeadline st goal parsed"
     ]
   length (mainSourcePositions
-      "runSynthLaneCursor assessmentContext" classicalSection) @?= 2
+      "runSynthLaneCursor verificationContext assessmentContext"
+      classicalSection) @?= 2
   mapM_ (assertMainSourceContains "classical context" classicalSection)
     [ "emDeadline <- classicalSynthLaneDeadline assessmentContext commandDeadline st"
-    , "emRun <- runSynthLaneCursor assessmentContext"
+    , "emRun <- runSynthLaneCursor verificationContext assessmentContext"
     , "nnDeadline <- classicalSynthLaneDeadline assessmentContext commandDeadline st"
-    , "nnRun <- runSynthLaneCursor assessmentContext nnPolicy nnDeadline st goal"
+    , "nnRun <- runSynthLaneCursor verificationContext assessmentContext nnPolicy nnDeadline st goal"
     ]
 
   assertMainSourceContains "ReplState Length configuration" stateSection
@@ -15572,13 +16361,13 @@ assertLengthAssessmentMainLaneSeam = do
   let declarationSection = mainSourceSection
         "data SynthLaneOutcome =" "-- Output (" sourceLines
       verificationSection = mainSourceSection
-        "verifySynthLane assessmentContext groupLimit st goal notes groups ="
+        "verifySynthLane verificationContext assessmentContext groupLimit"
         "synthLaneDispositionWith ::" sourceLines
       dispositionSection = mainSourceSection
         "synthLaneDispositionWith shown outcome ="
         "synthLaneAccumulationDisposition" sourceLines
       callbackSection = mainSourceSection
-        "synthVerify successQuota st goal groups ="
+        "synthVerifySerial successQuota st goal groups = do"
         "completionCandidates ::" sourceLines
       verificationText = unlines verificationSection
       dispositionText = unlines dispositionSection
@@ -15609,8 +16398,10 @@ assertLengthAssessmentMainLaneSeam = do
   filterQuota <- expectMainSourcePosition "lane verifier"
     "LengthBehaviorFilter -> groupLimit" verificationSection
   callback <- expectMainSourcePosition "lane verifier"
-    "(verification, callbackAttempts) <- synthVerify successQuota st goal"
+    "(verification, callbackAttempts) <- synthVerify verificationContext"
       verificationSection
+  assertMainSourceContains "lane verifier" verificationSection
+    "synthVerify verificationContext successQuota st goal"
   assessment <- expectMainSourcePosition "lane verifier"
     "assessLengthVerificationContext assessmentContext verification"
       verificationSection
@@ -15776,7 +16567,7 @@ assertLengthAssessmentMainLaneFinalization = do
   sourceLines <- lines <$> readFile "src/Main.hs"
   let sourceText = unlines sourceLines
       verificationSection = mainSourceSection
-        "verifySynthLane assessmentContext groupLimit st goal notes groups ="
+        "verifySynthLane verificationContext assessmentContext groupLimit"
         "synthLaneDispositionWith ::" sourceLines
       dispositionSection = mainSourceSection
         "synthLaneDispositionWith shown outcome ="
@@ -15909,7 +16700,7 @@ assertLengthAssessmentMainLaneScheduling :: IO ()
 assertLengthAssessmentMainLaneScheduling = do
   sourceLines <- lines <$> readFile "src/Main.hs"
   let schedulerSection = mainSourceSection
-        "synthGo' assessmentContext st args retriedVars goal parsed = do"
+        "synthGoWithVerification verificationContext assessmentContext"
         "loadSynthProviders ::" sourceLines
       constructiveSection = mainSourceSection
         "limit <- synthTimeoutSeconds st"
@@ -15931,14 +16722,15 @@ assertLengthAssessmentMainLaneScheduling = do
     [ "let deadline"
     , "runSynthesis includeLibrary checked laneEngine providers accumulation ="
     , "base = synthesizeWithProvidersSkippingDetailedWith limits laneEngine (rsSynthSteps state) checked providers fragment"
-    , "in runSynthLaneCursor assessmentContext"
+    , "in runSynthLaneCursor verificationContext assessmentContext"
     , "ordinarySynthLaneCursorPolicy assessmentContext laneEngine limits"
     , "deadline st goal id outcome accumulation"
     ]
   assertBool
       "constructive scheduling lost its serial or two parallel cursors"
     $ length (mainSourcePositions
-        "runSynthLaneCursor assessmentContext" constructiveSection) == 3
+        "runSynthLaneCursor verificationContext assessmentContext"
+        constructiveSection) == 3
 
   mapM_ (assertMainSourceContains "baseline run routing" baselineSection)
     [ "baseline <- case initialBaselineSchedule of"
@@ -16007,7 +16799,7 @@ assertLengthAssessmentMainParallelBaseline = do
   sourceLines <- lines <$> readFile "src/Main.hs"
   engineLines <- lines <$> readFile "src/Leant/Synth/Engine.hs"
   let schedulerSection = mainSourceSection
-        "synthGo' assessmentContext st args retriedVars goal parsed = do"
+        "synthGoWithVerification verificationContext assessmentContext"
         "loadSynthProviders ::" sourceLines
       constructiveSection = mainSourceSection
         "limit <- synthTimeoutSeconds st"
@@ -16043,8 +16835,8 @@ assertLengthAssessmentMainParallelBaseline = do
         "runProviderLanes runDeadline fallback runLane checked accumulation lanes ="
         "finalize accumulation = do" schedulerSection
       classicalSection = mainSourceSection
-        "synthClassical assessmentContext commandDeadline st goal parsed accumulation ="
-        "verifySynthLane assessmentContext groupLimit st goal notes groups ="
+        "synthClassical verificationContext assessmentContext commandDeadline"
+        "verifySynthLane verificationContext assessmentContext groupLimit"
         sourceLines
       engineBothSection = mainSourceSection
         "EngineBoth -> do"
@@ -16056,13 +16848,17 @@ assertLengthAssessmentMainParallelBaseline = do
         ]
 
   length (mainSourcePositions
-      "runSynthLaneCursor assessmentContext" constructiveSection) @?= 3
+      "runSynthLaneCursor verificationContext assessmentContext"
+      constructiveSection) @?= 3
   length (mainSourcePositions
-      "runSynthLaneCursor assessmentContext" serialSection) @?= 1
+      "runSynthLaneCursor verificationContext assessmentContext"
+      serialSection) @?= 1
   length (mainSourcePositions
-      "runSynthLaneCursor assessmentContext" structuralParallelSection) @?= 1
+      "runSynthLaneCursor verificationContext assessmentContext"
+      structuralParallelSection) @?= 1
   length (mainSourcePositions
-      "runSynthLaneCursor assessmentContext" libraryParallelSection) @?= 1
+      "runSynthLaneCursor verificationContext assessmentContext"
+      libraryParallelSection) @?= 1
 
   mapM_ (assertMainSourceContains "parallel baseline eligibility"
       parallelSection)
@@ -16144,7 +16940,7 @@ assertLengthAssessmentMainParallelBaseline = do
     , "prepared <- forceDetailedSynthPairBefore (synthLimitTried limits) (synthLimitTried limits) deadline"
     , "(runBranch EngineDjinn) (runBranch EngineExference)"
     , "let outcome = fmap (uncurry $ mergeDetailedOutcomesSkipping Set.empty) branches"
-    , "in runSynthLaneCursor assessmentContext baselinePolicy deadline st goal id outcome accumulation"
+    , "in runSynthLaneCursor verificationContext assessmentContext baselinePolicy deadline st goal id outcome accumulation"
     ]
   synthLimitTried defaultSynthLimits @?= 12
   synthLimitTried defaultSynthLimits @?= synthMaxTried
@@ -16161,7 +16957,7 @@ assertLengthAssessmentMainParallelBaseline = do
   defaultMerge <- expectMainSourcePosition "parallel structural branches"
     "mergeDetailedOutcomesSkipping Set.empty" structuralParallelSection
   mergedCursor <- expectMainSourcePosition "parallel structural branches"
-    "in runSynthLaneCursor assessmentContext baselinePolicy deadline"
+    "in runSynthLaneCursor verificationContext assessmentContext"
       structuralParallelSection
   assertBool "parallel branches or their default merge changed order"
     $ branchDefinition < djinnBranch
@@ -16177,7 +16973,7 @@ assertLengthAssessmentMainParallelBaseline = do
     , "(stripRecCtors fragment) fragment"
     , "prepared <- forceDetailedSynthPairBefore 0 (synthVerificationWindowWith limits engine) deadline base library"
     , "let outcome = branches >>= \\(baseOutcome, libraryOutcome) -> mergeLibraryDetailedOutcomes (Right baseOutcome) (Right libraryOutcome)"
-    , "in runSynthLaneCursor assessmentContext baselinePolicy deadline st goal id outcome accumulation"
+    , "in runSynthLaneCursor verificationContext assessmentContext baselinePolicy deadline st goal id outcome accumulation"
     ]
   mapM_ (\forbidden -> assertBool
       ("outer library pair nested through " ++ forbidden)
@@ -16198,7 +16994,7 @@ assertLengthAssessmentMainParallelBaseline = do
   libraryMerge <- expectMainSourcePosition "parallel library branches"
     "mergeLibraryDetailedOutcomes" libraryParallelSection
   libraryCursor <- expectMainSourcePosition "parallel library branches"
-    "in runSynthLaneCursor assessmentContext baselinePolicy deadline"
+    "in runSynthLaneCursor verificationContext assessmentContext"
       libraryParallelSection
   assertBool "parallel library pair changed base-first merge/cursor order"
     $ libraryBase < librarySearch
@@ -16385,13 +17181,13 @@ assertLengthAssessmentMainCursorDriver = do
         "forceDetailedSynthPairBefore"
         sourceLines
       driverSection = mainSourceSection
-        "runSynthLaneCursor assessmentContext policy deadline st goal transform outcome"
+        "runSynthLaneCursor verificationContext assessmentContext policy deadline"
         "debugSynthLaneGroups ::" sourceLines
       debugSection = mainSourceSection
         "debugSynthLaneGroups ::"
         "-- | The Glivenko fallback" sourceLines
       verificationSection = mainSourceSection
-        "verifySynthLane assessmentContext groupLimit st goal notes groups ="
+        "verifySynthLane verificationContext assessmentContext groupLimit"
         "synthLaneDispositionWith ::" sourceLines
       driverText = unlines driverSection
   mapM_ (assertMainSourceContains "ordinary cursor policy" policySection)
@@ -16438,7 +17234,7 @@ assertLengthAssessmentMainCursorDriver = do
     , "notes = detailedCandidateBatchNotes batch"
     , "nextCount = groupCount + length groups"
     , "debugSynthLaneGroups st groupCount groups"
-    , "lane <- verifySynthLane assessmentContext (synthLaneCursorBatchSize policy) st goal [] groups"
+    , "lane <- verifySynthLane verificationContext assessmentContext (synthLaneCursorBatchSize policy) st goal [] groups"
     , "let reverseOutcomes' = lane : reverseOutcomes"
     , "SynthLaneSurvivors _ _ -> finish reverseOutcomes' nextCount notes SynthLaneRunStoppedByDisposition"
     , "SynthLaneAssessmentPreserved _ _ -> finish reverseOutcomes' nextCount notes SynthLaneRunStoppedByDisposition"
@@ -16471,9 +17267,11 @@ assertLengthAssessmentMainCursorDriver = do
   length (mainSourcePositions
       "runSynthLaneCursor" sourceLines) @?= 7
   length (mainSourcePositions
-      "verifySynthLane assessmentContext" driverSection) @?= 1
+      "verifySynthLane verificationContext assessmentContext"
+      driverSection) @?= 1
   length (mainSourcePositions
-      "verifySynthLane assessmentContext" sourceLines) @?= 2
+      "verifySynthLane verificationContext assessmentContext"
+      sourceLines) @?= 2
   length (mainSourcePositions
       "assessLengthVerificationContext assessmentContext verification"
       verificationSection) @?= 1
@@ -16532,7 +17330,7 @@ assertLengthAssessmentMainClassicalScheduling = do
   sourceLines <- lines <$> readFile "src/Main.hs"
   let deadlineSection = mainSourceSection
         "classicalSynthLaneDeadline assessmentContext commandDeadline st ="
-        "runSynthLaneCursor assessmentContext policy deadline st goal transform outcome"
+        "runSynthLaneCursor verificationContext assessmentContext policy deadline"
         sourceLines
       filterDeadlineSection = mainSourceSection
         "LengthBehaviorFilter -> pure commandDeadline"
@@ -16541,8 +17339,8 @@ assertLengthAssessmentMainClassicalScheduling = do
         "LengthBehaviorRank -> do"
         "-- | Consume one lazy detailed outcome" deadlineSection
       classicalSection = mainSourceSection
-        "synthClassical assessmentContext commandDeadline st goal parsed accumulation ="
-        "verifySynthLane assessmentContext groupLimit st goal notes groups ="
+        "synthClassical verificationContext assessmentContext commandDeadline"
+        "verifySynthLane verificationContext assessmentContext groupLimit"
         sourceLines
       classicalText = unlines classicalSection
   mapM_ (assertMainSourceContains "classical deadline ownership"
@@ -16585,7 +17383,7 @@ assertLengthAssessmentMainClassicalScheduling = do
       classicalSection)
     [ "emDeadline <- classicalSynthLaneDeadline assessmentContext commandDeadline st"
     , "if null atoms || length atoms > 5 then runDoubleNegation engine steps prefix body accumulation"
-    , "emRun <- runSynthLaneCursor assessmentContext"
+    , "emRun <- runSynthLaneCursor verificationContext assessmentContext"
     , "admissibleCursorBatch limits (synthLimitTried limits `div` 2)"
     , "synthLaneCursorAllowsFilterSuccessor = False"
     , "synthLaneCursorRetainsRunNotes = False"
@@ -16598,7 +17396,7 @@ assertLengthAssessmentMainClassicalScheduling = do
     , "ordinaryPolicy = ordinarySynthLaneCursorPolicy assessmentContext engine limits"
     , "nnPolicy = ordinaryPolicy { synthLaneCursorRetainsRunNotes = False }"
     , "nnDeadline <- classicalSynthLaneDeadline assessmentContext commandDeadline st"
-    , "nnRun <- runSynthLaneCursor assessmentContext nnPolicy nnDeadline st goal"
+    , "nnRun <- runSynthLaneCursor verificationContext assessmentContext nnPolicy nnDeadline st goal"
     , "mapDetailedCandidateGroupVariantsDroppingSemanticSidecar wrap"
     , "synthesizeTunedDetailedWith limits engine steps (djinnCandidateCutoff, Nothing)"
     , "pure (synthLaneRunAccumulation nnRun)"
@@ -16606,7 +17404,8 @@ assertLengthAssessmentMainClassicalScheduling = do
   length (mainSourcePositions
       "classicalSynthLaneDeadline" classicalSection) @?= 2
   length (mainSourcePositions
-      "runSynthLaneCursor assessmentContext" classicalSection) @?= 2
+      "runSynthLaneCursor verificationContext assessmentContext"
+      classicalSection) @?= 2
   length (mainSourcePositions
       "synthLaneCursorRetainsRunNotes = False" classicalSection) @?= 2
   emDeadline <- expectMainSourcePosition "classical EM ordering"
@@ -16649,7 +17448,7 @@ assertLengthAssessmentMainDiagnosticGates :: IO ()
 assertLengthAssessmentMainDiagnosticGates = do
   sourceLines <- lines <$> readFile "src/Main.hs"
   let schedulerSection = mainSourceSection
-        "synthGo' assessmentContext st args retriedVars goal parsed = do"
+        "synthGoWithVerification verificationContext assessmentContext"
         "loadSynthProviders ::" sourceLines
       reportSection = mainSourceSection
         "report _ laneRun@SynthLaneRun"
@@ -16780,7 +17579,7 @@ assertLengthAssessmentMainDiagnosticGates = do
       "reportSynthLaneNotes" noTermSection) @?= 1
 
   classicalRetry <- expectMainSourcePosition "sound-refutation diagnostic"
-    "then synthClassical assessmentContext runDeadline"
+    "then synthClassical verificationContext assessmentContext"
       soundSection
   soundFinalize <- expectMainSourcePosition "sound-refutation diagnostic"
     "classical <- finalizeSynthLaneAccumulation" soundSection

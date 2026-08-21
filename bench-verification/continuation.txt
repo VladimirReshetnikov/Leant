@@ -1,0 +1,2 @@
+:synth (((A → R) → R) → (A → (B → R) → R) → (B → R) → R)
+:quit

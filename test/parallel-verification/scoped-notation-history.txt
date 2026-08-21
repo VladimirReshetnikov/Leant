@@ -1,0 +1,6 @@
+namespace ScopedParity
+scoped notation "Tokenish" => Nat
+end ScopedParity
+open scoped ScopedParity
+:synth (Tokenish → Tokenish → Tokenish)
+:quit

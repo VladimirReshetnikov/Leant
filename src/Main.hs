@@ -10,7 +10,17 @@
 module Main (main) where
 
 import Control.Concurrent (getNumCapabilities)
-import Control.Exception (SomeException, evaluate, finally, try)
+import Control.Exception
+  ( Exception
+  , bracketOnError
+  , IOException
+  , SomeException
+  , evaluate
+  , finally
+  , mask
+  , throwIO
+  , try
+  )
 import Control.Monad (forM_, unless, void, when)
 import Control.Monad.IO.Class (liftIO)
 import Data.Char
@@ -68,6 +78,12 @@ import Language.Haskell.Djex
   )
 
 import Leant.Backend
+import Leant.Backend.Isolated
+  ( IsolatedBackendFailure
+  , runIsolatedBackendCommand
+  , withIsolatedBackendLease
+  , withIsolatedBackendPair
+  )
 import Leant.Builtins (builtinInfo)
 import Leant.Classify
 import Leant.Format (formatInfo, indentDefBody)
@@ -228,7 +244,19 @@ import Leant.Synth.Verification
   , VerificationBatch
   , verificationObservations
   , verifiedCandidateReceipts
+  , verifyCandidateGroup
   , verifyCandidateGroups
+  )
+import Leant.Synth.Verification.Parallel
+  ( verifyCandidateGroupsParallel
+  )
+import Leant.Synth.Verification.Runtime
+  ( ParallelFailureDisposition (..)
+  , VerificationArtifactRuntime
+  , ensureVerificationArtifactWith
+  , parallelVerificationFailureAllowsSerialFallback
+  , runVerificationBatchWith
+  , withVerificationArtifactRuntime
   )
 
 #ifdef mingw32_HOST_OS
@@ -670,26 +698,39 @@ ensureBackendProcess st = do
     Just backend -> pure (Right (backend, False))
     Nothing -> do
       emitLn st =<< cDim st "starting Lean backend..."
-      result <- try (spawnBackend (rsConfig state))
-      case (result :: Either SomeException Backend) of
-        Left err -> pure (Left (show err))
-        Right backend -> do
-          modifyIORef' st (\s -> s { rsBackend = Just backend })
-          pure (Right (backend, True))
+      -- Process-launch failures are ordinary diagnostics.  Caller
+      -- cancellation is not: swallowing an async exception here could let a
+      -- cancelled synthesis continue into snapshot or worker setup.  Keep
+      -- the caller-side spawn/publication handoff masked: 'spawnBackend'
+      -- restores interruptibility only inside its own cleanup-protected
+      -- startup, so a successfully returned process cannot be interrupted
+      -- before it becomes owned by 'rsBackend'.
+      mask $ \_ -> do
+        result <- try (spawnBackend (rsConfig state))
+        case (result :: Either IOException Backend) of
+          Left err -> pure (Left (show err))
+          Right backend -> do
+            modifyIORef' st (\s -> s { rsBackend = Just backend })
+            pure (Right (backend, True))
 
 abandonReplacementBackend :: St -> Bool -> IO ()
 abandonReplacementBackend st spawned = when spawned (backendDied st)
 
 backendDied :: St -> IO ()
-backendDied st = do
+backendDied st = mask $ \restore -> do
   state <- readIORef st
-  forM_ (rsBackend state) killBackend
+  killed <- try $ restore $ forM_ (rsBackend state) killBackend
   -- Proof states and the last-sorry handle are backend-local too. Preserve
   -- the human-readable script, but never submit either token after respawn.
-  proveEmergencyExit st "the Lean backend stopped; leaving prove mode"
-  modifyIORef' st $ \current ->
-    invalidateProviderWorld (invalidateDerivedEnvironments current
-      { rsBackend = Nothing, rsLastSorry = Nothing })
+  invalidated <- try
+    $ proveEmergencyExit st "the Lean backend stopped; leaving prove mode"
+    `finally` modifyIORef' st (\current ->
+      invalidateProviderWorld (invalidateDerivedEnvironments current
+        { rsBackend = Nothing, rsLastSorry = Nothing }))
+  case (killed, invalidated) of
+    (Left primary, _) -> throwIO (primary :: SomeException)
+    (Right (), Left failure) -> throwIO (failure :: SomeException)
+    (Right (), Right ()) -> pure ()
 
 -- Run a command in an exact backend-local environment. Nothing env = fresh
 -- (imports allowed). Callers targeting the interactive session must use
@@ -752,7 +793,17 @@ runPayloadAfterBackend st makePayload = do
     Left err -> pure (Left err)
     Right backend -> do
       state <- readIORef st
-      result <- request backend (rsTimeout state) (makePayload state)
+      -- Once a request reaches the line-oriented protocol, an exception can
+      -- leave an unread response behind just as surely as a timeout or a bad
+      -- frame.  Retire the process before rethrowing the original exception;
+      -- a later command will rebuild the session on a fresh stream.
+      requestOutcome <- try
+        $ request backend (rsTimeout state) (makePayload state)
+      result <- case requestOutcome of
+        Left (primary :: SomeException) -> do
+          _ <- try (backendDied st) :: IO (Either SomeException ())
+          throwIO primary
+        Right completed -> pure completed
       case result of
         Right v -> pure (Right v)
         Left RequestTimeout -> do
@@ -766,7 +817,12 @@ runPayloadAfterBackend st makePayload = do
             ++ (if null (trim stderrText) then "" else ":\n" ++ stderrText)
             ++ "\nhint: check that the project is built (lake build) and that "
             ++ "enough memory is available; the session replays on the next command"))
-        Left (BadResponse err) -> pure (Left ("bad response: " ++ err))
+        Left (BadResponse err) -> do
+          -- A malformed frame leaves the stream boundary untrustworthy just
+          -- like EOF or timeout.  Retire it before either serial fallback or
+          -- a later interactive command can reuse the poisoned protocol.
+          backendDied st
+          pure (Left ("bad response: " ++ err))
 
 -- Response accessors --------------------------------------------------------
 
@@ -2584,6 +2640,75 @@ unknownCheckProgram vars = unlines
   , "  logInfo (\"(unknown \" ++ String.intercalate \" \" unknown ++ \")\")"
   ]
 
+-- A synthesis command owns at most one immutable snapshot artifact.  The
+-- artifact is prepared lazily at the first batch which can actually overlap
+-- two candidate groups, then reused by any later batch.  Worker pairs remain
+-- batch-scoped: a poisoned pair is closed before its speculative checks are
+-- discarded and the same batch is replayed through the established serial
+-- verifier.
+type SynthVerificationContext = VerificationArtifactRuntime FilePath
+
+newtype ParallelVerificationInfrastructureException =
+  ParallelVerificationInfrastructureException IsolatedBackendFailure
+
+instance Show ParallelVerificationInfrastructureException where
+  show (ParallelVerificationInfrastructureException failure) =
+    "parallel verification infrastructure failed: " ++ show failure
+
+instance Exception ParallelVerificationInfrastructureException
+
+withSynthVerificationContext
+  :: (SynthVerificationContext -> IO value)
+  -> IO value
+withSynthVerificationContext =
+  withVerificationArtifactRuntime removeFileIfExists
+
+ensureSynthVerificationArtifact
+  :: SynthVerificationContext
+  -> St
+  -> IO (Maybe FilePath)
+ensureSynthVerificationArtifact context st =
+  ensureVerificationArtifactWith context sessionEligible
+    getNumCapabilities acquire prepare
+ where
+  -- Upstream environment snapshots do not preserve arbitrary
+  -- session-created scoped extensions.  Until workers can replay the
+  -- complete command state, admit only the initial imported session: no
+  -- opaque snapshot base, proof token, last-sorry token, or accepted
+  -- interactive history.  The private runtime observes this gate before
+  -- capabilities or any environment/filesystem work, and only while its
+  -- state remains unprobed.
+  sessionEligible = do
+    session <- readIORef st
+    pure $ isNothing (rsSnapshotBase session)
+      && isNothing (rsProve session)
+      && isNothing (rsLastSorry session)
+      && null (rsHistory session)
+
+  acquire = do
+    environmentOr <- currentEnvironmentId st
+    case environmentOr of
+      Left _ -> pure Nothing
+      Right environment -> do
+        -- Backend processes may run in the configured project directory
+        -- rather than Leant's cwd, so never hand them a TMPDIR-relative path.
+        temporaryOr <- tryIOError
+          $ getTemporaryDirectory >>= makeAbsolute
+        case temporaryOr of
+          Left _ -> pure Nothing
+          Right temporary -> do
+            reservedOr <- freshSiblingPath
+              (temporary </> "leant-parallel-verification.olean")
+            pure $ case reservedOr of
+              Left _ -> Nothing
+              Right artifact -> Just (artifact, environment)
+
+  prepare artifact environment = do
+    pickled <- pickleEnvironment st artifact environment
+    pure $ case pickled of
+      Left _ -> False
+      Right () -> True
+
 synthGo
   :: LengthAssessmentContext command
   -> St
@@ -2606,7 +2731,22 @@ synthGo'
   -> String
   -> ParsedGoal
   -> IO ()
-synthGo' assessmentContext st args retriedVars goal parsed = do
+synthGo' assessmentContext st args retriedVars goal parsed =
+  withSynthVerificationContext $ \verificationContext ->
+    synthGoWithVerification verificationContext assessmentContext
+      st args retriedVars goal parsed
+
+synthGoWithVerification
+  :: SynthVerificationContext
+  -> LengthAssessmentContext command
+  -> St
+  -> [String]
+  -> Maybe [String]
+  -> String
+  -> ParsedGoal
+  -> IO ()
+synthGoWithVerification verificationContext assessmentContext
+    st args retriedVars goal parsed = do
   state <- readIORef st
   let fragment = pgFrag parsed
       engine = rsSynthEngine state
@@ -2662,7 +2802,7 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
                       ]
                       (stripRecCtors fragment) fragment)
               | otherwise = base
-        in runSynthLaneCursor assessmentContext
+        in runSynthLaneCursor verificationContext assessmentContext
           (ordinarySynthLaneCursorPolicy assessmentContext laneEngine limits)
           deadline st goal id outcome accumulation
       -- Scoped parallel work remains limited to an initial provider-free
@@ -2713,7 +2853,8 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
             let outcome = fmap
                   (uncurry $ mergeDetailedOutcomesSkipping Set.empty)
                   branches
-            in runSynthLaneCursor assessmentContext baselinePolicy deadline
+            in runSynthLaneCursor verificationContext assessmentContext
+              baselinePolicy deadline
               st goal id outcome accumulation
       runParallelLibraryBaseline accumulation = do
         let base = synthesizeWithProvidersSkippingDetailedWith limits
@@ -2739,7 +2880,8 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
             let outcome = branches >>= \(baseOutcome, libraryOutcome) ->
                   mergeLibraryDetailedOutcomes
                     (Right baseOutcome) (Right libraryOutcome)
-            in runSynthLaneCursor assessmentContext baselinePolicy deadline
+            in runSynthLaneCursor verificationContext assessmentContext
+              baselinePolicy deadline
               st goal id outcome accumulation
   if structuralFirst
     then do
@@ -2880,8 +3022,9 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
           wantClassical <- rsSynthClassical <$> readIORef st
           classicalAccumulation <-
             if wantClassical
-              then synthClassical assessmentContext runDeadline
-                st goal parsed (synthLaneRunAccumulation laneRun)
+              then synthClassical verificationContext assessmentContext
+                runDeadline st goal parsed
+                (synthLaneRunAccumulation laneRun)
               else pure (synthLaneRunAccumulation laneRun)
           classical <- finalizeSynthLaneAccumulation
             st args goal classicalAccumulation
@@ -3258,7 +3401,8 @@ classicalSynthLaneDeadline assessmentContext commandDeadline st =
 -- batch produced no verified term or rejected every verified term.  The
 -- second candidate batch ends by policy without a third tail probe.
 runSynthLaneCursor
-  :: LengthAssessmentContext command
+  :: SynthVerificationContext
+  -> LengthAssessmentContext command
   -> SynthLaneCursorPolicy
   -> Maybe UTCTime
   -> St
@@ -3267,8 +3411,8 @@ runSynthLaneCursor
   -> Either String DetailedSynthOutcome
   -> SynthLaneAccumulation
   -> IO SynthLaneRun
-runSynthLaneCursor assessmentContext policy deadline st goal transform outcome
-    initialAccumulation =
+runSynthLaneCursor verificationContext assessmentContext policy deadline
+    st goal transform outcome initialAccumulation =
   observe (1 :: Int) 0 [] [] (startDetailedSynthCursor outcome)
  where
   observe batchOrdinal groupCount reverseOutcomes runNotes cursor = do
@@ -3287,7 +3431,7 @@ runSynthLaneCursor assessmentContext policy deadline st goal transform outcome
               nextCount = groupCount + length groups
           when (synthLaneCursorRetainsRunNotes policy) $
             debugSynthLaneGroups st groupCount groups
-          lane <- verifySynthLane assessmentContext
+          lane <- verifySynthLane verificationContext assessmentContext
             (synthLaneCursorBatchSize policy) st goal [] groups
           let reverseOutcomes' = lane : reverseOutcomes
           case synthLaneDispositionWith (synthLaneCursorShown policy) lane of
@@ -3377,14 +3521,16 @@ debugSynthLaneGroups st priorGroupCount groups = do
 -- Returns the updated command accumulation without finalization.  The sound-
 -- refutation caller remains the sole output and state-effect boundary.
 synthClassical
-  :: LengthAssessmentContext command
+  :: SynthVerificationContext
+  -> LengthAssessmentContext command
   -> Maybe UTCTime
   -> St
   -> String
   -> ParsedGoal
   -> SynthLaneAccumulation
   -> IO SynthLaneAccumulation
-synthClassical assessmentContext commandDeadline st goal parsed accumulation =
+synthClassical verificationContext assessmentContext commandDeadline
+    st goal parsed accumulation =
   case glivenkoSplit (pgFrag parsed) of
   Nothing -> pure accumulation
   Just (prefix, body) -> do
@@ -3415,7 +3561,7 @@ synthClassical assessmentContext commandDeadline st goal parsed accumulation =
         -- never consumes a successor, including in filter mode.
         emDeadline <- classicalSynthLaneDeadline
           assessmentContext commandDeadline st
-        emRun <- runSynthLaneCursor assessmentContext
+        emRun <- runSynthLaneCursor verificationContext assessmentContext
           SynthLaneCursorPolicy
             { synthLaneCursorBatchSize =
                 admissibleCursorBatch limits (synthLimitTried limits `div` 2)
@@ -3463,7 +3609,8 @@ synthClassical assessmentContext commandDeadline st goal parsed accumulation =
             { synthLaneCursorRetainsRunNotes = False }
       nnDeadline <- classicalSynthLaneDeadline
         assessmentContext commandDeadline st
-      nnRun <- runSynthLaneCursor assessmentContext nnPolicy nnDeadline st goal
+      nnRun <- runSynthLaneCursor verificationContext assessmentContext
+        nnPolicy nnDeadline st goal
         (mapDetailedCandidateGroupVariantsDroppingSemanticSidecar wrap)
         (synthesizeTunedDetailedWith limits engine steps
           (djinnCandidateCutoff, Nothing) [] nnFrag nnFrag)
@@ -3495,14 +3642,16 @@ synthClassical assessmentContext commandDeadline st goal parsed accumulation =
 -- historical five-success quota; filtering may inspect the complete bounded
 -- lane so a later survivor can replace an earlier behavioral rejection.
 verifySynthLane
-  :: LengthAssessmentContext command
+  :: SynthVerificationContext
+  -> LengthAssessmentContext command
   -> Int
   -> St
   -> String
   -> [String]
   -> [DetailedCandidateGroup]
   -> IO SynthLaneOutcome
-verifySynthLane assessmentContext groupLimit st goal notes groups =
+verifySynthLane verificationContext assessmentContext groupLimit
+    st goal notes groups =
   case take groupLimit groups of
     [] -> pure SynthLaneOutcome
       { synthLaneCheckedFrontierSpellings = []
@@ -3517,7 +3666,8 @@ verifySynthLane assessmentContext groupLimit st goal notes groups =
             lengthAssessmentContextBehaviorMode assessmentContext of
               LengthBehaviorRank -> shown
               LengthBehaviorFilter -> groupLimit
-      (verification, callbackAttempts) <- synthVerify successQuota st goal
+      (verification, callbackAttempts) <- synthVerify verificationContext
+        successQuota st goal
         (map detailedCandidateGroupVerificationVariants boundedGroups)
       let observations =
             candidateRenderingRouteObservations
@@ -3774,6 +3924,70 @@ synthBind st goal term = do
 -- elaborates represents the group.  Failure classification is deliberately
 -- ordered: transport, fatal response, error diagnostic, then a `sorry`.
 synthVerify
+  :: SynthVerificationContext
+  -> Int
+  -> St
+  -> String
+  -> [[DetailedVerificationVariant]]
+  -> IO
+      ( VerificationBatch DetailedVerificationVariant
+      , [DetailedVerificationVariant]
+      )
+synthVerify verificationContext successQuota st goal groups =
+  runVerificationBatchWith verificationContext
+    (successQuota >= 2 && hasTwoGroups groups)
+    (ensureSynthVerificationArtifact verificationContext st)
+    serialVerification
+    parallelVerification
+    classifyInfrastructureFailure
+ where
+  hasTwoGroups candidateGroups = case candidateGroups of
+    _ : _ : _ -> True
+    _ -> False
+
+  serialVerification = synthVerifySerial successQuota st goal groups
+
+  -- Convert only our typed worker failure inside the pair callback.  That
+  -- lets the pair close normally and preserve any cleanup failure in its
+  -- returned value.  Async and programmer exceptions remain exceptions and
+  -- retain the bracket's primary precedence.
+  parallelVerification path = do
+    state <- readIORef st
+    attempted <- withIsolatedBackendPair
+      (rsConfig state) path (rsTimeout state) $ \pair ->
+        try $ verifyCandidateGroupsParallel 2 successQuota
+          (verifyIsolatedGroup pair) groups
+    pure $ case attempted of
+      Left failure -> Left failure
+      Right (Left
+          (ParallelVerificationInfrastructureException failure)) ->
+        Left failure
+      Right (Right verified) -> Right verified
+
+  classifyInfrastructureFailure failure
+    | parallelVerificationFailureAllowsSerialFallback failure =
+        FallbackSerial
+    | otherwise = AbortParallel
+        $ ParallelVerificationInfrastructureException failure
+
+  verifyIsolatedGroup pair group = do
+    leased <- withIsolatedBackendLease pair $ \lease ->
+      verifyCandidateGroup (verifyIsolatedVariant lease) group
+    case leased of
+      Left failure -> throwIO
+        $ ParallelVerificationInfrastructureException failure
+      Right result -> pure result
+
+  verifyIsolatedVariant lease variant = do
+    let term = detailedVerificationVariantText variant
+    result <- runIsolatedBackendCommand lease
+      (candidateVerificationProgram goal term)
+    case result of
+      Left failure -> throwIO
+        $ ParallelVerificationInfrastructureException failure
+      Right response -> pure $ classifyVerificationResponse response
+
+synthVerifySerial
   :: Int
   -> St
   -> String
@@ -3782,7 +3996,7 @@ synthVerify
       ( VerificationBatch DetailedVerificationVariant
       , [DetailedVerificationVariant]
       )
-synthVerify successQuota st goal groups = do
+synthVerifySerial successQuota st goal groups = do
   reverseAttempts <- newIORef []
   verification <- verifyCandidateGroups successQuota
     (verifyVariant reverseAttempts) groups
@@ -3798,13 +4012,15 @@ synthVerify successQuota st goal groups = do
     result <- runCurrentCmd st (candidateVerificationProgram goal term)
     pure $ case result of
       Left _ -> VariantRejected BackendRequestFailure
-      Right response
-        | isJust (respFatal response) ->
-            VariantRejected BackendFatalResponse
-        | hasErrors response -> VariantRejected LeanErrorDiagnostic
-        | not (null (respSorries response)) ->
-            VariantRejected LeanContainsSorry
-        | otherwise -> VariantAccepted
+      Right response -> classifyVerificationResponse response
+
+classifyVerificationResponse :: JValue -> VariantVerdict
+classifyVerificationResponse response
+  | isJust (respFatal response) = VariantRejected BackendFatalResponse
+  | hasErrors response = VariantRejected LeanErrorDiagnostic
+  | not (null (respSorries response)) =
+      VariantRejected LeanContainsSorry
+  | otherwise = VariantAccepted
 
 completionCandidates :: St -> String -> IO [String]
 completionCandidates st prefix = do
@@ -3928,12 +4144,21 @@ ioResult action = do
 -- Reserve a collision-resistant sibling name, but leave it absent for the
 -- backend, whose pickle operation creates the artifact itself.
 freshSiblingPath :: FilePath -> IO (Either String FilePath)
-freshSiblingPath target = ioResult $ do
-  (path, handle) <- openBinaryTempFile (takeDirectory target)
-    (takeFileName target ++ ".tmp")
-  hClose handle
-  removeFile path
-  pure path
+freshSiblingPath target = ioResult $ bracketOnError
+  (openBinaryTempFile (takeDirectory target)
+    (takeFileName target ++ ".tmp"))
+  cleanup
+  $ \(path, handle) -> do
+      hClose handle
+      removeFile path
+      pure path
+ where
+  -- The bracket preserves an acquisition/use exception.  These actions are
+  -- idempotent best effort because either normal use may already have closed
+  -- the handle or a concurrent actor may have removed the reserved name.
+  cleanup (path, handle) = do
+    catchIOError (hClose handle) (const $ pure ())
+    catchIOError (removeFile path) (const $ pure ())
 
 copyManagedArtifact :: FilePath -> IO (Either String FilePath)
 copyManagedArtifact source = do

@@ -13,6 +13,7 @@ module Leant.Backend.Isolated
   ) where
 
 import Control.Concurrent (forkIOWithUnmask)
+import Control.Concurrent.Async (cancel, wait, withAsync)
 import Control.Concurrent.MVar
   ( MVar
   , newEmptyMVar
@@ -40,6 +41,13 @@ import Control.Exception
   , uninterruptibleMask_
   )
 import Data.Char (isSpace)
+import Data.IORef
+  ( IORef
+  , atomicModifyIORef'
+  , newIORef
+  , readIORef
+  )
+import Data.List (sortOn)
 
 import Leant.Backend
   ( Backend
@@ -239,59 +247,69 @@ acquireIsolatedBackendPair
      )
   -> IO (Either IsolatedBackendFailure IsolatedBackendPair)
 acquireIsolatedBackendPair config artifact requestTimeout restoreSetup = do
-    firstSpawn <- tryIOException $ spawnBackend config
-    case firstSpawn of
-      Left failure -> pure $ Left $ IsolatedBackendSpawnFailure 1
-        $ show failure
-      Right firstBackend -> do
-        firstSetup <- restoreSetup
-          (setupWorker 1 firstBackend artifact requestTimeout)
-          `onException` cleanupBackendsIgnoringFailures
-            [(1, firstBackend)]
-        case firstSetup of
-          Left failure -> initializationFailure failure
-            [(1, firstBackend)]
-          Right firstWorker -> do
-            secondSpawn <- tryIOException
-              (spawnBackend config)
-              `onException` cleanupBackendsIgnoringFailures
-                [(1, firstBackend)]
-            case secondSpawn of
-              Left failure -> initializationFailure
-                (IsolatedBackendSpawnFailure 2 $ show failure)
-                [(1, firstBackend)]
-              Right secondBackend -> do
-                secondSetup <- restoreSetup
-                  (setupWorker 2 secondBackend artifact requestTimeout)
-                  `onException` cleanupBackendsIgnoringFailures
-                    [ (1, firstBackend)
-                    , (2, secondBackend)
-                    ]
-                case secondSetup of
-                  Left failure -> initializationFailure failure
-                    [ (1, firstBackend)
-                    , (2, secondBackend)
-                    ]
-                  Right secondWorker ->
-                    (do
-                      state <- atomically $ newTVar IsolatedPairState
-                        { isolatedPairStatus = IsolatedPairHealthy
-                        , isolatedPairAvailable =
-                            [firstWorker, secondWorker]
-                        }
-                      pure $ Right IsolatedBackendPair
-                        { isolatedPairWorkers =
-                            [firstWorker, secondWorker]
-                        , isolatedPairState = state
-                        , isolatedPairRequestTimeout = requestTimeout
-                        }) `onException` cleanupBackendsIgnoringFailures
-                          [ (1, firstBackend)
-                          , (2, secondBackend)
-                          ]
+    -- The registry closes the ownership gap between each child's masked
+    -- spawn handoff and this parent's ordered result handoff.  In particular,
+    -- cancellation of the parent cannot strand a backend whose child had
+    -- already finished (or whose setup was still in flight).
+    registered <- newIORef []
+    (withAsync
+        (tryAny $ restoreSetup $ acquireWorker registered 1) $ \first ->
+      withAsync
+        (tryAny $ restoreSetup $ acquireWorker registered 2) $ \second -> do
+        -- Both workers start concurrently, but observing worker one first
+        -- preserves the old left-to-right failure contract.  A known
+        -- worker-one failure cancels a possibly non-responsive sibling
+        -- instead of waiting for an outcome which cannot replace it.
+        firstResult <- wait first
+        case firstResult of
+          Left failure -> cancel second >> throwIO failure
+          Right (Left failure) -> do
+            cancel second
+            registeredBackends registered
+              >>= initializationFailure failure
+          Right (Right firstWorker) -> do
+            secondResult <- wait second
+            backends <- registeredBackends registered
+            case secondResult of
+              Left failure -> throwIO failure
+              Right (Left failure) ->
+                initializationFailure failure backends
+              Right (Right secondWorker) -> do
+                state <- atomically $ newTVar IsolatedPairState
+                  { isolatedPairStatus = IsolatedPairHealthy
+                  , isolatedPairAvailable =
+                      [firstWorker, secondWorker]
+                  }
+                pure $ Right IsolatedBackendPair
+                  { isolatedPairWorkers =
+                      [firstWorker, secondWorker]
+                  , isolatedPairState = state
+                  , isolatedPairRequestTimeout = requestTimeout
+                  }) `onException`
+                    cleanupRegisteredIgnoringFailures registered
  where
+  acquireWorker registered ordinal = mask $ \restoreWorker -> do
+    spawned <- tryIOException $ restoreWorker $ spawnBackend config
+    case spawned of
+      Left failure -> pure $ Left $ IsolatedBackendSpawnFailure ordinal
+        $ show failure
+      Right backend -> do
+        -- Publish ownership while masked before setup becomes interruptible.
+        atomicModifyIORef' registered $ \backends ->
+          ((ordinal, backend) : backends, ())
+        restoreWorker $ setupWorker ordinal backend artifact requestTimeout
+
   initializationFailure failure backends = do
     cleanupFailures <- cleanupBackendsUncancellable backends
     pure $ attachCleanupFailures cleanupFailures $ Left failure
+
+registeredBackends :: IORef [(Int, Backend)] -> IO [(Int, Backend)]
+registeredBackends registered = sortOn fst <$> readIORef registered
+
+cleanupRegisteredIgnoringFailures :: IORef [(Int, Backend)] -> IO ()
+cleanupRegisteredIgnoringFailures registered = do
+  backends <- registeredBackends registered
+  cleanupBackendsIgnoringFailures backends
 
 setupWorker
   :: Int

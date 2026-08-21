@@ -20,6 +20,13 @@ Homepage:      https://github.com/VladimirReshetnikov/Leant
 Bug-Reports:   https://github.com/VladimirReshetnikov/Leant/issues
 Category:      Development
 Build-Type:    Simple
+Extra-Source-Files:
+  bench-verification/README.md
+  bench-verification/benchmark.py
+  bench-verification/*.txt
+  test/run-parallel-verification-gate.sh
+  test/parallel-verification/README.md
+  test/parallel-verification/*.txt
 
 Source-Repository head
   Type:     git
@@ -80,6 +87,7 @@ Executable leant
     Leant.Synth.Render
     Leant.Synth.Verification
     Leant.Synth.Verification.Parallel
+    Leant.Synth.Verification.Runtime
   Ghc-Options:
     -Wall
     -Wcompat
@@ -155,6 +163,7 @@ Test-Suite leant-synth-tests
     Leant.Synth.Render
     Leant.Synth.Verification
     Leant.Synth.Verification.Parallel
+    Leant.Synth.Verification.Runtime
     Leant.Json
     Leant.Json.Bounded
     Leant.Session.Replay

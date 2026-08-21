@@ -8,6 +8,10 @@
 -- attempt and outcome observations without changing synthesis-engine output.
 module Leant.Synth.Verification
   ( VariantVerdict (..)
+  , GroupVerificationSummary
+  , verifyCandidateGroup
+  , groupVerificationSummaryAccepted
+  , verificationBatchFromGroupSummaries
   , Verified
   , verifiedCandidate
   , VerificationBatch
@@ -18,6 +22,7 @@ module Leant.Synth.Verification
   , verifyCandidateGroups
   ) where
 
+import Control.DeepSeq (NFData (rnf))
 import Language.Haskell.Synthesis.Observability
   ( noObservations
   , recordObservation
@@ -35,6 +40,59 @@ data VariantVerdict
   = VariantAccepted
   | VariantRejected VerificationFailureClass
   deriving (Eq, Ord, Show)
+
+instance NFData VariantVerdict where
+  rnf verdict = case verdict of
+    VariantAccepted -> ()
+    VariantRejected failure -> rnf failure
+
+-- | Candidate-free result of attempting one complete semantic group.
+--
+-- The private constructors retain rejection classes in variant order.  An
+-- accepted summary ends immediately before the first accepted variant; a
+-- rejected summary contains every attempted variant's failure.  Consequently
+-- an empty rejected list also represents an empty group.  Keeping candidates
+-- out of this value lets a worker force the complete verdict before
+-- publication without demanding a retained semantic sidecar.
+data GroupVerificationSummary
+  = GroupVerificationAccepted ![VerificationFailureClass]
+  | GroupVerificationRejected ![VerificationFailureClass]
+
+instance NFData GroupVerificationSummary where
+  rnf summary = case summary of
+    GroupVerificationAccepted failures -> rnf failures
+    GroupVerificationRejected failures -> rnf failures
+
+-- | Verify exactly one group, stopping at its first accepted variant.
+--
+-- This package-internal scheduler seam deliberately records no candidate.
+-- The group and its summary are reunited only after ordered worker results
+-- have been observed.
+verifyCandidateGroup
+  :: Monad m
+  => (candidate -> m VariantVerdict)
+  -> [candidate]
+  -> m GroupVerificationSummary
+verifyCandidateGroup verifyVariant = go []
+ where
+  go reverseFailures variants = case variants of
+    [] -> pure $ GroupVerificationRejected $ reverse reverseFailures
+    candidate : remaining -> do
+      verdict <- verifyVariant candidate
+      case verdict of
+        VariantAccepted ->
+          pure $ GroupVerificationAccepted $ reverse reverseFailures
+        VariantRejected failure ->
+          go (failure : reverseFailures) remaining
+
+-- | Whether a complete group summary contains an accepted variant.
+--
+-- This is exposed only so the private parallel scheduler can translate the
+-- summary into its rejection-or-success quota protocol.
+groupVerificationSummaryAccepted :: GroupVerificationSummary -> Bool
+groupVerificationSummaryAccepted summary = case summary of
+  GroupVerificationAccepted _ -> True
+  GroupVerificationRejected _ -> False
 
 -- | Opaque receipt that the supplied verification callback accepted a
 -- candidate.
@@ -158,6 +216,87 @@ addGroupObservations observations result = case result of
     GroupAccepted candidate (observations <> following)
   GroupRejected following -> GroupRejected (observations <> following)
 
+-- | Reattach ordered summaries to the exact group prefix that produced them.
+--
+-- The first component is the historical verification batch.  The second is
+-- the flattened logical attempt trace: complete rejected groups and accepted
+-- groups through their first accepted variant, all in input order.  Neither
+-- component deep-forces candidate payloads.  Inspecting stops with the
+-- summary list, so a success-quota tail remains untouched.
+--
+-- The summaries and groups must come from the same ordered traversal.  The
+-- private parallel scheduler and 'verifyCandidateGroups' establish that
+-- invariant before calling this package-internal reconstruction boundary.
+verificationBatchFromGroupSummaries
+  :: [GroupVerificationSummary]
+  -> [[candidate]]
+  -> (VerificationBatch candidate, [candidate])
+verificationBatchFromGroupSummaries = go
+ where
+  go summaries groups = case summaries of
+    [] -> (VerificationBatch [] 0 noObservations, [])
+    summary : followingSummaries -> case groups of
+      [] -> error $ unwords
+        [ "verificationBatchFromGroupSummaries:"
+        , "summary/group length mismatch"
+        ]
+      group : followingGroups ->
+        let (followingBatch, followingAttempts) =
+              go followingSummaries followingGroups
+            attempts = groupAttemptedCandidates summary group
+              ++ followingAttempts
+            observations = groupVerificationObservations summary
+            batch = case summary of
+              GroupVerificationAccepted failures ->
+                prependCandidate
+                  (Verified $ acceptedCandidate failures group)
+                  observations
+                  followingBatch
+              GroupVerificationRejected _ ->
+                prependRejectedGroup observations followingBatch
+        in (batch, attempts)
+
+-- Select only list spines.  Candidate values, including semantic sidecars,
+-- remain thunks in both the receipt batch and the logical attempt trace.
+groupAttemptedCandidates
+  :: GroupVerificationSummary
+  -> [candidate]
+  -> [candidate]
+groupAttemptedCandidates summary group = case summary of
+  GroupVerificationAccepted failures ->
+    take (length failures + 1) group
+  GroupVerificationRejected failures ->
+    take (length failures) group
+
+acceptedCandidate
+  :: [VerificationFailureClass]
+  -> [candidate]
+  -> candidate
+acceptedCandidate failures group = case drop (length failures) group of
+  candidate : _ -> candidate
+  [] -> error $ unwords
+    [ "verificationBatchFromGroupSummaries:"
+    , "accepted summary lacks its candidate"
+    ]
+
+groupVerificationObservations
+  :: GroupVerificationSummary
+  -> LeantObservations
+groupVerificationObservations summary =
+  foldr recordFailure terminal failures
+ where
+  (failures, terminal) = case summary of
+    GroupVerificationAccepted rejected ->
+      ( rejected
+      , recordObservation LeanCandidateVerified
+          $ recordObservation LeanVariantAttempted noObservations
+      )
+    GroupVerificationRejected rejected -> (rejected, noObservations)
+
+  recordFailure failure observations =
+    recordObservation (LeanVerificationFailure failure)
+      $ recordObservation LeanVariantAttempted observations
+
 prependCandidate
   :: Verified candidate
   -> LeantObservations
@@ -169,6 +308,14 @@ prependCandidate receipt observations
     (receipt : receipts)
     failed
     (observations <> following)
+
+prependRejectedGroup
+  :: LeantObservations
+  -> VerificationBatch candidate
+  -> VerificationBatch candidate
+prependRejectedGroup observations
+    (VerificationBatch candidates failed following) =
+  VerificationBatch candidates (failed + 1) (observations <> following)
 
 prependObservations
   :: LeantObservations

@@ -1,0 +1,2 @@
+:synth ((a → b) → List a → List b)
+:quit

@@ -6,11 +6,19 @@
 -- the success-quota cutoff of the corresponding serial traversal.
 module Leant.Synth.Verification.Parallel
   ( runOrderedSuccessQuota
+  , verifyCandidateGroupsParallel
   ) where
 
 import Control.Concurrent.Async (wait, withAsync)
 import Control.DeepSeq (NFData, force)
 import Control.Exception (evaluate)
+
+import Leant.Synth.Verification
+  ( GroupVerificationSummary
+  , VerificationBatch
+  , groupVerificationSummaryAccepted
+  , verificationBatchFromGroupSummaries
+  )
 
 -- | Run rejection-or-success tasks concurrently while retaining serial
 -- observation order.
@@ -51,6 +59,47 @@ runOrderedSuccessQuota workerLimit successQuota runTask inputs
           else do
             followingResults <- go followingQuota followingInputs
             pure $ waveResults ++ followingResults
+
+-- | Verify independent semantic groups concurrently and recover the exact
+-- serially observable result.
+--
+-- Each worker publishes only a strict, candidate-free summary.  Once the
+-- scheduler has observed those summaries in input order, reconstruction
+-- selects the accepted representatives and the flattened attempted-candidate
+-- prefix from the original groups.  Candidate payloads and retained semantic
+-- sidecars are never part of the worker result and are not deep-forced.
+-- The callback owns the complete group scope; a resource-backed caller can
+-- therefore acquire one lease and invoke @verifyCandidateGroup@ with a
+-- lease-bound variant verifier before releasing that lease.
+--
+-- The worker and quota guards, bounded wave admission, exception ordering,
+-- cancellation, and literal one-worker serial route are inherited from
+-- 'runOrderedSuccessQuota'.
+verifyCandidateGroupsParallel
+  :: Int
+  -> Int
+  -> ([candidate] -> IO GroupVerificationSummary)
+  -> [[candidate]]
+  -> IO (VerificationBatch candidate, [candidate])
+verifyCandidateGroupsParallel workerLimit successQuota verifyGroup groups =
+  do
+    scheduled <- runOrderedSuccessQuota workerLimit successQuota
+      classifyGroup groups
+    pure $ verificationBatchFromGroupSummaries
+      (map forgetQuotaClassification scheduled) groups
+ where
+  classifyGroup group = do
+    summary <- verifyGroup group
+    pure $ if groupVerificationSummaryAccepted summary
+      then Right summary
+      else Left summary
+
+  forgetQuotaClassification
+    :: Either GroupVerificationSummary GroupVerificationSummary
+    -> GroupVerificationSummary
+  forgetQuotaClassification result = case result of
+    Left summary -> summary
+    Right summary -> summary
 
 -- Do not inspect the tail after the final admitted cons cell.  In particular,
 -- the second component remains a thunk when the requested width is reached.
