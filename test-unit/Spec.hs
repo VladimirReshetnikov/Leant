@@ -11,6 +11,7 @@ import Control.Concurrent
   , readMVar
   , takeMVar
   , threadDelay
+  , throwTo
   )
 import Control.Concurrent.Async
   ( async
@@ -56,7 +57,7 @@ import qualified Data.Text as Text
 import qualified Data.Text.Encoding as TextEncoding
 import Data.Word (Word8)
 import GHC.Conc
-  ( BlockReason (BlockedOnMVar)
+  ( BlockReason (BlockedOnMVar, BlockedOnSTM)
   , ThreadStatus (ThreadBlocked, ThreadDied, ThreadFinished)
   , threadStatus
   )
@@ -166,9 +167,13 @@ import qualified Leant.Backend as Backend
 import Leant.Backend.Isolated
   ( IsolatedBackendFailure (..)
   , IsolatedBackendTransportFailure (..)
+  , PreparedPairFinalization (..)
   , runIsolatedBackendCommand
+  , runPreparedIsolatedBackendPair
   , withIsolatedBackendLease
   , withIsolatedBackendPair
+  , withIsolatedBackendPairPreparation
+  , withIsolatedBackendPairPreparationAfterPublicationForTesting
   )
 import qualified Leant.Json as Json
 import Leant.Json.Bounded
@@ -1159,6 +1164,363 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
             $ "parallel setup did not finish cleanly: " ++ show other
         readIORef callbackRan >>= (@?= True)
         mapM_ (assertFakeWorkerStopped root) [1, 2]
+  , testGroup "prepared one-shot pair"
+      [ testCase "overlap ready setup with gated caller work" $
+          withTemporaryDirectory "leant prepared overlap" $ \root -> do
+            config <- isolatedFakeBackendConfig root
+              "setup-gated-all" Nothing
+            callbackEntered <- newEmptyMVar
+            releaseCaller <- newEmptyMVar
+            running <- async $ withIsolatedBackendPairPreparation config
+              (root </> "prepared overlap snapshot") Nothing $ \prepared -> do
+                putMVar callbackEntered ()
+                readMVar releaseCaller
+                consumed <- runPreparedIsolatedBackendPair prepared $ \pair -> do
+                  leased <- withIsolatedBackendLease pair $ \lease ->
+                    runIsolatedBackendCommand lease "prepared-overlap"
+                  case leased of
+                    Left failure -> assertFailure
+                      $ "prepared lease failed: " ++ show failure
+                    Right commandResult -> void
+                      $ expectIsolatedCommand commandResult
+                consumed @?= Right ()
+            entered <- timeout 3000000 $ readMVar callbackEntered
+            entered @?= Just ()
+            bothRestoring <- timeout 3000000 $ mapM_
+              (waitForHeartbeat . isolatedFakeSetupPath root) [1, 2]
+            bothRestoring @?= Just ()
+            writeFile (isolatedFakeSetupGatePath root) "open\n"
+            bothReady <- timeout 3000000 $ mapM_
+              (waitForHeartbeat . isolatedFakeRestoredPath root) [1, 2]
+            bothReady @?= Just ()
+            assertExactlyTwoFakeWorkers root
+            premature <- timeout 200000 $ waitCatch running
+            assertBool "gated caller returned before release"
+              $ isNothing premature
+            putMVar releaseCaller ()
+            outcome <- timeout 5000000 $ waitCatch running
+            case outcome of
+              Just (Right ((), PreparedPairConsumed)) -> pure ()
+              other -> assertFailure
+                $ "prepared overlap failed: " ++ show other
+            mapM_ (assertFakeWorkerStopped root) [1, 2]
+      , testCase "claim exactly once and fail closed after the scope" $
+          withTemporaryDirectory "leant prepared one shot" $ \root -> do
+            config <- isolatedFakeBackendConfig root "healthy" Nothing
+            (escaped, finalization) <-
+              withIsolatedBackendPairPreparation config
+                (root </> "prepared one-shot snapshot") Nothing
+                $ \prepared -> do
+                  mapM_ (waitForHeartbeat . isolatedFakeRestoredPath root)
+                    [1, 2]
+                  first <- runPreparedIsolatedBackendPair prepared
+                    $ \_ -> pure ()
+                  second <- runPreparedIsolatedBackendPair prepared
+                    $ \_ -> pure ()
+                  first @?= Right ()
+                  second @?= Left IsolatedBackendPreparationClaimed
+                  pure prepared
+            finalization @?= PreparedPairConsumed
+            late <- runPreparedIsolatedBackendPair escaped $ \_ -> pure ()
+            late @?= Left IsolatedBackendPreparationClaimed
+            assertExactlyTwoFakeWorkers root
+            mapM_ (assertFakeWorkerStopped root) [1, 2]
+      , testCase "linearize two simultaneous claims exactly once" $
+          withTemporaryDirectory "leant prepared simultaneous claims" $ \root -> do
+            config <- isolatedFakeBackendConfig root
+              "setup-gated-all" Nothing
+            firstReady <- newEmptyMVar
+            secondReady <- newEmptyMVar
+            releaseClaims <- newEmptyMVar
+            callbackCount <- newIORef (0 :: Int)
+            (results, finalization) <-
+              withIsolatedBackendPairPreparation config
+                (root </> "prepared simultaneous snapshot") Nothing
+                $ \prepared -> do
+                  first <- async $ do
+                    putMVar firstReady ()
+                    readMVar releaseClaims
+                    runPreparedIsolatedBackendPair prepared $ \_ ->
+                      modifyIORef' callbackCount (+ 1)
+                  second <- async $ do
+                    putMVar secondReady ()
+                    readMVar releaseClaims
+                    runPreparedIsolatedBackendPair prepared $ \_ ->
+                      modifyIORef' callbackCount (+ 1)
+                  readMVar firstReady
+                  readMVar secondReady
+                  putMVar releaseClaims ()
+                  writeFile (isolatedFakeSetupGatePath root) "open\n"
+                  mapM waitCatch [first, second]
+            finalization @?= PreparedPairConsumed
+            let values = [value | Right value <- results]
+            length values @?= 2
+            length [() | Right () <- values] @?= 1
+            length
+              [()
+              | Left IsolatedBackendPreparationClaimed <- values
+              ] @?= 1
+            readIORef callbackCount >>= (@?= 1)
+            assertExactlyTwoFakeWorkers root
+            mapM_ (assertFakeWorkerStopped root) [1, 2]
+      , testCase "discard before either launched worker restores" $
+          withTemporaryDirectory "leant prepared startup discard" $ \root -> do
+            config <- isolatedFakeBackendConfig root
+              "startup-gated-all" Nothing
+            (_, finalization) <- withIsolatedBackendPairPreparation config
+              (root </> "prepared startup snapshot") Nothing $ \_ ->
+                mapM_ (waitForHeartbeat . isolatedFakeStartupPath root)
+                  [1, 2]
+            finalization @?= PreparedPairDiscarded
+            mapM (doesFileExist . isolatedFakeSetupPath root) [1, 2]
+              >>= (@?= [False, False])
+            assertExactlyTwoFakeWorkers root
+            mapM_ (assertFakeWorkerStopped root) [1, 2]
+      , testCase "cancel the owner while launched workers await startup" $
+          withTemporaryDirectory "leant prepared startup cancellation" $ \root -> do
+            config <- isolatedFakeBackendConfig root
+              "startup-gated-all" Nothing
+            callbackEntered <- newEmptyMVar
+            never <- newEmptyMVar
+            running <- async $ withIsolatedBackendPairPreparation config
+              (root </> "prepared startup cancellation snapshot") Nothing
+              $ \_ -> do
+                mapM_ (waitForHeartbeat . isolatedFakeStartupPath root)
+                  [1, 2]
+                putMVar callbackEntered ()
+                readMVar never >> pure ()
+            readMVar callbackEntered
+            throwTo (asyncThreadId running) ThreadKilled
+            outcome <- waitCatch running
+            assertThreadKilledOutcome "startup cancellation" outcome
+            mapM_ (assertFakeWorkerStopped root) [1, 2]
+      , testCase "discard while both restores are gated" $
+          withTemporaryDirectory "leant prepared restore discard" $ \root -> do
+            config <- isolatedFakeBackendConfig root
+              "setup-gated-all" Nothing
+            (_, finalization) <- withIsolatedBackendPairPreparation config
+              (root </> "prepared restore snapshot") Nothing $ \_ ->
+                mapM_ (waitForHeartbeat . isolatedFakeSetupPath root) [1, 2]
+            finalization @?= PreparedPairDiscarded
+            assertExactlyTwoFakeWorkers root
+            mapM_ (assertFakeWorkerStopped root) [1, 2]
+      , testCase "discard a fully ready unused pair" $
+          withTemporaryDirectory "leant prepared ready discard" $ \root -> do
+            config <- isolatedFakeBackendConfig root "healthy" Nothing
+            (_, finalization) <- withIsolatedBackendPairPreparation config
+              (root </> "prepared ready snapshot") Nothing $ \_ ->
+                mapM_ (waitForHeartbeat . isolatedFakeRestoredPath root)
+                  [1, 2]
+            finalization @?= PreparedPairDiscarded
+            assertExactlyTwoFakeWorkers root
+            mapM_ (assertFakeWorkerStopped root) [1, 2]
+      , testCase "join the acquisition owner before unused discard returns" $
+          withTemporaryDirectory "leant prepared discard join" $ \root -> do
+            config <- isolatedFakeBackendConfig root "healthy" Nothing
+            ownerPublished <- newEmptyMVar
+            ownerHold <- newEmptyMVar
+            cleanupTailEntered <- newEmptyMVar
+            releaseCleanupTail <- newEmptyMVar
+            let ownerTail = do
+                  putMVar ownerPublished ()
+                  readMVar ownerHold `finally` do
+                    putMVar cleanupTailEntered ()
+                    readMVar releaseCleanupTail
+            running <- async $
+              withIsolatedBackendPairPreparationAfterPublicationForTesting
+                ownerTail config
+                (root </> "prepared discard join snapshot") Nothing
+                $ \_ -> readMVar ownerPublished
+            entered <- timeout 3000000 $ readMVar cleanupTailEntered
+            entered @?= Just ()
+            premature <- timeout 200000 $ waitCatch running
+            assertBool "unused discard returned before its owner joined"
+              $ isNothing premature
+            putMVar releaseCleanupTail ()
+            outcome <- timeout 5000000 $ waitCatch running
+            case outcome of
+              Just (Right ((), PreparedPairDiscarded)) -> pure ()
+              other -> assertFailure
+                $ "unused discard join failed: " ++ show other
+            assertExactlyTwoFakeWorkers root
+            mapM_ (assertFakeWorkerStopped root) [1, 2]
+      , testCase "surface unused setup failure with worker-one precedence" $
+          withTemporaryDirectory "leant prepared setup failure" $ \root -> do
+            config <- isolatedFakeBackendConfig root
+              "setup-gated-fatal-all" Nothing
+            (_, finalization) <- withIsolatedBackendPairPreparation config
+              (root </> "prepared failure snapshot") Nothing $ \_ -> do
+                mapM_ (waitForHeartbeat . isolatedFakeSetupPath root) [1, 2]
+                writeFile (isolatedFakeSetupGatePath root) "release\n"
+                mapM_ (assertFakeWorkerStopped root) [1, 2]
+            finalization @?= PreparedPairDiscardedWithFailure
+              (IsolatedBackendSetupFatal 1 "fake setup fatal")
+            assertExactlyTwoFakeWorkers root
+      , testCase "surface claimed setup failure before running callback" $
+          withTemporaryDirectory "leant prepared claimed failure" $ \root -> do
+            config <- isolatedFakeBackendConfig root
+              "setup-gated-fatal-all" Nothing
+            callbackRan <- newIORef False
+            (claimed, finalization) <-
+              withIsolatedBackendPairPreparation config
+                (root </> "prepared claimed failure snapshot") Nothing
+                $ \prepared -> do
+                    mapM_ (waitForHeartbeat . isolatedFakeSetupPath root) [1, 2]
+                    writeFile (isolatedFakeSetupGatePath root) "release\n"
+                    runPreparedIsolatedBackendPair prepared $ \_ ->
+                      modifyIORef' callbackRan $ const True
+            claimed @?= Left
+              (IsolatedBackendSetupFatal 1 "fake setup fatal")
+            finalization @?= PreparedPairConsumed
+            readIORef callbackRan >>= (@?= False)
+            assertExactlyTwoFakeWorkers root
+            mapM_ (assertFakeWorkerStopped root) [1, 2]
+      , testCase "cancel an unused preparation during restore" $
+          withTemporaryDirectory "leant prepared unused cancellation" $ \root -> do
+            config <- isolatedFakeBackendConfig root
+              "setup-gated-all" Nothing
+            callbackEntered <- newEmptyMVar
+            never <- newEmptyMVar
+            running <- async $ withIsolatedBackendPairPreparation config
+              (root </> "prepared unused cancellation snapshot") Nothing
+              $ \_ -> do
+                putMVar callbackEntered ()
+                readMVar never >> pure ()
+            readMVar callbackEntered
+            mapM_ (waitForHeartbeat . isolatedFakeSetupPath root) [1, 2]
+            throwTo (asyncThreadId running) ThreadKilled
+            outcome <- waitCatch running
+            assertThreadKilledOutcome "unused preparation cancellation"
+              outcome
+            mapM_ (assertFakeWorkerStopped root) [1, 2]
+      , testCase "cancel a claimed preparation while setup is gated" $
+          withTemporaryDirectory "leant prepared claimed cancellation" $ \root -> do
+            config <- isolatedFakeBackendConfig root
+              "setup-gated-all" Nothing
+            claimBlocked <- newEmptyMVar
+            running <- async $ withIsolatedBackendPairPreparation config
+              (root </> "prepared claimed cancellation snapshot") Nothing
+              $ \prepared -> do
+                claimed <- async $ runPreparedIsolatedBackendPair prepared
+                  $ \_ -> pure ()
+                blocked <- timeout 3000000 $ waitForMVarBlock
+                  $ asyncThreadId claimed
+                blocked @?= Just ()
+                putMVar claimBlocked ()
+                waitCatch claimed >>= either throwIO pure
+            readMVar claimBlocked
+            mapM_ (waitForHeartbeat . isolatedFakeSetupPath root) [1, 2]
+            throwTo (asyncThreadId running) ThreadKilled
+            outcome <- waitCatch running
+            assertThreadKilledOutcome "claimed preparation cancellation"
+              outcome
+            mapM_ (assertFakeWorkerStopped root) [1, 2]
+      , testCase "join a published acquisition owner before cancellation" $
+          withTemporaryDirectory "leant prepared publication join" $ \root -> do
+            config <- isolatedFakeBackendConfig root "healthy" Nothing
+            outcomePublished <- newEmptyMVar
+            releaseOwner <- newEmptyMVar
+            callbackRan <- newIORef False
+            running <- async $
+              withIsolatedBackendPairPreparationAfterPublicationForTesting
+                (putMVar outcomePublished () >> readMVar releaseOwner)
+                config (root </> "prepared publication snapshot") Nothing
+                $ \prepared -> runPreparedIsolatedBackendPair prepared $ \_ ->
+                    modifyIORef' callbackRan $ const True
+            readMVar outcomePublished
+            blocked <- timeout 3000000 $ waitForSTMBlock
+              $ asyncThreadId running
+            blocked @?= Just ()
+            killer <- async $ throwTo (asyncThreadId running) ThreadKilled
+            premature <- timeout 200000 $ waitCatch killer
+            assertBool "published-owner join accepted cancellation"
+              $ isNothing premature
+            putMVar releaseOwner ()
+            killerOutcome <- timeout 3000000 $ waitCatch killer
+            case killerOutcome of
+              Just (Right ()) -> pure ()
+              other -> assertFailure
+                $ "cancellation sender did not finish: " ++ show other
+            outcome <- timeout 5000000 $ waitCatch running
+            case outcome of
+              Just killed -> assertThreadKilledOutcome
+                "published acquisition handoff cancellation" killed
+              Nothing -> assertFailure
+                "published acquisition handoff did not terminate"
+            readIORef callbackRan >>= (@?= False)
+            mapM_ (assertFakeWorkerStopped root) [1, 2]
+      , testCase "cancel inside a ready prepared-pair callback" $
+          withTemporaryDirectory "leant prepared callback cancellation" $ \root -> do
+            config <- isolatedFakeBackendConfig root "healthy" Nothing
+            pairCallbackEntered <- newEmptyMVar
+            never <- newEmptyMVar
+            running <- async $ withIsolatedBackendPairPreparation config
+              (root </> "prepared callback cancellation snapshot") Nothing
+              $ \prepared -> runPreparedIsolatedBackendPair prepared $ \_ -> do
+                  putMVar pairCallbackEntered ()
+                  readMVar never >> pure ()
+            readMVar pairCallbackEntered
+            throwTo (asyncThreadId running) ThreadKilled
+            outcome <- waitCatch running
+            assertThreadKilledOutcome "prepared callback cancellation"
+              outcome
+            mapM_ (assertFakeWorkerStopped root) [1, 2]
+      , testCase "cancel and join a detached claimed run at scope exit" $
+          withTemporaryDirectory "leant prepared detached claim" $ \root -> do
+            config <- isolatedFakeBackendConfig root "healthy" Nothing
+            pairCallbackEntered <- newEmptyMVar
+            never <- newEmptyMVar
+            (detached, finalization) <-
+              withIsolatedBackendPairPreparation config
+                (root </> "prepared detached snapshot") Nothing
+                $ \prepared -> do
+                  child <- async $ runPreparedIsolatedBackendPair prepared
+                    $ \_ -> do
+                      putMVar pairCallbackEntered ()
+                      readMVar never >> pure ()
+                  readMVar pairCallbackEntered
+                  pure child
+            finalization @?= PreparedPairConsumed
+            detachedOutcome <- waitCatch detached
+            case detachedOutcome of
+              Left _ -> pure ()
+              Right value -> assertFailure
+                $ "detached prepared run escaped: " ++ show value
+            mapM_ (assertFakeWorkerStopped root) [1, 2]
+      , testCase "preserve callback exception after unused-pair cleanup" $
+          withTemporaryDirectory "leant prepared callback exception" $ \root -> do
+            config <- isolatedFakeBackendConfig root "healthy" Nothing
+            attempted <- try $ withIsolatedBackendPairPreparation config
+              (root </> "prepared exception snapshot") Nothing $ \_ -> do
+                mapM_ (waitForHeartbeat . isolatedFakeRestoredPath root)
+                  [1, 2]
+                ioError $ userError "prepared callback sentinel"
+            case (attempted :: Either SomeException
+                ((), PreparedPairFinalization)) of
+              Left failure -> assertBool
+                "prepared cleanup replaced callback exception"
+                $ "prepared callback sentinel" `isInfixOf` show failure
+              Right value -> assertFailure
+                $ "prepared callback exception returned: " ++ show value
+            mapM_ (assertFakeWorkerStopped root) [1, 2]
+      , testCase "preserve claimed pair-callback exception after cleanup" $
+          withTemporaryDirectory "leant prepared pair exception" $ \root -> do
+            config <- isolatedFakeBackendConfig root "healthy" Nothing
+            attempted <- try $ withIsolatedBackendPairPreparation config
+              (root </> "prepared pair exception snapshot") Nothing
+              $ \prepared -> runPreparedIsolatedBackendPair prepared $ \_ ->
+                  ioError $ userError "prepared pair callback sentinel"
+            case (attempted :: Either SomeException
+                ( Either IsolatedBackendFailure ()
+                , PreparedPairFinalization
+                )) of
+              Left failure -> assertBool
+                "prepared pair cleanup replaced callback exception"
+                $ "prepared pair callback sentinel" `isInfixOf` show failure
+              Right value -> assertFailure
+                $ "prepared pair callback exception returned: " ++ show value
+            mapM_ (assertFakeWorkerStopped root) [1, 2]
+      ]
   , testCase "restore two distinct workers and retain each leased environment" $
       withTemporaryDirectory "leant isolated backend" $ \root -> do
         let artifact = root </> "snapshot artifact with spaces.olean"
@@ -1692,6 +2054,17 @@ sameTransportKind IsolatedBackendRequestInterrupted
     IsolatedBackendRequestInterrupted = True
 sameTransportKind _ _ = False
 
+assertThreadKilledOutcome
+  :: String
+  -> Either SomeException a
+  -> IO ()
+assertThreadKilledOutcome label outcome = case outcome of
+  Left failure -> case fromException failure of
+    Just ThreadKilled -> pure ()
+    other -> assertFailure $ label ++ " lost its primary exception: "
+      ++ show other ++ " / " ++ show failure
+  Right _ -> assertFailure $ label ++ " returned normally"
+
 expectAsyncIsolatedCommand
   :: Either SomeException
       (Either IsolatedBackendFailure
@@ -1774,6 +2147,9 @@ isolatedBackendFakeHelper encodedDescriptor = do
     threadDelay 10000
     BS.appendFile (isolatedFakeHeartbeatPath root worker)
       $ BS.singleton 'H'
+  when (scenario == "startup-gated-all") $ do
+    writeFile (isolatedFakeStartupPath root worker) "started\n"
+    waitForHeartbeat $ isolatedFakeStartupGatePath root
   sequenceNumber <- newIORef 0
   isolatedFakeRequestLoop root scenario maybeLauncher
     worker pid sequenceNumber
@@ -1812,9 +2188,10 @@ isolatedFakeRequestLoop root scenario maybeLauncher worker pid sequenceNumber =
           $ "invalid fake-backend request: " ++ failure
         Right value -> pure value
       case requestValue of
-        Json.JObj [("unpickleEnvFrom", Json.JStr artifact)] ->
+        Json.JObj [("unpickleEnvFrom", Json.JStr artifact)] -> do
           isolatedFakeSetupResponse root scenario maybeLauncher
             worker artifact
+          writeFile (isolatedFakeRestoredPath root worker) "restored\n"
         Json.JObj
             [("cmd", Json.JStr command), ("env", Json.JInt environment)] ->
           isolatedFakeCommandResponse root scenario worker pid
@@ -1838,7 +2215,11 @@ isolatedFakeSetupResponse root scenario maybeLauncher worker artifact = do
         || scenario == prefix ++ "-all"
       environment = isolatedFakeEnvironment worker
   case () of
-    _ | targeted "setup-fatal" ->
+    _ | targeted "setup-gated-fatal" ->
+          waitForHeartbeat (isolatedFakeSetupGatePath root)
+            >> isolatedFakeWriteResponse (Json.JObj
+              [("message", Json.JStr "fake setup fatal")])
+      | targeted "setup-fatal" ->
           isolatedFakeWriteResponse $ Json.JObj
             [("message", Json.JStr "fake setup fatal")]
       | targeted "setup-error" ->
@@ -1943,6 +2324,14 @@ isolatedFakeSetupPath :: FilePath -> Integer -> FilePath
 isolatedFakeSetupPath root worker =
   root </> ("worker-" ++ show worker ++ ".setup")
 
+isolatedFakeRestoredPath :: FilePath -> Integer -> FilePath
+isolatedFakeRestoredPath root worker =
+  root </> ("worker-" ++ show worker ++ ".restored")
+
+isolatedFakeStartupPath :: FilePath -> Integer -> FilePath
+isolatedFakeStartupPath root worker =
+  root </> ("worker-" ++ show worker ++ ".startup")
+
 isolatedFakeHeartbeatPath :: FilePath -> Integer -> FilePath
 isolatedFakeHeartbeatPath root worker =
   root </> ("worker-" ++ show worker ++ ".heartbeat")
@@ -1961,6 +2350,9 @@ isolatedFakeCommandGatePath root worker =
 
 isolatedFakeSetupGatePath :: FilePath -> FilePath
 isolatedFakeSetupGatePath root = root </> "setup-gate"
+
+isolatedFakeStartupGatePath :: FilePath -> FilePath
+isolatedFakeStartupGatePath root = root </> "startup-gate"
 
 waitForIsolatedFakeCommandWorker :: FilePath -> String -> IO Integer
 waitForIsolatedFakeCommandWorker root command = do
@@ -1995,6 +2387,11 @@ assertFakeWorkerStopped root worker = do
     Nothing -> assertFailure $ "fake worker " ++ show worker
       ++ " continued after isolated-pair cleanup"
     Just () -> pure ()
+
+assertExactlyTwoFakeWorkers :: FilePath -> IO ()
+assertExactlyTwoFakeWorkers root = do
+  claims <- mapM (doesDirectoryExist . isolatedFakeClaimPath root) [1, 2, 3]
+  claims @?= [True, True, False]
 
 backendStderrFloodMode :: String
 backendStderrFloodMode = "__leant_backend_stderr_flood__"
@@ -2076,6 +2473,17 @@ waitForMVarBlock thread = do
     ThreadDied -> ioError $ userError
       "thread died before blocking on its release MVar"
     _ -> threadDelay 10000 >> waitForMVarBlock thread
+
+waitForSTMBlock :: ThreadId -> IO ()
+waitForSTMBlock thread = do
+  status <- threadStatus thread
+  case status of
+    ThreadBlocked BlockedOnSTM -> pure ()
+    ThreadFinished -> ioError $ userError
+      "thread finished before blocking on its acquisition join"
+    ThreadDied -> ioError $ userError
+      "thread died before blocking on its acquisition join"
+    _ -> threadDelay 10000 >> waitForSTMBlock thread
 
 waitForHeartbeat :: FilePath -> IO ()
 waitForHeartbeat heartbeatPath = do
@@ -5985,6 +6393,7 @@ parallelVerificationRuntimeTests = testGroup
             , IsolatedBackendLeaseClosed
             , IsolatedBackendLeaseRetired timeoutCause
             , IsolatedBackendPairClosed
+            , IsolatedBackendPreparationClaimed
             , IsolatedBackendSetupTransportFailure 1
                 IsolatedBackendRequestInterrupted
             , IsolatedBackendRequestFailure

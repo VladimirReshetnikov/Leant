@@ -197,6 +197,7 @@ parallelVerificationFailureAllowsSerialFallback failure = case failure of
   IsolatedBackendLeaseClosed -> False
   IsolatedBackendLeaseRetired {} -> False
   IsolatedBackendPairClosed -> False
+  IsolatedBackendPreparationClaimed -> False
  where
   -- An interruption is cancellation/lifecycle evidence, never ordinary
   -- speculative unavailability.  Replaying serially would swallow it.

@@ -5,21 +5,42 @@
 module Leant.Backend.Isolated
   ( IsolatedBackendPair
   , IsolatedBackendLease
+  , PreparedIsolatedBackendPair
+  , PreparedPairFinalization (..)
   , IsolatedBackendFailure (..)
   , IsolatedBackendTransportFailure (..)
   , withIsolatedBackendPair
+  , withIsolatedBackendPairPreparation
+  , withIsolatedBackendPairPreparationAfterPublicationForTesting
+  , runPreparedIsolatedBackendPair
   , withIsolatedBackendLease
   , runIsolatedBackendCommand
   ) where
 
-import Control.Concurrent (forkIOWithUnmask)
-import Control.Concurrent.Async (cancel, wait, withAsync)
+import Control.Concurrent
+  ( ThreadId
+  , forkIOWithUnmask
+  , myThreadId
+  , throwTo
+  )
+import Control.Concurrent.Async
+  ( Async
+  , asyncWithUnmask
+  , cancel
+  , cancelWith
+  , wait
+  , waitCatch
+  , withAsync
+  )
 import Control.Concurrent.MVar
   ( MVar
+  , modifyMVar
   , newEmptyMVar
   , newMVar
   , putMVar
   , readMVar
+  , tryPutMVar
+  , tryReadMVar
   , withMVar
   )
 import Control.Concurrent.STM
@@ -32,8 +53,10 @@ import Control.Concurrent.STM
   , writeTVar
   )
 import Control.Exception
-  ( IOException
+  ( Exception
+  , IOException
   , SomeException
+  , fromException
   , mask
   , onException
   , throwIO
@@ -89,9 +112,58 @@ data IsolatedBackendFailure
   | IsolatedBackendLeaseRetired IsolatedBackendTransportFailure
   | IsolatedBackendPairPoisoned IsolatedBackendTransportFailure
   | IsolatedBackendPairClosed
+  | IsolatedBackendPreparationClaimed
   | IsolatedBackendCleanupFailure
       (Maybe IsolatedBackendFailure) [String]
   deriving (Eq, Show)
+
+-- | How a scoped speculative preparation ended after its caller returned
+-- normally.  A consumed preparation reports its setup and pair result through
+-- 'runPreparedIsolatedBackendPair'.  An unused preparation reports any setup
+-- or teardown failure here instead, so speculative work cannot fail silently.
+data PreparedPairFinalization
+  = PreparedPairConsumed
+  | PreparedPairDiscarded
+  | PreparedPairDiscardedWithFailure IsolatedBackendFailure
+  deriving (Eq, Show)
+
+-- | A scoped, one-shot future for an isolated pair.  Its constructor is hidden
+-- and every terminal state is fail-closed, so neither a pair nor its setup
+-- owner can be detached from 'withIsolatedBackendPairPreparation'.
+data PreparedIsolatedBackendPair = PreparedIsolatedBackendPair
+  { preparedAcquisitionOwner :: Async ()
+  , preparedAcquisitionOutcome :: MVar PreparedAcquisitionOutcome
+  , preparedClaimState :: MVar PreparedClaimState
+  }
+
+data PreparedAcquisitionOutcome
+  = PreparedAcquisitionCompleted
+      (Either IsolatedBackendFailure IsolatedBackendPair)
+  | PreparedAcquisitionDiscarded [String]
+  | PreparedAcquisitionException SomeException
+
+data PreparedClaimState
+  = PreparedPairUnclaimed
+  | PreparedPairClaimed ThreadId (MVar ())
+  | PreparedPairScopeClosed
+
+data PreparedScopeDisposition
+  = PreparedScopeDiscard
+  | PreparedScopeConsume ThreadId (MVar ())
+  | PreparedScopeAlreadyClosed
+
+-- These private asynchronous exceptions are ownership signals, not transport
+-- failures.  They are never converted into public infrastructure-failure
+-- values; callers may still observe their enclosing operation's exception.
+data PreparedAcquisitionDiscard = PreparedAcquisitionDiscard
+  deriving (Show)
+
+instance Exception PreparedAcquisitionDiscard
+
+data PreparedRunScopeClosing = PreparedRunScopeClosing
+  deriving (Show)
+
+instance Exception PreparedRunScopeClosing
 
 -- | Exactly two workers and their private admission state.
 data IsolatedBackendPair = IsolatedBackendPair
@@ -147,21 +219,260 @@ withIsolatedBackendPair config artifact requestTimeout callback =
       config artifact requestTimeout restore
     case acquired of
       Left failure -> pure $ Left failure
-      Right pair -> do
-        callbackResult <- tryAny $ restore $ callback pair
-        cleanupResult <- tryAny $ closeIsolatedBackendPair pair
-        case callbackResult of
-          Left callbackFailure -> throwIO callbackFailure
-          Right value -> case cleanupResult of
-            Left cleanupException -> throwIO cleanupException
-            Right (terminalStatus, cleanupFailures) ->
-              pure $ attachCleanupFailures
-                cleanupFailures $ case terminalStatus of
-                IsolatedPairHealthy -> Right value
-                IsolatedPairPoisonedStatus cause ->
-                  Left $ IsolatedBackendPairPoisoned cause
-                IsolatedPairClosedStatus ->
-                  Left IsolatedBackendPairClosed
+      Right pair -> runAcquiredIsolatedBackendPair pair
+        $ restore $ callback pair
+
+-- | Start the same concurrent two-worker acquisition used by
+-- 'withIsolatedBackendPair', then enter the caller callback as soon as both
+-- setup children are owned.  Pair readiness is deliberately not awaited, so
+-- independent caller work can overlap spawning and environment restoration.
+--
+-- The prepared value is one-shot.  A claimed pair is always closed before
+-- 'runPreparedIsolatedBackendPair' returns.  An unclaimed pair is discarded,
+-- canceled, and joined before this scope returns.  Callback exceptions remain
+-- primary after either cleanup path completes.
+withIsolatedBackendPairPreparation
+  :: BackendConfig
+  -> FilePath
+  -> Maybe Int
+  -> (PreparedIsolatedBackendPair -> IO a)
+  -> IO (a, PreparedPairFinalization)
+withIsolatedBackendPairPreparation config artifact requestTimeout callback =
+  withIsolatedBackendPairPreparationUsing
+    (pure ()) config artifact requestTimeout callback
+
+-- | Package-private deterministic seam for proving the ownership handoff
+-- after the manager publishes its terminal acquisition outcome.  Production
+-- always supplies a no-op; tests may hold the manager in this already-owned
+-- tail while cancellation targets the claimant waiting to join it.
+withIsolatedBackendPairPreparationAfterPublicationForTesting
+  :: IO ()
+  -> BackendConfig
+  -> FilePath
+  -> Maybe Int
+  -> (PreparedIsolatedBackendPair -> IO a)
+  -> IO (a, PreparedPairFinalization)
+withIsolatedBackendPairPreparationAfterPublicationForTesting =
+  withIsolatedBackendPairPreparationUsing
+
+withIsolatedBackendPairPreparationUsing
+  :: IO ()
+  -> BackendConfig
+  -> FilePath
+  -> Maybe Int
+  -> (PreparedIsolatedBackendPair -> IO a)
+  -> IO (a, PreparedPairFinalization)
+withIsolatedBackendPairPreparationUsing afterOutcomePublished
+    config artifact requestTimeout callback =
+  mask $ \restore -> do
+    acquisitionStarted <- newEmptyMVar
+    acquisitionOutcome <- newEmptyMVar
+    claimState <- newMVar PreparedPairUnclaimed
+    acquisitionOwner <- asyncWithUnmask $ \unmask -> unmask
+      $ preparedAcquisitionManager config artifact requestTimeout
+        acquisitionStarted acquisitionOutcome afterOutcomePublished
+    let prepared = PreparedIsolatedBackendPair
+          { preparedAcquisitionOwner = acquisitionOwner
+          , preparedAcquisitionOutcome = acquisitionOutcome
+          , preparedClaimState = claimState
+          }
+    callbackResult <- tryAny $ restore $ do
+      -- The manager publishes this only after both worker-acquisition threads
+      -- are bracketed, or after an earlier manager failure is safely owned.
+      readMVar acquisitionStarted
+      callback prepared
+    finalizationResult <- tryAny $ finalizePreparedPairScope prepared
+    case callbackResult of
+      Left callbackFailure -> throwIO callbackFailure
+      Right value -> case finalizationResult of
+        Left cleanupException -> throwIO cleanupException
+        Right finalization -> pure (value, finalization)
+
+-- | Claim a prepared pair exactly once, await its setup, run the pair callback,
+-- and close the pair before returning.  Setup and lifecycle failures remain
+-- typed values; callback exceptions and cancellation remain exceptions after
+-- cleanup completes.
+runPreparedIsolatedBackendPair
+  :: PreparedIsolatedBackendPair
+  -> (IsolatedBackendPair -> IO a)
+  -> IO (Either IsolatedBackendFailure a)
+runPreparedIsolatedBackendPair prepared callback = mask $ \restore -> do
+  completion <- newEmptyMVar
+  claimant <- myThreadId
+  claimed <- modifyMVar (preparedClaimState prepared) $ \state ->
+    case state of
+      PreparedPairUnclaimed -> pure
+        (PreparedPairClaimed claimant completion, True)
+      PreparedPairClaimed{} -> pure (state, False)
+      PreparedPairScopeClosed -> pure (state, False)
+  if not claimed
+    then pure $ Left IsolatedBackendPreparationClaimed
+    else do
+      result <- tryAny $ restore
+        $ consumePreparedIsolatedBackendPair prepared callback
+      putMVar completion ()
+      either throwIO pure result
+
+preparedAcquisitionManager
+  :: BackendConfig
+  -> FilePath
+  -> Maybe Int
+  -> MVar ()
+  -> MVar PreparedAcquisitionOutcome
+  -> IO ()
+  -> IO ()
+preparedAcquisitionManager config artifact requestTimeout started outcome
+    afterOutcomePublished =
+  mask $ \restoreSetup -> do
+    acquired <- tryAny $ acquirePreparedIsolatedBackendPair
+      config artifact requestTimeout restoreSetup
+      $ do
+        _ <- tryPutMVar started ()
+        pure ()
+    -- If acquiring the async children itself failed, unblock the scoped caller
+    -- only after that failure is captured by this owner.
+    _ <- tryPutMVar started ()
+    putMVar outcome $ either PreparedAcquisitionException id acquired
+    afterOutcomePublished
+
+acquirePreparedIsolatedBackendPair
+  :: BackendConfig
+  -> FilePath
+  -> Maybe Int
+  -> ( IO (Either IsolatedBackendFailure IsolatedWorker)
+       -> IO (Either IsolatedBackendFailure IsolatedWorker)
+     )
+  -> IO ()
+  -> IO PreparedAcquisitionOutcome
+acquirePreparedIsolatedBackendPair config artifact requestTimeout
+    restoreSetup acquisitionOwned = do
+  registered <- newIORef []
+  attempted <- tryAny $ acquireIsolatedBackendPairWithRegistry
+    registered config artifact requestTimeout restoreSetup acquisitionOwned
+  case attempted of
+    Right acquired -> pure $ PreparedAcquisitionCompleted acquired
+    Left exception -> case fromException exception of
+      Just PreparedAcquisitionDiscard -> do
+        backends <- registeredBackends registered
+        PreparedAcquisitionDiscarded
+          <$> cleanupBackendsUncancellable backends
+      Nothing -> do
+        cleanupRegisteredIgnoringFailures registered
+        throwIO exception
+
+consumePreparedIsolatedBackendPair
+  :: PreparedIsolatedBackendPair
+  -> (IsolatedBackendPair -> IO a)
+  -> IO (Either IsolatedBackendFailure a)
+consumePreparedIsolatedBackendPair prepared callback = mask $ \restore -> do
+  acquired <- tryAny $ restore
+    $ readMVar $ preparedAcquisitionOutcome prepared
+  case acquired of
+    Left primary -> do
+      discardPreparedAcquisitionPreservingPrimary prepared
+      throwIO primary
+    Right outcome -> do
+      -- Publication occurs in the manager's masked tail.  Join its wrapper
+      -- uncancellably before transferring pair ownership to this claim.  The
+      -- manager has no setup or cleanup left after publication, so this join
+      -- cannot inherit an unbounded backend operation.
+      joinPreparedAcquisitionOwner prepared
+      case outcome of
+        PreparedAcquisitionCompleted (Left failure) -> pure $ Left failure
+        PreparedAcquisitionCompleted (Right pair) ->
+          runAcquiredIsolatedBackendPair pair $ restore $ callback pair
+        PreparedAcquisitionDiscarded cleanupFailures -> pure
+          $ attachCleanupFailures cleanupFailures
+          $ Left IsolatedBackendPreparationClaimed
+        PreparedAcquisitionException exception -> throwIO exception
+
+finalizePreparedPairScope
+  :: PreparedIsolatedBackendPair
+  -> IO PreparedPairFinalization
+finalizePreparedPairScope prepared = mask $ \_ -> do
+  disposition <- modifyMVar (preparedClaimState prepared) $ \state ->
+    case state of
+      PreparedPairUnclaimed -> pure
+        (PreparedPairScopeClosed, PreparedScopeDiscard)
+      PreparedPairClaimed claimant completion -> pure
+        ( PreparedPairScopeClosed
+        , PreparedScopeConsume claimant completion
+        )
+      PreparedPairScopeClosed -> pure
+        (PreparedPairScopeClosed, PreparedScopeAlreadyClosed)
+  case disposition of
+    PreparedScopeDiscard -> discardPreparedAcquisition prepared
+    PreparedScopeConsume claimant completion -> do
+      finished <- tryReadMVar completion
+      case finished of
+        Just () -> pure ()
+        Nothing -> do
+          throwTo claimant PreparedRunScopeClosing
+          uninterruptibleMask_ $ readMVar completion
+      pure PreparedPairConsumed
+    PreparedScopeAlreadyClosed -> pure PreparedPairConsumed
+
+discardPreparedAcquisition
+  :: PreparedIsolatedBackendPair
+  -> IO PreparedPairFinalization
+discardPreparedAcquisition prepared = uninterruptibleMask_ $ do
+  cancelWith (preparedAcquisitionOwner prepared) PreparedAcquisitionDiscard
+  joinPreparedAcquisitionOwner prepared
+  outcome <- readMVar $ preparedAcquisitionOutcome prepared
+  case outcome of
+    PreparedAcquisitionCompleted (Left failure) ->
+      pure $ PreparedPairDiscardedWithFailure failure
+    PreparedAcquisitionCompleted (Right pair) -> do
+      closed <- closePreparedUnusedPair pair
+      pure $ either PreparedPairDiscardedWithFailure
+        (const PreparedPairDiscarded) closed
+    PreparedAcquisitionDiscarded [] -> pure PreparedPairDiscarded
+    PreparedAcquisitionDiscarded cleanupFailures -> pure
+      $ PreparedPairDiscardedWithFailure
+      $ IsolatedBackendCleanupFailure Nothing cleanupFailures
+    PreparedAcquisitionException exception -> throwIO exception
+
+joinPreparedAcquisitionOwner :: PreparedIsolatedBackendPair -> IO ()
+joinPreparedAcquisitionOwner prepared = uninterruptibleMask_ $ do
+  _ <- waitCatch $ preparedAcquisitionOwner prepared
+  pure ()
+
+discardPreparedAcquisitionPreservingPrimary
+  :: PreparedIsolatedBackendPair
+  -> IO ()
+discardPreparedAcquisitionPreservingPrimary prepared = do
+  _ <- tryAny $ discardPreparedAcquisition prepared
+  pure ()
+
+closePreparedUnusedPair
+  :: IsolatedBackendPair
+  -> IO (Either IsolatedBackendFailure ())
+closePreparedUnusedPair pair = do
+  (terminalStatus, cleanupFailures) <- closeIsolatedBackendPair pair
+  pure $ attachCleanupFailures cleanupFailures $ case terminalStatus of
+    IsolatedPairHealthy -> Right ()
+    IsolatedPairPoisonedStatus cause ->
+      Left $ IsolatedBackendPairPoisoned cause
+    IsolatedPairClosedStatus -> Left IsolatedBackendPairClosed
+
+runAcquiredIsolatedBackendPair
+  :: IsolatedBackendPair
+  -> IO a
+  -> IO (Either IsolatedBackendFailure a)
+runAcquiredIsolatedBackendPair pair callback = do
+  callbackResult <- tryAny callback
+  cleanupResult <- tryAny $ closeIsolatedBackendPair pair
+  case callbackResult of
+    Left callbackFailure -> throwIO callbackFailure
+    Right value -> case cleanupResult of
+      Left cleanupException -> throwIO cleanupException
+      Right (terminalStatus, cleanupFailures) ->
+        pure $ attachCleanupFailures cleanupFailures
+          $ case terminalStatus of
+          IsolatedPairHealthy -> Right value
+          IsolatedPairPoisonedStatus cause ->
+            Left $ IsolatedBackendPairPoisoned cause
+          IsolatedPairClosedStatus -> Left IsolatedBackendPairClosed
 
 -- | Lease one worker for the whole callback.  At most two lease callbacks can
 -- run simultaneously.  The worker is returned only while both it and the pair
@@ -247,48 +558,64 @@ acquireIsolatedBackendPair
      )
   -> IO (Either IsolatedBackendFailure IsolatedBackendPair)
 acquireIsolatedBackendPair config artifact requestTimeout restoreSetup = do
-    -- The registry closes the ownership gap between each child's masked
-    -- spawn handoff and this parent's ordered result handoff.  In particular,
-    -- cancellation of the parent cannot strand a backend whose child had
-    -- already finished (or whose setup was still in flight).
-    registered <- newIORef []
-    (withAsync
-        (tryAny $ restoreSetup $ acquireWorker registered 1) $ \first ->
-      withAsync
-        (tryAny $ restoreSetup $ acquireWorker registered 2) $ \second -> do
-        -- Both workers start concurrently, but observing worker one first
-        -- preserves the old left-to-right failure contract.  A known
-        -- worker-one failure cancels a possibly non-responsive sibling
-        -- instead of waiting for an outcome which cannot replace it.
-        firstResult <- wait first
-        case firstResult of
-          Left failure -> cancel second >> throwIO failure
-          Right (Left failure) -> do
-            cancel second
-            registeredBackends registered
-              >>= initializationFailure failure
-          Right (Right firstWorker) -> do
-            secondResult <- wait second
-            backends <- registeredBackends registered
-            case secondResult of
-              Left failure -> throwIO failure
-              Right (Left failure) ->
-                initializationFailure failure backends
-              Right (Right secondWorker) -> do
-                state <- atomically $ newTVar IsolatedPairState
-                  { isolatedPairStatus = IsolatedPairHealthy
-                  , isolatedPairAvailable =
-                      [firstWorker, secondWorker]
-                  }
-                pure $ Right IsolatedBackendPair
-                  { isolatedPairWorkers =
-                      [firstWorker, secondWorker]
-                  , isolatedPairState = state
-                  , isolatedPairRequestTimeout = requestTimeout
-                  }) `onException`
-                    cleanupRegisteredIgnoringFailures registered
+  -- The registry closes the ownership gap between each child's masked spawn
+  -- handoff and this parent's ordered result handoff.
+  registered <- newIORef []
+  acquireIsolatedBackendPairWithRegistry registered config artifact
+      requestTimeout restoreSetup (pure ())
+    `onException` cleanupRegisteredIgnoringFailures registered
+
+acquireIsolatedBackendPairWithRegistry
+  :: IORef [(Int, Backend)]
+  -> BackendConfig
+  -> FilePath
+  -> Maybe Int
+  -> ( IO (Either IsolatedBackendFailure IsolatedWorker)
+       -> IO (Either IsolatedBackendFailure IsolatedWorker)
+     )
+  -> IO ()
+  -> IO (Either IsolatedBackendFailure IsolatedBackendPair)
+acquireIsolatedBackendPairWithRegistry registered config artifact
+    requestTimeout restoreSetup acquisitionOwned =
+  withAsync
+      (tryAny $ restoreSetup $ acquireWorker 1) $ \first ->
+    withAsync
+      (tryAny $ restoreSetup $ acquireWorker 2) $ \second -> do
+      -- Publish that both setup children are bracketed before observing
+      -- readiness.  The prepared-pair callback may begin after this point.
+      acquisitionOwned
+      -- Both workers start concurrently, but observing worker one first
+      -- preserves the old left-to-right failure contract.  A known
+      -- worker-one failure cancels a possibly non-responsive sibling instead
+      -- of waiting for an outcome which cannot replace it.
+      firstResult <- wait first
+      case firstResult of
+        Left failure -> cancel second >> throwIO failure
+        Right (Left failure) -> do
+          cancel second
+          registeredBackends registered
+            >>= initializationFailure failure
+        Right (Right firstWorker) -> do
+          secondResult <- wait second
+          backends <- registeredBackends registered
+          case secondResult of
+            Left failure -> throwIO failure
+            Right (Left failure) ->
+              initializationFailure failure backends
+            Right (Right secondWorker) -> do
+              state <- atomically $ newTVar IsolatedPairState
+                { isolatedPairStatus = IsolatedPairHealthy
+                , isolatedPairAvailable =
+                    [firstWorker, secondWorker]
+                }
+              pure $ Right IsolatedBackendPair
+                { isolatedPairWorkers =
+                    [firstWorker, secondWorker]
+                , isolatedPairState = state
+                , isolatedPairRequestTimeout = requestTimeout
+                }
  where
-  acquireWorker registered ordinal = mask $ \restoreWorker -> do
+  acquireWorker ordinal = mask $ \restoreWorker -> do
     spawned <- tryIOException $ restoreWorker $ spawnBackend config
     case spawned of
       Left failure -> pure $ Left $ IsolatedBackendSpawnFailure ordinal
