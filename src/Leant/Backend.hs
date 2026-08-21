@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 -- | Lean REPL backend process management: discovery of the repl executable,
 -- spawning under @lake env@, and the JSON-over-stdio request cycle.
 --
@@ -17,16 +19,31 @@ module Leant.Backend
   , RequestError (..)
   ) where
 
-import Control.Concurrent (ThreadId, forkIOWithUnmask, killThread)
+import Control.Concurrent
+  ( ThreadId
+  , forkIO
+  , forkIOWithUnmask
+  , killThread
+  )
 import Control.Concurrent.MVar
   ( MVar
+  , modifyMVar
   , modifyMVar_
   , newEmptyMVar
   , newMVar
   , putMVar
   , readMVar
   )
-import Control.Exception (IOException, finally, mask, onException, try)
+import Control.Exception
+  ( IOException
+  , SomeException
+  , finally
+  , mask
+  , mask_
+  , onException
+  , throwIO
+  , try
+  )
 import Control.Monad (filterM, forM)
 import qualified Data.ByteString as ByteString
 import Data.List (sortOn)
@@ -60,16 +77,38 @@ import System.IO
   , universalNewlineMode
   , utf8
   )
+import System.IO.Error (isDoesNotExistError, tryIOError)
 import System.Process
   ( CreateProcess (..)
+  , Pid
   , ProcessHandle
   , StdStream (..)
   , createProcess
+  , getPid
   , proc
   , terminateProcess
-  , waitForProcess
   )
 import System.Timeout (timeout)
+
+#ifdef mingw32_HOST_OS
+import System.Process (waitForProcess)
+#else
+import Control.Concurrent (threadDelay)
+import Control.Exception (uninterruptibleMask_)
+import Data.Word (Word64)
+import GHC.Clock (getMonotonicTimeNSec)
+import System.Process (getProcessExitCode)
+#endif
+
+#ifndef mingw32_HOST_OS
+import System.Posix.Signals
+  ( Signal
+  , nullSignal
+  , sigKILL
+  , sigTERM
+  , signalProcessGroup
+  )
+#endif
 
 import Leant.Json (JValue, encodeJson, parseJson)
 
@@ -90,10 +129,16 @@ data Backend = Backend
   , beOut :: Handle
   , beErr :: Handle
   , beProc :: ProcessHandle
+  , beProcessGroupIdentifier :: Maybe Integer
   , beErrCapture :: MVar CapturedStderr
   , beErrDone :: MVar ()
   , beErrThread :: ThreadId
+  , beCleanupState :: MVar BackendCleanupState
   }
+
+data BackendCleanupState
+  = BackendCleanupNotStarted
+  | BackendCleanupRunning (MVar (Either SomeException ()))
 
 data CapturedStderr = CapturedStderr
   { capturedStderrTruncated :: !Bool
@@ -214,22 +259,35 @@ spawnBackend config = mask $ \restore -> do
       , std_in = CreatePipe
       , std_out = CreatePipe
       , std_err = CreatePipe
+      , create_group = True
+      , use_process_jobs = True
       }
-  case created of
-    (Just hIn, Just hOut, Just hErr, ph) ->
-      finish restore hIn hOut hErr ph
-        `onException` cleanupCreatedProcess hIn hOut hErr ph
-    (maybeIn, maybeOut, maybeErr, ph) -> do
-      cleanupIncompleteProcess maybeIn maybeOut maybeErr ph
-      ioError $ userError "backend process did not create all three pipes"
+  let (_, _, _, process) = created
+  processGroupIdentifier <- captureProcessGroupIdentifier process
+  case processGroupIdentifier of
+    Nothing -> do
+      let (maybeIn, maybeOut, maybeErr, ph) = created
+      cleanupIncompleteProcess maybeIn maybeOut maybeErr ph Nothing
+      ioError $ userError
+        "backend process did not expose its owned process-group identifier"
+    Just _ -> case created of
+      (Just hIn, Just hOut, Just hErr, ph) ->
+        finish restore hIn hOut hErr ph processGroupIdentifier
+          `onException` cleanupCreatedProcess hIn hOut hErr ph
+            processGroupIdentifier
+      (maybeIn, maybeOut, maybeErr, ph) -> do
+        cleanupIncompleteProcess maybeIn maybeOut maybeErr ph
+          processGroupIdentifier
+        ioError $ userError "backend process did not create all three pipes"
  where
-  finish restore hIn hOut hErr ph = do
+  finish restore hIn hOut hErr ph processGroupIdentifier = do
     _ <- restore $ do
       mapM_ prepareText [hIn, hOut]
       hSetBinaryMode hErr True
       hSetBuffering hErr NoBuffering
     capture <- newMVar $ CapturedStderr False ByteString.empty
     done <- newEmptyMVar
+    cleanupState <- newMVar BackendCleanupNotStarted
     drainThread <- forkIOWithUnmask $ \unmask ->
       unmask (captureStderr hErr capture) `finally` putMVar done ()
     pure Backend
@@ -237,9 +295,11 @@ spawnBackend config = mask $ \restore -> do
       , beOut = hOut
       , beErr = hErr
       , beProc = ph
+      , beProcessGroupIdentifier = processGroupIdentifier
       , beErrCapture = capture
       , beErrDone = done
       , beErrThread = drainThread
+      , beCleanupState = cleanupState
       }
 
   prepareText h = do
@@ -248,29 +308,201 @@ spawnBackend config = mask $ \restore -> do
     hSetBuffering h LineBuffering
 
 cleanupCreatedProcess
-  :: Handle -> Handle -> Handle -> ProcessHandle -> IO ()
-cleanupCreatedProcess hIn hOut hErr process = do
-  closeQuietly hIn
-  terminateAndWait process
-  mapM_ closeQuietly [hOut, hErr]
+  :: Handle
+  -> Handle
+  -> Handle
+  -> ProcessHandle
+  -> Maybe Integer
+  -> IO ()
+cleanupCreatedProcess hIn hOut hErr process processGroupIdentifier = do
+  runCleanupActionsPreservingFirstFailure
+    [ terminateProcessTree process processGroupIdentifier
+    , closeQuietly hIn
+    , closeQuietly hOut
+    , closeQuietly hErr
+    ]
 
 cleanupIncompleteProcess
   :: Maybe Handle
   -> Maybe Handle
   -> Maybe Handle
   -> ProcessHandle
+  -> Maybe Integer
   -> IO ()
-cleanupIncompleteProcess maybeIn maybeOut maybeErr process = do
-  mapM_ closeQuietly maybeIn
-  terminateAndWait process
-  mapM_ closeQuietly maybeOut
-  mapM_ closeQuietly maybeErr
+cleanupIncompleteProcess maybeIn maybeOut maybeErr process
+    processGroupIdentifier = do
+  runCleanupActionsPreservingFirstFailure
+    $ terminateProcessTree process processGroupIdentifier
+    : map closeQuietly (catMaybes [maybeIn, maybeOut, maybeErr])
 
-terminateAndWait :: ProcessHandle -> IO ()
-terminateAndWait process = do
-  _ <- try (terminateProcess process) :: IO (Either IOException ())
-  _ <- try (waitForProcess process) :: IO (Either IOException ExitCode)
-  pure ()
+captureProcessGroupIdentifier :: ProcessHandle -> IO (Maybe Integer)
+captureProcessGroupIdentifier process = do
+  captured <- tryIOError $ getPid process
+  pure $ case captured of
+    Right (Just pid) -> Just $ toInteger (pid :: Pid)
+    _ -> Nothing
+
+-- | Terminate the complete process tree without ever addressing the caller's
+-- process group.  POSIX children are born as leaders of a dedicated group,
+-- whose identifier is captured before startup can return.  Keeping the direct
+-- wrapper unreaped until after group escalation also prevents its numeric PID
+-- from being reused while it is still being used as the group address.
+-- Windows' @use_process_jobs@ makes 'terminateProcess' operate on the Job; its
+-- matching bounded 'waitForProcess' observes all processes in that Job.
+terminateProcessTree :: ProcessHandle -> Maybe Integer -> IO ()
+terminateProcessTree process processGroupIdentifier =
+#ifdef mingw32_HOST_OS
+  mask_ $ do
+    -- TerminateJobObject kills the whole Job; waitForProcess then waits for
+    -- Job completion, rather than merely observing the already-exited wrapper.
+    processGroupIdentifier `seq` pure ()
+    terminateDirectProcess process
+    waited <- boundedWaitForJobProcess
+      process processReapWaitMicroseconds
+    case waited of
+      Just _ -> pure ()
+      Nothing -> do
+        terminateDirectProcess process
+        waitedAgain <- boundedWaitForJobProcess
+          process processReapWaitMicroseconds
+        case waitedAgain of
+          Just _ -> pure ()
+          Nothing -> ioError $ userError
+            "backend process Job did not complete after termination"
+#else
+  uninterruptibleMask_ $ do
+    case processGroupIdentifier of
+      Nothing -> do
+        terminateDirectProcess process
+        requireDirectProcessReaped process
+      Just identifier -> do
+        termResult <- signalOwnedProcessGroup sigTERM identifier
+        case termResult of
+          OwnedProcessGroupGone -> requireDirectProcessReaped process
+          OwnedProcessGroupSignalled -> do
+            groupGone <- waitForOwnedProcessGroup
+              identifier processTerminationGraceMicroseconds
+            if groupGone
+              then requireDirectProcessReaped process
+              else do
+                killResult <- signalOwnedProcessGroup sigKILL identifier
+                requireDirectProcessReaped process
+                case killResult of
+                  OwnedProcessGroupGone -> pure ()
+                  OwnedProcessGroupSignalled -> do
+                    killedGroupGone <- waitForOwnedProcessGroup identifier
+                      processGroupKillWaitMicroseconds
+                    if killedGroupGone
+                      then pure ()
+                      else ioError $ userError
+                        "backend process group remained after SIGKILL"
+#endif
+
+terminateDirectProcess :: ProcessHandle -> IO ()
+terminateDirectProcess process = do
+  attempted <- tryIOError $ terminateProcess process
+  case attempted of
+    Right () -> pure ()
+    Left failure
+      | isDoesNotExistError failure -> pure ()
+      | otherwise -> ioError failure
+
+#ifndef mingw32_HOST_OS
+requireDirectProcessReaped :: ProcessHandle -> IO ()
+requireDirectProcessReaped process = do
+  reaped <- boundedReapDirectProcess process processReapWaitMicroseconds
+  case reaped of
+    Just _ -> pure ()
+    Nothing -> do
+      terminateDirectProcess process
+      reapedAfterFallback <- boundedReapDirectProcess
+        process processReapWaitMicroseconds
+      case reapedAfterFallback of
+        Just _ -> pure ()
+        Nothing -> ioError $ userError
+          "backend wrapper did not exit after process-tree termination"
+
+boundedReapDirectProcess
+  :: ProcessHandle -> Int -> IO (Maybe ExitCode)
+boundedReapDirectProcess process microseconds = do
+  started <- getMonotonicTimeNSec
+  let deadline = toInteger started + toInteger microseconds * 1000
+  go deadline
+ where
+  go deadline = do
+    observed <- getProcessExitCode process
+    case observed of
+      Just status -> pure $ Just status
+      Nothing -> do
+        now <- getMonotonicTimeNSec
+        if toInteger now >= deadline
+          then pure Nothing
+          else do
+            threadDelay $ boundedPollingDelay deadline now
+            go deadline
+
+boundedPollingDelay :: Integer -> Word64 -> Int
+boundedPollingDelay deadline now = fromInteger
+  $ max 1 $ min processPollingMicroseconds
+  $ (deadline - toInteger now + 999) `div` 1000
+#endif
+
+#ifdef mingw32_HOST_OS
+boundedWaitForJobProcess
+  :: ProcessHandle -> Int -> IO (Maybe ExitCode)
+boundedWaitForJobProcess process microseconds =
+  timeout microseconds $ waitForProcess process
+#endif
+
+#ifndef mingw32_HOST_OS
+data OwnedProcessGroupSignalResult
+  = OwnedProcessGroupSignalled
+  | OwnedProcessGroupGone
+
+signalOwnedProcessGroup
+  :: Signal -> Integer -> IO OwnedProcessGroupSignalResult
+signalOwnedProcessGroup signal identifier = do
+  signalled <- tryIOError $ signalProcessGroup signal $ fromInteger identifier
+  case signalled of
+    Right () -> pure OwnedProcessGroupSignalled
+    Left failure
+      | isDoesNotExistError failure -> pure OwnedProcessGroupGone
+      | otherwise -> ioError failure
+
+waitForOwnedProcessGroup :: Integer -> Int -> IO Bool
+waitForOwnedProcessGroup identifier microseconds = do
+  started <- getMonotonicTimeNSec
+  let deadline = toInteger started + toInteger microseconds * 1000
+  go deadline
+ where
+  go deadline = do
+    observation <- signalOwnedProcessGroup nullSignal identifier
+    case observation of
+      OwnedProcessGroupGone -> pure True
+      OwnedProcessGroupSignalled -> do
+        now <- getMonotonicTimeNSec
+        if toInteger now >= deadline
+          then pure False
+          else do
+            threadDelay $ boundedPollingDelay deadline now
+            go deadline
+#endif
+
+#ifndef mingw32_HOST_OS
+processTerminationGraceMicroseconds :: Int
+processTerminationGraceMicroseconds = 200000
+
+processGroupKillWaitMicroseconds :: Int
+processGroupKillWaitMicroseconds = 500000
+#endif
+
+processReapWaitMicroseconds :: Int
+processReapWaitMicroseconds = 500000
+
+#ifndef mingw32_HOST_OS
+processPollingMicroseconds :: Integer
+processPollingMicroseconds = 5000
+#endif
 
 closeQuietly :: Handle -> IO ()
 closeQuietly handle = do
@@ -281,9 +513,34 @@ closeQuietly handle = do
 -- give the stderr-capture thread a bounded window to finish, then close
 -- the remaining handles.
 killBackend :: Backend -> IO ()
-killBackend backend = do
-  closeQuietly $ beIn backend
-  terminateAndWait $ beProc backend
+killBackend backend = mask_ $ do
+  completion <- modifyMVar (beCleanupState backend) $ \state -> case state of
+    BackendCleanupNotStarted -> do
+      done <- newEmptyMVar
+      _ <- forkIO $ do
+        attempted <- try (cleanupBackend backend)
+          :: IO (Either SomeException ())
+        modifyMVar_ (beCleanupState backend) $ const $ pure $ case attempted of
+          Right () -> BackendCleanupRunning done
+          Left _ -> BackendCleanupNotStarted
+        putMVar done attempted
+      pure (BackendCleanupRunning done, done)
+    BackendCleanupRunning done -> pure (state, done)
+  readMVar completion >>= either throwIO pure
+
+cleanupBackend :: Backend -> IO ()
+cleanupBackend backend = mask_ $
+  runCleanupActionsPreservingFirstFailure
+    [ terminateProcessTree
+        (beProc backend) (beProcessGroupIdentifier backend)
+    , closeQuietly $ beIn backend
+    , stopBackendStderrCapture backend
+    , closeQuietly $ beOut backend
+    , closeQuietly $ beErr backend
+    ]
+
+stopBackendStderrCapture :: Backend -> IO ()
+stopBackendStderrCapture backend = do
   drained <- timeout 1000000 $ readMVar (beErrDone backend)
   case drained of
     Just () -> pure ()
@@ -292,7 +549,23 @@ killBackend backend = do
       _ <- timeout stderrCompletionWaitMicroseconds
         $ readMVar (beErrDone backend)
       pure ()
-  mapM_ closeQuietly [beOut backend, beErr backend]
+
+runCleanupActionsPreservingFirstFailure :: [IO ()] -> IO ()
+runCleanupActionsPreservingFirstFailure [] = pure ()
+runCleanupActionsPreservingFirstFailure (action : remaining) =
+  runCleanupPreservingPrimaryFailure action
+    $ runCleanupActionsPreservingFirstFailure remaining
+
+runCleanupPreservingPrimaryFailure :: IO () -> IO () -> IO ()
+runCleanupPreservingPrimaryFailure primaryAction cleanupAction =
+  mask $ \restore -> do
+    primaryResult <- try (restore primaryAction)
+      :: IO (Either SomeException ())
+    cleanupResult <- try cleanupAction
+      :: IO (Either SomeException ())
+    case primaryResult of
+      Left primaryFailure -> throwIO primaryFailure
+      Right () -> either throwIO pure cleanupResult
 
 -- Request cycle -------------------------------------------------------------
 

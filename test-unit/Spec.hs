@@ -62,6 +62,7 @@ import System.IO
   )
 import System.Info (os)
 import System.IO.Unsafe (unsafePerformIO)
+import System.Process (createProcess, proc)
 import System.Timeout (timeout)
 import Test.Tasty (TestTree, defaultMain, testGroup, withResource)
 import Test.Tasty.HUnit ((@?=), assertBool, assertFailure, testCase)
@@ -607,9 +608,16 @@ import Leant.Session.Snapshot
 main :: IO ()
 main = do
   arguments <- getArgs
-  if arguments == ["env", backendStderrFloodMode]
-    then backendStderrFloodHelper
-    else defaultMain $ testGroup "Leant synthesis boundary"
+  case arguments of
+    ["env", mode]
+      | mode == backendStderrFloodMode -> backendStderrFloodHelper
+      | backendProcessTreeWrapperPrefix `isPrefixOf` mode ->
+          backendProcessTreeWrapperHelper
+            $ drop (length backendProcessTreeWrapperPrefix) mode
+    [mode, heartbeatPath]
+      | mode == backendProcessTreeGrandchildMode ->
+          backendProcessTreeGrandchildHelper heartbeatPath
+    _ -> defaultMain $ testGroup "Leant synthesis boundary"
       [ commandLineTests
       , backendDiscoveryTests
       , backendLifecycleTests
@@ -763,7 +771,106 @@ backendDiscoveryTests = testGroup "Lean backend discovery"
 
 backendLifecycleTests :: TestTree
 backendLifecycleTests = testGroup "Lean backend lifecycle"
-  [ testCase "drain oversized stderr while awaiting a response" $ do
+  [ testCase "spawn and tear down only an explicitly owned process tree" $ do
+      source <- readFile "src/Leant/Backend.hs"
+      assertBool "backend spawn did not request a dedicated process group"
+        $ "create_group = True" `isInfixOf` source
+      assertBool "backend spawn did not request a Windows process Job"
+        $ "use_process_jobs = True" `isInfixOf` source
+      assertBool "backend spawn did not capture its group leader PID"
+        $ "getPid process" `isInfixOf` source
+      assertBool "POSIX cleanup did not signal the owned group with SIGTERM"
+        $ "signalOwnedProcessGroup sigTERM" `isInfixOf` source
+      assertBool "POSIX cleanup did not escalate the owned group to SIGKILL"
+        $ "signalOwnedProcessGroup sigKILL" `isInfixOf` source
+      assertBool "POSIX cleanup did not wait for post-SIGKILL disappearance"
+        $ "processGroupKillWaitMicroseconds" `isInfixOf` source
+          && "backend process group remained after SIGKILL" `isInfixOf` source
+      assertBool "process-group errors were not restricted to benign ESRCH"
+        $ "isDoesNotExistError failure" `isInfixOf` source
+          && "otherwise -> ioError failure" `isInfixOf` source
+      assertBool "Windows Job cleanup lacked a bounded completion failure"
+        $ "timeout microseconds $ waitForProcess process" `isInfixOf` source
+          && "backend process Job did not complete after termination"
+            `isInfixOf` source
+      assertBool "direct wrapper observation still collapsed IO failures"
+        $ not $ "tryIOError $ getProcessExitCode" `isInfixOf` source
+      assertBool "complete-pipe startup cleanup lacked an unconditional tail"
+        $ "cleanupCreatedProcess hIn hOut hErr process processGroupIdentifier = do\n  runCleanupActionsPreservingFirstFailure"
+          `isInfixOf` source
+      assertBool "partial-pipe startup cleanup lacked an unconditional tail"
+        $ "cleanupIncompleteProcess maybeIn maybeOut maybeErr process\n    processGroupIdentifier = do\n  runCleanupActionsPreservingFirstFailure"
+          `isInfixOf` source
+      assertBool "backend cleanup did not guard every local resource cleanup"
+        $ "cleanupBackend backend = mask_ $\n  runCleanupActionsPreservingFirstFailure"
+          `isInfixOf` source
+          && all (`isInfixOf` source)
+            [ "stopBackendStderrCapture backend"
+            , "closeQuietly $ beOut backend"
+            , "closeQuietly $ beErr backend"
+            ]
+      assertBool "the cleanup combinator did not preserve the tree failure"
+        $ "Left primaryFailure -> throwIO primaryFailure" `isInfixOf` source
+      assertBool "failed backend cleanup remained permanently memoized"
+        $ "Left _ -> BackendCleanupNotStarted" `isInfixOf` source
+  , testCase "terminate backend descendants and stop their heartbeat" $
+      withTemporaryDirectory "leant-backend-process-tree" $ \root -> do
+        executable <- getExecutablePath
+        workingDirectory <- getCurrentDirectory
+        let heartbeatPath =
+              root </> "grandchild heartbeat path with spaces.log"
+            wrapperExitedPath =
+              backendProcessTreeWrapperExitedPath heartbeatPath
+            wrapperArgument =
+              backendProcessTreeWrapperPrefix ++ heartbeatPath
+        assertBool "the grandchild path did not exercise argument spaces"
+          $ ' ' `elem` heartbeatPath
+        backend <- spawnBackend BackendConfig
+          { bcLakePath = executable
+          , bcReplExe = wrapperArgument
+          , bcWorkingDir = workingDirectory
+          }
+        let cleanup = do
+              cleaned <- timeout 4000000 $ killBackend backend
+              case cleaned of
+                Just () -> pure ()
+                Nothing -> assertFailure
+                  "backend process-tree cleanup did not return"
+        flip finally cleanup $ do
+          wrapperExited <- timeout 3000000
+            $ waitForHeartbeat wrapperExitedPath
+          case wrapperExited of
+            Just () -> pure ()
+            Nothing -> assertFailure
+              "fake Lake wrapper did not exit after launching its child"
+          observed <- timeout 3000000 $ waitForHeartbeat heartbeatPath
+          case observed of
+            Just () -> pure ()
+            Nothing -> assertFailure
+              "backend grandchild did not establish its heartbeat"
+          firstCleanup <- async $ killBackend backend
+          threadDelay 20000
+          firstState <- poll firstCleanup
+          when (os /= "mingw32" && isJust firstState) $ assertFailure
+            "POSIX cleanup skipped the bounded SIGTERM grace"
+          cancel firstCleanup
+          _ <- waitCatch firstCleanup
+          concurrentCleanups <- replicateM 4 $ async $ killBackend backend
+          completed <- timeout 4000000 $ mapM waitCatch concurrentCleanups
+          case completed of
+            Nothing -> assertFailure
+              "concurrent repeated backend cleanups did not return"
+            Just outcomes -> mapM_ (\case
+                Left failure -> assertFailure
+                  $ "repeated backend cleanup failed: " ++ show failure
+                Right () -> pure ()) outcomes
+          stabilized <- timeout 2000000
+            $ waitForStableHeartbeat heartbeatPath
+          case stabilized of
+            Just () -> pure ()
+            Nothing -> assertFailure
+              "backend descendant continued work after killBackend returned"
+  , testCase "drain oversized stderr while awaiting a response" $ do
       executable <- getExecutablePath
       workingDirectory <- getCurrentDirectory
       backend <- spawnBackend BackendConfig
@@ -800,6 +907,16 @@ backendLifecycleTests = testGroup "Lean backend lifecycle"
 backendStderrFloodMode :: String
 backendStderrFloodMode = "__leant_backend_stderr_flood__"
 
+backendProcessTreeWrapperPrefix :: String
+backendProcessTreeWrapperPrefix = "__leant_backend_process_tree_wrapper__:"
+
+backendProcessTreeGrandchildMode :: String
+backendProcessTreeGrandchildMode = "__leant_backend_process_tree_grandchild__"
+
+backendProcessTreeWrapperExitedPath :: FilePath -> FilePath
+backendProcessTreeWrapperExitedPath heartbeatPath =
+  heartbeatPath ++ ".wrapper-exited"
+
 backendStderrTailBytes :: Int
 backendStderrTailBytes = 64 * 1024
 
@@ -823,6 +940,67 @@ backendStderrFloodHelper = do
   consumeInput = do
     bytes <- ByteString.hGetSome stdin 4096
     unless (ByteString.null bytes) consumeInput
+
+backendProcessTreeWrapperHelper :: FilePath -> IO ()
+backendProcessTreeWrapperHelper heartbeatPath = do
+  executable <- getExecutablePath
+  let specification
+        | os == "mingw32" = proc executable
+            [backendProcessTreeGrandchildMode, heartbeatPath]
+        | otherwise = proc "/bin/sh"
+            [ "-c"
+            , "trap '' TERM; exec \"$1\" \"$2\" \"$3\""
+            , "leant-backend-grandchild"
+            , executable
+            , backendProcessTreeGrandchildMode
+            , heartbeatPath
+            ]
+  void $ createProcess specification
+  -- Exit the direct wrapper immediately.  The backend must retain the group
+  -- address/Job strongly enough to stop this inherited descendant later.
+  writeFile (backendProcessTreeWrapperExitedPath heartbeatPath)
+    "wrapper launched child and is exiting\n"
+
+backendProcessTreeGrandchildHelper :: FilePath -> IO ()
+backendProcessTreeGrandchildHelper heartbeatPath = do
+ heartbeat 1500
+ where
+  -- The finite lifetime is only a final leak guard for a failed cleanup: the
+  -- lifecycle test expects the owned process tree to stop within milliseconds.
+  heartbeat :: Int -> IO ()
+  heartbeat 0 = pure ()
+  heartbeat remaining = do
+    BS.appendFile heartbeatPath $ BS.singleton 'H'
+    threadDelay 10000
+    heartbeat $ remaining - 1
+
+waitForHeartbeat :: FilePath -> IO ()
+waitForHeartbeat heartbeatPath = do
+  exists <- doesFileExist heartbeatPath
+  if exists
+    then do
+      bytes <- ByteString.readFile heartbeatPath
+      if ByteString.null bytes
+        then pollHeartbeat
+        else pure ()
+    else pollHeartbeat
+ where
+  pollHeartbeat = threadDelay 10000 >> waitForHeartbeat heartbeatPath
+
+waitForStableHeartbeat :: FilePath -> IO ()
+waitForStableHeartbeat heartbeatPath = do
+  initial <- ByteString.length <$> ByteString.readFile heartbeatPath
+  observe initial 0
+ where
+  observe :: Int -> Int -> IO ()
+  observe previous stablePolls = do
+    threadDelay 20000
+    current <- ByteString.length <$> ByteString.readFile heartbeatPath
+    if current == previous
+      then if stablePolls >= 24
+        then pure ()
+        else observe current $ stablePolls + 1
+      else observe current 0
 
 withTemporaryDirectory :: String -> (FilePath -> IO a) -> IO a
 withTemporaryDirectory template action = do
