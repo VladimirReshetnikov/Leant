@@ -3,17 +3,39 @@
 module Main (main) where
 
 import Control.Concurrent
-  ( myThreadId
+  ( ThreadId
+  , forkIO
+  , myThreadId
   , newEmptyMVar
   , putMVar
   , readMVar
   , takeMVar
   , threadDelay
   )
-import Control.Concurrent.Async (async, cancel, poll, waitCatch)
-import Control.Monad (replicateM, unless, void, when, zipWithM_)
+import Control.Concurrent.Async
+  ( async
+  , asyncThreadId
+  , cancel
+  , poll
+  , waitCatch
+  )
+import Control.Monad
+  ( forM
+  , forever
+  , replicateM
+  , unless
+  , void
+  , when
+  , zipWithM_
+  )
 import Control.DeepSeq (rnf)
-import Control.Exception (SomeException, evaluate, finally, throwIO, try)
+import Control.Exception
+  ( SomeException
+  , evaluate
+  , finally
+  , throwIO
+  , try
+  )
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as BS
 import Data.Char (isAlphaNum, toLower)
@@ -31,6 +53,11 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as TextEncoding
 import Data.Word (Word8)
+import GHC.Conc
+  ( BlockReason (BlockedOnMVar)
+  , ThreadStatus (ThreadBlocked, ThreadDied, ThreadFinished)
+  , threadStatus
+  )
 import Numeric.Natural (Natural)
 import System.Directory
   ( canonicalizePath
@@ -38,6 +65,7 @@ import System.Directory
   , createDirectory
   , createDirectoryIfMissing
   , createFileLink
+  , doesDirectoryExist
   , doesFileExist
   , findExecutable
   , getCurrentDirectory
@@ -54,15 +82,17 @@ import System.FilePath ((</>), normalise, takeDirectory)
 import System.IO
   ( hClose
   , hFlush
+  , hGetLine
   , hSetBinaryMode
   , openBinaryTempFile
   , stderr
   , stdin
   , stdout
   )
+import System.IO.Error (isAlreadyExistsError)
 import System.Info (os)
 import System.IO.Unsafe (unsafePerformIO)
-import System.Process (createProcess, proc)
+import System.Process (createProcess, getCurrentPid, proc)
 import System.Timeout (timeout)
 import Test.Tasty (TestTree, defaultMain, testGroup, withResource)
 import Test.Tasty.HUnit ((@?=), assertBool, assertFailure, testCase)
@@ -131,6 +161,13 @@ import Leant.Backend
   , spawnBackend
   )
 import qualified Leant.Backend as Backend
+import Leant.Backend.Isolated
+  ( IsolatedBackendFailure (..)
+  , IsolatedBackendTransportFailure (..)
+  , runIsolatedBackendCommand
+  , withIsolatedBackendLease
+  , withIsolatedBackendPair
+  )
 import qualified Leant.Json as Json
 import Leant.Json.Bounded
   ( BoundedJsonError (..)
@@ -614,6 +651,9 @@ main = do
       | backendProcessTreeWrapperPrefix `isPrefixOf` mode ->
           backendProcessTreeWrapperHelper
             $ drop (length backendProcessTreeWrapperPrefix) mode
+      | isolatedBackendFakePrefix `isPrefixOf` mode ->
+          isolatedBackendFakeHelper
+            $ drop (length isolatedBackendFakePrefix) mode
     [mode, heartbeatPath]
       | mode == backendProcessTreeGrandchildMode ->
           backendProcessTreeGrandchildHelper heartbeatPath
@@ -621,6 +661,7 @@ main = do
       [ commandLineTests
       , backendDiscoveryTests
       , backendLifecycleTests
+      , isolatedBackendPairTests
       , boundedJsonTests
       , snapshotMetadataTests
       , sessionReplayTests
@@ -904,6 +945,833 @@ backendLifecycleTests = testGroup "Lean backend lifecycle"
             "closed backend request blocked after stdout reached EOF"
   ]
 
+isolatedBackendPairTests :: TestTree
+isolatedBackendPairTests = testGroup "isolated Lean backend pair"
+  [ testCase "capture terminal status in the atomic close transition" $ do
+      sourceLines <- lines <$> readFile "src/Leant/Backend/Isolated.hs"
+      let pairBracket = unlines $ mainSourceSection
+            "withIsolatedBackendPair config artifact requestTimeout callback ="
+            "-- | Lease one worker" sourceLines
+          closeSection = unlines $ mainSourceSection
+            "closeIsolatedBackendPair pair = mask"
+            "cleanupBackends ::" sourceLines
+          atomicClose =
+            "terminalStatus <- atomically $ do\n\
+            \    state <- readTVar $ isolatedPairState pair\n\
+            \    writeTVar (isolatedPairState pair) state\n\
+            \      { isolatedPairStatus = IsolatedPairClosedStatus\n\
+            \      , isolatedPairAvailable = []\n\
+            \      }\n\
+            \    pure $ isolatedPairStatus state"
+      assertBool "pair bracket still sampled status before closing"
+        $ not $ "terminalStatus <- atomically" `isInfixOf` pairBracket
+      assertBool "pair bracket did not decide from close's captured status"
+        $ "Right (terminalStatus, cleanupFailures)" `isInfixOf` pairBracket
+      assertBool "close did not capture status and transition atomically"
+        $ atomicClose `isInfixOf` closeSection
+  , testCase "restore two distinct workers and retain each leased environment" $
+      withTemporaryDirectory "leant isolated backend" $ \root -> do
+        let artifact = root </> "snapshot artifact with spaces.olean"
+        config <- isolatedFakeBackendConfig root "healthy" Nothing
+        paired <- withIsolatedBackendPair config artifact (Just 2) $ \pair -> do
+          firstReady <- newEmptyMVar
+          secondReady <- newEmptyMVar
+          release <- newEmptyMVar
+          first <- async $ withIsolatedBackendLease pair $ \lease -> do
+            putMVar firstReady ()
+            readMVar release
+            runIsolatedBackendCommand lease "simultaneous-first"
+          second <- async $ withIsolatedBackendLease pair $ \lease -> do
+            putMVar secondReady ()
+            readMVar release
+            runIsolatedBackendCommand lease "simultaneous-second"
+          ready <- timeout 3000000 $ do
+            readMVar firstReady
+            readMVar secondReady
+          putMVar release ()
+          case ready of
+            Nothing -> assertFailure
+              "two isolated workers could not be leased simultaneously"
+            Just () -> pure ()
+          completed <- timeout 3000000 $ do
+            firstResult <- waitCatch first
+            secondResult <- waitCatch second
+            pure [firstResult, secondResult]
+          identities <- case completed of
+            Nothing -> assertFailure
+              "simultaneous isolated requests did not complete"
+              >> pure []
+            Just outcomes -> mapM expectAsyncIsolatedCommand outcomes
+          workers <- mapM (requireJsonInteger "worker") identities
+          pids <- mapM (requireJsonInteger "pid") identities
+          environments <- mapM (requireJsonInteger "seenEnv") identities
+          Set.fromList workers @?= Set.fromList [1, 2]
+          assertBool "isolated backends reused one operating-system process"
+            $ Set.size (Set.fromList pids) == 2
+          assertBool "isolated backends reused one process-local environment"
+            $ Set.size (Set.fromList environments) == 2
+          zipWithM_ (\worker environment ->
+              environment @?= isolatedFakeEnvironment worker)
+            workers environments
+          sequential <- withIsolatedBackendLease pair $ \lease -> do
+            firstResponse <- runIsolatedBackendCommand lease "sequence-one"
+            secondResponse <- runIsolatedBackendCommand lease "sequence-two"
+            pure (firstResponse, secondResponse)
+          (firstResponse, secondResponse) <-
+            expectSequentialIsolatedCommands sequential
+          firstPid <- requireJsonInteger "pid" firstResponse
+          secondPid <- requireJsonInteger "pid" secondResponse
+          firstEnvironment <- requireJsonInteger "seenEnv" firstResponse
+          secondEnvironment <- requireJsonInteger "seenEnv" secondResponse
+          firstSequence <- requireJsonInteger "sequence" firstResponse
+          secondSequence <- requireJsonInteger "sequence" secondResponse
+          secondPid @?= firstPid
+          secondEnvironment @?= firstEnvironment
+          secondSequence @?= firstSequence + 1
+        paired @?= Right ()
+        mapM_ (assertFakeWorkerStopped root) [1, 2]
+        firstPath <- readFile $ isolatedFakeSetupPath root 1
+        secondPath <- readFile $ isolatedFakeSetupPath root 2
+        firstPath @?= artifact
+        secondPath @?= artifact
+        setupOrder <- lines <$> readFile (root </> "setup-order.log")
+        setupOrder @?= ["1", "2"]
+  , testCase "return fatal, error, and sorry JSON without poisoning" $
+      withTemporaryDirectory "leant isolated valid responses" $ \root -> do
+        config <- isolatedFakeBackendConfig root "healthy" Nothing
+        paired <- withIsolatedBackendPair config
+          (root </> "valid response snapshot") (Just 2) $ \pair -> do
+            leased <- withIsolatedBackendLease pair $ \lease ->
+              forM ["fatal", "error", "sorry", "identity"]
+                $ runIsolatedBackendCommand lease
+            responses <- case leased of
+              Left failure -> assertFailure
+                ("valid response lease failed: " ++ show failure)
+                >> pure []
+              Right results -> mapM expectIsolatedCommand results
+            length responses @?= 4
+            case responses of
+              fatalResponse : errorResponse : sorryResponse : finalResponse : [] -> do
+                Json.jLookup "message" fatalResponse @?=
+                  Just (Json.JStr "fake command fatal")
+                assertBool "error response lost its messages"
+                  $ isJust $ Json.jLookup "messages" errorResponse
+                assertBool "sorry response lost its sorries"
+                  $ isJust $ Json.jLookup "sorries" sorryResponse
+                worker <- requireJsonInteger "worker" finalResponse
+                seen <- requireJsonInteger "seenEnv" finalResponse
+                seen @?= isolatedFakeEnvironment worker
+              _ -> assertFailure "valid response batch had the wrong shape"
+        paired @?= Right ()
+        mapM_ (assertFakeWorkerStopped root) [1, 2]
+  , testCase "reject a lease after its callback releases the worker" $
+      withTemporaryDirectory "leant isolated closed lease" $ \root -> do
+        config <- isolatedFakeBackendConfig root "healthy" Nothing
+        paired <- withIsolatedBackendPair config
+          (root </> "closed lease snapshot") (Just 2) $ \pair -> do
+            escaped <- withIsolatedBackendLease pair pure
+            staleLease <- case escaped of
+              Left failure -> assertFailure
+                ("could not acquire lease: " ++ show failure)
+                >> error "unreachable"
+              Right lease -> pure lease
+            staleResult <- runIsolatedBackendCommand staleLease "stale"
+            staleResult @?= Left IsolatedBackendLeaseClosed
+            healthy <- withIsolatedBackendLease pair $ \lease ->
+              runIsolatedBackendCommand lease "fresh"
+            case healthy of
+              Left failure -> assertFailure
+                $ "fresh lease failed: " ++ show failure
+              Right commandResult -> void $ expectIsolatedCommand commandResult
+        paired @?= Right ()
+        mapM_ (assertFakeWorkerStopped root) [1, 2]
+  , testCase "keep an idle worker healthy across a lease callback exception" $
+      withTemporaryDirectory "leant isolated idle callback exception" $ \root -> do
+        config <- isolatedFakeBackendConfig root "healthy" Nothing
+        paired <- withIsolatedBackendPair config
+          (root </> "idle callback exception snapshot") (Just 2) $ \pair -> do
+            attempted <- try $ withIsolatedBackendLease pair $ \_ ->
+              ioError $ userError "isolated lease callback sentinel"
+            case (attempted :: Either SomeException
+                (Either IsolatedBackendFailure ())) of
+              Left failure -> assertBool
+                "lease callback exception was replaced"
+                $ "isolated lease callback sentinel" `isInfixOf` show failure
+              Right value -> assertFailure
+                $ "lease callback exception became a value: " ++ show value
+            healthy <- withIsolatedBackendLease pair $ \lease ->
+              runIsolatedBackendCommand lease "after-callback-exception"
+            case healthy of
+              Left failure -> assertFailure
+                $ "idle callback poisoned the pair: " ++ show failure
+              Right commandResult -> void $ expectIsolatedCommand commandResult
+        paired @?= Right ()
+        mapM_ (assertFakeWorkerStopped root) [1, 2]
+  , testCase "serialize concurrent commands sharing one active lease" $
+      withTemporaryDirectory "leant isolated lease serialization" $ \root -> do
+        config <- isolatedFakeBackendConfig root "healthy" Nothing
+        paired <- withIsolatedBackendPair config
+          (root </> "lease serialization snapshot") Nothing $ \pair -> do
+            leased <- withIsolatedBackendLease pair $ \lease -> do
+              first <- async $ runIsolatedBackendCommand lease "gated"
+              received <- timeout 3000000 $ waitForHeartbeat
+                $ isolatedFakeCommandStartedPath root 1
+              received @?= Just ()
+              second <- async $ runIsolatedBackendCommand lease
+                "serialized-second"
+              overlapped <- timeout 200000 $ waitForFakeCommandCount
+                (isolatedFakeCommandStartedPath root 1) 2
+              overlapped @?= Nothing
+              writeFile (isolatedFakeCommandGatePath root 1) "open\n"
+              completed <- timeout 5000000 $ do
+                firstResult <- waitCatch first
+                secondResult <- waitCatch second
+                pure (firstResult, secondResult)
+              case completed of
+                Just (Right firstResult, Right secondResult) -> do
+                  firstResponse <- expectIsolatedCommand firstResult
+                  secondResponse <- expectIsolatedCommand secondResult
+                  firstSequence <- requireJsonInteger
+                    "sequence" firstResponse
+                  secondSequence <- requireJsonInteger
+                    "sequence" secondResponse
+                  (firstSequence, secondSequence) @?= (1, 2)
+                other -> assertFailure
+                  $ "serialized requests did not finish: " ++ show other
+            leased @?= Right ()
+        paired @?= Right ()
+        mapM_ (assertFakeWorkerStopped root) [1, 2]
+  , testCase "wait for an admitted child request before reusing its worker" $
+      withTemporaryDirectory "leant isolated inflight release" $ \root -> do
+        config <- isolatedFakeBackendConfig root "healthy" Nothing
+        paired <- withIsolatedBackendPair config
+          (root </> "inflight release snapshot") Nothing $ \pair -> do
+            callbackReturned <- newEmptyMVar
+            childSlot <- newEmptyMVar
+            firstLease <- async $ withIsolatedBackendLease pair $ \lease -> do
+              child <- async $ runIsolatedBackendCommand lease "gated"
+              received <- timeout 3000000 $ waitForHeartbeat
+                $ isolatedFakeCommandStartedPath root 1
+              received @?= Just ()
+              putMVar childSlot child
+              putMVar callbackReturned ()
+            returned <- timeout 3000000 $ readMVar callbackReturned
+            returned @?= Just ()
+            holderReady <- newEmptyMVar
+            releaseHolder <- newEmptyMVar
+            holder <- async $ withIsolatedBackendLease pair $ \_ -> do
+              putMVar holderReady ()
+              readMVar releaseHolder
+            held <- timeout 3000000 $ readMVar holderReady
+            held @?= Just ()
+            secondStarted <- newEmptyMVar
+            secondLease <- async $ withIsolatedBackendLease pair $ \lease -> do
+              putMVar secondStarted ()
+              runIsolatedBackendCommand lease "after-gated"
+            premature <- timeout 200000 $ readMVar secondStarted
+            premature @?= Nothing
+            writeFile (isolatedFakeCommandGatePath root 1) "open\n"
+            firstOutcome <- timeout 5000000 $ waitCatch firstLease
+            case firstOutcome of
+              Just (Right (Right ())) -> pure ()
+              other -> assertFailure
+                $ "first lease did not release cleanly: " ++ show other
+            child <- readMVar childSlot
+            childOutcome <- timeout 3000000 $ waitCatch child
+            childResponse <- case childOutcome of
+              Just (Right commandResult) ->
+                expectIsolatedCommand commandResult
+              other -> assertFailure
+                ("gated child did not finish: " ++ show other)
+                >> pure Json.JNull
+            Json.jLookup "cmd" childResponse @?=
+              Just (Json.JStr "gated")
+            startedAfterGate <- timeout 3000000 $ readMVar secondStarted
+            startedAfterGate @?= Just ()
+            secondOutcome <- timeout 3000000 $ waitCatch secondLease
+            secondResponse <- case secondOutcome of
+              Just outcome -> expectAsyncIsolatedCommand outcome
+              Nothing -> assertFailure "second lease did not finish"
+                >> pure Json.JNull
+            secondWorker <- requireJsonInteger "worker" secondResponse
+            secondWorker @?= 1
+            putMVar releaseHolder ()
+            holderOutcome <- timeout 3000000 $ waitCatch holder
+            case holderOutcome of
+              Just (Right (Right ())) -> pure ()
+              other -> assertFailure
+                $ "worker-two holder failed: " ++ show other
+        paired @?= Right ()
+        mapM_ (assertFakeWorkerStopped root) [1, 2]
+  , testCase "retire a worker when normal release is cancelled" $
+      withTemporaryDirectory "leant isolated release cancellation" $ \root -> do
+        config <- isolatedFakeBackendConfig root "healthy" Nothing
+        paired <- withIsolatedBackendPair config
+          (root </> "release cancellation snapshot") Nothing $ \pair -> do
+            childSlot <- newEmptyMVar
+            callbackReturned <- newEmptyMVar
+            releasing <- async $ withIsolatedBackendLease pair $ \lease -> do
+              child <- async $ runIsolatedBackendCommand lease "gated"
+              received <- timeout 3000000 $ waitForHeartbeat
+                $ isolatedFakeCommandStartedPath root 1
+              received @?= Just ()
+              putMVar childSlot child
+              putMVar callbackReturned ()
+            returned <- timeout 3000000 $ readMVar callbackReturned
+            returned @?= Just ()
+            blocked <- timeout 3000000 $ waitForMVarBlock
+              $ asyncThreadId releasing
+            blocked @?= Just ()
+            cancelled <- timeout 5000000 $ cancel releasing
+            cancelled @?= Just ()
+            releaseOutcome <- waitCatch releasing
+            case releaseOutcome of
+              Left _ -> pure ()
+              Right value -> assertFailure
+                $ "cancelled release returned normally: " ++ show value
+            child <- readMVar childSlot
+            childOutcome <- timeout 5000000 $ waitCatch child
+            assertBool "retired worker left its request child blocked"
+              $ isJust childOutcome
+            reused <- withIsolatedBackendLease pair $ \_ -> pure ()
+            reused @?= Left (IsolatedBackendPairPoisoned
+              IsolatedBackendRequestInterrupted)
+        paired @?= Left (IsolatedBackendPairPoisoned
+          IsolatedBackendRequestInterrupted)
+        mapM_ (assertFakeWorkerStopped root) [1, 2]
+  , testGroup "reject invalid setup responses"
+      [ isolatedSetupFailureTest
+          "fatal" "setup-fatal-1" $ \case
+            IsolatedBackendSetupFatal 1 "fake setup fatal" -> True
+            _ -> False
+      , isolatedSetupFailureTest
+          "error" "setup-error-1" $ \case
+            IsolatedBackendSetupErrors 1 ["fake setup error"] -> True
+            _ -> False
+      , isolatedSetupFailureTest
+          "missing environment" "setup-missing-1" $ \case
+            IsolatedBackendSetupMissingEnvironment 1 -> True
+            _ -> False
+      , isolatedSetupFailureTest
+          "timeout" "setup-timeout-1" $ \case
+            IsolatedBackendSetupTransportFailure 1
+              IsolatedBackendRequestTimeout -> True
+            _ -> False
+      , isolatedSetupFailureTest
+          "EOF" "setup-eof-1" $ \case
+            IsolatedBackendSetupTransportFailure 1
+              (IsolatedBackendServerClosed _) -> True
+            _ -> False
+      , isolatedSetupFailureTest
+          "malformed JSON" "setup-malformed-1" $ \case
+            IsolatedBackendSetupTransportFailure 1
+              (IsolatedBackendBadResponse _) -> True
+            _ -> False
+      ]
+  , testCase "clean the first worker after second-worker setup failure" $
+      withTemporaryDirectory "leant isolated partial setup" $ \root -> do
+        config <- isolatedFakeBackendConfig root "setup-fatal-2" Nothing
+        callbackRan <- newIORef False
+        paired <- withIsolatedBackendPair config
+          (root </> "partial setup snapshot") (Just 1) $ \_ -> do
+            modifyIORef' callbackRan $ const True
+        case paired of
+          Left (IsolatedBackendSetupFatal 2 "fake setup fatal") -> pure ()
+          other -> assertFailure $ "wrong second-worker failure: " ++ show other
+        callbackWasRun <- readIORef callbackRan
+        callbackWasRun @?= False
+        mapM_ (assertFakeWorkerStopped root) [1, 2]
+  , testCase "cancel second-worker setup and clean both workers" $
+      withTemporaryDirectory "leant isolated setup cancellation" $ \root -> do
+        config <- isolatedFakeBackendConfig root "setup-timeout-2" Nothing
+        callbackRan <- newIORef False
+        running <- async $ withIsolatedBackendPair config
+          (root </> "cancelled setup snapshot") Nothing $ \_ ->
+            modifyIORef' callbackRan $ const True
+        enteredSecondSetup <- timeout 3000000 $ do
+          waitForHeartbeat $ isolatedFakeHeartbeatPath root 2
+          waitForHeartbeat $ isolatedFakeSetupPath root 2
+        enteredSecondSetup @?= Just ()
+        cancelled <- timeout 5000000 $ cancel running
+        cancelled @?= Just ()
+        outcome <- waitCatch running
+        case outcome of
+          Left _ -> pure ()
+          Right value -> assertFailure
+            $ "setup cancellation returned normally: " ++ show value
+        callbackWasRun <- readIORef callbackRan
+        callbackWasRun @?= False
+        mapM_ (assertFakeWorkerStopped root) [1, 2]
+  , testCase "clean the first worker after second-worker spawn failure" $
+      if os == "mingw32" then pure () else
+        withTemporaryDirectory "leant isolated partial spawn" $ \root -> do
+          executable <- getExecutablePath
+          let launcher = root </> "temporary fake lake launcher"
+          createFileLink executable launcher
+          config <- isolatedFakeBackendConfig root "healthy" $ Just launcher
+          callbackRan <- newIORef False
+          paired <- withIsolatedBackendPair config
+            (root </> "partial spawn snapshot") (Just 1) $ \_ ->
+              modifyIORef' callbackRan $ const True
+          case paired of
+            Left (IsolatedBackendSpawnFailure 2 _) -> pure ()
+            other -> assertFailure $ "wrong second-spawn failure: " ++ show other
+          callbackWasRun <- readIORef callbackRan
+          callbackWasRun @?= False
+          assertFakeWorkerStopped root 1
+  , testGroup "retire transport-failed workers without replacement"
+      [ isolatedTransportFailureTest
+          "timeout" IsolatedBackendRequestTimeout
+      , isolatedTransportFailureTest
+          "eof" $ IsolatedBackendServerClosed ""
+      , isolatedTransportFailureTest
+          "malformed" $ IsolatedBackendBadResponse ""
+      ]
+  , testCase "let a leased sibling finish while retaining the first poison" $
+      withTemporaryDirectory "leant isolated sibling finish" $ \root -> do
+        config <- isolatedFakeBackendConfig root "healthy" Nothing
+        paired <- withIsolatedBackendPair config
+          (root </> "sibling snapshot") (Just 2) $ \pair -> do
+            poisonReady <- newEmptyMVar
+            siblingReady <- newEmptyMVar
+            releasePoisoner <- newEmptyMVar
+            releaseSibling <- newEmptyMVar
+            poisoner <- async $ withIsolatedBackendLease pair $ \lease -> do
+              putMVar poisonReady ()
+              readMVar releasePoisoner
+              runIsolatedBackendCommand lease "malformed"
+            sibling <- async $ withIsolatedBackendLease pair $ \lease -> do
+              putMVar siblingReady ()
+              readMVar releaseSibling
+              first <- runIsolatedBackendCommand lease "post-poison"
+              second <- runIsolatedBackendCommand lease "eof"
+              pure (first, second)
+            ready <- timeout 3000000 $ do
+              readMVar poisonReady
+              readMVar siblingReady
+            ready @?= Just ()
+            putMVar releasePoisoner ()
+            poisonResult <- waitCatch poisoner
+            case poisonResult of
+              Right (Right (Left (IsolatedBackendRequestFailure
+                  (IsolatedBackendBadResponse _)))) -> pure ()
+              other -> assertFailure $ "wrong poison result: " ++ show other
+            putMVar releaseSibling ()
+            siblingResult <- waitCatch sibling
+            case siblingResult of
+              Right (Right (firstResult, secondResult)) -> do
+                siblingResponse <- expectIsolatedCommand firstResult
+                Json.jLookup "cmd" siblingResponse @?=
+                  Just (Json.JStr "post-poison")
+                case secondResult of
+                  Left (IsolatedBackendRequestFailure
+                      (IsolatedBackendServerClosed _)) -> pure ()
+                  other -> assertFailure
+                    $ "wrong sibling transport result: " ++ show other
+              other -> assertFailure
+                $ "wrong sibling lease result: " ++ show other
+        case paired of
+          Left (IsolatedBackendPairPoisoned
+              (IsolatedBackendBadResponse _)) -> pure ()
+          other -> assertFailure $ "pair lost first poison: " ++ show other
+        mapM_ (assertFakeWorkerStopped root) [1, 2]
+  , testCase "let close win over a later checked-out request failure" $
+      withTemporaryDirectory "leant isolated close ordering" $ \root -> do
+        config <- isolatedFakeBackendConfig root "healthy" Nothing
+        lateRequestSlot <- newEmptyMVar
+        paired <- withIsolatedBackendPair config
+          (root </> "close ordering snapshot") Nothing $ \pair -> do
+            lateRequest <- async $ withIsolatedBackendLease pair $ \lease ->
+              runIsolatedBackendCommand lease "gated"
+            putMVar lateRequestSlot lateRequest
+            received <- timeout 3000000 $ waitForHeartbeat
+              $ isolatedFakeCommandStartedPath root 1
+            received @?= Just ()
+            -- Returning closes the pair before cleanup kills the backend and
+            -- makes this already-admitted request fail.
+            pure ()
+        paired @?= Right ()
+        lateRequest <- readMVar lateRequestSlot
+        lateOutcome <- timeout 5000000 $ waitCatch lateRequest
+        assertBool "late checked-out request did not observe pair cleanup"
+          $ isJust lateOutcome
+        mapM_ (assertFakeWorkerStopped root) [1, 2]
+  , testCase "propagate callback exceptions after killing both workers" $
+      withTemporaryDirectory "leant isolated callback exception" $ \root -> do
+        config <- isolatedFakeBackendConfig root "healthy" Nothing
+        attempted <- try $ withIsolatedBackendPair config
+          (root </> "callback snapshot") (Just 2) $ \_ -> do
+            mapM_ (waitForHeartbeat . isolatedFakeHeartbeatPath root) [1, 2]
+            ioError $ userError "isolated callback sentinel"
+        case (attempted :: Either SomeException
+            (Either IsolatedBackendFailure ())) of
+          Left failure -> assertBool "callback exception was replaced"
+            $ "isolated callback sentinel" `isInfixOf` show failure
+          Right result -> assertFailure
+            $ "callback exception became a value: " ++ show result
+        mapM_ (assertFakeWorkerStopped root) [1, 2]
+  , testCase "cancel an in-flight request and still reap checked-out workers" $
+      withTemporaryDirectory "leant isolated caller cancellation" $ \root -> do
+        config <- isolatedFakeBackendConfig root "healthy" Nothing
+        running <- async $ withIsolatedBackendPair config
+          (root </> "cancellation snapshot") Nothing $ \pair ->
+            withIsolatedBackendLease pair $ \lease -> do
+              runIsolatedBackendCommand lease "timeout"
+        started <- timeout 3000000 $ waitForHeartbeat
+          $ isolatedFakeCommandStartedPath root 1
+        started @?= Just ()
+        mapM_ (waitForHeartbeat . isolatedFakeHeartbeatPath root) [1, 2]
+        cancelled <- timeout 5000000 $ cancel running
+        cancelled @?= Just ()
+        outcome <- waitCatch running
+        case outcome of
+          Left _ -> pure ()
+          Right value -> assertFailure
+            $ "caller cancellation returned normally: " ++ show value
+        mapM_ (assertFakeWorkerStopped root) [1, 2]
+  ]
+
+isolatedSetupFailureTest
+  :: String
+  -> String
+  -> (IsolatedBackendFailure -> Bool)
+  -> TestTree
+isolatedSetupFailureTest label scenario expected =
+  testCase ("reject " ++ label) $
+    withTemporaryDirectory ("leant isolated setup " ++ label) $ \root -> do
+      config <- isolatedFakeBackendConfig root scenario Nothing
+      callbackRan <- newIORef False
+      paired <- withIsolatedBackendPair config
+        (root </> "setup artifact with spaces") (Just 1) $ \_ ->
+          modifyIORef' callbackRan $ const True
+      case paired of
+        Left failure | expected failure -> pure ()
+        other -> assertFailure $ "wrong setup result: " ++ show other
+      callbackWasRun <- readIORef callbackRan
+      callbackWasRun @?= False
+      assertFakeWorkerStopped root 1
+
+isolatedTransportFailureTest
+  :: String
+  -> IsolatedBackendTransportFailure
+  -> TestTree
+isolatedTransportFailureTest command expectedCause =
+  testCase command $
+    withTemporaryDirectory ("leant isolated transport " ++ command) $ \root -> do
+      config <- isolatedFakeBackendConfig root "healthy" Nothing
+      paired <- withIsolatedBackendPair config
+        (root </> "transport artifact") (Just 1) $ \pair -> do
+          failed <- withIsolatedBackendLease pair $ \lease ->
+            runIsolatedBackendCommand lease command
+          case failed of
+            Right (Left (IsolatedBackendRequestFailure actual))
+              | sameTransportKind expectedCause actual -> pure ()
+            other -> assertFailure $ "wrong request failure: " ++ show other
+          reused <- withIsolatedBackendLease pair $ \_ -> pure ()
+          case reused of
+            Left (IsolatedBackendPairPoisoned actual)
+              | sameTransportKind expectedCause actual -> pure ()
+            other -> assertFailure $ "poisoned pair was reusable: " ++ show other
+      case paired of
+        Left (IsolatedBackendPairPoisoned actual)
+          | sameTransportKind expectedCause actual -> pure ()
+        other -> assertFailure $ "pair did not publish poison: " ++ show other
+      third <- doesDirectoryExist $ isolatedFakeClaimPath root 3
+      third @?= False
+      mapM_ (assertFakeWorkerStopped root) [1, 2]
+
+sameTransportKind
+  :: IsolatedBackendTransportFailure
+  -> IsolatedBackendTransportFailure
+  -> Bool
+sameTransportKind IsolatedBackendRequestTimeout
+    IsolatedBackendRequestTimeout = True
+sameTransportKind (IsolatedBackendServerClosed _)
+    (IsolatedBackendServerClosed _) = True
+sameTransportKind (IsolatedBackendBadResponse _)
+    (IsolatedBackendBadResponse _) = True
+sameTransportKind IsolatedBackendRequestInterrupted
+    IsolatedBackendRequestInterrupted = True
+sameTransportKind _ _ = False
+
+expectAsyncIsolatedCommand
+  :: Either SomeException
+      (Either IsolatedBackendFailure
+        (Either IsolatedBackendFailure Json.JValue))
+  -> IO Json.JValue
+expectAsyncIsolatedCommand outcome = case outcome of
+  Left failure -> assertFailure
+    ("isolated lease threw: " ++ show failure) >> pure Json.JNull
+  Right (Left failure) -> assertFailure
+    ("isolated lease failed: " ++ show failure) >> pure Json.JNull
+  Right (Right commandResult) -> expectIsolatedCommand commandResult
+
+expectIsolatedCommand
+  :: Either IsolatedBackendFailure Json.JValue
+  -> IO Json.JValue
+expectIsolatedCommand result = case result of
+  Left failure -> assertFailure
+    ("isolated command failed: " ++ show failure) >> pure Json.JNull
+  Right response -> pure response
+
+expectSequentialIsolatedCommands
+  :: Either IsolatedBackendFailure
+      ( Either IsolatedBackendFailure Json.JValue
+      , Either IsolatedBackendFailure Json.JValue
+      )
+  -> IO (Json.JValue, Json.JValue)
+expectSequentialIsolatedCommands result = case result of
+  Left failure -> assertFailure
+    ("sequential lease failed: " ++ show failure)
+    >> pure (Json.JNull, Json.JNull)
+  Right (first, second) -> (,)
+    <$> expectIsolatedCommand first
+    <*> expectIsolatedCommand second
+
+requireJsonInteger :: String -> Json.JValue -> IO Integer
+requireJsonInteger key value = case Json.jLookup key value >>= Json.jInt of
+  Just integer -> pure integer
+  Nothing -> assertFailure ("missing integer field " ++ show key
+    ++ " in " ++ show value) >> pure 0
+
+isolatedBackendFakePrefix :: String
+isolatedBackendFakePrefix = "__leant_isolated_backend__:"
+
+isolatedFakeBackendConfig
+  :: FilePath
+  -> String
+  -> Maybe FilePath
+  -> IO BackendConfig
+isolatedFakeBackendConfig root scenario maybeLauncher = do
+  executable <- maybe getExecutablePath pure maybeLauncher
+  workingDirectory <- getCurrentDirectory
+  let descriptor = Json.JObj $
+        [ ("root", Json.JStr root)
+        , ("scenario", Json.JStr scenario)
+        ] ++ case maybeLauncher of
+          Nothing -> []
+          Just launcher -> [("removeLauncher", Json.JStr launcher)]
+  pure BackendConfig
+    { bcLakePath = executable
+    , bcReplExe = isolatedBackendFakePrefix
+        ++ Json.encodeJson descriptor
+    , bcWorkingDir = workingDirectory
+    }
+
+isolatedBackendFakeHelper :: String -> IO ()
+isolatedBackendFakeHelper encodedDescriptor = do
+  descriptor <- case Json.parseJson encodedDescriptor of
+    Left failure -> ioError $ userError
+      $ "invalid isolated fake-backend descriptor: " ++ failure
+    Right value -> pure value
+  root <- requireDescriptorString "root" descriptor
+  scenario <- requireDescriptorString "scenario" descriptor
+  let maybeLauncher = Json.jLookup "removeLauncher" descriptor
+        >>= Json.jString
+  worker <- claimIsolatedFakeWorker root 1
+  pid <- fromIntegral <$> getCurrentPid
+  BS.appendFile (isolatedFakeHeartbeatPath root worker)
+    $ BS.singleton 'H'
+  void $ forkIO $ forever $ do
+    threadDelay 10000
+    BS.appendFile (isolatedFakeHeartbeatPath root worker)
+      $ BS.singleton 'H'
+  sequenceNumber <- newIORef 0
+  isolatedFakeRequestLoop root scenario maybeLauncher
+    worker pid sequenceNumber
+
+requireDescriptorString :: String -> Json.JValue -> IO String
+requireDescriptorString key descriptor =
+  case Json.jLookup key descriptor >>= Json.jString of
+    Just value -> pure value
+    Nothing -> ioError $ userError
+      $ "isolated fake-backend descriptor lacks " ++ show key
+
+claimIsolatedFakeWorker :: FilePath -> Integer -> IO Integer
+claimIsolatedFakeWorker root worker = do
+  claimed <- try $ createDirectory $ isolatedFakeClaimPath root worker
+  case claimed of
+    Right () -> pure worker
+    Left failure
+      | isAlreadyExistsError failure ->
+          claimIsolatedFakeWorker root $ worker + 1
+      | otherwise -> ioError failure
+
+isolatedFakeRequestLoop
+  :: FilePath
+  -> String
+  -> Maybe FilePath
+  -> Integer
+  -> Integer
+  -> IORef Integer
+  -> IO ()
+isolatedFakeRequestLoop root scenario maybeLauncher worker pid sequenceNumber =
+  forever $ do
+    requestLine <- hGetLine stdin
+    unless (null requestLine) $ do
+      requestValue <- case Json.parseJson requestLine of
+        Left failure -> ioError $ userError
+          $ "invalid fake-backend request: " ++ failure
+        Right value -> pure value
+      case requestValue of
+        Json.JObj [("unpickleEnvFrom", Json.JStr artifact)] ->
+          isolatedFakeSetupResponse root scenario maybeLauncher
+            worker artifact
+        Json.JObj
+            [("cmd", Json.JStr command), ("env", Json.JInt environment)] ->
+          isolatedFakeCommandResponse root scenario worker pid
+            sequenceNumber command environment
+        _ -> ioError $ userError
+          $ "unexpected fake-backend request shape: " ++ show requestValue
+
+isolatedFakeSetupResponse
+  :: FilePath
+  -> String
+  -> Maybe FilePath
+  -> Integer
+  -> FilePath
+  -> IO ()
+isolatedFakeSetupResponse root scenario maybeLauncher worker artifact = do
+  writeFile (isolatedFakeSetupPath root worker) artifact
+  appendFile (root </> "setup-order.log") $ show worker ++ "\n"
+  when (worker == 1) $ case maybeLauncher of
+    Nothing -> pure ()
+    Just launcher -> removeFile launcher
+  let targeted prefix = scenario == prefix ++ "-" ++ show worker
+      environment = isolatedFakeEnvironment worker
+  case () of
+    _ | targeted "setup-fatal" ->
+          isolatedFakeWriteResponse $ Json.JObj
+            [("message", Json.JStr "fake setup fatal")]
+      | targeted "setup-error" ->
+          isolatedFakeWriteResponse $ Json.JObj
+            [ ("env", Json.JInt environment)
+            , ("messages", Json.JArr
+                [ Json.JObj
+                    [ ("severity", Json.JStr "error")
+                    , ("data", Json.JStr "fake setup error")
+                    ]
+                ])
+            ]
+      | targeted "setup-missing" ->
+          isolatedFakeWriteResponse $ Json.JObj
+            [("ok", Json.JBool True)]
+      | targeted "setup-timeout" -> threadDelay 30000000
+      | targeted "setup-eof" -> isolatedFakeCloseOutput
+      | targeted "setup-malformed" -> isolatedFakeWriteMalformed
+      | otherwise -> isolatedFakeWriteResponse $ Json.JObj
+          [("env", Json.JInt environment)]
+
+isolatedFakeCommandResponse
+  :: FilePath
+  -> String
+  -> Integer
+  -> Integer
+  -> IORef Integer
+  -> String
+  -> Integer
+  -> IO ()
+isolatedFakeCommandResponse root scenario worker pid sequenceNumber
+    command environment = do
+  appendFile (isolatedFakeCommandStartedPath root worker)
+    $ command ++ "\n"
+  sequenceOrdinal <- atomicModifyIORef' sequenceNumber $ \current ->
+    let next = current + 1
+    in (next, next)
+  case command of
+    "timeout" -> threadDelay 30000000
+    "eof" -> isolatedFakeCloseOutput
+    "malformed" -> isolatedFakeWriteMalformed
+    "gated" -> waitForHeartbeat
+      (isolatedFakeCommandGatePath root worker)
+      >> isolatedFakeWriteIdentity sequenceOrdinal
+    "fatal" -> isolatedFakeWriteResponse $ Json.JObj
+      [("message", Json.JStr "fake command fatal")]
+    "error" -> isolatedFakeWriteResponse $ Json.JObj
+      [ ("messages", Json.JArr
+          [ Json.JObj
+              [ ("severity", Json.JStr "error")
+              , ("data", Json.JStr "fake command error")
+              ]
+          ])
+      ]
+    "sorry" -> isolatedFakeWriteResponse $ Json.JObj
+      [("sorries", Json.JArr [Json.JObj []])]
+    _ -> isolatedFakeWriteIdentity sequenceOrdinal
+ where
+  isolatedFakeWriteIdentity sequenceOrdinal =
+    isolatedFakeWriteResponse $ Json.JObj
+      [ ("pid", Json.JInt pid)
+      , ("worker", Json.JInt worker)
+      , ("seenEnv", Json.JInt environment)
+      , ("env", Json.JInt $ environment + 1000000)
+      , ("cmd", Json.JStr command)
+      , ("sequence", Json.JInt sequenceOrdinal)
+      , ("scenario", Json.JStr scenario)
+      ]
+
+isolatedFakeWriteResponse :: Json.JValue -> IO ()
+isolatedFakeWriteResponse response = do
+  putStr $ Json.encodeJson response ++ "\n\n"
+  hFlush stdout
+
+isolatedFakeWriteMalformed :: IO ()
+isolatedFakeWriteMalformed = do
+  putStr "{malformed fake response\n\n"
+  hFlush stdout
+
+-- Closing stderr too lets Backend's bounded diagnostic drain finish before
+-- the enclosing request timeout can obscure the intended stdout EOF.
+isolatedFakeCloseOutput :: IO ()
+isolatedFakeCloseOutput = do
+  hClose stdout
+  hClose stderr
+  threadDelay 30000000
+
+isolatedFakeEnvironment :: Integer -> Integer
+isolatedFakeEnvironment worker = 700000 + worker
+
+isolatedFakeSetupPath :: FilePath -> Integer -> FilePath
+isolatedFakeSetupPath root worker =
+  root </> ("worker-" ++ show worker ++ ".setup")
+
+isolatedFakeHeartbeatPath :: FilePath -> Integer -> FilePath
+isolatedFakeHeartbeatPath root worker =
+  root </> ("worker-" ++ show worker ++ ".heartbeat")
+
+isolatedFakeClaimPath :: FilePath -> Integer -> FilePath
+isolatedFakeClaimPath root worker =
+  root </> ("worker-" ++ show worker ++ ".claim")
+
+isolatedFakeCommandStartedPath :: FilePath -> Integer -> FilePath
+isolatedFakeCommandStartedPath root worker =
+  root </> ("worker-" ++ show worker ++ ".command-started")
+
+isolatedFakeCommandGatePath :: FilePath -> Integer -> FilePath
+isolatedFakeCommandGatePath root worker =
+  root </> ("worker-" ++ show worker ++ ".command-gate")
+
+waitForFakeCommandCount :: FilePath -> Int -> IO ()
+waitForFakeCommandCount path expected = do
+  observed <- length . lines <$> readFile path
+  if observed >= expected
+    then pure ()
+    else threadDelay 10000 >> waitForFakeCommandCount path expected
+
+assertFakeWorkerStopped :: FilePath -> Integer -> IO ()
+assertFakeWorkerStopped root worker = do
+  let heartbeatPath = isolatedFakeHeartbeatPath root worker
+  observed <- timeout 3000000 $ waitForHeartbeat heartbeatPath
+  case observed of
+    Nothing -> assertFailure $ "fake worker " ++ show worker
+      ++ " never established its heartbeat"
+    Just () -> pure ()
+  stabilized <- timeout 3000000 $ waitForStableHeartbeat heartbeatPath
+  case stabilized of
+    Nothing -> assertFailure $ "fake worker " ++ show worker
+      ++ " continued after isolated-pair cleanup"
+    Just () -> pure ()
+
 backendStderrFloodMode :: String
 backendStderrFloodMode = "__leant_backend_stderr_flood__"
 
@@ -973,6 +1841,17 @@ backendProcessTreeGrandchildHelper heartbeatPath = do
     BS.appendFile heartbeatPath $ BS.singleton 'H'
     threadDelay 10000
     heartbeat $ remaining - 1
+
+waitForMVarBlock :: ThreadId -> IO ()
+waitForMVarBlock thread = do
+  status <- threadStatus thread
+  case status of
+    ThreadBlocked BlockedOnMVar -> pure ()
+    ThreadFinished -> ioError $ userError
+      "thread finished before blocking on its release MVar"
+    ThreadDied -> ioError $ userError
+      "thread died before blocking on its release MVar"
+    _ -> threadDelay 10000 >> waitForMVarBlock thread
 
 waitForHeartbeat :: FilePath -> IO ()
 waitForHeartbeat heartbeatPath = do
