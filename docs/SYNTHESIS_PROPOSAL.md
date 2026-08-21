@@ -38,11 +38,12 @@ for any engine. The first small structural benchmark regressed; a substantive
 eight-premise library fixture measured a cautious 1.5x search-only gain for
 Exference and `EngineBoth` at `-N2`. Neither result is an end-to-end,
 verification, or default-`N2` claim. A package-private ordered success-quota
-scheduler and an exactly two-worker isolated backend pair are now implemented
-and characterized. The pair restores both independently spawned processes
-from one environment artifact above the bounded whole-tree lifecycle. Main
-imports neither foundation, so production verification and its single-backend
-route remain serial. The
+scheduler and an exactly two-worker isolated backend pair are now connected to
+a conservative N2 verification route. The pair restores independently spawned
+processes from one command artifact above the bounded whole-tree lifecycle,
+while N1 retains the literal serial verifier. Real-Lean parity and route use
+are pinned; a five-sample end-to-end screen measured roughly 1.16x but did not
+clear the provisional 1.25x promotion threshold. The
 implemented post-phase-2 increments
 are detailed in §7. Companion to
 [PROPOSALS.md](PROPOSALS.md).*
@@ -719,9 +720,9 @@ same absolute deadline.
 
 Scoped cancellation joins unfinished workers, and a pair timeout produces an
 empty receipt without probing cancelled work. Providers, filter successors,
-classical routes, retuned-limit lanes, Lean verification, and behavioral
-assessment retain serial scheduling. The executable has no default `-N2` and
-there is no public jobs setting.
+classical routes, retuned-limit search lanes, and behavioral assessment retain
+serial scheduling. Candidate verification has the separate gate below. The
+executable has no default `-N2` and there is no public jobs setting.
 
 The fixed quartic `EngineBoth` fixture produced a 0.908x serial/parallel
 median ratio, about 10.1% slower. The more substantive eight-premise
@@ -733,7 +734,7 @@ latency, Lean verification, every workload, or enabling `-N2` by default. See
 the [structural-pair report](reports/2026-08-20-scoped-parallel-engine-both-baseline.md)
 and [library-pair report](reports/2026-08-20-parallel-library-baseline.md).
 
-### Ordered verification scheduler foundation (implemented, not connected)
+### Ordered verification scheduler foundation (implemented and connected)
 
 `Leant.Synth.Verification.Parallel` contains a private scheduler for the next
 verification-concurrency stage. Tasks return `Either rejection success` in
@@ -745,14 +746,13 @@ waits and exceptions are observed in input order, and nested `withAsync`
 scopes cancel and join unfinished siblings. A one-worker request takes a
 literal strict caller-thread traversal.
 
-The module is a Cabal `Other-Modules` implementation detail imported only by
-tests. Main, Backend, and the established Verification module do not call it,
-so current synthesis still verifies groups and their variants serially over
-one Lean backend. The separate private isolated-pair foundation now provides
-the required two-process ownership boundary, but neither primitive is wired to
-the command path. No verification-latency or end-to-end speed claim follows
-from the scheduler checkpoint. See the
-[ordered scheduler report](reports/2026-08-20-ordered-verification-scheduler-foundation.md).
+The module remains a Cabal `Other-Modules` implementation detail. Main now
+calls its candidate-group wrapper only through the conservative runtime route
+below; the original scheduler checkpoint by itself had no verification or
+end-to-end performance claim. See the
+[ordered scheduler report](reports/2026-08-20-ordered-verification-scheduler-foundation.md)
+and its
+[connected successor](reports/2026-08-21-ordered-isolated-parallel-verification.md).
 
 ### Backend process-tree lifecycle prerequisite (implemented)
 
@@ -782,21 +782,19 @@ the child also has a finite self-expiry leak guard. The complete strict unit
 suite passed **508 of 508** tests at commit `39901f3`. See the
 [backend lifecycle report](reports/2026-08-20-backend-process-tree-lifecycle.md).
 
-This is a lifecycle prerequisite, not verification parallelism or performance
-evidence. It now supports the private isolated pair described next, while
-production verification stays serial over one backend. Command-current
-environment acquisition, Main wiring to the ordered scheduler, end-to-end
-cancellation policy, and performance measurement remain future stages.
+This lifecycle checkpoint was a prerequisite rather than performance
+evidence. It now supports the connected isolated route described below.
 
-### Isolated two-worker backend foundation (implemented, not connected)
+### Isolated two-worker backend foundation (implemented and connected)
 
 `Leant.Backend.Isolated` constructs exactly two independently spawned Lean
 backend processes and restores each from the same caller-supplied environment
 artifact. The pair and lease constructors are opaque; scoped callbacks own
-their lifetime. Setup requires a valid process-local `env` from both sequential
-`unpickleEnvFrom` requests and reports ordinal-tagged spawn, transport, fatal,
-error-diagnostic, or missing-environment failures. Partial setup and
-cancellation clean every process already acquired.
+their lifetime. Setup starts both spawn-and-`unpickleEnvFrom` actions
+concurrently, records every acquired backend in a masked ownership registry,
+and still observes logical worker one first. It reports ordinal-tagged spawn,
+transport, fatal, error-diagnostic, or missing-environment failures. Partial
+setup and cancellation clean every process already acquired in ordinal order.
 
 Each lease retains one worker and its restored environment for a complete
 candidate-group callback. Commands on the same lease are serialized, and
@@ -817,21 +815,60 @@ cancellation exceptions retain precedence, and cleanup failures remain typed
 and worker-labelled.
 
 This private module is registered only as a Cabal `Other-Modules` component;
-Main and the production Verification route do not import it. The self-hosted
-fake-backend group passed **24 of 24** focused cases, the complete strict unit
-suite passed **532 of 532**, and the serialized all-suite, strict all-target,
-Cabal, source-distribution, and diff gates passed. An independent concurrency
-audit returned GO. None of this measures a real Lean workload or supports a
-speed-up claim. See the
-[isolated backend pair report](reports/2026-08-20-isolated-backend-pair-foundation.md).
+Main reaches it through the runtime adapter below. The current self-hosted
+fake-backend group passes **28 of 28** focused cases and the complete strict
+unit suite passes **557 of 557**. See the historical
+[isolated backend pair report](reports/2026-08-20-isolated-backend-pair-foundation.md)
+and its connected successor.
 
-The next implementation stage is command integration in Main: materialize one
-artifact for the current live Lean environment, restore the pair, give one
-candidate group to one lease through the ordered success-quota scheduler, and
-keep variants serial within that lease. The literal one-worker route,
-deadline/error semantics, output ordering, and transcript behavior must remain
-equivalent. Cold and warm startup, resident memory, and end-to-end latency need
-real-backend benchmarks before deciding whether or when to enable it.
+### Ordered isolated verification route (implemented, opt-in)
+
+Main owns one lazy environment artifact for a synthesis command and one fresh
+exactly-two-worker pair for each eligible batch. Admission requires at least
+two RTS capabilities, a success quota of at least two, and at least two
+reachable candidate groups. It also requires the initial imported session:
+no snapshot base, accepted interactive history, active proof, or resumable
+`sorry` token. These exclusions run before the capability count and avoid the
+known upstream loss of session-created scoped-extension entries. N1 and every
+ineligible batch invoke the literal established serial verifier without
+artifact or worker work.
+
+The runtime reserves an absent absolute temporary path, records ownership
+while masked, and asks the primary backend to pickle its current environment.
+It reuses the immutable artifact across batches, removes it on every command
+exit, and makes ordinary preparation failure sticky serial. Each admitted
+batch closes its pair before either returning results or deciding whether an
+infrastructure failure can be replayed serially.
+
+One scheduler worker owns one group and one lease; variants remain serial and
+stop at the first acceptance. Candidate-free strict summaries are collected in
+group order and then reattached to the original receipts. Rejections do not
+spend the success quota, speculative suffixes remain unobserved, and attempts,
+failure counts, observations, candidates, and exception precedence match the
+serial oracle.
+
+Only cleanup-free spawn, setup, timeout, EOF, and malformed-response failures
+disable the command's parallel route and replay the exact batch serially.
+Interruption, cleanup failure, and impossible lease/pair lifecycle states are
+fail-stop. A committed real-Lean gate proves history-free N1/N2 byte parity and
+the exact one-versus-three backend topology; a scoped-notation history fixture
+proves N2 stays serial and retains the five-candidate transcript.
+
+Imported module restoration reruns imported initializers, and imported macros
+or elaborators may have external or process-local effects. The parity contract
+therefore assumes restoration and elaboration are deterministic and free of
+externally significant/process-local effects; affected users must choose
+`+RTS -N1 -RTS`.
+
+A five-sample O2 2x2 screen measured B2/C2 median wall ratios of 1.166x and
+1.169x on two primary history-free workloads and 1.144x on a contextual
+`List.map` workload, with a 1.159x geometric mean and no material N1
+regression. Preflight certified exact 1/1/1/3 backend counts, while preflight
+and every timed sample retained its transcript hash. Primary candidate N2 p95
+improved. The provisional 1.25x promotion gate therefore remains HOLD: the
+route is useful evidence for explicit N2, not a
+default-N2 or broad speed-up claim. See the
+[ordered isolated-verification report](reports/2026-08-21-ordered-isolated-parallel-verification.md).
 
 Design rules, all inherited from Djex:
 
@@ -1041,10 +1078,10 @@ Design rules, all inherited from Djex:
   sub-oracle inside the search, and broader measured concurrency across
   provider or engine-internal work. The two bounded initial search schedules
   in §3, the private ordered success-quota scheduler, and the isolated
-  two-worker backend pair are implemented groundwork. Command-current artifact
-  ownership, production verification wiring, and its measurements remain
-  future work; none of these foundations establishes that the wider design
-  will be faster.
+  two-worker backend pair are implemented groundwork. The scheduler and pair
+  are connected for history-free N2 verification, but the measured 1.16x
+  checkpoint remains opt-in and below its promotion threshold; none of this
+  establishes that the wider design will be faster.
 
 ## 5. Honest limitations
 
@@ -1189,10 +1226,13 @@ quartic fixture regressed, whereas substantive Exference and `EngineBoth`
 library-search workloads measured roughly 1.5x at `-N2`; both remain opt-in
 through RTS capabilities while later seams and end-to-end latency are measured
 independently. The private ordered success-quota scheduler and isolated
-two-worker backend pair now supply the coordination and resource foundations
-for the next candidate seam. The next implementation step is command-current
-artifact ownership and Main integration; production verification remains
-serial until that route is connected, parity-tested, and benchmarked.
+two-worker backend pair are now connected to conservatively gated candidate
+verification. History-free real-Lean parity and exact worker admission are
+pinned, while the five-sample screen recorded roughly 1.16x B2/C2 median wall
+ratios but remains non-promotional and below the provisional 1.25x threshold.
+The next concurrency step should hide or reduce cold worker preparation before
+considering default N2; the literal N1 route remains the compatibility and
+external-effects control.
 
 ## 7. Post-phase-2 proposals
 

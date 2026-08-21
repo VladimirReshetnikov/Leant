@@ -5,6 +5,11 @@ Date: 2026-08-20
 Landing checkpoint:
 `8163d13f49d9aa46724f20cc5b25789cce7aeec3` (`8163d13`)
 
+Successor: Main connected this pair to conservatively gated N2 candidate-group
+verification at `ea75133`; see the
+[ordered isolated parallel verification report](2026-08-21-ordered-isolated-parallel-verification.md).
+The boundary below describes the pair at its original foundation checkpoint.
+
 ## Outcome and boundary
 
 Leant now has a package-private scoped owner for exactly two independent Lean

@@ -1100,9 +1100,9 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   24 for `both`), then retains the existing library-first, base-left merge;
   later base fill and deduplication stay serial under the same deadline.
   `synth-steps` is deliberately outside the admission gate and may be
-  retuned. Providers, filter successors, classical routes, Lean verification,
-  behavioral assessment, and retuned-limit lanes remain serial in the
-  production route.
+  retuned. Providers, filter successors, classical routes, behavioral
+  assessment, and retuned-limit *search* lanes remain serial. Candidate
+  verification has a separate, narrower multicore gate described below.
 
   The executable is threaded but does not select `-N2` by default and exposes
   no public synthesis-jobs setting. Start it with `+RTS -N2 -RTS` to make an
@@ -1114,15 +1114,38 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   not an end-to-end, verification, default-`N2`, or universal speedup claim.
   See the [first structural-pair report](docs/reports/2026-08-20-scoped-parallel-engine-both-baseline.md)
   and the [library-pair report](docs/reports/2026-08-20-parallel-library-baseline.md).
-  Two package-private foundations now prepare the next seam: an ordered
-  success-quota scheduler and an exactly two-worker Lean backend pair restored
-  from one environment artifact. The pair gives each checked-out lease its own
-  process-local environment and serialized request stream, poisons the pair and
-  closes new lease admission on transport failure, and owns both process trees
-  through cleanup. Main does not
-  call either foundation yet, so candidate verification still uses one backend
-  serially and the new pair carries no speed-up claim. See the
-  [isolated-pair checkpoint](docs/reports/2026-08-20-isolated-backend-pair-foundation.md).
+  Candidate verification now connects two package-private foundations: an
+  ordered success-quota scheduler and an exactly two-worker Lean backend pair.
+  At `-N2`, a verification batch with room for at least two successes and at
+  least two reachable candidate groups may send different groups to isolated
+  Lean processes; variants within one group remain serial, and completed
+  groups are committed in their original order. `-N1` enters the literal old
+  verifier without capability-dependent artifact or worker work.
+
+  The parallel route is deliberately conservative. It admits only the initial
+  imported session: no loaded snapshot base, accepted interactive history,
+  active proof, or resumable `sorry` token. One absolute environment artifact
+  is prepared lazily for the command, while a fresh exactly-two-worker pair is
+  acquired and closed around each eligible batch. Clean setup/transport
+  unavailability closes the pair before replaying that batch serially and
+  disables later parallel batches; interruption, cleanup failure, and
+  impossible lease/pair lifecycle states remain fatal. Imported-module
+  restoration and candidate elaboration are assumed deterministic and free of
+  externally significant or process-local effects. In particular, imported
+  initializers execute again in each worker; affected users should run
+  `+RTS -N1 -RTS`.
+
+  A route-certified five-sample O2 screen measured B2/C2 median wall ratios of
+  **1.166x** and **1.169x** on two history-free five-result workloads, with a
+  **1.159x** geometric mean across those and a `List.map` control. Preflight
+  certified the exact 1/1/1/3 backend topology, while preflight and every timed
+  sample retained the exact transcript hash. N1 controls stayed within about
+  1%. This is a favorable opt-in screening result, not release acceleration
+  evidence: it misses the provisional 1.25x promotion threshold; `-N2` is
+  still not selected by default and there is no broad speed-up claim. See the
+  [isolated-pair foundation](docs/reports/2026-08-20-isolated-backend-pair-foundation.md)
+  and the
+  [ordered isolated-verification report](docs/reports/2026-08-21-ordered-isolated-parallel-verification.md).
   Within each Exference invocation, Leant stable-deduplicates rendered groups
   before applying the internal 60-candidate collection window
   (`:set synth-window N`). The first
@@ -1288,11 +1311,14 @@ tree, and still attempts local pipe and stderr-capture cleanup when termination
 reports an error. This lifecycle is the foundation beneath isolated
 verification workers. The package-private
 [isolated backend pair](docs/synth-internals.md#private-isolated-backend-pair-foundation)
-now builds exactly two independently restored workers above that lifecycle,
-but Main does not route candidate verification through it; production remains
-serial over one backend. See the
+builds exactly two independently restored workers above that lifecycle. Main
+now routes conservatively eligible N2 candidate groups through the pair and
+the ordered verification scheduler; N1 and unsafe live sessions retain the
+literal serial verifier. See the
 [lifecycle checkpoint](docs/reports/2026-08-20-backend-process-tree-lifecycle.md)
-and [isolated-pair checkpoint](docs/reports/2026-08-20-isolated-backend-pair-foundation.md).
+and [isolated-pair checkpoint](docs/reports/2026-08-20-isolated-backend-pair-foundation.md),
+plus the
+[connected route report](docs/reports/2026-08-21-ordered-isolated-parallel-verification.md).
 The JSON codec is hand-rolled
 ([src/Leant/Json.hs](src/Leant/Json.hs)). The direct external dependency
 surface stays small: `async` supplies scoped worker lifetime management and

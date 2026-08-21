@@ -85,10 +85,11 @@ nonnested outer pair: `EngineBoth` stays serial inside both actions. It forces
 the base result/verdict and notes at a zero-group boundary and one complete
 library verification window, then retains the established base-left,
 library-first merge. Later base fill and deduplication remain serial under the
-same deadline. Providers, filter successors, classical routes, verification,
-behavioral assessment, and retuned-limit work remain serial. `synth-steps`
-remains eligible; `+RTS -N1 -RTS` takes the literal serial callback. There is
-no default `-N2` or public jobs setting. The first quartic fixture regressed,
+same deadline. Providers, filter successors, classical routes, behavioral
+assessment, and retuned-limit search work remain serial; verification has the
+separate gate below. `synth-steps` remains eligible; `+RTS -N1 -RTS` takes the
+literal serial callback. There is no default `-N2` or public jobs setting. The
+first quartic fixture regressed,
 while a substantive eight-premise library-search fixture measured roughly
 1.5x for Exference and `EngineBoth` at `-N2`; that is a search-only workload
 result, not an end-to-end or default-runtime claim.
@@ -96,11 +97,9 @@ result, not an end-to-end or default-runtime claim.
 A separate package-private checkpoint now provides an ordered success-quota
 scheduler for isolated Lean-verification workers. It admits lazy bounded
 waves, deeply forces results before publication, preserves input-order result
-and exception observation, and cancels and joins active workers. Only tests
-import the module: Main, Backend, and the current Verification route are
-unchanged, so production verification remains serial and this checkpoint
-supports no speed claim. A later checkpoint supplies the private process
-foundation but still does not connect this scheduler.
+and exception observation, and cancels and joins active workers. That
+foundation carried no speed claim by itself; the 2026-08-21 successor now
+connects it to Main through the isolated process boundary.
 
 The backend lifecycle prerequisite is now complete at commit `39901f3`.
 Every `lake env repl` launch owns a dedicated POSIX process group or Windows
@@ -112,9 +111,8 @@ primary tree failure. The deterministic fixture covers an exited fake wrapper
 and an independently active heartbeat grandchild that ignores `SIGTERM` on
 POSIX. The Windows path was strictly source-compiled, not runtime-tested on
 Windows.
-This cleared the lifecycle prerequisite used by the later isolated pair:
-production verification remains serial, while Main wiring and performance work
-remain future. See the
+This cleared the lifecycle prerequisite used by the later isolated pair and
+the now-connected verification route. See the
 [backend process-tree lifecycle report](2026-08-20-backend-process-tree-lifecycle.md).
 
 The private isolated-pair checkpoint at `8163d13` now owns exactly two
@@ -124,11 +122,25 @@ transport failure retires its worker, preserves the first pair poison, and
 admits no replacement or new lease, while an already checked-out sibling may
 finish its whole group. Release is fail-stop on an interrupted handoff, close
 captures prior poison atomically, and bounded cleanup owns both registered
-process trees. Only tests import the module. The focused group passed 24/24 and
-the complete strict suite 532/532, but Main still verifies serially through one
-backend and there is no speed claim. The next stage is command-current artifact
-ownership and connection to the ordered scheduler. See the
+process trees. Its foundation checkpoint passed 24/24 focused and 532/532
+complete strict tests; the connected route later expanded this to 28/28 and
+557/557. See the
 [isolated backend pair report](2026-08-20-isolated-backend-pair-foundation.md).
+
+The ordered isolated-verification checkpoint at `ea75133` connects those
+foundations on an explicit N2 route. Only a history-free imported session with
+no snapshot, active proof, or resumable `sorry` token may prepare one
+command-owned environment artifact. Each eligible batch owns one fresh
+two-worker pair; groups run in parallel, variants remain serial, and ordered
+strict summaries preserve the serial success cutoff and receipts. Clean
+operational unavailability closes before exact serial replay, while
+interruption, cleanup, and lifecycle failures remain fail-stop. A committed
+real-Lean gate proves byte parity, one-versus-three history-free routing, and
+one-versus-one scoped-history serial control. A five-sample O2 screen
+measured 1.166x and 1.169x on its two primary workloads and a 1.159x geometric
+mean, but did not clear the provisional 1.25x promotion gate. This is an
+opt-in checkpoint, not a default-N2 or broad speed-up claim. See the
+[ordered isolated-verification report](2026-08-21-ordered-isolated-parallel-verification.md).
 
 The Length counterexample bank still has no `ReplState` field, serialization
 or snapshot restoration, session-wide scope, or persistence. There is also no
@@ -219,6 +231,7 @@ Reports are listed oldest first.
 - 2026-08-20 — [Private ordered verification scheduler foundation](2026-08-20-ordered-verification-scheduler-foundation.md)
 - 2026-08-20 — [Backend process-tree lifecycle prerequisite](2026-08-20-backend-process-tree-lifecycle.md)
 - 2026-08-20 — [Private isolated Lean backend pair foundation](2026-08-20-isolated-backend-pair-foundation.md)
+- 2026-08-21 — [Ordered isolated parallel Lean verification](2026-08-21-ordered-isolated-parallel-verification.md)
 
 ## Standalone PDF reports
 

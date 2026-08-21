@@ -46,6 +46,7 @@ who wants the *what* can stop at the paragraph.
 - [Private ordered verification scheduler foundation](#private-ordered-verification-scheduler-foundation)
 - [Backend process-tree lifecycle prerequisite](#backend-process-tree-lifecycle-prerequisite)
 - [Private isolated backend pair foundation](#private-isolated-backend-pair-foundation)
+- [Ordered isolated parallel verification](#ordered-isolated-parallel-verification)
 - [Main's progressive same-run cursor scheduler](#mains-progressive-same-run-cursor-scheduler)
 - [Contract vocabulary and module ownership](#contract-vocabulary-and-module-ownership)
 - [Post-verification sealing](#post-verification-sealing)
@@ -1254,9 +1255,10 @@ worker exception, command timeout, or caller cancellation. A deadline win
 produces a genuinely empty `SynthLaneRunTimedOut` receipt without probing the
 cancelled outcomes, notes, spelling frontier, or group counts.
 
-Provider-enriched lanes and widening, behavioral filter successors, classical
-routes, Lean verification, post-verification behavioral assessment, and any
-lane with retuned shown/verify/window/budget/queue limits remain serial. The
+Provider-enriched search lanes and widening, behavioral filter successors,
+classical search routes, post-verification behavioral assessment, and any
+search lane with retuned shown/verify/window/budget/queue limits remain serial.
+Candidate verification has the separate gate below. The
 first quartic engine-pair fixture was about 10.1% slower at `-N2`. In contrast,
 the fixed eight-premise `List.map` search-only fixture measured 1.523x for
 Exference and 1.572x for `EngineBoth`, with near-parity `-N1` controls and an
@@ -1268,14 +1270,12 @@ and [library-pair report](reports/2026-08-20-parallel-library-baseline.md).
 
 ## Private ordered verification scheduler foundation
 
-`Leant.Synth.Verification.Parallel` now provides one package-private
-`runOrderedSuccessQuota` primitive for future production use with isolated
-Lean-verification workers. Cabal lists the module only under `Other-Modules`,
-and only the unit test suite imports it. `Main`, `Leant.Backend`, and
-`Leant.Synth.Verification` have
-no dependency on the primitive, so every production candidate group and its
-rendering variants still use the established serial verification route over
-one backend process.
+`Leant.Synth.Verification.Parallel` first landed the package-private
+`runOrderedSuccessQuota` primitive used by the current isolated
+Lean-verification route. Cabal lists the module only under `Other-Modules`.
+`Leant.Synth.Verification` now supplies a candidate-free strict group summary,
+and Main calls the scheduler through `verifyCandidateGroupsParallel` only
+after the runtime gate below admits a two-worker batch.
 
 The primitive classifies each task result as `Left rejection` or
 `Right success`. Rejections remain in the ordered result but do not consume
@@ -1297,13 +1297,13 @@ returning. The pre-landing audit specifically sealed guard precedence,
 poisoned-tail laziness, strict result publication, caller-thread N1 behavior,
 ordered exception precedence, and cancel-and-join cleanup.
 
-This checkpoint is a scheduler proof boundary, not a runtime integration or a
-performance result. The separate private isolated-pair foundation now supplies
-two backend processes restored from one artifact; a single backend pipe is
-never shared concurrently. Neither foundation is connected to Main, so
-production wiring and benchmarking remain future work. The scheduler's exact
-contract, audit evidence, and boundary are recorded in the
-[ordered verification scheduler report](reports/2026-08-20-ordered-verification-scheduler-foundation.md).
+The original checkpoint was a scheduler proof boundary, not a runtime or
+performance result. The later route below now composes it with two independent
+backend processes; a single backend pipe is never shared concurrently. The
+foundation contract is recorded in the
+[ordered verification scheduler report](reports/2026-08-20-ordered-verification-scheduler-foundation.md),
+and the connected behavior and measurements in the
+[ordered isolated-verification report](reports/2026-08-21-ordered-isolated-parallel-verification.md).
 
 ## Backend process-tree lifecycle prerequisite
 
@@ -1359,20 +1359,18 @@ leave the observed child active and fail this characterization. The existing
 oversized-stderr regression remains in the same three-test lifecycle group.
 
 This checkpoint cleared the lifecycle prerequisite used by the later private
-isolated-pair foundation. Production candidate verification still runs
-serially over one backend. Main integration, acquisition of a command-current
-environment artifact, connection to the private ordered scheduler, and
-performance measurement all remain future work. The lifecycle implementation,
-audit repairs, and **508 of 508** strict-suite result are recorded in the
+isolated-pair foundation. Main now uses that foundation on the conservatively
+gated `-N2` route described below. The lifecycle implementation, audit repairs,
+and its original **508 of 508** strict-suite result are recorded in the
 [backend lifecycle report](reports/2026-08-20-backend-process-tree-lifecycle.md).
 
 ## Private isolated backend pair foundation
 
-`Leant.Backend.Isolated` is a package-private resource boundary for future
-parallel Lean verification. Cabal lists it under `Other-Modules`; Main and the
-production Verification route do not import it. Its pair and lease
-constructors are hidden, while its typed setup, transport, lease, pair, and
-cleanup failures are inspectable. Its callable shape inside the package is:
+`Leant.Backend.Isolated` is the package-private resource boundary used by
+parallel Lean verification. Cabal lists it under `Other-Modules`; pair and
+lease constructors remain hidden, while typed setup, transport, lease, pair,
+and cleanup failures are inspectable. Its callable shape inside the package
+is:
 
 ```haskell
 withIsolatedBackendPair
@@ -1390,9 +1388,11 @@ runIsolatedBackendCommand
   -> IO (Either IsolatedBackendFailure JValue)
 ```
 
-Pair acquisition sequentially spawns exactly two independent `Backend`
-processes and sends each `unpickleEnvFrom` with the same optional request
-timeout. Each
+Pair acquisition starts exactly two independent `Backend` spawn-and-restore
+actions concurrently and sends each `unpickleEnvFrom` with the same optional
+request timeout. A masked atomic ownership registry closes the handoff gap;
+the parent still observes logical worker one first, cancels a sibling after a
+known worker-one failure, and cleans registered backends in ordinal order. Each
 successful response must contain its own integer environment identifier and
 must contain neither a fatal response nor an error-severity diagnostic.
 Failures retain the worker ordinal and distinguish spawn, transport, fatal,
@@ -1444,27 +1444,85 @@ before close cannot be missed, while close wins over a later failure from a
 request already admitted in an escaped child. Cleanup uses the bounded,
 cancellation-safe whole-process-tree lifecycle described above.
 
-The self-hosted fake-backend characterization passed all **24 of 24** focused
-cases, including distinct process/environment identity, setup ordering and
+The self-hosted fake-backend characterization now passes all **28 of 28**
+focused cases, including simultaneous restore admission, setup cancellation,
+distinct process/environment identity, setup ordering and
 partial cleanup, command serialization, escaped leases, gated release,
 release and request cancellation, valid diagnostic responses, stable poison,
 sibling completion, callback precedence, and atomic close ordering. The
-complete warning-as-error unit suite passed **532 of 532** tests; the
+complete warning-as-error unit suite passed **557 of 557** tests; the
 serialized all-suite gate, strict all-target tests-and-benchmarks build, Cabal
 check, source-distribution construction, and diff checks also passed. An
-independent concurrency audit returned GO. These results characterize the
-private foundation and its fake protocol peer, not production routing, real
-project environment parity, throughput, latency, or memory use.
-
-The next stage belongs in Main: create and own one artifact representing the
-command's current Lean environment, restore both isolated workers from that
-artifact, route one candidate group per lease through the ordered success-quota
-scheduler, and keep variants serial inside the lease. A one-worker setting
-must retain the literal established serial route. Real-backend parity,
-deadlines, cold and warm pool cost, resident memory, failure fallback, and
-end-to-end transcript equality must be measured before enabling the route or
-claiming a speed-up. The landing boundary and evidence are recorded in the
+independent concurrency audit returned GO. The foundation landing boundary is
+recorded in the
 [isolated backend pair report](reports/2026-08-20-isolated-backend-pair-foundation.md).
+
+## Ordered isolated parallel verification
+
+Main wraps each synthesis command in a private
+`VerificationArtifactRuntime FilePath`. The first verification batch with a
+success quota of at least two and at least two reachable groups asks the
+runtime to evaluate four session exclusions before the capability count:
+`rsSnapshotBase`, `rsProve`, and `rsLastSorry` must all be absent, and
+`rsHistory` must be empty. This excludes session-created scoped extensions,
+whose current upstream pickle format is not complete, as well as proof and
+resumable-sorry state that an extra speculative backend request could disturb.
+At fewer than two RTS capabilities, or for an ineligible batch, Main calls
+`synthVerifySerial` literally and performs no artifact or worker work.
+
+An admitted command asks the primary backend for its current environment,
+reserves an absent collision-resistant path beneath an absolute temporary
+directory, records ownership while masked, and pickles the environment there.
+The command runtime reuses that immutable artifact across later batches and
+removes it after normal completion, exception, or cancellation. A failed
+preparation becomes sticky serial. Successful early deletion clears ownership
+immediately; failed deletion retains it for command-final retry, so a stale
+name can neither leak nor delete an unrelated later file.
+
+Each eligible batch acquires and closes one fresh isolated pair. One scheduler
+task owns one candidate group and one lease; `verifyCandidateGroup` traverses
+that group's textual variants serially and stops at its first accepted
+variant. The worker publishes only a candidate-free, deeply forced summary.
+After ordered collection, `verificationBatchFromGroupSummaries` reattaches the
+original candidate receipts without demanding an accepted variant suffix or a
+group beyond the success cutoff. Rejected groups do not spend the success
+quota. Attempts, failure counts, observations, accepted candidates, and
+exception precedence therefore match `synthVerifySerial`.
+
+A typed scheduler failure is caught *inside* the pair callback so the callback
+can return normally and the pair can attach poison or cleanup information
+before Main classifies it. Clean spawn, restore, timeout, EOF, or malformed
+response unavailability closes the pair, disables later command parallelism,
+and replays the exact batch serially. Interrupted requests, cleanup failures,
+and closed/retired lease or pair states abort instead of being hidden by
+fallback. Arbitrary and asynchronous exceptions are never converted. The
+primary request path likewise retires a backend interrupted after protocol
+admission before it can be reused.
+
+The committed real-Lean gate runs a history-free fixture at N1 and N2 and
+requires byte-identical output plus exactly one versus three backend
+executions. A scoped-notation history fixture requires byte-identical output
+and exactly one backend at both capability counts, proving the conservative
+session gate rather than merely observing coincidental output parity.
+
+Restoring an imported environment reruns imported module initializers, and an
+imported macro or elaborator may perform process-local or external I/O while a
+candidate is checked. Parallel parity therefore assumes import restoration and
+candidate elaboration are deterministic and free of externally significant or
+process-local effects. Users outside that boundary must use `+RTS -N1 -RTS`.
+
+The five-sample O2 2x2 screen compared the clean serial baseline and candidate
+at N1/N2. Two history-free five-result workloads measured B2/C2 median wall
+ratios of 1.166x and 1.169x; the contextual `List.map` workload measured
+1.144x, for a 1.159x geometric mean. N1 ratios were 1.000x, 1.010x, and
+0.990x. Preflight certified the required 1/1/1/3 backend topology; preflight
+and every timed sample retained the exact transcript hash. Candidate N2 p95
+was better than baseline N2 on both primary fixtures. This is useful route and
+screening evidence, but not acceleration evidence: it is below the provisional
+1.25x promotion threshold. It does not justify default `-N2`
+or a universal speed-up claim. Methodology, resource caveats, and raw summary
+are in the
+[ordered isolated-verification report](reports/2026-08-21-ordered-isolated-parallel-verification.md).
 
 ## Main's progressive same-run cursor scheduler
 

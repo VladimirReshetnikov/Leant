@@ -6,6 +6,12 @@ Implementation checkpoint: `31c7d43` (`Add an ordered verification worker schedu
 
 Current repository checkpoint: `470d15b` (`Advance Djex to the audited parallel-search checkpoints`)
 
+Successor: the scheduler was connected to conservatively gated, isolated N2
+verification at `ea75133`; see the
+[ordered isolated parallel verification report](2026-08-21-ordered-isolated-parallel-verification.md).
+The boundary below describes this foundation at its original landing
+checkpoint.
+
 ## Outcome
 
 Leant now has a private coordination primitive for a future pool of isolated

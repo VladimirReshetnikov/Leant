@@ -21,9 +21,12 @@ Bug-Reports:   https://github.com/VladimirReshetnikov/Leant/issues
 Category:      Development
 Build-Type:    Simple
 Extra-Source-Files:
+  README.md
   bench-verification/README.md
   bench-verification/benchmark.py
   bench-verification/*.txt
+  docs/*.md
+  docs/reports/*.md
   test/run-parallel-verification-gate.sh
   test/parallel-verification/README.md
   test/parallel-verification/*.txt

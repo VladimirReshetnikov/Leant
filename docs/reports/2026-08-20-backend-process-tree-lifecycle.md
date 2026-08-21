@@ -5,6 +5,11 @@ Date: 2026-08-20
 Landing checkpoint:
 `39901f314c9cca7bb177b6194c8ef047293c2a35` (`39901f3`)
 
+Successor: the lifecycle now owns the workers used by the connected N2
+verification route at `ea75133`; see the
+[ordered isolated parallel verification report](2026-08-21-ordered-isolated-parallel-verification.md).
+The boundary below remains the historical lifecycle checkpoint.
+
 ## Outcome and boundary
 
 Leant now owns and boundedly tears down the complete process tree behind each
