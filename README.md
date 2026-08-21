@@ -1086,22 +1086,33 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   by alternating tails: the Djinn head is one short of `synth-shown` and each
   front runs to `synth-verify`, so retuning either setting reshapes the
   interleave accordingly.
-  The first multicore checkpoint overlaps those two searches only for the
-  provider-free structural baseline when `both` is selected, no library
-  premises were selected for the goal, the five `SynthLimits` settings retain
-  their defaults (shown 5, verify 12, window 60, budget off, queue 1024), the
-  behavioral mode is disabled or ranking, and the RTS exposes at least two
-  capabilities. `synth-steps` is deliberately independent of that gate and
-  may still be retuned. Each scoped worker prepares 12 groups; Leant then uses
-  the same deterministic merge and performs Lean verification serially. All
-  provider, library-premise, filter-successor, classical, and retuned-limit
-  lanes remain serial. The executable is threaded but does not select `-N2`
-  by default and there is no public synthesis-jobs setting: start it with
-  `+RTS -N2 -RTS` to admit this checkpoint, or `+RTS -N1 -RTS` to take the
-  exact original serial path. The initial quartic benchmark was about 10.1%
-  slower at `-N2`, so this is cancellation-safe groundwork, not a speedup
-  claim; see the
-  [scoped parallel baseline report](docs/reports/2026-08-20-scoped-parallel-engine-both-baseline.md).
+  Multicore search is confined to the initial provider-free baseline with the
+  five default `SynthLimits` settings (shown 5, verify 12, window 60, budget
+  off, queue 1024), a disabled/ranking one-batch behavioral policy, and at
+  least two RTS capabilities. Before its sole capability query, Main selects
+  one of two disjoint schedules entirely from command state: without selected
+  library premises, `both` may overlap its Djinn and Exference searches;
+  with a nonempty selected-premise list, any engine may instead overlap the
+  structural base and library searches. The latter is one nonnested outer
+  pair: even for `both`, Djinn and Exference remain serial inside each action.
+  It initially forces the base verdict and notes without its group spine and
+  one full library verification window (12 groups for a standalone engine,
+  24 for `both`), then retains the existing library-first, base-left merge;
+  later base fill and deduplication stay serial under the same deadline.
+  `synth-steps` is deliberately outside the admission gate and may be
+  retuned. Providers, filter successors, classical routes, Lean verification,
+  behavioral assessment, and retuned-limit lanes remain serial.
+
+  The executable is threaded but does not select `-N2` by default and exposes
+  no public synthesis-jobs setting. Start it with `+RTS -N2 -RTS` to make an
+  eligible pair possible; `+RTS -N1 -RTS` takes the literal established
+  serial path. The original quartic `EngineBoth` fixture was about 10.1%
+  slower in the paired benchmark, while the substantive eight-premise
+  `List.map` search-only fixture measured about **1.5x** at `-N2` for
+  Exference and `both`. That is evidence for this bounded library-search seam,
+  not an end-to-end, verification, default-`N2`, or universal speedup claim.
+  See the [first structural-pair report](docs/reports/2026-08-20-scoped-parallel-engine-both-baseline.md)
+  and the [library-pair report](docs/reports/2026-08-20-parallel-library-baseline.md).
   Within each Exference invocation, Leant stable-deduplicates rendered groups
   before applying the internal 60-candidate collection window
   (`:set synth-window N`). The first

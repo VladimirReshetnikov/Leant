@@ -1186,61 +1186,81 @@ deduplication, note-presentation policy, survivor quota, `ReplState` field, or
 counterexample-directed engine request; those private orchestration choices
 remain in Main.
 
-## Scoped parallel `EngineBoth` structural baseline
+## Scoped parallel initial structural schedules
 
-The first concurrency checkpoint lives in Main rather than in the pure Engine
-API. `runTunedSynthesis` and its `EngineBoth` branch remain serial and retain
-their established left-to-right failure behavior. Main admits the private
-parallel path only for the initial, provider-free structural baseline when all
-of these conditions hold:
+The concurrency checkpoints live in Main rather than in the pure Engine API.
+`runTunedSynthesis`, including its `EngineBoth` branch, remains serial and
+retains its established left-to-right failure behavior. For the initial
+provider-free structural baseline, Main can select exactly one of two
+disjoint private schedules:
 
-- the selected engine is `EngineBoth`;
-- `SynthLimits` equals `defaultSynthLimits`: 5 shown, 12 verified per
-  standalone lane, a 60-group observation window, no Djinn choice-point
-  budget, and an Exference queue bound of 1024;
-- the goal selected no rated library premise;
-- the assessment policy is disabled or rank, so the lane is one-batch and
-  cannot request a filter successor; and
-- `getNumCapabilities` reports at least two RTS capabilities.
+| Selected premises | Engine | Scoped pair |
+| --- | --- | --- |
+| none | `EngineBoth` | standalone Djinn / standalone Exference |
+| nonempty | Djinn, Exference, or `EngineBoth` | structural base / tuned library search |
 
-`rsSynthSteps` is not part of `SynthLimits`, so `:set synth-steps N` remains
-eligible. Provider discovery may also remain enabled: eligibility concerns the
-provider-free first lane, not whether a later serial provider stage can be
-reached. Conversely, an applicable selected library premise, filter mode, a
-retuned shown/verify/window/budget/queue setting, a provider lane, or a
-classical lane stays on the established serial path. Lean verification and
-post-verification behavioral assessment are serial in every case.
+Both schedules additionally require `SynthLimits == defaultSynthLimits` (5
+shown, 12 verified per standalone engine, a 60-group window, no Djinn
+choice-point budget, and Exference queue 1024), a disabled or rank assessment
+whose lane cannot request a filter successor, and at least two RTS
+capabilities. The library schedule also requires a structurally accepted goal;
+the selected premises are the goal-specific rated list, not merely the global
+`:set synth-library on` switch. `rsSynthSteps` is not a `SynthLimits` field,
+so `:set synth-steps N` remains eligible.
 
-For an admitted baseline, Main constructs the existing standalone Djinn and
-Exference outcomes and passes two strict-prefix actions to the private
-`runParallelEitherPairOrdered` helper. Nested `withAsync` scopes start both
-workers before either result is observed. Main waits for Djinn first and then
-Exference, preserving the established left-first value/error precedence.
-Leaving either scope cancels and joins unfinished work; the same cleanup owns
-normal left failure, worker exceptions, command timeout, and caller
-cancellation. Each worker forces only `synthLimitTried`, 12 groups at the
-defaults, rather than its complete lazy trace.
+`initialBaselineSchedule` decides among those two closures and the serial route
+entirely from pure command state. Only an admitted closure reaches the one
+`getNumCapabilities` call. At one capability, including explicit
+`+RTS -N1 -RTS`, Main does not construct either pair: it invokes the literal
+established `runSynthesis True Set.empty engine []` callback, which performs
+the same base-then-library schedule as before. The executable is threaded but
+has neither a default `-N2` nor a public `:set synth-jobs` setting.
 
-The whole pair is forced beneath the command's already captured absolute
-deadline. A timeout returns a genuine empty `SynthLaneRunTimedOut` receipt:
-no outcome, notes, checked-frontier spelling, or group count is probed from
-the cancelled work. Successful branches are joined before Main applies the
-existing `mergeDetailedOutcomesSkipping Set.empty`, so combined ordering and
-exact-text deduplication remain Engine-owned and deterministic. Cross-lane
-duplicates can make the merged cursor demand a worker tail beyond its forced
-12-group prefix. That extra demand happens serially after the workers have
-joined, when the unchanged cursor driver forces the combined batch beneath
-the remaining part of the same absolute deadline.
+The no-library schedule retains the first checkpoint's exact boundary. Its
+scoped workers request and strictly force the available prefix of up to 12
+groups from Djinn and 12 from Exference, observe the left/Djinn result first,
+join both workers, and then apply the established deterministic `EngineBoth`
+merge. Any duplicate-driven tail demand is left to the cursor under the
+remaining part of the same absolute command deadline.
 
-The executable is built with the threaded runtime but has no default
-`-with-rtsopts=-N2` and exposes no `:set synth-jobs` control. With one
-capability, including an explicit `+RTS -N1 -RTS`, Main bypasses pair
-construction and calls the exact pre-existing serial `EngineBoth` path. With
-at least two capabilities the narrow path above is eligible; the initial
-quartic benchmark found it slower, so the checkpoint establishes scoped
-ownership and deterministic equivalence rather than a performance claim. See
-the dated
-[scoped parallel baseline report](reports/2026-08-20-scoped-parallel-engine-both-baseline.md).
+The selected-library schedule is one *outer* pair for every engine mode. Its
+left action is the ordinary provider-free structural search and its right
+action is the existing tuned library-premise search. There is no nested engine
+parallelism: when the selected engine is `EngineBoth`, its Djinn and Exference
+halves remain serial inside each outer action, so at most these two search
+actions are active. The asymmetric strict boundary is intentional:
+
+- the left/base request is zero groups, which still forces the outcome
+  constructor, refutation verdict when present, and run-note string spines,
+  without entering the candidate-group spine; and
+- the right/library request is one complete verification window, capped at 12
+  groups for Djinn or Exference and 24 groups for `EngineBoth`.
+
+After both actions join, Main calls the unchanged
+`mergeLibraryDetailedOutcomes` with base on the left. Base failures therefore
+retain left-first ownership, library candidates still precede base candidates,
+and only the base may supply a negative verdict. The ordinary cursor then owns
+later base filling and variant-list deduplication under the same absolute
+deadline; worker preparation does not start a new clock.
+
+Both paths use the private `runParallelEitherPairOrdered` helper. Nested
+`withAsync` scopes start the actions before either result is observed, wait
+left first, and cancel and join unfinished work on ordinary left failure,
+worker exception, command timeout, or caller cancellation. A deadline win
+produces a genuinely empty `SynthLaneRunTimedOut` receipt without probing the
+cancelled outcomes, notes, spelling frontier, or group counts.
+
+Provider-enriched lanes and widening, behavioral filter successors, classical
+routes, Lean verification, post-verification behavioral assessment, and any
+lane with retuned shown/verify/window/budget/queue limits remain serial. The
+first quartic engine-pair fixture was about 10.1% slower at `-N2`. In contrast,
+the fixed eight-premise `List.map` search-only fixture measured 1.523x for
+Exference and 1.572x for `EngineBoth`, with near-parity `-N1` controls and an
+independent reproduction near 1.5x. This supports a cautious search-only gain
+for the substantive library seam, not an end-to-end, verification,
+default-`N2`, or universal speedup claim. See the dated
+[structural-pair report](reports/2026-08-20-scoped-parallel-engine-both-baseline.md)
+and [library-pair report](reports/2026-08-20-parallel-library-baseline.md).
 
 ## Main's progressive same-run cursor scheduler
 

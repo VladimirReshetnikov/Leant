@@ -31,10 +31,14 @@ engines and a validated one-layer eliminator in Exference. That eliminator
 preserves the established strict candidate prefix, retrying with intentionally
 unused inputs only after a strict search miss and rendering omitted fields as
 Lean wildcards. Phase 4 and a persistent Mathlib-scale inventory remain future
-work. One bounded concurrency checkpoint now overlaps the independent Djinn
-and Exference halves of an eligible provider-free `EngineBoth` baseline, but
-its first benchmark is slower and does not support a speedup claim. The
-implemented post-phase-2 increments are detailed in §7. Companion to
+work. Bounded concurrency checkpoints now overlap either the independent
+Djinn/Exference halves of an eligible provider-free `EngineBoth` baseline or,
+when rated library premises were selected, the structural and library searches
+for any engine. The first small structural benchmark regressed; a substantive
+eight-premise library fixture measured a cautious 1.5x search-only gain for
+Exference and `EngineBoth` at `-N2`. Neither result is an end-to-end,
+verification, or default-`N2` claim. The implemented post-phase-2 increments
+are detailed in §7. Companion to
 [PROPOSALS.md](PROPOSALS.md).*
 
 Djex — vendored read-only in this repository as the
@@ -683,33 +687,45 @@ This pair is independent of the provider-free/provider-enriched orchestration
 above; if both provider passes are reached, each invocation applies the same
 strict-first rule within the one shared command deadline.
 
-### Scoped parallel combined baseline (implemented checkpoint)
+### Scoped parallel initial baseline (implemented checkpoints)
 
-Main now overlaps Djinn and Exference only for the provider-free structural
-baseline of `EngineBoth` when no library premise was selected, the ordinary
-lane is disabled/rank one-batch, all five `SynthLimits` values retain their
-defaults (shown 5, verify 12, window 60, budget off, queue 1024), and the RTS
-offers at least two capabilities. `synth-steps` remains independently
-retunable. Providers, selected library premises, filter successors, classical
-routes, retuned limits, Lean verification, and behavioral assessment all keep
-their serial scheduling.
+Main selects one of two disjoint initial provider-free schedules. With no
+selected library premise, `EngineBoth` can overlap its standalone Djinn and
+Exference searches. With a nonempty selected-premise list, Djinn, Exference,
+and `EngineBoth` can instead overlap the ordinary structural base with the
+tuned library-premise search. Both routes require the default five
+`SynthLimits` values (shown 5, verify 12, window 60, budget off, queue 1024), a
+disabled/rank one-batch assessment, and at least two RTS capabilities.
+`synth-steps` remains independently retunable.
 
-Two scoped async workers force 12 standalone groups each under the already
-captured command deadline. Results are observed Djinn-first; scope exit cancels
-and joins unfinished work. The workers join before the established
-deterministic combined merge. If cross-lane exact-text duplicates require a
-tail beyond either forced prefix, that tail is demanded serially by the cursor
-under the remaining same deadline. A pair timeout yields an empty timeout
-receipt without probing cancelled work. `+RTS -N1 -RTS` bypasses construction
-of the pair and enters the exact historical serial `EngineBoth` path.
+The concrete schedule is chosen entirely from pure command state before the
+sole capability query. At `+RTS -N1 -RTS`, Main bypasses pair construction and
+enters the literal established serial callback. At `-N2`, the no-library pair
+strictly requests up to 12 groups from each standalone engine before the
+deterministic combined merge. The library pair is nonnested: even for
+`EngineBoth`, each of its two outer actions keeps the pure Djinn/Exference
+sequence serial. It forces zero base groups (but does force the base
+outcome/verdict and notes) and one library verification window (capped at 12
+standalone or 24 combined groups). The unchanged
+base-left, library-candidates-first merge runs only after both actions join;
+later base filling and deduplication remain serial cursor demand under the
+same absolute deadline.
 
-This is an ownership and equivalence foundation, not a default performance
-feature. The executable has no default `-N2` and there is no public jobs
-setting. On the fixed quartic rank-N workload, five `-N2` samples produced a
-0.908x serial/parallel median ratio: the parallel path was about 10.1% slower.
-More granular search or verification parallelism needs separate measurement
-and design. The checkpoint and benchmark are recorded in the
-[scoped parallel baseline report](reports/2026-08-20-scoped-parallel-engine-both-baseline.md).
+Scoped cancellation joins unfinished workers, and a pair timeout produces an
+empty receipt without probing cancelled work. Providers, filter successors,
+classical routes, retuned-limit lanes, Lean verification, and behavioral
+assessment retain serial scheduling. The executable has no default `-N2` and
+there is no public jobs setting.
+
+The fixed quartic `EngineBoth` fixture produced a 0.908x serial/parallel
+median ratio, about 10.1% slower. The more substantive eight-premise
+`List.map` search-only fixture produced 1.523x for Exference and 1.572x for
+`EngineBoth` at `-N2`; an independent run reproduced 1.538x and 1.566x, while
+`-N1` controls stayed near parity. That is evidence for a roughly 1.5x
+search-only gain on the selected-library seam, not a claim about end-to-end
+latency, Lean verification, every workload, or enabling `-N2` by default. See
+the [structural-pair report](reports/2026-08-20-scoped-parallel-engine-both-baseline.md)
+and [library-pair report](reports/2026-08-20-parallel-library-baseline.md).
 
 Design rules, all inherited from Djex:
 
@@ -917,9 +933,9 @@ Design rules, all inherited from Djex:
 - **Phase 4 — research horizon (not scheduled).** Dependent goals,
   `Decidable` instance synthesis, interaction with `exact?` as a
   sub-oracle inside the search, and broader measured concurrency across
-  provider, engine-internal, or isolated-verification work. The narrow
-  provider-free `EngineBoth` overlap in §3 is implemented groundwork, not
-  evidence that those wider designs will be faster.
+  provider, engine-internal, or isolated-verification work. The two bounded
+  initial schedules in §3 are implemented groundwork, not evidence that those
+  wider designs will be faster.
 
 ## 5. Honest limitations
 
@@ -1059,9 +1075,11 @@ LRU now removes repeated inventory round-trips without changing startup
 discipline, and synthesis-history appends replay only their suffix. The
 next phase-3 work should measure those latency gains and improve relevance
 beyond a single target root; stable project-local ratings are already exposed.
-The first scoped `EngineBoth` overlap is also implemented, but its quartic
-benchmark regressed, so it should remain opt-in through RTS capabilities while
-later parallel seams are designed and measured independently.
+The scoped structural and library overlaps are also implemented. The tiny
+quartic fixture regressed, whereas substantive Exference and `EngineBoth`
+library-search workloads measured roughly 1.5x at `-N2`; both remain opt-in
+through RTS capabilities while later seams and end-to-end latency are measured
+independently.
 
 ## 7. Post-phase-2 proposals
 

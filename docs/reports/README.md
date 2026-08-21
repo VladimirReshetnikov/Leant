@@ -76,17 +76,22 @@ rank and disabled modes retain independently fresh configured-duration
 deadlines at each reached EM and NN route. Timeout zero remains unbounded.
 
 The current multicore checkpoint is narrower than the ordinary lane policy.
-With `EngineBoth`, default shown/verify/window/budget/queue limits, no selected
-library premise, a disabled/rank one-batch assessment, and at least two RTS
-capabilities, Main overlaps only the provider-free structural Djinn and
-Exference prefixes. It forces 12 groups per scoped worker under the existing
-absolute deadline, observes results Djinn-first, joins both workers, and then
-uses the established deterministic merge. Duplicate-driven tail demand,
-verification, providers, library-premise search, filter successors, classical
-routes, and retuned-limit search remain serial. A timeout produces an empty
-receipt. `synth-steps` remains eligible; `+RTS -N1 -RTS` takes the exact serial
-fallback. There is no default `-N2` or public jobs setting, and the first fixed
-quartic benchmark was slower rather than faster.
+For an initial provider-free, default-limit, disabled/rank one-batch baseline,
+Main purely selects one of two disjoint schedules before its sole capability
+query. With no selected library premise, `EngineBoth` can overlap the Djinn and
+Exference prefixes. With nonempty selected premises, any engine can instead
+overlap the structural base and tuned library search. The latter is a
+nonnested outer pair: `EngineBoth` stays serial inside both actions. It forces
+the base result/verdict and notes at a zero-group boundary and one complete
+library verification window, then retains the established base-left,
+library-first merge. Later base fill and deduplication remain serial under the
+same deadline. Providers, filter successors, classical routes, verification,
+behavioral assessment, and retuned-limit work remain serial. `synth-steps`
+remains eligible; `+RTS -N1 -RTS` takes the literal serial callback. There is
+no default `-N2` or public jobs setting. The first quartic fixture regressed,
+while a substantive eight-premise library-search fixture measured roughly
+1.5x for Exference and `EngineBoth` at `-N2`; that is a search-only workload
+result, not an end-to-end or default-runtime claim.
 
 There is still no `ReplState` field, serialization, snapshot restoration,
 session bank, or persistence, and no new engine-side counterexample request,
@@ -172,6 +177,7 @@ Reports are listed oldest first.
 - 2026-08-20 — [Inline Length where-clause runtime activation](2026-08-20-inline-length-where-runtime.md)
 - 2026-08-20 — [Host-native behavioral constraints in both REPLs](2026-08-20-host-native-behavioral-constraints.md)
 - 2026-08-20 — [Scoped parallel `EngineBoth` structural baseline](2026-08-20-scoped-parallel-engine-both-baseline.md)
+- 2026-08-20 — [Parallel structural/library baseline](2026-08-20-parallel-library-baseline.md)
 
 ## Standalone PDF reports
 
