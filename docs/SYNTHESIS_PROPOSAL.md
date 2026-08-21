@@ -43,7 +43,9 @@ a conservative N2 verification route. The pair restores independently spawned
 processes from one command artifact above the bounded whole-tree lifecycle,
 while N1 retains the literal serial verifier. Real-Lean parity and route use
 are pinned; a five-sample end-to-end screen measured roughly 1.16x but did not
-clear the provisional 1.25x promotion threshold. The
+clear the provisional 1.25x promotion threshold. A later one-shot prepared-pair
+owner safely supports concurrent setup, but its experimental Main prewarm seam
+also missed the fixed gate and was not connected. The
 implemented post-phase-2 increments
 are detailed in §7. Companion to
 [PROPOSALS.md](PROPOSALS.md).*
@@ -870,6 +872,34 @@ route is useful evidence for explicit N2, not a
 default-N2 or broad speed-up claim. See the
 [ordered isolated-verification report](reports/2026-08-21-ordered-isolated-parallel-verification.md).
 
+### Prepared-pair foundation and prewarm HOLD
+
+Commit `a35863e` adds a package-private ownership mechanism for starting an
+isolated pair while an enclosing caller performs independent work. Both
+spawn-and-restore actions start concurrently, while masked ordinal ownership,
+worker-one observation, and ordered cleanup preserve deterministic failure
+precedence. The opaque prepared value may be claimed once. A successful
+claimant joins the acquisition manager before pair ownership transfers;
+concurrent or late claims fail closed. An unused scope cancels and joins its
+manager and closes any completed pair, while a detached claimant is
+interrupted and joined before the scope returns.
+
+This is foundation, not a production scheduling change. The prepared subgroup
+has 17 cases, the broader `-p prepared` selection passed 26 of 26 in five
+independent repetitions, and the complete strict suite passed 574 of 574.
+Main still uses the connected route above: lazy command artifact preparation
+at the first eligible batch and a fresh pair scoped around that batch.
+
+The attempted caller prepared the artifact synchronously, then overlapped pair
+spawn/restore with the initial pure search. A route-certified five-sample O2
+screen measured B2/C2 median wall ratios of 1.165x and 1.166x on its two
+primary workloads, with a 1.167x geometric mean across three. Both primary
+ratios missed the fixed 1.25x gate and were effectively unchanged from the
+earlier route screen. The experimental Main and unused-prewarm fixture were
+removed before the foundation commit; the API currently has no Main caller.
+See the
+[prepared-pair and prewarm report](reports/2026-08-21-prepared-isolated-pair-prewarm-hold.md).
+
 Design rules, all inherited from Djex:
 
 1. **Checked boundaries.** The translator refuses anything outside the
@@ -1080,8 +1110,10 @@ Design rules, all inherited from Djex:
   in §3, the private ordered success-quota scheduler, and the isolated
   two-worker backend pair are implemented groundwork. The scheduler and pair
   are connected for history-free N2 verification, but the measured 1.16x
-  checkpoint remains opt-in and below its promotion threshold; none of this
-  establishes that the wider design will be faster.
+  checkpoint remains opt-in and below its promotion threshold. A safe
+  one-shot prepared-pair owner is also implemented, but the attempted initial-
+  search prewarm measured only 1.165x/1.166x on its primary screen and was
+  withheld. None of this establishes that the wider design will be faster.
 
 ## 5. Honest limitations
 
@@ -1230,9 +1262,12 @@ two-worker backend pair are now connected to conservatively gated candidate
 verification. History-free real-Lean parity and exact worker admission are
 pinned, while the five-sample screen recorded roughly 1.16x B2/C2 median wall
 ratios but remains non-promotional and below the provisional 1.25x threshold.
-The next concurrency step should hide or reduce cold worker preparation before
-considering default N2; the literal N1 route remains the compatibility and
-external-effects control.
+The package-private prepared-pair owner now proves that cold worker setup can
+be overlapped without escaping ownership, but the first attempted initial-
+search seam did not improve the ratios enough and remains disconnected. A
+future attempt needs a materially longer independent phase and a fresh fixed-
+threshold result before reconsidering default N2; the literal N1 route remains
+the compatibility and external-effects control.
 
 ## 7. Post-phase-2 proposals
 

@@ -142,6 +142,16 @@ mean, but did not clear the provisional 1.25x promotion gate. This is an
 opt-in checkpoint, not a default-N2 or broad speed-up claim. See the
 [ordered isolated-verification report](2026-08-21-ordered-isolated-parallel-verification.md).
 
+The prepared-pair ownership checkpoint at `a35863e` starts both isolated
+spawn-and-restore actions concurrently and adds an opaque, one-shot owner that
+joins the acquisition manager before transfer, discards and joins unused
+preparations, and prevents detached claims from escaping scope. Main has no
+prepared-pair caller. An experimental synchronous-artifact/initial-search
+prewarm measured 1.165x and 1.166x B2/C2 on its two primary five-sample
+workloads, below the fixed 1.25x gate; it was removed before commit and is a
+HOLD rather than acceleration evidence. See the
+[prepared isolated-pair report](2026-08-21-prepared-isolated-pair-prewarm-hold.md).
+
 The Length counterexample bank still has no `ReplState` field, serialization
 or snapshot restoration, session-wide scope, or persistence. There is also no
 new engine-side counterexample request, typed prefix pruning, or complete
@@ -232,6 +242,7 @@ Reports are listed oldest first.
 - 2026-08-20 — [Backend process-tree lifecycle prerequisite](2026-08-20-backend-process-tree-lifecycle.md)
 - 2026-08-20 — [Private isolated Lean backend pair foundation](2026-08-20-isolated-backend-pair-foundation.md)
 - 2026-08-21 — [Ordered isolated parallel Lean verification](2026-08-21-ordered-isolated-parallel-verification.md)
+- 2026-08-21 — [Prepared isolated-pair ownership and speculative prewarm HOLD](2026-08-21-prepared-isolated-pair-prewarm-hold.md)
 
 ## Standalone PDF reports
 

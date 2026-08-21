@@ -6,6 +6,12 @@ Implementation commit: `ea75133`
 
 Serial-verifier baseline: `57e4445`
 
+> **Successor:** commit `a35863e` added a safe one-shot prepared-pair owner,
+> but an experimental Main prewarm measured only 1.165x and 1.166x B2/C2 on
+> the primary five-sample screen, below the fixed 1.25x gate. The Main
+> experiment was removed. See the
+> [prepared-pair and prewarm HOLD report](2026-08-21-prepared-isolated-pair-prewarm-hold.md).
+
 ## Result
 
 Leant now has an end-to-end, package-private-to-Main route for verifying

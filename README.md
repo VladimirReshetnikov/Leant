@@ -1146,6 +1146,20 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   [isolated-pair foundation](docs/reports/2026-08-20-isolated-backend-pair-foundation.md)
   and the
   [ordered isolated-verification report](docs/reports/2026-08-21-ordered-isolated-parallel-verification.md).
+
+  Commit `a35863e` adds a second, still package-private ownership boundary for
+  future latency hiding. Ordinary isolated-pair acquisition now starts both
+  worker spawn-and-restore actions concurrently while retaining deterministic
+  worker-one failure precedence. An opaque prepared pair may be claimed
+  exactly once, joins its acquisition manager before ownership transfer,
+  cancels and joins an unused preparation, and prevents a detached claim from
+  escaping its scope. Main does not call this API. An experimental route which
+  prepared the artifact synchronously and overlapped pair setup with the
+  initial pure search measured only **1.165x** and **1.166x** B2/C2 on the two
+  primary five-sample workloads (**1.167x** geometric mean across three),
+  below the fixed **1.25x** promotion gate. The Main experiment was removed;
+  this is a prewarm HOLD, not acceleration evidence. See the
+  [prepared-pair and prewarm report](docs/reports/2026-08-21-prepared-isolated-pair-prewarm-hold.md).
   Within each Exference invocation, Leant stable-deduplicates rendered groups
   before applying the internal 60-candidate collection window
   (`:set synth-window N`). The first
@@ -1318,7 +1332,9 @@ literal serial verifier. See the
 [lifecycle checkpoint](docs/reports/2026-08-20-backend-process-tree-lifecycle.md)
 and [isolated-pair checkpoint](docs/reports/2026-08-20-isolated-backend-pair-foundation.md),
 plus the
-[connected route report](docs/reports/2026-08-21-ordered-isolated-parallel-verification.md).
+[connected route report](docs/reports/2026-08-21-ordered-isolated-parallel-verification.md)
+and the later
+[prepared-pair ownership report](docs/reports/2026-08-21-prepared-isolated-pair-prewarm-hold.md).
 The JSON codec is hand-rolled
 ([src/Leant/Json.hs](src/Leant/Json.hs)). The direct external dependency
 surface stays small: `async` supplies scoped worker lifetime management and

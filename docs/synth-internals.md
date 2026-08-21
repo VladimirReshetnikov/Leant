@@ -47,6 +47,7 @@ who wants the *what* can stop at the paragraph.
 - [Backend process-tree lifecycle prerequisite](#backend-process-tree-lifecycle-prerequisite)
 - [Private isolated backend pair foundation](#private-isolated-backend-pair-foundation)
 - [Ordered isolated parallel verification](#ordered-isolated-parallel-verification)
+- [Prepared isolated-pair ownership and prewarm HOLD](#prepared-isolated-pair-ownership-and-prewarm-hold)
 - [Main's progressive same-run cursor scheduler](#mains-progressive-same-run-cursor-scheduler)
 - [Contract vocabulary and module ownership](#contract-vocabulary-and-module-ownership)
 - [Post-verification sealing](#post-verification-sealing)
@@ -1444,13 +1445,13 @@ before close cannot be missed, while close wins over a later failure from a
 request already admitted in an escaped child. Cleanup uses the bounded,
 cancellation-safe whole-process-tree lifecycle described above.
 
-The self-hosted fake-backend characterization now passes all **28 of 28**
-focused cases, including simultaneous restore admission, setup cancellation,
+At the connected-route landing, the self-hosted fake-backend characterization
+passed all **28 of 28** focused cases, including simultaneous restore admission, setup cancellation,
 distinct process/environment identity, setup ordering and
 partial cleanup, command serialization, escaped leases, gated release,
 release and request cancellation, valid diagnostic responses, stable poison,
 sibling completion, callback precedence, and atomic close ordering. The
-complete warning-as-error unit suite passed **557 of 557** tests; the
+complete warning-as-error unit suite then passed **557 of 557** tests; the
 serialized all-suite gate, strict all-target tests-and-benchmarks build, Cabal
 check, source-distribution construction, and diff checks also passed. An
 independent concurrency audit returned GO. The foundation landing boundary is
@@ -1523,6 +1524,38 @@ screening evidence, but not acceleration evidence: it is below the provisional
 or a universal speed-up claim. Methodology, resource caveats, and raw summary
 are in the
 [ordered isolated-verification report](reports/2026-08-21-ordered-isolated-parallel-verification.md).
+
+## Prepared isolated-pair ownership and prewarm HOLD
+
+Commit `a35863e` adds an opaque one-shot preparation owner without changing
+Main's production route. Both spawn-and-restore children begin concurrently,
+publish newly owned backends into a masked ordinal registry, and are still
+observed and cleaned in logical worker order. A
+`PreparedIsolatedBackendPair` can be claimed once. The claimant joins the
+acquisition manager through an uncancellable publication handoff before it
+owns the pair; competing or late claims fail closed. If no claim occurs, the
+preparation scope cancels and joins the manager, reads its terminal outcome,
+and closes any completed pair. A detached claimant is interrupted and joined
+before the enclosing scope returns.
+
+The prepared subgroup has 17 deterministic cases, including simultaneous
+claims and both claimed and unused post-publication manager joins. The broader
+`-p prepared` pattern passed 26 of 26 tests in five independent repetitions;
+the final warning-as-error unit suite passed 574 of 574, and strict all-target,
+O2 executable, Cabal, sdist, diff, and existing real-Lean route gates passed.
+The ordinary production pair also benefits from concurrent acquisition, but
+production still prepares the artifact lazily at the first eligible batch and
+creates one fresh pair around that batch.
+
+An experimental Main caller prepared the artifact synchronously, then
+overlapped prepared-pair startup with the historically serial initial search.
+Its route-certified five-sample O2 screen measured B2/C2 median wall ratios of
+1.165x and 1.166x on the primary workloads and a 1.167x geometric mean across
+three. Both primary ratios missed the fixed 1.25x gate and were effectively
+unchanged from the connected-route screen. The experiment and its unused-pair
+fixture were removed before commit: the prepared API has no Main caller and
+the measurements are a prewarm HOLD, not acceleration evidence. See the
+[prepared isolated-pair report](reports/2026-08-21-prepared-isolated-pair-prewarm-hold.md).
 
 ## Main's progressive same-run cursor scheduler
 
