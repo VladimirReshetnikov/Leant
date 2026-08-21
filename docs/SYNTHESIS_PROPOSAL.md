@@ -37,7 +37,10 @@ when rated library premises were selected, the structural and library searches
 for any engine. The first small structural benchmark regressed; a substantive
 eight-premise library fixture measured a cautious 1.5x search-only gain for
 Exference and `EngineBoth` at `-N2`. Neither result is an end-to-end,
-verification, or default-`N2` claim. The implemented post-phase-2 increments
+verification, or default-`N2` claim. A package-private ordered success-quota
+scheduler is also implemented and characterized, but only tests import it:
+production verification and its single-backend route remain serial. The
+implemented post-phase-2 increments
 are detailed in §7. Companion to
 [PROPOSALS.md](PROPOSALS.md).*
 
@@ -727,6 +730,27 @@ latency, Lean verification, every workload, or enabling `-N2` by default. See
 the [structural-pair report](reports/2026-08-20-scoped-parallel-engine-both-baseline.md)
 and [library-pair report](reports/2026-08-20-parallel-library-baseline.md).
 
+### Ordered verification scheduler foundation (implemented, not connected)
+
+`Leant.Synth.Verification.Parallel` contains a private scheduler for the next
+verification-concurrency stage. Tasks return `Either rejection success` in
+input order; rejections do not spend the success quota. Parallel work is
+admitted in lazy waves no wider than
+`min workerLimit remainingSuccessQuota`, which prevents admission beyond the
+serial success cutoff. Results are forced to normal form inside each worker,
+waits and exceptions are observed in input order, and nested `withAsync`
+scopes cancel and join unfinished siblings. A one-worker request takes a
+literal strict caller-thread traversal.
+
+The module is a Cabal `Other-Modules` implementation detail imported only by
+tests. Main, Backend, and the established Verification module do not call it,
+so current synthesis still verifies groups and their variants serially over
+one Lean backend. The next stage must provide a pool of isolated backend
+processes cloned from the same command environment before this scheduler can
+be connected safely. No verification-latency or end-to-end speed claim follows
+from the scheduler checkpoint. See the
+[ordered scheduler report](reports/2026-08-20-ordered-verification-scheduler-foundation.md).
+
 Design rules, all inherited from Djex:
 
 1. **Checked boundaries.** The translator refuses anything outside the
@@ -933,9 +957,11 @@ Design rules, all inherited from Djex:
 - **Phase 4 — research horizon (not scheduled).** Dependent goals,
   `Decidable` instance synthesis, interaction with `exact?` as a
   sub-oracle inside the search, and broader measured concurrency across
-  provider, engine-internal, or isolated-verification work. The two bounded
-  initial schedules in §3 are implemented groundwork, not evidence that those
-  wider designs will be faster.
+  provider or engine-internal work. The two bounded initial search schedules
+  in §3 and the private ordered success-quota scheduler are implemented
+  groundwork. Isolated Lean worker-pool construction, production verification
+  wiring, and its measurements remain future work; none of these foundations
+  establishes that the wider design will be faster.
 
 ## 5. Honest limitations
 
@@ -1079,7 +1105,10 @@ The scoped structural and library overlaps are also implemented. The tiny
 quartic fixture regressed, whereas substantive Exference and `EngineBoth`
 library-search workloads measured roughly 1.5x at `-N2`; both remain opt-in
 through RTS capabilities while later seams and end-to-end latency are measured
-independently.
+independently. The private ordered success-quota scheduler now supplies the
+deterministic coordination primitive for the next candidate seam, but the next
+implementation step is still an isolated Lean backend pool; production
+verification remains serial until that resource boundary is built and proved.
 
 ## 7. Post-phase-2 proposals
 

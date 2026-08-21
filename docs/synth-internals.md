@@ -42,6 +42,8 @@ who wants the *what* can stop at the paragraph.
   - [Inline where-clause command and activation](#inline-where-clause-command-and-activation)
   - [Integration and one-shot contracts](#integration-and-one-shot-contracts)
 - [Opaque detailed synthesis cursor foundation](#opaque-detailed-synthesis-cursor-foundation)
+- [Scoped parallel initial structural schedules](#scoped-parallel-initial-structural-schedules)
+- [Private ordered verification scheduler foundation](#private-ordered-verification-scheduler-foundation)
 - [Main's progressive same-run cursor scheduler](#mains-progressive-same-run-cursor-scheduler)
 - [Contract vocabulary and module ownership](#contract-vocabulary-and-module-ownership)
 - [Post-verification sealing](#post-verification-sealing)
@@ -1261,6 +1263,43 @@ for the substantive library seam, not an end-to-end, verification,
 default-`N2`, or universal speedup claim. See the dated
 [structural-pair report](reports/2026-08-20-scoped-parallel-engine-both-baseline.md)
 and [library-pair report](reports/2026-08-20-parallel-library-baseline.md).
+
+## Private ordered verification scheduler foundation
+
+`Leant.Synth.Verification.Parallel` now provides one package-private
+`runOrderedSuccessQuota` primitive for a future isolated Lean-verification
+pool. Cabal lists the module only under `Other-Modules`, and only the unit test
+suite imports it. `Main`, `Leant.Backend`, and `Leant.Synth.Verification` have
+no dependency on the primitive, so every production candidate group and its
+rendering variants still use the established serial verification route over
+one backend process.
+
+The primitive classifies each task result as `Left rejection` or
+`Right success`. Rejections remain in the ordered result but do not consume
+the requested success quota. A positive parallel run admits lazy waves of
+width `min workerLimit remainingSuccessQuota`; because one input can contribute
+at most one success, no wave can include an input beyond the corresponding
+serial success cutoff. The splitter does not inspect the input tail beyond the
+last admitted cons cell. A nonpositive quota returns without inspecting the
+worker limit, task, or input. For a positive quota, a nonpositive worker limit
+fails before inspecting the task or input, while `workerLimit == 1` executes a
+literal strict traversal on the caller thread with no asynchronous worker.
+
+Every `Either` result is forced to normal form inside its worker before
+publication. A parallel wave starts its admitted workers in nested
+`withAsync` scopes and waits in input order. Later completion or failure cannot
+overtake an earlier result or exception; an observed failure, caller
+cancellation, or scope exit cancels and joins all unfinished siblings before
+returning. The pre-landing audit specifically sealed guard precedence,
+poisoned-tail laziness, strict result publication, caller-thread N1 behavior,
+ordered exception precedence, and cancel-and-join cleanup.
+
+This checkpoint is a scheduler proof boundary, not a runtime integration or a
+performance result. The next stage is a pool of isolated Lean backend workers
+cloned from the command's current environment; a single backend pipe must not
+be shared concurrently. Production wiring and benchmarking remain future
+work. The exact contract, audit evidence, and boundary are recorded in the
+[ordered verification scheduler report](reports/2026-08-20-ordered-verification-scheduler-foundation.md).
 
 ## Main's progressive same-run cursor scheduler
 

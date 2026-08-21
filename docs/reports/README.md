@@ -93,6 +93,14 @@ while a substantive eight-premise library-search fixture measured roughly
 1.5x for Exference and `EngineBoth` at `-N2`; that is a search-only workload
 result, not an end-to-end or default-runtime claim.
 
+A separate package-private checkpoint now provides an ordered success-quota
+scheduler for a future isolated Lean-verification pool. It admits lazy bounded
+waves, deeply forces results before publication, preserves input-order result
+and exception observation, and cancels and joins active workers. Only tests
+import the module: Main, Backend, and the current Verification route are
+unchanged, so production verification remains serial and this checkpoint
+supports no speed claim. Isolated backend-pool construction is the next stage.
+
 There is still no `ReplState` field, serialization, snapshot restoration,
 session bank, or persistence, and no new engine-side counterexample request,
 typed prefix pruning, or complete Level-2 CEGIS loop. Preserve-all candidate
@@ -178,6 +186,7 @@ Reports are listed oldest first.
 - 2026-08-20 — [Host-native behavioral constraints in both REPLs](2026-08-20-host-native-behavioral-constraints.md)
 - 2026-08-20 — [Scoped parallel `EngineBoth` structural baseline](2026-08-20-scoped-parallel-engine-both-baseline.md)
 - 2026-08-20 — [Parallel structural/library baseline](2026-08-20-parallel-library-baseline.md)
+- 2026-08-20 — [Private ordered verification scheduler foundation](2026-08-20-ordered-verification-scheduler-foundation.md)
 
 ## Standalone PDF reports
 
