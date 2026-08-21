@@ -45,6 +45,7 @@ who wants the *what* can stop at the paragraph.
 - [Scoped parallel initial structural schedules](#scoped-parallel-initial-structural-schedules)
 - [Private ordered verification scheduler foundation](#private-ordered-verification-scheduler-foundation)
 - [Backend process-tree lifecycle prerequisite](#backend-process-tree-lifecycle-prerequisite)
+- [Private isolated backend pair foundation](#private-isolated-backend-pair-foundation)
 - [Main's progressive same-run cursor scheduler](#mains-progressive-same-run-cursor-scheduler)
 - [Contract vocabulary and module ownership](#contract-vocabulary-and-module-ownership)
 - [Post-verification sealing](#post-verification-sealing)
@@ -1268,9 +1269,10 @@ and [library-pair report](reports/2026-08-20-parallel-library-baseline.md).
 ## Private ordered verification scheduler foundation
 
 `Leant.Synth.Verification.Parallel` now provides one package-private
-`runOrderedSuccessQuota` primitive for a future isolated Lean-verification
-pool. Cabal lists the module only under `Other-Modules`, and only the unit test
-suite imports it. `Main`, `Leant.Backend`, and `Leant.Synth.Verification` have
+`runOrderedSuccessQuota` primitive for future production use with isolated
+Lean-verification workers. Cabal lists the module only under `Other-Modules`,
+and only the unit test suite imports it. `Main`, `Leant.Backend`, and
+`Leant.Synth.Verification` have
 no dependency on the primitive, so every production candidate group and its
 rendering variants still use the established serial verification route over
 one backend process.
@@ -1296,10 +1298,11 @@ poisoned-tail laziness, strict result publication, caller-thread N1 behavior,
 ordered exception precedence, and cancel-and-join cleanup.
 
 This checkpoint is a scheduler proof boundary, not a runtime integration or a
-performance result. The next stage is a pool of isolated Lean backend workers
-cloned from the command's current environment; a single backend pipe must not
-be shared concurrently. Production wiring and benchmarking remain future
-work. The exact contract, audit evidence, and boundary are recorded in the
+performance result. The separate private isolated-pair foundation now supplies
+two backend processes restored from one artifact; a single backend pipe is
+never shared concurrently. Neither foundation is connected to Main, so
+production wiring and benchmarking remain future work. The scheduler's exact
+contract, audit evidence, and boundary are recorded in the
 [ordered verification scheduler report](reports/2026-08-20-ordered-verification-scheduler-foundation.md).
 
 ## Backend process-tree lifecycle prerequisite
@@ -1355,13 +1358,113 @@ heartbeat to stabilize after cleanup returns. Wrapper-only termination would
 leave the observed child active and fail this characterization. The existing
 oversized-stderr regression remains in the same three-test lifecycle group.
 
-This checkpoint clears one prerequisite only. Production candidate
-verification still runs serially over one backend. Constructing an isolated
-backend pool, cloning each command environment into its workers, connecting
-the private ordered scheduler through Main, and measuring performance all
-remain future work. The implementation, audit repairs, and **508 of 508**
-strict-suite result are recorded in the
+This checkpoint cleared the lifecycle prerequisite used by the later private
+isolated-pair foundation. Production candidate verification still runs
+serially over one backend. Main integration, acquisition of a command-current
+environment artifact, connection to the private ordered scheduler, and
+performance measurement all remain future work. The lifecycle implementation,
+audit repairs, and **508 of 508** strict-suite result are recorded in the
 [backend lifecycle report](reports/2026-08-20-backend-process-tree-lifecycle.md).
+
+## Private isolated backend pair foundation
+
+`Leant.Backend.Isolated` is a package-private resource boundary for future
+parallel Lean verification. Cabal lists it under `Other-Modules`; Main and the
+production Verification route do not import it. Its pair and lease
+constructors are hidden, while its typed setup, transport, lease, pair, and
+cleanup failures are inspectable. Its callable shape inside the package is:
+
+```haskell
+withIsolatedBackendPair
+  :: BackendConfig -> FilePath -> Maybe Int
+  -> (IsolatedBackendPair -> IO a)
+  -> IO (Either IsolatedBackendFailure a)
+
+withIsolatedBackendLease
+  :: IsolatedBackendPair
+  -> (IsolatedBackendLease -> IO a)
+  -> IO (Either IsolatedBackendFailure a)
+
+runIsolatedBackendCommand
+  :: IsolatedBackendLease -> String
+  -> IO (Either IsolatedBackendFailure JValue)
+```
+
+Pair acquisition sequentially spawns exactly two independent `Backend`
+processes and sends each `unpickleEnvFrom` with the same optional request
+timeout. Each
+successful response must contain its own integer environment identifier and
+must contain neither a fatal response nor an error-severity diagnostic.
+Failures retain the worker ordinal and distinguish spawn, transport, fatal,
+diagnostic, and missing-environment setup cases. A failure or cancellation at
+any partial-acquisition point tears down every process already owned before it
+returns or rethrows.
+
+The environment artifact is common, but the restored identifiers and process
+state are worker-local. A leased command sends exactly the requested `cmd` and
+that worker's retained `env`; a response's optional `env` is ignored. Thus all
+variants assigned to one lease stay on the same restored branch for the whole
+callback rather than silently advancing or crossing into a sibling process.
+Fatal, error-diagnostic, and `sorry` JSON received as valid command responses
+remain ordinary values for the caller to classify and do not damage the pool.
+
+STM admits at most two simultaneous lease callbacks. Each worker has a
+request lock, so commands sharing even one active lease enter its protocol
+strictly one at a time. A checkout-local active token prevents a lease from
+escaping its callback: release invalidates the token before synchronizing with
+the request lock, waits for an already admitted command, and requeues only an
+idle worker while both worker and pair remain healthy. A queued detached
+command therefore observes a closed lease instead of racing with reuse.
+
+A request timeout, server closure, malformed response, or interrupted
+protocol request retires and kills that worker, poisons the complete pair, and
+admits no replacement or new lease. The pair's first poison is stable. A
+sibling already checked out when that poison occurs may nevertheless finish
+its complete candidate-group callback, including further serial variants; it
+is not asynchronously killed merely because the other worker failed. Its own
+later transport failure retires it without replacing the original pair cause.
+This whole-group sibling rule is the resource counterpart to keeping variants
+within one ordered-verification task.
+
+Normal release is fail-stop if its synchronized handoff is interrupted or
+throws: the worker is retired, the pair receives an interruption poison, and
+bounded cleanup completes under an independent owner before the original
+release exception is rethrown. An idle lease-callback exception may return its
+healthy worker, while an exception with an admitted request retires it. Pair
+and request callback exceptions remain primary after cleanup; infrastructure
+failures returned as values can attach deterministic worker-labelled cleanup
+details.
+
+Pair closure atomically captures the prior healthy or first-poison status in
+the same STM transaction that changes the pair to closed and removes all idle
+admission. It then tears down both originally registered workers, including a
+worker still checked out by a mis-scoped child, rather than relying on the idle
+queue. This atomic transition has two deliberate outcomes: poison established
+before close cannot be missed, while close wins over a later failure from a
+request already admitted in an escaped child. Cleanup uses the bounded,
+cancellation-safe whole-process-tree lifecycle described above.
+
+The self-hosted fake-backend characterization passed all **24 of 24** focused
+cases, including distinct process/environment identity, setup ordering and
+partial cleanup, command serialization, escaped leases, gated release,
+release and request cancellation, valid diagnostic responses, stable poison,
+sibling completion, callback precedence, and atomic close ordering. The
+complete warning-as-error unit suite passed **532 of 532** tests; the
+serialized all-suite gate, strict all-target tests-and-benchmarks build, Cabal
+check, source-distribution construction, and diff checks also passed. An
+independent concurrency audit returned GO. These results characterize the
+private foundation and its fake protocol peer, not production routing, real
+project environment parity, throughput, latency, or memory use.
+
+The next stage belongs in Main: create and own one artifact representing the
+command's current Lean environment, restore both isolated workers from that
+artifact, route one candidate group per lease through the ordered success-quota
+scheduler, and keep variants serial inside the lease. A one-worker setting
+must retain the literal established serial route. Real-backend parity,
+deadlines, cold and warm pool cost, resident memory, failure fallback, and
+end-to-end transcript equality must be measured before enabling the route or
+claiming a speed-up. The landing boundary and evidence are recorded in the
+[isolated backend pair report](reports/2026-08-20-isolated-backend-pair-foundation.md).
 
 ## Main's progressive same-run cursor scheduler
 

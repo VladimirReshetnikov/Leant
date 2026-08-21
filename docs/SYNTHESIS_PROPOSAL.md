@@ -38,10 +38,11 @@ for any engine. The first small structural benchmark regressed; a substantive
 eight-premise library fixture measured a cautious 1.5x search-only gain for
 Exference and `EngineBoth` at `-N2`. Neither result is an end-to-end,
 verification, or default-`N2` claim. A package-private ordered success-quota
-scheduler is also implemented and characterized, but only tests import it.
-The backend now owns and boundedly tears down each complete spawned process
-tree, clearing one prerequisite for isolated workers. Production verification
-and its single-backend route nevertheless remain serial. The
+scheduler and an exactly two-worker isolated backend pair are now implemented
+and characterized. The pair restores both independently spawned processes
+from one environment artifact above the bounded whole-tree lifecycle. Main
+imports neither foundation, so production verification and its single-backend
+route remain serial. The
 implemented post-phase-2 increments
 are detailed in §7. Companion to
 [PROPOSALS.md](PROPOSALS.md).*
@@ -747,13 +748,13 @@ literal strict caller-thread traversal.
 The module is a Cabal `Other-Modules` implementation detail imported only by
 tests. Main, Backend, and the established Verification module do not call it,
 so current synthesis still verifies groups and their variants serially over
-one Lean backend. The next stage must provide a pool of isolated backend
-processes cloned from the same command environment before this scheduler can
-be connected safely. No verification-latency or end-to-end speed claim follows
+one Lean backend. The separate private isolated-pair foundation now provides
+the required two-process ownership boundary, but neither primitive is wired to
+the command path. No verification-latency or end-to-end speed claim follows
 from the scheduler checkpoint. See the
 [ordered scheduler report](reports/2026-08-20-ordered-verification-scheduler-foundation.md).
 
-### Backend process-tree lifecycle prerequisite (implemented, no pool)
+### Backend process-tree lifecycle prerequisite (implemented)
 
 The current backend launch owns the complete `lake env repl` process tree.
 POSIX launches lead a dedicated process group, retain its captured leader PID
@@ -782,10 +783,55 @@ suite passed **508 of 508** tests at commit `39901f3`. See the
 [backend lifecycle report](reports/2026-08-20-backend-process-tree-lifecycle.md).
 
 This is a lifecycle prerequisite, not verification parallelism or performance
-evidence. Production verification stays serial over one backend. Isolated
-pool construction and environment cloning, Main wiring to the ordered
-scheduler, end-to-end cancellation policy, and performance measurement remain
-future stages.
+evidence. It now supports the private isolated pair described next, while
+production verification stays serial over one backend. Command-current
+environment acquisition, Main wiring to the ordered scheduler, end-to-end
+cancellation policy, and performance measurement remain future stages.
+
+### Isolated two-worker backend foundation (implemented, not connected)
+
+`Leant.Backend.Isolated` constructs exactly two independently spawned Lean
+backend processes and restores each from the same caller-supplied environment
+artifact. The pair and lease constructors are opaque; scoped callbacks own
+their lifetime. Setup requires a valid process-local `env` from both sequential
+`unpickleEnvFrom` requests and reports ordinal-tagged spawn, transport, fatal,
+error-diagnostic, or missing-environment failures. Partial setup and
+cancellation clean every process already acquired.
+
+Each lease retains one worker and its restored environment for a complete
+candidate-group callback. Commands on the same lease are serialized, and
+every request contains exactly `cmd` plus the retained process-local `env`;
+response environments are ignored. Release invalidates the checkout before it
+waits for an admitted request, so an escaped or queued command cannot race
+worker reuse. Valid fatal, error, and `sorry` command JSON stays healthy and is
+left for the existing verification classifier.
+
+Timeout, server closure, malformed JSON, and interrupted requests retire the
+worker and poison the pair without replacement. New leases then fail with the
+stable first cause. A sibling lease already checked out may finish the whole
+group, including later serial variants, rather than being asynchronously
+killed by the other worker's poison. Atomic close captures the prior status in
+the same STM transition that seals admission, then boundedly cleans both
+registered process trees, including checked-out workers. Callback and
+cancellation exceptions retain precedence, and cleanup failures remain typed
+and worker-labelled.
+
+This private module is registered only as a Cabal `Other-Modules` component;
+Main and the production Verification route do not import it. The self-hosted
+fake-backend group passed **24 of 24** focused cases, the complete strict unit
+suite passed **532 of 532**, and the serialized all-suite, strict all-target,
+Cabal, source-distribution, and diff gates passed. An independent concurrency
+audit returned GO. None of this measures a real Lean workload or supports a
+speed-up claim. See the
+[isolated backend pair report](reports/2026-08-20-isolated-backend-pair-foundation.md).
+
+The next implementation stage is command integration in Main: materialize one
+artifact for the current live Lean environment, restore the pair, give one
+candidate group to one lease through the ordered success-quota scheduler, and
+keep variants serial within that lease. The literal one-worker route,
+deadline/error semantics, output ordering, and transcript behavior must remain
+equivalent. Cold and warm startup, resident memory, and end-to-end latency need
+real-backend benchmarks before deciding whether or when to enable it.
 
 Design rules, all inherited from Djex:
 
@@ -994,10 +1040,11 @@ Design rules, all inherited from Djex:
   `Decidable` instance synthesis, interaction with `exact?` as a
   sub-oracle inside the search, and broader measured concurrency across
   provider or engine-internal work. The two bounded initial search schedules
-  in §3 and the private ordered success-quota scheduler are implemented
-  groundwork. Isolated Lean worker-pool construction, production verification
-  wiring, and its measurements remain future work; none of these foundations
-  establishes that the wider design will be faster.
+  in §3, the private ordered success-quota scheduler, and the isolated
+  two-worker backend pair are implemented groundwork. Command-current artifact
+  ownership, production verification wiring, and its measurements remain
+  future work; none of these foundations establishes that the wider design
+  will be faster.
 
 ## 5. Honest limitations
 
@@ -1141,10 +1188,11 @@ The scoped structural and library overlaps are also implemented. The tiny
 quartic fixture regressed, whereas substantive Exference and `EngineBoth`
 library-search workloads measured roughly 1.5x at `-N2`; both remain opt-in
 through RTS capabilities while later seams and end-to-end latency are measured
-independently. The private ordered success-quota scheduler now supplies the
-deterministic coordination primitive for the next candidate seam, but the next
-implementation step is still an isolated Lean backend pool; production
-verification remains serial until that resource boundary is built and proved.
+independently. The private ordered success-quota scheduler and isolated
+two-worker backend pair now supply the coordination and resource foundations
+for the next candidate seam. The next implementation step is command-current
+artifact ownership and Main integration; production verification remains
+serial until that route is connected, parity-tested, and benchmarked.
 
 ## 7. Post-phase-2 proposals
 

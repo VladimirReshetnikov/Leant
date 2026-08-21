@@ -94,12 +94,13 @@ while a substantive eight-premise library-search fixture measured roughly
 result, not an end-to-end or default-runtime claim.
 
 A separate package-private checkpoint now provides an ordered success-quota
-scheduler for a future isolated Lean-verification pool. It admits lazy bounded
+scheduler for isolated Lean-verification workers. It admits lazy bounded
 waves, deeply forces results before publication, preserves input-order result
 and exception observation, and cancels and joins active workers. Only tests
 import the module: Main, Backend, and the current Verification route are
 unchanged, so production verification remains serial and this checkpoint
-supports no speed claim. Isolated backend-pool construction is the next stage.
+supports no speed claim. A later checkpoint supplies the private process
+foundation but still does not connect this scheduler.
 
 The backend lifecycle prerequisite is now complete at commit `39901f3`.
 Every `lake env repl` launch owns a dedicated POSIX process group or Windows
@@ -111,15 +112,29 @@ primary tree failure. The deterministic fixture covers an exited fake wrapper
 and an independently active heartbeat grandchild that ignores `SIGTERM` on
 POSIX. The Windows path was strictly source-compiled, not runtime-tested on
 Windows.
-This clears only the lifecycle prerequisite: production verification remains
-serial, while isolated-pool construction, Main wiring, and performance work
+This cleared the lifecycle prerequisite used by the later isolated pair:
+production verification remains serial, while Main wiring and performance work
 remain future. See the
 [backend process-tree lifecycle report](2026-08-20-backend-process-tree-lifecycle.md).
 
-There is still no `ReplState` field, serialization, snapshot restoration,
-session bank, or persistence, and no new engine-side counterexample request,
-typed prefix pruning, or complete Level-2 CEGIS loop. Preserve-all candidate
-fallback does not roll back already completed cache transitions.
+The private isolated-pair checkpoint at `8163d13` now owns exactly two
+independently spawned backends restored from one environment artifact. Opaque
+scoped leases retain process-local environments and serialize requests; a
+transport failure retires its worker, preserves the first pair poison, and
+admits no replacement or new lease, while an already checked-out sibling may
+finish its whole group. Release is fail-stop on an interrupted handoff, close
+captures prior poison atomically, and bounded cleanup owns both registered
+process trees. Only tests import the module. The focused group passed 24/24 and
+the complete strict suite 532/532, but Main still verifies serially through one
+backend and there is no speed claim. The next stage is command-current artifact
+ownership and connection to the ordered scheduler. See the
+[isolated backend pair report](2026-08-20-isolated-backend-pair-foundation.md).
+
+The Length counterexample bank still has no `ReplState` field, serialization
+or snapshot restoration, session-wide scope, or persistence. There is also no
+new engine-side counterexample request, typed prefix pruning, or complete
+Level-2 CEGIS loop. Preserve-all candidate fallback does not roll back already
+completed cache transitions.
 The [README](../../README.md) and
 [Length ranking reference](../length-ranking.md) describe the current tree.
 
@@ -203,6 +218,7 @@ Reports are listed oldest first.
 - 2026-08-20 — [Parallel structural/library baseline](2026-08-20-parallel-library-baseline.md)
 - 2026-08-20 — [Private ordered verification scheduler foundation](2026-08-20-ordered-verification-scheduler-foundation.md)
 - 2026-08-20 — [Backend process-tree lifecycle prerequisite](2026-08-20-backend-process-tree-lifecycle.md)
+- 2026-08-20 — [Private isolated Lean backend pair foundation](2026-08-20-isolated-backend-pair-foundation.md)
 
 ## Standalone PDF reports
 

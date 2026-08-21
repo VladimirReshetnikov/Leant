@@ -1101,7 +1101,8 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   later base fill and deduplication stay serial under the same deadline.
   `synth-steps` is deliberately outside the admission gate and may be
   retuned. Providers, filter successors, classical routes, Lean verification,
-  behavioral assessment, and retuned-limit lanes remain serial.
+  behavioral assessment, and retuned-limit lanes remain serial in the
+  production route.
 
   The executable is threaded but does not select `-N2` by default and exposes
   no public synthesis-jobs setting. Start it with `+RTS -N2 -RTS` to make an
@@ -1113,6 +1114,15 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   not an end-to-end, verification, default-`N2`, or universal speedup claim.
   See the [first structural-pair report](docs/reports/2026-08-20-scoped-parallel-engine-both-baseline.md)
   and the [library-pair report](docs/reports/2026-08-20-parallel-library-baseline.md).
+  Two package-private foundations now prepare the next seam: an ordered
+  success-quota scheduler and an exactly two-worker Lean backend pair restored
+  from one environment artifact. The pair gives each checked-out lease its own
+  process-local environment and serialized request stream, poisons the pair and
+  closes new lease admission on transport failure, and owns both process trees
+  through cleanup. Main does not
+  call either foundation yet, so candidate verification still uses one backend
+  serially and the new pair carries no speed-up claim. See the
+  [isolated-pair checkpoint](docs/reports/2026-08-20-isolated-backend-pair-foundation.md).
   Within each Exference invocation, Leant stable-deduplicates rendered groups
   before applying the internal 60-candidate collection window
   (`:set synth-window N`). The first
@@ -1275,14 +1285,19 @@ Windows) inside the Lake project. Each backend is born in an owned process
 tree: a dedicated process group on POSIX and a Job on Windows. Teardown keeps
 running if its caller is cancelled, waits boundedly for the complete owned
 tree, and still attempts local pipe and stderr-capture cleanup when termination
-reports an error. This clears a lifecycle prerequisite for future isolated
-verification workers; production verification remains serial over one
-backend. See the [internals](docs/synth-internals.md#backend-process-tree-lifecycle-prerequisite)
-and [lifecycle checkpoint](docs/reports/2026-08-20-backend-process-tree-lifecycle.md).
+reports an error. This lifecycle is the foundation beneath isolated
+verification workers. The package-private
+[isolated backend pair](docs/synth-internals.md#private-isolated-backend-pair-foundation)
+now builds exactly two independently restored workers above that lifecycle,
+but Main does not route candidate verification through it; production remains
+serial over one backend. See the
+[lifecycle checkpoint](docs/reports/2026-08-20-backend-process-tree-lifecycle.md)
+and [isolated-pair checkpoint](docs/reports/2026-08-20-isolated-backend-pair-foundation.md).
 The JSON codec is hand-rolled
 ([src/Leant/Json.hs](src/Leant/Json.hs)). The direct external dependency
-surface stays small: `async` supplies scoped worker lifetime management, while
-`haskell-src-exts` arrives through the vendored Djex. On backend death,
+surface stays small: `async` supplies scoped worker lifetime management and
+`stm` coordinates the private isolated worker pair, while `haskell-src-exts`
+arrives through the vendored Djex. On backend death,
 timeout, or Ctrl+C, the owned tree is terminated and the session (imports +
 history) replays automatically on the next command. The Haskeline
 front-end provides the interrupt-safe step loop, logical multi-line
@@ -1375,9 +1390,10 @@ capture` races a fake solver's start-up against a 700 ms budget and can
 fail on a slow or loaded machine while passing in isolation. Treat any
 *other* failure as a regression. Second, a set of
 characterization tests read production source text and assert on it —
-currently twenty-six read sites, thirteen of them on
-[src/Main.hs](src/Main.hs) and the rest across `Synth/Engine.hs`,
-`Synth/BehavioralSelection.hs`, and the `Length` modules
+currently thirty-one read sites, fourteen of them on
+[src/Main.hs](src/Main.hs) and the rest across `Backend.hs`,
+`Backend/Isolated.hs`, `Synth/Engine.hs`, `Synth/BehavioralSelection.hs`, and
+the `Length` modules
 (`Command.hs`, `Configuration.hs`, `Handoff.hs`, `Integration.hs`,
 `Ranking.hs`, `Ranking/Generic.hs`, `Selection.hs`, `Where.hs`, all
 under `src/Leant/`); `grep -c 'readFile "src/' test-unit/Spec.hs`
