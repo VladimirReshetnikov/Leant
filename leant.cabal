@@ -78,6 +78,7 @@ Executable leant
     Leant.Synth.Replay
     Leant.Synth.Render
     Leant.Synth.Verification
+    Leant.Synth.Verification.Parallel
   Ghc-Options:
     -Wall
     -Wcompat
@@ -150,6 +151,7 @@ Test-Suite leant-synth-tests
     Leant.Synth.Replay
     Leant.Synth.Render
     Leant.Synth.Verification
+    Leant.Synth.Verification.Parallel
     Leant.Json
     Leant.Json.Bounded
     Leant.Session.Replay

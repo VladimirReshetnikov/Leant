@@ -3,20 +3,27 @@
 module Main (main) where
 
 import Control.Concurrent
-  ( newEmptyMVar
+  ( myThreadId
+  , newEmptyMVar
   , putMVar
   , readMVar
   , takeMVar
   , threadDelay
   )
-import Control.Concurrent.Async (async, cancel, waitCatch)
+import Control.Concurrent.Async (async, cancel, poll, waitCatch)
 import Control.Monad (replicateM, unless, void, when, zipWithM_)
 import Control.DeepSeq (rnf)
 import Control.Exception (SomeException, evaluate, finally, throwIO, try)
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as BS
 import Data.Char (isAlphaNum, toLower)
-import Data.IORef (IORef, modifyIORef', newIORef, readIORef)
+import Data.IORef
+  ( IORef
+  , atomicModifyIORef'
+  , modifyIORef'
+  , newIORef
+  , readIORef
+  )
 import Data.List (isInfixOf, isPrefixOf, permutations, sortOn, tails)
 import Data.Maybe (fromMaybe, isJust, isNothing)
 import qualified Data.Map.Strict as Map
@@ -201,6 +208,7 @@ import Leant.Synth.Engine
   , withoutCheckedDetailedCandidates
   )
 import Leant.Synth.Engine.Parallel (runParallelEitherPairOrdered)
+import Leant.Synth.Verification.Parallel (runOrderedSuccessQuota)
 import Leant.Synth.Fragment
   ( AppHead (..)
   , ExactContextArgument (..)
@@ -614,6 +622,7 @@ main = do
       , providerScheduleTests
       , combinedEngineMergeTests
       , parallelEnginePairTests
+      , parallelVerificationSchedulerTests
       , detailedSynthCursorTests
       , typedCandidateRoutingTests
       , lengthCounterexampleBankAdapterTests
@@ -4334,6 +4343,380 @@ parallelEnginePairTests = testGroup
         (Right $ DetailedSynthCandidates
           (error "nonzero force skipped its selected group" : poisonTail)
           notes)
+  ]
+
+parallelVerificationSchedulerTests :: TestTree
+parallelVerificationSchedulerTests = testGroup
+  "ordered success-quota verification workers"
+  [ testCase "start every admitted worker before observing the wave" $ do
+      firstStarted <- newEmptyMVar
+      secondStarted <- newEmptyMVar
+      let task input = case input of
+            1 -> do
+              putMVar firstStarted ()
+              readMVar secondStarted
+              pure $ Right "first"
+            2 -> do
+              putMVar secondStarted ()
+              readMVar firstStarted
+              pure $ Right "second"
+            _ -> pure $ Left "unexpected input"
+          typedTask :: Int -> IO (Either String String)
+          typedTask = task
+      observed <- expectParallelPairWithin "verification wave start"
+        $ runOrderedSuccessQuota 2 2 typedTask [1, 2]
+      observed @?= [Right "first", Right "second"]
+  , testCase "return input order when a later task finishes first" $ do
+      secondFinished <- newEmptyMVar
+      let task input = case input of
+            1 -> do
+              readMVar secondFinished
+              pure $ Right "first"
+            2 -> pure (Right "second")
+              `finally` putMVar secondFinished ()
+            _ -> pure $ Left "unexpected input"
+          typedTask :: Int -> IO (Either String String)
+          typedTask = task
+      observed <- expectParallelPairWithin "right-first verification result"
+        $ runOrderedSuccessQuota 2 2 typedTask [1, 2]
+      observed @?= [Right "first", Right "second"]
+  , testCase "never launch an input after the exact success cutoff" $ do
+      started <- newIORef ([] :: [Int])
+      let task :: Int -> IO (Either String Int)
+          task input = do
+            atomicModifyIORef' started $ \values -> (input : values, ())
+            if input <= 2
+              then pure $ Right input
+              else throwIO $ userError "task beyond quota was launched"
+      observed <- runOrderedSuccessQuota 4 2 task [1 .. 5]
+      observed @?= [Right 1, Right 2]
+      launched <- readIORef started
+      sortOn id launched @?= [1, 2]
+  , testCase "let rejected inputs pass without consuming success quota" $ do
+      started <- newIORef ([] :: [Int])
+      let task input = do
+            atomicModifyIORef' started $ \values -> (input : values, ())
+            pure $ if even input
+              then Right input
+              else Left input
+      observed <- runOrderedSuccessQuota 2 2 task [1 .. 5]
+      observed @?= [Left 1, Right 2, Left 3, Right 4]
+      launched <- readIORef started
+      sortOn id launched @?= [1, 2, 3, 4]
+  , testCase "make the one-worker route identical to a serial oracle" $ do
+      scheduledLog <- newIORef ([] :: [Int])
+      serialLog <- newIORef ([] :: [Int])
+      callerThread <- myThreadId
+      let classify input = if input `elem` [2, 5]
+            then Right ("accepted-" ++ show input)
+            else Left ("rejected-" ++ show input)
+          action logRef input = do
+            modifyIORef' logRef (++ [input])
+            pure $ classify input
+          serial
+            :: Int
+            -> (Int -> IO (Either String String))
+            -> [Int]
+            -> IO [Either String String]
+          serial remaining runTask currentInputs
+            | remaining <= 0 = pure []
+            | otherwise = case currentInputs of
+                [] -> pure []
+                input : following -> do
+                  result <- runTask input
+                  rest <- serial
+                    (case result of Left _ -> remaining; Right _ -> remaining - 1)
+                    runTask following
+                  pure $ result : rest
+          oracleInputs = [1 .. 7]
+      expected <- serial 2 (action serialLog) oracleInputs
+      observed <- runOrderedSuccessQuota 1 2
+        (action scheduledLog) oracleInputs
+      observed @?= expected
+      readIORef scheduledLog >>= (@?= [1, 2, 3, 4, 5])
+      readIORef serialLog >>= (@?= [1, 2, 3, 4, 5])
+      sameThread <- runOrderedSuccessQuota 1 1
+        (\() -> do
+          taskThread <- myThreadId
+          pure (Right $ taskThread == callerThread) ::
+            IO (Either String Bool))
+        [()]
+      sameThread @?= [Right True]
+  , testCase "allow each group to classify only its first accepted variant" $ do
+      attempted <- newIORef ([] :: [String])
+      let verifyGroup variants = case variants of
+            [] -> pure $ Left "no accepted variant"
+            (variant, accepted) : following -> do
+              atomicModifyIORef' attempted $ \values ->
+                (variant : values, ())
+              if accepted
+                then pure $ Right variant
+                else verifyGroup following
+          firstVariants =
+            ("group-1-rejected", False)
+              : ("group-1-accepted", True)
+              : error "first accepted variant did not stop its group"
+          secondVariants =
+            ("group-2-accepted", True)
+              : error "second accepted variant did not stop its group"
+          groups = firstVariants : secondVariants
+            : error "success cutoff inspected the candidate-group tail"
+      observed <- runOrderedSuccessQuota 2 2 verifyGroup groups
+      observed @?=
+        [Right "group-1-accepted", Right "group-2-accepted"]
+      attempts <- readIORef attempted
+      sortOn id attempts @?=
+        ["group-1-accepted", "group-1-rejected", "group-2-accepted"]
+  , testCase "do not admit a later exception beyond the quota cutoff" $ do
+      started <- newIORef ([] :: [Int])
+      let task :: Int -> IO (Either String String)
+          task input = do
+            atomicModifyIORef' started $ \values -> (input : values, ())
+            case input of
+              1 -> pure $ Right "accepted"
+              _ -> throwIO $ userError "exception beyond quota was admitted"
+      observed <- runOrderedSuccessQuota 3 1 task [1, 2]
+      observed @?= [Right "accepted"]
+      readIORef started >>= (@?= [1])
+  , testCase
+      "propagate a later exception only after observing the earlier result" $ do
+      laterExited <- newEmptyMVar
+      let task input = case input of
+            1 -> do
+              readMVar laterExited
+              pure $ Right "earlier result"
+            2 -> throwIO (userError "later task exception")
+              `finally` putMVar laterExited ()
+            _ -> pure $ Left "unexpected input"
+          typedTask :: Int -> IO (Either String String)
+          typedTask = task
+      observed <- expectParallelPairWithin "ordered later exception"
+        (try (runOrderedSuccessQuota 2 2 typedTask [1, 2]) ::
+          IO (Either SomeException [Either String String]))
+      case observed of
+        Left failure -> assertBool
+          "the serially reachable later exception lost its identity"
+          $ "later task exception" `isInfixOf` show failure
+        Right values -> assertFailure
+          $ "later exception was converted to values: " ++ show values
+  , testCase "give the earlier exception precedence within a wave" $ do
+      laterExited <- newEmptyMVar
+      let task input = case input of
+            1 -> do
+              readMVar laterExited
+              throwIO $ userError "earlier task exception"
+            2 -> throwIO (userError "later task exception")
+              `finally` putMVar laterExited ()
+            _ -> pure $ Left "unexpected input"
+          typedTask :: Int -> IO (Either String String)
+          typedTask = task
+      observed <- expectParallelPairWithin "earlier exception precedence"
+        (try (runOrderedSuccessQuota 2 2 typedTask [1, 2]) ::
+          IO (Either SomeException [Either String String]))
+      case observed of
+        Left failure -> do
+          assertBool "the earlier exception lost precedence"
+            $ "earlier task exception" `isInfixOf` show failure
+          assertBool "the later exception escaped ahead of the earlier one"
+            $ not $ "later task exception" `isInfixOf` show failure
+        Right values -> assertFailure
+          $ "worker exceptions were converted to values: " ++ show values
+  , testCase "cancel and join later work after an earlier exception" $ do
+      firstStarted <- newEmptyMVar
+      laterStarted <- newEmptyMVar
+      laterCleaned <- newEmptyMVar
+      blocked <- newEmptyMVar
+      let task input = case input of
+            1 -> do
+              putMVar firstStarted ()
+              readMVar laterStarted
+              throwIO $ userError "ordered first worker failure"
+            2 ->
+              (do
+                putMVar laterStarted ()
+                _ <- takeMVar blocked
+                pure $ Right "later result")
+              `finally` putMVar laterCleaned ()
+            _ -> pure $ Left "unexpected input"
+          typedTask :: Int -> IO (Either String String)
+          typedTask = task
+      observed <- expectParallelPairWithin "earlier worker failure cleanup"
+        (try (runOrderedSuccessQuota 2 2 typedTask [1, 2]) ::
+          IO (Either SomeException [Either String String]))
+      case observed of
+        Left failure -> assertBool "the earlier worker failure lost identity"
+          $ "ordered first worker failure" `isInfixOf` show failure
+        Right values -> assertFailure
+          $ "earlier worker failure became values: " ++ show values
+      expectParallelPairWithin "later worker exception cleanup"
+        $ readMVar laterCleaned
+  , testCase "never exceed the caller's worker limit" $ do
+      active <- newIORef (0 :: Int)
+      peak <- newIORef (0 :: Int)
+      started <- newIORef (0 :: Int)
+      firstArrived <- newEmptyMVar
+      secondArrived <- newEmptyMVar
+      release <- newEmptyMVar
+      let task input =
+            (do
+              current <- atomicModifyIORef' active $ \count ->
+                let next = count + 1 in (next, next)
+              atomicModifyIORef' peak $ \old -> (max old current, ())
+              atomicModifyIORef' started $ \count -> (count + 1, ())
+              case input of
+                1 -> putMVar firstArrived ()
+                2 -> putMVar secondArrived ()
+                _ -> pure ()
+              readMVar release
+              pure $ Right input)
+            `finally` atomicModifyIORef' active (\count -> (count - 1, ()))
+          typedTask :: Int -> IO (Either String Int)
+          typedTask = task
+      caller <- async $ runOrderedSuccessQuota 2 5 typedTask [1 .. 5]
+      expectParallelPairWithin "first verification worker arrival"
+        $ readMVar firstArrived
+      expectParallelPairWithin "second verification worker arrival"
+        $ readMVar secondArrived
+      readIORef peak >>= (@?= 2)
+      readIORef started >>= (@?= 2)
+      putMVar release ()
+      joined <- expectParallelPairWithin "bounded verification completion"
+        $ waitCatch caller
+      case joined of
+        Left failure -> assertFailure
+          $ "bounded verification worker failed: " ++ show failure
+        Right values -> values @?= map Right [1 .. 5]
+      readIORef peak >>= (@?= 2)
+      readIORef active >>= (@?= 0)
+  , testCase "cancel and join every active worker with the caller" $ do
+      blocked <- newEmptyMVar
+      firstStarted <- newEmptyMVar
+      secondStarted <- newEmptyMVar
+      firstCleaned <- newEmptyMVar
+      secondCleaned <- newEmptyMVar
+      let task input = case input of
+            1 -> lane firstStarted firstCleaned "first"
+            2 -> lane secondStarted secondCleaned "second"
+            _ -> pure $ Left "unexpected input"
+          lane started cleaned value =
+            (do
+              putMVar started ()
+              _ <- takeMVar blocked
+              pure $ Right value)
+            `finally` putMVar cleaned ()
+          typedTask :: Int -> IO (Either String String)
+          typedTask = task
+      caller <- async $ runOrderedSuccessQuota 2 2 typedTask [1, 2]
+      expectParallelPairWithin "first verification worker admission"
+        $ readMVar firstStarted
+      expectParallelPairWithin "second verification worker admission"
+        $ readMVar secondStarted
+      joined <- expectParallelPairWithin "verification caller cancellation" $ do
+        cancel caller
+        waitCatch caller
+      case joined of
+        Left _ -> pure ()
+        Right values -> assertFailure
+          $ "cancelled verification returned normally: " ++ show values
+      expectParallelPairWithin "first verification worker cleanup"
+        $ readMVar firstCleaned
+      expectParallelPairWithin "second verification worker cleanup"
+        $ readMVar secondCleaned
+  , testCase
+      "force a parallel result before publication and join its sibling" $ do
+      firstStarted <- newEmptyMVar
+      siblingStarted <- newEmptyMVar
+      siblingBlocking <- newEmptyMVar
+      siblingBlocked <- newEmptyMVar
+      siblingCleanupStarted <- newEmptyMVar
+      siblingCleanupRelease <- newEmptyMVar
+      siblingCleaned <- newEmptyMVar
+      let task input = case input of
+            1 -> do
+              putMVar firstStarted ()
+              readMVar siblingStarted
+              readMVar siblingBlocking
+              pure $ Right $ 'x'
+                : error "parallel strict-publication payload poison"
+            2 ->
+              (do
+                putMVar siblingStarted ()
+                readMVar firstStarted
+                putMVar siblingBlocking ()
+                _ <- takeMVar siblingBlocked
+                pure $ Right "unblocked sibling")
+              `finally` do
+                putMVar siblingCleanupStarted ()
+                _ <- takeMVar siblingCleanupRelease
+                putMVar siblingCleaned ()
+            _ -> pure $ Left "unexpected input"
+          typedTask :: Int -> IO (Either String String)
+          typedTask = task
+      caller <- async $ runOrderedSuccessQuota 2 2 typedTask [1, 2]
+      expectParallelPairWithin "strict-publication sibling cleanup start"
+        $ readMVar siblingCleanupStarted
+      premature <- poll caller
+      putMVar siblingCleanupRelease ()
+      observed <- expectParallelPairWithin "parallel strict publication"
+        $ waitCatch caller
+      case premature of
+        Nothing -> pure ()
+        Just result -> assertFailure
+          $ "parallel scheduler returned before joining sibling cleanup: "
+              ++ show result
+      case observed of
+        Left failure -> assertBool
+          "parallel strict publication lost the deep payload poison"
+          $ "parallel strict-publication payload poison"
+              `isInfixOf` show failure
+        Right values -> assertFailure
+          $ "parallel poisoned result list was published: " ++ show values
+      expectParallelPairWithin "strict-publication sibling cleanup"
+        $ readMVar siblingCleaned
+  , testCase "force a task result before publishing it" $ do
+      let task :: () -> IO (Either String String)
+          task _ = pure $ Right
+            $ error "unforced verification task result"
+      observed <- try (runOrderedSuccessQuota 1 1 task [()]) ::
+        IO (Either SomeException [Either String String])
+      case observed of
+        Left failure -> assertBool "strict result force lost its exception"
+          $ "unforced verification task result" `isInfixOf` show failure
+        Right values -> assertFailure
+          $ "poisoned result was published: " ++ show values
+  , testCase "leave the input tail untouched after its final admission" $ do
+      let task :: Int -> IO (Either String Int)
+          task input = pure $ Right input
+          inputs = 1 : error "success cutoff inspected the input tail"
+      observed <- runOrderedSuccessQuota 4 1 task inputs
+      observed @?= [Right 1]
+  , testCase "leave all input untouched for a zero success quota" $ do
+      let task :: Int -> IO (Either String Int)
+          task input = pure $ Right input
+          inputs = error "zero quota inspected its input"
+      observed <- runOrderedSuccessQuota 0 0 task inputs
+      observed @?= []
+  , testCase "validate workers after the total zero-quota guard" $ do
+      let poisonedTask :: Int -> IO (Either String Int)
+          poisonedTask = error "worker validation inspected its task"
+          poisonedInputs = error "worker validation inspected its input"
+      mapM_ (\workerLimit -> do
+          observed <- try
+            (runOrderedSuccessQuota workerLimit 1
+              poisonedTask poisonedInputs) ::
+            IO (Either SomeException [Either String Int])
+          case observed of
+            Left failure -> do
+              assertBool "invalid worker limit lost its exact failure"
+                $ "worker limit must be positive" `isInfixOf` show failure
+              assertBool "invalid worker limit demanded a poisoned argument"
+                $ not $ "worker validation inspected" `isInfixOf` show failure
+            Right values -> assertFailure
+              $ "invalid worker limit returned values: " ++ show values)
+        [0, -1]
+      zeroObserved <- runOrderedSuccessQuota (-1) 0
+        poisonedTask poisonedInputs
+      zeroObserved @?= []
   ]
 
 expectParallelPairWithin :: String -> IO value -> IO value
