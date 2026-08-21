@@ -6,7 +6,7 @@ import Control.Exception (evaluate)
 import Control.Monad (forM, unless)
 import Data.Bits (xor)
 import qualified Data.ByteString as ByteString
-import Data.List (sort)
+import Data.List (sort, stripPrefix)
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
@@ -32,12 +32,14 @@ import Leant.Synth.Engine
   , detailedVerificationVariantText
   , forceDetailedOutcome
   , mergeDetailedOutcomesSkipping
+  , synthLimitWindow
   , synthLimitTried
   , synthVerificationWindowWith
+  , synthesizeTunedDetailedWith
   , synthesizeWithProvidersSkippingDetailedWith
   )
 import Leant.Synth.Engine.Parallel (runParallelEitherPairOrdered)
-import Leant.Synth.Fragment (Frag (..))
+import Leant.Synth.Fragment (Frag (..), stripRecCtors)
 
 data SearchMode = Serial | Parallel
   deriving (Eq, Show)
@@ -73,13 +75,22 @@ main = do
   arguments <- getArgs
   case arguments of
     [] -> runCoordinator
+    ["library"] -> runLibraryCoordinator
     ["worker", modeText, expectedCapabilitiesText] -> do
       mode <- parseMode modeText
       expectedCapabilities <- parsePositive
         "worker capability argument" expectedCapabilitiesText
       runWorker mode expectedCapabilities
+    ["library-worker", engineText, modeText, expectedCapabilitiesText] -> do
+      engine <- parseLibraryEngine engineText
+      mode <- parseMode modeText
+      expectedCapabilities <- parsePositive
+        "worker capability argument" expectedCapabilitiesText
+      runLibraryWorker engine mode expectedCapabilities
     _ -> die
-      "usage: leant-parallel-bench [worker (serial|parallel) CAPABILITIES]"
+      "usage: leant-parallel-bench [library | worker (serial|parallel) \
+      \CAPABILITIES | library-worker (djinn|exference|both) \
+      \(serial|parallel) CAPABILITIES]"
 
 runCoordinator :: IO ()
 runCoordinator = do
@@ -139,6 +150,89 @@ runCoordinator = do
   printf "observed median wall ratio (serial / parallel): %.3fx\n"
     (serialMedian / parallelMedian)
 
+-- The established no-argument quartic benchmark and its v1 transcript stay
+-- unchanged.  The explicit @library@ mode measures the separate outer pair
+-- used by Main when selected library premises are present: one provider-free
+-- structural search and one tuned library search, with EngineBoth itself
+-- remaining serial inside each action.
+runLibraryCoordinator :: IO ()
+runLibraryCoordinator = do
+  validateBenchmarkContract
+  samples <- readPositiveVariable benchmarkSamplesVariable 5
+  capabilities <- readPositiveVariable benchmarkCapabilitiesVariable 2
+  executable <- getExecutablePath
+  putStrLn "Leant deterministic outer library-search benchmark"
+  putStrLn
+    "workload: List.map goal; selected map/reverse/append premises; steps=4096"
+  putStrLn
+    "scope: no providers, Lean backend, verification, or nested engine work"
+  putStrLn $ "samples per engine: " ++ show samples
+  putStrLn $ "worker capabilities: " ++ show capabilities
+  putStrLn
+    "timing: fresh worker-process wall time (startup + search + transcript)"
+  mapM_ (runLibraryEngineCoordinator executable capabilities samples)
+    [EngineDjinn, EngineExference, EngineBoth]
+
+runLibraryEngineCoordinator :: FilePath -> Int -> Int -> SynthEngine -> IO ()
+runLibraryEngineCoordinator executable capabilities samples engine = do
+  let libraryFrontier = synthVerificationWindowWith defaultSynthLimits engine
+  putStrLn $ "engine: " ++ libraryEngineArgument engine
+  putStrLn $ "bounded demand: base 0 groups; library "
+    ++ show libraryFrontier ++ " groups"
+
+  preflightSerial <- runFreshLibraryWorker executable capabilities engine Serial
+  preflightParallel <-
+    runFreshLibraryWorker executable capabilities engine Parallel
+  ensureEquivalent ("library " ++ libraryEngineArgument engine ++ " preflight")
+    (timedRunTranscript preflightSerial)
+    (timedRunTranscript preflightParallel)
+  let expectedTranscript = timedRunTranscript preflightSerial
+  putStrLn "preflight semantic transcript: byte-for-byte equal"
+  putStrLn $ "semantic transcript FNV-1a-64/UTF-8: "
+    ++ renderWord64 (hashTranscript expectedTranscript)
+  putStrLn $ "actual library candidate groups inside demand cap: "
+    ++ show (libraryTranscriptGroupCount expectedTranscript)
+
+  results <- forM [1 .. samples] $ \sampleNumber -> do
+    let serialFirst = odd sampleNumber
+    (serialRun, parallelRun) <- if serialFirst
+      then do
+        serialResult <-
+          runFreshLibraryWorker executable capabilities engine Serial
+        parallelResult <-
+          runFreshLibraryWorker executable capabilities engine Parallel
+        pure (serialResult, parallelResult)
+      else do
+        parallelResult <-
+          runFreshLibraryWorker executable capabilities engine Parallel
+        serialResult <-
+          runFreshLibraryWorker executable capabilities engine Serial
+        pure (serialResult, parallelResult)
+    ensureEquivalent
+      ("library " ++ libraryEngineArgument engine ++ " sample "
+        ++ show sampleNumber ++ " serial")
+      expectedTranscript (timedRunTranscript serialRun)
+    ensureEquivalent
+      ("library " ++ libraryEngineArgument engine ++ " sample "
+        ++ show sampleNumber ++ " parallel")
+      expectedTranscript (timedRunTranscript parallelRun)
+    printf
+      "sample %d (%s first): serial %.6f s; parallel %.6f s\n"
+      sampleNumber
+      (if serialFirst then "serial" else "parallel")
+      (timedRunWallSeconds serialRun)
+      (timedRunWallSeconds parallelRun)
+    pure (timedRunWallSeconds serialRun, timedRunWallSeconds parallelRun)
+
+  let serialTimes = map fst results
+      parallelTimes = map snd results
+      serialMedian = median serialTimes
+      parallelMedian = median parallelTimes
+  printSummary "serial" serialTimes
+  printSummary "parallel" parallelTimes
+  printf "observed median wall ratio (serial / parallel): %.3fx\n"
+    (serialMedian / parallelMedian)
+
 runWorker :: SearchMode -> Int -> IO ()
 runWorker mode expectedCapabilities = do
   validateBenchmarkContract
@@ -150,6 +244,19 @@ runWorker mode expectedCapabilities = do
     Serial -> runSerialSearch
     Parallel -> runParallelSearch
   transcript <- evaluate $ force $ semanticTranscript outcome
+  putStr transcript
+
+runLibraryWorker :: SynthEngine -> SearchMode -> Int -> IO ()
+runLibraryWorker engine mode expectedCapabilities = do
+  validateBenchmarkContract
+  actualCapabilities <- getNumCapabilities
+  unless (actualCapabilities == expectedCapabilities) $ die $
+    "worker capability mismatch: expected " ++ show expectedCapabilities
+      ++ ", got " ++ show actualCapabilities
+  outcome <- case mode of
+    Serial -> runSerialLibrarySearch engine
+    Parallel -> runParallelLibrarySearch engine
+  transcript <- evaluate $ force $ librarySemanticTranscript engine outcome
   putStr transcript
 
 runSerialSearch :: IO (Either String DetailedSynthOutcome)
@@ -178,6 +285,99 @@ search :: SynthEngine -> Either String DetailedSynthOutcome
 search engine =
   synthesizeWithProvidersSkippingDetailedWith
     defaultSynthLimits engine benchmarkSteps Set.empty [] quarticGoal
+
+runSerialLibrarySearch
+  :: SynthEngine
+  -> IO (Either String (DetailedSynthOutcome, DetailedSynthOutcome))
+runSerialLibrarySearch engine = do
+  baseOutcome <- strictLibraryPrefix 0 (libraryBaseSearch engine)
+  case baseOutcome of
+    Left err -> pure (Left err)
+    Right base -> do
+      libraryOutcome <- strictLibraryPrefix
+        (synthVerificationWindowWith defaultSynthLimits engine)
+        (libraryPremiseSearch engine)
+      pure $ fmap (\library -> (base, library)) libraryOutcome
+
+runParallelLibrarySearch
+  :: SynthEngine
+  -> IO (Either String (DetailedSynthOutcome, DetailedSynthOutcome))
+runParallelLibrarySearch engine =
+  runParallelEitherPairOrdered
+    (strictLibraryPrefix 0 (libraryBaseSearch engine))
+    (strictLibraryPrefix
+      (synthVerificationWindowWith defaultSynthLimits engine)
+      (libraryPremiseSearch engine))
+
+strictLibraryPrefix
+  :: Int
+  -> Either String DetailedSynthOutcome
+  -> IO (Either String DetailedSynthOutcome)
+strictLibraryPrefix requested outcome = do
+  _ <- evaluate $ forceDetailedOutcome requested outcome
+  pure outcome
+
+libraryBaseSearch :: SynthEngine -> Either String DetailedSynthOutcome
+libraryBaseSearch engine =
+  synthesizeWithProvidersSkippingDetailedWith
+    defaultSynthLimits engine benchmarkSteps Set.empty [] libraryGoal
+
+libraryPremiseSearch :: SynthEngine -> Either String DetailedSynthOutcome
+libraryPremiseSearch engine =
+  synthesizeTunedDetailedWith defaultSynthLimits engine benchmarkSteps
+    (synthLimitWindow defaultSynthLimits, Just 100000)
+    [ (name, stripRecCtors premise)
+    | (name, premise) <- libraryPremises
+    ]
+    (stripRecCtors libraryGoal) libraryGoal
+
+-- This mirrors the first checked case in test/synth-library.txt.  Main's
+-- serializer instantiates selected premises at the goal's own element types;
+-- the goal retains its recursive constructor schemas for the ordinary action,
+-- while the tuned action receives the same constructor-stripped premise and
+-- goal forms used by Main.
+libraryGoal :: Frag
+libraryGoal = libraryMapBody
+
+libraryPremises :: [(String, Frag)]
+libraryPremises =
+  [ ("List.map", libraryMapBody)
+  , ("List.map", libraryMapAA)
+  , ("List.map", libraryMapBA)
+  , ("List.map", libraryMapBB)
+  , ("List.append", FArr libraryListA (FArr libraryListA libraryListA))
+  , ("List.append", FArr libraryListB (FArr libraryListB libraryListB))
+  , ("List.reverse", FArr libraryListA libraryListA)
+  , ("List.reverse", FArr libraryListB libraryListB)
+  ]
+
+libraryMapBody :: Frag
+libraryMapBody =
+  FArr (FArr libraryElementA libraryElementB)
+    (FArr libraryListA libraryListB)
+
+libraryMapAA, libraryMapBA, libraryMapBB :: Frag
+libraryMapAA =
+  FArr (FArr libraryElementA libraryElementA)
+    (FArr libraryListA libraryListA)
+libraryMapBA =
+  FArr (FArr libraryElementB libraryElementA)
+    (FArr libraryListB libraryListA)
+libraryMapBB =
+  FArr (FArr libraryElementB libraryElementB)
+    (FArr libraryListB libraryListB)
+
+libraryElementA, libraryElementB, libraryListA, libraryListB :: Frag
+libraryElementA = FVar "a"
+libraryElementB = FVar "b"
+libraryListA = libraryList "List a" libraryElementA
+libraryListB = libraryList "List b" libraryElementB
+
+libraryList :: String -> Frag -> Frag
+libraryList key element = FParamRec True "List" key [element]
+  [ ("List.nil", [])
+  , ("List.cons", [element, FAtom False key])
+  ]
 
 -- This is the exact fragment used by Spec's balanced eight-site quartic
 -- rank-N synthesis case. It intentionally exercises only in-process search:
@@ -225,6 +425,88 @@ semanticTranscript outcome = unlines $ schemaLine : case outcome of
       ++ noteLines notes
  where
   schemaLine = "schema\tleant-parallel-search-v1"
+
+librarySemanticTranscript
+  :: SynthEngine
+  -> Either String (DetailedSynthOutcome, DetailedSynthOutcome)
+  -> String
+librarySemanticTranscript engine outcome = unlines $
+  [ "schema\tleant-parallel-library-search-v1"
+  , "engine\t" ++ libraryEngineArgument engine
+  , "base-demand-cap\t0"
+  , "library-demand-cap\t"
+      ++ show (synthVerificationWindowWith defaultSynthLimits engine)
+  ] ++ case outcome of
+    Left err ->
+      [ "pair-outcome\terror"
+      , "error\t" ++ show err
+      ]
+    Right (baseOutcome, libraryOutcome) ->
+      ["pair-outcome\tsuccess"]
+        ++ boundedOutcomeLines "base" 0 baseOutcome
+        ++ boundedOutcomeLines "library"
+          (synthVerificationWindowWith defaultSynthLimits engine)
+          libraryOutcome
+
+boundedOutcomeLines :: String -> Int -> DetailedSynthOutcome -> [String]
+boundedOutcomeLines label requested outcome = case outcome of
+  DetailedSynthRefuted sound ->
+    [ label ++ "-outcome\trefuted"
+    , label ++ "-sound\t" ++ show sound
+    , label ++ "-notes-count\t0"
+    ]
+  DetailedSynthNoTerm notes ->
+    (label ++ "-outcome\tno-term") : boundedNoteLines label notes
+  DetailedSynthCandidates groups notes ->
+    let frontier = take requested groups
+    in [ label ++ "-outcome\tcandidates"
+       , label ++ "-group-count\t" ++ show (length frontier)
+       ]
+      ++ concat (zipWith (boundedGroupLines label) [0 :: Int ..] frontier)
+      ++ boundedNoteLines label notes
+
+boundedGroupLines :: String -> Int -> DetailedCandidateGroup -> [String]
+boundedGroupLines label groupOrdinal group =
+  [ label ++ "-group\t" ++ show groupOrdinal
+      ++ "\troute\t" ++ show (detailedCandidateGroupRoute group)
+      ++ "\tvariant-count\t" ++ show (length variants)
+  ] ++ concat
+    (zipWith (boundedVariantLines label groupOrdinal) [0 :: Int ..] variants)
+ where
+  variants = detailedCandidateGroupVerificationVariants group
+
+boundedVariantLines
+  :: String
+  -> Int
+  -> Int
+  -> DetailedVerificationVariant
+  -> [String]
+boundedVariantLines label groupOrdinal variantIndex variant =
+  [ label ++ "-variant\t" ++ show groupOrdinal
+      ++ "\tindex\t" ++ show variantIndex
+      ++ "\tordinal\t" ++ show (detailedVerificationVariantOrdinal variant)
+      ++ "\troute\t" ++ show (detailedVerificationVariantRoute variant)
+      ++ "\ttext\t" ++ show (detailedVerificationVariantText variant)
+  ]
+
+boundedNoteLines :: String -> [String] -> [String]
+boundedNoteLines label notes =
+  (label ++ "-notes-count\t" ++ show (length notes))
+    : zipWith renderNote [0 :: Int ..] notes
+ where
+  renderNote index note =
+    label ++ "-note\t" ++ show index ++ "\ttext\t" ++ show note
+
+libraryTranscriptGroupCount :: String -> Int
+libraryTranscriptGroupCount transcript = case
+    [ value
+    | line <- lines transcript
+    , Just raw <- [stripPrefix "library-group-count\t" line]
+    , Just value <- [readMaybe raw]
+    ] of
+  [count] -> count
+  counts -> error $ "library transcript group-count invariant failed: "
+    ++ show counts
 
 groupLines :: Int -> DetailedCandidateGroup -> [String]
 groupLines groupOrdinal group =
@@ -276,6 +558,39 @@ runFreshWorker executable capabilities mode = do
       ++ show code ++ ": " ++ errors
     ExitSuccess -> unless (null errors) $ die $
       modeArgument mode ++ " worker wrote to stderr: " ++ errors
+  pure TimedRun
+    { timedRunWallSeconds = nanosecondsToSeconds (finished - started)
+    , timedRunTranscript = output
+    }
+
+runFreshLibraryWorker
+  :: FilePath
+  -> Int
+  -> SynthEngine
+  -> SearchMode
+  -> IO TimedRun
+runFreshLibraryWorker executable capabilities engine mode = do
+  started <- getMonotonicTimeNSec
+  (exitCode, output, errors) <- readProcessWithExitCode executable
+    [ "library-worker"
+    , libraryEngineArgument engine
+    , modeArgument mode
+    , show capabilities
+    , "+RTS"
+    , "-N" ++ show capabilities
+    , "-RTS"
+    ]
+    ""
+  _ <- evaluate $ force output
+  _ <- evaluate $ force errors
+  finished <- getMonotonicTimeNSec
+  case exitCode of
+    ExitFailure code -> die $ "library " ++ libraryEngineArgument engine
+      ++ " " ++ modeArgument mode ++ " worker exited "
+      ++ show code ++ ": " ++ errors
+    ExitSuccess -> unless (null errors) $ die $
+      "library " ++ libraryEngineArgument engine ++ " "
+        ++ modeArgument mode ++ " worker wrote to stderr: " ++ errors
   pure TimedRun
     { timedRunWallSeconds = nanosecondsToSeconds (finished - started)
     , timedRunTranscript = output
@@ -350,6 +665,19 @@ parseMode mode = case mode of
   "serial" -> pure Serial
   "parallel" -> pure Parallel
   _ -> die $ "unknown worker mode: " ++ show mode
+
+libraryEngineArgument :: SynthEngine -> String
+libraryEngineArgument engine = case engine of
+  EngineDjinn -> "djinn"
+  EngineExference -> "exference"
+  EngineBoth -> "both"
+
+parseLibraryEngine :: String -> IO SynthEngine
+parseLibraryEngine engine = case engine of
+  "djinn" -> pure EngineDjinn
+  "exference" -> pure EngineExference
+  "both" -> pure EngineBoth
+  _ -> die $ "unknown library benchmark engine: " ++ show engine
 
 readPositiveVariable :: String -> Int -> IO Int
 readPositiveVariable variable fallback = do
