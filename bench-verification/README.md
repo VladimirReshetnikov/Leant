@@ -1,10 +1,11 @@
-# Ordered isolated-verification benchmark
+# Compiled synthesis-tooling cache benchmark
 
-This benchmark measures the end-to-end effect of Leant's ordered,
-process-isolated parallel Lean verifier. It compares the last serial-verifier
-baseline and the candidate worktree at both one and two RTS capabilities.
-Every run is a fresh Leant process; Lean startup, synthesis, verification, and
-presentation are all included.
+This benchmark measures the end-to-end effect of Leant's persistent compiled
+synthesis-tooling cache. It compares the exact pre-cache baseline and the
+candidate worktree at both one and two RTS capabilities. Both binaries already
+contain the same ordered, process-isolated parallel Lean verifier. Every run is
+a fresh Leant process; Lean startup, synthesis, verification, and presentation
+are all included.
 
 This is a release gate, not a microbenchmark. The script refuses to time a
 route until an untimed `strace` preflight proves the expected backend topology
@@ -27,25 +28,28 @@ cabal build exe:leant --enable-optimization=2 -j1 --ghc-options=-Werror
 cabal list-bin exe:leant --enable-optimization=2
 ```
 
-For the 2026-08-21 checkpoint, the baseline is the clean tree at commit
-`57e44451c9e9d263b64ddb123239cbdc9802b326`. Build it in a detached worktree
+For the compiled-tooling checkpoint, the baseline is the clean tree at commit
+`575d67b667bd1fe03112c3027e7dc18a786282b8`. Build it in a detached worktree
 with its recorded Djex submodule, then build the candidate from the dirty or
 committed candidate tree with the same command.
 
 ## Cells and workloads
 
-The four cells isolate capability effects from implementation effects:
+Four warm-cache cells isolate capability effects from implementation effects.
+Two cold-cache controls bound the first-use cost:
 
 | Cell | Executable | RTS capabilities | Expected Lean processes |
 | --- | --- | ---: | ---: |
-| B1 | serial baseline | 1 | 1 |
-| B2 | serial baseline | 2 | 1 |
+| B1 | pre-cache baseline | 1 | 1 |
+| B2 | pre-cache baseline | 2 | 3: primary plus two isolated workers |
 | C1 | candidate | 1 | 1 |
 | C2 | candidate | 2 | 3: primary plus two isolated workers |
+| D1 | serial baseline, fresh cache directory | 1 | 1 |
+| D2 | candidate, fresh cache directory | 1 | 1 |
 
 The two primary fixtures are history-free, default-Djinn, five-result goals.
-Their baseline N1 and N2 search routes are identical, so B2/C2 isolates the
-new verification implementation cleanly:
+Their baseline and candidate verification routes are identical, so B2/C2
+isolates the compiled-tooling cache at fixed N2 verification semantics:
 
 - `state-thread.txt`: a state-threading product result;
 - `continuation.txt`: a nested continuation result.
@@ -57,22 +61,32 @@ geometric mean but not used as an isolated verification promotion workload.
 ## Protocol
 
 An untimed preflight runs every workload in B1, B2, C1, and C2 with synthesis
-debug metrics and `strace -f -e execve`. It requires:
+debug metrics and `strace -f -e execve,openat`. All preflight and timed B/C
+cells share one private compiled-tooling cache. C1 cold-populates that cache;
+C2 must open the resulting module. The preflight requires:
 
 - exactly `it1` through `it5`;
 - one `lean-variant-attempted=5` metric and one
   `lean-candidate-verified=5` metric;
-- exactly 1/1/1/3 backend executions in B1/B2/C1/C2;
+- exactly 1/3/1/3 backend executions in B1/B2/C1/C2;
+- exactly one compiled-tooling module after C1, opened by C2;
 - byte-identical normalized debug and semantic transcripts;
 - no `leant-parallel-verification*` artifact beneath the private temporary
   directory.
 
 Timed runs disable debug and `strace`, use a fresh private `TMPDIR`, force
 `LEANT_SYNTH_TIMEOUT=600`, clear `GHCRTS`, and stabilize the locale and time
-zone. Two warmup cycles followed by 21 measured samples per cell is the
-release profile. Cell order follows a fixed four-row Latin square; workload
-order alternates between samples. Each timed run rechecks the preflight
-transcript hash and candidate count.
+zone. B1/B2/C1/C2 use the shared preflight-populated cache. Every D1/D2 run
+receives its own new cache directory: D1 must leave it empty, while D2 must
+publish exactly one compiled-tooling module. This distinguishes repeat-process
+warm-cache benefit from first-use behavior instead of silently averaging the
+two.
+
+Two warmup cycles followed by 21 measured samples per cell is the release
+profile: 378 rows across three workloads and six cells. Warm-cell order follows
+a fixed four-row Latin square, cold-cell order alternates, and workload order
+alternates between samples. Each timed run rechecks the preflight transcript
+hash and candidate count.
 
 Example:
 
@@ -106,6 +120,8 @@ The default enforced gate requires:
 - B2/C2 median wall speedup of at least 1.25x on each primary fixture;
 - C2 p95 no worse than B2 on each primary fixture;
 - C1/B1 median wall ratio no greater than 1.05 on each primary fixture;
+- D2/D1 cold median wall ratio no greater than 1.05 on each primary fixture;
+- D2/D1 cold p95 wall ratio no greater than 1.10 on each primary fixture;
 - C2/B2 median GHC allocation ratio no greater than 1.10;
 - C2/B2 median process-tree CPU and aggregate-RSS ratios no greater than 1.25;
 - a positive B2/C2 geometric-mean speedup across all three workloads.

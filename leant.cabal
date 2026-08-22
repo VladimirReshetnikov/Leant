@@ -89,6 +89,7 @@ Executable leant
     Leant.Synth.ProviderCache
     Leant.Synth.Replay
     Leant.Synth.Render
+    Leant.Synth.ToolingCache
     Leant.Synth.Verification
     Leant.Synth.Verification.Parallel
     Leant.Synth.Verification.Runtime
@@ -165,6 +166,7 @@ Test-Suite leant-synth-tests
     Leant.Synth.ProviderCache
     Leant.Synth.Replay
     Leant.Synth.Render
+    Leant.Synth.ToolingCache
     Leant.Synth.Verification
     Leant.Synth.Verification.Parallel
     Leant.Synth.Verification.Runtime

@@ -641,6 +641,17 @@ import Leant.Synth.Render
   , providerInfo
   , renderLeanTerm
   )
+import Leant.Synth.ToolingCache
+  ( invalidateSynthesisToolingCacheEntry
+  , openSynthesisToolingCacheAt
+  , synthesisToolingCacheABI
+  , synthesisToolingCacheArtifactExists
+  , synthesisToolingCacheArtifactPath
+  , synthesisToolingCacheEntry
+  , synthesisToolingCacheModuleName
+  , synthesisToolingCacheSearchPath
+  , withSynthesisToolingCacheExportPath
+  )
 import Leant.Synth.Verification
   ( GroupVerificationSummary
   , VariantVerdict (..)
@@ -689,6 +700,7 @@ main = do
       , isolatedBackendPairTests
       , boundedJsonTests
       , snapshotMetadataTests
+      , synthesisToolingCacheTests
       , sessionReplayTests
       , providerCacheTests
       , goalTranslationAcquisitionTests
@@ -896,6 +908,7 @@ backendLifecycleTests = testGroup "Lean backend lifecycle"
           { bcLakePath = executable
           , bcReplExe = wrapperArgument
           , bcWorkingDir = workingDirectory
+          , bcLeanPath = []
           }
         let cleanup = do
               cleaned <- timeout 4000000 $ killBackend backend
@@ -944,6 +957,7 @@ backendLifecycleTests = testGroup "Lean backend lifecycle"
         { bcLakePath = executable
         , bcReplExe = backendStderrFloodMode
         , bcWorkingDir = workingDirectory
+        , bcLeanPath = []
         }
       let cleanup = do
             cleaned <- timeout 3000000 $ killBackend backend
@@ -1051,6 +1065,12 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
           currentEnvironmentSection = mainSourceSection
             "currentEnvironmentId st = do"
             "-- Build a pickleable" sourceLines
+          toolingSection = mainSourceSection
+            "ensureSynthBase st = do"
+            "-- | The synthesis environment" sourceLines
+          processCacheSection = mainSourceSection
+            "workingDir <- makeAbsolute workingDir0"
+            "ratings <- loadRatings" sourceLines
           startupSection = mainSourceSection
             "-- startup probe"
             "-- imports requested on the command line" sourceLines
@@ -1131,6 +1151,48 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
       assertBool "current environment precedence changed"
         $ activeEnvironment < cachedEnvironment
           && cachedEnvironment < materializedEnvironment
+      mapM_ (assertMainSourceContains "compiled tooling cache admission"
+          toolingSection)
+        [ "(rsProjectDir state, rsImports state, rsSynthToolingCache state)"
+        , "(Nothing, [], Just cache) -> Just"
+        , "synthesisToolingCacheEntry cache source"
+        , "cached <- case maybeCacheEntry of"
+        , "Just cacheEntry -> restoreCompiledTooling cacheEntry"
+        , "Just environment -> remember environment"
+        , "Nothing -> buildDynamicImportedBase state source maybeCacheEntry"
+        , "[\"Lean.Environment\" | isJust maybeCacheEntry]"
+        , "withSynthesisToolingCacheExportPath cacheEntry"
+        , "compiledToolingABIDefinition cacheEntry"
+        , "compiledToolingExportProgram cacheEntry"
+        , "exists <- synthesisToolingCacheArtifactExists cacheEntry"
+        , "restored <- runCmd st Nothing $ compiledToolingImportProgram cacheEntry"
+        , "not (hasErrors response)"
+        , "Nothing <- respFatal response"
+        , "invalidateSynthesisToolingCacheEntry cacheEntry"
+        ]
+      cacheRestore <- expectMainSourcePosition "compiled tooling cache"
+        "cached <- case maybeCacheEntry of" toolingSection
+      dynamicFallback <- expectMainSourcePosition "compiled tooling cache"
+        "Nothing -> buildDynamicImportedBase state source maybeCacheEntry"
+        toolingSection
+      assertBool "dynamic synthesis fallback preceded cache validation"
+        $ cacheRestore < dynamicFallback
+      mapM_ (assertMainSourceContains "compiled tooling cache process path"
+          processCacheSection)
+        [ "toolingCache <- case project of"
+        , "Nothing -> openSynthesisToolingCache exe workingDir"
+        , "Just _ -> pure Nothing"
+        , "bcLeanPath = maybe [] (pure . synthesisToolingCacheSearchPath) toolingCache"
+        ]
+      backendLines <- lines <$> readFile "src/Leant/Backend.hs"
+      let backendSpawnSection = mainSourceSection
+            "spawnBackend config = mask"
+            "cleanupCreatedProcess" backendLines
+      mapM_ (assertMainSourceContains "compiled tooling backend search path"
+          backendSpawnSection)
+        [ "processEnvironment <- backendProcessEnvironment (bcLeanPath config)"
+        , "env = processEnvironment"
+        ]
   , testCase
       "fallback only after the pair closes cleanly and disable later batches" $ do
       sourceLines <- lines <$> readFile "src/Main.hs"
@@ -2282,6 +2344,7 @@ isolatedFakeBackendConfig root scenario maybeLauncher = do
     , bcReplExe = isolatedBackendFakePrefix
         ++ Json.encodeJson descriptor
     , bcWorkingDir = workingDirectory
+    , bcLeanPath = []
     }
 
 isolatedBackendFakeHelper :: String -> IO ()
@@ -3153,6 +3216,134 @@ snapshotMetadataTests = testGroup "environment snapshot metadata"
             ++ "\"fnv1a64\":\"cbf29ce484222325\"},"
             ++ "\"synthesisCompanion\":null}")
         @?= Left "snapshot it-counter is out of range"
+  ]
+
+synthesisToolingCacheTests :: TestTree
+synthesisToolingCacheTests = testGroup "compiled synthesis tooling cache"
+  [ testCase "bind entries to backend, project, and exact source" $
+      withTemporaryDirectory "leant tooling cache identity" $ \root -> do
+        let cacheRoot = root </> "cache root"
+            backend = root </> "backend image"
+            firstProject = root </> "project one"
+            secondProject = root </> "project two"
+        ByteString.writeFile backend $ BS.pack "backend-one"
+        firstOpened <- openSynthesisToolingCacheAt
+          cacheRoot backend firstProject
+        first <- case firstOpened of
+          Nothing -> ioError $ userError "tooling cache did not open"
+          Just cache -> pure cache
+        let firstEntry = synthesisToolingCacheEntry first "source one"
+            changedSource = synthesisToolingCacheEntry first "source two"
+        synthesisToolingCacheSearchPath first @?= cacheRoot
+        assertBool "cache module name was not a generated Lean name"
+          $ "LeantSynthCache.K" `isPrefixOf`
+              synthesisToolingCacheModuleName firstEntry
+        assertBool "cache ABI did not use the established tooling identity"
+          $ "leant-synth-fnv1a64-" `isPrefixOf`
+              synthesisToolingCacheABI firstEntry
+        takeDirectory (synthesisToolingCacheArtifactPath firstEntry)
+          @?= cacheRoot </> "LeantSynthCache"
+        assertBool "a source change reused the compiled module"
+          $ synthesisToolingCacheModuleName firstEntry
+              /= synthesisToolingCacheModuleName changedSource
+
+        secondOpened <- openSynthesisToolingCacheAt
+          cacheRoot backend secondProject
+        second <- case secondOpened of
+          Nothing -> ioError $ userError "second tooling cache did not open"
+          Just cache -> pure cache
+        assertBool "a project change reused the compiled module"
+          $ synthesisToolingCacheModuleName firstEntry
+              /= synthesisToolingCacheModuleName
+                  (synthesisToolingCacheEntry second "source one")
+
+        ByteString.writeFile backend
+          $ BS.pack "backend-two-with-a-different-size"
+        changedBackendOpened <- openSynthesisToolingCacheAt
+          cacheRoot backend firstProject
+        changedBackend <- case changedBackendOpened of
+          Nothing -> ioError $ userError
+            "changed-backend cache did not open"
+          Just cache -> pure cache
+        assertBool "a backend change reused the compiled module"
+          $ synthesisToolingCacheModuleName firstEntry
+              /= synthesisToolingCacheModuleName
+                  (synthesisToolingCacheEntry changedBackend "source one")
+
+        missing <- openSynthesisToolingCacheAt cacheRoot
+          (root </> "missing backend") firstProject
+        case missing of
+          Nothing -> pure ()
+          Just _ -> assertFailure "a missing backend opened a cache"
+  , testCase "publish only complete modules and retain an existing artifact" $
+      withTemporaryDirectory "leant tooling cache publication" $ \root -> do
+        let backend = root </> "backend"
+        ByteString.writeFile backend $ BS.pack "backend"
+        opened <- openSynthesisToolingCacheAt
+          (root </> "cache") backend (root </> "project")
+        cache <- case opened of
+          Nothing -> ioError $ userError "tooling cache did not open"
+          Just value -> pure value
+        let completeEntry = synthesisToolingCacheEntry cache "complete"
+            incompleteEntry = synthesisToolingCacheEntry cache "incomplete"
+        result <- withSynthesisToolingCacheExportPath completeEntry $ \case
+          Nothing -> assertFailure "cache path was not reserved"
+            >> pure ("missing", False)
+          Just temporary -> do
+            ByteString.writeFile temporary $ BS.pack "first module"
+            pure ("published", True)
+        result @?= "published"
+        synthesisToolingCacheArtifactExists completeEntry >>= (@?= True)
+        ByteString.readFile (synthesisToolingCacheArtifactPath completeEntry)
+          >>= (@?= BS.pack "first module")
+
+        _ <- withSynthesisToolingCacheExportPath completeEntry $ \case
+          Nothing -> pure ((), False)
+          Just temporary -> do
+            ByteString.writeFile temporary $ BS.pack "second module"
+            pure ((), True)
+        ByteString.readFile (synthesisToolingCacheArtifactPath completeEntry)
+          >>= (@?= BS.pack "first module")
+
+        _ <- withSynthesisToolingCacheExportPath incompleteEntry $ \case
+          Nothing -> pure ((), False)
+          Just temporary -> do
+            ByteString.writeFile temporary $ BS.pack "partial module"
+            pure ((), False)
+        synthesisToolingCacheArtifactExists incompleteEntry >>= (@?= False)
+        invalidateSynthesisToolingCacheEntry completeEntry
+        synthesisToolingCacheArtifactExists completeEntry >>= (@?= False)
+  , testCase "preserve cancellation and clean an unpublished module" $
+      withTemporaryDirectory "leant tooling cache cancellation" $ \root -> do
+        let backend = root </> "backend"
+        ByteString.writeFile backend $ BS.pack "backend"
+        opened <- openSynthesisToolingCacheAt
+          (root </> "cache") backend (root </> "project")
+        cache <- case opened of
+          Nothing -> ioError $ userError "tooling cache did not open"
+          Just value -> pure value
+        let entry = synthesisToolingCacheEntry cache "cancelled"
+        started <- newEmptyMVar
+        never <- newEmptyMVar
+        running <- async $ withSynthesisToolingCacheExportPath entry $ \case
+          Nothing -> assertFailure "cache path was not reserved"
+            >> pure ((), False)
+          Just temporary -> do
+            ByteString.writeFile temporary $ BS.pack "partial module"
+            putMVar started temporary
+            _ <- readMVar never
+            pure ((), True)
+        temporary <- readMVar started
+        throwTo (asyncThreadId running) ThreadKilled
+        stopped <- waitCatch running
+        case stopped of
+          Left failure -> case fromException failure of
+            Just ThreadKilled -> pure ()
+            other -> assertFailure
+              $ "cache cancellation changed exception: " ++ show other
+          Right () -> assertFailure "cache cancellation returned normally"
+        doesFileExist temporary >>= (@?= False)
+        synthesisToolingCacheArtifactExists entry >>= (@?= False)
   ]
 
 providerProgramTests :: TestTree

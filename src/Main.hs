@@ -239,6 +239,18 @@ import Leant.Synth.ProviderCache
   , lookupProviderCache
   )
 import Leant.Synth.Replay (ReplayPlan (..), planReplay)
+import Leant.Synth.ToolingCache
+  ( SynthesisToolingCache
+  , SynthesisToolingCacheEntry
+  , invalidateSynthesisToolingCacheEntry
+  , openSynthesisToolingCache
+  , synthesisToolingCacheABI
+  , synthesisToolingCacheArtifactExists
+  , synthesisToolingCacheEntry
+  , synthesisToolingCacheModuleName
+  , synthesisToolingCacheSearchPath
+  , withSynthesisToolingCacheExportPath
+  )
 import Leant.Synth.Verification
   ( VariantVerdict (..)
   , VerificationBatch
@@ -364,6 +376,10 @@ data ReplState = ReplState
     -- ^ the base environment with the session history replayed on top
     -- (so session-local names translate), tagged with the history it
     -- replayed; rebuilt when the history changes
+  , rsSynthToolingCache :: Maybe SynthesisToolingCache
+    -- ^ process-start authority for the optional compiled serializer cache.
+    -- The path is installed before the backend starts; entries are derived
+    -- lazily from the exact generated source.
   , rsProviderWorld :: ProviderWorld
     -- ^ generation of imports and user declarations eligible for live
     -- provider discovery; generated it bindings do not advance it
@@ -1958,9 +1974,17 @@ ensureSynthBase st = do
     modifyIORef' st (\state -> state { rsSynthBase = Just env })
     pure (Right env)
 
-  compilePrelude imported externalSnapshot = do
-    names <- map fst . rsRatings <$> readIORef st
-    prelude <- runCmd st (Just imported) (synthPrelude names)
+  compilePrelude imported externalSnapshot source maybeCacheEntry = do
+    prelude <- case maybeCacheEntry of
+      Nothing -> runCmd st (Just imported) source
+      Just cacheEntry ->
+        withSynthesisToolingCacheExportPath cacheEntry $ \maybePath -> do
+          let program = source
+                ++ compiledToolingABIDefinition cacheEntry
+                ++ maybe "" (compiledToolingExportProgram cacheEntry)
+                    maybePath
+          result <- runCmd st (Just imported) program
+          pure (result, cacheExportCompleted cacheEntry maybePath result)
     case prelude of
       Left err -> pure (Left err)
       Right response
@@ -1984,7 +2008,7 @@ ensureSynthBase st = do
       Just tooling -> do
         restored <- restoreEnvironmentArtifact st tooling
         case restored of
-          Right env -> compilePrelude env False
+          Right env -> compileDynamicPrelude env False
           Left (SnapshotTransportError err) -> pure (Left err)
           Left (SnapshotRejected err) -> do
             snapshotWarning st ("synthesis companion could not be restored: "
@@ -1997,12 +2021,27 @@ ensureSynthBase st = do
     case restored of
       Left (SnapshotTransportError err) -> pure (Left err)
       Left (SnapshotRejected err) -> pure (Left err)
-      Right snapshotEnv -> compilePrelude snapshotEnv True
+      Right snapshotEnv -> compileDynamicPrelude snapshotEnv True
 
   prepareImportedBase state = do
     emitLn st =<< cDim st
       "preparing synthesis environment (session imports + Lean)..."
-    let imports = nub (rsImports state ++ ["Lean"])
+    let source = synthPrelude (map fst $ rsRatings state)
+        maybeCacheEntry = case
+            (rsProjectDir state, rsImports state, rsSynthToolingCache state) of
+          (Nothing, [], Just cache) -> Just
+            $ synthesisToolingCacheEntry cache source
+          _ -> Nothing
+    cached <- case maybeCacheEntry of
+      Nothing -> pure Nothing
+      Just cacheEntry -> restoreCompiledTooling cacheEntry
+    case cached of
+      Just environment -> remember environment
+      Nothing -> buildDynamicImportedBase state source maybeCacheEntry
+
+  buildDynamicImportedBase state source maybeCacheEntry = do
+    let imports = nub $ rsImports state ++ ["Lean"]
+          ++ ["Lean.Environment" | isJust maybeCacheEntry]
     result <- runCmd st Nothing (unlines (map ("import " ++) imports))
     case result of
       Left err -> pure (Left err)
@@ -2011,8 +2050,81 @@ ensureSynthBase st = do
             _ <- printResponse st Nothing response
             pure (Left "failed to build the synthesis environment")
         | Just importEnv <- respEnv response ->
-            compilePrelude importEnv False
+            compilePrelude importEnv False source maybeCacheEntry
         | otherwise -> pure (Left "synthesis environment has no id")
+
+  compileDynamicPrelude imported externalSnapshot = do
+    state <- readIORef st
+    compilePrelude imported externalSnapshot
+      (synthPrelude $ map fst $ rsRatings state) Nothing
+
+  restoreCompiledTooling cacheEntry = do
+    exists <- synthesisToolingCacheArtifactExists cacheEntry
+    if not exists then pure Nothing else do
+      restored <- runCmd st Nothing $ compiledToolingImportProgram cacheEntry
+      case restored of
+        Right response
+          | not (hasErrors response)
+          , Nothing <- respFatal response
+          , Just environment <- respEnv response ->
+              pure (Just environment)
+        _ -> do
+          invalidateSynthesisToolingCacheEntry cacheEntry
+          pure Nothing
+
+compiledToolingABIDefinition :: SynthesisToolingCacheEntry -> String
+compiledToolingABIDefinition cacheEntry = unlines
+  [ ""
+  , "namespace LeantSynth"
+  , "def compiledToolingABI : String := "
+      ++ leanStringLit (synthesisToolingCacheABI cacheEntry)
+  , "end LeantSynth"
+  ]
+
+compiledToolingImportProgram :: SynthesisToolingCacheEntry -> String
+compiledToolingImportProgram cacheEntry = unlines
+  [ "import " ++ synthesisToolingCacheModuleName cacheEntry
+  , "example : LeantSynth.compiledToolingABI = "
+      ++ leanStringLit (synthesisToolingCacheABI cacheEntry) ++ " := by rfl"
+  ]
+
+compiledToolingExportMarker :: SynthesisToolingCacheEntry -> String
+compiledToolingExportMarker cacheEntry =
+  "(leant-tooling-cache-exported "
+    ++ synthesisToolingCacheABI cacheEntry ++ ")"
+
+compiledToolingExportProgram
+  :: SynthesisToolingCacheEntry
+  -> FilePath
+  -> String
+compiledToolingExportProgram cacheEntry path = unlines
+  [ ""
+  , "open Lean in run_cmd do"
+  , "  try"
+  , "    let env \8592 getEnv"
+  , "    let env := env.setMainModule `"
+      ++ synthesisToolingCacheModuleName cacheEntry
+  , "    Lean.writeModule env " ++ leanStringLit path
+      ++ " (writeIR := false)"
+  , "    logInfo " ++ leanStringLit
+      (compiledToolingExportMarker cacheEntry)
+  , "  catch _ =>"
+  , "    try IO.FS.removeFile " ++ leanStringLit path
+  , "    catch _ => pure ()"
+  ]
+
+cacheExportCompleted
+  :: SynthesisToolingCacheEntry
+  -> Maybe FilePath
+  -> Either String JValue
+  -> Bool
+cacheExportCompleted cacheEntry maybePath result = case (maybePath, result) of
+  (Just _, Right response) ->
+    not (hasErrors response)
+      && isNothing (respFatal response)
+      && compiledToolingExportMarker cacheEntry
+          `elem` map (trim . snd) (respMessages response)
+  _ -> False
 
 -- | The synthesis environment: the base plus the session history, so goals
 -- may mention session-local declarations.  A cached chronological prefix is
@@ -5702,10 +5814,15 @@ run opts = do
               putStrLn "an executable built below a lakefile.lean or lakefile.toml."
               exitWith (ExitFailure 1)
       workingDir <- makeAbsolute workingDir0
+      toolingCache <- case project of
+        Nothing -> openSynthesisToolingCache exe workingDir
+        Just _ -> pure Nothing
       let config = BackendConfig
             { bcLakePath = optLake opts
             , bcReplExe = exe
             , bcWorkingDir = workingDir
+            , bcLeanPath = maybe []
+                (pure . synthesisToolingCacheSearchPath) toolingCache
             }
       ratings <- loadRatings
       synthTimeout <- initialSynthTimeoutSeconds
@@ -5732,6 +5849,7 @@ run opts = do
         , rsBrowseEnv = Nothing
         , rsSynthBase = Nothing
         , rsSynthEnv = Nothing
+        , rsSynthToolingCache = toolingCache
         , rsProviderWorld = initialProviderWorld
         , rsProviderCache = emptyProviderCache providerCacheCapacity
         , rsSynthIts = []

@@ -114,6 +114,8 @@ TEMPORARY_PARENT=${TMPDIR:-/tmp}
   usage_failure "temporary directory does not exist: $TEMPORARY_PARENT"
 WORK_DIR=$(mktemp -d -- "$TEMPORARY_PARENT/leant parallel verification gate.XXXXXXXX") ||
   usage_failure 'could not create gate work directory'
+CACHE_HOME="$WORK_DIR/compiled tooling cache with spaces"
+mkdir -p -- "$CACHE_HOME"
 cleanup() {
   chmod -R u+rwX -- "$WORK_DIR" 2>/dev/null || true
   rm -rf -- "$WORK_DIR"
@@ -153,6 +155,7 @@ run_one() {
   local -a environment=(
     env -u GHCRTS -u LEANT_SYNTH_DEBUG
     "TMPDIR=$command_tmp"
+    "XDG_CACHE_HOME=$CACHE_HOME"
     "LEANT_SYNTH_TIMEOUT=${LEANT_SYNTH_TIMEOUT:-600}"
   )
   if [ -n "$BACKEND" ]; then
@@ -162,7 +165,7 @@ run_one() {
   if [ "$TRACE_ROUTES" -eq 1 ]; then
     if "$TIMEOUT_EXE" --foreground --signal=TERM --kill-after=30s \
         "${LEANT_GATE_TIMEOUT_SECONDS:-900}s" \
-        strace -f -qq -e trace=execve -s 4096 -o "$trace" -- \
+        strace -f -qq -e trace=execve,openat -s 4096 -o "$trace" -- \
         "${environment[@]}" "$EXE" --plain \
           +RTS "-N$capabilities" -RTS < "$fixture" > "$raw" 2>&1; then
       status=0
@@ -236,6 +239,24 @@ compare_capabilities() {
     "$fixture_name" "$actual_candidates"
 }
 
+compiled_tooling_module() {
+  find "$CACHE_HOME/leant/synthesis-tooling-v1/LeantSynthCache" \
+    -type f -name 'K*.olean' -print 2>/dev/null | LC_ALL=C sort
+}
+
+require_one_compiled_tooling_module() {
+  local label=$1
+  local modules
+  local count
+  modules=$(compiled_tooling_module)
+  count=$(printf '%s\n' "$modules" | sed '/^$/d' | wc -l | tr -d '[:space:]')
+  [ "$count" -eq 1 ] || {
+    printf '%s\n' "$modules" >&2
+    fail "$label observed $count compiled tooling modules; expected 1"
+  }
+  printf '%s\n' "$modules"
+}
+
 printf 'Leant:   %s\n' "$EXE"
 if [ -n "$BACKEND" ]; then
   printf 'Backend: %s\n' "$BACKEND"
@@ -248,7 +269,16 @@ if [ "$TRACE_ROUTES" -eq 0 ]; then
 fi
 
 run_one history-free-multi-group 1 1
+CACHE_MODULE=$(require_one_compiled_tooling_module 'cold history-free run')
+CACHE_CHECKSUM=$(cksum -- "$CACHE_MODULE")
 run_one history-free-multi-group 2 3
+[ "$(cksum -- "$CACHE_MODULE")" = "$CACHE_CHECKSUM" ] ||
+  fail 'warm history-free run rewrote the compiled tooling module'
+if [ "$TRACE_ROUTES" -eq 1 ]; then
+  grep -F -- "$CACHE_MODULE" \
+      "$WORK_DIR/history-free-multi-group N2/backend-exec.trace" >/dev/null ||
+    fail 'warm history-free run did not open the compiled tooling module'
+fi
 compare_capabilities history-free-multi-group 2
 
 run_one scoped-notation-history 1 1

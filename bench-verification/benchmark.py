@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""End-to-end benchmark for Leant's ordered isolated verifier.
+"""End-to-end benchmark for Leant's compiled synthesis-tooling cache.
 
-The benchmark compares a serial-verification baseline and a candidate binary
-at both one and two RTS capabilities.  Linux /proc sampling reports aggregate
-process-tree CPU and resident memory; strace proves which cells actually start
-the two isolated Lean workers.
+The benchmark compares the exact pre-cache baseline and a candidate binary at
+both one and two RTS capabilities.  Linux /proc sampling reports aggregate
+process-tree CPU and resident memory; strace proves that both binaries retain
+the same ordered isolated-verification topology.
 """
 
 from __future__ import annotations
@@ -39,6 +39,10 @@ LATIN_ROWS = (
     ("C1", "C2", "B2", "B1"),
     ("C2", "B1", "C1", "B2"),
 )
+COLD_ROWS = (
+    ("D1", "D2"),
+    ("D2", "D1"),
+)
 PRIMARY_WORKLOADS = ("state-thread", "continuation")
 STARTUP_PREFIXES = (
     "no Lake project",
@@ -64,6 +68,7 @@ class Cell:
     executable: Path
     capabilities: int
     expected_backends: int
+    expected_cache_modules: int
 
 
 @dataclass(frozen=True)
@@ -193,6 +198,16 @@ def parse_arguments() -> argparse.Namespace:
         type=float,
         default=1.25,
     )
+    parser.add_argument(
+        "--maximum-cold-regression",
+        type=float,
+        default=1.05,
+    )
+    parser.add_argument(
+        "--maximum-cold-p95-ratio",
+        type=float,
+        default=1.10,
+    )
     return parser.parse_args()
 
 
@@ -232,13 +247,20 @@ def assert_five_candidates(transcript: bytes, label: str) -> None:
         )
 
 
-def base_environment(backend: Path, temporary: Path, *, debug: bool) -> dict[str, str]:
+def base_environment(
+    backend: Path,
+    temporary: Path,
+    tooling_cache: Path,
+    *,
+    debug: bool,
+) -> dict[str, str]:
     environment = os.environ.copy()
     environment.pop("GHCRTS", None)
     environment.pop("LEANT_SYNTH_DEBUG", None)
     environment["LEANT_BACKEND"] = str(backend)
     environment["LEANT_SYNTH_TIMEOUT"] = "600"
     environment["TMPDIR"] = str(temporary)
+    environment["XDG_CACHE_HOME"] = str(tooling_cache)
     environment["LC_ALL"] = "C"
     environment["LANG"] = "C"
     environment["TZ"] = "UTC"
@@ -325,12 +347,38 @@ def assert_no_artifact_leak(temporary: Path, label: str) -> None:
         raise BenchmarkFailure(f"{label}: leaked artifacts: {leaks}")
 
 
+def tooling_cache_modules(tooling_cache: Path) -> list[Path]:
+    return sorted(
+        (
+            tooling_cache
+            / "leant"
+            / "synthesis-tooling-v1"
+            / "LeantSynthCache"
+        ).glob("K*.olean")
+    )
+
+
+def assert_tooling_cache_modules(
+    tooling_cache: Path,
+    expected: int,
+    label: str,
+) -> list[Path]:
+    modules = tooling_cache_modules(tooling_cache)
+    if len(modules) != expected:
+        raise BenchmarkFailure(
+            f"{label}: observed {len(modules)} compiled tooling modules, "
+            f"expected {expected}"
+        )
+    return modules
+
+
 def preflight_workload(
     name: str,
     fixture: Path,
     cells: dict[str, Cell],
     backend: Path,
     root: Path,
+    tooling_cache: Path,
     timeout_seconds: int,
 ) -> str:
     expected_debug: bytes | None = None
@@ -346,7 +394,7 @@ def preflight_workload(
             "-f",
             "-qq",
             "-e",
-            "trace=execve",
+            "trace=execve,openat",
             "-s",
             "4096",
             "-o",
@@ -361,7 +409,9 @@ def preflight_workload(
         return_code, output = communicate_before(
             command,
             fixture,
-            base_environment(backend, temporary, debug=True),
+            base_environment(
+                backend, temporary, tooling_cache, debug=True
+            ),
             timeout_seconds,
         )
         if return_code != 0:
@@ -403,6 +453,18 @@ def preflight_workload(
         print(
             f"ok   preflight {name:13s} {cell_name} "
             f"({backend_count} backend{'s' if backend_count != 1 else ''})"
+        )
+    cache_modules = assert_tooling_cache_modules(
+        tooling_cache,
+        1,
+        f"preflight {name}",
+    )
+    warm_trace = (
+        root / f"preflight {name} C2" / "backend-exec.trace"
+    ).read_text(encoding="utf-8", errors="strict")
+    if str(cache_modules[0]) not in warm_trace:
+        raise BenchmarkFailure(
+            f"preflight {name}/C2 did not open the compiled tooling module"
         )
     assert expected_semantic is not None
     transcript_hash = sha256_bytes(expected_semantic)
@@ -468,6 +530,7 @@ def measure_cell(
     expected_hash: str,
     timeout_seconds: int,
     interval_seconds: float,
+    tooling_cache: Path,
 ) -> RunResult:
     run_root = root / f"sample {sample_number} {workload} {cell.name}"
     temporary = run_root / "temporary artifacts with spaces"
@@ -494,7 +557,9 @@ def measure_cell(
             stdin=stdin_handle,
             stdout=stdout_handle,
             stderr=stderr_handle,
-            env=base_environment(backend, temporary, debug=False),
+            env=base_environment(
+                backend, temporary, tooling_cache, debug=False
+            ),
         )
         try:
             while True:
@@ -532,6 +597,11 @@ def measure_cell(
     if sample_count == 0:
         raise BenchmarkFailure(f"{workload}/{cell.name}: no /proc sample")
     assert_no_artifact_leak(temporary, f"{workload}/{cell.name}")
+    assert_tooling_cache_modules(
+        tooling_cache,
+        cell.expected_cache_modules,
+        f"{workload}/{cell.name}",
+    )
     normalized = normalize_transcript(
         stdout_path.read_bytes(), remove_debug=True
     )
@@ -602,7 +672,7 @@ def write_results(path: Path, results: Sequence[RunResult]) -> None:
 
 
 def print_provenance(args: argparse.Namespace) -> None:
-    print("Leant ordered isolated-verification benchmark")
+    print("Leant compiled synthesis-tooling cache benchmark")
     print(f"baseline:  {args.baseline}")
     print(f"  sha256:  {sha256_file(args.baseline)}")
     print(f"candidate: {args.candidate}")
@@ -627,10 +697,12 @@ def main() -> int:
         if not fixture.is_file():
             raise BenchmarkFailure(f"missing {name} fixture: {fixture}")
     cells = {
-        "B1": Cell("B1", args.baseline, 1, 1),
-        "B2": Cell("B2", args.baseline, 2, 1),
-        "C1": Cell("C1", args.candidate, 1, 1),
-        "C2": Cell("C2", args.candidate, 2, 3),
+        "B1": Cell("B1", args.baseline, 1, 1, 1),
+        "B2": Cell("B2", args.baseline, 2, 3, 1),
+        "C1": Cell("C1", args.candidate, 1, 1, 1),
+        "C2": Cell("C2", args.candidate, 2, 3, 1),
+        "D1": Cell("D1", args.baseline, 1, 1, 0),
+        "D2": Cell("D2", args.candidate, 1, 1, 1),
     }
     print_provenance(args)
     interval_seconds = args.sample_interval_ms / 1000.0
@@ -639,6 +711,8 @@ def main() -> int:
         prefix="leant verification benchmark."
     ) as raw_root:
         root = Path(raw_root)
+        tooling_cache = root / "compiled tooling cache with spaces"
+        tooling_cache.mkdir()
         expected_hashes = {
             name: preflight_workload(
                 name,
@@ -646,6 +720,7 @@ def main() -> int:
                 cells,
                 args.backend,
                 root,
+                tooling_cache,
                 args.timeout,
             )
             for name, fixture in WORKLOADS
@@ -665,6 +740,7 @@ def main() -> int:
                         expected_hashes[name],
                         args.timeout,
                         interval_seconds,
+                        tooling_cache,
                     )
                     print(
                         f"warmup {warmup} {name:13s} {cell_name} "
@@ -689,6 +765,37 @@ def main() -> int:
                         expected_hashes[name],
                         args.timeout,
                         interval_seconds,
+                        tooling_cache,
+                    )
+                    all_results.append(result)
+                    print(
+                        f"sample {sample_number:2d} {name:13s} {cell_name} "
+                        f"wall={result.wall_seconds:.3f}s "
+                        f"cpu={result.cpu_seconds:.3f}s "
+                        f"rss={result.peak_rss_kib / 1024:.1f}MiB "
+                        f"alloc={result.allocated_bytes / 1048576:.1f}MiB"
+                    )
+                cold_row = COLD_ROWS[
+                    (sample_number - 1 + workload_index) % len(COLD_ROWS)
+                ]
+                for cell_name in cold_row:
+                    cold_cache = (
+                        root
+                        / "cold compiled tooling caches"
+                        / f"sample {sample_number} {name} {cell_name}"
+                    )
+                    cold_cache.mkdir(parents=True)
+                    result = measure_cell(
+                        name,
+                        workload_map[name],
+                        sample_number,
+                        cells[cell_name],
+                        args.backend,
+                        root,
+                        expected_hashes[name],
+                        args.timeout,
+                        interval_seconds,
+                        cold_cache,
                     )
                     all_results.append(result)
                     print(
@@ -718,7 +825,7 @@ def main() -> int:
     summaries: dict[tuple[str, str], dict[str, float]] = {}
     print("summary:")
     for workload, _ in WORKLOADS:
-        for cell_name in ("B1", "B2", "C1", "C2"):
+        for cell_name in ("B1", "B2", "C1", "C2", "D1", "D2"):
             selected = [
                 result
                 for result in all_results
@@ -742,13 +849,19 @@ def main() -> int:
         b2 = summaries[(workload, "B2")]
         c1 = summaries[(workload, "C1")]
         c2 = summaries[(workload, "C2")]
+        d1 = summaries[(workload, "D1")]
+        d2 = summaries[(workload, "D2")]
         incremental = ratio(b2["wall_median"], c2["wall_median"])
         candidate_scaling = ratio(c1["wall_median"], c2["wall_median"])
         n1_ratio = ratio(c1["wall_median"], b1["wall_median"])
+        cold_ratio = ratio(d2["wall_median"], d1["wall_median"])
+        cold_p95_ratio = ratio(d2["wall_p95"], d1["wall_p95"])
         speedups.append(incremental)
         print(
             f"  {workload:13s}: B2/C2={incremental:.3f}x; "
-            f"C1/C2={candidate_scaling:.3f}x; C1/B1={n1_ratio:.3f}x"
+            f"C1/C2={candidate_scaling:.3f}x; C1/B1={n1_ratio:.3f}x; "
+            f"D2/D1={cold_ratio:.3f}x; "
+            f"cold-p95={cold_p95_ratio:.3f}x"
         )
         if workload in PRIMARY_WORKLOADS:
             if incremental < args.minimum_speedup:
@@ -765,6 +878,17 @@ def main() -> int:
                 promotion_holds.append(
                     f"{workload} N1 ratio {n1_ratio:.3f}x "
                     f"> {args.maximum_n1_regression:.3f}x"
+                )
+            if cold_ratio > args.maximum_cold_regression:
+                promotion_holds.append(
+                    f"{workload} cold N1 ratio {cold_ratio:.3f}x "
+                    f"> {args.maximum_cold_regression:.3f}x"
+                )
+            if cold_p95_ratio > args.maximum_cold_p95_ratio:
+                promotion_holds.append(
+                    f"{workload} cold N1 p95 ratio "
+                    f"{cold_p95_ratio:.3f}x > "
+                    f"{args.maximum_cold_p95_ratio:.3f}x"
                 )
             resource_checks = (
                 ("allocation", "alloc_median", args.maximum_allocation_ratio),

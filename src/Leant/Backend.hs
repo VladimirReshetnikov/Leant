@@ -46,7 +46,8 @@ import Control.Exception
   )
 import Control.Monad (filterM, forM)
 import qualified Data.ByteString as ByteString
-import Data.List (sortOn)
+import Data.Char (toUpper)
+import Data.List (intercalate, sortOn)
 import Data.Maybe (catMaybes, listToMaybe)
 import Data.Ord (Down (..))
 import qualified Data.Text as Text
@@ -60,9 +61,9 @@ import System.Directory
   , listDirectory
   , makeAbsolute
   )
-import System.Environment (lookupEnv)
+import System.Environment (getEnvironment, lookupEnv)
 import System.Exit (ExitCode)
-import System.FilePath ((</>), takeDirectory)
+import System.FilePath ((</>), searchPathSeparator, takeDirectory)
 import System.IO
   ( BufferMode (..)
   , Handle
@@ -118,6 +119,9 @@ data BackendConfig = BackendConfig
   { bcLakePath :: FilePath
   , bcReplExe :: FilePath
   , bcWorkingDir :: FilePath
+  , bcLeanPath :: [FilePath]
+    -- ^ extra module roots appended to the environment inherited by
+    -- @lake env@; empty preserves the historical process environment.
   }
   deriving (Show)
 
@@ -253,9 +257,11 @@ isBuiltProject dir =
 -- partially created process down before propagating.
 spawnBackend :: BackendConfig -> IO Backend
 spawnBackend config = mask $ \restore -> do
+  processEnvironment <- backendProcessEnvironment (bcLeanPath config)
   created <- createProcess
     (proc (bcLakePath config) ["env", bcReplExe config])
       { cwd = Just (bcWorkingDir config)
+      , env = processEnvironment
       , std_in = CreatePipe
       , std_out = CreatePipe
       , std_err = CreatePipe
@@ -306,6 +312,20 @@ spawnBackend config = mask $ \restore -> do
     hSetEncoding h utf8
     hSetNewlineMode h universalNewlineMode
     hSetBuffering h LineBuffering
+
+backendProcessEnvironment
+  :: [FilePath]
+  -> IO (Maybe [(String, String)])
+backendProcessEnvironment [] = pure Nothing
+backendProcessEnvironment roots = do
+  inherited <- getEnvironment
+  let isLeanPath name = map toUpper name == "LEAN_PATH"
+      existing = listToMaybe
+        [ value | (name, value) <- inherited, isLeanPath name ]
+      combined = intercalate [searchPathSeparator]
+        (roots ++ maybe [] pure existing)
+      withoutLeanPath = filter (not . isLeanPath . fst) inherited
+  pure $ Just (("LEAN_PATH", combined) : withoutLeanPath)
 
 cleanupCreatedProcess
   :: Handle
