@@ -62,14 +62,21 @@ geometric mean but not used as an isolated verification promotion workload.
 
 An untimed preflight runs every workload in B1, B2, C1, and C2 with synthesis
 debug metrics and `strace -f -e execve,openat`. All preflight and timed B/C
-cells share one private compiled-tooling cache. C1 cold-populates that cache;
-C2 must open the resulting module. The preflight requires:
+cells share one private compiled-tooling cache. With the default pre-cache
+baseline, C1 cold-populates that cache; with
+`--baseline-cold-cache-modules 1`, B1 does so instead. C2 must open the
+resulting module. The preflight requires:
 
 - exactly `it1` through `it5`;
 - one `lean-variant-attempted=5` metric and one
   `lean-candidate-verified=5` metric;
 - exactly 1/3/1/3 backend executions in B1/B2/C1/C2;
-- exactly one compiled-tooling module after C1, opened by C2;
+- exactly one compiled-tooling module after the first cache-enabled cell, with
+  B2 opening it according to `--baseline-cold-cache-modules` and C2 opening it
+  exactly once;
+- the baseline B2 artifact route and the candidate C2 initializer selected by
+  `--candidate-n2-initializer` (the default is the production `artifact`
+  route; `pristine-replay` is available for controlled experiments);
 - byte-identical normalized debug and semantic transcripts;
 - no `leant-parallel-verification*` artifact beneath the private temporary
   directory.
@@ -77,10 +84,16 @@ C2 must open the resulting module. The preflight requires:
 Timed runs disable debug and `strace`, use a fresh private `TMPDIR`, force
 `LEANT_SYNTH_TIMEOUT=600`, clear `GHCRTS`, and stabilize the locale and time
 zone. B1/B2/C1/C2 use the shared preflight-populated cache. Every D1/D2 run
-receives its own new cache directory: D1 must leave it empty, while D2 must
-publish exactly one compiled-tooling module. This distinguishes repeat-process
-warm-cache benefit from first-use behavior instead of silently averaging the
-two.
+receives its own new cache directory: D1 must leave the configured baseline
+module count (empty by default), while D2 must publish exactly one
+compiled-tooling module. This distinguishes repeat-process warm-cache benefit
+from first-use behavior instead of silently averaging the two.
+
+When the selected baseline already contains the compiled-tooling cache, pass
+`--baseline-cold-cache-modules 1`; the default `0` preserves the original
+pre-cache release protocol. This setting selects both the baseline B2
+cache-open oracle and the D1 cache-module oracle; it does not change any timed
+route.
 
 Two warmup cycles followed by 21 measured samples per cell is the release
 profile: 378 rows across three workloads and six cells. Warm-cell order follows

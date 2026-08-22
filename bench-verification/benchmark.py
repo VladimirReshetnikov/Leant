@@ -208,6 +208,25 @@ def parse_arguments() -> argparse.Namespace:
         type=float,
         default=1.10,
     )
+    parser.add_argument(
+        "--baseline-cold-cache-modules",
+        type=int,
+        choices=(0, 1),
+        default=0,
+        help=(
+            "compiled modules expected after a cold baseline N1 run; "
+            "use 1 when the baseline already contains the tooling cache"
+        ),
+    )
+    parser.add_argument(
+        "--candidate-n2-initializer",
+        choices=("artifact", "pristine-replay"),
+        default="artifact",
+        help=(
+            "route which candidate N2 preflight must prove for isolated "
+            "verification workers"
+        ),
+    )
     return parser.parse_args()
 
 
@@ -380,6 +399,8 @@ def preflight_workload(
     root: Path,
     tooling_cache: Path,
     timeout_seconds: int,
+    baseline_cache_modules: int,
+    candidate_n2_initializer: str,
 ) -> str:
     expected_debug: bytes | None = None
     expected_semantic: bytes | None = None
@@ -459,12 +480,39 @@ def preflight_workload(
         1,
         f"preflight {name}",
     )
-    warm_trace = (
-        root / f"preflight {name} C2" / "backend-exec.trace"
-    ).read_text(encoding="utf-8", errors="strict")
-    if str(cache_modules[0]) not in warm_trace:
+    traces = {
+        cell_name: (
+            root / f"preflight {name} {cell_name}" / "backend-exec.trace"
+        ).read_text(encoding="utf-8", errors="strict")
+        for cell_name in ("B2", "C2")
+    }
+    exact_module = f'"{cache_modules[0]}"'
+    expected_module_opens = {
+        "B2": baseline_cache_modules,
+        "C2": 1,
+    }
+    for cell_name in ("B2", "C2"):
+        module_opens = traces[cell_name].count(exact_module)
+        expected_opens = expected_module_opens[cell_name]
+        if module_opens != expected_opens:
+            raise BenchmarkFailure(
+                f"preflight {name}/{cell_name}: opened the exact compiled "
+                f"tooling module {module_opens} times, expected "
+                f"{expected_opens}"
+            )
+    artifact_marker = "leant-parallel-verification"
+    if artifact_marker not in traces["B2"]:
         raise BenchmarkFailure(
-            f"preflight {name}/C2 did not open the compiled tooling module"
+            f"preflight {name}/B2 did not exercise the baseline artifact route"
+        )
+    candidate_has_artifact = artifact_marker in traces["C2"]
+    expected_candidate_artifact = candidate_n2_initializer == "artifact"
+    if candidate_has_artifact != expected_candidate_artifact:
+        expected = "present" if expected_candidate_artifact else "absent"
+        actual = "present" if candidate_has_artifact else "absent"
+        raise BenchmarkFailure(
+            f"preflight {name}/C2 verification artifact was {actual}; "
+            f"expected {expected} for {candidate_n2_initializer}"
         )
     assert expected_semantic is not None
     transcript_hash = sha256_bytes(expected_semantic)
@@ -683,6 +731,11 @@ def print_provenance(args: argparse.Namespace) -> None:
     print(f"logical CPUs: {os.cpu_count()}")
     print(f"samples: {args.samples}; warmups: {args.warmups}")
     print(f"process-tree sampling: {args.sample_interval_ms} ms")
+    print(
+        "baseline cold cache modules: "
+        f"{args.baseline_cold_cache_modules}"
+    )
+    print(f"candidate N2 initializer: {args.candidate_n2_initializer}")
 
 
 def main() -> int:
@@ -701,7 +754,9 @@ def main() -> int:
         "B2": Cell("B2", args.baseline, 2, 3, 1),
         "C1": Cell("C1", args.candidate, 1, 1, 1),
         "C2": Cell("C2", args.candidate, 2, 3, 1),
-        "D1": Cell("D1", args.baseline, 1, 1, 0),
+        "D1": Cell(
+            "D1", args.baseline, 1, 1, args.baseline_cold_cache_modules
+        ),
         "D2": Cell("D2", args.candidate, 1, 1, 1),
     }
     print_provenance(args)
@@ -722,6 +777,8 @@ def main() -> int:
                 root,
                 tooling_cache,
                 args.timeout,
+                args.baseline_cold_cache_modules,
+                args.candidate_n2_initializer,
             )
             for name, fixture in WORKLOADS
         }

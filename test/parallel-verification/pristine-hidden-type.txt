@@ -1,0 +1,3 @@
+:set synth-library off
+:synth (Lean.Elab.Command.CommandElabM Unit → Lean.Elab.Command.CommandElabM Unit → Lean.Elab.Command.CommandElabM Unit)
+:quit

@@ -20,6 +20,7 @@ import Control.Concurrent.Async
   , poll
   , wait
   , waitCatch
+  , withAsync
   )
 import Control.Monad
   ( forM
@@ -2022,29 +2023,29 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
         mapM_ (assertFakeWorkerStopped root) [1, 2]
   , testGroup "reject invalid setup responses"
       [ isolatedSetupFailureTest
-          "fatal" "setup-fatal-all" $ \case
+          "fatal" "setup-gated-fatal-all" $ \case
             IsolatedBackendSetupFatal 1 "fake setup fatal" -> True
             _ -> False
       , isolatedSetupFailureTest
-          "error" "setup-error-all" $ \case
+          "error" "setup-gated-error-all" $ \case
             IsolatedBackendSetupErrors 1 ["fake setup error"] -> True
             _ -> False
       , isolatedSetupFailureTest
-          "missing environment" "setup-missing-all" $ \case
+          "missing environment" "setup-gated-missing-all" $ \case
             IsolatedBackendSetupMissingEnvironment 1 -> True
             _ -> False
       , isolatedSetupFailureTest
-          "timeout" "setup-timeout-all" $ \case
+          "timeout" "setup-gated-timeout-all" $ \case
             IsolatedBackendSetupTransportFailure 1
               IsolatedBackendRequestTimeout -> True
             _ -> False
       , isolatedSetupFailureTest
-          "EOF" "setup-eof-all" $ \case
+          "EOF" "setup-gated-eof-all" $ \case
             IsolatedBackendSetupTransportFailure 1
               (IsolatedBackendServerClosed _) -> True
             _ -> False
       , isolatedSetupFailureTest
-          "malformed JSON" "setup-malformed-all" $ \case
+          "malformed JSON" "setup-gated-malformed-all" $ \case
             IsolatedBackendSetupTransportFailure 1
               (IsolatedBackendBadResponse _) -> True
             _ -> False
@@ -2218,14 +2219,22 @@ isolatedSetupFailureTest label scenario expected =
     withTemporaryDirectory ("leant isolated setup " ++ label) $ \root -> do
       config <- isolatedFakeBackendConfig root scenario Nothing
       callbackRan <- newIORef False
-      paired <- withIsolatedBackendPair config
-        (root </> "setup artifact with spaces") (Just 1) $ \_ ->
-          modifyIORef' callbackRan $ const True
-      case paired of
-        Left failure | expected failure -> pure ()
-        other -> assertFailure $ "wrong setup result: " ++ show other
+      withAsync
+          (withIsolatedBackendPair config
+            (root </> "setup artifact with spaces") (Just 1) $ \_ ->
+              modifyIORef' callbackRan $ const True)
+          $ \running -> do
+              bothSetup <- timeout 3000000
+                $ mapM_ (waitForHeartbeat . isolatedFakeSetupPath root) [1, 2]
+              bothSetup @?= Just ()
+              writeFile (isolatedFakeSetupGatePath root) "release\n"
+              paired <- timeout 5000000 $ waitCatch running
+              case paired of
+                Just (Right (Left failure)) | expected failure -> pure ()
+                other -> assertFailure $ "wrong setup result: " ++ show other
       callbackWasRun <- readIORef callbackRan
       callbackWasRun @?= False
+      assertExactlyTwoFakeWorkers root
       mapM_ (assertFakeWorkerStopped root) [1, 2]
 
 isolatedTransportFailureTest
@@ -2444,6 +2453,17 @@ isolatedFakeSetupResponse root scenario maybeLauncher worker artifact = do
       | targeted "setup-fatal" ->
           isolatedFakeWriteResponse $ Json.JObj
             [("message", Json.JStr "fake setup fatal")]
+      | targeted "setup-gated-error" ->
+          waitForHeartbeat (isolatedFakeSetupGatePath root)
+            >> isolatedFakeWriteResponse (Json.JObj
+              [ ("env", Json.JInt environment)
+              , ("messages", Json.JArr
+                  [ Json.JObj
+                      [ ("severity", Json.JStr "error")
+                      , ("data", Json.JStr "fake setup error")
+                      ]
+                  ])
+              ])
       | targeted "setup-error" ->
           isolatedFakeWriteResponse $ Json.JObj
             [ ("env", Json.JInt environment)
@@ -2454,6 +2474,10 @@ isolatedFakeSetupResponse root scenario maybeLauncher worker artifact = do
                     ]
                 ])
             ]
+      | targeted "setup-gated-missing" ->
+          waitForHeartbeat (isolatedFakeSetupGatePath root)
+            >> isolatedFakeWriteResponse (Json.JObj
+              [("ok", Json.JBool True)])
       | targeted "setup-missing" ->
           isolatedFakeWriteResponse $ Json.JObj
             [("ok", Json.JBool True)]
@@ -2461,8 +2485,17 @@ isolatedFakeSetupResponse root scenario maybeLauncher worker artifact = do
           waitForHeartbeat (isolatedFakeSetupGatePath root)
             >> isolatedFakeWriteResponse (Json.JObj
               [("env", Json.JInt environment)])
+      | targeted "setup-gated-timeout" ->
+          waitForHeartbeat (isolatedFakeSetupGatePath root)
+            >> threadDelay 30000000
       | targeted "setup-timeout" -> threadDelay 30000000
+      | targeted "setup-gated-eof" ->
+          waitForHeartbeat (isolatedFakeSetupGatePath root)
+            >> isolatedFakeCloseOutput
       | targeted "setup-eof" -> isolatedFakeCloseOutput
+      | targeted "setup-gated-malformed" ->
+          waitForHeartbeat (isolatedFakeSetupGatePath root)
+            >> isolatedFakeWriteMalformed
       | targeted "setup-malformed" -> isolatedFakeWriteMalformed
       | otherwise -> isolatedFakeWriteResponse $ Json.JObj
           [("env", Json.JInt environment)]

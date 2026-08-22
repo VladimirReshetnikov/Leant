@@ -141,8 +141,10 @@ run_one() {
   local fixture_name=$1
   local capabilities=$2
   local expected_processes=$3
+  local run_key=${4:-"$fixture_name N$capabilities"}
+  local cache_home=${5:-"$CACHE_HOME"}
   local fixture="$FIXTURE_DIR/$fixture_name.txt"
-  local run_dir="$WORK_DIR/$fixture_name N$capabilities"
+  local run_dir="$WORK_DIR/$run_key"
   local command_tmp="$run_dir/temporary artifacts with spaces"
   local raw="$run_dir/transcript.raw"
   local normalized="$run_dir/transcript.normalized"
@@ -155,7 +157,7 @@ run_one() {
   local -a environment=(
     env -u GHCRTS -u LEANT_SYNTH_DEBUG
     "TMPDIR=$command_tmp"
-    "XDG_CACHE_HOME=$CACHE_HOME"
+    "XDG_CACHE_HOME=$cache_home"
     "LEANT_SYNTH_TIMEOUT=${LEANT_SYNTH_TIMEOUT:-600}"
   )
   if [ -n "$BACKEND" ]; then
@@ -240,21 +242,46 @@ compare_capabilities() {
 }
 
 compiled_tooling_module() {
-  find "$CACHE_HOME/leant/synthesis-tooling-v1/LeantSynthCache" \
+  local cache_home=${1:-"$CACHE_HOME"}
+  find "$cache_home/leant/synthesis-tooling-v1/LeantSynthCache" \
     -type f -name 'K*.olean' -print 2>/dev/null | LC_ALL=C sort
 }
 
 require_one_compiled_tooling_module() {
   local label=$1
+  local cache_home=${2:-"$CACHE_HOME"}
   local modules
   local count
-  modules=$(compiled_tooling_module)
+  modules=$(compiled_tooling_module "$cache_home")
   count=$(printf '%s\n' "$modules" | sed '/^$/d' | wc -l | tr -d '[:space:]')
   [ "$count" -eq 1 ] || {
     printf '%s\n' "$modules" >&2
     fail "$label observed $count compiled tooling modules; expected 1"
   }
   printf '%s\n' "$modules"
+}
+
+require_trace_occurrences() {
+  local label=$1
+  local trace_file=$2
+  local needle=$3
+  local expected=$4
+  local actual
+  actual=$(LC_ALL=C grep -F -c -- "$needle" "$trace_file" || true)
+  [ "$actual" -eq "$expected" ] || {
+    sed -n '1,260p' "$trace_file" >&2
+    fail "$label trace contains $actual occurrences of $needle; expected $expected"
+  }
+}
+
+require_trace_present() {
+  local label=$1
+  local trace_file=$2
+  local needle=$3
+  if ! LC_ALL=C grep -F -q -- "$needle" "$trace_file"; then
+    sed -n '1,260p' "$trace_file" >&2
+    fail "$label trace does not contain $needle"
+  fi
 }
 
 printf 'Leant:   %s\n' "$EXE"
@@ -275,11 +302,40 @@ run_one history-free-multi-group 2 3
 [ "$(cksum -- "$CACHE_MODULE")" = "$CACHE_CHECKSUM" ] ||
   fail 'warm history-free run rewrote the compiled tooling module'
 if [ "$TRACE_ROUTES" -eq 1 ]; then
-  grep -F -- "$CACHE_MODULE" \
-      "$WORK_DIR/history-free-multi-group N2/backend-exec.trace" >/dev/null ||
-    fail 'warm history-free run did not open the compiled tooling module'
+  WARM_TRACE="$WORK_DIR/history-free-multi-group N2/backend-exec.trace"
+  require_trace_present 'warm history-free run' "$WARM_TRACE" \
+    'leant-parallel-verification'
+  require_trace_occurrences 'warm history-free run' "$WARM_TRACE" \
+    "\"$CACHE_MODULE\"" 1
 fi
 compare_capabilities history-free-multi-group 2
+
+COLD_N2_CACHE_HOME="$WORK_DIR/cold N2 compiled tooling cache with spaces"
+mkdir -p -- "$COLD_N2_CACHE_HOME"
+run_one history-free-multi-group 2 3 \
+  'history-free-multi-group cold N2' "$COLD_N2_CACHE_HOME"
+COLD_N2_MODULE=$(require_one_compiled_tooling_module \
+  'cold history-free N2 run' "$COLD_N2_CACHE_HOME")
+if ! cmp -s -- \
+    "$WORK_DIR/history-free-multi-group N1/transcript.normalized" \
+    "$WORK_DIR/history-free-multi-group cold N2/transcript.normalized"; then
+  diff -u -- \
+    "$WORK_DIR/history-free-multi-group N1/transcript.normalized" \
+    "$WORK_DIR/history-free-multi-group cold N2/transcript.normalized" >&2 || true
+  fail 'cold history-free N2 transcript differs from the N1 oracle'
+fi
+if [ "$TRACE_ROUTES" -eq 1 ]; then
+  COLD_N2_TRACE="$WORK_DIR/history-free-multi-group cold N2/backend-exec.trace"
+  require_trace_present 'cold history-free N2 run' "$COLD_N2_TRACE" \
+    'leant-parallel-verification'
+  require_trace_occurrences 'cold history-free N2 run' "$COLD_N2_TRACE" \
+    "\"$COLD_N2_MODULE\"" 0
+fi
+printf 'ok   %-31s parity (cold N2)\n' history-free-multi-group
+
+run_one pristine-hidden-type 1 1
+run_one pristine-hidden-type 2 3
+compare_capabilities pristine-hidden-type 0
 
 run_one scoped-notation-history 1 1
 run_one scoped-notation-history 2 1
