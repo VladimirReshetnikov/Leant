@@ -51,6 +51,7 @@ Executable leant
     Leant.Options
     Leant.Session.Replay
     Leant.Session.Snapshot
+    Leant.SyntaxHighlight
     Leant.Synth.BehavioralSelection
     Leant.Synth.BehavioralSelection.Internal
     Leant.Synth.Engine
@@ -128,6 +129,7 @@ Test-Suite leant-synth-tests
     Leant.Backend
     Leant.Backend.Isolated
     Leant.Options
+    Leant.SyntaxHighlight
     Leant.Synth.BehavioralSelection
     Leant.Synth.BehavioralSelection.Internal
     Leant.Synth.Engine

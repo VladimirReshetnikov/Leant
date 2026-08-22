@@ -197,6 +197,7 @@ import Leant.Options
   , lengthAssessmentSetup
   , parseArgs
   )
+import Leant.SyntaxHighlight (highlightLean, stripSgr)
 import Leant.Synth.Engine
   ( DetailedCandidateBatch
   , DetailedCandidateGroup
@@ -699,7 +700,8 @@ main = do
       | mode == backendProcessTreeGrandchildMode ->
           backendProcessTreeGrandchildHelper heartbeatPath
     _ -> defaultMain $ testGroup "Leant synthesis boundary"
-      [ commandLineTests
+      [ syntaxHighlightTests
+      , commandLineTests
       , backendDiscoveryTests
       , backendLifecycleTests
       , isolatedBackendPairTests
@@ -745,6 +747,164 @@ main = do
       , rankNFrontierTests
       , visibleTypeApplicationTests
       ]
+
+syntaxHighlightTests :: TestTree
+syntaxHighlightTests = testGroup "Lean syntax highlighting"
+  [ testCase "leave the disabled path as an exact textual identity" $ do
+      let source = unlines
+            [ "def «identity proof» (α : Type) (x : α) : α := x"
+            , "-- no presentation control may enter redirected output"
+            , "/- nested /- comment -/ remains exact -/"
+            ]
+      highlightLean False source @?= source
+      assertBool "disabled highlighting emitted an escape sequence"
+        $ not $ isInfixOf "\ESC[" (highlightLean False source)
+
+  , testCase "round-trip every emitted SGR span to the exact Lean source" $ do
+      let source = unlines
+            [ "theorem demo (α : Type) : α → α := by"
+            , "  fun x => x -- identity"
+            , "def text := \"escaped \\\"string\\\"\""
+            , "def numeral := 0xff + 6.02e-23"
+            , "/- outer /- nested -/ comment -/"
+            ]
+          rendered = highlightLean True source
+      assertBool "enabled highlighting emitted no SGR sequence"
+        $ isInfixOf "\ESC[" rendered
+      stripSgr rendered @?= source
+
+  , testCase "classify keywords only at identifier boundaries" $
+      highlightLean True "define functor def fun exact? exactness" @?=
+        "define functor " ++ syntaxKeyword "def" ++ " "
+          ++ syntaxKeyword "fun" ++ " " ++ syntaxKeyword "exact?"
+          ++ " exactness"
+
+  , testCase "highlight primitive types, constructors, quoted names, and commands" $
+      highlightLean True "#check «strange name» : Nat.succ (.some 42)" @?=
+        syntaxKeyword "#check" ++ " "
+          ++ syntaxConstructor "«strange name»" ++ " "
+          ++ syntaxOperator ":" ++ " "
+          ++ syntaxConstructor "Nat"
+          ++ syntaxOperator "." ++ syntaxConstructor "succ" ++ " "
+          ++ syntaxOperator "("
+          ++ syntaxOperator "." ++ syntaxConstructor "some" ++ " "
+          ++ syntaxNumber "42" ++ syntaxOperator ")"
+
+  , testCase "keep strings and escaped character literals lexically indivisible" $ do
+      let tokens =
+            [ "\"def -- /- \\\"quoted\\\"\""
+            , "'\\n'"
+            , "'\\''"
+            , "'λ'"
+            ]
+          source = unwords tokens
+      highlightLean True source @?= unwords (map syntaxLiteral tokens)
+      stripSgr (highlightLean True source) @?= source
+      let adjacent = "(\"x\",'a',«quoted»,#check Nat)"
+      highlightLean True adjacent @?=
+        syntaxOperator "(" ++ syntaxLiteral "\"x\""
+          ++ syntaxOperator "," ++ syntaxLiteral "'a'"
+          ++ syntaxOperator "," ++ syntaxConstructor "«quoted»"
+          ++ syntaxOperator "," ++ syntaxKeyword "#check" ++ " "
+          ++ syntaxConstructor "Nat" ++ syntaxOperator ")"
+
+  , testCase "keep line and nested block comments lexically indivisible" $ do
+      let lineComment = "-- fun \"ignored\" /- ignored -/"
+          blockComment = "/- outer\n  /- def inner := 1 -/\n  tail -/"
+          source = "def x " ++ lineComment ++ "\n"
+            ++ blockComment ++ "\nNat"
+          expected = syntaxKeyword "def" ++ " x "
+            ++ syntaxComment lineComment ++ "\n"
+            ++ syntaxComment blockComment ++ "\n"
+            ++ syntaxConstructor "Nat"
+      highlightLean True source @?= expected
+      stripSgr (highlightLean True source) @?= source
+      highlightLean True "x:=/- adjacent -/Nat" @?=
+        "x" ++ syntaxOperator ":=" ++ syntaxComment "/- adjacent -/"
+          ++ syntaxConstructor "Nat"
+
+  , testCase "highlight decimal, based, separated, fractional, and exponent numbers" $ do
+      let numbers =
+            [ "0", "42", "12_345", "0xff", "0XCA_FE", "0b1010"
+            , "0B10_01", "0o77", "0O7_0", "3.14", "6.02e-23", "1E+9"
+            ]
+          source = unwords numbers
+      highlightLean True source @?= unwords (map syntaxNumber numbers)
+      stripSgr (highlightLean True source) @?= source
+
+  , testCase "preserve Unicode identifiers while styling Unicode operators" $
+      highlightLean True "fun α β₁ => α → β₁; λ x => x" @?=
+        syntaxKeyword "fun" ++ " α β₁ " ++ syntaxOperator "=>" ++ " α "
+          ++ syntaxOperator "→" ++ " β₁" ++ syntaxOperator ";" ++ " "
+          ++ syntaxKeyword "λ" ++ " x " ++ syntaxOperator "=>" ++ " x"
+
+  , testCase "remain total and closed on multiline unterminated input" $ do
+      let unfinished =
+            [ "\"unterminated\nstill string"
+            , "/- outer\n  /- inner -/\nstill outer"
+            , "«unterminated\nquoted name"
+            , "'unterminated"
+            , "0x 1e+ trailing"
+            ]
+      forM_ unfinished $ \source ->
+        stripSgr (highlightLean True source) @?= source
+      highlightLean True "\"unterminated\nstill string" @?=
+        syntaxLiteral "\"unterminated\nstill string"
+      highlightLean True "/- open /- nested -/" @?=
+        syntaxComment "/- open /- nested -/"
+
+  , testCase "strip only numeric SGR controls and preserve other CSI text" $ do
+      stripSgr
+          ("\ESC[mplain\ESC[1;34mblue\ESC[38:5:9mred\ESC[0m")
+        @?= "plainbluered"
+      let nonSgr = "\ESC[2Jscreen\ESC[?25lhidden\ESC[31broken"
+      stripSgr nonSgr @?= nonSgr
+
+  , testCase "reset every styled span without leaking presentation state" $ do
+      let source = "def Nat \"x\" 42 -- comment"
+          rendered = highlightLean True source
+          controls = syntaxOccurrenceCount "\ESC[" rendered
+          resets = syntaxOccurrenceCount "\ESC[0m" rendered
+      stripSgr rendered @?= source
+      assertBool "the sample did not exercise any styled spans" $ resets > 0
+      controls @?= 2 * resets
+      assertBool "the final styled span did not reset"
+        $ isInfixOf "\ESC[0m" (reversePrefix rendered)
+
+  , testCase "scan a long mixed document without changing its visible text" $ do
+      let source = concat $ replicate 4000
+            "def α₁ : Nat := 12_345 -- stable\n"
+      stripSgr (highlightLean True source) @?= source
+  ]
+ where
+  -- Compare the final reset without adding another Data.List import to this
+  -- already large test module.
+  reversePrefix rendered = reverse $ take 4 $ reverse rendered
+
+syntaxSgr :: String -> String -> String
+syntaxSgr code text = "\ESC[" ++ code ++ "m" ++ text ++ "\ESC[0m"
+
+syntaxKeyword :: String -> String
+syntaxKeyword = syntaxSgr "1;34"
+
+syntaxConstructor :: String -> String
+syntaxConstructor = syntaxSgr "36"
+
+syntaxLiteral :: String -> String
+syntaxLiteral = syntaxSgr "32"
+
+syntaxNumber :: String -> String
+syntaxNumber = syntaxSgr "35"
+
+syntaxComment :: String -> String
+syntaxComment = syntaxSgr "2"
+
+syntaxOperator :: String -> String
+syntaxOperator = syntaxSgr "33"
+
+syntaxOccurrenceCount :: String -> String -> Int
+syntaxOccurrenceCount needle source =
+  length [() | suffix <- tails source, isPrefixOf needle suffix]
 
 commandLineTests :: TestTree
 commandLineTests = testGroup "command-line admission"
