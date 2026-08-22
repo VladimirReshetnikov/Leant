@@ -190,6 +190,16 @@ five-sample acceleration remains meaningful screening evidence even though one
 cold p95 control printed `HOLD`; no row was replaced. See the
 [compiled synthesis-tooling cache report](2026-08-21-compiled-synthesis-tooling-cache.md).
 
+A subsequent worker-environment audit rejected initializing verification
+workers from that compiled module, because its imported Lean implementation
+names are richer than the pristine serial session. The sound control rebuilt
+the exact `#check True` base per worker and passed every semantic gate, but its
+five-sample B2/C2 ratios were 0.974x, 1.019x, and 1.003x, a 0.999x geometric
+mean. Production retains the command environment artifact. This incremental
+HOLD does not revise the earlier meaningful roughly 16.5% connected-route
+screen; 1.25x remains a separate promotion threshold. See the
+[direct-pristine initializer report](2026-08-21-direct-pristine-verification-worker-initialization-hold.md).
+
 The Length counterexample bank still has no `ReplState` field, serialization
 or snapshot restoration, session-wide scope, or persistence. There is also no
 new engine-side counterexample request, typed prefix pruning, or complete
@@ -284,6 +294,7 @@ Reports are listed oldest first.
 - 2026-08-21 — [Verification critical-path overlap](2026-08-21-verification-critical-path-overlap.md)
 - 2026-08-21 — [Isolated history-replay foundation](2026-08-21-isolated-history-replay-foundation.md)
 - 2026-08-21 — [Persistent compiled synthesis-tooling cache](2026-08-21-compiled-synthesis-tooling-cache.md)
+- 2026-08-21 — [Direct pristine verification-worker initialization screen](2026-08-21-direct-pristine-verification-worker-initialization-hold.md)
 
 ## Standalone PDF reports
 

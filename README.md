@@ -1231,6 +1231,18 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   and its committed
   [378-row result table](bench-verification/results/2026-08-21-compiled-tooling-cache-release.tsv).
 
+  A follow-up worker-initialization audit rejected using that compiled module
+  as the N2 verification environment: its imported Lean names are strictly
+  richer than the pristine serial session. The exact semantic control rebuilt
+  the pristine `#check True` base independently in each worker, but a
+  route-certified five-sample screen measured **0.974x**, **1.019x**, and
+  **1.003x** B2/C2, a neutral **0.999x** geometric mean. Production therefore
+  retains the exact command-scoped environment artifact. This incremental
+  HOLD does not discount the earlier roughly **16.5% measured verifier-route
+  acceleration**; that remains worthwhile screening evidence, while 1.25x is
+  the separate release-promotion threshold. See the
+  [direct-pristine initializer report](docs/reports/2026-08-21-direct-pristine-verification-worker-initialization-hold.md).
+
   Within each Exference invocation, Leant stable-deduplicates rendered groups
   before applying the internal 60-candidate collection window
   (`:set synth-window N`). The first

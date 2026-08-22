@@ -170,6 +170,25 @@ The preceding five-sample screen's exact acceleration remains useful screening
 evidence even though one noisy cold p95 control printed `HOLD`; no row was
 replaced. The 21-sample profile is the independent release-promotion evidence.
 
+### Rejected direct-pristine initializer screen
+
+A later controlled experiment compared the cache-enabled parent `896840a`
+with a candidate that replaced the verification artifact only for the exact
+pristine session. It used `--baseline-cold-cache-modules 1` and
+`--candidate-n2-initializer pristine-replay`, one warmup, and five measured
+samples per cell. The three B2/C2 median ratios were 0.974x, 1.019x, and
+1.003x, for a neutral 0.999x geometric mean. Exact transcripts, 1/3/1/3
+preflight topology, route selection, cache behavior, and cleanup all passed.
+
+The candidate route was removed: it established semantic parity but no
+incremental acceleration over the artifact route. The harness defaults remain
+`--baseline-cold-cache-modules 0` and
+`--candidate-n2-initializer artifact`, preserving the published pre-cache
+release protocol. The
+[direct-pristine initializer report](../docs/reports/2026-08-21-direct-pristine-verification-worker-initialization-hold.md)
+records exact executable hashes, wall results, and the separate semantic
+rejection of using the richer compiled-tooling module itself.
+
 ### Previous verifier-route release evidence
 
 The pre-cache verification-route table for implementation commit `8afedc3`

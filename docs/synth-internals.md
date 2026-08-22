@@ -51,6 +51,7 @@ who wants the *what* can stop at the paragraph.
 - [Verification critical-path overlap](#verification-critical-path-overlap)
 - [Disconnected isolated history replay](#disconnected-isolated-history-replay)
 - [Persistent compiled synthesis-tooling cache](#persistent-compiled-synthesis-tooling-cache)
+- [Verification-worker environment authority](#verification-worker-environment-authority)
 - [Main's progressive same-run cursor scheduler](#mains-progressive-same-run-cursor-scheduler)
 - [Contract vocabulary and module ownership](#contract-vocabulary-and-module-ownership)
 - [Post-verification sealing](#post-verification-sealing)
@@ -1684,6 +1685,39 @@ replaced; the larger release profile is the promotion evidence. Exact
 provenance, wall/resource tables, transcript hashes, and the claim boundary are
 in the
 [compiled-tooling cache report](reports/2026-08-21-compiled-synthesis-tooling-cache.md).
+
+## Verification-worker environment authority
+
+The compiled synthesis-tooling module is not a substitute for the exact
+verification environment. It is built after importing Lean implementation
+modules so the generated serializer can compile; a pristine serial session is
+instead rooted at the validated environment returned by `#check True`. A
+worker which imports the tooling module can therefore resolve names that the
+serial candidate check rejects.
+
+The real-Lean `pristine-hidden-type` gate pins this distinction. Leant's
+translator can construct projection spellings for a goal mentioning
+`Lean.Elab.Command.CommandElabM`, but neither may verify in the pristine
+environment. N1 must return zero candidates, and N2 must return the same zero
+while still starting exactly two isolated workers. This catches a richer
+worker environment directly rather than relying on ordinary goals whose
+imports happen to coincide.
+
+A corrected experiment initialized workers through
+`withIsolatedBackendPairReplaying config [] []`, whose empty replay case
+materializes the exact `#check True` base independently in each process. It
+preserved transcript, topology, cache, and cleanup invariants, but a
+five-sample screen measured B2/C2 ratios of 0.974x, 1.019x, and 1.003x, with a
+0.999x geometric mean. Main therefore retains the command-owned pickle of the
+eligible current environment; the direct replay remains a package-private
+foundation rather than the production candidate verifier.
+
+That neutral incremental result is separate from the earlier connected
+verifier's roughly 16.5% measured screening improvement. The latter remains
+meaningful evidence; the 1.25x gate controls release promotion, not whether a
+double-digit observation is worth recording. Full semantic evidence,
+provenance, and wall results are in the
+[direct-pristine initializer report](reports/2026-08-21-direct-pristine-verification-worker-initialization-hold.md).
 
 ## Main's progressive same-run cursor scheduler
 
