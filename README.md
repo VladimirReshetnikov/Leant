@@ -1196,6 +1196,41 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   5.05s to 6.05s after one declaration. The correct foundation remains; the
   measured 16.5% and 19.8% regressions do not. See the
   [isolated history-replay report](docs/reports/2026-08-21-isolated-history-replay-foundation.md).
+
+  Commit `c95afa9` removes repeated compilation of Leant's generated Lean
+  synthesis tooling from fresh no-project sessions. When there is no Lake project
+  and no explicit startup import, Leant derives a persistent XDG cache entry
+  from the backend path/size/modification time, working directory, cache
+  format, and exact generated source. The `.olean` embeds an exact ABI marker;
+  every hit must pass both Lean's module loader and an ABI equality proof.
+  A miss, rejection, or optional filesystem failure uses the established
+  dynamic compiler. Project, explicit-import, and snapshot bases remain
+  dynamic. Such a session may replay its accepted history on top of the
+  cached pristine base exactly as before; no user declaration, proof state,
+  resumable token, or candidate enters the module.
+
+  Cold publication uses a masked absent sibling path and an exact Lean
+  completion marker. Backend launch prepends the cache root to inherited
+  `LEAN_PATH` with the platform separator, so the primary and isolated
+  processes can load the same module. The real-Lean gate proves one cold N1
+  publisher, a checksum-stable three-backend warm N2 hit which opens that exact
+  module, unchanged N1/N2 transcripts, and the existing one-backend scoped-
+  history control.
+
+  The preregistered O2 release profile used two warmups and 21 unreplaced
+  samples for three workloads and six cells (378 rows). At fixed N2, the warm
+  cache measured **1.921x** and **1.965x** B2/C2 median speedups on the two
+  primary workloads and **1.934x** on `List.map`, for a **1.940x** geometric
+  mean. Primary cold N1 median ratios were 1.005x and 1.024x, with p95 ratios
+  1.028x and 1.009x; all transcript, process-topology, allocation, CPU, RSS,
+  and cleanup gates passed. The earlier five-sample acceleration remains
+  meaningful screening evidence even though one cold p95 control printed
+  `HOLD`; the unreplaced 21-sample run independently returned
+  `promotion: GO`. See the
+  [compiled-tooling cache report](docs/reports/2026-08-21-compiled-synthesis-tooling-cache.md)
+  and its committed
+  [378-row result table](bench-verification/results/2026-08-21-compiled-tooling-cache-release.tsv).
+
   Within each Exference invocation, Leant stable-deduplicates rendered groups
   before applying the internal 60-candidate collection window
   (`:set synth-window N`). The first

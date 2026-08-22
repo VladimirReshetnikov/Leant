@@ -49,6 +49,8 @@ who wants the *what* can stop at the paragraph.
 - [Ordered isolated parallel verification](#ordered-isolated-parallel-verification)
 - [Prepared isolated-pair ownership and prewarm experiment](#prepared-isolated-pair-ownership-and-prewarm-experiment)
 - [Verification critical-path overlap](#verification-critical-path-overlap)
+- [Disconnected isolated history replay](#disconnected-isolated-history-replay)
+- [Persistent compiled synthesis-tooling cache](#persistent-compiled-synthesis-tooling-cache)
 - [Main's progressive same-run cursor scheduler](#mains-progressive-same-run-cursor-scheduler)
 - [Contract vocabulary and module ownership](#contract-vocabulary-and-module-ownership)
 - [Post-verification sealing](#post-verification-sealing)
@@ -1630,6 +1632,58 @@ to 6.07s replay-parallel; a one-declaration state-thread control changed from
 5.05s to 6.05s. Main therefore keeps the faster history-free artifact path
 and continues to reject nonempty history. See the
 [isolated history-replay report](reports/2026-08-21-isolated-history-replay-foundation.md).
+
+## Persistent compiled synthesis-tooling cache
+
+Commit `c95afa9` adds `Leant.Synth.ToolingCache` and one process-start cache
+authority to `ReplState`. Startup opens it only outside a Lake project and
+places its root on the backend's inherited `LEAN_PATH`; `BackendConfig` leaves
+the historical environment untouched when no extra root exists and otherwise
+uses the platform search-path separator. Main derives an entry only for an
+empty explicit-import list. User history, proof state, resumable-sorry state,
+and candidates never enter the module. Project, explicit-import, and snapshot
+bases remain dynamic; such a session may replay its history on top of the
+cached pristine base through the unchanged replay owner.
+
+The opaque entry identity covers the format tag, absolute backend path,
+backend byte count and high-resolution modification time, normalized working
+directory, and exact generated `synthPrelude` source. This metadata is a cheap
+accidental-staleness/build-cache key, not a security boundary. Hashing the
+complete 227 MiB REPL executable was rejected because it increased GHC
+allocation by roughly 9–11x. Semantic acceptance instead ends at Lean's module
+loader and an equality proof against the exact ABI constant embedded in the
+module; a rejected entry is invalidated before the dynamic fallback.
+
+A cold miss imports `Lean` and `Lean.Environment`, compiles the exact old
+source, and appends both the ABI definition and a `Lean.writeModule` action to
+the same protocol command. Haskell publishes only after a clean response and
+the exact ABI-qualified completion marker. The absent sibling path is owned
+under masking, incomplete output is removed, callback cancellation remains
+primary, and an existing same-key module is retained. Filesystem discovery,
+reservation, publication, and invalidation failures are fail-soft cache misses;
+they do not replace the serializer compiler as semantic oracle.
+
+Three deterministic cache tests cover identity, publication/retention/
+invalidation, and exact `ThreadKilled` cleanup. The real-Lean gate gives the
+cache root a path containing spaces: cold N1 publishes one module, warm N2
+starts three backends, preserves its checksum, and opens the exact module.
+History-free N1/N2 output remains byte-identical, while the scoped-history
+control remains one backend at both capability counts.
+
+The release benchmark compares the exact pre-cache parent and `c95afa9` at
+fixed N1/N2, plus unique-cache cold N1 controls. Two warmups and 21 unreplaced
+samples for three workloads and six cells produced 378 rows. Warm B2/C2 median
+speedups were 1.921x, 1.965x, and 1.934x (1.940x geometric mean). Primary cold
+D2/D1 median ratios were 1.005x and 1.024x; cold p95 ratios were 1.028x and
+1.009x. Transcript, topology, p95, allocation, CPU, RSS, and cleanup gates all
+passed and the run returned `promotion: GO`.
+
+The earlier five-sample screen remains meaningful observed acceleration, even
+though one cold p95 maximum made that screening run print `HOLD`. No row was
+replaced; the larger release profile is the promotion evidence. Exact
+provenance, wall/resource tables, transcript hashes, and the claim boundary are
+in the
+[compiled-tooling cache report](reports/2026-08-21-compiled-synthesis-tooling-cache.md).
 
 ## Main's progressive same-run cursor scheduler
 

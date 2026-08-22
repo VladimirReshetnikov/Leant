@@ -174,6 +174,22 @@ to 6.05s on two controls. Main remains history-free while the correct private
 ownership seam stays available. See the
 [isolated history-replay report](2026-08-21-isolated-history-replay-foundation.md).
 
+The persistent compiled-tooling checkpoint at `c95afa9` removes repeated
+fresh-process compilation of Leant's generated Lean serializer for the narrow
+no-project/no-explicit-import route. A metadata-derived XDG cache entry embeds
+an exact ABI constant and must pass Lean module loading plus an equality proof;
+misses, rejection, and optional filesystem failure retain the dynamic
+compiler. Cold publication is masked and marker-gated, while the cache root is
+prepended to inherited `LEAN_PATH` for both primary and isolated backends. The
+real-Lean gate proves cold publication, a checksum-stable warm N2 module open,
+one-versus-three history-free topology, and the unchanged scoped-history serial
+control. A two-warmup, 21-sample, 378-row release profile measured 1.921x and
+1.965x B2/C2 on the primary workloads and a 1.940x geometric mean; primary cold
+median and p95 controls passed and the enforced gate returned GO. The earlier
+five-sample acceleration remains meaningful screening evidence even though one
+cold p95 control printed `HOLD`; no row was replaced. See the
+[compiled synthesis-tooling cache report](2026-08-21-compiled-synthesis-tooling-cache.md).
+
 The Length counterexample bank still has no `ReplState` field, serialization
 or snapshot restoration, session-wide scope, or persistence. There is also no
 new engine-side counterexample request, typed prefix pruning, or complete
@@ -267,6 +283,7 @@ Reports are listed oldest first.
 - 2026-08-21 — [Prepared isolated-pair ownership and prewarm experiment](2026-08-21-prepared-isolated-pair-prewarm-hold.md)
 - 2026-08-21 — [Verification critical-path overlap](2026-08-21-verification-critical-path-overlap.md)
 - 2026-08-21 — [Isolated history-replay foundation](2026-08-21-isolated-history-replay-foundation.md)
+- 2026-08-21 — [Persistent compiled synthesis-tooling cache](2026-08-21-compiled-synthesis-tooling-cache.md)
 
 ## Standalone PDF reports
 

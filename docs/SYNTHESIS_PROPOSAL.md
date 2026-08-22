@@ -49,7 +49,13 @@ experimental Main prewarm did not improve that connected route and was not
 retained. Commit `8afedc3` instead reuses the validated startup environment and
 overlaps result-name discovery with isolated verification. A 21-sample release
 profile returned GO at 1.338x/1.327x on the primary workloads and a 1.324x
-geometric mean across three, without N1 regression. The
+geometric mean across three, without N1 regression. The following production
+checkpoint caches the compiled, ABI-checked Lean synthesis tooling for
+plain no-project/no-explicit-import synthesis bases. Its 378-row release
+profile returned GO at
+1.921x/1.965x fixed-N2 speedups on the primary workloads and a 1.940x
+geometric mean across three, while cold N1 controls remained within their
+predeclared bounds. The
 implemented post-phase-2 increments
 are detailed in §7. Companion to
 [PROPOSALS.md](PROPOSALS.md).*
@@ -950,6 +956,56 @@ foundation is retained for a future workload-aware design; current Main still
 admits only history-free sessions. See the
 [isolated history-replay report](reports/2026-08-21-isolated-history-replay-foundation.md).
 
+### Persistent compiled synthesis-tooling cache (implemented and promoted)
+
+Commit `c95afa9` replaces repeated fresh-process compilation of the generated
+Lean synthesis serializer with a fail-soft persistent module for the narrow
+no-project/no-explicit-import base route. Startup opens an XDG cache only when no Lake project is
+selected. Main derives an entry only when there are no explicit imports; all
+project, explicit-import, and snapshot bases retain the dynamic compiler. Such
+a session replays any accepted history on top of the cached pristine base
+through the unchanged owner; user history, proof state, resumable-sorry state,
+and candidates never enter the module. Verification admission remains
+unchanged.
+
+The entry key includes a format tag, absolute backend path, backend size and
+high-resolution modification time, normalized working directory, and exact
+generated source. Those cheap metadata fields avoid hashing a 227 MiB REPL on
+every short-lived invocation and are explicitly not a security boundary. The
+generated module embeds the exact synthesis-tooling ABI. A hit must pass Lean's
+loader plus an ABI equality proof before its process-local environment is
+accepted; rejection invalidates the entry and falls back dynamically.
+
+The backend launcher prepends the cache root to inherited `LEAN_PATH` with the
+platform separator. On a cold miss, `Lean.Environment`, the exact old prelude,
+the ABI definition, and `Lean.writeModule` execute in one existing protocol
+command. Publication requires a clean response and an exact completion marker.
+The Haskell owner reserves and cleans an absent sibling path under masking,
+preserves callback cancellation, keeps an existing same-key module, and treats
+optional filesystem failure as a cache miss.
+
+The real-Lean gate proves one cold N1 publisher, a checksum-stable three-
+backend N2 hit which opens that exact module, unchanged history-free N1/N2
+output, and the existing scoped-history one-backend control. The complete
+strict Leant suite passes 585/585; the serialized workspace suite, strict all-
+target build, native and forced-Windows backend compiles, Cabal, sdist, diff,
+and whitespace gates pass.
+
+The release benchmark compares the exact pre-cache parent and candidate at
+fixed N1/N2, plus unique-cache cold N1 controls. It used two warmups and 21
+unreplaced samples for three workloads and six cells. B2/C2 warm median
+speedups were 1.921x and 1.965x on the primary workloads and 1.934x on
+`List.map`, with a 1.940x geometric mean. Primary D2/D1 cold median ratios were
+1.005x and 1.024x; cold p95 ratios were 1.028x and 1.009x. Transcript,
+topology, p95, allocation, CPU, RSS, and cleanup gates all passed; the run
+returned `promotion: GO`.
+
+The preceding five-sample acceleration remains meaningful screening evidence
+even though one noisy cold p95 control printed `HOLD`; no sample was replaced.
+The 21-sample profile is the separate release-promotion evidence. See the
+[compiled-tooling cache report](reports/2026-08-21-compiled-synthesis-tooling-cache.md)
+and its committed raw table.
+
 Design rules, all inherited from Djex:
 
 1. **Checked boundaries.** The translator refuses anything outside the
@@ -1315,6 +1371,11 @@ pinned. Reusing the validated startup environment and overlapping the
 read-only binding-name probe with isolated verification then cleared the
 release profile at 1.338x/1.327x on the primary workloads and a 1.324x
 three-workload geometric mean, without N1 regression.
+The following compiled-tooling cache removes repeated serializer compilation
+from plain no-project/no-explicit-import bases and clears its own 378-row release profile
+at 1.921x/1.965x fixed-N2 speedups and a 1.940x geometric mean. Unique-cache
+cold N1 controls, transcript hashes, worker topology, p95, and resource gates
+remain within the preregistered bounds.
 The package-private prepared-pair owner now proves that cold worker setup can
 be overlapped without escaping ownership, but the first attempted initial-
 search seam did not improve the ratios enough and remains disconnected. A

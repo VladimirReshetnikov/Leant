@@ -135,13 +135,36 @@ screening run or a result that prints `HOLD` as release-promotion evidence.
 
 ## Preserved release evidence
 
-The release-profile table for implementation commit `8afedc3` is preserved as
-[`results/2026-08-21-critical-path-overlap-release.tsv`](results/2026-08-21-critical-path-overlap-release.tsv).
-It contains all 252 timed rows: 21 unreplaced samples for each of three
-workloads and four cells. Its SHA-256 is
-`80d3b1e5f87b2138c0ea9a3d6449533f6b63b4a6686a535e529d58bdf8c19fa9`.
-The run used two warmup cycles, the documented fixed Latin-square order, and
-`--enforce`; it returned `promotion: GO`. The dated
-[critical-path overlap report](../docs/reports/2026-08-21-verification-critical-path-overlap.md)
+The compiled-tooling release table for implementation commit `c95afa9` is
+preserved as
+[`results/2026-08-21-compiled-tooling-cache-release.tsv`](results/2026-08-21-compiled-tooling-cache-release.tsv).
+It contains all 378 timed rows: 21 unreplaced samples for each of three
+workloads and six cells. Its SHA-256 is
+`e2c4ca4484b4f0897cf74b7312dc09ca174f9140045d496f73defb6c13af7d34`.
+The run used two warmup cycles, the documented fixed Latin-square and
+alternating cold-cell orders, and `--enforce`; it returned `promotion: GO`.
+
+B2/C2 warm median speedups were 1.921x and 1.965x on the two primary
+workloads and 1.934x on the `List.map` control, for a 1.940x geometric mean.
+Primary D2/D1 cold medians were 1.005x and 1.024x; cold p95 ratios were 1.028x
+and 1.009x. The dated
+[compiled-tooling cache report](../docs/reports/2026-08-21-compiled-synthesis-tooling-cache.md)
 records executable hashes, preflight topology and transcript hashes, exact
-summary values, resource caveats, and the implementation boundary.
+wall/resource tables, cache-artifact evidence, and the implementation
+boundary.
+
+The preceding five-sample screen's exact acceleration remains useful screening
+evidence even though one noisy cold p95 control printed `HOLD`; no row was
+replaced. The 21-sample profile is the independent release-promotion evidence.
+
+### Previous verifier-route release evidence
+
+The pre-cache verification-route table for implementation commit `8afedc3`
+remains preserved as
+[`results/2026-08-21-critical-path-overlap-release.tsv`](results/2026-08-21-critical-path-overlap-release.tsv).
+It contains 252 timed rows and has SHA-256
+`80d3b1e5f87b2138c0ea9a3d6449533f6b63b4a6686a535e529d58bdf8c19fa9`.
+Its separate
+[critical-path overlap report](../docs/reports/2026-08-21-verification-critical-path-overlap.md)
+documents that checkpoint's four-cell protocol and 1.324x geometric-mean
+result.
