@@ -1243,6 +1243,33 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   the separate release-promotion threshold. See the
   [direct-pristine initializer report](docs/reports/2026-08-21-direct-pristine-verification-worker-initialization-hold.md).
 
+  Commit `1097e30` separately retains a package-private bounded backend-pool
+  owner. A hidden validated size admits only two through four artifact-restored
+  workers; setup starts them concurrently but observes failures in ordinal
+  order, joins an irrelevant suffix before registry cleanup, and preserves the
+  existing lease, poison, atomic-close, and whole-tree ownership rules. Every
+  historical pair, replay, and prepared-pair entry point remains exactly two
+  workers, and Main still uses that pair.
+
+  The capability-scaled Main experiment at `4f11872` bounded worker count by
+  capabilities, success quota, and the reachable group prefix, leaving N1
+  literal serial and N2 exact. Its six-cell, five-sample screen retained all
+  60 rows on six effective CPUs and proved exact 1/1/3/3/3/5 long-workload
+  topology plus byte-identical transcripts. Nevertheless state-thread and
+  continuation B4/C4 median speed factors were only
+  **0.851881067021277x** and **0.867948821945671x**, a
+  **0.859877414844080x** geometric mean. Equivalently, four workers cost about
+  **16.3% more median wall time**, with worse p95, CPU, and aggregate RSS. The
+  harness returned nine HOLDs, so `a9d2655` reverted the production connection
+  while retaining the foundation and benchmark protocol. See the
+  [capability-scaled pool report](docs/reports/2026-08-21-capability-scaled-isolated-verification-hold.md)
+  and its committed
+  [60-row table](bench-verification/results/2026-08-21-scaled-pool-screen.tsv).
+  This opposite-sign result does not make a real positive gain above 10%,
+  including the earlier roughly 16.5%, speculative: such a gain is meaningful
+  and worth retaining. N3/N4 stays on HOLD until warm reuse, deeper batches, or
+  another benchmarked amortization passes the same greater-than-10% gate.
+
   Within each Exference invocation, Leant stable-deduplicates rendered groups
   before applying the internal 60-candidate collection window
   (`:set synth-window N`). The first
@@ -1411,13 +1438,17 @@ verification workers. The package-private
 builds exactly two independently restored workers above that lifecycle. Main
 now routes conservatively eligible N2 candidate groups through the pair and
 the ordered verification scheduler; N1 and unsafe live sessions retain the
-literal serial verifier. See the
+literal serial verifier. A disconnected package-private owner can validate
+and acquire two through four workers, but the measured capability-scaled
+Main connection was slower and was reverted. See the
 [lifecycle checkpoint](docs/reports/2026-08-20-backend-process-tree-lifecycle.md)
 and [isolated-pair checkpoint](docs/reports/2026-08-20-isolated-backend-pair-foundation.md),
 plus the
 [connected route report](docs/reports/2026-08-21-ordered-isolated-parallel-verification.md)
 and the later
-[prepared-pair ownership report](docs/reports/2026-08-21-prepared-isolated-pair-prewarm-hold.md).
+[prepared-pair ownership report](docs/reports/2026-08-21-prepared-isolated-pair-prewarm-hold.md),
+plus the
+[scaled-pool HOLD](docs/reports/2026-08-21-capability-scaled-isolated-verification-hold.md).
 The JSON codec is hand-rolled
 ([src/Leant/Json.hs](src/Leant/Json.hs)). The direct external dependency
 surface stays small: `async` supplies scoped worker lifetime management and

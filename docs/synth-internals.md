@@ -52,6 +52,7 @@ who wants the *what* can stop at the paragraph.
 - [Disconnected isolated history replay](#disconnected-isolated-history-replay)
 - [Persistent compiled synthesis-tooling cache](#persistent-compiled-synthesis-tooling-cache)
 - [Verification-worker environment authority](#verification-worker-environment-authority)
+- [Capability-scaled isolated verification HOLD](#capability-scaled-isolated-verification-hold)
 - [Main's progressive same-run cursor scheduler](#mains-progressive-same-run-cursor-scheduler)
 - [Contract vocabulary and module ownership](#contract-vocabulary-and-module-ownership)
 - [Post-verification sealing](#post-verification-sealing)
@@ -1373,13 +1374,23 @@ and its original **508 of 508** strict-suite result are recorded in the
 
 `Leant.Backend.Isolated` is the package-private resource boundary used by
 parallel Lean verification. Cabal lists it under `Other-Modules`; pair and
-lease constructors remain hidden, while typed setup, transport, lease, pair,
-and cleanup failures are inspectable. Its callable shape inside the package
-is:
+lease constructors and the validated pool-size constructor remain hidden,
+while typed size, setup, transport, lease, pair, and cleanup failures are
+inspectable. Its callable shape inside the package includes:
 
 ```haskell
 withIsolatedBackendPair
   :: BackendConfig -> FilePath -> Maybe Int
+  -> (IsolatedBackendPair -> IO a)
+  -> IO (Either IsolatedBackendFailure a)
+
+mkIsolatedBackendPoolSize
+  :: Int
+  -> Either IsolatedBackendPoolSizeError IsolatedBackendPoolSize
+
+withIsolatedBackendPool
+  :: IsolatedBackendPoolSize
+  -> BackendConfig -> FilePath -> Maybe Int
   -> (IsolatedBackendPair -> IO a)
   -> IO (Either IsolatedBackendFailure a)
 
@@ -1393,17 +1404,20 @@ runIsolatedBackendCommand
   -> IO (Either IsolatedBackendFailure JValue)
 ```
 
-Pair acquisition starts exactly two independent `Backend` spawn-and-restore
-actions concurrently and sends each `unpickleEnvFrom` with the same optional
-request timeout. A masked atomic ownership registry closes the handoff gap;
-the parent still observes logical worker one first, cancels a sibling after a
-known worker-one failure, and cleans registered backends in ordinal order. Each
-successful response must contain its own integer environment identifier and
-must contain neither a fatal response nor an error-severity diagnostic.
-Failures retain the worker ordinal and distinguish spawn, transport, fatal,
-diagnostic, and missing-environment setup cases. A failure or cancellation at
-any partial-acquisition point tears down every process already owned before it
-returns or rethrows.
+Every historical pair, replay, and prepared-pair entry point starts exactly two
+independent `Backend` spawn-and-restore actions. Commit `1097e30` adds one
+artifact-restored pool entry point whose pure hidden authority admits only two
+through four workers; it never reads capabilities or silently clamps a caller.
+All requested setup actions start under recursively nested structured `async`
+owners before the parent observes readiness. Observation remains in logical
+worker order. After the first known ordinal failure, every higher-ordinal
+suffix is cancelled and joined before the masked registry is read and all
+registered backends are cleaned in ordinal order. Each successful response
+must contain its own integer environment identifier and must contain neither a
+fatal response nor an error-severity diagnostic. Failures retain the worker
+ordinal and distinguish spawn, transport, fatal, diagnostic, and missing-
+environment setup cases. A failure or cancellation at any partial-acquisition
+point tears down every process already owned before it returns or rethrows.
 
 The environment artifact is common, but the restored identifiers and process
 state are worker-local. A leased command sends exactly the requested `cmd` and
@@ -1413,13 +1427,14 @@ callback rather than silently advancing or crossing into a sibling process.
 Fatal, error-diagnostic, and `sorry` JSON received as valid command responses
 remain ordinary values for the caller to classify and do not damage the pool.
 
-STM admits at most two simultaneous lease callbacks. Each worker has a
-request lock, so commands sharing even one active lease enter its protocol
-strictly one at a time. A checkout-local active token prevents a lease from
-escaping its callback: release invalidates the token before synchronizing with
-the request lock, waits for an already admitted command, and requeues only an
-idle worker while both worker and pair remain healthy. A queued detached
-command therefore observes a closed lease instead of racing with reuse.
+STM admits at most the owner's configured worker count of simultaneous lease
+callbacks—two for every historical pair entry point. Each worker has a request
+lock, so commands sharing even one active lease enter its protocol strictly
+one at a time. A checkout-local active token prevents a lease from escaping
+its callback: release invalidates the token before synchronizing with the
+request lock, waits for an already admitted command, and requeues only an idle
+worker while both worker and owner remain healthy. A queued detached command
+therefore observes a closed lease instead of racing with reuse.
 
 A request timeout, server closure, malformed response, or interrupted
 protocol request retires and kills that worker, poisons the complete pair, and
@@ -1440,9 +1455,9 @@ and request callback exceptions remain primary after cleanup; infrastructure
 failures returned as values can attach deterministic worker-labelled cleanup
 details.
 
-Pair closure atomically captures the prior healthy or first-poison status in
-the same STM transaction that changes the pair to closed and removes all idle
-admission. It then tears down both originally registered workers, including a
+Owner closure atomically captures the prior healthy or first-poison status in
+the same STM transaction that changes the owner to closed and removes all idle
+admission. It then tears down every originally registered worker, including a
 worker still checked out by a mis-scoped child, rather than relying on the idle
 queue. This atomic transition has two deliberate outcomes: poison established
 before close cannot be missed, while close wins over a later failure from a
@@ -1718,6 +1733,41 @@ meaningful evidence; the 1.25x gate controls release promotion, not whether a
 double-digit observation is worth recording. Full semantic evidence,
 provenance, and wall results are in the
 [direct-pristine initializer report](reports/2026-08-21-direct-pristine-verification-worker-initialization-hold.md).
+
+## Capability-scaled isolated verification HOLD
+
+The retained `1097e30` foundation generalized only package-private artifact-
+restored ownership. The experimental `4f11872` caller recorded the verification
+artifact runtime's sole post-session-gate capability callback in its command
+context, then bounded a batch's worker count by four, available capabilities,
+success quota, and only the reachable group prefix. It supplied that exact
+width to both the pool and ordered scheduler. N1 remained the literal serial
+verifier, N2 remained exact two, and an N4 two-group batch still acquired only
+two workers.
+
+The real-Lean experiment proved byte-identical N1/N2/N3/N4 transcripts on a
+five-result fixture with exact primary-plus-worker topology, plus bounded N4
+topology on the short fixture. Exact artifact routing, one cache-module open,
+compiled-module identity, cleanup, the pristine hidden-type oracle, and scoped-
+history serial control remained intact.
+
+The fixed five-sample screen then retained 60 unreplaced rows on six effective
+CPUs. Against the fixed-two B4 control, candidate C4 median speed factors were
+0.851881067021277x state-thread and 0.867948821945671x continuation, with a
+0.859877414844080x geometric mean. The reciprocal geometric mean was
+1.162956466511367x: about 16.3% more wall cost. Candidate N4 p95 was worse on
+both workloads, and both CPU and aggregate RSS crossed 1.25. The harness
+reported nine HOLD conditions. Commit `a9d2655` therefore reverted Main and
+its N3/N4 route gates; production remains fixed-two while the bounded owner and
+benchmark protocol remain package-private infrastructure.
+
+This is opposite-sign evidence, not a reason to discount genuine speedups. A
+positive measured improvement greater than 10%, including the earlier roughly
+16.5%, is meaningful and worth retaining, not speculative. N3/N4 remains on
+HOLD unless warm reuse, deeper batches, or another measured amortization
+passes the same greater-than-10% gate. Exact provenance, medians, p95 values,
+unrounded ratios, hashes, and the committed 60-row table are in the
+[capability-scaled pool report](reports/2026-08-21-capability-scaled-isolated-verification-hold.md).
 
 ## Main's progressive same-run cursor scheduler
 

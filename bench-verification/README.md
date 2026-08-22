@@ -183,6 +183,34 @@ The compiled-cache-only controls (`--minimum-speedup`,
 options, `--baseline-cold-cache-modules`, and `--candidate-n2-initializer`) do
 not alter the fixed scaled-pool screen.
 
+### Completed scaled-pool screen
+
+The 2026-08-21 fixed screen compared exact baseline `1097e30` with connected
+candidate `4f11872` on a host and affinity set of six CPUs. All 60 measured
+rows completed without replacement. State-thread and continuation B4/C4
+median speed factors were **0.851881067021277x** and
+**0.867948821945671x**; their geometric mean was
+**0.859877414844080x**. In the reciprocal direction the candidate therefore
+cost about **16.3% more median wall time**. Candidate N4 p95 was worse on both
+workloads, and both N4 CPU and aggregate-RSS ratios exceeded 1.25. The harness
+reported nine HOLD conditions.
+
+The exact
+[`60-row result table`](results/2026-08-21-scaled-pool-screen.tsv) has SHA-256
+`5f530bafce3bab6053bafddd846c88f2ca865bd80dd5a8e4b628d597ea8638cc`.
+The
+[capability-scaled verification report](../docs/reports/2026-08-21-capability-scaled-isolated-verification-hold.md)
+records exact medians, p95 values, unrounded ratios, provenance, preflight
+hashes, and all nine failures. Commit `a9d2655` reverted the production
+connection. The validated two-to-four-worker owner remains package-private;
+Main remains fixed-two.
+
+This negative result has the opposite sign from a genuine double-digit
+improvement. A measured positive gain greater than 10%, including the earlier
+roughly 16.5%, remains meaningful and worth retaining, not speculative.
+Future N3/N4 work stays on HOLD until a measured amortization design such as
+warm reuse or deeper batches passes this same greater-than-10% gate.
+
 ## Default compiled-cache cells and workloads
 
 Four warm-cache cells isolate capability effects from implementation effects.

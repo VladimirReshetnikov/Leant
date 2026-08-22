@@ -200,6 +200,21 @@ HOLD does not revise the earlier meaningful roughly 16.5% connected-route
 screen; 1.25x remains a separate promotion threshold. See the
 [direct-pristine initializer report](2026-08-21-direct-pristine-verification-worker-initialization-hold.md).
 
+The bounded isolated-pool foundation at `1097e30` validates and owns two to
+four artifact-restored workers while leaving every historical pair/replay/
+prepared entry point exact-two. The `4f11872` Main experiment connected that
+width to capabilities, quota, and reachable group demand, but a 60-row fixed-
+N4 screen measured 0.851881067021277x and 0.867948821945671x B4/C4 median
+speed factors, a 0.859877414844080x geometric mean and about 16.3% higher
+median wall cost. Worse N4 p95 plus CPU/RSS excesses produced nine HOLDs;
+`a9d2655` reverted the connection. Production remains fixed-two and the
+foundation stays package-private. A genuine positive improvement over 10%,
+including the earlier roughly 16.5%, remains meaningful and worth retaining,
+not speculative; future N3/N4 work awaits a benchmarked amortization that
+passes that gate. See the
+[capability-scaled pool report](2026-08-21-capability-scaled-isolated-verification-hold.md)
+and its committed raw table.
+
 The Length counterexample bank still has no `ReplState` field, serialization
 or snapshot restoration, session-wide scope, or persistence. There is also no
 new engine-side counterexample request, typed prefix pruning, or complete
@@ -295,6 +310,7 @@ Reports are listed oldest first.
 - 2026-08-21 — [Isolated history-replay foundation](2026-08-21-isolated-history-replay-foundation.md)
 - 2026-08-21 — [Persistent compiled synthesis-tooling cache](2026-08-21-compiled-synthesis-tooling-cache.md)
 - 2026-08-21 — [Direct pristine verification-worker initialization screen](2026-08-21-direct-pristine-verification-worker-initialization-hold.md)
+- 2026-08-21 — [Capability-scaled isolated verification screen](2026-08-21-capability-scaled-isolated-verification-hold.md)
 
 ## Standalone PDF reports
 

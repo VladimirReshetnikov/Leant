@@ -833,6 +833,13 @@ unit suite passes **557 of 557**. See the historical
 [isolated backend pair report](reports/2026-08-20-isolated-backend-pair-foundation.md)
 and its connected successor.
 
+Commit `1097e30` later generalized the artifact-restored owner behind a hidden
+validated two-to-four-worker size. All setup children are scoped before
+ordinal observation; a known failure cancels and joins its suffix before
+ordinal registry cleanup. The established pair, replay, and prepared APIs
+remain exact-two, and lease, poison, close, and process-tree semantics are
+unchanged at the wider sizes. This foundation is still package-private.
+
 ### Ordered isolated verification route (implemented, opt-in)
 
 Main owns one lazy environment artifact for a synthesis command and one fresh
@@ -1005,6 +1012,32 @@ even though one noisy cold p95 control printed `HOLD`; no sample was replaced.
 The 21-sample profile is the separate release-promotion evidence. See the
 [compiled-tooling cache report](reports/2026-08-21-compiled-synthesis-tooling-cache.md)
 and its committed raw table.
+
+### Capability-scaled verification experiment (HOLD)
+
+The experimental `4f11872` Main caller used the verification artifact
+runtime's sole post-session-gate capability callback and selected an exact
+worker width bounded by four,
+capabilities, success quota, and reachable group demand. This preserved literal
+N1, exact N2, ordered success semantics, and two-worker N4 topology for a short
+two-group batch. A real-Lean gate proved byte parity through N4, exact long-
+batch 1/1/3/3/3/5 topology, cache/artifact routing, and cleanup.
+
+The fixed one-warmup, five-sample screen retained all 60 rows on six effective
+CPUs. State-thread and continuation B4/C4 median speed factors were
+0.851881067021277x and 0.867948821945671x, a 0.859877414844080x geometric mean.
+The reciprocal result is about 16.3% more median wall cost; N4 p95, CPU, and
+aggregate RSS also failed their gates. All nine HOLD conditions were retained,
+and `a9d2655` reverted the production connection. Main remains fixed-two; the
+package-private bounded owner and benchmark protocol remain available.
+
+This negative result has the opposite sign from a meaningful positive gain.
+An improvement greater than 10%, including the earlier roughly 16.5%, is worth
+retaining and is not speculative. Future N3/N4 work stays on HOLD until safe
+warm reuse, deeper batches, or another benchmarked amortization clears that
+same meaningful greater-than-10% threshold. See the
+[capability-scaled verification report](reports/2026-08-21-capability-scaled-isolated-verification-hold.md)
+and its committed 60-row table.
 
 Design rules, all inherited from Djex:
 
