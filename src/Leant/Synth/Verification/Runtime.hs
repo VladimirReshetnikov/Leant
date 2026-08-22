@@ -6,8 +6,12 @@
 -- keeps admission, cancellation, and cleanup independently testable.
 module Leant.Synth.Verification.Runtime
   ( VerificationArtifactRuntime
+  , VerificationBindingPrefetch
   , ParallelFailureDisposition (..)
   , withVerificationArtifactRuntime
+  , newVerificationBindingPrefetch
+  , withVerificationBindingPrefetch
+  , takeVerificationBindingPrefetch
   , ensureVerificationArtifactWith
   , disableVerificationArtifactRuntime
   , runVerificationBatchWith
@@ -24,6 +28,7 @@ import Control.Exception
   , throwIO
   , try
   )
+import Control.Concurrent.Async (wait, withAsync)
 import Data.IORef
 
 import Leant.Backend.Isolated
@@ -41,11 +46,58 @@ data VerificationArtifactState artifact
   | VerificationArtifactDisabled (Maybe artifact)
   | VerificationArtifactReady artifact
 
+-- | One command-local, one-value cache for work which is independent of an
+-- isolated verification attempt but needed by its successful presentation.
+-- The base counter prevents a stale result from being consumed after any
+-- intervening binding changes the logical session.
+newtype VerificationBindingPrefetch = VerificationBindingPrefetch
+  (IORef (Maybe (Int, Int)))
+
 -- | Decide whether a completed, cleanly closed parallel attempt can be
 -- replayed through the serial oracle or must terminate the command.
 data ParallelFailureDisposition fatal
   = FallbackSerial
   | AbortParallel fatal
+
+newVerificationBindingPrefetch :: IO VerificationBindingPrefetch
+newVerificationBindingPrefetch =
+  VerificationBindingPrefetch <$> newIORef Nothing
+
+-- | Overlap a read-only primary-backend probe with one isolated parallel
+-- attempt.  Both scoped actions finish before return.  A normal parallel
+-- failure still joins the probe but does not publish it; exceptions and
+-- cancellation retain 'withAsync' structured-cleanup semantics.
+withVerificationBindingPrefetch
+  :: VerificationBindingPrefetch
+  -> Int
+  -> IO (Maybe Int)
+  -> IO (Either failure result)
+  -> IO (Either failure result)
+withVerificationBindingPrefetch (VerificationBindingPrefetch cached)
+    baseCounter prefetch runParallel =
+  withAsync prefetch $ \pending -> do
+    attempted <- runParallel
+    candidate <- wait pending
+    case attempted of
+      Right _ -> case candidate of
+        Just available -> writeIORef cached
+          $ Just (baseCounter, available)
+        Nothing -> pure ()
+      Left _ -> pure ()
+    pure attempted
+
+-- | Consume a prefetched identifier exactly once and only from the unchanged
+-- logical counter state.  A mismatched entry is stale and is discarded.
+takeVerificationBindingPrefetch
+  :: VerificationBindingPrefetch
+  -> Int
+  -> IO (Maybe Int)
+takeVerificationBindingPrefetch (VerificationBindingPrefetch cached)
+    currentCounter =
+  atomicModifyIORef' cached $ \entry -> case entry of
+    Just (baseCounter, candidate)
+      | baseCounter == currentCounter -> (Nothing, Just candidate)
+    _ -> (Nothing, Nothing)
 
 -- | Own one optional artifact for a complete command.
 --

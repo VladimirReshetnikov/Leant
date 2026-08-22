@@ -18,6 +18,7 @@ import Control.Concurrent.Async
   , asyncThreadId
   , cancel
   , poll
+  , wait
   , waitCatch
   )
 import Control.Monad
@@ -260,8 +261,11 @@ import Leant.Synth.Verification.Parallel
 import Leant.Synth.Verification.Runtime
   ( ParallelFailureDisposition (..)
   , ensureVerificationArtifactWith
+  , newVerificationBindingPrefetch
   , parallelVerificationFailureAllowsSerialFallback
   , runVerificationBatchWith
+  , takeVerificationBindingPrefetch
+  , withVerificationBindingPrefetch
   , withVerificationArtifactRuntime
   )
 import Leant.Synth.Fragment
@@ -1031,7 +1035,7 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
       "scope one absolute snapshot to parity-safe command state" $ do
       sourceLines <- lines <$> readFile "src/Main.hs"
       let contextSection = mainSourceSection
-            "type SynthVerificationContext ="
+            "data SynthVerificationContext ="
             "synthGo" sourceLines
           wrapperSection = mainSourceSection
             "synthGo' assessmentContext st args retriedVars goal parsed ="
@@ -1042,10 +1046,20 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
           reservationSection = mainSourceSection
             "freshSiblingPath :: FilePath"
             "copyManagedArtifact ::" sourceLines
+          currentEnvironmentSection = mainSourceSection
+            "currentEnvironmentId st = do"
+            "-- Build a pickleable" sourceLines
+          startupSection = mainSourceSection
+            "-- startup probe"
+            "-- imports requested on the command line" sourceLines
       mapM_ (assertMainSourceContains "verification command owner"
           contextSection)
-        [ "type SynthVerificationContext = VerificationArtifactRuntime FilePath"
-        , "withSynthVerificationContext = withVerificationArtifactRuntime removeFileIfExists"
+        [ "synthVerificationArtifactRuntime :: VerificationArtifactRuntime FilePath"
+        , "synthVerificationPrefetchedItCounter :: VerificationBindingPrefetch"
+        , "withVerificationArtifactRuntime removeFileIfExists $ \\runtime -> do"
+        , "prefetchedItCounter <- newVerificationBindingPrefetch"
+        , "synthVerificationArtifactRuntime = runtime"
+        , "synthVerificationPrefetchedItCounter = prefetchedItCounter"
         ]
       mapM_ (assertMainSourceContains "verification command wrapper"
           wrapperSection)
@@ -1054,7 +1068,7 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
         ]
       mapM_ (assertMainSourceContains "parallel verification admission"
           artifactSection)
-        [ "ensureVerificationArtifactWith context sessionEligible getNumCapabilities acquire prepare"
+        [ "ensureVerificationArtifactWith (synthVerificationArtifactRuntime context) sessionEligible getNumCapabilities acquire prepare"
         , "session <- readIORef st"
         , "isNothing (rsSnapshotBase session)"
         , "isNothing (rsProve session)"
@@ -1076,6 +1090,45 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
         , "removeFile path"
         , "cleanup (path, handle)"
         ]
+      mapM_ (assertMainSourceContains "startup environment cache"
+          startupSection)
+        [ "probe <- runCmd st Nothing \"#check True\""
+        , "not (hasErrors response)"
+        , "Nothing <- respFatal response"
+        , "Just environment <- respEnv response"
+        , "rsBaseEnv = Just environment"
+        ]
+      startupValidation <- expectMainSourcePosition
+        "startup environment cache" "not (hasErrors response)"
+        startupSection
+      startupPublication <- expectMainSourcePosition
+        "startup environment cache" "rsBaseEnv = Just environment"
+        startupSection
+      assertBool "startup cached an unvalidated backend environment"
+        $ startupValidation < startupPublication
+      mapM_ (assertMainSourceContains "current environment cache"
+          currentEnvironmentSection)
+        [ "case rsEnv state of"
+        , "Just env -> pure (Right env)"
+        , "Nothing -> case rsBaseEnv state of"
+        , "materialized <- runCmd st Nothing \"#check True\""
+        , "not (hasErrors response)"
+        , "Nothing <- respFatal response"
+        , "Just env <- respEnv response -> Right env"
+        ]
+      activeEnvironment <- expectMainSourcePosition
+        "current environment cache" "case rsEnv state of"
+        currentEnvironmentSection
+      cachedEnvironment <- expectMainSourcePosition
+        "current environment cache" "case rsBaseEnv state of"
+        currentEnvironmentSection
+      materializedEnvironment <- expectMainSourcePosition
+        "current environment cache"
+        "materialized <- runCmd st Nothing \"#check True\""
+        currentEnvironmentSection
+      assertBool "current environment precedence changed"
+        $ activeEnvironment < cachedEnvironment
+          && cachedEnvironment < materializedEnvironment
   , testCase
       "fallback only after the pair closes cleanly and disable later batches" $ do
       sourceLines <- lines <$> readFile "src/Main.hs"
@@ -1087,12 +1140,14 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
             "completionCandidates ::" sourceLines
       mapM_ (assertMainSourceContains "parallel verification route"
           verificationSection)
-        [ "runVerificationBatchWith verificationContext"
+        [ "runVerificationBatchWith (synthVerificationArtifactRuntime verificationContext)"
         , "successQuota >= 2 && hasTwoGroups groups"
         , "ensureSynthVerificationArtifact verificationContext st"
         , "serialVerification"
         , "parallelVerification"
         , "classifyInfrastructureFailure"
+        , "withVerificationBindingPrefetch (synthVerificationPrefetchedItCounter verificationContext) baseCounter"
+        , "firstUnusedItCounter st (baseCounter + 1) 10000"
         , "withIsolatedBackendPair (rsConfig state) path (rsTimeout state)"
         , "try $ verifyCandidateGroupsParallel 2 successQuota"
         , "withIsolatedBackendLease pair"
@@ -1105,12 +1160,15 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
         ]
       pairBracket <- expectMainSourcePosition "parallel verification route"
         "attempted <- withIsolatedBackendPair" verificationSection
+      namePrefetch <- expectMainSourcePosition "parallel verification route"
+        "withVerificationBindingPrefetch" verificationSection
       typedCatch <- expectMainSourcePosition "parallel verification route"
         "try $ verifyCandidateGroupsParallel" verificationSection
       classification <- expectMainSourcePosition "parallel verification route"
         "pure $ case attempted of" verificationSection
       assertBool "typed worker failures escaped pair cleanup"
-        $ pairBracket < typedCatch
+        $ namePrefetch < pairBracket
+          && pairBracket < typedCatch
           && typedCatch < classification
       mapM_ (assertMainSourceContains "literal serial verification oracle"
           serialSection)
@@ -6037,7 +6095,61 @@ parallelEnginePairTests = testGroup
 parallelVerificationRuntimeTests :: TestTree
 parallelVerificationRuntimeTests = testGroup
   "command-scoped parallel verification runtime"
-  [ testCase "leave an ineligible batch unprobed for a later batch" $ do
+  [ testCase
+      "overlap and join presentation prefetch before publishing success" $ do
+      prefetched <- newVerificationBindingPrefetch
+      probeStarted <- newEmptyMVar
+      parallelStarted <- newEmptyMVar
+      releaseProbe <- newEmptyMVar
+      releaseParallel <- newEmptyMVar
+      running <- async $ withVerificationBindingPrefetch prefetched 7
+        (putMVar probeStarted () >> readMVar releaseProbe >> pure (Just 11))
+        (putMVar parallelStarted () >> readMVar releaseParallel
+          >> pure (Right "verified" :: Either String String))
+      readMVar probeStarted
+      readMVar parallelStarted
+      putMVar releaseParallel ()
+      premature <- timeout 200000 $ waitCatch running
+      assertBool "parallel completion escaped before its prefetch joined"
+        $ isNothing premature
+      putMVar releaseProbe ()
+      wait running >>= (@?= Right "verified")
+      takeVerificationBindingPrefetch prefetched 7 >>= (@?= Just 11)
+      takeVerificationBindingPrefetch prefetched 7 >>= (@?= Nothing)
+  , testCase "publish no presentation prefetch after parallel failure" $ do
+      prefetched <- newVerificationBindingPrefetch
+      attempted <- withVerificationBindingPrefetch prefetched 3
+        (pure $ Just 5)
+        (pure $ Left "transport" :: IO (Either String String))
+      attempted @?= Left "transport"
+      takeVerificationBindingPrefetch prefetched 3 >>= (@?= Nothing)
+  , testCase "discard a prefetched counter after logical state changes" $ do
+      prefetched <- newVerificationBindingPrefetch
+      attempted <- withVerificationBindingPrefetch prefetched 3
+        (pure $ Just 5)
+        (pure $ Right "verified" :: IO (Either String String))
+      attempted @?= Right "verified"
+      takeVerificationBindingPrefetch prefetched 4 >>= (@?= Nothing)
+      takeVerificationBindingPrefetch prefetched 3 >>= (@?= Nothing)
+  , testCase "cancel and join presentation prefetch with its parallel scope" $ do
+      prefetched <- newVerificationBindingPrefetch
+      probeStarted <- newEmptyMVar
+      probeStopped <- newEmptyMVar
+      parallelStarted <- newEmptyMVar
+      never <- newEmptyMVar
+      running <- async $ withVerificationBindingPrefetch prefetched 0
+        ((putMVar probeStarted () >> readMVar never >> pure (Just 1))
+          `finally` putMVar probeStopped ())
+        (putMVar parallelStarted () >> readMVar never
+          >> pure (Right () :: Either String ()))
+      readMVar probeStarted
+      readMVar parallelStarted
+      throwTo (asyncThreadId running) ThreadKilled
+      outcome <- waitCatch running
+      assertThreadKilledOutcome "presentation prefetch cancellation" outcome
+      timeout 3000000 (readMVar probeStopped) >>= (@?= Just ())
+      takeVerificationBindingPrefetch prefetched 0 >>= (@?= Nothing)
+  , testCase "leave an ineligible batch unprobed for a later batch" $ do
       events <- newIORef ([] :: [String])
       let record event = modifyIORef' events (++ [event])
           serial label = record ("serial-" ++ label) >> pure label
@@ -16983,10 +17095,10 @@ assertLengthAssessmentMainLaneFinalization = do
         "synthLaneAccumulationDisposition" sourceLines
       finalizerSection = mainSourceSection
         "accumulation@(SynthLaneAccumulation reverseOutcomes) = do"
-        "finalizeSynthLanePresentations st args goal presentations rejections = do"
+        "-- | Bind and present"
         sourceLines
       presentationSection = mainSourceSection
-        "finalizeSynthLanePresentations st args goal presentations rejections = do"
+        "    st args goal presentations rejections = do"
         "reportSynthLaneNotes ::" sourceLines
       noVerifiedBranch = takeWhile
           (not . isInfixOf "SynthLaneSurvivors presentations rejections ->")
@@ -17009,10 +17121,10 @@ assertLengthAssessmentMainLaneFinalization = do
     , "lengthAssessmentFailure $ assessedSynthLaneLengthAssessment assessed"
     , "let disposition = synthLaneAccumulationDisposition shown accumulation"
     , "SynthLaneNoVerified -> pure ()"
-    , "SynthLaneSurvivors presentations rejections -> finalizeSynthLanePresentations st args goal presentations rejections"
+    , "SynthLaneSurvivors presentations rejections -> finalizeSynthLanePresentations verificationContext st args goal presentations rejections"
     , "SynthLaneAllBehaviorallyRejected rejections -> do"
     , "rsSynthIts = [], rsSynthItsProve = False"
-    , "SynthLaneAssessmentPreserved presentations rejections -> finalizeSynthLanePresentations st args goal presentations rejections"
+    , "SynthLaneAssessmentPreserved presentations rejections -> finalizeSynthLanePresentations verificationContext st args goal presentations rejections"
     , "forM_ effectiveLanes $ \\(outcome, laneDisposition) -> case laneDisposition of"
     , "SynthLaneNoVerified -> pure () SynthLaneSurvivors _ _ -> reportSynthLaneNotes st (synthLaneOutcomeNotes outcome)"
     , "throughFirstTerminal lanes = case lanes of"
@@ -17044,14 +17156,14 @@ assertLengthAssessmentMainLaneFinalization = do
   mapM_ (assertMainSourceContains "survivor finalizer"
       presentationSection)
     [ "shown = map lengthCandidatePresentationText presentations"
-    , "counters <- mapM (synthBind st goal) (reverse shown)"
+    , "counters <- mapM (synthBind verificationContext st goal) (reverse shown)"
     , "zip shown (reverse counters)"
     , "rsSynthIts = splices, rsSynthItsProve = proving"
     , "forM_ (zip [1 :: Int ..] presentations)"
     , "reportLengthAssessmentRejections st rejections"
     ]
   reverseBinding <- expectMainSourcePosition "survivor finalizer"
-    "counters <- mapM (synthBind st goal) (reverse shown)"
+    "counters <- mapM (synthBind verificationContext st goal)"
       presentationSection
   cacheMutation <- expectMainSourcePosition "survivor finalizer"
     "rsSynthIts = splices" presentationSection
@@ -17067,7 +17179,8 @@ assertLengthAssessmentMainLaneFinalization = do
     $ not ("lengthCandidateRejectionPresentationText"
       `isInfixOf` presentationText)
   length (mainSourcePositions
-      "counters <- mapM (synthBind st goal)" presentationSection) @?= 1
+      "counters <- mapM (synthBind verificationContext st goal)"
+      presentationSection) @?= 1
   length (mainSourcePositions
       "modifyIORef' st" presentationSection) @?= 1
 
@@ -17898,7 +18011,7 @@ assertLengthAssessmentMainDiagnosticGates = do
         "-- Abnormal engine completion" schedulerSection
 
   timeoutFinalize <- expectMainSourcePosition "timeout diagnostic"
-    "finalizeSynthLaneAccumulation st args goal" timeoutSection
+    "finalizeSynthLaneAccumulation verificationContext" timeoutSection
   timeoutDiagnostic <- expectMainSourcePosition "timeout diagnostic"
     "the engine did not finish within" timeoutSection
   assertBool "timeout output preceded completed lane finalization"
@@ -17906,7 +18019,7 @@ assertLengthAssessmentMainDiagnosticGates = do
   length (mainSourcePositions
       "finalizeSynthLaneAccumulation" timeoutSection) @?= 1
   admissionFinalize <- expectMainSourcePosition "cursor-admission diagnostic"
-    "finalizeSynthLaneAccumulation st args goal" admissionSection
+    "finalizeSynthLaneAccumulation verificationContext" admissionSection
   admissionDiagnostic <- expectMainSourcePosition
     "cursor-admission diagnostic"
     "detailed cursor admission failed" admissionSection
@@ -17915,7 +18028,7 @@ assertLengthAssessmentMainDiagnosticGates = do
   length (mainSourcePositions
       "finalizeSynthLaneAccumulation" admissionSection) @?= 1
   errorFinalize <- expectMainSourcePosition "engine-error diagnostic"
-    "finalizeSynthLaneAccumulation st args goal" errorSection
+    "finalizeSynthLaneAccumulation verificationContext" errorSection
   engineError <- expectMainSourcePosition "engine-error diagnostic"
     "synthesis engine error:" errorSection
   assertBool "engine-error output preceded completed lane finalization"
@@ -17924,7 +18037,7 @@ assertLengthAssessmentMainDiagnosticGates = do
       "finalizeSynthLaneAccumulation" errorSection) @?= 1
 
   candidateFinalize <- expectMainSourcePosition "candidate diagnostic"
-    "disposition <- finalizeSynthLaneAccumulation st args goal"
+    "disposition <- finalizeSynthLaneAccumulation verificationContext"
       candidateSection
   candidateGate <- expectMainSourcePosition "candidate diagnostic"
     "case disposition of" candidateSection

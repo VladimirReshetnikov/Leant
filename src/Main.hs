@@ -253,9 +253,13 @@ import Leant.Synth.Verification.Parallel
 import Leant.Synth.Verification.Runtime
   ( ParallelFailureDisposition (..)
   , VerificationArtifactRuntime
+  , VerificationBindingPrefetch
   , ensureVerificationArtifactWith
+  , newVerificationBindingPrefetch
   , parallelVerificationFailureAllowsSerialFallback
   , runVerificationBatchWith
+  , takeVerificationBindingPrefetch
+  , withVerificationBindingPrefetch
   , withVerificationArtifactRuntime
   )
 
@@ -2646,7 +2650,12 @@ unknownCheckProgram vars = unlines
 -- batch-scoped: a poisoned pair is closed before its speculative checks are
 -- discarded and the same batch is replayed through the established serial
 -- verifier.
-type SynthVerificationContext = VerificationArtifactRuntime FilePath
+data SynthVerificationContext = SynthVerificationContext
+  { synthVerificationArtifactRuntime
+      :: VerificationArtifactRuntime FilePath
+  , synthVerificationPrefetchedItCounter
+      :: VerificationBindingPrefetch
+  }
 
 newtype ParallelVerificationInfrastructureException =
   ParallelVerificationInfrastructureException IsolatedBackendFailure
@@ -2660,15 +2669,21 @@ instance Exception ParallelVerificationInfrastructureException
 withSynthVerificationContext
   :: (SynthVerificationContext -> IO value)
   -> IO value
-withSynthVerificationContext =
-  withVerificationArtifactRuntime removeFileIfExists
+withSynthVerificationContext action =
+  withVerificationArtifactRuntime removeFileIfExists $ \runtime -> do
+    prefetchedItCounter <- newVerificationBindingPrefetch
+    action SynthVerificationContext
+      { synthVerificationArtifactRuntime = runtime
+      , synthVerificationPrefetchedItCounter = prefetchedItCounter
+      }
 
 ensureSynthVerificationArtifact
   :: SynthVerificationContext
   -> St
   -> IO (Maybe FilePath)
 ensureSynthVerificationArtifact context st =
-  ensureVerificationArtifactWith context sessionEligible
+  ensureVerificationArtifactWith
+    (synthVerificationArtifactRuntime context) sessionEligible
     getNumCapabilities acquire prepare
  where
   -- Upstream environment snapshots do not preserve arbitrary
@@ -2987,7 +3002,8 @@ synthGoWithVerification verificationContext assessmentContext
       Nothing -> report runDeadline fresh
 
   finalize accumulation = do
-    _ <- finalizeSynthLaneAccumulation st args goal accumulation
+    _ <- finalizeSynthLaneAccumulation verificationContext
+      st args goal accumulation
     pure ()
 
   -- Abnormal engine completion remains visible even if an earlier lane was
@@ -2995,7 +3011,7 @@ synthGoWithVerification verificationContext assessmentContext
   -- no weaker lane notes are appended to the abnormal diagnostic.
   report _ laneRun@SynthLaneRun
       { synthLaneRunEnd = SynthLaneRunTimedOut } = do
-    _ <- finalizeSynthLaneAccumulation st args goal
+    _ <- finalizeSynthLaneAccumulation verificationContext st args goal
       (synthLaneRunAccumulation laneRun)
     limit <- synthTimeoutSeconds st
     emitLn st =<< cYellow st
@@ -3007,13 +3023,13 @@ synthGoWithVerification verificationContext assessmentContext
        ++ "or 0 to wait indefinitely)")
   report _ laneRun@SynthLaneRun
       { synthLaneRunEnd = SynthLaneRunCursorAdmissionFailed err } = do
-    _ <- finalizeSynthLaneAccumulation st args goal
+    _ <- finalizeSynthLaneAccumulation verificationContext st args goal
       (synthLaneRunAccumulation laneRun)
     emitLn st =<< cRed st
       ("synthesis engine error: detailed cursor admission failed: " ++ show err)
   report _ laneRun@SynthLaneRun
       { synthLaneRunEnd = SynthLaneRunEngineFailed err } = do
-    _ <- finalizeSynthLaneAccumulation st args goal
+    _ <- finalizeSynthLaneAccumulation verificationContext st args goal
       (synthLaneRunAccumulation laneRun)
     emitLn st =<< cRed st ("synthesis engine error: " ++ err)
   report runDeadline laneRun@SynthLaneRun
@@ -3026,7 +3042,7 @@ synthGoWithVerification verificationContext assessmentContext
                 runDeadline st goal parsed
                 (synthLaneRunAccumulation laneRun)
               else pure (synthLaneRunAccumulation laneRun)
-          classical <- finalizeSynthLaneAccumulation
+          classical <- finalizeSynthLaneAccumulation verificationContext
             st args goal classicalAccumulation
           case classical of
             SynthLaneNoVerified -> do
@@ -3051,7 +3067,7 @@ synthGoWithVerification verificationContext assessmentContext
             SynthLaneAllBehaviorallyRejected _ -> pure ()
             SynthLaneAssessmentPreserved _ _ -> pure ()
     | otherwise = do
-          disposition <- finalizeSynthLaneAccumulation
+          disposition <- finalizeSynthLaneAccumulation verificationContext
             st args goal (synthLaneRunAccumulation laneRun)
           case disposition of
             SynthLaneNoVerified -> do
@@ -3066,7 +3082,8 @@ synthGoWithVerification verificationContext assessmentContext
             SynthLaneAssessmentPreserved _ _ -> pure ()
   report _ laneRun@SynthLaneRun
       { synthLaneRunEnd = SynthLaneRunNoTerm } = do
-      disposition <- finalizeSynthLaneAccumulation st args goal
+      disposition <- finalizeSynthLaneAccumulation verificationContext
+        st args goal
         (synthLaneRunAccumulation laneRun)
       case disposition of
         SynthLaneNoVerified -> do
@@ -3081,7 +3098,8 @@ synthGoWithVerification verificationContext assessmentContext
   report _ laneRun = reportCandidateCompletion laneRun
 
   reportCandidateCompletion laneRun = do
-    disposition <- finalizeSynthLaneAccumulation st args goal
+    disposition <- finalizeSynthLaneAccumulation verificationContext
+      st args goal
       (synthLaneRunAccumulation laneRun)
     case disposition of
       SynthLaneNoVerified -> do
@@ -3765,12 +3783,13 @@ synthLaneAccumulationDisposition shown
 -- withholds notes so an intermediate lane cannot leak weaker engine
 -- diagnostics; the final caller reports its error before those notes.
 finalizeSynthLaneAccumulation
-  :: St
+  :: SynthVerificationContext
+  -> St
   -> [String]
   -> String
   -> SynthLaneAccumulation
   -> IO SynthLaneDisposition
-finalizeSynthLaneAccumulation st args goal
+finalizeSynthLaneAccumulation verificationContext st args goal
     accumulation@(SynthLaneAccumulation reverseOutcomes) = do
   shown <- synthLimitShown <$> synthLimitsOf st
   let outcomes = reverse reverseOutcomes
@@ -3796,7 +3815,8 @@ finalizeSynthLaneAccumulation st args goal
   case disposition of
     SynthLaneNoVerified -> pure ()
     SynthLaneSurvivors presentations rejections ->
-      finalizeSynthLanePresentations st args goal presentations rejections
+      finalizeSynthLanePresentations verificationContext
+        st args goal presentations rejections
     SynthLaneAllBehaviorallyRejected rejections -> do
       -- An accepted filter can intentionally remove the whole verified batch.
       -- This is handled but creates no itN binding and invalidates the prior
@@ -3805,7 +3825,8 @@ finalizeSynthLaneAccumulation st args goal
         { rsSynthIts = [], rsSynthItsProve = False })
       reportLengthAssessmentRejections st rejections
     SynthLaneAssessmentPreserved presentations rejections ->
-      finalizeSynthLanePresentations st args goal presentations rejections
+      finalizeSynthLanePresentations verificationContext
+        st args goal presentations rejections
   forM_ effectiveLanes $ \(outcome, laneDisposition) ->
     case laneDisposition of
       SynthLaneNoVerified -> pure ()
@@ -3831,13 +3852,15 @@ finalizeSynthLaneAccumulation st args goal
 -- Callback acceptance, semantic origin, and renderer ordinal remain together
 -- inside each opaque presentation value.
 finalizeSynthLanePresentations
-  :: St
+  :: SynthVerificationContext
+  -> St
   -> [String]
   -> String
   -> [LengthCandidatePresentation]
   -> [LengthCandidateRejectionPresentation]
   -> IO ()
-finalizeSynthLanePresentations st args goal presentations rejections = do
+finalizeSynthLanePresentations verificationContext
+    st args goal presentations rejections = do
   let shown = map lengthCandidatePresentationText presentations
   proving <- isJust . rsProve <$> readIORef st
   splices <-
@@ -3850,7 +3873,8 @@ finalizeSynthLanePresentations st args goal presentations rejections = do
         ]
       else do
         -- Bind worst-first, so the newest binding - bare `it` - is best.
-        counters <- mapM (synthBind st goal) (reverse shown)
+        counters <- mapM (synthBind verificationContext st goal)
+          (reverse shown)
         pure
           [ maybe ("(" ++ term ++ ")") itName counter
           | (term, counter) <- zip shown (reverse counters)
@@ -3894,8 +3918,13 @@ leaveProve st = modifyIORef' st $ \s -> s
 -- | Bind one verified candidate under the next mangled it-name,
 -- retrying @noncomputable@ (classical data-level terms need it).
 -- 'Nothing' makes the splice fall back to the candidate text itself.
-synthBind :: St -> String -> String -> IO (Maybe Int)
-synthBind st goal term = do
+synthBind
+  :: SynthVerificationContext
+  -> St
+  -> String
+  -> String
+  -> IO (Maybe Int)
+synthBind verificationContext st goal term = do
   plain <- attempt ""
   case plain of
     Just n -> pure (Just n)
@@ -3903,7 +3932,12 @@ synthBind st goal term = do
  where
   attempt keyword = do
     state <- readIORef st
-    candidate <- firstUnusedItCounter st (rsItCounter state + 1) 10000
+    prefetched <- takeVerificationBindingPrefetch
+      (synthVerificationPrefetchedItCounter verificationContext)
+      (rsItCounter state)
+    candidate <- case prefetched of
+      Just available -> pure $ Just available
+      Nothing -> firstUnusedItCounter st (rsItCounter state + 1) 10000
     case candidate of
       Nothing -> pure Nothing
       Just n -> do
@@ -3934,7 +3968,8 @@ synthVerify
       , [DetailedVerificationVariant]
       )
 synthVerify verificationContext successQuota st goal groups =
-  runVerificationBatchWith verificationContext
+  runVerificationBatchWith
+    (synthVerificationArtifactRuntime verificationContext)
     (successQuota >= 2 && hasTwoGroups groups)
     (ensureSynthVerificationArtifact verificationContext st)
     serialVerification
@@ -3953,16 +3988,25 @@ synthVerify verificationContext successQuota st goal groups =
   -- retain the bracket's primary precedence.
   parallelVerification path = do
     state <- readIORef st
-    attempted <- withIsolatedBackendPair
-      (rsConfig state) path (rsTimeout state) $ \pair ->
-        try $ verifyCandidateGroupsParallel 2 successQuota
-          (verifyIsolatedGroup pair) groups
-    pure $ case attempted of
-      Left failure -> Left failure
-      Right (Left
-          (ParallelVerificationInfrastructureException failure)) ->
-        Left failure
-      Right (Right verified) -> Right verified
+    let baseCounter = rsItCounter state
+    -- Name-collision discovery is a read-only request against the primary
+    -- backend.  Once the immutable artifact exists, it is independent of the
+    -- isolated pair's setup and checks, so overlap the two scoped operations.
+    -- The result becomes visible only after the pair closes successfully.
+    withVerificationBindingPrefetch
+        (synthVerificationPrefetchedItCounter verificationContext)
+        baseCounter
+        (firstUnusedItCounter st (baseCounter + 1) 10000) $ do
+      attempted <- withIsolatedBackendPair
+        (rsConfig state) path (rsTimeout state) $ \pair ->
+          try $ verifyCandidateGroupsParallel 2 successQuota
+            (verifyIsolatedGroup pair) groups
+      pure $ case attempted of
+            Left failure -> Left failure
+            Right (Left
+                (ParallelVerificationInfrastructureException failure)) ->
+              Left failure
+            Right (Right verified) -> Right verified
 
   classifyInfrastructureFailure failure
     | parallelVerificationFailureAllowsSerialFallback failure =
@@ -4364,14 +4408,19 @@ currentEnvironmentId st = do
       state <- readIORef st
       case rsEnv state of
         Just env -> pure (Right env)
-        Nothing -> do
-          materialized <- runCmd st Nothing "#check True"
-          pure $ case materialized of
-            Right response
-              | not (hasErrors response)
-              , Nothing <- respFatal response
-              , Just env <- respEnv response -> Right env
-            _ -> Left "could not materialize the current environment"
+        Nothing -> case rsBaseEnv state of
+          -- The startup probe records the pristine imported base.  Reusing
+          -- that process-local snapshot avoids materializing the same empty
+          -- session again after an otherwise pure synthesis search.
+          Just env -> pure (Right env)
+          Nothing -> do
+            materialized <- runCmd st Nothing "#check True"
+            pure $ case materialized of
+              Right response
+                | not (hasErrors response)
+                , Nothing <- respFatal response
+                , Just env <- respEnv response -> Right env
+              _ -> Left "could not materialize the current environment"
 
 -- Build a pickleable Lean-equipped copy of the logical session without the
 -- compiled serializer itself.  Upstream environment snapshots restore
@@ -5718,13 +5767,24 @@ run opts = do
 
       -- startup probe (spawns the backend and surfaces setup problems early)
       started <- getCurrentTime
-      probe <- runCmd st Nothing "#eval (0 : Nat)"
+      probe <- runCmd st Nothing "#check True"
       case probe of
         Left err -> do
           emitLn st =<< cRed st "the Lean backend failed to start:"
           emitLn st err
           exitWith (ExitFailure 1)
-        Right _ -> do
+        Right response -> do
+          -- Keep only a validated clean startup environment as the base of
+          -- the empty imported session.  Reconstruction overwrites this
+          -- process-local identifier after restart, imports, reset, or
+          -- snapshot replacement, so it cannot cross a backend boundary.
+          case response of
+            _ | not (hasErrors response)
+              , Nothing <- respFatal response
+              , Just environment <- respEnv response ->
+                modifyIORef' st (\state -> state
+                  { rsBaseEnv = Just environment })
+            _ -> pure ()
           finished <- getCurrentTime
           emitLn st =<< cDim st ("backend responding ("
             ++ show (round (diffUTCTime finished started) :: Integer) ++ "s)")
