@@ -114,6 +114,11 @@ Companion documents:
   dotted identifiers; multi-line input opens automatically on
   syntactically incomplete lines and a blank line submits (`:{` … `:}`
   delimits an explicit block, as in GHCi).
+- **Readable Lean output.** Terms, declarations, goals, and tactic scripts are
+  syntax-highlighted on ANSI-capable terminals. Redirected output stays exact
+  plaintext, transcripts strip styling, and `:set color auto|always|never`
+  provides an explicit override. Haskeline does not expose live input-buffer
+  styling, so text being edited at the prompt remains uncolored.
 - **Crash-proof sessions.** If the backend dies, times out, or is
   interrupted, it restarts and the session (imports + history) replays
   automatically; prove-mode scripts are printed before the mode exits,
@@ -264,6 +269,7 @@ See the
 | `:synth --where LEAN-LENGTH-CLAUSE -- TYPE` | filter with conservative built-in-`List` defaults derived from the checked target; requires the activated startup execution policy |
 | `:synth --behavior-mode filter --length-model list-scalar-exact-cases\|list-binary-product-exact-cases --length-inputs arg0[,argN...] --where CLAUSE -- TYPE` | use one inline, unquoted, bounded Length postcondition with an explicit fixed `List` model and observed physical arguments; filter-only and requires the activated startup policy |
 | `:prove [PROP]` | interactive prove mode; bare form resumes the last `sorry` |
+| `:set color auto\|always\|never` | control syntax highlighting (`auto` honors TTY, `TERM=dumb`, and `NO_COLOR`) |
 | `:set OPT VAL` | `set_option` persisting in the session |
 | `:undo` | revert the last state-changing command |
 | `:reset` | clear definitions or an active snapshot base, keeping configured imports |
@@ -1416,6 +1422,7 @@ historical constants, so a fresh session behaves exactly as documented.
 | `synth-timeout N` | 20 (`LEANT_SYNTH_TIMEOUT`) | wall-clock seconds per `:synth`; `0` waits indefinitely |
 | `backend-timeout N` | 300 (`--timeout`) | seconds per Lean request; `0` none |
 | `synth-debug on\|off` | `off` (`LEANT_SYNTH_DEBUG`) | fragment, provider, lane, and metric diagnostics |
+| `color auto\|always\|never` | `auto` | Lean output highlighting; `always` can color redirected output and `never` is exact plaintext |
 
 ## How it works
 

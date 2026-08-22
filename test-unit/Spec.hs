@@ -875,6 +875,26 @@ syntaxHighlightTests = testGroup "Lean syntax highlighting"
       let source = concat $ replicate 4000
             "def α₁ : Nat := 12_345 -- stable\n"
       stripSgr (highlightLean True source) @?= source
+
+  , testCase "route only explicit Lean output through terminal-aware styling" $ do
+      mainSource <- readFile "src/Main.hs"
+      mapM_ (\fragment -> assertBool
+          ("Main omitted syntax-highlighting contract: " ++ fragment)
+          $ fragment `isInfixOf` mainSource)
+        [ "noColor <- isJust <$> lookupEnv \"NO_COLOR\""
+        , "terminal /= Just \"dumb\""
+        , "rsAutomaticColor = useColor"
+        , "rsColorMode = ColorAuto"
+        , "highlightLean (rsColor state) source"
+        , "printLeanResponse = printResponseAs LeanResponse"
+        , "[\"color\", value] -> case map toLower value of"
+        , "\"usage: :set color auto|always|never\""
+        , "displayed <- leanSyntax st term"
+        , "forM_ (lines (trimEnd' g)) (emitLeanLn st)"
+        , "mapM_ (emitLeanLn st) script"
+        , "emitLeanLn st body"
+        , "hPutStr h (stripAnsi text)"
+        ]
   ]
  where
   -- Compare the final reset without adding another Data.List import to this

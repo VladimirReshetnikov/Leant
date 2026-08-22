@@ -111,6 +111,7 @@ import Leant.Session.Snapshot
   , snapshotMetadataPath
   , synthesisToolingABI
   )
+import Leant.SyntaxHighlight (highlightLean)
 import Leant.Synth.Engine
   ( DetailedCandidateGroup
   , DetailedSynthCursor
@@ -340,6 +341,12 @@ enableVT = pure True
 
 -- State ---------------------------------------------------------------------
 
+data ColorMode
+  = ColorAuto
+  | ColorAlways
+  | ColorNever
+  deriving (Eq, Show)
+
 data ReplState = ReplState
   { rsBackend :: Maybe Backend
   , rsConfig :: BackendConfig
@@ -438,6 +445,10 @@ data ReplState = ReplState
     -- mid-session edit of the file takes effect next session
   , rsTimeout :: Maybe Int
   , rsColor :: Bool
+  , rsAutomaticColor :: Bool
+    -- ^ Startup terminal/VT/NO_COLOR/TERM policy, retained so
+    -- @:set color auto@ can restore it after an explicit override.
+  , rsColorMode :: ColorMode
   , rsInteractive :: Bool
     -- ^ False when stdin is piped: prompts and echo go through emit (so the
     -- output and transcript read like a session) and Haskeline's own
@@ -621,6 +632,32 @@ cYellow st = color st "33"
 cCyan st = color st "36"
 cDim st = color st "2"
 cBold st = color st "1"
+
+-- Syntax decoration is deliberately layered immediately above 'emit'.  The
+-- transcript boundary still sees the decorated string and strips its SGR,
+-- while backend requests, history, snapshots, and proof state remain raw.
+leanSyntax :: St -> String -> IO String
+leanSyntax st source = do
+  state <- readIORef st
+  pure $ highlightLean (rsColor state) source
+
+emitLeanLn :: St -> String -> IO ()
+emitLeanLn st source = leanSyntax st source >>= emitLn st
+
+colorModeName :: ColorMode -> String
+colorModeName mode = case mode of
+  ColorAuto -> "auto"
+  ColorAlways -> "always"
+  ColorNever -> "never"
+
+setColorMode :: St -> ColorMode -> IO ()
+setColorMode st mode = modifyIORef' st $ \state -> state
+  { rsColorMode = mode
+  , rsColor = case mode of
+      ColorAuto -> rsAutomaticColor state
+      ColorAlways -> True
+      ColorNever -> False
+  }
 
 -- Transcript ----------------------------------------------------------------
 
@@ -884,9 +921,24 @@ looksIncomplete v =
     _ : rest -> suffixes rest
     [] -> []
 
--- Print messages/sorries; returns True if there were errors.
+data ResponsePresentation = PlainResponse | LeanResponse
+
+-- Print messages/sorries; returns True if there were errors.  Successful
+-- #eval/#check/#print responses opt into Lean presentation explicitly;
+-- diagnostics and prose-producing commands retain their existing treatment.
 printResponse :: St -> Maybe (String -> Maybe String) -> JValue -> IO Bool
-printResponse st transform v = case respFatal v of
+printResponse = printResponseAs PlainResponse
+
+printLeanResponse :: St -> Maybe (String -> Maybe String) -> JValue -> IO Bool
+printLeanResponse = printResponseAs LeanResponse
+
+printResponseAs
+  :: ResponsePresentation
+  -> St
+  -> Maybe (String -> Maybe String)
+  -> JValue
+  -> IO Bool
+printResponseAs presentation st transform v = case respFatal v of
   Just m -> do
     emitLn st . (++ m) =<< cRed st "REPL error: "
     pure True
@@ -901,7 +953,11 @@ printResponse st transform v = case respFatal v of
         "warning" ->
           unless ("declaration uses" `isPrefixOf` text) $
             emitLn st . (++ text) =<< cYellow st "warning: "
-        _ -> emitLn st text
+        _ -> do
+          displayed <- case presentation of
+            PlainResponse -> pure text
+            LeanResponse -> leanSyntax st text
+          emitLn st displayed
     forM_ (respSorries v) $ \(proofState, goal) -> do
       forM_ proofState $ \ps -> modifyIORef' st
         (\s -> s { rsLastSorry = Just (ps, goal) })
@@ -909,7 +965,9 @@ printResponse st transform v = case respFatal v of
       note <- cDim st (" (proof state " ++ maybe "?" show proofState
         ++ " \8212 :prove to work on it)")
       emitLn st (tag ++ note)
-      forM_ (lines (trimEnd goal)) $ \l -> emitLn st ("  " ++ l)
+      forM_ (lines (trimEnd goal)) $ \l -> do
+        displayed <- leanSyntax st l
+        emitLn st ("  " ++ displayed)
     readIORef errored
  where
   applyTransform "info" text = fromMaybe text (transform >>= \f -> f text)
@@ -1221,7 +1279,7 @@ evalInput st allowIncomplete rawText = do
               Right v
                 | allowIncomplete && looksIncomplete v -> pure EvalIncomplete
                 | otherwise -> do
-                    errored <- printResponse st Nothing v
+                    errored <- printLeanResponse st Nothing v
                     unless errored (advanceEnv st (respEnv v) text)
                     pure EvalDone
           else do
@@ -1239,19 +1297,19 @@ evalExpression st text = do
   evalResult <- runCurrentCmd st ("#eval (" ++ text ++ ")")
   case evalResult of
     Right v | not (hasErrors v), Nothing <- respFatal v -> do
-      _ <- printResponse st Nothing v
+      _ <- printLeanResponse st Nothing v
       bindIt st text
     Left err -> emitLn st =<< cRed st err
     _ -> do
       checkResult <- runCurrentCmd st ("#check (" ++ text ++ ")")
       case checkResult of
         Right v | not (hasErrors v), Nothing <- respFatal v ->
-          void (printResponse st Nothing v)
+          void (printLeanResponse st Nothing v)
         _ -> do
           rawResult <- runCurrentCmd st text
           case rawResult of
             Right v | not (hasErrors v), Nothing <- respFatal v -> do
-              _ <- printResponse st Nothing v
+              _ <- printLeanResponse st Nothing v
               advanceEnv st (respEnv v) text
             _ -> do
               printed <- printBuiltinInfo st text
@@ -1333,7 +1391,9 @@ helpText = unlines
   , "                           metrics (on|off; LEANT_SYNTH_DEBUG at startup)"
   , "  :set backend-timeout N   seconds per Lean request (default 300, or"
   , "                           --timeout at startup; 0 = none)"
-  , "  :set                     show every synth setting"
+  , "  :set color M             syntax color: auto | always | never"
+  , "                           (auto honors TTY, TERM=dumb, and NO_COLOR)"
+  , "  :set                     show every REPL setting"
   , "  :set OPT VAL             set_option OPT VAL (persists in the session)"
   , "  :undo                    revert the last state-changing command"
   , "  :reset                   clear definitions/snapshot (keeps imports)"
@@ -1391,12 +1451,19 @@ dispatchCommand st line = do
           ++ " (listed imports take effect after :reset)")
       if null imports
         then emitLn st =<< cDim st "(no configured imports)"
-        else forM_ imports (\m -> emitLn st ("import " ++ m))
+        else forM_ imports (\m -> emitLeanLn st ("import " ++ m))
       pure True
     "set" -> do
       -- :synth's own options are intercepted here; anything else is a
       -- Lean set_option forwarded to the backend
       case words arg of
+        ["color", value] -> case map toLower value of
+          "auto" -> setColorMode st ColorAuto >> showColorMode st
+          "always" -> setColorMode st ColorAlways >> showColorMode st
+          "never" -> setColorMode st ColorNever >> showColorMode st
+          _ -> emitLn st =<< cRed st
+            "usage: :set color auto|always|never"
+        ["color"] -> showColorMode st
         ["synth-engine", value] -> case parseSynthEngine value of
           Just engine -> do
             modifyIORef' st (\s -> s { rsSynthEngine = engine })
@@ -1566,8 +1633,9 @@ dispatchCommand st line = do
             (rsHistory state)
       if null history
         then emitLn st =<< cDim st "(empty)"
-        else forM_ (zip [1 :: Int ..] history) $ \(i, h) ->
-          emitLn st (pad i ++ "  " ++ takeWhile (/= '\n') h
+        else forM_ (zip [1 :: Int ..] history) $ \(i, h) -> do
+          displayed <- leanSyntax st (takeWhile (/= '\n') h)
+          emitLn st (pad i ++ "  " ++ displayed
             ++ (if '\n' `elem` h then " \8230" else ""))
       pure True
     "env" -> do
@@ -1632,7 +1700,7 @@ cmdType st rawArg
           | hasErrors v || isJust (respFatal v) -> do
               printed <- printBuiltinInfo st arg
               unless printed (void (printResponse st Nothing v))
-          | otherwise -> void (printResponse st Nothing v)
+          | otherwise -> void (printLeanResponse st Nothing v)
 
 cmdInfo :: St -> String -> IO ()
 cmdInfo st arg
@@ -1646,11 +1714,11 @@ cmdInfo st arg
               checkResult <- runCurrentCmd st ("#check (" ++ arg ++ ")")
               case checkResult of
                 Right cv | not (hasErrors cv), Nothing <- respFatal cv ->
-                  void (printResponse st Nothing cv)
+                  void (printLeanResponse st Nothing cv)
                 _ -> do
                   printed <- printBuiltinInfo st arg
                   unless printed (void (printResponse st Nothing v))
-          | otherwise -> void (printResponse st
+          | otherwise -> void (printLeanResponse st
               (Just (\t -> formatInfo t `orElse` indentDefBody t)) v)
  where
   orElse (Just x) _ = Just x
@@ -1946,7 +2014,7 @@ cmdSearch st byType arg
                          , lower arg `isInfixOf` lower n ]
           unless (null matching) $ do
             emitLn st =<< cDim st "-- declared in this session:"
-            mapM_ (emitLn st) matching
+            mapM_ (emitLeanLn st) matching
  where
   lower = map toLower
 
@@ -2267,6 +2335,12 @@ showSynthSettings st = do
   row "synth-timeout" (showSynthTimeout (rsSynthTimeout state))
   row "backend-timeout" (showSynthTimeout (fromMaybe 0 (rsTimeout state)))
   row "synth-debug" (onOffLabel (rsSynthDebug state))
+  row "color" (colorModeName (rsColorMode state))
+
+showColorMode :: St -> IO ()
+showColorMode st = do
+  mode <- rsColorMode <$> readIORef st
+  emitLn st =<< cDim st ("color: " ++ colorModeName mode)
 
 -- | How a setting names itself in its own report: the option spelling with
 -- its separators opened up, as every ':set' report has always printed it.
@@ -3996,7 +4070,8 @@ finalizeSynthLanePresentations verificationContext
   forM_ (zip [1 :: Int ..] presentations) $ \(i, presentation) -> do
     label <- cBold st ("it" ++ show i)
     let term = lengthCandidatePresentationText presentation
-    emitLn st ("  " ++ label ++ "  " ++ term)
+    displayed <- leanSyntax st term
+    emitLn st ("  " ++ label ++ "  " ++ displayed)
     forM_ (lengthCandidatePresentationNote presentation) $ \note ->
       emitLn st ("       " ++ note)
   reportLengthAssessmentRejections st rejections
@@ -4012,9 +4087,10 @@ reportLengthAssessmentRejections
 reportLengthAssessmentRejections st rejections =
   forM_ rejections $ \rejection -> do
     label <- cYellow st "rejected"
+    displayed <- leanSyntax st
+      (lengthCandidateRejectionPresentationText rejection)
     emitLn st
-      ("  " ++ label ++ "  "
-        ++ lengthCandidateRejectionPresentationText rejection)
+      ("  " ++ label ++ "  " ++ displayed)
     emitLn st
       ("            " ++ lengthCandidateRejectionPresentationNote rejection)
 
@@ -4221,7 +4297,7 @@ cmdBrowse st showAll rawArg
       let decls = concatMap sessionDeclNames history
       if null decls
         then emitLn st =<< cDim st "(no session declarations)"
-        else mapM_ (emitLn st) decls
+        else mapM_ (emitLeanLn st) decls
   | any isSpace arg || any null nameComponents = do
       message <- cRed st ("invalid namespace `" ++ arg ++ "`")
       emitLn st (message
@@ -4246,7 +4322,7 @@ cmdBrowse st showAll rawArg
             ]
       unless (null matching) $ do
         emitLn st =<< cDim st "-- declared in this session:"
-        mapM_ (emitLn st) matching
+        mapM_ (emitLeanLn st) matching
  where
   -- a leading '@' (pasted from :t @f output) is meaningless here; drop it
   arg = dropWhile (== '@') (trim rawArg)
@@ -4991,12 +5067,7 @@ formatGoals st goals
       forM_ (zip [1 :: Int ..] goals) $ \(i, g) -> do
         when (n > 1) $
           emitLn st =<< cDim st ("\8212 goal " ++ show i ++ " of " ++ show n ++ " \8212")
-        forM_ (lines (trimEnd' g)) $ \line ->
-          if "case " `isPrefixOf` line
-            then emitLn st =<< cCyan st line
-            else if "\8866" `isPrefixOf` line
-              then emitLn st =<< cBold st line
-              else emitLn st line
+        forM_ (lines (trimEnd' g)) (emitLeanLn st)
  where
   trimEnd' = reverse . dropWhile isSpace . reverse
 
@@ -5177,8 +5248,12 @@ emitSuggestion :: St -> String -> IO ()
 emitSuggestion st suggestion = case lines suggestion of
   [] -> pure ()
   first : rest -> do
-    emitLn st =<< cDim st ("suggestion: " ++ first)
-    forM_ rest $ \line -> emitLn st =<< cDim st ("            " ++ line)
+    prefix <- cDim st "suggestion: "
+    displayed <- leanSyntax st first
+    emitLn st (prefix ++ displayed)
+    forM_ rest $ \line -> do
+      continuation <- leanSyntax st line
+      emitLn st ("            " ++ continuation)
 
 -- | Find and display a useful next tactic without changing the user's proof
 -- stack. The backend proof-state protocol is persistent, so speculative
@@ -5334,7 +5409,9 @@ proveEmergencyExit st why = do
     let script = proveScript pv
     unless (null script) $ do
       emitLn st =<< cDim st "tactic script so far (proof states were lost):"
-      forM_ script $ \t -> emitLn st ("  " ++ t)
+      forM_ script $ \t -> do
+        displayed <- leanSyntax st t
+        emitLn st ("  " ++ displayed)
   leaveProve st
 
 cmdProve :: St -> String -> IO ()
@@ -5468,7 +5545,7 @@ proveInput st text = do
           state <- readIORef st
           case rsProve state of
             Just pv | script@(_ : _) <- proveScript pv ->
-              mapM_ (emitLn st) script
+              mapM_ (emitLeanLn st) script
             _ -> emitLn st =<< cDim st "(no tactics yet)"
           pure True
         "suggest" -> True <$ suggestTactic st
@@ -5483,7 +5560,9 @@ proveInput st text = do
               then emitLn st =<< cDim st "left prove mode"
               else do
                 emitLn st =<< cDim st "left prove mode; the script was:"
-                forM_ script $ \t -> emitLn st ("  " ++ t)
+                forM_ script $ \t -> do
+                  displayed <- leanSyntax st t
+                  emitLn st ("  " ++ displayed)
           leaveProve st
           pure True
         _ -> do
@@ -5576,7 +5655,7 @@ cmdQed st arg = do
             Nothing -> do
               emitLn st =<< cDim st
                 "replace the `sorry` in the original declaration with:"
-              emitLn st body
+              emitLeanLn st body
               leaveProve st
             Just stmt -> do
               let name = if null (trim arg)
@@ -5611,9 +5690,10 @@ cmdQed st arg = do
                                 advanceEnv st (respEnv v) (codeFor kw)
                                 when (null (trim arg)) $ modifyIORef' st
                                   (\s -> s { rsProveCounter = rsProveCounter s + 1 })
-                                saved <- color st "32"
-                                  ("saved: " ++ kw ++ " " ++ name ++ " : " ++ stmt)
-                                emitLn st saved
+                                saved <- color st "32" "saved: "
+                                declaration <- leanSyntax st
+                                  (kw ++ " " ++ name ++ " : " ++ stmt)
+                                emitLn st (saved ++ declaration)
                                 leaveProve st
               save "theorem"
 
@@ -5771,7 +5851,9 @@ run opts = do
   vtOk <- enableVT
   tty <- hIsTerminalDevice stdout
   interactive <- hIsTerminalDevice stdin
-  let useColor = vtOk && tty
+  noColor <- isJust <$> lookupEnv "NO_COLOR"
+  terminal <- fmap (map toLower) <$> lookupEnv "TERM"
+  let useColor = vtOk && tty && not noColor && terminal /= Just "dumb"
 
   lengthAssessmentMode <- case lengthAssessmentSetup opts of
     Nothing -> pure disabledLengthAssessmentMode
@@ -5869,6 +5951,8 @@ run opts = do
         , rsTimeout = if optTimeout opts <= 0 then Nothing
             else Just (optTimeout opts)
         , rsColor = useColor
+        , rsAutomaticColor = useColor
+        , rsColorMode = ColorAuto
         , rsInteractive = interactive
         }
 
