@@ -938,6 +938,18 @@ effectful imported initialization/elaboration, persistent worker pools, and
 universal speedup claims remain outside the checkpoint. See the
 [critical-path overlap report](reports/2026-08-21-verification-critical-path-overlap.md).
 
+Commit `2156261` also closes the next semantic foundation without widening
+production admission. A package-private isolated pair can reconstruct the
+import base, validate it through a later environment, and replay accepted
+session commands in order on two independent workers. This makes the known
+session-created scoped-extension case byte-identical under N1/N2 in a real
+Lean 4.32 diagnostic. The proposed Main connection was nevertheless removed:
+a five-sample scoped-history screen regressed from a 5.21s serial median to
+6.07s, and a one-declaration control regressed from 5.05s to 6.05s. The
+foundation is retained for a future workload-aware design; current Main still
+admits only history-free sessions. See the
+[isolated history-replay report](reports/2026-08-21-isolated-history-replay-foundation.md).
+
 Design rules, all inherited from Djex:
 
 1. **Checked boundaries.** The translator refuses anything outside the

@@ -165,6 +165,15 @@ the probe. The strict suite passes 578/578 and the real-Lean 1/3 plus scoped
 all three. The enforced gate returned GO. See the
 [critical-path overlap report](2026-08-21-verification-critical-path-overlap.md).
 
+The isolated history-replay foundation at `2156261` adds a disconnected
+two-worker initializer which rebuilds imports, validates the retained import
+environment, and replays accepted commands in order. It makes the known
+scoped-notation divergence reproducibly exact at N1/N2, but a proposed Main
+connection regressed five-sample medians from 5.21s to 6.07s and from 5.05s
+to 6.05s on two controls. Main remains history-free while the correct private
+ownership seam stays available. See the
+[isolated history-replay report](2026-08-21-isolated-history-replay-foundation.md).
+
 The Length counterexample bank still has no `ReplState` field, serialization
 or snapshot restoration, session-wide scope, or persistence. There is also no
 new engine-side counterexample request, typed prefix pruning, or complete
@@ -257,6 +266,7 @@ Reports are listed oldest first.
 - 2026-08-21 — [Ordered isolated parallel Lean verification](2026-08-21-ordered-isolated-parallel-verification.md)
 - 2026-08-21 — [Prepared isolated-pair ownership and prewarm experiment](2026-08-21-prepared-isolated-pair-prewarm-hold.md)
 - 2026-08-21 — [Verification critical-path overlap](2026-08-21-verification-critical-path-overlap.md)
+- 2026-08-21 — [Isolated history-replay foundation](2026-08-21-isolated-history-replay-foundation.md)
 
 ## Standalone PDF reports
 

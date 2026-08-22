@@ -1183,6 +1183,19 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   [critical-path overlap report](docs/reports/2026-08-21-verification-critical-path-overlap.md)
   and its committed
   [252-row result table](bench-verification/results/2026-08-21-critical-path-overlap-release.tsv).
+
+  Commit `2156261` adds a disconnected package-private reconstruction path
+  for future session-history work. Two fresh workers can now rebuild the
+  exact import base, retain the import environment after a usability probe,
+  and replay accepted commands chronologically while preserving deterministic
+  worker-one failure precedence and complete cancellation cleanup. Main still
+  excludes nonempty history. Real Lean 4.32 diagnostics proved exact N1/N2
+  output for the formerly divergent scoped-notation session and for a
+  nonempty-import declaration, but routing replay through Main was slower:
+  median wall time moved from 5.21s to 6.07s on the scoped session and from
+  5.05s to 6.05s after one declaration. The correct foundation remains; the
+  measured 16.5% and 19.8% regressions do not. See the
+  [isolated history-replay report](docs/reports/2026-08-21-isolated-history-replay-foundation.md).
   Within each Exference invocation, Leant stable-deduplicates rendered groups
   before applying the internal 60-candidate collection window
   (`:set synth-window N`). The first

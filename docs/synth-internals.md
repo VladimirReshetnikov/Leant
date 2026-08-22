@@ -1602,6 +1602,35 @@ initializers/elaborators with externally significant or process-local effects.
 The exact 252-row table and full boundary are in the
 [critical-path overlap report](reports/2026-08-21-verification-critical-path-overlap.md).
 
+## Disconnected isolated history replay
+
+Commit `2156261` adds `withIsolatedBackendPairReplaying` without changing
+Main admission. Each of two fresh workers independently executes the exact
+backend-reconstruction protocol: ordered imports from a fresh environment,
+one later-environment usability probe while retaining the import response
+environment, then every accepted history entry in chronological order. The
+workers initialize concurrently, but commands remain serial within each
+worker. Environment IDs never cross a process. The existing pair registry,
+worker-one result observation, failure attachment, cancellation, and complete
+tree cleanup own the whole operation.
+
+Four new deterministic cases pin import/probe/history order and environment
+threading, empty-base materialization, simultaneous gated replay failure with
+worker-one precedence, and exact `ThreadKilled` cleanup. The focused isolated
+and runtime group passes 50/50; the complete strict Leant suite passes 582/582,
+and the strict all-target, Cabal, diff, and byte-exact sdist gates pass.
+
+The package-private seam repairs the known snapshot expressiveness gap, but
+the attempted Main route was not retained. A real Lean 4.32 scoped-notation
+session which formerly diverged produced the same five candidates and exact
+normalized transcript at N1/N2, with one versus three backend processes. A
+nonempty `Std` import plus a declaration also matched exactly. Performance
+was negative: the scoped-history five-sample median changed from 5.21s serial
+to 6.07s replay-parallel; a one-declaration state-thread control changed from
+5.05s to 6.05s. Main therefore keeps the faster history-free artifact path
+and continues to reject nonempty history. See the
+[isolated history-replay report](reports/2026-08-21-isolated-history-replay-foundation.md).
+
 ## Main's progressive same-run cursor scheduler
 
 Main adds three private, lazy representation boundaries with no `Eq` or `Show`
