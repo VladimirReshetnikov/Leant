@@ -1,0 +1,2 @@
+:synth ((S → A × S) → (A → S → B × S) → S → B × S)
+:quit

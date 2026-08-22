@@ -80,9 +80,10 @@ import Language.Haskell.Djex
 import Leant.Backend
 import Leant.Backend.Isolated
   ( IsolatedBackendFailure
+  , mkIsolatedBackendPoolSize
   , runIsolatedBackendCommand
   , withIsolatedBackendLease
-  , withIsolatedBackendPair
+  , withIsolatedBackendPool
   )
 import Leant.Builtins (builtinInfo)
 import Leant.Classify
@@ -2758,13 +2759,16 @@ unknownCheckProgram vars = unlines
 
 -- A synthesis command owns at most one immutable snapshot artifact.  The
 -- artifact is prepared lazily at the first batch which can actually overlap
--- two candidate groups, then reused by any later batch.  Worker pairs remain
--- batch-scoped: a poisoned pair is closed before its speculative checks are
--- discarded and the same batch is replayed through the established serial
--- verifier.
+-- two candidate groups, then reused by any later batch.  The capability count
+-- admitted by that runtime probe is retained for the command; worker pools
+-- remain batch-scoped, so a poisoned pool is closed before its speculative
+-- checks are discarded and the same batch is replayed through the established
+-- serial verifier.
 data SynthVerificationContext = SynthVerificationContext
   { synthVerificationArtifactRuntime
       :: VerificationArtifactRuntime FilePath
+  , synthVerificationCapabilities
+      :: IORef (Maybe Int)
   , synthVerificationPrefetchedItCounter
       :: VerificationBindingPrefetch
   }
@@ -2783,9 +2787,11 @@ withSynthVerificationContext
   -> IO value
 withSynthVerificationContext action =
   withVerificationArtifactRuntime removeFileIfExists $ \runtime -> do
+    capabilities <- newIORef Nothing
     prefetchedItCounter <- newVerificationBindingPrefetch
     action SynthVerificationContext
       { synthVerificationArtifactRuntime = runtime
+      , synthVerificationCapabilities = capabilities
       , synthVerificationPrefetchedItCounter = prefetchedItCounter
       }
 
@@ -2796,7 +2802,7 @@ ensureSynthVerificationArtifact
 ensureSynthVerificationArtifact context st =
   ensureVerificationArtifactWith
     (synthVerificationArtifactRuntime context) sessionEligible
-    getNumCapabilities acquire prepare
+    recordCapabilities acquire prepare
  where
   -- Upstream environment snapshots do not preserve arbitrary
   -- session-created scoped extensions.  Until workers can replay the
@@ -2811,6 +2817,14 @@ ensureSynthVerificationArtifact context st =
       && isNothing (rsProve session)
       && isNothing (rsLastSorry session)
       && null (rsHistory session)
+
+  -- This is the runtime's sole capability callback.  Retain its exact result
+  -- for every later batch which reuses the ready artifact; pool routing must
+  -- not perform a second capability read after admission.
+  recordCapabilities = do
+    capabilities <- getNumCapabilities
+    writeIORef (synthVerificationCapabilities context) $ Just capabilities
+    pure capabilities
 
   acquire = do
     environmentOr <- currentEnvironmentId st
@@ -4094,25 +4108,38 @@ synthVerify verificationContext successQuota st goal groups =
 
   serialVerification = synthVerifySerial successQuota st goal groups
 
-  -- Convert only our typed worker failure inside the pair callback.  That
-  -- lets the pair close normally and preserve any cleanup failure in its
+  -- Convert only our typed worker failure inside the pool callback.  That
+  -- lets the pool close normally and preserve any cleanup failure in its
   -- returned value.  Async and programmer exceptions remain exceptions and
   -- retain the bracket's primary precedence.
   parallelVerification path = do
     state <- readIORef st
+    recordedCapabilities <- readIORef
+      $ synthVerificationCapabilities verificationContext
+    capabilities <- case recordedCapabilities of
+      Just available -> pure available
+      Nothing -> ioError $ userError
+        "parallel verification artifact has no recorded capability count"
     let baseCounter = rsItCounter state
+        workerLimit = min 4 $ min capabilities successQuota
+        workerCount = length $ take workerLimit groups
+    poolSize <- case mkIsolatedBackendPoolSize workerCount of
+      Right validPoolSize -> pure validPoolSize
+      Left invalidPoolSize -> ioError $ userError
+        $ "invalid parallel verification worker count: "
+          ++ show invalidPoolSize
     -- Name-collision discovery is a read-only request against the primary
     -- backend.  Once the immutable artifact exists, it is independent of the
-    -- isolated pair's setup and checks, so overlap the two scoped operations.
-    -- The result becomes visible only after the pair closes successfully.
+    -- isolated pool's setup and checks, so overlap the two scoped operations.
+    -- The result becomes visible only after the pool closes successfully.
     withVerificationBindingPrefetch
         (synthVerificationPrefetchedItCounter verificationContext)
         baseCounter
         (firstUnusedItCounter st (baseCounter + 1) 10000) $ do
-      attempted <- withIsolatedBackendPair
-        (rsConfig state) path (rsTimeout state) $ \pair ->
-          try $ verifyCandidateGroupsParallel 2 successQuota
-            (verifyIsolatedGroup pair) groups
+      attempted <- withIsolatedBackendPool poolSize
+        (rsConfig state) path (rsTimeout state) $ \pool ->
+          try $ verifyCandidateGroupsParallel workerCount successQuota
+            (verifyIsolatedGroup pool) groups
       pure $ case attempted of
             Left failure -> Left failure
             Right (Left

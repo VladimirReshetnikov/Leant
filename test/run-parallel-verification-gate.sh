@@ -159,6 +159,9 @@ run_one() {
     "TMPDIR=$command_tmp"
     "XDG_CACHE_HOME=$cache_home"
     "LEANT_SYNTH_TIMEOUT=${LEANT_SYNTH_TIMEOUT:-600}"
+    "LC_ALL=C"
+    "LANG=C"
+    "TZ=UTC"
   )
   if [ -n "$BACKEND" ]; then
     environment+=("LEANT_BACKEND=$BACKEND")
@@ -221,14 +224,21 @@ run_one() {
 compare_capabilities() {
   local fixture_name=$1
   local expected_candidates=$2
+  shift 2
   local n1="$WORK_DIR/$fixture_name N1/transcript.normalized"
-  local n2="$WORK_DIR/$fixture_name N2/transcript.normalized"
+  local capabilities
+  local parallel
   local actual_candidates
 
-  if ! cmp -s -- "$n1" "$n2"; then
-    diff -u -- "$n1" "$n2" >&2 || true
-    fail "$fixture_name has different normalized -N1 and -N2 transcripts"
-  fi
+  [ "$#" -gt 0 ] || usage_failure \
+    "compare_capabilities requires at least one capability to compare"
+  for capabilities in "$@"; do
+    parallel="$WORK_DIR/$fixture_name N$capabilities/transcript.normalized"
+    if ! cmp -s -- "$n1" "$parallel"; then
+      diff -u -- "$n1" "$parallel" >&2 || true
+      fail "$fixture_name has different normalized -N1 and -N$capabilities transcripts"
+    fi
+  done
 
   actual_candidates=$(LC_ALL=C sed -n \
     '/^[[:space:]]*it[0-9][0-9]*[[:space:]][[:space:]]/p' "$n1" |
@@ -237,8 +247,8 @@ compare_capabilities() {
     sed -n '1,240p' "$n1" >&2
     fail "$fixture_name returned $actual_candidates candidates; expected $expected_candidates"
   }
-  printf 'ok   %-31s parity (%s candidates)\n' \
-    "$fixture_name" "$actual_candidates"
+  printf 'ok   %-31s N1 oracle parity through N%s (%s candidates)\n' \
+    "$fixture_name" "${!#}" "$actual_candidates"
 }
 
 compiled_tooling_module() {
@@ -284,6 +294,62 @@ require_trace_present() {
   fi
 }
 
+require_trace_absent() {
+  local label=$1
+  local trace_file=$2
+  local needle=$3
+  if LC_ALL=C grep -F -q -- "$needle" "$trace_file"; then
+    sed -n '1,260p' "$trace_file" >&2
+    fail "$label trace unexpectedly contains $needle"
+  fi
+}
+
+require_artifact_route() {
+  local label=$1
+  local run_key=$2
+  local expectation=$3
+  local trace_file="$WORK_DIR/$run_key/backend-exec.trace"
+
+  [ "$TRACE_ROUTES" -eq 1 ] || return 0
+  case "$expectation" in
+    present)
+      require_trace_present "$label" "$trace_file" \
+        'leant-parallel-verification'
+      ;;
+    absent)
+      require_trace_absent "$label" "$trace_file" \
+        'leant-parallel-verification'
+      ;;
+    *) usage_failure "invalid artifact-route expectation: $expectation" ;;
+  esac
+}
+
+require_cache_module_opens() {
+  local label=$1
+  local run_key=$2
+  local module=$3
+  local expected=$4
+
+  [ "$TRACE_ROUTES" -eq 1 ] || return 0
+  require_trace_occurrences "$label" \
+    "$WORK_DIR/$run_key/backend-exec.trace" "\"$module\"" "$expected"
+}
+
+require_cache_unchanged() {
+  local label=$1
+  local module=$2
+  local checksum=$3
+  local observed
+  observed=$(require_one_compiled_tooling_module "$label")
+  [ "$observed" = "$module" ] || {
+    printf 'expected cache module: %s\nobserved cache module: %s\n' \
+      "$module" "$observed" >&2
+    fail "$label changed the compiled tooling cache path"
+  }
+  [ "$(cksum -- "$module")" = "$checksum" ] ||
+    fail "$label rewrote the compiled tooling module"
+}
+
 printf 'Leant:   %s\n' "$EXE"
 if [ -n "$BACKEND" ]; then
   printf 'Backend: %s\n' "$BACKEND"
@@ -298,17 +364,18 @@ fi
 run_one history-free-multi-group 1 1
 CACHE_MODULE=$(require_one_compiled_tooling_module 'cold history-free run')
 CACHE_CHECKSUM=$(cksum -- "$CACHE_MODULE")
+require_artifact_route 'serial history-free run' \
+  'history-free-multi-group N1' absent
+require_cache_module_opens 'serial history-free run' \
+  'history-free-multi-group N1' "$CACHE_MODULE" 0
 run_one history-free-multi-group 2 3
-[ "$(cksum -- "$CACHE_MODULE")" = "$CACHE_CHECKSUM" ] ||
-  fail 'warm history-free run rewrote the compiled tooling module'
-if [ "$TRACE_ROUTES" -eq 1 ]; then
-  WARM_TRACE="$WORK_DIR/history-free-multi-group N2/backend-exec.trace"
-  require_trace_present 'warm history-free run' "$WARM_TRACE" \
-    'leant-parallel-verification'
-  require_trace_occurrences 'warm history-free run' "$WARM_TRACE" \
-    "\"$CACHE_MODULE\"" 1
-fi
-compare_capabilities history-free-multi-group 2
+require_cache_unchanged 'warm history-free N2 run' \
+  "$CACHE_MODULE" "$CACHE_CHECKSUM"
+require_artifact_route 'warm history-free N2 run' \
+  'history-free-multi-group N2' present
+require_cache_module_opens 'warm history-free N2 run' \
+  'history-free-multi-group N2' "$CACHE_MODULE" 1
+compare_capabilities history-free-multi-group 2 2
 
 COLD_N2_CACHE_HOME="$WORK_DIR/cold N2 compiled tooling cache with spaces"
 mkdir -p -- "$COLD_N2_CACHE_HOME"
@@ -333,12 +400,82 @@ if [ "$TRACE_ROUTES" -eq 1 ]; then
 fi
 printf 'ok   %-31s parity (cold N2)\n' history-free-multi-group
 
+run_one history-free-five-result 1 1
+require_cache_unchanged 'warm five-result N1 run' \
+  "$CACHE_MODULE" "$CACHE_CHECKSUM"
+require_artifact_route 'warm five-result N1 run' \
+  'history-free-five-result N1' absent
+require_cache_module_opens 'warm five-result N1 run' \
+  'history-free-five-result N1' "$CACHE_MODULE" 1
+for CAPABILITIES in 2 3 4; do
+  case "$CAPABILITIES" in
+    2) EXPECTED_PROCESSES=3 ;;
+    3) EXPECTED_PROCESSES=4 ;;
+    4) EXPECTED_PROCESSES=5 ;;
+  esac
+  run_one history-free-five-result "$CAPABILITIES" "$EXPECTED_PROCESSES"
+  require_cache_unchanged "warm five-result N$CAPABILITIES run" \
+    "$CACHE_MODULE" "$CACHE_CHECKSUM"
+  require_artifact_route "warm five-result N$CAPABILITIES run" \
+    "history-free-five-result N$CAPABILITIES" present
+  require_cache_module_opens "warm five-result N$CAPABILITIES run" \
+    "history-free-five-result N$CAPABILITIES" "$CACHE_MODULE" 1
+done
+compare_capabilities history-free-five-result 5 2 3 4
+
+run_one history-free-multi-group 4 3
+require_cache_unchanged 'warm short history-free N4 run' \
+  "$CACHE_MODULE" "$CACHE_CHECKSUM"
+require_artifact_route 'warm short history-free N4 run' \
+  'history-free-multi-group N4' present
+require_cache_module_opens 'warm short history-free N4 run' \
+  'history-free-multi-group N4' "$CACHE_MODULE" 1
+compare_capabilities history-free-multi-group 2 2 4
+
 run_one pristine-hidden-type 1 1
+require_cache_unchanged 'warm pristine hidden-type N1 run' \
+  "$CACHE_MODULE" "$CACHE_CHECKSUM"
+require_artifact_route 'warm pristine hidden-type N1 run' \
+  'pristine-hidden-type N1' absent
+require_cache_module_opens 'warm pristine hidden-type N1 run' \
+  'pristine-hidden-type N1' "$CACHE_MODULE" 1
 run_one pristine-hidden-type 2 3
-compare_capabilities pristine-hidden-type 0
+require_cache_unchanged 'warm pristine hidden-type N2 run' \
+  "$CACHE_MODULE" "$CACHE_CHECKSUM"
+require_artifact_route 'warm pristine hidden-type N2 run' \
+  'pristine-hidden-type N2' present
+require_cache_module_opens 'warm pristine hidden-type N2 run' \
+  'pristine-hidden-type N2' "$CACHE_MODULE" 1
+run_one pristine-hidden-type 4 3
+require_cache_unchanged 'warm pristine hidden-type N4 run' \
+  "$CACHE_MODULE" "$CACHE_CHECKSUM"
+require_artifact_route 'warm pristine hidden-type N4 run' \
+  'pristine-hidden-type N4' present
+require_cache_module_opens 'warm pristine hidden-type N4 run' \
+  'pristine-hidden-type N4' "$CACHE_MODULE" 1
+compare_capabilities pristine-hidden-type 0 2 4
 
 run_one scoped-notation-history 1 1
+require_cache_unchanged 'warm scoped-history N1 run' \
+  "$CACHE_MODULE" "$CACHE_CHECKSUM"
+require_artifact_route 'warm scoped-history N1 run' \
+  'scoped-notation-history N1' absent
+require_cache_module_opens 'warm scoped-history N1 run' \
+  'scoped-notation-history N1' "$CACHE_MODULE" 1
 run_one scoped-notation-history 2 1
-compare_capabilities scoped-notation-history 5
+require_cache_unchanged 'warm scoped-history N2 run' \
+  "$CACHE_MODULE" "$CACHE_CHECKSUM"
+require_artifact_route 'warm scoped-history N2 run' \
+  'scoped-notation-history N2' absent
+require_cache_module_opens 'warm scoped-history N2 run' \
+  'scoped-notation-history N2' "$CACHE_MODULE" 1
+run_one scoped-notation-history 4 1
+require_cache_unchanged 'warm scoped-history N4 run' \
+  "$CACHE_MODULE" "$CACHE_CHECKSUM"
+require_artifact_route 'warm scoped-history N4 run' \
+  'scoped-notation-history N4' absent
+require_cache_module_opens 'warm scoped-history N4 run' \
+  'scoped-notation-history N4' "$CACHE_MODULE" 1
+compare_capabilities scoped-notation-history 5 2 4
 
 printf 'PASS parallel-verification real-Lean parity and route gate\n'
