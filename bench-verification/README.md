@@ -113,5 +113,19 @@ The default enforced gate requires:
 Any route, transcript, candidate-count, metric, timeout, or artifact-cleanup
 mismatch is an unconditional failure. Without `--enforce`, a completed run
 still prints `promotion: HOLD` but returns success so screening data can be
-collected. Do not claim acceleration from a screening run or from a result
-that prints `HOLD`.
+collected. A screening run may retain and describe an exact observed
+acceleration when it is clearly labelled as screening evidence. Do not use a
+screening run or a result that prints `HOLD` as release-promotion evidence.
+
+## Preserved release evidence
+
+The release-profile table for implementation commit `8afedc3` is preserved as
+[`results/2026-08-21-critical-path-overlap-release.tsv`](results/2026-08-21-critical-path-overlap-release.tsv).
+It contains all 252 timed rows: 21 unreplaced samples for each of three
+workloads and four cells. Its SHA-256 is
+`80d3b1e5f87b2138c0ea9a3d6449533f6b63b4a6686a535e529d58bdf8c19fa9`.
+The run used two warmup cycles, the documented fixed Latin-square order, and
+`--enforce`; it returned `promotion: GO`. The dated
+[critical-path overlap report](../docs/reports/2026-08-21-verification-critical-path-overlap.md)
+records executable hashes, preflight topology and transcript hashes, exact
+summary values, resource caveats, and the implementation boundary.

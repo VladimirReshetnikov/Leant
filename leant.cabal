@@ -25,6 +25,7 @@ Extra-Source-Files:
   bench-verification/README.md
   bench-verification/benchmark.py
   bench-verification/*.txt
+  bench-verification/results/*.tsv
   docs/*.md
   docs/reports/*.md
   test/run-parallel-verification-gate.sh

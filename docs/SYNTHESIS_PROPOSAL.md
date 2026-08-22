@@ -42,10 +42,14 @@ scheduler and an exactly two-worker isolated backend pair are now connected to
 a conservative N2 verification route. The pair restores independently spawned
 processes from one command artifact above the bounded whole-tree lifecycle,
 while N1 retains the literal serial verifier. Real-Lean parity and route use
-are pinned; a five-sample end-to-end screen measured roughly 1.16x but did not
-clear the provisional 1.25x promotion threshold. A later one-shot prepared-pair
-owner safely supports concurrent setup, but its experimental Main prewarm seam
-also missed the fixed gate and was not connected. The
+are pinned. The first five-sample screen measured a meaningful roughly 1.16x
+but was not the release profile and did not clear the predeclared 1.25x gate.
+A later one-shot prepared-pair owner safely supports concurrent setup, but its
+experimental Main prewarm did not improve that connected route and was not
+retained. Commit `8afedc3` instead reuses the validated startup environment and
+overlaps result-name discovery with isolated verification. A 21-sample release
+profile returned GO at 1.338x/1.327x on the primary workloads and a 1.324x
+geometric mean across three, without N1 regression. The
 implemented post-phase-2 increments
 are detailed in §7. Companion to
 [PROPOSALS.md](PROPOSALS.md).*
@@ -867,12 +871,13 @@ A five-sample O2 2x2 screen measured B2/C2 median wall ratios of 1.166x and
 `List.map` workload, with a 1.159x geometric mean and no material N1
 regression. Preflight certified exact 1/1/1/3 backend counts, while preflight
 and every timed sample retained its transcript hash. Primary candidate N2 p95
-improved. The provisional 1.25x promotion gate therefore remains HOLD: the
-route is useful evidence for explicit N2, not a
-default-N2 or broad speed-up claim. See the
+improved. The double-digit result was meaningful retention evidence for
+explicit N2, but this five-sample profile was not release evidence and both
+primary medians were below the predeclared 1.25x gate. It did not justify
+default N2 or a broad speed-up claim by itself. See the
 [ordered isolated-verification report](reports/2026-08-21-ordered-isolated-parallel-verification.md).
 
-### Prepared-pair foundation and prewarm HOLD
+### Prepared-pair foundation and prewarm experiment
 
 Commit `a35863e` adds a package-private ownership mechanism for starting an
 isolated pair while an enclosing caller performs independent work. Both
@@ -899,6 +904,39 @@ earlier route screen. The experimental Main and unused-prewarm fixture were
 removed before the foundation commit; the API currently has no Main caller.
 See the
 [prepared-pair and prewarm report](reports/2026-08-21-prepared-isolated-pair-prewarm-hold.md).
+
+### Verification critical-path overlap (implemented and promoted)
+
+Commit `8afedc3` removes two waits without connecting the prepared-pair API or
+changing verification admission. The startup readiness request is now
+`#check True`; Main records its environment only after proving the response
+has no errors, no fatal diagnostic, and a present environment. The current
+logical `rsEnv` remains authoritative, followed by that validated
+process-local `rsBaseEnv`, then a fresh materialization. Reconstruction
+replaces the base identifier after a backend/import/reset/snapshot change.
+
+The command context also owns one opaque binding-name prefetch. Once the
+immutable artifact exists, the primary backend's read-only search for the next
+unused `itN` candidate runs concurrently with fresh isolated-pair setup and
+group checking. The operations join before return. Only parallel success
+publishes a found `(baseCounter, candidate)`; result binding consumes it once
+if the live counter still matches. Failure publishes nothing, stale state is
+discarded, and exceptions/cancellation cancel and join the probe. No backend
+handle is shared concurrently.
+
+Four deterministic tests pin overlap, publication, staleness, and exact
+`ThreadKilled` cleanup. The strict Leant suite passes 578/578, and the full
+workspace/build/Cabal/sdist/real-Lean route gates pass. The release benchmark
+used two warmups and 21 unreplaced O2 samples per cell. B2/C2 median wall
+speedups were 1.338x state-thread, 1.327x continuation, and 1.309x `List.map`;
+the geometric mean was 1.324x. N1 ratios were 0.993x, 1.002x, and 0.997x, and
+candidate N2 p95 improved on every workload. The enforced run returned GO.
+
+The promotion is deliberately narrow: explicit N2 on the measured
+history-free five-result workloads. Default N2, broadened session state,
+effectful imported initialization/elaboration, persistent worker pools, and
+universal speedup claims remain outside the checkpoint. See the
+[critical-path overlap report](reports/2026-08-21-verification-critical-path-overlap.md).
 
 Design rules, all inherited from Djex:
 
@@ -1109,11 +1147,12 @@ Design rules, all inherited from Djex:
   provider or engine-internal work. The two bounded initial search schedules
   in §3, the private ordered success-quota scheduler, and the isolated
   two-worker backend pair are implemented groundwork. The scheduler and pair
-  are connected for history-free N2 verification, but the measured 1.16x
-  checkpoint remains opt-in and below its promotion threshold. A safe
-  one-shot prepared-pair owner is also implemented, but the attempted initial-
-  search prewarm measured only 1.165x/1.166x on its primary screen and was
-  withheld. None of this establishes that the wider design will be faster.
+  are connected for history-free N2 verification. The later startup-base and
+  binding-name overlap cleared its release gate at 1.338x/1.327x on the two
+  primary workloads, while remaining explicit-N2. A safe one-shot
+  prepared-pair owner is also implemented, but the attempted initial-search
+  prewarm did not improve the earlier route and was withheld. None of this
+  establishes that wider eligibility or a persistent pool will be faster.
 
 ## 5. Honest limitations
 
@@ -1260,14 +1299,16 @@ through RTS capabilities while later seams and end-to-end latency are measured
 independently. The private ordered success-quota scheduler and isolated
 two-worker backend pair are now connected to conservatively gated candidate
 verification. History-free real-Lean parity and exact worker admission are
-pinned, while the five-sample screen recorded roughly 1.16x B2/C2 median wall
-ratios but remains non-promotional and below the provisional 1.25x threshold.
+pinned. Reusing the validated startup environment and overlapping the
+read-only binding-name probe with isolated verification then cleared the
+release profile at 1.338x/1.327x on the primary workloads and a 1.324x
+three-workload geometric mean, without N1 regression.
 The package-private prepared-pair owner now proves that cold worker setup can
 be overlapped without escaping ownership, but the first attempted initial-
 search seam did not improve the ratios enough and remains disconnected. A
-future attempt needs a materially longer independent phase and a fresh fixed-
-threshold result before reconsidering default N2; the literal N1 route remains
-the compatibility and external-effects control.
+future attempt still needs an independent phase and fixed-threshold result
+before reconsidering default N2 or wider eligibility; the literal N1 route
+remains the compatibility and external-effects control.
 
 ## 7. Post-phase-2 proposals
 

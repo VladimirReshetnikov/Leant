@@ -6,11 +6,14 @@ Implementation commit: `ea75133`
 
 Serial-verifier baseline: `57e4445`
 
-> **Successor:** commit `a35863e` added a safe one-shot prepared-pair owner,
-> but an experimental Main prewarm measured only 1.165x and 1.166x B2/C2 on
-> the primary five-sample screen, below the fixed 1.25x gate. The Main
-> experiment was removed. See the
-> [prepared-pair and prewarm HOLD report](2026-08-21-prepared-isolated-pair-prewarm-hold.md).
+> **Successors:** commit `a35863e` added a safe one-shot prepared-pair owner;
+> its experimental Main prewarm did not improve this route and was removed.
+> Commit `8afedc3` instead reused the validated startup environment and
+> overlapped binding-name discovery with isolated verification. Its enforced
+> 21-sample release profile returned GO at 1.338x/1.327x on the two primary
+> workloads. See the
+> [prepared-pair experiment](2026-08-21-prepared-isolated-pair-prewarm-hold.md)
+> and [critical-path overlap report](2026-08-21-verification-critical-path-overlap.md).
 
 ## Result
 
@@ -23,11 +26,11 @@ gate. N1 enters the literal established serial verifier.
 The implementation and parity gates are GO. The performance decision is more
 limited: a route-certified five-sample O2 screen recorded 1.166x and 1.169x
 B2/C2 median wall ratios on the two primary workloads and a 1.159x geometric
-mean across all three workloads. Those observations favor the candidate in
-this screen, but the screening profile and its HOLD are not acceleration
-evidence: both ratios are below the provisional 1.25x promotion threshold.
-The checkpoint is therefore useful opt-in N2 functionality, not evidence for
-selecting N2 by default or claiming a universal verification speedup.
+mean across all three workloads. That double-digit result was meaningful
+retention evidence, but the five-sample profile was not release evidence and
+both ratios were below the predeclared 1.25x promotion threshold. By itself it
+did not justify selecting N2 by default or claiming a universal verification
+speedup. The successor release run above supplies the stronger current claim.
 
 ## Production boundary
 
@@ -277,8 +280,9 @@ description, so the report retains the HOLD.
 
 The route remains valuable as explicit opt-in functionality. All three screen
 median ratios favor the candidate, and the resource signals stayed within
-their gates, but the result must remain non-promotional and narrowly
-described.
+their gates. At this historical checkpoint the result remained
+non-promotional because the fixed screen threshold was not met; the successor
+report records the later release-grade GO.
 
 The most plausible next optimization is to overlap the already-parallel
 two-worker preparation with the pure initial search. The current critical path

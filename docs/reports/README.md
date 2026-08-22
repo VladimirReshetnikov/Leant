@@ -148,9 +148,22 @@ joins the acquisition manager before transfer, discards and joins unused
 preparations, and prevents detached claims from escaping scope. Main has no
 prepared-pair caller. An experimental synchronous-artifact/initial-search
 prewarm measured 1.165x and 1.166x B2/C2 on its two primary five-sample
-workloads, below the fixed 1.25x gate; it was removed before commit and is a
-HOLD rather than acceleration evidence. See the
+workloads. The double-digit route gain was meaningful, but this seam was
+effectively unchanged from the already-connected route, below its predeclared
+gate, and removed before commit for lack of incremental benefit. See the
 [prepared isolated-pair report](2026-08-21-prepared-isolated-pair-prewarm-hold.md).
+
+The critical-path overlap checkpoint at `8afedc3` keeps that prepared API
+disconnected. It instead retains the validated startup `#check True`
+environment and overlaps the primary backend's read-only next-`itN` probe with
+the existing fresh isolated pair. Publication occurs only after parallel
+success, consumption is one-shot and counter-matched, and cancellation joins
+the probe. The strict suite passes 578/578 and the real-Lean 1/3 plus scoped
+1/1 route gate remains exact. A two-warmup, 21-sample O2 release run measured
+1.338x and 1.327x B2/C2 on the primary workloads, 1.309x on `List.map`, and a
+1.324x geometric mean; N1 stayed at parity and candidate N2 p95 improved on
+all three. The enforced gate returned GO. See the
+[critical-path overlap report](2026-08-21-verification-critical-path-overlap.md).
 
 The Length counterexample bank still has no `ReplState` field, serialization
 or snapshot restoration, session-wide scope, or persistence. There is also no
@@ -242,7 +255,8 @@ Reports are listed oldest first.
 - 2026-08-20 — [Backend process-tree lifecycle prerequisite](2026-08-20-backend-process-tree-lifecycle.md)
 - 2026-08-20 — [Private isolated Lean backend pair foundation](2026-08-20-isolated-backend-pair-foundation.md)
 - 2026-08-21 — [Ordered isolated parallel Lean verification](2026-08-21-ordered-isolated-parallel-verification.md)
-- 2026-08-21 — [Prepared isolated-pair ownership and speculative prewarm HOLD](2026-08-21-prepared-isolated-pair-prewarm-hold.md)
+- 2026-08-21 — [Prepared isolated-pair ownership and prewarm experiment](2026-08-21-prepared-isolated-pair-prewarm-hold.md)
+- 2026-08-21 — [Verification critical-path overlap](2026-08-21-verification-critical-path-overlap.md)
 
 ## Standalone PDF reports
 

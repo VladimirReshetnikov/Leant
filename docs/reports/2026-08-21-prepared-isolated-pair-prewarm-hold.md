@@ -1,4 +1,4 @@
-# Prepared isolated-pair ownership and speculative prewarm HOLD
+# Prepared isolated-pair ownership and prewarm experiment
 
 Date: 2026-08-21
 
@@ -7,6 +7,13 @@ Foundation commit: `a35863e`
 Connected verification route: `ea75133`
 
 Serial-verifier benchmark baseline: `57e4445`
+
+> **Successor:** commit `8afedc3` kept this prepared API disconnected and
+> removed different critical-path waits: it reused the validated startup
+> environment and overlapped binding-name discovery with isolated
+> verification. The enforced 21-sample release profile returned GO at
+> 1.338x/1.327x on the two primary workloads. See the
+> [critical-path overlap report](2026-08-21-verification-critical-path-overlap.md).
 
 ## Result
 
@@ -17,13 +24,16 @@ linearizes competing claims, cancels and joins an unused preparation, closes a
 consumed pair before returning, and prevents a detached claim from escaping
 the preparation scope.
 
-The proposed production use was not promoted. An experimental Main route
+The proposed production use was not promoted. Its measured double-digit route
+gain was meaningful, but an experimental Main route
 prepared the artifact synchronously and overlapped pair spawn/restore with one
 historically serial initial search. Its route-certified five-sample O2 screen
 measured B2/C2 median wall ratios of **1.165x** and **1.166x** on the two
 primary workloads, below the fixed **1.25x** promotion threshold. The
-geometric mean across all three workloads was **1.167x**. These observations
-are a screening HOLD, not acceleration evidence.
+geometric mean across all three workloads was **1.167x**. That screen was not
+the release profile, and—more importantly for this experiment—the result was
+effectively unchanged from the already connected route. It did not establish
+an incremental benefit for this prewarm seam.
 
 The experimental Main and real-Lean unused-prewarm fixture were therefore
 removed before `a35863e` was committed. Production still prepares the command
@@ -279,8 +289,10 @@ cannot rescue two failed primary gates.
 Lowering the threshold after observing the result would convert a promotion
 rule into a description. Running the larger profile after a failed screen
 would consume time without changing that decision. Main prewarming is therefore
-HOLD, its speculative effects are absent from the committed product, and no
-acceleration claim is made.
+HOLD and its speculative effects are absent from the committed product. The
+measured 1.165x and 1.166x accelerations remain meaningful screening evidence;
+the screen does not establish an incremental prewarm benefit or a
+release-promotion claim.
 
 The ownership mechanism remains useful infrastructure. A later route may use
 it only after identifying a substantially longer independent phase, proving

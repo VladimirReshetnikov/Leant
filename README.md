@@ -1140,9 +1140,10 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   **1.159x** geometric mean across those and a `List.map` control. Preflight
   certified the exact 1/1/1/3 backend topology, while preflight and every timed
   sample retained the exact transcript hash. N1 controls stayed within about
-  1%. This is a favorable opt-in screening result, not release acceleration
-  evidence: it misses the provisional 1.25x promotion threshold; `-N2` is
-  still not selected by default and there is no broad speed-up claim. See the
+  1%. The double-digit screen was meaningful retention evidence for explicit
+  N2, but five samples were not the release profile and both primary ratios
+  missed the predeclared 1.25x promotion threshold. It did not by itself
+  justify default N2 or a broad speed-up claim. See the
   [isolated-pair foundation](docs/reports/2026-08-20-isolated-backend-pair-foundation.md)
   and the
   [ordered isolated-verification report](docs/reports/2026-08-21-ordered-isolated-parallel-verification.md).
@@ -1157,9 +1158,31 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   prepared the artifact synchronously and overlapped pair setup with the
   initial pure search measured only **1.165x** and **1.166x** B2/C2 on the two
   primary five-sample workloads (**1.167x** geometric mean across three),
-  below the fixed **1.25x** promotion gate. The Main experiment was removed;
-  this is a prewarm HOLD, not acceleration evidence. See the
+  below the fixed **1.25x** promotion gate and effectively unchanged from the
+  connected route. The measured gain was meaningful, but this prewarm added no
+  incremental benefit, so its Main caller was removed. See the
   [prepared-pair and prewarm report](docs/reports/2026-08-21-prepared-isolated-pair-prewarm-hold.md).
+
+  Commit `8afedc3` removes the remaining measured waits without using the
+  prepared-pair API. The clean startup `#check True` response now supplies the
+  process-local base environment instead of being discarded and rematerialized
+  at first verification. Once the immutable artifact exists, the primary
+  backend's read-only search for the next unused `itN` name overlaps isolated
+  pair setup and checking. The result is scoped, joined, published only after
+  parallel success, consumed once, and rejected if the logical counter moved.
+
+  A release-profile O2 run with two warmups and 21 unreplaced samples per cell
+  returned `promotion: GO`. B2/C2 median wall speedups were **1.338x** and
+  **1.327x** on the two verifier-isolation workloads and **1.309x** on the
+  `List.map` control, for a **1.324x** geometric mean. N1 ratios were 0.993x,
+  1.002x, and 0.997x; candidate N2 p95 improved on every workload. All 12
+  preflights proved the exact 1/1/1/3 topology, and every timed row retained
+  its transcript hash. This is release-grade evidence for the measured
+  explicit-N2 route, while default N2, widened session eligibility, and a
+  universal speedup claim remain out of scope. See the
+  [critical-path overlap report](docs/reports/2026-08-21-verification-critical-path-overlap.md)
+  and its committed
+  [252-row result table](bench-verification/results/2026-08-21-critical-path-overlap-release.tsv).
   Within each Exference invocation, Leant stable-deduplicates rendered groups
   before applying the internal 60-candidate collection window
   (`:set synth-window N`). The first

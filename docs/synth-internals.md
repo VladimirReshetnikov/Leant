@@ -47,7 +47,8 @@ who wants the *what* can stop at the paragraph.
 - [Backend process-tree lifecycle prerequisite](#backend-process-tree-lifecycle-prerequisite)
 - [Private isolated backend pair foundation](#private-isolated-backend-pair-foundation)
 - [Ordered isolated parallel verification](#ordered-isolated-parallel-verification)
-- [Prepared isolated-pair ownership and prewarm HOLD](#prepared-isolated-pair-ownership-and-prewarm-hold)
+- [Prepared isolated-pair ownership and prewarm experiment](#prepared-isolated-pair-ownership-and-prewarm-experiment)
+- [Verification critical-path overlap](#verification-critical-path-overlap)
 - [Main's progressive same-run cursor scheduler](#mains-progressive-same-run-cursor-scheduler)
 - [Contract vocabulary and module ownership](#contract-vocabulary-and-module-ownership)
 - [Post-verification sealing](#post-verification-sealing)
@@ -1518,14 +1519,15 @@ ratios of 1.166x and 1.169x; the contextual `List.map` workload measured
 1.144x, for a 1.159x geometric mean. N1 ratios were 1.000x, 1.010x, and
 0.990x. Preflight certified the required 1/1/1/3 backend topology; preflight
 and every timed sample retained the exact transcript hash. Candidate N2 p95
-was better than baseline N2 on both primary fixtures. This is useful route and
-screening evidence, but not acceleration evidence: it is below the provisional
-1.25x promotion threshold. It does not justify default `-N2`
-or a universal speed-up claim. Methodology, resource caveats, and raw summary
+was better than baseline N2 on both primary fixtures. The double-digit result
+was meaningful retention evidence, but the five-sample profile was not the
+release profile and both primary medians were below the predeclared 1.25x
+promotion threshold. It did not justify default `-N2` or a universal speed-up
+claim by itself. Methodology, resource caveats, and raw summary
 are in the
 [ordered isolated-verification report](reports/2026-08-21-ordered-isolated-parallel-verification.md).
 
-## Prepared isolated-pair ownership and prewarm HOLD
+## Prepared isolated-pair ownership and prewarm experiment
 
 Commit `a35863e` adds an opaque one-shot preparation owner without changing
 Main's production route. Both spawn-and-restore children begin concurrently,
@@ -1554,8 +1556,51 @@ Its route-certified five-sample O2 screen measured B2/C2 median wall ratios of
 three. Both primary ratios missed the fixed 1.25x gate and were effectively
 unchanged from the connected-route screen. The experiment and its unused-pair
 fixture were removed before commit: the prepared API has no Main caller and
-the measurements are a prewarm HOLD, not acceleration evidence. See the
+the prewarm showed no incremental benefit beyond the already meaningful
+connected-route gain. See the
 [prepared isolated-pair report](reports/2026-08-21-prepared-isolated-pair-prewarm-hold.md).
+
+## Verification critical-path overlap
+
+Commit `8afedc3` leaves prepared-pair ownership unused and instead removes two
+serial waits at already-established ownership boundaries. The startup probe
+uses `#check True` and records `rsBaseEnv` only from a response with no errors,
+no fatal diagnostic, and a present environment. `currentEnvironmentId` then
+prefers the live `rsEnv`, followed by that process-local validated base, before
+materializing a new environment. Backend reconstruction replaces the base ID,
+so it cannot survive a process boundary.
+
+The command context also owns one opaque `VerificationBindingPrefetch`. After
+the immutable verification artifact is ready, a read-only
+`firstUnusedItCounter` request on the primary backend runs under `withAsync`
+while the existing fresh isolated pair sets up and checks groups. Both actions
+join before return. Only parallel `Right` plus a found candidate publishes a
+`(baseCounter, candidate)` entry; binding consumes it atomically once if the
+live counter still matches. Failure publishes nothing, mismatch clears stale
+state, and exception/cancellation uses structured cancel-and-join cleanup.
+The primary request never shares a handle with the two isolated requests.
+
+Four deterministic runtime tests cover overlap/join, failure nonpublication,
+stale-counter rejection, and exact `ThreadKilled` cleanup. Source contracts pin
+clean startup validation, environment precedence, context threading through
+finalization, and prefetch-before-pair-before-classification order. The strict
+Leant suite passes 578/578; the serialized workspace suite, strict all-target
+build, O2 executable, Cabal, sdist, diff, and committed real-Lean route gates
+pass.
+
+The fixed release profile ran two warmups and 21 unreplaced O2 samples for
+every workload/cell. B2/C2 median wall speedups were 1.338x state-thread,
+1.327x continuation, and 1.309x `List.map`, with a 1.324x geometric mean.
+Candidate N1 ratios were 0.993x, 1.002x, and 0.997x, while candidate N2 p95
+improved for every workload. Preflight certified 1/1/1/3 backend executions;
+every timed row retained its transcript hash. The run returned
+`promotion: GO`.
+
+This is release-grade acceleration evidence for the measured explicit-N2
+route. It does not choose N2 by default, widen eligibility, or cover imported
+initializers/elaborators with externally significant or process-local effects.
+The exact 252-row table and full boundary are in the
+[critical-path overlap report](reports/2026-08-21-verification-critical-path-overlap.md).
 
 ## Main's progressive same-run cursor scheduler
 
