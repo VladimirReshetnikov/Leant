@@ -888,13 +888,23 @@ syntaxHighlightTests = testGroup "Lean syntax highlighting"
         , "highlightLean (rsColor state) source"
         , "printLeanResponse = printResponseAs LeanResponse"
         , "[\"color\", value] -> case map toLower value of"
+        , "\"color\" : _ -> emitLn st =<< cRed st"
         , "\"usage: :set color auto|always|never\""
         , "displayed <- leanSyntax st term"
         , "forM_ (lines (trimEnd' g)) (emitLeanLn st)"
         , "mapM_ (emitLeanLn st) script"
         , "emitLeanLn st body"
-        , "hPutStr h (stripAnsi text)"
+        , "hPutStr h (stripSgr text)"
         ]
+      let declarationSection = take 23 $ dropWhile
+            (not . isInfixOf "else if isDeclaration text")
+            (lines mainSource)
+      assertBool "known source-producing hash commands lost highlighting"
+        $ any (isInfixOf
+            "firstToken text `elem` [\"#eval\", \"#check\", \"#print\"]")
+          declarationSection
+      assertBool "declaration execution lost its plain response path"
+        $ any (isInfixOf "otherwise = printResponse") declarationSection
   ]
  where
   -- Compare the final reset without adding another Data.List import to this

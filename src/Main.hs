@@ -111,7 +111,7 @@ import Leant.Session.Snapshot
   , snapshotMetadataPath
   , synthesisToolingABI
   )
-import Leant.SyntaxHighlight (highlightLean)
+import Leant.SyntaxHighlight (highlightLean, stripSgr)
 import Leant.Synth.Engine
   ( DetailedCandidateGroup
   , DetailedSynthCursor
@@ -610,16 +610,11 @@ emit st text = do
   putStr text
   hFlush stdout
   forM_ (rsTranscript state) $ \(_, h) -> do
-    hPutStr h (stripAnsi text)
+    hPutStr h (stripSgr text)
     hFlush h
 
 emitLn :: St -> String -> IO ()
 emitLn st text = emit st (text ++ "\n")
-
-stripAnsi :: String -> String
-stripAnsi [] = []
-stripAnsi ('\27' : '[' : rest) = stripAnsi (drop 1 (dropWhile (/= 'm') rest))
-stripAnsi (c : rest) = c : stripAnsi rest
 
 color :: St -> String -> String -> IO String
 color st code text = do
@@ -1279,7 +1274,11 @@ evalInput st allowIncomplete rawText = do
               Right v
                 | allowIncomplete && looksIncomplete v -> pure EvalIncomplete
                 | otherwise -> do
-                    errored <- printLeanResponse st Nothing v
+                    let present
+                          | firstToken text `elem` ["#eval", "#check", "#print"] =
+                              printLeanResponse
+                          | otherwise = printResponse
+                    errored <- present st Nothing v
                     unless errored (advanceEnv st (respEnv v) text)
                     pure EvalDone
           else do
@@ -1464,6 +1463,8 @@ dispatchCommand st line = do
           _ -> emitLn st =<< cRed st
             "usage: :set color auto|always|never"
         ["color"] -> showColorMode st
+        "color" : _ -> emitLn st =<< cRed st
+          "usage: :set color auto|always|never"
         ["synth-engine", value] -> case parseSynthEngine value of
           Just engine -> do
             modifyIORef' st (\s -> s { rsSynthEngine = engine })
