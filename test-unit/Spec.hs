@@ -1082,13 +1082,10 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
       mapM_ (assertMainSourceContains "verification command owner"
           contextSection)
         [ "synthVerificationArtifactRuntime :: VerificationArtifactRuntime FilePath"
-        , "synthVerificationCapabilities :: IORef (Maybe Int)"
         , "synthVerificationPrefetchedItCounter :: VerificationBindingPrefetch"
         , "withVerificationArtifactRuntime removeFileIfExists $ \\runtime -> do"
-        , "capabilities <- newIORef Nothing"
         , "prefetchedItCounter <- newVerificationBindingPrefetch"
         , "synthVerificationArtifactRuntime = runtime"
-        , "synthVerificationCapabilities = capabilities"
         , "synthVerificationPrefetchedItCounter = prefetchedItCounter"
         ]
       mapM_ (assertMainSourceContains "verification command wrapper"
@@ -1098,16 +1095,12 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
         ]
       mapM_ (assertMainSourceContains "parallel verification admission"
           artifactSection)
-        [ "ensureVerificationArtifactWith (synthVerificationArtifactRuntime context) sessionEligible recordCapabilities acquire prepare"
+        [ "ensureVerificationArtifactWith (synthVerificationArtifactRuntime context) sessionEligible getNumCapabilities acquire prepare"
         , "session <- readIORef st"
         , "isNothing (rsSnapshotBase session)"
         , "isNothing (rsProve session)"
         , "isNothing (rsLastSorry session)"
         , "null (rsHistory session)"
-        , "recordCapabilities = do"
-        , "capabilities <- getNumCapabilities"
-        , "writeIORef (synthVerificationCapabilities context) $ Just capabilities"
-        , "pure capabilities"
         , "environmentOr <- currentEnvironmentId st"
         , "temporaryOr <- tryIOError $ getTemporaryDirectory >>= makeAbsolute"
         , "reservedOr <- freshSiblingPath"
@@ -1116,28 +1109,6 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
         , "Left _ -> False"
         , "Right () -> True"
         ]
-      staticGate <- expectMainSourcePosition "parallel verification admission"
-        "sessionEligible = do" artifactSection
-      capabilityCallback <- expectMainSourcePosition
-        "parallel verification admission" "recordCapabilities = do"
-        artifactSection
-      capabilityRead <- expectMainSourcePosition
-        "parallel verification admission"
-        "capabilities <- getNumCapabilities" artifactSection
-      capabilityPublication <- expectMainSourcePosition
-        "parallel verification admission"
-        "writeIORef (synthVerificationCapabilities context)"
-        artifactSection
-      acquisition <- expectMainSourcePosition "parallel verification admission"
-        "acquire = do" artifactSection
-      assertBool
-        "capabilities were read outside the runtime callback or before the static gate"
-        $ staticGate < capabilityCallback
-          && capabilityCallback < capabilityRead
-          && capabilityRead < capabilityPublication
-          && capabilityPublication < acquisition
-      length (mainSourcePositions "getNumCapabilities" artifactSection)
-        @?= 1
       mapM_ (assertMainSourceContains "artifact reservation cancellation"
           reservationSection)
         [ "freshSiblingPath target = ioResult $ bracketOnError"
@@ -1228,71 +1199,7 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
         , "env = processEnvironment"
         ]
   , testCase
-      "bound one shared pool width by capabilities, quota, and group demand" $ do
-      sourceLines <- lines <$> readFile "src/Main.hs"
-      let verificationSection = mainSourceSection
-            "synthVerify verificationContext successQuota st goal groups"
-            "synthVerifySerial successQuota st goal groups = do" sourceLines
-          modeledWorkerCount capabilities successQuota candidateGroups =
-            length $ take (min 4 $ min capabilities successQuota)
-              candidateGroups
-          poisonedTail = error
-            "bounded worker-count selection forced an unreachable group tail"
-      mapM_ (assertMainSourceContains "scaled verification pool"
-          verificationSection)
-        [ "successQuota >= 2 && hasTwoGroups groups"
-        , "recordedCapabilities <- readIORef $ synthVerificationCapabilities verificationContext"
-        , "capabilities <- case recordedCapabilities of"
-        , "Nothing -> ioError $ userError"
-        , "parallel verification artifact has no recorded capability count"
-        , "workerLimit = min 4 $ min capabilities successQuota"
-        , "workerCount = length $ take workerLimit groups"
-        , "poolSize <- case mkIsolatedBackendPoolSize workerCount of"
-        , "withIsolatedBackendPool poolSize (rsConfig state) path (rsTimeout state)"
-        , "verifyCandidateGroupsParallel workerCount successQuota"
-        ]
-      capabilityUse <- expectMainSourcePosition "scaled verification pool"
-        "recordedCapabilities <- readIORef" verificationSection
-      boundedLimit <- expectMainSourcePosition "scaled verification pool"
-        "workerLimit = min 4 $ min capabilities successQuota"
-        verificationSection
-      boundedDemand <- expectMainSourcePosition "scaled verification pool"
-        "workerCount = length $ take workerLimit groups"
-        verificationSection
-      validatedWidth <- expectMainSourcePosition "scaled verification pool"
-        "mkIsolatedBackendPoolSize workerCount" verificationSection
-      poolBracket <- expectMainSourcePosition "scaled verification pool"
-        "withIsolatedBackendPool poolSize" verificationSection
-      schedulerWidth <- expectMainSourcePosition "scaled verification pool"
-        "verifyCandidateGroupsParallel workerCount successQuota"
-        verificationSection
-      assertBool "pool and scheduler widths were selected independently"
-        $ capabilityUse < boundedLimit
-          && boundedLimit < boundedDemand
-          && boundedDemand < validatedWidth
-          && validatedWidth < poolBracket
-          && poolBracket < schedulerWidth
-      assertBool "scaled verification performed a second capability read"
-        $ not $ "getNumCapabilities" `isInfixOf` unlines verificationSection
-      assertBool "scaled verification demanded the complete group spine"
-        $ not $ "length groups" `isInfixOf` unlines verificationSection
-      length (mainSourcePositions "workerLimit" verificationSection) @?= 2
-      length (mainSourcePositions "workerCount" verificationSection) @?= 3
-      length (mainSourcePositions "withIsolatedBackendPool"
-        verificationSection) @?= 1
-      length (mainSourcePositions "withIsolatedBackendPair"
-        verificationSection) @?= 0
-      modeledWorkerCount 1 5 (replicate 6 ()) @?= 1
-      modeledWorkerCount 2 5 (replicate 6 ()) @?= 2
-      modeledWorkerCount 3 5 (replicate 6 ()) @?= 3
-      modeledWorkerCount 4 5 (replicate 6 ()) @?= 4
-      modeledWorkerCount 8 8 (replicate 6 ()) @?= 4
-      modeledWorkerCount 4 2 (replicate 6 ()) @?= 2
-      modeledWorkerCount 4 5 [(), ()] @?= 2
-      evaluate (modeledWorkerCount 8 2 [(), (), poisonedTail])
-        >>= (@?= 2)
-  , testCase
-      "fallback only after the pool closes cleanly and disable later batches" $ do
+      "fallback only after the pair closes cleanly and disable later batches" $ do
       sourceLines <- lines <$> readFile "src/Main.hs"
       let verificationSection = mainSourceSection
             "synthVerify verificationContext successQuota st goal groups"
@@ -1310,8 +1217,8 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
         , "classifyInfrastructureFailure"
         , "withVerificationBindingPrefetch (synthVerificationPrefetchedItCounter verificationContext) baseCounter"
         , "firstUnusedItCounter st (baseCounter + 1) 10000"
-        , "withIsolatedBackendPool poolSize (rsConfig state) path (rsTimeout state)"
-        , "try $ verifyCandidateGroupsParallel workerCount successQuota"
+        , "withIsolatedBackendPair (rsConfig state) path (rsTimeout state)"
+        , "try $ verifyCandidateGroupsParallel 2 successQuota"
         , "withIsolatedBackendLease pair"
         , "verifyCandidateGroup (verifyIsolatedVariant lease) group"
         , "runIsolatedBackendCommand lease"
@@ -1320,17 +1227,17 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
         , "FallbackSerial"
         , "AbortParallel $ ParallelVerificationInfrastructureException failure"
         ]
-      poolBracket <- expectMainSourcePosition "parallel verification route"
-        "attempted <- withIsolatedBackendPool" verificationSection
+      pairBracket <- expectMainSourcePosition "parallel verification route"
+        "attempted <- withIsolatedBackendPair" verificationSection
       namePrefetch <- expectMainSourcePosition "parallel verification route"
         "withVerificationBindingPrefetch" verificationSection
       typedCatch <- expectMainSourcePosition "parallel verification route"
         "try $ verifyCandidateGroupsParallel" verificationSection
       classification <- expectMainSourcePosition "parallel verification route"
         "pure $ case attempted of" verificationSection
-      assertBool "typed worker failures escaped pool cleanup"
-        $ namePrefetch < poolBracket
-          && poolBracket < typedCatch
+      assertBool "typed worker failures escaped pair cleanup"
+        $ namePrefetch < pairBracket
+          && pairBracket < typedCatch
           && typedCatch < classification
       mapM_ (assertMainSourceContains "literal serial verification oracle"
           serialSection)
@@ -1340,7 +1247,7 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
         , "Right response -> classifyVerificationResponse response"
         ]
       length (mainSourcePositions
-        "withIsolatedBackendPool" verificationSection) @?= 1
+        "withIsolatedBackendPair" verificationSection) @?= 1
   , testCase "capture terminal status in the atomic close transition" $ do
       sourceLines <- lines <$> readFile "src/Leant/Backend/Isolated.hs"
       let pairBracket = unlines $ mainSourceSection
