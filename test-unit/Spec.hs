@@ -23,6 +23,7 @@ import Control.Concurrent.Async
   )
 import Control.Monad
   ( forM
+  , forM_
   , forever
   , replicateM
   , unless
@@ -173,6 +174,7 @@ import Leant.Backend.Isolated
   , runPreparedIsolatedBackendPair
   , withIsolatedBackendLease
   , withIsolatedBackendPair
+  , withIsolatedBackendPairReplaying
   , withIsolatedBackendPairPreparation
   , withIsolatedBackendPairPreparationAfterPublicationForTesting
   )
@@ -1222,6 +1224,101 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
             $ "parallel setup did not finish cleanly: " ++ show other
         readIORef callbackRan >>= (@?= True)
         mapM_ (assertFakeWorkerStopped root) [1, 2]
+  , testCase
+      "replay imports and accepted history in order on both workers" $
+      withTemporaryDirectory "leant isolated replay order" $ \root -> do
+        config <- isolatedFakeBackendConfig root "healthy" Nothing
+        paired <- withIsolatedBackendPairReplaying config
+          ["Alpha", "Beta"] ["history-one", "history-two"] Nothing
+          $ \pair -> do
+              release <- newEmptyMVar
+              first <- async $ withIsolatedBackendLease pair $ \lease -> do
+                readMVar release
+                runIsolatedBackendCommand lease "after-replay-one"
+              second <- async $ withIsolatedBackendLease pair $ \lease -> do
+                readMVar release
+                runIsolatedBackendCommand lease "after-replay-two"
+              putMVar release ()
+              mapM wait [first, second]
+        results <- case paired of
+          Left failure -> assertFailure
+            ("replayed pair failed: " ++ show failure) >> pure []
+          Right values -> pure values
+        responses <- forM results $ \result -> case result of
+          Left failure -> assertFailure
+            ("replayed lease failed: " ++ show failure) >> pure Json.JNull
+          Right commandResult -> expectIsolatedCommand commandResult
+        length responses @?= 2
+        observedWorkers <- sortOn id <$> mapM
+          (requireJsonInteger "worker") responses
+        observedWorkers @?= [1, 2]
+        forM_ [1, 2] $ \worker -> do
+          trace <- readIsolatedFakeCommandTrace root worker
+          let base = isolatedFakeEnvironment worker
+          take 4 trace @?=
+            [ ("import Alpha\nimport Beta\n", base - 1000000)
+            , ("example : True := True.intro", base)
+            , ("history-one", base)
+            , ("history-two", base + 1000000)
+            ]
+          case drop 4 trace of
+            [(command, environment)] -> do
+              assertBool "unexpected post-replay command"
+                $ command `elem` ["after-replay-one", "after-replay-two"]
+              environment @?= base + 2000000
+            other -> assertFailure
+              $ "unexpected post-replay trace: " ++ show other
+        assertExactlyTwoFakeWorkers root
+        mapM_ (assertFakeWorkerStopped root) [1, 2]
+  , testCase "materialize an empty replay base independently per worker" $
+      withTemporaryDirectory "leant isolated empty replay" $ \root -> do
+        config <- isolatedFakeBackendConfig root "healthy" Nothing
+        paired <- withIsolatedBackendPairReplaying config [] [] Nothing
+          $ \_ -> pure ()
+        paired @?= Right ()
+        forM_ [1, 2] $ \worker -> do
+          trace <- readIsolatedFakeCommandTrace root worker
+          trace @?=
+            [ ( "#check True"
+              , isolatedFakeEnvironment worker - 1000000
+              )
+            ]
+        assertExactlyTwoFakeWorkers root
+        mapM_ (assertFakeWorkerStopped root) [1, 2]
+  , testCase
+      "preserve worker-one replay failure and clean the gated sibling" $
+      withTemporaryDirectory "leant isolated replay failure" $ \root -> do
+        config <- isolatedFakeBackendConfig root "healthy" Nothing
+        callbackRan <- newIORef False
+        running <- async $ withIsolatedBackendPairReplaying config []
+          ["setup-gated-error"] Nothing $ \_ ->
+            modifyIORef' callbackRan $ const True
+        entered <- timeout 3000000 $ mapM_
+          (waitForHeartbeat . isolatedFakeCommandTracePath root) [1, 2]
+        entered @?= Just ()
+        writeFile (isolatedFakeSetupGatePath root) "release\n"
+        outcome <- timeout 5000000 $ waitCatch running
+        case outcome of
+          Just (Right (Left (IsolatedBackendSetupErrors 1 messages))) ->
+            messages @?= ["fake replay error"]
+          other -> assertFailure
+            $ "replay setup failure changed precedence: " ++ show other
+        readIORef callbackRan >>= (@?= False)
+        assertExactlyTwoFakeWorkers root
+        mapM_ (assertFakeWorkerStopped root) [1, 2]
+  , testCase "cancel and join both workers during history replay" $
+      withTemporaryDirectory "leant isolated replay cancellation" $ \root -> do
+        config <- isolatedFakeBackendConfig root "healthy" Nothing
+        running <- async $ withIsolatedBackendPairReplaying config []
+          ["timeout"] Nothing $ \_ -> pure ()
+        entered <- timeout 3000000 $ mapM_
+          (waitForHeartbeat . isolatedFakeCommandTracePath root) [1, 2]
+        entered @?= Just ()
+        throwTo (asyncThreadId running) ThreadKilled
+        outcome <- waitCatch running
+        assertThreadKilledOutcome "history replay cancellation" outcome
+        assertExactlyTwoFakeWorkers root
+        mapM_ (assertFakeWorkerStopped root) [1, 2]
   , testGroup "prepared one-shot pair"
       [ testCase "overlap ready setup with gated caller work" $
           withTemporaryDirectory "leant prepared overlap" $ \root -> do
@@ -2250,6 +2347,10 @@ isolatedFakeRequestLoop root scenario maybeLauncher worker pid sequenceNumber =
           isolatedFakeSetupResponse root scenario maybeLauncher
             worker artifact
           writeFile (isolatedFakeRestoredPath root worker) "restored\n"
+        Json.JObj [("cmd", Json.JStr command)] ->
+          isolatedFakeCommandResponse root scenario worker pid
+            sequenceNumber command
+            (isolatedFakeEnvironment worker - 1000000)
         Json.JObj
             [("cmd", Json.JStr command), ("env", Json.JInt environment)] ->
           isolatedFakeCommandResponse root scenario worker pid
@@ -2316,6 +2417,11 @@ isolatedFakeCommandResponse root scenario worker pid sequenceNumber
     command environment = do
   appendFile (isolatedFakeCommandStartedPath root worker)
     $ command ++ "\n"
+  appendFile (isolatedFakeCommandTracePath root worker)
+    $ Json.encodeJson (Json.JObj
+        [ ("cmd", Json.JStr command)
+        , ("env", Json.JInt environment)
+        ]) ++ "\n"
   sequenceOrdinal <- atomicModifyIORef' sequenceNumber $ \current ->
     let next = current + 1
     in (next, next)
@@ -2326,6 +2432,16 @@ isolatedFakeCommandResponse root scenario worker pid sequenceNumber
     "gated" -> waitForHeartbeat
       (isolatedFakeCommandGatePath root worker)
       >> isolatedFakeWriteIdentity sequenceOrdinal
+    "setup-gated-error" -> waitForHeartbeat
+      (isolatedFakeSetupGatePath root)
+      >> isolatedFakeWriteResponse (Json.JObj
+        [ ("messages", Json.JArr
+            [ Json.JObj
+                [ ("severity", Json.JStr "error")
+                , ("data", Json.JStr "fake replay error")
+                ]
+            ])
+        ])
     "fatal" -> isolatedFakeWriteResponse $ Json.JObj
       [("message", Json.JStr "fake command fatal")]
     "error" -> isolatedFakeWriteResponse $ Json.JObj
@@ -2401,6 +2517,25 @@ isolatedFakeClaimPath root worker =
 isolatedFakeCommandStartedPath :: FilePath -> Integer -> FilePath
 isolatedFakeCommandStartedPath root worker =
   root </> ("worker-" ++ show worker ++ ".command-started")
+
+isolatedFakeCommandTracePath :: FilePath -> Integer -> FilePath
+isolatedFakeCommandTracePath root worker =
+  root </> ("worker-" ++ show worker ++ ".command-trace")
+
+readIsolatedFakeCommandTrace
+  :: FilePath
+  -> Integer
+  -> IO [(String, Integer)]
+readIsolatedFakeCommandTrace root worker = do
+  entries <- lines <$> readFile (isolatedFakeCommandTracePath root worker)
+  forM entries $ \entry -> case Json.parseJson entry of
+    Right value
+      | Just command <- Json.jLookup "cmd" value >>= Json.jString
+      , Just environment <- Json.jLookup "env" value >>= Json.jInt ->
+          pure (command, environment)
+    parsed -> assertFailure
+      ("invalid isolated fake command trace: " ++ show parsed)
+      >> pure ("", 0)
 
 isolatedFakeCommandGatePath :: FilePath -> Integer -> FilePath
 isolatedFakeCommandGatePath root worker =

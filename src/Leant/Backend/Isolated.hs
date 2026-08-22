@@ -1,7 +1,7 @@
--- | A command-local pair of independent Lean backends restored from one
--- environment artifact.  This module deliberately owns the complete worker
--- lifetime: callers can lease a worker, but cannot extract or share its
--- underlying 'Backend'.
+-- | A command-local pair of independent Lean backends initialized either
+-- from one environment artifact or by replaying an imported command history.
+-- This module deliberately owns the complete worker lifetime: callers can
+-- lease a worker, but cannot extract or share its underlying 'Backend'.
 module Leant.Backend.Isolated
   ( IsolatedBackendPair
   , IsolatedBackendLease
@@ -10,6 +10,7 @@ module Leant.Backend.Isolated
   , IsolatedBackendFailure (..)
   , IsolatedBackendTransportFailure (..)
   , withIsolatedBackendPair
+  , withIsolatedBackendPairReplaying
   , withIsolatedBackendPairPreparation
   , withIsolatedBackendPairPreparationAfterPublicationForTesting
   , runPreparedIsolatedBackendPair
@@ -200,6 +201,15 @@ data IsolatedPairStatus
   | IsolatedPairPoisonedStatus IsolatedBackendTransportFailure
   | IsolatedPairClosedStatus
 
+-- | How a fresh worker reaches the command-local environment used for
+-- candidate checks.  Snapshot restoration remains the established fast path
+-- for a history-free session.  Ordered reconstruction is the package-private
+-- escape hatch for session-created command state which upstream snapshots do
+-- not preserve completely.
+data IsolatedBackendInitialization
+  = IsolatedBackendRestore FilePath
+  | IsolatedBackendReplay [String] [String]
+
 -- | Spawn and restore exactly two independent backends, run a callback, and
 -- then kill and reap both workers (including workers still checked out by a
 -- mis-scoped child thread).  A normal callback result is rejected when any
@@ -212,11 +222,40 @@ withIsolatedBackendPair
   -> (IsolatedBackendPair -> IO a)
   -> IO (Either IsolatedBackendFailure a)
 withIsolatedBackendPair config artifact requestTimeout callback =
+  withIsolatedBackendPairUsing config
+    (IsolatedBackendRestore artifact) requestTimeout callback
+
+-- | Spawn exactly two independent backends, reconstruct the same imported
+-- base and chronological accepted command history in each process, run a
+-- callback, and then kill and reap both workers.  Imports and history are
+-- replayed serially within each worker, while the two worker reconstructions
+-- run concurrently.  This is deliberately separate from artifact restore:
+-- callers must choose replay only when duplicating the recorded commands is
+-- within their explicit parallel-session contract.
+withIsolatedBackendPairReplaying
+  :: BackendConfig
+  -> [String]
+  -> [String]
+  -> Maybe Int
+  -> (IsolatedBackendPair -> IO a)
+  -> IO (Either IsolatedBackendFailure a)
+withIsolatedBackendPairReplaying config imports history requestTimeout
+    callback =
+  withIsolatedBackendPairUsing config
+    (IsolatedBackendReplay imports history) requestTimeout callback
+
+withIsolatedBackendPairUsing
+  :: BackendConfig
+  -> IsolatedBackendInitialization
+  -> Maybe Int
+  -> (IsolatedBackendPair -> IO a)
+  -> IO (Either IsolatedBackendFailure a)
+withIsolatedBackendPairUsing config initialization requestTimeout callback =
   mask $ \restore -> do
     -- Keep the ownership handoff masked: once acquisition returns a pair,
     -- this bracket must bind it before caller cancellation can be delivered.
     acquired <- acquireIsolatedBackendPair
-      config artifact requestTimeout restore
+      config initialization requestTimeout restore
     case acquired of
       Left failure -> pure $ Left failure
       Right pair -> runAcquiredIsolatedBackendPair pair
@@ -348,7 +387,8 @@ acquirePreparedIsolatedBackendPair config artifact requestTimeout
     restoreSetup acquisitionOwned = do
   registered <- newIORef []
   attempted <- tryAny $ acquireIsolatedBackendPairWithRegistry
-    registered config artifact requestTimeout restoreSetup acquisitionOwned
+    registered config (IsolatedBackendRestore artifact) requestTimeout
+      restoreSetup acquisitionOwned
   case attempted of
     Right acquired -> pure $ PreparedAcquisitionCompleted acquired
     Left exception -> case fromException exception of
@@ -551,31 +591,31 @@ runIsolatedBackendCommand lease command =
 
 acquireIsolatedBackendPair
   :: BackendConfig
-  -> FilePath
+  -> IsolatedBackendInitialization
   -> Maybe Int
   -> ( IO (Either IsolatedBackendFailure IsolatedWorker)
        -> IO (Either IsolatedBackendFailure IsolatedWorker)
      )
   -> IO (Either IsolatedBackendFailure IsolatedBackendPair)
-acquireIsolatedBackendPair config artifact requestTimeout restoreSetup = do
+acquireIsolatedBackendPair config initialization requestTimeout restoreSetup = do
   -- The registry closes the ownership gap between each child's masked spawn
   -- handoff and this parent's ordered result handoff.
   registered <- newIORef []
-  acquireIsolatedBackendPairWithRegistry registered config artifact
+  acquireIsolatedBackendPairWithRegistry registered config initialization
       requestTimeout restoreSetup (pure ())
     `onException` cleanupRegisteredIgnoringFailures registered
 
 acquireIsolatedBackendPairWithRegistry
   :: IORef [(Int, Backend)]
   -> BackendConfig
-  -> FilePath
+  -> IsolatedBackendInitialization
   -> Maybe Int
   -> ( IO (Either IsolatedBackendFailure IsolatedWorker)
        -> IO (Either IsolatedBackendFailure IsolatedWorker)
      )
   -> IO ()
   -> IO (Either IsolatedBackendFailure IsolatedBackendPair)
-acquireIsolatedBackendPairWithRegistry registered config artifact
+acquireIsolatedBackendPairWithRegistry registered config initialization
     requestTimeout restoreSetup acquisitionOwned =
   withAsync
       (tryAny $ restoreSetup $ acquireWorker 1) $ \first ->
@@ -624,7 +664,8 @@ acquireIsolatedBackendPairWithRegistry registered config artifact
         -- Publish ownership while masked before setup becomes interruptible.
         atomicModifyIORef' registered $ \backends ->
           ((ordinal, backend) : backends, ())
-        restoreWorker $ setupWorker ordinal backend artifact requestTimeout
+        restoreWorker $ setupWorker ordinal backend initialization
+          requestTimeout
 
   initializationFailure failure backends = do
     cleanupFailures <- cleanupBackendsUncancellable backends
@@ -641,38 +682,83 @@ cleanupRegisteredIgnoringFailures registered = do
 setupWorker
   :: Int
   -> Backend
-  -> FilePath
+  -> IsolatedBackendInitialization
   -> Maybe Int
   -> IO (Either IsolatedBackendFailure IsolatedWorker)
-setupWorker ordinal backend artifact requestTimeout = do
-  restored <- request backend requestTimeout $ JObj
-    [("unpickleEnvFrom", JStr artifact)]
-  case restored of
-    Left requestFailure -> pure $ Left
-      $ IsolatedBackendSetupTransportFailure ordinal
-      $ transportFailure requestFailure
-    Right response
-      | Just fatal <- responseFatal response ->
-          pure $ Left $ IsolatedBackendSetupFatal ordinal $ trim fatal
-      | not (null errors) ->
-          pure $ Left $ IsolatedBackendSetupErrors ordinal errors
-      | Just environment <- jLookup "env" response >>= jInt -> do
-          requestLock <- newMVar ()
-          (requestInFlight, retired) <- atomically $ (,)
-            <$> newTVar False
-            <*> newTVar Nothing
-          pure $ Right IsolatedWorker
-            { isolatedWorkerOrdinal = ordinal
-            , isolatedWorkerBackend = backend
-            , isolatedWorkerEnvironment = environment
-            , isolatedWorkerRequestLock = requestLock
-            , isolatedWorkerRequestInFlight = requestInFlight
-            , isolatedWorkerRetired = retired
-            }
-      | otherwise -> pure $ Left
-          $ IsolatedBackendSetupMissingEnvironment ordinal
-     where
-      errors = responseErrors response
+setupWorker ordinal backend initialization requestTimeout = do
+  initialized <- case initialization of
+    IsolatedBackendRestore artifact ->
+      setupEnvironment $ JObj [("unpickleEnvFrom", JStr artifact)]
+    IsolatedBackendReplay imports history ->
+      replayEnvironment imports history
+  case initialized of
+    Left failure -> pure $ Left failure
+    Right environment -> do
+      requestLock <- newMVar ()
+      (requestInFlight, retired) <- atomically $ (,)
+        <$> newTVar False
+        <*> newTVar Nothing
+      pure $ Right IsolatedWorker
+        { isolatedWorkerOrdinal = ordinal
+        , isolatedWorkerBackend = backend
+        , isolatedWorkerEnvironment = environment
+        , isolatedWorkerRequestLock = requestLock
+        , isolatedWorkerRequestInFlight = requestInFlight
+        , isolatedWorkerRetired = retired
+        }
+ where
+  setupEnvironment payload = do
+    attempted <- request backend requestTimeout payload
+    pure $ case attempted of
+      Left requestFailure -> Left
+        $ IsolatedBackendSetupTransportFailure ordinal
+        $ transportFailure requestFailure
+      Right response
+        | Just fatal <- responseFatal response ->
+            Left $ IsolatedBackendSetupFatal ordinal $ trim fatal
+        | errors@(_ : _) <- responseErrors response ->
+            Left $ IsolatedBackendSetupErrors ordinal errors
+        | Just environment <- jLookup "env" response >>= jInt ->
+            Right environment
+        | otherwise -> Left $ IsolatedBackendSetupMissingEnvironment ordinal
+
+  replayEnvironment imports history = do
+    base <- case imports of
+      [] -> pure $ Right Nothing
+      _ -> do
+        imported <- setupEnvironment $ setupCommandPayload Nothing
+          $ unlines $ map ("import " ++) imports
+        case imported of
+          Left failure -> pure $ Left failure
+          Right environment -> do
+            -- Match Main's backend-reconstruction contract: retain the
+            -- import response environment, but reject a silently unusable
+            -- import branch through one later-environment probe.
+            probed <- setupEnvironment $ setupCommandPayload
+              (Just environment) "example : True := True.intro"
+            pure $ case probed of
+              Left failure -> Left failure
+              Right _ -> Right $ Just environment
+    case base of
+      Left failure -> pure $ Left failure
+      Right environment -> replayHistory environment history
+
+  replayHistory environment commands = case commands of
+    [] -> case environment of
+      Just ready -> pure $ Right ready
+      Nothing -> setupEnvironment
+        $ setupCommandPayload Nothing "#check True"
+    command : rest -> do
+      advanced <- setupEnvironment
+        $ setupCommandPayload environment command
+      case advanced of
+        Left failure -> pure $ Left failure
+        Right next -> replayHistory (Just next) rest
+
+setupCommandPayload :: Maybe Integer -> String -> JValue
+setupCommandPayload environment command = JObj
+  $ ("cmd", JStr command)
+  : [("env", JInt value) | Just value <- [environment]]
 
 commandPayload :: Integer -> String -> JValue
 commandPayload environment command = JObj
