@@ -1,15 +1,21 @@
-# Compiled synthesis-tooling cache benchmark
+# Isolated synthesis-verification benchmarks
 
-This benchmark measures the end-to-end effect of Leant's persistent compiled
-synthesis-tooling cache. It compares the exact pre-cache baseline and the
-candidate worktree at both one and two RTS capabilities. Both binaries already
-contain the same ordered, process-isolated parallel Lean verifier. Every run is
-a fresh Leant process; Lean startup, synthesis, verification, and presentation
-are all included.
+The default `compiled-cache` protocol measures the end-to-end effect of
+Leant's persistent compiled synthesis-tooling cache. It compares the exact
+pre-cache baseline and the candidate worktree at both one and two RTS
+capabilities. Both binaries already contain the same ordered,
+process-isolated parallel Lean verifier. Every run is a fresh Leant process;
+Lean startup, synthesis, verification, and presentation are all included.
 
 This is a release gate, not a microbenchmark. The script refuses to time a
 route until an untimed `strace` preflight proves the expected backend topology
 and byte-identical semantic output in all four cells.
+
+The opt-in `--protocol scaled-pool` is a separate, preregistered retention
+screen for the bounded two-to-four-worker verifier. It fixes the benchmark at
+one warmup and five measured samples in six N1/N2/N4 cells. It neither changes
+the default compiled-cache protocol nor constitutes release-promotion
+evidence.
 
 ## Requirements
 
@@ -18,6 +24,12 @@ and byte-identical semantic output in all four cells.
 - `strace`
 - an executable Lean REPL backend compatible with this Leant checkout
 - optimized baseline and candidate Leant executables
+
+The scaled-pool protocol additionally requires at least four effective CPUs.
+On platforms with `sched_getaffinity`, the script uses the current process's
+affinity-set size; otherwise it falls back to the host logical-CPU count. It
+prints both host and effective counts and aborts before preflight when the
+effective count is below four.
 
 Build both Leant executables with the same compiler and explicit Cabal
 optimization profile. Repeat the profile on `list-bin`, because optimized and
@@ -33,7 +45,145 @@ For the compiled-tooling checkpoint, the baseline is the clean tree at commit
 with its recorded Djex submodule, then build the candidate from the dirty or
 committed candidate tree with the same command.
 
-## Cells and workloads
+## Scaled-pool retention protocol
+
+Use `--protocol scaled-pool` to compare the fixed-two-worker baseline at exact
+commit `1097e30cba7140df3fd22705276530b1f39b2d70` with a candidate that
+connects the bounded pool to Main. The protocol times only the two primary,
+history-free, five-result workloads: `state-thread.txt` and
+`continuation.txt`.
+
+Scaled mode requires all four exact provenance options:
+`--baseline-leant-commit`, `--candidate-leant-commit`,
+`--baseline-djex-commit`, and `--candidate-djex-commit`. Each value must be a
+40-character lowercase hexadecimal commit. The script prints them with the
+three executable hashes before preflight. These options are globally optional,
+so omitting them preserves the default compiled-cache CLI.
+
+The six warm-cache cells are:
+
+| Cell | Executable | RTS capabilities | Expected Lean processes |
+| --- | --- | ---: | ---: |
+| B1 | fixed-two baseline | 1 | 1 |
+| C1 | scaled-pool candidate | 1 | 1 |
+| B2 | fixed-two baseline | 2 | 3: primary plus two workers |
+| C2 | scaled-pool candidate | 2 | 3: primary plus two workers |
+| B4 | fixed-two baseline | 4 | 3: primary plus two workers |
+| C4 | scaled-pool candidate | 4 | 5: primary plus four workers |
+
+The protocol explicitly passes `+RTS -N4 -RTS` to B4 and C4. That fixed
+experimental cell does not add a default `-N4`, change the executable's
+ordinary capability count, or by itself promote N4 as a default route.
+
+### Scaled-pool preflight
+
+Before the long-workload preflight, the repository's
+`history-free-multi-group.txt` short batch runs in this exact order against one
+shared private tooling cache:
+
+| Short cell | Executable/capabilities | Backends | Artifact | Exact module opens |
+| --- | --- | ---: | --- | ---: |
+| SB1 | baseline N1 | 1 | absent | 0; cold-publishes the module |
+| SB4 | baseline N4 | 3 | present | 1 |
+| SC1 | candidate N1 | 1 | absent | 1 |
+| SC4 | candidate N4 | 3 | present | 1 |
+
+The N4 short cells prove that a reachable two-group batch acquires only two
+workers. All four cells must produce byte-identical normalized debug and
+semantic transcripts with exactly `it1`/`it2`, one
+`lean-variant-attempted=2`, and one `lean-candidate-verified=2` metric. SB1
+creates exactly one compiled module. SB4, SC1, and SC4 must retain that exact
+module path and SHA-256 while opening it once each.
+
+Each long workload then runs untimed in all six cells against that same warm
+module. The preflight requires:
+
+- exactly `it1` through `it5`, one `lean-variant-attempted=5`, and one
+  `lean-candidate-verified=5` in every cell;
+- byte-identical normalized debug and semantic transcripts across all six
+  cells;
+- exact 1/1/3/3/3/5 backend counts in B1/C1/B2/C2/B4/C4;
+- one open of the exact shared compiled module per long preflight cell, with
+  an unchanged path and SHA-256;
+- an artifact route in every N2/N4 multi-worker trace and no artifact route in
+  either N1 trace;
+- no `leant-parallel-verification*` artifact beneath any command's private
+  temporary directory after it exits.
+
+Any mismatch aborts before timing.
+
+### Scaled-pool timing order
+
+The screen is fixed at one warmup and five measured samples per cell and
+workload: 60 retained timing rows. `--warmups` and `--samples` must therefore
+remain 1 and 5. A failed or noisy row is never rerun or replaced. Workload
+order alternates by measured sample. Within a workload the six treatments use
+this fixed Williams square, where every directed adjacency occurs exactly
+once across its six rows:
+
+| Row | Treatment order |
+| ---: | --- |
+| 1 | B1, C1, C4, B2, B4, C2 |
+| 2 | C1, B2, B1, C2, C4, B4 |
+| 3 | B2, C2, C1, B4, B1, C4 |
+| 4 | C2, B4, B2, C4, C1, B1 |
+| 5 | B4, C4, C2, B1, B2, C1 |
+| 6 | C4, B1, B4, C1, C2, B2 |
+
+Each workload uses every Williams row exactly once across its warmup and five
+measured samples. State-thread warms up with row 1 and measures rows 2 through
+6. Continuation warms up with row 2 and measures rows 3 through 6 followed by
+row 1.
+
+Example:
+
+```console
+./bench-verification/benchmark.py \
+  --protocol scaled-pool \
+  --baseline /absolute/path/to/1097e30/leant \
+  --candidate /absolute/path/to/candidate/leant \
+  --backend /absolute/path/to/repl \
+  --baseline-leant-commit 1097e30cba7140df3fd22705276530b1f39b2d70 \
+  --candidate-leant-commit 4f11872b9563be16bc9664982f37d4d5ad770583 \
+  --baseline-djex-commit 9fa145ed743321cd861440940398413a6ad844b3 \
+  --candidate-djex-commit 9fa145ed743321cd861440940398413a6ad844b3 \
+  --warmups 1 \
+  --samples 5 \
+  --results /absolute/path/to/scaled-pool-screen.tsv \
+  --artifacts /absolute/path/to/scaled-pool-artifacts \
+  --enforce
+```
+
+The fixed retention gate requires, on each workload:
+
+- B4/C4 median wall speedup of at least 1.10x;
+- C4 p95 wall time no worse than B4;
+- C1/B1 and C2/B2 median wall ratios no greater than 1.05, and p95 ratios no
+  greater than 1.10;
+- C1/B1, C2/B2, and C4/B4 median GHC allocation ratios no greater than 1.10;
+- C1/B1, C2/B2, and C4/B4 median process-tree CPU and aggregate-RSS ratios no
+  greater than 1.25;
+- a B4/C4 geometric-mean speedup of at least 1.10x across both workloads.
+
+The report also prints C2/C4 candidate scaling, the B2/B4 fixed-two control,
+all N1/N2 median and p95 ratios, the C4/B4 p95 ratio, and allocation, CPU, and
+RSS ratios for C1/B1, C2/B2, and C4/B4. Without `--enforce`, a threshold miss
+prints `scaled-pool retention: HOLD` but returns success so the unreplaced
+screen can be preserved.
+
+A measured improvement >10%, including ~16.5%, is meaningful retention
+evidence. Such a result is worth keeping and must not be described as
+speculative merely because it came from this screen. The historical 1.25x
+compiled-cache release-promotion tier is a distinct, stronger evidence level;
+it does not erase a reproducible double-digit result or turn fixed N4 into a
+default runtime setting.
+
+The compiled-cache-only controls (`--minimum-speedup`,
+`--maximum-n1-regression`, the allocation/CPU/RSS and cold-cache threshold
+options, `--baseline-cold-cache-modules`, and `--candidate-n2-initializer`) do
+not alter the fixed scaled-pool screen.
+
+## Default compiled-cache cells and workloads
 
 Four warm-cache cells isolate capability effects from implementation effects.
 Two cold-cache controls bound the first-use cost:

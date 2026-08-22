@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""End-to-end benchmark for Leant's compiled synthesis-tooling cache.
+"""End-to-end benchmarks for Leant's isolated synthesis verification.
 
-The benchmark compares the exact pre-cache baseline and a candidate binary at
-both one and two RTS capabilities.  Linux /proc sampling reports aggregate
-process-tree CPU and resident memory; strace proves that both binaries retain
-the same ordered isolated-verification topology.
+The default protocol compares the exact pre-cache baseline and a candidate
+binary at both one and two RTS capabilities.  The opt-in ``scaled-pool``
+protocol screens the bounded two-to-four-worker verification pool at fixed
+N1, N2, and N4.  Linux /proc sampling reports aggregate process-tree CPU and
+resident memory; strace proves the selected ordered isolated-verification
+topology before either protocol records timings.
 """
 
 from __future__ import annotations
@@ -33,17 +35,43 @@ WORKLOADS = (
     ("continuation", SCRIPT_DIR / "continuation.txt"),
     ("library-map", SCRIPT_DIR / "library-map.txt"),
 )
+SCALED_POOL_WORKLOADS = WORKLOADS[:2]
+SHORT_BATCH_FIXTURE = (
+    SCRIPT_DIR.parent
+    / "test"
+    / "parallel-verification"
+    / "history-free-multi-group.txt"
+)
 LATIN_ROWS = (
     ("B1", "B2", "C2", "C1"),
     ("B2", "C1", "B1", "C2"),
     ("C1", "C2", "B2", "B1"),
     ("C2", "B1", "C1", "B2"),
 )
+SCALED_POOL_CELL_ORDER = ("B1", "C1", "B2", "C2", "B4", "C4")
+# The first row is the standard even-order Williams construction
+# A, B, F, C, E, D.  Cyclic relabeling produces all six rows and makes every
+# ordered pair of distinct treatments adjacent exactly once.
+SCALED_POOL_WILLIAMS_ROWS = tuple(
+    tuple(
+        SCALED_POOL_CELL_ORDER[(ordinal + shift) % 6]
+        for ordinal in (0, 1, 5, 2, 4, 3)
+    )
+    for shift in range(6)
+)
 COLD_ROWS = (
     ("D1", "D2"),
     ("D2", "D1"),
 )
 PRIMARY_WORKLOADS = ("state-thread", "continuation")
+SCALED_POOL_WARMUPS = 1
+SCALED_POOL_SAMPLES = 5
+SCALED_POOL_MINIMUM_SPEEDUP = 1.10
+SCALED_POOL_MAXIMUM_MEDIAN_REGRESSION = 1.05
+SCALED_POOL_MAXIMUM_P95_REGRESSION = 1.10
+SCALED_POOL_MAXIMUM_ALLOCATION_RATIO = 1.10
+SCALED_POOL_MAXIMUM_CPU_RATIO = 1.25
+SCALED_POOL_MAXIMUM_RSS_RATIO = 1.25
 STARTUP_PREFIXES = (
     "no Lake project",
     "starting Lean backend",
@@ -56,6 +84,7 @@ ALLOCATED_RE = re.compile(
 )
 CANDIDATE_RE = re.compile(r"^\s*(it[0-9]+)\s{2}", re.MULTILINE)
 QUEUE_COUNT_RE = re.compile(r"queue limit pruned [0-9]+")
+GIT_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
 class BenchmarkFailure(RuntimeError):
@@ -91,6 +120,13 @@ class RunResult:
     transcript_hash: str
 
 
+@dataclass(frozen=True)
+class PreflightResult:
+    debug_transcript: bytes
+    semantic_transcript: bytes
+    trace_text: str
+
+
 def positive_int(raw: str) -> int:
     value = int(raw)
     if value <= 0:
@@ -112,10 +148,46 @@ def executable_path(raw: str) -> Path:
     return path
 
 
+def exact_git_commit(raw: str) -> str:
+    if GIT_COMMIT_RE.fullmatch(raw) is None:
+        raise argparse.ArgumentTypeError(
+            "expected an exact 40-character lowercase hexadecimal commit"
+        )
+    return raw
+
+
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="benchmark baseline and candidate verification at N1/N2",
+        description=(
+            "benchmark baseline and candidate isolated verification; the "
+            "default compiled-cache protocol uses N1/N2"
+        ),
     )
+    parser.add_argument(
+        "--protocol",
+        choices=("compiled-cache", "scaled-pool"),
+        default="compiled-cache",
+        help=(
+            "benchmark protocol (default: compiled-cache); scaled-pool is "
+            "the fixed N1/N2/N4 five-sample retention screen"
+        ),
+    )
+    for role, repository in (
+        ("baseline", "leant"),
+        ("candidate", "leant"),
+        ("baseline", "djex"),
+        ("candidate", "djex"),
+    ):
+        option = f"--{role}-{repository}-commit"
+        parser.add_argument(
+            option,
+            type=exact_git_commit,
+            metavar="COMMIT",
+            help=(
+                f"exact {role} {repository.capitalize()} commit; "
+                "required by --protocol scaled-pool"
+            ),
+        )
     parser.add_argument(
         "--baseline",
         type=executable_path,
@@ -171,7 +243,10 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--enforce",
         action="store_true",
-        help="return failure when the documented promotion thresholds fail",
+        help=(
+            "return failure when the selected protocol's documented "
+            "thresholds fail"
+        ),
     )
     parser.add_argument(
         "--minimum-speedup",
@@ -242,6 +317,17 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def host_and_effective_cpu_counts() -> tuple[int | None, int | None]:
+    host_count = os.cpu_count()
+    affinity = getattr(os, "sched_getaffinity", None)
+    if affinity is not None:
+        try:
+            return host_count, len(affinity(0))
+        except (OSError, NotImplementedError):
+            pass
+    return host_count, host_count
+
+
 def normalize_transcript(raw: bytes, *, remove_debug: bool) -> bytes:
     text = raw.decode("utf-8", errors="strict").replace("\r", "")
     normalized: list[str] = []
@@ -257,13 +343,21 @@ def normalize_transcript(raw: bytes, *, remove_debug: bool) -> bytes:
     return ("\n".join(normalized) + "\n").encode("utf-8")
 
 
-def assert_five_candidates(transcript: bytes, label: str) -> None:
+def assert_candidates(
+    transcript: bytes,
+    expected_count: int,
+    label: str,
+) -> None:
     names = CANDIDATE_RE.findall(transcript.decode("utf-8"))
-    expected = [f"it{ordinal}" for ordinal in range(1, 6)]
+    expected = [f"it{ordinal}" for ordinal in range(1, expected_count + 1)]
     if names != expected:
         raise BenchmarkFailure(
             f"{label}: expected candidates {expected}, observed {names}"
         )
+
+
+def assert_five_candidates(transcript: bytes, label: str) -> None:
+    assert_candidates(transcript, 5, label)
 
 
 def base_environment(
@@ -520,6 +614,294 @@ def preflight_workload(
     return transcript_hash
 
 
+def validate_scaled_pool_design() -> None:
+    """Fail closed if the checked-in six-treatment design is malformed."""
+
+    expected_cells = set(SCALED_POOL_CELL_ORDER)
+    if len(SCALED_POOL_WILLIAMS_ROWS) != len(expected_cells):
+        raise BenchmarkFailure("scaled-pool design must contain six rows")
+    carryover: dict[tuple[str, str], int] = {}
+    for row in SCALED_POOL_WILLIAMS_ROWS:
+        if len(row) != len(expected_cells) or set(row) != expected_cells:
+            raise BenchmarkFailure(
+                f"scaled-pool Williams row is not a permutation: {row!r}"
+            )
+        for pair in zip(row, row[1:]):
+            carryover[pair] = carryover.get(pair, 0) + 1
+    expected_pairs = {
+        (left, right)
+        for left in expected_cells
+        for right in expected_cells
+        if left != right
+    }
+    if set(carryover) != expected_pairs or any(
+        count != 1 for count in carryover.values()
+    ):
+        raise BenchmarkFailure(
+            "scaled-pool Williams design does not balance ordered carryover"
+        )
+    for workload_index, _ in enumerate(SCALED_POOL_WORKLOADS):
+        scheduled = [SCALED_POOL_WILLIAMS_ROWS[workload_index]] + [
+            SCALED_POOL_WILLIAMS_ROWS[
+                (sample_number + workload_index)
+                % len(SCALED_POOL_WILLIAMS_ROWS)
+            ]
+            for sample_number in range(1, SCALED_POOL_SAMPLES + 1)
+        ]
+        if set(scheduled) != set(SCALED_POOL_WILLIAMS_ROWS):
+            raise BenchmarkFailure(
+                "scaled-pool warmup and sample schedule must use every "
+                "Williams row once per workload"
+            )
+
+
+def scaled_pool_preflight_cell(
+    workload: str,
+    fixture: Path,
+    expected_candidates: int,
+    cell: Cell,
+    backend: Path,
+    root: Path,
+    tooling_cache: Path,
+    timeout_seconds: int,
+    *,
+    expected_backends: int | None = None,
+) -> PreflightResult:
+    run_root = root / f"scaled preflight {workload} {cell.name}"
+    temporary = run_root / "temporary artifacts with spaces"
+    temporary.mkdir(parents=True)
+    trace = run_root / "backend-exec.trace"
+    command = (
+        "strace",
+        "-f",
+        "-qq",
+        "-e",
+        "trace=execve,openat",
+        "-s",
+        "4096",
+        "-o",
+        str(trace),
+        "--",
+        str(cell.executable),
+        "--plain",
+        "+RTS",
+        f"-N{cell.capabilities}",
+        "-RTS",
+    )
+    return_code, output = communicate_before(
+        command,
+        fixture,
+        base_environment(backend, temporary, tooling_cache, debug=True),
+        timeout_seconds,
+    )
+    if return_code != 0:
+        raise BenchmarkFailure(
+            f"scaled preflight {workload}/{cell.name} exited "
+            f"{return_code}:\n"
+            + output.decode("utf-8", errors="replace")
+        )
+    label = f"scaled preflight {workload}/{cell.name}"
+    assert_no_artifact_leak(temporary, label)
+    debug_transcript = normalize_transcript(output, remove_debug=False)
+    semantic_transcript = normalize_transcript(output, remove_debug=True)
+    assert_candidates(semantic_transcript, expected_candidates, label)
+    debug_text = debug_transcript.decode("utf-8")
+    for metric in (
+        f"debug metric: lean-variant-attempted={expected_candidates}",
+        f"debug metric: lean-candidate-verified={expected_candidates}",
+    ):
+        if debug_text.count(metric) != 1:
+            raise BenchmarkFailure(f"{label}: expected one {metric!r}")
+    trace_text = trace.read_text(encoding="utf-8", errors="strict")
+    backend_count = trace_text.count(f'execve("{backend}"')
+    backend_oracle = (
+        cell.expected_backends
+        if expected_backends is None
+        else expected_backends
+    )
+    if backend_count != backend_oracle:
+        raise BenchmarkFailure(
+            f"{label}: launched {backend_count} backends, expected "
+            f"{backend_oracle}"
+        )
+    artifact_marker = "leant-parallel-verification"
+    artifact_route = artifact_marker in trace_text
+    expected_artifact_route = backend_oracle > 1
+    if artifact_route != expected_artifact_route:
+        actual = "present" if artifact_route else "absent"
+        expected = "present" if expected_artifact_route else "absent"
+        raise BenchmarkFailure(
+            f"{label}: verification artifact route was {actual}, "
+            f"expected {expected}"
+        )
+    print(
+        f"ok   scaled preflight {workload:13s} {cell.name} "
+        f"({backend_count} backend{'s' if backend_count != 1 else ''})"
+    )
+    return PreflightResult(
+        debug_transcript=debug_transcript,
+        semantic_transcript=semantic_transcript,
+        trace_text=trace_text,
+    )
+
+
+def assert_exact_module_open_count(
+    result: PreflightResult,
+    module: Path,
+    expected: int,
+    label: str,
+) -> None:
+    actual = result.trace_text.count(f'"{module}"')
+    if actual != expected:
+        raise BenchmarkFailure(
+            f"{label}: opened the exact compiled tooling module {actual} "
+            f"times, expected {expected}"
+        )
+
+
+def assert_same_preflight_transcripts(
+    reference: PreflightResult,
+    observed: PreflightResult,
+    label: str,
+) -> None:
+    if observed.debug_transcript != reference.debug_transcript:
+        raise BenchmarkFailure(
+            f"{label}: debug transcript hash "
+            f"{sha256_bytes(observed.debug_transcript)} differs from "
+            f"{sha256_bytes(reference.debug_transcript)}"
+        )
+    if observed.semantic_transcript != reference.semantic_transcript:
+        raise BenchmarkFailure(
+            f"{label}: semantic transcript hash "
+            f"{sha256_bytes(observed.semantic_transcript)} differs from "
+            f"{sha256_bytes(reference.semantic_transcript)}"
+        )
+
+
+def scaled_pool_preflight(
+    cells: dict[str, Cell],
+    backend: Path,
+    root: Path,
+    tooling_cache: Path,
+    timeout_seconds: int,
+) -> dict[str, str]:
+    """Prove cache, semantic, debug, topology, and cleanup invariants."""
+
+    assert_tooling_cache_modules(
+        tooling_cache, 0, "scaled-pool initial cache"
+    )
+    short_reference = scaled_pool_preflight_cell(
+        "SB1",
+        SHORT_BATCH_FIXTURE,
+        2,
+        cells["B1"],
+        backend,
+        root,
+        tooling_cache,
+        timeout_seconds,
+    )
+    modules = assert_tooling_cache_modules(
+        tooling_cache, 1, "scaled-pool SB1 cache prime"
+    )
+    module = modules[0]
+    module_checksum = sha256_file(module)
+    assert_exact_module_open_count(
+        short_reference,
+        module,
+        0,
+        "scaled preflight SB1/B1",
+    )
+    for short_name, cell_name, backend_override in (
+        ("SB4", "B4", None),
+        ("SC1", "C1", None),
+        ("SC4", "C4", 3),
+    ):
+        observed = scaled_pool_preflight_cell(
+            short_name,
+            SHORT_BATCH_FIXTURE,
+            2,
+            cells[cell_name],
+            backend,
+            root,
+            tooling_cache,
+            timeout_seconds,
+            expected_backends=backend_override,
+        )
+        label = f"scaled preflight {short_name}/{cell_name}"
+        assert_same_preflight_transcripts(short_reference, observed, label)
+        current_modules = assert_tooling_cache_modules(
+            tooling_cache, 1, label
+        )
+        if (
+            current_modules[0] != module
+            or sha256_file(module) != module_checksum
+        ):
+            raise BenchmarkFailure(
+                f"{label}: replaced the shared cache module"
+            )
+        assert_exact_module_open_count(observed, module, 1, label)
+    print(
+        "ok   scaled preflight short-batch semantic sha256 "
+        f"{sha256_bytes(short_reference.semantic_transcript)}"
+    )
+    print(
+        "ok   scaled preflight shared module "
+        f"{module} sha256 {module_checksum}; "
+        "SB1/SB4/SC1/SC4 opens 0/1/1/1"
+    )
+
+    expected_hashes: dict[str, str] = {}
+    for workload, fixture in SCALED_POOL_WORKLOADS:
+        reference: PreflightResult | None = None
+        for cell_name in SCALED_POOL_CELL_ORDER:
+            result = scaled_pool_preflight_cell(
+                workload,
+                fixture,
+                5,
+                cells[cell_name],
+                backend,
+                root,
+                tooling_cache,
+                timeout_seconds,
+            )
+            if reference is None:
+                reference = result
+            else:
+                assert_same_preflight_transcripts(
+                    reference,
+                    result,
+                    f"scaled preflight {workload}/{cell_name}",
+                )
+            current_modules = assert_tooling_cache_modules(
+                tooling_cache, 1, f"scaled preflight {workload}/{cell_name}"
+            )
+            if (
+                current_modules[0] != module
+                or sha256_file(module) != module_checksum
+            ):
+                raise BenchmarkFailure(
+                    f"scaled preflight {workload}/{cell_name} replaced "
+                    "the shared cache module"
+                )
+            assert_exact_module_open_count(
+                result,
+                module,
+                1,
+                f"scaled preflight {workload}/{cell_name}",
+            )
+        if reference is None:
+            raise BenchmarkFailure(
+                f"scaled preflight {workload}: no cells were executed"
+            )
+        transcript_hash = sha256_bytes(reference.semantic_transcript)
+        expected_hashes[workload] = transcript_hash
+        print(
+            f"ok   scaled preflight {workload:13s} semantic sha256 "
+            f"{transcript_hash}"
+        )
+    return expected_hashes
+
+
 def read_process_table() -> dict[int, ProcSample]:
     table: dict[int, ProcSample] = {}
     page_kib = os.sysconf("SC_PAGE_SIZE") // 1024
@@ -738,6 +1120,314 @@ def print_provenance(args: argparse.Namespace) -> None:
     print(f"candidate N2 initializer: {args.candidate_n2_initializer}")
 
 
+def print_scaled_pool_provenance(
+    args: argparse.Namespace,
+    host_cpu_count: int | None,
+    effective_cpu_count: int | None,
+) -> None:
+    print("Leant bounded isolated-verification pool screen")
+    print("protocol: scaled-pool (fixed N1/N2/N4)")
+    print(f"baseline Leant commit:  {args.baseline_leant_commit}")
+    print(f"candidate Leant commit: {args.candidate_leant_commit}")
+    print(f"baseline Djex commit:   {args.baseline_djex_commit}")
+    print(f"candidate Djex commit:  {args.candidate_djex_commit}")
+    print(f"baseline:  {args.baseline}")
+    print(f"  sha256:  {sha256_file(args.baseline)}")
+    print(f"candidate: {args.candidate}")
+    print(f"  sha256:  {sha256_file(args.candidate)}")
+    print(f"backend:   {args.backend}")
+    print(f"  sha256:  {sha256_file(args.backend)}")
+    print(f"platform:  {platform.platform()}")
+    print(f"host logical CPUs: {host_cpu_count}")
+    print(f"effective CPUs: {effective_cpu_count}")
+    print(
+        f"samples: {SCALED_POOL_SAMPLES}; warmups: "
+        f"{SCALED_POOL_WARMUPS}; measured rows are never replaced"
+    )
+    print(f"process-tree sampling: {args.sample_interval_ms} ms")
+    print(
+        "retention threshold: each B4/C4 and their geometric mean "
+        f">= {SCALED_POOL_MINIMUM_SPEEDUP:.2f}x"
+    )
+
+
+def scaled_pool_cells(args: argparse.Namespace) -> dict[str, Cell]:
+    return {
+        "B1": Cell("B1", args.baseline, 1, 1, 1),
+        "C1": Cell("C1", args.candidate, 1, 1, 1),
+        "B2": Cell("B2", args.baseline, 2, 3, 1),
+        "C2": Cell("C2", args.candidate, 2, 3, 1),
+        "B4": Cell("B4", args.baseline, 4, 3, 1),
+        "C4": Cell("C4", args.candidate, 4, 5, 1),
+    }
+
+
+def print_scaled_pool_summary(results: Sequence[RunResult]) -> list[str]:
+    summaries: dict[tuple[str, str], dict[str, float]] = {}
+    print("scaled-pool summary:")
+    for workload, _ in SCALED_POOL_WORKLOADS:
+        for cell_name in SCALED_POOL_CELL_ORDER:
+            selected = [
+                result
+                for result in results
+                if result.workload == workload and result.cell == cell_name
+            ]
+            if len(selected) != SCALED_POOL_SAMPLES:
+                raise BenchmarkFailure(
+                    f"{workload}/{cell_name}: retained {len(selected)} rows, "
+                    f"expected {SCALED_POOL_SAMPLES}"
+                )
+            metrics = summary_metrics(selected)
+            summaries[(workload, cell_name)] = metrics
+            print(
+                f"  {workload:13s} {cell_name}: "
+                f"wall median/p95 {metrics['wall_median']:.3f}/"
+                f"{metrics['wall_p95']:.3f}s; "
+                f"CPU {metrics['cpu_median']:.3f}s; "
+                f"RSS {metrics['rss_median'] / 1024:.1f}MiB; "
+                f"alloc {metrics['alloc_median'] / 1048576:.1f}MiB"
+            )
+
+    speedups: list[float] = []
+    retention_holds: list[str] = []
+    for workload, _ in SCALED_POOL_WORKLOADS:
+        b1 = summaries[(workload, "B1")]
+        c1 = summaries[(workload, "C1")]
+        b2 = summaries[(workload, "B2")]
+        c2 = summaries[(workload, "C2")]
+        b4 = summaries[(workload, "B4")]
+        c4 = summaries[(workload, "C4")]
+        incremental = ratio(b4["wall_median"], c4["wall_median"])
+        candidate_scaling = ratio(c2["wall_median"], c4["wall_median"])
+        baseline_n4_control = ratio(b2["wall_median"], b4["wall_median"])
+        n1_median_ratio = ratio(c1["wall_median"], b1["wall_median"])
+        n1_p95_ratio = ratio(c1["wall_p95"], b1["wall_p95"])
+        n2_median_ratio = ratio(c2["wall_median"], b2["wall_median"])
+        n2_p95_ratio = ratio(c2["wall_p95"], b2["wall_p95"])
+        n4_p95_ratio = ratio(c4["wall_p95"], b4["wall_p95"])
+        speedups.append(incremental)
+        print(
+            f"  {workload:13s}: B4/C4={incremental:.3f}x; "
+            f"C2/C4={candidate_scaling:.3f}x; "
+            f"B2/B4={baseline_n4_control:.3f}x"
+        )
+        print(
+            f"  {workload:13s}: C1/B1 median/p95="
+            f"{n1_median_ratio:.3f}/{n1_p95_ratio:.3f}x; "
+            f"C2/B2 median/p95={n2_median_ratio:.3f}/"
+            f"{n2_p95_ratio:.3f}x; C4/B4 p95={n4_p95_ratio:.3f}x"
+        )
+        if incremental < SCALED_POOL_MINIMUM_SPEEDUP:
+            retention_holds.append(
+                f"{workload} B4/C4 speedup {incremental:.3f}x < "
+                f"{SCALED_POOL_MINIMUM_SPEEDUP:.3f}x"
+            )
+        if c4["wall_p95"] > b4["wall_p95"]:
+            retention_holds.append(
+                f"{workload} candidate N4 p95 {c4['wall_p95']:.3f}s > "
+                f"baseline N4 {b4['wall_p95']:.3f}s"
+            )
+        for capabilities, median_ratio, p95_ratio in (
+            (1, n1_median_ratio, n1_p95_ratio),
+            (2, n2_median_ratio, n2_p95_ratio),
+        ):
+            if median_ratio > SCALED_POOL_MAXIMUM_MEDIAN_REGRESSION:
+                retention_holds.append(
+                    f"{workload} N{capabilities} median ratio "
+                    f"{median_ratio:.3f}x > "
+                    f"{SCALED_POOL_MAXIMUM_MEDIAN_REGRESSION:.3f}x"
+                )
+            if p95_ratio > SCALED_POOL_MAXIMUM_P95_REGRESSION:
+                retention_holds.append(
+                    f"{workload} N{capabilities} p95 ratio "
+                    f"{p95_ratio:.3f}x > "
+                    f"{SCALED_POOL_MAXIMUM_P95_REGRESSION:.3f}x"
+                )
+        resource_checks = (
+            (
+                "allocation",
+                "alloc_median",
+                SCALED_POOL_MAXIMUM_ALLOCATION_RATIO,
+            ),
+            ("CPU", "cpu_median", SCALED_POOL_MAXIMUM_CPU_RATIO),
+            ("aggregate RSS", "rss_median", SCALED_POOL_MAXIMUM_RSS_RATIO),
+        )
+        for capabilities, baseline, candidate in (
+            (1, b1, c1),
+            (2, b2, c2),
+            (4, b4, c4),
+        ):
+            resource_ratios = [
+                (label, ratio(candidate[metric], baseline[metric]), maximum)
+                for label, metric, maximum in resource_checks
+            ]
+            print(
+                f"  {workload:13s}: C{capabilities}/B{capabilities} "
+                + "; ".join(
+                    f"{label}={observed:.3f}x"
+                    for label, observed, _ in resource_ratios
+                )
+            )
+            for label, observed, maximum in resource_ratios:
+                if observed > maximum:
+                    retention_holds.append(
+                        f"{workload} N{capabilities} {label} ratio "
+                        f"{observed:.3f}x > {maximum:.3f}x"
+                    )
+    geometric_mean = math.exp(
+        sum(math.log(value) for value in speedups) / len(speedups)
+    )
+    print(f"  geometric mean B4/C4: {geometric_mean:.3f}x")
+    if geometric_mean < SCALED_POOL_MINIMUM_SPEEDUP:
+        retention_holds.append(
+            f"geometric mean B4/C4 speedup {geometric_mean:.3f}x < "
+            f"{SCALED_POOL_MINIMUM_SPEEDUP:.3f}x"
+        )
+    return retention_holds
+
+
+def run_scaled_pool_protocol(args: argparse.Namespace) -> int:
+    validate_scaled_pool_design()
+    commit_arguments = (
+        ("--baseline-leant-commit", args.baseline_leant_commit),
+        ("--candidate-leant-commit", args.candidate_leant_commit),
+        ("--baseline-djex-commit", args.baseline_djex_commit),
+        ("--candidate-djex-commit", args.candidate_djex_commit),
+    )
+    missing_commits = [
+        option for option, commit in commit_arguments if commit is None
+    ]
+    if missing_commits:
+        raise BenchmarkFailure(
+            "scaled-pool requires exact provenance arguments: "
+            + ", ".join(missing_commits)
+        )
+    if args.warmups != SCALED_POOL_WARMUPS:
+        raise BenchmarkFailure(
+            "scaled-pool is preregistered with exactly one warmup; "
+            f"observed --warmups {args.warmups}"
+        )
+    if args.samples != SCALED_POOL_SAMPLES:
+        raise BenchmarkFailure(
+            "scaled-pool is preregistered with exactly five measured "
+            f"samples; observed --samples {args.samples}"
+        )
+    if not SHORT_BATCH_FIXTURE.is_file():
+        raise BenchmarkFailure(
+            f"missing scaled-pool short-batch fixture: {SHORT_BATCH_FIXTURE}"
+        )
+    for name, fixture in SCALED_POOL_WORKLOADS:
+        if not fixture.is_file():
+            raise BenchmarkFailure(f"missing {name} fixture: {fixture}")
+
+    host_cpu_count, effective_cpu_count = host_and_effective_cpu_counts()
+    cells = scaled_pool_cells(args)
+    print_scaled_pool_provenance(
+        args, host_cpu_count, effective_cpu_count
+    )
+    if effective_cpu_count is None or effective_cpu_count < 4:
+        observed = "unknown" if effective_cpu_count is None else str(
+            effective_cpu_count
+        )
+        raise BenchmarkFailure(
+            "scaled-pool requires at least four effective CPUs; observed "
+            + observed
+        )
+    interval_seconds = args.sample_interval_ms / 1000.0
+    all_results: list[RunResult] = []
+    with tempfile.TemporaryDirectory(
+        prefix="leant scaled pool benchmark."
+    ) as raw_root:
+        root = Path(raw_root)
+        tooling_cache = root / "compiled tooling cache with spaces"
+        tooling_cache.mkdir()
+        expected_hashes = scaled_pool_preflight(
+            cells,
+            args.backend,
+            root,
+            tooling_cache,
+            args.timeout,
+        )
+        workload_map = dict(SCALED_POOL_WORKLOADS)
+        for workload_index, (name, fixture) in enumerate(
+            SCALED_POOL_WORKLOADS
+        ):
+            row = SCALED_POOL_WILLIAMS_ROWS[workload_index]
+            for cell_name in row:
+                result = measure_cell(
+                    name,
+                    fixture,
+                    -1,
+                    cells[cell_name],
+                    args.backend,
+                    root,
+                    expected_hashes[name],
+                    args.timeout,
+                    interval_seconds,
+                    tooling_cache,
+                )
+                print(
+                    f"warmup 1 {name:13s} {cell_name} "
+                    f"{result.wall_seconds:.3f}s"
+                )
+        for sample_number in range(1, SCALED_POOL_SAMPLES + 1):
+            workload_names = [name for name, _ in SCALED_POOL_WORKLOADS]
+            if sample_number % 2 == 0:
+                workload_names.reverse()
+            for name in workload_names:
+                workload_index = PRIMARY_WORKLOADS.index(name)
+                row = SCALED_POOL_WILLIAMS_ROWS[
+                    (sample_number + workload_index)
+                    % len(SCALED_POOL_WILLIAMS_ROWS)
+                ]
+                for cell_name in row:
+                    result = measure_cell(
+                        name,
+                        workload_map[name],
+                        sample_number,
+                        cells[cell_name],
+                        args.backend,
+                        root,
+                        expected_hashes[name],
+                        args.timeout,
+                        interval_seconds,
+                        tooling_cache,
+                    )
+                    all_results.append(result)
+                    print(
+                        f"sample {sample_number:2d} {name:13s} {cell_name} "
+                        f"wall={result.wall_seconds:.3f}s "
+                        f"cpu={result.cpu_seconds:.3f}s "
+                        f"rss={result.peak_rss_kib / 1024:.1f}MiB "
+                        f"alloc={result.allocated_bytes / 1048576:.1f}MiB"
+                    )
+        raw_results = root / "results.tsv"
+        write_results(raw_results, all_results)
+        if args.results is not None:
+            destination = args.results.expanduser().resolve()
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(raw_results, destination)
+            print(f"raw results: {destination}")
+        if args.artifacts is not None:
+            destination = args.artifacts.expanduser().resolve()
+            if destination.exists():
+                raise BenchmarkFailure(
+                    f"artifact destination already exists: {destination}"
+                )
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(root, destination)
+            print(f"raw artifacts: {destination}")
+
+    retention_holds = print_scaled_pool_summary(all_results)
+    if retention_holds:
+        print("scaled-pool retention: HOLD")
+        for hold in retention_holds:
+            print(f"  - {hold}")
+        return 1 if args.enforce else 0
+    print("scaled-pool retention: GO")
+    return 0
+
+
 def main() -> int:
     args = parse_arguments()
     if platform.system() != "Linux" or not Path("/proc").is_dir():
@@ -746,6 +1436,8 @@ def main() -> int:
         )
     if shutil.which("strace") is None:
         raise BenchmarkFailure("strace is required for route preflight")
+    if args.protocol == "scaled-pool":
+        return run_scaled_pool_protocol(args)
     for name, fixture in WORKLOADS:
         if not fixture.is_file():
             raise BenchmarkFailure(f"missing {name} fixture: {fixture}")
