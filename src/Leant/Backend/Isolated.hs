@@ -5,10 +5,14 @@
 module Leant.Backend.Isolated
   ( IsolatedBackendPair
   , IsolatedBackendLease
+  , IsolatedBackendPoolSize
+  , IsolatedBackendPoolSizeError (..)
   , PreparedIsolatedBackendPair
   , PreparedPairFinalization (..)
   , IsolatedBackendFailure (..)
   , IsolatedBackendTransportFailure (..)
+  , mkIsolatedBackendPoolSize
+  , withIsolatedBackendPool
   , withIsolatedBackendPair
   , withIsolatedBackendPairReplaying
   , withIsolatedBackendPairPreparation
@@ -118,6 +122,39 @@ data IsolatedBackendFailure
       (Maybe IsolatedBackendFailure) [String]
   deriving (Eq, Show)
 
+-- | A caller-selected size for the package-private artifact-restored pool.
+-- The constructor is hidden so acquisition never needs to handle an invalid
+-- count after it starts owning backend processes.
+newtype IsolatedBackendPoolSize = IsolatedBackendPoolSize Int
+  deriving (Eq, Show)
+
+-- | A programmer/configuration error detected by the pure pool-size boundary,
+-- before a 'BackendConfig', artifact path, or callback can be used.
+data IsolatedBackendPoolSizeError
+  = IsolatedBackendPoolSizeOutOfRange Int
+  deriving (Eq, Show)
+
+-- | Validate the deliberately small first-stage pool range.  Capability
+-- policy remains with the caller: this function never queries capabilities or
+-- silently clamps a requested value.
+mkIsolatedBackendPoolSize
+  :: Int
+  -> Either IsolatedBackendPoolSizeError IsolatedBackendPoolSize
+mkIsolatedBackendPoolSize workerCount
+  | workerCount >= minimumIsolatedBackendPoolSize
+  , workerCount <= maximumIsolatedBackendPoolSize =
+      Right $ IsolatedBackendPoolSize workerCount
+  | otherwise = Left $ IsolatedBackendPoolSizeOutOfRange workerCount
+
+minimumIsolatedBackendPoolSize :: Int
+minimumIsolatedBackendPoolSize = 2
+
+maximumIsolatedBackendPoolSize :: Int
+maximumIsolatedBackendPoolSize = 4
+
+twoWorkerPoolSize :: IsolatedBackendPoolSize
+twoWorkerPoolSize = IsolatedBackendPoolSize 2
+
 -- | How a scoped speculative preparation ended after its caller returned
 -- normally.  A consumed preparation reports its setup and pair result through
 -- 'runPreparedIsolatedBackendPair'.  An unused preparation reports any setup
@@ -166,7 +203,9 @@ data PreparedRunScopeClosing = PreparedRunScopeClosing
 
 instance Exception PreparedRunScopeClosing
 
--- | Exactly two workers and their private admission state.
+-- | An opaque owner and its private admission state.  Every historical pair
+-- constructor below creates exactly two workers; the package-private pool
+-- bracket may create the validated count carried by 'IsolatedBackendPoolSize'.
 data IsolatedBackendPair = IsolatedBackendPair
   { isolatedPairWorkers :: [IsolatedWorker]
   , isolatedPairState :: TVar IsolatedPairState
@@ -210,6 +249,23 @@ data IsolatedBackendInitialization
   = IsolatedBackendRestore FilePath
   | IsolatedBackendReplay [String] [String]
 
+-- | Spawn and restore a validated number of independent backends, run a
+-- callback, and then kill and reap every worker (including workers still
+-- checked out by a mis-scoped child thread).  This is the sole scaled-pool
+-- entry point: replay and prepared acquisition deliberately remain pair-only.
+-- A normal callback result is rejected when any request poisoned the pool,
+-- even if the callback ignored that request's 'Left'.
+withIsolatedBackendPool
+  :: IsolatedBackendPoolSize
+  -> BackendConfig
+  -> FilePath
+  -> Maybe Int
+  -> (IsolatedBackendPair -> IO a)
+  -> IO (Either IsolatedBackendFailure a)
+withIsolatedBackendPool poolSize config artifact requestTimeout callback =
+  withIsolatedBackendPairUsing poolSize config
+    (IsolatedBackendRestore artifact) requestTimeout callback
+
 -- | Spawn and restore exactly two independent backends, run a callback, and
 -- then kill and reap both workers (including workers still checked out by a
 -- mis-scoped child thread).  A normal callback result is rejected when any
@@ -222,7 +278,7 @@ withIsolatedBackendPair
   -> (IsolatedBackendPair -> IO a)
   -> IO (Either IsolatedBackendFailure a)
 withIsolatedBackendPair config artifact requestTimeout callback =
-  withIsolatedBackendPairUsing config
+  withIsolatedBackendPairUsing twoWorkerPoolSize config
     (IsolatedBackendRestore artifact) requestTimeout callback
 
 -- | Spawn exactly two independent backends, reconstruct the same imported
@@ -241,21 +297,23 @@ withIsolatedBackendPairReplaying
   -> IO (Either IsolatedBackendFailure a)
 withIsolatedBackendPairReplaying config imports history requestTimeout
     callback =
-  withIsolatedBackendPairUsing config
+  withIsolatedBackendPairUsing twoWorkerPoolSize config
     (IsolatedBackendReplay imports history) requestTimeout callback
 
 withIsolatedBackendPairUsing
-  :: BackendConfig
+  :: IsolatedBackendPoolSize
+  -> BackendConfig
   -> IsolatedBackendInitialization
   -> Maybe Int
   -> (IsolatedBackendPair -> IO a)
   -> IO (Either IsolatedBackendFailure a)
-withIsolatedBackendPairUsing config initialization requestTimeout callback =
+withIsolatedBackendPairUsing poolSize config initialization requestTimeout
+    callback =
   mask $ \restore -> do
     -- Keep the ownership handoff masked: once acquisition returns a pair,
     -- this bracket must bind it before caller cancellation can be delivered.
     acquired <- acquireIsolatedBackendPair
-      config initialization requestTimeout restore
+      poolSize config initialization requestTimeout restore
     case acquired of
       Left failure -> pure $ Left failure
       Right pair -> runAcquiredIsolatedBackendPair pair
@@ -387,7 +445,8 @@ acquirePreparedIsolatedBackendPair config artifact requestTimeout
     restoreSetup acquisitionOwned = do
   registered <- newIORef []
   attempted <- tryAny $ acquireIsolatedBackendPairWithRegistry
-    registered config (IsolatedBackendRestore artifact) requestTimeout
+    registered twoWorkerPoolSize config (IsolatedBackendRestore artifact)
+      requestTimeout
       restoreSetup acquisitionOwned
   case attempted of
     Right acquired -> pure $ PreparedAcquisitionCompleted acquired
@@ -514,9 +573,9 @@ runAcquiredIsolatedBackendPair pair callback = do
             Left $ IsolatedBackendPairPoisoned cause
           IsolatedPairClosedStatus -> Left IsolatedBackendPairClosed
 
--- | Lease one worker for the whole callback.  At most two lease callbacks can
--- run simultaneously.  The worker is returned only while both it and the pair
--- remain healthy.
+-- | Lease one worker for the whole callback.  At most the owner's configured
+-- worker count of lease callbacks can run simultaneously.  The worker is
+-- returned only while both it and the owner remain healthy.
 withIsolatedBackendLease
   :: IsolatedBackendPair
   -> (IsolatedBackendLease -> IO a)
@@ -590,23 +649,26 @@ runIsolatedBackendCommand lease command =
   worker = isolatedLeaseWorker lease
 
 acquireIsolatedBackendPair
-  :: BackendConfig
+  :: IsolatedBackendPoolSize
+  -> BackendConfig
   -> IsolatedBackendInitialization
   -> Maybe Int
   -> ( IO (Either IsolatedBackendFailure IsolatedWorker)
        -> IO (Either IsolatedBackendFailure IsolatedWorker)
      )
   -> IO (Either IsolatedBackendFailure IsolatedBackendPair)
-acquireIsolatedBackendPair config initialization requestTimeout restoreSetup = do
+acquireIsolatedBackendPair poolSize config initialization requestTimeout
+    restoreSetup = do
   -- The registry closes the ownership gap between each child's masked spawn
   -- handoff and this parent's ordered result handoff.
   registered <- newIORef []
-  acquireIsolatedBackendPairWithRegistry registered config initialization
-      requestTimeout restoreSetup (pure ())
+  acquireIsolatedBackendPairWithRegistry registered poolSize config
+      initialization requestTimeout restoreSetup (pure ())
     `onException` cleanupRegisteredIgnoringFailures registered
 
 acquireIsolatedBackendPairWithRegistry
   :: IORef [(Int, Backend)]
+  -> IsolatedBackendPoolSize
   -> BackendConfig
   -> IsolatedBackendInitialization
   -> Maybe Int
@@ -615,46 +677,47 @@ acquireIsolatedBackendPairWithRegistry
      )
   -> IO ()
   -> IO (Either IsolatedBackendFailure IsolatedBackendPair)
-acquireIsolatedBackendPairWithRegistry registered config initialization
-    requestTimeout restoreSetup acquisitionOwned =
-  withAsync
-      (tryAny $ restoreSetup $ acquireWorker 1) $ \first ->
-    withAsync
-      (tryAny $ restoreSetup $ acquireWorker 2) $ \second -> do
-      -- Publish that both setup children are bracketed before observing
-      -- readiness.  The prepared-pair callback may begin after this point.
-      acquisitionOwned
-      -- Both workers start concurrently, but observing worker one first
-      -- preserves the old left-to-right failure contract.  A known
-      -- worker-one failure cancels a possibly non-responsive sibling instead
-      -- of waiting for an outcome which cannot replace it.
-      firstResult <- wait first
-      case firstResult of
-        Left failure -> cancel second >> throwIO failure
-        Right (Left failure) -> do
-          cancel second
-          registeredBackends registered
-            >>= initializationFailure failure
-        Right (Right firstWorker) -> do
-          secondResult <- wait second
-          backends <- registeredBackends registered
-          case secondResult of
-            Left failure -> throwIO failure
-            Right (Left failure) ->
-              initializationFailure failure backends
-            Right (Right secondWorker) -> do
-              state <- atomically $ newTVar IsolatedPairState
-                { isolatedPairStatus = IsolatedPairHealthy
-                , isolatedPairAvailable =
-                    [firstWorker, secondWorker]
-                }
-              pure $ Right IsolatedBackendPair
-                { isolatedPairWorkers =
-                    [firstWorker, secondWorker]
-                , isolatedPairState = state
-                , isolatedPairRequestTimeout = requestTimeout
-                }
+acquireIsolatedBackendPairWithRegistry registered poolSize config
+    initialization requestTimeout restoreSetup acquisitionOwned =
+  withAsyncOwners setupActions $ \owners -> do
+    -- Publish that every setup child is bracketed before observing readiness.
+    -- Prepared acquisition uses this only at its fixed two-worker size.
+    acquisitionOwned
+    observeInOrdinalOrder [] owners
  where
+  workerCount = case poolSize of
+    IsolatedBackendPoolSize value -> value
+
+  setupActions =
+    [ tryAny $ restoreSetup $ acquireWorker ordinal
+    | ordinal <- [1 .. workerCount]
+    ]
+
+  observeInOrdinalOrder workers [] = do
+    let orderedWorkers = reverse workers
+    state <- atomically $ newTVar IsolatedPairState
+      { isolatedPairStatus = IsolatedPairHealthy
+      , isolatedPairAvailable = orderedWorkers
+      }
+    pure $ Right IsolatedBackendPair
+      { isolatedPairWorkers = orderedWorkers
+      , isolatedPairState = state
+      , isolatedPairRequestTimeout = requestTimeout
+      }
+  observeInOrdinalOrder workers (owner : remaining) = do
+    observed <- wait owner
+    case observed of
+      Left failure -> throwIO failure
+      Right (Left failure) -> do
+        -- No higher ordinal can replace this failure.  Join every suffix
+        -- child before reading the registry, so teardown cannot race a late
+        -- spawn publication or setup request.
+        mapM_ cancel remaining
+        registeredBackends registered
+          >>= initializationFailure failure
+      Right (Right worker) ->
+        observeInOrdinalOrder (worker : workers) remaining
+
   acquireWorker ordinal = mask $ \restoreWorker -> do
     spawned <- tryIOException $ restoreWorker $ spawnBackend config
     case spawned of
@@ -670,6 +733,16 @@ acquireIsolatedBackendPairWithRegistry registered config initialization
   initializationFailure failure backends = do
     cleanupFailures <- cleanupBackendsUncancellable backends
     pure $ attachCleanupFailures cleanupFailures $ Left failure
+
+-- Recursively nested brackets keep every owner scoped until the observer
+-- returns.  The callback runs only after all owners exist, and exception
+-- unwinding cancels and joins the complete set before registry cleanup runs.
+withAsyncOwners :: [IO a] -> ([Async a] -> IO b) -> IO b
+withAsyncOwners [] callback = callback []
+withAsyncOwners (action : remaining) callback =
+  withAsync action $ \owner ->
+    withAsyncOwners remaining $ \owners ->
+      callback $ owner : owners
 
 registeredBackends :: IORef [(Int, Backend)] -> IO [(Int, Backend)]
 registeredBackends registered = sortOn fst <$> readIORef registered

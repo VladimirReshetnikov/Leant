@@ -169,11 +169,15 @@ import Leant.Backend
 import qualified Leant.Backend as Backend
 import Leant.Backend.Isolated
   ( IsolatedBackendFailure (..)
+  , IsolatedBackendPoolSize
+  , IsolatedBackendPoolSizeError (..)
   , IsolatedBackendTransportFailure (..)
   , PreparedPairFinalization (..)
+  , mkIsolatedBackendPoolSize
   , runIsolatedBackendCommand
   , runPreparedIsolatedBackendPair
   , withIsolatedBackendLease
+  , withIsolatedBackendPool
   , withIsolatedBackendPair
   , withIsolatedBackendPairReplaying
   , withIsolatedBackendPairPreparation
@@ -1287,6 +1291,292 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
             $ "parallel setup did not finish cleanly: " ++ show other
         readIORef callbackRan >>= (@?= True)
         mapM_ (assertFakeWorkerStopped root) [1, 2]
+  , testGroup "bounded artifact-restored pool"
+      [ testCase "validate only worker counts two through four" $ do
+          mapM_ (\workerCount ->
+              mkIsolatedBackendPoolSize workerCount @?=
+                Left (IsolatedBackendPoolSizeOutOfRange workerCount))
+            [-1, 0, 1, 5, 100]
+          mapM_ (\workerCount ->
+              case mkIsolatedBackendPoolSize workerCount of
+                Right _ -> pure ()
+                Left failure -> assertFailure
+                  $ "valid pool size was rejected: " ++ show failure)
+            [2, 3, 4]
+      , testCase
+          "observe ordinals and join a failing suffix before cleanup" $ do
+          sourceLines <- lines
+            <$> readFile "src/Leant/Backend/Isolated.hs"
+          let acquisitionSection = mainSourceSection
+                "acquireIsolatedBackendPairWithRegistry registered poolSize config"
+                "-- Recursively nested brackets" sourceLines
+          mapM_ (assertMainSourceContains "scaled acquisition ownership"
+              acquisitionSection)
+            [ "withAsyncOwners setupActions $ \\owners -> do"
+            , "acquisitionOwned"
+            , "observeInOrdinalOrder [] owners"
+            , "observed <- wait owner"
+            , "mapM_ cancel remaining"
+            , "registeredBackends registered"
+            , ">>= initializationFailure failure"
+            , "let orderedWorkers = reverse workers"
+            , "isolatedPairAvailable = orderedWorkers"
+            , "isolatedPairWorkers = orderedWorkers"
+            ]
+          allOwned <- expectMainSourcePosition
+            "scaled acquisition ownership"
+            "withAsyncOwners setupActions" acquisitionSection
+          ownershipPublished <- expectMainSourcePosition
+            "scaled acquisition ownership"
+            "-- Publish that every setup child"
+            acquisitionSection
+          observationStarted <- expectMainSourcePosition
+            "scaled acquisition ownership"
+            "observeInOrdinalOrder [] owners" acquisitionSection
+          orderedWait <- expectMainSourcePosition
+            "scaled failure order" "observed <- wait owner"
+            acquisitionSection
+          suffixJoined <- expectMainSourcePosition
+            "scaled failure order" "mapM_ cancel remaining"
+            acquisitionSection
+          registryRead <- expectMainSourcePosition
+            "scaled failure order" "registeredBackends registered"
+            acquisitionSection
+          cleanupStarted <- expectMainSourcePosition
+            "scaled failure order" ">>= initializationFailure failure"
+            acquisitionSection
+          assertBool "setup was observed before every child was owned"
+            $ allOwned < ownershipPublished
+              && ownershipPublished < observationStarted
+          assertBool "later failure cleanup raced its setup suffix"
+            $ orderedWait < suffixJoined
+              && suffixJoined < registryRead
+              && registryRead < cleanupStarted
+          let registrySection = mainSourceSection
+                "registeredBackends registered ="
+                "cleanupRegisteredIgnoringFailures" sourceLines
+          assertMainSourceContains "ordinal cleanup order" registrySection
+            "sortOn fst <$> readIORef registered"
+      , testCase
+          "own all four setup children before observing readiness" $
+          withTemporaryDirectory "leant isolated pool setup" $ \root -> do
+            poolSize <- requireIsolatedBackendPoolSize 4
+            let artifact = root </> "pool setup artifact with spaces"
+            config <- isolatedFakeBackendConfig root
+              "setup-gated-all" Nothing
+            callbackRan <- newIORef False
+            running <- async $ withIsolatedBackendPool poolSize config
+              artifact Nothing $ \_ ->
+                modifyIORef' callbackRan $ const True
+            allEntered <- timeout 3000000 $ mapM_
+              (waitForHeartbeat . isolatedFakeSetupPath root) [1 .. 4]
+            allEntered @?= Just ()
+            mapM_ (\worker ->
+                readFile (isolatedFakeSetupPath root worker)
+                  >>= (@?= artifact))
+              [1 .. 4]
+            readIORef callbackRan >>= (@?= False)
+            premature <- timeout 200000 $ waitCatch running
+            assertBool "pool completed before setup gate opened"
+              $ isNothing premature
+            writeFile (isolatedFakeSetupGatePath root) "open\n"
+            completed <- timeout 5000000 $ waitCatch running
+            case completed of
+              Just (Right (Right ())) -> pure ()
+              other -> assertFailure
+                $ "four-worker setup did not finish: " ++ show other
+            readIORef callbackRan >>= (@?= True)
+            assertExactlyFakeWorkers root 4
+            mapM_ (assertFakeWorkerStopped root) [1 .. 4]
+      , testCase
+          "lease four distinct processes and never exceed pool capacity" $
+          withTemporaryDirectory "leant isolated pool leases" $ \root -> do
+            poolSize <- requireIsolatedBackendPoolSize 4
+            config <- isolatedFakeBackendConfig root "healthy" Nothing
+            pooled <- withIsolatedBackendPool poolSize config
+              (root </> "pool lease artifact") Nothing $ \pool -> do
+                ready <- newEmptyMVar
+                fifthReady <- newEmptyMVar
+                release <- newEmptyMVar
+                active <- newIORef (0 :: Int)
+                maximumActive <- newIORef (0 :: Int)
+                let runHeldLease entered command =
+                      withIsolatedBackendLease pool $ \lease ->
+                        (do
+                          current <- atomicModifyIORef' active $ \value ->
+                            let next = value + 1
+                            in (next, next)
+                          atomicModifyIORef' maximumActive $ \value ->
+                            (max value current, ())
+                          putMVar entered ()
+                          readMVar release
+                          runIsolatedBackendCommand lease command)
+                        `finally` atomicModifyIORef' active
+                          (\value -> (value - 1, ()))
+                firstFour <- forM [1 :: Int .. 4] $ \ordinal ->
+                  async $ runHeldLease ready
+                    $ "pool-lease-" ++ show ordinal
+                admitted <- timeout 3000000
+                  $ mapM_ (const $ takeMVar ready) firstFour
+                admitted @?= Just ()
+                fifth <- async $ runHeldLease fifthReady "pool-lease-fifth"
+                overflow <- timeout 200000 $ readMVar fifthReady
+                overflow @?= Nothing
+                readIORef maximumActive >>= (@?= 4)
+                putMVar release ()
+                completed <- timeout 5000000
+                  $ mapM waitCatch $ firstFour ++ [fifth]
+                outcomes <- case completed of
+                  Just values -> pure values
+                  Nothing -> assertFailure
+                    "bounded pool leases did not complete" >> pure []
+                let (firstOutcomes, fifthOutcomes) = splitAt 4 outcomes
+                identities <- mapM expectAsyncIsolatedCommand firstOutcomes
+                case fifthOutcomes of
+                  [fifthOutcome] -> void
+                    $ expectAsyncIsolatedCommand fifthOutcome
+                  other -> assertFailure
+                    $ "unexpected fifth lease outcomes: " ++ show other
+                readMVar fifthReady
+                workers <- mapM (requireJsonInteger "worker") identities
+                pids <- mapM (requireJsonInteger "pid") identities
+                environments <- mapM
+                  (requireJsonInteger "seenEnv") identities
+                Set.fromList workers @?= Set.fromList [1, 2, 3, 4]
+                Set.size (Set.fromList pids) @?= 4
+                Set.size (Set.fromList environments) @?= 4
+                zipWithM_ (\worker environment ->
+                    environment @?= isolatedFakeEnvironment worker)
+                  workers environments
+                readIORef maximumActive >>= (@?= 4)
+            pooled @?= Right ()
+            assertExactlyFakeWorkers root 4
+            mapM_ (assertFakeWorkerStopped root) [1 .. 4]
+      , testCase
+          "prefer ordinal one when all four setup children fail" $
+          withTemporaryDirectory "leant isolated pool precedence" $ \root -> do
+            poolSize <- requireIsolatedBackendPoolSize 4
+            config <- isolatedFakeBackendConfig root
+              "setup-gated-fatal-all" Nothing
+            callbackRan <- newIORef False
+            running <- async $ withIsolatedBackendPool poolSize config
+              (root </> "pool precedence artifact") Nothing $ \_ ->
+                modifyIORef' callbackRan $ const True
+            allEntered <- timeout 3000000 $ mapM_
+              (waitForHeartbeat . isolatedFakeSetupPath root) [1 .. 4]
+            allEntered @?= Just ()
+            writeFile (isolatedFakeSetupGatePath root) "release\n"
+            completed <- timeout 5000000 $ waitCatch running
+            case completed of
+              Just (Right (Left
+                  (IsolatedBackendSetupFatal 1 "fake setup fatal"))) ->
+                    pure ()
+              other -> assertFailure
+                $ "pool setup precedence changed: " ++ show other
+            readIORef callbackRan >>= (@?= False)
+            assertExactlyFakeWorkers root 4
+            mapM_ (assertFakeWorkerStopped root) [1 .. 4]
+      , testCase "cancel and join three concurrent setup children" $
+          withTemporaryDirectory "leant isolated pool cancellation" $ \root -> do
+            poolSize <- requireIsolatedBackendPoolSize 3
+            config <- isolatedFakeBackendConfig root
+              "setup-gated-all" Nothing
+            callbackRan <- newIORef False
+            running <- async $ withIsolatedBackendPool poolSize config
+              (root </> "pool cancellation artifact") Nothing $ \_ ->
+                modifyIORef' callbackRan $ const True
+            allEntered <- timeout 3000000 $ mapM_
+              (waitForHeartbeat . isolatedFakeSetupPath root) [1 .. 3]
+            allEntered @?= Just ()
+            cancelled <- timeout 5000000 $ cancel running
+            cancelled @?= Just ()
+            waitCatch running >>= \case
+              Left _ -> pure ()
+              Right value -> assertFailure
+                $ "cancelled pool returned normally: " ++ show value
+            readIORef callbackRan >>= (@?= False)
+            assertExactlyFakeWorkers root 3
+            mapM_ (assertFakeWorkerStopped root) [1 .. 3]
+      , testCase
+          "retain first poison while checked-out siblings finish" $
+          withTemporaryDirectory "leant isolated pool poison" $ \root -> do
+            poolSize <- requireIsolatedBackendPoolSize 3
+            config <- isolatedFakeBackendConfig root "healthy" Nothing
+            pooled <- withIsolatedBackendPool poolSize config
+              (root </> "pool poison artifact") (Just 2) $ \pool -> do
+                poisonReady <- newEmptyMVar
+                siblingsReady <- newEmptyMVar
+                releasePoisoner <- newEmptyMVar
+                releaseSiblings <- newEmptyMVar
+                poisoner <- async $ withIsolatedBackendLease pool $ \lease -> do
+                  putMVar poisonReady ()
+                  readMVar releasePoisoner
+                  runIsolatedBackendCommand lease "malformed"
+                siblings <- forM [1 :: Int .. 2] $ \ordinal ->
+                  async $ withIsolatedBackendLease pool $ \lease -> do
+                    putMVar siblingsReady ()
+                    readMVar releaseSiblings
+                    runIsolatedBackendCommand lease
+                      $ "post-pool-poison-" ++ show ordinal
+                admitted <- timeout 3000000 $ do
+                  takeMVar poisonReady
+                  mapM_ (const $ takeMVar siblingsReady) siblings
+                admitted @?= Just ()
+                putMVar releasePoisoner ()
+                poisonOutcome <- timeout 5000000 $ waitCatch poisoner
+                case poisonOutcome of
+                  Just (Right (Right (Left (IsolatedBackendRequestFailure
+                      (IsolatedBackendBadResponse _))))) -> pure ()
+                  other -> assertFailure
+                    $ "wrong scaled-pool poison result: " ++ show other
+                rejected <- withIsolatedBackendLease pool $ \_ -> pure ()
+                case rejected of
+                  Left (IsolatedBackendPairPoisoned
+                      (IsolatedBackendBadResponse _)) -> pure ()
+                  other -> assertFailure
+                    $ "poisoned scaled pool admitted a lease: " ++ show other
+                putMVar releaseSiblings ()
+                siblingOutcomes <- timeout 5000000
+                  $ mapM waitCatch siblings
+                case siblingOutcomes of
+                  Just outcomes -> mapM_ (void . expectAsyncIsolatedCommand)
+                    outcomes
+                  Nothing -> assertFailure
+                    "checked-out pool siblings did not finish"
+            case pooled of
+              Left (IsolatedBackendPairPoisoned
+                  (IsolatedBackendBadResponse _)) -> pure ()
+              other -> assertFailure
+                $ "scaled pool lost its first poison: " ++ show other
+            assertExactlyFakeWorkers root 3
+            mapM_ (assertFakeWorkerStopped root) [1 .. 3]
+      , testCase "publish closed state after reaping all four workers" $
+          withTemporaryDirectory "leant isolated pool close" $ \root -> do
+            poolSize <- requireIsolatedBackendPoolSize 4
+            config <- isolatedFakeBackendConfig root "healthy" Nothing
+            pooled <- withIsolatedBackendPool poolSize config
+              (root </> "pool close artifact") Nothing $ \pool -> do
+                leased <- withIsolatedBackendLease pool pure
+                lease <- case leased of
+                  Right value -> pure value
+                  Left failure -> assertFailure
+                    ("could not capture pool lease: " ++ show failure)
+                    >> error "unreachable"
+                pure (pool, lease)
+            (closedPool, closedLease) <- case pooled of
+              Right value -> pure value
+              Left failure -> assertFailure
+                ("scaled pool did not close cleanly: " ++ show failure)
+                >> error "unreachable"
+            closedLeaseAttempt <- withIsolatedBackendLease closedPool
+              $ \_ -> pure ()
+            closedLeaseAttempt @?= Left IsolatedBackendPairClosed
+            closedCommand <- runIsolatedBackendCommand closedLease
+              "after-pool-close"
+            closedCommand @?= Left IsolatedBackendPairClosed
+            assertExactlyFakeWorkers root 4
+            mapM_ (assertFakeWorkerStopped root) [1 .. 4]
+      ]
   , testCase
       "replay imports and accepted history in order on both workers" $
       withTemporaryDirectory "leant isolated replay order" $ \root -> do
@@ -2331,6 +2621,13 @@ requireJsonInteger key value = case Json.jLookup key value >>= Json.jInt of
   Nothing -> assertFailure ("missing integer field " ++ show key
     ++ " in " ++ show value) >> pure 0
 
+requireIsolatedBackendPoolSize :: Int -> IO IsolatedBackendPoolSize
+requireIsolatedBackendPoolSize workerCount =
+  case mkIsolatedBackendPoolSize workerCount of
+    Right poolSize -> pure poolSize
+    Left failure -> assertFailure
+      ("invalid test pool size: " ++ show failure) >> error "unreachable"
+
 isolatedBackendFakePrefix :: String
 isolatedBackendFakePrefix = "__leant_isolated_backend__:"
 
@@ -2678,9 +2975,13 @@ assertFakeWorkerStopped root worker = do
     Just () -> pure ()
 
 assertExactlyTwoFakeWorkers :: FilePath -> IO ()
-assertExactlyTwoFakeWorkers root = do
-  claims <- mapM (doesDirectoryExist . isolatedFakeClaimPath root) [1, 2, 3]
-  claims @?= [True, True, False]
+assertExactlyTwoFakeWorkers root = assertExactlyFakeWorkers root 2
+
+assertExactlyFakeWorkers :: FilePath -> Int -> IO ()
+assertExactlyFakeWorkers root workerCount = do
+  let ordinals = map fromIntegral [1 .. workerCount + 1]
+  claims <- mapM (doesDirectoryExist . isolatedFakeClaimPath root) ordinals
+  claims @?= replicate workerCount True ++ [False]
 
 backendStderrFloodMode :: String
 backendStderrFloodMode = "__leant_backend_stderr_flood__"
