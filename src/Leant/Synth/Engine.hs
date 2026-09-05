@@ -101,6 +101,7 @@ module Leant.Synth.Engine
   , PreparedSynthesisInspection (..)
   , ExferenceRunAuthorityInspection (..)
   , inspectExferencePreparation
+  , retainRequiredPrelude
   ) where
 
 import Data.Foldable (toList)
@@ -122,6 +123,7 @@ import Language.Haskell.Djex
   , DataConstructor (..)
   , Declaration
       ( AbstractTypeDeclaration
+      , TypeSynonymDeclaration
       , ClassDeclaration
       , DataTypeDeclaration
       , InstanceDeclaration
@@ -159,6 +161,7 @@ import Language.Haskell.Djex
   , candidateOutput
   , containsForall
   , declarationTypeVariables
+  , declarationSubjectName
   , defaultExferenceOptions
   , defaultExferenceSessionPolicy
   , defaultQueryOptions
@@ -1333,9 +1336,14 @@ exferenceRun limits multiConstructorPatterns steps prepared = do
       goal = semanticOriginSearchGoal semanticOrigin
       decls = semanticOriginDeclarations semanticOrigin
       instantiations = semanticOriginProviderAssignments semanticOrigin
-      allDecls =
-        environmentDeclarations (djinnSessionEnvironment standard)
-          ++ decls
+      standardDecls = environmentDeclarations (djinnSessionEnvironment standard)
+      allDecls = standardDecls ++ decls
+      requiredTypes = goal :
+        [ argument
+        | assignment <- instantiations
+        , (_, argument) <- kindedProviderInstantiationAssignmentArguments assignment
+        ]
+      focusedDecls = retainRequiredPrelude standardDecls decls requiredTypes ++ decls
       names = nub
         ( concatMap declarationTypeVariables allDecls
           ++ toList goal
@@ -1367,7 +1375,7 @@ exferenceRun limits multiConstructorPatterns steps prepared = do
     (mkExferenceSessionWithPolicy policy environment)
   targetName <- viaShow (mkIdentifier "leantSynth")
   target <- viaShow (mkDefinitionName targetName)
-  let runLane useMultiConstructorPatterns allowUnused = do
+  let runLane activeSession useMultiConstructorPatterns allowUnused = do
         let query = QueryRequest
               { requestTarget = target
               , requestGoal = fmap convert goal
@@ -1388,11 +1396,11 @@ exferenceRun limits multiConstructorPatterns steps prepared = do
               { exferenceAuthorityPreparation = semanticOrigin
               , exferenceAuthorityNameTable = table
               , exferenceAuthorityPolicy = policy
-              , exferenceAuthoritySession = session
+              , exferenceAuthoritySession = activeSession
               , exferenceAuthorityRequest = request
               }
         results <- viaDiagnostic
-          (runExferenceTypedQueryWithKindedInstantiationAssignments session
+          (runExferenceTypedQueryWithKindedInstantiationAssignments activeSession
             convertedInstantiations request)
         let selection =
               selectQueryResults SelectAll (const (0 :: Int))
@@ -1421,31 +1429,99 @@ exferenceRun limits multiConstructorPatterns steps prepared = do
             notes = maybe [] (progressNotesWith (synthLimitWindow limits))
               (selectionProgress selection)
         pure (groups, notes)
-      runPatternLanes useMultiConstructorPatterns = do
-        (strictGroups, strictNotes) <- runLane useMultiConstructorPatterns False
+      runPatternLanes activeSession useMultiConstructorPatterns = do
+        (strictGroups, strictNotes) <- runLane activeSession useMultiConstructorPatterns False
         if not (null strictGroups)
           then pure $ DetailedSynthCandidates strictGroups strictNotes
           else do
             -- Exference normally prefers terms which use every introduced
             -- binder. Retry without that preference only when the strict lane
             -- produced no term, retaining established successful prefixes.
-            (relaxedGroups, relaxedNotes) <- runLane useMultiConstructorPatterns True
+            (relaxedGroups, relaxedNotes) <- runLane activeSession useMultiConstructorPatterns True
             pure $ if null relaxedGroups
               then DetailedSynthNoTerm (nub $ strictNotes ++ relaxedNotes)
               else DetailedSynthCandidates relaxedGroups relaxedNotes
-  primary <- runPatternLanes multiConstructorPatterns
+      runSession activeSession = do
+        primary <- runPatternLanes activeSession multiConstructorPatterns
+        case primary of
+          DetailedSynthNoTerm primaryNotes | multiConstructorPatterns -> do
+            -- Splitting every available sum can consume the queue before a
+            -- simple polymorphic result is introduced. Retain the same checked
+            -- environment while omitting those optional eliminations.
+            fallback <- runPatternLanes activeSession False
+            pure $ case fallback of
+              DetailedSynthNoTerm fallbackNotes ->
+                DetailedSynthNoTerm (nub $ primaryNotes ++ fallbackNotes)
+              _ -> fallback
+          _ -> pure primary
+  primary <- runSession session
   case primary of
-    DetailedSynthNoTerm primaryNotes | multiConstructorPatterns -> do
-      -- Splitting every available sum can consume the queue before a simple
-      -- polymorphic result is introduced, even when all those inputs may be
-      -- ignored. A separate bounded lane omits those optional eliminations;
-      -- it retains the same checked environment and exact request authority.
-      fallback <- runPatternLanes False
-      pure $ case fallback of
-        DetailedSynthNoTerm fallbackNotes ->
-          DetailedSynthNoTerm (nub $ primaryNotes ++ fallbackNotes)
-        _ -> fallback
+    DetailedSynthNoTerm primaryNotes
+      | length focusedDecls < length allDecls -> do
+          -- Even an unrelated stock datatype such as Maybe competes with
+          -- constructing a polymorphic argument under successive forall
+          -- layers. Preserve every successful historical prefix; only an
+          -- exhausted search retries with the prelude dependencies actually
+          -- mentioned by the goal, exact assignments, and retained providers.
+          -- Keep the original variable table and ratings, and seal this
+          -- smaller checked inventory into the fallback candidate authority.
+          focusedEnvironment <- viaShow $ mkEnvironment
+            (map (mapDeclarationTypeVariables convert) focusedDecls)
+          focusedSession <- viaDiagnostic $
+            mkExferenceSessionWithPolicy policy focusedEnvironment
+          fallback <- runSession focusedSession
+          pure $ case fallback of
+            DetailedSynthNoTerm fallbackNotes ->
+              DetailedSynthNoTerm (nub $ primaryNotes ++ fallbackNotes)
+            _ -> fallback
     _ -> pure primary
+
+-- Retain a transitive dependency closure of the historical prelude. Foreign
+-- declarations are all kept: this fallback never drops a discovered provider,
+-- caller premise, exact class/instance, or constructor family from Lean.
+-- Exported only for the executable's focused dependency-boundary tests.
+retainRequiredPrelude
+  :: [Declaration variable kind annotation]
+  -> [Declaration variable kind annotation]
+  -> [Type variable]
+  -> [Declaration variable kind annotation]
+retainRequiredPrelude prelude foreignDeclarations requiredTypes =
+  close $ Set.unions
+    (map typeReferences requiredTypes ++ map declarationReferences foreignDeclarations)
+ where
+  close required =
+    let retained = filter ((`Set.member` required) . declarationSubjectName) prelude
+        expanded = required `Set.union` Set.unions (map declarationReferences retained)
+    in if expanded == required then retained else close expanded
+  declarationReferences declaration = case declaration of
+    TypeSynonymDeclaration _ _ _ body -> typeReferences body
+    DataTypeDeclaration _ _ _ constructors -> Set.unions
+      [ typeReferences field
+      | constructor <- constructors
+      , field <- constructorFields constructor
+      ]
+    AbstractTypeDeclaration{} -> Set.empty
+    ValueDeclaration signature -> typeReferences (valueType signature)
+    ClassDeclaration _ _ _ contexts methods -> Set.unions
+      (map contextReferences contexts ++ map (typeReferences . valueType) methods)
+    InstanceDeclaration _ _ contexts headContext ->
+      Set.unions (map contextReferences (headContext : contexts))
+  contextReferences (Constraint className arguments) =
+    Set.insert className (Set.unions (map typeReferences arguments))
+  typeReferences source = case source of
+    TypeVariable{} -> Set.empty
+    TypeConstructor name -> Set.singleton name
+    TypeApplication function argument ->
+      typeReferences function `Set.union` typeReferences argument
+    FunctionType domain result ->
+      typeReferences domain `Set.union` typeReferences result
+    TupleType boxity elements ->
+      let elementNames = Set.unions (map typeReferences elements)
+      in case tupleName boxity (length elements) of
+          Right tuple -> Set.insert tuple elementNames
+          Left _ -> elementNames
+    ForallType _ contexts body -> Set.unions
+      (typeReferences body : map contextReferences contexts)
 
 -- | Merge two ranked group streams without letting either engine's bounded
 -- tail suppress a candidate from the other.  Djinn owns the first four fresh

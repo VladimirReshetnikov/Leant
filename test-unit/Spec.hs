@@ -221,6 +221,7 @@ import Leant.Synth.Engine
   , forceDetailedOutcome
   , forceDetailedSynthCursorStep
   , inspectExferencePreparation
+  , retainRequiredPrelude
   , mapDetailedCandidateGroupVariantsDroppingSemanticSidecar
   , mergeCandidateGroups
   , mergeDetailedCandidateGroups
@@ -26361,7 +26362,80 @@ parametricFamilyEngineTests = testGroup "parametric family engine projection"
 
 rankNFrontierTests :: TestTree
 rankNFrontierTests = testGroup "Djinn rank-N frontiers"
-  [ testCase "give constructed sum scrutinees an explicit family fallback" $ do
+  [ testCase "retain transitive class, synonym, tuple, and exact-argument prelude dependencies" $ do
+      standard <- expectRight Djex.standardDjinnSession
+      maybeName <- expectRight $ mkIdentifier "Maybe"
+      unitName <- expectRight $ tupleName Boxed 0
+      aliasName <- expectRight $ mkIdentifier "FocusedAlias"
+      parentName <- expectRight $ mkIdentifier "FocusedParent"
+      childName <- expectRight $ mkIdentifier "FocusedChild"
+      exactName <- expectRight $ mkIdentifier "FocusedExact"
+      providerName <- expectRight $ mkIdentifier "focusedProvider"
+      let parameter = Djex.TypeParameter "a" (Just Djex.ProperTypeKind)
+          appliedAlias = TypeApplication (TypeConstructor aliasName) (TypeVariable "a")
+          prelude = Djex.environmentDeclarations (Djex.djinnSessionEnvironment standard) ++
+            [ Djex.TypeSynonymDeclaration () aliasName [parameter]
+                (TypeApplication (TypeConstructor maybeName) (TypeVariable "a"))
+            , Djex.ClassDeclaration () parentName [parameter] [] []
+            , Djex.ClassDeclaration () childName [parameter]
+                [Djex.Constraint parentName [appliedAlias]] []
+            , Djex.AbstractTypeDeclaration () exactName Djex.ProperTypeKind
+            ]
+          foreignDeclarations = [Djex.ValueDeclaration $ Djex.ValueSignature () providerName
+            (ForallType ["a"] [Djex.Constraint childName [TypeVariable "a"]]
+              (FunctionType (TypeVariable "a") (TypeVariable "a")))]
+          retained = retainRequiredPrelude prelude foreignDeclarations
+            [TupleType Boxed [], TypeConstructor exactName]
+      Set.fromList (map Djex.declarationSubjectName retained) @?=
+        Set.fromList [unitName, maybeName, aliasName, parentName, childName, exactName]
+      -- The closure must still form a valid checked environment with every
+      -- foreign declaration; a mere name-set match would miss kind/context
+      -- dependencies or accidentally dropped caller authority.
+      _ <- expectRight $ Djex.mkEnvironment (retained ++ foreignDeclarations)
+      pure ()
+  , testCase "recover successive polymorphic layers without unrelated prelude constructors" $ do
+      let variable = FVar
+          identity = FAll True "s0" (FArr (variable "s0") (variable "s0"))
+          boolean = FAll True "s0"
+            (FArr (variable "s0") (FArr (variable "s0") (variable "s0")))
+          result headName arguments = FApp False (headName ++ " arguments")
+            (AppNominal headName) arguments
+          binary seed = FArr seed (FAll True "s0"
+            (FArr (variable "s0") (FArr seed (FAll True "s1"
+              (FArr (variable "s1") (result "Layered.G2" [variable "s0", variable "s1"]))))))
+          ternary seed application = FArr seed (FAll True "s0" (FAll True "s1"
+            (FArr (variable "s0") (FArr (variable "s1") (FArr seed
+              (FAll True "s2" (FArr (variable "s2")
+                (application [variable "s0", variable "s1", variable "s2"]))))))))
+          sourceProviders seed targetWidth =
+            let maker2 = ProviderFragWithBinders "Layered.maker2" (binary seed) []
+                maker3 = ProviderFragWithBinders "Layered.maker3"
+                  (ternary seed (result "Layered.G3")) []
+                seedValue = ProviderFragWithBinders "Layered.seed" seed []
+            in if targetWidth == (2 :: Int)
+                then [maker2, seedValue, maker3] else [maker3, seedValue, maker2]
+          localApplication arguments = FApp True "G arguments" (AppVariable "G") arguments
+          localGoal = FAll True "Seed" (FAll True "G"
+            (FArr (variable "Seed")
+              (FArr (ternary (variable "Seed") localApplication)
+                (localApplication [identity, boolean, identity]))))
+          opaqueSeed = FAtom False "Layered.Seed"
+          cases =
+            [ ("local ternary", [], localGoal, "fun")
+            , ("named binary", sourceProviders opaqueSeed 2,
+                result "Layered.G2" [identity, boolean], "Layered.maker2")
+            , ("named ternary", sourceProviders opaqueSeed 3,
+                result "Layered.G3" [identity, boolean, identity], "Layered.maker3")
+            , ("required structural unit", sourceProviders FTop 3,
+                result "Layered.G3" [identity, boolean, identity], "Layered.maker3")
+            ]
+      mapM_ (\(label, providers, goal, requiredHead) ->
+          case synthesizeWithProviders EngineExference 4096 providers goal of
+            Right (SynthCandidates groups _) -> assertBool
+              (label ++ " lost its retained source: " ++ show groups)
+              (any (requiredHead `isInfixOf`) (concat groups))
+            outcome -> assertFailure $ label ++ ": " ++ show outcome) cases
+  , testCase "give constructed sum scrutinees an explicit family fallback" $ do
       left <- expectRight $ mkIdentifier "Left"
       right <- expectRight $ mkIdentifier "Right"
       let goal = FAll True "A" (FAll True "B"
@@ -26400,6 +26474,39 @@ rankNFrontierTests = testGroup "Djinn rank-N frontiers"
       fmap (take 1)
           (renderLeanTerm Map.empty Map.empty Map.empty ([], 0, []) goal expression)
         @?= Right ["fun _ f => let g := f ⟨⟩; @g _ (fun _ x => x)"]
+  , testCase "refit an ambient polymorphic choice through single-use let aliases" $ do
+      argument <- expectRight $ partiallySpecifiedVisibleTypeArgument
+        (ForallType ["inner"] []
+          (FunctionType (TypeVariable "ambient")
+            (FunctionType (TypeVariable "inner") (TypeVariable "inner"))))
+      let variable = FVar
+          identity = FAll True "inner" (FArr (variable "inner") (variable "inner"))
+          openIdentity = FAll True "inner"
+            (FArr (variable "X") (FArr (variable "inner") (variable "inner")))
+          application arguments = FApp True "G arguments" (AppVariable "G") arguments
+          source = FArr (variable "Seed") (FAll True "a"
+            (FArr (variable "a") (FArr (variable "Seed")
+              (FAll True "b" (FArr (variable "b")
+                (application [variable "a", variable "b"]))))))
+          goal = FAll True "Seed" (FAll True "X" (FAll True "G"
+            (FArr (variable "Seed") (FArr source (application [openIdentity, identity])))))
+          expression = Lambda [Bind "seed", Bind "maker"]
+            (Let (Bind "first")
+              (Apply (VisibleTypeApplication
+                (Apply (Local "maker") (Local "seed")) argument)
+                (Lambda [Wildcard, Bind "value"] (Local "value")))
+              (Let (Bind "second") (Apply (Local "first") (Local "seed"))
+                (Apply (Local "second") (Lambda [Bind "value"] (Local "value")))))
+          expected = "fun _ _ _ x f => f x (∀ (a0_0 : _), _ → a0_0 → a0_0) "
+            ++ "(fun _ _ y => y) x _ (fun _ z => z)"
+      candidates <- expectRight $
+        renderLeanTerm Map.empty Map.empty Map.empty ([], 0, []) goal expression
+      assertBool ("missing the completely fitted application: " ++ show candidates)
+        (expected `elem` candidates)
+      assertBool "single-use inlining displaced the original rendering prefix"
+        (case candidates of first : _ -> "let " `isInfixOf` first; [] -> False)
+      assertBool "the two normal forms exceeded their independent metadata bounds"
+        (length candidates <= 2 * 3 * Djex.maximumProviderInstantiationAssignments)
   , testCase "fit distinct polytypes in every application argument" $ do
       let application arguments = FApp True "F arguments" (AppVariable "F") arguments
           identity = FAll True "inner" (FArr (FVar "inner") (FVar "inner"))
@@ -26416,6 +26523,33 @@ rankNFrontierTests = testGroup "Djinn rank-N frontiers"
               (Lambda [Bind "left", Wildcard] (Local "left")))
       renderLeanTerm Map.empty Map.empty Map.empty ([], 0, []) goal expression
         @?= Right ["fun _ f => @f _ _ (fun _ x => x) (fun _ y _ => y)"]
+  , testCase "retain a specified polytype through successive term and forall layers" $ do
+      argument <- expectRight $ specifiedVisibleTypeArgument
+        (ForallType ["a"] []
+          (FunctionType (TypeVariable "a") (TypeVariable "a")))
+      let variable = FVar
+          identity = FAll True "inner" (FArr (variable "inner") (variable "inner"))
+          application arguments = FApp True "G arguments" (AppVariable "G") arguments
+          source = FArr (variable "Seed")
+            (FAll True "a" (FArr (variable "a")
+              (FArr (variable "Seed") (FAll True "b"
+                (FArr (variable "b") (application [variable "a", variable "b"]))))))
+          goal = FAll True "Seed" (FAll True "G"
+            (FArr (variable "Seed") (FArr source (application [identity, identity]))))
+          identityTerm = Lambda [Bind "value"] (Local "value")
+          expression = Lambda [Bind "seed", Bind "maker"]
+            (Let (Bind "first")
+              (Apply (VisibleTypeApplication
+                (Apply (Local "maker") (Local "seed")) argument) identityTerm)
+              (Let (Bind "second") (Apply (Local "first") (Local "seed"))
+                (Apply (Local "second") identityTerm)))
+      candidates <- expectRight $
+        renderLeanTerm Map.empty Map.empty Map.empty ([], 0, []) goal expression
+      case candidates of
+        primary : _ -> assertBool
+          ("lost the quantified value's binders across let aliases: " ++ show candidates)
+          (length (filter (isPrefixOf "(fun _ ") (tails primary)) == 2)
+        [] -> assertFailure "no rendering of successive forall layers"
   , testCase "fit a continuation argument whose result is known only from its caller" $ do
       let variable = FVar
           boolean = FAll True "choice"
@@ -26445,6 +26579,22 @@ rankNFrontierTests = testGroup "Djinn rank-N frontiers"
               (Lambda [Wildcard, Bind "value"] (Local "value")))
       renderLeanTerm Map.empty Map.empty Map.empty ([], 0, []) goal expression
         @?= Right ["fun _ _ f => @f _ (fun _ _ x => x)"]
+  , testCase "keep ambient holes out of closed visible argument evidence" $ do
+      argument <- expectRight $ partiallySpecifiedVisibleTypeArgument
+        (ForallType ["inner"] []
+          (FunctionType (TypeVariable "ambient")
+            (FunctionType (TypeVariable "inner") (TypeVariable "inner"))))
+      let application arguments = FApp True "F arguments" (AppVariable "F") arguments
+          target = FAll True "inner"
+            (FArr (FVar "A") (FArr (FVar "inner") (FVar "inner")))
+          source = FAll True "a" (FArr (FVar "a") (application [FVar "a"]))
+          goal = FAll True "F" (FAll True "A" (FArr source (application [target])))
+          expression = Lambda [Bind "build"]
+            (Apply (VisibleTypeApplication (Local "build") argument)
+              (Lambda [Wildcard, Bind "value"] (Local "value")))
+      fmap (take 1) (renderLeanTerm Map.empty Map.empty Map.empty ([], 0, []) goal expression)
+        @?= Right
+          ["fun _ _ f => @f (∀ (a0_0 : _), _ → a0_0 → a0_0) (fun _ _ x => x)"]
   , testCase "retain a rigid ambient result when checking a known argument" $ do
       let variable = FVar
           boolean = FAll True "choice"

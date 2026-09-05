@@ -67,6 +67,8 @@ import Language.Haskell.Synthesis.Generated
   , discardUnusedPatternBindingsBy
   , expressionFullApplicationSpine
   , isInferredVisibleTypeArgument
+  , simplifyExpressionWithoutEtaBy
+  , visibleTypeArgumentClosedType
   , visibleTypeArgumentPatternType
   )
 import Language.Haskell.Synthesis.TypedGenerated
@@ -200,37 +202,79 @@ renderLeanTerm cm providers typeNames (outerPrems, skip, innerPrems)
   -- before assigning Lean-facing names; this keeps recursive projections
   -- finite and renders the omission explicitly as @.mk value _@.
   base <- uniquify $ discardUnusedPatternBindingsBy id stripped
-  -- premises participate in domain fitting under their marked names,
-  -- so case splits on them reveal their branch binders' domains
-  let premises = outerPrems ++ innerPrems
-      seed = [(premiseMark ++ name, frag) | (name, frag) <- premises]
-  (occurrenceProviders, occurrenceBase) <-
-    aliasProviderOccurrences cm providers base
-  let providerVariants = providerRenderingAlternatives occurrenceProviders
-      fittedCohorts =
-        [ nub
-            [ (providerVariant,
-                fit cm providerVariant force goalFrag occurrenceBase 0 seed)
-            | providerVariant <- providerVariants
-            ]
-        | force <- [False, True]
-        ]
-  -- Keep the aggregate provider-assignment budget independently in each
-  -- universe-domain lane. This preserves every bounded exact-metadata choice
-  -- before the verifier while keeping the final group bounded at three times
-  -- that limit. Named, monomorphic, and otherwise domain-insensitive spellings
-  -- collapse back to the old size in the final 'nub'.
-  lanes <- mapM
-    (\visibleBinderDomain -> do
-      cohorts <- mapM
-        (mapM (uncurry (variantsFor visibleBinderDomain))) fittedCohorts
-      pure $ take visibleBinderDomainVariantLimit $
-        nub (concatMap roundRobin cohorts))
-    visibleBinderDomains
-  case nub $ concat lanes of
-    [] -> Left "no renderable variant"
-    group -> Right group
+  let inlined = simplifyExpressionWithoutEtaBy id base
+      fallback = case renderBase inlined of
+        Right (alternatives, _) -> alternatives
+        Left _ -> []
+  -- An ambient hole in a selected polytype cannot become exact local type
+  -- evidence. A single-use let can nevertheless hide the final expected
+  -- result which determines that polytype. Capture-safe substitution exposes
+  -- the complete application spine for a second fitting pass, without eta
+  -- contraction or duplication. Keep every established variant as a prefix.
+  -- Each form has its own existing bounded metadata cohort, so a full primary
+  -- cohort cannot starve the fallback; at most two such cohorts are returned.
+  case renderBase base of
+    Right (primary, needsInlining) ->
+      pure $ if not needsInlining || inlined == base then primary else
+        nub $ primary ++ fallback
+    Left failure
+      | inlined /= base, not (null fallback) -> Right fallback
+      | otherwise -> Left failure
  where
+  renderBase base = do
+    -- Premises participate in domain fitting under their marked names, so
+    -- case splits on them reveal their branch binders' domains.
+    let premises = outerPrems ++ innerPrems
+        seed = [(premiseMark ++ name, frag) | (name, frag) <- premises]
+    (occurrenceProviders, occurrenceBase) <-
+      aliasProviderOccurrences cm providers base
+    let providerVariants = providerRenderingAlternatives occurrenceProviders
+        fittedCohorts =
+          [ nub
+              [ (providerVariant,
+                  fit cm providerVariant force goalFrag occurrenceBase 0 seed)
+              | providerVariant <- providerVariants
+              ]
+          | force <- [False, True]
+          ]
+    -- Preserve each bounded provider-assignment choice independently in each
+    -- universe-domain lane. Insensitive spellings collapse in the final nub.
+    lanes <- mapM
+      (\visibleBinderDomain -> do
+        cohorts <- mapM
+          (mapM (uncurry (variantsFor visibleBinderDomain))) fittedCohorts
+        pure $ take visibleBinderDomainVariantLimit $
+          nub (concatMap roundRobin cohorts))
+      visibleBinderDomains
+    case nub $ concat lanes of
+      [] -> Left "no renderable variant"
+      group -> Right (group, any missingAppliedLetDomain
+        [ fitted | cohort <- fittedCohorts, (_, fitted) <- cohort ])
+
+  -- Fitting already knows which aliases retain an exact domain. Only an
+  -- applied alias with no such domain asks for the additional normal form;
+  -- unrelated and fully fitted lets keep precisely their existing variants.
+  missingAppliedLetDomain (expression, _, domains) = walk expression
+   where
+    known = Map.fromList domains
+    walk node = case node of
+      Let (Bind local) _ body
+        | Map.notMember local known
+        , applied local body -> True
+      _ -> any walk (children node)
+    applied local node =
+      case expressionFullApplicationSpine node of
+        (Local headLocal, _ : _) | local == headLocal -> True
+        _ -> any (applied local) (children node)
+    children node = case node of
+      Lambda _ body -> [body]
+      Apply function argument -> [function, argument]
+      VisibleTypeApplication function _ -> [function]
+      Tuple elements -> elements
+      Let _ binding body -> [binding, body]
+      Case scrutinee alternatives -> scrutinee : map snd alternatives
+      _ -> []
+
   variantsFor visibleBinderDomain selectedProviders fitted = do
     let (expr, domPairs) = roleRename fitted
         doms = Map.fromList domPairs
@@ -702,6 +746,39 @@ properProviderArgument argument = case argument of
     , Just visibilities <- providerArgumentForallVisibilities argument
     , length domains == length visibilities -> Just frag
   _ -> Nothing
+
+-- A specified local type application is evidence too. Its closed structural
+-- part has exactly the explicit forall spelling emitted by the renderer, so
+-- it can specialize argument domains and a later let alias before the final
+-- expected result is available. Ambient holes and nominal constructors need
+-- their retained Lean-side source evidence; do not invent rigid identities for
+-- them from the neutral syntax.
+structuralVisibleArgument :: VisibleTypeArgument -> Maybe Frag
+structuralVisibleArgument argument =
+  visibleTypeArgumentClosedType argument >>= convert
+ where
+  convert typeExpression = case typeExpression of
+    SharedType.TypeVariable variable ->
+      Just (FVar (closedVisibleTypeVariableSpelling variable))
+    SharedType.FunctionType domain result ->
+      FArr <$> convert domain <*> convert result
+    SharedType.TupleType Boxed [] -> Just FTop
+    SharedType.TupleType Boxed elements ->
+      foldr1 FProd <$> mapM convert elements
+    SharedType.ForallType variables [] body -> do
+      converted <- convert body
+      pure (foldr (FAll True . closedVisibleTypeVariableSpelling) converted variables)
+    SharedType.TypeApplication{} -> do
+      let (headType, arguments) = typeSpine typeExpression []
+      case headType of
+        SharedType.TypeVariable variable ->
+          FApp True "" (AppVariable (closedVisibleTypeVariableSpelling variable))
+            <$> mapM convert arguments
+        _ -> Nothing
+    _ -> Nothing
+  typeSpine (SharedType.TypeApplication function argumentType) arguments =
+    typeSpine function (argumentType : arguments)
+  typeSpine function arguments = (function, arguments)
 
 -- Djex intentionally erases Lean's explicit/implicit forall distinction from
 -- its neutral visible-type syntax.  Exact provider evidence retains the source
@@ -1195,7 +1272,7 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
                     ]
                   opened = renameFragBinder binder fresh rest
                   (replacements', remainingExact, remaining) = case arguments of
-                    VisibleTypeArgumentArgument _ : tailArguments ->
+                    VisibleTypeArgumentArgument argument : tailArguments ->
                       case exactArguments of
                         exact : tailExact ->
                           ( maybe replacements
@@ -1205,7 +1282,14 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
                           , tailExact
                           , tailArguments
                           )
-                        [] -> (replacements, [], tailArguments)
+                        [] ->
+                          ( maybe replacements
+                              (\replacement ->
+                                replacements ++ [(fresh, replacement)])
+                              (structuralVisibleArgument argument)
+                          , []
+                          , tailArguments
+                          )
                     _ -> (replacements, exactArguments, arguments)
               in go (Set.insert fresh consumed) replacements'
                 termDomains remainingExact remaining opened
@@ -1766,7 +1850,8 @@ visibleBinderDomains =
 
 -- Applied separately to the three bounded domain lanes in 'renderLeanTerm'.
 -- Thirty-two preserves the complete source-selection prefix above before
--- style/site fallbacks; the final candidate group remains bounded at 96.
+-- style/site fallbacks. Each normal form is bounded at 96 variants; an
+-- unresolved applied let may add one independently bounded inlined form.
 visibleBinderDomainVariantLimit :: Int
 visibleBinderDomainVariantLimit = maximumProviderInstantiationAssignments
 
@@ -1815,7 +1900,10 @@ render cm providers typeNames style visibleBinderDomain doms = go
         _ -> do
           headTxt <- renderHead headExpr
           argTxts <- mapM (go 2) args
-          Right (at req 1 (unwords (headTxt : argTxts)))
+          let supplied = case remainingSourceFragment headExpr of
+                Just source -> weaveArgs source argTxts
+                Nothing -> argTxts
+          Right (at req 1 (unwords (headTxt : supplied)))
     VisibleTypeApplication function argument ->
       case namedProviderApplication expr of
         Left failure -> Left failure
@@ -1949,6 +2037,29 @@ render cm providers typeNames style visibleBinderDomain doms = go
   sumConstructorSuffix GInl = Just "inl"
   sumConstructorSuffix GInr = Just "inr"
   sumConstructorSuffix _ = Nothing
+
+  -- An explicit type argument may split one known source application into
+  -- multiple syntax nodes. Ordinary arguments after that node still cross
+  -- the remaining explicit forall binders of the original source. Recover
+  -- only its binder spine here; type identity and lambda fitting remain the
+  -- responsibility of the fragment-directed fitting pass above.
+  remainingSourceFragment expression = do
+    let (headExpr, arguments) = expressionFullApplicationSpine expression
+    source <- case headExpr of
+      Local local -> Map.lookup local doms
+      Global global -> piFrag <$> declaredProvider providers global
+      _ -> Nothing
+    consume arguments source
+   where
+    consume [] source = Just source
+    consume arguments source = case (source, arguments) of
+      (FAll _ _ rest, VisibleTypeArgumentArgument _ : remaining) ->
+        consume remaining rest
+      (FAll _ _ rest, _) -> consume arguments rest
+      (FInst _ rest, _) -> consume arguments rest
+      (FExactContext _ _ rest, _) -> consume arguments rest
+      (FArr _ rest, TermArgument _ : remaining) -> consume remaining rest
+      _ -> Nothing
 
   -- Djex's visible type application is Haskell's @f \@T@.  Lean exposes an
   -- implicit binder position by prefixing the head with @\@@; this is also
