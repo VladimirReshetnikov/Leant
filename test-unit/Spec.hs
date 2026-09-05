@@ -26647,6 +26647,55 @@ rankNFrontierTests = testGroup "Djinn rank-N frontiers"
       renderLeanTerm Map.empty malformed Map.empty ([], 0, []) goal expression
         @?= Left
           "cannot align exact provider type-argument source vector for Lean provider Demo.factory"
+  , testCase "introduce implicit polytype arguments before a later forall layer" $ do
+      let variable = FVar
+          identity explicit = FAll explicit "inner"
+            (FArr (variable "inner") (variable "inner"))
+          openIdentity = FAll False "inner"
+            (FArr (variable "X") (FArr (variable "inner") (variable "inner")))
+          application arguments = FApp True "G arguments" (AppVariable "G") arguments
+          source explicit = FArr (variable "Seed") (FAll explicit "a"
+            (FArr (variable "a") (FArr (variable "Seed")
+              (FAll explicit "b" (FArr (variable "b")
+                (application [variable "a", variable "b"]))))))
+          check (explicit, ambient) = do
+            let result = application
+                  [if ambient then openIdentity else identity False, identity (not ambient)]
+                goal = foldr (FAll True)
+                  (FArr (variable "Seed") (FArr (source explicit) result))
+                  (if ambient then ["Seed", "X", "G"] else ["Seed", "G"])
+                value = Lambda
+                  ((if ambient then [Wildcard] else []) ++ [Bind "value"])
+                  (Local "value")
+                expression = Lambda [Bind "seed", Bind "maker"]
+                  (foldl Apply (Local "maker")
+                    [Local "seed", value, Local "seed", Lambda [Bind "last"] (Local "last")])
+                expected = "fun " ++ (if ambient then "_ _ _ " else "_ _ ")
+                  ++ "x f => f x " ++ (if explicit then "_ " else "")
+                  ++ "(fun {_} " ++ (if ambient then "_ " else "") ++ "y => y) x "
+                  ++ (if explicit then "_ " else "")
+                  ++ "(fun " ++ (if ambient then "" else "_ ") ++ "z => z)"
+            fmap (take 1) (renderLeanTerm Map.empty Map.empty Map.empty ([], 0, []) goal expression)
+              @?= Right [expected]
+          checkNested explicit = do
+            let nested = FAll False "left"
+                  (FArr (variable "left") (FAll False "right"
+                    (FArr (variable "right") (variable "left"))))
+                goal = FAll True "Seed" (FAll True "G"
+                  (FArr (variable "Seed")
+                    (FArr (source explicit) (application [nested, identity True]))))
+                expression = Lambda [Bind "seed", Bind "maker"]
+                  (foldl Apply (Local "maker")
+                    [ Local "seed", Lambda [Bind "value", Wildcard] (Local "value")
+                    , Local "seed", Lambda [Bind "last"] (Local "last")
+                    ])
+                expected = "fun _ _ x f => f x " ++ (if explicit then "_ " else "")
+                  ++ "(fun {_} y {_} _ => y) x " ++ (if explicit then "_ " else "")
+                  ++ "(fun _ z => z)"
+            fmap (take 1) (renderLeanTerm Map.empty Map.empty Map.empty ([], 0, []) goal expression)
+              @?= Right [expected]
+      mapM_ check [(True, False), (True, True), (False, True)]
+      mapM_ checkNested [True, False]
   , testCase "fit a continuation argument whose result is known only from its caller" $ do
       let variable = FVar
           boolean = FAll True "choice"

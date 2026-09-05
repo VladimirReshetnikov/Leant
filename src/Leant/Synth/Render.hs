@@ -1120,6 +1120,37 @@ lambdaWithImplicitBoundaries frag pats body =
     boundary rest remaining (pat : previous)
   boundary _ _ _ = Nothing
 
+-- A later forall in an applied source can postpone Lean's expected-result
+-- information until after an earlier value lambda has been elaborated. Its
+-- implicit type binders must then be written, rather than relying on automatic
+-- insertion under an already known expected type. This marker is introduced
+-- only after source binders have been uniquified; it has no term occurrences
+-- and prints as an anonymous implicit binder, so it cannot capture a name.
+implicitTypeWildcard :: String
+implicitTypeWildcard = "\0leant-render-implicit-type-wildcard"
+
+exposeImplicitLambdaBinders :: Frag -> Expression String -> Expression String
+exposeImplicitLambdaBinders frag expression@Lambda{} =
+  let (patterns, body) = lambdaSpine expression
+  in Lambda (binders frag patterns) body
+ where
+  lambdaSpine (Lambda patterns body) =
+    let (rest, core) = lambdaSpine body in (patterns ++ rest, core)
+  lambdaSpine body = ([], body)
+  binders _ [] = []
+  binders (FAll False _ rest) patterns =
+    Bind implicitTypeWildcard : binders rest patterns
+  binders (FAll True _ rest) (pattern : patterns) =
+    pattern : binders rest patterns
+  binders (FArr _ rest) (pattern : patterns) =
+    pattern : binders rest patterns
+  binders (FInst _ rest) (pattern : patterns) =
+    pattern : binders rest patterns
+  binders (FExactContext _ _ rest) (pattern : patterns) =
+    pattern : binders rest patterns
+  binders _ patterns = patterns
+exposeImplicitLambdaBinders _ expression = expression
+
 -- | Recurse through introduction forms whose component types the goal
 -- fragment determines, through elimination inputs far enough to fit
 -- applications whose heads have known source fragments, and through match
@@ -1358,7 +1389,11 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
               Just actual ->
                 inferFragReplacements consumed replacements domain actual
             let fittedDomain = specializeFrag replacements' domain
-            go consumed replacements' visibleArguments (fittedDomain : termDomains)
+                needsImplicitIntroduction = laterForall rest
+                  && not (Set.null
+                    (freeFragVariables Set.empty fittedDomain `Set.intersection` consumed))
+            go consumed replacements' visibleArguments
+              ((fittedDomain, needsImplicitIntroduction) : termDomains)
               exactArguments remaining rest
           _ -> finish consumed replacements visibleArguments termDomains arguments frag
         _ -> finish consumed replacements visibleArguments termDomains arguments frag
@@ -1386,9 +1421,17 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
                 , let resolved = specializeFrag finalReplacements replacement
                 ]
           pure
-            ( map (specializeFrag fittingReplacements) (reverse termDomains)
+            ( [ (specializeFrag fittingReplacements domain, needsImplicitIntroduction)
+              | (domain, needsImplicitIntroduction) <- reverse termDomains
+              ]
             , specializeFrag finalReplacements frag
             )
+    laterForall source = case source of
+      FAll{} -> True
+      FArr _ rest -> laterForall rest
+      FInst _ rest -> laterForall rest
+      FExactContext _ _ rest -> laterForall rest
+      _ -> False
   eliminationPatternDomains scrutineeFrag pat =
     case (scrutineeFrag, pat) of
       (Just (FSum a _), Constructor g [p])
@@ -1418,7 +1461,7 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
                   , env
                   , domains
                   )
-                (TermArgument argument, domain : remaining) ->
+                (TermArgument argument, (domain, needsImplicitIntroduction) : remaining) ->
                   let exactArgument = knownArgumentFrag
                         (fragVariableNames domain) env argument
                       (argument', j', env') = case exactArgument of
@@ -1426,7 +1469,11 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
                           | equivalentFrag domain actual ->
                               fitEliminationInput argument j env
                         _ -> fit cm providers force domain argument j env
-                  in (TermArgument argument' : fittedArguments, j', env', remaining)
+                      explicitArgument
+                        | needsImplicitIntroduction =
+                            exposeImplicitLambdaBinders domain argument'
+                        | otherwise = argument'
+                  in (TermArgument explicitArgument : fittedArguments, j', env', remaining)
                 -- 'analyzeKnownApplication' accepts a term argument only by
                 -- consuming one arrow, so this branch is defensive.
                 (TermArgument argument, []) ->
@@ -2514,6 +2561,7 @@ renderPattern
 renderPattern cm style = go False
  where
   go _ _ Wildcard = Right "_"
+  go _ True (Bind x) | x == implicitTypeWildcard = Right "{_}"
   go _ _ (Bind x) = Right x
   go _ binder (TuplePattern ps) = do
     txts <- mapM (go True binder) ps
