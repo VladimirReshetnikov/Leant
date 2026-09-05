@@ -2488,10 +2488,21 @@ providerProgramTests = testGroup "provider discovery program"
       "for inst in instances.toList.reverse do"
         `isInfixOf` prelude @?= True
       "Lean.withoutModifyingState do" `isInfixOf` prelude @?= True
-      "partial def closeProviderConstraints (fuel : Nat) (pending : List Expr)"
+      "partial def closeProviderConstraints (remaining : IO.Ref Nat)"
         `isInfixOf` prelude @?= True
-      "closeProviderConstraints fuel (subgoals ++ rest)"
+      "closeProviderConstraints remaining fuel (subgoals ++ rest)"
         `isInfixOf` prelude @?= True
+      "let remaining ← IO.mkRef (128 : Nat)"
+        `isInfixOf` prelude @?= True
+      "unless ← takeProviderResolutionAttempt remaining do return assignments"
+        `isInfixOf` prelude @?= True
+      "unless ← takeProviderResolutionAttempt remaining do return none"
+        `isInfixOf` prelude @?= True
+      "LeantSynth.withProviderAssignmentBudget do"
+        `isInfixOf` program @?= True
+      "min 2000000 (context.maxHeartbeats - (started - context.initHeartbeats))"
+        `isInfixOf` prelude @?= True
+      "tryCatchRuntimeEx" `isInfixOf` prelude @?= True
       "let mut pending := subgoals" `isInfixOf` prelude @?= True
       "let otherGoal ← mkFreshExprMVar otherConstraint"
         `isInfixOf` prelude @?= True

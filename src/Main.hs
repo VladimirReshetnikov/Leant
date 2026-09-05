@@ -3001,7 +3001,13 @@ loadSynthProviders st query = do
                     Left err -> unavailable err
                   [] -> unavailable "Lean emitted no provider inventory"
           Left err -> unavailable err
-          Right _ -> unavailable "Lean rejected provider discovery"
+          Right response -> unavailable $ intercalate "\n"
+            ("Lean rejected provider discovery"
+              : [fatal | Just fatal <- [respFatal response]]
+              ++ [ severity ++ ": " ++ body
+                 | (severity, body) <- respMessages response
+                 , severity == "error"
+                 ])
 
   unavailable reason = do
     debug <- synthDebugEnabled st
