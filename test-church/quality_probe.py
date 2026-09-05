@@ -91,7 +91,8 @@ def kernel_source(results):
             name = f"Quality.case{index}_{number}"
             names.append(name)
             declarations.append((name, result))
-            lines.extend([f"def {name} : {result['type']} :=",
+            declaration = "noncomputable def" if result["name"] == "provider" else "def"
+            lines.extend([f"{declaration} {name} : {result['type']} :=",
                           "\n".join("  " + line for line in term.splitlines()),
                           f"#print axioms {name}"])
         if result["name"] == "projection" and result["policy"] == "diverse":

@@ -41,6 +41,9 @@ def main():
             parser.error("Leant executable changed between fixtures; rerun against one build")
         path = ROOT / "test" / (name + ".txt")
         source = path.read_text(encoding="utf-8-sig")
+        source_raw_hash = hashlib.sha256(path.read_bytes()).hexdigest()
+        golden = path.with_suffix(".golden")
+        golden_before_hash = hashlib.sha256(golden.read_bytes()).hexdigest() if golden.exists() else None
         query_lines = [(line_number, line) for line_number, line
                        in enumerate(source.splitlines(), start=1) if line.startswith(":synth ")]
         cases = [{"id": f"case{index}", "name": f"case{index}", "fixture_line": line_number,
@@ -98,16 +101,35 @@ def main():
         passed = (run.returncode == 0 and count == len(cases) and kernel.returncode == 0
                   and "sorryAx" not in kernel_output and exact_vectors and expected_axioms
                   and executable_stable)
-        golden = path.with_suffix(".golden")
+        validation_passed = passed
+        golden_status = "not_checked_validation_failed"
+        golden_comparison_passed = None
         normalized = normalized_output(output)
         if passed and args.update_goldens:
             golden.write_text(normalized, encoding="utf-8")
+            golden_status = "updated_after_validation"
         elif passed:
             def telemetry(text):
                 return re.sub(r"queue limit pruned \d+", "queue limit pruned <machine-dependent>", text)
             passed = golden.exists() and telemetry(golden.read_text(encoding="utf-8")) == telemetry(normalized)
+            golden_comparison_passed = passed
+            golden_status = "matched" if passed else ("mismatch" if golden.exists() else "missing")
         reports.append({"fixture": name,
                         "fixture_source_sha256": hashlib.sha256(source.encode("utf-8")).hexdigest(),
+                        "fixture_source_raw_sha256": source_raw_hash,
+                        "live_exit_code": run.returncode,
+                        "validation_passed_before_golden": validation_passed,
+                        "golden_status": golden_status,
+                        "golden_comparison_passed": golden_comparison_passed,
+                        "golden_before_sha256": golden_before_hash,
+                        "golden_after_sha256": hashlib.sha256(golden.read_bytes()).hexdigest() if golden.exists() else None,
+                        "raw_output_path": str(output_path.resolve()),
+                        "raw_output_sha256": hashlib.sha256(output_path.read_bytes()).hexdigest(),
+                        "normalized_output_sha256": hashlib.sha256(normalized.encode("utf-8")).hexdigest(),
+                        "kernel_source_path": str(replay_path.resolve()),
+                        "kernel_source_sha256": hashlib.sha256(replay_path.read_bytes()).hexdigest(),
+                        "kernel_output_path": str((args.output / (name + ".kernel.txt")).resolve()),
+                        "kernel_output_sha256": hashlib.sha256((args.output / (name + ".kernel.txt")).read_bytes()).hexdigest(),
                         "candidate_count": count, "case_count": len(cases),
                         "kernel_exit_code": kernel.returncode, "exact_provider_vectors": exact_vectors,
                         "axiom_free_count": axiom_free_count, "expected_axioms": expected_axioms,

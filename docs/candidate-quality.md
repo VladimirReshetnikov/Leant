@@ -144,12 +144,65 @@ authority, provider specialization, and existing Length contracts. The build
 receipt is `test-church/quality-results/build-leant-04.log`; elapsed test time
 is validation metadata, not evidence of a synthesis performance improvement.
 
-The new policy-specific live Lean probes remain pending. Their exact displayed
-terms must be independently kernel-replayed, with results pinned to the
-executable that ran them, before claiming final live acceptance of the new
-default.
+The policy matrix passed **84 queries across Djinn, Exference, and the combined
+frontend**, with all four profiles at the same configured allowances. All
+**139 displayed terms** passed independent Lean kernel replay: **112 closed
+terms had empty axiom inventories**, and **27 provider terms used only the
+fixture's declared premises**. All queries produced a result. The three paired
+Exference `nil` checks and three separate `diverse` projection proofs passed.
+The earlier focused repair run passed six queries and 14 terms; it exercises a
+subset of this matrix and is not an additional set of distinct coverage cases.
 
-The completed 700-term Church result in the
+For the Church `nil` type
+`∀ A R : Type, (A → R → R) → R → R`, the freshly observed first Exference
+result changed from this legacy term:
+
+```lean
+fun _ _ f x => match Sum.inr x with | .inl a => f a x | .inr b => b
+```
+
+to this term under each structural profile:
+
+```lean
+fun _ _ _ x => x
+```
+
+Both complete terms were independently checked at the requested type. This is
+a concrete improvement before the display cutoff under unchanged settings,
+not a claim of globally minimal terms or faster search.
+
+These results use Leant implementation `fb84b96`, vendored Djex `2954b6d2`, and
+executable SHA-256
+`dab110ad2a7903ac4ef4883898d48532c00cc8c3b1b8d8748aac7744eedffb61`.
+The executable remained unchanged during both runs. Receipts are
+`test-church/quality-results/matrix-accepted/results.json` and
+`test-church/quality-results/focused-repair/results.json`. The matrix uses a
+12-candidate window, four displayed outputs, 10,000 Exference steps, 10,000
+explicit Djinn choice points, and a 30-second configured synthesis timeout;
+the [focused guide](../test-church/quality.md) describes the compatibility
+window semantics and independent replay checks.
+
+The opaque-provider replay definitions alone are marked `noncomputable`:
+their premises supply values without executable implementations. The closed
+definitions remain computable. Correcting those wrappers preserved every
+displayed term and all settings from the previous matrix attempt; it did not
+relax kernel typing or permitted axiom inventories.
+
+A fresh Church corpus run with each engine also passed on this executable's
+default `balanced` profile: **350/350 cases per engine, with all 700 exact
+displayed terms independently kernel-replayed and all axiom inventories
+empty**. Receipts are
+`test-church/quality-results/church-djinn/results.json` and
+`test-church/quality-results/church-exference/results.json`. Both runs used a
+one-candidate window and a 30-second configured synthesis timeout; Exference
+used 4,096 steps, while Djinn retained `synth-budget off` subject to the shared
+deadline and intrinsic finite planning caps. Each engine covers 315 total
+cases, 16 integer-provider cases, and 19 cases with a supplied ordinary default
+argument. Those defaults and Lean's predicative universe discipline follow the
+[corpus guide](../test-church/README.md). Fresh acceptance of the 90 broader
+rank-N/provider fixture queries remains pending.
+
+The earlier 700-term Church result in the
 [corpus guide](../test-church/README.md) belongs to Leant `4757569` with Djex
 `e2eb71e` and executable SHA-256
 `addfac35b9d82955fc871c177b582a8c043475c0171c22cb17977e0e9f5b9869`.

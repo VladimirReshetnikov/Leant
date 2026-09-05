@@ -3,10 +3,13 @@
 The [candidate-quality guide](../docs/candidate-quality.md) explains the new
 default `balanced` profile and its legacy compatibility mode. The
 [focused quality probes](quality.md) compare policies at equal configured
-budgets. Their final acceptance is still being completed. Commands below run
-the current checkout; the completed 700-term result later in this document
-is pinned to its earlier executable and does not stand for a fresh run of the
-new default.
+budgets: the full 84-query matrix and all 139 displayed terms passed live
+synthesis and independent kernel replay. Fresh corpus runs also passed all
+350 Church cases per engine on the same quality-policy executable: all 700
+displayed terms were independently kernel-replayed with empty axiom
+inventories. Fresh acceptance of the 90 compact-fixture queries remains pending. Commands
+below run the current checkout; the earlier corpus and ordinary-suite results
+are separately identified as historical evidence.
 
 `run_corpus.py` consumes Djex's GHC-resolved `test-church/manifest.json` and
 generates a Lean goal for every signature in `docs/examples/Church.hs`,
@@ -106,6 +109,15 @@ ordinary Church and rank-N fixtures require empty axiom inventories. The runner
 records the executable hash before the first run and rejects a build change
 during the fixture run. `--update-goldens` writes
 goldens only after those checks pass; otherwise existing goldens must match.
+The fixture receipt separates `live_exit_code`,
+`validation_passed_before_golden` (live success, every candidate, independent
+kernel replay, the fixture's axiom/argument checks, and an unchanged executable), and
+`golden_comparison_passed`. A valid term can therefore be distinguished from
+a changed baseline. `golden_status` records a match, mismatch, missing golden,
+an update after validation, or a comparison skipped because validation failed;
+the comparison result is null when no comparison was performed. The final
+`passed` field still requires the applicable validation and golden checks,
+and the aggregate run separately rejects an executable hash change.
 There are 90 compact fixture queries in total: nine representative Church
 queries, 69 rank-N queries, six exact-provider queries, and six global-factory
 queries.
@@ -132,7 +144,46 @@ limits do not change source-derived type-binder arity or weaken complete,
 correlated vector checks. Generated sources and compiler output remain under
 the ignored `generated-provider-discovery` directory.
 
-## Recorded rank-N corpus and focused acceptance
+## Current quality-policy acceptance
+
+The current receipts use Leant implementation `fb84b96`, vendored Djex
+`2954b6d2`, and executable SHA-256
+`dab110ad2a7903ac4ef4883898d48532c00cc8c3b1b8d8748aac7744eedffb61`.
+Each completed live run verified that the executable remained unchanged.
+
+| Gate | Current result | Receipt |
+| --- | --- | --- |
+| Leant unit suite | 565 tests passed serially at unchanged limits, 392.05 seconds | `quality-results/build-leant-04.log` |
+| Four profiles across Djinn, Exference, and combined mode | 84/84 queries; all 139 displayed terms independently kernel-replayed | `quality-results/matrix-accepted/results.json` |
+| Church corpus, Djinn | 350/350 candidates; all 350 independently kernel-replayed with empty axiom inventories | `quality-results/church-djinn/results.json` |
+| Church corpus, Exference | 350/350 candidates; all 350 independently kernel-replayed with empty axiom inventories | `quality-results/church-exference/results.json` |
+| Four compact fixtures | Pending fresh acceptance of all 90 queries | — |
+
+The policy matrix contains 112 closed terms with empty axiom inventories and
+27 provider terms whose dependencies stay within the fixture's declared
+premises. Its three paired Exference `nil` improvements and three independent
+projection-diversity proofs passed. The [quality guide](quality.md) records
+the unchanged settings, exact before/after terms, and provider-only
+`noncomputable` replay wrappers. These quality witnesses do not substitute for
+the full Church corpus or compact-fixture gates.
+
+Both fresh corpus runs used the executable's default `balanced` profile,
+a one-candidate search and verification window, and a configured 30-second
+synthesis timeout. Exference used 4,096 steps. Djinn's choice-point budget remained `synth-budget off`,
+subject to the shared search deadline and intrinsic finite planning caps;
+the transcript's `synth-steps 4096` applies only to Exference. The timeout
+does not cover startup, serialization, or independent kernel replay.
+All **700 exact displayed terms** passed independent Lean 4.32.0 replay with
+empty axiom inventories. Each engine's 350 cases comprise 315 pure total
+cases, 16 integer-provider cases, and
+19 cases supplied with the explicit ordinary default argument described
+above. The latter establish the default-extended types only. Lean's
+predicative universe discipline and independently inferred universe
+instantiations remain unchanged.
+
+## Historical acceptance before the quality profiles
+
+### Rank-N corpus and compact fixtures
 
 Independent live runs completed **350/350 cases for Djinn and 350/350 for
 Exference**. Lean 4.32.0 independently accepted all **700 exact displayed
@@ -162,6 +213,8 @@ declared premises. Their report is
 `generated-fixtures-bounded-final/results.json`. The Haskell unit suite passes
 558 tests; the eight constructive syntax witnesses, five standalone
 provider-discovery modes, and fourteen Python harness checks pass separately.
+
+### Full ordinary compatibility suite on the historical executable
 
 The full ordinary compatibility run completed on that same unchanged
 executable on 5 September 2026 at 01:55:44, UTC-07:00. It covered 30 files,

@@ -66,6 +66,8 @@ Companion documents:
   ([LaTeX source](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/rank-n-impredicative-synthesis.tex));
 - **[docs/length-ranking.md](docs/length-ranking.md)** — the complete
   Length counterexample-ranking and replay-authorized filtering reference;
+- **[Candidate quality](docs/candidate-quality.md)** — ranking profiles,
+  checked simplification, and the current policy-matrix acceptance;
 - **[docs/synth-internals.md](docs/synth-internals.md)** — the design
   boundaries and dated-report index behind `:synth`;
 - **[Lean from First Principles](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Lean_from_First_Principles/Lean_from_First_Principles.pdf)**
@@ -120,9 +122,10 @@ Companion documents:
   for the corpus's 19 partial cases.
 - **Candidate quality before the cutoff.** Configurable `balanced`, `compact`,
   `diverse`, and `legacy` profiles guide search and rank checked candidates
-  before verification. Structural cost, provider relevance, and checked
+  before verification. Structural cost, diversity, and checked
   constructor/match simplification improve first results and useful
-  alternatives under the same search allowances. See the
+  alternatives under the same search allowances. All 84 policy-matrix queries
+  and 139 displayed terms passed independent Lean replay. See the
   [candidate-quality guide](docs/candidate-quality.md).
 - **Interactive proving.** `:prove` turns the prompt into a
   tactic-by-tactic loop with unlimited `:undo`, and `:qed` saves the
@@ -783,7 +786,7 @@ their order. Full impredicative inhabitation is undecidable: those resource boun
 make an unsuccessful rank-N search inconclusive, and the answer remains
 "no term found within bounds".
 
-The recorded [Church acceptance run](test-church/README.md) passed **350/350
+The fresh [Church acceptance runs](test-church/README.md#current-quality-policy-acceptance) passed **350/350
 resolved signatures with each engine**, including four local signatures.
 All **700 displayed Lean terms** were independently replayed by Lean's kernel
 with empty axiom inventories. Per engine, the corpus comprises 315 total
@@ -797,10 +800,20 @@ general System F inhabitation. The comprehensive
 [implementation report (PDF)](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/rank-n-impredicative-synthesis.pdf)
 and its [LaTeX source](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/rank-n-impredicative-synthesis.tex)
 document the algorithms, evidence boundaries, and Haskell/Lean correspondence.
-These results belong to Leant `4757569`, Djex `e2eb71e`, and the unchanged
-executable identified in the corpus guide, before the new quality policies.
-The [focused quality probes](test-church/quality.md) provide a separate
-comparison; final validation of the new default is still being completed.
+These current results use the default `balanced` quality profile on Leant
+`fb84b96` with Djex `2954b6d2` and the unchanged executable identified in the
+corpus guide. The previous corpus and full 30-file/265-command ordinary-suite
+receipts remain separately recorded as
+[historical acceptance](test-church/README.md#historical-acceptance-before-the-quality-profiles).
+
+On that same executable, the [policy matrix](test-church/quality.md) passed
+**84 queries and 139 exact displayed terms** across both engines and combined
+mode: 112 closed terms
+have empty axiom inventories, and 27 provider terms use only their declared
+premises. All 565 Leant unit tests passed. Fresh acceptance of the 90
+compact-fixture queries remains pending; the
+[current acceptance table](test-church/README.md#current-quality-policy-acceptance)
+pins these separate results to their executable and receipts.
 
 The plan-family bounds (which quantifier-site selections are
 exhaustive, where the next gap lies) and the dedicated rank-N transcripts
