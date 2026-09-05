@@ -24,6 +24,8 @@ Extra-Source-Files:
   test-church/check-provider-discovery.hs
   test-church/*.py
   test-church/README.md
+  test-church/quality.md
+  docs/candidate-quality.md
   test-church/UniverseProbe.lean
   test-church/MixedSpineSyntax.lean
   test/*.txt

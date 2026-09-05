@@ -95,6 +95,7 @@ module Leant.Synth.Engine
   , takeDistinct
   , takeDistinctOn
   , renderCandidateByAvailability
+  , candidateQualityExpressionByAvailability
   , TranslatedPremise (..)
   , ProviderBindingInspection (..)
   , SemanticFamilyBindingInspection (..)
@@ -102,6 +103,7 @@ module Leant.Synth.Engine
   , ExferenceRunAuthorityInspection (..)
   , inspectExferencePreparation
   , retainRequiredPrelude
+  , leanNonStrictConstructorArities
   ) where
 
 import Data.Foldable (toList)
@@ -114,7 +116,8 @@ import Data.Void (Void)
 import Numeric.Natural (Natural)
 
 import Language.Haskell.Djex
-  ( Constraint (..)
+  ( CandidateRankingPolicy (..)
+  , Constraint (..)
   , QueryEvidence (..)
   , QueryOptions (..)
   , QueryRequest (..)
@@ -162,11 +165,14 @@ import Language.Haskell.Djex
   , containsForall
   , declarationTypeVariables
   , declarationSubjectName
+  , defaultCandidateRankingPolicy
+  , defaultCandidateProviderCost
   , defaultExferenceOptions
   , defaultExferenceSessionPolicy
   , defaultQueryOptions
   , djinnSessionEnvironment
   , environmentDeclarations
+  , eraseTermGraph
   , expressionSize
   , freeVariables
   , functionClauseExpression
@@ -187,12 +193,12 @@ import Language.Haskell.Djex
   , runDjinnQueryWithKindedInstantiationAssignments
   , runExferenceTypedQueryWithKindedInstantiationAssignments
   , selectQueryResults
+  , selectQualityQueryResults
   , specifiedVisibleTypeArgument
   , splitLeadingForalls
   , standardDjinnSession
   , substituteTypeVariablesBatch
   , tupleName
-  , valueName
   , typedCandidateCompatibility
   , typedCandidateTermGraph
   , TermGraph
@@ -796,11 +802,11 @@ synthVerificationWindow engine = case engine of
 candidateWindow :: Int
 candidateWindow = 60
 
--- | The per-command search bounds a REPL session may retune.  Every field
--- defaults to the established constant, so 'defaultSynthLimits' reproduces
--- the historical behaviour exactly; the ordinary lanes take their Djinn
+-- | Per-command search bounds and candidate ranking. The resource defaults
+-- retain the established allowances; the ordinary lanes take their Djinn
 -- candidate cutoff and choice-point budget from here, while the library and
--- classical lanes keep their own fixed budgets.
+-- classical lanes keep their own fixed budgets. Ranking changes selection
+-- within those allowances, independently of verification and Length ranking.
 data SynthLimits = SynthLimits
   { synthLimitShown :: !Int
     -- ^ accepted candidate groups shown and bound ('synthMaxShown')
@@ -815,11 +821,13 @@ data SynthLimits = SynthLimits
     -- 'Nothing' is unbounded
   , synthLimitQueue :: !Int
     -- ^ Exference queue bound
+  , synthLimitRanking :: !CandidateRankingPolicy
+    -- ^ Target-neutral candidate ordering within the same search bounds.
   }
   deriving (Eq, Show)
 
 -- | The historical bounds: 5 shown, 12 tried, a 60-group window, no Djinn
--- budget, and an Exference queue of 1024.
+-- budget, and an Exference queue of 1024, with balanced candidate ranking.
 defaultSynthLimits :: SynthLimits
 defaultSynthLimits = SynthLimits
   { synthLimitShown = synthMaxShown
@@ -827,6 +835,7 @@ defaultSynthLimits = SynthLimits
   , synthLimitWindow = candidateWindow
   , synthLimitBudget = Nothing
   , synthLimitQueue = 1024
+  , synthLimitRanking = defaultCandidateRankingPolicy
   }
 
 -- | 'synthVerificationWindow' under retuned limits.
@@ -913,6 +922,21 @@ renderCandidateByAvailability
       ( RouteLegacyCandidateFallback
       , renderLegacy (fallback compatibility)
       )
+
+-- | Score the same source form selected for rendering. A present typed graph
+-- owns this projection; its compatibility payload remains deliberately lazy.
+-- The candidate handle and its authority are never reconstructed from the
+-- projected expression. Exported only for focused boundary tests.
+candidateQualityExpressionByAvailability
+  :: (typed -> Expression local)
+  -> Either absence typed
+  -> compatibility
+  -> (compatibility -> Expression local)
+  -> Expression local
+candidateQualityExpressionByAvailability erase availability compatibility fallback =
+  case availability of
+    Right graph -> erase graph
+    Left _ -> fallback compatibility
 
 -- | Which synthesis engine(s) a query runs (proposal F of
 -- SYNTHESIS_PROPOSAL.md \167 7).  Djinn is the complete, terminating LJT
@@ -1087,7 +1111,9 @@ runTunedSynthesis limits
     prepared <- prepareSynthesis djinnRecursiveProjection
       providers extras engineFrag fitFrag
     let origin = preparedSemanticOrigin prepared
-    outcome <- djinnRun (synthLimitWindow limits) djinnLimits fitFrag
+    outcome <- djinnRun (synthLimitRanking limits)
+      Map.empty
+      (synthLimitWindow limits) djinnLimits fitFrag
       (semanticOriginProjectionCompleteness origin)
       (preparedRenderExpression prepared)
       (semanticOriginSearchGoal origin)
@@ -1105,7 +1131,9 @@ runTunedSynthesis limits
     djinnPrepared <- prepareSynthesis djinnRecursiveProjection
       providers extras engineFrag fitFrag
     let djinnOrigin = preparedSemanticOrigin djinnPrepared
-    djinnCompatibility <- djinnRun (synthLimitWindow limits) djinnLimits fitFrag
+    djinnCompatibility <- djinnRun (synthLimitRanking limits)
+      Map.empty
+      (synthLimitWindow limits) djinnLimits fitFrag
       (semanticOriginProjectionCompleteness djinnOrigin)
       (preparedRenderExpression djinnPrepared)
       (semanticOriginSearchGoal djinnOrigin)
@@ -1250,10 +1278,12 @@ prepareProviderGroundFactTranslation recursiveProjection providers extras
         accepted <- trialProviderGroundFactSelection candidate replay
         choose (if accepted then candidate else selected) remaining
 
--- | The complete LJT search: candidates, or a refutation whose
--- soundness depends on the translation having hidden nothing.
+-- | LJT search with bounded higher-rank extensions: candidates, or a
+-- refutation whose soundness depends on the translation having hidden nothing.
 djinnRun
-  :: Int
+  :: CandidateRankingPolicy
+  -> Map.Map Name Natural
+  -> Int
   -> (Int, Maybe Integer)
   -> Frag
   -> ProjectionCompleteness
@@ -1262,7 +1292,7 @@ djinnRun
   -> [DjinnDecl]
   -> [KindedProviderInstantiationAssignment String]
   -> Either String SynthOutcome
-djinnRun window (cutoff, budget) frag projection render goal decls
+djinnRun ranking providerCosts window (cutoff, budget) frag projection render goal decls
     instantiations = do
   standard <- viaDiagnostic standardDjinnSession
   targetName <- viaShow (mkIdentifier "leantSynth")
@@ -1283,6 +1313,8 @@ djinnRun window (cutoff, budget) frag projection render goal decls
             { optionAlternatives = True
             , optionCutoff = cutoff
             , optionBudget = budget
+            , optionRanking = ranking
+            , optionProviderCosts = providerCosts
             }
         }
   request <- viaDiagnostic (mkDjinnRequest query)
@@ -1291,17 +1323,19 @@ djinnRun window (cutoff, budget) frag projection render goal decls
       session instantiations request)
   let batch = resultSearch result
       notes = progressNotesWith window (batchProgress batch)
-      -- Djinn ranks by unused-binder fraction, which happily puts a
-      -- redundantly re-cased monster ahead of the obvious term.  Prefer
-      -- smaller terms, keeping the engine's order as the tie-break, over
-      -- a bounded prefix (the batch is terminal but can be long).
+      -- Preserve Leant's historical size tie-break only in legacy mode.
+      -- Structural policies already selected and ordered the checked Djex
+      -- candidates before the result cutoff; sorting again here would erase
+      -- their elimination, provider-cost, and diversity preferences.
       rendered =
         [ (expressionSize expr, group)
         | candidate <- take cutoff (batchCandidates batch)
         , let expr = functionClauseExpression (candidateOutput candidate)
         , Right group <- [render expr]
         ]
-      terms = map snd (sortOn fst rendered)
+      terms = map snd $ case ranking of
+        LegacyCandidateRanking -> sortOn fst rendered
+        StructuralCandidateRanking _ -> rendered
   pure $ case resultEvidence result of
     ValidatedCandidates -> SynthCandidates terms notes
     ProvedUninhabitable
@@ -1354,28 +1388,30 @@ exferenceRun limits multiConstructorPatterns steps prepared = do
         )
       table = Map.fromList (zip names [0 :: Int ..])
       convert v = FlexibleVariable (table Map.! v)
-  let convertedDecls = map (mapDeclarationTypeVariables convert) allDecls
-      convertedInstantiations = convertProviderAssignments table instantiations
-      providerNames =
-        [ valueName signature
-        | ValueDeclaration signature <- convertedDecls
-        , Just spelling <- [nameSpelling (valueName signature)]
-        , "leantProvider" `isPrefixOf` spelling
-        ]
+  let convertedInstantiations = convertProviderAssignments table instantiations
       -- A foreign inventory is intentionally ordered by Lean-side relevance.
       -- Increasing penalties retain more fallback providers without allowing
       -- them to drown the first exact/short provider in combinatorial terms.
-      providerRatings = Map.fromList
-        (zip providerNames
-          [Penalty (fromIntegral rank * 20) | rank <- [0 :: Int ..]])
+      -- These positional search ratings are separate from structural prices:
+      -- charging them again for each provider occurrence would count the
+      -- existing relevance penalty twice and disfavor necessary repeated use.
+      providerRatings = semanticOriginProviderRatings semanticOrigin
       policy = defaultExferenceSessionPolicy
         { exferenceRatingOverrides = providerRatings }
-  environment <- viaShow (mkEnvironment convertedDecls)
-  session <- viaDiagnostic
-    (mkExferenceSessionWithPolicy policy environment)
+      prepareSession activeDeclarations = do
+        constructorArities <- leanNonStrictConstructorArities
+          (semanticOriginConstructorMap semanticOrigin) activeDeclarations
+        let activePolicy = policy
+              { exferenceNonStrictConstructors = constructorArities }
+        environment <- viaShow $ mkEnvironment
+          (map (mapDeclarationTypeVariables convert) activeDeclarations)
+        activeSession <- viaDiagnostic
+          (mkExferenceSessionWithPolicy activePolicy environment)
+        pure (activePolicy, activeSession)
+  session <- prepareSession allDecls
   targetName <- viaShow (mkIdentifier "leantSynth")
   target <- viaShow (mkDefinitionName targetName)
-  let runLane activeSession useMultiConstructorPatterns allowUnused = do
+  let runLane (activePolicy, activeSession) useMultiConstructorPatterns allowUnused = do
         let query = QueryRequest
               { requestTarget = target
               , requestGoal = fmap convert goal
@@ -1383,6 +1419,8 @@ exferenceRun limits multiConstructorPatterns steps prepared = do
               , requestOptions = defaultExferenceOptions
                   { exferenceAllowUnused = allowUnused
                   , exferenceMaximumSteps = steps
+                  , exferenceCandidateRanking = synthLimitRanking limits
+                  , exferenceProviderCosts = Map.empty
                   , exferenceMultiConstructorPatterns =
                       useMultiConstructorPatterns
                     -- the queue is the memory hog; a modest bound keeps the
@@ -1395,20 +1433,30 @@ exferenceRun limits multiConstructorPatterns steps prepared = do
         let authority = ExferenceRunAuthority
               { exferenceAuthorityPreparation = semanticOrigin
               , exferenceAuthorityNameTable = table
-              , exferenceAuthorityPolicy = policy
+              , exferenceAuthorityPolicy = activePolicy
               , exferenceAuthoritySession = activeSession
               , exferenceAuthorityRequest = request
               }
         results <- viaDiagnostic
           (runExferenceTypedQueryWithKindedInstantiationAssignments activeSession
             convertedInstantiations request)
-        let selection =
-              selectQueryResults SelectAll (const (0 :: Int))
-                (const True) results
-            -- Deduplicate before applying the public result window. Backend
-            -- search histories may converge on the same rendered term, and
-            -- repetitions must not crowd later distinct candidates out of a
-            -- bounded interactive response.
+        let selection = case synthLimitRanking limits of
+              LegacyCandidateRanking ->
+                selectQueryResults SelectAll (const (0 :: Int))
+                  (const True) results
+              ranking@StructuralCandidateRanking{} ->
+                selectQualityQueryResults (synthLimitWindow limits) ranking
+                  defaultCandidateProviderCost
+                  (\candidate -> candidateQualityExpressionByAvailability
+                    eraseTermGraph (typedCandidateTermGraph candidate)
+                    (typedCandidateCompatibility candidate)
+                    (functionClauseExpression . candidateOutput))
+                  (const True) results
+            -- Quality selection has already charged every raw observation,
+            -- including failures and normalized duplicates, before ranking
+            -- its finite pool. Rendering and textual deduplication can only
+            -- shrink that pool. Legacy mode retains its historical distinct
+            -- rendered-group window without changing its search prefix.
             groups = takeDistinctOn detailedCandidateGroupVariants
               (synthLimitWindow limits)
               [ DetailedCandidateGroup route
@@ -1465,16 +1513,71 @@ exferenceRun limits multiConstructorPatterns steps prepared = do
           -- mentioned by the goal, exact assignments, and retained providers.
           -- Keep the original variable table and ratings, and seal this
           -- smaller checked inventory into the fallback candidate authority.
-          focusedEnvironment <- viaShow $ mkEnvironment
-            (map (mapDeclarationTypeVariables convert) focusedDecls)
-          focusedSession <- viaDiagnostic $
-            mkExferenceSessionWithPolicy policy focusedEnvironment
+          focusedSession <- prepareSession focusedDecls
           fallback <- runSession focusedSession
           pure $ case fallback of
             DetailedSynthNoTerm fallbackNotes ->
               DetailedSynthNoTerm (nub $ primaryNotes ++ fallbackNotes)
             _ -> fallback
     _ -> pure primary
+
+-- | Exact constructor reduction authority for this Lean target. A private
+-- datatype contributes only constructors present in the translation's own
+-- renderer map with the same field arity. Lean constructor fields are total;
+-- this target fact is explicit policy rather than an inference about Haskell
+-- strictness from a neutral declaration. The receiving Exference session
+-- checks every name and arity again against its prepared datatype inventory.
+--
+-- Canonical sums use the translator's intrinsic Either identity instead of
+-- private renderer entries. Their real declaration must have the complete
+-- binary-sum shape; the constructor names come from that declaration. Boxed
+-- tuples already carry intrinsic arity authority in the shared normalizer.
+-- Recompute this view for a pruned session so removed prelude constructors
+-- never remain authorized. Exported only for focused boundary tests.
+leanNonStrictConstructorArities
+  :: CtorMap -> [DjinnDecl] -> Either String (Map.Map Name Natural)
+leanNonStrictConstructorArities constructorMap declarations = do
+  sumType <- leanSumTypeName
+  entries <- concat <$> mapM (declarationEntries sumType) declarations
+  let arities = Map.fromList entries
+  if Map.size arities == length entries
+    then Right arities
+    else Left "duplicate constructor in Lean reduction authority"
+ where
+  declarationEntries sumType declaration = case declaration of
+    DataTypeDeclaration _ typeName parameters constructors
+      | typeName == sumType -> case (parameters, constructors) of
+          ([TypeParameter left _, TypeParameter right _], [inLeft, inRight])
+            | left /= right
+            , constructorFields inLeft == [TypeVariable left]
+            , constructorFields inRight == [TypeVariable right] ->
+                Right [(constructorName inLeft, 1), (constructorName inRight, 1)]
+          _ -> Left "canonical Lean sum declaration has an incompatible constructor shape"
+      | otherwise -> catMaybes <$> mapM mappedConstructor constructors
+    _ -> Right []
+
+  mappedConstructor constructor = case exactRendererInfo of
+    Nothing -> Right Nothing
+    Just info
+      | length (ciFields info) == length (constructorFields constructor) ->
+          Right $ Just (constructorName constructor,
+            fromIntegral $ length $ constructorFields constructor)
+      | otherwise -> Left "Lean constructor reduction authority disagrees with its renderer"
+   where
+    -- Renderer keys are generated unqualified identifiers. nameSpelling alone
+    -- drops a module qualifier, which must never let an unrelated constructor
+    -- borrow a private constructor's target-language authority.
+    exactRendererInfo = do
+      spelling <- nameSpelling (constructorName constructor)
+      case mkIdentifier spelling of
+        Right privateName | privateName == constructorName constructor ->
+          Map.lookup spelling constructorMap
+        _ -> Nothing
+
+-- The intrinsic family identity used by both fragment translation and its
+-- constructor-reduction authority. No constructor spelling is inferred here.
+leanSumTypeName :: Either String Name
+leanSumTypeName = viaShow (mkIdentifier "Either")
 
 -- Retain a transitive dependency closure of the historical prelude. Foreign
 -- declarations are all kept: this fallback never drops a discovered provider,
@@ -2200,6 +2303,17 @@ semanticOriginProviderAssignments
 semanticOriginProviderAssignments =
   concatMap providerBindingAssignments . semanticOriginProviderBindings
 
+-- | Exference's established positional search ratings, keyed by the same
+-- private identities which own declarations and assignment evidence. These
+-- are source priorities, not structural provider prices. Both engines use
+-- the shared default structural prices (named values one, constructors zero),
+-- while provider encounter order and this Exference rating remain unchanged.
+semanticOriginProviderRatings
+  :: PreparedSemanticOrigin -> Map.Map Name Penalty
+semanticOriginProviderRatings origin = Map.fromList $ zip
+  (map providerBindingPrivateName $ semanticOriginProviderBindings origin)
+  (map (Penalty . fromIntegral) [0 :: Natural, 20 ..])
+
 -- | Exact package-private provider-binding view consumed by the checked
 -- Length handoff and focused boundary tests. It deliberately contains no
 -- semantic summary or independent trust claim.
@@ -2865,7 +2979,7 @@ fragToDjinnPass
   -> Either String SynthesisTranslation
 fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
     providers extras frag0 = do
-  eitherC <- viaShow (mkIdentifier "Either")
+  eitherC <- leanSumTypeName
   voidC <- viaShow (mkIdentifier "Void")
   unitC <- viaShow (tupleName Boxed 0)
   pairC <- viaShow (tupleName Boxed 2)

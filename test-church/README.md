@@ -1,5 +1,13 @@
 # Church synthesis acceptance in Lean
 
+The [candidate-quality guide](../docs/candidate-quality.md) explains the new
+default `balanced` profile and its legacy compatibility mode. The
+[focused quality probes](quality.md) compare policies at equal configured
+budgets. Their final acceptance is still being completed. Commands below run
+the current checkout; the completed 700-term result later in this document
+is pinned to its earlier executable and does not stand for a fresh run of the
+new default.
+
 `run_corpus.py` consumes Djex's GHC-resolved `test-church/manifest.json` and
 generates a Lean goal for every signature in `docs/examples/Church.hs`,
 including its locally scoped signatures. It expands aliases from the manifest;
@@ -124,13 +132,15 @@ limits do not change source-derived type-binder arity or weaken complete,
 correlated vector checks. Generated sources and compiler output remain under
 the ignored `generated-provider-discovery` directory.
 
-## Completed corpus and focused acceptance
+## Recorded rank-N corpus and focused acceptance
 
 Independent live runs completed **350/350 cases for Djinn and 350/350 for
 Exference**. Lean 4.32.0 independently accepted all **700 exact displayed
 terms**, and every corpus declaration has an empty axiom inventory. Each
 engine covers 315 pure total cases, 16 integer-provider cases, and 19
 explicit-default cases under the policy above.
+These runs preceded the candidate-quality profiles. Their original outputs
+and executable identity remain the acceptance evidence for that revision.
 
 Both runs used a one-candidate window and a configured thirty-second synthesis
 timeout. Exference used 4,096 search steps. Djinn retained its default

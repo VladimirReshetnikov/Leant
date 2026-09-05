@@ -118,6 +118,12 @@ Companion documents:
   [validated coverage and examples](#rank-n-and-impredicative-goals) include
   all 350 resolved Church signatures per engine, with explicit defaults
   for the corpus's 19 partial cases.
+- **Candidate quality before the cutoff.** Configurable `balanced`, `compact`,
+  `diverse`, and `legacy` profiles guide search and rank checked candidates
+  before verification. Structural cost, provider relevance, and checked
+  constructor/match simplification improve first results and useful
+  alternatives under the same search allowances. See the
+  [candidate-quality guide](docs/candidate-quality.md).
 - **Interactive proving.** `:prove` turns the prompt into a
   tactic-by-tactic loop with unlimited `:undo`, and `:qed` saves the
   finished proof as a real theorem in the session.
@@ -411,13 +417,18 @@ Three rules run through the design:
 
 Transcripts below are lightly abridged: `⋯` marks elided trailing
 candidates (and, where applicable, a truncation note).
+They illustrate checked terms from their recorded runs; structural ranking
+can change the displayed order without changing the requested type. The
+[quality guide](docs/candidate-quality.md) distinguishes the new profiles
+from the legacy ordering used by the earlier acceptance receipts.
 
 ### Higher-order plumbing
 
 The sweet spot is the "plumbing" terms one writes constantly. Free
-capital identifiers are auto-bound, so quick queries stay quick, and
-the first candidate is reliably the term you would have written —
-here `flip`, composition, `uncurry`, and product associativity:
+capital identifiers are auto-bound, so quick queries stay quick. These
+recorded examples produce `flip`, composition, `uncurry`, and product
+associativity; the selected ranking policy can change which valid term is
+shown first:
 
 ```text
 λ> :synth ((a → b → c) → b → a → c)
@@ -719,8 +730,10 @@ transcript turns live-library premises off and checks all three modes through
 final Lean 4.31 elaboration with Exference bounded to 128 steps. The pure
 boundary test does the same below the REPL layer.
 
-The new Djinn family is appended after every established structural, provider,
-and loaded-scheme family, so historical candidate prefixes do not move. Its
+The query-closed Djinn family is appended after the established structural,
+provider, and loaded-scheme families. This preserves their plan-family
+schedule; structural quality policies can change proof choices and candidate
+ordering within that schedule. Its
 plan carries the established local, loaded, and caller-supplied provider
 premises, allowing those capabilities to compose in one proof. It retains the
 finite fallback limits of 16 axioms per scheme, 64 axioms per family, and
@@ -770,7 +783,7 @@ their order. Full impredicative inhabitation is undecidable: those resource boun
 make an unsuccessful rank-N search inconclusive, and the answer remains
 "no term found within bounds".
 
-The [Church acceptance harness](test-church/README.md) passed **350/350
+The recorded [Church acceptance run](test-church/README.md) passed **350/350
 resolved signatures with each engine**, including four local signatures.
 All **700 displayed Lean terms** were independently replayed by Lean's kernel
 with empty axiom inventories. Per engine, the corpus comprises 315 total
@@ -784,6 +797,10 @@ general System F inhabitation. The comprehensive
 [implementation report (PDF)](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/rank-n-impredicative-synthesis.pdf)
 and its [LaTeX source](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/rank-n-impredicative-synthesis.tex)
 document the algorithms, evidence boundaries, and Haskell/Lean correspondence.
+These results belong to Leant `4757569`, Djex `e2eb71e`, and the unchanged
+executable identified in the corpus guide, before the new quality policies.
+The [focused quality probes](test-church/quality.md) provide a separate
+comparison; final validation of the new default is still being completed.
 
 The plan-family bounds (which quantifier-site selections are
 exhaustive, where the next gap lies) and the dedicated rank-N transcripts
@@ -1169,11 +1186,14 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   call either foundation yet, so candidate verification still uses one backend
   serially and the new pair carries no speed-up claim. See the
   [isolated-pair checkpoint](docs/reports/2026-08-20-isolated-backend-pair-foundation.md).
-  Within each Exference invocation, Leant stable-deduplicates rendered groups
-  before applying the internal 60-candidate collection window
-  (`:set synth-window N`). The first
-  spelling remains authoritative, while repeated backend derivations cannot
-  consume slots ahead of later distinct terms. Ranking and disabled commands
+  Under `balanced`, `compact`, and `diverse`, each Exference invocation first
+  observes at most `synth-window` raw backend candidates (default 60), ranks
+  that pool, and then renders and stable-deduplicates its groups. Rejected
+  rendering and duplicates consume observation slots and do not cause a
+  refill. `legacy` retains the earlier distinct-rendered-group window, which
+  can inspect duplicate derivations while collecting that many distinct
+  groups. Both policies charge the original backend work. The first retained
+  spelling remains authoritative. Behavioral rank and disabled commands
   retain one outer batch of `synth-verify` groups (default 12, or 24 for
   `both`) and ranking stops after `synth-shown` accepted groups (default
   five). Filtering may consume one successor of the same width after a first
@@ -1211,7 +1231,9 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   filter run. Before a later provider lane is forced or capped, every spelling
   in an earlier completed no-verified or all-rejected run frontier is removed
   from each source stream and newly empty groups are dropped.
-  Rediscovered candidates therefore consume no fresh lane quota. Continuation
+  Rediscovered spellings therefore consume no fresh verification-group quota
+  in that later lane. Their raw search work and structural-policy observation
+  slots remain spent. Continuation
   does not collect five survivors across lanes: one survivor is terminal. This
   policy
   deliberately favors a structural solution over breadth: provider
@@ -1298,16 +1320,19 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
 ### Session settings
 
 Every knob above is a `:set` setting; given without a value it prints its
-current state, and a bare `:set` prints them all. Defaults reproduce the
-historical constants, so a fresh session behaves exactly as documented.
+current state, and a bare `:set` prints them all. The resource defaults retain
+their earlier values. The default ranking profile is now `balanced`;
+`legacy` selects the earlier search, size-sort, and distinct-group-window
+behavior described in the [quality guide](docs/candidate-quality.md).
 
 | Setting | Default | Meaning |
 |---|---|---|
 | `synth-engine djinn\|exference\|both` | `djinn` | which Djex search runs |
+| `synth-ranking legacy\|balanced\|compact\|diverse` | `balanced` | structural quality and diversity before verification; preserves search bounds |
 | `synth-steps N` | 4096 | Exference step budget |
 | `synth-queue N` | 1024 | Exference queue bound |
 | `synth-budget N\|off` | `off` | Djinn choice-point budget of the ordinary and provider lanes |
-| `synth-window N` | 60 | candidate groups one lane may observe |
+| `synth-window N` | 60 | lane collection limit; structural Exference policies charge raw candidates before rendering/deduplication, legacy counts distinct rendered groups |
 | `synth-verify N` | 12 | fresh candidate groups Lean checks per lane (`both` sends twice that, and the batch is clamped to `synth-window`) |
 | `synth-shown N` | 5 | accepted groups shown, and the ranking stop |
 | `synth-classical on\|off` | `on` | excluded-middle and double-negation fallbacks |

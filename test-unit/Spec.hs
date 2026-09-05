@@ -222,6 +222,7 @@ import Leant.Synth.Engine
   , forceDetailedSynthCursorStep
   , inspectExferencePreparation
   , retainRequiredPrelude
+  , leanNonStrictConstructorArities
   , mapDetailedCandidateGroupVariantsDroppingSemanticSidecar
   , mergeCandidateGroups
   , mergeDetailedCandidateGroups
@@ -237,6 +238,7 @@ import Leant.Synth.Engine
   , synthesizeWith
   , synthesizeWithProviders
   , synthesizeWithProvidersSkippingDetailed
+  , synthesizeWithProvidersSkippingDetailedWith
   , synthesizeWithProvidersSkippingDetailedWithMultiConstructorPatterns
   , synthesizeTunedDetailed
   , startDetailedSynthCursor
@@ -244,6 +246,7 @@ import Leant.Synth.Engine
   , projectDetailedSynthOutcome
   , renderExactTypedVariantOrigin
   , renderCandidateByAvailability
+  , candidateQualityExpressionByAvailability
   , takeDistinct
   , takeDistinctOn
   , typedCandidateSemanticCandidate
@@ -677,6 +680,7 @@ main = do
       , goalTranslationAcquisitionTests
       , translationPreparationTests
       , providerScheduleTests
+      , candidateRankingIntegrationTests
       , combinedEngineMergeTests
       , parallelEnginePairTests
       , parallelVerificationSchedulerTests
@@ -5159,6 +5163,236 @@ providerScheduleTests = testGroup "live provider widening"
         , (EngineBoth, [1 .. 5])
         ]
   ]
+
+candidateRankingIntegrationTests :: TestTree
+candidateRankingIntegrationTests = testGroup "candidate quality integration"
+  [ testCase "select all public ranking profiles without changing resource bounds" $ do
+      synthLimitRanking defaultSynthLimits @?= Djex.defaultCandidateRankingPolicy
+      forM_ rankingProfiles $ \(spelling, ranking) -> do
+        Djex.parseCandidateRankingPolicy spelling @?= Right ranking
+        Djex.candidateRankingPolicyName ranking @?= spelling
+        let selected = defaultSynthLimits { synthLimitRanking = ranking }
+        selected { synthLimitRanking = Djex.defaultCandidateRankingPolicy }
+          @?= defaultSynthLimits
+      assertBool "unknown ranking profile was admitted"
+        $ not $ isRight $ Djex.parseCandidateRankingPolicy "smallest"
+  , testCase "keep the REPL ranking setting local and preserve parallel eligibility" $ do
+      source <- lines <$> readFile "src/Main.hs"
+      let setting = mainSourceSection
+            "[\"synth-ranking\", value]"
+            "[\"synth-steps\", value]" source
+          parallel = mainSourceSection
+            "defaultSearchBounds ="
+            "initialBaselineSchedule" source
+      mapM_ (assertMainSourceContains "candidate ranking setting" setting)
+        [ "case parseCandidateRankingPolicy value of"
+        , "(rsSynthLimits s) { synthLimitRanking = ranking }"
+        , "[\"synth-ranking\"] -> do"
+        , "candidateRankingPolicyName ranking"
+        , "\"synth-ranking\" : _ ->"
+        , "usage: :set synth-ranking legacy|balanced|compact|diverse"
+        ]
+      assertBool "ranking setting forwarded an invalid mode to Lean"
+        $ not $ "sendCmd" `isInfixOf` unlines setting
+      mapM_ (assertMainSourceContains "ranking-neutral parallel admission" parallel)
+        [ "limits { synthLimitRanking = defaultCandidateRankingPolicy } == defaultSynthLimits"
+        , "&& defaultSearchBounds"
+        ]
+      assertMainSourceContains "synthesis settings" source
+        "row \"synth-ranking\" (candidateRankingPolicyName (synthLimitRanking limits))"
+  , testCase "score the authoritative typed expression without forcing compatibility" $ do
+      let typed = Lambda [Bind "x"] (Local "x")
+          fallback = Local "fallback"
+      candidateQualityExpressionByAvailability id
+        (Right typed :: Either () (Expression String))
+        (error "quality forced typed candidate compatibility" :: Expression String)
+        (error "quality forced typed candidate fallback") @?= typed
+      candidateQualityExpressionByAvailability
+        (error "quality forced an absent typed graph")
+        (Left () :: Either () (Expression String)) fallback id @?= fallback
+  , testCase "prefer the compact provider term before the same displayed cutoff" $ do
+      let token = FAtom False "Quality.Token"
+          providers =
+            [ ProviderFrag "Quality.cheap" (FArr FTop token)
+            , ProviderFrag "Quality.expensive" token
+            ]
+          bounds = defaultSynthLimits
+            { synthLimitShown = 1
+            , synthLimitTried = 2
+            , synthLimitWindow = 16
+            , synthLimitBudget = Just 10000
+            , synthLimitQueue = 128
+            }
+          sizeOnly = Djex.StructuralCandidateRanking
+            $ Djex.CandidateQualityWeights 1 0 0 0
+          firstQualityGroup limits engine = do
+            outcome <- expectRight $ synthesizeWithProvidersSkippingDetailedWith
+              limits engine 512 Set.empty providers token
+            case outcome of
+              DetailedSynthCandidates (group : _) _ ->
+                pure $ detailedCandidateGroupVariants group
+              other -> assertFailure
+                ("expected quality candidates, got: " ++ show other)
+                >> pure []
+      -- Source relevance is independent of structural cost. The first
+      -- provider needs a real unit argument (size three); the direct provider
+      -- has size one. Legacy is a preservation control, not an improvement
+      -- witness: it already puts the smaller term first.
+      legacy <- firstQualityGroup
+        (bounds { synthLimitRanking = Djex.LegacyCandidateRanking }) EngineDjinn
+      assertBool "legacy Djinn no longer retains its historical size ordering"
+        $ any (== "Quality.expensive") legacy
+      forM_ [EngineDjinn, EngineExference, EngineBoth] $ \engine -> do
+        selected <- firstQualityGroup (bounds { synthLimitRanking = sizeOnly }) engine
+        assertBool ("compact provider order was overwritten for " ++ show engine)
+          $ any (== "Quality.expensive") selected
+  , testCase "retain exact quality request authority through candidate verification" $ do
+      let token = FParamInd "Quality.AuthorityBox" "Quality.AuthorityBox" []
+            [("Quality.AuthorityBox.mk", [FTop])]
+          providers =
+            [ ProviderFrag "Quality.preferred" token
+            , ProviderFrag "Quality.fallback" token
+            ]
+          bounds = defaultSynthLimits
+            { synthLimitShown = 1
+            , synthLimitTried = 2
+            , synthLimitWindow = 8
+            , synthLimitQueue = 128
+            }
+      expected <- expectRight $ inspectExferencePreparation
+        providers [] token token
+      standard <- expectRight Djex.standardDjinnSession
+      expectedConstructorArities <- expectRight $ leanNonStrictConstructorArities
+        (inspectedConstructorMap expected)
+        (Djex.environmentDeclarations (Djex.djinnSessionEnvironment standard)
+          ++ inspectedDeclarations expected)
+      let costs = Map.fromList $ zip
+            (map inspectedProviderPrivateName $ inspectedProviderBindings expected)
+            [0, 20 :: Natural]
+      forM_ rankingProfiles $ \(_, ranking) -> do
+        outcome <- expectRight $ synthesizeWithProvidersSkippingDetailedWith
+          (bounds { synthLimitRanking = ranking }) EngineExference
+          128 Set.empty providers token
+        case outcome of
+          DetailedSynthCandidates (group : _) _ ->
+            case detailedCandidateGroupSemanticSidecar group of
+              Nothing -> assertFailure "ranked candidate lost its typed authority"
+              Just semantic -> do
+                let authority = typedCandidateSemanticAuthorityInspection semantic
+                    options = requestOptions $ inspectedAuthorityRequest authority
+                inspectedAuthorityPreparation authority @?= expected
+                exferenceCandidateRanking options @?= ranking
+                exferenceProviderCosts options @?= Map.empty
+                exferenceMaximumSteps options @?= 128
+                exferenceMaximumQueueSize options @?= Just 128
+                exferenceRatingOverrides (inspectedAuthorityPolicy authority)
+                  @?= Map.map (Djex.Penalty . fromIntegral) costs
+                exferenceNonStrictConstructors (inspectedAuthorityPolicy authority)
+                  @?= expectedConstructorArities
+                -- This callback tests receipt identity, not Lean validity;
+                -- independent live fixtures replay the displayed text.
+                batch <- verifyCandidateGroups 1 (const $ pure VariantAccepted)
+                  [detailedCandidateGroupVerificationVariants group]
+                case verifiedCandidates batch of
+                  [accepted] -> do
+                    assertBool "quality verification detached semantic authority"
+                      $ detailedVerificationVariantSemanticSidecar accepted
+                          == Just semantic
+                    case detailedCandidateGroupVariants group of
+                      first : _ -> detailedVerificationVariantText accepted @?= first
+                      [] -> assertFailure "verified quality group has no displayed variant"
+                    case detailedVerificationVariantExactTypedOrigin accepted of
+                      Just exact -> renderExactTypedVariantOrigin exact
+                        @?= Right (detailedCandidateGroupVariants group)
+                      Nothing -> assertFailure "quality selection detached exact origin"
+                  other -> assertFailure $ "unexpected verification receipts: " ++ show other
+          other -> assertFailure $ "expected ranked typed candidates, got: " ++ show other
+  , testCase "derive total constructor authority only from exact Lean mappings" $ do
+      let atom = FAtom False "Quality.Field"
+          named = FParamInd "Quality.Pair" "Quality.Pair" []
+            [("Quality.Pair.mk", [atom, atom])]
+          legacy = FInd "Quality.Legacy"
+            [("Quality.Legacy.zero", []), ("Quality.Legacy.one", [atom])]
+          goal = FProd named legacy
+      prepared <- expectRight $ inspectExferencePreparation [] [] goal goal
+      let declarations = inspectedDeclarations prepared
+          constructorMap = inspectedConstructorMap prepared
+          expected = Map.fromList
+            [ (Djex.constructorName constructor,
+                fromIntegral $ length $ Djex.constructorFields constructor)
+            | DataTypeDeclaration _ _ _ constructors <- declarations
+            , constructor <- constructors
+            ]
+      Map.size expected @?= 3
+      leanNonStrictConstructorArities constructorMap declarations @?= Right expected
+      -- A datatype declaration alone carries no Haskell strictness claim.
+      leanNonStrictConstructorArities Map.empty declarations @?= Right Map.empty
+      leanNonStrictConstructorArities constructorMap [] @?= Right Map.empty
+      qualifiedDeclarations <- forM declarations $ \declaration -> case declaration of
+        DataTypeDeclaration annotation name parameters constructors -> do
+          qualified <- forM constructors $ \constructor -> do
+            spelling <- case Djex.nameSpelling (Djex.constructorName constructor) of
+              Just value -> pure value
+              Nothing -> assertFailure "private constructor lacks an identifier" >> pure "Missing"
+            lookalike <- expectRight $ Djex.parseName ("Other." ++ spelling)
+            pure constructor { Djex.constructorName = lookalike }
+          pure $ DataTypeDeclaration annotation name parameters qualified
+        _ -> pure declaration
+      leanNonStrictConstructorArities constructorMap qualifiedDeclarations
+        @?= Right Map.empty
+      let wrongArity = Map.map (\info -> info { ciFields = FTop : ciFields info })
+            constructorMap
+      assertBool "renderer/declaration arity mismatch was certified"
+        $ not $ isRight $ leanNonStrictConstructorArities wrongArity declarations
+      assertBool "duplicate declaration authority was silently collapsed"
+        $ not $ isRight $ leanNonStrictConstructorArities constructorMap
+            (declarations ++ declarations)
+  , testCase "retain intrinsic sum authority only in its actual prepared projection" $ do
+      standard <- expectRight Djex.standardDjinnSession
+      sumName <- expectRight $ mkIdentifier "Either"
+      let declarations = Djex.environmentDeclarations
+            $ Djex.djinnSessionEnvironment standard
+          sumDeclarations =
+            [ declaration
+            | declaration@(DataTypeDeclaration _ name _ _) <- declarations
+            , name == sumName
+            ]
+          expected = Map.fromList
+            [ (Djex.constructorName constructor, 1)
+            | DataTypeDeclaration _ _ _ constructors <- sumDeclarations
+            , constructor <- constructors
+            ]
+      Map.size expected @?= 2
+      leanNonStrictConstructorArities Map.empty declarations @?= Right expected
+      leanNonStrictConstructorArities Map.empty
+        (retainRequiredPrelude declarations [] []) @?= Right Map.empty
+      case sumDeclarations of
+        [DataTypeDeclaration annotation name parameters [inLeft, inRight]] -> do
+          let scrutinee = Apply (Global $ Djex.constructorName inRight) (Local "value")
+              original = Case scrutinee
+                [ (Constructor (Djex.constructorName inLeft) [Bind "left"], Local "left")
+                , (Constructor (Djex.constructorName inRight) [Bind "right"], Local "right")
+                ]
+              certified name' = fromIntegral <$> Map.lookup name' expected
+              reduced = Djex.reduceKnownConstructorCasesBy id certified original
+          -- The actual right constructor is the intrinsic Sum.inr route used
+          -- by Church nil. Without this target-specific authority the shared
+          -- reducer must retain the case, even for a familiar spelling.
+          Djex.reduceKnownConstructorCasesBy id (const Nothing) original @?= original
+          Djex.simplifyExpressionWithoutEtaBy id reduced @?= Local "value"
+          let malformed = DataTypeDeclaration annotation name parameters
+                [inLeft { Djex.constructorFields = [] }, inRight]
+          assertBool "a same-named non-sum declaration obtained intrinsic authority"
+            $ not $ isRight $ leanNonStrictConstructorArities Map.empty [malformed]
+        other -> assertFailure $ "unexpected prepared sum declaration: " ++ show other
+  ]
+ where
+  rankingProfiles =
+    [ ("legacy", Djex.LegacyCandidateRanking)
+    , ("balanced", Djex.defaultCandidateRankingPolicy)
+    , ("compact", Djex.compactCandidateRankingPolicy)
+    , ("diverse", Djex.diverseCandidateRankingPolicy)
+    ]
 
 combinedEngineMergeTests :: TestTree
 combinedEngineMergeTests = testGroup "combined-engine verification frontier"
@@ -16114,11 +16348,11 @@ assertLengthAssessmentMainParallelBaseline = do
       parallelSection)
     [ "baselinePolicy = ordinarySynthLaneCursorPolicy assessmentContext engine limits"
     , "parallelStructuralBaselineStaticallyEligible = engine == EngineBoth"
-    , "&& limits == defaultSynthLimits"
+    , "&& defaultSearchBounds"
     , "&& null libraryPremises"
     , "&& not (synthLaneCursorAllowsFilterSuccessor baselinePolicy)"
     , "parallelLibraryBaselineStaticallyEligible = structuralFirst"
-    , "&& limits == defaultSynthLimits"
+    , "&& defaultSearchBounds"
     , "&& not (null libraryPremises)"
     , "initialBaselineSchedule"
     , "| parallelLibraryBaselineStaticallyEligible = Just runParallelLibraryBaseline"
@@ -22490,13 +22724,34 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
       detailed <- expectRight $
         synthesizeWithProvidersSkippingDetailed
           EngineExference 512 Set.empty [provider] goal
-      case detailed of
-        DetailedSynthCandidates groups _ -> case
+      let graphCertificateHandles graph =
+            [ handle
+            | (_, Djex.TermNode _
+                  (Djex.TypedVisibleTypeApplication _ _ _ witness)) <-
+                Djex.termGraphNodes graph
+            , Just handle <- [Djex.typeApplicationCertificate witness]
+            ]
+          groupCertificateHandles group =
+            [ handle
+            | Just semantic <- [detailedCandidateGroupSemanticSidecar group]
+            , Right graph <-
+                [typedCandidateTermGraph $ typedCandidateSemanticCandidate semantic]
+            , handle <- graphCertificateHandles graph
+            ]
+          matchingProviderGroups groups =
             [ group
             | group <- groups
             , [variant] <- [detailedCandidateGroupVariants group]
             , "Demo.emptyPolyList" `isInfixOf` variant
-            , isJust (detailedCandidateGroupSemanticSidecar group)
+            ]
+      case detailed of
+        DetailedSynthCandidates groups _ -> case
+            [ group
+            | group <- matchingProviderGroups groups
+            -- A smaller inferred provider use can rank before its explicit
+            -- specialization. This fixture requires the actual certificate
+            -- route, independently of that valid quality ordering.
+            , not $ null $ groupCertificateHandles group
             ] of
           origin : _ -> do
             semantic <- case detailedCandidateGroupSemanticSidecar origin of
@@ -22506,14 +22761,7 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
             projected <- expectRight
               $ typedCandidateTermGraph
               $ typedCandidateSemanticCandidate semantic
-            let certificateHandles =
-                  [ handle
-                  | (_, Djex.TermNode _
-                        (Djex.TypedVisibleTypeApplication _ _ _ witness)) <-
-                      Djex.termGraphNodes projected
-                  , Just handle <-
-                      [Djex.typeApplicationCertificate witness]
-                  ]
+            let certificateHandles = graphCertificateHandles projected
             case certificateHandles of
               [(certificate, slot)] -> do
                 slot @?= 0
@@ -22548,8 +22796,10 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                 "unexpected polymorphic verification receipts: "
                   ++ show receipts
           _ -> assertFailure $
-            "expected one direct polymorphic provider group, got: "
-              ++ show groups
+            "expected a certified direct polymorphic provider group; matching texts and certificate counts: "
+              ++ show
+                [(detailedCandidateGroupVariants group, length $ groupCertificateHandles group)
+                | group <- matchingProviderGroups groups]
         other -> assertFailure $
           "expected polymorphic provider candidates, got: " ++ show other
   , testCase

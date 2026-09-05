@@ -65,6 +65,9 @@ import System.Timeout (timeout)
 
 import Language.Haskell.Djex
   ( LengthSMTLibExecutableLaunchStrategy (..)
+  , candidateRankingPolicyName
+  , defaultCandidateRankingPolicy
+  , parseCandidateRankingPolicy
   )
 
 import Leant.Backend
@@ -1231,6 +1234,8 @@ helpText = unlines
   , "                           use one inline Length constraint"
   , "                           candidates are bound as it1 (= it), it2, ..."
   , "  :set synth-engine E      djinn (default) | exference | both"
+  , "  :set synth-ranking P     legacy | balanced (default) | compact | diverse"
+  , "                           candidate quality within the same search bounds"
   , "  :set synth-steps N       Exference step budget (default 4096)"
   , "  :set synth-classical B   classical candidates for refuted goals"
   , "                           (on|off, default on)"
@@ -1331,6 +1336,20 @@ dispatchCommand st line = do
           engine <- rsSynthEngine <$> readIORef st
           emitLn st =<< cDim st
             ("synth engine: " ++ synthEngineName engine)
+        ["synth-ranking", value] -> case parseCandidateRankingPolicy value of
+          Right ranking -> do
+            modifyIORef' st (\s -> s { rsSynthLimits =
+              (rsSynthLimits s) { synthLimitRanking = ranking } })
+            emitLn st =<< cDim st
+              ("synth ranking: " ++ candidateRankingPolicyName ranking)
+          Left _ -> emitLn st =<< cRed st
+            "usage: :set synth-ranking legacy|balanced|compact|diverse"
+        ["synth-ranking"] -> do
+          ranking <- synthLimitRanking <$> synthLimitsOf st
+          emitLn st =<< cDim st
+            ("synth ranking: " ++ candidateRankingPolicyName ranking)
+        "synth-ranking" : _ -> emitLn st =<< cRed st
+          "usage: :set synth-ranking legacy|balanced|compact|diverse"
         ["synth-steps", value]
           | [(n, "")] <- reads value, n > (0 :: Int) -> do
               modifyIORef' st (\s -> s { rsSynthSteps = n })
@@ -2081,6 +2100,7 @@ showSynthSettings st = do
   let limits = rsSynthLimits state
       row name value = emitLn st =<< cDim st (name ++ ": " ++ value)
   row "synth-engine" (synthEngineName (rsSynthEngine state))
+  row "synth-ranking" (candidateRankingPolicyName (synthLimitRanking limits))
   row "synth-steps" (show (rsSynthSteps state))
   row "synth-queue" (show (synthLimitQueue limits))
   row "synth-budget" (showSynthBudget (synthLimitBudget limits))
@@ -2675,14 +2695,20 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
       -- these static policies admit one of the two disjoint schedules.
       baselinePolicy =
         ordinarySynthLaneCursorPolicy assessmentContext engine limits
+      -- Ranking changes candidate order, not the five resource bounds which
+      -- admit the established parallel schedule. Every branch receives the
+      -- original limits, including this command's selected ranking policy.
+      defaultSearchBounds =
+        limits { synthLimitRanking = defaultCandidateRankingPolicy }
+          == defaultSynthLimits
       parallelStructuralBaselineStaticallyEligible =
         engine == EngineBoth
-          && limits == defaultSynthLimits
+          && defaultSearchBounds
           && null libraryPremises
           && not (synthLaneCursorAllowsFilterSuccessor baselinePolicy)
       parallelLibraryBaselineStaticallyEligible =
         structuralFirst
-          && limits == defaultSynthLimits
+          && defaultSearchBounds
           && not (null libraryPremises)
           && not (synthLaneCursorAllowsFilterSuccessor baselinePolicy)
       -- Select the serial route or one concrete parallel closure entirely

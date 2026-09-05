@@ -1,5 +1,22 @@
 # `:synth` internals
 
+The [candidate-quality guide](candidate-quality.md) describes the configurable
+policy now applied before candidate-window, verification, and display cutoffs.
+`synthLimitRanking` travels with each lane. Djinn orders finite proof choices
+before its raw cutoff; Exference ranks a bounded checked pool before rendering
+and deduplication. Selection moves whole candidate/evidence associations and
+uses typed-graph erasure for scoring when that authority is available. Raw
+proof/step work is never refunded for normalized duplicates. The later cursor,
+verification, and Length boundaries below consume that selected order.
+The default profile is `balanced`. Descriptions of legacy candidate prefixes
+or the distinct-rendered-group window apply to `legacy`; the structural
+profiles can choose another checked order under the same resource settings.
+See the [focused quality probes](../test-church/quality.md) for independent
+compiler/kernel replay and policy comparisons. Their final acceptance is
+still being completed; the recorded 700-term Church run remains pinned to
+Leant `4757569`, Djex `e2eb71e`, and the executable hash in the
+[corpus guide](../test-church/README.md).
+
 *How Leant's synthesis pipeline is put together: the semantic-origin record,
 provider bindings, the Length handoff, and the invariants each dated report
 pins. The [README](../README.md) keeps the user-facing tour of `:synth`; this
@@ -1157,6 +1174,13 @@ unchanged. A request can return fewer groups because the stream ended or
 because the remaining hard-cap allowance was smaller; the following step
 states which boundary was reached.
 
+This cursor consumes the already selected engine outcome. Its group count
+does not replace the earlier raw observation bound: structural Exference
+selection has already charged each backend candidate, including rendering
+failures and duplicates, before constructing this stream. Legacy Exference
+instead builds the stream with its earlier distinct-rendered-group window.
+Advancing the cursor does not refund either form of underlying search work.
+
 `DetailedSynthCursorNaturallyExhausted` is returned only when advancing before
 the cap observes an empty stream. Once 60 groups have been returned,
 `DetailedSynthCursorHardCapReached` wins without probing the next group. An
@@ -1204,14 +1228,17 @@ disjoint private schedules:
 | none | `EngineBoth` | standalone Djinn / standalone Exference |
 | nonempty | Djinn, Exference, or `EngineBoth` | structural base / tuned library search |
 
-Both schedules additionally require `SynthLimits == defaultSynthLimits` (5
+Both schedules additionally require the resource fields of `SynthLimits` to
+match `defaultSynthLimits` (5
 shown, 12 verified per standalone engine, a 60-group window, no Djinn
 choice-point budget, and Exference queue 1024), a disabled or rank assessment
 whose lane cannot request a filter successor, and at least two RTS
 capabilities. The library schedule also requires a structurally accepted goal;
 the selected premises are the goal-specific rated list, not merely the global
 `:set synth-library on` switch. `rsSynthSteps` is not a `SynthLimits` field,
-so `:set synth-steps N` remains eligible.
+so `:set synth-steps N` remains eligible. The ranking profile is excluded from
+that resource-default comparison: each scheduled branch retains the actual
+`synthLimitRanking` captured for the command.
 
 `initialBaselineSchedule` decides among those two closures and the serial route
 entirely from pure command state. Only an admitted closure reaches the one
@@ -1852,10 +1879,11 @@ One exact provider may retain several distinct successful instance-head
 vectors. In the same transcript, heads for `AlternativeChoice Wrap` and
 `AlternativeChoice (Pair Nat)` produce exactly
 `Higher.alternative («F» := Higher.Wrap)` and
-`Higher.alternative («F» := (@Higher.Pair Nat))`. Standalone Djinn ranks
-`Wrap` first, standalone Exference ranks `Pair Nat` first, and combined mode
-uses Djinn's order after stable exact-spelling deduplication. The order is
-engine policy; the semantic requirement is that every mode retain both exact
+`Higher.alternative («F» := (@Higher.Pair Nat))`. In the recorded rank-N
+acceptance transcript, standalone Djinn ranked `Wrap` first, standalone
+Exference ranked `Pair Nat` first, and combined mode used Djinn's order after
+stable exact-spelling deduplication. A different structural profile may change
+that order; the semantic requirement is that every mode retain both exact
 alternatives once. The transcript also carries one heterogeneous two-binder
 vector with kind arities one and two, respectively, and requires
 `Higher.multiVacuous («F» := Higher.Wrap) («G» := (@Higher.Triple Nat))` in
