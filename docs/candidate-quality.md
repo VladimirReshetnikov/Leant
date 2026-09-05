@@ -114,6 +114,15 @@ the earlier normalization sequence. Leant supplies exact non-strict
 constructor arities from its actual total family translation and active
 inventory. Generic neutral declarations alone do not grant that authority.
 
+Before reduction, Exference's capture-safe simplifier exposes single-use let
+aliases and removes unused lets without contracting eta expansions. It then
+applies the shared one-pass constructor reducer and simplifies the resulting
+field lets. Newly exposed matches are reduced only while the number of case
+nodes strictly decreases, so the original case count bounds the iteration.
+Repeated payload uses remain shared, and a visible type application on a
+constructor head still blocks its reduction. This iteration belongs to the
+Exference adapter; the shared reducer itself remains a single pass.
+
 Djex checks a normalized Exference candidate before constructing its typed
 graph; a failed reduction can fall back to the checked original. Leant scores
 the authoritative graph when available, preserving the candidate's exact
@@ -129,10 +138,10 @@ does not establish that it implements an intended operation such as reversal.
 ## Validation status
 
 The Haskell implementation passed all **565 Leant unit tests**, run serially
-at unchanged limits in 415.87 seconds. The five focused tests also passed
-before the full run. These checks cover the policy integration, exact candidate
+at unchanged limits in 392.05 seconds after the constructor-alias repair.
+These checks cover the policy integration, exact candidate
 authority, provider specialization, and existing Length contracts. The build
-receipt is `test-church/quality-results/build-leant-03.log`; elapsed test time
+receipt is `test-church/quality-results/build-leant-04.log`; elapsed test time
 is validation metadata, not evidence of a synthesis performance improvement.
 
 The new policy-specific live Lean probes remain pending. Their exact displayed
