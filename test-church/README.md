@@ -153,7 +153,28 @@ declared premises. Their report is
 558 tests; the eight constructive syntax witnesses, five standalone
 provider-discovery modes, and fourteen Python harness checks pass separately.
 
-The full ordinary transcript replay remains pending: its inventory contains
-30 files, 263 explicit-type queries, and two proof-mode `:synth` commands,
-for 265 synthesis commands altogether. That compatibility run is distinct
-from the completed full corpus and compact fixture acceptance above.
+The full ordinary compatibility run completed on that same unchanged
+executable on 5 September 2026 at 01:55:44, UTC-07:00. It covered 30 files,
+263 explicit-type queries, and two proof-mode `:synth` commands, for 265
+synthesis commands altogether. With a configured 600-second synthesis
+timeout, the complete run took 5,515.86 seconds. Its original runner exit
+code was 1: 17 fixture outputs matched immediately and 13 differed from
+their baselines. That original result remains recorded.
+
+The 13 changed fixtures were reviewed query by query: 114 actual displayed
+terms across 34 changed queries passed independent Lean 4.32.0 replay.
+Thirty-one have empty axiom inventories, and 83 have exactly their
+fixture-declared premises. No previously successful query lost its result.
+The aggregate `generated-final-drift-index/results.json` records this review;
+it excludes four earlier baseline updates and their separate 44 term replays.
+Only reviewed term and diagnostic changes were applied to the golden files.
+
+All **30 final golden files match the retained full live-run outputs** using
+the production Bash runner's normalization functions and command-substitution
+semantics. This final check is an offline comparison of the completed live
+outputs, not a second live synthesis run. Evidence is retained under
+`generated-goldens-final`: `results.json` preserves the original exit code,
+timing, and executable identity; `final-comparison.json` records all final
+comparisons; `runner.log` and `transcripts/` retain the live output. This
+ordinary compatibility closure is distinct from the independently checked
+full corpus and compact fixture acceptance above.
