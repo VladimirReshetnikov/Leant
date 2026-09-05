@@ -1125,9 +1125,22 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
         piFrag
           <$> declaredProvider providers global
       _ -> do
-        (_, _, _, resultFrag) <-
+        (headExpr, _, _, resultFrag) <-
           analyzeExactApplication avoiding dss expression
-        pure resultFrag
+        headFrag <- applicationHeadFrag dss headExpr
+        -- An opened forall whose instantiation is determined only by the
+        -- enclosing application is not an exact argument type yet. Its fresh
+        -- variable must not be compared as a rigid ambient variable: that
+        -- would abandon fitting the enclosing application and hide nested
+        -- type applications. Let the expected domain drive this expression
+        -- instead. Unopened binders remain bound, and real ambient variables
+        -- retain the identities supplied by the source and local environment.
+        let ambient = Set.unions
+              (freeFragVariables Set.empty headFrag
+                : map (freeFragVariables Set.empty . snd) dss)
+        if freeFragVariables Set.empty resultFrag `Set.isSubsetOf` ambient
+          then Just resultFrag
+          else Nothing
   -- A plain let binder transports the value's whole type, including a
   -- forall reached after an ordinary application. Destructuring instead
   -- needs the structural result exposed for its component binders.

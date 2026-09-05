@@ -26416,6 +26416,24 @@ rankNFrontierTests = testGroup "Djinn rank-N frontiers"
               (Lambda [Bind "left", Wildcard] (Local "left")))
       renderLeanTerm Map.empty Map.empty Map.empty ([], 0, []) goal expression
         @?= Right ["fun _ f => @f _ _ (fun _ x => x) (fun _ y _ => y)"]
+  , testCase "fit a continuation argument whose result is known only from its caller" $ do
+      let variable = FVar
+          boolean = FAll True "choice"
+            (FArr (variable "choice") (FArr (variable "choice") (variable "choice")))
+          pair = FAll True "result"
+            (FArr (FArr (variable "A") (FArr (variable "B") (variable "result")))
+              (variable "result"))
+          goal = FAll True "A" (FAll True "B" (FAll True "R"
+            (FArr (FArr (variable "A") boolean)
+              (FArr pair (FArr (FArr (variable "B") (variable "R")) (variable "R"))))))
+          argument = Lambda [Bind "left", Bind "right"]
+            (Let (Bind "choice") (Apply (Local "choose") (Local "left"))
+              (Apply (Apply (Local "choice") (Local "right")) (Local "right")))
+          expression = Lambda [Bind "choose", Bind "pair", Bind "consume"]
+            (Apply (Local "consume") (Apply (Local "pair") argument))
+      fmap (take 1)
+          (renderLeanTerm Map.empty Map.empty Map.empty ([], 0, []) goal expression)
+        @?= Right ["fun _ _ _ f g h => h (g _ (fun x y => let f1 := f x; f1 _ y y))"]
   , testCase "retain ambient variables while fitting a quantified value" $ do
       let application arguments = FApp True "F arguments" (AppVariable "F") arguments
           target = FAll True "inner"
@@ -26427,6 +26445,33 @@ rankNFrontierTests = testGroup "Djinn rank-N frontiers"
               (Lambda [Wildcard, Bind "value"] (Local "value")))
       renderLeanTerm Map.empty Map.empty Map.empty ([], 0, []) goal expression
         @?= Right ["fun _ _ f => @f _ (fun _ _ x => x)"]
+  , testCase "retain a rigid ambient result when checking a known argument" $ do
+      let variable = FVar
+          boolean = FAll True "choice"
+            (FArr (variable "choice") (FArr (variable "choice") (variable "choice")))
+          pair = FArr (FArr (variable "A") (FArr (variable "B") (variable "B")))
+            (variable "C")
+          goal = foldr (FAll True)
+            (FArr (FArr (variable "A") boolean)
+              (FArr pair (FArr (FArr (variable "B") (variable "R")) (variable "R"))))
+            ["A", "B", "C", "R"]
+          argument = Lambda [Bind "left", Bind "right"]
+            (Let (Bind "choice") (Apply (Local "choose") (Local "left"))
+              (Apply (Apply (Local "choice") (Local "right")) (Local "right")))
+          expression = Lambda [Bind "choose", Bind "pair", Bind "consume"]
+            (Apply (Local "consume") (Apply (Local "pair") argument))
+      -- This deliberately malformed candidate gives consume a C, although it
+      -- requires B. C is an ambient rigid variable, not an unresolved result
+      -- of silent forall opening. Preserve the mismatch instead of fitting
+      -- its nested callback under an invented agreement; verification rejects
+      -- the candidate. Unfitted local binders keep their generic a/b/c names.
+      rendered <- expectRight $
+        renderLeanTerm Map.empty Map.empty Map.empty ([], 0, []) goal expression
+      case rendered of
+        primary : _ -> assertBool
+          ("a rigid ambient result was treated as an unresolved argument: " ++ show rendered)
+          ("let c := f a; c b b" `isInfixOf` primary)
+        [] -> assertFailure "renderer returned no spelling for the rigid mismatch probe"
   , testCase "preserve implicit forall boundaries inside a rank-N argument" $ do
       let identity = FAll False "A" (FArr (FVar "A") (FVar "A"))
           result = FVar "R"
