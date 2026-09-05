@@ -1,0 +1,65 @@
+
+   __                  __
+  / /  ___ ___ ____   / /_
+ / /__/ -_) _ `/ _ \_/ __/
+/____/\__/\_,_/_//_/ \__/
+Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to exit.
+λ> -- These axioms model explicitly supplied opaque primitives. This fixture
+λ> -- checks provider discovery and kernel typing relative to that environment;
+…> -- closed Church-corpus acceptance uses no axioms.
+…> namespace ChurchProviders8
+…> axiom Token : Type
+…> class Choice (t0 t1 t2 t3 t4 t5 t6 t7 : Type 1) : Prop where witness : True
+…> instance : Choice (∀ A : Type, A → A) (∀ A : Type, A → A → A) (∀ A : Type, A → A → A → A) (∀ A : Type, A → A → A → A → A) (∀ A : Type, A → A → A → A → A → A) (∀ A : Type, A → A → A → A → A → A → A) (∀ A : Type, A → A → A → A → A → A → A → A) (∀ A : Type, A → A → A → A → A → A → A → A → A) := ⟨True.intro⟩
+…> axiom chosen {t0 t1 t2 t3 t4 t5 t6 t7 : Type 1} [Choice t0 t1 t2 t3 t4 t5 t6 t7] : Token
+…> end ChurchProviders8
+…>
+λ> namespace ChurchProviders12
+λ> axiom Token : Type
+λ> class Choice (t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 : Type 1) : Prop where witness : True
+λ> instance : Choice (∀ A : Type, A → A) (∀ A : Type, A → A → A) (∀ A : Type, A → A → A → A) (∀ A : Type, A → A → A → A → A) (∀ A : Type, A → A → A → A → A → A) (∀ A : Type, A → A → A → A → A → A → A) (∀ A : Type, A → A → A → A → A → A → A → A) (∀ A : Type, A → A → A → A → A → A → A → A → A) (∀ A : Type, A → A → A → A → A → A → A → A → A → A) (∀ A : Type, A → A → A → A → A → A → A → A → A → A → A) (∀ A : Type, A → A → A → A → A → A → A → A → A → A → A → A) (∀ A : Type, A → A → A → A → A → A → A → A → A → A → A → A → A) := ⟨True.intro⟩
+λ> axiom chosen {t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 : Type 1} [Choice t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11] : Token
+λ> end ChurchProviders12
+λ>
+λ> :set synth-library off
+synth library: off
+λ> :set synth-classical off
+synth classical: off
+λ> :set synth-window 1
+synth window: 1
+note: each lane verifies 1 groups, clamped by synth-window 1
+λ> :set synth-verify 1
+synth verify: 1
+λ> :set synth-shown 1
+synth shown: 1
+λ> :set synth-steps 512
+synth steps: 512
+λ> :set synth-engine djinn
+synth engine: djinn
+λ> :synth ChurchProviders8.Token
+preparing synthesis environment (session imports + Lean)...
+note: `-- These axioms model explicitly supplied opaque primitives. This fixture` is not visible to :synth (it did not replay over the Lean import)
+  it1  ChurchProviders8.chosen («t0» := (∀ (a0_0 : Type _), a0_0 → a0_0)) («t1» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0)) («t2» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0)) («t3» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t4» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t5» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t6» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t7» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0))
+note: search truncated: candidate limit reached (1)
+λ> :synth ChurchProviders12.Token
+  it1  ChurchProviders12.chosen («t0» := (∀ (a0_0 : Type _), a0_0 → a0_0)) («t1» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0)) («t2» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0)) («t3» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t4» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t5» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t6» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t7» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t8» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t9» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t10» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t11» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0))
+note: search truncated: candidate limit reached (1)
+λ> :set synth-engine exference
+synth engine: exference
+λ> :synth ChurchProviders8.Token
+  it1  ChurchProviders8.chosen («t0» := (∀ (a0_0 : Type _), a0_0 → a0_0)) («t1» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0)) («t2» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0)) («t3» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t4» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t5» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t6» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t7» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0))
+note: search truncated: step limit reached, queue limit pruned 4429
+λ> :synth ChurchProviders12.Token
+  it1  ChurchProviders12.chosen («t0» := (∀ (a0_0 : Type _), a0_0 → a0_0)) («t1» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0)) («t2» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0)) («t3» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t4» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t5» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t6» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t7» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t8» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t9» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t10» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t11» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0))
+note: search truncated: step limit reached, queue limit pruned 4429
+λ> :set synth-engine both
+synth engine: both
+λ> :synth ChurchProviders8.Token
+  it1  ChurchProviders8.chosen («t0» := (∀ (a0_0 : Type _), a0_0 → a0_0)) («t1» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0)) («t2» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0)) («t3» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t4» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t5» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t6» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t7» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0))
+note: search truncated: candidate limit reached (1)
+note: exference: search truncated: step limit reached, queue limit pruned 2469
+λ> :synth ChurchProviders12.Token
+  it1  ChurchProviders12.chosen («t0» := (∀ (a0_0 : Type _), a0_0 → a0_0)) («t1» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0)) («t2» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0)) («t3» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t4» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t5» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t6» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t7» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t8» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t9» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t10» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («t11» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0))
+note: search truncated: candidate limit reached (1)
+note: exference: search truncated: step limit reached, queue limit pruned 2469
+λ> :quit

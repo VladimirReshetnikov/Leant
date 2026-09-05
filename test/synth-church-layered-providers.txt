@@ -1,0 +1,25 @@
+namespace ChurchLayered
+axiom Seed : Type
+axiom seed : Seed
+axiom G2 : Type 1 → Type 1 → Type 1
+axiom G3 : Type 1 → Type 1 → Type 1 → Type 1
+axiom maker2 : Seed → ∀ a : Type 1, a → Seed → ∀ b : Type 1, b → G2 a b
+axiom maker3 : Seed → ∀ a b : Type 1, a → b → Seed → ∀ c : Type 1, c → G3 a b c
+end ChurchLayered
+:set synth-library off
+:set synth-classical off
+:set synth-providers on
+:set synth-steps 4096
+:set synth-window 1
+:set synth-verify 1
+:set synth-shown 1
+:set synth-engine djinn
+:synth (ChurchLayered.G2 (∀ a : Type, a → a) (∀ a : Type, a → a → a))
+:synth (ChurchLayered.G3 (∀ a : Type, a → a) (∀ a : Type, a → a → a) (∀ a : Type, a → a))
+:set synth-engine exference
+:synth (ChurchLayered.G2 (∀ a : Type, a → a) (∀ a : Type, a → a → a))
+:synth (ChurchLayered.G3 (∀ a : Type, a → a) (∀ a : Type, a → a → a) (∀ a : Type, a → a))
+:set synth-engine both
+:synth (ChurchLayered.G2 (∀ a : Type, a → a) (∀ a : Type, a → a → a))
+:synth (ChurchLayered.G3 (∀ a : Type, a → a) (∀ a : Type, a → a → a) (∀ a : Type, a → a))
+:quit

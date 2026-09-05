@@ -4,13 +4,15 @@
 #   ./run-tests.sh            run all *.txt, diff against *.golden
 #   ./run-tests.sh -u         regenerate the golden files instead
 #   ./run-tests.sh basic      run only synth-basic.txt
+#   LEANT_GOLDEN_LOG_DIR=/absolute/path ./run-tests.sh
+#                            retain raw per-fixture output while tests run
 #
 # Each transcript is piped into `leant --plain` on stdin; volatile lines
 # (backend discovery, startup timing) are filtered before comparison, so
 # the goldens are stable across machines and cache states.  Requires the
 # Lean backend that leant already knows how to find (see ../README.md).
 
-set -u
+set -uo pipefail
 cd "$(dirname "$0")"
 
 # Resolve the built binary through cabal (toolchain-agnostic), falling
@@ -41,6 +43,19 @@ done
 # Export a different LEANT_SYNTH_TIMEOUT to override it (0 waits forever).
 export LEANT_SYNTH_TIMEOUT="${LEANT_SYNTH_TIMEOUT:-600}"
 
+if [ -n "${LEANT_GOLDEN_LOG_DIR:-}" ]; then
+  mkdir -p -- "$LEANT_GOLDEN_LOG_DIR" || exit 2
+fi
+
+run_leant() {
+  if [ -n "${LEANT_GOLDEN_LOG_DIR:-}" ]; then
+    "$EXE" --plain < "$input" 2>&1 \
+      | tee "$LEANT_GOLDEN_LOG_DIR/${input%.txt}.output.txt"
+  else
+    "$EXE" --plain < "$input" 2>&1
+  fi
+}
+
 filter() {
   # Drop the volatile startup lines, and any CR a Windows checkout may
   # still introduce.  Normalize prompt-only continuation lines too: the REPL
@@ -68,7 +83,12 @@ for input in *.txt; do
   esac
   ran=$((ran + 1))
   golden="${input%.txt}.golden"
-  actual=$("$EXE" --plain < "$input" 2>&1 | filter)
+  if ! actual=$(run_leant | filter); then
+    echo "FAIL $input (Leant or transcript filtering exited unsuccessfully)"
+    printf '%s\n' "$actual"
+    failures=$((failures + 1))
+    continue
+  fi
   if [ "$update" = 1 ]; then
     printf '%s\n' "$actual" > "$golden"
     echo "updated $golden"

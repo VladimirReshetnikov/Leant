@@ -20,6 +20,15 @@ Homepage:      https://github.com/VladimirReshetnikov/Leant
 Bug-Reports:   https://github.com/VladimirReshetnikov/Leant/issues
 Category:      Development
 Build-Type:    Simple
+Extra-Source-Files:
+  test-church/check-provider-discovery.hs
+  test-church/*.py
+  test-church/README.md
+  test-church/UniverseProbe.lean
+  test-church/MixedSpineSyntax.lean
+  test/*.txt
+  test/*.golden
+  test/run-tests.sh
 
 Source-Repository head
   Type:     git

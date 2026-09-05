@@ -1,0 +1,33 @@
+-- These axioms model explicitly supplied opaque primitives. This fixture
+-- checks provider discovery and kernel typing relative to that environment;
+-- closed Church-corpus acceptance uses no axioms.
+namespace ChurchProviders8
+axiom Token : Type
+class Choice (t0 t1 t2 t3 t4 t5 t6 t7 : Type 1) : Prop where witness : True
+instance : Choice (∀ A : Type, A → A) (∀ A : Type, A → A → A) (∀ A : Type, A → A → A → A) (∀ A : Type, A → A → A → A → A) (∀ A : Type, A → A → A → A → A → A) (∀ A : Type, A → A → A → A → A → A → A) (∀ A : Type, A → A → A → A → A → A → A → A) (∀ A : Type, A → A → A → A → A → A → A → A → A) := ⟨True.intro⟩
+axiom chosen {t0 t1 t2 t3 t4 t5 t6 t7 : Type 1} [Choice t0 t1 t2 t3 t4 t5 t6 t7] : Token
+end ChurchProviders8
+
+namespace ChurchProviders12
+axiom Token : Type
+class Choice (t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 : Type 1) : Prop where witness : True
+instance : Choice (∀ A : Type, A → A) (∀ A : Type, A → A → A) (∀ A : Type, A → A → A → A) (∀ A : Type, A → A → A → A → A) (∀ A : Type, A → A → A → A → A → A) (∀ A : Type, A → A → A → A → A → A → A) (∀ A : Type, A → A → A → A → A → A → A → A) (∀ A : Type, A → A → A → A → A → A → A → A → A) (∀ A : Type, A → A → A → A → A → A → A → A → A → A) (∀ A : Type, A → A → A → A → A → A → A → A → A → A → A) (∀ A : Type, A → A → A → A → A → A → A → A → A → A → A → A) (∀ A : Type, A → A → A → A → A → A → A → A → A → A → A → A → A) := ⟨True.intro⟩
+axiom chosen {t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 : Type 1} [Choice t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11] : Token
+end ChurchProviders12
+
+:set synth-library off
+:set synth-classical off
+:set synth-window 1
+:set synth-verify 1
+:set synth-shown 1
+:set synth-steps 512
+:set synth-engine djinn
+:synth ChurchProviders8.Token
+:synth ChurchProviders12.Token
+:set synth-engine exference
+:synth ChurchProviders8.Token
+:synth ChurchProviders12.Token
+:set synth-engine both
+:synth ChurchProviders8.Token
+:synth ChurchProviders12.Token
+:quit

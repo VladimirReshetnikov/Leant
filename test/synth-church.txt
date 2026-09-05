@@ -1,0 +1,24 @@
+universe u v w
+abbrev Church.Bool := ∀ e : Type u, e → e → e
+abbrev Church.Pair (a : Type u) (b : Type v) := ∀ e : Type w, (a → b → e) → e
+abbrev Church.List (a : Type u) := ∀ e : Type v, (a → e → e) → e → e
+abbrev Church.Maybe (a : Type u) := ∀ e : Type v, e → (a → e) → e
+
+:set synth-library off
+:set synth-providers off
+:set synth-classical off
+:set synth-steps 4096
+:set synth-window 1
+:set synth-verify 1
+:set synth-shown 1
+:set synth-engine djinn
+:synth Church.Bool
+:synth (∀ a b : Type _, Church.Pair a b → a)
+:synth (∀ a : Type _, Church.List a → Church.Maybe (Church.Pair a (Church.List a)))
+:synth (∀ a b : Type _, (a → b) → Church.List a → Church.List b)
+:synth (∀ a b : Type _, Church.List (Church.Pair a b) → Church.Pair (Church.List a) (Church.List b))
+:synth (∀ a : Type _, Church.List (Church.List a) → Church.List a)
+:synth (∀ a : Type _, Church.List a → Church.List (Church.List a))
+:synth (∀ a : Type _, a → Church.List a → a)
+:synth (∀ F : Type 1 → Type 1, (∀ a : Type 1, F a) → F (∀ b : Type, b → b))
+:quit

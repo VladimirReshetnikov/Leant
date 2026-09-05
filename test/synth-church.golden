@@ -1,0 +1,58 @@
+
+   __                  __
+  / /  ___ ___ ____   / /_
+ / /__/ -_) _ `/ _ \_/ __/
+/____/\__/\_,_/_//_/ \__/
+Leant (Haskell) - a GHCi-style REPL for Lean 4.  Type :help for help, :quit to exit.
+λ> universe u v w
+λ> abbrev Church.Bool := ∀ e : Type u, e → e → e
+λ> abbrev Church.Pair (a : Type u) (b : Type v) := ∀ e : Type w, (a → b → e) → e
+λ> abbrev Church.List (a : Type u) := ∀ e : Type v, (a → e → e) → e → e
+λ> abbrev Church.Maybe (a : Type u) := ∀ e : Type v, e → (a → e) → e
+λ>
+λ> :set synth-library off
+synth library: off
+λ> :set synth-providers off
+synth providers: off
+λ> :set synth-classical off
+synth classical: off
+λ> :set synth-steps 4096
+synth steps: 4096
+λ> :set synth-window 1
+synth window: 1
+note: each lane verifies 1 groups, clamped by synth-window 1
+λ> :set synth-verify 1
+synth verify: 1
+λ> :set synth-shown 1
+synth shown: 1
+λ> :set synth-engine djinn
+synth engine: djinn
+λ> :synth Church.Bool
+preparing synthesis environment (session imports + Lean)...
+  it1  fun _ _ x => x
+note: search truncated: candidate limit reached (1)
+λ> :synth (∀ a b : Type _, Church.Pair a b → a)
+  it1  fun _ _ f => f _ (fun x _ => x)
+note: search truncated: candidate limit reached (1)
+λ> :synth (∀ a : Type _, Church.List a → Church.Maybe (Church.Pair a (Church.List a)))
+  it1  fun _ _ _ x _ => x
+note: search truncated: candidate limit reached (1)
+λ> :synth (∀ a b : Type _, (a → b) → Church.List a → Church.List b)
+  it1  fun _ _ _ _ _ _ x => x
+note: search truncated: candidate limit reached (1)
+λ> :synth (∀ a b : Type _, Church.List (Church.Pair a b) → Church.Pair (Church.List a) (Church.List b))
+  it1  fun _ _ _ _ f => f (fun _ _ x => x) (fun _ _ y => y)
+note: search truncated: candidate limit reached (1)
+λ> :synth (∀ a : Type _, Church.List (Church.List a) → Church.List a)
+  it1  fun _ _ _ _ x => x
+note: search truncated: candidate limit reached (1)
+λ> :synth (∀ a : Type _, Church.List a → Church.List (Church.List a))
+  it1  fun _ _ _ _ x => x
+note: search truncated: candidate limit reached (1)
+λ> :synth (∀ a : Type _, a → Church.List a → a)
+  it1  fun _ x _ => x
+note: search truncated: candidate limit reached (1)
+λ> :synth (∀ F : Type 1 → Type 1, (∀ a : Type 1, F a) → F (∀ b : Type, b → b))
+  it1  fun _ x => x _
+note: search truncated: candidate limit reached (1)
+λ> :quit
