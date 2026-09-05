@@ -32,7 +32,12 @@ The default manifest path is `lib/Djex/test-church/manifest.json`. Use
 selects individual source names and may be repeated; `--classification`
 selects total, integer-provider, or partial/default-bearing cases. `--engine`
 chooses `djinn`, `exference`, or `both`. `--window` sets the search and
-verification window, and `--timeout` sets the wall-clock limit for each goal.
+verification window. `--steps` sets `synth-steps`, the Exference-only step
+budget; it does not set a Djinn choice-point limit. Djinn retains the default
+`synth-budget off`, subject to the shared wall-clock search deadline and
+intrinsic finite planning caps. `--timeout` configures `synth-timeout` for
+synthesis; it is not an end-to-end limit covering process startup, goal
+serialization, or the separate standalone kernel replay.
 
 The output directory contains the exact goal transcript, a translated manifest,
 the complete Leant output, every accepted candidate as a Lean declaration, and
@@ -127,8 +132,13 @@ terms**, and every corpus declaration has an empty axiom inventory. Each
 engine covers 315 pure total cases, 16 integer-provider cases, and 19
 explicit-default cases under the policy above.
 
-Both runs used a one-candidate window, 4,096 search steps, and a thirty-second
-per-query timeout, on one unchanged executable with SHA-256
+Both runs used a one-candidate window and a configured thirty-second synthesis
+timeout. Exference used 4,096 search steps. Djinn retained its default
+unbounded choice-point budget (`synth-budget off`), subject to the shared
+wall-clock search deadline and intrinsic finite planning caps; the configured
+`synth-steps 4096` does not bound Djinn choice points. The synthesis timeout
+does not cover process startup, goal serialization, or the separate standalone
+kernel replay. Both runs used one unchanged executable with SHA-256
 `addfac35b9d82955fc871c177b582a8c043475c0171c22cb17977e0e9f5b9869`.
 The implementation revisions are Leant `4757569` and vendored Djex `e2eb71e`.
 The live-synthesis reports, candidate modules, and kernel output are in
