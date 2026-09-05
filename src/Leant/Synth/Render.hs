@@ -15,6 +15,9 @@
 --     'fit' weaves an anonymous binder for every explicit quantifier the
 --     goal reaches while the candidate is still binding (including inside
 --     tuple components, injections, and match alternatives), and
+--     starts a new lambda group at an intermediate implicit quantifier so
+--     Lean can insert that binder without consuming the next value binder;
+--     it also
 --     eta-expands cores left under an explicit quantifier - always for
 --     introduction forms, and as an extra variant for elimination forms
 --     (which may instead be transported whole);
@@ -64,7 +67,7 @@ import Language.Haskell.Synthesis.Generated
   , discardUnusedPatternBindingsBy
   , expressionFullApplicationSpine
   , isInferredVisibleTypeArgument
-  , visibleTypeArgumentClosedType
+  , visibleTypeArgumentPatternType
   )
 import Language.Haskell.Synthesis.TypedGenerated
   ( TermGraph
@@ -919,7 +922,7 @@ fit cm providers force frag expr n doms =
       (core2, n2, doms2) =
         fitCore cm providers force coreFrag core1 n1 doms1
       allPats = pats' ++ etaPats
-  in (if null allPats then core2 else Lambda allPats core2, n2, doms2)
+  in (lambdaWithImplicitBoundaries frag allPats core2, n2, doms2)
  where
   lambdaSpine (Lambda ps b) =
     let (more, coreExpr) = lambdaSpine b in (ps ++ more, coreExpr)
@@ -973,6 +976,36 @@ fit cm providers force frag expr n doms =
       in (Wildcard : ps, core', f', k')
     _ -> ([], core, f, k)
 
+-- Lean inserts a leading implicit lambda binder when it starts elaborating a
+-- lambda against an expected forall. It does not repeat that insertion in the
+-- middle of the same syntactic lambda binder group: @fun _ x => x@ against
+-- @P -> forall {A : Type}, A -> A@ consumes the implicit type binder as @x@.
+-- Keep a new lambda at that boundary, yielding @fun _ => fun x => x@. Djex
+-- erases type lambdas, so reconstruct these groups from the exact source
+-- fragment after fitting rather than flattening all value binders together.
+lambdaWithImplicitBoundaries
+  :: Frag -> [Pattern String] -> Expression String -> Expression String
+lambdaWithImplicitBoundaries _ [] body = body
+lambdaWithImplicitBoundaries frag pats body =
+  case boundary frag pats [] of
+    Just (prefix, restFrag, suffix) ->
+      Lambda prefix (lambdaWithImplicitBoundaries restFrag suffix body)
+    Nothing -> Lambda pats body
+ where
+  boundary _ [] _ = Nothing
+  boundary current@(FAll False _ rest) remaining previous
+    | not (null previous) = Just (reverse previous, current, remaining)
+    | otherwise = boundary rest remaining previous
+  boundary (FAll True _ rest) (pat : remaining) previous =
+    boundary rest remaining (pat : previous)
+  boundary (FArr _ rest) (pat : remaining) previous =
+    boundary rest remaining (pat : previous)
+  boundary (FInst _ rest) (pat : remaining) previous =
+    boundary rest remaining (pat : previous)
+  boundary (FExactContext _ _ rest) (pat : remaining) previous =
+    boundary rest remaining (pat : previous)
+  boundary _ _ _ = Nothing
+
 -- | Recurse through introduction forms whose component types the goal
 -- fragment determines, through elimination inputs far enough to fit
 -- applications whose heads have known source fragments, and through match
@@ -1023,7 +1056,7 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
   -- it a constructed @forall@ argument would lose Lean's explicit type-binder
   -- wildcard and be rejected only at backend verification.
   (_, _)
-    | Just fitted <- fitKnownApplication ce n ds -> fitted
+    | Just fitted <- fitKnownApplication (Just cf) ce n ds -> fitted
   (_, VisibleTypeApplication function argument) ->
     let (function', n1, ds1) =
           fitCore cm providers force cf function n ds
@@ -1040,8 +1073,7 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
     in (Case scrut' alts', n1, ds1)
   (_, Let pat rhs body) ->
     let (rhs', n0, ds0) = fitEliminationInput rhs n ds
-        aliasDoms = maybe [] (bindDomainPairs pat)
-          (knownExpressionFrag ds0 rhs')
+        aliasDoms = letPatternDomains ds0 pat rhs'
         (body', n1, ds1) =
           fit cm providers force cf body n0 (aliasDoms ++ ds0)
     in (Let pat rhs' body', n1, ds1)
@@ -1096,12 +1128,19 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
         (_, _, _, resultFrag) <-
           analyzeExactApplication avoiding dss expression
         pure resultFrag
+  -- A plain let binder transports the value's whole type, including a
+  -- forall reached after an ordinary application. Destructuring instead
+  -- needs the structural result exposed for its component binders.
+  letPatternDomains dss pattern rhs =
+    maybe [] (bindDomainPairs pattern) $ case pattern of
+      Bind _ -> knownArgumentFrag Set.empty dss rhs
+      _ -> knownExpressionFrag dss rhs
   -- Analyze once for both elimination-result recovery and argument fitting.
   -- Each returned term domain includes every replacement learned at that
   -- argument, while the complete mixed spine is retained for reconstruction.
-  analyzeKnownApplication = analyzeApplication False
-  analyzeExactApplication = analyzeApplication True
-  analyzeApplication preserveTrailing avoiding dss expression = do
+  analyzeKnownApplication = analyzeApplication False Nothing
+  analyzeExactApplication = analyzeApplication True Nothing
+  analyzeApplication preserveTrailing expectedResult avoiding dss expression = do
     let (headExpr, arguments) = expressionFullApplicationSpine expression
     headFrag <- applicationHeadFrag dss headExpr
     let exactArguments = case headExpr of
@@ -1116,10 +1155,10 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
           ++ map providerArgumentVariableNames retainedArguments
           ++ map (fragVariableNames . snd) dss
     (termDomains, resultFrag) <-
-      consumeApplication preserveTrailing dss reserved retainedArguments
+      consumeApplication preserveTrailing expectedResult dss reserved retainedArguments
         arguments headFrag
     pure (headExpr, arguments, termDomains, resultFrag)
-  consumeApplication preserveTrailing dss reserved = go Set.empty [] []
+  consumeApplication preserveTrailing expectedResult dss reserved = go Set.empty [] []
    where
     go consumed replacements termDomains exactArguments arguments sourceFrag =
       let frag = specializeFrag replacements sourceFrag
@@ -1129,7 +1168,7 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
           -- Elimination analysis instead keeps the historical silent opening
           -- needed to expose a provider's structural result to case or let.
           | preserveTrailing && null arguments ->
-              finish replacements termDomains arguments frag
+              finish consumed replacements termDomains arguments frag
           | otherwise ->
               let replacementNames = Set.unions
                     [ Set.insert formal (fragVariableNames replacement)
@@ -1159,12 +1198,12 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
                 termDomains remainingExact remaining opened
         FInst _ rest
           | preserveTrailing && null arguments ->
-              finish replacements termDomains arguments frag
+              finish consumed replacements termDomains arguments frag
           | otherwise ->
               go consumed replacements termDomains exactArguments arguments rest
         FExactContext _ _ rest
           | preserveTrailing && null arguments ->
-              finish replacements termDomains arguments frag
+              finish consumed replacements termDomains arguments frag
           | otherwise ->
               go consumed replacements termDomains exactArguments arguments rest
         FArr domain rest -> case arguments of
@@ -1183,13 +1222,24 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
             let fittedDomain = specializeFrag replacements' domain
             go consumed replacements' (fittedDomain : termDomains)
               exactArguments remaining rest
-          _ -> finish replacements termDomains arguments frag
-        _ -> finish replacements termDomains arguments frag
+          _ -> finish consumed replacements termDomains arguments frag
+        _ -> finish consumed replacements termDomains arguments frag
 
-    finish replacements termDomains arguments frag
+    finish consumed replacements termDomains arguments frag
       | not (null arguments) = Nothing
-      | otherwise = Just
-          (reverse termDomains, specializeFrag replacements frag)
+      | otherwise = do
+          -- A result such as F (forall b, b -> b) determines the source
+          -- provider's a in forall a, a -> F a even when its value argument
+          -- is an unannotated lambda. Propagate that result evidence back
+          -- through every domain before reconstructing Lean's type lambdas.
+          finalReplacements <- case expectedResult of
+            Nothing -> Just replacements
+            Just expected ->
+              inferFragReplacements consumed replacements frag expected
+          pure
+            ( map (specializeFrag finalReplacements) (reverse termDomains)
+            , specializeFrag finalReplacements frag
+            )
   eliminationPatternDomains scrutineeFrag pat =
     case (scrutineeFrag, pat) of
       (Just (FSum a _), Constructor g [p])
@@ -1205,9 +1255,9 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
       (Just frag, TuplePattern _) -> bindDomainPairs pat frag
       (Just frag, Bind x) -> [(x, frag)]
       _ -> []
-  fitKnownApplication expression k dss = do
+  fitKnownApplication expected expression k dss = do
     (headExpr, arguments, termDomains, _) <-
-      analyzeKnownApplication Set.empty dss expression
+      analyzeApplication False expected Set.empty dss expression
     if null termDomains
       then Nothing
       else
@@ -1245,7 +1295,7 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
   -- unknown applications, and nested eliminations without guessing the
   -- input's result fragment.
   fitEliminationInput expression k dss =
-    case fitKnownApplication expression k dss of
+    case fitKnownApplication Nothing expression k dss of
       Just fitted -> fitted
       Nothing -> case expression of
         Apply function argument ->
@@ -1270,8 +1320,7 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
           in (Tuple elements', k1, dss1)
         Let pat rhs body ->
           let (rhs', k1, dss1) = fitEliminationInput rhs k dss
-              aliasDoms = maybe [] (bindDomainPairs pat)
-                (knownExpressionFrag dss1 rhs')
+              aliasDoms = letPatternDomains dss1 pat rhs'
               (body', k2, dss2) =
                 fitEliminationInput body k1 (aliasDoms ++ dss1)
           in (Let pat rhs' body', k2, dss2)
@@ -1804,7 +1853,7 @@ render cm providers typeNames style visibleBinderDomain doms = go
       scrutTxt <- go 2 scrut
       Right (at req 0 ("nomatch " ++ scrutTxt))
     Case scrut alts -> do
-      scrutTxt <- go 1 scrut
+      scrutTxt <- renderMatchScrutinee scrut
       altTxts <- mapM renderAlt alts
       Right (at req 0 ("match " ++ scrutTxt ++ " with " ++ unwords altTxts))
     Hole _ -> Left "candidate contains an unfilled hole"
@@ -1866,6 +1915,27 @@ render cm providers typeNames style visibleBinderDomain doms = go
           Idiomatic -> shortDot (ciLean info)
           Explicit -> ciLean info
   renderHead other = go 1 other
+
+  -- A match scrutinee has no expected type. A leading-dot sum constructor
+  -- consequently cannot infer its family there, even when both branches
+  -- determine its arguments. Retain the idiomatic candidate and give the
+  -- explicit lane a family head; the existing domain lanes cover both data
+  -- sums and propositional disjunctions, with kernel verification deciding.
+  renderMatchScrutinee scrutinee
+    | style == Explicit
+    , (Global constructor, arguments) <- spine scrutinee []
+    , Right kind <- globalKind cm constructor
+    , Just suffix <- sumConstructorSuffix kind = do
+          argumentTexts <- mapM (go 2) arguments
+          let family = case visibleBinderDomain of
+                PropVisibleBinderDomain -> "Or"
+                _ -> "Sum"
+          Right $ unwords ((family ++ "." ++ suffix) : argumentTexts)
+    | otherwise = go 1 scrutinee
+
+  sumConstructorSuffix GInl = Just "inl"
+  sumConstructorSuffix GInr = Just "inr"
+  sumConstructorSuffix _ = Nothing
 
   -- Djex's visible type application is Haskell's @f \@T@.  Lean exposes an
   -- implicit binder position by prefixing the head with @\@@; this is also
@@ -2033,7 +2103,7 @@ renderVisibleTypeArgumentWithForallMetadata
 renderVisibleTypeArgumentWithForallMetadata visibleBinderDomain
     explicitStandalone typeNames exactBinders argument =
   case ( isInferredVisibleTypeArgument argument
-       , visibleTypeArgumentClosedType argument) of
+       , visibleTypeArgumentPatternType argument) of
     (True, Nothing) -> Right "_"
     (False, Just typeExpression) -> do
       (rendered, remaining) <- renderType False 2
@@ -2045,20 +2115,20 @@ renderVisibleTypeArgumentWithForallMetadata visibleBinderDomain
               "exact Lean provider type-argument visibility exceeds its canonical type"
         _ -> Right rendered
     (True, Just _) -> Left
-      "internal: inferred visible type argument has a closed representation"
+      "internal: inferred visible type argument has a structured representation"
     (False, Nothing) -> Left
-      "internal: specified visible type argument has no closed representation"
+      "internal: specified visible type argument has no structured representation"
  where
   -- 0 = forall/arrow/product, 1 = type application, 2 = atom.
   renderType
     :: Bool
     -> Int
     -> [(Bool, VisibleBinderDomain)]
-    -> SharedType.Type ClosedVisibleTypeVariable
+    -> SharedType.Type (Maybe ClosedVisibleTypeVariable)
     -> Either String (String, [(Bool, VisibleBinderDomain)])
   renderType applicationHead req visibilities typeExpression = case typeExpression of
     SharedType.TypeVariable variable -> Right
-      ( at req 2 $ closedVisibleTypeVariableSpelling variable
+      ( at req 2 $ visibleVariableSpelling variable
       , visibilities
       )
     SharedType.TypeConstructor name -> do
@@ -2093,7 +2163,7 @@ renderVisibleTypeArgumentWithForallMetadata visibleBinderDomain
           (bodyTxt, remaining) <- renderType False 0 afterConstraints body
           let binderTxt (variable, (explicit, domain)) =
                 (if explicit then "(" else "{")
-                  ++ closedVisibleTypeVariableSpelling variable ++ " : "
+                  ++ visibleVariableSpelling variable ++ " : "
                   ++ visibleBinderDomainText domain
                   ++ (if explicit then ")" else "}")
               contextualBody = intercalate " \8594 "
@@ -2105,6 +2175,11 @@ renderVisibleTypeArgumentWithForallMetadata visibleBinderDomain
                       (map binderTxt (zip variables binderMetadata))
                       ++ ", " ++ contextualBody
           Right (at req 0 rendered, remaining)
+
+  -- Bound variables keep their validated lexical identity. An ambient type
+  -- unknown is an elaborator placeholder, never a source-level variable name
+  -- or executable snippet supplied by the caller.
+  visibleVariableSpelling = maybe "_" closedVisibleTypeVariableSpelling
 
   renderTypes visibilities types = case types of
     [] -> Right ([], visibilities)

@@ -21,8 +21,10 @@ import Control.Concurrent.Async
   )
 import Control.Monad
   ( forM
+  , forM_
   , forever
   , replicateM
+  , replicateM_
   , unless
   , void
   , when
@@ -39,6 +41,7 @@ import Control.Exception
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as BS
 import Data.Char (isAlphaNum, toLower)
+import Data.Either (isRight)
 import Data.IORef
   ( IORef
   , atomicModifyIORef'
@@ -83,6 +86,8 @@ import System.IO
   ( hClose
   , hFlush
   , hGetLine
+  , hPutStr
+  , hPutStrLn
   , hSetBinaryMode
   , openBinaryTempFile
   , stderr
@@ -95,7 +100,7 @@ import System.IO.Unsafe (unsafePerformIO)
 import System.Process (createProcess, getCurrentPid, proc)
 import System.Timeout (timeout)
 import Test.Tasty (TestTree, defaultMain, testGroup, withResource)
-import Test.Tasty.HUnit ((@?=), assertBool, assertFailure, testCase)
+import Test.Tasty.HUnit ((@?=), assertBool, assertEqual, assertFailure, testCase)
 
 import qualified Language.Haskell.Djex as Djex
 import Language.Haskell.Djex
@@ -136,6 +141,7 @@ import Language.Haskell.Djex
   , observationCount
   , renderCanonical
   , specifiedVisibleTypeArgument
+  , partiallySpecifiedVisibleTypeArgument
   , typedCandidateTermGraph
   , tupleName
   , behavioralProblemFingerprint
@@ -267,6 +273,7 @@ import Leant.Synth.Fragment
   , glivenkoSplit
   , maximumProviderArgumentKindArity
   , maximumProviderExactForallDomains
+  , maximumProviderExactContextArguments
   , parseUniqueGoalTranslation
   , parseGoalSexp
   , parseProviderSexp
@@ -1258,6 +1265,17 @@ isolatedBackendPairTests = testGroup "isolated Lean backend pair"
               IsolatedBackendRequestTimeout -> True
             _ -> False
       , isolatedSetupFailureTest
+          "timeout while a response line is incomplete"
+          "setup-partial-line-1" $ \case
+            IsolatedBackendSetupTransportFailure 1
+              IsolatedBackendRequestTimeout -> True
+            _ -> False
+      , isolatedSetupFailureTest
+          "missing environment with an unread output tail"
+          "setup-output-tail-1" $ \case
+            IsolatedBackendSetupMissingEnvironment 1 -> True
+            _ -> False
+      , isolatedSetupFailureTest
           "EOF" "setup-eof-1" $ \case
             IsolatedBackendSetupTransportFailure 1
               (IsolatedBackendServerClosed _) -> True
@@ -1657,6 +1675,15 @@ isolatedFakeSetupResponse root scenario maybeLauncher worker artifact = do
           isolatedFakeWriteResponse $ Json.JObj
             [("ok", Json.JBool True)]
       | targeted "setup-timeout" -> threadDelay 30000000
+      | targeted "setup-partial-line" -> do
+          hPutStr stdout "{\"env\":"
+          hFlush stdout
+          threadDelay 30000000
+      | targeted "setup-output-tail" -> do
+          isolatedFakeWriteResponse $ Json.JObj [("ok", Json.JBool True)]
+          replicateM_ 100 $ hPutStrLn stdout "unread response tail"
+          hFlush stdout
+          threadDelay 30000000
       | targeted "setup-eof" -> isolatedFakeCloseOutput
       | targeted "setup-malformed" -> isolatedFakeWriteMalformed
       | otherwise -> isolatedFakeWriteResponse $ Json.JObj
@@ -2451,8 +2478,9 @@ providerProgramTests = testGroup "provider discovery program"
       let prelude = synthPrelude []
           program = providerProgram []
             (ProviderQuery ["Gap"] (Just "Gap.Token"))
-      ("providerEvidenceSpine fuel "
-          ++ show maximumProviderInstantiationArguments ++ " source")
+      "let binders ← leadingTypeBinderNames fuel source"
+        `isInfixOf` prelude @?= True
+      "providerEvidenceSpine fuel binders.size source"
         `isInfixOf` prelude @?= True
       "if inspected < 32 && assignments.size < 16"
         `isInfixOf` prelude @?= True
@@ -2478,7 +2506,7 @@ providerProgramTests = testGroup "provider discovery program"
           ]
         `isInfixOf` prelude @?= True
       ("if arguments.size > "
-          ++ show maximumProviderInstantiationArguments ++ " then return none")
+          ++ show maximumProviderExactContextArguments ++ " then return none")
         `isInfixOf` prelude @?= True
       "match \8592 Meta.isClass? classType with"
         `isInfixOf` prelude @?= True
@@ -4923,8 +4951,11 @@ providerParserTests = testGroup "provider inventory parser"
           "(kinded 65 (atom unsafe \"Nat\"))")
         @?= Left "invalid exact-context class argument kind arity"
       parseProviderSexp (inventory $ unwords $
-          replicate (maximumProviderInstantiationArguments + 1) proper)
+          replicate (maximumProviderExactContextArguments + 1) proper)
         @?= Left "too many exact-context class arguments"
+      forM_ [8, 12] $ \arity -> assertBool
+        ("exact class context rejected practical arity " ++ show arity)
+        $ isRight $ parseProviderSexp $ inventory $ unwords $ replicate arity proper
   , testCase "retain canonical nominal provider arguments" $
       parseProviderSexp
           "(providers (provider \"Gap.partial\" (binders \"F\") \
@@ -10133,7 +10164,10 @@ assertLengthUsableWorkBudgetBuilderAndAdmission = do
   identity <- buildOneInputLengthRankingCandidate
   (_, pairCandidate) <- buildLengthSpinePairRankingFixture
   shortBudget <- expectLengthUsableWorkBudget 80
-  longBudget <- expectLengthUsableWorkBudget 700
+  -- This fixture tests builder precedence, not process-startup performance.
+  -- Two delayed solver queries already spend 600 ms; leave enough margin for
+  -- Windows process creation while the 80 ms policy still expires decisively.
+  longBudget <- expectLengthUsableWorkBudget 3000
   withFakeLengthSolver "query-delay-300ms" $ \executable -> do
     base <- expectRight $ statusOnlyLengthRankingPolicy executable
     let shortLast = enableLengthRankingUsableWorkBudget shortBudget
@@ -25287,11 +25321,33 @@ typeApplicationTests = testGroup "retained type applications"
                 ++ synthEngineName engine ++ ": " ++ outcomeTag other
             Left err -> assertFailure err
       mapM_ check [EngineDjinn, EngineExference, EngineBoth]
-  , testCase "do not enter a seven-argument provider assignment" $ do
+  , testCase "retain exact eight- and twelve-argument provider assignments" $ do
+      let checkArity arity = do
+            let token = FAtom False "Gap.WideToken"
+                binderNames = ["p" ++ show index | index <- [1 .. arity]]
+                providerType = foldr (FAll False) token binderNames
+                assignment = replicate arity $ properArgument polytype
+                provider = ProviderFragWithEvidence "Gap.wide"
+                  providerType binderNames [assignment]
+                exact term = "Gap.wide" `isInfixOf` term && all
+                  (\binder -> ("«" ++ binder ++ "» := (∀") `isInfixOf` term)
+                  binderNames
+                check engine = case
+                    synthesizeWithProviders engine 512 [provider] token of
+                  Right (SynthCandidates groups _) -> assertBool
+                    ("exact " ++ show arity ++ "-argument assignment was lost in "
+                      ++ synthEngineName engine ++ ": " ++ show groups)
+                    $ any (any exact) groups
+                  Right other -> assertFailure $ "unexpected wide exact outcome: "
+                    ++ outcomeTag other
+                  Left err -> assertFailure err
+            mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+      mapM_ checkArity [8, 12]
+  , testCase "do not enter arguments beyond the exact provider arity" $ do
       let token = FAtom False "Gap.SevenBoundaryToken"
           binderNames =
             ["p" ++ show index
-            | index <- [1 .. maximumProviderInstantiationArguments + 1]
+            | index <- [1 .. maximumProviderInstantiationArguments]
             ]
           providerType = foldr (FAll False) token binderNames
           inertArguments = replicate maximumProviderInstantiationArguments
@@ -25300,16 +25356,26 @@ typeApplicationTests = testGroup "retained type applications"
             [error "entered an over-wide provider assignment argument"]
           provider = ProviderFragWithEvidence "Gap.sevenBoundary"
             providerType binderNames [assignment]
-          check engine = case
-              synthesizeWithProviders engine 128 [provider] token of
-            Left err -> assertFailure $
-              "over-wide assignment failed the whole "
-                ++ synthEngineName engine ++ " query: " ++ err
-            Right (SynthCandidates groups _) -> assertBool
-              ("over-wide assignment became visible in "
-                ++ synthEngineName engine ++ ": " ++ show groups)
-              (all (all (not . isInfixOf "«p1» :=")) groups)
-            Right _ -> pure ()
+          baseline = ProviderFragWithEvidence "Gap.sevenBoundary"
+            providerType binderNames []
+          -- Invalid exact evidence must have no effect. The ordinary checked
+          -- provider may still receive independently inferred type arguments.
+          check engine = assertEqual
+            ("over-wide evidence changed " ++ synthEngineName engine ++ " search")
+            (synthesizeWithProviders engine 128 [baseline] token)
+            (synthesizeWithProviders engine 128 [provider] token)
+      mapM_ check [EngineDjinn, EngineExference, EngineBoth]
+  , testCase "reject cyclic exact provider vectors before entering arguments" $ do
+      let token = FAtom False "Gap.CyclicVectorToken"
+          assignment = error "entered a cyclic provider argument" : assignment
+          provider = ProviderFragWithEvidence "Gap.cyclicVector"
+            (FAll False "a" token) ["a"] [assignment]
+          baseline = ProviderFragWithEvidence "Gap.cyclicVector"
+            (FAll False "a" token) ["a"] []
+          check engine = assertEqual
+            ("cyclic evidence changed " ++ synthEngineName engine ++ " search")
+            (synthesizeWithProviders engine 128 [baseline] token)
+            (synthesizeWithProviders engine 128 [provider] token)
       mapM_ check [EngineDjinn, EngineExference, EngineBoth]
   , testCase "do not enter provider evidence beyond the aggregate bound" $
       let token = FAtom False "Gap.Token"
@@ -25583,7 +25649,25 @@ parametricFamilyFragmentTests = testGroup "parametric family fragments"
 
 parametricFamilyEngineTests :: TestTree
 parametricFamilyEngineTests = testGroup "parametric family engine projection"
-  [ testCase "transport an Option-like rank-N family with Djinn" $
+  [ testCase "introduce a quantified result without splitting irrelevant recursive inputs" $ do
+      let natural = FParamRec True "Nat" "Nat" []
+            [("Nat.zero", []), ("Nat.succ", [FAtom False "Nat"])]
+          integer = FParamInd "Int" "Int" []
+            [("Int.ofNat", [natural]), ("Int.negSucc", [natural])]
+          quantified = FAll True "a"
+            (FArr (FVar "a") (FArr (FVar "a") (FVar "a")))
+          goal = FArr integer (FArr integer quantified)
+      result <- expectRight $ synthesizeWithProvidersSkippingDetailed
+        EngineExference 4096 Set.empty [] goal
+      case result of
+        DetailedSynthCandidates groups _ -> do
+          let direct = filter
+                (any (`elem` ["fun _ _ _ _ x => x", "fun _ _ _ x _ => x"])
+                  . detailedCandidateGroupVariants) groups
+          assertBool "constructor splitting starved a quantified introduction"
+            (not $ null direct)
+        other -> assertFailure $ "expected a quantified implementation: " ++ show other
+  , testCase "transport an Option-like rank-N family with Djinn" $
       expectExactFamilyTerm "fun x => x _"
         (synthesizeWithProviders EngineDjinn 0 [] optionRankNGoal)
   , testCase "transport an Option-like rank-N family with Exference" $
@@ -26277,7 +26361,95 @@ parametricFamilyEngineTests = testGroup "parametric family engine projection"
 
 rankNFrontierTests :: TestTree
 rankNFrontierTests = testGroup "Djinn rank-N frontiers"
-  [ testCase "render four-binder hypothesis instantiation for Lean" $ do
+  [ testCase "give constructed sum scrutinees an explicit family fallback" $ do
+      left <- expectRight $ mkIdentifier "Left"
+      right <- expectRight $ mkIdentifier "Right"
+      let goal = FAll True "A" (FAll True "B"
+            (FArr (FArr (FVar "A") (FVar "B")) (FArr (FVar "B") (FVar "B"))))
+          expression = Lambda [Bind "consume", Bind "value"]
+            (Case (Apply (Global right) (Local "value"))
+              [ (Constructor left [Bind "left"], Apply (Local "consume") (Local "left"))
+              , (Constructor right [Bind "right"], Local "right")
+              ])
+          rendered family = "fun _ _ f x => match " ++ family
+            ++ " x with | .inl a => f a | .inr b => b"
+      renderLeanTerm Map.empty Map.empty Map.empty ([], 0, []) goal expression
+        @?= Right (map rendered [".inr", "Sum.inr", "Or.inr"])
+  , testCase "fit a polymorphic value from the application's expected result" $ do
+      let application arguments = FApp True "F arguments" (AppVariable "F") arguments
+          identity = FAll True "inner" (FArr (FVar "inner") (FVar "inner"))
+          source = FAll True "a" (FArr (FVar "a") (application [FVar "a"]))
+          goal = FAll True "F" (FArr source (application [identity]))
+          expression = Lambda [Bind "build"]
+            (Apply (VisibleTypeApplication (Local "build") inferredVisibleTypeArgument)
+              (Lambda [Bind "value"] (Local "value")))
+      renderLeanTerm Map.empty Map.empty Map.empty ([], 0, []) goal expression
+        @?= Right ["fun _ f => @f _ (fun _ x => x)"]
+  , testCase "retain a polymorphic result through a local let alias" $ do
+      let application arguments = FApp True "F arguments" (AppVariable "F") arguments
+          identity = FAll True "inner" (FArr (FVar "inner") (FVar "inner"))
+          source = FArr FTop
+            (FAll True "a" (FArr (FVar "a") (application [FVar "a"])))
+          goal = FAll True "F" (FArr source (application [identity]))
+          expression = Lambda [Bind "maker"]
+            (Let (Bind "factory") (Apply (Local "maker") (Tuple []))
+              (Apply (VisibleTypeApplication (Local "factory") inferredVisibleTypeArgument)
+                (Lambda [Bind "value"] (Local "value"))))
+      -- The established trailing-instantiation variant remains available;
+      -- exact transport must be the primary candidate sent to verification.
+      fmap (take 1)
+          (renderLeanTerm Map.empty Map.empty Map.empty ([], 0, []) goal expression)
+        @?= Right ["fun _ f => let g := f ⟨⟩; @g _ (fun _ x => x)"]
+  , testCase "fit distinct polytypes in every application argument" $ do
+      let application arguments = FApp True "F arguments" (AppVariable "F") arguments
+          identity = FAll True "inner" (FArr (FVar "inner") (FVar "inner"))
+          boolean = FAll True "inner"
+            (FArr (FVar "inner") (FArr (FVar "inner") (FVar "inner")))
+          source = FAll True "a" (FAll True "b"
+            (FArr (FVar "a") (FArr (FVar "b") (application [FVar "a", FVar "b"]))))
+          goal = FAll True "F" (FArr source (application [identity, boolean]))
+          headExpr = VisibleTypeApplication
+            (VisibleTypeApplication (Local "build") inferredVisibleTypeArgument)
+            inferredVisibleTypeArgument
+          expression = Lambda [Bind "build"]
+            (Apply (Apply headExpr (Lambda [Bind "value"] (Local "value")))
+              (Lambda [Bind "left", Wildcard] (Local "left")))
+      renderLeanTerm Map.empty Map.empty Map.empty ([], 0, []) goal expression
+        @?= Right ["fun _ f => @f _ _ (fun _ x => x) (fun _ y _ => y)"]
+  , testCase "retain ambient variables while fitting a quantified value" $ do
+      let application arguments = FApp True "F arguments" (AppVariable "F") arguments
+          target = FAll True "inner"
+            (FArr (FVar "A") (FArr (FVar "inner") (FVar "inner")))
+          source = FAll True "a" (FArr (FVar "a") (application [FVar "a"]))
+          goal = FAll True "F" (FAll True "A" (FArr source (application [target])))
+          expression = Lambda [Bind "build"]
+            (Apply (VisibleTypeApplication (Local "build") inferredVisibleTypeArgument)
+              (Lambda [Wildcard, Bind "value"] (Local "value")))
+      renderLeanTerm Map.empty Map.empty Map.empty ([], 0, []) goal expression
+        @?= Right ["fun _ _ f => @f _ (fun _ _ x => x)"]
+  , testCase "preserve implicit forall boundaries inside a rank-N argument" $ do
+      let identity = FAll False "A" (FArr (FVar "A") (FVar "A"))
+          result = FVar "R"
+          goal = FAll True "R"
+            (FArr (FArr (FArr identity identity) result) result)
+          expression = Lambda [Bind "consume"]
+            (Apply (Local "consume")
+              (Lambda [Wildcard, Bind "value"] (Local "value")))
+      renderLeanTerm Map.empty Map.empty Map.empty ([], 0, []) goal expression
+        @?= Right ["fun _ f => f (fun _ => fun x => x)"]
+  , testCase "preserve each implicit forall boundary in a value lambda spine" $ do
+      let goal = FArr FTop
+            (FAll False "A" (FArr (FVar "A")
+              (FAll False "B" (FArr (FVar "B") (FVar "A")))))
+          expression = Lambda [Wildcard, Bind "value", Wildcard] (Local "value")
+      renderLeanTerm Map.empty Map.empty Map.empty ([], 0, []) goal expression
+        @?= Right ["fun _ => fun x => fun _ => x"]
+  , testCase "keep leading implicit forall introduction compact" $ do
+      let goal = FAll False "A" (FArr (FVar "A") (FVar "A"))
+          expression = Lambda [Bind "value"] (Local "value")
+      renderLeanTerm Map.empty Map.empty Map.empty ([], 0, []) goal expression
+        @?= Right ["fun x => x"]
+  , testCase "render four-binder hypothesis instantiation for Lean" $ do
       let variable = FVar
           forall4 a b c d resultFrag =
             FAll True a
@@ -26723,6 +26895,31 @@ visibleTypeApplicationTests = testGroup "Lean visible type applications"
           ([], 0, []) (FAtom False "Demo.Token") expression
         @?= Right
           ["Demo.global («a» := (∀ (a0_0 : _), a0_0 → a0_0))"]
+  , testCase "preserve a quantified type argument with ambient inference holes" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      argument <- expectRight $ partiallySpecifiedVisibleTypeArgument
+        (ForallType ["inner"] []
+          (FunctionType (TypeVariable "ambient")
+            (FunctionType (TypeVariable "inner") (TypeVariable "inner"))))
+      let expression = VisibleTypeApplication (Global providerName) argument
+      renderLeanTerm Map.empty
+          (Map.singleton "leantProvider0"
+            (testProviderInfo "Demo.identity" Nothing)) Map.empty
+          ([], 0, []) (FAtom False "Demo.Token") expression
+        @?= Right
+          ["@Demo.identity (∀ (a0_0 : _), _ → a0_0 → a0_0)"]
+  , testCase "preserve ambient holes in named quantified provider arguments" $ do
+      providerName <- expectRight $ mkIdentifier "leantProvider0"
+      argument <- expectRight $ partiallySpecifiedVisibleTypeArgument
+        (ForallType ["inner"] []
+          (FunctionType (TypeVariable "ambient") (TypeVariable "inner")))
+      let expression = VisibleTypeApplication (Global providerName) argument
+      renderLeanTerm Map.empty
+          (Map.singleton "leantProvider0"
+            (testProviderInfo "Demo.global" $ Just ["a"])) Map.empty
+          ([], 0, []) (FAtom False "Demo.Token") expression
+        @?= Right
+          ["Demo.global («a» := (∀ (a0_0 : _), _ → a0_0))"]
   , testCase "parenthesize a positional quantified type argument" $ do
       providerName <- expectRight $ mkIdentifier "leantProvider0"
       argument <- expectRight $ specifiedVisibleTypeArgument

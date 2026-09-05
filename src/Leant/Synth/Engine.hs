@@ -169,7 +169,7 @@ import Language.Haskell.Djex
   , functionClauseExpression
   , mapDeclarationTypeVariables
   , maximumProviderInstantiationAssignments
-  , maximumProviderInstantiationArguments
+  , observedListLength
   , mkDefinitionName
   , mkDjinnRequest
   , mkDjinnSession
@@ -1367,7 +1367,7 @@ exferenceRun limits multiConstructorPatterns steps prepared = do
     (mkExferenceSessionWithPolicy policy environment)
   targetName <- viaShow (mkIdentifier "leantSynth")
   target <- viaShow (mkDefinitionName targetName)
-  let runLane allowUnused = do
+  let runLane useMultiConstructorPatterns allowUnused = do
         let query = QueryRequest
               { requestTarget = target
               , requestGoal = fmap convert goal
@@ -1376,7 +1376,7 @@ exferenceRun limits multiConstructorPatterns steps prepared = do
                   { exferenceAllowUnused = allowUnused
                   , exferenceMaximumSteps = steps
                   , exferenceMultiConstructorPatterns =
-                      multiConstructorPatterns
+                      useMultiConstructorPatterns
                     -- the queue is the memory hog; a modest bound keeps the
                     -- search interactive on small machines, reported honestly
                     -- as pruning
@@ -1421,20 +1421,31 @@ exferenceRun limits multiConstructorPatterns steps prepared = do
             notes = maybe [] (progressNotesWith (synthLimitWindow limits))
               (selectionProgress selection)
         pure (groups, notes)
-  (strictGroups, strictNotes) <- runLane False
-  if not (null strictGroups)
-    then pure $ DetailedSynthCandidates strictGroups strictNotes
-    else do
-      -- Exference normally prefers terms which use every introduced binder.
-      -- Lean accepts intentional omission, however, and recursive projection
-      -- often needs it: after matching @Headed a@, the recursive tail must stay
-      -- unopened while the @a@ field is returned.  Retry only after the strict
-      -- lane has produced no term, preserving its established candidate order
-      -- and provider preference for every existing successful query.
-      (relaxedGroups, relaxedNotes) <- runLane True
-      pure $ if null relaxedGroups
-        then DetailedSynthNoTerm (nub $ strictNotes ++ relaxedNotes)
-        else DetailedSynthCandidates relaxedGroups relaxedNotes
+      runPatternLanes useMultiConstructorPatterns = do
+        (strictGroups, strictNotes) <- runLane useMultiConstructorPatterns False
+        if not (null strictGroups)
+          then pure $ DetailedSynthCandidates strictGroups strictNotes
+          else do
+            -- Exference normally prefers terms which use every introduced
+            -- binder. Retry without that preference only when the strict lane
+            -- produced no term, retaining established successful prefixes.
+            (relaxedGroups, relaxedNotes) <- runLane useMultiConstructorPatterns True
+            pure $ if null relaxedGroups
+              then DetailedSynthNoTerm (nub $ strictNotes ++ relaxedNotes)
+              else DetailedSynthCandidates relaxedGroups relaxedNotes
+  primary <- runPatternLanes multiConstructorPatterns
+  case primary of
+    DetailedSynthNoTerm primaryNotes | multiConstructorPatterns -> do
+      -- Splitting every available sum can consume the queue before a simple
+      -- polymorphic result is introduced, even when all those inputs may be
+      -- ignored. A separate bounded lane omits those optional eliminations;
+      -- it retains the same checked environment and exact request authority.
+      fallback <- runPatternLanes False
+      pure $ case fallback of
+        DetailedSynthNoTerm fallbackNotes ->
+          DetailedSynthNoTerm (nub $ primaryNotes ++ fallbackNotes)
+        _ -> fallback
+    _ -> pure primary
 
 -- | Merge two ranked group streams without letting either engine's bounded
 -- tail suppress a candidate from the other.  Djinn owns the first four fresh
@@ -3753,8 +3764,7 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
     in filter
       (\assignment ->
         not (null assignment)
-          && length assignment == arity
-          && length assignment <= maximumProviderInstantiationArguments
+          && observedListLength arity assignment == arity
           && all usableProviderArgument assignment)
       assignments
 

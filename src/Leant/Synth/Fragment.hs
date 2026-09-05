@@ -34,9 +34,9 @@
 --
 -- This module keeps Djex syntax out of the fragment representation: it parses
 -- the S-expression into 'Frag' and answers refusal/safety questions.
--- 'Leant.Synth.Engine' owns the narrow type-and-search boundary.  The generated
--- Lean provider worker imports only Djex's public finite argument limit so the
--- producer and checked consumer cannot drift onto different arities.
+-- 'Leant.Synth.Engine' owns the narrow type-and-search boundary. The generated
+-- Lean provider worker derives exact assignment arity from the source prefix;
+-- the checked consumer verifies that same arity before entering arguments.
 module Leant.Synth.Fragment
   ( AppHead (..)
   , ExactContextArgument (..)
@@ -50,6 +50,7 @@ module Leant.Synth.Fragment
   , ProviderQuery (..)
   , maximumProviderArgumentKindArity
   , maximumProviderExactForallDomains
+  , maximumProviderExactContextArguments
   , exactContextArgumentKindArity
   , exactContextArgumentPayloadFragments
   , mapExactContextArgumentFragments
@@ -89,7 +90,6 @@ import Data.Maybe (fromMaybe)
 import qualified Data.Set as Set
 import Text.Read (readMaybe)
 
-import Language.Haskell.Djex (maximumProviderInstantiationArguments)
 
 import Leant.Synth.ProviderCache
   ( ProviderQuery (..)
@@ -302,10 +302,13 @@ maximumProviderExactForallDomains :: Int
 maximumProviderExactForallDomains = 128
 
 -- | A contextual class application is auxiliary evidence inside a provider
--- scheme or exact argument, so keep its positional width no larger than the
--- public exact provider vector. This bounds generated and caller-authored data.
+-- scheme or exact argument. Its independent positional-width resource bound
+-- does not restrict the number of exact leading provider arguments. Keep the
+-- wire-format width at the same 128-entry budget as exact forall metadata;
+-- using the historical six-choice search frontier here rejected otherwise
+-- valid ordinary class instances before exact evidence could be inspected.
 maximumProviderExactContextArguments :: Int
-maximumProviderExactContextArguments = maximumProviderInstantiationArguments
+maximumProviderExactContextArguments = 128
 
 -- | One Lean environment value lowered to the synthesis fragment.  The
 -- provider name remains the exact fully-qualified Lean spelling; the engine
@@ -860,8 +863,8 @@ synthPrelude inventory = unlines
   , ""
   , "-- Open only the provider prefix represented by its serialized FAlls,"
   , "-- retaining erased instance constraints next to the fresh type metas"
-  , "-- they can determine.  Five type binders bound the candidate product;"
-  , "-- the ordinary serializer fuel bounds intervening instance binders."
+  , "-- they can determine. The exact source prefix supplies its type arity;"
+  , "-- ordinary serializer fuel bounds intervening instance binders."
   , "partial def providerEvidenceSpine (fuel remainingTypes : Nat)"
   , "    (e : Expr) : MetaM (Array Expr × Array Expr) := do"
   , "  match fuel with"
@@ -1149,8 +1152,8 @@ synthPrelude inventory = unlines
   , "-- distinct complete assignments."
   , "partial def providerInstantiationAssignments (fuel : Nat) (source : Expr)"
   , "    : MetaM (Array (Array ProviderCandidateFragment)) := do"
-  , "  let (typeArgs, constraints) ← providerEvidenceSpine fuel "
-      ++ show maximumProviderInstantiationArguments ++ " source"
+  , "  let binders ← leadingTypeBinderNames fuel source"
+  , "  let (typeArgs, constraints) ← providerEvidenceSpine fuel binders.size source"
   , "  if typeArgs.isEmpty || constraints.isEmpty then return #[]"
   , "  let mut inspected := 0"
   , "  let mut assignments : Array (Array ProviderCandidateFragment) := #[]"
