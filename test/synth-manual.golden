@@ -74,6 +74,8 @@ note: search truncated: candidate limit reached (60)
 synth engine: exference
 λ> :synth (∀ (F : Type 1 → Type), (∀ a : Type 1, F a) → F (∀ b : Type, b → b))
   it1  fun _ x => x _
+  it2  fun _ x => match Sum.inr (x _) with | .inl a => a | .inr b => b
+  it3  fun _ x => match Sum.inl (x _) with | .inl a => a | .inr b => b
 note: search truncated: step limit reached, queue limit pruned 23355
 λ> :set synth-engine djinn
 synth engine: djinn
@@ -85,7 +87,7 @@ note: search truncated: candidate limit reached (60)
 λ> :synth (Nat → a → List a)
   it1  fun x y => List.replicate x y
   it2  fun x y => List.reverse (List.replicate x y)
-  it3  fun x y => List.map (fun z => z) (List.replicate x y)
+  it3  fun x y => List.map (fun a => a) (List.replicate x y)
   it4  fun x y => List.append (List.replicate x y) (List.replicate x y)
   it5  fun x y => List.flatMap (fun _ => List.replicate x y) (List.replicate x y)
 note: search truncated: candidate limit reached (60)
@@ -115,5 +117,9 @@ note: search truncated: candidate limit reached (60)
 synth engine: both
 λ> :synth ((A → B → C) → (A → B) → A → C)
   it1  fun f g x => f x (g x)
+  it2  fun f g x => f x (g (match Sum.inl x with | .inl a => a | .inr b => b))
+  it3  fun f g x => f x (g (match Sum.inr x with | .inl a => a | .inr b => b))
+  it4  fun f g x => f x (match Sum.inr (g x) with | .inl a => a | .inr b => b)
+  it5  fun f g x => f x (match Sum.inr (g x) with | .inl a => g a | .inr b => b)
 note: exference: search truncated: step limit reached, queue limit pruned 36194
 λ> :quit

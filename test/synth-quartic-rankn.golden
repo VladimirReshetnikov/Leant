@@ -16,6 +16,10 @@ note: search truncated: candidate limit reached (60)
 synth engine: exference
 λ> :synth (∀ Q R Z M : Type, (∀ A B C D E : Type, Q) → (∀ A B C D E : Type, R) → (∀ A B C D E : Type, Z) → (∀ A B C D E : Type, M) → (∀ V W X Y U : Type, Q) × (∀ V W X Y U : Type, R) × (∀ V W X Y U : Type, Z) × (∀ V W X Y U : Type, M) × (∀ E : Type, E → E) × (∀ F : Type, F → F) × (∀ G : Type, G → G) × (∀ H : Type, H → H))
   it1  fun _ _ _ _ f g h f1 => ⟨f, ⟨g, ⟨h, ⟨f1, ⟨fun _ x => x, ⟨fun _ y => y, ⟨fun _ z => z, fun _ w => w⟩⟩⟩⟩⟩⟩⟩
+  it2  fun _ _ _ _ f g h f1 => ⟨f, ⟨g, ⟨h, ⟨f1, ⟨fun _ x => x, ⟨fun _ y => y, ⟨fun _ z => z, fun _ w => match Sum.inl w with | .inl a => a | .inr b => b⟩⟩⟩⟩⟩⟩⟩
+  it3  fun _ _ _ _ f g h f1 => ⟨f, ⟨g, ⟨h, ⟨f1, ⟨fun _ x => x, ⟨fun _ y => y, ⟨fun _ z => z, fun _ w => match Sum.inr w with | .inl a => a | .inr b => b⟩⟩⟩⟩⟩⟩⟩
+  it4  fun _ _ _ _ f g h f1 => ⟨f, ⟨g, ⟨h, ⟨f1, ⟨fun _ x => x, ⟨fun _ y => y, ⟨fun _ z => match Sum.inl z with | .inl a => a | .inr b => b, fun _ w => w⟩⟩⟩⟩⟩⟩⟩
+  it5  fun _ _ _ _ f g h f1 => ⟨f, ⟨g, ⟨h, ⟨f1, ⟨fun _ x => x, ⟨fun _ y => y, ⟨fun _ z => match Sum.inr z with | .inl a => a | .inr b => b, fun _ w => w⟩⟩⟩⟩⟩⟩⟩
 note: search truncated: step limit reached, queue limit pruned 39308
 λ> :set synth-engine both
 synth engine: both
@@ -23,6 +27,8 @@ synth engine: both
   it1  fun _ _ _ _ f g h f1 => ⟨f, ⟨g, ⟨h, ⟨f1, ⟨fun _ x => x, ⟨fun _ y => y, ⟨fun _ z => z, fun _ w => w⟩⟩⟩⟩⟩⟩⟩
   it2  fun _ _ _ _ f g h f1 => ⟨f, ⟨g, ⟨h, ⟨fun x y _ _ _ => f1 x x x x y, ⟨fun _ z => z, ⟨fun _ w => w, ⟨fun _ x1 => x1, fun _ x2 => x2⟩⟩⟩⟩⟩⟩⟩
   it3  fun _ _ _ _ f g h f1 => ⟨f, ⟨g, ⟨h, ⟨fun x _ _ _ _ => f1 x x x x x, ⟨fun _ y => y, ⟨fun _ z => z, ⟨fun _ w => w, fun _ x1 => x1⟩⟩⟩⟩⟩⟩⟩
+  it4  fun _ _ _ _ f g h f1 => ⟨f, ⟨g, ⟨h, ⟨f1, ⟨fun _ x => x, ⟨fun _ y => y, ⟨fun _ z => z, fun _ w => match Sum.inl w with | .inl a => a | .inr b => b⟩⟩⟩⟩⟩⟩⟩
+  it5  fun _ _ _ _ f g h f1 => ⟨f, ⟨g, ⟨h, ⟨f1, ⟨fun _ x => x, ⟨fun _ y => y, ⟨fun _ z => z, fun _ w => match Sum.inr w with | .inl a => a | .inr b => b⟩⟩⟩⟩⟩⟩⟩
 note: search truncated: candidate limit reached (60)
 note: exference: search truncated: step limit reached, queue limit pruned 39308
 λ> :quit

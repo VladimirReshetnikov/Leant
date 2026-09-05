@@ -85,5 +85,7 @@ note: search truncated: candidate limit reached (60)
 note: exference: search truncated: step limit reached, queue limit pruned 7774
 λ> :synth StructuralContext.Token
   it1  StructuralContext.choose («selected» := (∀ {a0_0 : Type _}, [@StructuralContext.Binary Prod] → [@StructuralContext.Unary (Sum (StructuralContext.Fixed))] → a0_0 → a0_0))
+  it2  match Sum.inl (StructuralContext.choose («selected» := (∀ {a0_0 : Type _}, [@StructuralContext.Binary Prod] → [@StructuralContext.Unary (Sum (StructuralContext.Fixed))] → a0_0 → a0_0))) with | .inl a => a | .inr b => b
+  it3  match Sum.inr (StructuralContext.choose («selected» := (∀ {a0_0 : Type _}, [@StructuralContext.Binary Prod] → [@StructuralContext.Unary (Sum (StructuralContext.Fixed))] → a0_0 → a0_0))) with | .inl a => a | .inr b => b
 note: exference: search truncated: step limit reached, queue limit pruned 6556
 λ> :quit

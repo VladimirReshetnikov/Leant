@@ -68,11 +68,14 @@ preparing synthesis environment (session imports + Lean)...
 synth engine: exference
 λ> :synth ContextualOnly.Token
   it1  ContextualOnly.chosen («a» := (∀ {a0_0 : Type _}, [@Inhabited a0_0] → a0_0 → a0_0))
+  it2  match Sum.inl (ContextualOnly.chosen («a» := (∀ {a0_0 : Type _}, [@Inhabited a0_0] → a0_0 → a0_0))) with | .inl a => a | .inr b => b
 note: search truncated: step limit reached, queue limit pruned 2148
 λ> :set synth-engine both
 synth engine: both
 λ> :synth ContextualOnly.Token
   it1  ContextualOnly.chosen («a» := (∀ {a0_0 : Type _}, [@Inhabited a0_0] → a0_0 → a0_0))
+  it2  match Sum.inl (ContextualOnly.chosen («a» := (∀ {a0_0 : Type _}, [@Inhabited a0_0] → a0_0 → a0_0))) with | .inl a => a | .inr b => b
+  it3  match Sum.inr (ContextualOnly.chosen («a» := (∀ {a0_0 : Type _}, [@Inhabited a0_0] → a0_0 → a0_0))) with | .inl a => a | .inr b => b
 note: exference: search truncated: step limit reached, queue limit pruned 857
 λ> :set synth-steps 512
 synth steps: 512
@@ -89,6 +92,8 @@ note: search truncated: step limit reached, queue limit pruned 6771
 synth engine: both
 λ> :synth HigherContext.Token
   it1  HigherContext.chosen («a» := (∀ {a0_0 : Type _}, [@HigherContext.Mark List] → a0_0 → a0_0))
+  it2  match Sum.inl (HigherContext.chosen («a» := (∀ {a0_0 : Type _}, [@HigherContext.Mark List] → a0_0 → a0_0))) with | .inl a => a | .inr b => b
+  it3  match Sum.inr (HigherContext.chosen («a» := (∀ {a0_0 : Type _}, [@HigherContext.Mark List] → a0_0 → a0_0))) with | .inl a => a | .inr b => b
 note: exference: search truncated: step limit reached, queue limit pruned 2740
 λ> :set synth-steps 256
 synth steps: 256
@@ -102,10 +107,14 @@ synth engine: exference
 λ> :synth DependentContext.Token
 no term found within the search bounds
 note: search truncated: step limit reached, queue limit pruned 1940
+note: search truncated: step limit reached, queue limit pruned <machine-dependent>
+note: search truncated: step limit reached, queue limit pruned <machine-dependent>
 λ> :set synth-engine both
 synth engine: both
 λ> :synth DependentContext.Token
 no term found within the search bounds
 note: search truncated: candidate limit reached (60)
 note: exference: search truncated: step limit reached, queue limit pruned 1940
+note: exference: search truncated: step limit reached, queue limit pruned <machine-dependent>
+note: exference: search truncated: step limit reached, queue limit pruned <machine-dependent>
 λ> :quit

@@ -37,6 +37,9 @@ synth engine: both
 λ> :synth Gap.Token
   it1  Gap.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
   it2  Gap.polyGlobal («a» := (∀ {a0_0 : Type _}, [@Inhabited a0_0] → a0_0))
+  it3  match Sum.inr (Gap.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))) with | .inl a => a | .inr b => b
+  it4  match Sum.inr (Gap.polyGlobal («a» := (∀ {a0_0 : Type _}, [@Inhabited a0_0] → a0_0))) with | .inl a => a | .inr b => b
+  it5  match Sum.inl (Gap.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))) with | .inl a => a | .inr b => b
 note: exference: search truncated: step limit reached, queue limit pruned 6179
 λ> :set synth-engine djinn
 synth engine: djinn

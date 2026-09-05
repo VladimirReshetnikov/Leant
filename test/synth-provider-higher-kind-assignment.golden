@@ -56,9 +56,13 @@ synth engine: exference
 note: search truncated: step limit reached, queue limit pruned 121301
 λ> :synth Higher.VacuousToken
   it1  Higher.vacuous («F» := Higher.Wrap)
+  it2  match Sum.inr (Higher.vacuous («F» := Higher.Wrap)) with | .inl a => a | .inr b => b
+  it3  match Sum.inl (Higher.vacuous («F» := Higher.Wrap)) with | .inl a => a | .inr b => b
 note: search truncated: step limit reached, queue limit pruned 74691
 λ> :synth Higher.MultiVacuousToken
   it1  Higher.multiVacuous («F» := Higher.Wrap) («G» := (@Higher.Triple Nat))
+  it2  match Sum.inr (Higher.multiVacuous («F» := Higher.Wrap) («G» := (@Higher.Triple Nat))) with | .inl a => a | .inr b => b
+  it3  match Sum.inl (Higher.multiVacuous («F» := Higher.Wrap) («G» := (@Higher.Triple Nat))) with | .inl a => a | .inr b => b
 note: search truncated: step limit reached, queue limit pruned 74691
 λ> :synth Higher.AlternativeToken
   it1  Higher.alternative («F» := (@Higher.Pair Nat))
@@ -72,12 +76,19 @@ note: search truncated: candidate limit reached (60)
 note: exference: search truncated: step limit reached, queue limit pruned 17438
 λ> :synth Higher.VacuousToken
   it1  Higher.vacuous («F» := Higher.Wrap)
+  it2  match Sum.inl (Higher.vacuous («F» := Higher.Wrap)) with | .inl a => a | .inr b => b
+  it3  match Sum.inr (Higher.vacuous («F» := Higher.Wrap)) with | .inl a => a | .inr b => b
 note: exference: search truncated: step limit reached, queue limit pruned 12439
 λ> :synth Higher.MultiVacuousToken
   it1  Higher.multiVacuous («F» := Higher.Wrap) («G» := (@Higher.Triple Nat))
+  it2  match Sum.inl (Higher.multiVacuous («F» := Higher.Wrap) («G» := (@Higher.Triple Nat))) with | .inl a => a | .inr b => b
+  it3  match Sum.inr (Higher.multiVacuous («F» := Higher.Wrap) («G» := (@Higher.Triple Nat))) with | .inl a => a | .inr b => b
 note: exference: search truncated: step limit reached, queue limit pruned 14974
 λ> :synth Higher.AlternativeToken
   it1  Higher.alternative («F» := Higher.Wrap)
   it2  Higher.alternative («F» := (@Higher.Pair Nat))
+  it3  match Sum.inl (Higher.alternative («F» := (@Higher.Pair Nat))) with | .inl a => a | .inr b => b
+  it4  match Sum.inl (Higher.alternative («F» := Higher.Wrap)) with | .inl a => a | .inr b => b
+  it5  match Sum.inr (Higher.alternative («F» := (@Higher.Pair Nat))) with | .inl a => a | .inr b => b
 note: exference: search truncated: step limit reached, queue limit pruned 15508
 λ> :quit

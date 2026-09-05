@@ -33,6 +33,7 @@ synth engine: exference
 λ> :synth RefutationExference.Void
 preparing synthesis environment (session imports + Lean)...
   it1  RefutationExference.impossible («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
+  it2  match Sum.inr (RefutationExference.impossible («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))) with | .inl a => a | .inr b => b
 note: search truncated: step limit reached, queue limit pruned 49783
 λ> :reset
 session reset
@@ -50,6 +51,8 @@ synth engine: both
 λ> :synth RefutationBoth.Void
 preparing synthesis environment (session imports + Lean)...
   it1  RefutationBoth.impossible («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
+  it2  match Sum.inl (RefutationBoth.impossible («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))) with | .inl a => a | .inr b => b
+  it3  match Sum.inr (RefutationBoth.impossible («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))) with | .inl a => a | .inr b => b
 note: exference: search truncated: step limit reached, queue limit pruned 29844
 λ> :reset
 session reset
