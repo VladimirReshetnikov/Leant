@@ -33,6 +33,7 @@ import Control.Concurrent.MVar
   , newMVar
   , putMVar
   , readMVar
+  , takeMVar
   )
 import Control.Exception
   ( IOException
@@ -80,11 +81,9 @@ import System.IO
 import System.IO.Error (isDoesNotExistError, tryIOError)
 import System.Process
   ( CreateProcess (..)
-  , Pid
   , ProcessHandle
   , StdStream (..)
   , createProcess
-  , getPid
   , proc
   , terminateProcess
   )
@@ -97,7 +96,7 @@ import Control.Concurrent (threadDelay)
 import Control.Exception (uninterruptibleMask_)
 import Data.Word (Word64)
 import GHC.Clock (getMonotonicTimeNSec)
-import System.Process (getProcessExitCode)
+import System.Process (Pid, getPid, getProcessExitCode)
 #endif
 
 #ifndef mingw32_HOST_OS
@@ -130,6 +129,9 @@ data Backend = Backend
   , beErr :: Handle
   , beProc :: ProcessHandle
   , beProcessGroupIdentifier :: Maybe Integer
+  , beOutLines :: MVar (Either IOException String)
+  , beOutDone :: MVar ()
+  , beOutThread :: ThreadId
   , beErrCapture :: MVar CapturedStderr
   , beErrDone :: MVar ()
   , beErrThread :: ThreadId
@@ -265,12 +267,12 @@ spawnBackend config = mask $ \restore -> do
   let (_, _, _, process) = created
   processGroupIdentifier <- captureProcessGroupIdentifier process
   case processGroupIdentifier of
-    Nothing -> do
+    Nothing | requiresProcessGroupIdentifier -> do
       let (maybeIn, maybeOut, maybeErr, ph) = created
       cleanupIncompleteProcess maybeIn maybeOut maybeErr ph Nothing
       ioError $ userError
         "backend process did not expose its owned process-group identifier"
-    Just _ -> case created of
+    _ -> case created of
       (Just hIn, Just hOut, Just hErr, ph) ->
         finish restore hIn hOut hErr ph processGroupIdentifier
           `onException` cleanupCreatedProcess hIn hOut hErr ph
@@ -286,16 +288,24 @@ spawnBackend config = mask $ \restore -> do
       hSetBinaryMode hErr True
       hSetBuffering hErr NoBuffering
     capture <- newMVar $ CapturedStderr False ByteString.empty
+    outputLines <- newEmptyMVar
+    outputDone <- newEmptyMVar
     done <- newEmptyMVar
     cleanupState <- newMVar BackendCleanupNotStarted
     drainThread <- forkIOWithUnmask $ \unmask ->
       unmask (captureStderr hErr capture) `finally` putMVar done ()
+    outputThread <- forkIOWithUnmask $ \unmask ->
+      unmask (captureStdout hOut outputLines)
+        `finally` putMVar outputDone ()
     pure Backend
       { beIn = hIn
       , beOut = hOut
       , beErr = hErr
       , beProc = ph
       , beProcessGroupIdentifier = processGroupIdentifier
+      , beOutLines = outputLines
+      , beOutDone = outputDone
+      , beOutThread = outputThread
       , beErrCapture = capture
       , beErrDone = done
       , beErrThread = drainThread
@@ -336,11 +346,26 @@ cleanupIncompleteProcess maybeIn maybeOut maybeErr process
     : map closeQuietly (catMaybes [maybeIn, maybeOut, maybeErr])
 
 captureProcessGroupIdentifier :: ProcessHandle -> IO (Maybe Integer)
+#ifdef mingw32_HOST_OS
+-- A successful createProcess with use_process_jobs owns the Windows Job.
+-- process-1.6 represents that ownership by OpenExtHandle; its public getPid
+-- returns Nothing for that handle. POSIX-style group signalling
+-- is neither needed nor used: termination and completion use the owned Job.
+captureProcessGroupIdentifier _ = pure Nothing
+#else
 captureProcessGroupIdentifier process = do
   captured <- tryIOError $ getPid process
   pure $ case captured of
     Right (Just pid) -> Just $ toInteger (pid :: Pid)
     _ -> Nothing
+#endif
+
+requiresProcessGroupIdentifier :: Bool
+#ifdef mingw32_HOST_OS
+requiresProcessGroupIdentifier = False
+#else
+requiresProcessGroupIdentifier = True
+#endif
 
 -- | Terminate the complete process tree without ever addressing the caller's
 -- process group.  POSIX children are born as leaders of a dedicated group,
@@ -534,20 +559,38 @@ cleanupBackend backend = mask_ $
     [ terminateProcessTree
         (beProc backend) (beProcessGroupIdentifier backend)
     , closeQuietly $ beIn backend
+    , stopBackendStdoutCapture backend
     , stopBackendStderrCapture backend
     , closeQuietly $ beOut backend
     , closeQuietly $ beErr backend
     ]
 
+stopBackendStdoutCapture :: Backend -> IO ()
+stopBackendStdoutCapture backend = do
+  -- Process-tree termination has closed the pipe writers. Unlike stderr,
+  -- unread stdout is no longer useful; do not spend a drain window waiting
+  -- for a reader whose bounded queue has no remaining consumer.
+  killThread $ beOutThread backend
+  completed <- timeout stderrCompletionWaitMicroseconds
+    $ readMVar (beOutDone backend)
+  case completed of
+    Just () -> pure ()
+    Nothing -> ioError $ userError
+      "backend stdout capture did not stop after process-tree termination"
+
 stopBackendStderrCapture :: Backend -> IO ()
-stopBackendStderrCapture backend = do
-  drained <- timeout 1000000 $ readMVar (beErrDone backend)
+stopBackendStderrCapture backend =
+  stopBackendCapture (beErrDone backend) (beErrThread backend)
+
+stopBackendCapture :: MVar () -> ThreadId -> IO ()
+stopBackendCapture done captureThread = do
+  drained <- timeout 1000000 $ readMVar done
   case drained of
     Just () -> pure ()
     Nothing -> do
-      killThread (beErrThread backend)
+      killThread captureThread
       _ <- timeout stderrCompletionWaitMicroseconds
-        $ readMVar (beErrDone backend)
+        $ readMVar done
       pure ()
 
 runCleanupActionsPreservingFirstFailure :: [IO ()] -> IO ()
@@ -595,13 +638,36 @@ readResponse :: Backend -> IO (Either RequestError String)
 readResponse backend = go []
  where
   go acc = do
-    line <- try (hGetLine (beOut backend))
+    line <- takeBackendOutputLine backend
     case (line :: Either IOException String) of
       Left _ -> Left . ServerClosed <$> drainStderr backend
       Right l
         | null l && not (null acc) -> pure (Right (unlines (reverse acc)))
         | null l -> go acc  -- leading blank line; keep waiting
         | otherwise -> go (l : acc)
+
+-- Windows process pipes use a blocking read that cannot be interrupted by
+-- System.Timeout. Keep that read in its owned capture thread and let requests
+-- wait on an interruptible MVar instead. One pending line provides backpressure
+-- without retaining an unbounded stream while a request is cancelled.
+captureStdout :: Handle -> MVar (Either IOException String) -> IO ()
+captureStdout handle outputLines = go
+ where
+  go = do
+    observed <- try $ hGetLine handle
+    putMVar outputLines observed
+    case observed of
+      Left _ -> pure ()
+      Right _ -> go
+
+takeBackendOutputLine :: Backend -> IO (Either IOException String)
+takeBackendOutputLine backend = mask_ $ do
+  observed <- takeMVar $ beOutLines backend
+  -- EOF is terminal, including for a subsequent request against a dead server.
+  case observed of
+    Left _ -> putMVar (beOutLines backend) observed
+    Right _ -> pure ()
+  pure observed
 
 drainStderr :: Backend -> IO String
 drainStderr backend = do
