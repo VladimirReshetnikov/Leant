@@ -11,20 +11,24 @@ verification, and Length boundaries below consume that selected order.
 The default profile is `balanced`. Descriptions of legacy candidate prefixes
 or the distinct-rendered-group window apply to `legacy`; the structural
 profiles can choose another checked order under the same resource settings.
-See the [focused quality probes](../test-church/quality.md) for independent
-compiler/kernel replay and policy comparisons. The current 565-unit suite and
-84-query policy matrix passed, with all 139 exact displayed terms independently
-replayed: 112 have empty axiom inventories and 27 use only declared provider
-premises. Fresh Church runs also passed all 350 cases per engine: all 700
-exact displayed terms passed independent kernel replay with empty axiom
-inventories. These results use Leant `fb84b96`, Djex `2954b6d2`, and the
-unchanged executable identified in the
-[current acceptance table](../test-church/README.md#current-quality-policy-acceptance).
-Fresh acceptance of the 90 compact-fixture queries remains pending.
-The earlier complete 700-term corpus and 30-file/265-command ordinary suite
-remain separately pinned to Leant `4757569`, Djex `e2eb71e`, and executable
-SHA-256 `addfac35b9d82955fc871c177b582a8c043475c0171c22cb17977e0e9f5b9869`
-under [historical acceptance](../test-church/README.md#historical-acceptance-before-the-quality-profiles).
+Current validation uses Leant acceptance checkout `5629936`, with unchanged
+production code from `a970d1f`, vendored Djex `ae986bf5` (synthesis code
+`2954b6d2`), and the unchanged `e0b9…` executable. All **569 unit tests**
+passed serially at unchanged limits. Both engines passed **350/350 Church
+cases**, with all **700 exact displayed terms** independently kernel-replayed
+and all axiom inventories empty. The **84-query/136-term policy matrix**
+passed with 112 empty inventories and 24 confined to declared provider
+premises, including three paired nil checks and three projection-diversity
+proofs. All **90 broader fixture terms** passed live and kernel validation,
+with 78 empty inventories and 12 exact declared-premise inventories.
+
+The [current acceptance table](../test-church/README.md#current-quality-policy-acceptance)
+and [quality probes](../test-church/quality.md) retain executable hashes,
+receipt paths, universe/default qualifications, and the distinction between
+live validation and reviewed offline golden comparison. The remaining 26
+ordinary compatibility fixtures are still being validated. Earlier receipts
+remain separately identified under
+[historical acceptance](../test-church/README.md#historical-acceptance-before-the-quality-profiles).
 
 *How Leant's synthesis pipeline is put together: the semantic-origin record,
 provider bindings, the Length handoff, and the invariants each dated report
@@ -2094,8 +2098,13 @@ prefix. If that isolated candidate does not verify, Leant tries the first four
 and first sixteen providers before the full bounded inventory. These sparse
 prefixes preserve discovery order while reaching small compositions before
 unrelated declarations can displace them from Djinn's candidate window. In
-`both` mode, only the singleton and full lanes rerun Exference; intermediate
-prefixes are Djinn-only. The exact live transcript deliberately places an
+structural `both` mode, every proper prefix is Djinn-only and the full lane
+runs both engines; a singleton inventory is already the full lane. Legacy
+preserves its combined singleton/full lanes and Djinn-only intermediate
+prefixes. `providerStagesWithRanking` owns this choice while the original
+`providerStages` retains the legacy schedule. Discovery order, the shared
+deadline, engine budgets, verification quotas, and final merge do not change.
+The exact live transcript deliberately places an
 unrelated class-constrained provider before a two-provider composition and
 verifies that the width-four lane recovers
 `Demo.consume (Demo.produce x)`. It also covers an atomic provider,

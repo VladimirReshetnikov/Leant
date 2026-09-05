@@ -1,12 +1,12 @@
 # Focused candidate-quality acceptance
 
 See the [policy guide](../docs/candidate-quality.md) for the score, legacy
-behavior, and raw candidate observation contract. The full 84-query policy
-matrix has passed live synthesis and independent replay of all 139 displayed
-terms. Fresh Church corpus runs on the same executable also passed all 700
-displayed terms with empty axiom inventories. Fresh acceptance of the 90
-broader fixture queries remains pending; the earlier corpus and ordinary-suite
-receipts remain separately pinned to their historical executable.
+behavior, and raw candidate observation contract. The repaired executable has
+passed the fresh **84-query policy matrix and all 136 displayed terms**, plus
+independent replay of all 90 broader fixture terms and all **700 Church
+terms**, on the unchanged `e0b9…` executable. The remaining 26 ordinary
+compatibility fixtures are still being validated. Earlier matrix, corpus,
+and full ordinary-suite receipts remain separately historical.
 
 The standalone runner compares all four ranking policies under identical
 settings and independently kernel-replays every displayed alternative:
@@ -26,7 +26,7 @@ The runner does not build Leant or modify existing transcripts or goldens.
 The accepted 84-query run explicitly included all three engine modes:
 
 ```powershell
-python test-church/quality_probe.py --leant PATH_TO_BUILT_LEANT_EXE --engine djinn --engine exference --engine both --output test-church/quality-results/matrix-accepted
+python test-church/quality_probe.py --leant PATH_TO_BUILT_LEANT_EXE --engine djinn --engine exference --engine both --output test-church/quality-results/matrix-final
 ```
 
 Defaults are `synth-window 12`, four displayed outputs, 10,000 Exference steps,
@@ -59,6 +59,27 @@ example records the selected terms without requiring one provider name to win;
 the focused size-only integration test checks the compact term at the same
 cutoff. The companion Haskell API probe separately asserts explicit exact-name
 cost overrides, which the Lean REPL does not expose.
+
+For exact class-instance assignments whose context must be erased during
+neutral search, the renderer can restore omitted leading type choices only
+from complete retained vectors. The quantified variables must be vacuous in
+the residual value type, including ordinary argument domains and later
+contexts; each argument must remain closed and aligned with the source binder
+arity. Existing explicit choices and nonvacuous dependencies are excluded.
+Whole-vector alternatives and their exact Lean metadata use the existing
+bounded rendering cohorts, with no new raw candidate slots. Reconstructed
+groups use `RouteUnobserved` and have no typed semantic sidecar: a graph of the
+bare source cannot certify the added instantiation. The mandatory independent
+Lean replay and exact-vector/premise checks remain in force.
+
+Structural combined mode searches proper provider prefixes with Djinn only
+and runs both engines on the full inventory; a singleton inventory still runs
+both. Legacy keeps its combined singleton/full stages and Djinn-only
+intermediate prefixes. This changes the structural stage order, not the
+shared deadline, per-engine budgets, verification quota, or final fair merge.
+The repair regressions specifically retain the wide-provider window of one
+and 512 Exference steps, rather than widening the search to recover a later
+exact witness.
 
 Nonlegacy Church `nil` must avoid an explicit `match`. When the run includes
 Exference `nil` under both `legacy` and a structural profile, an additional
@@ -105,7 +126,64 @@ The executable hash covers its exact file bytes.
 - Paired `nil` checks requiring actual before and after witnesses, with zero
   comparisons when no legacy baseline was run.
 
-## Accepted policy matrix
+## Current provider-repair acceptance
+
+Leant acceptance checkout `5629936` includes the corrected test assertion and
+reviewed goldens. Its production code is unchanged from `a970d1f`, with
+vendored Djex `ae986bf5` (synthesis code `2954b6d2`).
+`quality-results/build-executable-05.log` records the successful build of that
+unchanged executable, whose SHA-256 is
+`e0b9c87cae0bc34d59c8d5a34a58fdd5005676913969a80d5503d7281081d025`.
+All nine focused repair tests passed. The fresh full suite passed **all 569
+tests** serially at unchanged limits in **389.71 seconds**, with process exit
+zero. Receipts are
+`quality-results/provider-repair-focused-01.log` and
+`quality-results/build-leant-06.log`. The latter supersedes the earlier
+`build-leant-05.log` failure of a stale source-text routing assertion.
+
+`quality-results/fixtures-repair/results.json` records **90/90 required
+candidates**, all independently kernel-replayed: **78 empty axiom inventories
+and 12 exact declared-premise inventories**. All four live processes and
+kernel replays exited zero, and every pre-golden validation passed. The wide
+providers retain all eight or twelve named arguments under the original
+one-candidate window and 512-step budget. All six layered-provider queries
+also succeeded without larger limits.
+
+The same executable passed the fresh full matrix in
+`quality-results/matrix-final/results.json`: **84/84 nonempty queries and
+136 exact displayed terms**, all independently kernel-replayed. **112 terms
+have empty axiom inventories and 24 use only the declared provider premises**.
+All three paired `nil` improvements and three projection-diversity proofs
+passed. Live synthesis and kernel replay exited zero, and the executable hash
+remained unchanged. Settings and canonical input hash match the earlier matrix.
+Only the second provider alternative under each structural combined profile
+disappeared: every first result and all 81 other query term lists are unchanged.
+The current 136-term result remains separate from the earlier 139-term receipt.
+
+The original fixture runner exited 1 because three reviewed golden files
+differed. After those baseline changes were applied,
+`quality-results/compact-comparison/results.json` confirms that all four
+goldens match the preserved live captures using the fixture runner's
+normalization. This is an offline comparison, not a second live or kernel run;
+the original receipt and its three mismatches remain intact.
+
+The same executable also passed **350/350 Church cases per engine**, with
+all **700 exact displayed terms** independently kernel-replayed and all axiom
+inventories empty. Receipts are
+`quality-results/church-djinn-final/results.json` and
+`quality-results/church-exference-final/results.json`.
+The runs retain the default `balanced` profile, window one, a configured
+30-second synthesis timeout, 4,096 Exference steps, and Djinn's
+`synth-budget off` under the shared deadline and intrinsic finite planning
+caps. Each engine covers 315 total, 16 integer-provider, and 19 explicit-default
+cases, with the scope and universe qualifications in the
+[corpus guide](README.md#current-quality-policy-acceptance). The remaining 26
+ordinary compatibility fixtures are still being validated.
+
+## Recorded policy matrix before the provider repairs
+
+The following completed receipts belong to the earlier executable and remain
+separate from acceptance of the repaired executable.
 
 Leant implementation `fb84b96` with vendored Djex `2954b6d2` passed all
 **565 unit tests**, run serially at unchanged limits in 392.05 seconds
@@ -169,8 +247,7 @@ timeout; Exference uses 4,096 steps, and Djinn leaves `synth-budget off`, subjec
 to the shared deadline and intrinsic finite planning caps. Each engine's
 315 total, 16 integer-provider, and 19 explicit-default cases retain the
 scope and predicative-universe qualifications in the
-[corpus guide](README.md#current-quality-policy-acceptance). Fresh acceptance
-of the 90 broader fixture queries remains pending.
+[corpus guide](README.md).
 
 The first broader-fixture attempt is retained in
 `quality-results/fixtures/results.json`. All nine ordinary Church and 69
@@ -180,5 +257,11 @@ fixture produced only two of six required results because Exference and
 combined mode selected a bare provider whose exact type arguments Lean could
 not infer. The layered-provider fixture produced four of six results, with
 the two combined-mode queries reaching the configured 30-second deadline.
-Those missing results remain failures requiring repair; the successful corpus
-and quality matrix do not substitute for the broader fixture acceptance.
+Those missing results were real failures; the successful corpus and quality
+matrix did not substitute for broader fixture acceptance. The later 90-query
+repair run above separately verifies their resolution.
+The report keeps live process exit codes separate from candidate/kernel
+validation and golden comparison, so its zero live exits and kernel checks
+for the emitted subset cannot hide missing required results. The original
+broader runner exited unsuccessfully; the successful repair run does not
+change that recorded outcome.

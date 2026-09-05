@@ -90,8 +90,15 @@ classical deadline ownership unchanged.
 
 Ordinary, provider, library, and classical lanes use the same selected
 profile. With `synth-engine both`, each engine is ranked before the existing
-fair merge. Provider discovery, lane priorities, and verification quotas keep
-their separate roles.
+fair merge. Structural profiles use Djinn alone for proper provider-inventory
+prefixes of one, four, and sixteen declarations, then run both engines on the
+full inventory. A singleton inventory therefore still runs both engines.
+This avoids spending Exference's rated search on an incomplete singleton
+before reaching a composition which needs another provider. `legacy` keeps
+its previous combined singleton and full stages, with Djinn-only intermediate
+prefixes. Standalone engine schedules and discovery order remain unchanged.
+`providerStagesWithRanking` selects this schedule without changing the shared
+command deadline, raw search allowances, verification quotas, or final merge.
 
 ## Normalization and verification
 
@@ -130,12 +137,93 @@ provider assignments, rendering route, and request authority. Every displayed
 term is still re-elaborated by Lean. A smaller score is never an acceptance
 certificate.
 
+Exact provider assignments have a separate target-reconstruction boundary.
+Some retained class-instance vectors contain quantified types which cannot
+be represented as first-order resolver facts. Their fallback search scheme
+therefore erases the leading class context while retaining the complete Lean
+vector. A bare provider may then be valid and cheaper in the neutral search
+language even though Lean cannot infer its class-dependent type arguments.
+
+For that explicitly marked fallback alone, rendering can restore a whole
+retained vector at an otherwise unannotated provider occurrence. Every
+leading quantified variable must be absent from the residual value type,
+including ordinary argument domains and later contexts. The vector must be
+complete, closed, and aligned with the source-derived binder arity; existing
+visible choices and nonvacuous variables are not overwritten. Occurrence
+aliases keep the canonical type arguments and their Lean domain/visibility
+metadata together. Alternatives select complete correlated vectors inside
+the existing bounded metadata cohorts, without mixing vector positions,
+adding a raw candidate slot, or refunding search work.
+
+The added type choices belong to target rendering, not to the original
+checked graph. Such groups are marked `RouteUnobserved` and carry no typed
+semantic sidecar or exact typed origin, even when their original candidate
+had a graph. They are not mislabeled as the graph-absence compatibility route.
+Lean still checks every resulting spelling before display, and Length cannot
+obtain a certificate by transferring the bare graph to a reconstructed vector.
+
 Length assessment still receives the exact verified batch. Its behavioral
 ordering and authorized filtering are applied after this structural selection,
 with the same failure-preservation rules. A preference for a smaller inhabitant
 does not establish that it implements an intended operation such as reversal.
 
 ## Validation status
+
+The provider repairs compiled successfully and passed all **90 broader fixture
+queries**. Acceptance checkout `5629936` includes the corrected test assertion
+and reviewed goldens, with unchanged production code from `a970d1f`, vendored
+Djex `ae986bf5` (synthesis code
+`2954b6d2`) and unchanged executable SHA-256
+`e0b9c87cae0bc34d59c8d5a34a58fdd5005676913969a80d5503d7281081d025`.
+All 90 displayed terms passed independent kernel replay: **78 have empty axiom
+inventories and 12 contain exactly their declared premises**. The eight- and
+twelve-argument providers retain every named argument in their complete
+correlated vectors, and all six layered-provider queries now produce verified
+results under the original limits.
+
+The same executable also passed the fresh **84-query policy matrix**, with
+all **136 exact displayed terms** independently kernel-replayed: **112 closed
+terms have empty axiom inventories and 24 provider terms use only their
+declared premises**. All queries produced candidates, all three paired
+Exference `nil` checks passed, and all three projection-diversity proofs
+passed. `test-church/quality-results/matrix-final/results.json` records zero
+live/kernel exit codes and an unchanged executable. Its settings and canonical
+input hash match the earlier matrix. The three fewer terms are second
+provider alternatives under structural combined mode; every first result and
+all other query term lists retain their previous order.
+
+The live fixture receipt is `test-church/quality-results/fixtures-repair/results.json`.
+Its original runner exit was 1 solely because three golden files differed;
+all four live exits, kernel exits, and pre-golden validation checks succeeded.
+After review and application of those three baseline changes, all four goldens
+match the preserved captures. `test-church/quality-results/compact-comparison/results.json`
+records that final **offline comparison**, not a second synthesis or kernel run.
+
+The focused repair suite passed all nine tests
+(`provider-repair-focused-01.log`). The fresh full suite passed **all 569 tests**
+serially at unchanged limits in **389.71 seconds**, with process exit zero
+(`build-leant-06.log`). This supersedes the earlier stale source-text routing
+assertion in `build-leant-05.log`. `build-executable-05.log` records the successful executable
+build. These log paths are under `test-church/quality-results/`.
+
+Both full Church runs also passed on that same executable: **350/350 cases
+per engine, all 700 exact displayed terms independently kernel-replayed,
+and all axiom inventories empty**. The final receipts are
+`test-church/quality-results/church-djinn-final/results.json` and
+`test-church/quality-results/church-exference-final/results.json`.
+Both use the default `balanced` profile, a one-candidate window, and a
+30-second configured synthesis timeout. Exference uses 4,096 steps; Djinn
+retains `synth-budget off`, subject to the shared deadline and intrinsic
+finite planning caps. The 315 total, 16 integer-provider, and 19
+explicit-default cases per engine retain the
+[corpus guide's](../test-church/README.md) scope and predicative-universe
+qualifications. The remaining 26 ordinary compatibility fixtures are still
+being validated.
+
+### Recorded acceptance before the provider repairs
+
+The following matrix and full-corpus receipts remain valid for their pinned
+`dab110…` executable. They do not claim acceptance of the repaired executable.
 
 The Haskell implementation passed all **565 Leant unit tests**, run serially
 at unchanged limits in 392.05 seconds after the constructor-alias repair.
@@ -199,8 +287,18 @@ used 4,096 steps, while Djinn retained `synth-budget off` subject to the shared
 deadline and intrinsic finite planning caps. Each engine covers 315 total
 cases, 16 integer-provider cases, and 19 cases with a supplied ordinary default
 argument. Those defaults and Lean's predicative universe discipline follow the
-[corpus guide](../test-church/README.md). Fresh acceptance of the 90 broader
-rank-N/provider fixture queries remains pending.
+[corpus guide](../test-church/README.md).
+
+The initial broader run on that same executable failed and remains recorded
+at `test-church/quality-results/fixtures/results.json`: the ordinary Church
+and rank-N fixtures produced all 9 and 69 required kernel-checked terms,
+respectively, but the latter had a golden mismatch. Wide exact providers
+produced only 2/6 results, with the Exference and combined candidates rejected
+by Lean; layered providers produced 4/6 results, with both combined queries
+reaching the configured deadline. That original failure remains recorded;
+the later 90-query repair run above resolves the missing results through fresh
+live synthesis and kernel replay, not by inferring success from this corpus
+or policy matrix.
 
 The earlier 700-term Church result in the
 [corpus guide](../test-church/README.md) belongs to Leant `4757569` with Djex

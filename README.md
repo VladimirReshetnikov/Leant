@@ -67,7 +67,7 @@ Companion documents:
 - **[docs/length-ranking.md](docs/length-ranking.md)** — the complete
   Length counterexample-ranking and replay-authorized filtering reference;
 - **[Candidate quality](docs/candidate-quality.md)** — ranking profiles,
-  checked simplification, and the current policy-matrix acceptance;
+  checked simplification, and revision-pinned acceptance results;
 - **[docs/synth-internals.md](docs/synth-internals.md)** — the design
   boundaries and dated-report index behind `:synth`;
 - **[Lean from First Principles](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Lean_from_First_Principles/Lean_from_First_Principles.pdf)**
@@ -124,8 +124,8 @@ Companion documents:
   `diverse`, and `legacy` profiles guide search and rank checked candidates
   before verification. Structural cost, diversity, and checked
   constructor/match simplification improve first results and useful
-  alternatives under the same search allowances. All 84 policy-matrix queries
-  and 139 displayed terms passed independent Lean replay. See the
+  alternatives under the same search allowances. The fresh 84 policy-matrix
+  queries and 136 displayed terms passed independent Lean replay. See the
   [candidate-quality guide](docs/candidate-quality.md).
 - **Interactive proving.** `:prove` turns the prompt into a
   tactic-by-tactic loop with unlimited `:undo`, and `:qed` saves the
@@ -786,34 +786,36 @@ their order. Full impredicative inhabitation is undecidable: those resource boun
 make an unsuccessful rank-N search inconclusive, and the answer remains
 "no term found within bounds".
 
-The fresh [Church acceptance runs](test-church/README.md#current-quality-policy-acceptance) passed **350/350
-resolved signatures with each engine**, including four local signatures.
-All **700 displayed Lean terms** were independently replayed by Lean's kernel
-with empty axiom inventories. Per engine, the corpus comprises 315 total
-cases, 16 cases using integer providers, and 19 partial cases tested with an
-additional ordinary default argument. Those 19 checks establish inhabitation
-of the default-extended types, not the unrestricted original signatures.
-Each Lean quantifier gets an inferred universe, so acceptance concerns valid
-universe instantiations of the Haskell types; Lean's `Type` hierarchy remains
-predicative. This is practical corpus coverage, not a completeness claim for
-general System F inhabitation. The comprehensive
-[implementation report (PDF)](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/rank-n-impredicative-synthesis.pdf)
-and its [LaTeX source](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/rank-n-impredicative-synthesis.tex)
-document the algorithms, evidence boundaries, and Haskell/Lean correspondence.
-These current results use the default `balanced` quality profile on Leant
-`fb84b96` with Djex `2954b6d2` and the unchanged executable identified in the
-corpus guide. The previous corpus and full 30-file/265-command ordinary-suite
-receipts remain separately recorded as
-[historical acceptance](test-church/README.md#historical-acceptance-before-the-quality-profiles).
+The current `balanced` [Church acceptance runs](test-church/README.md#current-quality-policy-acceptance)
+passed **350/350 resolved signatures per engine**, including four local
+signatures. All **700 exact displayed terms** passed independent Lean kernel
+replay with empty axiom inventories. Each engine covers 315 total cases,
+16 integer-provider cases, and 19 partial cases supplied with an additional
+ordinary default argument. Those 19 checks establish the default-extended
+types, not the unrestricted originals. These are matching-type tests, not
+behavioral specifications of operations such as `map` or `sort`.
 
-On that same executable, the [policy matrix](test-church/quality.md) passed
-**84 queries and 139 exact displayed terms** across both engines and combined
-mode: 112 closed terms
-have empty axiom inventories, and 27 provider terms use only their declared
-premises. All 565 Leant unit tests passed. Fresh acceptance of the 90
-compact-fixture queries remains pending; the
-[current acceptance table](test-church/README.md#current-quality-policy-acceptance)
-pins these separate results to their executable and receipts.
+Lean's `Type` hierarchy remains predicative: independently inferred universes
+establish valid instantiations of the Haskell signatures, not inhabitation at
+every independent universe assignment. This practical coverage is not a
+completeness claim for general System F inhabitation. The comprehensive
+[implementation report (PDF)](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/rank-n-impredicative-synthesis.pdf)
+and [LaTeX source](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/rank-n-impredicative-synthesis.tex)
+explain the algorithms, evidence boundaries, and Haskell/Lean correspondence.
+
+The same unchanged executable passed **90 broader fixture queries** and the
+**84-query/136-term policy matrix**, alongside the **569-test unit suite**.
+The fixtures have 78 empty axiom inventories and 12 exact declared-premise
+inventories; the matrix has 112 empty inventories and 24 confined to declared
+premises. Complete eight- and twelve-argument provider vectors survive a
+one-candidate cutoff, and all three paired nil improvements and three
+projection-diversity proofs pass under unchanged allowances. The
+[quality guide](docs/candidate-quality.md) and
+[acceptance receipts](test-church/README.md#current-quality-policy-acceptance)
+pin these results to Leant `5629936` and executable `e0b9…`, distinguish live
+kernel checks from reviewed offline golden comparison, and retain historical
+results separately. The remaining 26 ordinary compatibility fixtures are
+still being validated.
 
 The plan-family bounds (which quantifier-site selections are
 exhaustive, where the next gap lies) and the dedicated rank-N transcripts
@@ -1237,9 +1239,11 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   Provider-eligible atomic/refused goals go directly to provider search.
   Djinn first isolates the highest-ranked provider, then widens through the
   first 4 and 16 providers before the full bounded inventory after verified
-  misses; Exference keeps its internally rated full-inventory lane. Combined
-  mode runs both engines for the singleton and full lanes but uses Djinn alone
-  for the intermediate prefixes. Baseline and provider lanes consume one
+  misses; Exference keeps its internally rated full-inventory lane. Structural
+  combined mode uses Djinn for every proper prefix and both engines for the
+  full inventory, including a singleton inventory. Legacy combined mode keeps
+  both engines for singleton and full lanes and Djinn alone for intermediate
+  prefixes. Baseline and provider lanes consume one
   command-wide deadline (`:set synth-timeout`), including both batches of a
   filter run. Before a later provider lane is forced or capped, every spelling
   in an earlier completed no-verified or all-rejected run frontier is removed
