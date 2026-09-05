@@ -49,7 +49,7 @@ import Data.IORef
   , newIORef
   , readIORef
   )
-import Data.List (isInfixOf, isPrefixOf, permutations, sortOn, tails)
+import Data.List (intercalate, isInfixOf, isPrefixOf, permutations, sortOn, tails)
 import Data.Maybe (fromMaybe, isJust, isNothing)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -230,6 +230,7 @@ import Leant.Synth.Engine
   , mergeOutcomes
   , mergeOutcomesSkipping
   , providerStages
+  , providerStagesWithRanking
   , synthEngineName
   , candidateWindow
   , synthMaxShown
@@ -627,6 +628,7 @@ import Leant.Synth.Render
   , ProviderAssignmentInfo (..)
   , ProviderInfo (..)
   , providerInfo
+  , providerArgumentReconstructionRequired
   , renderLeanTerm
   )
 import Leant.Synth.Verification
@@ -5162,6 +5164,45 @@ providerScheduleTests = testGroup "live provider widening"
         , (EngineDjinn, [1 .. 4])
         , (EngineBoth, [1 .. 5])
         ]
+  , testCase "preserve legacy schedules and standalone engines under every ranking" $ do
+      let profiles =
+            [ Djex.LegacyCandidateRanking
+            , Djex.defaultCandidateRankingPolicy
+            , Djex.compactCandidateRankingPolicy
+            , Djex.diverseCandidateRankingPolicy
+            ]
+          sizes = [0, 1, 2, 4, 5, 16, 17, 80]
+      forM_ sizes $ \size -> do
+        let providers = [1 .. size] :: [Int]
+        forM_ [EngineDjinn, EngineExference, EngineBoth] $ \engine ->
+          providerStagesWithRanking Djex.LegacyCandidateRanking engine providers
+            @?= providerStages engine providers
+        forM_ profiles $ \ranking ->
+          forM_ [EngineDjinn, EngineExference] $ \engine ->
+            providerStagesWithRanking ranking engine providers
+              @?= providerStages engine providers
+  , testCase "reserve structural combined Exference work for the complete inventory" $ do
+      let profiles =
+            [ Djex.defaultCandidateRankingPolicy
+            , Djex.compactCandidateRankingPolicy
+            , Djex.diverseCandidateRankingPolicy
+            ]
+          expectedStages =
+            [ (0, [])
+            , (1, [(EngineBoth, 1)])
+            , (2, [(EngineDjinn, 1), (EngineBoth, 2)])
+            , (4, [(EngineDjinn, 1), (EngineBoth, 4)])
+            , (5, [(EngineDjinn, 1), (EngineDjinn, 4), (EngineBoth, 5)])
+            , (16, [(EngineDjinn, 1), (EngineDjinn, 4), (EngineBoth, 16)])
+            , (17, [(EngineDjinn, 1), (EngineDjinn, 4), (EngineDjinn, 16), (EngineBoth, 17)])
+            , (80, [(EngineDjinn, 1), (EngineDjinn, 4), (EngineDjinn, 16), (EngineBoth, 80)])
+            ]
+      forM_ profiles $ \ranking ->
+        forM_ expectedStages $ \(size, expected) -> do
+          let providers = [1 .. size] :: [Int]
+              stages = providerStagesWithRanking ranking EngineBoth providers
+          map (\(engine, entries) -> (engine, length entries)) stages @?= expected
+          map snd stages @?= [take count providers | (_, count) <- expected]
   ]
 
 candidateRankingIntegrationTests :: TestTree
@@ -25605,6 +25646,95 @@ typeApplicationTests = testGroup "retained type applications"
                   Left err -> assertFailure err
             mapM_ check [EngineDjinn, EngineExference, EngineBoth]
       mapM_ checkArity [8, 12]
+  , testCase "restore exact contextual provider vectors within the first raw slot" $ do
+      let limits = defaultSynthLimits
+            { synthLimitWindow = 1, synthLimitTried = 1, synthLimitShown = 1 }
+          checkArity arity = do
+            let token = FAtom False "Gap.ExactToken"
+                binders = ["p" ++ show index | index <- [1 .. arity]]
+                quantified count = FAll True "A" $
+                  foldr FArr (FVar "A") (replicate count (FVar "A"))
+                arguments =
+                  [ ProviderInstantiationExactArgument 0 (quantified count)
+                      [ProviderForallDomainType]
+                  | count <- [1 .. arity] ]
+                source = foldr (FAll False)
+                  (FExactContext "Gap.Choice"
+                    [ExactContextFragmentArgument 0 (FVar binder) | binder <- binders]
+                    token) binders
+                provider = ProviderFragWithEvidence "Gap.chosen"
+                  source binders [arguments]
+                expected = "Gap.chosen" ++ concat
+                  [ " («" ++ binder ++ "» := (∀ (a0_0 : Type _), "
+                      ++ intercalate " → " (replicate (count + 1) "a0_0") ++ "))"
+                  | (binder, count) <- zip binders [1 :: Int ..] ]
+            forM_ [EngineDjinn, EngineExference, EngineBoth] $ \engine -> do
+              outcome <- expectRight $ synthesizeWithProvidersSkippingDetailedWith
+                limits engine 512 Set.empty [provider] token
+              case outcome of
+                DetailedSynthCandidates [group] _ -> do
+                  case detailedCandidateGroupVariants group of
+                    first : _ -> first @?= expected
+                    [] -> assertFailure "selected contextual provider has no rendering"
+                  when (engine /= EngineDjinn) $ do
+                    detailedCandidateGroupRoute group @?= RouteUnobserved
+                    assertBool "reconstructed provider acquired an unrelated typed origin"
+                      $ isNothing (detailedCandidateGroupSemanticSidecar group)
+                other -> assertFailure $ "expected one complete exact vector at cutoff one: "
+                  ++ show engine ++ ", arity " ++ show arity ++ ": " ++ show other
+      mapM_ checkArity [8, 12]
+  , testCase "reconstruct only whole vacuous provider vectors with retained metadata" $ do
+      name <- expectRight $ mkIdentifier "leantProvider0"
+      let token = FAtom False "Gap.Token"
+          poly count = FAll True "A" $
+            foldr FArr (FVar "A") (replicate count (FVar "A"))
+          source result = FAll False "a" $ FAll False "b" $
+            FExactContext "Gap.Choice"
+              [ ExactContextFragmentArgument 0 (FVar "a")
+              , ExactContextFragmentArgument 0 (FVar "b") ] result
+      visible <- mapM (expectRight . specifiedVisibleTypeArgument)
+        [ ForallType ["A"] [] $
+            foldr FunctionType (TypeVariable "A") (replicate count (TypeVariable "A"))
+        | count <- [1 :: Int, 2] ]
+      let makeAssignment order = ProviderAssignmentInfo
+            { paiVisibleArguments = [argument | index <- order,
+                (position, argument) <- zip [1 :: Int ..] visible, position == index]
+            , paiSourceArguments =
+                [ProviderInstantiationExactArgument 0 (poly index)
+                  [ProviderForallDomainType] | index <- order]
+            }
+          info = (providerInfo "Gap.chosen" (Just ["a", "b"]) (source token))
+            { piAssignments = [makeAssignment [1, 2], makeAssignment [2, 1]]
+            , piReconstructVacuousArguments = True }
+          providers info' = Map.singleton "leantProvider0" info'
+          expression = Global name :: Expression String
+          expected first second = "Gap.chosen" ++ concat
+            [ " («" ++ binder ++ "» := (∀ (a0_0 : Type _), "
+                ++ intercalate " → " (replicate (count + 1) "a0_0") ++ "))"
+            | (binder, count) <- [("a", first), ("b", second)] ]
+      providerArgumentReconstructionRequired (providers info) expression @?= True
+      renderLeanTerm Map.empty (providers info) Map.empty ([], 0, []) token expression
+        @?= Right [expected 1 2, expected 2 1]
+      -- Value-type dependence, incomplete vectors, absent preparation authority,
+      -- and an existing explicit choice must never invent a specialization.
+      forM_ [ info { piFrag = source (FArr (FVar "a") token) }
+            , info { piFrag = source (FVar "a") }
+            , info { piFrag = source $ FArr FTop $ FExactContext "Gap.Later"
+                [ExactContextFragmentArgument 0 (FVar "a")] token }
+            , info { piAssignments = [makeAssignment [1]] }
+            , info { piReconstructVacuousArguments = False }
+            ] $ \excluded ->
+        providerArgumentReconstructionRequired (providers excluded) expression @?= False
+      case visible of
+        argument : _ -> providerArgumentReconstructionRequired (providers info)
+          (VisibleTypeApplication expression argument) @?= False
+        [] -> assertFailure "test did not construct a visible argument"
+      let alreadySpecified = foldl VisibleTypeApplication expression visible
+      providerArgumentReconstructionRequired (providers info) alreadySpecified @?= False
+      renderLeanTerm Map.empty (providers info) Map.empty ([], 0, []) token alreadySpecified
+        @?= renderLeanTerm Map.empty
+          (providers (info { piReconstructVacuousArguments = False }))
+          Map.empty ([], 0, []) token alreadySpecified
   , testCase "do not enter arguments beyond the exact provider arity" $ do
       let token = FAtom False "Gap.SevenBoundaryToken"
           binderNames =
@@ -26696,6 +26826,44 @@ rankNFrontierTests = testGroup "Djinn rank-N frontiers"
               (label ++ " lost its retained source: " ++ show groups)
               (any (requiredHead `isInfixOf`) (concat groups))
             outcome -> assertFailure $ label ++ ": " ++ show outcome) cases
+      -- Exercise the real provider-stage schedule, rather than only the final
+      -- full-inventory engine query. The singleton factory lacks its Seed;
+      -- both engines receive the original complete inventory at the last stage.
+      let bounds = defaultSynthLimits
+            { synthLimitWindow = 1
+            , synthLimitTried = 1
+            , synthLimitShown = 1
+            }
+          runStages _ [] =
+            assertFailure "provider widening exhausted without an inhabitant"
+              >> pure ([], [])
+          runStages goal ((stageEngine, stageProviders) : remaining) = do
+            let outcome = synthesizeWithProvidersSkippingDetailedWith bounds
+                  stageEngine 4096 Set.empty stageProviders goal
+                visit = (stageEngine, length stageProviders)
+            _ <- evaluate (forceDetailedOutcome 1 outcome)
+            case outcome of
+              Left err -> assertFailure err >> pure ([], [])
+              Right (DetailedSynthCandidates (group : _) _) ->
+                pure ([visit], detailedCandidateGroupVariants group)
+              Right _ -> do
+                (visits, variants) <- runStages goal remaining
+                pure (visit : visits, variants)
+          namedCases =
+            [ (label, providers, goal, requiredHead)
+            | (label, providers, goal, requiredHead) <- cases
+            , label `elem` ["named binary", "named ternary"]
+            ]
+      forM_ namedCases $ \(label, providers, goal, requiredHead) -> do
+        completed <- timeout 30000000 $ runStages goal
+          (providerStagesWithRanking (synthLimitRanking bounds) EngineBoth providers)
+        case completed of
+          Nothing -> assertFailure $ label ++ ": staged combined search exceeded 30s"
+          Just (visits, variants) -> do
+            visits @?= [(EngineDjinn, 1), (EngineBoth, 3)]
+            assertBool (label ++ ": staged candidate lost its factory or seed")
+              (any (\term -> requiredHead `isInfixOf` term
+                && "Layered.seed" `isInfixOf` term) variants)
   , testCase "give constructed sum scrutinees an explicit family fallback" $ do
       left <- expectRight $ mkIdentifier "Left"
       right <- expectRight $ mkIdentifier "Right"

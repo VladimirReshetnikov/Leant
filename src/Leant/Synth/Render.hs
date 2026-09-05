@@ -43,6 +43,7 @@ module Leant.Synth.Render
   , ProviderMap
   , TypeMap
   , providerInfo
+  , providerArgumentReconstructionRequired
   , renderLeanTerm
   , renderLeanTermGraphProjection
   ) where
@@ -137,6 +138,10 @@ data ProviderInfo = ProviderInfo
   , piBinderNames :: Maybe [String]
   , piFrag :: Frag
   , piAssignments :: [ProviderAssignmentInfo]
+  , piReconstructVacuousArguments :: Bool
+    -- ^ Exact contextual evidence survived only through the context-erased
+    -- assignment lane. A bare source cannot ask Lean to infer those otherwise
+    -- vacuous choices. This flag grants no new vector or type authority.
   }
   deriving (Eq, Show)
 
@@ -156,6 +161,7 @@ providerInfo leanName binderNames frag = ProviderInfo
   , piBinderNames = binderNames
   , piFrag = frag
   , piAssignments = []
+  , piReconstructVacuousArguments = False
   }
 
 -- | Collision-free engine type spelling to its exact Lean type or type-family
@@ -232,7 +238,9 @@ renderLeanTerm cm providers typeNames (outerPrems, skip, innerPrems)
         fittedCohorts =
           [ nub
               [ (providerVariant,
-                  fit cm providerVariant force goalFrag occurrenceBase 0 seed)
+                  fit cm providerVariant force goalFrag
+                    (fst $ reconstructVacuousProviderArguments
+                      providerVariant occurrenceBase) 0 seed)
               | providerVariant <- providerVariants
               ]
           | force <- [False, True]
@@ -326,6 +334,14 @@ aliasProviderOccurrences constructors providers expression = do
   go next expression'
     | Just (providerName, arguments) <- providerVisibleSpine expression' []
     , Just info <- declaredProvider providers providerName
+    , null arguments
+    , not (null $ vacuousProviderAssignments info) = do
+        (aliasName, aliasKey, next') <- freshAlias next
+        let aliasedInfo = info { piAssignments = vacuousProviderAssignments info }
+        pure (Global aliasName, [(aliasKey, aliasedInfo)], next')
+  go next expression'
+    | Just (providerName, arguments) <- providerVisibleSpine expression' []
+    , Just info <- declaredProvider providers providerName
     , let retained =
             [ assignment
             | assignment <- piAssignments info
@@ -333,7 +349,10 @@ aliasProviderOccurrences constructors providers expression = do
             ]
     , not (null retained) = do
         (aliasName, aliasKey, next') <- freshAlias next
-        let aliasedInfo = info { piAssignments = retained }
+        let aliasedInfo = info
+              { piAssignments = retained
+              , piReconstructVacuousArguments = False
+              }
             aliasedExpression = foldl VisibleTypeApplication
               (Global aliasName) arguments
         pure (aliasedExpression, [(aliasKey, aliasedInfo)], next')
@@ -352,9 +371,14 @@ aliasProviderOccurrences constructors providers expression = do
         , functionAliases ++ argumentAliases
         , final
         )
-    VisibleTypeApplication function argument -> do
-      (function', aliases, final) <- go next function
-      pure (VisibleTypeApplication function' argument, aliases, final)
+    VisibleTypeApplication function argument ->
+      case providerVisibleSpine expression' [] of
+        -- An unmatched or partial leading visible prefix is already a source
+        -- choice. Do not restore a second full vector beneath that prefix.
+        Just _ -> pure (expression', [], next)
+        Nothing -> do
+          (function', aliases, final) <- go next function
+          pure (VisibleTypeApplication function' argument, aliases, final)
     Tuple elements -> do
       (elements', aliases, final) <- goMany next elements
       pure (Tuple elements', aliases, final)
@@ -431,6 +455,95 @@ providerVisibleSpine expression arguments = case expression of
   Global name -> Just (name, arguments)
   _ -> Nothing
 
+-- A complete correlated vector may restore only quantifiers which disappear
+-- from the residual value type. Leading exact contexts are precisely the
+-- obligations erased by this flagged preparation route; later contexts and
+-- ordinary argument domains remain in the free-variable check. Shadowed names
+-- stay scoped, and source binder arity is independent of any work quota.
+vacuousProviderAssignments :: ProviderInfo -> [ProviderAssignmentInfo]
+vacuousProviderAssignments info
+  | not (piReconstructVacuousArguments info) = []
+  | null binders || not hasContext = []
+  | length (nub binders) /= length binders = []
+  | maybe True ((/= length binders) . length) (piBinderNames info) = []
+  | not $ Set.null $ Set.intersection (Set.fromList binders)
+      (freeFragVariables Set.empty residual) = []
+  | otherwise = filter complete (piAssignments info)
+ where
+  (binders, hasContext, residual) = spine (piFrag info)
+  spine source = case source of
+    FAll _ binder body ->
+      let (rest, context, result) = spine body
+      in (binder : rest, context, result)
+    FExactContext _ _ body ->
+      let (rest, _, result) = spine body
+      in (rest, True, result)
+    _ -> ([], False, source)
+  complete assignment =
+    length (paiVisibleArguments assignment) == length binders
+      && length (paiSourceArguments assignment) == length binders
+      && all (maybe False (const True) . visibleTypeArgumentClosedType)
+        (paiVisibleArguments assignment)
+
+-- | Does this expression need a target-only instantiation reconstruction?
+-- Engine uses the same predicate to withhold an exact typed sidecar: the
+-- original graph does not record these renderer-selected type arguments.
+providerArgumentReconstructionRequired
+  :: ProviderMap -> Expression local -> Bool
+providerArgumentReconstructionRequired providers expression
+  | not (any piReconstructVacuousArguments $ Map.elems providers) = False
+  | otherwise = snd $ reconstructVacuousProviderArguments providers expression
+
+reconstructVacuousProviderArguments
+  :: ProviderMap -> Expression local -> (Expression local, Bool)
+reconstructVacuousProviderArguments providers = go
+ where
+  go expression = case expressionFullApplicationSpine expression of
+    (Global name, arguments) ->
+      let (arguments', nested) = unzip $ map mapArgument arguments
+          retained = maybe [] vacuousProviderAssignments
+            (declaredProvider providers name)
+          chosen = case retained of
+            assignment : _ | all isTermArgument arguments ->
+              Just $ paiVisibleArguments assignment
+            _ -> Nothing
+          headExpression = case chosen of
+            Just vector -> foldl VisibleTypeApplication (Global name) vector
+            Nothing -> Global name
+      in ( applyExpressionArguments headExpression arguments'
+         , maybe False (const True) chosen || or nested
+         )
+    _ -> case expression of
+      Lambda patterns body ->
+        let (body', changed) = go body in (Lambda patterns body', changed)
+      Apply function argument ->
+        let (function', left) = go function
+            (argument', right) = go argument
+        in (Apply function' argument', left || right)
+      VisibleTypeApplication function argument ->
+        let (function', changed) = go function
+        in (VisibleTypeApplication function' argument, changed)
+      Tuple elements ->
+        let (elements', changed) = unzip $ map go elements
+        in (Tuple elements', or changed)
+      Let pattern rhs body ->
+        let (rhs', left) = go rhs
+            (body', right) = go body
+        in (Let pattern rhs' body', left || right)
+      Case scrutinee alternatives ->
+        let (scrutinee', changed) = go scrutinee
+            (alternatives', changes) = unzip
+              [ let (body', change) = go body in ((pattern, body'), change)
+              | (pattern, body) <- alternatives ]
+        in (Case scrutinee' alternatives', changed || or changes)
+      _ -> (expression, False)
+  mapArgument argument = case argument of
+    TermArgument term ->
+      let (term', changed) = go term in (TermArgument term', changed)
+    VisibleTypeArgumentArgument{} -> (argument, False)
+  isTermArgument TermArgument{} = True
+  isTermArgument VisibleTypeArgumentArgument{} = False
+
 -- Exact domain vectors which collapse to one Djex visible type must remain
 -- render alternatives: Lean verification can reject the first (for example a
 -- Prop-domain spelling) and accept the next Type-domain spelling. Build a
@@ -453,11 +566,12 @@ providerRenderingAlternatives providers =
       , min maximumProviderInstantiationAssignments count
       )
     | (providerKey, info) <- Map.toAscList providers
-    , visibleArguments <- nub (map paiVisibleArguments (piAssignments info))
+    , visibleArguments <- if piReconstructVacuousArguments info
+        then [[]] else nub (map paiVisibleArguments (piAssignments info))
     , let count = length
             [ ()
             | candidate <- piAssignments info
-            , paiVisibleArguments candidate == visibleArguments
+            , null visibleArguments || paiVisibleArguments candidate == visibleArguments
             ]
     , count > 1
     ]
@@ -493,7 +607,7 @@ providerRenderingAlternatives providers =
    where
     pick _ _ _ [] = Nothing
     pick target seen previous (assignment : rest)
-      | paiVisibleArguments assignment == visibleArguments =
+      | null visibleArguments || paiVisibleArguments assignment == visibleArguments =
           if seen == target
             then Just (assignment, reverse previous ++ rest)
             else pick target (seen + 1) (assignment : previous) rest

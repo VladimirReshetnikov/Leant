@@ -66,6 +66,7 @@ module Leant.Synth.Engine
   , parseSynthEngine
   , synthEngineName
   , providerStages
+  , providerStagesWithRanking
   , mergeCandidateGroups
   , mergeDetailedCandidateGroups
   , mergeOutcomes
@@ -246,6 +247,7 @@ import Leant.Synth.Render
   , ProviderMap
   , TypeMap
   , providerInfo
+  , providerArgumentReconstructionRequired
   , renderLeanTerm
   , renderLeanTermGraphProjection
   )
@@ -987,6 +989,22 @@ providerStages engine providers =
       | size == 1 || size == providerCount -> EngineBoth
       | otherwise -> EngineDjinn
 
+-- | Structural combined search reserves Exference's rated search for the
+-- complete inventory. A proper singleton prefix can omit the second provider
+-- needed for a composition while spending the same shared command deadline.
+-- Keep the geometric Djinn prefixes and every legacy stage unchanged; this
+-- is stage ordering, not an increase in per-engine work or verification quota.
+providerStagesWithRanking
+  :: CandidateRankingPolicy -> SynthEngine -> [a] -> [(SynthEngine, [a])]
+providerStagesWithRanking policy engine providers = case (policy, engine) of
+  (StructuralCandidateRanking{}, EngineBoth) ->
+    finalCombined $ providerStages EngineDjinn providers
+  _ -> providerStages engine providers
+ where
+  finalCombined [] = []
+  finalCombined [(_, inventory)] = [(EngineBoth, inventory)]
+  finalCombined (stage : remaining) = stage : finalCombined remaining
+
 -- | Run the selected in-process search on a translated goal.  The
 -- step budget applies to Exference only (Djinn's complete search needs
 -- no budget beyond the candidate window).
@@ -1370,6 +1388,10 @@ exferenceRun limits multiConstructorPatterns steps prepared = do
       goal = semanticOriginSearchGoal semanticOrigin
       decls = semanticOriginDeclarations semanticOrigin
       instantiations = semanticOriginProviderAssignments semanticOrigin
+      providerRenderMap = Map.fromList
+        [ (providerBindingPrivateSpelling binding, providerBindingRenderInfo binding)
+        | binding <- semanticOriginProviderBindings semanticOrigin
+        ]
       standardDecls = environmentDeclarations (djinnSessionEnvironment standard)
       allDecls = standardDecls ++ decls
       requiredTypes = goal :
@@ -1466,12 +1488,24 @@ exferenceRun limits multiConstructorPatterns steps prepared = do
                     compatibility = typedCandidateCompatibility candidate
                     fallback = fmap (("x" ++) . show)
                       . functionClauseExpression . candidateOutput
-                    (route, rendered) = renderCandidateByAvailability
+                    reconstructed = providerArgumentReconstructionRequired
+                      providerRenderMap $ candidateQualityExpressionByAvailability
+                        (fmap (("x" ++) . show) . eraseTermGraph) availability
+                        compatibility fallback
+                    (originalRoute, rendered) = renderCandidateByAvailability
                       renderGraph render availability compatibility fallback
+                    -- The selected neutral expression omitted a type choice
+                    -- needed only by Lean's erased provider context. Rendering
+                    -- may restore one whole retained vector, but the original
+                    -- graph does not certify that chosen instantiation. Keep
+                    -- the raw slot charged and withhold its exact typed origin.
+                    route
+                      | reconstructed = RouteUnobserved
+                      | otherwise = originalRoute
                     sidecar = case availability of
-                      Right _ -> Just $ TypedCandidateSemanticSidecar
+                      Right _ | not reconstructed -> Just $ TypedCandidateSemanticSidecar
                         candidate authority
-                      Left _ -> Nothing
+                      _ -> Nothing
               , Right group <- [rendered]
               ]
             notes = maybe [] (progressNotesWith (synthLimitWindow limits))
@@ -3782,6 +3816,8 @@ fragToDjinnPass successfulKeyFilter groundFactMode recursiveProjection
                 info = (providerInfo leanName binderNames sourceProviderFrag)
                   { piAssignments =
                       map providerTranslatedRenderInfo historicalAssignments
+                  , piReconstructVacuousArguments =
+                      exactContextual && not (null retainedAssignments)
                   }
             pure ProviderBinding
               { providerBindingSource = provider

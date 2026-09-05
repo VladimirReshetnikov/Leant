@@ -117,7 +117,7 @@ import Leant.Synth.Engine
   , mapDetailedCandidateGroupVariantsDroppingSemanticSidecar
   , mergeDetailedOutcomesSkipping
   , parseSynthEngine
-  , providerStages
+  , providerStagesWithRanking
   , startDetailedSynthCursor
   , advanceDetailedSynthCursorWith
   , synthEngineName
@@ -2632,6 +2632,7 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
       engine = rsSynthEngine state
       refusal = fragRefusal fragment
       limits = rsSynthLimits state
+      ranking = synthLimitRanking limits
       libraryPremises
         | rsSynthLibrary state =
             selectLibraryPremises (rsSynthLibraryPremises state)
@@ -2802,11 +2803,11 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
             else runProviderLanes deadline (Just baseline)
               (runSynthesis False) Set.empty
               (synthLaneRunAccumulation baseline)
-              (providerStages engine providers)
+              (providerStagesWithRanking ranking engine providers)
         SynthLaneRunStoppedByDisposition ->
           finalize (synthLaneRunAccumulation baseline)
         _ -> continueAfterBaseline deadline runSynthesis discoverProviders
-          engine baseline
+          ranking engine baseline
     else do
       providers <-
         if discoverProviders
@@ -2818,9 +2819,9 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
               emitLn st =<< cRed st ("out of fragment: " ++ reason)
         _ -> runProviderLanes deadline Nothing (runSynthesis False) Set.empty
           emptySynthLaneAccumulation
-          (providerStages engine providers)
+          (providerStagesWithRanking ranking engine providers)
  where
-  continueAfterBaseline runDeadline runLane discover laneEngine baseline = do
+  continueAfterBaseline runDeadline runLane discover ranking laneEngine baseline = do
     providers <-
       if discover
         then loadSynthProviders st (pgProviderQuery parsed)
@@ -2831,7 +2832,7 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
     if null providers
       then report runDeadline baseline
       else runProviderLanes runDeadline Nothing (runLane False)
-        checked accumulation (providerStages laneEngine providers)
+        checked accumulation (providerStagesWithRanking ranking laneEngine providers)
 
   runProviderLanes runDeadline fallback runLane checked accumulation lanes =
     case lanes of
