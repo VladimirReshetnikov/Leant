@@ -716,7 +716,7 @@ providerAssignmentAt
   -> [ApplicationArgument local]
   -> Maybe [ProviderInstantiationArgument]
 providerAssignmentAt info arguments = do
-  let visiblePrefix = takeVisiblePrefix arguments
+  let visiblePrefix = applicationVisiblePrefix arguments
   if null visiblePrefix || any isInferredVisibleTypeArgument visiblePrefix
     then Nothing
     else do
@@ -727,11 +727,12 @@ providerAssignmentAt info arguments = do
       if length sourceArguments == length visiblePrefix
         then Just sourceArguments
         else Nothing
- where
-  takeVisiblePrefix applicationArguments = case applicationArguments of
-    VisibleTypeArgumentArgument argument : remaining ->
-      argument : takeVisiblePrefix remaining
-    _ -> []
+
+applicationVisiblePrefix :: [ApplicationArgument local] -> [VisibleTypeArgument]
+applicationVisiblePrefix applicationArguments = case applicationArguments of
+  VisibleTypeArgumentArgument argument : remaining ->
+    argument : applicationVisiblePrefix remaining
+  _ -> []
 
 -- | A proper-kinded direct fragment can participate in the renderer's
 -- existing first-order substitution.  Higher-kinded and nominal arguments
@@ -779,6 +780,42 @@ structuralVisibleArgument argument =
   typeSpine (SharedType.TypeApplication function argumentType) arguments =
     typeSpine function (argumentType : arguments)
   typeSpine function arguments = (function, arguments)
+
+-- A non-exact visible annotation spells its known forall binders explicitly.
+-- The final expected result can determine an open annotation's type while
+-- carrying different Lean binder visibility. Keep those inferred identities,
+-- but fit supplied values under the visibility actually printed in the
+-- annotation. In particular, a wildcard leaf never opens or changes the
+-- unknown fragment it stands for. This is syntax alignment, not type evidence.
+visibleArgumentFittingVisibility :: VisibleTypeArgument -> Frag -> Frag
+visibleArgumentFittingVisibility argument original =
+  maybe original (`align` original) (visibleTypeArgumentPatternType argument)
+ where
+  align patternType actual = case (patternType, actual) of
+    (SharedType.ForallType variables [] body, _) ->
+      binders variables body actual
+    (SharedType.FunctionType domain result, FArr actualDomain actualResult) ->
+      FArr (align domain actualDomain) (align result actualResult)
+    (SharedType.TupleType Boxed elements, _) -> tuple elements actual
+    (SharedType.TypeApplication{}, FApp explicit key headType arguments) ->
+      let (_, patterns) = application patternType []
+      in if length patterns == length arguments
+          then FApp explicit key headType (zipWith align patterns arguments)
+          else actual
+    _ -> actual
+  binders [] body actual = align body actual
+  binders (_ : variables) body (FAll _ name rest) =
+    FAll True name (binders variables body rest)
+  binders _ _ actual = actual
+  tuple [element] actual = align element actual
+  tuple (element : elements) (FProd left right) =
+    FProd (align element left) (tuple elements right)
+  tuple (element : elements) (FLeanProd left right) =
+    FLeanProd (align element left) (tuple elements right)
+  tuple _ actual = actual
+  application (SharedType.TypeApplication function value) arguments =
+    application function (value : arguments)
+  application function arguments = (function, arguments)
 
 -- Djex intentionally erases Lean's explicit/implicit forall distinction from
 -- its neutral visible-type syntax.  Exact provider evidence retains the source
@@ -1248,9 +1285,9 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
       consumeApplication preserveTrailing expectedResult dss reserved retainedArguments
         arguments headFrag
     pure (headExpr, arguments, termDomains, resultFrag)
-  consumeApplication preserveTrailing expectedResult dss reserved = go Set.empty [] []
+  consumeApplication preserveTrailing expectedResult dss reserved = go Set.empty [] [] []
    where
-    go consumed replacements termDomains exactArguments arguments sourceFrag =
+    go consumed replacements visibleArguments termDomains exactArguments arguments sourceFrag =
       let frag = specializeFrag replacements sourceFrag
       in case frag of
         FAll _ binder rest
@@ -1258,7 +1295,7 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
           -- Elimination analysis instead keeps the historical silent opening
           -- needed to expose a provider's structural result to case or let.
           | preserveTrailing && null arguments ->
-              finish consumed replacements termDomains arguments frag
+              finish consumed replacements visibleArguments termDomains arguments frag
           | otherwise ->
               let replacementNames = Set.unions
                     [ Set.insert formal (fragVariableNames replacement)
@@ -1291,18 +1328,22 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
                           , tailArguments
                           )
                     _ -> (replacements, exactArguments, arguments)
+                  visibleArguments' = case (arguments, exactArguments) of
+                    (VisibleTypeArgumentArgument argument : _, []) ->
+                      (fresh, argument) : visibleArguments
+                    _ -> visibleArguments
               in go (Set.insert fresh consumed) replacements'
-                termDomains remainingExact remaining opened
+                visibleArguments' termDomains remainingExact remaining opened
         FInst _ rest
           | preserveTrailing && null arguments ->
-              finish consumed replacements termDomains arguments frag
+              finish consumed replacements visibleArguments termDomains arguments frag
           | otherwise ->
-              go consumed replacements termDomains exactArguments arguments rest
+              go consumed replacements visibleArguments termDomains exactArguments arguments rest
         FExactContext _ _ rest
           | preserveTrailing && null arguments ->
-              finish consumed replacements termDomains arguments frag
+              finish consumed replacements visibleArguments termDomains arguments frag
           | otherwise ->
-              go consumed replacements termDomains exactArguments arguments rest
+              go consumed replacements visibleArguments termDomains exactArguments arguments rest
         FArr domain rest -> case arguments of
           TermArgument argument : remaining -> do
             let replacementNames = Set.unions
@@ -1317,12 +1358,12 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
               Just actual ->
                 inferFragReplacements consumed replacements domain actual
             let fittedDomain = specializeFrag replacements' domain
-            go consumed replacements' (fittedDomain : termDomains)
+            go consumed replacements' visibleArguments (fittedDomain : termDomains)
               exactArguments remaining rest
-          _ -> finish consumed replacements termDomains arguments frag
-        _ -> finish consumed replacements termDomains arguments frag
+          _ -> finish consumed replacements visibleArguments termDomains arguments frag
+        _ -> finish consumed replacements visibleArguments termDomains arguments frag
 
-    finish consumed replacements termDomains arguments frag
+    finish consumed replacements visibleArguments termDomains arguments frag
       | not (null arguments) = Nothing
       | otherwise = do
           -- A result such as F (forall b, b -> b) determines the source
@@ -1332,9 +1373,20 @@ fitCore cm providers force cf ce n ds = case (cf, ce) of
           finalReplacements <- case expectedResult of
             Nothing -> Just replacements
             Just expected ->
-              inferFragReplacements consumed replacements frag expected
+              -- Lean's definitional equality ignores forall binder visibility.
+              -- A closed selected annotation may therefore be explicit while
+              -- the final goal is implicit. Retain the annotation's original
+              -- fitting metadata, but do not reject its otherwise exact result.
+              inferFragReplacementsWithVisibility False
+                consumed replacements frag expected
+          let fittingReplacements =
+                [ (name, maybe resolved (`visibleArgumentFittingVisibility` resolved)
+                    (lookup name visibleArguments))
+                | (name, replacement) <- finalReplacements
+                , let resolved = specializeFrag finalReplacements replacement
+                ]
           pure
-            ( map (specializeFrag finalReplacements) (reverse termDomains)
+            ( map (specializeFrag fittingReplacements) (reverse termDomains)
             , specializeFrag finalReplacements frag
             )
   eliminationPatternDomains scrutineeFrag pat =
@@ -1474,14 +1526,20 @@ constructorFieldsAt occurrence info = case ciParametric info of
 inferFragReplacements
   :: Set.Set String -> [(String, Frag)] -> Frag -> Frag
   -> Maybe [(String, Frag)]
-inferFragReplacements targets = go Set.empty
+inferFragReplacements = inferFragReplacementsWithVisibility True
+
+inferFragReplacementsWithVisibility
+  :: Bool -> Set.Set String -> [(String, Frag)] -> Frag -> Frag
+  -> Maybe [(String, Frag)]
+inferFragReplacementsWithVisibility requireVisibility targets = go Set.empty
  where
   go bound replacements (FVar variable) actual
     | variable `Set.member` targets
     , variable `Set.notMember` bound = case lookup variable replacements of
         Nothing -> Just (replacements ++ [(variable, actual)])
         Just previous
-          | equivalentFrag previous actual -> Just replacements
+          | Just _ <- inferFragReplacementsWithVisibility requireVisibility
+              Set.empty [] previous actual -> Just replacements
           | otherwise -> Nothing
   go _ replacements (FVar variable) (FVar variable')
     | variable == variable' = Just replacements
@@ -1506,7 +1564,7 @@ inferFragReplacements targets = go Set.empty
     go bound replacements' right right'
   go bound replacements (FAll explicit binder body)
       (FAll explicit' binder' body')
-    | explicit == explicit' =
+    | not requireVisibility || explicit == explicit' =
         let reserved = Set.unions
               [ targets
               , bound
@@ -1862,7 +1920,32 @@ render
 render cm providers typeNames style visibleBinderDomain doms = go
  where
   go :: Int -> Expression String -> Either String String
-  go req expr = case expr of
+  go req expr = case explicitMixedSpine expr of
+    Just (headExpr, arguments, source) -> do
+      headTxt <- case headExpr of
+        Local local -> ("@" ++) <$> renderUse 2 local []
+        Global global -> case declaredProvider providers global of
+          Just info -> Right ("@" ++ piLeanName info)
+          Nothing -> Left "an explicit mixed source lost its provider"
+        _ -> Left "an explicit mixed source lost its head"
+      exactArguments <- case headExpr of
+        Global global | Just info <- declaredProvider providers global ->
+          case providerAssignmentAt info arguments of
+            Just exact -> Right exact
+            Nothing
+              | let prefix = applicationVisiblePrefix arguments
+              , any (\assignment -> paiVisibleArguments assignment == prefix
+                    && length (paiSourceArguments assignment) /= length prefix)
+                  (piAssignments info) -> Left $
+                    "cannot align exact provider type-argument source vector for Lean provider "
+                      ++ piLeanName info
+              | otherwise -> Right []
+        _ -> Right []
+      argumentTexts <- renderExplicitArguments exactArguments arguments source
+      Right $ at req 1 (unwords (headTxt : argumentTexts))
+    Nothing -> renderOrdinary req expr
+
+  renderOrdinary req expr = case expr of
     Local x -> renderUse req x []
     Global name -> case declaredProvider providers name of
       Just info -> Right (at req 2 (piLeanName info))
@@ -1962,6 +2045,7 @@ render cm providers typeNames style visibleBinderDomain doms = go
   -- one use of a (possibly tagged) local with already-rendered term
   -- arguments: weave mid-spine placeholders, and instantiate the
   -- trailing quantifiers when the site is tagged
+  renderUse :: Int -> String -> [String] -> Either String String
   renderUse req x argTxts =
     let name = stripMark (stripTag x)
         -- domain lookups keep the premise mark (premise entries are
@@ -2038,6 +2122,59 @@ render cm providers typeNames style visibleBinderDomain doms = go
   sumConstructorSuffix GInr = Just "inr"
   sumConstructorSuffix _ = Nothing
 
+  -- Lean accepts @f seed ... but not @(f seed) .... If a visible type
+  -- application after a term argument selects an implicit source binder,
+  -- expose the complete checked spine at its original known head. The named
+  -- leading-global path is untouched: it has no preceding term argument.
+  explicitMixedSpine expression = do
+    let (headExpr, arguments) = expressionFullApplicationSpine expression
+    source <- sourceHeadFragment headExpr
+    if needsExplicit False arguments source
+      then Just (headExpr, arguments, source)
+      else Nothing
+   where
+    needsExplicit _ [] _ = False
+    needsExplicit seenTerm arguments source = case (source, arguments) of
+      (FAll explicit _ rest, VisibleTypeArgumentArgument _ : remaining) ->
+        (seenTerm && not explicit) || needsExplicit seenTerm remaining rest
+      (FAll _ _ rest, _) -> needsExplicit seenTerm arguments rest
+      (FInst _ rest, _) -> needsExplicit seenTerm arguments rest
+      (FExactContext _ _ rest, _) -> needsExplicit seenTerm arguments rest
+      (FArr _ rest, TermArgument _ : remaining) ->
+        needsExplicit True remaining rest
+      _ -> False
+
+  renderExplicitArguments _ [] _ = Right []
+  renderExplicitArguments exactArguments arguments source = case (source, arguments) of
+    (FAll _ _ rest, VisibleTypeArgumentArgument argument : remaining) -> do
+      (argumentText, remainingExact) <- case exactArguments of
+        exact : others -> do
+          rendered <- renderExactNamedVisibleTypeArgument
+            visibleBinderDomain typeNames exact argument
+          pure (rendered, others)
+        [] -> do
+          rendered <- renderVisibleTypeArgumentWith
+            visibleBinderDomain True typeNames argument
+          pure (rendered, [])
+      (argumentText :) <$> renderExplicitArguments remainingExact remaining rest
+    (FAll _ _ rest, _) ->
+      ("_" :) <$> renderExplicitArguments exactArguments arguments rest
+    -- An explicit application exposes instance slots as well. Lean can
+    -- synthesize an explicitly supplied underscore in an instance slot;
+    -- source-context evidence still has to be available to its elaborator.
+    (FInst _ rest, _) -> ("_" :) <$> renderExplicitArguments exactArguments arguments rest
+    (FExactContext _ _ rest, _) ->
+      ("_" :) <$> renderExplicitArguments exactArguments arguments rest
+    (FArr _ rest, TermArgument argument : remaining) -> do
+      argumentText <- go 2 argument
+      (argumentText :) <$> renderExplicitArguments exactArguments remaining rest
+    _ -> Left "cannot align a mixed application with its checked source spine"
+
+  sourceHeadFragment headExpr = case headExpr of
+    Local local -> Map.lookup local doms
+    Global global -> piFrag <$> declaredProvider providers global
+    _ -> Nothing
+
   -- An explicit type argument may split one known source application into
   -- multiple syntax nodes. Ordinary arguments after that node still cross
   -- the remaining explicit forall binders of the original source. Recover
@@ -2045,10 +2182,7 @@ render cm providers typeNames style visibleBinderDomain doms = go
   -- responsibility of the fragment-directed fitting pass above.
   remainingSourceFragment expression = do
     let (headExpr, arguments) = expressionFullApplicationSpine expression
-    source <- case headExpr of
-      Local local -> Map.lookup local doms
-      Global global -> piFrag <$> declaredProvider providers global
-      _ -> Nothing
+    source <- sourceHeadFragment headExpr
     consume arguments source
    where
     consume [] source = Just source
@@ -2064,9 +2198,9 @@ render cm providers typeNames style visibleBinderDomain doms = go
   -- Djex's visible type application is Haskell's @f \@T@.  Lean exposes an
   -- implicit binder position by prefixing the head with @\@@; this is also
   -- valid for an already-explicit binder.  Prefix only the first nominal/local
-  -- node in a VTA chain.  Higher-rank results reached through an ordinary term
-  -- application have no general positional Lean spelling, so they retain the
-  -- conservative ordinary-application fallback and verification decides.
+  -- node in a VTA chain. Interleaved implicit choices at a known source use
+  -- 'explicitMixedSpine' above, exposing the original head before its ordinary
+  -- arguments. Other applied expressions retain their ordinary spelling.
   visibleFunctionText function = case function of
     VisibleTypeApplication{} -> go 1 function
     Local{} -> ("@" ++) <$> go 2 function

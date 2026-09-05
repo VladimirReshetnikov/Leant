@@ -26480,16 +26480,18 @@ rankNFrontierTests = testGroup "Djinn rank-N frontiers"
           (FunctionType (TypeVariable "ambient")
             (FunctionType (TypeVariable "inner") (TypeVariable "inner"))))
       let variable = FVar
-          identity = FAll True "inner" (FArr (variable "inner") (variable "inner"))
-          openIdentity = FAll True "inner"
+          identity innerExplicit = FAll innerExplicit "inner"
+            (FArr (variable "inner") (variable "inner"))
+          openIdentity innerExplicit = FAll innerExplicit "inner"
             (FArr (variable "X") (FArr (variable "inner") (variable "inner")))
           application arguments = FApp True "G arguments" (AppVariable "G") arguments
-          source = FArr (variable "Seed") (FAll True "a"
+          source explicit = FArr (variable "Seed") (FAll explicit "a"
             (FArr (variable "a") (FArr (variable "Seed")
-              (FAll True "b" (FArr (variable "b")
+              (FAll explicit "b" (FArr (variable "b")
                 (application [variable "a", variable "b"]))))))
-          goal = FAll True "Seed" (FAll True "X" (FAll True "G"
-            (FArr (variable "Seed") (FArr source (application [openIdentity, identity])))))
+          goal explicit innerExplicit = FAll True "Seed" (FAll True "X" (FAll True "G"
+            (FArr (variable "Seed") (FArr (source explicit)
+              (application [openIdentity innerExplicit, identity innerExplicit])))))
           expression = Lambda [Bind "seed", Bind "maker"]
             (Let (Bind "first")
               (Apply (VisibleTypeApplication
@@ -26497,16 +26499,74 @@ rankNFrontierTests = testGroup "Djinn rank-N frontiers"
                 (Lambda [Wildcard, Bind "value"] (Local "value")))
               (Let (Bind "second") (Apply (Local "first") (Local "seed"))
                 (Apply (Local "second") (Lambda [Bind "value"] (Local "value")))))
-          expected = "fun _ _ _ x f => f x (∀ (a0_0 : _), _ → a0_0 → a0_0) "
-            ++ "(fun _ _ y => y) x _ (fun _ z => z)"
-      candidates <- expectRight $
-        renderLeanTerm Map.empty Map.empty Map.empty ([], 0, []) goal expression
-      assertBool ("missing the completely fitted application: " ++ show candidates)
-        (expected `elem` candidates)
-      assertBool "single-use inlining displaced the original rendering prefix"
-        (case candidates of first : _ -> "let " `isInfixOf` first; [] -> False)
-      assertBool "the two normal forms exceeded their independent metadata bounds"
-        (length candidates <= 2 * 3 * Djex.maximumProviderInstantiationAssignments)
+          expected explicit innerExplicit = "fun _ _ _ x f => "
+            ++ (if explicit then "f" else "@f")
+            ++ " x (∀ (a0_0 : _), _ → a0_0 → a0_0) "
+            ++ "(fun _ _ y => y) x _ (fun "
+            ++ (if innerExplicit then "_ " else "") ++ "z => z)"
+          check (explicit, innerExplicit) = do
+            candidates <- expectRight $
+              renderLeanTerm Map.empty Map.empty Map.empty ([], 0, [])
+                (goal explicit innerExplicit) expression
+            assertBool ("missing the completely fitted application: " ++ show candidates)
+              (expected explicit innerExplicit `elem` candidates)
+            assertBool "single-use inlining displaced the original rendering prefix"
+              (case candidates of first : _ -> "let " `isInfixOf` first; [] -> False)
+            assertBool "the two normal forms exceeded their independent metadata bounds"
+              (length candidates <= 2 * 3 * Djex.maximumProviderInstantiationAssignments)
+      mapM_ check [(True, True), (False, True), (True, False), (False, False)]
+  , testCase "expose an implicit choice after ordinary arguments at the original head" $ do
+      argument <- expectRight $ specifiedVisibleTypeArgument
+        (ForallType ["a"] []
+          (FunctionType (TypeVariable "a") (TypeVariable "a")))
+      let variable = FVar
+          identity = FAll True "inner" (FArr (variable "inner") (variable "inner"))
+          application arguments = FApp True "G arguments" (AppVariable "G") arguments
+          source = FArr (variable "Seed") (FAll False "a"
+            (FArr (variable "a") (FArr (variable "Seed")
+              (FAll False "b" (FArr (variable "b")
+                (application [variable "a", variable "b"]))))))
+          goal = FAll True "Seed" (FAll True "G"
+            (FArr (variable "Seed") (FArr source (application [identity, identity]))))
+          identityTerm = Lambda [Bind "value"] (Local "value")
+          expression = Lambda [Bind "seed", Bind "maker"]
+            (Apply (Apply (Apply (VisibleTypeApplication
+              (Apply (Local "maker") (Local "seed")) argument) identityTerm)
+              (Local "seed")) identityTerm)
+      fmap (take 1) (renderLeanTerm Map.empty Map.empty Map.empty ([], 0, []) goal expression)
+        @?= Right ["fun _ _ x f => @f x (∀ (a0_0 : _), a0_0 → a0_0) "
+          ++ "(fun _ y => y) x _ (fun _ z => z)"]
+  , testCase "expose instance slots throughout an explicitly selected mixed spine" $ do
+      argument <- expectRight $ specifiedVisibleTypeArgument
+        (ForallType ["a"] []
+          (FunctionType (TypeVariable "a") (TypeVariable "a")))
+      let variable = FVar
+          identity = FAll True "inner" (FArr (variable "inner") (variable "inner"))
+          application arguments = FApp True "G arguments" (AppVariable "G") arguments
+          source contextual = FArr (variable "Seed") (FAll False "a"
+            (contextual "a" (FArr (variable "a") (FArr (variable "Seed")
+              (FAll False "b" (contextual "b" (FArr (variable "b")
+                (application [variable "a", variable "b"]))))))))
+          goal contextual = FAll True "Seed" (FAll True "G"
+            (FArr (variable "Seed")
+              (FArr (source contextual) (application [identity, identity]))))
+          identityTerm = Lambda [Bind "value"] (Local "value")
+          expression = Lambda [Bind "seed", Bind "maker"]
+            (Apply (Apply (Apply (VisibleTypeApplication
+              (Apply (Local "maker") (Local "seed")) argument) identityTerm)
+              (Local "seed")) identityTerm)
+          check contextual =
+            fmap (take 1) (renderLeanTerm Map.empty Map.empty Map.empty ([], 0, [])
+              (goal contextual) expression)
+              @?= Right ["fun _ _ x f => @f x (∀ (a0_0 : _), a0_0 → a0_0) _ "
+                ++ "(fun _ y => y) x _ _ (fun _ z => z)"]
+      -- Both fragment representations describe one actual Lean instance
+      -- slot. The durable Lean syntax witness checks that explicit `_`
+      -- reconstructs the available Marker instance in each position.
+      mapM_ check
+        [ \name -> FInst ("Marker " ++ name)
+        , \name -> FExactContext "Marker" [ExactContextFragmentArgument 0 (variable name)]
+        ]
   , testCase "fit distinct polytypes in every application argument" $ do
       let application arguments = FApp True "F arguments" (AppVariable "F") arguments
           identity = FAll True "inner" (FArr (FVar "inner") (FVar "inner"))
@@ -26528,14 +26588,16 @@ rankNFrontierTests = testGroup "Djinn rank-N frontiers"
         (ForallType ["a"] []
           (FunctionType (TypeVariable "a") (TypeVariable "a")))
       let variable = FVar
-          identity = FAll True "inner" (FArr (variable "inner") (variable "inner"))
+          identity explicit = FAll explicit "inner"
+            (FArr (variable "inner") (variable "inner"))
           application arguments = FApp True "G arguments" (AppVariable "G") arguments
           source = FArr (variable "Seed")
             (FAll True "a" (FArr (variable "a")
               (FArr (variable "Seed") (FAll True "b"
                 (FArr (variable "b") (application [variable "a", variable "b"]))))))
-          goal = FAll True "Seed" (FAll True "G"
-            (FArr (variable "Seed") (FArr source (application [identity, identity]))))
+          goal firstExplicit = FAll True "Seed" (FAll True "G"
+            (FArr (variable "Seed")
+              (FArr source (application [identity firstExplicit, identity True]))))
           identityTerm = Lambda [Bind "value"] (Local "value")
           expression = Lambda [Bind "seed", Bind "maker"]
             (Let (Bind "first")
@@ -26543,13 +26605,48 @@ rankNFrontierTests = testGroup "Djinn rank-N frontiers"
                 (Apply (Local "maker") (Local "seed")) argument) identityTerm)
               (Let (Bind "second") (Apply (Local "first") (Local "seed"))
                 (Apply (Local "second") identityTerm)))
-      candidates <- expectRight $
-        renderLeanTerm Map.empty Map.empty Map.empty ([], 0, []) goal expression
-      case candidates of
-        primary : _ -> assertBool
-          ("lost the quantified value's binders across let aliases: " ++ show candidates)
-          (length (filter (isPrefixOf "(fun _ ") (tails primary)) == 2)
-        [] -> assertFailure "no rendering of successive forall layers"
+          check firstExplicit = do
+            candidates <- expectRight $
+              renderLeanTerm Map.empty Map.empty Map.empty ([], 0, [])
+                (goal firstExplicit) expression
+            case candidates of
+              primary : _ -> assertBool
+                ("lost the quantified value's binders across let aliases: " ++ show candidates)
+                (length (filter (isPrefixOf "(fun _ ") (tails primary)) == 2)
+              [] -> assertFailure "no rendering of successive forall layers"
+      -- The first type annotation is explicitly quantified even when its
+      -- definitionally equal final target is implicit. Its retained let type
+      -- must not prevent fitting the second, explicitly quantified value.
+      mapM_ check [True, False]
+  , testCase "retain exact leading metadata when a later implicit choice exposes a global" $ do
+      providerName <- expectRight $ mkIdentifier "mixedProvider"
+      identityArgument <- expectRight $ specifiedVisibleTypeArgument
+        (ForallType ["inner"] []
+          (FunctionType (TypeVariable "inner") (TypeVariable "inner")))
+      let token = FAtom False "Demo.Token"
+          implicitIdentity = FAll False "inner"
+            (FArr (FVar "inner") (FVar "inner"))
+          source = FAll False "a" (FArr (FVar "a") (FArr FTop
+            (FAll False "b" (FArr (FVar "b") token))))
+          info = (providerInfo "Demo.factory" (Just ["a"]) source)
+            { piAssignments = [ProviderAssignmentInfo [identityArgument]
+                [ProviderInstantiationExactArgument 0 implicitIdentity
+                  [ProviderForallDomainType]]] }
+          providers = Map.singleton "mixedProvider" info
+          identityTerm = Lambda [Bind "value"] (Local "value")
+          expression = Lambda [Bind "seed"]
+            (Apply (VisibleTypeApplication
+              (Apply (Apply (VisibleTypeApplication (Global providerName) identityArgument)
+                identityTerm) (Local "seed")) identityArgument) identityTerm)
+          goal = FArr FTop token
+      fmap (take 1) (renderLeanTerm Map.empty providers Map.empty ([], 0, []) goal expression)
+        @?= Right ["fun x => @Demo.factory (∀ {a0_0 : Type _}, a0_0 → a0_0) "
+          ++ "(fun y => y) x (∀ (a0_0 : _), a0_0 → a0_0) (fun _ z => z)"]
+      let malformed = Map.singleton "mixedProvider"
+            (info { piAssignments = [ProviderAssignmentInfo [identityArgument] []] })
+      renderLeanTerm Map.empty malformed Map.empty ([], 0, []) goal expression
+        @?= Left
+          "cannot align exact provider type-argument source vector for Lean provider Demo.factory"
   , testCase "fit a continuation argument whose result is known only from its caller" $ do
       let variable = FVar
           boolean = FAll True "choice"
