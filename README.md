@@ -4,7 +4,8 @@ Leant brings [Djex](https://github.com/VladimirReshetnikov/Djex)-powered program
 Lean 4, wrapped in an interactive read-eval-print loop. The centerpiece
 is `:synth`: give it a type and it constructs terms of that type —
 ranked, bound into the session, and every candidate re-elaborated by
-Lean before you see it — or proves that no such term exists. Around the
+Lean before you see it. It can also prove non-inhabitation in supported
+fragments; bounded searches may instead end inconclusively. Around the
 synthesizer, Leant is a full REPL in the GHCi-inspired mold Djex itself
 follows: type expressions and they are evaluated, type declarations and
 they enter the session, and a family of `:commands` gives you type
@@ -59,6 +60,10 @@ There is a manual: **[docs/Leant_Overview/Leant_Overview.pdf](https://raw.github
 Companion documents:
 
 - the **[manual](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Leant_Overview/Leant_Overview.pdf)** — tutorial and `:synth` tour;
+- **[Rank-N and Impredicative Synthesis](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/rank-n-impredicative-synthesis.pdf)**
+  — the algorithms, scope and universe rules, and compiler-checked Church
+  corpus results across Djex and Leant
+  ([LaTeX source](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/rank-n-impredicative-synthesis.tex));
 - **[docs/length-ranking.md](docs/length-ranking.md)** — the complete
   Length counterexample-ranking and replay-authorized filtering reference;
 - **[docs/synth-internals.md](docs/synth-internals.md)** — the design
@@ -103,9 +108,16 @@ Companion documents:
 
 - **Verified term synthesis.** `:synth TYPE` constructs programs and
   proofs — ranked, bound as `it1`, `it2`, …, and every candidate
-  re-elaborated by the Lean backend before it is shown. When no
-  constructive inhabitant exists it can *prove* that, and for refuted
-  propositional goals it offers classical candidates instead.
+  re-elaborated by the Lean backend before it is shown. Within supported
+  fragments, Djinn can *prove* non-inhabitation; refuted propositional
+  goals can also receive classical candidates.
+- **Rank-N and impredicative synthesis.** Both Djinn and Exference can
+  instantiate polymorphic functions at quantified types and construct
+  polymorphic arguments, including through interleaved type/value
+  applications and nested implicit binders. The
+  [validated coverage and examples](#rank-n-and-impredicative-goals) include
+  all 350 resolved Church signatures per engine, with explicit defaults
+  for the corpus's 19 partial cases.
 - **Interactive proving.** `:prove` turns the prompt into a
   tactic-by-tactic loop with unlimited `:undo`, and `:qed` saves the
   finished proof as a real theorem in the session.
@@ -488,9 +500,11 @@ candidate ranked first and the real one second:
 ### Rank-N and impredicative goals
 
 A polymorphic hypothesis is not just cargo: Djex instantiates it at
-types the goal itself supplies — including, under a guard, at
-*polymorphic* ones. Here the first candidate applies the identity
-hypothesis to the whole goal `Q → Q`, an impredicative instantiation:
+types the goal supplies, including quantified types, and can construct
+polymorphic values to pass as arguments. Both engines preserve those choices
+through nested and interleaved quantifiers. This first, simpler example
+instantiates the identity hypothesis at `Q`; the explicit type argument is
+inferred by Lean:
 
 ```text
 λ> :synth ((∀ p : Prop, p → p) → Q → Q)
@@ -756,15 +770,20 @@ their order. Full impredicative inhabitation is undecidable: those resource boun
 make an unsuccessful rank-N search inconclusive, and the answer remains
 "no term found within bounds".
 
-The [Church acceptance harness](test-church/README.md) translates all 350
-resolved signatures, including four local signatures, and replays the emitted
-terms with Lean's kernel. Its 19 partial cases receive an explicit element
-default; the other 331 cases preserve their input requirements, with integer
-providers enabled only where needed. Each Lean quantifier gets an inferred
-universe, so acceptance concerns valid universe instantiations of the
-Haskell types. Lean's `Type` hierarchy remains predicative. The comprehensive
-[implementation report](lib/Djex/docs/rank-n-impredicative-synthesis.tex)
-documents the algorithms, evidence boundaries, and Haskell/Lean correspondence.
+The [Church acceptance harness](test-church/README.md) passed **350/350
+resolved signatures with each engine**, including four local signatures.
+All **700 displayed Lean terms** were independently replayed by Lean's kernel
+with empty axiom inventories. Per engine, the corpus comprises 315 total
+cases, 16 cases using integer providers, and 19 partial cases tested with an
+additional ordinary default argument. Those 19 checks establish inhabitation
+of the default-extended types, not the unrestricted original signatures.
+Each Lean quantifier gets an inferred universe, so acceptance concerns valid
+universe instantiations of the Haskell types; Lean's `Type` hierarchy remains
+predicative. This is practical corpus coverage, not a completeness claim for
+general System F inhabitation. The comprehensive
+[implementation report (PDF)](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/rank-n-impredicative-synthesis.pdf)
+and its [LaTeX source](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/rank-n-impredicative-synthesis.tex)
+document the algorithms, evidence boundaries, and Haskell/Lean correspondence.
 
 The plan-family bounds (which quantifier-site selections are
 exhaustive, where the next gap lies) and the dedicated rank-N transcripts
