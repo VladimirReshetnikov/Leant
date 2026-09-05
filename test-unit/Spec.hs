@@ -16239,7 +16239,7 @@ assertLengthAssessmentMainLaneScheduling = do
         "if structuralFirst"
         "where" schedulerSection
       continuationSection = mainSourceSection
-        "continueAfterBaseline runDeadline runLane discover laneEngine baseline = do"
+        "continueAfterBaseline runDeadline runLane discover ranking laneEngine baseline = do"
         "runProviderLanes runDeadline fallback runLane checked accumulation lanes ="
         schedulerSection
       providerSection = mainSourceSection
@@ -16247,6 +16247,8 @@ assertLengthAssessmentMainLaneScheduling = do
         "finalize accumulation = do"
         schedulerSection
       schedulerText = unlines schedulerSection
+  assertMainSourceContains "command ranking capture" schedulerSection
+    "ranking = synthLimitRanking limits"
   mapM_ (assertMainSourceContains "constructive cursor lane"
       constructiveSection)
     [ "let deadline"
@@ -16277,15 +16279,22 @@ assertLengthAssessmentMainLaneScheduling = do
     , "then report deadline baseline"
     , "else runProviderLanes deadline (Just baseline)"
     , "SynthLaneRunStoppedByDisposition -> finalize (synthLaneRunAccumulation baseline)"
-    , "_ -> continueAfterBaseline deadline runSynthesis discoverProviders engine baseline"
+    , "_ -> continueAfterBaseline deadline runSynthesis discoverProviders ranking engine baseline"
     ]
+  assertBool "refuted and provider-open routes lost the captured ranking schedule"
+    $ length (mainSourcePositions
+        "providerStagesWithRanking ranking engine providers" baselineSection) == 2
   mapM_ (assertMainSourceContains "baseline continuation"
       continuationSection)
     [ "accumulation = synthLaneRunAccumulation baseline"
     , "checked = Set.fromList (synthLaneRunCheckedFrontierSpellings baseline)"
     , "then report runDeadline baseline"
     , "else runProviderLanes runDeadline Nothing (runLane False) checked accumulation"
+    , "checked accumulation (providerStagesWithRanking ranking laneEngine providers)"
     ]
+  assertBool "baseline continuation duplicated its ranked provider schedule"
+    $ length (mainSourcePositions
+        "providerStagesWithRanking ranking laneEngine providers" continuationSection) == 1
 
   mapM_ (assertMainSourceContains "provider run routing" providerSection)
     [ "fresh <- runLane checked laneEngine providers accumulation"

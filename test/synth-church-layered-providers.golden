@@ -39,19 +39,19 @@ note: search truncated: candidate limit reached (1)
 λ> :set synth-engine exference
 synth engine: exference
 λ> :synth (ChurchLayered.G2 (∀ a : Type, a → a) (∀ a : Type, a → a → a))
-  it1  let f := ChurchLayered.maker2 ChurchLayered.seed (∀ (a0_0 : _), a0_0 → a0_0) (fun _ x => x); let g := f ChurchLayered.seed; g _ (fun _ _ y => y)
-note: search truncated: step limit reached, queue limit pruned 19592
+  it1  let f := ChurchLayered.maker2 ChurchLayered.seed (∀ (a0_0 : _), a0_0 → a0_0) (fun _ x => x); let g := f ChurchLayered.seed; g _ (fun _ y _ => y)
+note: search truncated: candidate limit reached (1)
 λ> :synth (ChurchLayered.G3 (∀ a : Type, a → a) (∀ a : Type, a → a → a) (∀ a : Type, a → a))
   it1  let f := ChurchLayered.maker3 ChurchLayered.seed (∀ (a0_0 : _), a0_0 → a0_0) (∀ (a0_0 : _), a0_0 → a0_0 → a0_0) (fun _ x => x); let g := f (fun _ _ y => y); let h := g ChurchLayered.seed; h _ (fun _ z => z)
-note: search truncated: step limit reached, queue limit pruned 18984
+note: search truncated: candidate limit reached (1)
 λ> :set synth-engine both
 synth engine: both
 λ> :synth (ChurchLayered.G2 (∀ a : Type, a → a) (∀ a : Type, a → a → a))
-  it1  let f := ChurchLayered.maker2 ChurchLayered.seed (∀ (a0_0 : _), a0_0 → a0_0) (fun _ x => x); let g := f ChurchLayered.seed; g _ (fun _ _ y => y)
+  it1  let f := ChurchLayered.maker2 ChurchLayered.seed (∀ (a0_0 : _), a0_0 → a0_0) (fun _ x => x); let g := f ChurchLayered.seed; g _ (fun _ y _ => y)
 note: search truncated: candidate limit reached (1)
-note: exference: search truncated: step limit reached, queue limit pruned 19592
+note: exference: search truncated: candidate limit reached (1)
 λ> :synth (ChurchLayered.G3 (∀ a : Type, a → a) (∀ a : Type, a → a → a) (∀ a : Type, a → a))
   it1  let f := ChurchLayered.maker3 ChurchLayered.seed (∀ (a0_0 : _), a0_0 → a0_0) (∀ (a0_0 : _), a0_0 → a0_0 → a0_0) (fun _ x => x); let g := f (fun _ _ y => y); let h := g ChurchLayered.seed; h _ (fun _ z => z)
 note: search truncated: candidate limit reached (1)
-note: exference: search truncated: step limit reached, queue limit pruned 18984
+note: exference: search truncated: candidate limit reached (1)
 λ> :quit

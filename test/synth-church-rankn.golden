@@ -95,165 +95,165 @@ note: search truncated: candidate limit reached (1)
 synth engine: exference
 λ> :synth (∀ (F : Type → Type → Type → Type → Type → Type → Type → Type → Type) (A B C D E G H I : Type), (∀ a b c d e f g h : Type, F a b c d e f g h) → F I H G E D C B A)
   it1  fun _ _ _ _ _ _ _ _ _ x => x _ _ _ _ _ _ _ _
-note: search truncated: step limit reached, queue limit pruned 23745
+note: search truncated: candidate limit reached (1)
 λ> :synth (∀ (F : Type → Type → Type → Type → Type → Type → Type → Type → Type → Type → Type → Type → Type) (A B C D E G H I J K L M : Type), (∀ a b c d e f g h i j k l : Type, F a b c d e f g h i j k l) → F M L K J I H G E D C B A)
   it1  fun _ _ _ _ _ _ _ _ _ _ _ _ _ x => x _ _ _ _ _ _ _ _ _ _ _ _
-note: search truncated: step limit reached, queue limit pruned 26623
+note: search truncated: candidate limit reached (1)
 λ> :synth (∀ F : Type 1 → Type 1, (∀ a : Type 1, a → F a) → F (∀ b : Type, b → b))
   it1  fun _ f => f _ (fun _ x => x)
-note: search truncated: step limit reached, queue limit pruned 26156
+note: search truncated: candidate limit reached (1)
 λ> :synth (∀ F : Type 1 → Type 1 → Type 1, (∀ a b : Type 1, a → b → F a b) → F (∀ a : Type, a → a) (∀ b : Type, b → b → b))
-  it1  fun _ f => f _ _ (fun _ x => x) (fun _ _ y => y)
-note: search truncated: step limit reached, queue limit pruned 28306
+  it1  fun _ f => f _ _ (fun _ x => x) (fun _ y _ => y)
+note: search truncated: candidate limit reached (1)
 λ> :synth (∀ (F : Type 1 → Type 1) (A : Type), (∀ a : Type 1, a → F a) → F (∀ B : Type, A → B → B))
   it1  fun _ _ f => f _ (fun _ _ x => x)
-note: search truncated: step limit reached, queue limit pruned 26547
+note: search truncated: candidate limit reached (1)
 λ> :synth (∀ F : Type 1 → Type 1, (∀ {a : Type 1}, a → F a) → F (∀ {b : Type}, b → b))
   it1  fun _ f => f (fun x => x)
-note: search truncated: step limit reached, queue limit pruned 26156
+note: search truncated: candidate limit reached (1)
 λ> :synth (∀ F : Type 1 → Type 1, (Unit → ∀ a : Type 1, a → F a) → F (∀ b : Type, b → b))
   it1  fun _ f => let g := f ⟨⟩; g _ (fun _ x => x)
-note: search truncated: step limit reached, queue limit pruned 28699
+note: search truncated: candidate limit reached (1)
 λ> :synth (∀ F : Type 1 → Type 1, (Unit → ∀ {a : Type 1}, a → F a) → F (∀ {b : Type}, b → b))
   it1  fun _ f => let g := f ⟨⟩; g (fun x => x)
-note: search truncated: step limit reached, queue limit pruned 28699
+note: search truncated: candidate limit reached (1)
 λ> :synth (∀ R : Type, ((∀ {A : Type}, ((∀ {B : Type}, B → B) → A) → A) → R) → R)
   it1  fun _ f => f (fun g => g (fun x => x))
-note: search truncated: step limit reached, queue limit pruned 30539
+note: search truncated: candidate limit reached (1)
 λ> :synth (∀ R : Type, (((∀ {A : Type}, A → A) → (∀ {B : Type}, B → B)) → R) → R)
   it1  fun _ f => f (fun g => g)
-note: search truncated: step limit reached, queue limit pruned 34622
+note: search truncated: candidate limit reached (1)
 λ> :synth (∀ a b c : Type _, (a → b) → (c → b) → (∀ r : Type _, (a → r) → (c → r) → r) → b)
   it1  fun _ _ _ f g h => h _ f g
-note: search truncated: step limit reached, queue limit pruned 32741
+note: search truncated: candidate limit reached (1)
 λ> :synth (∀ A : Type, ((∀ B : Type, ((∀ C : Type, ((∀ D : Type, D → D) → C) → C) → B) → B) → A) → A)
   it1  fun _ f => f (fun _ g => g (fun _ h => h (fun _ x => x)))
-note: search truncated: step limit reached, queue limit pruned 34688
+note: search truncated: candidate limit reached (1)
 λ> :synth (∀ {A : Type}, ((∀ {B : Type}, ((∀ {C : Type}, ((∀ {D : Type}, D → D) → C) → C) → B) → B) → A) → A)
   it1  fun f => f (fun g => g (fun h => h (fun x => x)))
-note: search truncated: step limit reached, queue limit pruned 34688
+note: search truncated: candidate limit reached (1)
 λ> :synth (∀ (F : Type 1 → Type 1) (G H K : Type → Type), (∀ a : Type 1, a → F a) → (∀ a : Type, G a → H a) → (∀ a : Type, H a → K a) → F (∀ a : Type, G a → K a))
   it1  fun _ _ _ _ f g h => f _ (fun _ x => h _ (g _ x))
-note: search truncated: step limit reached, queue limit pruned 34810
+note: search truncated: candidate limit reached (1)
 λ> :synth (∀ F : Type 1 → Type 1, (∀ a : Type 1, a → F a) → F (∀ b : Type, b → F (∀ c : Type, c → c)))
   it1  fun _ f => f _ (fun _ _ => f _ (fun _ x => x))
-note: search truncated: step limit reached, queue limit pruned 24960
+note: search truncated: candidate limit reached (1)
 λ> :synth (∀ F : Type 1 → Type 1, (∀ a : Type 1, a → F a) → F (∀ b : Type, b → F (∀ c : Type, b → c → b)))
-  it1  fun _ f => f _ (fun _ _ => f _ (fun _ x _ => x))
-note: search truncated: step limit reached, queue limit pruned 25851
+  it1  fun _ f => f _ (fun _ x => f _ (fun _ _ _ => x))
+note: search truncated: candidate limit reached (1)
 λ> :synth (∀ (Seed : Type) (G : Type 1 → Type 1 → Type 1), Seed → (Seed → ∀ a : Type 1, a → Seed → ∀ b : Type 1, b → G a b) → G (∀ a : Type, a → a) (∀ b : Type, b → b))
   it1  fun _ _ x f => let g := f x (∀ (a0_0 : _), a0_0 → a0_0) (fun _ y => y); let h := g x; h _ (fun _ z => z)
-note: search truncated: step limit reached, queue limit pruned 35252
+note: search truncated: candidate limit reached (1)
 λ> :synth (∀ (Seed : Type) (G : Type 1 → Type 1 → Type 1), Seed → (Seed → ∀ a : Type 1, a → Seed → ∀ b : Type 1, b → G a b) → G (∀ {a : Type}, a → a) (∀ b : Type, b → b))
   it1  fun _ _ x f => let g := f x (∀ (a0_0 : _), a0_0 → a0_0) (fun _ y => y); let h := g x; h _ (fun _ z => z)
-note: search truncated: step limit reached, queue limit pruned 35252
+note: search truncated: candidate limit reached (1)
 λ> :synth (∀ (Seed : Type) (G : Type 1 → Type 1 → Type 1 → Type 1), Seed → (Seed → ∀ a b : Type 1, a → b → Seed → ∀ c : Type 1, c → G a b c) → G (∀ a : Type, a → a) (∀ b : Type, b → b → b) (∀ c : Type, c → c))
-  it1  fun _ _ x f => let g := f x (∀ (a0_0 : _), a0_0 → a0_0) (∀ (a0_0 : _), a0_0 → a0_0 → a0_0) (fun _ y => y); let h := g (fun _ z _ => z); let f1 := h x; f1 _ (fun _ w => w)
-note: search truncated: step limit reached, queue limit pruned 16091
+  it1  fun _ _ x f => let g := f x (∀ (a0_0 : _), a0_0 → a0_0) (∀ (a0_0 : _), a0_0 → a0_0 → a0_0) (fun _ y => y); let h := g (fun _ _ z => z); let f1 := h x; f1 _ (fun _ w => w)
+note: search truncated: candidate limit reached (1)
 λ> :synth (∀ (Seed X : Type) (G : Type 1 → Type 1 → Type 1), Seed → (Seed → ∀ a : Type 1, a → Seed → ∀ b : Type 1, b → G a b) → G (∀ c : Type, X → c → c) (∀ d : Type, d → d))
   it1  fun _ _ _ x f => f x (∀ (a0_0 : _), _ → a0_0 → a0_0) (fun _ _ y => y) x _ (fun _ z => z)
-note: search truncated: step limit reached, queue limit pruned 35240
+note: search truncated: candidate limit reached (1)
 λ> :synth (∀ (Seed X : Type) (G : Type 1 → Type 1 → Type 1), Seed → (Seed → ∀ {a : Type 1}, a → Seed → ∀ {b : Type 1}, b → G a b) → G (∀ c : Type, X → c → c) (∀ d : Type, d → d))
   it1  fun _ _ _ x f => @f x (∀ (a0_0 : _), _ → a0_0 → a0_0) (fun _ _ y => y) x _ (fun _ z => z)
-note: search truncated: step limit reached, queue limit pruned 35240
+note: search truncated: candidate limit reached (1)
 λ> :synth (∀ (Seed X : Type) (G : Type 1 → Type 1 → Type 1), Seed → (Seed → ∀ a : Type 1, a → Seed → ∀ b : Type 1, b → G a b) → G (∀ {c : Type}, X → c → c) (∀ {d : Type}, d → d))
   it1  fun _ _ _ x f => f x (∀ (a0_0 : _), _ → a0_0 → a0_0) (fun _ _ y => y) x _ (fun z => z)
-note: search truncated: step limit reached, queue limit pruned 35240
+note: search truncated: candidate limit reached (1)
 λ> :synth (∀ (Seed X : Type) (G : Type 1 → Type 1 → Type 1), Seed → (Seed → ∀ {a : Type 1}, a → Seed → ∀ {b : Type 1}, b → G a b) → G (∀ {c : Type}, X → c → c) (∀ {d : Type}, d → d))
   it1  fun _ _ _ x f => @f x (∀ (a0_0 : _), _ → a0_0 → a0_0) (fun _ _ y => y) x _ (fun z => z)
-note: search truncated: step limit reached, queue limit pruned 35240
+note: search truncated: candidate limit reached (1)
 λ> :set synth-engine both
 synth engine: both
 λ> :synth (∀ (F : Type → Type → Type → Type → Type → Type → Type → Type → Type) (A B C D E G H I : Type), (∀ a b c d e f g h : Type, F a b c d e f g h) → F I H G E D C B A)
   it1  fun _ _ _ _ _ _ _ _ _ x => x _ _ _ _ _ _ _ _
 note: search truncated: candidate limit reached (1)
-note: exference: search truncated: step limit reached, queue limit pruned 23745
+note: exference: search truncated: candidate limit reached (1)
 λ> :synth (∀ (F : Type → Type → Type → Type → Type → Type → Type → Type → Type → Type → Type → Type → Type) (A B C D E G H I J K L M : Type), (∀ a b c d e f g h i j k l : Type, F a b c d e f g h i j k l) → F M L K J I H G E D C B A)
   it1  fun _ _ _ _ _ _ _ _ _ _ _ _ _ x => x _ _ _ _ _ _ _ _ _ _ _ _
 note: search truncated: candidate limit reached (1)
-note: exference: search truncated: step limit reached, queue limit pruned 26623
+note: exference: search truncated: candidate limit reached (1)
 λ> :synth (∀ F : Type 1 → Type 1, (∀ a : Type 1, a → F a) → F (∀ b : Type, b → b))
   it1  fun _ f => f _ (fun _ x => x)
 note: search truncated: candidate limit reached (1)
-note: exference: search truncated: step limit reached, queue limit pruned 26156
+note: exference: search truncated: candidate limit reached (1)
 λ> :synth (∀ F : Type 1 → Type 1 → Type 1, (∀ a b : Type 1, a → b → F a b) → F (∀ a : Type, a → a) (∀ b : Type, b → b → b))
-  it1  fun _ f => f _ _ (fun _ x => x) (fun _ _ y => y)
+  it1  fun _ f => f _ _ (fun _ x => x) (fun _ y _ => y)
 note: search truncated: candidate limit reached (1)
-note: exference: search truncated: step limit reached, queue limit pruned 28306
+note: exference: search truncated: candidate limit reached (1)
 λ> :synth (∀ (F : Type 1 → Type 1) (A : Type), (∀ a : Type 1, a → F a) → F (∀ B : Type, A → B → B))
   it1  fun _ _ f => f _ (fun _ _ x => x)
 note: search truncated: candidate limit reached (1)
-note: exference: search truncated: step limit reached, queue limit pruned 26547
+note: exference: search truncated: candidate limit reached (1)
 λ> :synth (∀ F : Type 1 → Type 1, (∀ {a : Type 1}, a → F a) → F (∀ {b : Type}, b → b))
   it1  fun _ f => f (fun x => x)
 note: search truncated: candidate limit reached (1)
-note: exference: search truncated: step limit reached, queue limit pruned 26156
+note: exference: search truncated: candidate limit reached (1)
 λ> :synth (∀ F : Type 1 → Type 1, (Unit → ∀ a : Type 1, a → F a) → F (∀ b : Type, b → b))
   it1  fun _ f => let g := f ⟨⟩; g _ (fun _ x => x)
 note: search truncated: candidate limit reached (1)
-note: exference: search truncated: step limit reached, queue limit pruned 28699
+note: exference: search truncated: candidate limit reached (1)
 λ> :synth (∀ F : Type 1 → Type 1, (Unit → ∀ {a : Type 1}, a → F a) → F (∀ {b : Type}, b → b))
   it1  fun _ f => let g := f ⟨⟩; g (fun x => x)
 note: search truncated: candidate limit reached (1)
-note: exference: search truncated: step limit reached, queue limit pruned 28699
+note: exference: search truncated: candidate limit reached (1)
 λ> :synth (∀ R : Type, ((∀ {A : Type}, ((∀ {B : Type}, B → B) → A) → A) → R) → R)
   it1  fun _ f => f (fun g => g (fun x => x))
 note: search truncated: candidate limit reached (1)
-note: exference: search truncated: step limit reached, queue limit pruned 30539
+note: exference: search truncated: candidate limit reached (1)
 λ> :synth (∀ R : Type, (((∀ {A : Type}, A → A) → (∀ {B : Type}, B → B)) → R) → R)
   it1  fun _ f => f (fun g => g)
 note: search truncated: candidate limit reached (1)
-note: exference: search truncated: step limit reached, queue limit pruned 34622
+note: exference: search truncated: candidate limit reached (1)
 λ> :synth (∀ a b c : Type _, (a → b) → (c → b) → (∀ r : Type _, (a → r) → (c → r) → r) → b)
   it1  fun _ _ _ f g h => h _ f g
 note: search truncated: candidate limit reached (1)
-note: exference: search truncated: step limit reached, queue limit pruned 32741
+note: exference: search truncated: candidate limit reached (1)
 λ> :synth (∀ A : Type, ((∀ B : Type, ((∀ C : Type, ((∀ D : Type, D → D) → C) → C) → B) → B) → A) → A)
   it1  fun _ f => f (fun _ g => g (fun _ h => h (fun _ x => x)))
 note: search truncated: candidate limit reached (1)
-note: exference: search truncated: step limit reached, queue limit pruned 34688
+note: exference: search truncated: candidate limit reached (1)
 λ> :synth (∀ {A : Type}, ((∀ {B : Type}, ((∀ {C : Type}, ((∀ {D : Type}, D → D) → C) → C) → B) → B) → A) → A)
   it1  fun f => f (fun g => g (fun h => h (fun x => x)))
 note: search truncated: candidate limit reached (1)
-note: exference: search truncated: step limit reached, queue limit pruned 34688
+note: exference: search truncated: candidate limit reached (1)
 λ> :synth (∀ (F : Type 1 → Type 1) (G H K : Type → Type), (∀ a : Type 1, a → F a) → (∀ a : Type, G a → H a) → (∀ a : Type, H a → K a) → F (∀ a : Type, G a → K a))
   it1  fun _ _ _ _ f g h => f _ (fun _ x => h _ (g _ x))
 note: search truncated: candidate limit reached (1)
-note: exference: search truncated: step limit reached, queue limit pruned 34810
+note: exference: search truncated: candidate limit reached (1)
 λ> :synth (∀ F : Type 1 → Type 1, (∀ a : Type 1, a → F a) → F (∀ b : Type, b → F (∀ c : Type, c → c)))
   it1  fun _ f => f _ (fun _ _ => f _ (fun _ x => x))
 note: search truncated: candidate limit reached (1)
-note: exference: search truncated: step limit reached, queue limit pruned 24960
+note: exference: search truncated: candidate limit reached (1)
 λ> :synth (∀ F : Type 1 → Type 1, (∀ a : Type 1, a → F a) → F (∀ b : Type, b → F (∀ c : Type, b → c → b)))
-  it1  fun _ f => f _ (fun _ _ => f _ (fun _ x _ => x))
+  it1  fun _ f => f _ (fun _ x => f _ (fun _ _ _ => x))
 note: search truncated: candidate limit reached (1)
-note: exference: search truncated: step limit reached, queue limit pruned 25851
+note: exference: search truncated: candidate limit reached (1)
 λ> :synth (∀ (Seed : Type) (G : Type 1 → Type 1 → Type 1), Seed → (Seed → ∀ a : Type 1, a → Seed → ∀ b : Type 1, b → G a b) → G (∀ a : Type, a → a) (∀ b : Type, b → b))
   it1  fun _ _ x f => let g := f x (∀ (a0_0 : _), a0_0 → a0_0) (fun _ y => y); let h := g x; h _ (fun _ z => z)
 note: search truncated: candidate limit reached (1)
-note: exference: search truncated: step limit reached, queue limit pruned 35252
+note: exference: search truncated: candidate limit reached (1)
 λ> :synth (∀ (Seed : Type) (G : Type 1 → Type 1 → Type 1), Seed → (Seed → ∀ a : Type 1, a → Seed → ∀ b : Type 1, b → G a b) → G (∀ {a : Type}, a → a) (∀ b : Type, b → b))
   it1  fun _ _ x f => let g := f x (∀ (a0_0 : _), a0_0 → a0_0) (fun _ y => y); let h := g x; h _ (fun _ z => z)
 note: search truncated: candidate limit reached (1)
-note: exference: search truncated: step limit reached, queue limit pruned 35252
+note: exference: search truncated: candidate limit reached (1)
 λ> :synth (∀ (Seed : Type) (G : Type 1 → Type 1 → Type 1 → Type 1), Seed → (Seed → ∀ a b : Type 1, a → b → Seed → ∀ c : Type 1, c → G a b c) → G (∀ a : Type, a → a) (∀ b : Type, b → b → b) (∀ c : Type, c → c))
-  it1  fun _ _ x f => let g := f x (∀ (a0_0 : _), a0_0 → a0_0) (∀ (a0_0 : _), a0_0 → a0_0 → a0_0) (fun _ y => y); let h := g (fun _ z _ => z); let f1 := h x; f1 _ (fun _ w => w)
+  it1  fun _ _ x f => let g := f x (∀ (a0_0 : _), a0_0 → a0_0) (∀ (a0_0 : _), a0_0 → a0_0 → a0_0) (fun _ y => y); let h := g (fun _ _ z => z); let f1 := h x; f1 _ (fun _ w => w)
 note: search truncated: candidate limit reached (1)
-note: exference: search truncated: step limit reached, queue limit pruned 16091
+note: exference: search truncated: candidate limit reached (1)
 λ> :synth (∀ (Seed X : Type) (G : Type 1 → Type 1 → Type 1), Seed → (Seed → ∀ a : Type 1, a → Seed → ∀ b : Type 1, b → G a b) → G (∀ c : Type, X → c → c) (∀ d : Type, d → d))
   it1  fun _ _ _ x f => f x (∀ (a0_0 : _), _ → a0_0 → a0_0) (fun _ _ y => y) x _ (fun _ z => z)
 note: search truncated: candidate limit reached (1)
-note: exference: search truncated: step limit reached, queue limit pruned 35240
+note: exference: search truncated: candidate limit reached (1)
 λ> :synth (∀ (Seed X : Type) (G : Type 1 → Type 1 → Type 1), Seed → (Seed → ∀ {a : Type 1}, a → Seed → ∀ {b : Type 1}, b → G a b) → G (∀ c : Type, X → c → c) (∀ d : Type, d → d))
   it1  fun _ _ _ x f => @f x (∀ (a0_0 : _), _ → a0_0 → a0_0) (fun _ _ y => y) x _ (fun _ z => z)
 note: search truncated: candidate limit reached (1)
-note: exference: search truncated: step limit reached, queue limit pruned 35240
+note: exference: search truncated: candidate limit reached (1)
 λ> :synth (∀ (Seed X : Type) (G : Type 1 → Type 1 → Type 1), Seed → (Seed → ∀ a : Type 1, a → Seed → ∀ b : Type 1, b → G a b) → G (∀ {c : Type}, X → c → c) (∀ {d : Type}, d → d))
   it1  fun _ _ _ x f => f x (∀ (a0_0 : _), _ → a0_0 → a0_0) (fun _ _ y => y) x _ (fun z => z)
 note: search truncated: candidate limit reached (1)
-note: exference: search truncated: step limit reached, queue limit pruned 35240
+note: exference: search truncated: candidate limit reached (1)
 λ> :synth (∀ (Seed X : Type) (G : Type 1 → Type 1 → Type 1), Seed → (Seed → ∀ {a : Type 1}, a → Seed → ∀ {b : Type 1}, b → G a b) → G (∀ {c : Type}, X → c → c) (∀ {d : Type}, d → d))
   it1  fun _ _ _ x f => @f x (∀ (a0_0 : _), _ → a0_0 → a0_0) (fun _ _ y => y) x _ (fun z => z)
 note: search truncated: candidate limit reached (1)
-note: exference: search truncated: step limit reached, queue limit pruned 35240
+note: exference: search truncated: candidate limit reached (1)
 λ> :quit
