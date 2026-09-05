@@ -641,6 +641,7 @@ import Leant.Synth.Verification
   , verifiedCandidateReceipts
   , verifiedCandidates
   , verifyCandidateGroups
+  , verifyDistinctCandidateGroupsBy
   )
 import Leant.Session.Replay (itCounterAfterHistory, replayHistoryWith)
 import Leant.Session.Snapshot
@@ -2581,7 +2582,8 @@ candidateVerificationTests = testGroup "candidate verification programs"
 
 verificationObservabilityTests :: TestTree
 verificationObservabilityTests = testGroup "verification observability"
-  [ testCase "assign unique stable codes to every metric" $ do
+  [ acceptedSpellingVerificationTests
+  , testCase "assign unique stable codes to every metric" $ do
       let failures = [minBound .. maxBound]
           metrics =
             [ LegacyCandidateFallback
@@ -2761,6 +2763,133 @@ verificationObservabilityTests = testGroup "verification observability"
           (const $ pure VariantAccepted)
           (take synthMaxTried $ cycle acceptedGroups)
         fmap verifiedCandidates cyclicBatch @?= Just (concat acceptedGroups)
+  ]
+
+acceptedSpellingVerificationTests :: TestTree
+acceptedSpellingVerificationTests = testGroup "accepted spelling deduplication"
+  [ testCase "accept overlapping provider cohorts only once per spelling" $ do
+      attempts <- newIORef ([] :: [String])
+      let groups = [["contextual", "identity"], ["identity"], ["contextual"]]
+          verify spelling = do
+            modifyIORef' attempts (++ [spelling])
+            pure VariantAccepted
+      batch <- verifyDistinctCandidateGroupsBy id 5 verify groups
+      verifiedCandidates batch @?= ["contextual", "identity"]
+      readIORef attempts >>= (@?= ["contextual", "identity"])
+      failedCandidateGroups batch @?= 0
+      observationCount LeanVariantAttempted (verificationObservations batch) @?= 2
+      observationCount LeanCandidateVerified (verificationObservations batch) @?= 2
+  , testCase "compare accepted spellings with exact case-sensitive identity" $ do
+      batch <- verifyDistinctCandidateGroupsBy id 5 (const $ pure VariantAccepted)
+        [["Provider.Token"], ["Provider.token"], ["Provider.Token"]]
+      verifiedCandidates batch @?= ["Provider.Token", "Provider.token"]
+      observationCount LeanVariantAttempted (verificationObservations batch) @?= 2
+  , testCase "retain a fresh alternative's original ordinal and route" $ do
+      let groups = map detailedCandidateGroupVerificationVariants
+            [ detailedCandidateGroup RouteUnobserved ["same"]
+            , detailedCandidateGroup RouteLegacyCandidateFallback
+                ("same" : "fresh" : error "accepted fresh variant forced its tail")
+            ] ++ error "unique success quota forced a later group"
+      batch <- verifyDistinctCandidateGroupsBy detailedVerificationVariantText 2
+        (const $ pure VariantAccepted) groups
+      case verifiedCandidates batch of
+        [first, fresh] -> do
+          detailedVerificationVariantText first @?= "same"
+          detailedVerificationVariantRoute first @?= RouteUnobserved
+          detailedVerificationVariantText fresh @?= "fresh"
+          detailedVerificationVariantOrdinal fresh @?= 1
+          detailedVerificationVariantRoute fresh @?= RouteLegacyCandidateFallback
+          assertBool "a fresh variant acquired another occurrence's sidecar"
+            $ isNothing $ detailedVerificationVariantSemanticSidecar fresh
+          assertBool "a fresh variant acquired another occurrence's exact origin"
+            $ isNothing $ detailedVerificationVariantExactTypedOrigin fresh
+        found -> assertFailure $ "unexpected distinct representatives: " ++ show found
+      observationCount LeanVariantAttempted (verificationObservations batch) @?= 2
+  , testCase "retry rejected spellings without reusing an earlier verdict" $
+      forM_ [minBound .. maxBound] $ \failure -> do
+        attempts <- newIORef ([] :: [(String, Int)])
+        let verify candidate@(_, occurrence) = do
+              modifyIORef' attempts (++ [candidate])
+              pure $ if occurrence == 1 then VariantRejected failure else VariantAccepted
+        batch <- verifyDistinctCandidateGroupsBy fst 1 verify
+          [[("retry", 1)], [("retry", 2)]]
+        verifiedCandidates batch @?= [("retry", 2)]
+        readIORef attempts >>= (@?= [("retry", 1), ("retry", 2)])
+        failedCandidateGroups batch @?= 1
+        observationCount LeanVariantAttempted (verificationObservations batch) @?= 2
+        observationCount (LeanVerificationFailure failure) (verificationObservations batch) @?= 1
+        observationCount LeanCandidateVerified (verificationObservations batch) @?= 1
+  , testCase "skip duplicate-only groups without inventing failures" $ do
+      let verify spelling = pure $ if spelling == "bad"
+            then VariantRejected LeanErrorDiagnostic else VariantAccepted
+      batch <- verifyDistinctCandidateGroupsBy id 3 verify
+        [[], ["same"], ["same", "same"], ["bad", "bad"], ["fresh"]]
+      verifiedCandidates batch @?= ["same", "fresh"]
+      failedCandidateGroups batch @?= 2
+      observationCount LeanVariantAttempted (verificationObservations batch) @?= 4
+      observationCount (LeanVerificationFailure LeanErrorDiagnostic)
+        (verificationObservations batch) @?= 2
+  , testCase "do not refill an already bounded group prefix" $ do
+      let bounded = take 2 $ [["same"], ["same"]]
+            ++ error "duplicate filtering refilled the caller's bounded prefix"
+      batch <- verifyDistinctCandidateGroupsBy id 5 (const $ pure VariantAccepted) bounded
+      verifiedCandidates batch @?= ["same"]
+      failedCandidateGroups batch @?= 0
+      observationCount LeanVariantAttempted (verificationObservations batch) @?= 1
+  , testCase "leave keys and both tails untouched after the success quota" $ do
+      zero <- verifyDistinctCandidateGroupsBy
+        (error "zero quota forced the key projection" :: String -> String) 0
+        (\_ -> assertFailure "zero quota called verification" >> pure VariantAccepted)
+        (error "zero quota forced groups")
+      verifiedCandidates zero @?= []
+      verificationObservations zero @?= noObservations
+      one <- verifyDistinctCandidateGroupsBy id 1 (const $ pure VariantAccepted)
+        (("accepted" : error "acceptance forced remaining variants")
+          : error "success quota forced remaining groups")
+      verifiedCandidates one @?= ["accepted"]
+      observationCount LeanVariantAttempted (verificationObservations one) @?= 1
+  , testCase "leave the generic duplicate-payload verifier unchanged" $ do
+      batch <- verifyCandidateGroups 2 (const $ pure VariantAccepted)
+        [["same"], ["same"]]
+      verifiedCandidates batch @?= ["same", "same"]
+      observationCount LeanVariantAttempted (verificationObservations batch) @?= 2
+  , testCase "retain the accepted owner without borrowing later Length authority" $ do
+      let token = FAtom False "Dedup.Token"
+          goal = FArr token token
+      outcome <- expectRight $ synthesizeWithProvidersSkippingDetailed
+        EngineExference 128 Set.empty [] goal
+      group <- case outcome of
+        DetailedSynthCandidates (candidate : _) _ -> pure candidate
+        other -> assertFailure ("expected a typed identity candidate: " ++ show other)
+          >> error "unreachable"
+      assertBool "identity fixture has no actual typed sidecar"
+        $ isJust $ detailedCandidateGroupSemanticSidecar group
+      original <- case detailedCandidateGroupVerificationVariants group of
+        candidate : _ -> pure candidate
+        [] -> assertFailure "typed identity fixture has no spelling" >> error "unreachable"
+      let text = detailedVerificationVariantText original
+          compatibility = detailedCandidateGroupVerificationVariants
+            $ detailedCandidateGroup RouteUnobserved [text]
+      typedFirst <- verifyDistinctCandidateGroupsBy detailedVerificationVariantText 2
+        (const $ pure VariantAccepted) [[original], compatibility]
+      verifiedCandidates typedFirst @?= [original]
+      compatibilityFirst <- verifyDistinctCandidateGroupsBy detailedVerificationVariantText 2
+        (const $ pure VariantAccepted) [compatibility, [original]]
+      case verifiedCandidateReceipts compatibilityFirst of
+        [receipt] -> do
+          let accepted = verifiedCandidate receipt
+          detailedVerificationVariantRoute accepted @?= RouteUnobserved
+          detailedVerificationVariantOrdinal accepted @?= 0
+          assertBool "later duplicate donated its sidecar"
+            $ isNothing $ detailedVerificationVariantSemanticSidecar accepted
+          assertBool "later duplicate donated its exact typed origin"
+            $ isNothing $ detailedVerificationVariantExactTypedOrigin accepted
+          case prepareCheckedLengthProblem
+              (error "missing-owner authority forced a Length contract") receipt of
+            Left (LengthHandoffNotTypedRoute RouteUnobserved) -> pure ()
+            Left refusal -> assertFailure $ "unexpected duplicate Length refusal: " ++ show refusal
+            Right _ -> assertFailure "later duplicate donated a Length capability"
+        found -> assertFailure $ "unexpected compatibility representatives: " ++ show found
   ]
 
 postVerificationTests :: TestTree
@@ -15968,7 +16097,7 @@ assertLengthAssessmentMainLaneSeam = do
 
   mapM_ (assertMainSourceContains "callback trace" callbackSection)
     [ "reverseAttempts <- newIORef []"
-    , "verification <- verifyCandidateGroups successQuota (verifyVariant reverseAttempts) groups"
+    , "verification <- verifyDistinctCandidateGroupsBy detailedVerificationVariantText successQuota (verifyVariant reverseAttempts) groups"
     , "attempts <- reverse <$> readIORef reverseAttempts"
     , "pure (verification, attempts)"
     , "modifyIORef' reverseAttempts (variant :)"

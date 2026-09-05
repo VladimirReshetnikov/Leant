@@ -231,7 +231,7 @@ import Leant.Synth.Verification
   , VerificationBatch
   , verificationObservations
   , verifiedCandidateReceipts
-  , verifyCandidateGroups
+  , verifyDistinctCandidateGroupsBy
   )
 
 #ifdef mingw32_HOST_OS
@@ -3817,7 +3817,11 @@ synthVerify
       )
 synthVerify successQuota st goal groups = do
   reverseAttempts <- newIORef []
-  verification <- verifyCandidateGroups successQuota
+  -- The caller has already bounded this lane's groups. Overlapping renderer
+  -- cohorts may contain the same spelling, but only its first actual
+  -- acceptance spends a success slot. Keep that representative's own origin;
+  -- a later typed duplicate cannot donate authority to it.
+  verification <- verifyDistinctCandidateGroupsBy detailedVerificationVariantText successQuota
     (verifyVariant reverseAttempts) groups
   attempts <- reverse <$> readIORef reverseAttempts
   pure (verification, attempts)
