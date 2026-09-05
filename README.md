@@ -709,11 +709,13 @@ The new Djinn family is appended after every established structural, provider,
 and loaded-scheme family, so historical candidate prefixes do not move. Its
 plan carries the established local, loaded, and caller-supplied provider
 premises, allowing those capabilities to compose in one proof. It retains the
-same six-binder eligibility, 16 axioms per scheme, 64 axioms per family, and
-512 tuple attempts. It is positive-only: exhausting this incomplete tail is
+finite fallback limits of 16 axioms per scheme, 64 axioms per family, and
+512 tuple attempts. Source and target structure now also drive correlated
+instantiation plans without a fixed six-binder eligibility test. This search
+is positive-only: exhausting this incomplete tail is
 <code>NoEvidence</code>, never a proof of uninhabitability.
 
-Context-free hypothesis chains now reach six leading binders. Leant inserts
+The established six-binder regression remains supported. Leant inserts
 all six inferred type arguments, and Lean 4.31 verifies a non-lexical
 source-order application of an abstract six-argument constructor:
 
@@ -726,18 +728,43 @@ source-order application of an abstract six-argument constructor:
 Explicit `∀` binders — leading, nested, trailing, or interleaved — are
 woven into the candidate's lambda automatically, and uses of quantified
 hypotheses get placeholder type arguments wherever Lean needs them
-(`f _ x`), so bounded rank-N candidates verify. Chains with seven or more
-leading binders remain outside Djinn's fixed instantiation bound. Full
-impredicative inhabitation is undecidable, so Djinn uses a deterministic
-bounded plan family rather than a power set. Its singleton, pairwise, triple,
-quadruple, and quintuple open/opaque frontiers cover every choice across eleven
-independent quantified sites. Quintuple selections are edge-balanced and
-capped at 512 plans per orientation; this retains all 252 ten-site and 462
-eleven-site choices while bounding larger queries. A twelve-site goal needing
-exactly six open and six opaque sites is the next deliberate occurrence-plan
-gap. Beyond either that occurrence bound or the separate six-binder
-instantiation guard, the answer is "no term found within bounds" and nothing
-stronger.
+(`f _ x`). When inference needs a quantified argument's shape, the renderer
+retains that shape explicitly, including `_` holes for ambient types whose
+names are outside the emitted term's scope. Nested implicit type binders also
+retain their lambda boundaries, so an introduced term argument is not mistaken
+for an implicit type argument. An application's expected result specializes
+the domains of polymorphic value arguments, and plain `let` aliases preserve
+quantified results reached after ordinary arguments. A specified closed
+structural type argument also supplies those domains before the final result
+is available, including through successive term/forall layers and let aliases.
+An unresolved result from
+a nested polymorphic application waits for its caller's expected input type;
+it is never confused with a rigid type variable from the surrounding scope.
+Constructed sum scrutinees
+have explicit `Sum`/`Or` constructor alternatives where leading-dot notation
+has no expected family.
+
+Correlated assignments derive their width from the actual quantified source;
+there is no fixed six-binder acceptance cutoff. Demand-directed plans can use
+multiple distinct polytypes and compound polymorphic values in one candidate.
+The search combines these plans with finite structural and occurrence-selection
+families. When Exference exhausts its established routes, it also retries with
+the transitive prelude dependencies required by the query and its providers;
+unrelated stock constructors can otherwise crowd out a polymorphic value.
+All discovered providers remain available, and successful earlier results keep
+their order. Full impredicative inhabitation is undecidable: those resource bounds
+make an unsuccessful rank-N search inconclusive, and the answer remains
+"no term found within bounds".
+
+The [Church acceptance harness](test-church/README.md) translates all 350
+resolved signatures, including four local signatures, and replays the emitted
+terms with Lean's kernel. Its 19 partial cases receive an explicit element
+default; the other 331 cases preserve their input requirements, with integer
+providers enabled only where needed. Each Lean quantifier gets an inferred
+universe, so acceptance concerns valid universe instantiations of the
+Haskell types. Lean's `Type` hierarchy remains predicative. The comprehensive
+[implementation report](lib/Djex/docs/rank-n-impredicative-synthesis.tex)
+documents the algorithms, evidence boundaries, and Haskell/Lean correspondence.
 
 The plan-family bounds (which quantifier-site selections are
 exhaustive, where the next gap lies) and the dedicated rank-N transcripts
@@ -1138,8 +1165,10 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   authority, the exact spelling may lazily retain the first bounded later
   Exference origin solely for checked behavioral preparation; route metrics,
   ordinals, sibling variants, and displayed order do not change.
-  Refutations still come only from Djinn. The default `djinn` remains the
-  complete, terminating LJT search.
+  Refutations still come only from Djinn. The default `djinn` combines complete,
+  terminating LJT search for its supported intuitionistic propositional
+  fragment with bounded higher-rank and provider extensions. Exhausting those
+  incomplete extensions does not establish non-inhabitation.
 - Every engine mode gives a structurally accepted goal a provider-free
   baseline lane. Its rendered candidates are checked by Lean first, and live
   providers are discovered whenever no baseline term verifies or an authorized
@@ -1205,8 +1234,9 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   engine still runs with the structural declarations it already has.
 - Exact polymorphic providers whose class constraints pin down their type
   arguments can be discovered together with the instance-head evidence that
-  determines those arguments, within fixed bounds (six binders, 32 heads, 16
-  vectors per provider); the exact vectors, kinds, wire format, and ground-fact
+  determines those arguments. Vector width follows the source provider's
+  leading type binders; discovery retains finite limits of 32 heads and 16
+  vectors per provider. The exact vectors, kinds, wire format, and ground-fact
   rules are specified in
   [docs/synth-internals.md](docs/synth-internals.md#provider-instantiation-evidence).
 - Non-dependent instance-implicit binders in a goal are serialized as
@@ -1284,9 +1314,11 @@ with blank-line framing, spawned as `lake env repl` (`repl.exe` on
 Windows) inside the Lake project. Each backend is born in an owned process
 tree: a dedicated process group on POSIX and a Job on Windows. Teardown keeps
 running if its caller is cancelled, waits boundedly for the complete owned
-tree, and still attempts local pipe and stderr-capture cleanup when termination
+tree, and still attempts local pipe and capture-thread cleanup when termination
 reports an error. This lifecycle is the foundation beneath isolated
-verification workers. The package-private
+verification workers. A bounded stdout capture queue keeps request timeouts
+interruptible on Windows even if the child has not finished a response line.
+The package-private
 [isolated backend pair](docs/synth-internals.md#private-isolated-backend-pair-foundation)
 now builds exactly two independently restored workers above that lifecycle,
 but Main does not route candidate verification through it; production remains
@@ -1370,6 +1402,8 @@ output against the checked-in `*.golden`; `-u` regenerates the goldens
 after an intentional behavior change. The runner raises the `:synth` wall
 clock to 600 s so a transcript records what the engines answer rather than
 how fast the machine answers it; export `LEANT_SYNTH_TIMEOUT` to override.
+Set `LEANT_GOLDEN_LOG_DIR` to an absolute directory to retain each fixture's
+raw output while it runs, including partial output from failed processes.
 These end-to-end goldens require
 the Lake project to provide the backend executable (`repl` or
 `repl.exe`); the focused suite remains runnable when that backend is not
@@ -1382,13 +1416,13 @@ path to `.lake/build/bin/repl`; the very first heavy `:synth` there may
 pay one cold-toolchain warm-up against the 300 s per-request backend
 timeout and succeed on retry.
 
-Two things make a fresh run easier to read. First, the suite passes in
-full on every platform (the two historical Windows path-admission
-failures now spell their absolute fixture paths per platform), with one
-caveat: `compose a persistent last-wins builder and admit before clock
-capture` races a fake solver's start-up against a 700 ms budget and can
-fail on a slow or loaded machine while passing in isolation. Treat any
-*other* failure as a regression. Second, a set of
+The test fixtures spell their absolute paths for the host platform. The
+`compose a persistent last-wins builder and admit before clock capture`
+regression now gives its successful route 3 seconds for two 300 ms fake-solver
+queries and process startup; its separate 80 ms route still verifies expiry.
+The former 700 ms success budget left little room for native Windows process
+creation. Treat failures as regressions rather than accepting that timing
+failure as an exception. A set of
 characterization tests read production source text and assert on it —
 currently thirty-one read sites, fourteen of them on
 [src/Main.hs](src/Main.hs) and the rest across `Backend.hs`,

@@ -106,9 +106,10 @@ over an *approximated* goal no longer counts as a refutation); and,
 most importantly here, a principled treatment of **rank-N and
 impredicative types** — goal-side quantifiers open through
 polarity-aware plan families, quantified hypotheses and context-free loaded
-schemes are instantiated at a bounded set of query and environment types, and
-impredicative instantiation is admitted under a guard that never invents a
-polytype the checked input did not supply.
+schemes use correlated source/target assignments together with bounded query
+and environment alternatives. Impredicative instantiation retains quantified
+structure and lexical scope through checking, including compound polytypes
+assembled from those demands.
 
 ## The semantic-origin record and provider bindings
 
@@ -1309,10 +1310,12 @@ contract, audit evidence, and boundary are recorded in the
 
 `Leant.Backend` now gives every `lake env repl` launch an owned process-tree
 boundary. The `CreateProcess` request sets both `create_group = True` and
-`use_process_jobs = True`, and captures the direct wrapper PID immediately
-after creation. Startup does not publish a `Backend` without that identifier.
-This preserves a stable address for inherited descendants even if the Lake
-wrapper exits before teardown begins. Backend-bearing components require
+`use_process_jobs = True`. On POSIX it captures the direct wrapper PID
+immediately after creation and refuses to publish a `Backend` without it.
+That PID supplies a stable process-group address for inherited descendants
+even if the Lake wrapper exits before teardown begins. Windows ownership is
+the Job held by `ProcessHandle`; it does not require a separate wrapper PID.
+Backend-bearing components require
 `process >= 1.6.3`, the release in which `getPid` became available.
 
 On POSIX, the child leads a dedicated process group whose ID is the captured
@@ -1329,8 +1332,14 @@ a Job. `terminateProcess` therefore terminates that Job rather than only the
 direct wrapper, and a bounded `waitForProcess` observes Job completion. If the
 first wait expires, Leant retries termination and one bounded wait; a second
 expiry is an explicit cleanup failure. This branch passed warning-as-error
-source compilation with the Windows CPP path forced, but it was not
-runtime-tested on Windows at this checkpoint.
+source compilation with the Windows CPP path forced at the original lifecycle
+checkpoint. The subsequent native Windows validation found and corrected a
+startup mismatch: `process` represents Job ownership with `OpenExtHandle`, for
+which its public `getPid` returns `Nothing`. Requiring that separate identifier
+rejected every otherwise valid Job-owned backend. The platform-specific guard
+now retains the mandatory POSIX group identifier and uses Windows Job ownership
+directly. The native Windows lifecycle and isolated-worker tests exercise
+descendant termination, cancellation, malformed responses, and setup timeouts.
 
 `killBackend` owns a masked shared cleanup attempt rather than tying cleanup
 to one waiting caller. Cancellation of a waiter does not cancel teardown;
@@ -1341,11 +1350,20 @@ to its current waiters; a later caller may begin a retry just before that
 publication, but cannot overlap the completed resource cleanup. Complete
 startup, partial startup, and ordinary backend teardown all run their local
 cleanup actions even when the tree terminator fails. They attempt to close
-every available pipe, and
-ordinary teardown also gives the stderr pump a bounded drain window before
+every available pipe. Ordinary teardown also gives the stderr pump a bounded drain window before
 killing it and boundedly waiting again. Actions run left to right and the
 first failure, normally the tree failure, is preserved after the remaining
 cleanup attempts.
+
+Backend stdout has a dedicated capture thread and a bounded one-line queue.
+Requests wait interruptibly on that queue, preserving their deadline even when
+a native Windows pipe read blocks before the end of a line. Directly timing
+`hGetLine` did not interrupt that blocking native read and could leave setup
+timeouts waiting indefinitely. EOF and read errors remain terminal results in
+the queue. Teardown terminates the owned tree first, then stops and joins stdout
+capture immediately; unread response lines do not incur the stderr diagnostic
+drain grace period. Dedicated regressions cover an incomplete response line
+and a valid response followed by an unread output tail.
 
 The deterministic lifecycle fixture runs the unit-test executable as a fake
 Lake wrapper. That wrapper launches an independently active heartbeat child
@@ -1843,8 +1861,8 @@ vector with kind arities one and two, respectively, and requires
 `Higher.multiVacuous («F» := Higher.Wrap) («G» := (@Higher.Triple Nat))` in
 all three modes.
 
-Extraction is deliberately finite and local. It opens at most six leading
-type binders on one provider, retains the source instance constraints,
+Extraction is deliberately finite and local. It opens the leading type
+binders retained on the source provider, retains its instance constraints,
 and inspects at most 32 active heads in Lean's resolver order. Each attempt is
 state-isolated. The selected head remains fixed while its instance subgoals and
 every other provider constraint are solved under the same metavariable context;
@@ -1857,7 +1875,10 @@ proper type; positive counts preserve bare and partially applied constructors.
 
 At most 16 alpha-distinct vectors survive per provider, and Leant passes at
 most 32 provider/vector associations in total. Every vector has exact provider
-arity and at most six arguments. That aggregate prefix is taken before an
+arity, including source spines wider than six binders. The consumer examines
+at most the expected arity plus one list cell before traversing arguments, so
+overwide and cyclic vectors fail without an unbounded length check. The
+aggregate prefix is taken before an
 argument can affect family planning, rigidity, or type translation, so
 evidence beyond the boundary is not entered. Live metadata uses
 `(instantiations (args (kinded N ...) ...))`. A proper-kind live argument also
@@ -2066,7 +2087,7 @@ refutation.
 
 For an exact polymorphic provider whose source constraints can determine its
 visible type arguments, discovery may attach active-instance-head evidence.
-It opens at most six type binders and inspects at most 32 heads in
+It derives the required type-binder count from the source and inspects at most 32 heads in
 resolver order under isolated metavariable state. A selected head is retained
 only after its own subgoals and every remaining provider constraint close;
 one success yields one ordered vector of kind/type pairs, and incomplete
@@ -2080,7 +2101,22 @@ translatable bounded vectors through the erased fallback. Leant
 rejects residual kind arities above 64 before that bridge, and pinned Djex
 independently rejects a supplied `GroundKind` above 129 constructor nodes
 before recursive operations on that assignment. At most
-16 distinct vectors survive per provider. `FDepth` and legacy raw `FInst`
+16 distinct vectors survive per provider. The seed attempts and all recursive
+instance-closure branches share 128 resolution attempts per provider. This
+counter uses an `IO.Ref`, so restoring a failed branch's metavariable state
+does not replenish its work budget. Optional assignment discovery also gets
+at most 2000 Lean heartbeats, clamped to the command's remaining allowance.
+A local heartbeat timeout or ordinary assignment exception yields no exact
+vector while preserving the provider and inventory already collected.
+Interruptions, other runtime exceptions, and exhaustion of the original
+command budget still propagate; the original context is checked after both
+failure and success. These are search work limits, independent of source
+binder arity and the complete-vector acceptance rules. The live regression
+`runghc -isrc test-church/check-provider-discovery.hs` covers `Or.by_cases`,
+later usable providers, state rollback, and explicit fault injection at that
+assignment boundary.
+
+`FDepth` and legacy raw `FInst`
 fragments reject their complete vector after parsing. The live wire retains
 provider-scheme and exact-assignment `FExactContext` nodes only for bounded,
 closed nominal class applications. Exference preserves them on the
@@ -2204,5 +2240,143 @@ With Djex `d728719f`, the first live goal requires a non-prefix five-opaque /
 five-open selection across ten sites, and the second requires the separate
 five-open / six-opaque dual across eleven. Leant `80f123a` records the direct
 Djinn terms accepted by Lean 4.31 for both goals. Neither run is truncated.
-The sentinel is now seven-binder so the same occurrence-planning witnesses
-remain outside Djinn's independent six-binder instantiation cap.
+The historical sentinel used seven binders to stay outside the then-current
+six-binder instantiation cap. That cap has since been replaced by
+source-directed correlated instantiation, so the transcript remains a useful
+regression but no longer identifies a current capability boundary.
+
+### Source-directed rank-N and Church acceptance
+
+Djex now derives correlated assignments from quantified source and target
+structure before resorting to bounded tuple enumeration. Source binder count
+determines assignment arity; multiple independently selected polytypes and
+compound types containing nested quantifiers can appear in one candidate.
+Finite fallback and occurrence-planning limits still apply to the overall
+search. Exhausting an incomplete rank-N route cannot justify negative evidence.
+
+If Exference's established strict and relaxed searches both return no groups,
+Leant also tries a checked route with multi-constructor patterns disabled.
+This prevents decomposition of an irrelevant recursive input such as Lean's
+expanded `Int`/`Nat` schema from consuming the entire budget before an ordinary
+polymorphic result is introduced. The route uses its own exact Exference
+options; when a typed sidecar is available, those options remain part of the
+recovered run authority. It never displaces a successful candidate from either
+earlier route. Candidates without an optional typed graph still pass through
+the existing compatibility renderer and mandatory Lean verification.
+
+If all of those searches miss, a final family of routes keeps only the
+historical prelude declarations required by the goal, exact instantiation
+arguments, and retained Lean declarations. The dependency closure includes
+type synonyms, constructor fields, class constraints and superclasses, and
+structural tuple identities. Every discovered provider and foreign declaration
+is retained. Unrelated stock constructor families such as `Maybe` or `Either`
+can otherwise consume the search budget while a polymorphic argument is being
+constructed through successive forall layers. The fallback keeps the original
+variable identities and provider ratings, and stores its actual checked
+session in the candidate authority. Length assessment consequently reads the
+same reduced inventory that admitted the candidate. A successful earlier
+candidate is unchanged, and an unsuccessful fallback adds no negative proof.
+
+The Lean renderer keeps the original fragment's explicitness information even
+when Djex coalesces a forall spine. In particular, an implicit forall between
+term arguments begins a new lambda boundary. Flattening that boundary would
+move a subsequent synthesized term binder into an implicit type-binder slot.
+Visible type arguments can also retain a quantified shape with ambient `_`
+holes; bound variables retain canonical lexical identities. Those holes are
+emission syntax after the complete correlated assignment has been checked,
+and never serve as evidence for that assignment.
+
+Expected result types also propagate backward into application argument
+domains. For example, `F (forall b, b -> b)` determines the value domain in
+`forall a, a -> F a`, letting the renderer reconstruct the argument's explicit
+Lean type lambda. A plain `let` alias retains a forall reached after ordinary
+arguments, so the same fitting applies through a local factory alias;
+destructuring still exposes the structural result needed by its patterns.
+A specified closed structural type argument also specializes the consumed
+source binder directly. This is needed when a partially applied factory is
+stored in a let before its final expected result is available: both the
+constructed argument's type lambda and the alias's remaining forall spine
+must survive. Neutral syntax with ambient holes or nominal constructors does
+not supply an invented rigid fragment; exact retained Lean evidence and the
+caller's expected type remain authoritative for those cases.
+When a single-use plain let hides that expected result and its applied alias
+has no exact domain, an additional rendering pass substitutes the binding
+capture-safely and fits the complete application against the original goal.
+The shared simplifier does not contract eta redexes or duplicate bindings.
+All original variants remain first; the inlined form has its own bounded
+metadata cohort, so a full original cohort cannot suppress it. The three
+32-variant domain lanes bound each form at 96 variants, and the two forms
+together at 192. Candidate quotas still count semantic groups, with serial
+verification of their variants under the existing request deadline. A visible
+type argument in the middle of an application retains the rest of its source
+forall spine, including placeholders after later ordinary arguments.
+If such a selected binder is implicit, the renderer exposes the checked
+application at its original known head (`@factory seed ...`). Lean does not
+accept `@(factory seed) ...`; the complete source binder stream therefore
+supplies every intervening type and instance placeholder from the original
+head. Leading named global type assignments retain their existing spelling.
+Explicit underscores in instance slots are reconstructed by Lean's instance
+search, as checked by the constructive `MixedSpineSyntax.lean` witnesses.
+A non-exact visible type annotation spells its known forall binders explicitly.
+When its ambient holes are resolved from a target containing implicit foralls,
+argument fitting preserves those resolved type identities but follows the
+annotation's actual binder visibility. The alignment follows known syntax
+nodes only; a wildcard leaf neither opens nor changes its unknown fragment.
+Final-result matching ignores the explicit/implicit forall flag, which Lean's
+definitional equality also ignores; all rigid identities, scope checks, and
+capture prevention remain intact. Argument/evidence matching retains its
+existing visibility policy. A closed explicit annotation can therefore match
+an implicitly quantified target while its own value retains explicit lambda
+binders. If a global application with leading exact type arguments later
+exposes an implicit binder, the positional rendering retains that leading
+vector's exact visibility and universe-domain metadata, consuming it only
+at actual visible argument nodes. Malformed retained vectors still fail closed.
+For an inferred polymorphic argument before a later forall layer, Lean may
+elaborate the value before learning its final expected type. The renderer
+therefore writes that value's known implicit type binders as `fun {_} ...`.
+This applies only when the argument domain still contains an unresolved opened
+source variable before final-result fitting; an already exact domain keeps its
+existing spelling. It reconstructs those binders, including boundaries inside
+the value's lambda spine, from the already fitted fragment. Anonymous private markers are added
+after source-name uniquification and never occur in a term body. This adds no
+type identities or candidate variants; final arguments and ordinary applications
+retain their existing compact spelling.
+When bottom-up argument analysis leaves an opened forall variable unresolved,
+that result is not treated as an exact rigid input type. The renderer instead
+fits the nested application against its caller's expected domain. This reaches
+polymorphic let aliases inside a Church continuation whose result is determined
+only by the enclosing consumer. Genuine ambient variables remain rigid, and a
+conflict with a known rigid argument still prevents that fitting route.
+Directly constructed sum scrutinees additionally receive qualified `Sum.inl`
+or `Sum.inr` variants, with `Or` variants for propositions. Leading-dot syntax
+alone has no expected family at a match scrutinee. These alternatives remain
+subject to the same mandatory Lean verification as every other candidate.
+
+Live exact-provider evidence uses source-derived arity as well. The nominal
+class-context payload has its own finite 128-argument guard, independent of
+the number of quantified binders. The new
+[`synth-church-providers`](../test/synth-church-providers.txt) fixture checks
+eight- and twelve-binder source vectors against actual active instances. Its
+opaque provider declarations are explicit premises of that fixture; kernel
+acceptance is relative to those premises.
+The separate
+[`synth-church-layered-providers`](../test/synth-church-layered-providers.txt)
+fixture exercises named global factories through successive term/forall
+layers, with alpha-reused identity and Boolean arguments. Its accepted axiom
+inventory is exactly the declared seed type, seed value, result constructor,
+and corresponding factory; the harness rejects any additional premise.
+
+The [Church harness](../test-church/README.md) translates all 350 resolved source
+signatures from the versioned Djex manifest and records source, manifest, and
+executable hashes. It replays the complete displayed candidate text in a fresh
+Lean file, checks every selected case was reached, and requires an empty axiom
+inventory for every generated corpus declaration. The compact
+[`synth-church-rankn`](../test/synth-church-rankn.txt) fixture additionally covers
+explicit and implicit rank-seven continuation encodings, distinct polymorphic
+arguments, composition, and nested construction with an ambient dependency.
+Nineteen source signatures require a supplied element default; those cases
+are separate from the 315 pure total cases and 16 integer-provider cases.
+Each quantified type receives its own inferred Lean universe. Successful
+elaboration establishes a valid universe instantiation, not inhabitation
+under all independent universe assignments and not impredicativity of Lean's
+`Type` hierarchy. No Church implementation is supplied as a synthesis provider.
