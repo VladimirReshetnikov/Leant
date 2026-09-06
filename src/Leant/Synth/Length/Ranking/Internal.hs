@@ -84,15 +84,12 @@ import Control.DeepSeq (NFData (rnf))
 import Numeric.Natural (Natural)
 
 import Language.Haskell.Djex
-  ( ExferenceLocal
-  , LengthBooleanFiniteUnionLimits
+  ( LengthBooleanFiniteUnionLimits
   , LengthApplicableDomainValidation (..)
   , LengthApplicableDomainValidationError (..)
-  , LengthCounterexampleBank
   , LengthCounterexampleBankError
   , LengthCounterexampleBankLimits
   , LengthCounterexampleBankSample
-  , LengthCounterexampleBankScope
   , LengthCounterexampleSimplificationError (..)
   , LengthEvaluationError
   , LengthEvaluationLimits
@@ -134,7 +131,9 @@ import Language.Haskell.Djex
 import Leant.Synth.Engine (DetailedVerificationVariant)
 import Leant.Synth.Length.Adapter
   ( CheckedLengthQuery
-  , prepareCheckedLengthQuery
+  , SourceCheckedLengthQuery (..)
+  , prepareSourceCheckedLengthQuery
+  , withSourceCheckedLengthQuery
   )
 import Leant.Synth.Length.Contract (LeanLengthContract)
 import qualified Leant.Synth.Length.CounterexampleBank.Internal
@@ -769,7 +768,7 @@ rankPostVerificationLengthCandidatesWithRankingPoliciesAndScopedUsableWorkBudget
 -- the supplied command-local scalar bank instead of the batch-local MRU; every
 -- admission, preparation, live, and fallback rule is unchanged.
 rankPostVerificationLengthCandidatesWithRankingPoliciesAndCounterexampleBankContextAndLiveSessionOpening
-  :: CounterexampleBank.LengthCounterexampleBankContext command ExferenceLocal
+  :: CounterexampleBank.SourceLengthBankContext command
   -> LengthInputBoxRankingPolicy
   -> LengthApplicableDomainRankingPolicy
   -> LengthOriginProbeRankingPolicy
@@ -805,7 +804,7 @@ rankPostVerificationLengthCandidatesWithRankingPoliciesAndCounterexampleBankCont
       -> AssociatedLengthRanking
         (PostVerificationCandidate epoch DetailedVerificationVariant))
   -> LengthSMTLibLiveUsableWorkBudget
-  -> CounterexampleBank.LengthCounterexampleBankContext command ExferenceLocal
+  -> CounterexampleBank.SourceLengthBankContext command
   -> LengthInputBoxRankingPolicy
   -> LengthApplicableDomainRankingPolicy
   -> LengthOriginProbeRankingPolicy
@@ -842,7 +841,7 @@ rankPostVerificationLengthCandidatesWithRankingPoliciesAndCounterexampleBankCont
       -> AssociatedLengthRanking
         (PostVerificationCandidate epoch DetailedVerificationVariant))
   -> LengthSMTLibLiveUsableWorkBudget
-  -> CounterexampleBank.LengthCounterexampleBankContext command ExferenceLocal
+  -> CounterexampleBank.SourceLengthBankContext command
   -> LengthInputBoxRankingPolicy
   -> LengthApplicableDomainRankingPolicy
   -> LengthOriginProbeRankingPolicy
@@ -969,13 +968,15 @@ replayCounterexampleSeeds
   -> CheckedLengthQuery
   -> [[Natural]]
   -> Maybe ([Natural], ValidatedLengthCounterexample)
-replayCounterexampleSeeds = Generic.replayCounterexampleSeeds @ScalarLength
+replayCounterexampleSeeds evaluation query =
+  Generic.replayCounterexampleSeeds @ScalarLength evaluation
+    $ ExferenceCheckedLengthQuery query
 
 -- The domain instance ---------------------------------------------------------
 
 instance LengthRankingDomain ScalarLength where
   type Contract ScalarLength = LeanLengthContract
-  type Query ScalarLength = CheckedLengthQuery
+  type Query ScalarLength = SourceCheckedLengthQuery
   type Assessment ScalarLength = LengthRankingAssessment
   type FailureClass ScalarLength = LengthRankingFailureClass
   type Failure ScalarLength = LengthRankingFailure
@@ -992,26 +993,29 @@ instance LengthRankingDomain ScalarLength where
   type SimplificationError ScalarLength =
     LengthCounterexampleSimplificationError
   type BankLimits ScalarLength = LengthCounterexampleBankLimits
-  type Bank ScalarLength = LengthCounterexampleBank ExferenceLocal
-  type BankScope ScalarLength = LengthCounterexampleBankScope ExferenceLocal
+  type Bank ScalarLength = CounterexampleBank.SourceLengthBank
+  type BankScope ScalarLength = CounterexampleBank.SourceLengthBankScope
   type BankSample ScalarLength = LengthCounterexampleBankSample
   type BankError ScalarLength = LengthCounterexampleBankError
 
   prepareQuery contract verified =
-    case prepareCheckedLengthQuery contract verified of
+    case prepareSourceCheckedLengthQuery contract verified of
       Left refusal -> Left $ lengthHandoffPreparationRefusalClass refusal
       Right (Left refusal) -> Left $ lengthQueryPreparationRefusalClass refusal
       Right (Right query) -> Right query
 
   replayInputs evaluation query inputs = replayRejection
-    $ replayLengthSMTLibCounterexampleInputs evaluation query inputs
+    $ withSourceCheckedLengthQuery query $ \exact ->
+        replayLengthSMTLibCounterexampleInputs evaluation exact inputs
 
   probeAtOrigin evaluation query = replayRejection
-    $ probeLengthSMTLibCounterexampleAtOrigin evaluation query
+    $ withSourceCheckedLengthQuery query $ \exact ->
+        probeLengthSMTLibCounterexampleAtOrigin evaluation exact
 
   validateApplicableDomain evaluation inputBoxLimits unionLimits query =
-    case validateLengthSMTLibQueryApplicableDomain
-        evaluation inputBoxLimits unionLimits query of
+    case withSourceCheckedLengthQuery query (\exact ->
+        validateLengthSMTLibQueryApplicableDomain
+          evaluation inputBoxLimits unionLimits exact) of
       Left (LengthSMTLibApplicableDomainValidationAssociationRejected _) ->
         Left DomainAssociationRejected
       Left (LengthSMTLibApplicableDomainValidationRejected failure) ->
@@ -1035,7 +1039,8 @@ instance LengthRankingDomain ScalarLength where
     LengthApplicableDomainInternalEnumerationInvariant -> False
 
   validateInputBox evaluation limits query maximums =
-    case validateLengthSMTLibQueryInputBox evaluation limits query maximums of
+    case withSourceCheckedLengthQuery query (\exact ->
+        validateLengthSMTLibQueryInputBox evaluation limits exact maximums) of
       Left (LengthSMTLibInputBoxValidationRejected failure) ->
         Left $ BoxValidationRejected failure
       Left (LengthSMTLibInputBoxValidationAssociationRejected _) ->
@@ -1045,8 +1050,9 @@ instance LengthRankingDomain ScalarLength where
       Right (LengthInputBoxValidated receipt) -> Right $ BoxValidated receipt
 
   simplifyCounterexample evaluation limits query receipt =
-    case simplifyLengthSMTLibQueryCounterexample
-        evaluation limits query receipt of
+    case withSourceCheckedLengthQuery query (\exact ->
+        simplifyLengthSMTLibQueryCounterexample
+          evaluation limits exact receipt) of
       Left (LengthSMTLibCounterexampleSimplificationRejected
           (LengthCounterexampleSimplificationInputBoxValidationRejected
             LengthInputBoxAssignmentEvaluationRejected {})) ->
@@ -1066,23 +1072,23 @@ instance LengthRankingDomain ScalarLength where
     validatedLengthApplicableDomainApplicableAssignmentCount
 
   runLiveQuery evaluation session query =
-    fmap (fmap gate) $ runLengthSMTLibLiveQuery evaluation session query
-   where
-    gate observation =
-      case replayLengthSMTLibLiveQueryObservation query observation of
-        Left LengthSMTLibLiveObservationQueryFingerprintMismatch ->
-          LiveObservationRejected ObservationQueryFingerprintMismatch
-        Left LengthSMTLibLiveObservationEvidenceProblemMismatch{} ->
-          LiveObservationRejected ObservationEvidenceProblemMismatch
-        Right Nothing -> LiveHeuristic
-          $ lengthSMTLibLiveQueryObservationSolverStatus observation
-        Right (Just receipt) -> LiveCounterexample receipt
+    withSourceCheckedLengthQuery query $ \exact ->
+      let gate observation =
+            case replayLengthSMTLibLiveQueryObservation exact observation of
+              Left LengthSMTLibLiveObservationQueryFingerprintMismatch ->
+                LiveObservationRejected ObservationQueryFingerprintMismatch
+              Left LengthSMTLibLiveObservationEvidenceProblemMismatch{} ->
+                LiveObservationRejected ObservationEvidenceProblemMismatch
+              Right Nothing -> LiveHeuristic
+                $ lengthSMTLibLiveQueryObservationSolverStatus observation
+              Right (Just receipt) -> LiveCounterexample receipt
+      in fmap (fmap gate) $ runLengthSMTLibLiveQuery evaluation session exact
 
   liveErrorPrimaryFailure = lengthSMTLibLiveQueryPrimaryFailure
   liveErrorCleanupIncomplete = lengthSMTLibLiveQueryCleanupIncomplete
 
-  bankSurface = CounterexampleBank.scalarBankSurface
-  bankBridge = CounterexampleBank.scalarBankBridge
+  bankSurface = CounterexampleBank.sourceScalarBankSurface
+  bankBridge = CounterexampleBank.sourceScalarBankBridge
 
   buildAssessment view = case view of
     ViewUnassessed -> Unassessed
@@ -1199,6 +1205,11 @@ lengthHandoffPreparationRefusalClass refusal = case refusal of
   LengthHandoffContractRejected _ -> LengthPreparationContractRejected
   LengthHandoffProblemRejected _ ->
     LengthPreparationCandidateSemanticsRejected
+  LengthHandoffExferenceProjectionRequired -> LengthPreparationUnsupportedRoute
+  LengthHandoffDjinnTypedGraphLost _ -> LengthPreparationTypedAuthorityUnavailable
+  LengthHandoffDjinnSessionRejected _ -> LengthPreparationSessionRejected
+  LengthHandoffDjinnContractRejected _ -> LengthPreparationContractRejected
+  LengthHandoffDjinnProblemRejected _ -> LengthPreparationCandidateSemanticsRejected
 
 -- | Reduce a canonical-query construction refusal to its payload-free phase.
 -- Like the handoff classifier, this is exhaustive and does not inspect fields.

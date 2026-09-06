@@ -57,8 +57,7 @@ module Leant.Synth.Length.Configuration
 import Numeric.Natural (Natural)
 
 import Language.Haskell.Djex
-  ( ExferenceLocal
-  , LengthBooleanFiniteUnionLimits
+  ( LengthBooleanFiniteUnionLimits
   , LengthEvaluationLimitError
   , LengthEvaluationLimitSource
   , LengthEvaluationLimits
@@ -933,8 +932,7 @@ assessVerifiedLengthCandidatesWithPolicy policy contract =
 
 rankPostVerificationLengthCandidatesWithPolicyAndCounterexampleBankContext
   :: LengthRankingPolicy
-  -> CounterexampleBank.LengthCounterexampleBankContext
-      command ExferenceLocal
+  -> CounterexampleBank.SourceLengthBankContext command
   -> LeanLengthContract
   -> [PostVerificationCandidate epoch DetailedVerificationVariant]
   -> IO
@@ -996,8 +994,7 @@ rankPostVerificationLengthCandidatesWithPolicyAndCounterexampleBankContext
 -- generative occurrence-permutation seal.
 assessVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext
   :: LengthRankingPolicy
-  -> CounterexampleBank.LengthCounterexampleBankContext
-      command ExferenceLocal
+  -> CounterexampleBank.SourceLengthBankContext command
   -> LeanLengthContract
   -> VerificationBatch DetailedVerificationVariant
   -> IO LengthPostVerificationResult
@@ -1085,8 +1082,7 @@ assessVerifiedLengthSpinePairCandidatesWithPolicy policy contract =
 
 rankPostVerificationLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
   :: LengthRankingPolicy
-  -> CounterexampleBank.LengthSpinePairCounterexampleBankContext
-      command ExferenceLocal
+  -> CounterexampleBank.SourceLengthSpinePairBankContext command
   -> LeanLengthSpinePairContract
   -> [PostVerificationCandidate epoch DetailedVerificationVariant]
   -> IO
@@ -1148,8 +1144,7 @@ rankPostVerificationLengthSpinePairCandidatesWithPolicyAndCounterexampleBankCont
 -- only through the pair-specific occurrence seal.
 assessVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
   :: LengthRankingPolicy
-  -> CounterexampleBank.LengthSpinePairCounterexampleBankContext
-      command ExferenceLocal
+  -> CounterexampleBank.SourceLengthSpinePairBankContext command
   -> LeanLengthSpinePairContract
   -> VerificationBatch DetailedVerificationVariant
   -> IO LengthSpinePairPostVerificationResult

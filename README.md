@@ -69,6 +69,9 @@ Companion documents:
   Length counterexample-ranking and replay-authorized filtering reference;
 - **[Candidate quality](docs/candidate-quality.md)** — ranking profiles,
   checked simplification, and revision-pinned acceptance results;
+- **[Djinn source-typed evidence](lib/Djex/docs/source-typed-evidence-graph.md)**
+  — exact candidate graphs, quantified source types, ownership, and the
+  validation boundary for typed rendering and Length;
 - **[Behavioral assertions](docs/behavioral-synthesis.md)** — the new
   `:synth f : TYPE where PROP` entrance, exact candidate checks, and bounded
   Djinn search for reusable higher-order compositions;
@@ -124,6 +127,11 @@ Companion documents:
   [validated coverage and examples](#rank-n-and-impredicative-goals) include
   all 350 resolved Church signatures per engine, with explicit defaults
   for the corpus's 19 partial cases.
+- **Source-owned typed candidates.** Djinn now retains source-checked graphs
+  alongside Exference, including full forall roots and erased type operations.
+  Rendering and Length consume the candidate's own graph and source inventory;
+  `both` preserves each retained candidate's engine ownership. See the
+  [implementation and pending validation](docs/synth-internals.md#djinn-source-graphs-and-current-validation).
 - **Candidate quality before the cutoff.** Configurable `balanced`, `compact`,
   `diverse`, and `legacy` profiles guide search and rank checked candidates
   before verification. Structural cost, diversity, and checked
@@ -1284,7 +1292,9 @@ saved: theorem not_not_elim : ∀ p : Prop, ¬¬p → p
   no-verification or all-rejected batch, for a 12+12 standalone or 24+24
   combined maximum at the defaults from the same engine outcome, before its
   `synth-shown` presentation cap. There is no third probe. Combined exact-text deduplication
-  likewise keeps the first display occurrence. If that occurrence has no typed
+  likewise keeps the first display occurrence and its own Djinn or Exference
+  source authority. An existing typed owner is never replaced by the other
+  engine's graph. If that occurrence has no typed
   authority, the exact spelling may lazily retain the first bounded later
   Exference origin solely for checked behavioral preparation; route metrics,
   ordinals, sibling variants, and displayed order do not change.

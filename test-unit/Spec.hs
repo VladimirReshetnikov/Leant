@@ -211,6 +211,13 @@ import Leant.Synth.Engine
   , detailedCandidateGroup
   , detailedCandidateGroupRoute
   , detailedCandidateGroupSemanticSidecar
+  , detailedCandidateGroupSourceAuthority
+  , detailedVerificationVariantSourceAuthority
+  , candidateSourceAuthorityEngine
+  , candidateSourceAuthorityDjinn
+  , djinnSourceCandidate
+  , djinnSourcePreparation
+  , djinnSourceRequest
   , detailedCandidateGroupVariants
   , detailedCandidateGroupVerificationVariants
   , detailedCandidateBatchGroups
@@ -318,6 +325,12 @@ import Leant.Synth.Length.Adapter
   , prepareCheckedLengthQueryWithLimits
   , prepareCheckedLengthSpinePairQuery
   , prepareCheckedLengthSpinePairQueryWithLimits
+  , SourceCheckedLengthQuery (..)
+  , SourceCheckedLengthSpinePairQuery (..)
+  , prepareSourceCheckedLengthQuery
+  , prepareSourceCheckedLengthSpinePairQuery
+  , withSourceCheckedLengthQuery
+  , withSourceCheckedLengthSpinePairQuery
   )
 import qualified Leant.Synth.Length.CounterexampleBank.Internal
   as LengthCounterexampleBank
@@ -5680,8 +5693,8 @@ djinnStrategyIntegrationTests = testGroup "Djinn strategy integration"
         ":set synth-djinn-strategy S depth-first (default) | interleave"
       engine <- lines <$> readFile "src/Leant/Synth/Engine.hs"
       mapM_ (assertMainSourceContains "common Djinn strategy request" engine)
-        [ "outcome <- djinnRun limits djinnLimits fitFrag"
-        , "djinnCompatibility <- djinnRun limits djinnLimits fitFrag"
+        [ "outcome <- djinnRun limits djinnLimits prepared"
+        , "djinn <- djinnRun limits djinnLimits djinnPrepared"
         , "requestOptions = djinnQueryOptionsForLimits limits laneBounds"
         ]
   ]
@@ -7399,6 +7412,30 @@ expectPairAdapterBank
 expectPairAdapterBank = expectAdapterBank "product"
   . LengthCounterexampleBank.lengthSpinePairCounterexampleBankStateActiveBank
 
+expectSourceScalarAdapterBank
+  :: LengthCounterexampleBank.BankState Djex.LengthCounterexampleBankLimits
+      LengthCounterexampleBank.SourceLengthBank
+  -> IO (Djex.LengthCounterexampleBank Djex.ExferenceLocal)
+expectSourceScalarAdapterBank state = do
+  bank <- expectAdapterBank "source scalar"
+    $ LengthCounterexampleBank.bankStateActiveBank state
+  case bank of
+    LengthCounterexampleBank.ExferenceIndexed exact -> pure exact
+    LengthCounterexampleBank.DjinnIndexed _ ->
+      assertFailure "Exference runner changed bank ownership" >> error "unreachable"
+
+expectSourcePairAdapterBank
+  :: LengthCounterexampleBank.BankState Djex.LengthSpinePairCounterexampleBankLimits
+      LengthCounterexampleBank.SourceLengthSpinePairBank
+  -> IO (Djex.LengthSpinePairCounterexampleBank Djex.ExferenceLocal)
+expectSourcePairAdapterBank state = do
+  bank <- expectAdapterBank "source product"
+    $ LengthCounterexampleBank.bankStateActiveBank state
+  case bank of
+    LengthCounterexampleBank.ExferenceIndexed exact -> pure exact
+    LengthCounterexampleBank.DjinnIndexed _ ->
+      assertFailure "Exference runner changed bank ownership" >> error "unreachable"
+
 scalarAdapterBankStats
   :: Djex.LengthCounterexampleBank identity
   -> (Natural, Natural, Natural, Natural, Natural, Natural)
@@ -9056,8 +9093,8 @@ assertCounterexampleBankRunnerArchitecture = do
       , [ "instance LengthRankingDomain ScalarLength where"
         , "ViewEvidenceReplayMismatch -> LengthRankingEvidenceReplayMismatch"
         , "ViewQueryAssociationMismatch -> LengthRankingQueryAssociationMismatch"
-        , "bankSurface = CounterexampleBank.scalarBankSurface"
-        , "bankBridge = CounterexampleBank.scalarBankBridge"
+        , "bankSurface = CounterexampleBank.sourceScalarBankSurface"
+        , "bankBridge = CounterexampleBank.sourceScalarBankBridge"
         ]
       )
     , ( "product"
@@ -9065,8 +9102,8 @@ assertCounterexampleBankRunnerArchitecture = do
       , [ "instance LengthRankingDomain PairLength where"
         , "ViewEvidenceReplayMismatch -> LengthSpinePairRankingEvidenceReplayMismatch"
         , "ViewQueryAssociationMismatch -> LengthSpinePairRankingQueryAssociationMismatch"
-        , "bankSurface = CounterexampleBank.spinePairBankSurface"
-        , "bankBridge = CounterexampleBank.spinePairBankBridge"
+        , "bankSurface = CounterexampleBank.sourceSpinePairBankSurface"
+        , "bankBridge = CounterexampleBank.sourceSpinePairBankBridge"
         ]
       )
     ]
@@ -9195,7 +9232,7 @@ assertScalarCounterexampleBankRunnerRoutes fixture = do
  where
   runRoute executable firstVerification secondVerification
       (label, deferred, policy) =
-    LengthCounterexampleBank.withDefaultLengthCounterexampleBankContext $
+    LengthCounterexampleBank.withDefaultSourceLengthBankContext $
       \context -> do
         first <- expectLengthPostVerificationWithin (label ++ " scalar first")
           $ assessVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext
@@ -9206,9 +9243,9 @@ assertScalarCounterexampleBankRunnerRoutes fixture = do
         Djex.validatedLengthCounterexampleInputs firstReceipt @?= [3]
         Djex.validatedLengthCounterexampleResult firstReceipt @?= 6
         firstState <-
-          LengthCounterexampleBank.readLengthCounterexampleBankContextState
+          LengthCounterexampleBank.readBankContextState
             context
-        firstBank <- expectScalarAdapterBank firstState
+        firstBank <- expectSourceScalarAdapterBank firstState
         map Djex.lengthCounterexampleBankSampleInputs
             (Djex.lengthCounterexampleBankSamples firstBank) @?= [[3]]
         map Djex.lengthCounterexampleBankSampleOrigin
@@ -9229,9 +9266,9 @@ assertScalarCounterexampleBankRunnerRoutes fixture = do
         Djex.validatedLengthCounterexampleInputs secondReceipt @?= [3]
         Djex.validatedLengthCounterexampleResult secondReceipt @?= 3
         secondState <-
-          LengthCounterexampleBank.readLengthCounterexampleBankContextState
+          LengthCounterexampleBank.readBankContextState
             context
-        secondBank <- expectScalarAdapterBank secondState
+        secondBank <- expectSourceScalarAdapterBank secondState
         map Djex.lengthCounterexampleBankSampleInputs
             (Djex.lengthCounterexampleBankSamples secondBank) @?= [[3]]
         map Djex.lengthCounterexampleBankSampleOrigin
@@ -9264,7 +9301,7 @@ assertPairCounterexampleBankRunnerRoutes fixture = do
  where
   runRoute executable firstVerification secondVerification
       (label, deferred, policy) =
-    LengthCounterexampleBank.withDefaultLengthSpinePairCounterexampleBankContext
+    LengthCounterexampleBank.withDefaultSourceLengthSpinePairBankContext
       $ \context -> do
         first <- expectLengthSpinePairPostVerificationWithin
           $ assessVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
@@ -9274,9 +9311,9 @@ assertPairCounterexampleBankRunnerRoutes fixture = do
         Djex.validatedLengthSpinePairCounterexampleResult firstReceipt @?=
           Djex.LengthSpinePair 3 3
         firstState <-
-          LengthCounterexampleBank.readLengthSpinePairCounterexampleBankContextState
+          LengthCounterexampleBank.readBankContextState
             context
-        firstBank <- expectPairAdapterBank firstState
+        firstBank <- expectSourcePairAdapterBank firstState
         map Djex.lengthSpinePairCounterexampleBankSampleInputs
             (Djex.lengthSpinePairCounterexampleBankSamples firstBank) @?= [[3]]
         map Djex.lengthSpinePairCounterexampleBankSampleOrigin
@@ -9296,9 +9333,9 @@ assertPairCounterexampleBankRunnerRoutes fixture = do
         Djex.validatedLengthSpinePairCounterexampleResult secondReceipt @?=
           Djex.LengthSpinePair 3 0
         secondState <-
-          LengthCounterexampleBank.readLengthSpinePairCounterexampleBankContextState
+          LengthCounterexampleBank.readBankContextState
             context
-        secondBank <- expectPairAdapterBank secondState
+        secondBank <- expectSourcePairAdapterBank secondState
         map Djex.lengthSpinePairCounterexampleBankSampleInputs
             (Djex.lengthSpinePairCounterexampleBankSamples secondBank) @?= [[3]]
         map Djex.lengthSpinePairCounterexampleBankSampleOrigin
@@ -9359,7 +9396,7 @@ assertCounterexampleBankRunnerCaps fixture = do
           scalarCounterexampleBankAdapterLimits 1 1 8 4096 1
         scalarInsertionLimits =
           scalarCounterexampleBankAdapterLimits 0 1 8 4096 1
-    LengthCounterexampleBank.withLengthCounterexampleBankContext
+    LengthCounterexampleBank.withSourceLengthBankContext
         scalarAttemptLimits $ \context -> do
       first <- expectLengthSelectionWithin "scalar bank attempt seed"
         $ LengthSelectionInternal.selectVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext
@@ -9367,9 +9404,9 @@ assertCounterexampleBankRunnerCaps fixture = do
       assertOnlyScalarBankSelectionRejection
         (counterexampleBankRunnerScaledCandidate fixture) 6 first
       firstState <-
-        LengthCounterexampleBank.readLengthCounterexampleBankContextState
+        LengthCounterexampleBank.readBankContextState
           context
-      firstBank <- expectScalarAdapterBank firstState
+      firstBank <- expectSourceScalarAdapterBank firstState
       scalarAdapterBankStats firstBank @?=
         (1, scalarAdapterBankEncodedBytes firstBank, 1, 0, 0, 1)
       assertFakeLengthQueryEvents [0] [0] =<<
@@ -9382,9 +9419,9 @@ assertCounterexampleBankRunnerCaps fixture = do
       assertOnlyScalarBankSelectionRejection
         (counterexampleBankRunnerIndependentCandidate fixture) 3 unavailable
       unavailableState <-
-        LengthCounterexampleBank.readLengthCounterexampleBankContextState
+        LengthCounterexampleBank.readBankContextState
           context
-      unavailableBank <- expectScalarAdapterBank unavailableState
+      unavailableBank <- expectSourceScalarAdapterBank unavailableState
       scalarAdapterBankStats unavailableBank @?=
         ( 1
         , scalarAdapterBankEncodedBytes unavailableBank
@@ -9399,7 +9436,7 @@ assertCounterexampleBankRunnerCaps fixture = do
       assertFakeLengthQueryEvents [0] [0] =<<
         BS.readFile (executable ++ ".events")
 
-    LengthCounterexampleBank.withLengthCounterexampleBankContext
+    LengthCounterexampleBank.withSourceLengthBankContext
         scalarInsertionLimits $ \context -> do
       insertion <- expectLengthSelectionWithin
         "scalar ordinary bank insertion unavailability"
@@ -9408,9 +9445,9 @@ assertCounterexampleBankRunnerCaps fixture = do
       assertOnlyScalarBankSelectionRejection
         (counterexampleBankRunnerScaledCandidate fixture) 6 insertion
       insertionState <-
-        LengthCounterexampleBank.readLengthCounterexampleBankContextState
+        LengthCounterexampleBank.readBankContextState
           context
-      insertionBank <- expectScalarAdapterBank insertionState
+      insertionBank <- expectSourceScalarAdapterBank insertionState
       Djex.lengthCounterexampleBankSamples insertionBank @?= []
       scalarAdapterBankStats insertionBank @?= (0, 0, 0, 0, 0, 1)
 
@@ -9418,7 +9455,7 @@ assertCounterexampleBankRunnerCaps fixture = do
           pairCounterexampleBankAdapterLimits 1 1 8 4096 1
         pairInsertionLimits =
           pairCounterexampleBankAdapterLimits 0 1 8 4096 1
-    LengthCounterexampleBank.withLengthSpinePairCounterexampleBankContext
+    LengthCounterexampleBank.withSourceLengthSpinePairBankContext
         pairAttemptLimits $ \context -> do
       first <- expectLengthSpinePairSelectionWithin
         $ LengthSpinePairSelectionInternal.selectVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
@@ -9427,9 +9464,9 @@ assertCounterexampleBankRunnerCaps fixture = do
         (counterexampleBankRunnerDuplicatedCandidate fixture)
         (Djex.LengthSpinePair 3 3) first
       firstState <-
-        LengthCounterexampleBank.readLengthSpinePairCounterexampleBankContextState
+        LengthCounterexampleBank.readBankContextState
           context
-      firstBank <- expectPairAdapterBank firstState
+      firstBank <- expectSourcePairAdapterBank firstState
       pairAdapterBankStats firstBank @?=
         (1, pairAdapterBankEncodedBytes firstBank, 1, 0, 0, 1)
 
@@ -9440,9 +9477,9 @@ assertCounterexampleBankRunnerCaps fixture = do
         (counterexampleBankRunnerInputAndZeroCandidate fixture)
         (Djex.LengthSpinePair 3 0) unavailable
       unavailableState <-
-        LengthCounterexampleBank.readLengthSpinePairCounterexampleBankContextState
+        LengthCounterexampleBank.readBankContextState
           context
-      unavailableBank <- expectPairAdapterBank unavailableState
+      unavailableBank <- expectSourcePairAdapterBank unavailableState
       pairAdapterBankStats unavailableBank @?=
         ( 1
         , pairAdapterBankEncodedBytes unavailableBank
@@ -9457,7 +9494,7 @@ assertCounterexampleBankRunnerCaps fixture = do
       assertFakeLengthQueryEvents [0] [0] =<<
         BS.readFile (executable ++ ".events")
 
-    LengthCounterexampleBank.withLengthSpinePairCounterexampleBankContext
+    LengthCounterexampleBank.withSourceLengthSpinePairBankContext
         pairInsertionLimits $ \context -> do
       insertion <- expectLengthSpinePairSelectionWithin
         $ LengthSpinePairSelectionInternal.selectVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
@@ -9466,9 +9503,9 @@ assertCounterexampleBankRunnerCaps fixture = do
         (counterexampleBankRunnerDuplicatedCandidate fixture)
         (Djex.LengthSpinePair 3 3) insertion
       insertionState <-
-        LengthCounterexampleBank.readLengthSpinePairCounterexampleBankContextState
+        LengthCounterexampleBank.readBankContextState
           context
-      insertionBank <- expectPairAdapterBank insertionState
+      insertionBank <- expectSourcePairAdapterBank insertionState
       Djex.lengthSpinePairCounterexampleBankSamples insertionBank @?= []
       pairAdapterBankStats insertionBank @?= (0, 0, 0, 0, 0, 1)
 
@@ -9539,7 +9576,7 @@ assertCounterexampleBankSelectionContinuity fixture = do
     base <- lengthCounterexampleBankRunnerBasePolicy executable
     let policy = enableLengthRankingDeferredLiveSessionOpening base
         scalarContract = counterexampleBankRunnerScalarContract fixture
-    LengthCounterexampleBank.withDefaultLengthCounterexampleBankContext $
+    LengthCounterexampleBank.withDefaultSourceLengthBankContext $
       \context -> do
         first <- expectLengthSelectionWithin "scalar selection continuity seed"
           $ LengthSelectionInternal.selectVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext
@@ -9548,9 +9585,9 @@ assertCounterexampleBankSelectionContinuity fixture = do
           (counterexampleBankRunnerScaledCandidate fixture) 6 first
         firstEvents <- BS.readFile $ executable ++ ".events"
         beforePreserve <-
-          LengthCounterexampleBank.readLengthCounterexampleBankContextState
+          LengthCounterexampleBank.readBankContextState
             context
-        beforeBank <- expectScalarAdapterBank beforePreserve
+        beforeBank <- expectSourceScalarAdapterBank beforePreserve
 
         preserved <- expectLengthSelectionWithin
           "scalar selection continuity preserve"
@@ -9563,9 +9600,9 @@ assertCounterexampleBankSelectionContinuity fixture = do
           failure -> assertFailure
             $ "unexpected scalar preserve failure: " ++ show failure
         afterPreserve <-
-          LengthCounterexampleBank.readLengthCounterexampleBankContextState
+          LengthCounterexampleBank.readBankContextState
             context
-        afterPreserveBank <- expectScalarAdapterBank afterPreserve
+        afterPreserveBank <- expectSourceScalarAdapterBank afterPreserve
         scalarAdapterBankStats afterPreserveBank @?=
           scalarAdapterBankStats beforeBank
 
@@ -9576,14 +9613,14 @@ assertCounterexampleBankSelectionContinuity fixture = do
         assertOnlyScalarBankSelectionRejection
           (counterexampleBankRunnerIndependentCandidate fixture) 3 resumed
         resumedState <-
-          LengthCounterexampleBank.readLengthCounterexampleBankContextState
+          LengthCounterexampleBank.readBankContextState
             context
-        resumedBank <- expectScalarAdapterBank resumedState
+        resumedBank <- expectSourceScalarAdapterBank resumedState
         scalarAdapterBankStats resumedBank @?=
           (1, scalarAdapterBankEncodedBytes resumedBank, 2, 1, 0, 2)
         BS.readFile (executable ++ ".events") >>= (@?= firstEvents)
 
-    LengthCounterexampleBank.withDefaultLengthSpinePairCounterexampleBankContext
+    LengthCounterexampleBank.withDefaultSourceLengthSpinePairBankContext
       $ \context -> do
         first <- expectLengthSpinePairSelectionWithin
           $ LengthSpinePairSelectionInternal.selectVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
@@ -9593,9 +9630,9 @@ assertCounterexampleBankSelectionContinuity fixture = do
           (Djex.LengthSpinePair 3 3) first
         firstEvents <- BS.readFile $ executable ++ ".events"
         beforePreserve <-
-          LengthCounterexampleBank.readLengthSpinePairCounterexampleBankContextState
+          LengthCounterexampleBank.readBankContextState
             context
-        beforeBank <- expectPairAdapterBank beforePreserve
+        beforeBank <- expectSourcePairAdapterBank beforePreserve
 
         preserved <- expectLengthSpinePairSelectionWithin
           $ LengthSpinePairSelectionInternal.selectVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
@@ -9611,9 +9648,9 @@ assertCounterexampleBankSelectionContinuity fixture = do
           failure -> assertFailure
             $ "unexpected product preserve failure: " ++ show failure
         afterPreserve <-
-          LengthCounterexampleBank.readLengthSpinePairCounterexampleBankContextState
+          LengthCounterexampleBank.readBankContextState
             context
-        afterPreserveBank <- expectPairAdapterBank afterPreserve
+        afterPreserveBank <- expectSourcePairAdapterBank afterPreserve
         pairAdapterBankStats afterPreserveBank @?= pairAdapterBankStats beforeBank
 
         resumed <- expectLengthSpinePairSelectionWithin
@@ -9623,9 +9660,9 @@ assertCounterexampleBankSelectionContinuity fixture = do
           (counterexampleBankRunnerInputAndZeroCandidate fixture)
           (Djex.LengthSpinePair 3 0) resumed
         resumedState <-
-          LengthCounterexampleBank.readLengthSpinePairCounterexampleBankContextState
+          LengthCounterexampleBank.readBankContextState
             context
-        resumedBank <- expectPairAdapterBank resumedState
+        resumedBank <- expectSourcePairAdapterBank resumedState
         pairAdapterBankStats resumedBank @?=
           (1, pairAdapterBankEncodedBytes resumedBank, 2, 1, 0, 2)
         BS.readFile (executable ++ ".events") >>= (@?= firstEvents)
@@ -9641,7 +9678,7 @@ assertCounterexampleBankSelectionLiveFailure fixture = do
   withFakeLengthSolver "wrong-echo" $ \executable -> do
     base <- lengthCounterexampleBankRunnerBasePolicy executable
     let policy = enableLengthRankingDeferredLiveSessionOpening base
-    LengthCounterexampleBank.withDefaultLengthCounterexampleBankContext $
+    LengthCounterexampleBank.withDefaultSourceLengthBankContext $
       \context -> do
         result <- expectLengthSelectionWithin "scalar bank live failure"
           $ LengthSelectionInternal.selectVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext
@@ -9651,14 +9688,14 @@ assertCounterexampleBankSelectionLiveFailure fixture = do
         assertLengthSelectionRankingPreserved
           (verifiedCandidateReceipts scalarVerification) result
         state <-
-          LengthCounterexampleBank.readLengthCounterexampleBankContextState
+          LengthCounterexampleBank.readBankContextState
             context
-        bank <- expectScalarAdapterBank state
+        bank <- expectSourceScalarAdapterBank state
         scalarAdapterBankStats bank @?= (0, 0, 0, 0, 0, 0)
         assertFakeLengthQueryEvents [] [] =<<
           BS.readFile (executable ++ ".events")
 
-    LengthCounterexampleBank.withDefaultLengthSpinePairCounterexampleBankContext
+    LengthCounterexampleBank.withDefaultSourceLengthSpinePairBankContext
       $ \context -> do
         result <- expectLengthSpinePairSelectionWithin
           $ LengthSpinePairSelectionInternal.selectVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
@@ -9674,9 +9711,9 @@ assertCounterexampleBankSelectionLiveFailure fixture = do
           failure -> assertFailure
             $ "unexpected product live failure: " ++ show failure
         state <-
-          LengthCounterexampleBank.readLengthSpinePairCounterexampleBankContextState
+          LengthCounterexampleBank.readBankContextState
             context
-        bank <- expectPairAdapterBank state
+        bank <- expectSourcePairAdapterBank state
         pairAdapterBankStats bank @?= (0, 0, 0, 0, 0, 0)
         assertFakeLengthQueryEvents [] [] =<<
           BS.readFile (executable ++ ".events")
@@ -17123,7 +17160,7 @@ assertLengthAssessmentMainParallelBaseline = do
   mapM_ (assertMainSourceContains "serial EngineBoth implementation"
       engineBothSection)
     [ "djinnPrepared <- prepareSynthesis djinnRecursiveProjection"
-    , "djinnCompatibility <- djinnRun"
+    , "djinn <- djinnRun"
     , "exferencePrepared <- prepareSynthesis exferenceRecursiveProjection"
     , "exference <- exferenceRun"
     , "mergeDetailedOutcomesSkippingWith limits checked (asCollection djinn) exference"
@@ -22810,9 +22847,291 @@ withFakeLengthSolver mode action =
     setPermissions target $ setOwnerExecutable True permissions
     canonicalizePath target >>= action
 
+firstSourceOwnedGroup :: SynthEngine -> DetailedSynthOutcome -> IO DetailedCandidateGroup
+firstSourceOwnedGroup engine outcome = case outcome of
+  DetailedSynthCandidates groups _ -> case
+      [ group
+      | group <- groups
+      , detailedCandidateGroupRoute group == RouteTypedCandidate
+      , fmap candidateSourceAuthorityEngine
+          (detailedCandidateGroupSourceAuthority group) == Just engine
+      , not $ null $ detailedCandidateGroupVariants group
+      ] of
+    first : _ -> pure first
+    [] -> assertFailure ("no nonempty source-owned " ++ show engine
+      ++ " candidate: " ++ show groups) >> error "unreachable"
+  other -> assertFailure ("source-owned synthesis failed: " ++ show other)
+    >> error "unreachable"
+
+verifiedSourceOwnedCandidate
+  :: SynthEngine -> Frag -> IO (Verified DetailedVerificationVariant)
+verifiedSourceOwnedCandidate engine goal = do
+  outcome <- expectRight $ synthesizeWithProvidersSkippingDetailedWithMultiConstructorPatterns
+    False engine 512 Set.empty [] goal
+  group <- firstSourceOwnedGroup engine outcome
+  batch <- verifyCandidateGroups 1 (const $ pure VariantAccepted)
+    [detailedCandidateGroupVerificationVariants group]
+  case verifiedCandidateReceipts batch of
+    [verified] -> pure verified
+    receipts -> assertFailure ("unexpected source-owned receipts: " ++ show receipts)
+      >> error "unreachable"
+
+-- These receipts exercise the exact-origin handoff, not Lean kernel execution.
+-- The tests below require a public Djinn graph before independently evaluating
+-- the sealed Length problem; graph absence is never a successful fallback.
+verifiedDjinnSourceGraph
+  :: Verified DetailedVerificationVariant
+  -> IO (PreparedSynthesisInspection, Djex.TermGraph Djex.DjinnTermGraphType String)
+verifiedDjinnSourceGraph verified = do
+  let variant = verifiedCandidate verified
+  detailedVerificationVariantRoute variant @?= RouteTypedCandidate
+  assertBool "Djinn variant acquired an Exference sidecar"
+    $ isNothing $ detailedVerificationVariantSemanticSidecar variant
+  authority <- case detailedVerificationVariantSourceAuthority variant
+      >>= candidateSourceAuthorityDjinn of
+    Just retained -> pure retained
+    Nothing -> assertFailure "the verified variant has no own Djinn source authority"
+      >> error "unreachable"
+  graph <- expectRight $ typedCandidateTermGraph $ djinnSourceCandidate authority
+  origin <- case detailedVerificationVariantExactTypedOrigin variant of
+    Just retained -> pure retained
+    Nothing -> assertFailure "the verified Djinn variant lost its exact renderer origin"
+      >> error "unreachable"
+  rendered <- expectRight $ renderExactTypedVariantOrigin origin
+  assertBool "the exact Djinn origin no longer renders the retained spelling"
+    $ detailedVerificationVariantText variant `elem` rendered
+  let preparation = djinnSourcePreparation authority
+      exactGoal = Djex.requestGoal $ djinnSourceRequest authority
+  exactGoal @?= Djex.quantifyFreeVariables (const True)
+    (inspectedSearchGoal preparation)
+  root <- case Djex.lookupTermNode (Djex.termGraphRoot graph) graph of
+    Just retained -> pure retained
+    Nothing -> assertFailure "the sealed Djinn graph has no root" >> error "unreachable"
+  assertBool "the Djinn graph root lost the complete retained request goal"
+    $ Djex.alphaEquivalentClosedTypes
+        exactGoal (Djex.termNodeType root)
+  pure (preparation, graph)
+
+assertDjinnForallRoot :: Djex.TermGraph Djex.DjinnTermGraphType String -> IO ()
+assertDjinnForallRoot graph = case
+    Djex.lookupTermNode (Djex.termGraphRoot graph) graph of
+  Just (Djex.TermNode ForallType{} (Djex.TypedForallIntroduction _ _ witness)) ->
+    case Djex.forallIntroductionVariable witness of
+      TypeVariable (Djex.RigidVariable _) -> pure ()
+      other -> assertFailure $ "forall opening is not a rigid source binder: " ++ show other
+  other -> assertFailure $ "the full forall introduction is missing: " ++ show other
+
+sourceOwnedPolymorphicList :: Frag
+sourceOwnedPolymorphicList = FParamRec True "List" listKey [FVar "a"]
+  [ ("List.nil", [])
+  , ("List.cons", [FVar "a", FAtom False listKey])
+  ]
+ where
+  listKey = "List a"
+
 typedCandidateRoutingTests :: TestTree
 typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
-  [ testCase "render a supported Exference graph and preserve projection" $ do
+  [ testCase "retain Djinn source graph ownership and compatibility projection" $ do
+      let token = FAtom False "Demo.TypedToken"
+          goal = FArr token token
+      detailed <- expectRight $ synthesizeWithProvidersSkippingDetailed
+        EngineDjinn 128 Set.empty [] goal
+      compatibility <- expectRight $ synthesizeWithProviders EngineDjinn 128 [] goal
+      projectDetailedSynthOutcome detailed @?= compatibility
+      group <- firstSourceOwnedGroup EngineDjinn detailed
+      assertBool "Djinn acquired an Exference sidecar"
+        $ isNothing $ detailedCandidateGroupSemanticSidecar group
+      case detailedCandidateGroupSourceAuthority group >>= candidateSourceAuthorityDjinn of
+        Nothing -> assertFailure "Djinn graph lost its whole source owner"
+        Just authority -> case typedCandidateTermGraph $ djinnSourceCandidate authority of
+          Left absence -> assertFailure $ "Djinn identity graph unavailable: " ++ show absence
+          Right _ -> pure ()
+      forM_ (detailedCandidateGroupVerificationVariants group) $ \variant -> do
+        fmap candidateSourceAuthorityEngine
+          (detailedVerificationVariantSourceAuthority variant) @?= Just EngineDjinn
+        case detailedVerificationVariantExactTypedOrigin variant of
+          Nothing -> assertFailure "Djinn renderer variant lost its exact origin"
+          Just origin -> do
+            rendered <- expectRight $ renderExactTypedVariantOrigin origin
+            assertBool "Djinn exact rerender omitted the accepted spelling"
+              $ detailedVerificationVariantText variant `elem` rendered
+  , testCase "Both retains each typed source owner without borrowing a duplicate graph" $ do
+      let token = FAtom False "Demo.TypedToken"
+          provider = ProviderFrag "Demo.sourceToken" token
+      djinn <- expectRight $ synthesizeWithProvidersSkippingDetailed
+        EngineDjinn 128 Set.empty [provider] token
+      exference <- expectRight $ synthesizeWithProvidersSkippingDetailed
+        EngineExference 128 Set.empty [provider] token
+      djinnGroup <- firstSourceOwnedGroup EngineDjinn djinn
+      exferenceGroup <- firstSourceOwnedGroup EngineExference exference
+      detailedCandidateGroupVariants djinnGroup @?= ["Demo.sourceToken"]
+      detailedCandidateGroupVariants exferenceGroup @?= ["Demo.sourceToken"]
+      forM_ [(djinnGroup, exferenceGroup, EngineDjinn),
+          (exferenceGroup, djinnGroup, EngineExference)] $ \(first, second, engine) -> do
+        let merged = mergeDetailedCandidateGroups [first] [second]
+        map detailedCandidateGroupVariants merged @?= [["Demo.sourceToken"]]
+        map (fmap candidateSourceAuthorityEngine . detailedCandidateGroupSourceAuthority)
+          merged @?= [Just engine]
+        map (fmap candidateSourceAuthorityEngine . detailedVerificationVariantSourceAuthority)
+          (concatMap detailedCandidateGroupVerificationVariants merged) @?= [Just engine]
+  , testCase "Djinn scalar source graph supports the existing Length contract sealer" $ do
+      verified <- verifiedSourceOwnedCandidate EngineDjinn
+        $ FArr lengthSpinePairFixtureList lengthSpinePairFixtureList
+      let contract = lengthSpinePairScalarRegressionContract
+            { leanLengthContractSource = LengthContractSource
+                (LengthTruth True) (LengthTruth False) }
+      query <- expectRight (prepareSourceCheckedLengthQuery contract verified) >>= expectRight
+      case query of
+        ExferenceCheckedLengthQuery _ -> assertFailure "Djinn Length query changed engines"
+        DjinnCheckedLengthQuery _ -> pure ()
+      replay <- expectRight $ withSourceCheckedLengthQuery query $ \exact ->
+        Djex.replayLengthSMTLibCounterexampleInputs defaultLengthEvaluationLimits exact [3]
+      case replay of
+        Nothing -> assertFailure "false scalar contract did not replay a counterexample"
+        Just receipt -> Djex.validatedLengthCounterexampleInputs receipt @?= [3]
+      case prepareCheckedLengthQuery contract verified of
+        Left LengthHandoffExferenceProjectionRequired -> pure ()
+        Left refusal -> assertFailure $ "legacy projection failed at wrong boundary: " ++ show refusal
+        Right _ -> assertFailure "legacy Exference projection relabeled a Djinn graph"
+  , testCase "Djinn product source graph supports exact canonical Prod Length semantics" $ do
+      verified <- verifiedSourceOwnedCandidate EngineDjinn lengthSpinePairFixtureGoal
+      let contract = lengthSpinePairFixtureContract
+            { leanLengthSpinePairContractSource = Djex.LengthSpinePairContractSource
+                (LengthTruth True) (LengthTruth False) }
+      query <- expectRight (prepareSourceCheckedLengthSpinePairQuery contract verified) >>= expectRight
+      case query of
+        ExferenceCheckedLengthSpinePairQuery _ -> assertFailure "Djinn product query changed engines"
+        DjinnCheckedLengthSpinePairQuery _ -> pure ()
+      replay <- expectRight $ withSourceCheckedLengthSpinePairQuery query $ \exact ->
+        Djex.replayLengthSpinePairSMTLibCounterexampleInputs defaultLengthEvaluationLimits exact [3]
+      case replay of
+        Nothing -> assertFailure "false product contract did not replay a counterexample"
+        Just receipt -> Djex.validatedLengthSpinePairCounterexampleInputs receipt @?= [3]
+  , testCase "Djinn leading-forall scalar keeps its own root through independent Length replay" $ do
+      let list = sourceOwnedPolymorphicList
+          goal = FAll True "a" $ FArr list list
+          contract = lengthSpinePairScalarRegressionContract
+            { leanLengthContractSource = LengthContractSource
+                (LengthTruth True) (LengthTruth False) }
+      verified <- verifiedSourceOwnedCandidate EngineDjinn goal
+      (_, graph) <- verifiedDjinnSourceGraph verified
+      assertDjinnForallRoot graph
+      query <- expectRight (prepareSourceCheckedLengthQuery contract verified) >>= expectRight
+      case query of
+        DjinnCheckedLengthQuery _ -> pure ()
+        ExferenceCheckedLengthQuery _ -> assertFailure "forall scalar changed source owner"
+      forM_ [[0], [3]] $ \inputs -> do
+        replay <- expectRight $ withSourceCheckedLengthQuery query $ \exact ->
+          Djex.replayLengthSMTLibCounterexampleInputs defaultLengthEvaluationLimits exact inputs
+        case replay of
+          Nothing -> assertFailure "false forall scalar contract produced no independent replay"
+          Just receipt -> Djex.validatedLengthCounterexampleInputs receipt @?= inputs
+  , testCase "Djinn leading-forall pair keeps its own tuple graph through independent Length replay" $ do
+      let list = sourceOwnedPolymorphicList
+          goal = FAll True "a" $ FArr list $ FLeanProd list list
+          contract = lengthSpinePairFixtureContract
+            { leanLengthSpinePairContractSource = Djex.LengthSpinePairContractSource
+                (LengthTruth True) (LengthTruth False) }
+      verified <- verifiedSourceOwnedCandidate EngineDjinn goal
+      (_, graph) <- verifiedDjinnSourceGraph verified
+      assertDjinnForallRoot graph
+      assertBool "the forall pair test did not exercise a real pair construction"
+        $ not $ null
+            [ () | (_, Djex.TermNode _ (Djex.TypedTuple [_, _])) <- Djex.termGraphNodes graph ]
+      query <- expectRight (prepareSourceCheckedLengthSpinePairQuery contract verified) >>= expectRight
+      case query of
+        DjinnCheckedLengthSpinePairQuery _ -> pure ()
+        ExferenceCheckedLengthSpinePairQuery _ -> assertFailure "forall pair changed source owner"
+      forM_ [[0], [3]] $ \inputs -> do
+        replay <- expectRight $ withSourceCheckedLengthSpinePairQuery query $ \exact ->
+          Djex.replayLengthSpinePairSMTLibCounterexampleInputs defaultLengthEvaluationLimits exact inputs
+        case replay of
+          Nothing -> assertFailure "false forall pair contract produced no independent replay"
+          Just receipt -> Djex.validatedLengthSpinePairCounterexampleInputs receipt @?= inputs
+  , testCase "Djinn forced spine constructor retains exact source identity and replays length zero" $ do
+      -- No source argument or provider can forward a list here: a constructor
+      -- must be produced. Actual recursive zero/step cases are separately
+      -- checked at the private source-checker/Length seam; Djinn search keeps
+      -- negative recursive inputs opaque and this test makes no case claim.
+      outcome <- expectRight $ synthesizeWithProvidersSkippingDetailedWithMultiConstructorPatterns
+        False EngineDjinn 512 Set.empty [] lengthSpinePairFixtureList
+      group <- firstSourceOwnedGroup EngineDjinn outcome
+      -- A checked constructor can have both anonymous and qualified Lean
+      -- spellings. Each variant must retain and replay its own exact origin;
+      -- the renderer's cohort need not be a singleton.
+      forM_ (detailedCandidateGroupVerificationVariants group) $ \variant -> do
+        batch <- verifyCandidateGroups 1 (const $ pure VariantAccepted) [[variant]]
+        verified <- case verifiedCandidateReceipts batch of
+          [receipt] -> pure receipt
+          receipts -> assertFailure ("unexpected constructor variant receipts: " ++ show receipts)
+            >> error "unreachable"
+        (preparation, graph) <- verifiedDjinnSourceGraph verified
+        zero <- case
+            [ constructor
+            | family <- inspectedSemanticFamilyBindings preparation
+            , inspectedSemanticFamilyLeanName family == "List"
+            , Just constructor <- [Map.lookup "List.nil" $ inspectedSemanticFamilyConstructors family]
+            ] of
+          [constructor] -> pure constructor
+          constructors -> assertFailure ("missing exact List.nil source identity: " ++ show constructors)
+            >> error "unreachable"
+        assertBool "the forced constructor candidate does not use its exact List.nil global"
+          $ zero `elem`
+              [ constructor | (_, Djex.TermNode _ (Djex.TypedGlobal _ constructor)) <- Djex.termGraphNodes graph ]
+        let legacyContract = lengthSpinePairScalarRegressionContract
+              { leanLengthContractTargetArgumentRoles = []
+              , leanLengthContractSource = LengthContractSource
+                  (LengthTruth True) (LengthTruth False) }
+            alternativeCount = length $ detailedCandidateGroupVariants group
+            -- This existing policy associates a retained renderer ordinal,
+            -- even for a constructor-only graph. It does not assert that
+            -- public Djinn search can eliminate a recursive input.
+            contract = legacyContract
+              { leanLengthContractCandidateCasePolicy = LeanLengthExactSpineZeroStepV1 }
+        when (alternativeCount > 1) $
+          case prepareSourceCheckedLengthQuery legacyContract verified of
+            Left (LengthHandoffRendererNotUnique count) -> count @?= alternativeCount
+            Left refusal -> assertFailure $ "legacy constructor refusal changed: " ++ show refusal
+            Right _ -> assertFailure "legacy singleton policy accepted multiple renderings"
+        query <- expectRight (prepareSourceCheckedLengthQuery contract verified) >>= expectRight
+        case query of
+          DjinnCheckedLengthQuery _ -> pure ()
+          ExferenceCheckedLengthQuery _ -> assertFailure "forced constructor changed source owner"
+        replay <- expectRight $ withSourceCheckedLengthQuery query $ \exact ->
+          Djex.replayLengthSMTLibCounterexampleInputs defaultLengthEvaluationLimits exact []
+        case replay of
+          Nothing -> assertFailure "the forced constructor produced no independent replay"
+          Just receipt -> do
+            Djex.validatedLengthCounterexampleInputs receipt @?= []
+            Djex.validatedLengthCounterexampleResult receipt @?= 0
+  , testCase "source-owned Length bank switches engines without transferring a receipt" $ do
+      let goal = FArr lengthSpinePairFixtureList lengthSpinePairFixtureList
+          contract = lengthSpinePairScalarRegressionContract
+            { leanLengthContractSource = LengthContractSource
+                (LengthTruth True) (LengthTruth False) }
+      djinn <- verifiedSourceOwnedCandidate EngineDjinn goal
+      exference <- verifiedSourceOwnedCandidate EngineExference goal
+      djinnQuery <- expectRight (prepareSourceCheckedLengthQuery contract djinn) >>= expectRight
+      exferenceQuery <- expectRight (prepareSourceCheckedLengthQuery contract exference) >>= expectRight
+      replay <- expectRight $ withSourceCheckedLengthQuery djinnQuery $ \exact ->
+        Djex.replayLengthSMTLibCounterexampleInputs defaultLengthEvaluationLimits exact [3]
+      receipt <- maybe (assertFailure "missing Djinn counterexample" >> error "unreachable") pure replay
+      let djinnBridge = LengthCounterexampleBank.sourceScalarBankBridge defaultLengthEvaluationLimits djinnQuery
+          exferenceBridge = LengthCounterexampleBank.sourceScalarBankBridge defaultLengthEvaluationLimits exferenceQuery
+      LengthCounterexampleBank.withDefaultSourceLengthBankContext $ \context -> do
+        recorded <- LengthCounterexampleBank.recordBankReceiptInContext djinnBridge
+          LengthCounterexampleBank.BankReceiptFromSolverIndependentReplay receipt context
+        case recorded of
+          Right (LengthCounterexampleBank.BankRecorded _) -> pure ()
+          _ -> assertFailure "Djinn bank failed to record its own replay"
+        switched <- LengthCounterexampleBank.replayBankInContext exferenceBridge context
+        case switched of
+          Right (LengthCounterexampleBank.BankReplayMiss []) -> pure ()
+          _ -> assertFailure "Exference replay borrowed Djinn's retained sample"
+        state <- LengthCounterexampleBank.readBankContextState context
+        bank <- expectSourceScalarAdapterBank state
+        Djex.lengthCounterexampleBankSamples bank @?= []
+  , testCase "render a supported Exference graph and preserve projection" $ do
       let token = FAtom False "Demo.TypedToken"
           goal = FArr token token
           detailed = synthesizeWithProvidersSkippingDetailed

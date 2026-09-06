@@ -1,3 +1,5 @@
+{-# LANGUAGE RankNTypes #-}
+
 -- | The narrow checked projection from one callback-accepted Leant candidate
 -- to Djex's pure, canonical Length query.
 --
@@ -20,6 +22,12 @@ module Leant.Synth.Length.Adapter
   , CheckedLengthSpinePairQuery
   , prepareCheckedLengthSpinePairQuery
   , prepareCheckedLengthSpinePairQueryWithLimits
+  , SourceCheckedLengthQuery (..)
+  , SourceCheckedLengthSpinePairQuery (..)
+  , prepareSourceCheckedLengthQuery
+  , prepareSourceCheckedLengthSpinePairQuery
+  , withSourceCheckedLengthQuery
+  , withSourceCheckedLengthSpinePairQuery
   ) where
 
 import Language.Haskell.Djex
@@ -44,6 +52,10 @@ import Leant.Synth.Length.Handoff
   , LengthSpinePairHandoffRefusal
   , prepareCheckedLengthProblem
   , prepareCheckedLengthSpinePairProblem
+  , SourceCheckedLengthProblem (..)
+  , SourceCheckedLengthSpinePairProblem (..)
+  , prepareSourceCheckedLengthProblem
+  , prepareSourceCheckedLengthSpinePairProblem
   )
 import Leant.Synth.Verification (Verified)
 
@@ -56,6 +68,59 @@ type CheckedLengthQuery = LengthSMTLibQuery ExferenceLocal ExferenceLocal
 -- identities. It remains nominally distinct from 'CheckedLengthQuery'.
 type CheckedLengthSpinePairQuery =
   LengthSpinePairSMTLibQuery ExferenceLocal ExferenceLocal
+
+-- | A nominal engine sum around the original sealed query. The eliminators
+-- let engine-neutral consumers use the shared semantic operations without
+-- changing any source identity, candidate graph, or query fingerprint.
+data SourceCheckedLengthQuery
+  = ExferenceCheckedLengthQuery CheckedLengthQuery
+  | DjinnCheckedLengthQuery (LengthSMTLibQuery String String)
+
+data SourceCheckedLengthSpinePairQuery
+  = ExferenceCheckedLengthSpinePairQuery CheckedLengthSpinePairQuery
+  | DjinnCheckedLengthSpinePairQuery (LengthSpinePairSMTLibQuery String String)
+
+withSourceCheckedLengthQuery
+  :: SourceCheckedLengthQuery
+  -> (forall identity. LengthSMTLibQuery identity identity -> result)
+  -> result
+withSourceCheckedLengthQuery query action = case query of
+  ExferenceCheckedLengthQuery exact -> action exact
+  DjinnCheckedLengthQuery exact -> action exact
+
+withSourceCheckedLengthSpinePairQuery
+  :: SourceCheckedLengthSpinePairQuery
+  -> (forall identity. LengthSpinePairSMTLibQuery identity identity -> result)
+  -> result
+withSourceCheckedLengthSpinePairQuery query action = case query of
+  ExferenceCheckedLengthSpinePairQuery exact -> action exact
+  DjinnCheckedLengthSpinePairQuery exact -> action exact
+
+prepareSourceCheckedLengthQuery
+  :: LeanLengthContract
+  -> Verified DetailedVerificationVariant
+  -> Either LengthHandoffRefusal
+      (Either LengthSMTLibQueryError SourceCheckedLengthQuery)
+prepareSourceCheckedLengthQuery contract verified = do
+  problem <- prepareSourceCheckedLengthProblem contract verified
+  pure $ case problem of
+    ExferenceCheckedLengthProblem exact -> ExferenceCheckedLengthQuery
+      <$> sealLengthSMTLibQuery defaultLengthSMTLibLimits exact
+    DjinnCheckedLengthProblem exact -> DjinnCheckedLengthQuery
+      <$> sealLengthSMTLibQuery defaultLengthSMTLibLimits exact
+
+prepareSourceCheckedLengthSpinePairQuery
+  :: LeanLengthSpinePairContract
+  -> Verified DetailedVerificationVariant
+  -> Either LengthSpinePairHandoffRefusal
+      (Either LengthSpinePairSMTLibQueryError SourceCheckedLengthSpinePairQuery)
+prepareSourceCheckedLengthSpinePairQuery contract verified = do
+  problem <- prepareSourceCheckedLengthSpinePairProblem contract verified
+  pure $ case problem of
+    ExferenceCheckedLengthSpinePairProblem exact -> ExferenceCheckedLengthSpinePairQuery
+      <$> sealLengthSpinePairSMTLibQuery defaultLengthSMTLibLimits exact
+    DjinnCheckedLengthSpinePairProblem exact -> DjinnCheckedLengthSpinePairQuery
+      <$> sealLengthSpinePairSMTLibQuery defaultLengthSMTLibLimits exact
 
 -- | Check the verified origin, then construct a query with Djex's conservative
 -- bounds. The nested result preserves the handoff/query refusal boundary

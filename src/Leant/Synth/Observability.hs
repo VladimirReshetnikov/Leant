@@ -26,10 +26,11 @@ import Numeric.Natural (Natural)
 
 -- | How one semantic candidate group reached Leant's renderer.
 --
--- Djinn does not yet expose the shared typed-candidate lane.  Its groups are
--- deliberately 'RouteUnobserved': treating them as legacy fallbacks would
--- conflate an engine without a typed route with an explicit checked
--- Exference graph absence, and would make later Djinn adoption incomparable.
+-- Either engine's own checked graph uses 'RouteTypedCandidate'. Djinn's
+-- explicit graph absence preserves its historical 'RouteUnobserved' route;
+-- Exference's explicit graph absence uses 'RouteLegacyCandidateFallback'.
+-- Target-only reconstruction also remains unobserved and carries no graph
+-- authority for the changed expression.
 data CandidateRenderingRoute
   = RouteUnobserved
   | RouteLegacyCandidateFallback
@@ -61,9 +62,8 @@ verificationFailureClassCode failure = case failure of
 
 -- | Leant-local synthesis observations.
 --
--- Exference records whether each bounded rendered group came from its checked
--- typed graph or from an explicit graph-absence fallback.  Djinn remains
--- deliberately unobserved until it exposes the same typed-candidate lane.
+-- Each bounded group rendered from its originating checked graph is counted.
+-- The existing engine-specific graph-absence route conventions remain stable.
 data LeantSynthesisMetric
   = LegacyCandidateFallback
   | TypedCandidateRendered
@@ -89,7 +89,7 @@ candidateRenderingRouteMetric route = case route of
   RouteLegacyCandidateFallback -> Just LegacyCandidateFallback
   RouteTypedCandidate -> Just TypedCandidateRendered
 
--- | Count each observed Exference semantic group exactly once.
+-- | Count each observed semantic group exactly once.
 --
 -- This sidecar is independent of Lean variant attempts and verdicts.  The
 -- caller chooses the bounded semantic-group prefix before applying it, so

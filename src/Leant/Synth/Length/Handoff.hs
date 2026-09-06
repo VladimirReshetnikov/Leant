@@ -1,3 +1,5 @@
+{-# LANGUAGE RankNTypes #-}
+
 -- | Checked correspondence from one callback-accepted Leant occurrence to a
 -- candidate-specific Djex Length problem.
 --
@@ -15,8 +17,12 @@
 module Leant.Synth.Length.Handoff
   ( LengthHandoffRefusal (..)
   , prepareCheckedLengthProblem
+  , SourceCheckedLengthProblem (..)
+  , prepareSourceCheckedLengthProblem
   , LengthSpinePairHandoffRefusal (..)
   , prepareCheckedLengthSpinePairProblem
+  , SourceCheckedLengthSpinePairProblem (..)
+  , prepareSourceCheckedLengthSpinePairProblem
   ) where
 
 import qualified Data.Map.Strict as Map
@@ -24,6 +30,10 @@ import Numeric.Natural (Natural)
 
 import Language.Haskell.Djex
   ( CheckedLengthProblem
+  , Candidate
+  , Inventory
+  , Type
+  , TypedCandidate
   , CheckedLengthSpinePairProblem
   , ExferenceLocal
   , ExferenceTermGraphAbsence
@@ -52,6 +62,11 @@ import Language.Haskell.Djex
   , sealLengthTypedCandidateProblemInSession
   , splitLeadingForalls
   )
+import Language.Haskell.Djex.Djinn
+  ( DjinnTermGraphAbsence
+  , djinnSessionSourceInventory
+  , djinnTypedCandidateForLength
+  )
 
 import Leant.Synth.Engine
   ( DetailedVerificationVariant
@@ -64,7 +79,13 @@ import Leant.Synth.Engine
   , detailedVerificationVariantRoute
   , detailedVerificationVariantText
   , exactTypedVariantOriginOrdinal
-  , exactTypedVariantOriginSidecar
+  , exactTypedVariantOriginSourceAuthority
+  , foldCandidateSourceAuthority
+  , djinnSourceCandidate
+  , djinnSourcePreparation
+  , djinnSourceRequest
+  , djinnSourceSession
+  , closeDjinnTransportGoal
   , inspectedAuthorityNameTable
   , inspectedAuthorityPreparation
   , inspectedAuthorityRequest
@@ -129,6 +150,12 @@ data LengthHandoffRefusal
   | LengthHandoffProblemRejected
       (LengthProblemError
         ExferenceTermGraphAbsence ExferenceLocal ExferenceLocal)
+  | LengthHandoffExferenceProjectionRequired
+  | LengthHandoffDjinnTypedGraphLost DjinnTermGraphAbsence
+  | LengthHandoffDjinnSessionRejected (LengthSessionError String)
+  | LengthHandoffDjinnContractRejected (LengthContractError (Variable String))
+  | LengthHandoffDjinnProblemRejected
+      (LengthProblemError DjinnTermGraphAbsence String String)
   deriving (Eq, Show)
 
 -- | Fail-closed phases unique to the canonical binary-product entrance.
@@ -144,7 +171,107 @@ data LengthSpinePairHandoffRefusal
   | LengthSpinePairHandoffProblemRejected
       (LengthSpinePairProblemError
         ExferenceTermGraphAbsence ExferenceLocal ExferenceLocal)
+  | LengthSpinePairHandoffDjinnContractRejected
+      (LengthSpinePairContractError (Variable String))
+  | LengthSpinePairHandoffDjinnProblemRejected
+      (LengthSpinePairProblemError DjinnTermGraphAbsence String String)
   deriving (Eq, Show)
+
+-- | Whole checked problems keep their engine's nominal source and local
+-- identities. Neither branch rekeys a graph or substitutes another engine's
+-- inventory, including when Both displays equal spellings.
+data SourceCheckedLengthProblem
+  = ExferenceCheckedLengthProblem
+      (CheckedLengthProblem ExferenceLocal ExferenceLocal)
+  | DjinnCheckedLengthProblem (CheckedLengthProblem String String)
+
+data SourceCheckedLengthSpinePairProblem
+  = ExferenceCheckedLengthSpinePairProblem
+      (CheckedLengthSpinePairProblem ExferenceLocal ExferenceLocal)
+  | DjinnCheckedLengthSpinePairProblem
+      (CheckedLengthSpinePairProblem String String)
+
+-- These inputs are constructed only by eliminating the retained whole owner.
+-- The polymorphic helpers below use the same checked Djex sealers for either
+-- nominal identity domain; the compatibility residual adapter is supplied by
+-- Djinn itself and does not rebuild or relabel the graph.
+data LengthSourceInputs identity local absence details output = LengthSourceInputs
+  { sourcePreparation :: PreparedSynthesisInspection
+  , sourceInventory :: Inventory (Variable identity) ()
+  , sourceTypedCandidate :: TypedCandidate absence (Type (Variable identity)) local
+      (Candidate (Type (Variable identity)) details output)
+  , sourceVariable :: String -> Either LengthHandoffRefusal (Variable identity)
+  , sourceProviderVariable :: String -> String
+      -> Either LengthHandoffRefusal (Variable identity)
+  , sourceRequestGoal :: Type (Variable identity)
+  , sourceCloseGoal :: Type (Variable identity) -> Type (Variable identity)
+  , sourceRequestContextCount :: Int
+  , sourceSessionRefusal :: LengthSessionError identity -> LengthHandoffRefusal
+  , sourceContractRefusal :: LengthContractError (Variable identity)
+      -> LengthHandoffRefusal
+  , sourceProblemRefusal :: LengthProblemError absence identity local
+      -> LengthHandoffRefusal
+  , sourcePairContractRefusal :: LengthSpinePairContractError (Variable identity)
+      -> LengthSpinePairHandoffRefusal
+  , sourcePairProblemRefusal :: LengthSpinePairProblemError absence identity local
+      -> LengthSpinePairHandoffRefusal
+  }
+
+withLengthSource
+  :: ExactTypedVariantOrigin
+  -> (forall identity local absence details output. (Ord identity, Ord local)
+      => LengthSourceInputs identity local absence details output
+      -> (CheckedLengthProblem identity local -> SourceCheckedLengthProblem)
+      -> (CheckedLengthSpinePairProblem identity local
+          -> SourceCheckedLengthSpinePairProblem)
+      -> result)
+  -> result
+withLengthSource exactOrigin action =
+  foldCandidateSourceAuthority fromDjinn fromExference
+    $ exactTypedVariantOriginSourceAuthority exactOrigin
+ where
+  fromExference semantic =
+    let authority = typedCandidateSemanticAuthorityInspection semantic
+        request = inspectedAuthorityRequest authority
+        providerVariable provider variable = case Map.lookup variable
+            $ inspectedAuthorityNameTable authority of
+          Nothing -> Left $ LengthHandoffProviderVariableMissing provider variable
+          Just local -> Right $ FlexibleVariable local
+        inputs = LengthSourceInputs
+          { sourcePreparation = inspectedAuthorityPreparation authority
+          , sourceInventory = typedCandidateSemanticInventory semantic
+          , sourceTypedCandidate = typedCandidateSemanticCandidate semantic
+          , sourceVariable = convertSourceVariable authority
+          , sourceProviderVariable = providerVariable
+          , sourceRequestGoal = requestGoal request
+          , sourceCloseGoal = id
+          , sourceRequestContextCount = length $ requestContexts request
+          , sourceSessionRefusal = LengthHandoffSessionRejected
+          , sourceContractRefusal = LengthHandoffContractRejected
+          , sourceProblemRefusal = LengthHandoffProblemRejected
+          , sourcePairContractRefusal = LengthSpinePairHandoffContractRejected
+          , sourcePairProblemRefusal = LengthSpinePairHandoffProblemRejected
+          }
+    in action inputs ExferenceCheckedLengthProblem
+        ExferenceCheckedLengthSpinePairProblem
+  fromDjinn authority =
+    let request = djinnSourceRequest authority
+        inputs = LengthSourceInputs
+          { sourcePreparation = djinnSourcePreparation authority
+          , sourceInventory = djinnSessionSourceInventory $ djinnSourceSession authority
+          , sourceTypedCandidate = djinnTypedCandidateForLength $ djinnSourceCandidate authority
+          , sourceVariable = Right . FlexibleVariable
+          , sourceProviderVariable = \_ -> Right . FlexibleVariable
+          , sourceRequestGoal = fmap FlexibleVariable $ requestGoal request
+          , sourceCloseGoal = closeDjinnTransportGoal
+          , sourceRequestContextCount = length $ requestContexts request
+          , sourceSessionRefusal = LengthHandoffDjinnSessionRejected
+          , sourceContractRefusal = LengthHandoffDjinnContractRejected
+          , sourceProblemRefusal = LengthHandoffDjinnProblemRejected
+          , sourcePairContractRefusal = LengthSpinePairHandoffDjinnContractRejected
+          , sourcePairProblemRefusal = LengthSpinePairHandoffDjinnProblemRejected
+          }
+    in action inputs DjinnCheckedLengthProblem DjinnCheckedLengthSpinePairProblem
 
 -- | Prepare the only currently supported Leant-to-Djex behavioral problem.
 --
@@ -164,7 +291,18 @@ prepareCheckedLengthProblem
   -> Verified DetailedVerificationVariant
   -> Either LengthHandoffRefusal
       (CheckedLengthProblem ExferenceLocal ExferenceLocal)
-prepareCheckedLengthProblem source verified = do
+prepareCheckedLengthProblem source verified =
+  requireExferenceProjection LengthHandoffExferenceProjectionRequired verified $ do
+    problem <- prepareSourceCheckedLengthProblem source verified
+    case problem of
+      ExferenceCheckedLengthProblem exact -> Right exact
+      DjinnCheckedLengthProblem _ -> Left LengthHandoffExferenceProjectionRequired
+
+prepareSourceCheckedLengthProblem
+  :: LeanLengthContract
+  -> Verified DetailedVerificationVariant
+  -> Either LengthHandoffRefusal SourceCheckedLengthProblem
+prepareSourceCheckedLengthProblem source verified = do
   let variant = verifiedCandidate verified
       route = detailedVerificationVariantRoute variant
   exactOrigin <- case detailedVerificationVariantExactTypedOrigin variant of
@@ -173,10 +311,19 @@ prepareCheckedLengthProblem source verified = do
       | route == RouteTypedCandidate ->
           Left LengthHandoffMissingSemanticSidecar
       | otherwise -> Left $ LengthHandoffNotTypedRoute route
-  let semantic = exactTypedVariantOriginSidecar exactOrigin
-      candidate = typedCandidateSemanticCandidate semantic
-      authority = typedCandidateSemanticAuthorityInspection semantic
-      origin = inspectedAuthorityPreparation authority
+  withLengthSource exactOrigin $ \inputs wrapProblem _ ->
+    wrapProblem <$> prepareLengthProblemFromSource inputs source exactOrigin variant
+
+prepareLengthProblemFromSource
+  :: (Ord identity, Ord local)
+  => LengthSourceInputs identity local absence details output
+  -> LeanLengthContract
+  -> ExactTypedVariantOrigin
+  -> DetailedVerificationVariant
+  -> Either LengthHandoffRefusal (CheckedLengthProblem identity local)
+prepareLengthProblemFromSource inputs source exactOrigin variant = do
+  let origin = sourcePreparation inputs
+      candidate = sourceTypedCandidate inputs
   if inspectedEngineFragment origin == inspectedFitFragment origin
     then pure ()
     else Left LengthHandoffRetargetedFragments
@@ -187,14 +334,13 @@ prepareCheckedLengthProblem source verified = do
   if inspectedSourceGoal origin == inspectedSearchGoal origin
     then pure ()
     else Left LengthHandoffSearchGoalChanged
-  convertedSource <- traverse (convertSourceVariable authority)
+  convertedSource <- fmap (sourceCloseGoal inputs) $ traverse (sourceVariable inputs)
     $ inspectedSourceGoal origin
-  let request = inspectedAuthorityRequest authority
-  if null $ requestContexts request
+  if sourceRequestContextCount inputs == 0
     then pure ()
     else Left $ LengthHandoffRequestContextsPresent
-      $ length $ requestContexts request
-  if requestGoal request == convertedSource
+      $ sourceRequestContextCount inputs
+  if sourceRequestGoal inputs == convertedSource
     then pure ()
     else Left LengthHandoffRequestGoalChanged
   checkDirectRendering
@@ -203,8 +349,8 @@ prepareCheckedLengthProblem source verified = do
     $ leanLengthContractSpine source
   providerLaws <- boundedProviderLawPrefix
     $ leanLengthContractProviderLaws source
-  providerSources <- mapM (resolveProviderLaw authority origin) providerLaws
-  let inventory = typedCandidateSemanticInventory semantic
+  providerSources <- mapM (resolveProviderLawBy (sourceProviderVariable inputs) origin) providerLaws
+  let inventory = sourceInventory inputs
       spineModel = DeclaredListSpine
         (inspectedSemanticFamilyPrivateTypeName family)
         zeroConstructor
@@ -213,13 +359,13 @@ prepareCheckedLengthProblem source verified = do
       casePolicy = leanLengthContractCandidateCasePolicy source
       interpretationPolicy = lengthInterpretationPolicySource
         casePolicy targetRoles
-  session <- either (Left . LengthHandoffSessionRejected) Right
+  session <- either (Left . sourceSessionRefusal inputs) Right
     $ sealLengthSessionWithInterpretationPolicy defaultLengthLimits
         interpretationPolicy inventory spineModel providerSources
-  contract <- either (Left . LengthHandoffContractRejected) Right
+  contract <- either (Left . sourceContractRefusal inputs) Right
     $ sealLengthContractInSession session convertedSource
         (leanLengthContractSource source)
-  either (Left . LengthHandoffProblemRejected) Right
+  either (Left . sourceProblemRefusal inputs) Right
     $ sealLengthTypedCandidateProblemInSession
         defaultLengthProblemLimits session contract candidate
 
@@ -239,7 +385,34 @@ prepareCheckedLengthSpinePairProblem
   -> Verified DetailedVerificationVariant
   -> Either LengthSpinePairHandoffRefusal
       (CheckedLengthSpinePairProblem ExferenceLocal ExferenceLocal)
-prepareCheckedLengthSpinePairProblem source verified = do
+prepareCheckedLengthSpinePairProblem source verified =
+  requireExferenceProjection refusal verified $ do
+    problem <- prepareSourceCheckedLengthSpinePairProblem source verified
+    case problem of
+      ExferenceCheckedLengthSpinePairProblem exact -> Right exact
+      DjinnCheckedLengthSpinePairProblem _ -> Left refusal
+ where
+  refusal = LengthSpinePairHandoffSharedRefusal LengthHandoffExferenceProjectionRequired
+
+-- Preserve the old projection's early refusal, including non-strictness in
+-- a contract which is irrelevant to this engine. Missing origins still use
+-- the usual route/authority diagnostics in the shared entrance.
+requireExferenceProjection
+  :: refusal
+  -> Verified DetailedVerificationVariant
+  -> Either refusal result
+  -> Either refusal result
+requireExferenceProjection refusal verified action =
+  case detailedVerificationVariantExactTypedOrigin $ verifiedCandidate verified of
+    Nothing -> action
+    Just origin -> foldCandidateSourceAuthority (const $ Left refusal) (const action)
+      $ exactTypedVariantOriginSourceAuthority origin
+
+prepareSourceCheckedLengthSpinePairProblem
+  :: LeanLengthSpinePairContract
+  -> Verified DetailedVerificationVariant
+  -> Either LengthSpinePairHandoffRefusal SourceCheckedLengthSpinePairProblem
+prepareSourceCheckedLengthSpinePairProblem source verified = do
   let variant = verifiedCandidate verified
       route = detailedVerificationVariantRoute variant
       shared result = either
@@ -251,10 +424,22 @@ prepareCheckedLengthSpinePairProblem source verified = do
       | route == RouteTypedCandidate ->
           Left LengthHandoffMissingSemanticSidecar
       | otherwise -> Left $ LengthHandoffNotTypedRoute route
-  let semantic = exactTypedVariantOriginSidecar exactOrigin
-      candidate = typedCandidateSemanticCandidate semantic
-      authority = typedCandidateSemanticAuthorityInspection semantic
-      origin = inspectedAuthorityPreparation authority
+  withLengthSource exactOrigin $ \inputs _ wrapProblem ->
+    wrapProblem <$> prepareLengthSpinePairProblemFromSource inputs source exactOrigin variant
+
+prepareLengthSpinePairProblemFromSource
+  :: (Ord identity, Ord local)
+  => LengthSourceInputs identity local absence details output
+  -> LeanLengthSpinePairContract
+  -> ExactTypedVariantOrigin
+  -> DetailedVerificationVariant
+  -> Either LengthSpinePairHandoffRefusal
+      (CheckedLengthSpinePairProblem identity local)
+prepareLengthSpinePairProblemFromSource inputs source exactOrigin variant = do
+  let origin = sourcePreparation inputs
+      candidate = sourceTypedCandidate inputs
+      shared result = either
+        (Left . LengthSpinePairHandoffSharedRefusal) Right result
   shared $ if inspectedEngineFragment origin == inspectedFitFragment origin
     then Right ()
     else Left LengthHandoffRetargetedFragments
@@ -265,14 +450,13 @@ prepareCheckedLengthSpinePairProblem source verified = do
   shared $ if inspectedSourceGoal origin == inspectedSearchGoal origin
     then Right ()
     else Left LengthHandoffSearchGoalChanged
-  convertedSource <- shared $ traverse (convertSourceVariable authority)
+  convertedSource <- shared $ fmap (sourceCloseGoal inputs) $ traverse (sourceVariable inputs)
     $ inspectedSourceGoal origin
-  let request = inspectedAuthorityRequest authority
-  shared $ if null $ requestContexts request
+  shared $ if sourceRequestContextCount inputs == 0
     then Right ()
     else Left $ LengthHandoffRequestContextsPresent
-      $ length $ requestContexts request
-  shared $ if requestGoal request == convertedSource
+      $ sourceRequestContextCount inputs
+  shared $ if sourceRequestGoal inputs == convertedSource
     then Right ()
     else Left LengthHandoffRequestGoalChanged
   shared $ checkDirectRendering
@@ -291,8 +475,8 @@ prepareCheckedLengthSpinePairProblem source verified = do
   providerLaws <- shared $ boundedProviderLawPrefix
     $ leanLengthSpinePairContractProviderLaws source
   providerSources <- shared $ mapM
-    (resolveProviderLaw authority origin) providerLaws
-  let inventory = typedCandidateSemanticInventory semantic
+    (resolveProviderLawBy (sourceProviderVariable inputs) origin) providerLaws
+  let inventory = sourceInventory inputs
       spineModel = DeclaredListSpine
         (inspectedSemanticFamilyPrivateTypeName family)
         zeroConstructor
@@ -301,14 +485,14 @@ prepareCheckedLengthSpinePairProblem source verified = do
       casePolicy = leanLengthSpinePairContractCandidateCasePolicy source
       interpretationPolicy = lengthInterpretationPolicySource
         casePolicy targetRoles
-  session <- shared $ either (Left . LengthHandoffSessionRejected) Right
+  session <- shared $ either (Left . sourceSessionRefusal inputs) Right
     $ sealLengthSessionWithInterpretationPolicy defaultLengthLimits
         interpretationPolicy inventory spineModel providerSources
   contract <- either
-    (Left . LengthSpinePairHandoffContractRejected) Right
+    (Left . sourcePairContractRefusal inputs) Right
     $ sealLengthSpinePairContractInSession session convertedSource
         (leanLengthSpinePairContractSource source)
-  either (Left . LengthSpinePairHandoffProblemRejected) Right
+  either (Left . sourcePairProblemRefusal inputs) Right
     $ sealLengthSpinePairTypedCandidateProblemInSession
         defaultLengthProblemLimits session contract candidate
 
@@ -413,19 +597,19 @@ convertSourceVariable
   :: ExferenceRunAuthorityInspection
   -> String
   -> Either LengthHandoffRefusal ExferenceTypeVariable
-convertSourceVariable authority sourceVariable = case Map.lookup sourceVariable
+convertSourceVariable authority sourceName = case Map.lookup sourceName
     $ inspectedAuthorityNameTable authority of
-  Nothing -> Left $ LengthHandoffSourceGoalVariableMissing sourceVariable
+  Nothing -> Left $ LengthHandoffSourceGoalVariableMissing sourceName
   Just local -> Right $ FlexibleVariable local
 
-resolveProviderLaw
-  :: ExferenceRunAuthorityInspection
+resolveProviderLawBy
+  :: (String -> String -> Either LengthHandoffRefusal variable)
   -> PreparedSynthesisInspection
   -> LeanLengthProviderLaw
   -> Either
       LengthHandoffRefusal
-      (LengthProviderSummarySource ExferenceTypeVariable)
-resolveProviderLaw authority origin law = case
+      (LengthProviderSummarySource variable)
+resolveProviderLawBy convertVariable origin law = case
     [ binding
     | binding <- inspectedProviderBindings origin
     , inspectedProviderSourceName binding == leanLengthProviderLawName law
@@ -457,11 +641,7 @@ resolveProviderLaw authority origin law = case
             }
     Right providerSummary
    where
-    convertProviderVariable providerVariable = case Map.lookup providerVariable
-        $ inspectedAuthorityNameTable authority of
-      Nothing -> Left $ LengthHandoffProviderVariableMissing
-        (leanLengthProviderLawName law) providerVariable
-      Just local -> Right $ FlexibleVariable local
+    convertProviderVariable = convertVariable $ leanLengthProviderLawName law
   bindings -> Left $ LengthHandoffProviderAmbiguous
     (leanLengthProviderLawName law) (length bindings)
 
@@ -474,6 +654,8 @@ checkDirectRendering casePolicy exactOrigin variant = do
   rendered <- case renderExactTypedVariantOrigin exactOrigin of
     Left (ExactTypedVariantGraphUnavailable absence) ->
       Left $ LengthHandoffTypedGraphLost absence
+    Left (ExactTypedVariantDjinnGraphUnavailable absence) ->
+      Left $ LengthHandoffDjinnTypedGraphLost absence
     Left (ExactTypedVariantRendererRejected refusal) ->
       Left $ LengthHandoffRendererRejected refusal
     Right alternatives -> Right alternatives

@@ -83,15 +83,12 @@ import Control.DeepSeq (NFData (rnf))
 import Numeric.Natural (Natural)
 
 import Language.Haskell.Djex
-  ( ExferenceLocal
-  , LengthBooleanFiniteUnionLimits
+  ( LengthBooleanFiniteUnionLimits
   , LengthApplicableDomainValidation (..)
   , LengthSpinePairApplicableDomainValidationError (..)
-  , LengthSpinePairCounterexampleBank
   , LengthSpinePairCounterexampleBankError
   , LengthSpinePairCounterexampleBankLimits
   , LengthSpinePairCounterexampleBankSample
-  , LengthSpinePairCounterexampleBankScope
   , LengthSpinePairCounterexampleSimplificationError (..)
   , LengthSpinePairEvaluationError
   , LengthEvaluationLimits
@@ -133,7 +130,9 @@ import Language.Haskell.Djex
 import Leant.Synth.Engine (DetailedVerificationVariant)
 import Leant.Synth.Length.Adapter
   ( CheckedLengthSpinePairQuery
-  , prepareCheckedLengthSpinePairQuery
+  , SourceCheckedLengthSpinePairQuery (..)
+  , prepareSourceCheckedLengthSpinePairQuery
+  , withSourceCheckedLengthSpinePairQuery
   )
 import Leant.Synth.Length.Contract (LeanLengthSpinePairContract)
 import qualified Leant.Synth.Length.CounterexampleBank.Internal
@@ -806,8 +805,7 @@ rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndScopedUsableW
 -- the supplied command-local pair bank instead of the batch-local MRU; every
 -- admission, preparation, live, and fallback rule is unchanged.
 rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndCounterexampleBankContextAndLiveSessionOpening
-  :: CounterexampleBank.LengthSpinePairCounterexampleBankContext
-      command ExferenceLocal
+  :: CounterexampleBank.SourceLengthSpinePairBankContext command
   -> LengthSpinePairInputBoxRankingPolicy
   -> LengthSpinePairApplicableDomainRankingPolicy
   -> LengthSpinePairOriginProbeRankingPolicy
@@ -843,8 +841,7 @@ rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndCounterexampl
       -> AssociatedLengthSpinePairRanking
         (PostVerificationCandidate epoch DetailedVerificationVariant))
   -> LengthSMTLibLiveUsableWorkBudget
-  -> CounterexampleBank.LengthSpinePairCounterexampleBankContext
-      command ExferenceLocal
+  -> CounterexampleBank.SourceLengthSpinePairBankContext command
   -> LengthSpinePairInputBoxRankingPolicy
   -> LengthSpinePairApplicableDomainRankingPolicy
   -> LengthSpinePairOriginProbeRankingPolicy
@@ -881,8 +878,7 @@ rankPostVerificationLengthSpinePairCandidatesWithRankingPoliciesAndCounterexampl
       -> AssociatedLengthSpinePairRanking
         (PostVerificationCandidate epoch DetailedVerificationVariant))
   -> LengthSMTLibLiveUsableWorkBudget
-  -> CounterexampleBank.LengthSpinePairCounterexampleBankContext
-      command ExferenceLocal
+  -> CounterexampleBank.SourceLengthSpinePairBankContext command
   -> LengthSpinePairInputBoxRankingPolicy
   -> LengthSpinePairApplicableDomainRankingPolicy
   -> LengthSpinePairOriginProbeRankingPolicy
@@ -1012,8 +1008,9 @@ replayLengthSpinePairCounterexampleSeeds
   -> CheckedLengthSpinePairQuery
   -> [[Natural]]
   -> Maybe ([Natural], ValidatedLengthSpinePairCounterexample)
-replayLengthSpinePairCounterexampleSeeds =
-  replayCounterexampleSeeds @PairLength
+replayLengthSpinePairCounterexampleSeeds evaluation query =
+  replayCounterexampleSeeds @PairLength evaluation
+    $ ExferenceCheckedLengthSpinePairQuery query
 
 -- | Promote one pair counterexample input vector to the front of the
 -- batch-local seed bank; see 'promoteCounterexampleSeed' for the MRU
@@ -1029,7 +1026,7 @@ promoteLengthSpinePairCounterexampleSeed = promoteCounterexampleSeed
 
 instance LengthRankingDomain PairLength where
   type Contract PairLength = LeanLengthSpinePairContract
-  type Query PairLength = CheckedLengthSpinePairQuery
+  type Query PairLength = SourceCheckedLengthSpinePairQuery
   type Assessment PairLength = LengthSpinePairRankingAssessment
   type FailureClass PairLength = LengthSpinePairRankingFailureClass
   type Failure PairLength = LengthSpinePairRankingFailure
@@ -1046,14 +1043,13 @@ instance LengthRankingDomain PairLength where
   type SimplificationError PairLength =
     LengthSpinePairCounterexampleSimplificationError
   type BankLimits PairLength = LengthSpinePairCounterexampleBankLimits
-  type Bank PairLength = LengthSpinePairCounterexampleBank ExferenceLocal
-  type BankScope PairLength =
-    LengthSpinePairCounterexampleBankScope ExferenceLocal
+  type Bank PairLength = CounterexampleBank.SourceLengthSpinePairBank
+  type BankScope PairLength = CounterexampleBank.SourceLengthSpinePairBankScope
   type BankSample PairLength = LengthSpinePairCounterexampleBankSample
   type BankError PairLength = LengthSpinePairCounterexampleBankError
 
   prepareQuery contract verified =
-    case prepareCheckedLengthSpinePairQuery contract verified of
+    case prepareSourceCheckedLengthSpinePairQuery contract verified of
       Left refusal ->
         Left $ lengthSpinePairHandoffPreparationRefusalClass refusal
       Right (Left refusal) ->
@@ -1061,14 +1057,17 @@ instance LengthRankingDomain PairLength where
       Right (Right query) -> Right query
 
   replayInputs evaluation query inputs = replayRejection
-    $ replayLengthSpinePairSMTLibCounterexampleInputs evaluation query inputs
+    $ withSourceCheckedLengthSpinePairQuery query $ \exact ->
+        replayLengthSpinePairSMTLibCounterexampleInputs evaluation exact inputs
 
   probeAtOrigin evaluation query = replayRejection
-    $ probeLengthSpinePairSMTLibCounterexampleAtOrigin evaluation query
+    $ withSourceCheckedLengthSpinePairQuery query $ \exact ->
+        probeLengthSpinePairSMTLibCounterexampleAtOrigin evaluation exact
 
   validateApplicableDomain evaluation inputBoxLimits unionLimits query =
-    case validateLengthSpinePairSMTLibQueryApplicableDomain
-        evaluation inputBoxLimits unionLimits query of
+    case withSourceCheckedLengthSpinePairQuery query (\exact ->
+        validateLengthSpinePairSMTLibQueryApplicableDomain
+          evaluation inputBoxLimits unionLimits exact) of
       Left (LengthSpinePairSMTLibApplicableDomainValidationAssociationRejected
           _) ->
         Left DomainAssociationRejected
@@ -1093,8 +1092,9 @@ instance LengthRankingDomain PairLength where
     LengthSpinePairApplicableDomainInternalEnumerationInvariant -> False
 
   validateInputBox evaluation limits query maximums =
-    case validateLengthSpinePairSMTLibQueryInputBox
-        evaluation limits query maximums of
+    case withSourceCheckedLengthSpinePairQuery query (\exact ->
+        validateLengthSpinePairSMTLibQueryInputBox
+          evaluation limits exact maximums) of
       Left (LengthSpinePairSMTLibInputBoxValidationRejected failure) ->
         Left $ BoxValidationRejected failure
       Left (LengthSpinePairSMTLibInputBoxValidationAssociationRejected _) ->
@@ -1104,8 +1104,9 @@ instance LengthRankingDomain PairLength where
       Right (LengthInputBoxValidated receipt) -> Right $ BoxValidated receipt
 
   simplifyCounterexample evaluation limits query receipt =
-    case simplifyLengthSpinePairSMTLibQueryCounterexample
-        evaluation limits query receipt of
+    case withSourceCheckedLengthSpinePairQuery query (\exact ->
+        simplifyLengthSpinePairSMTLibQueryCounterexample
+          evaluation limits exact receipt) of
       Left (LengthSpinePairSMTLibCounterexampleSimplificationRejected
           (LengthSpinePairCounterexampleSimplificationInputBoxValidationRejected
             LengthSpinePairInputBoxAssignmentEvaluationRejected {})) ->
@@ -1127,24 +1128,24 @@ instance LengthRankingDomain PairLength where
     validatedLengthSpinePairApplicableDomainApplicableAssignmentCount
 
   runLiveQuery evaluation session query =
-    fmap (fmap gate)
-      $ runLengthSpinePairSMTLibLiveQuery evaluation session query
-   where
-    gate observation =
-      case replayLengthSpinePairSMTLibLiveQueryObservation query observation of
-        Left LengthSpinePairSMTLibLiveObservationQueryFingerprintMismatch ->
-          LiveObservationRejected ObservationQueryFingerprintMismatch
-        Left LengthSpinePairSMTLibLiveObservationEvidenceProblemMismatch{} ->
-          LiveObservationRejected ObservationEvidenceProblemMismatch
-        Right Nothing -> LiveHeuristic
-          $ lengthSpinePairSMTLibLiveQueryObservationSolverStatus observation
-        Right (Just receipt) -> LiveCounterexample receipt
+    withSourceCheckedLengthSpinePairQuery query $ \exact ->
+      let gate observation =
+            case replayLengthSpinePairSMTLibLiveQueryObservation exact observation of
+              Left LengthSpinePairSMTLibLiveObservationQueryFingerprintMismatch ->
+                LiveObservationRejected ObservationQueryFingerprintMismatch
+              Left LengthSpinePairSMTLibLiveObservationEvidenceProblemMismatch{} ->
+                LiveObservationRejected ObservationEvidenceProblemMismatch
+              Right Nothing -> LiveHeuristic
+                $ lengthSpinePairSMTLibLiveQueryObservationSolverStatus observation
+              Right (Just receipt) -> LiveCounterexample receipt
+      in fmap (fmap gate) $
+          runLengthSpinePairSMTLibLiveQuery evaluation session exact
 
   liveErrorPrimaryFailure = lengthSpinePairSMTLibLiveQueryPrimaryFailure
   liveErrorCleanupIncomplete = lengthSpinePairSMTLibLiveQueryCleanupIncomplete
 
-  bankSurface = CounterexampleBank.spinePairBankSurface
-  bankBridge = CounterexampleBank.spinePairBankBridge
+  bankSurface = CounterexampleBank.sourceSpinePairBankSurface
+  bankBridge = CounterexampleBank.sourceSpinePairBankBridge
 
   buildAssessment view = case view of
     ViewUnassessed -> LengthSpinePairUnassessed
@@ -1234,6 +1235,8 @@ lengthSpinePairHandoffPreparationRefusalClass refusal = case refusal of
     LengthPreparationContractRejected
   LengthSpinePairHandoffProblemRejected _ ->
     LengthPreparationCandidateSemanticsRejected
+  LengthSpinePairHandoffDjinnContractRejected _ -> LengthPreparationContractRejected
+  LengthSpinePairHandoffDjinnProblemRejected _ -> LengthPreparationCandidateSemanticsRejected
 
 -- | Reduce a canonical pair-query construction refusal to its payload-free
 -- phase.  Like the handoff classifier, this is exhaustive and does not

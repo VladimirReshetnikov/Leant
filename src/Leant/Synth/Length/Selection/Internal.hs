@@ -30,8 +30,7 @@ module Leant.Synth.Length.Selection.Internal
 import Numeric.Natural (Natural)
 
 import Language.Haskell.Djex
-  ( ExferenceLocal
-  , SolverStatus
+  ( SolverStatus
   , ValidatedLengthApplicableDomain
   , ValidatedLengthCounterexample
   , ValidatedLengthCounterexampleSimplification
@@ -230,8 +229,7 @@ selectVerifiedLengthCandidatesWithPolicy policy contract verification = do
 -- rejects, and every failure preserves the supplied batch.
 selectVerifiedLengthCandidatesWithPolicyAndCounterexampleBankContext
   :: LengthRankingPolicy
-  -> CounterexampleBank.LengthCounterexampleBankContext
-      command ExferenceLocal
+  -> CounterexampleBank.SourceLengthBankContext command
   -> LeanLengthContract
   -> VerificationBatch DetailedVerificationVariant
   -> IO LengthSelectionResult

@@ -28,6 +28,8 @@
 module Leant.Synth.Length.CounterexampleBank.Internal
   ( BankState
   , BankContext
+  , bankStateActiveBank
+  , readBankContextState
   , BankSurface (..)
   , BankBridge (..)
   , BankReplayStep (..)
@@ -49,6 +51,21 @@ module Leant.Synth.Length.CounterexampleBank.Internal
   , scalarBankBridge
   , spinePairBankSurface
   , spinePairBankBridge
+  , EngineIndexed (..)
+  , SourceLengthBank
+  , SourceLengthBankScope
+  , SourceLengthSpinePairBank
+  , SourceLengthSpinePairBankScope
+  , SourceLengthBankContext
+  , SourceLengthSpinePairBankContext
+  , withDefaultSourceLengthBankContext
+  , withDefaultSourceLengthSpinePairBankContext
+  , withSourceLengthBankContext
+  , withSourceLengthSpinePairBankContext
+  , sourceScalarBankSurface
+  , sourceScalarBankBridge
+  , sourceSpinePairBankSurface
+  , sourceSpinePairBankBridge
   , LengthCounterexampleBankState
   , emptyLengthCounterexampleBankState
   , defaultLengthCounterexampleBankState
@@ -104,7 +121,8 @@ import Control.DeepSeq (NFData, rnf)
 import Control.Exception (evaluate)
 
 import Language.Haskell.Djex
-  ( LengthCounterexampleBank
+  ( ExferenceLocal
+  , LengthCounterexampleBank
   , LengthCounterexampleBankError
   , LengthCounterexampleBankLimits
   , LengthCounterexampleBankOrigin
@@ -154,6 +172,154 @@ import Language.Haskell.Djex
   , replayLengthSMTLibCounterexampleBankSample
   , replayLengthSpinePairSMTLibCounterexampleBankSample
   )
+import Leant.Synth.Length.Adapter
+  ( SourceCheckedLengthQuery (..)
+  , SourceCheckedLengthSpinePairQuery (..)
+  )
+
+-- | This sum preserves each engine's nominal semantic indexes. A command
+-- still owns zero or one bank, not a second allowance for each engine.
+data EngineIndexed exference djinn
+  = ExferenceIndexed exference
+  | DjinnIndexed djinn
+
+instance (NFData exference, NFData djinn) => NFData (EngineIndexed exference djinn) where
+  rnf (ExferenceIndexed exact) = rnf exact
+  rnf (DjinnIndexed exact) = rnf exact
+
+type SourceLengthBank = EngineIndexed
+  (LengthCounterexampleBank ExferenceLocal) (LengthCounterexampleBank String)
+type SourceLengthBankScope = EngineIndexed
+  (LengthCounterexampleBankScope ExferenceLocal) (LengthCounterexampleBankScope String)
+type SourceLengthSpinePairBank = EngineIndexed
+  (LengthSpinePairCounterexampleBank ExferenceLocal) (LengthSpinePairCounterexampleBank String)
+type SourceLengthSpinePairBankScope = EngineIndexed
+  (LengthSpinePairCounterexampleBankScope ExferenceLocal) (LengthSpinePairCounterexampleBankScope String)
+type SourceLengthBankContext command =
+  BankContext command LengthCounterexampleBankLimits SourceLengthBank
+type SourceLengthSpinePairBankContext command =
+  BankContext command LengthSpinePairCounterexampleBankLimits SourceLengthSpinePairBank
+
+withDefaultSourceLengthBankContext
+  :: (forall command. SourceLengthBankContext command -> IO result) -> IO result
+withDefaultSourceLengthBankContext = withBankContext defaultLengthCounterexampleBankLimits
+
+withSourceLengthBankContext
+  :: LengthCounterexampleBankLimits
+  -> (forall command. SourceLengthBankContext command -> IO result) -> IO result
+withSourceLengthBankContext = withBankContext
+
+withDefaultSourceLengthSpinePairBankContext
+  :: (forall command. SourceLengthSpinePairBankContext command -> IO result) -> IO result
+withDefaultSourceLengthSpinePairBankContext =
+  withBankContext defaultLengthSpinePairCounterexampleBankLimits
+
+withSourceLengthSpinePairBankContext
+  :: LengthSpinePairCounterexampleBankLimits
+  -> (forall command. SourceLengthSpinePairBankContext command -> IO result) -> IO result
+withSourceLengthSpinePairBankContext = withBankContext
+
+engineBankSurface
+  :: BankSurface exference exferenceScope sample failure
+  -> BankSurface djinn djinnScope sample failure
+  -> BankSurface (EngineIndexed exference djinn)
+      (EngineIndexed exferenceScope djinnScope) sample failure
+engineBankSurface exference djinn = BankSurface
+  { surfaceMatchesScope = \scope bank -> case (scope, bank) of
+      (ExferenceIndexed exactScope, ExferenceIndexed exactBank) ->
+        surfaceMatchesScope exference exactScope exactBank
+      (DjinnIndexed exactScope, DjinnIndexed exactBank) ->
+        surfaceMatchesScope djinn exactScope exactBank
+      _ -> False
+  , surfaceSamples = \bank -> case bank of
+      ExferenceIndexed exact -> surfaceSamples exference exact
+      DjinnIndexed exact -> surfaceSamples djinn exact
+  , surfaceInsertReplayedSample = \sample bank -> case bank of
+      ExferenceIndexed exact -> ExferenceIndexed
+        <$> surfaceInsertReplayedSample exference sample exact
+      DjinnIndexed exact -> DjinnIndexed
+        <$> surfaceInsertReplayedSample djinn sample exact
+  }
+
+-- Lift only the selected query's bridge. The scope transition constructs the
+-- matching bank before replay; a mismatched caller remains fail-closed and
+-- keeps its original successor state. No receipt is reinterpreted across tags.
+liftEngineBankBridge
+  :: BankSurface bank scope sample failure
+  -> (limits -> scope -> bank)
+  -> (exactBank -> bank)
+  -> (bank -> Maybe exactBank)
+  -> (exactScope -> scope)
+  -> BankBridge limits exactBank exactScope sample receipt failure evaluationError
+  -> BankBridge limits bank scope sample receipt failure evaluationError
+liftEngineBankBridge surface empty wrap project wrapScope exact = BankBridge
+  { bridgeSurface = surface
+  , bridgeQueryScope = wrapScope $ bridgeQueryScope exact
+  , bridgeEmptyBank = empty
+  , bridgeReplaySample = \sample bank -> case project bank of
+      Nothing -> (bank, ReplayStepScopeMismatch)
+      Just selected -> let (successor, outcome) = bridgeReplaySample exact sample selected
+        in (wrap successor, outcome)
+  , bridgeRecordReceipt = \origin receipt bank -> case project bank of
+      Nothing -> (bank, RecordStepScopeMismatch)
+      Just selected -> let (successor, outcome) = bridgeRecordReceipt exact origin receipt selected
+        in (wrap successor, outcome)
+  }
+
+exferenceIndexed :: EngineIndexed exference djinn -> Maybe exference
+exferenceIndexed (ExferenceIndexed exact) = Just exact
+exferenceIndexed (DjinnIndexed _) = Nothing
+
+djinnIndexed :: EngineIndexed exference djinn -> Maybe djinn
+djinnIndexed (DjinnIndexed exact) = Just exact
+djinnIndexed (ExferenceIndexed _) = Nothing
+
+sourceScalarBankSurface
+  :: BankSurface SourceLengthBank SourceLengthBankScope
+      LengthCounterexampleBankSample LengthCounterexampleBankError
+sourceScalarBankSurface = engineBankSurface scalarBankSurface scalarBankSurface
+
+sourceScalarBankBridge
+  :: LengthEvaluationLimits
+  -> SourceCheckedLengthQuery
+  -> BankBridge LengthCounterexampleBankLimits SourceLengthBank SourceLengthBankScope
+      LengthCounterexampleBankSample ValidatedLengthCounterexample
+      LengthCounterexampleBankError LengthEvaluationError
+sourceScalarBankBridge limits query = case query of
+  ExferenceCheckedLengthQuery exact ->
+    liftEngineBankBridge sourceScalarBankSurface empty ExferenceIndexed
+      exferenceIndexed ExferenceIndexed $ scalarBankBridge limits exact
+  DjinnCheckedLengthQuery exact ->
+    liftEngineBankBridge sourceScalarBankSurface empty DjinnIndexed
+      djinnIndexed DjinnIndexed $ scalarBankBridge limits exact
+ where
+  empty bound scope = case scope of
+    ExferenceIndexed exact -> ExferenceIndexed $ emptyLengthCounterexampleBank bound exact
+    DjinnIndexed exact -> DjinnIndexed $ emptyLengthCounterexampleBank bound exact
+
+sourceSpinePairBankSurface
+  :: BankSurface SourceLengthSpinePairBank SourceLengthSpinePairBankScope
+      LengthSpinePairCounterexampleBankSample LengthSpinePairCounterexampleBankError
+sourceSpinePairBankSurface = engineBankSurface spinePairBankSurface spinePairBankSurface
+
+sourceSpinePairBankBridge
+  :: LengthEvaluationLimits
+  -> SourceCheckedLengthSpinePairQuery
+  -> BankBridge LengthSpinePairCounterexampleBankLimits
+      SourceLengthSpinePairBank SourceLengthSpinePairBankScope
+      LengthSpinePairCounterexampleBankSample ValidatedLengthSpinePairCounterexample
+      LengthSpinePairCounterexampleBankError LengthSpinePairEvaluationError
+sourceSpinePairBankBridge limits query = case query of
+  ExferenceCheckedLengthSpinePairQuery exact ->
+    liftEngineBankBridge sourceSpinePairBankSurface empty ExferenceIndexed
+      exferenceIndexed ExferenceIndexed $ spinePairBankBridge limits exact
+  DjinnCheckedLengthSpinePairQuery exact ->
+    liftEngineBankBridge sourceSpinePairBankSurface empty DjinnIndexed
+      djinnIndexed DjinnIndexed $ spinePairBankBridge limits exact
+ where
+  empty bound scope = case scope of
+    ExferenceIndexed exact -> ExferenceIndexed $ emptyLengthSpinePairCounterexampleBank bound exact
+    DjinnIndexed exact -> DjinnIndexed $ emptyLengthSpinePairCounterexampleBank bound exact
 
 -- Shared ownership --------------------------------------------------------
 

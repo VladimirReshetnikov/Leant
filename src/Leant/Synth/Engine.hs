@@ -35,18 +35,32 @@ module Leant.Synth.Engine
   , ExactTypedVariantOrigin
   , ExactTypedVariantRenderingFailure (..)
   , TypedCandidateSemanticSidecar
+  , CandidateSourceAuthority
+  , DjinnCandidateSourceAuthority
+  , candidateSourceAuthorityEngine
+  , candidateSourceAuthorityExference
+  , candidateSourceAuthorityDjinn
+  , foldCandidateSourceAuthority
+  , djinnSourceCandidate
+  , djinnSourceSession
+  , djinnSourceRequest
+  , closeDjinnTransportGoal
+  , djinnSourcePreparation
   , detailedCandidateGroup
   , detailedCandidateGroupRoute
   , detailedCandidateGroupVariants
   , detailedCandidateGroupVerificationVariants
   , detailedCandidateGroupSemanticSidecar
+  , detailedCandidateGroupSourceAuthority
   , detailedVerificationVariantText
   , detailedVerificationVariantOrdinal
   , detailedVerificationVariantRoute
   , detailedVerificationVariantSemanticSidecar
+  , detailedVerificationVariantSourceAuthority
   , detailedVerificationVariantExactTypedOrigin
   , exactTypedVariantOriginOrdinal
   , exactTypedVariantOriginSidecar
+  , exactTypedVariantOriginSourceAuthority
   , renderExactTypedVariantOrigin
   , typedCandidateSemanticCandidate
   , typedCandidateSemanticInventory
@@ -143,6 +157,10 @@ import Language.Haskell.Djex
       , ValueDeclaration
       )
   , Diagnostic
+  , DjinnRequest
+  , DjinnSession
+  , DjinnTermGraphAbsence
+  , DjinnTypedCandidate
   , ExferenceInventory
   , ExferenceLocal
   , ExferenceOptions (..)
@@ -182,6 +200,8 @@ import Language.Haskell.Djex
   , defaultExferenceSessionPolicy
   , defaultQueryOptions
   , djinnSessionEnvironment
+  , djinnSessionInventory
+  , djinnRequestQuery
   , environmentDeclarations
   , eraseTermGraph
   , expressionSize
@@ -198,10 +218,11 @@ import Language.Haskell.Djex
   , mkExferenceSessionWithPolicy
   , mkIdentifier
   , nameSpelling
+  , quantifyFreeVariables
   , renderDiagnostic
   , resultEvidence
   , resultSearch
-  , runDjinnQueryWithKindedInstantiationAssignments
+  , runDjinnTypedQueryWithKindedInstantiationAssignments
   , runExferenceTypedQueryWithKindedInstantiationAssignments
   , selectQueryResults
   , selectQualityQueryResults
@@ -346,7 +367,79 @@ typedCandidateSemanticAuthorityInspection
     (TypedCandidateSemanticSidecar _ authority) =
   inspectExferenceRunAuthority authority
 
--- | Exact typed origin for one spelling.  It can be the direct Exference
+-- | The exact Djinn lane remains attached to its own source-typed candidate.
+-- Its source identities are strings; they are never coerced into Exference's
+-- local identity domain or inferred from a matching rendered spelling.
+data DjinnCandidateSourceAuthority = DjinnCandidateSourceAuthority
+  DjinnTypedCandidate
+  PreparedSemanticOrigin
+  DjinnSession
+  DjinnRequest
+
+instance Eq DjinnCandidateSourceAuthority where
+  DjinnCandidateSourceAuthority leftCandidate leftOrigin leftSession leftRequest
+      == DjinnCandidateSourceAuthority rightCandidate rightOrigin rightSession rightRequest =
+    leftCandidate == rightCandidate
+      && leftOrigin == rightOrigin
+      && djinnSessionInventory leftSession == djinnSessionInventory rightSession
+      && djinnRequestQuery leftRequest == djinnRequestQuery rightRequest
+
+-- | One originating engine, one candidate, and one checked lane. A group's
+-- ownership is not replaced when another engine produces the same text.
+data CandidateSourceAuthority
+  = DjinnSourceAuthority DjinnCandidateSourceAuthority
+  | ExferenceSourceAuthority TypedCandidateSemanticSidecar
+  deriving (Eq)
+
+foldCandidateSourceAuthority
+  :: (DjinnCandidateSourceAuthority -> result)
+  -> (TypedCandidateSemanticSidecar -> result)
+  -> CandidateSourceAuthority
+  -> result
+foldCandidateSourceAuthority djinn exference authority = case authority of
+  DjinnSourceAuthority retained -> djinn retained
+  ExferenceSourceAuthority retained -> exference retained
+
+candidateSourceAuthorityEngine :: CandidateSourceAuthority -> SynthEngine
+candidateSourceAuthorityEngine DjinnSourceAuthority{} = EngineDjinn
+candidateSourceAuthorityEngine ExferenceSourceAuthority{} = EngineExference
+
+candidateSourceAuthorityExference
+  :: CandidateSourceAuthority -> Maybe TypedCandidateSemanticSidecar
+candidateSourceAuthorityExference (ExferenceSourceAuthority semantic) = Just semantic
+candidateSourceAuthorityExference DjinnSourceAuthority{} = Nothing
+
+candidateSourceAuthorityDjinn
+  :: CandidateSourceAuthority -> Maybe DjinnCandidateSourceAuthority
+candidateSourceAuthorityDjinn (DjinnSourceAuthority authority) = Just authority
+candidateSourceAuthorityDjinn ExferenceSourceAuthority{} = Nothing
+
+djinnSourceCandidate :: DjinnCandidateSourceAuthority -> DjinnTypedCandidate
+djinnSourceCandidate (DjinnCandidateSourceAuthority candidate _ _ _) = candidate
+
+-- The session is opaque and immutable; consumers obtain it only through the
+-- accepted variant's whole authority, never by reconstructing an inventory.
+djinnSourceSession :: DjinnCandidateSourceAuthority -> DjinnSession
+djinnSourceSession (DjinnCandidateSourceAuthority _ _ session _) = session
+
+djinnSourceRequest
+  :: DjinnCandidateSourceAuthority -> QueryRequest (Type String) QueryOptions
+djinnSourceRequest (DjinnCandidateSourceAuthority _ _ _ request) =
+  djinnRequestQuery request
+
+-- | Materialize Djinn's implicit universals in the translated request before
+-- checking a candidate. Free transport variables can represent opaque Lean
+-- atoms (including a List element type); they are not source-checker metas.
+-- Keep the original translation for rendering and require this same closure
+-- when relating its source goal to a retained request or Length contract.
+closeDjinnTransportGoal :: Ord variable => Type variable -> Type variable
+closeDjinnTransportGoal = quantifyFreeVariables (const True)
+
+djinnSourcePreparation :: DjinnCandidateSourceAuthority -> PreparedSynthesisInspection
+djinnSourcePreparation (DjinnCandidateSourceAuthority _ origin _ _) =
+  inspectPreparedSemanticOrigin origin
+
+-- | Exact typed origin for one spelling.  It can be the direct engine
 -- display owner or an Exference origin retained after a later duplicate was
 -- collapsed.  This is deliberately variant-scoped: in the latter case the
 -- sidecar still belongs to that Exference candidate and its original renderer
@@ -354,7 +447,7 @@ typedCandidateSemanticAuthorityInspection
 data ExactTypedVariantOrigin = ExactTypedVariantOrigin
   !Natural
   !String
-  !TypedCandidateSemanticSidecar
+  !CandidateSourceAuthority
 
 instance Eq ExactTypedVariantOrigin where
   ExactTypedVariantOrigin leftOrdinal leftText leftSidecar
@@ -401,7 +494,7 @@ showsDetailedCandidateVariant precedence ordinal text =
 data DetailedCandidateGroup = DetailedCandidateGroup
   CandidateRenderingRoute
   [DetailedCandidateVariant]
-  (Maybe TypedCandidateSemanticSidecar)
+  (Maybe CandidateSourceAuthority)
 
 -- Compare the observable checked-candidate and run authority.  The custom
 -- 'Show' instance keeps routine diagnostics independent of the retained
@@ -483,7 +576,7 @@ detailedCandidateGroupVerificationVariants
 
 verificationVariant
   :: CandidateRenderingRoute
-  -> Maybe TypedCandidateSemanticSidecar
+  -> Maybe CandidateSourceAuthority
   -> DetailedCandidateVariant
   -> DetailedVerificationVariant
 verificationVariant route retained
@@ -521,7 +614,13 @@ detailedVerificationVariantSemanticSidecar
   :: DetailedVerificationVariant
   -> Maybe TypedCandidateSemanticSidecar
 detailedVerificationVariantSemanticSidecar variant =
-  exactTypedVariantOriginSidecar
+  detailedVerificationVariantSourceAuthority variant
+    >>= candidateSourceAuthorityExference
+
+detailedVerificationVariantSourceAuthority
+  :: DetailedVerificationVariant -> Maybe CandidateSourceAuthority
+detailedVerificationVariantSourceAuthority variant =
+  exactTypedVariantOriginSourceAuthority
     <$> detailedVerificationVariantExactTypedOrigin variant
 
 -- | Exact candidate identity, when this group came from a retained checked
@@ -530,7 +629,13 @@ detailedCandidateGroupSemanticSidecar
   :: DetailedCandidateGroup
   -> Maybe TypedCandidateSemanticSidecar
 detailedCandidateGroupSemanticSidecar
-    (DetailedCandidateGroup _ _ sidecar) = sidecar
+    group = detailedCandidateGroupSourceAuthority group
+      >>= candidateSourceAuthorityExference
+
+detailedCandidateGroupSourceAuthority
+  :: DetailedCandidateGroup -> Maybe CandidateSourceAuthority
+detailedCandidateGroupSourceAuthority
+    (DetailedCandidateGroup _ _ authority) = authority
 
 -- | Apply an arbitrary textual wrapper. Such a wrapper denotes a new term and
 -- possibly a new target (notably @Classical.byContradiction@), so retaining the
@@ -558,7 +663,7 @@ retainDetailedCandidateGroupVariants
 retainDetailedCandidateGroupVariants variants group = DetailedCandidateGroup
   (detailedCandidateGroupRoute group)
   variants
-  (detailedCandidateGroupSemanticSidecar group)
+  (detailedCandidateGroupSourceAuthority group)
 
 detailedCandidateGroupVariantRecords
   :: DetailedCandidateGroup
@@ -607,9 +712,15 @@ exactTypedVariantOriginText (ExactTypedVariantOrigin _ text _) = text
 -- spelling, even when a Djinn group displayed the same text first.
 exactTypedVariantOriginSidecar
   :: ExactTypedVariantOrigin
-  -> TypedCandidateSemanticSidecar
+  -> Maybe TypedCandidateSemanticSidecar
 exactTypedVariantOriginSidecar
-    (ExactTypedVariantOrigin _ _ sidecar) = sidecar
+    origin = candidateSourceAuthorityExference
+      $ exactTypedVariantOriginSourceAuthority origin
+
+exactTypedVariantOriginSourceAuthority
+  :: ExactTypedVariantOrigin -> CandidateSourceAuthority
+exactTypedVariantOriginSourceAuthority
+    (ExactTypedVariantOrigin _ _ authority) = authority
 
 -- | Closed failure phases of re-rendering the exact checked graph retained by
 -- one typed verification origin. The graph remains owned by its opaque Djex
@@ -617,6 +728,7 @@ exactTypedVariantOriginSidecar
 -- input maps or premise layout.
 data ExactTypedVariantRenderingFailure
   = ExactTypedVariantGraphUnavailable ExferenceTermGraphAbsence
+  | ExactTypedVariantDjinnGraphUnavailable DjinnTermGraphAbsence
   | ExactTypedVariantRendererRejected String
   deriving (Eq, Show)
 
@@ -632,22 +744,31 @@ renderExactTypedVariantOrigin
   -> Either ExactTypedVariantRenderingFailure [String]
 renderExactTypedVariantOrigin
     (ExactTypedVariantOrigin _ _
-      (TypedCandidateSemanticSidecar candidate authority)) = do
+      (ExferenceSourceAuthority (TypedCandidateSemanticSidecar candidate authority))) = do
   graph <- case typedCandidateTermGraph candidate of
     Left absence -> Left $ ExactTypedVariantGraphUnavailable absence
     Right retained -> Right retained
-  let origin = exferenceAuthorityPreparation authority
-      providerMap = providerMapFromBindings
-        $ semanticOriginProviderBindings origin
   either (Left . ExactTypedVariantRendererRejected) Right
-    $ renderLeanTermGraphProjection
-        (("x" ++) . show)
-        (semanticOriginConstructorMap origin)
-        providerMap
-        (semanticOriginTypeMap origin)
-        (premiseLayoutForRenderer $ semanticOriginPremiseLayout origin)
-        (semanticOriginFitFragment origin)
-        graph
+    $ renderOriginTermGraph (("x" ++) . show)
+        (exferenceAuthorityPreparation authority) graph
+renderExactTypedVariantOrigin
+    (ExactTypedVariantOrigin _ _
+      (DjinnSourceAuthority (DjinnCandidateSourceAuthority candidate origin _ _))) = do
+  graph <- case typedCandidateTermGraph candidate of
+    Left absence -> Left $ ExactTypedVariantDjinnGraphUnavailable absence
+    Right retained -> Right retained
+  either (Left . ExactTypedVariantRendererRejected) Right
+    $ renderOriginTermGraph id origin graph
+
+renderOriginTermGraph
+  :: (local -> String) -> PreparedSemanticOrigin -> TermGraph ty local
+  -> Either String [String]
+renderOriginTermGraph localName origin = renderLeanTermGraphProjection localName
+  (semanticOriginConstructorMap origin)
+  (providerMapFromBindings $ semanticOriginProviderBindings origin)
+  (semanticOriginTypeMap origin)
+  (premiseLayoutForRenderer $ semanticOriginPremiseLayout origin)
+  (semanticOriginFitFragment origin)
 
 indexDetailedCandidateVariants :: [String] -> [DetailedCandidateVariant]
 indexDetailedCandidateVariants = zipWith
@@ -1353,16 +1474,10 @@ runTunedSynthesisWithCollection streaming limits
     EngineDjinn -> do
       prepared <- prepareSynthesis djinnRecursiveProjection
         providers extras engineFrag fitFrag
-      let origin = preparedSemanticOrigin prepared
-      outcome <- djinnRun limits djinnLimits fitFrag
-        (semanticOriginProjectionCompleteness origin)
-        (preparedRenderExpression prepared)
-        (semanticOriginSearchGoal origin)
-        (semanticOriginDeclarations origin)
-        (semanticOriginProviderAssignments origin)
+      outcome <- djinnRun limits djinnLimits prepared
       pure
         (withoutCheckedDetailedCandidates checked
-          (asCollection $ detailUnobservedOutcome outcome))
+          (asCollection outcome))
     EngineExference -> do
       prepared <- prepareSynthesis exferenceRecursiveProjection
         providers extras engineFrag fitFrag
@@ -1371,14 +1486,7 @@ runTunedSynthesisWithCollection streaming limits
     EngineBoth -> do
       djinnPrepared <- prepareSynthesis djinnRecursiveProjection
         providers extras engineFrag fitFrag
-      let djinnOrigin = preparedSemanticOrigin djinnPrepared
-      djinnCompatibility <- djinnRun limits djinnLimits fitFrag
-        (semanticOriginProjectionCompleteness djinnOrigin)
-        (preparedRenderExpression djinnPrepared)
-        (semanticOriginSearchGoal djinnOrigin)
-        (semanticOriginDeclarations djinnOrigin)
-        (semanticOriginProviderAssignments djinnOrigin)
-      let djinn = detailUnobservedOutcome djinnCompatibility
+      djinn <- djinnRun limits djinnLimits djinnPrepared
       exferencePrepared <- prepareSynthesis exferenceRecursiveProjection
         providers extras engineFrag fitFrag
       exference <- exferenceRun streaming limits multiConstructorPatterns steps
@@ -1529,15 +1637,18 @@ prepareProviderGroundFactTranslation recursiveProjection providers extras
 djinnRun
   :: SynthLimits
   -> (Int, Maybe Integer)
-  -> Frag
-  -> ProjectionCompleteness
-  -> (Expression String -> Either String [String])
-  -> Type String
-  -> [DjinnDecl]
-  -> [KindedProviderInstantiationAssignment String]
-  -> Either String SynthOutcome
-djinnRun limits laneBounds@(cutoff, budget) frag projection render goal decls
-    instantiations = do
+  -> PreparedSynthesis
+  -> Either String DetailedSynthOutcome
+djinnRun limits laneBounds@(cutoff, budget) prepared = do
+  let origin = preparedSemanticOrigin prepared
+      frag = semanticOriginFitFragment origin
+      projection = semanticOriginProjectionCompleteness origin
+      goal = semanticOriginSearchGoal origin
+      decls = semanticOriginDeclarations origin
+      instantiations = semanticOriginProviderAssignments origin
+      render = preparedRenderExpression prepared
+      providerRenderMap = providerMapFromBindings
+        $ semanticOriginProviderBindings origin
   standard <- viaDiagnostic standardDjinnSession
   targetName <- viaShow (mkIdentifier "leantSynth")
   target <- viaShow (mkDefinitionName targetName)
@@ -1551,13 +1662,13 @@ djinnRun limits laneBounds@(cutoff, budget) frag projection render goal decls
         viaDiagnostic (mkDjinnSession environment)
   let query = QueryRequest
         { requestTarget = target
-        , requestGoal = goal
+        , requestGoal = closeDjinnTransportGoal goal
         , requestContexts = []
         , requestOptions = djinnQueryOptionsForLimits limits laneBounds
         }
   request <- viaDiagnostic (mkDjinnRequest query)
   result <- viaDiagnostic
-    (runDjinnQueryWithKindedInstantiationAssignments
+    (runDjinnTypedQueryWithKindedInstantiationAssignments
       session instantiations request)
   let window = synthLimitWindow limits
       ranking = synthLimitRanking limits
@@ -1568,30 +1679,53 @@ djinnRun limits laneBounds@(cutoff, budget) frag projection render goal decls
       -- candidates before the result cutoff; sorting again here would erase
       -- their elimination, provider-cost, and diversity preferences.
       rendered =
-        [ (expressionSize expr, group)
+        [ (expressionSize expression, group)
         | candidate <- take cutoff (batchCandidates batch)
-        , let expr = functionClauseExpression (candidateOutput candidate)
-        , Right group <- [render expr]
+        , let availability = typedCandidateTermGraph candidate
+              compatibility = typedCandidateCompatibility candidate
+              fallback = functionClauseExpression . candidateOutput
+              expression = candidateQualityExpressionByAvailability
+                eraseTermGraph availability compatibility fallback
+              reconstructed = providerArgumentReconstructionRequired
+                providerRenderMap expression
+              (observedRoute, alternatives) = renderCandidateByAvailability
+                (renderOriginTermGraph id origin) render availability
+                compatibility fallback
+              -- Djinn graph absence retains its historical unobserved route.
+              -- A present graph is authoritative: rendering failure never
+              -- retries its compatibility projection. Target-only choices do
+              -- not acquire authority from the pre-reconstruction graph.
+              route = case availability of
+                Left _ -> RouteUnobserved
+                Right _ | reconstructed -> RouteUnobserved
+                        | otherwise -> observedRoute
+              authority = case availability of
+                Right _ | not reconstructed -> Just $ DjinnSourceAuthority
+                  $ DjinnCandidateSourceAuthority candidate origin session request
+                _ -> Nothing
+        , Right variants <- [alternatives]
+        , let group = DetailedCandidateGroup route
+                (indexDetailedCandidateVariants variants) authority
         ]
       terms = map snd $ case ranking of
         LegacyCandidateRanking -> sortOn fst rendered
         StructuralCandidateRanking _ -> rendered
   pure $ case resultEvidence result of
-    ValidatedCandidates -> SynthCandidates terms notes
+    ValidatedCandidates -> DetailedSynthCandidates terms notes
     ProvedUninhabitable
-      | not (projectionFamiliesComplete projection) -> SynthNoTerm
+      | not (projectionFamiliesComplete projection) -> DetailedSynthNoTerm
           ("an exact Lean family stayed opaque because its constructor schema \
            \was ambiguous or incompatible" : notes)
       | otherwise ->
-          SynthRefuted
+          DetailedSynthRefuted
             ( isNothing budget
               && projectionFragmentsComplete projection
               && fragmentProjectionComplete frag
             )
-    RequiresTargetReference -> SynthNoTerm
+    RequiresTargetReference -> DetailedSynthNoTerm
       ("only a recursive reference to the definition itself would inhabit \
        \this type" : notes)
-    NoEvidence -> SynthNoTerm notes
+    NoEvidence -> DetailedSynthNoTerm notes
 
 -- | The ranked heuristic search: the same shared environment and goal,
 -- converted to Exference's integer variable domain.  Candidates keep
@@ -1725,8 +1859,8 @@ exferenceRun streaming limits multiConstructorPatterns steps prepared = do
                       | reconstructed = RouteUnobserved
                       | otherwise = originalRoute
                     sidecar = case availability of
-                      Right _ | not reconstructed -> Just $ TypedCandidateSemanticSidecar
-                        candidate authority
+                      Right _ | not reconstructed -> Just $ ExferenceSourceAuthority
+                        $ TypedCandidateSemanticSidecar candidate authority
                       _ -> Nothing
                 in case rendered of
                   Left _ -> Nothing
@@ -2009,7 +2143,7 @@ retainExactExferenceVariantOrigins
   -> DetailedCandidateGroup
 retainExactExferenceVariantOrigins exference group
   | detailedCandidateGroupRoute group == RouteTypedCandidate = group
-  | Just _ <- detailedCandidateGroupSemanticSidecar group = group
+  | Just _ <- detailedCandidateGroupSourceAuthority group = group
   | otherwise = DetailedCandidateGroup
       (detailedCandidateGroupRoute group)
       (map retainOrigin $ detailedCandidateGroupVariantRecords group)
@@ -2042,7 +2176,7 @@ findExactTypedVariantOrigin spelling = go candidateWindow
           Just variant -> Just $ ExactTypedVariantOrigin
             (detailedCandidateVariantOrdinal variant)
             spelling
-            sidecar
+            (ExferenceSourceAuthority sidecar)
 
   matchingVariant [] = Nothing
   matchingVariant (variant : variants)

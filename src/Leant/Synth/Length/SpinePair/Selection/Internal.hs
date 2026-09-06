@@ -29,8 +29,7 @@ module Leant.Synth.Length.SpinePair.Selection.Internal
 import Numeric.Natural (Natural)
 
 import Language.Haskell.Djex
-  ( ExferenceLocal
-  , SolverStatus
+  ( SolverStatus
   , ValidatedLengthSpinePairApplicableDomain
   , ValidatedLengthSpinePairCounterexample
   , ValidatedLengthSpinePairCounterexampleSimplification
@@ -234,8 +233,7 @@ selectVerifiedLengthSpinePairCandidatesWithPolicy
 -- supplied batch.
 selectVerifiedLengthSpinePairCandidatesWithPolicyAndCounterexampleBankContext
   :: LengthRankingPolicy
-  -> CounterexampleBank.LengthSpinePairCounterexampleBankContext
-      command ExferenceLocal
+  -> CounterexampleBank.SourceLengthSpinePairBankContext command
   -> LeanLengthSpinePairContract
   -> VerificationBatch DetailedVerificationVariant
   -> IO LengthSpinePairSelectionResult

@@ -77,6 +77,7 @@ who wants the *what* can stop at the paragraph.
 - [The Djex engine](#the-djex-engine)
 - [The semantic-origin record and provider bindings](#the-semantic-origin-record-and-provider-bindings)
   - [Candidate authority, sidecars, and exact-text deduplication](#candidate-authority-sidecars-and-exact-text-deduplication)
+  - [Djinn source graphs and current validation](#djinn-source-graphs-and-current-validation)
 - [Length handoff and problem sealing](#length-handoff-and-problem-sealing)
   - [Interpretation policy and session-owned sealing](#interpretation-policy-and-session-owned-sealing)
   - [Adapter and canonical query sealing](#adapter-and-canonical-query-sealing)
@@ -171,7 +172,7 @@ Leant's synthesis preparation now builds one semantic-origin record whose
 source and search goals, declarations, provider bindings, constructor and type
 renderer maps, premise layout, and completeness facts provide the respective
 inputs projected by search and the renderer closures, then remain unchanged in
-the exact Exference run authority. Each provider binding is the sole prepared
+the exact engine-specific run authority. Each provider binding is the sole prepared
 owner of its private declaration inputs, renderer metadata, and ordered
 instantiation assignments. Preparation derives provider declarations and one
 lazy strict-map projection shared by both renderer closures; exact-origin
@@ -201,8 +202,10 @@ checked conversion before it checks request contexts and the request goal.
 ### Candidate authority, sidecars, and exact-text deduplication
 
 There is no post-search field-for-field preparation copy. The
-detailed Exference route retains an opaque checked candidate and that exact
-run authority beside the originating rendered group. The candidate remains the
+detailed Djinn and Exference routes retain a tagged, opaque checked candidate
+and that engine's exact run authority beside the originating rendered group.
+Djinn's authority retains its own request, session and prepared origin;
+Exference keeps its existing candidate and source-name table. The candidate remains the
 sole owner of its graph and any opaque checked certificate association.
 Rendering may inspect the public bare-graph projection, but a stamped
 projection has discarded that association and is rejected by Djex's public
@@ -211,8 +214,10 @@ to Djex so the domain can freshly reseal and authorize either an exact
 obligation-free provider or one exact conditional occurrence whose ground
 obligations and protected certificate prefix pass Djex's static checks. The
 rendering sidecar carries no parallel
-fallible graph-key cache. Filtering preserves a group sidecar only
+fallible graph-key cache. Filtering preserves source authority only
 with its original candidate. During combined-engine exact-text deduplication,
+an existing Djinn or Exference typed owner remains unchanged; equal text does
+not authorize exchanging the two graphs. Only
 an earlier compatibility-only spelling may retain a private variant-scoped
 witness to the first later Exference candidate which rendered the identical bytes; display
 ownership, route, ordinal, ordering, and sibling variants remain unchanged, so
@@ -241,6 +246,59 @@ earlier combined-engine origin association above is a separate boundary.
 variants. Skips do not request a refill or refund raw search work, and the
 generic `verifyCandidateGroups` API retains its earlier behavior.
 
+### Djinn source graphs and current validation
+
+Djinn's typed runner checks the final generated clause against its retained
+source request and declarations. Its graph erases to that exact clause and
+keeps the complete requested source type at the root. A leading or returned
+forall is represented by `TypedForallIntroduction` with a fresh rigid opening;
+`TypedImplicitTypeApplication` records an erased specialization separately
+from a visible type application. Globals retain their original unspecialized
+schemes. The source checker and shared graph sealer validate nominal types,
+kinds, lexical scope, constructor authority and each application witness.
+
+The Lean-to-Djex translation can represent an opaque Lean atom, including a
+`List Nat` element type, by a free transport variable. Before making a Djinn
+request, `closeDjinnTransportGoal` applies
+`quantifyFreeVariables (const True)` to make those implicit universals explicit.
+The source checker therefore receives the closed request itself and introduces
+its own rigid openings. `PreparedSemanticOrigin` retains the original translated
+source/search goals, fragments and renderer maps; closing the request does not
+rewrite that provenance or relabel an existing graph. Scalar and pair Length
+handoffs convert the original source into the owner's type-variable domain,
+apply the same Djinn closure, require exact equality with the retained request,
+and seal the contract against that same closed type. The Exference branch uses
+the identity operation at this boundary and retains its existing request rules.
+
+Leant scores and renders a graph-present Djinn candidate from graph erasure,
+using the same prepared renderer maps and premise layout as exact-origin
+replay. Failure to render an available graph does not retry its compatibility
+payload. An explicit graph absence retains Djinn's historical unobserved
+compatibility route; target-only provider-vector reconstruction also remains
+unobserved and carries no typed source owner. Missing dictionary evidence or
+unavailable source mappings must remain explicit graph absences, even when
+the corresponding compatibility candidate can still be checked by Lean.
+
+This adds source evidence to returned candidates without broadening Djinn's
+search fragment. In particular, negative recursive-list inputs remain opaque:
+a public forwarding result is not evidence that Djinn can synthesize a list
+case. Actual zero/step case support has a separate private
+source-checker-to-Length validation gate under the declared case policy; the public
+nonrecursive two-constructor case exercises the ordinary producer route.
+
+The downstream implementation and targeted tests are present. The **608-test
+Leant run and fresh Lean integration replay remain pending** for this change;
+earlier corpus, behavioral and quality receipts elsewhere in this guide do
+not validate the new graph path. On native Windows, Length configuration-file
+acquisition deliberately returns `LengthFilePlatformUnsupported`; successful
+public solver-backed `--where` filtering requires the existing supported
+POSIX acquisition and launcher environment. Native validation therefore keeps
+pure checked scalar/pair Length replay, exact emitted-term Lean kernel replay,
+and public unsupported-policy refusal as separate checks. It does not count a
+preserved, unassessed candidate as successful Length assessment. The vendored
+[source-typed evidence guide](../lib/Djex/docs/source-typed-evidence-graph.md)
+records the producer, rejection, compatibility and consumer requirements.
+
 ## Length handoff and problem sealing
 
 The Length sections that follow assume the reader knows what a satisfiable
@@ -251,7 +309,7 @@ maintainer's source map, so it is the place to start when this material is
 new.
 
 `Leant.Synth.Length.Handoff` binds callback-accepted text back to its exact
-typed origin, original Exference renderer ordinal and exact re-rendered variant,
+typed origin, original engine's renderer ordinal and exact re-rendered variant,
 family provenance, an opaque Djex session which owns the exact inventory and
 provider assumptions, its checked interpretation policy, the separately
 reassociated contract, and the
@@ -263,6 +321,29 @@ selected current contract policy rejects cases. The exact zero/step policy
 instead owns selection of the retained original ordinal and equality with the
 callback-accepted text; other valid renderer alternatives neither replace that
 retained variant nor make its exact association ambiguous.
+
+Scalar and canonical-pair handoffs dispatch on the retained source owner.
+The Djinn branch supplies its own typed candidate and the source inventory
+from that same Djinn session; the Exference branch keeps its existing checked
+candidate, inventory and source-name conversion. Djinn's adapter preserves the
+original graph association while tagging compatibility types into the graph's
+type-variable domain. It does not rebuild, rekey or borrow an Exference graph.
+The old Exference-only projections explicitly refuse a Djinn owner; the
+engine-tagged checked-problem and query surfaces enter the same shared Length
+sealers. Full forall roots are matched through the existing checked root-opening
+correspondence, and erased forall/type-application nodes preserve runtime
+evaluation. Source graph availability does not expand Length's constructor,
+case or semantic policy. Counterexample banks also retain the engine tag, so
+switching owners cannot transfer a previously replayed receipt.
+
+Scalar and pair live assessment also keep execution and observation replay
+inside one invocation of their engine-tagged query continuation. The replay
+gate closes over the exact query used to run the solver; an observation cannot
+escape that type identity and be replayed under a second, freshly opened query.
+Only the existing identity-independent assessment leaves the continuation:
+a replayed counterexample, a heuristic solver status, or a sanitized
+fingerprint/evidence refusal. This preserves the distinction between observing
+a solver response and accepting evidence for this particular checked problem.
 
 ### Interpretation policy and session-owned sealing
 

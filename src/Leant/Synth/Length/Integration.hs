@@ -50,8 +50,7 @@ module Leant.Synth.Length.Integration
   ) where
 
 import Language.Haskell.Djex
-  ( ExferenceLocal
-  , LengthSMTLibExecutableLaunchStrategy
+  ( LengthSMTLibExecutableLaunchStrategy
   )
 
 import Leant.Synth.Engine (DetailedVerificationVariant)
@@ -196,13 +195,11 @@ data LengthAssessmentContext command
   | LengthAssessmentScalarFilteringContext
       !LengthRankingPolicy
       LeanLengthContract
-      !(CounterexampleBank.LengthCounterexampleBankContext
-          command ExferenceLocal)
+      !(CounterexampleBank.SourceLengthBankContext command)
   | LengthAssessmentSpinePairFilteringContext
       !LengthRankingPolicy
       LeanLengthSpinePairContract
-      !(CounterexampleBank.LengthSpinePairCounterexampleBankContext
-          command ExferenceLocal)
+      !(CounterexampleBank.SourceLengthSpinePairBankContext command)
 
 type role LengthAssessmentContext nominal
 
@@ -223,12 +220,12 @@ withLengthAssessmentRequestContext request action = case request of
       (LengthBehaviorRank, LeanLengthSpinePairContractSelection contract) ->
         action $ LengthAssessmentSpinePairRankingContext policy contract
       (LengthBehaviorFilter, LeanLengthScalarContractSelection contract) ->
-        CounterexampleBank.withDefaultLengthCounterexampleBankContext
+        CounterexampleBank.withDefaultSourceLengthBankContext
           $ \context -> action
               $ LengthAssessmentScalarFilteringContext
                   policy contract context
       (LengthBehaviorFilter, LeanLengthSpinePairContractSelection contract) ->
-        CounterexampleBank.withDefaultLengthSpinePairCounterexampleBankContext
+        CounterexampleBank.withDefaultSourceLengthSpinePairBankContext
           $ \context -> action
               $ LengthAssessmentSpinePairFilteringContext
                   policy contract context

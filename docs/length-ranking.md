@@ -253,12 +253,22 @@ leak-prevention guarantees, not executable, solver, or behavioral evidence.
 
 ### Candidate eligibility
 
-Only callback-verified candidates with direct or exact-duplicate-recovered
-typed Exference authority are eligible. Candidates with neither authority
-remain in place with a payload-free preparation refusal and do not open a
-worker by themselves. The default `djinn` synthesis engine supplies no typed
-graph; select `:set synth-engine exference` or `both` to produce candidates
-which may reach this ranking path.
+Only callback-verified candidates with an exact typed source owner are
+eligible. Djinn and Exference retain their own candidate, source request and
+session inventory; `both` preserves the owner of each retained occurrence.
+Equal rendered text does not authorize replacing an existing Djinn graph with
+an Exference graph, or vice versa. The established variant-specific recovery
+of a later Exference origin applies only to an earlier occurrence that has no
+typed source authority.
+
+The default `djinn` engine can now enter the shared scalar and canonical-pair
+Length sealers using its own source graph, including a full forall root with
+checked rigid openings. Graph absence, unavailable source or dictionary
+evidence, and unsupported Length semantics remain preparation refusals;
+those candidates stay in place and do not open a worker by themselves.
+Target-only renderer reconstruction likewise cannot acquire authority from
+the graph of a different term. See the
+[source-ownership implementation and pending validation](synth-internals.md#djinn-source-graphs-and-current-validation).
 
 ## Command-level ranking and hard filtering
 
@@ -422,11 +432,14 @@ semantic vocabulary rather than sharing an ad hoc text grammar or executing
 host expressions. Djex's `parseHaskellLengthWhereSource` and Leant's
 `parseLeanLengthWhereSource` lower their nominally separate host spellings to
 the same opaque bounded Length source. Djex then runs the request through its
-standalone checked Exference/Z3/replay path; Leant runs it through the same
-command-local scheduler used by explicit inline constraints. Djinn currently
-lacks the source-typed graph required for behavioral assessment, so Djex
-fails a Djinn-only constrained request closed and labels that lane unavailable
-under `:compare`. Both REPLs lead with the host-native examples while keeping
+checked Djinn or Exference candidate/session path into the shared Length,
+Z3 and independent-replay boundary; Leant runs it through the same
+command-local scheduler used by explicit inline constraints. Each lane must
+supply its own source graph and exact inventory. Missing evidence remains an
+explicit candidate-local refusal rather than a reason to borrow the other
+engine's graph. These paths retain their existing platform and activated-policy
+requirements; native Windows configuration-file acquisition still fails closed.
+Both REPLs lead with the host-native examples while keeping
 custom models, roles, laws, and richer contracts on their explicit surfaces.
 
 ### Retention and rejection taxonomy
@@ -792,14 +805,17 @@ about purity, totality, parametricity, strictness, or effects.
 `candidateCasePolicy` is also always explicit. `"cases-rejected"` preserves the
 singleton, ordinal-zero renderer rule. `"exact-spine-zero-step-v1"` enables the
 one nonempty case shape currently modeled by Length. The policy is not inferred
-from a graph. Exference must independently retain a
+from a graph. The candidate's own source authority must independently retain a
 checked complete case over the exact recursive two-constructor spine, with one
 zero-field constructor and one two-field constructor whose single recursive
 field is the scrutinized spine. Djex freshly re-seals that graph against the
 contract-resolved `List` schema. The zero branch receives length zero; the step
 branch receives an opaque payload and a tail length `input monus 1`; the whole
 case retains the union of provider laws reached by either branch. Every other
-case shape fails closed.
+case shape fails closed. This consumer rule does not broaden Djinn's proof
+search: negative recursive-list inputs remain opaque there. An exact List case
+checked at the private source-checker/Length seam is separate evidence from a
+public recursive-list synthesis result; forwarding alone exercises no case.
 
 This remains a bounded model-relative interpretation. It does not prove Lean
 purity, totality, termination, strictness, source-level equivalence, or a
@@ -890,11 +906,14 @@ pairContract = LeanLengthSpinePairContract
   , leanLengthSpinePairContractProviderLaws = []
   }
 
-queryResult = prepareCheckedLengthSpinePairQuery pairContract verified
+queryResult = prepareSourceCheckedLengthSpinePairQuery pairContract verified
 ```
 
 Here `verified` is the existing callback-verified candidate carrying its exact
-Exference origin; the example does not manufacture that authority. The
+Djinn or Exference origin; the example does not manufacture that authority.
+The result retains an engine-tagged checked query. The older
+`prepareCheckedLengthSpinePairQuery` projection remains Exference-only and
+explicitly refuses a Djinn owner. The
 handoff reuses the scalar path's exact origin checks, configured-spine and
 provider resolution, candidate-case/target-role policy, and sealed session
 authority. It does not invent a semantic-family binding for Lean's built-in
@@ -1777,7 +1796,8 @@ uses the same versionless domain-selection rule.
 
 ### Using a binary-product contract document with `:synth`
 
-Then select a typed Exference-producing engine and synthesize normally. A
+Then select `djinn`, `exference`, or `both` and synthesize normally. A candidate
+must retain its own eligible source graph under the activated policy. A
 versionless binary-product document can replace the startup-fixed contract for
 one command without changing the CLI grammar:
 
