@@ -268,7 +268,7 @@ evidence, and unsupported Length semantics remain preparation refusals;
 those candidates stay in place and do not open a worker by themselves.
 Target-only renderer reconstruction likewise cannot acquire authority from
 the graph of a different term. See the
-[source-ownership implementation and pending validation](synth-internals.md#djinn-source-graphs-and-current-validation).
+[source-ownership implementation and validated coverage](synth-internals.md#djinn-source-graphs-and-current-validation).
 
 ## Command-level ranking and hard filtering
 

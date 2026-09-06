@@ -286,15 +286,25 @@ case. Actual zero/step case support has a separate private
 source-checker-to-Length validation gate under the declared case policy; the public
 nonrecursive two-constructor case exercises the ordinary producer route.
 
-The downstream implementation and targeted tests are present. The **608-test
-Leant run and fresh Lean integration replay remain pending** for this change;
-earlier corpus, behavioral and quality receipts elsewhere in this guide do
-not validate the new graph path. On native Windows, Length configuration-file
+The executable and test suite compile with GHC 9.12.4. The **complete 608-test
+Leant suite passed**, including all 32 focused rendering and source-ownership
+tests. Fresh Lean 4.32.0 replay checked all 350 Djinn Church candidates with
+empty axiom inventories; every displayed candidate used the typed graph route,
+with no compatibility fallback. All 81 compact rank-N and provider queries
+passed kernel replay, exact provider checks and unchanged golden comparisons.
+Separate named `not` queries for Djinn and `both` passed exact candidate and
+predicate replay and rejected the false oracle. The
+[acceptance report](../lib/Djex/docs/reports/2026-09-06-djinn-source-graphs.md)
+records these current receipts separately from earlier corpus and quality runs.
+
+On native Windows, Length configuration-file
 acquisition deliberately returns `LengthFilePlatformUnsupported`; successful
 public solver-backed `--where` filtering requires the existing supported
 POSIX acquisition and launcher environment. Native validation therefore keeps
 pure checked scalar/pair Length replay, exact emitted-term Lean kernel replay,
-and public unsupported-policy refusal as separate checks. It does not count a
+and public unsupported-policy refusal as separate checks. The final frontend
+controls confirmed four inactive-policy refusals and the expected platform
+acquisition refusal. This does not count a
 preserved, unassessed candidate as successful Length assessment. The vendored
 [source-typed evidence guide](../lib/Djex/docs/source-typed-evidence-graph.md)
 records the producer, rejection, compatibility and consumer requirements.

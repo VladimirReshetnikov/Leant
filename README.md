@@ -131,7 +131,7 @@ Companion documents:
   alongside Exference, including full forall roots and erased type operations.
   Rendering and Length consume the candidate's own graph and source inventory;
   `both` preserves each retained candidate's engine ownership. See the
-  [implementation and pending validation](docs/synth-internals.md#djinn-source-graphs-and-current-validation).
+  [implementation and validated coverage](docs/synth-internals.md#djinn-source-graphs-and-current-validation).
 - **Candidate quality before the cutoff.** Configurable `balanced`, `compact`,
   `diverse`, and `legacy` profiles guide search and rank checked candidates
   before verification. Structural cost, diversity, and checked
