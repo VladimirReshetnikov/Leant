@@ -43,6 +43,7 @@ There is a manual: **[docs/Leant_Overview/Leant_Overview.pdf](https://raw.github
 - [Usage](#usage) — command-line options and the command table
 - [Interactive proving — `:prove`](#interactive-proving--prove)
 - [`:synth` — automatic term synthesis](#synth--automatic-term-synthesis)
+  - [Behavioral examples](#behavioral-examples)
   - [Higher-order plumbing](#higher-order-plumbing)
   - [Programs you already know](#programs-you-already-know)
   - [Rank-N and impredicative goals](#rank-n-and-impredicative-goals)
@@ -68,6 +69,9 @@ Companion documents:
   Length counterexample-ranking and replay-authorized filtering reference;
 - **[Candidate quality](docs/candidate-quality.md)** — ranking profiles,
   checked simplification, and revision-pinned acceptance results;
+- **[Behavioral assertions](docs/behavioral-synthesis.md)** — the new
+  `:synth f : TYPE where PROP` entrance, exact candidate checks, and its
+  current validation status;
 - **[docs/synth-internals.md](docs/synth-internals.md)** — the design
   boundaries and dated-report index behind `:synth`;
 - **[Lean from First Principles](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Lean_from_First_Principles/Lean_from_First_Principles.pdf)**
@@ -424,6 +428,27 @@ They illustrate checked terms from their recorded runs; structural ranking
 can change the displayed order without changing the requested type. The
 [quality guide](docs/candidate-quality.md) distinguishes the new profiles
 from the legacy ordering used by the earlier acceptance receipts.
+
+### Behavioral examples
+
+Name the function and state its expected behavior using ordinary Lean
+propositions:
+
+```text
+:synth f : (∀ α : Type, α → α → α) where f Nat 11 29 = 29 ∧ f Bool true false = false
+```
+
+Leant checks every candidate at the requested type, then asks Lean to prove the
+supplied assertion with `decide`. Only an exact candidate whose assertion passes
+can occupy a displayed-result slot. A falsified assertion rejects that candidate;
+an error, timeout, or unavailable decision procedure is inconclusive and does not
+pass. The query works with Djinn, Exference, and `both`.
+
+This checks the assertion as written: finite examples do not establish a
+universal algorithmic specification. The existing `--where List.length ... --`
+syntax remains the separate symbolic Length interface. See the
+[behavioral synthesis guide](docs/behavioral-synthesis.md) for the six-operation
+Church corpus, examples, and checking limits.
 
 ### Higher-order plumbing
 

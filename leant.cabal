@@ -26,6 +26,7 @@ Extra-Source-Files:
   test-church/README.md
   test-church/quality.md
   docs/candidate-quality.md
+  docs/behavioral-synthesis.md
   test-church/UniverseProbe.lean
   test-church/MixedSpineSyntax.lean
   test/*.txt
@@ -52,6 +53,7 @@ Executable leant
     Leant.Session.Replay
     Leant.Session.Snapshot
     Leant.Synth.BehavioralSelection
+    Leant.Synth.Behavioral
     Leant.Synth.BehavioralSelection.Internal
     Leant.Synth.Engine
     Leant.Synth.Engine.Parallel
@@ -127,6 +129,7 @@ Test-Suite leant-synth-tests
     Leant.Backend.Isolated
     Leant.Options
     Leant.Synth.BehavioralSelection
+    Leant.Synth.Behavioral
     Leant.Synth.BehavioralSelection.Internal
     Leant.Synth.Engine
     Leant.Synth.Engine.Parallel

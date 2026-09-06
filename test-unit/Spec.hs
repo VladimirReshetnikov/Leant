@@ -218,6 +218,9 @@ import Leant.Synth.Engine
   , detailedVerificationVariantSemanticSidecar
   , detailedVerificationVariantText
   , defaultSynthLimits
+  , parseSynthDjinnStrategy
+  , synthDjinnStrategyName
+  , djinnQueryOptionsForLimits
   , forceDetailedOutcome
   , forceDetailedSynthCursorStep
   , inspectExferencePreparation
@@ -642,6 +645,19 @@ import Leant.Synth.Verification
   , verifiedCandidates
   , verifyCandidateGroups
   , verifyDistinctCandidateGroupsBy
+  , verifyBehavioralCandidateGroupsBy
+  )
+import Language.Haskell.Synthesis.Behavioral
+  ( BehavioralLanguage (LeanBehavioral)
+  , BehavioralQuery (..)
+  , parseBehavioralQuery
+  )
+import Leant.Synth.Behavioral
+  ( BehavioralVerdict (..)
+  , behavioralSyntaxProgram
+  , behavioralPreflightProgram
+  , behavioralDecisionProgram
+  , decideBehavioralBy
   )
 import Leant.Session.Replay (itCounterAfterHistory, replayHistoryWith)
 import Leant.Session.Snapshot
@@ -684,6 +700,7 @@ main = do
       , translationPreparationTests
       , providerScheduleTests
       , candidateRankingIntegrationTests
+      , djinnStrategyIntegrationTests
       , combinedEngineMergeTests
       , parallelEnginePairTests
       , parallelVerificationSchedulerTests
@@ -704,6 +721,7 @@ main = do
       , replayPlanTests
       , providerProgramTests
       , candidateVerificationTests
+      , hostBehavioralTests
       , verificationObservabilityTests
       , postVerificationTests
       , behavioralSelectionTests
@@ -2578,6 +2596,145 @@ candidateVerificationTests = testGroup "candidate verification programs"
   [ testCase "retry valid opaque inhabitants as noncomputable" $
       candidateVerificationProgram "Widget" "Widget.saved" @?=
         "set_option autoImplicit true in noncomputable example : (Widget) := (Widget.saved)"
+  ]
+
+hostBehavioralTests :: TestTree
+hostBehavioralTests = testGroup "host behavioral synthesis"
+  [ testCase "admit named assertions without changing leading Length syntax" $ do
+      parseBehavioralQuery LeanBehavioral
+        "select : Bool → Bool where select true = false" @?=
+          Right (Just $ BehavioralQuery "select" "Bool → Bool" "select true = false")
+      parseBehavioralQuery LeanBehavioral
+        "--where List.length result = List.length arg0 -- List Nat → List Nat" @?=
+          Right Nothing
+  , testCase "prepare a cold synthesis environment before starting the assertion clock" $ do
+      sourceLines <- lines <$> readFile "src/Main.hs"
+      let entrance = mainSourceSection "runBehavioralSynth st query = do"
+            "behavioralCheckedResponse ::" sourceLines
+      prepare <- expectMainSourcePosition "behavioral cold-start boundary"
+        "prepared <- ensureSynthEnv st" entrance
+      preparedGuard <- expectMainSourcePosition "behavioral cold-start boundary"
+        "Right _ -> runPrepared" entrance
+      clock <- expectMainSourcePosition "behavioral cold-start boundary"
+        "started <- getCurrentTime" entrance
+      preflight <- expectMainSourcePosition "behavioral cold-start boundary"
+        "syntax <- runBehavioralCommand st initial True" entrance
+      assertBool "cold setup consumed the assertion allowance or bypassed preparation failure"
+        $ prepare < preparedGuard && preparedGuard < clock && clock < preflight
+      assertMainSourceContains "unchanged behavioral request deadline" entrance
+        "BehavioralRun query deadline observations"
+      length (mainSourcePositions "started <- getCurrentTime" entrance) @?= 1
+  , testCase "parse complete terms and preserve trailing comments at all boundaries" $ do
+      let query = BehavioralQuery "f" "∀ A : Type, A → A -- type comment"
+            "f Nat 7 = 7 -- predicate comment"
+          syntax = behavioralSyntaxProgram query
+          preflight = behavioralPreflightProgram query
+          decision = behavioralDecisionProgram False query "f -- provider named f"
+      assertBool "host terms are not parsed independently"
+        $ "Parser.runParserCategory" `isInfixOf` syntax
+      assertBool "preflight did not retain the exact polymorphic candidate binder"
+        $ (behavioralType query ++ "\n) → Prop := fun f => (\n") `isInfixOf` preflight
+      assertBool "a predicate line comment swallowed its closing delimiter"
+        $ (behavioralPredicate query ++ "\n)) := by decide") `isInfixOf` decision
+      assertBool "the named binder captured or rewrote its nonrecursive RHS"
+        $ ") := (\nf -- provider named f\n); (\n" `isInfixOf` decision
+      assertBool "unknown predicate names were silently auto-bound"
+        $ "set_option autoImplicit false in" `isInfixOf` preflight
+      assertBool "negation was not outside the whole lexical candidate binding"
+        $ "example : ¬ (\nlet f" `isInfixOf` behavioralDecisionProgram True query "f"
+  , testCase "escape quoted host syntax without executing command text" $ do
+      let program = behavioralSyntaxProgram
+            $ BehavioralQuery "f" "Nat\n-- comment" "f = \"a\\b\""
+      assertBool "newline was embedded in the source string"
+        $ "Nat\\n-- comment" `isInfixOf` program
+      assertBool "quote/backslash source did not remain a string literal"
+        $ "f = \\\"a\\\\b\\\"" `isInfixOf` program
+  , testCase "a positive kernel decision does not demand negation" $ do
+      verdict <- decideBehavioralBy $ \negative ->
+        if negative then error "positive success demanded a second proof"
+          else pure (Right True)
+      verdict @?= BehavioralSatisfied
+  , testCase "only a checked negation establishes falsity" $ do
+      attempts <- newIORef []
+      verdict <- decideBehavioralBy $ \negative -> do
+        modifyIORef' attempts (++ [negative])
+        pure (Right negative)
+      verdict @?= BehavioralFalsified
+      readIORef attempts >>= (@?= [False, True])
+      unknown <- decideBehavioralBy (const $ pure $ Right False)
+      assertBool "two failed proofs were treated as a counterexample" $ case unknown of
+        BehavioralInconclusive _ -> True
+        _ -> False
+  , testCase "transport failure is inconclusive and cannot reuse a retired backend" $ do
+      verdict <- decideBehavioralBy $ \negative ->
+        if negative then error "transport failure reused the backend"
+          else pure (Left "request deadline")
+      verdict @?= BehavioralInconclusive "request deadline"
+  , testCase "a later rendering can satisfy the assertion before the success cutoff" $ do
+      attempts <- newIORef ([] :: [String])
+      let verify term = modifyIORef' attempts (++ [term]) >> pure VariantAccepted
+          assess "wrong" = pure BehavioralFalsified
+          assess _ = pure BehavioralSatisfied
+      (batch, verdicts) <- verifyBehavioralCandidateGroupsBy id 1 verify assess
+        (("wrong" : "right" : error "successful variant forced its tail")
+          : error "success quota forced another group")
+      verifiedCandidates batch @?= ["right"]
+      verdicts @?= [("wrong", BehavioralFalsified), ("right", BehavioralSatisfied)]
+      readIORef attempts >>= (@?= ["wrong", "right"])
+      failedCandidateGroups batch @?= 0
+      observationCount LeanCandidateVerified (verificationObservations batch) @?= 2
+  , testCase "false and inconclusive assertions do not become Lean type failures" $ do
+      let verify "illtyped" = pure $ VariantRejected LeanErrorDiagnostic
+          verify _ = pure VariantAccepted
+          assess "false" = pure BehavioralFalsified
+          assess "unknown" = pure $ BehavioralInconclusive "not decidable"
+          assess "illtyped" = error "behavior was checked before the type"
+          assess _ = pure BehavioralSatisfied
+      (batch, verdicts) <- verifyBehavioralCandidateGroupsBy id 1 verify assess
+        [["illtyped"], ["false"], ["unknown"], ["pass"]]
+      verifiedCandidates batch @?= ["pass"]
+      failedCandidateGroups batch @?= 1
+      length verdicts @?= 3
+      observationCount (LeanVerificationFailure LeanErrorDiagnostic)
+        (verificationObservations batch) @?= 1
+  , testCase "deduplicate only both-accepted spellings without refilling the caller bound" $ do
+      attempts <- newIORef ([] :: [(String, Int)])
+      let verify candidate = modifyIORef' attempts (++ [candidate]) >> pure VariantAccepted
+          assess (_, occurrence) = pure $ if occurrence == 0
+            then BehavioralFalsified else BehavioralSatisfied
+          bounded = take 3 $ [[("same", 0)], [("same", 1)], [("same", 2)]]
+            ++ error "behavioral filtering refilled the raw window"
+      (batch, _) <- verifyBehavioralCandidateGroupsBy fst 5 verify assess bounded
+      verifiedCandidates batch @?= [("same", 1)]
+      readIORef attempts >>= (@?= [("same", 0), ("same", 1)])
+  , testCase "zero quota leaves callbacks keys and input untouched" $ do
+      (batch, verdicts) <- verifyBehavioralCandidateGroupsBy
+        (error "zero quota forced the key" :: String -> String) 0
+        (error "zero quota forced type verification")
+        (error "zero quota forced behavior verification")
+        (error "zero quota forced groups")
+      verifiedCandidates batch @?= []
+      verdicts @?= []
+  , testCase "retain the successful variant's ordinal and exact owner" $ do
+      let candidates = detailedCandidateGroupVerificationVariants
+            $ detailedCandidateGroup RouteUnobserved ["wrong", "right"]
+          assess candidate = pure $ if detailedVerificationVariantText candidate == "right"
+            then BehavioralSatisfied else BehavioralFalsified
+      (batch, _) <- verifyBehavioralCandidateGroupsBy detailedVerificationVariantText 1
+        (const $ pure VariantAccepted) assess [candidates]
+      case verifiedCandidateReceipts batch of
+        [receipt] -> do
+          let candidate = verifiedCandidate receipt
+          detailedVerificationVariantText candidate @?= "right"
+          detailedVerificationVariantOrdinal candidate @?= 1
+          detailedVerificationVariantRoute candidate @?= RouteUnobserved
+          assertBool "behavior invented an exact typed origin"
+            $ isNothing $ detailedVerificationVariantExactTypedOrigin candidate
+          case prepareCheckedLengthProblem
+              (error "behavioral acceptance forced an unauthorized Length contract") receipt of
+            Left (LengthHandoffNotTypedRoute RouteUnobserved) -> pure ()
+            _ -> assertFailure "behavioral acceptance granted Length authority"
+        _ -> assertFailure "wrong number of exact behavioral receipts"
   ]
 
 verificationObservabilityTests :: TestTree
@@ -5334,6 +5491,69 @@ providerScheduleTests = testGroup "live provider widening"
           map snd stages @?= [take count providers | (_, count) <- expected]
   ]
 
+djinnStrategyIntegrationTests :: TestTree
+djinnStrategyIntegrationTests = testGroup "Djinn strategy integration"
+  [ testCase "retain depth-first by default and parse only explicit strategies" $ do
+      synthLimitDjinnStrategy defaultSynthLimits @?= Djex.DepthFirst
+      forM_ [("depth-first", Djex.DepthFirst), ("interleave", Djex.Interleave)] $
+        \(spelling, strategy) -> do
+          parseSynthDjinnStrategy spelling @?= Just strategy
+          synthDjinnStrategyName strategy @?= spelling
+          let selected = defaultSynthLimits { synthLimitDjinnStrategy = strategy }
+          selected { synthLimitDjinnStrategy = Djex.DepthFirst } @?= defaultSynthLimits
+      forM_ ["", "breadth-first", "Interleave", "interleave extra"] $ \spelling ->
+        parseSynthDjinnStrategy spelling @?= Nothing
+  , testCase "carry strategy into actual Djinn options without replacing lane bounds" $ do
+      forM_ [Djex.DepthFirst, Djex.Interleave] $ \strategy ->
+        forM_ [(1, Nothing), (17, Just 31), (4096, Just 100000)] $ \laneBounds -> do
+          let limits = defaultSynthLimits
+                { synthLimitWindow = 23
+                , synthLimitBudget = Just 47
+                , synthLimitRanking = Djex.diverseCandidateRankingPolicy
+                , synthLimitDjinnStrategy = strategy
+                }
+              options = djinnQueryOptionsForLimits limits laneBounds
+              (cutoff, budget) = laneBounds
+          options @?= Djex.defaultQueryOptions
+            { Djex.optionAlternatives = True
+            , Djex.optionCutoff = cutoff
+            , Djex.optionBudget = budget
+            , Djex.optionRanking = Djex.diverseCandidateRankingPolicy
+            , Djex.optionProviderCosts = Map.empty
+            , Djex.optionStrategy = strategy
+            }
+      djinnQueryOptionsForLimits defaultSynthLimits (candidateWindow, Nothing)
+        @?= Djex.defaultQueryOptions
+          { Djex.optionAlternatives = True
+          , Djex.optionCutoff = candidateWindow
+          }
+  , testCase "wire the local setting and both common Djinn request paths" $ do
+      source <- lines <$> readFile "src/Main.hs"
+      let setting = mainSourceSection
+            "[\"synth-djinn-strategy\", value]"
+            "[\"synth-steps\", value]" source
+      mapM_ (assertMainSourceContains "Djinn strategy setting" setting)
+        [ "case parseSynthDjinnStrategy value of"
+        , "(rsSynthLimits s) { synthLimitDjinnStrategy = strategy }"
+        , "[\"synth-djinn-strategy\"] -> do"
+        , "\"synth djinn-strategy: \" ++ synthDjinnStrategyName strategy"
+        , "\"synth-djinn-strategy\" : _ ->"
+        , "usage: :set synth-djinn-strategy depth-first|interleave"
+        ]
+      assertBool "invalid strategy was forwarded to Lean"
+        $ not $ "sendCmd" `isInfixOf` unlines setting
+      assertMainSourceContains "synthesis settings" source
+        "row \"synth-djinn-strategy\" (synthDjinnStrategyName (synthLimitDjinnStrategy limits))"
+      assertMainSourceContains "synthesis help" source
+        ":set synth-djinn-strategy S depth-first (default) | interleave"
+      engine <- lines <$> readFile "src/Leant/Synth/Engine.hs"
+      mapM_ (assertMainSourceContains "common Djinn strategy request" engine)
+        [ "outcome <- djinnRun limits djinnLimits fitFrag"
+        , "djinnCompatibility <- djinnRun limits djinnLimits fitFrag"
+        , "requestOptions = djinnQueryOptionsForLimits limits laneBounds"
+        ]
+  ]
+
 candidateRankingIntegrationTests :: TestTree
 candidateRankingIntegrationTests = testGroup "candidate quality integration"
   [ testCase "select all public ranking profiles without changing resource bounds" $ do
@@ -5365,7 +5585,7 @@ candidateRankingIntegrationTests = testGroup "candidate quality integration"
       assertBool "ranking setting forwarded an invalid mode to Lean"
         $ not $ "sendCmd" `isInfixOf` unlines setting
       mapM_ (assertMainSourceContains "ranking-neutral parallel admission" parallel)
-        [ "limits { synthLimitRanking = defaultCandidateRankingPolicy } == defaultSynthLimits"
+        [ "limits { synthLimitRanking = defaultCandidateRankingPolicy , synthLimitDjinnStrategy = synthLimitDjinnStrategy defaultSynthLimits } == defaultSynthLimits"
         , "&& defaultSearchBounds"
         ]
       assertMainSourceContains "synthesis settings" source
@@ -14096,13 +14316,13 @@ assertLeanLengthWhereRuntimeArchitecture = do
         "import Leant.Synth.Length.Contract.File.Acquire" mainLines
       commandSection = mainSourceSection
         "cmdSynth :: St -> String -> IO ()"
-        "-- | Resolve the ordinary explicit goal" mainLines
+        "-- The query name is a lexical predicate binder" mainLines
       explicitCommandSection = mainSourceSection
         "  runInline ::"
         "  runNativeInline ::" mainLines
       nativeCommandSection = mainSourceSection
         "  runNativeInline ::"
-        "-- | Resolve the ordinary explicit goal" mainLines
+        "-- The query name is a lexical predicate binder" mainLines
       establishedRunSection = mainSourceSection
         "synthRun ::"
         "-- | Activate one already authorized" mainLines
@@ -14216,7 +14436,7 @@ assertLeanLengthWhereRuntimeArchitecture = do
     "withLengthAssessmentRequestContext" explicitInlineSection
   explicitScheduler <- expectMainSourcePosition
     "explicit inline context lifetime"
-    "synthGo assessmentContext st args retriedVars" explicitInlineSection
+    "synthGo Nothing assessmentContext st args retriedVars" explicitInlineSection
   length (mainSourcePositions
       "withLengthAssessmentRequestContext" explicitInlineSection) @?= 1
   assertBool "explicit translation, resolution, and context order changed"
@@ -14239,7 +14459,7 @@ assertLeanLengthWhereRuntimeArchitecture = do
     "withLengthAssessmentRequestContext" nativeInlineSection
   nativeScheduler <- expectMainSourcePosition
     "concise inline context lifetime"
-    "synthGo assessmentContext st args retriedVars" nativeInlineSection
+    "synthGo Nothing assessmentContext st args retriedVars" nativeInlineSection
   length (mainSourcePositions
       "withLengthAssessmentRequestContext" nativeInlineSection) @?= 1
   assertBool "concise translation, resolution, and context order changed"
@@ -15872,8 +16092,11 @@ assertLengthAssessmentMainCommandContext = do
         "data ReplState = ReplState"
         "-- | Backend-local identifiers" sourceLines
       commandSection = mainSourceSection
-        "cmdSynth :: St -> String -> IO ()"
-        "-- | Select one command-local assessment authority" sourceLines
+        "cmdSynthEstablished :: St -> String -> IO ()"
+        "-- The query name is a lexical predicate binder" sourceLines
+      hostCommandSection = mainSourceSection
+        "runBehavioralSynth ::"
+        "behavioralCheckedResponse ::" sourceLines
       runSection = mainSourceSection
         "synthRun :: LengthAssessmentRequest"
         "-- | Activate one already authorized" sourceLines
@@ -15890,15 +16113,15 @@ assertLengthAssessmentMainCommandContext = do
         "-- | Auto-bound variables get"
         "-- | Whether an error text names this marker universe" sourceLines
       goSection = mainSourceSection
-        "synthGo assessmentContext st args retriedVars goal parsed = do"
-        "synthGo' assessmentContext st args retriedVars goal parsed = do"
+        "synthGo behavioral assessmentContext st args retriedVars goal parsed = do"
+        "synthGo' behavioral assessmentContext st args retriedVars goal parsed = do"
         sourceLines
       schedulerSection = mainSourceSection
-        "synthGo' assessmentContext st args retriedVars goal parsed = do"
+        "synthGo' behavioral assessmentContext st args retriedVars goal parsed = do"
         "loadSynthProviders ::" sourceLines
       classicalSection = mainSourceSection
-        "synthClassical assessmentContext commandDeadline st goal parsed accumulation ="
-        "verifySynthLane assessmentContext groupLimit st goal notes groups ="
+        "synthClassical behavioral assessmentContext commandDeadline st goal parsed accumulation ="
+        "verifySynthLane behavioral assessmentContext groupLimit st goal notes groups ="
         sourceLines
   mapM_ (assertMainSourceContains "Length Integration import" importSection)
     [ "LengthAssessmentContext"
@@ -15924,12 +16147,12 @@ assertLengthAssessmentMainCommandContext = do
     "{-# LANGUAGE RankNTypes #-}"
   length (mainSourcePositions
       "withLengthAssessmentRequestContext assessmentRequest" sourceLines)
-    @?= 1
+    @?= 2
   length (mainSourcePositions
       "withLengthAssessmentRequestContext"
       $ dropWhile (not . isInfixOf "synthRun ::") sourceLines) @?= 3
   length (mainSourcePositions
-      ":: LengthAssessmentContext command" sourceLines)
+      "LengthAssessmentContext command" sourceLines)
     @?= 7
 
   assertMainSourceContains "command entrance" commandSection
@@ -15937,13 +16160,17 @@ assertLengthAssessmentMainCommandContext = do
   assertBool "cmdSynth created a second assessment context"
     $ not ("withLengthAssessmentRequestContext" `isInfixOf`
       unlines commandSection)
+  length (mainSourcePositions
+      "withLengthAssessmentRequestContext assessmentRequest" hostCommandSection) @?= 1
+  assertMainSourceContains "host assertion context forwarding" hostCommandSection
+    "synthGo (Just active) context st args retriedVars translatedGoal parsed"
   contextOpen <- expectMainSourcePosition "synthRun context"
     "withLengthAssessmentRequestContext assessmentRequest"
       runSection
   translation <- expectMainSourcePosition "synthRun context"
     "translateSynthGoalWithRetry st goal" runSection
   direct <- expectMainSourcePosition "synthRun context"
-    "$ synthGo assessmentContext st args" runSection
+    "$ synthGo Nothing assessmentContext st args" runSection
   assertBool "the established context did not enclose translation and retry"
     $ contextOpen < translation && translation < direct
 
@@ -15954,7 +16181,7 @@ assertLengthAssessmentMainCommandContext = do
   inlineContext <- expectMainSourcePosition "explicit inline context"
     "withLengthAssessmentRequestContext" explicitInlineSection
   inlineScheduler <- expectMainSourcePosition "explicit inline context"
-    "synthGo assessmentContext st args retriedVars" explicitInlineSection
+    "synthGo Nothing assessmentContext st args retriedVars" explicitInlineSection
   length (mainSourcePositions
       "withLengthAssessmentRequestContext" explicitInlineSection) @?= 1
   assertBool "the explicit inline context opened before translation or resolution"
@@ -15969,7 +16196,7 @@ assertLengthAssessmentMainCommandContext = do
   nativeContext <- expectMainSourcePosition "concise inline context"
     "withLengthAssessmentRequestContext" nativeInlineSection
   nativeScheduler <- expectMainSourcePosition "concise inline context"
-    "synthGo assessmentContext st args retriedVars" nativeInlineSection
+    "synthGo Nothing assessmentContext st args retriedVars" nativeInlineSection
   length (mainSourcePositions
       "withLengthAssessmentRequestContext" nativeInlineSection) @?= 1
   assertBool "the concise inline context opened before translation or resolution"
@@ -15990,19 +16217,19 @@ assertLengthAssessmentMainCommandContext = do
   assertBool "the universe retry reacquired a nominal command context"
     $ not $ "assessmentContext" `isInfixOf` unlines retrySection
   assertMainSourceContains "synthGo context forwarding" goSection
-    "synthGo' assessmentContext st args retriedVars goal parsed"
+    "synthGo' behavioral assessmentContext st args retriedVars goal parsed"
   mapM_ (assertMainSourceContains "constructive context" schedulerSection)
-    [ "runSynthLaneCursor assessmentContext"
+    [ "runSynthLaneCursor behavioral assessmentContext"
     , "ordinarySynthLaneCursorPolicy assessmentContext laneEngine limits"
-    , "synthClassical assessmentContext runDeadline st goal parsed"
+    , "synthClassical behavioral assessmentContext runDeadline st goal parsed"
     ]
   length (mainSourcePositions
-      "runSynthLaneCursor assessmentContext" classicalSection) @?= 2
+      "runSynthLaneCursor behavioral assessmentContext" classicalSection) @?= 2
   mapM_ (assertMainSourceContains "classical context" classicalSection)
-    [ "emDeadline <- classicalSynthLaneDeadline assessmentContext commandDeadline st"
-    , "emRun <- runSynthLaneCursor assessmentContext"
-    , "nnDeadline <- classicalSynthLaneDeadline assessmentContext commandDeadline st"
-    , "nnRun <- runSynthLaneCursor assessmentContext nnPolicy nnDeadline st goal"
+    [ "emDeadline <- maybe (classicalSynthLaneDeadline assessmentContext commandDeadline st) (pure . behavioralRunDeadline) behavioral"
+    , "emRun <- runSynthLaneCursor behavioral assessmentContext"
+    , "nnDeadline <- maybe (classicalSynthLaneDeadline assessmentContext commandDeadline st) (pure . behavioralRunDeadline) behavioral"
+    , "nnRun <- runSynthLaneCursor behavioral assessmentContext nnPolicy nnDeadline st goal"
     ]
 
   assertMainSourceContains "ReplState Length configuration" stateSection
@@ -16022,14 +16249,14 @@ assertLengthAssessmentMainLaneSeam = do
   let declarationSection = mainSourceSection
         "data SynthLaneOutcome =" "-- Output (" sourceLines
       verificationSection = mainSourceSection
-        "verifySynthLane assessmentContext groupLimit st goal notes groups ="
+        "verifySynthLane behavioral assessmentContext groupLimit st goal notes groups ="
         "synthLaneDispositionWith ::" sourceLines
       dispositionSection = mainSourceSection
         "synthLaneDispositionWith shown outcome ="
         "synthLaneAccumulationDisposition" sourceLines
       callbackSection = mainSourceSection
         "synthVerify successQuota st goal groups ="
-        "completionCandidates ::" sourceLines
+        "synthVerifyBehavioral" sourceLines
       verificationText = unlines verificationSection
       dispositionText = unlines dispositionSection
   mapM_ (assertMainSourceContains "lane outcome declaration"
@@ -16059,7 +16286,7 @@ assertLengthAssessmentMainLaneSeam = do
   filterQuota <- expectMainSourcePosition "lane verifier"
     "LengthBehaviorFilter -> groupLimit" verificationSection
   callback <- expectMainSourcePosition "lane verifier"
-    "(verification, callbackAttempts) <- synthVerify successQuota st goal"
+    "(verification, callbackAttempts) <- case behavioral of"
       verificationSection
   assessment <- expectMainSourcePosition "lane verifier"
     "assessLengthVerificationContext assessmentContext verification"
@@ -16080,6 +16307,8 @@ assertLengthAssessmentMainLaneSeam = do
     , "synthLaneCallbackAttemptVariants = callbackAttempts"
     , "map detailedCandidateGroupVerificationVariants boundedGroups"
     , "synthLaneAssessed = Just AssessedSynthLane"
+    , "Nothing -> synthVerify successQuota st goal variants"
+    , "Just active -> synthVerifyBehavioral active successQuota st goal variants"
     ]
   mapM_ (\fragment -> assertBool
       ("verification-only lane seam retained side effect " ++ show fragment)
@@ -16226,7 +16455,7 @@ assertLengthAssessmentMainLaneFinalization = do
   sourceLines <- lines <$> readFile "src/Main.hs"
   let sourceText = unlines sourceLines
       verificationSection = mainSourceSection
-        "verifySynthLane assessmentContext groupLimit st goal notes groups ="
+        "verifySynthLane behavioral assessmentContext groupLimit st goal notes groups ="
         "synthLaneDispositionWith ::" sourceLines
       dispositionSection = mainSourceSection
         "synthLaneDispositionWith shown outcome ="
@@ -16359,7 +16588,7 @@ assertLengthAssessmentMainLaneScheduling :: IO ()
 assertLengthAssessmentMainLaneScheduling = do
   sourceLines <- lines <$> readFile "src/Main.hs"
   let schedulerSection = mainSourceSection
-        "synthGo' assessmentContext st args retriedVars goal parsed = do"
+        "synthGo' behavioral assessmentContext st args retriedVars goal parsed = do"
         "loadSynthProviders ::" sourceLines
       constructiveSection = mainSourceSection
         "limit <- synthTimeoutSeconds st"
@@ -16383,14 +16612,14 @@ assertLengthAssessmentMainLaneScheduling = do
     [ "let deadline"
     , "runSynthesis includeLibrary checked laneEngine providers accumulation ="
     , "base = synthesizeWithProvidersSkippingDetailedWith limits laneEngine (rsSynthSteps state) checked providers fragment"
-    , "in runSynthLaneCursor assessmentContext"
+    , "in runSynthLaneCursor behavioral assessmentContext"
     , "ordinarySynthLaneCursorPolicy assessmentContext laneEngine limits"
     , "deadline st goal id outcome accumulation"
     ]
   assertBool
       "constructive scheduling lost its serial or two parallel cursors"
     $ length (mainSourcePositions
-        "runSynthLaneCursor assessmentContext" constructiveSection) == 3
+        "runSynthLaneCursor behavioral assessmentContext" constructiveSection) == 3
 
   mapM_ (assertMainSourceContains "baseline run routing" baselineSection)
     [ "baseline <- case initialBaselineSchedule of"
@@ -16466,7 +16695,7 @@ assertLengthAssessmentMainParallelBaseline = do
   sourceLines <- lines <$> readFile "src/Main.hs"
   engineLines <- lines <$> readFile "src/Leant/Synth/Engine.hs"
   let schedulerSection = mainSourceSection
-        "synthGo' assessmentContext st args retriedVars goal parsed = do"
+        "synthGo' behavioral assessmentContext st args retriedVars goal parsed = do"
         "loadSynthProviders ::" sourceLines
       constructiveSection = mainSourceSection
         "limit <- synthTimeoutSeconds st"
@@ -16502,8 +16731,8 @@ assertLengthAssessmentMainParallelBaseline = do
         "runProviderLanes runDeadline fallback runLane checked accumulation lanes ="
         "finalize accumulation = do" schedulerSection
       classicalSection = mainSourceSection
-        "synthClassical assessmentContext commandDeadline st goal parsed accumulation ="
-        "verifySynthLane assessmentContext groupLimit st goal notes groups ="
+        "synthClassical behavioral assessmentContext commandDeadline st goal parsed accumulation ="
+        "verifySynthLane behavioral assessmentContext groupLimit st goal notes groups ="
         sourceLines
       engineBothSection = mainSourceSection
         "EngineBoth -> do"
@@ -16515,13 +16744,13 @@ assertLengthAssessmentMainParallelBaseline = do
         ]
 
   length (mainSourcePositions
-      "runSynthLaneCursor assessmentContext" constructiveSection) @?= 3
+      "runSynthLaneCursor behavioral assessmentContext" constructiveSection) @?= 3
   length (mainSourcePositions
-      "runSynthLaneCursor assessmentContext" serialSection) @?= 1
+      "runSynthLaneCursor behavioral assessmentContext" serialSection) @?= 1
   length (mainSourcePositions
-      "runSynthLaneCursor assessmentContext" structuralParallelSection) @?= 1
+      "runSynthLaneCursor behavioral assessmentContext" structuralParallelSection) @?= 1
   length (mainSourcePositions
-      "runSynthLaneCursor assessmentContext" libraryParallelSection) @?= 1
+      "runSynthLaneCursor behavioral assessmentContext" libraryParallelSection) @?= 1
 
   mapM_ (assertMainSourceContains "parallel baseline eligibility"
       parallelSection)
@@ -16603,7 +16832,7 @@ assertLengthAssessmentMainParallelBaseline = do
     , "prepared <- forceDetailedSynthPairBefore (synthLimitTried limits) (synthLimitTried limits) deadline"
     , "(runBranch EngineDjinn) (runBranch EngineExference)"
     , "let outcome = fmap (uncurry $ mergeDetailedOutcomesSkipping Set.empty) branches"
-    , "in runSynthLaneCursor assessmentContext baselinePolicy deadline st goal id outcome accumulation"
+    , "in runSynthLaneCursor behavioral assessmentContext baselinePolicy deadline st goal id outcome accumulation"
     ]
   synthLimitTried defaultSynthLimits @?= 12
   synthLimitTried defaultSynthLimits @?= synthMaxTried
@@ -16620,7 +16849,7 @@ assertLengthAssessmentMainParallelBaseline = do
   defaultMerge <- expectMainSourcePosition "parallel structural branches"
     "mergeDetailedOutcomesSkipping Set.empty" structuralParallelSection
   mergedCursor <- expectMainSourcePosition "parallel structural branches"
-    "in runSynthLaneCursor assessmentContext baselinePolicy deadline"
+    "in runSynthLaneCursor behavioral assessmentContext baselinePolicy deadline"
       structuralParallelSection
   assertBool "parallel branches or their default merge changed order"
     $ branchDefinition < djinnBranch
@@ -16636,7 +16865,7 @@ assertLengthAssessmentMainParallelBaseline = do
     , "(stripRecCtors fragment) fragment"
     , "prepared <- forceDetailedSynthPairBefore 0 (synthVerificationWindowWith limits engine) deadline base library"
     , "let outcome = branches >>= \\(baseOutcome, libraryOutcome) -> mergeLibraryDetailedOutcomes (Right baseOutcome) (Right libraryOutcome)"
-    , "in runSynthLaneCursor assessmentContext baselinePolicy deadline st goal id outcome accumulation"
+    , "in runSynthLaneCursor behavioral assessmentContext baselinePolicy deadline st goal id outcome accumulation"
     ]
   mapM_ (\forbidden -> assertBool
       ("outer library pair nested through " ++ forbidden)
@@ -16657,7 +16886,7 @@ assertLengthAssessmentMainParallelBaseline = do
   libraryMerge <- expectMainSourcePosition "parallel library branches"
     "mergeLibraryDetailedOutcomes" libraryParallelSection
   libraryCursor <- expectMainSourcePosition "parallel library branches"
-    "in runSynthLaneCursor assessmentContext baselinePolicy deadline"
+    "in runSynthLaneCursor behavioral assessmentContext baselinePolicy deadline"
       libraryParallelSection
   assertBool "parallel library pair changed base-first merge/cursor order"
     $ libraryBase < librarySearch
@@ -16844,13 +17073,13 @@ assertLengthAssessmentMainCursorDriver = do
         "forceDetailedSynthPairBefore"
         sourceLines
       driverSection = mainSourceSection
-        "runSynthLaneCursor assessmentContext policy deadline st goal transform outcome"
+        "runSynthLaneCursor behavioral assessmentContext policy deadline st goal transform outcome"
         "debugSynthLaneGroups ::" sourceLines
       debugSection = mainSourceSection
         "debugSynthLaneGroups ::"
         "-- | The Glivenko fallback" sourceLines
       verificationSection = mainSourceSection
-        "verifySynthLane assessmentContext groupLimit st goal notes groups ="
+        "verifySynthLane behavioral assessmentContext groupLimit st goal notes groups ="
         "synthLaneDispositionWith ::" sourceLines
       driverText = unlines driverSection
   mapM_ (assertMainSourceContains "ordinary cursor policy" policySection)
@@ -16897,7 +17126,7 @@ assertLengthAssessmentMainCursorDriver = do
     , "notes = detailedCandidateBatchNotes batch"
     , "nextCount = groupCount + length groups"
     , "debugSynthLaneGroups st groupCount groups"
-    , "lane <- verifySynthLane assessmentContext (synthLaneCursorBatchSize policy) st goal [] groups"
+    , "lane <- verifySynthLane behavioral assessmentContext (synthLaneCursorBatchSize policy) st goal [] groups"
     , "let reverseOutcomes' = lane : reverseOutcomes"
     , "SynthLaneSurvivors _ _ -> finish reverseOutcomes' nextCount notes SynthLaneRunStoppedByDisposition"
     , "SynthLaneAssessmentPreserved _ _ -> finish reverseOutcomes' nextCount notes SynthLaneRunStoppedByDisposition"
@@ -16930,9 +17159,9 @@ assertLengthAssessmentMainCursorDriver = do
   length (mainSourcePositions
       "runSynthLaneCursor" sourceLines) @?= 7
   length (mainSourcePositions
-      "verifySynthLane assessmentContext" driverSection) @?= 1
+      "verifySynthLane behavioral assessmentContext" driverSection) @?= 1
   length (mainSourcePositions
-      "verifySynthLane assessmentContext" sourceLines) @?= 2
+      "verifySynthLane behavioral assessmentContext" sourceLines) @?= 2
   length (mainSourcePositions
       "assessLengthVerificationContext assessmentContext verification"
       verificationSection) @?= 1
@@ -16991,7 +17220,7 @@ assertLengthAssessmentMainClassicalScheduling = do
   sourceLines <- lines <$> readFile "src/Main.hs"
   let deadlineSection = mainSourceSection
         "classicalSynthLaneDeadline assessmentContext commandDeadline st ="
-        "runSynthLaneCursor assessmentContext policy deadline st goal transform outcome"
+        "runSynthLaneCursor behavioral assessmentContext policy deadline st goal transform outcome"
         sourceLines
       filterDeadlineSection = mainSourceSection
         "LengthBehaviorFilter -> pure commandDeadline"
@@ -17000,8 +17229,8 @@ assertLengthAssessmentMainClassicalScheduling = do
         "LengthBehaviorRank -> do"
         "-- | Consume one lazy detailed outcome" deadlineSection
       classicalSection = mainSourceSection
-        "synthClassical assessmentContext commandDeadline st goal parsed accumulation ="
-        "verifySynthLane assessmentContext groupLimit st goal notes groups ="
+        "synthClassical behavioral assessmentContext commandDeadline st goal parsed accumulation ="
+        "verifySynthLane behavioral assessmentContext groupLimit st goal notes groups ="
         sourceLines
       classicalText = unlines classicalSection
   mapM_ (assertMainSourceContains "classical deadline ownership"
@@ -17042,9 +17271,9 @@ assertLengthAssessmentMainClassicalScheduling = do
 
   mapM_ (assertMainSourceContains "classical cursor schedule"
       classicalSection)
-    [ "emDeadline <- classicalSynthLaneDeadline assessmentContext commandDeadline st"
+    [ "emDeadline <- maybe (classicalSynthLaneDeadline assessmentContext commandDeadline st) (pure . behavioralRunDeadline) behavioral"
     , "if null atoms || length atoms > 5 then runDoubleNegation engine steps prefix body accumulation"
-    , "emRun <- runSynthLaneCursor assessmentContext"
+    , "emRun <- runSynthLaneCursor behavioral assessmentContext"
     , "admissibleCursorBatch limits (synthLimitTried limits `div` 2)"
     , "synthLaneCursorAllowsFilterSuccessor = False"
     , "synthLaneCursorRetainsRunNotes = False"
@@ -17056,8 +17285,8 @@ assertLengthAssessmentMainClassicalScheduling = do
     , "LengthBehaviorFilter -> synthLimitWindow limits"
     , "ordinaryPolicy = ordinarySynthLaneCursorPolicy assessmentContext engine limits"
     , "nnPolicy = ordinaryPolicy { synthLaneCursorRetainsRunNotes = False }"
-    , "nnDeadline <- classicalSynthLaneDeadline assessmentContext commandDeadline st"
-    , "nnRun <- runSynthLaneCursor assessmentContext nnPolicy nnDeadline st goal"
+    , "nnDeadline <- maybe (classicalSynthLaneDeadline assessmentContext commandDeadline st) (pure . behavioralRunDeadline) behavioral"
+    , "nnRun <- runSynthLaneCursor behavioral assessmentContext nnPolicy nnDeadline st goal"
     , "mapDetailedCandidateGroupVariantsDroppingSemanticSidecar wrap"
     , "synthesizeTunedDetailedWith limits engine steps (djinnCandidateCutoff, Nothing)"
     , "pure (synthLaneRunAccumulation nnRun)"
@@ -17065,11 +17294,11 @@ assertLengthAssessmentMainClassicalScheduling = do
   length (mainSourcePositions
       "classicalSynthLaneDeadline" classicalSection) @?= 2
   length (mainSourcePositions
-      "runSynthLaneCursor assessmentContext" classicalSection) @?= 2
+      "runSynthLaneCursor behavioral assessmentContext" classicalSection) @?= 2
   length (mainSourcePositions
       "synthLaneCursorRetainsRunNotes = False" classicalSection) @?= 2
   emDeadline <- expectMainSourcePosition "classical EM ordering"
-    "emDeadline <- classicalSynthLaneDeadline" classicalSection
+    "emDeadline <- maybe" classicalSection
   skippedEm <- expectMainSourcePosition "classical skipped-EM ordering"
     "if null atoms || length atoms > 5" classicalSection
   emRun <- expectMainSourcePosition "classical EM ordering"
@@ -17079,7 +17308,7 @@ assertLengthAssessmentMainClassicalScheduling = do
   nnBody <- expectMainSourcePosition "classical route ordering"
     "let nnFrag =" classicalSection
   nnDeadline <- expectMainSourcePosition "classical NN ordering"
-    "nnDeadline <- classicalSynthLaneDeadline" classicalSection
+    "nnDeadline <- maybe" classicalSection
   nnRun <- expectMainSourcePosition "classical NN ordering"
     "nnRun <- runSynthLaneCursor" classicalSection
   assertBool "classical routes lost separate reached-route deadlines/order"
@@ -17108,7 +17337,7 @@ assertLengthAssessmentMainDiagnosticGates :: IO ()
 assertLengthAssessmentMainDiagnosticGates = do
   sourceLines <- lines <$> readFile "src/Main.hs"
   let schedulerSection = mainSourceSection
-        "synthGo' assessmentContext st args retriedVars goal parsed = do"
+        "synthGo' behavioral assessmentContext st args retriedVars goal parsed = do"
         "loadSynthProviders ::" sourceLines
       reportSection = mainSourceSection
         "report _ laneRun@SynthLaneRun"
@@ -17239,7 +17468,7 @@ assertLengthAssessmentMainDiagnosticGates = do
       "reportSynthLaneNotes" noTermSection) @?= 1
 
   classicalRetry <- expectMainSourcePosition "sound-refutation diagnostic"
-    "then synthClassical assessmentContext runDeadline"
+    "then synthClassical behavioral assessmentContext runDeadline"
       soundSection
   soundFinalize <- expectMainSourcePosition "sound-refutation diagnostic"
     "classical <- finalizeSynthLaneAccumulation" soundSection

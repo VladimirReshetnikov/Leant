@@ -69,6 +69,11 @@ import Language.Haskell.Djex
   , defaultCandidateRankingPolicy
   , parseCandidateRankingPolicy
   )
+import Language.Haskell.Synthesis.Behavioral
+  ( BehavioralLanguage (LeanBehavioral)
+  , BehavioralQuery (..)
+  , parseBehavioralQuery
+  )
 
 import Leant.Backend
 import Leant.Builtins (builtinInfo)
@@ -125,9 +130,18 @@ import Leant.Synth.Engine
   , synthesizeTunedDetailedWith
   , SynthLimits (..)
   , defaultSynthLimits
+  , parseSynthDjinnStrategy
+  , synthDjinnStrategyName
   , synthVerificationWindowWith
   )
 import Leant.Synth.Engine.Parallel (runParallelEitherPairOrdered)
+import Leant.Synth.Behavioral
+  ( BehavioralVerdict (..)
+  , behavioralSyntaxProgram
+  , behavioralPreflightProgram
+  , behavioralDecisionProgram
+  , decideBehavioralBy
+  )
 import Leant.Synth.Fragment
   ( Frag (..)
   , GoalSort (..)
@@ -232,6 +246,7 @@ import Leant.Synth.Verification
   , verificationObservations
   , verifiedCandidateReceipts
   , verifyDistinctCandidateGroupsBy
+  , verifyBehavioralCandidateGroupsBy
   )
 
 #ifdef mingw32_HOST_OS
@@ -366,8 +381,8 @@ data ReplState = ReplState
     -- indefinitely.  Seeded from LEANT_SYNTH_TIMEOUT (default 20).
   , rsSynthLimits :: SynthLimits
     -- ^ :set synth-shown / synth-verify / synth-window / synth-budget /
-    -- synth-queue - the retunable search bounds; 'defaultSynthLimits'
-    -- reproduces the historical constants
+    -- synth-queue plus synth-ranking / synth-djinn-strategy. The default
+    -- keeps the historical bounds and depth-first traversal.
   , rsSynthProviders :: Bool
     -- ^ :set synth-providers on|off - discover live providers after the
     -- structural baseline lane
@@ -445,6 +460,14 @@ data ProveState = ProveState
   }
 
 type St = IORef ReplState
+
+-- One explicitly named behavioral request. It stays on the command's stack;
+-- no predicate or observation leaks into a later interactive command.
+data BehavioralRun = BehavioralRun
+  { behavioralRunQuery :: BehavioralQuery
+  , behavioralRunDeadline :: Maybe UTCTime
+  , behavioralRunObservations :: IORef [(String, BehavioralVerdict)]
+  }
 
 -- | One bounded synthesis lane after callback verification and optional
 -- behavioral assessment.  The two candidate sequences deliberately retain
@@ -1221,6 +1244,8 @@ helpText = unlines
   , "  :search TEXT             search declaration names (case-insensitive)"
   , "  :search? TYPE            proof search: what proves TYPE? (via exact?)"
   , "  :synth TYPE              synthesize verified terms of TYPE (LJT engine)"
+  , "  :synth f : TYPE where PROP"
+  , "                           require the supplied assertion about each candidate"
   , "  :synth --behavior-mode filter -- TYPE"
   , "                           filter with the activated startup contract"
   , "  :synth --where List.length result = List.length arg0 -- TYPE"
@@ -1235,6 +1260,7 @@ helpText = unlines
   , "                           candidates are bound as it1 (= it), it2, ..."
   , "  :set synth-engine E      djinn (default) | exference | both"
   , "  :set synth-ranking P     legacy | balanced (default) | compact | diverse"
+  , "  :set synth-djinn-strategy S  depth-first (default) | interleave"
   , "                           candidate quality within the same search bounds"
   , "  :set synth-steps N       Exference step budget (default 4096)"
   , "  :set synth-classical B   classical candidates for refuted goals"
@@ -1350,6 +1376,20 @@ dispatchCommand st line = do
             ("synth ranking: " ++ candidateRankingPolicyName ranking)
         "synth-ranking" : _ -> emitLn st =<< cRed st
           "usage: :set synth-ranking legacy|balanced|compact|diverse"
+        ["synth-djinn-strategy", value] -> case parseSynthDjinnStrategy value of
+          Just strategy -> do
+            modifyIORef' st (\s -> s { rsSynthLimits =
+              (rsSynthLimits s) { synthLimitDjinnStrategy = strategy } })
+            emitLn st =<< cDim st
+              ("synth djinn-strategy: " ++ synthDjinnStrategyName strategy)
+          Nothing -> emitLn st =<< cRed st
+            "usage: :set synth-djinn-strategy depth-first|interleave"
+        ["synth-djinn-strategy"] -> do
+          strategy <- synthLimitDjinnStrategy <$> synthLimitsOf st
+          emitLn st =<< cDim st
+            ("synth djinn-strategy: " ++ synthDjinnStrategyName strategy)
+        "synth-djinn-strategy" : _ -> emitLn st =<< cRed st
+          "usage: :set synth-djinn-strategy depth-first|interleave"
         ["synth-steps", value]
           | [(n, "")] <- reads value, n > (0 :: Int) -> do
               modifyIORef' st (\s -> s { rsSynthSteps = n })
@@ -2101,6 +2141,7 @@ showSynthSettings st = do
       row name value = emitLn st =<< cDim st (name ++ ": " ++ value)
   row "synth-engine" (synthEngineName (rsSynthEngine state))
   row "synth-ranking" (candidateRankingPolicyName (synthLimitRanking limits))
+  row "synth-djinn-strategy" (synthDjinnStrategyName (synthLimitDjinnStrategy limits))
   row "synth-steps" (show (rsSynthSteps state))
   row "synth-queue" (show (synthLimitQueue limits))
   row "synth-budget" (showSynthBudget (synthLimitBudget limits))
@@ -2223,7 +2264,14 @@ initialSynthTimeoutSeconds = do
     _ -> Nothing
 
 cmdSynth :: St -> String -> IO ()
-cmdSynth st rawArg = case parseLengthSynthNativeInlineCommand rawArg of
+cmdSynth st rawArg = case parseBehavioralQuery LeanBehavioral rawArg of
+  Left failure -> emitLn st =<< cRed st
+    ("behavioral synthesis query rejected: " ++ failure)
+  Right (Just query) -> runBehavioralSynth st query
+  Right Nothing -> cmdSynthEstablished st rawArg
+
+cmdSynthEstablished :: St -> String -> IO ()
+cmdSynthEstablished st rawArg = case parseLengthSynthNativeInlineCommand rawArg of
   Left failure -> do
     emitLn st =<< cRed st
       ("inline finite-spine Length command rejected: " ++ show failure)
@@ -2302,6 +2350,121 @@ cmdSynth st rawArg = case parseLengthSynthNativeInlineCommand rawArg of
                 reportSynthCommandScope st args skipped
                 synthNativeInlineRun permission source st args goal
 
+-- The query name is a lexical predicate binder, not a declaration to publish.
+-- After environment preparation, admission, checks and lanes share one deadline.
+runBehavioralSynth :: St -> BehavioralQuery -> IO ()
+runBehavioralSynth st query = do
+  -- Ordinary synthesis prepares its serializer environment before starting
+  -- the search clock. Do the same for a first named query: cold Lean imports
+  -- must not consume the entire assertion allowance before preflight begins.
+  -- Preparation keeps the existing backend setup/request timeout boundary.
+  backendOr <- ensureBackend st
+  case backendOr of
+    Left failure -> reject failure
+    Right _ -> do
+      prepared <- ensureSynthEnv st
+      case prepared of
+        Left failure -> reject failure
+        Right _ -> runPrepared
+ where
+  reject failure = emitLn st =<< cRed st
+    ("behavioral query rejected before synthesis: " ++ failure)
+
+  runPrepared = do
+    state <- readIORef st
+    started <- getCurrentTime
+    let deadline
+          | rsSynthTimeout state <= 0 = Nothing
+          | otherwise = Just $ addUTCTime
+              (fromIntegral $ rsSynthTimeout state) started
+    observations <- newIORef []
+    let initial = BehavioralRun query deadline observations
+    syntax <- runBehavioralCommand st initial True (behavioralSyntaxProgram query)
+    case syntax >>= behavioralCheckedResponse of
+      Left failure -> reject failure
+      Right () -> case resolveSynthCommandGoal state (behavioralType query) of
+        Left failure -> reject failure
+        Right (goal, args, skipped) ->
+          translateSynthGoalWithRetry st (goal ++ "\n") $ \retriedVars translatedGoal parsed -> do
+            let checkedQuery = query { behavioralType = translatedGoal }
+                active = initial { behavioralRunQuery = checkedQuery }
+            preflight <- runBehavioralCommand st active False
+              (behavioralPreflightProgram checkedQuery)
+            case preflight >>= behavioralCheckedResponse of
+              Left failure -> reject failure
+              Right () -> case startupLengthAssessmentRequest
+                  LengthBehaviorRank (rsLengthAssessmentMode state) of
+                Left failure -> reject (show failure)
+                Right assessmentRequest -> do
+                  reportSynthCommandScope st args skipped
+                  withLengthAssessmentRequestContext assessmentRequest $ \context ->
+                    synthGo (Just active) context st args retriedVars translatedGoal parsed
+                  verdicts <- map snd <$> readIORef observations
+                  let passed = length [() | BehavioralSatisfied <- verdicts]
+                      falsified = length [() | BehavioralFalsified <- verdicts]
+                      inconclusive = [why | BehavioralInconclusive why <- verdicts]
+                  emitLn st =<< cDim st
+                    ("supplied behavioral assertion: " ++ show passed ++ " passed, "
+                      ++ show falsified ++ " falsified, " ++ show (length inconclusive)
+                      ++ " inconclusive (checks concern only the supplied assertion)")
+                  forM_ (take 1 inconclusive) $ \why -> emitLn st =<< cDim st
+                    ("behavioral check inconclusive: " ++ why)
+
+behavioralCheckedResponse :: JValue -> Either String ()
+behavioralCheckedResponse response
+  | Just fatal <- respFatal response = Left fatal
+  | hasErrors response = Left $ intercalate "\n"
+      [message | (severity, message) <- respMessages response, severity == "error"]
+  | not (null $ respSorries response) = Left "Lean reported an unresolved sorry"
+  | isNothing (respEnv response) = Left "Lean returned no checked command environment"
+  | otherwise = Right ()
+
+-- Use the owned request timeout boundary, never an asynchronous timeout around
+-- a read from the shared protocol stream. A timed-out backend is retired and
+-- its session is replayed by the established recovery path before reuse.
+runBehavioralCommand
+  :: St -> BehavioralRun -> Bool -> String -> IO (Either String JValue)
+runBehavioralCommand st active synthesisEnvironment code = do
+  before <- behavioralRequestSeconds st active
+  case before of
+    Nothing -> pure (Left "the synthesis deadline has no time for another check")
+    Just _ -> do
+      backendOr <- ensureBackend st
+      case backendOr of
+        Left failure -> pure (Left failure)
+        Right backend -> do
+          environmentOr <- if synthesisEnvironment
+            then fmap (fmap Just) (ensureSynthEnv st)
+            else Right . rsEnv <$> readIORef st
+          case environmentOr of
+            Left failure -> pure (Left failure)
+            Right environment -> do
+              seconds <- behavioralRequestSeconds st active
+              case seconds of
+                Nothing -> pure (Left "the synthesis deadline has no time for another check")
+                Just limit -> do
+                  result <- request backend (Just limit) (commandPayload environment code)
+                  case result of
+                    Right response -> pure (Right response)
+                    Left RequestTimeout -> do
+                      backendDied st
+                      pure (Left $ "decision timed out after " ++ show limit
+                        ++ "s; the backend was retired for session replay")
+                    Left (ServerClosed stderrText) -> do
+                      backendDied st
+                      pure (Left $ "the Lean server died during the check: " ++ trim stderrText)
+                    Left (BadResponse failure) -> pure (Left $ "bad response: " ++ failure)
+
+behavioralRequestSeconds :: St -> BehavioralRun -> IO (Maybe Int)
+behavioralRequestSeconds st active = do
+  state <- readIORef st
+  now <- getCurrentTime
+  let localLimit = min 5 $ fromMaybe 5 (rsTimeout state)
+      remaining = maybe localLimit
+        (min localLimit . floor . (`diffUTCTime` now))
+        (behavioralRunDeadline active)
+  pure $ if remaining < 1 then Nothing else Just remaining
+
 -- | Resolve the ordinary explicit goal or the current prove/sorry goal before
 -- any Length request authority is selected.  The result retains the same
 -- inaccessible-hypothesis accounting used by every synthesis entrance.
@@ -2375,7 +2538,7 @@ synthRun :: LengthAssessmentRequest -> St -> [String] -> String -> IO ()
 synthRun assessmentRequest st args goal =
   withLengthAssessmentRequestContext assessmentRequest $ \assessmentContext -> do
     translateSynthGoalWithRetry st goal
-      $ synthGo assessmentContext st args
+      $ synthGo Nothing assessmentContext st args
 
 -- | Activate one already authorized and bounded inline source only after Lean
 -- translation has supplied the physical arrow arity.  Failed translation or
@@ -2400,7 +2563,7 @@ synthInlineRun permission source st args goal =
           withLengthAssessmentRequestContext
               (explicitLengthAssessmentRequest permission selection)
             $ \assessmentContext ->
-                synthGo assessmentContext st args retriedVars
+                synthGo Nothing assessmentContext st args retriedVars
                   translatedGoal parsed
 
 -- | Activate the concise source after translation supplies the exact List
@@ -2423,7 +2586,7 @@ synthNativeInlineRun permission source st args goal =
           withLengthAssessmentRequestContext
               (explicitLengthAssessmentRequest permission selection)
             $ \assessmentContext ->
-                synthGo assessmentContext st args retriedVars
+                synthGo Nothing assessmentContext st args retriedVars
                   translatedGoal parsed
 
 -- | Translate once and preserve the existing narrowing retry state machine,
@@ -2605,28 +2768,30 @@ unknownCheckProgram vars = unlines
   ]
 
 synthGo
-  :: LengthAssessmentContext command
+  :: Maybe BehavioralRun
+  -> LengthAssessmentContext command
   -> St
   -> [String]
   -> Maybe [String]
   -> String
   -> ParsedGoal
   -> IO ()
-synthGo assessmentContext st args retriedVars goal parsed = do
+synthGo behavioral assessmentContext st args retriedVars goal parsed = do
   debugFrag <- synthDebugEnabled st
   when debugFrag $
     emitLn st =<< cDim st ("debug fragment: " ++ show (pgFrag parsed))
-  synthGo' assessmentContext st args retriedVars goal parsed
+  synthGo' behavioral assessmentContext st args retriedVars goal parsed
 
 synthGo'
-  :: LengthAssessmentContext command
+  :: Maybe BehavioralRun
+  -> LengthAssessmentContext command
   -> St
   -> [String]
   -> Maybe [String]
   -> String
   -> ParsedGoal
   -> IO ()
-synthGo' assessmentContext st args retriedVars goal parsed = do
+synthGo' behavioral assessmentContext st args retriedVars goal parsed = do
   state <- readIORef st
   let fragment = pgFrag parsed
       engine = rsSynthEngine state
@@ -2662,6 +2827,7 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
   limit <- synthTimeoutSeconds st
   started <- getCurrentTime
   let deadline
+        | Just active <- behavioral = behavioralRunDeadline active
         | limit <= 0 = Nothing
         | otherwise = Just (addUTCTime (fromIntegral limit) started)
       runSynthesis includeLibrary checked laneEngine providers accumulation =
@@ -2683,7 +2849,7 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
                       ]
                       (stripRecCtors fragment) fragment)
               | otherwise = base
-        in runSynthLaneCursor assessmentContext
+        in runSynthLaneCursor behavioral assessmentContext
           (ordinarySynthLaneCursorPolicy assessmentContext laneEngine limits)
           deadline st goal id outcome accumulation
       -- Scoped parallel work remains limited to an initial provider-free
@@ -2696,11 +2862,12 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
       -- these static policies admit one of the two disjoint schedules.
       baselinePolicy =
         ordinarySynthLaneCursorPolicy assessmentContext engine limits
-      -- Ranking changes candidate order, not the five resource bounds which
+      -- Ranking and traversal change search order, not the five resource bounds which
       -- admit the established parallel schedule. Every branch receives the
-      -- original limits, including this command's selected ranking policy.
+      -- original limits, including this command's ranking and Djinn strategy.
       defaultSearchBounds =
-        limits { synthLimitRanking = defaultCandidateRankingPolicy }
+        limits { synthLimitRanking = defaultCandidateRankingPolicy
+               , synthLimitDjinnStrategy = synthLimitDjinnStrategy defaultSynthLimits }
           == defaultSynthLimits
       parallelStructuralBaselineStaticallyEligible =
         engine == EngineBoth
@@ -2740,7 +2907,7 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
             let outcome = fmap
                   (uncurry $ mergeDetailedOutcomesSkipping Set.empty)
                   branches
-            in runSynthLaneCursor assessmentContext baselinePolicy deadline
+            in runSynthLaneCursor behavioral assessmentContext baselinePolicy deadline
               st goal id outcome accumulation
       runParallelLibraryBaseline accumulation = do
         let base = synthesizeWithProvidersSkippingDetailedWith limits
@@ -2766,7 +2933,7 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
             let outcome = branches >>= \(baseOutcome, libraryOutcome) ->
                   mergeLibraryDetailedOutcomes
                     (Right baseOutcome) (Right libraryOutcome)
-            in runSynthLaneCursor assessmentContext baselinePolicy deadline
+            in runSynthLaneCursor behavioral assessmentContext baselinePolicy deadline
               st goal id outcome accumulation
   if structuralFirst
     then do
@@ -2907,7 +3074,7 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
           wantClassical <- rsSynthClassical <$> readIORef st
           classicalAccumulation <-
             if wantClassical
-              then synthClassical assessmentContext runDeadline
+              then synthClassical behavioral assessmentContext runDeadline
                 st goal parsed (synthLaneRunAccumulation laneRun)
               else pure (synthLaneRunAccumulation laneRun)
           classical <- finalizeSynthLaneAccumulation
@@ -2915,8 +3082,10 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
           case classical of
             SynthLaneNoVerified -> do
               message <- cYellow st
-                ("provably uninhabited \8212 no closed term of this "
-                 ++ "polymorphic type exists")
+                (if isJust behavioral
+                   then "no candidate passed the supplied assertion; constructive search refuted the provider-free type"
+                   else "provably uninhabited \8212 no closed term of this "
+                     ++ "polymorphic type exists")
               emitLn st message
             SynthLaneSurvivors _ _ -> pure ()
             SynthLaneAllBehaviorallyRejected _ -> pure ()
@@ -2972,7 +3141,9 @@ synthGo' assessmentContext st args retriedVars goal parsed = do
         emitLn st =<< cRed st
           ("the engine proposed "
            ++ show (synthLaneRunCandidateGroupCount laneRun)
-           ++ " candidate(s) but none survived Lean verification")
+           ++ (if isJust behavioral
+                then " candidate(s) but none passed both Lean verification and the supplied assertion"
+                else " candidate(s) but none survived Lean verification"))
         reportSynthLaneNotes st (synthLaneRunNotes laneRun)
       SynthLaneSurvivors _ _ -> pure ()
       SynthLaneAllBehaviorallyRejected _ -> pure ()
@@ -3291,7 +3462,8 @@ classicalSynthLaneDeadline assessmentContext commandDeadline st =
 -- batch produced no verified term or rejected every verified term.  The
 -- second candidate batch ends by policy without a third tail probe.
 runSynthLaneCursor
-  :: LengthAssessmentContext command
+  :: Maybe BehavioralRun
+  -> LengthAssessmentContext command
   -> SynthLaneCursorPolicy
   -> Maybe UTCTime
   -> St
@@ -3300,7 +3472,7 @@ runSynthLaneCursor
   -> Either String DetailedSynthOutcome
   -> SynthLaneAccumulation
   -> IO SynthLaneRun
-runSynthLaneCursor assessmentContext policy deadline st goal transform outcome
+runSynthLaneCursor behavioral assessmentContext policy deadline st goal transform outcome
     initialAccumulation =
   observe (1 :: Int) 0 [] [] (startDetailedSynthCursor outcome)
  where
@@ -3320,7 +3492,7 @@ runSynthLaneCursor assessmentContext policy deadline st goal transform outcome
               nextCount = groupCount + length groups
           when (synthLaneCursorRetainsRunNotes policy) $
             debugSynthLaneGroups st groupCount groups
-          lane <- verifySynthLane assessmentContext
+          lane <- verifySynthLane behavioral assessmentContext
             (synthLaneCursorBatchSize policy) st goal [] groups
           let reverseOutcomes' = lane : reverseOutcomes
           case synthLaneDispositionWith (synthLaneCursorShown policy) lane of
@@ -3410,14 +3582,15 @@ debugSynthLaneGroups st priorGroupCount groups = do
 -- Returns the updated command accumulation without finalization.  The sound-
 -- refutation caller remains the sole output and state-effect boundary.
 synthClassical
-  :: LengthAssessmentContext command
+  :: Maybe BehavioralRun
+  -> LengthAssessmentContext command
   -> Maybe UTCTime
   -> St
   -> String
   -> ParsedGoal
   -> SynthLaneAccumulation
   -> IO SynthLaneAccumulation
-synthClassical assessmentContext commandDeadline st goal parsed accumulation =
+synthClassical behavioral assessmentContext commandDeadline st goal parsed accumulation =
   case glivenkoSplit (pgFrag parsed) of
   Nothing -> pure accumulation
   Just (prefix, body) -> do
@@ -3446,9 +3619,10 @@ synthClassical assessmentContext commandDeadline st goal parsed accumulation =
         -- Excluded-middle premises multiply the proof space, so this search
         -- retains its established choice-point cutoff and half-window.  It
         -- never consumes a successor, including in filter mode.
-        emDeadline <- classicalSynthLaneDeadline
-          assessmentContext commandDeadline st
-        emRun <- runSynthLaneCursor assessmentContext
+        emDeadline <- maybe
+          (classicalSynthLaneDeadline assessmentContext commandDeadline st)
+          (pure . behavioralRunDeadline) behavioral
+        emRun <- runSynthLaneCursor behavioral assessmentContext
           SynthLaneCursorPolicy
             { synthLaneCursorBatchSize =
                 admissibleCursorBatch limits (synthLimitTried limits `div` 2)
@@ -3494,9 +3668,10 @@ synthClassical assessmentContext commandDeadline st goal parsed accumulation =
             assessmentContext engine limits
           nnPolicy = ordinaryPolicy
             { synthLaneCursorRetainsRunNotes = False }
-      nnDeadline <- classicalSynthLaneDeadline
-        assessmentContext commandDeadline st
-      nnRun <- runSynthLaneCursor assessmentContext nnPolicy nnDeadline st goal
+      nnDeadline <- maybe
+        (classicalSynthLaneDeadline assessmentContext commandDeadline st)
+        (pure . behavioralRunDeadline) behavioral
+      nnRun <- runSynthLaneCursor behavioral assessmentContext nnPolicy nnDeadline st goal
         (mapDetailedCandidateGroupVariantsDroppingSemanticSidecar wrap)
         (synthesizeTunedDetailedWith limits engine steps
           (djinnCandidateCutoff, Nothing) [] nnFrag nnFrag)
@@ -3528,14 +3703,15 @@ synthClassical assessmentContext commandDeadline st goal parsed accumulation =
 -- historical five-success quota; filtering may inspect the complete bounded
 -- lane so a later survivor can replace an earlier behavioral rejection.
 verifySynthLane
-  :: LengthAssessmentContext command
+  :: Maybe BehavioralRun
+  -> LengthAssessmentContext command
   -> Int
   -> St
   -> String
   -> [String]
   -> [DetailedCandidateGroup]
   -> IO SynthLaneOutcome
-verifySynthLane assessmentContext groupLimit st goal notes groups =
+verifySynthLane behavioral assessmentContext groupLimit st goal notes groups =
   case take groupLimit groups of
     [] -> pure SynthLaneOutcome
       { synthLaneCheckedFrontierSpellings = []
@@ -3550,8 +3726,10 @@ verifySynthLane assessmentContext groupLimit st goal notes groups =
             lengthAssessmentContextBehaviorMode assessmentContext of
               LengthBehaviorRank -> shown
               LengthBehaviorFilter -> groupLimit
-      (verification, callbackAttempts) <- synthVerify successQuota st goal
-        (map detailedCandidateGroupVerificationVariants boundedGroups)
+      let variants = map detailedCandidateGroupVerificationVariants boundedGroups
+      (verification, callbackAttempts) <- case behavioral of
+        Nothing -> synthVerify successQuota st goal variants
+        Just active -> synthVerifyBehavioral active successQuota st goal variants
       let observations =
             candidateRenderingRouteObservations
               (map detailedCandidateGroupRoute boundedGroups)
@@ -3842,6 +4020,52 @@ synthVerify successQuota st goal groups = do
         | not (null (respSorries response)) ->
             VariantRejected LeanContainsSorry
         | otherwise -> VariantAccepted
+
+-- A rejected assertion does not consume the type-correct group's result slot:
+-- try its remaining renderings before advancing to the next admitted group.
+-- The returned receipt always belongs to the exact twice-checked variant.
+synthVerifyBehavioral
+  :: BehavioralRun
+  -> Int
+  -> St
+  -> String
+  -> [[DetailedVerificationVariant]]
+  -> IO (VerificationBatch DetailedVerificationVariant, [DetailedVerificationVariant])
+synthVerifyBehavioral active successQuota st goal groups = do
+  reverseAttempts <- newIORef []
+  (verification, assessments) <- verifyBehavioralCandidateGroupsBy
+    detailedVerificationVariantText successQuota
+    (verifyVariant reverseAttempts) assessVariant groups
+  modifyIORef' (behavioralRunObservations active)
+    (++ [(detailedVerificationVariantText candidate, verdict)
+         | (candidate, verdict) <- assessments])
+  attempts <- reverse <$> readIORef reverseAttempts
+  pure (verification, attempts)
+ where
+  verifyVariant reverseAttempts variant = do
+    modifyIORef' reverseAttempts (variant :)
+    result <- runBehavioralCommand st active False
+      (candidateVerificationProgram (goal ++ "\n")
+        (detailedVerificationVariantText variant ++ "\n"))
+    pure $ case result of
+      Left _ -> VariantRejected BackendRequestFailure
+      Right response
+        | isJust (respFatal response) -> VariantRejected BackendFatalResponse
+        | hasErrors response -> VariantRejected LeanErrorDiagnostic
+        | not (null $ respSorries response) -> VariantRejected LeanContainsSorry
+        | isNothing (respEnv response) -> VariantRejected BackendFatalResponse
+        | otherwise -> VariantAccepted
+
+  assessVariant variant = decideBehavioralBy $ \negatePredicate -> do
+    let query = (behavioralRunQuery active) { behavioralType = goal }
+    result <- runBehavioralCommand st active False
+      (behavioralDecisionProgram negatePredicate query
+        $ detailedVerificationVariantText variant)
+    pure $ case result of
+      Left failure -> Left failure
+      Right response -> Right $ case behavioralCheckedResponse response of
+        Right () -> True
+        Left _ -> False
 
 completionCandidates :: St -> String -> IO [String]
 completionCandidates st prefix = do
@@ -4472,6 +4696,8 @@ proveHelp = unlines
   , "  :suggest           reprint Lean's suggested next tactic"
   , "  :auto              try common finishing tactics on the current goal"
   , "  :synth             synthesize terms for the goal, with the hypotheses"
+  , "  :synth f : TYPE where PROP"
+  , "                     check a supplied assertion for an explicit type"
   , "                     as premises (then `exact it1` records the step)"
   , "  :synth --behavior-mode filter --"
   , "                     filter with the activated startup Length contract"

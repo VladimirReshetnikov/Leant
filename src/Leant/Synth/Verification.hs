@@ -17,6 +17,7 @@ module Leant.Synth.Verification
   , verificationObservations
   , verifyCandidateGroups
   , verifyDistinctCandidateGroupsBy
+  , verifyBehavioralCandidateGroupsBy
   ) where
 
 import qualified Data.Set as Set
@@ -25,6 +26,8 @@ import Language.Haskell.Synthesis.Observability
   , recordObservation
   )
 import Numeric.Natural (Natural)
+
+import Leant.Synth.Behavioral (BehavioralVerdict (..))
 
 import Leant.Synth.Observability
   ( LeantObservations
@@ -216,6 +219,63 @@ data FreshGroupResult key candidate
   = FreshGroupAccepted key (Verified candidate) LeantObservations
   | FreshGroupRejected LeantObservations
   | FreshGroupSkipped
+
+-- | Type-check and behaviorally assess each exact variant before consuming a
+-- success slot. Predicate failures are separate observations, not Lean error
+-- diagnostics. Only a candidate accepted by both callbacks enters the returned
+-- batch or the accepted-key set. The caller still owns the bounded input.
+verifyBehavioralCandidateGroupsBy
+  :: (Monad m, Ord key)
+  => (candidate -> key)
+  -> Int
+  -> (candidate -> m VariantVerdict)
+  -> (candidate -> m BehavioralVerdict)
+  -> [[candidate]]
+  -> m (VerificationBatch candidate, [(candidate, BehavioralVerdict)])
+verifyBehavioralCandidateGroupsBy key quota verifyType assess = go quota 0 Set.empty
+ where
+  go remaining failed accepted groups
+    | remaining <= 0 = pure (VerificationBatch [] failed noObservations, [])
+    | otherwise = case groups of
+        [] -> pure (VerificationBatch [] failed noObservations, [])
+        [] : rest -> go remaining (failed + 1) accepted rest
+        group : rest -> do
+          (chosen, attempted, typed, observations, assessments) <-
+            checkGroup accepted group
+          let failed' = if attempted && not typed then failed + 1 else failed
+          case chosen of
+            Nothing -> do
+              (following, later) <- go remaining failed' accepted rest
+              pure (prependObservations observations following, assessments ++ later)
+            Just candidate -> do
+              (following, later) <- go (remaining - 1) failed'
+                (Set.insert (key candidate) accepted) rest
+              pure (prependCandidate (Verified candidate) observations following,
+                assessments ++ later)
+
+  checkGroup accepted variants = case variants of
+    [] -> pure (Nothing, False, False, noObservations, [])
+    candidate : rest
+      | key candidate `Set.member` accepted -> checkGroup accepted rest
+      | otherwise -> do
+          checked <- verifyType candidate
+          let attempted = recordObservation LeanVariantAttempted noObservations
+          case checked of
+            VariantRejected failure -> do
+              (chosen, _, typed, observations, assessments) <- checkGroup accepted rest
+              pure (chosen, True, typed,
+                recordObservation (LeanVerificationFailure failure) attempted
+                  <> observations, assessments)
+            VariantAccepted -> do
+              verdict <- assess candidate
+              let observed = recordObservation LeanCandidateVerified attempted
+              case verdict of
+                BehavioralSatisfied ->
+                  pure (Just candidate, True, True, observed, [(candidate, verdict)])
+                _ -> do
+                  (chosen, _, _, observations, assessments) <- checkGroup accepted rest
+                  pure (chosen, True, True, observed <> observations,
+                    (candidate, verdict) : assessments)
 
 
 data GroupResult candidate

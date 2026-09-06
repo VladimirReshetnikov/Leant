@@ -89,6 +89,9 @@ module Leant.Synth.Engine
   , candidateWindow
   , SynthLimits (..)
   , defaultSynthLimits
+  , parseSynthDjinnStrategy
+  , synthDjinnStrategyName
+  , djinnQueryOptionsForLimits
   , synthVerificationWindowWith
   , synthesizeTunedDetailedWith
   , synthesizeWithProvidersSkippingDetailedWith
@@ -153,6 +156,7 @@ import Language.Haskell.Djex
   , KindedProviderInstantiationAssignment (..)
   , Selection (..)
   , SelectionMode (SelectAll)
+  , Strategy (..)
   , TruncationReason (..)
   , Type (..)
   , TypeParameter (..)
@@ -804,7 +808,7 @@ synthVerificationWindow engine = case engine of
 candidateWindow :: Int
 candidateWindow = 60
 
--- | Per-command search bounds and candidate ranking. The resource defaults
+-- | Per-command search bounds, strategy, and candidate ranking. The resource defaults
 -- retain the established allowances; the ordinary lanes take their Djinn
 -- candidate cutoff and choice-point budget from here, while the library and
 -- classical lanes keep their own fixed budgets. Ranking changes selection
@@ -825,11 +829,14 @@ data SynthLimits = SynthLimits
     -- ^ Exference queue bound
   , synthLimitRanking :: !CandidateRankingPolicy
     -- ^ Target-neutral candidate ordering within the same search bounds.
+  , synthLimitDjinnStrategy :: !Strategy
+    -- ^ Djinn choice traversal in every lane, independent of its resource bounds.
   }
   deriving (Eq, Show)
 
 -- | The historical bounds: 5 shown, 12 tried, a 60-group window, no Djinn
--- budget, and an Exference queue of 1024, with balanced candidate ranking.
+-- budget, and an Exference queue of 1024, with balanced candidate ranking and
+-- depth-first Djinn traversal.
 defaultSynthLimits :: SynthLimits
 defaultSynthLimits = SynthLimits
   { synthLimitShown = synthMaxShown
@@ -838,6 +845,29 @@ defaultSynthLimits = SynthLimits
   , synthLimitBudget = Nothing
   , synthLimitQueue = 1024
   , synthLimitRanking = defaultCandidateRankingPolicy
+  , synthLimitDjinnStrategy = DepthFirst
+  }
+
+parseSynthDjinnStrategy :: String -> Maybe Strategy
+parseSynthDjinnStrategy "depth-first" = Just DepthFirst
+parseSynthDjinnStrategy "interleave" = Just Interleave
+parseSynthDjinnStrategy _ = Nothing
+
+synthDjinnStrategyName :: Strategy -> String
+synthDjinnStrategyName DepthFirst = "depth-first"
+synthDjinnStrategyName Interleave = "interleave"
+
+-- | The actual Djinn options shared by ordinary, provider, library, classical,
+-- and combined searches. Each caller retains its lane's cutoff and budget;
+-- choosing a traversal changes neither those bounds nor candidate ownership.
+djinnQueryOptionsForLimits :: SynthLimits -> (Int, Maybe Integer) -> QueryOptions
+djinnQueryOptionsForLimits limits (cutoff, budget) = defaultQueryOptions
+  { optionAlternatives = True
+  , optionCutoff = cutoff
+  , optionBudget = budget
+  , optionRanking = synthLimitRanking limits
+  , optionProviderCosts = Map.empty
+  , optionStrategy = synthLimitDjinnStrategy limits
   }
 
 -- | 'synthVerificationWindow' under retuned limits.
@@ -1129,9 +1159,7 @@ runTunedSynthesis limits
     prepared <- prepareSynthesis djinnRecursiveProjection
       providers extras engineFrag fitFrag
     let origin = preparedSemanticOrigin prepared
-    outcome <- djinnRun (synthLimitRanking limits)
-      Map.empty
-      (synthLimitWindow limits) djinnLimits fitFrag
+    outcome <- djinnRun limits djinnLimits fitFrag
       (semanticOriginProjectionCompleteness origin)
       (preparedRenderExpression prepared)
       (semanticOriginSearchGoal origin)
@@ -1149,9 +1177,7 @@ runTunedSynthesis limits
     djinnPrepared <- prepareSynthesis djinnRecursiveProjection
       providers extras engineFrag fitFrag
     let djinnOrigin = preparedSemanticOrigin djinnPrepared
-    djinnCompatibility <- djinnRun (synthLimitRanking limits)
-      Map.empty
-      (synthLimitWindow limits) djinnLimits fitFrag
+    djinnCompatibility <- djinnRun limits djinnLimits fitFrag
       (semanticOriginProjectionCompleteness djinnOrigin)
       (preparedRenderExpression djinnPrepared)
       (semanticOriginSearchGoal djinnOrigin)
@@ -1299,9 +1325,7 @@ prepareProviderGroundFactTranslation recursiveProjection providers extras
 -- | LJT search with bounded higher-rank extensions: candidates, or a
 -- refutation whose soundness depends on the translation having hidden nothing.
 djinnRun
-  :: CandidateRankingPolicy
-  -> Map.Map Name Natural
-  -> Int
+  :: SynthLimits
   -> (Int, Maybe Integer)
   -> Frag
   -> ProjectionCompleteness
@@ -1310,7 +1334,7 @@ djinnRun
   -> [DjinnDecl]
   -> [KindedProviderInstantiationAssignment String]
   -> Either String SynthOutcome
-djinnRun ranking providerCosts window (cutoff, budget) frag projection render goal decls
+djinnRun limits laneBounds@(cutoff, budget) frag projection render goal decls
     instantiations = do
   standard <- viaDiagnostic standardDjinnSession
   targetName <- viaShow (mkIdentifier "leantSynth")
@@ -1327,19 +1351,15 @@ djinnRun ranking providerCosts window (cutoff, budget) frag projection render go
         { requestTarget = target
         , requestGoal = goal
         , requestContexts = []
-        , requestOptions = defaultQueryOptions
-            { optionAlternatives = True
-            , optionCutoff = cutoff
-            , optionBudget = budget
-            , optionRanking = ranking
-            , optionProviderCosts = providerCosts
-            }
+        , requestOptions = djinnQueryOptionsForLimits limits laneBounds
         }
   request <- viaDiagnostic (mkDjinnRequest query)
   result <- viaDiagnostic
     (runDjinnQueryWithKindedInstantiationAssignments
       session instantiations request)
-  let batch = resultSearch result
+  let window = synthLimitWindow limits
+      ranking = synthLimitRanking limits
+      batch = resultSearch result
       notes = progressNotesWith window (batchProgress batch)
       -- Preserve Leant's historical size tie-break only in legacy mode.
       -- Structural policies already selected and ordered the checked Djex
