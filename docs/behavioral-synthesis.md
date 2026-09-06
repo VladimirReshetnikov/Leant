@@ -125,8 +125,9 @@ and `--operation` select recorded subsets. The default `--window 256` sets both
 `synth-window` and `synth-verify`; Djinn's raw proof cutoff also derives from this
 window. Other initial settings are balanced ranking, shown 1, 100,000 Exference steps, 100,000 explicit Djinn choice
 points, Djinn's ordinary `depth-first` strategy, and a 30-second shared synthesis timeout. The separate runner process
-guard is 900 seconds. These are proposed limits pending live calibration, not
-claimed acceptance. Owned process trees are terminated on timeout.
+guard is 900 seconds. The Exference run below passed at these limits; complete
+Djinn and Both corpus acceptance remains pending. Owned process trees are
+terminated on timeout.
 
 A larger frontier can be calibrated explicitly without changing the default:
 
@@ -173,10 +174,77 @@ without running synthesis or the kernel.
 
 ## Validation status
 
-The implementation includes focused pure tests for source boundaries, verdict
-classification, later-rendering acceptance, bounded traversal, accepted spelling
-deduplication, and exact receipt ownership. The independent oracle baseline passed
-all 33 named declaration/proof checks with empty axiom inventories; the Haskell
-counterpart passed 17 assertions. This validates only the oracle witnesses and
-wrong controls. **Live six-operation synthesis acceptance is pending.** Existing
-rank-N and candidate-quality receipts do not establish behavioral-query acceptance.
+Named behavioral queries check rendered groups as they arrive, one group at a
+time. Exference retains its structural frontier ranking but does not wait for
+the ordinary command's complete frontend quality pool before trying the
+predicate. Each selected backend lane retains its original bounded trace: raw
+candidates remain charged before rendering or duplicate rejection, and checking
+a false predicate does not refill or restart that trace. Existing
+strict/unused-binder, pattern, provider, and library fallback policies remain
+separate bounded lanes. The existing candidate window, verification allowance,
+displayed-success quota, and command deadline still
+apply. Several accepted groups accumulate in encounter order with their own
+verification receipts. Both mode retains its reserved engine order and each
+group's own semantic authority; it does not inspect a later opposite-engine
+candidate to borrow typed metadata. Progress notes describe only observed work.
+Ordinary unnamed synthesis retains its existing finite-pool selection policy.
+
+**Exference passed all six live operations** at balanced ranking, window and
+verification allowance 256, shown 1, 100,000 search steps, and a 30-second command
+deadline. Each exact displayed implementation and its finite-oracle theorem were
+replayed independently. The six candidate files and separate oracle-control file
+produced **45 checked declarations/proofs, all with empty axiom inventories**:
+12 candidate/theorem inventories plus 33 control inventories. Before their first
+success, `not`, `append`, `reverse`, and `filter` recorded respectively 2, 1, 21,
+and 8 falsified assertions; none of the six positive queries reported an
+inconclusive assertion check.
+
+The mandatory `Nat → Nat where False` control displayed no implementation and
+recorded **128 actual falsifications and zero inconclusive checks** before its
+30-second command deadline. It is a successful rejection control, not a claim
+that search exhausted or the underlying type is uninhabited. The complete live
+process, including setup and this control, took 110.44 seconds; isolated kernel
+replays followed separately. The [tracked compact acceptance receipt](../test-church/receipts/behavior-exference-streaming-first.json)
+records the stable executable SHA-256
+`18ce4695bcc0432ba31295622361d24eefdfc6d35ed245d9c4a5f9b934e4e863`
+and the full local source-receipt SHA-256
+`77e950604ac4fd7cbabb6d5dcae88c8e6311633639cbad4f8699d93581f26165`.
+It retains exact terms, types, settings, per-query verdicts, replay-source and
+capture hashes, axiom inventories, and the scope of each claim without copying
+the large generated oracle programs or command transcript.
+
+Separate [live quota regressions recorded in that receipt](../test-church/receipts/behavior-exference-streaming-first.json)
+produced two distinct accepted results in both Exference and Both, demonstrated
+that verification allowance 1 stops after one falsified projection while
+allowance 16 reaches the accepted alternative, and verified a subsequent
+recovery query. The latest serialized focused run passed ten tests in 0.29
+seconds: seven streaming tests, including poisoned tails,
+raw-slot charging, deferred opposite-engine preparation, and capped final
+presentation across actual assessed batches, plus three corrected ordinary-route
+source checks. These checks establish streaming
+and quota behavior; they do not substitute for the six-operation corpus.
+
+The complete Leant Haskell unit suite subsequently passed **600/600 tests**
+serially (`-j1`), reporting 376.32 seconds (376.47 seconds for the process).
+The layered-provider regression passed in 90.97 seconds overall with its original
+30-second limits on each named staged search unchanged. The compact receipt
+retains the aggregate capture and executable/source hashes. This establishes the
+unit-suite milestone separately from the live behavioral corpus.
+
+A separate live timeout diagnostic requested two results for `∀ A : Type, A → A`
+after warming the backend. At window/verification allowance 256, **1,000,000
+steps and a 10-second deadline**, it accepted one identity implementation and
+then reported “accepted results retained; further search incomplete.” The
+subsequent query succeeded with a 20-second deadline. The process completed in
+54.13 seconds without reaching its 180-second outer guard. The compact receipt
+records the exact terms, settings, message, captures, and executable
+`4664a6d8baa5dda6d08a1ea94a6ec0b54da1b522951ab3e9cecc4e48a66907c1`.
+This deliberately larger step setting belongs only to the timeout diagnostic;
+the six-operation result above remains at 100,000 steps. An earlier two-second
+attempt stopped in preflight and is not counted as partial-success coverage.
+
+**Complete Djinn and Both six-operation corpus acceptance is still pending.**
+The separate oracle baseline passed all 33 Lean declaration/proof checks and
+17 Haskell assertions; those results validate the known witnesses and wrong
+controls only. Existing rank-N and candidate-quality receipts do not establish
+behavioral-query acceptance.

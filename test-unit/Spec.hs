@@ -192,6 +192,9 @@ import Leant.Synth.Engine
   ( DetailedCandidateBatch
   , DetailedCandidateGroup
   , DetailedSynthOutcome (..)
+  , streamDetailedQueryResults
+  , deferDetailedOutcome
+  , prependBehavioralLibraryOutcome
   , DetailedSynthCursor
   , DetailedSynthCursorError (..)
   , DetailedSynthCursorStep (..)
@@ -509,6 +512,7 @@ import Leant.Synth.Length.Presentation
   , lengthCandidatePresentationText
   , maximumLengthCounterexampleNoteCharacters
   , presentLengthAssessment
+  , presentLengthAssessmentBatches
   , presentLengthAssessmentRejections
   , presentLengthPostVerificationResult
   , presentLengthSpinePairPostVerificationResult
@@ -722,6 +726,7 @@ main = do
       , providerProgramTests
       , candidateVerificationTests
       , hostBehavioralTests
+      , behavioralStreamingTests
       , verificationObservabilityTests
       , postVerificationTests
       , behavioralSelectionTests
@@ -2736,6 +2741,133 @@ hostBehavioralTests = testGroup "host behavioral synthesis"
             _ -> assertFailure "behavioral acceptance granted Length authority"
         _ -> assertFailure "wrong number of exact behavioral receipts"
   ]
+
+behavioralStreamingTests :: TestTree
+behavioralStreamingTests = testGroup "named behavioral candidate streaming"
+  [ testCase "force the first group and observed notes without a future result" $ do
+      let first = detailedCandidateGroup RouteLegacyCandidateFallback ["first", "alternate"]
+          outcome = streamDetailedQueryResults 8 id
+            (batch Djex.Continuing [Just first] : error "stream forced future progress")
+      (selected, _) <- expectDetailedCandidateBatch 1 $ startDetailedSynthCursor $ Right outcome
+      detailedCandidateBatchGroups selected @?= [first]
+      detailedCandidateBatchNotes selected @?= ["search reported more batches to come"]
+      evaluate (forceDetailedOutcome 1 $ Right outcome) >>= \forced ->
+        assertBool "the selected group was not forced" (forced > 0)
+      forceDetailedOutcome 0 (Right $ streamDetailedQueryResults 8
+        (error "zero observation forced rendering") (error "zero observation forced the trace")) @?= 0
+  , testCase "raw misses and duplicates consume the original cap without refill" $ do
+      let first = cursorFixtureGroup 1
+          outcome = streamDetailedQueryResults 3 id
+            [batch Djex.Continuing
+              (Nothing : Just first : Just first : error "raw cap refilled after duplicates")]
+      (selected, afterFirst) <- expectDetailedCandidateBatch 1 $
+        startDetailedSynthCursor $ Right outcome
+      detailedCandidateBatchGroups selected @?= [first]
+      terminal <- expectDetailedSynthCursorStep 1 afterFirst
+      case terminal of
+        DetailedSynthCursorNaturallyExhausted notes ->
+          assertBool "the raw cap was mistaken for complete search"
+            $ any (isInfixOf "candidate limit reached (3)") notes
+        other -> assertFailure $ "wrong bounded terminal: " ++ detailedSynthCursorStepTag other
+      zero <- expectDetailedSynthCursorStep 1 $ startDetailedSynthCursor $ Right $
+        streamDetailedQueryResults 0
+          (error "zero cap rendered a candidate") (error "zero cap inspected a result")
+      case zero of
+        DetailedSynthCursorNaturallyExhausted notes ->
+          assertBool "zero cap lost truncation" $ any (isInfixOf "candidate limit reached (0)") notes
+        other -> assertFailure $ "wrong zero-cap terminal: " ++ detailedSynthCursorStepTag other
+  , testCase "an early passing candidate leaves its source tail untouched" $ do
+      let outcome = streamDetailedQueryResults 8 id
+            [batch Djex.Continuing
+              (Just (cursorFixtureGroup 1) : error "success forced the next raw candidate")]
+      (verified, _) <- verifyBehavioralCandidateGroupsBy detailedVerificationVariantText 1
+        (const $ pure VariantAccepted) (const $ pure BehavioralSatisfied)
+        (variantsFromCursor $ startDetailedSynthCursor $ Right outcome)
+      map detailedVerificationVariantText (verifiedCandidates verified) @?= ["candidate-1"]
+      map detailedVerificationVariantOrdinal (verifiedCandidates verified) @?= [0]
+      assertBool "streaming donated a typed origin" $ all
+        (isNothing . detailedVerificationVariantExactTypedOrigin) (verifiedCandidates verified)
+  , testCase "late acceptance and a multiple-success quota preserve exact encounter order" $ do
+      attempts <- newIORef ([] :: [String])
+      let groups = map (Just . cursorFixtureGroup) [1 .. 4]
+          outcome = streamDetailedQueryResults 8 id
+            [batch Djex.Continuing $ groups ++ error "multiple-success quota forced its tail"]
+          verify candidate = modifyIORef' attempts (++ [detailedVerificationVariantText candidate])
+            >> pure VariantAccepted
+          assess candidate = pure $ if detailedVerificationVariantText candidate
+              `elem` ["candidate-2", "candidate-4"]
+            then BehavioralSatisfied else BehavioralFalsified
+      (verified, verdicts) <- verifyBehavioralCandidateGroupsBy detailedVerificationVariantText 2
+        verify assess (variantsFromCursor $ startDetailedSynthCursor $ Right outcome)
+      map detailedVerificationVariantText (verifiedCandidates verified)
+        @?= ["candidate-2", "candidate-4"]
+      length verdicts @?= 4
+      readIORef attempts >>= (@?= map (("candidate-" ++) . show) [1 :: Int .. 4])
+  , testCase "combined and library prefixes do not demand opposite-lane evidence" $ do
+      let first = cursorFixtureGroup 1
+          source = streamDetailedQueryResults 8 id
+            [batch Djex.Continuing $ Just first : error "selected stream tail forced"]
+          combined = mergeDetailedOutcomesSkipping Set.empty (deferDetailedOutcome $ Right source)
+            (deferDetailedOutcome $ error "combined prefix forced opposite preparation")
+          library = prependBehavioralLibraryOutcome
+            (deferDetailedOutcome $ error "library prefix forced base preparation") source
+      forM_ [combined, library] $ \outcome -> do
+        (selected, _) <- expectDetailedCandidateBatch 1 $ startDetailedSynthCursor $ Right outcome
+        detailedCandidateBatchGroups selected @?= [first]
+        evaluate (forceDetailedOutcome 1 $ Right outcome) >>= \forced ->
+          assertBool "prefix was not observed" (forced > 0)
+      let noLibraryRefutation = prependBehavioralLibraryOutcome
+            (DetailedSynthNoTerm ["base bounded miss"]) (DetailedSynthRefuted True)
+      ended <- expectDetailedSynthCursorStep 1 $ startDetailedSynthCursor $ Right noLibraryRefutation
+      case ended of
+        DetailedSynthCursorNaturallyExhausted notes -> notes @?= ["base bounded miss"]
+        other -> assertFailure $ "library donated refutation: " ++ detailedSynthCursorStepTag other
+      failed <- expectDetailedSynthCursorStep 1 $ startDetailedSynthCursor $ Right $
+        deferDetailedOutcome $ Left "chosen preparation failed"
+      case failed of
+        DetailedSynthCursorEngineFailed failure -> failure @?= "chosen preparation failed"
+        other -> assertFailure $ "deferred failure lost meaning: " ++ detailedSynthCursorStepTag other
+  , testCase "final presentation accumulates successful batches with their own receipts" $ do
+      batches <- forM [1 :: Int, 2, 3] $ \number -> do
+        verified <- verifyCandidateGroups 1 (const $ pure VariantAccepted)
+          [detailedCandidateGroupVerificationVariants $ cursorFixtureGroup number]
+        assessLengthVerificationBatch disabledLengthAssessmentMode verified
+      let selected = presentLengthAssessmentBatches 2
+            (take 2 batches ++ error "final shown cap demanded a third assessed batch")
+      map lengthCandidatePresentationText selected @?= ["candidate-1", "candidate-2"]
+      map lengthCandidatePresentationNote selected @?= [Nothing, Nothing]
+      map lengthCandidatePresentationText (presentLengthAssessmentBatches 3 batches)
+        @?= ["candidate-1", "candidate-2", "candidate-3"]
+      null (presentLengthAssessmentBatches 0 $ error "zero final quota demanded receipts") @?= True
+  , testCase "command-local streaming retains cross-batch quota and spelling guards" $ do
+      source <- lines <$> readFile "src/Main.hs"
+      mapM_ (assertMainSourceContains "behavioral streaming entrance" source)
+        [ "Just _ -> synthesizeBehavioralWithProvidersSkippingDetailedWith limits"
+        , "Just _ -> synthesizeBehavioralTunedDetailedWith"
+        , "&& isNothing behavioral"
+        , "isJust behavioral && acceptedCount reverseOutcomes >= synthLaneCursorShown policy"
+        , "isJust behavioral && groupCount >= synthLaneCursorBatchSize policy"
+        , "if isJust behavioral then 1 else synthLaneCursorBatchSize policy"
+        , "previous <- readIORef $ behavioralRunObservations active"
+        , "[text | (text, BehavioralSatisfied) <- previous]"
+        , "presentations = presentLengthAssessmentBatches shown assessments"
+        , "BehavioralSynthLaneAccumulation (outcome : reverseOutcomes)"
+        , "| streaming = zip outcomes dispositions"
+        ]
+  ]
+ where
+  batch progress values = Djex.queryResultFromCandidates $ Djex.SearchBatch progress () values
+  -- Exercise the real cursor forcing boundary while feeding its lazy groups
+  -- to the same quota-aware behavioral verifier used by Main.
+  variantsFromCursor cursor = case advanceDetailedSynthCursor 1 cursor of
+    Left failure -> error $ show failure
+    Right step -> forceDetailedSynthCursorStep step `seq` case step of
+      DetailedSynthCursorCandidateBatch selected rest ->
+        map detailedCandidateGroupVerificationVariants (detailedCandidateBatchGroups selected)
+          ++ variantsFromCursor rest
+      DetailedSynthCursorNaturallyExhausted _ -> []
+      DetailedSynthCursorHardCapReached _ -> []
+      other -> error $ detailedSynthCursorStepTag other
 
 verificationObservabilityTests :: TestTree
 verificationObservabilityTests = testGroup "verification observability"
@@ -16381,17 +16513,17 @@ assertLengthAssessmentMainLaneAccumulation :: IO ()
 assertLengthAssessmentMainLaneAccumulation = do
   sourceLines <- lines <$> readFile "src/Main.hs"
   let declarationSection = mainSourceSection
-        "newtype SynthLaneAccumulation ="
+        "data SynthLaneAccumulation ="
         "-- | Pure scheduling meaning of a lane" sourceLines
       foldSection = mainSourceSection
-        "synthLaneAccumulationDisposition"
+        "-- | Fold a reverse lane history into one command disposition."
         "-- | Finalize one command's already verified/assessed lanes"
         sourceLines
       declarationText = unlines declarationSection
       foldText = unlines foldSection
   mapM_ (assertMainSourceContains "lane accumulation declaration"
       declarationSection)
-    [ "newtype SynthLaneAccumulation = SynthLaneAccumulation [SynthLaneOutcome]"
+    [ "data SynthLaneAccumulation = SynthLaneAccumulation [SynthLaneOutcome] | BehavioralSynthLaneAccumulation [SynthLaneOutcome]"
     , "emptySynthLaneAccumulation :: SynthLaneAccumulation"
     , "emptySynthLaneAccumulation = SynthLaneAccumulation []"
     , "accumulateSynthLaneOutcome :: SynthLaneOutcome -> SynthLaneAccumulation -> SynthLaneAccumulation"
@@ -16461,7 +16593,7 @@ assertLengthAssessmentMainLaneFinalization = do
         "synthLaneDispositionWith shown outcome ="
         "synthLaneAccumulationDisposition" sourceLines
       finalizerSection = mainSourceSection
-        "accumulation@(SynthLaneAccumulation reverseOutcomes) = do"
+        "let (streaming, reverseOutcomes) = case accumulation of"
         "finalizeSynthLanePresentations st args goal presentations rejections = do"
         sourceLines
       presentationSection = mainSourceSection
@@ -16480,9 +16612,10 @@ assertLengthAssessmentMainLaneFinalization = do
       finalizerText = unlines finalizerSection
       presentationText = unlines presentationSection
   mapM_ (assertMainSourceContains "lane finalizer" finalizerSection)
-    [ "let outcomes = reverse reverseOutcomes"
+    [ "outcomes = reverse reverseOutcomes"
     , "dispositions = map (synthLaneDispositionWith shown) outcomes"
-    , "effectiveLanes = throughFirstTerminal $ zip outcomes dispositions"
+    , "| otherwise = throughFirstTerminal $ zip outcomes dispositions"
+    , "| streaming = zip outcomes dispositions"
     , "forM_ outcomes $ \\outcome -> forM_ (leantObservationCodeEntries $ synthLaneOutcomeObservations outcome)"
     , "forM_ (map fst effectiveLanes) $ \\outcome -> case synthLaneAssessed outcome of"
     , "lengthAssessmentFailure $ assessedSynthLaneLengthAssessment assessed"
@@ -16551,7 +16684,7 @@ assertLengthAssessmentMainLaneFinalization = do
       "modifyIORef' st" presentationSection) @?= 1
 
   chronology <- expectMainSourcePosition "lane finalizer"
-    "let outcomes = reverse reverseOutcomes" finalizerSection
+    "outcomes = reverse reverseOutcomes" finalizerSection
   metrics <- expectMainSourcePosition "lane finalizer"
     "forM_ outcomes" finalizerSection
   warnings <- expectMainSourcePosition "lane finalizer"
@@ -16611,7 +16744,9 @@ assertLengthAssessmentMainLaneScheduling = do
       constructiveSection)
     [ "let deadline"
     , "runSynthesis includeLibrary checked laneEngine providers accumulation ="
-    , "base = synthesizeWithProvidersSkippingDetailedWith limits laneEngine (rsSynthSteps state) checked providers fragment"
+    , "base = case behavioral of"
+    , "Nothing -> synthesizeWithProvidersSkippingDetailedWith limits laneEngine (rsSynthSteps state) checked providers fragment"
+    , "Just _ -> synthesizeBehavioralWithProvidersSkippingDetailedWith limits laneEngine (rsSynthSteps state) checked providers fragment"
     , "in runSynthLaneCursor behavioral assessmentContext"
     , "ordinarySynthLaneCursorPolicy assessmentContext laneEngine limits"
     , "deadline st goal id outcome accumulation"
@@ -16777,6 +16912,13 @@ assertLengthAssessmentMainParallelBaseline = do
   let libraryEligibilitySection = mainSourceSection
         "parallelLibraryBaselineStaticallyEligible ="
         "initialBaselineSchedule" parallelSection
+      structuralEligibilitySection = mainSourceSection
+        "parallelStructuralBaselineStaticallyEligible ="
+        "parallelLibraryBaselineStaticallyEligible =" parallelSection
+  mapM_ (\(label, section) ->
+      assertMainSourceContains (label ++ " excludes named streaming") section
+        "&& isNothing behavioral")
+    [("structural pair", structuralEligibilitySection), ("library pair", libraryEligibilitySection)]
   assertBool "library-pair admission was restricted to one engine"
     $ not ("engine ==" `isInfixOf` unlines libraryEligibilitySection)
 
@@ -16963,10 +17105,14 @@ assertLengthAssessmentMainParallelBaseline = do
       ]) excludedSerialSections
   mapM_ (assertMainSourceContains "serial ordinary/library lane"
       serialSection)
-    [ "base = synthesizeWithProvidersSkippingDetailedWith limits laneEngine (rsSynthSteps state) checked providers fragment"
+    [ "base = case behavioral of"
+    , "Nothing -> synthesizeWithProvidersSkippingDetailedWith limits laneEngine (rsSynthSteps state) checked providers fragment"
+    , "Just _ -> synthesizeBehavioralWithProvidersSkippingDetailedWith limits laneEngine (rsSynthSteps state) checked providers fragment"
     , "includeLibrary && not (null libraryPremises)"
-    , "mergeLibraryDetailedOutcomes base"
-    , "synthesizeTunedDetailedWith limits laneEngine"
+    , "mergeLibraryForCommand base (tunedForCommand limits laneEngine"
+    , "tunedForCommand = case behavioral of Nothing -> synthesizeTunedDetailedWith Just _ -> synthesizeBehavioralTunedDetailedWith"
+    , "mergeLibraryForCommand base library = case behavioral of Nothing -> mergeLibraryDetailedOutcomes base library"
+    , "Just _ -> Right $ prependBehavioralLibraryOutcome (deferDetailedOutcome base) (deferDetailedOutcome library)"
     ]
   mapM_ (\parallelToken -> assertBool
       ("structural engine pair unexpectedly nested through " ++ parallelToken)
@@ -16980,7 +17126,8 @@ assertLengthAssessmentMainParallelBaseline = do
     , "djinnCompatibility <- djinnRun"
     , "exferencePrepared <- prepareSynthesis exferenceRecursiveProjection"
     , "exference <- exferenceRun"
-    , "mergeDetailedOutcomesSkippingWith limits checked djinn exference"
+    , "mergeDetailedOutcomesSkippingWith limits checked (asCollection djinn) exference"
+    , "asCollection outcome | streaming = DetailedSynthStreaming $ outcomeStream outcome | otherwise = outcome"
     ]
   mapM_ (\parallelToken -> assertBool
       ("pure EngineBoth unexpectedly owns concurrency via " ++ parallelToken)
@@ -17126,7 +17273,7 @@ assertLengthAssessmentMainCursorDriver = do
     , "notes = detailedCandidateBatchNotes batch"
     , "nextCount = groupCount + length groups"
     , "debugSynthLaneGroups st groupCount groups"
-    , "lane <- verifySynthLane behavioral assessmentContext (synthLaneCursorBatchSize policy) st goal [] groups"
+    , "lane <- verifySynthLane behavioral assessmentContext (if isJust behavioral then 1 else synthLaneCursorBatchSize policy) st goal [] groups"
     , "let reverseOutcomes' = lane : reverseOutcomes"
     , "SynthLaneSurvivors _ _ -> finish reverseOutcomes' nextCount notes SynthLaneRunStoppedByDisposition"
     , "SynthLaneAssessmentPreserved _ _ -> finish reverseOutcomes' nextCount notes SynthLaneRunStoppedByDisposition"
@@ -17179,7 +17326,7 @@ assertLengthAssessmentMainCursorDriver = do
   mapM_ (assertMainSourceContains "progressive run receipt" driverSection)
     [ "attachNotesToRightmostHandled notes reverseOutcomes"
     , "chronologicalOutcomes = reverse noteOwnedReverseOutcomes"
-    , "accumulation = foldl (flip accumulateSynthLaneOutcome) initialAccumulation chronologicalOutcomes"
+    , "accumulation = foldl (flip accumulateSynthLaneOutcome) commandAccumulation chronologicalOutcomes"
     , "synthLaneRunCheckedFrontierSpellings = concatMap synthLaneCheckedFrontierSpellings chronologicalOutcomes"
     , "synthLaneRunCandidateGroupCount = groupCount"
     , "synthLaneRunNotes = notes"
@@ -17278,7 +17425,7 @@ assertLengthAssessmentMainClassicalScheduling = do
     , "synthLaneCursorAllowsFilterSuccessor = False"
     , "synthLaneCursorRetainsRunNotes = False"
     , "emDeadline st goal id"
-    , "synthesizeTunedDetailedWith limits engine steps (synthLimitTried limits, Just 100000)"
+    , "tunedForBehavior limits engine steps (synthLimitTried limits, Just 100000)"
     , "SynthLaneRunStoppedByDisposition -> pure (synthLaneRunAccumulation emRun)"
     , "_ -> runDoubleNegation engine steps prefix body (synthLaneRunAccumulation emRun)"
     , "LengthBehaviorRank -> synthLimitTried limits"
@@ -17288,7 +17435,7 @@ assertLengthAssessmentMainClassicalScheduling = do
     , "nnDeadline <- maybe (classicalSynthLaneDeadline assessmentContext commandDeadline st) (pure . behavioralRunDeadline) behavioral"
     , "nnRun <- runSynthLaneCursor behavioral assessmentContext nnPolicy nnDeadline st goal"
     , "mapDetailedCandidateGroupVariantsDroppingSemanticSidecar wrap"
-    , "synthesizeTunedDetailedWith limits engine steps (djinnCandidateCutoff, Nothing)"
+    , "tunedForBehavior limits engine steps (djinnCandidateCutoff, Nothing)"
     , "pure (synthLaneRunAccumulation nnRun)"
     ]
   length (mainSourcePositions
@@ -17383,6 +17530,19 @@ assertLengthAssessmentMainDiagnosticGates = do
     "the engine did not finish within" timeoutSection
   assertBool "timeout output preceded completed lane finalization"
     $ timeoutFinalize < timeoutDiagnostic
+  mapM_ (assertMainSourceContains "partial behavioral timeout" timeoutSection)
+    [ "disposition <- finalizeSynthLaneAccumulation st args goal"
+    , "partialSuccess = isJust behavioral && case disposition of"
+    , "SynthLaneSurvivors presentations _ -> not (null presentations)"
+    , "SynthLaneAssessmentPreserved presentations _ -> not (null presentations)"
+    , "_ -> False"
+    , "| partialSuccess = \"s \\8212 accepted results retained; further search incomplete\""
+    , "| otherwise = \"s \\8212 no answer, not a verdict\""
+    ]
+  partialGate <- expectMainSourcePosition "partial behavioral timeout"
+    "partialSuccess = isJust behavioral && case disposition of" timeoutSection
+  assertBool "timeout classified partial success before its exact final disposition"
+    $ timeoutFinalize < partialGate && partialGate < timeoutDiagnostic
   length (mainSourcePositions
       "finalizeSynthLaneAccumulation" timeoutSection) @?= 1
   admissionFinalize <- expectMainSourcePosition "cursor-admission diagnostic"

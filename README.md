@@ -444,6 +444,12 @@ can occupy a displayed-result slot. A falsified assertion rejects that candidate
 an error, timeout, or unavailable decision procedure is inconclusive and does not
 pass. The query works with Djinn, Exference, and `both`.
 
+Named queries check candidate groups as they arrive and accumulate successful
+results up to `synth-shown`, while respecting the existing search window,
+verification allowance, and timeout. Exference keeps its structural search
+ranking; named queries do not wait for the full frontend candidate pool to be
+ranked before checking the first assertion.
+
 This checks the assertion as written: finite examples do not establish a
 universal algorithmic specification. The existing `--where List.length ... --`
 syntax remains the separate symbolic Length interface. See the

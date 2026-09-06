@@ -8,6 +8,7 @@ module Leant.Synth.Length.Presentation
   ( LengthCandidatePresentation
   , LengthCandidateRejectionPresentation
   , presentLengthAssessment
+  , presentLengthAssessmentBatches
   , presentLengthAssessmentRejections
   , presentLengthPostVerificationResult
   , presentLengthSpinePairPostVerificationResult
@@ -228,6 +229,14 @@ presentLengthAssessment assessment = case
         Just ranking -> presentLengthSpinePairRanking ranking
         Nothing -> map presentUnassessedCandidate
           $ lengthAssessmentCandidates assessment
+
+-- | Cap presentations across successive already assessed batches. Each
+-- opaque presentation retains its own callback receipt and semantic note;
+-- reaching the cap does not inspect a later batch or synthesize new evidence.
+presentLengthAssessmentBatches
+  :: Int -> [LengthAssessmentResult] -> [LengthCandidatePresentation]
+presentLengthAssessmentBatches shown =
+  take (max 0 shown) . concatMap presentLengthAssessment
 
 -- | Present omitted occurrences separately from survivors.  Ranking,
 -- disabled assessment, and preserve-all filter failures have no rejections.

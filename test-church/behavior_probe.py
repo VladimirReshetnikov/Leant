@@ -79,10 +79,12 @@ def commands(spec, engines, operations, args, targets):
                           "type": target, "command": command, "expected": "candidate",
                           "finite_observation_count": spec.OBSERVATIONS[operation]})
         name = "behavior_" + engine + "_reject_all"
-        command = f":synth {name} : ∀ A : Type, A → A where False"
+        # Exercise actual rejection on a plainly inhabited monomorphic type.
+        # The control should not depend on exhausting a polymorphic search.
+        command = f":synth {name} : Nat → Nat where False"
         lines.append(command)
         cases.append({"engine": engine, "operation": "reject_all", "name": name,
-                      "type": "∀ A : Type, A → A", "command": command,
+                      "type": "Nat → Nat", "command": command,
                       "expected": "no_candidate"})
     return "\n".join([*lines, ":quit", ""]), cases
 

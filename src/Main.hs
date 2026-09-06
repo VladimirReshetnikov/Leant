@@ -128,6 +128,10 @@ import Leant.Synth.Engine
   , synthEngineName
   , synthesizeWithProvidersSkippingDetailedWith
   , synthesizeTunedDetailedWith
+  , synthesizeBehavioralWithProvidersSkippingDetailedWith
+  , synthesizeBehavioralTunedDetailedWith
+  , prependBehavioralLibraryOutcome
+  , deferDetailedOutcome
   , SynthLimits (..)
   , defaultSynthLimits
   , parseSynthDjinnStrategy
@@ -212,6 +216,7 @@ import Leant.Synth.Length.Presentation
   , lengthCandidateRejectionPresentationNote
   , lengthCandidateRejectionPresentationText
   , presentLengthAssessment
+  , presentLengthAssessmentBatches
   , presentLengthAssessmentRejections
   )
 import Leant.Synth.Length.Where
@@ -497,8 +502,9 @@ data AssessedSynthLane = AssessedSynthLane
 -- | Command-local lane history in reverse attempt order.  Prepending keeps
 -- continuation constant-time without forcing an earlier outcome.  The owner
 -- is lexical to one 'synthRun' context and never enters 'ReplState'.
-newtype SynthLaneAccumulation =
+data SynthLaneAccumulation =
   SynthLaneAccumulation [SynthLaneOutcome]
+  | BehavioralSynthLaneAccumulation [SynthLaneOutcome]
 
 emptySynthLaneAccumulation :: SynthLaneAccumulation
 emptySynthLaneAccumulation = SynthLaneAccumulation []
@@ -509,6 +515,13 @@ accumulateSynthLaneOutcome
   -> SynthLaneAccumulation
 accumulateSynthLaneOutcome outcome (SynthLaneAccumulation reverseOutcomes) =
   SynthLaneAccumulation (outcome : reverseOutcomes)
+accumulateSynthLaneOutcome outcome (BehavioralSynthLaneAccumulation reverseOutcomes) =
+  BehavioralSynthLaneAccumulation (outcome : reverseOutcomes)
+
+behavioralSynthLaneAccumulation :: SynthLaneAccumulation -> SynthLaneAccumulation
+behavioralSynthLaneAccumulation (SynthLaneAccumulation outcomes) =
+  BehavioralSynthLaneAccumulation outcomes
+behavioralSynthLaneAccumulation accumulation = accumulation
 
 -- | Pure scheduling meaning of a lane.  'SynthLaneNoVerified' and successful
 -- behavioral all-rejection may enter a later scheduler lane, but remain
@@ -2831,8 +2844,11 @@ synthGo' behavioral assessmentContext st args retriedVars goal parsed = do
         | limit <= 0 = Nothing
         | otherwise = Just (addUTCTime (fromIntegral limit) started)
       runSynthesis includeLibrary checked laneEngine providers accumulation =
-        let base = synthesizeWithProvidersSkippingDetailedWith limits
-              laneEngine (rsSynthSteps state) checked providers fragment
+        let base = case behavioral of
+              Nothing -> synthesizeWithProvidersSkippingDetailedWith limits
+                laneEngine (rsSynthSteps state) checked providers fragment
+              Just _ -> synthesizeBehavioralWithProvidersSkippingDetailedWith limits
+                laneEngine (rsSynthSteps state) checked providers fragment
             -- Library premises are an isolated, deliberately budgeted
             -- extension of the structural lane.  Their candidates lead the
             -- unchanged base candidates, while only the base may contribute a
@@ -2840,8 +2856,8 @@ synthGo' behavioral assessmentContext st args retriedVars goal parsed = do
             -- cannot crowd out either ordinary or library synthesis.
             outcome
               | includeLibrary && not (null libraryPremises) =
-                  mergeLibraryDetailedOutcomes base
-                    (synthesizeTunedDetailedWith limits laneEngine
+                  mergeLibraryForCommand base
+                    (tunedForCommand limits laneEngine
                       (rsSynthSteps state)
                       (synthLimitWindow limits, Just 100000)
                       [ (name, stripRecCtors premise)
@@ -2852,6 +2868,13 @@ synthGo' behavioral assessmentContext st args retriedVars goal parsed = do
         in runSynthLaneCursor behavioral assessmentContext
           (ordinarySynthLaneCursorPolicy assessmentContext laneEngine limits)
           deadline st goal id outcome accumulation
+      tunedForCommand = case behavioral of
+        Nothing -> synthesizeTunedDetailedWith
+        Just _ -> synthesizeBehavioralTunedDetailedWith
+      mergeLibraryForCommand base library = case behavioral of
+        Nothing -> mergeLibraryDetailedOutcomes base library
+        Just _ -> Right $ prependBehavioralLibraryOutcome
+          (deferDetailedOutcome base) (deferDetailedOutcome library)
       -- Scoped parallel work remains limited to an initial provider-free
       -- structural lane with the default limits and a one-batch cursor.  The
       -- no-library EngineBoth case overlaps its two engines; a nonempty
@@ -2871,11 +2894,13 @@ synthGo' behavioral assessmentContext st args retriedVars goal parsed = do
           == defaultSynthLimits
       parallelStructuralBaselineStaticallyEligible =
         engine == EngineBoth
+          && isNothing behavioral
           && defaultSearchBounds
           && null libraryPremises
           && not (synthLaneCursorAllowsFilterSuccessor baselinePolicy)
       parallelLibraryBaselineStaticallyEligible =
         structuralFirst
+          && isNothing behavioral
           && defaultSearchBounds
           && not (null libraryPremises)
           && not (synthLaneCursorAllowsFilterSuccessor baselinePolicy)
@@ -3047,12 +3072,19 @@ synthGo' behavioral assessmentContext st args retriedVars goal parsed = do
   -- no weaker lane notes are appended to the abnormal diagnostic.
   report _ laneRun@SynthLaneRun
       { synthLaneRunEnd = SynthLaneRunTimedOut } = do
-    _ <- finalizeSynthLaneAccumulation st args goal
+    disposition <- finalizeSynthLaneAccumulation st args goal
       (synthLaneRunAccumulation laneRun)
     limit <- synthTimeoutSeconds st
+    let partialSuccess = isJust behavioral && case disposition of
+          SynthLaneSurvivors presentations _ -> not (null presentations)
+          SynthLaneAssessmentPreserved presentations _ -> not (null presentations)
+          _ -> False
+        completion
+          | partialSuccess = "s \8212 accepted results retained; further search incomplete"
+          | otherwise = "s \8212 no answer, not a verdict"
     emitLn st =<< cYellow st
       ("the engine did not finish within " ++ show limit
-       ++ "s \8212 no answer, not a verdict")
+       ++ completion)
     emitLn st =<< cDim st
       ("(bounded hypothesis instantiation can widen the search a lot; "
        ++ ":set synth-timeout N chooses another number of seconds, "
@@ -3340,6 +3372,7 @@ mergeLibraryDetailedOutcomes base lib = case (base, lib) of
     DetailedSynthCandidates _ notes -> notes
     DetailedSynthNoTerm notes -> notes
     DetailedSynthRefuted _ -> []
+    DetailedSynthStreaming _ -> []
 
 -- | The batch a lane may request of its cursor: at least one group, and
 -- never more than the window the cursor observes through.  The two bounds
@@ -3458,9 +3491,11 @@ classicalSynthLaneDeadline assessmentContext commandDeadline st =
 
 -- | Consume one lazy detailed outcome under a lane policy.  Every nonempty
 -- cursor batch is verified and behaviorally assessed exactly once.  Only an
--- ordinary filter lane may request a successor, and then only after its first
+-- ordinary filter lane may request a successor after its first
 -- batch produced no verified term or rejected every verified term.  The
--- second candidate batch ends by policy without a third tail probe.
+-- second candidate batch ends by policy without a third tail probe. Named
+-- assertions instead observe one group at a time up to the same verification
+-- allowance, stopping immediately at the shared successful-result quota.
 runSynthLaneCursor
   :: Maybe BehavioralRun
   -> LengthAssessmentContext command
@@ -3476,47 +3511,66 @@ runSynthLaneCursor behavioral assessmentContext policy deadline st goal transfor
     initialAccumulation =
   observe (1 :: Int) 0 [] [] (startDetailedSynthCursor outcome)
  where
-  observe batchOrdinal groupCount reverseOutcomes runNotes cursor = do
-    forced <- runDetailedSynthCursorBefore
-      (synthLaneCursorBatchSize policy) (synthLaneCursorWindow policy)
-      deadline cursor
-    case forced of
-      Nothing -> finish reverseOutcomes groupCount runNotes
-        SynthLaneRunTimedOut
-      Just (Left err) -> finish reverseOutcomes groupCount runNotes
-        (SynthLaneRunCursorAdmissionFailed err)
-      Just (Right step) -> case step of
-        DetailedSynthCursorCandidateBatch batch successor -> do
-          let groups = map transform (detailedCandidateBatchGroups batch)
-              notes = detailedCandidateBatchNotes batch
-              nextCount = groupCount + length groups
-          when (synthLaneCursorRetainsRunNotes policy) $
-            debugSynthLaneGroups st groupCount groups
-          lane <- verifySynthLane behavioral assessmentContext
-            (synthLaneCursorBatchSize policy) st goal [] groups
-          let reverseOutcomes' = lane : reverseOutcomes
-          case synthLaneDispositionWith (synthLaneCursorShown policy) lane of
-            SynthLaneSurvivors _ _ ->
-              finish reverseOutcomes' nextCount notes
-                SynthLaneRunStoppedByDisposition
-            SynthLaneAssessmentPreserved _ _ ->
-              finish reverseOutcomes' nextCount notes
-                SynthLaneRunStoppedByDisposition
-            SynthLaneNoVerified -> continueOrStop batchOrdinal nextCount reverseOutcomes' notes successor
-            SynthLaneAllBehaviorallyRejected _ -> continueOrStop batchOrdinal nextCount reverseOutcomes' notes successor
-        DetailedSynthCursorNaturallyExhausted notes ->
-          finish reverseOutcomes groupCount notes
-            SynthLaneRunNaturallyExhausted
-        DetailedSynthCursorHardCapReached notes ->
-          finish reverseOutcomes groupCount notes SynthLaneRunHardCapReached
-        DetailedSynthCursorEngineFailed err ->
-          finish reverseOutcomes groupCount runNotes
-            (SynthLaneRunEngineFailed err)
-        DetailedSynthCursorRefuted sound ->
-          finish reverseOutcomes groupCount runNotes
-            (SynthLaneRunRefuted sound)
-        DetailedSynthCursorNoTerm notes ->
-          finish reverseOutcomes groupCount notes SynthLaneRunNoTerm
+  observe batchOrdinal groupCount reverseOutcomes runNotes cursor
+    | isJust behavioral && acceptedCount reverseOutcomes >= synthLaneCursorShown policy =
+        finish reverseOutcomes groupCount runNotes SynthLaneRunStoppedByDisposition
+    | isJust behavioral && groupCount >= synthLaneCursorBatchSize policy =
+        finish reverseOutcomes groupCount runNotes SynthLaneRunBatchPolicyReached
+    | otherwise = do
+      forced <- runDetailedSynthCursorBefore
+        (if isJust behavioral then 1 else synthLaneCursorBatchSize policy)
+        (synthLaneCursorWindow policy)
+        deadline cursor
+      case forced of
+        Nothing -> finish reverseOutcomes groupCount runNotes
+          SynthLaneRunTimedOut
+        Just (Left err) -> finish reverseOutcomes groupCount runNotes
+          (SynthLaneRunCursorAdmissionFailed err)
+        Just (Right step) -> case step of
+          DetailedSynthCursorCandidateBatch batch successor -> do
+            let groups = map transform (detailedCandidateBatchGroups batch)
+                notes = detailedCandidateBatchNotes batch
+                nextCount = groupCount + length groups
+            when (synthLaneCursorRetainsRunNotes policy) $
+              debugSynthLaneGroups st groupCount groups
+            lane <- verifySynthLane behavioral assessmentContext
+              (if isJust behavioral then 1 else synthLaneCursorBatchSize policy) st goal [] groups
+            let reverseOutcomes' = lane : reverseOutcomes
+            case behavioral of
+              Just _ -> observe (batchOrdinal + 1) nextCount reverseOutcomes' notes successor
+              Nothing -> case synthLaneDispositionWith (synthLaneCursorShown policy) lane of
+                SynthLaneSurvivors _ _ ->
+                  finish reverseOutcomes' nextCount notes
+                    SynthLaneRunStoppedByDisposition
+                SynthLaneAssessmentPreserved _ _ ->
+                  finish reverseOutcomes' nextCount notes
+                    SynthLaneRunStoppedByDisposition
+                SynthLaneNoVerified -> continueOrStop batchOrdinal nextCount reverseOutcomes' notes successor
+                SynthLaneAllBehaviorallyRejected _ -> continueOrStop batchOrdinal nextCount reverseOutcomes' notes successor
+          DetailedSynthCursorNaturallyExhausted notes ->
+            finish reverseOutcomes groupCount notes
+              SynthLaneRunNaturallyExhausted
+          DetailedSynthCursorHardCapReached notes ->
+            finish reverseOutcomes groupCount notes SynthLaneRunHardCapReached
+          DetailedSynthCursorEngineFailed err ->
+            finish reverseOutcomes groupCount runNotes
+              (SynthLaneRunEngineFailed err)
+          DetailedSynthCursorRefuted sound ->
+            finish reverseOutcomes groupCount runNotes
+              (SynthLaneRunRefuted sound)
+          DetailedSynthCursorNoTerm notes ->
+            finish reverseOutcomes groupCount notes SynthLaneRunNoTerm
+
+  acceptedCount reverseOutcomes = case synthLaneAccumulationDisposition
+      (synthLaneCursorShown policy) $ foldl (flip accumulateSynthLaneOutcome)
+        commandAccumulation (reverse reverseOutcomes) of
+    SynthLaneSurvivors presentations _ -> length presentations
+    SynthLaneAssessmentPreserved presentations _ -> length presentations
+    _ -> 0
+
+  commandAccumulation = case behavioral of
+    Just _ -> behavioralSynthLaneAccumulation initialAccumulation
+    Nothing -> initialAccumulation
 
   continueOrStop batchOrdinal groupCount reverseOutcomes notes successor
     | synthLaneCursorAllowsFilterSuccessor policy && batchOrdinal < 2 =
@@ -3532,7 +3586,7 @@ runSynthLaneCursor behavioral assessmentContext policy deadline st goal transfor
         chronologicalOutcomes = reverse noteOwnedReverseOutcomes
         accumulation = foldl
           (flip accumulateSynthLaneOutcome)
-          initialAccumulation chronologicalOutcomes
+          commandAccumulation chronologicalOutcomes
     in pure SynthLaneRun
       { synthLaneRunAccumulation = accumulation
       , synthLaneRunCheckedFrontierSpellings = concatMap
@@ -3542,7 +3596,8 @@ runSynthLaneCursor behavioral assessmentContext policy deadline st goal transfor
       , synthLaneRunEnd = runEnd
       }
 
-  -- Outcomes are buffered only for this run (at most two).  Ordinary notes
+  -- Outcomes are buffered only for this run (at most two ordinary batches,
+  -- or the named command's existing verification allowance). Ordinary notes
   -- attach once to the latest handled result.  If every batch is a Lean miss,
   -- they stay solely on the run receipt for the final diagnostic.
   attachNotesToRightmostHandled _ [] = []
@@ -3632,7 +3687,7 @@ synthClassical behavioral assessmentContext commandDeadline st goal parsed accum
             , synthLaneCursorShown = synthLimitShown limits
             }
           emDeadline st goal id
-          (synthesizeTunedDetailedWith limits engine steps
+          (tunedForBehavior limits engine steps
             (synthLimitTried limits, Just 100000)
             emPremises emEngineFrag (pgFrag parsed))
           accumulation
@@ -3645,6 +3700,9 @@ synthClassical behavioral assessmentContext commandDeadline st goal parsed accum
           _ -> runDoubleNegation engine steps prefix body
             (synthLaneRunAccumulation emRun)
  where
+  tunedForBehavior = case behavioral of
+    Nothing -> synthesizeTunedDetailedWith
+    Just _ -> synthesizeBehavioralTunedDetailedWith
   runDoubleNegation engine steps prefix body accumulation' = do
       limits <- synthLimitsOf st
       -- route 2: the double-negation translation, wrapped in
@@ -3673,7 +3731,7 @@ synthClassical behavioral assessmentContext commandDeadline st goal parsed accum
         (pure . behavioralRunDeadline) behavioral
       nnRun <- runSynthLaneCursor behavioral assessmentContext nnPolicy nnDeadline st goal
         (mapDetailedCandidateGroupVariantsDroppingSemanticSidecar wrap)
-        (synthesizeTunedDetailedWith limits engine steps
+        (tunedForBehavior limits engine steps
           (djinnCandidateCutoff, Nothing) [] nnFrag nnFrag)
         accumulation'
       pure (synthLaneRunAccumulation nnRun)
@@ -3786,6 +3844,23 @@ synthLaneAccumulationDisposition
   :: Int
   -> SynthLaneAccumulation
   -> SynthLaneDisposition
+synthLaneAccumulationDisposition shown (BehavioralSynthLaneAccumulation reverseOutcomes) =
+  let assessed =
+        [ receipt
+        | outcome <- reverse reverseOutcomes
+        , Just receipt <- [synthLaneAssessed outcome]
+        , not $ null $ verifiedCandidateReceipts $ assessedSynthLaneVerification receipt
+        ]
+      assessments = map assessedSynthLaneLengthAssessment assessed
+      presentations = presentLengthAssessmentBatches shown assessments
+      rejections = concatMap presentLengthAssessmentRejections assessments
+  in if any (isJust . lengthAssessmentFailure) assessments
+       then SynthLaneAssessmentPreserved presentations rejections
+       else if not $ null presentations
+         then SynthLaneSurvivors presentations rejections
+         else if not $ null rejections
+           then SynthLaneAllBehaviorallyRejected rejections
+           else if null assessed then SynthLaneNoVerified else SynthLaneSurvivors [] []
 synthLaneAccumulationDisposition shown
     (SynthLaneAccumulation reverseOutcomes) =
   foldl accumulateDisposition SynthLaneNoVerified
@@ -3832,11 +3907,16 @@ finalizeSynthLaneAccumulation
   -> SynthLaneAccumulation
   -> IO SynthLaneDisposition
 finalizeSynthLaneAccumulation st args goal
-    accumulation@(SynthLaneAccumulation reverseOutcomes) = do
+    accumulation = do
   shown <- synthLimitShown <$> synthLimitsOf st
-  let outcomes = reverse reverseOutcomes
+  let (streaming, reverseOutcomes) = case accumulation of
+        SynthLaneAccumulation history -> (False, history)
+        BehavioralSynthLaneAccumulation history -> (True, history)
+      outcomes = reverse reverseOutcomes
       dispositions = map (synthLaneDispositionWith shown) outcomes
-      effectiveLanes = throughFirstTerminal $ zip outcomes dispositions
+      effectiveLanes
+        | streaming = zip outcomes dispositions
+        | otherwise = throughFirstTerminal $ zip outcomes dispositions
   debug <- synthDebugEnabled st
   when debug $ forM_ outcomes $ \outcome ->
     forM_ (leantObservationCodeEntries
@@ -4033,9 +4113,14 @@ synthVerifyBehavioral
   -> IO (VerificationBatch DetailedVerificationVariant, [DetailedVerificationVariant])
 synthVerifyBehavioral active successQuota st goal groups = do
   reverseAttempts <- newIORef []
+  previous <- readIORef $ behavioralRunObservations active
+  let acceptedSpellings = Set.fromList
+        [text | (text, BehavioralSatisfied) <- previous]
+      freshGroups = filter (not . null) $ map
+        (filter ((`Set.notMember` acceptedSpellings) . detailedVerificationVariantText)) groups
   (verification, assessments) <- verifyBehavioralCandidateGroupsBy
     detailedVerificationVariantText successQuota
-    (verifyVariant reverseAttempts) assessVariant groups
+    (verifyVariant reverseAttempts) assessVariant freshGroups
   modifyIORef' (behavioralRunObservations active)
     (++ [(detailedVerificationVariantText candidate, verdict)
          | (candidate, verdict) <- assessments])

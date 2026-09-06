@@ -32,13 +32,13 @@ supplied behavioral assertion: 1 passed, 0 falsified, 0 inconclusive (checks con
 synth engine: exference
 λ> :synth f : (∀ A : Type, A → A → A) where f Nat 11 29 = 29 ∧ f Bool true false = false
   it1  fun _ _ x => x
-note: search truncated: candidate limit reached (16)
+note: search reported more batches to come
 supplied behavioral assertion: 1 passed, 1 falsified, 0 inconclusive (checks concern only the supplied assertion)
 λ> :set synth-engine both
 synth engine: both
 λ> :synth f : (∀ A : Type, A → A → A) where f Nat 11 29 = 29 ∧ f Bool true false = false
   it1  fun _ _ x => x
-note: exference: search truncated: candidate limit reached (16)
+note: exference: search reported more batches to come
 supplied behavioral assertion: 1 passed, 1 falsified, 0 inconclusive (checks concern only the supplied assertion)
 λ> :synth f : (∀ A : Type, A → A) where False
 the engine proposed 2 candidate(s) but none passed both Lean verification and the supplied assertion
@@ -63,9 +63,45 @@ but is expected to have type
 behavioral query rejected before synthesis: Unknown identifier `Unknown.predicate`
 λ> :synth f : (∀ A : Type, A → A) where f Nat 7 = 7
   it1  fun _ x => x
-note: exference: search truncated: step limit reached, queue limit pruned 53197
+note: exference: search reported more batches to come
 supplied behavioral assertion: 1 passed, 0 falsified, 0 inconclusive (checks concern only the supplied assertion)
 λ> :synth (∀ A : Type, A → A)
   it1  fun _ x => x
 note: exference: search truncated: step limit reached, queue limit pruned 53197
+λ> :set synth-shown 2
+synth shown: 2
+λ> :set synth-engine exference
+synth engine: exference
+λ> :synth twoResults : (∀ A : Type, A → A → A) where True
+  it1  fun _ x _ => x
+  it2  fun _ _ x => x
+note: search reported more batches to come
+supplied behavioral assertion: 2 passed, 0 falsified, 0 inconclusive (checks concern only the supplied assertion)
+λ> :set synth-engine both
+synth engine: both
+λ> :synth bothResults : (∀ A : Type, A → A → A) where True
+  it1  fun _ _ x => x
+  it2  fun _ x _ => x
+note: exference: search reported more batches to come
+supplied behavioral assertion: 2 passed, 0 falsified, 0 inconclusive (checks concern only the supplied assertion)
+λ> :set synth-engine exference
+synth engine: exference
+λ> :set synth-shown 1
+synth shown: 1
+λ> :set synth-verify 1
+synth verify: 1
+λ> :synth limited : (∀ A : Type, A → A → A) where limited Nat 11 29 = 29 ∧ limited Bool true false = false
+the engine proposed 1 candidate(s) but none passed both Lean verification and the supplied assertion
+note: search reported more batches to come
+supplied behavioral assertion: 0 passed, 1 falsified, 0 inconclusive (checks concern only the supplied assertion)
+λ> :set synth-verify 16
+synth verify: 16
+λ> :synth later : (∀ A : Type, A → A → A) where later Nat 11 29 = 29 ∧ later Bool true false = false
+  it1  fun _ _ x => x
+note: search reported more batches to come
+supplied behavioral assertion: 1 passed, 1 falsified, 0 inconclusive (checks concern only the supplied assertion)
+λ> :synth recovery : (∀ A : Type, A → A) where recovery Nat 7 = 7
+  it1  fun _ x => x
+note: search reported more batches to come
+supplied behavioral assertion: 1 passed, 0 falsified, 0 inconclusive (checks concern only the supplied assertion)
 λ> :quit

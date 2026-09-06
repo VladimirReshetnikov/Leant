@@ -53,6 +53,9 @@ module Leant.Synth.Engine
   , typedCandidateSemanticAuthorityInspection
   , mapDetailedCandidateGroupVariantsDroppingSemanticSidecar
   , DetailedSynthOutcome (..)
+  , streamDetailedQueryResults
+  , deferDetailedOutcome
+  , prependBehavioralLibraryOutcome
   , projectDetailedSynthOutcome
   , DetailedCandidateBatch
   , detailedCandidateBatchGroups
@@ -95,6 +98,8 @@ module Leant.Synth.Engine
   , synthVerificationWindowWith
   , synthesizeTunedDetailedWith
   , synthesizeWithProvidersSkippingDetailedWith
+  , synthesizeBehavioralWithProvidersSkippingDetailedWith
+  , synthesizeBehavioralTunedDetailedWith
   , advanceDetailedSynthCursorWith
   , takeDistinct
   , takeDistinctOn
@@ -113,7 +118,7 @@ module Leant.Synth.Engine
 import Data.Foldable (toList)
 import Data.List (intercalate, isPrefixOf, nub, nubBy, sortOn)
 import Data.Bifunctor (first, second)
-import Data.Maybe (catMaybes, isNothing)
+import Data.Maybe (catMaybes, isNothing, mapMaybe)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Data.Void (Void)
@@ -125,6 +130,7 @@ import Language.Haskell.Djex
   , QueryEvidence (..)
   , QueryOptions (..)
   , QueryRequest (..)
+  , QueryResult
   , Boxity (Boxed)
   , Completion (..)
   , DataConstructor (..)
@@ -654,15 +660,142 @@ data DetailedSynthOutcome
   = DetailedSynthCandidates [DetailedCandidateGroup] [String]
   | DetailedSynthRefuted Bool
   | DetailedSynthNoTerm [String]
+  | DetailedSynthStreaming DetailedCandidateStream
   deriving (Eq, Show)
+
+-- Each observation belongs to the same original backend trace. A missing
+-- rendering still spends its raw slot. Notes describe only work already
+-- observed, never a separately demanded final-progress projection.
+data DetailedCandidateStream
+  = StreamObserved (Maybe DetailedCandidateGroup) [String] DetailedCandidateStream
+  | StreamFinished [String]
+  | StreamRefuted Bool
+  | StreamFailed String
+  deriving (Eq, Show)
+
+-- | Defer even preparation and the engine's first-result search until its
+-- scheduled cursor turn. Failures retain their meaning when observed.
+deferDetailedOutcome :: Either String DetailedSynthOutcome -> DetailedSynthOutcome
+deferDetailedOutcome result = DetailedSynthStreaming $
+  either StreamFailed outcomeStream result
+
+-- | Command-local streaming admission. The cap is charged before rendering;
+-- neither a rejected rendering nor a duplicate earns a replacement raw slot.
+-- The renderer must preserve the candidate's own provenance in its group.
+streamDetailedQueryResults
+  :: Int
+  -> (candidate -> Maybe DetailedCandidateGroup)
+  -> [QueryResult metadata candidate]
+  -> DetailedSynthOutcome
+streamDetailedQueryResults window render = DetailedSynthStreaming
+  . batches (max 0 window) Set.empty []
+ where
+  capped notes = nub $ notes ++
+    ["search truncated: candidate limit reached (" ++ show window ++ ")"]
+  batches 0 _ notes _ = StreamFinished $ capped notes
+  batches _ _ notes [] = StreamFinished notes
+  batches remaining seen _ (result : rest) =
+    let batch = resultSearch result
+        notes = progressNotesWith window $ batchProgress batch
+    in candidates remaining seen notes (batchCandidates batch) rest
+  candidates 0 _ notes _ _ = StreamFinished $ capped notes
+  candidates remaining seen notes [] rest = batches remaining seen notes rest
+  candidates remaining seen notes (candidate : rest) results =
+    let observedNotes = if remaining == 1 then capped notes else notes
+        (group, seen') = case render candidate of
+          Nothing -> (Nothing, seen)
+          Just rendered ->
+            let key = detailedCandidateGroupVariants rendered
+            in if key `Set.member` seen then (Nothing, seen)
+              else (Just rendered, Set.insert key seen)
+    in StreamObserved group observedNotes $
+      candidates (remaining - 1) seen' observedNotes rest results
+
+outcomeStream :: DetailedSynthOutcome -> DetailedCandidateStream
+outcomeStream outcome = case outcome of
+  DetailedSynthStreaming stream -> stream
+  DetailedSynthCandidates groups notes -> foldr
+    (\group -> StreamObserved (Just group) notes) (StreamFinished notes) groups
+  DetailedSynthNoTerm notes -> StreamFinished notes
+  DetailedSynthRefuted sound -> StreamRefuted sound
+
+mapStreamGroups
+  :: (DetailedCandidateGroup -> Maybe DetailedCandidateGroup)
+  -> DetailedCandidateStream
+  -> DetailedCandidateStream
+mapStreamGroups transform stream = case stream of
+  StreamObserved group notes rest -> StreamObserved
+    (group >>= transform) notes (mapStreamGroups transform rest)
+  other -> other
+
+-- Demand only the prefix required to establish whether this lane rendered a
+-- candidate. A successful lane keeps its original raw observations intact.
+normalizeStreamingOutcome :: DetailedSynthOutcome -> DetailedSynthOutcome
+normalizeStreamingOutcome outcome@(DetailedSynthStreaming original) = findFirst original
+ where
+  findFirst stream = case stream of
+    StreamObserved (Just _) _ _ -> outcome
+    StreamObserved Nothing _ rest -> findFirst rest
+    StreamFinished notes -> DetailedSynthNoTerm notes
+    StreamRefuted sound -> DetailedSynthRefuted sound
+    StreamFailed _ -> outcome
+normalizeStreamingOutcome outcome = outcome
+
+-- | Library candidates precede the base trace without demanding its verdict
+-- or notes. Only the base may contribute a refutation; any observed candidate
+-- prevents a later negative verdict from replacing that positive evidence.
+prependBehavioralLibraryOutcome
+  :: DetailedSynthOutcome -> DetailedSynthOutcome -> DetailedSynthOutcome
+prependBehavioralLibraryOutcome base library = DetailedSynthStreaming $
+  prepend Set.empty False [] (outcomeStream library)
+ where
+  prepend seen found notes stream = case stream of
+    StreamObserved group observed rest ->
+      let (fresh, seen') = freshStreamGroup seen group
+      in StreamObserved fresh observed $
+        prepend seen' (found || maybe False (const True) fresh) observed rest
+    StreamFinished latest -> append seen found latest $ outcomeStream base
+    StreamRefuted _ -> append seen found notes $ outcomeStream base
+    StreamFailed failure -> StreamFailed failure
+  append seen found previous stream = case stream of
+    StreamObserved group notes rest ->
+      let (fresh, seen') = freshStreamGroup seen group
+      in StreamObserved fresh (nub $ previous ++ notes) $
+        append seen' (found || maybe False (const True) fresh) previous rest
+    StreamFinished notes -> StreamFinished $ nub $ previous ++ notes
+    StreamRefuted sound
+      | found -> StreamFinished previous
+      | otherwise -> StreamRefuted sound
+    StreamFailed failure -> StreamFailed failure
+
+freshStreamGroup
+  :: Set.Set String
+  -> Maybe DetailedCandidateGroup
+  -> (Maybe DetailedCandidateGroup, Set.Set String)
+freshStreamGroup seen Nothing = (Nothing, seen)
+freshStreamGroup seen (Just group) =
+  let fresh = filter ((`Set.notMember` seen) . detailedCandidateVariantText)
+        $ detailedCandidateGroupVariantRecords group
+      next = foldr (Set.insert . detailedCandidateVariantText) seen fresh
+  in (if null fresh then Nothing else Just $ retainDetailedCandidateGroupVariants fresh group, next)
 
 -- | Forget rendering provenance without changing any historical result.
 projectDetailedSynthOutcome :: DetailedSynthOutcome -> SynthOutcome
 projectDetailedSynthOutcome outcome = case outcome of
+  DetailedSynthStreaming stream -> projectDetailedSynthOutcome $ collect [] stream
   DetailedSynthCandidates groups notes ->
     SynthCandidates (map detailedCandidateGroupVariants groups) notes
   DetailedSynthRefuted sound -> SynthRefuted sound
   DetailedSynthNoTerm notes -> SynthNoTerm notes
+ where
+  collect reversed stream = case stream of
+    StreamObserved group _ rest -> collect (maybe reversed (: reversed) group) rest
+    StreamFinished notes -> DetailedSynthCandidates (reverse reversed) notes
+    StreamRefuted sound -> case reversed of
+      [] -> DetailedSynthRefuted sound
+      _ -> DetailedSynthCandidates (reverse reversed) []
+    StreamFailed failure -> DetailedSynthCandidates (reverse reversed)
+      ["synthesis engine error: " ++ failure]
 
 -- | One nonempty, ordered slice of a detailed candidate stream.  The
 -- constructor stays hidden so callers cannot manufacture an empty batch or
@@ -679,7 +812,7 @@ detailedCandidateBatchGroups
   -> [DetailedCandidateGroup]
 detailedCandidateBatchGroups (DetailedCandidateBatch groups _) = groups
 
--- | Original run-level notes, unchanged for every slice of the run.
+-- | Run-level notes for ordinary pools, or prefix-observed notes for streams.
 detailedCandidateBatchNotes :: DetailedCandidateBatch -> [String]
 detailedCandidateBatchNotes (DetailedCandidateBatch _ notes) = notes
 
@@ -691,6 +824,7 @@ detailedCandidateBatchNotes (DetailedCandidateBatch _ notes) = notes
 data DetailedSynthCursor = DetailedSynthCursor
   Int
   (Either String DetailedSynthOutcome)
+  | DetailedSynthStreamingCursor Int [String] DetailedCandidateStream
 
 -- | Invalid per-step batch requests.  The limit error records the maximum
 -- first and the observed request second.
@@ -758,6 +892,8 @@ advanceValidDetailedSynthCursor window requested
       Right (DetailedSynthRefuted sound) ->
         DetailedSynthCursorRefuted sound
       Right (DetailedSynthNoTerm notes) -> DetailedSynthCursorNoTerm notes
+      Right (DetailedSynthStreaming stream) ->
+        advanceStreamingCursor window consumed [] stream
       Right (DetailedSynthCandidates groups notes) -> case batch of
         [] -> DetailedSynthCursorNaturallyExhausted notes
         _ : _ -> DetailedSynthCursorCandidateBatch
@@ -768,6 +904,24 @@ advanceValidDetailedSynthCursor window requested
        where
         (batch, rest) = splitAt remainingRequest groups
         remainingRequest = min requested (window - consumed)
+advanceValidDetailedSynthCursor window _
+    (DetailedSynthStreamingCursor consumed notes stream) =
+  advanceStreamingCursor window consumed notes stream
+
+advanceStreamingCursor
+  :: Int -> Int -> [String] -> DetailedCandidateStream -> DetailedSynthCursorStep
+advanceStreamingCursor window consumed previous stream
+  | consumed >= window = DetailedSynthCursorHardCapReached previous
+  | otherwise = case stream of
+      StreamObserved Nothing notes rest -> advanceStreamingCursor window consumed notes rest
+      StreamObserved (Just group) notes rest -> DetailedSynthCursorCandidateBatch
+        (DetailedCandidateBatch [group] notes)
+        (DetailedSynthStreamingCursor (consumed + 1) notes rest)
+      StreamFinished notes -> DetailedSynthCursorNaturallyExhausted notes
+      StreamRefuted sound
+        | consumed == 0 -> DetailedSynthCursorRefuted sound
+        | otherwise -> DetailedSynthCursorNaturallyExhausted previous
+      StreamFailed failure -> DetailedSynthCursorEngineFailed failure
 
 -- The only reachable capped cursor follows at least one candidate batch, so
 -- its payload is a locally reconstructed candidate outcome.  Keeping the
@@ -775,6 +929,7 @@ advanceValidDetailedSynthCursor window requested
 -- tail in the ordinary case.
 hardCapStep :: Either String DetailedSynthOutcome -> DetailedSynthCursorStep
 hardCapStep outcome = case outcome of
+  Right (DetailedSynthStreaming _) -> DetailedSynthCursorHardCapReached []
   Right (DetailedSynthCandidates _ notes) ->
     DetailedSynthCursorHardCapReached notes
   Left err -> DetailedSynthCursorEngineFailed err
@@ -902,11 +1057,21 @@ takeDistinctOn key limit =
 -- synthesis work.
 forceDetailedOutcome :: Int -> Either String DetailedSynthOutcome -> Int
 forceDetailedOutcome n outcome = case outcome of
+  Right (DetailedSynthStreaming stream) -> forceStream n stream
   Left err -> length err
   Right (DetailedSynthCandidates groups notes) ->
     detailedGroupSize (take n groups) + detailedNoteSize notes
   Right (DetailedSynthRefuted sound) -> if sound then 1 else 0
   Right (DetailedSynthNoTerm notes) -> detailedNoteSize notes
+ where
+  forceStream remaining _ | remaining <= 0 = 0
+  forceStream remaining stream = case stream of
+    StreamObserved group notes rest -> detailedNoteSize notes + case group of
+      Nothing -> forceStream remaining rest
+      Just candidate -> detailedGroupSize [candidate] + forceStream (remaining - 1) rest
+    StreamFinished notes -> detailedNoteSize notes
+    StreamRefuted sound -> if sound then 1 else 0
+    StreamFailed failure -> length failure
 
 -- | Force exactly the work owned by the current cursor step.  For a
 -- candidate step this is the whole selected batch and the original notes,
@@ -1085,6 +1250,16 @@ synthesizeWithProvidersSkippingDetailedWith limits engine steps checked
     (synthLimitWindow limits, synthLimitBudget limits)
     checked providers [] frag frag
 
+-- | Named behavioral queries consume the same bounded backend trace as it
+-- arrives, rather than waiting to rank a complete frontend candidate pool.
+synthesizeBehavioralWithProvidersSkippingDetailedWith
+  :: SynthLimits
+  -> SynthEngine -> Int -> Set.Set String -> [ProviderFrag] -> Frag
+  -> Either String DetailedSynthOutcome
+synthesizeBehavioralWithProvidersSkippingDetailedWith limits engine steps checked providers frag =
+  Right $ deferDetailedOutcome $ runTunedSynthesisWithCollection True limits True engine steps
+    (synthLimitWindow limits, synthLimitBudget limits) checked providers [] frag frag
+
 -- | Package-private tuned counterpart used by focused boundary tests which
 -- need to retain a simple checked provider graph without changing the REPL's
 -- established multi-constructor search policy. Production callers use
@@ -1143,6 +1318,14 @@ synthesizeTunedDetailedWith limits engine steps djinnLimits extras engineFrag
   runTunedSynthesis limits True engine steps djinnLimits Set.empty [] extras
     engineFrag fitFrag
 
+synthesizeBehavioralTunedDetailedWith
+  :: SynthLimits
+  -> SynthEngine -> Int -> (Int, Maybe Integer) -> [(String, Frag)]
+  -> Frag -> Frag -> Either String DetailedSynthOutcome
+synthesizeBehavioralTunedDetailedWith limits engine steps djinnLimits extras engineFrag fitFrag =
+  Right $ deferDetailedOutcome $ runTunedSynthesisWithCollection True limits True engine steps djinnLimits Set.empty [] extras
+    engineFrag fitFrag
+
 -- | The one tuned search: Djinn under the lane's cutoff/budget pair,
 -- Exference under the limits' step, queue, and window bounds, or both merged
 -- under the limits' shown/tried interleave.
@@ -1152,43 +1335,62 @@ runTunedSynthesis
   -> SynthEngine -> Int -> (Int, Maybe Integer) -> Set.Set String
   -> [ProviderFrag] -> [(String, Frag)] -> Frag -> Frag
   -> Either String DetailedSynthOutcome
-runTunedSynthesis limits
+runTunedSynthesis = runTunedSynthesisWithCollection False
+
+runTunedSynthesisWithCollection
+  :: Bool -> SynthLimits -> Bool
+  -> SynthEngine -> Int -> (Int, Maybe Integer) -> Set.Set String
+  -> [ProviderFrag] -> [(String, Frag)] -> Frag -> Frag
+  -> Either String DetailedSynthOutcome
+runTunedSynthesisWithCollection streaming limits
     multiConstructorPatterns engine steps djinnLimits checked providers extras
-    engineFrag fitFrag = case engine of
-  EngineDjinn -> do
-    prepared <- prepareSynthesis djinnRecursiveProjection
-      providers extras engineFrag fitFrag
-    let origin = preparedSemanticOrigin prepared
-    outcome <- djinnRun limits djinnLimits fitFrag
-      (semanticOriginProjectionCompleteness origin)
-      (preparedRenderExpression prepared)
-      (semanticOriginSearchGoal origin)
-      (semanticOriginDeclarations origin)
-      (semanticOriginProviderAssignments origin)
-    pure
-      (withoutCheckedDetailedCandidates checked
-        (detailUnobservedOutcome outcome))
-  EngineExference -> do
-    prepared <- prepareSynthesis exferenceRecursiveProjection
-      providers extras engineFrag fitFrag
-    outcome <- exferenceRun limits multiConstructorPatterns steps prepared
-    pure (withoutCheckedDetailedCandidates checked outcome)
-  EngineBoth -> do
-    djinnPrepared <- prepareSynthesis djinnRecursiveProjection
-      providers extras engineFrag fitFrag
-    let djinnOrigin = preparedSemanticOrigin djinnPrepared
-    djinnCompatibility <- djinnRun limits djinnLimits fitFrag
-      (semanticOriginProjectionCompleteness djinnOrigin)
-      (preparedRenderExpression djinnPrepared)
-      (semanticOriginSearchGoal djinnOrigin)
-      (semanticOriginDeclarations djinnOrigin)
-      (semanticOriginProviderAssignments djinnOrigin)
-    let djinn = detailUnobservedOutcome djinnCompatibility
-    exferencePrepared <- prepareSynthesis exferenceRecursiveProjection
-      providers extras engineFrag fitFrag
-    exference <- exferenceRun limits multiConstructorPatterns steps
-      exferencePrepared
-    pure (mergeDetailedOutcomesSkippingWith limits checked djinn exference)
+    engineFrag fitFrag
+  | streaming && engine == EngineBoth = Right $
+      mergeDetailedOutcomesSkippingWith limits checked
+        (deferDetailedOutcome $ single EngineDjinn)
+        (deferDetailedOutcome $ single EngineExference)
+  | otherwise = case engine of
+    EngineDjinn -> do
+      prepared <- prepareSynthesis djinnRecursiveProjection
+        providers extras engineFrag fitFrag
+      let origin = preparedSemanticOrigin prepared
+      outcome <- djinnRun limits djinnLimits fitFrag
+        (semanticOriginProjectionCompleteness origin)
+        (preparedRenderExpression prepared)
+        (semanticOriginSearchGoal origin)
+        (semanticOriginDeclarations origin)
+        (semanticOriginProviderAssignments origin)
+      pure
+        (withoutCheckedDetailedCandidates checked
+          (asCollection $ detailUnobservedOutcome outcome))
+    EngineExference -> do
+      prepared <- prepareSynthesis exferenceRecursiveProjection
+        providers extras engineFrag fitFrag
+      outcome <- exferenceRun streaming limits multiConstructorPatterns steps prepared
+      pure (withoutCheckedDetailedCandidates checked outcome)
+    EngineBoth -> do
+      djinnPrepared <- prepareSynthesis djinnRecursiveProjection
+        providers extras engineFrag fitFrag
+      let djinnOrigin = preparedSemanticOrigin djinnPrepared
+      djinnCompatibility <- djinnRun limits djinnLimits fitFrag
+        (semanticOriginProjectionCompleteness djinnOrigin)
+        (preparedRenderExpression djinnPrepared)
+        (semanticOriginSearchGoal djinnOrigin)
+        (semanticOriginDeclarations djinnOrigin)
+        (semanticOriginProviderAssignments djinnOrigin)
+      let djinn = detailUnobservedOutcome djinnCompatibility
+      exferencePrepared <- prepareSynthesis exferenceRecursiveProjection
+        providers extras engineFrag fitFrag
+      exference <- exferenceRun streaming limits multiConstructorPatterns steps
+        exferencePrepared
+      pure (mergeDetailedOutcomesSkippingWith limits checked (asCollection djinn) exference)
+ where
+  single selected = runTunedSynthesisWithCollection True limits
+    multiConstructorPatterns selected steps djinnLimits Set.empty providers extras
+    engineFrag fitFrag
+  asCollection outcome
+    | streaming = DetailedSynthStreaming $ outcomeStream outcome
+    | otherwise = outcome
 
 -- | Prepare one engine-specific translation without erasing which goal came
 -- from the source fragment and which goal search actually receives. Premise
@@ -1395,12 +1597,13 @@ djinnRun limits laneBounds@(cutoff, budget) frag projection render goal decls
 -- converted to Exference's integer variable domain.  Candidates keep
 -- Exference's own ranking; there is never negative evidence.
 exferenceRun
-  :: SynthLimits
+  :: Bool
+  -> SynthLimits
   -> Bool
   -> Int
   -> PreparedSynthesis
   -> Either String DetailedSynthOutcome
-exferenceRun limits multiConstructorPatterns steps prepared = do
+exferenceRun streaming limits multiConstructorPatterns steps prepared = do
   standard <- viaDiagnostic standardDjinnSession
   let semanticOrigin = preparedSemanticOrigin prepared
       render = preparedRenderExpression prepared
@@ -1501,10 +1704,9 @@ exferenceRun limits multiConstructorPatterns steps prepared = do
             -- rendered-group window without changing its search prefix.
             groups = takeDistinctOn detailedCandidateGroupVariants
               (synthLimitWindow limits)
-              [ DetailedCandidateGroup route
-                  (indexDetailedCandidateVariants group) sidecar
-              | candidate <- selectionCandidates selection
-              , let availability = typedCandidateTermGraph candidate
+              $ mapMaybe renderGroup $ selectionCandidates selection
+            renderGroup candidate =
+                let availability = typedCandidateTermGraph candidate
                     compatibility = typedCandidateCompatibility candidate
                     fallback = fmap (("x" ++) . show)
                       . functionClauseExpression . candidateOutput
@@ -1526,23 +1728,30 @@ exferenceRun limits multiConstructorPatterns steps prepared = do
                       Right _ | not reconstructed -> Just $ TypedCandidateSemanticSidecar
                         candidate authority
                       _ -> Nothing
-              , Right group <- [rendered]
-              ]
+                in case rendered of
+                  Left _ -> Nothing
+                  Right group -> Just $ DetailedCandidateGroup route
+                    (indexDetailedCandidateVariants group) sidecar
             notes = maybe [] (progressNotesWith (synthLimitWindow limits))
               (selectionProgress selection)
-        pure (groups, notes)
+        pure $ if streaming
+          then normalizeStreamingOutcome $ streamDetailedQueryResults
+            (synthLimitWindow limits) renderGroup results
+          else if null groups then DetailedSynthNoTerm notes
+            else DetailedSynthCandidates groups notes
       runPatternLanes activeSession useMultiConstructorPatterns = do
-        (strictGroups, strictNotes) <- runLane activeSession useMultiConstructorPatterns False
-        if not (null strictGroups)
-          then pure $ DetailedSynthCandidates strictGroups strictNotes
-          else do
+        strict <- runLane activeSession useMultiConstructorPatterns False
+        case strict of
+          DetailedSynthNoTerm strictNotes -> do
             -- Exference normally prefers terms which use every introduced
             -- binder. Retry without that preference only when the strict lane
             -- produced no term, retaining established successful prefixes.
-            (relaxedGroups, relaxedNotes) <- runLane activeSession useMultiConstructorPatterns True
-            pure $ if null relaxedGroups
-              then DetailedSynthNoTerm (nub $ strictNotes ++ relaxedNotes)
-              else DetailedSynthCandidates relaxedGroups relaxedNotes
+            relaxed <- runLane activeSession useMultiConstructorPatterns True
+            pure $ case relaxed of
+              DetailedSynthNoTerm relaxedNotes ->
+                DetailedSynthNoTerm (nub $ strictNotes ++ relaxedNotes)
+              _ -> relaxed
+          _ -> pure strict
       runSession activeSession = do
         primary <- runPatternLanes activeSession multiConstructorPatterns
         case primary of
@@ -1896,18 +2105,25 @@ mergeDetailedOutcomesSkippingWith
   -> DetailedSynthOutcome
   -> DetailedSynthOutcome
 mergeDetailedOutcomesSkippingWith limits checked djinn0 exference0 =
-  case (djinn, exference) of
-    (DetailedSynthCandidates a na, DetailedSynthCandidates b nb) ->
-      DetailedSynthCandidates
-        (mergeDetailedCandidateGroupsWith limits a b) (na ++ tag nb)
-    (DetailedSynthCandidates a na, other) ->
-      DetailedSynthCandidates a (na ++ tag (notesOf other))
-    (other, DetailedSynthCandidates b nb) ->
-      DetailedSynthCandidates b (notesOf other ++ tag nb)
-    (DetailedSynthRefuted sound, _) -> DetailedSynthRefuted sound
-    (DetailedSynthNoTerm na, other) ->
-      DetailedSynthNoTerm (na ++ tag (notesOf other))
+  if isStreaming djinn0 || isStreaming exference0
+    then DetailedSynthStreaming $ mergeBehavioralStreams limits
+      (outcomeStream $ withoutCheckedDetailedCandidates checked djinn0)
+      (outcomeStream $ withoutCheckedDetailedCandidates checked exference0)
+    else case (djinn, exference) of
+      (DetailedSynthCandidates a na, DetailedSynthCandidates b nb) ->
+        DetailedSynthCandidates
+          (mergeDetailedCandidateGroupsWith limits a b) (na ++ tag nb)
+      (DetailedSynthCandidates a na, other) ->
+        DetailedSynthCandidates a (na ++ tag (notesOf other))
+      (other, DetailedSynthCandidates b nb) ->
+        DetailedSynthCandidates b (notesOf other ++ tag nb)
+      (DetailedSynthRefuted sound, _) -> DetailedSynthRefuted sound
+      (DetailedSynthNoTerm na, other) ->
+        DetailedSynthNoTerm (na ++ tag (notesOf other))
+      _ -> error "Leant internal streaming merge dispatch invariant"
  where
+  isStreaming DetailedSynthStreaming{} = True
+  isStreaming _ = False
   djinn = normalize (withoutCheckedDetailedCandidates checked djinn0)
   exference = normalize
     (withoutCheckedDetailedCandidates checked exference0)
@@ -1928,6 +2144,53 @@ mergeDetailedOutcomesSkippingWith limits checked djinn0 exference0 =
     DetailedSynthCandidates _ notes -> notes
     DetailedSynthNoTerm notes -> notes
     DetailedSynthRefuted _ -> []
+    DetailedSynthStreaming _ -> []
+
+-- Same reserved group order as the ordinary combined frontier. Raw misses
+-- remain charged in their source stream but do not spend a fresh-group turn.
+-- No origin is recovered from an unobserved opposite-engine tail: each
+-- displayed group keeps its own exact authority.
+mergeBehavioralStreams
+  :: SynthLimits -> DetailedCandidateStream -> DetailedCandidateStream
+  -> DetailedCandidateStream
+mergeBehavioralStreams limits left right =
+  go schedule Set.empty False [] [] Nothing (Just left) (Just right)
+ where
+  leading = max 0 $ synthLimitShown limits - 1
+  schedule = replicate leading True ++ replicate (synthLimitTried limits) False
+    ++ replicate (max 0 $ synthLimitTried limits - leading) True
+    ++ cycle [False, True]
+  combined a b = nub $ a ++ map ("exference: " ++) b
+  go _ _ found leftNotes rightNotes refutation Nothing Nothing =
+    case (found, refutation) of
+      (False, Just sound) -> StreamRefuted sound
+      _ -> StreamFinished $ combined leftNotes rightNotes
+  go turns@(chooseLeft : later) seen found leftNotes rightNotes refutation leftSide rightSide =
+    case if chooseLeft then leftSide else rightSide of
+      Nothing -> go later seen found leftNotes rightNotes refutation leftSide rightSide
+      Just stream -> case stream of
+        StreamObserved group notes rest ->
+          let (fresh, seen') = freshStreamGroup seen group
+              leftNotes' = if chooseLeft then notes else leftNotes
+              rightNotes' = if chooseLeft then rightNotes else notes
+              leftSide' = if chooseLeft then Just rest else leftSide
+              rightSide' = if chooseLeft then rightSide else Just rest
+              nextTurns = maybe turns (const later) fresh
+          in StreamObserved fresh (combined leftNotes' rightNotes') $
+            go nextTurns seen' (found || maybe False (const True) fresh)
+              leftNotes' rightNotes' refutation leftSide' rightSide'
+        StreamFinished notes ->
+          go later seen found (if chooseLeft then notes else leftNotes)
+            (if chooseLeft then rightNotes else notes) refutation
+            (if chooseLeft then Nothing else leftSide)
+            (if chooseLeft then rightSide else Nothing)
+        StreamRefuted sound ->
+          go later seen found leftNotes rightNotes
+            (if chooseLeft then Just sound else refutation)
+            (if chooseLeft then Nothing else leftSide)
+            (if chooseLeft then rightSide else Nothing)
+        StreamFailed failure -> StreamFailed failure
+  go [] _ _ _ _ _ _ _ = error "Leant internal infinite schedule invariant"
 
 -- | Filter exact previously checked spellings while retaining the route of a
 -- semantic group with at least one surviving textual variant.
@@ -1936,6 +2199,10 @@ withoutCheckedDetailedCandidates
   -> DetailedSynthOutcome
   -> DetailedSynthOutcome
 withoutCheckedDetailedCandidates checked outcome = case outcome of
+  DetailedSynthStreaming stream -> DetailedSynthStreaming $
+    mapStreamGroups (\group -> case retainFresh group of
+      retained | null $ detailedCandidateGroupVariants retained -> Nothing
+      retained -> Just retained) stream
   DetailedSynthCandidates groups notes -> case freshGroups groups of
     [] -> DetailedSynthNoTerm notes
     fresh -> DetailedSynthCandidates fresh notes

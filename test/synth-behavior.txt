@@ -18,4 +18,16 @@
 :synth f : Nat → Nat where Unknown.predicate f
 :synth f : (∀ A : Type, A → A) where f Nat 7 = 7
 :synth (∀ A : Type, A → A)
+:set synth-shown 2
+:set synth-engine exference
+:synth twoResults : (∀ A : Type, A → A → A) where True
+:set synth-engine both
+:synth bothResults : (∀ A : Type, A → A → A) where True
+:set synth-engine exference
+:set synth-shown 1
+:set synth-verify 1
+:synth limited : (∀ A : Type, A → A → A) where limited Nat 11 29 = 29 ∧ limited Bool true false = false
+:set synth-verify 16
+:synth later : (∀ A : Type, A → A → A) where later Nat 11 29 = 29 ∧ later Bool true false = false
+:synth recovery : (∀ A : Type, A → A) where recovery Nat 7 = 7
 :quit

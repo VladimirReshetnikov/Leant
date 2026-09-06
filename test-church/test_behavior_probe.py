@@ -32,6 +32,9 @@ class BehavioralTranscriptTests(unittest.TestCase):
             self.assertIn(":set synth-window 4096", source.splitlines())
             self.assertIn(":set synth-verify 4096", source.splitlines())
             self.assertEqual(len(cases), 4)  # Two positives and both false controls.
+            for control in (item for item in cases if item["expected"] == "no_candidate"):
+                self.assertEqual(control["type"], "Nat → Nat")
+                self.assertTrue(control["command"].endswith(" : Nat → Nat where False"))
             acknowledged = "λ> " + setting + "\nsynth djinn-strategy: " + strategy + "\nλ> :quit\n"
             validate_settings(acknowledged, setting + "\n")
             with self.assertRaises(ValueError):
