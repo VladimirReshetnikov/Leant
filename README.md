@@ -70,8 +70,8 @@ Companion documents:
 - **[Candidate quality](docs/candidate-quality.md)** — ranking profiles,
   checked simplification, and revision-pinned acceptance results;
 - **[Behavioral assertions](docs/behavioral-synthesis.md)** — the new
-  `:synth f : TYPE where PROP` entrance, exact candidate checks, and its
-  current validation status;
+  `:synth f : TYPE where PROP` entrance, exact candidate checks, and bounded
+  Djinn search for reusable higher-order compositions;
 - **[docs/synth-internals.md](docs/synth-internals.md)** — the design
   boundaries and dated-report index behind `:synth`;
 - **[Lean from First Principles](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Lean_from_First_Principles/Lean_from_First_Principles.pdf)**
@@ -444,11 +444,30 @@ can occupy a displayed-result slot. A falsified assertion rejects that candidate
 an error, timeout, or unavailable decision procedure is inconclusive and does not
 pass. The query works with Djinn, Exference, and `both`.
 
-Named queries check candidate groups as they arrive and accumulate successful
-results up to `synth-shown`, while respecting the existing search window,
-verification allowance, and timeout. Exference keeps its structural search
-ranking; named queries do not wait for the full frontend candidate pool to be
-ranked before checking the first assertion.
+Named queries accumulate successful groups up to `synth-shown`, while respecting
+the existing search window, verification allowance, and timeout. Exference keeps
+its structural search ranking and can check assertions before collecting the
+full frontend candidate pool. Djinn still prepares its bounded backend batch
+before delivering the first group; Both mode can encounter this boundary when
+it observes its Djinn lane.
+
+Explicit `synth-djinn-strategy interleave` adds reusable normal-form term
+alternatives and resumable plan scheduling under the configured budgets. The
+[Djinn search description](docs/behavioral-synthesis.md#djinn-search-alternatives)
+explains how this reaches higher-order fold compositions while preserving type,
+scope, and source-instantiation checks. The ordinary strategy remains
+`depth-first`.
+
+All six Church operations (`not`, `swap`, `map`, `append`, `reverse`, and
+`filter`) passed their finite assertions under each Lean engine mode: **18
+exact synthesized terms**, independently kernel-replayed with their assertion
+proofs and empty axiom inventories. The [current acceptance table](docs/behavioral-synthesis.md#current-lean-six-operation-acceptance)
+records the distinct engine budgets, rejection controls, and executable-pinned
+receipts; these finite checks do not establish universal behavioral equivalence.
+Together with the 12 Haskell cells, this closes the **30-cell behavioral corpus**.
+The fresh Leant unit suite also passed **600/600 tests** serially; the
+[final validation receipt](test-church/receipts/behavior-validation-final.json)
+keeps that aggregate evidence separate from synthesis and kernel replay.
 
 This checks the assertion as written: finite examples do not establish a
 universal algorithmic specification. The existing `--where List.length ... --`

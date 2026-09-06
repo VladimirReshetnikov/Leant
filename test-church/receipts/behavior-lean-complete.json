@@ -1,0 +1,97 @@
+{
+  "schema_version": 2,
+  "receipt_kind": "union of three independently validated six-operation Lean engine runs",
+  "status": "passed",
+  "engines": [
+    "djinn",
+    "exference",
+    "both"
+  ],
+  "operations": [
+    "not",
+    "swap",
+    "map",
+    "append",
+    "reverse",
+    "filter"
+  ],
+  "candidate_count": 18,
+  "false_oracle_count": 3,
+  "executable_sha256": "baa4fb4ce1cc27f49900f0ded27f4b64468d00b29b57bbc3bc2e204ef1ff408a",
+  "profiles": {
+    "djinn": {
+      "ranking": "balanced",
+      "shown": 1,
+      "window": 65536,
+      "djinn_strategy": "interleave",
+      "verify": 65536,
+      "exference_steps": 100000,
+      "djinn_choice_budget": 500000,
+      "synthesis_timeout_seconds": 120,
+      "separate_process_guard_seconds": 1500.0
+    },
+    "exference": {
+      "ranking": "balanced",
+      "shown": 1,
+      "window": 256,
+      "djinn_strategy": "depth-first",
+      "verify": 256,
+      "exference_steps": 100000,
+      "djinn_choice_budget": 100000,
+      "synthesis_timeout_seconds": 30,
+      "separate_process_guard_seconds": 900.0
+    },
+    "both": {
+      "ranking": "balanced",
+      "shown": 1,
+      "window": 256,
+      "djinn_strategy": "interleave",
+      "verify": 256,
+      "exference_steps": 100000,
+      "djinn_choice_budget": 100000,
+      "synthesis_timeout_seconds": 30,
+      "separate_process_guard_seconds": 900.0
+    }
+  },
+  "candidate_and_theorem_inventory_count": 36,
+  "oracle_control_distinct_inventory_count": 33,
+  "oracle_control_replay_inventory_count": 99,
+  "total_empty_axiom_inventory_observations": 135,
+  "counting_note": "Each run independently replays 12 candidate/theorem inventories and the same 33 control inventories. The 135 observations are not 135 distinct declarations.",
+  "finite_observations_per_engine": 626,
+  "kernel_exit_codes": {
+    "djinn": 0,
+    "exference": 0,
+    "both": 0
+  },
+  "engine_receipts": {
+    "djinn": {
+      "file": "behavior-djinn-final.json",
+      "sha256": "81cbc8683717e9fc505b8bfc85f5f70535895cbbca65e920061a5ff9deb16e29"
+    },
+    "exference": {
+      "file": "behavior-exference-final.json",
+      "sha256": "42a1842766a15f3e92b5630c53bb9cf308bf9aca44145ff9dae4c63a17a6c1b6"
+    },
+    "both": {
+      "file": "behavior-both-final.json",
+      "sha256": "5eb35a8a36e44eb1210497cb8a5b98dc9cef253a35532078a74202796315e3e1"
+    }
+  },
+  "source_receipts": {
+    "djinn": {
+      "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-djinn-common-six-first/results.json",
+      "sha256": "34270f660c5d85317a498890972c8baaefd141a5e4ba09da66af340d05483de7"
+    },
+    "exference": {
+      "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-exference-common-six-final/results.json",
+      "sha256": "e8b8d314fc61bb5111fd9ddc0b266facc8cbe53ad60d335ff0deb1792dc71dbb"
+    },
+    "both": {
+      "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-both-common-six-final/results.json",
+      "sha256": "a37aff49c07ef29601915514e9ea72814e84ed73f97d369e3478e117dae1c14f"
+    }
+  },
+  "scope": "Fresh retained live synthesis and exact isolated finite-assertion kernel replay only; engine allowances remain separate, and earlier unit/streaming/corpus receipts are not repeated claims.",
+  "projection_validation": "Offline extraction, not an additional live synthesis or kernel run"
+}

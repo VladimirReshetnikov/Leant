@@ -1,0 +1,469 @@
+{
+  "schema_version": 2,
+  "receipt_kind": "compact source-verified projection of retained live synthesis and isolated kernel replay",
+  "source_receipt": {
+    "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-exference-common-six-final/results.json",
+    "sha256": "e8b8d314fc61bb5111fd9ddc0b266facc8cbe53ad60d335ff0deb1792dc71dbb"
+  },
+  "scope": {
+    "engines": [
+      "exference"
+    ],
+    "operations": [
+      "not",
+      "swap",
+      "map",
+      "append",
+      "reverse",
+      "filter"
+    ],
+    "named_synthesis_providers": [],
+    "library_search": "off",
+    "provider_discovery": "off",
+    "classical_fallback": "off",
+    "universe_policy": "element and eliminator-result Type0; predicative Church encodings live in Type1",
+    "finite_observations_per_six_operations": 626,
+    "claim": "These six exact terms passed their supplied finite assertions and isolated kernel replays; this is not universal behavioral equivalence or exhaustive search."
+  },
+  "provenance": {
+    "executable_sha256": "baa4fb4ce1cc27f49900f0ded27f4b64468d00b29b57bbc3bc2e204ef1ff408a",
+    "executable_unchanged": true,
+    "manifest_sha256": "0c2954eeb36811ea065aba86187d09cd8761529de1acefd5111ccf088b189ed9",
+    "church_source_raw_sha256": "9dadbc9c3491cff3b371db8e1c3039807df37a2f4258fad9c34fc25d269ae80b",
+    "church_source_canonical_lf_sha256": "782e4edaa5bf813e30e39ae02d52278ab0566315ebc521401a947b98c44cfd11",
+    "runner_sha256": "740545cf50fe97df06dc034f51d27f3470ce95befea124cb1876f119988e09fe",
+    "spec_sha256": "0adee4ac9eaad21c525b91930ca835a2fe5da27a94228ed3265a029b6854f797",
+    "input_sha256": "68c092ea3daa55937e0aedd8e00abff44415112b19dbbce0c668cb99e1a9e732",
+    "input_canonical_lf_sha256": "e44143246175000e4f83dc8c959957a3f2dee0039ff3ec3f1d4d157aac34d70a",
+    "runner_source": {
+      "workspace_relative_path": "test-church/behavior_probe.py",
+      "sha256": "740545cf50fe97df06dc034f51d27f3470ce95befea124cb1876f119988e09fe"
+    },
+    "spec_source": {
+      "workspace_relative_path": "lib/Djex/test-church/behavior_spec.py",
+      "sha256": "0adee4ac9eaad21c525b91930ca835a2fe5da27a94228ed3265a029b6854f797"
+    },
+    "manifest_source": {
+      "workspace_relative_path": "lib/Djex/test-church/manifest.json",
+      "sha256": "0c2954eeb36811ea065aba86187d09cd8761529de1acefd5111ccf088b189ed9"
+    },
+    "church_source": {
+      "workspace_relative_path": "lib/Djex/docs/examples/Church.hs",
+      "sha256": "9dadbc9c3491cff3b371db8e1c3039807df37a2f4258fad9c34fc25d269ae80b"
+    },
+    "query_source": {
+      "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-exference-common-six-final/queries.txt",
+      "sha256": "68c092ea3daa55937e0aedd8e00abff44415112b19dbbce0c668cb99e1a9e732"
+    },
+    "actual_live_stdin": {
+      "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-exference-common-six-final/live.input.txt",
+      "sha256": "68c092ea3daa55937e0aedd8e00abff44415112b19dbbce0c668cb99e1a9e732"
+    },
+    "process_receipt": {
+      "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-exference-common-six-final/processes.json",
+      "sha256": "27b098bc726c019fdcc65b62d7510f3a99fab2c68381623513d53234f8dcb2e3"
+    }
+  },
+  "settings": {
+    "ranking": "balanced",
+    "shown": 1,
+    "window": 256,
+    "djinn_strategy": "depth-first",
+    "verify": 256,
+    "exference_steps": 100000,
+    "djinn_choice_budget": 100000,
+    "synthesis_timeout_seconds": 30,
+    "separate_process_guard_seconds": 900.0
+  },
+  "status": "passed",
+  "candidate_count": 6,
+  "cells": [
+    {
+      "operation": "not",
+      "name": "behavior_exference_not",
+      "type": "((∀ (church0 : Type), (church0 → (church0 → church0))) → (∀ (church1 : Type), (church1 → (church1 → church1))))",
+      "command": ":synth behavior_exference_not : ((∀ (church0 : Type), (church0 → (church0 → church0))) → (∀ (church1 : Type), (church1 → (church1 → church1)))) where BehaviorChurch.check_not behavior_exference_not = true",
+      "exact_term": "fun f _ x y => f _ y x",
+      "finite_observation_count": 2,
+      "assertion_verdicts": {
+        "passed": 1,
+        "falsified": 2,
+        "inconclusive": 0
+      },
+      "kernel": {
+        "source": {
+          "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-exference-common-six-final/BehaviorCandidate0.lean",
+          "sha256": "1cd6cb65691cfaa4711efda2471dd29c43f39f3e007ea69fe1804ef95fc31b34"
+        },
+        "declarations": [
+          "BehaviorCandidates.behavior_exference_not",
+          "BehaviorCandidates.behavior_exference_not_passes"
+        ],
+        "exit_code": 0,
+        "empty_axiom_inventory_count": 2,
+        "process": {
+          "exit_code": 0,
+          "outer_process_timed_out": false,
+          "process_guard_seconds": 900.0,
+          "wall_seconds": 1.136740899994038,
+          "started_utc": "2026-09-06T18:26:37Z",
+          "finished_utc": "2026-09-06T18:26:38Z",
+          "captures": {
+            "stdout": {
+              "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-exference-common-six-final/kernel-0.stdout.txt",
+              "sha256": "1f4490a6dc9b9768cca0496e524ca490565770e674b79fbc563b9dfbf9fb29da"
+            },
+            "stderr": {
+              "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-exference-common-six-final/kernel-0.stderr.txt",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "swap",
+      "name": "behavior_exference_swap",
+      "type": "(∀ (church0 : Type) (church1 : Type), ((∀ (church2 : Type), ((church0 → (church1 → church2)) → church2)) → (∀ (church3 : Type), ((church1 → (church0 → church3)) → church3))))",
+      "command": ":synth behavior_exference_swap : (∀ (church0 : Type) (church1 : Type), ((∀ (church2 : Type), ((church0 → (church1 → church2)) → church2)) → (∀ (church3 : Type), ((church1 → (church0 → church3)) → church3)))) where BehaviorChurch.check_swap behavior_exference_swap = true",
+      "exact_term": "fun _ _ f _ g => f _ (fun x y => g y x)",
+      "finite_observation_count": 15,
+      "assertion_verdicts": {
+        "passed": 1,
+        "falsified": 0,
+        "inconclusive": 0
+      },
+      "kernel": {
+        "source": {
+          "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-exference-common-six-final/BehaviorCandidate1.lean",
+          "sha256": "8a4f5d04043ae723f19b947fdc9f0d3ae31af70262ce994ba938796b7f6adf6b"
+        },
+        "declarations": [
+          "BehaviorCandidates.behavior_exference_swap",
+          "BehaviorCandidates.behavior_exference_swap_passes"
+        ],
+        "exit_code": 0,
+        "empty_axiom_inventory_count": 2,
+        "process": {
+          "exit_code": 0,
+          "outer_process_timed_out": false,
+          "process_guard_seconds": 900.0,
+          "wall_seconds": 1.8271059999824502,
+          "started_utc": "2026-09-06T18:26:38Z",
+          "finished_utc": "2026-09-06T18:26:40Z",
+          "captures": {
+            "stdout": {
+              "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-exference-common-six-final/kernel-1.stdout.txt",
+              "sha256": "4e36c6497fea562b46c21054df693df1605a5f4f6fd15e5bf40905231b18c2ba"
+            },
+            "stderr": {
+              "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-exference-common-six-final/kernel-1.stderr.txt",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "map",
+      "name": "behavior_exference_map",
+      "type": "(∀ (church0 : Type) (church1 : Type), ((church0 → church1) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church1 → (church3 → church3)) → (church3 → church3))))))",
+      "command": ":synth behavior_exference_map : (∀ (church0 : Type) (church1 : Type), ((church0 → church1) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church1 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_map behavior_exference_map = true",
+      "exact_term": "fun _ _ f g _ h => g _ (fun x => h (f x))",
+      "finite_observation_count": 200,
+      "assertion_verdicts": {
+        "passed": 1,
+        "falsified": 0,
+        "inconclusive": 0
+      },
+      "kernel": {
+        "source": {
+          "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-exference-common-six-final/BehaviorCandidate2.lean",
+          "sha256": "92e23ab78e0ce14adbe69b2035bac80b3dfab1d49d27b7f61bec4eecd83a7b42"
+        },
+        "declarations": [
+          "BehaviorCandidates.behavior_exference_map",
+          "BehaviorCandidates.behavior_exference_map_passes"
+        ],
+        "exit_code": 0,
+        "empty_axiom_inventory_count": 2,
+        "process": {
+          "exit_code": 0,
+          "outer_process_timed_out": false,
+          "process_guard_seconds": 900.0,
+          "wall_seconds": 1.8840786000073422,
+          "started_utc": "2026-09-06T18:26:40Z",
+          "finished_utc": "2026-09-06T18:26:42Z",
+          "captures": {
+            "stdout": {
+              "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-exference-common-six-final/kernel-2.stdout.txt",
+              "sha256": "6a156638dd620678c170bd37b5172a954eb2d1ddffa6d65527a8ae3a3cb4fc92"
+            },
+            "stderr": {
+              "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-exference-common-six-final/kernel-2.stderr.txt",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "append",
+      "name": "behavior_exference_append",
+      "type": "(∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3))))))",
+      "command": ":synth behavior_exference_append : (∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_append behavior_exference_append = true",
+      "exact_term": "fun _ f g _ h x => f _ h (g _ h x)",
+      "finite_observation_count": 169,
+      "assertion_verdicts": {
+        "passed": 1,
+        "falsified": 1,
+        "inconclusive": 0
+      },
+      "kernel": {
+        "source": {
+          "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-exference-common-six-final/BehaviorCandidate3.lean",
+          "sha256": "d55892679cdd9e38bbccade36daddbc1d6d650c2391c58fb54690ea8c50b2fb1"
+        },
+        "declarations": [
+          "BehaviorCandidates.behavior_exference_append",
+          "BehaviorCandidates.behavior_exference_append_passes"
+        ],
+        "exit_code": 0,
+        "empty_axiom_inventory_count": 2,
+        "process": {
+          "exit_code": 0,
+          "outer_process_timed_out": false,
+          "process_guard_seconds": 900.0,
+          "wall_seconds": 1.841638799989596,
+          "started_utc": "2026-09-06T18:26:42Z",
+          "finished_utc": "2026-09-06T18:26:43Z",
+          "captures": {
+            "stdout": {
+              "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-exference-common-six-final/kernel-3.stdout.txt",
+              "sha256": "c3606e4cc6e0f6a696f855a1af922753d87b1157760214bc62743ed25751f40c"
+            },
+            "stderr": {
+              "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-exference-common-six-final/kernel-3.stderr.txt",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "reverse",
+      "name": "behavior_exference_reverse",
+      "type": "(∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → (∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2)))))",
+      "command": ":synth behavior_exference_reverse : (∀ (church0 : Type), ((∀ (church1 : Type), ((church0 → (church1 → church1)) → (church1 → church1))) → (∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))))) where BehaviorChurch.check_reverse behavior_exference_reverse = true",
+      "exact_term": "fun _ f _ g => f _ (fun x h y => h (g x y)) (fun z => z)",
+      "finite_observation_count": 40,
+      "assertion_verdicts": {
+        "passed": 1,
+        "falsified": 21,
+        "inconclusive": 0
+      },
+      "kernel": {
+        "source": {
+          "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-exference-common-six-final/BehaviorCandidate4.lean",
+          "sha256": "213b1670024b20778f0207c844042ad6ce20319372b7f6a670286a733676645e"
+        },
+        "declarations": [
+          "BehaviorCandidates.behavior_exference_reverse",
+          "BehaviorCandidates.behavior_exference_reverse_passes"
+        ],
+        "exit_code": 0,
+        "empty_axiom_inventory_count": 2,
+        "process": {
+          "exit_code": 0,
+          "outer_process_timed_out": false,
+          "process_guard_seconds": 900.0,
+          "wall_seconds": 1.7576584000198636,
+          "started_utc": "2026-09-06T18:26:43Z",
+          "finished_utc": "2026-09-06T18:26:45Z",
+          "captures": {
+            "stdout": {
+              "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-exference-common-six-final/kernel-4.stdout.txt",
+              "sha256": "540210cc2da966d0425c4faaccf562f1c34f0b37e9d7b6d58a978294acca1e8e"
+            },
+            "stderr": {
+              "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-exference-common-six-final/kernel-4.stderr.txt",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "filter",
+      "name": "behavior_exference_filter",
+      "type": "(∀ (church0 : Type), ((church0 → (∀ (church1 : Type), (church1 → (church1 → church1)))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3))))))",
+      "command": ":synth behavior_exference_filter : (∀ (church0 : Type), ((church0 → (∀ (church1 : Type), (church1 → (church1 → church1)))) → ((∀ (church2 : Type), ((church0 → (church2 → church2)) → (church2 → church2))) → (∀ (church3 : Type), ((church0 → (church3 → church3)) → (church3 → church3)))))) where BehaviorChurch.check_filter behavior_exference_filter = true",
+      "exact_term": "fun _ f g _ h x => g _ (fun y z => let f1 := f y; f1 _ (h y z) z) x",
+      "finite_observation_count": 200,
+      "assertion_verdicts": {
+        "passed": 1,
+        "falsified": 8,
+        "inconclusive": 0
+      },
+      "kernel": {
+        "source": {
+          "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-exference-common-six-final/BehaviorCandidate5.lean",
+          "sha256": "201ca266a0698221cba9b07fd50f746cefd5b940b73ed1a934046ce50ce46729"
+        },
+        "declarations": [
+          "BehaviorCandidates.behavior_exference_filter",
+          "BehaviorCandidates.behavior_exference_filter_passes"
+        ],
+        "exit_code": 0,
+        "empty_axiom_inventory_count": 2,
+        "process": {
+          "exit_code": 0,
+          "outer_process_timed_out": false,
+          "process_guard_seconds": 900.0,
+          "wall_seconds": 2.1187011000001803,
+          "started_utc": "2026-09-06T18:26:45Z",
+          "finished_utc": "2026-09-06T18:26:47Z",
+          "captures": {
+            "stdout": {
+              "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-exference-common-six-final/kernel-5.stdout.txt",
+              "sha256": "25106e555360c7c17ce3bbd10faddc16591684ae2dd044cb5939fdff1c0ec946"
+            },
+            "stderr": {
+              "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-exference-common-six-final/kernel-5.stderr.txt",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "false_oracle": {
+    "name": "behavior_exference_reject_all",
+    "type": "Nat → Nat",
+    "predicate": "False",
+    "command": ":synth behavior_exference_reject_all : Nat → Nat where False",
+    "displayed_terms": [],
+    "assertion_verdicts": {
+      "passed": 0,
+      "falsified": 128,
+      "inconclusive": 0
+    },
+    "captured_query_block_canonical_lf_sha256": "2e38ad4db2889cdb80f14d315041c2880e470cda118ff3bac4ad3eaa686f4fd4",
+    "completion_claim": "Actual falsification was observed; rejection does not establish exhaustive search or uninhabitability."
+  },
+  "kernel_summary": {
+    "exit_code": 0,
+    "inventory_count": 45,
+    "empty_axiom_inventory_count": 45,
+    "candidate_and_theorem_inventory_count": 12,
+    "oracle_control_inventory_count": 33,
+    "positive_controls": 6,
+    "exact_type_wrong_controls": 10,
+    "specialized_swap_control": 1,
+    "compiler_command_prefix": [
+      "lean",
+      "+leanprover/lean4:v4.32.0"
+    ],
+    "controls": {
+      "source": {
+        "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-exference-common-six-final/OracleControls.lean",
+        "sha256": "bfffaf3b30a632fb73289afa08b22525122fa36585099cfb1648e2f1350fcb57"
+      },
+      "declarations": [
+        "BehaviorControl.witness_not",
+        "BehaviorControl.witness_not_passes",
+        "BehaviorControl.witness_swap",
+        "BehaviorControl.witness_swap_passes",
+        "BehaviorControl.witness_map",
+        "BehaviorControl.witness_map_passes",
+        "BehaviorControl.witness_append",
+        "BehaviorControl.witness_append_passes",
+        "BehaviorControl.witness_reverse",
+        "BehaviorControl.witness_reverse_passes",
+        "BehaviorControl.witness_filter",
+        "BehaviorControl.witness_filter_passes",
+        "BehaviorControl.wrong_not_identity",
+        "BehaviorControl.wrong_not_identity_rejected",
+        "BehaviorControl.wrong_not_constant_false",
+        "BehaviorControl.wrong_not_constant_false_rejected",
+        "BehaviorControl.wrong_map_empty",
+        "BehaviorControl.wrong_map_empty_rejected",
+        "BehaviorControl.wrong_append_first",
+        "BehaviorControl.wrong_append_first_rejected",
+        "BehaviorControl.wrong_append_reversed",
+        "BehaviorControl.wrong_append_reversed_rejected",
+        "BehaviorControl.wrong_reverse_identity",
+        "BehaviorControl.wrong_reverse_identity_rejected",
+        "BehaviorControl.wrong_reverse_empty",
+        "BehaviorControl.wrong_reverse_empty_rejected",
+        "BehaviorControl.wrong_filter_identity",
+        "BehaviorControl.wrong_filter_identity_rejected",
+        "BehaviorControl.wrong_filter_empty",
+        "BehaviorControl.wrong_filter_empty_rejected",
+        "BehaviorControl.wrong_filter_negated",
+        "BehaviorControl.wrong_filter_negated_rejected",
+        "BehaviorControl.swap_specialized_identity_rejected"
+      ],
+      "exit_code": 0,
+      "empty_axiom_inventory_count": 33,
+      "process": {
+        "exit_code": 0,
+        "outer_process_timed_out": false,
+        "process_guard_seconds": 900.0,
+        "wall_seconds": 2.0852426000055857,
+        "started_utc": "2026-09-06T18:26:47Z",
+        "finished_utc": "2026-09-06T18:26:49Z",
+        "captures": {
+          "stdout": {
+            "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-exference-common-six-final/kernel-6.stdout.txt",
+            "sha256": "92da1bfdf933ecd939ef9203e18e7639677a1caa89efedf822cdfb808867fdb6"
+          },
+          "stderr": {
+            "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-exference-common-six-final/kernel-6.stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        }
+      }
+    }
+  },
+  "live_process": {
+    "exit_code": 0,
+    "outer_process_timed_out": false,
+    "process_guard_seconds": 900.0,
+    "wall_seconds": 43.24797930000932,
+    "started_utc": "2026-09-06T18:25:53Z",
+    "finished_utc": "2026-09-06T18:26:37Z",
+    "captures": {
+      "stdout": {
+        "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-exference-common-six-final/live.stdout.txt",
+        "sha256": "1ed7486bfb6c6ae65e278c5ecf115da9c6a1e8a40271748020b262284b915537"
+      },
+      "stderr": {
+        "workspace_relative_path": "dist-newstyle/behavioral-acceptance/lean-exference-common-six-final/live.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  },
+  "projection_validation": {
+    "method": "Offline reconstruction, capture reparsing, and byte-hash verification; no new synthesis or kernel execution",
+    "extractor_source": {
+      "workspace_relative_path": "dist-newstyle/behavioral-acceptance/compact-receipt/ExtractLeanBehaviorReceipt.py",
+      "sha256": "4ff4657818ee2153891a61c4ad953b7a0361916b13e03d3bb237f6a36feb0016"
+    },
+    "shared_runtime_source": {
+      "workspace_relative_path": "lib/Djex/test-church/behavior_runtime.py",
+      "sha256": "76a7364bf1ecdf40f8e8fd7b24ede8be9de36a6b758247b656dd83fc8cad8748"
+    },
+    "capture_parser_source": {
+      "workspace_relative_path": "test-church/run_corpus.py",
+      "sha256": "2c5c1b6b2a5e5a7d9cfacb56f101c095d8492231099fe1fbc6d81246ba2bd056"
+    },
+    "runner_specification_manifest_and_church_source_matched_recorded_hashes": true,
+    "dependency_hash_scope": "The shared runtime and capture-parser hashes identify the offline validator sources; the original runner does not separately pin those dependency hashes."
+  },
+  "excluded_claims": [
+    "New execution of earlier streaming, quota, timeout, or unit regressions",
+    "A fresh full Church-signature or ordinary-transcript corpus run",
+    "Universal behavioral equivalence, synthesis completeness, or a uniform allowance across engines"
+  ]
+}

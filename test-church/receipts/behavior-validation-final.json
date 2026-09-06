@@ -1,0 +1,582 @@
+{
+  "schema_version": 1,
+  "status": "passed",
+  "receipt_kind": "Verified union of current behavioral and regression receipts; offline validation does not rerun tests",
+  "scope": {
+    "operations": [
+      "not",
+      "swap",
+      "map",
+      "append",
+      "reverse",
+      "filter"
+    ],
+    "positive_behavioral_cells": 30,
+    "false_oracle_controls": 5,
+    "finite_observations_per_engine": 626,
+    "finite_observations_across_five_engine_profiles": 3130,
+    "claim": "Exact emitted full-type programs passed the specified finite observations and separate host replay. Finite examples do not establish universal behavioral equivalence or exhaustive synthesis."
+  },
+  "implementation": {
+    "Djex_code_commit": "22da13fd69ce54dd1e47db9faba28eb2869629d1",
+    "Djex_receipt_commit": "35df1bd943c5ed21f94f99f48166a59ad4b14b80",
+    "Leant_code_base_commit": "39279b51b9663fd2f5af094a2974c9bbf45f1c54",
+    "Leant_vendored_Djex_commit": "22da13fd69ce54dd1e47db9faba28eb2869629d1"
+  },
+  "engine_profiles": [
+    {
+      "host_language": "Haskell",
+      "engine": "djinn",
+      "candidate_count": 6,
+      "settings": {
+        "ranking": "balanced",
+        "select": "first",
+        "window": 65536,
+        "djinn_strategy": "interleave",
+        "steps": 100000,
+        "choice_budget": 500000,
+        "independent_evaluation_seconds": 2,
+        "separate_process_guard_seconds": 300
+      },
+      "executable_sha256": "d5d9f0112f300b4d33c0fbebdcf39a9d3aaf22db5b054c6411882c0c6651cefd",
+      "acceptance_receipt": {
+        "repository": "Djex",
+        "path": "test-church/receipts/behavior-djinn-common-result-first.json",
+        "sha256": "feae5811e2ddd213e429f1ac180da15e00e6ac94cce77d16d27ba023be69ed18"
+      }
+    },
+    {
+      "host_language": "Haskell",
+      "engine": "exference",
+      "candidate_count": 6,
+      "settings": {
+        "ranking": "balanced",
+        "select": "first",
+        "window": 256,
+        "djinn_strategy": "depth-first",
+        "steps": 100000,
+        "choice_budget": 100000,
+        "independent_evaluation_seconds": 2,
+        "separate_process_guard_seconds": 300
+      },
+      "executable_sha256": "d5d9f0112f300b4d33c0fbebdcf39a9d3aaf22db5b054c6411882c0c6651cefd",
+      "acceptance_receipt": {
+        "repository": "Djex",
+        "path": "test-church/receipts/behavior-exference-current-final.json",
+        "sha256": "0029d067cdb5863432662475da70ac4c6e3942c26247d4b4f013a40a98796d16"
+      }
+    },
+    {
+      "host_language": "Lean",
+      "engine": "djinn",
+      "candidate_count": 6,
+      "settings": {
+        "ranking": "balanced",
+        "shown": 1,
+        "window": 65536,
+        "djinn_strategy": "interleave",
+        "verify": 65536,
+        "exference_steps": 100000,
+        "djinn_choice_budget": 500000,
+        "synthesis_timeout_seconds": 120,
+        "separate_process_guard_seconds": 1500.0
+      },
+      "executable_sha256": "baa4fb4ce1cc27f49900f0ded27f4b64468d00b29b57bbc3bc2e204ef1ff408a",
+      "acceptance_receipt": {
+        "repository": "Leant",
+        "path": "test-church/receipts/behavior-djinn-final.json",
+        "sha256": "81cbc8683717e9fc505b8bfc85f5f70535895cbbca65e920061a5ff9deb16e29"
+      }
+    },
+    {
+      "host_language": "Lean",
+      "engine": "exference",
+      "candidate_count": 6,
+      "settings": {
+        "ranking": "balanced",
+        "shown": 1,
+        "window": 256,
+        "djinn_strategy": "depth-first",
+        "verify": 256,
+        "exference_steps": 100000,
+        "djinn_choice_budget": 100000,
+        "synthesis_timeout_seconds": 30,
+        "separate_process_guard_seconds": 900.0
+      },
+      "executable_sha256": "baa4fb4ce1cc27f49900f0ded27f4b64468d00b29b57bbc3bc2e204ef1ff408a",
+      "acceptance_receipt": {
+        "repository": "Leant",
+        "path": "test-church/receipts/behavior-exference-final.json",
+        "sha256": "42a1842766a15f3e92b5630c53bb9cf308bf9aca44145ff9dae4c63a17a6c1b6"
+      }
+    },
+    {
+      "host_language": "Lean",
+      "engine": "both",
+      "candidate_count": 6,
+      "settings": {
+        "ranking": "balanced",
+        "shown": 1,
+        "window": 256,
+        "djinn_strategy": "interleave",
+        "verify": 256,
+        "exference_steps": 100000,
+        "djinn_choice_budget": 100000,
+        "synthesis_timeout_seconds": 30,
+        "separate_process_guard_seconds": 900.0
+      },
+      "executable_sha256": "baa4fb4ce1cc27f49900f0ded27f4b64468d00b29b57bbc3bc2e204ef1ff408a",
+      "acceptance_receipt": {
+        "repository": "Leant",
+        "path": "test-church/receipts/behavior-both-final.json",
+        "sha256": "5eb35a8a36e44eb1210497cb8a5b98dc9cef253a35532078a74202796315e3e1"
+      }
+    }
+  ],
+  "matrix": [
+    {
+      "host_language": "Haskell",
+      "engine": "djinn",
+      "operation": "not",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Djex",
+        "path": "test-church/receipts/behavior-djinn-common-result-first.json",
+        "sha256": "feae5811e2ddd213e429f1ac180da15e00e6ac94cce77d16d27ba023be69ed18"
+      }
+    },
+    {
+      "host_language": "Haskell",
+      "engine": "djinn",
+      "operation": "swap",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Djex",
+        "path": "test-church/receipts/behavior-djinn-common-result-first.json",
+        "sha256": "feae5811e2ddd213e429f1ac180da15e00e6ac94cce77d16d27ba023be69ed18"
+      }
+    },
+    {
+      "host_language": "Haskell",
+      "engine": "djinn",
+      "operation": "map",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Djex",
+        "path": "test-church/receipts/behavior-djinn-common-result-first.json",
+        "sha256": "feae5811e2ddd213e429f1ac180da15e00e6ac94cce77d16d27ba023be69ed18"
+      }
+    },
+    {
+      "host_language": "Haskell",
+      "engine": "djinn",
+      "operation": "append",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Djex",
+        "path": "test-church/receipts/behavior-djinn-common-result-first.json",
+        "sha256": "feae5811e2ddd213e429f1ac180da15e00e6ac94cce77d16d27ba023be69ed18"
+      }
+    },
+    {
+      "host_language": "Haskell",
+      "engine": "djinn",
+      "operation": "reverse",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Djex",
+        "path": "test-church/receipts/behavior-djinn-common-result-first.json",
+        "sha256": "feae5811e2ddd213e429f1ac180da15e00e6ac94cce77d16d27ba023be69ed18"
+      }
+    },
+    {
+      "host_language": "Haskell",
+      "engine": "djinn",
+      "operation": "filter",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Djex",
+        "path": "test-church/receipts/behavior-djinn-common-result-first.json",
+        "sha256": "feae5811e2ddd213e429f1ac180da15e00e6ac94cce77d16d27ba023be69ed18"
+      }
+    },
+    {
+      "host_language": "Haskell",
+      "engine": "exference",
+      "operation": "not",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Djex",
+        "path": "test-church/receipts/behavior-exference-current-final.json",
+        "sha256": "0029d067cdb5863432662475da70ac4c6e3942c26247d4b4f013a40a98796d16"
+      }
+    },
+    {
+      "host_language": "Haskell",
+      "engine": "exference",
+      "operation": "swap",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Djex",
+        "path": "test-church/receipts/behavior-exference-current-final.json",
+        "sha256": "0029d067cdb5863432662475da70ac4c6e3942c26247d4b4f013a40a98796d16"
+      }
+    },
+    {
+      "host_language": "Haskell",
+      "engine": "exference",
+      "operation": "map",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Djex",
+        "path": "test-church/receipts/behavior-exference-current-final.json",
+        "sha256": "0029d067cdb5863432662475da70ac4c6e3942c26247d4b4f013a40a98796d16"
+      }
+    },
+    {
+      "host_language": "Haskell",
+      "engine": "exference",
+      "operation": "append",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Djex",
+        "path": "test-church/receipts/behavior-exference-current-final.json",
+        "sha256": "0029d067cdb5863432662475da70ac4c6e3942c26247d4b4f013a40a98796d16"
+      }
+    },
+    {
+      "host_language": "Haskell",
+      "engine": "exference",
+      "operation": "reverse",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Djex",
+        "path": "test-church/receipts/behavior-exference-current-final.json",
+        "sha256": "0029d067cdb5863432662475da70ac4c6e3942c26247d4b4f013a40a98796d16"
+      }
+    },
+    {
+      "host_language": "Haskell",
+      "engine": "exference",
+      "operation": "filter",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Djex",
+        "path": "test-church/receipts/behavior-exference-current-final.json",
+        "sha256": "0029d067cdb5863432662475da70ac4c6e3942c26247d4b4f013a40a98796d16"
+      }
+    },
+    {
+      "host_language": "Lean",
+      "engine": "djinn",
+      "operation": "not",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Leant",
+        "path": "test-church/receipts/behavior-djinn-final.json",
+        "sha256": "81cbc8683717e9fc505b8bfc85f5f70535895cbbca65e920061a5ff9deb16e29"
+      }
+    },
+    {
+      "host_language": "Lean",
+      "engine": "djinn",
+      "operation": "swap",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Leant",
+        "path": "test-church/receipts/behavior-djinn-final.json",
+        "sha256": "81cbc8683717e9fc505b8bfc85f5f70535895cbbca65e920061a5ff9deb16e29"
+      }
+    },
+    {
+      "host_language": "Lean",
+      "engine": "djinn",
+      "operation": "map",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Leant",
+        "path": "test-church/receipts/behavior-djinn-final.json",
+        "sha256": "81cbc8683717e9fc505b8bfc85f5f70535895cbbca65e920061a5ff9deb16e29"
+      }
+    },
+    {
+      "host_language": "Lean",
+      "engine": "djinn",
+      "operation": "append",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Leant",
+        "path": "test-church/receipts/behavior-djinn-final.json",
+        "sha256": "81cbc8683717e9fc505b8bfc85f5f70535895cbbca65e920061a5ff9deb16e29"
+      }
+    },
+    {
+      "host_language": "Lean",
+      "engine": "djinn",
+      "operation": "reverse",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Leant",
+        "path": "test-church/receipts/behavior-djinn-final.json",
+        "sha256": "81cbc8683717e9fc505b8bfc85f5f70535895cbbca65e920061a5ff9deb16e29"
+      }
+    },
+    {
+      "host_language": "Lean",
+      "engine": "djinn",
+      "operation": "filter",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Leant",
+        "path": "test-church/receipts/behavior-djinn-final.json",
+        "sha256": "81cbc8683717e9fc505b8bfc85f5f70535895cbbca65e920061a5ff9deb16e29"
+      }
+    },
+    {
+      "host_language": "Lean",
+      "engine": "exference",
+      "operation": "not",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Leant",
+        "path": "test-church/receipts/behavior-exference-final.json",
+        "sha256": "42a1842766a15f3e92b5630c53bb9cf308bf9aca44145ff9dae4c63a17a6c1b6"
+      }
+    },
+    {
+      "host_language": "Lean",
+      "engine": "exference",
+      "operation": "swap",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Leant",
+        "path": "test-church/receipts/behavior-exference-final.json",
+        "sha256": "42a1842766a15f3e92b5630c53bb9cf308bf9aca44145ff9dae4c63a17a6c1b6"
+      }
+    },
+    {
+      "host_language": "Lean",
+      "engine": "exference",
+      "operation": "map",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Leant",
+        "path": "test-church/receipts/behavior-exference-final.json",
+        "sha256": "42a1842766a15f3e92b5630c53bb9cf308bf9aca44145ff9dae4c63a17a6c1b6"
+      }
+    },
+    {
+      "host_language": "Lean",
+      "engine": "exference",
+      "operation": "append",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Leant",
+        "path": "test-church/receipts/behavior-exference-final.json",
+        "sha256": "42a1842766a15f3e92b5630c53bb9cf308bf9aca44145ff9dae4c63a17a6c1b6"
+      }
+    },
+    {
+      "host_language": "Lean",
+      "engine": "exference",
+      "operation": "reverse",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Leant",
+        "path": "test-church/receipts/behavior-exference-final.json",
+        "sha256": "42a1842766a15f3e92b5630c53bb9cf308bf9aca44145ff9dae4c63a17a6c1b6"
+      }
+    },
+    {
+      "host_language": "Lean",
+      "engine": "exference",
+      "operation": "filter",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Leant",
+        "path": "test-church/receipts/behavior-exference-final.json",
+        "sha256": "42a1842766a15f3e92b5630c53bb9cf308bf9aca44145ff9dae4c63a17a6c1b6"
+      }
+    },
+    {
+      "host_language": "Lean",
+      "engine": "both",
+      "operation": "not",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Leant",
+        "path": "test-church/receipts/behavior-both-final.json",
+        "sha256": "5eb35a8a36e44eb1210497cb8a5b98dc9cef253a35532078a74202796315e3e1"
+      }
+    },
+    {
+      "host_language": "Lean",
+      "engine": "both",
+      "operation": "swap",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Leant",
+        "path": "test-church/receipts/behavior-both-final.json",
+        "sha256": "5eb35a8a36e44eb1210497cb8a5b98dc9cef253a35532078a74202796315e3e1"
+      }
+    },
+    {
+      "host_language": "Lean",
+      "engine": "both",
+      "operation": "map",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Leant",
+        "path": "test-church/receipts/behavior-both-final.json",
+        "sha256": "5eb35a8a36e44eb1210497cb8a5b98dc9cef253a35532078a74202796315e3e1"
+      }
+    },
+    {
+      "host_language": "Lean",
+      "engine": "both",
+      "operation": "append",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Leant",
+        "path": "test-church/receipts/behavior-both-final.json",
+        "sha256": "5eb35a8a36e44eb1210497cb8a5b98dc9cef253a35532078a74202796315e3e1"
+      }
+    },
+    {
+      "host_language": "Lean",
+      "engine": "both",
+      "operation": "reverse",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Leant",
+        "path": "test-church/receipts/behavior-both-final.json",
+        "sha256": "5eb35a8a36e44eb1210497cb8a5b98dc9cef253a35532078a74202796315e3e1"
+      }
+    },
+    {
+      "host_language": "Lean",
+      "engine": "both",
+      "operation": "filter",
+      "status": "passed",
+      "acceptance_receipt": {
+        "repository": "Leant",
+        "path": "test-church/receipts/behavior-both-final.json",
+        "sha256": "5eb35a8a36e44eb1210497cb8a5b98dc9cef253a35532078a74202796315e3e1"
+      }
+    }
+  ],
+  "regressions": [
+    {
+      "repository": "Djex",
+      "test_group": "unit",
+      "passed_tests": 118,
+      "reported_seconds": 87.17,
+      "process_seconds": 87.8816106999875,
+      "command": [
+        "dist-newstyle/build/x86_64-windows/ghc-9.12.4/djex-2026.7.17/t/djinn-tests/build/djinn-tests/djinn-tests.exe",
+        "-j1"
+      ],
+      "status": "passed",
+      "exit_code": 0,
+      "timeout_seconds": 300.0,
+      "capture_sha256": {
+        "stdout": "d5633a167a0c035167ec2a19b98ca77ab2bf287b03486b5884f4087d9922b259",
+        "stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "capture_paths": {
+        "stdout": "dist-newstyle/behavioral-acceptance/djinn-common-result-full-final/unit.stdout.txt",
+        "stderr": "dist-newstyle/behavioral-acceptance/djinn-common-result-full-final/unit.stderr.txt"
+      },
+      "source_and_executable_sha256": {
+        "dist-newstyle/build/x86_64-windows/ghc-9.12.4/djex-2026.7.17/t/djinn-tests/build/djinn-tests/djinn-tests.exe": "11e633857b652d5b47e389630d8534e3a576abe2b4b13e903cf5c7d5ba455f3f",
+        "djinn/src-core/Djinn/Core.hs": "79bcda5e0fb638fc8e689e07082b187175bf35a60aec2434ac47e3980221b5d2",
+        "djinn/src-core/Djinn/Internal/LJT.hs": "a1ed3c7a80f747461f4422f0ed293f64c2b313fd0bcc1a37e989d7763226b9a9",
+        "djinn/test-unit/Spec.hs": "de5436481bdcb370a201f909518f8d3e38c2f1e283d29a4dafcac759449b10b3"
+      },
+      "source_process_receipt": {
+        "path": "dist-newstyle/behavioral-acceptance/djinn-common-result-full-final/processes.json",
+        "sha256": "7ed378919506f4a056b0d5838ba33662f1cd85e0c30d09db8ba2f71820844d3a"
+      }
+    },
+    {
+      "repository": "Djex",
+      "test_group": "behavioral-cli",
+      "passed_tests": 4,
+      "reported_seconds": 41.39,
+      "process_seconds": 41.530168900004355,
+      "command": [
+        "C:/Djex/dist-newstyle/build/x86_64-windows/ghc-9.12.4/djex-2026.7.17/t/djex-cli-tests/build/djex-cli-tests/djex-cli-tests.exe",
+        "--pattern=behavioral",
+        "--num-threads=1"
+      ],
+      "status": "passed",
+      "exit_code": 0,
+      "timeout_seconds": 180.0,
+      "capture_sha256": {
+        "stdout": "4f5c570ecb5b2d77f6de76f603cff786c1cd67caf0e74f429bd920579b765ffc",
+        "stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "capture_paths": {
+        "stdout": "dist-newstyle/behavioral-acceptance/cli-behavioral-common-final/behavioral-cli.stdout.txt",
+        "stderr": "dist-newstyle/behavioral-acceptance/cli-behavioral-common-final/behavioral-cli.stderr.txt"
+      },
+      "source_and_executable_sha256": {
+        "C:/Djex/dist-newstyle/build/x86_64-windows/ghc-9.12.4/djex-2026.7.17/t/djex-cli-tests/build/djex-cli-tests/djex-cli-tests.exe": "6a8e5288457db1b0f5d5371feb481192cf282e50fa9f528ccb7a0afcf4d96153",
+        "djinn/src-core/Djinn/Core.hs": "79bcda5e0fb638fc8e689e07082b187175bf35a60aec2434ac47e3980221b5d2",
+        "djinn/src-core/Djinn/Internal/LJT.hs": "a1ed3c7a80f747461f4422f0ed293f64c2b313fd0bcc1a37e989d7763226b9a9"
+      },
+      "source_process_receipt": {
+        "path": "dist-newstyle/behavioral-acceptance/cli-behavioral-common-final/processes.json",
+        "sha256": "4b77f8540dd820d7e2e6690ef6d5450df483f58ca18f30c0321c7173963bcabe"
+      }
+    },
+    {
+      "repository": "Leant",
+      "test_group": "unit",
+      "passed_tests": 600,
+      "reported_seconds": 308.18,
+      "process_seconds": 308.41435499998624,
+      "command": [
+        "C:/Leant/dist-newstyle/build/x86_64-windows/ghc-9.12.4/leant-0.1.0/t/leant-synth-tests/build/leant-synth-tests/leant-synth-tests.exe",
+        "-j1"
+      ],
+      "status": "passed",
+      "exit_code": 0,
+      "timeout_seconds": 650.0,
+      "capture_sha256": {
+        "stdout": "177b5df20801e9807acfc0e8bd3de5d630f733a4a49010b4ac693040e57c2d7f",
+        "stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "capture_paths": {
+        "stdout": "dist-newstyle/behavioral-acceptance/leant-unit-common-full-final/unit.stdout.txt",
+        "stderr": "dist-newstyle/behavioral-acceptance/leant-unit-common-full-final/unit.stderr.txt"
+      },
+      "source_and_executable_sha256": {
+        "C:/Leant/dist-newstyle/build/x86_64-windows/ghc-9.12.4/leant-0.1.0/t/leant-synth-tests/build/leant-synth-tests/leant-synth-tests.exe": "e9c5267e1aca04e7299abb58afdc61147ac1f053f9c7e7eb9c15ab7f6f4773a9",
+        "src/Main.hs": "2720f9b921beb17b610239187bd1bfbac6f68d5bbe42464893ccc8a509c42123",
+        "src/Leant/Synth/Engine.hs": "f2fd9590fbd642765738ba54f136541b392bac790c06092555d3087a39e6345d",
+        "test-unit/Spec.hs": "3ffe35019d47c7bebff36cda5c602aaac62f76ba8654bca4a49f79926fa5f273",
+        "lib/Djex/djinn/src-core/Djinn/Core.hs": "2b87279e4f7d1b69c4b30c4cf3d4ed864665ff80b0e6f0c6c726d88c3ac50ed1",
+        "lib/Djex/djinn/src-core/Djinn/Internal/LJT.hs": "68ed650b8bde514973c36b1b768190dbda3480c830316a2a31f7e5b524cf8b47"
+      },
+      "source_process_receipt": {
+        "path": "dist-newstyle/behavioral-acceptance/leant-unit-common-full-final/processes.json",
+        "sha256": "9f605f5300a3f8a6a0fa1bcd024a3f53dbfed66e5f9721f2f997f9474bde1dfd"
+      }
+    }
+  ],
+  "replay_counting": {
+    "Haskell_assertions_per_engine": 23,
+    "Haskell_candidate_assertions_per_engine": 6,
+    "Haskell_oracle_controls_per_engine": 17,
+    "Lean_candidate_and_theorem_inventories": 36,
+    "Lean_distinct_control_inventories": 33,
+    "Lean_control_inventory_replay_observations": 99,
+    "Lean_total_empty_axiom_inventory_observations": 135
+  },
+  "limitations": [
+    "Engine allowances differ and remain explicit; none of these tests changes defaults.",
+    "Lean Church elements and eliminator results use Type0; their quantified encodings live predicatively in Type1.",
+    "Default-bearing partial Church operations are outside these six total operations."
+  ]
+}

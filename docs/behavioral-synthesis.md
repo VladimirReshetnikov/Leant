@@ -80,6 +80,36 @@ This host-proposition form is separate from the existing leading Length syntax:
 That form retains its existing finite-spine contract, authorization, and receipt
 rules. A natural Lean assertion neither activates nor bypasses those rules.
 
+## Djinn search alternatives
+
+Explicit `synth-djinn-strategy interleave` enables bounded exploration of useful
+term alternatives beyond Djinn's historical inhabitation search. For a checked
+plan over atomic and function types, the first LJT proof is preserved. After
+that proof, a reusable beta-normal term search can explore compositions and
+repeated uses of local functions. It also admits function-valued variables and
+partial applications, so passing a function does not require expanding it into
+extra lambdas. This addresses higher-order folds such as Church `reverse` and
+`filter` without introducing operation names or reference implementations into
+search. The ordinary `depth-first` strategy remains the default.
+
+The additional search uses exact type identities, increasing head-use sizes,
+and an index of type-compatible applications. A conservative analysis stops a
+size ladder only when it establishes a finite maximum; an unresolved cycle does
+not justify discarding larger terms. Resumable plan and proof streams share the
+configured choice and raw-proof allowances, rotating after a proof or a bounded
+work quantum. Rejected proofs and normalized duplicates still consume their
+raw slots. Preserving a plan's first proof does not promise an unchanged first
+result across differently scheduled plans.
+
+Common-result contexts give related instantiations a smaller search context.
+They group existing checked premises by their exact terminal result formula;
+each member retains its own source association and visible type-argument vector.
+The grouping does not assert equality of the complete assignment vectors. These
+contexts provide positive candidates only, and a candidate must use a member of
+the selected group. Failure in such a context cannot establish noninhabitation.
+Every resulting proof still passes the original plan's proof and scope checks
+before conversion, followed by Lean's exact type and behavioral checks.
+
 ## Six-operation Church corpus
 
 The shared specification in
@@ -120,33 +150,37 @@ python test-church/behavior_probe.py --leant PATH_TO_BUILT_LEANT_EXE --spec-dir 
 Run against an already built executable. Once the specification is vendored,
 `--spec-dir` may be omitted. The default matrix explicitly includes **18 positive
 queries**, six per Djinn, Exference, and Both, plus three false-predicate queries.
-The Haskell runner adds 12 positive queries for a planned total of 30. `--engine`
+The Haskell runner adds 12 positive queries for a cross-language total of 30. `--engine`
 and `--operation` select recorded subsets. The default `--window 256` sets both
 `synth-window` and `synth-verify`; Djinn's raw proof cutoff also derives from this
-window. Other initial settings are balanced ranking, shown 1, 100,000 Exference steps, 100,000 explicit Djinn choice
-points, Djinn's ordinary `depth-first` strategy, and a 30-second shared synthesis timeout. The separate runner process
-guard is 900 seconds. The Exference run below passed at these limits; complete
-Djinn and Both corpus acceptance remains pending. Owned process trees are
-terminated on timeout.
+window. Other initial settings are balanced ranking, shown 1, 100,000 Exference
+steps, 100,000 explicit Djinn choice points, Djinn's ordinary `depth-first`
+strategy, and a 30-second shared synthesis timeout. The separate runner process
+guard is 900 seconds. Calibration settings and acceptance are recorded per
+engine; the default profile does not describe every accepted run. Owned process
+trees are terminated on timeout.
 
 A larger frontier can be calibrated explicitly without changing the default:
 
 ```powershell
-python test-church/behavior_probe.py --leant PATH_TO_BUILT_LEANT_EXE --spec-dir C:/Djex/test-church --window 4096 --djinn-strategy interleave --steps 100000 --budget 100000 --timeout 30 --output test-church/quality-results/behavior-window4096-interleave
+python test-church/behavior_probe.py --leant PATH_TO_BUILT_LEANT_EXE --engine djinn --window 65536 --djinn-strategy interleave --steps 100000 --budget 500000 --timeout 120 --process-timeout 1500 --output test-church/quality-results/behavior-djinn-final
 ```
 
 This explicitly selects Djinn's `interleave` branch strategy and expands
 candidate observation and verification allowances while retaining
 shown 1, exact isolated kernel replay, empty-axiom checks, and false-predicate
-controls. It does not increase the step/choice budgets or time guards. The runner
-sends `:set synth-djinn-strategy`, requires its exact acknowledgment in transcript
+controls. This Djinn profile explicitly uses 500,000 choices and a 120-second
+command deadline. Its 1,500-second process guard also covers cold preparation
+and all seven commands in the live session; each standalone kernel replay has
+its own process guard. These are separate from the command's search allowance.
+The runner sends `:set synth-djinn-strategy`, requires its exact acknowledgment in transcript
 order, and records the strategy in its receipt. It affects Djinn's work in both
 Djinn and Both modes; `--djinn-strategy depth-first` retains the ordinary order.
 Add
 `--operation reverse --operation filter` for those two operations; repeat
 `--operation` with any of `not`, `swap`, `map`, `append`, `reverse`, and `filter`
-to select another subset. Omission selects all six. A pass at 4,096 is reported
-at that bound and does not turn a previous 256-window miss into a pass.
+to select another subset. Omission selects all six. A pass at 65,536 is reported
+at that bound and does not turn a previous smaller-window miss into a pass.
 
 Each preparation or live run requires a new output directory or an existing
 empty one. A nonempty path is rejected before files are written, so use
@@ -174,10 +208,13 @@ without running synthesis or the kernel.
 
 ## Validation status
 
-Named behavioral queries check rendered groups as they arrive, one group at a
-time. Exference retains its structural frontier ranking but does not wait for
-the ordinary command's complete frontend quality pool before trying the
-predicate. Each selected backend lane retains its original bounded trace: raw
+Named behavioral queries check rendered groups one group at a time. Exference
+retains its structural frontier ranking but does not wait for the ordinary
+command's complete frontend quality pool before trying the predicate. Djinn
+still collects and ranks its bounded backend batch before returning the first
+group. Both mode defers unused engine work, but observing its Djinn lane can
+encounter the same collection boundary. Each selected backend lane retains its
+bounded trace: raw
 candidates remain charged before rendering or duplicate rejection, and checking
 a false predicate does not refill or restart that trace. Existing
 strict/unused-binder, pattern, provider, and library fallback policies remain
@@ -189,7 +226,83 @@ group's own semantic authority; it does not inspect a later opposite-engine
 candidate to borrow typed metadata. Progress notes describe only observed work.
 Ordinary unnamed synthesis retains its existing finite-pool selection policy.
 
-**Exference passed all six live operations** at balanced ranking, window and
+### Current Lean six-operation acceptance
+
+The executable with SHA-256
+`baa4fb4ce1cc27f49900f0ded27f4b64468d00b29b57bbc3bc2e204ef1ff408a`,
+using vendored Djex revision `22da13fd`, passed **all 18 Lean behavioral cells**:
+all six operations independently under Djinn, Exference, and Both. Each batch
+used balanced ranking and shown 1, with library search, provider discovery,
+and classical fallback disabled. The accepted bounds differ by engine:
+
+| Engine | Djinn strategy | Window / verification | Djinn choices | Exference steps | Command deadline | Process guard |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Djinn | `interleave` | 65,536 | 500,000 | unused | 120 s | 1,500 s |
+| Exference | `depth-first` (unused) | 256 | unused | 100,000 | 30 s | 900 s |
+| Both | `interleave` | 256 | 100,000 | 100,000 | 30 s | 900 s |
+
+Each displayed term and its finite-oracle theorem passed independent Lean
+kernel replay. Each batch produced **45 empty axiom inventories**: 12 from its
+six candidates and their theorems, plus 33 from the separate control file. Across
+the three batches this is 36 candidate/theorem inventories and the same 33
+controls replayed three times, for 135 empty-inventory observations, not 135
+distinct declarations. The six operations exercise 626 finite observations per
+engine. All 18 positive queries reported zero inconclusive checks.
+
+| Operation | Djinn falsifications before success | Exference / Both falsifications before success |
+| --- | ---: | ---: |
+| `not` | 5 | 2 |
+| `swap` | 0 | 0 |
+| `map` | 6 | 0 |
+| `append` | 181 | 1 |
+| `reverse` | 51 | 21 |
+| `filter` | 61 | 8 |
+
+The mandatory `Nat → Nat where False` queries displayed no terms and recorded
+five actual falsifications in Djinn and 128 each in Exference and Both, with
+zero inconclusive checks. The latter two reached their 30-second command
+deadlines after actual falsifications; this does not claim exhaustive rejection
+or uninhabitability. The live processes completed in 196.27 seconds for Djinn,
+43.25 seconds for Exference, and 43.99 seconds for Both. Seven isolated kernel
+processes followed each live batch separately. These timings describe the
+different accepted profiles, not a comparative performance claim.
+
+The [combined compact receipt](../test-church/receipts/behavior-lean-complete.json)
+indexes the separate [Djinn](../test-church/receipts/behavior-djinn-final.json),
+[Exference](../test-church/receipts/behavior-exference-final.json), and
+[Both](../test-church/receipts/behavior-both-final.json) receipts. They retain all
+exact terms, types, commands, verdicts, source and capture hashes, and isolated
+replay inventories. Offline extraction reconstructed the commands and replay
+sources and reparsed the captures before accepting the compact projections; it
+was not another live or kernel run. These new Lean receipts do not repeat the
+earlier streaming or quota claims below.
+
+### Unit and cross-language closure
+
+The fresh complete Leant unit suite passed **600/600 tests** serially (`-j1`)
+in 308.18 seconds, with process exit 0 after 308.41 seconds. The
+[final validation receipt](../test-church/receipts/behavior-validation-final.json)
+retains the test executable, source pins, and capture hashes from
+`dist-newstyle/behavioral-acceptance/leant-unit-common-full-final`.
+This is a new aggregate run on the current sources, separate from the earlier
+376.32-second unit milestone below and from live synthesis or kernel replay.
+
+The [canonical Haskell behavioral guide](https://github.com/VladimirReshetnikov/Djex/blob/main/docs/behavioral-synthesis.md)
+records the other **12 behavioral cells**, all six operations under each Haskell
+engine on executable
+`d5d9f0112f300b4d33c0fbebdcf39a9d3aaf22db5b054c6411882c0c6651cefd`.
+Haskell Djinn used explicit Interleave, a 65,536 window, and 500,000 shared
+choices; Haskell Exference used a 256 window and 100,000 steps. Both used
+balanced ranking and first-result selection. The exact accepted definitions
+were independently compiled at their full original types and checked against
+the finite conditions. Together with the 18 Lean cells above, these receipts
+close the **30-cell behavioral corpus** at the recorded per-engine limits.
+Haskell execution evidence and Lean kernel evidence remain distinct; neither
+establishes universal behavioral equivalence or completeness of bounded search.
+
+### Earlier Exference and streaming milestone
+
+**The earlier Exference executable passed all six live operations** at balanced ranking, window and
 verification allowance 256, shown 1, 100,000 search steps, and a 30-second command
 deadline. Each exact displayed implementation and its finite-oracle theorem were
 replayed independently. The six candidate files and separate oracle-control file
@@ -243,7 +356,6 @@ This deliberately larger step setting belongs only to the timeout diagnostic;
 the six-operation result above remains at 100,000 steps. An earlier two-second
 attempt stopped in preflight and is not counted as partial-success coverage.
 
-**Complete Djinn and Both six-operation corpus acceptance is still pending.**
 The separate oracle baseline passed all 33 Lean declaration/proof checks and
 17 Haskell assertions; those results validate the known witnesses and wrong
 controls only. Existing rank-N and candidate-quality receipts do not establish
