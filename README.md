@@ -786,7 +786,7 @@ their order. Full impredicative inhabitation is undecidable: those resource boun
 make an unsuccessful rank-N search inconclusive, and the answer remains
 "no term found within bounds".
 
-The current `balanced` [Church acceptance runs](test-church/README.md#current-quality-policy-acceptance)
+The historical E0 `balanced` [Church acceptance runs](test-church/README.md#current-quality-policy-acceptance)
 passed **350/350 resolved signatures per engine**, including four local
 signatures. All **700 exact displayed terms** passed independent Lean kernel
 replay with empty axiom inventories. Each engine covers 315 total cases,
@@ -813,9 +813,28 @@ projection-diversity proofs pass under unchanged allowances. The
 [quality guide](docs/candidate-quality.md) and
 [acceptance receipts](test-church/README.md#current-quality-policy-acceptance)
 pin these results to Leant `5629936` and executable `e0b9…`, distinguish live
-kernel checks from reviewed offline golden comparison, and retain historical
-results separately. The remaining 26 ordinary compatibility fixtures are
-still being validated.
+kernel checks from reviewed offline golden comparison, and retain earlier
+results separately. E0's remaining 26 ordinary fixtures also completed; after
+20 reviewed golden updates, all 30 fixture captures matched offline, covering
+265 synthesis commands. This historical baseline includes a first-result
+quality regression in manual query 20 (two `match` expressions became three),
+so improved ranking is not a per-query monotonic guarantee.
+
+The subsequent verification repair suppresses only exact spellings already
+accepted in the current batch. Failed spellings remain retryable, the first
+accepted candidate keeps its own evidence, and skipped duplicates do not
+refill the bounded input. Production revision `043a6a3d` passed **all 578
+tests serially in 533.23 seconds** and built executable `42c0c9c0…`
+successfully. Its fresh full **30-fixture/265-command live run** preserved
+all prior successes and first results, with only the intended duplicate-line
+removal. The two retained terms in that query passed fresh kernel replay;
+all reviewed goldens then matched offline, preserving the original runner
+exit 1. The fresh **84-query/136-term policy matrix** also passed independent
+kernel replay, including three paired nil improvements and three diversity
+proofs. The [acceptance guide](test-church/README.md#accepted-spelling-repair-completed-acceptance)
+records the complete hash, settings, and separate live, kernel, and offline
+receipts. The full 700-term Church replay remains explicitly historical E0
+evidence.
 
 The plan-family bounds (which quantifier-site selections are
 exhaustive, where the next gap lies) and the dedicated rank-N transcripts

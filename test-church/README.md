@@ -3,14 +3,17 @@
 The [candidate-quality guide](../docs/candidate-quality.md) explains the new
 default `balanced` profile and its legacy compatibility mode. The
 [focused quality probes](quality.md) compare policies at equal configured
-budgets: the current 84-query matrix and all 136 displayed terms passed live
+budgets: the historical E0 84-query matrix and all 136 displayed terms passed live
 synthesis and independent kernel replay. The repaired executable also passed
 all 90 compact queries and their independent kernel checks, followed by
 reviewed offline golden comparison. Both full Church runs also passed:
 350 cases per engine and all 700 exact displayed terms independently
-kernel-replayed with empty axiom inventories. The remaining 26 ordinary
-compatibility fixtures are still being validated; earlier receipts remain
-separately identified below.
+kernel-replayed with empty axiom inventories. Its remaining 26 ordinary
+fixtures also completed, followed by reviewed offline comparison of all 30
+goldens. The subsequent accepted-spelling repair passed 578 unit tests, a
+fresh full 30-fixture live run followed by reviewed offline comparison, and
+a fresh 84-query/136-term policy matrix. Each executable's receipts remain
+separately identified below; the 700-term corpus receipt is still historical.
 
 `run_corpus.py` consumes Djex's GHC-resolved `test-church/manifest.json` and
 generates a Lean goal for every signature in `docs/examples/Church.hs`,
@@ -147,14 +150,60 @@ the ignored `generated-provider-discovery` directory.
 
 ## Current quality-policy acceptance
 
-The current acceptance checkout is Leant `5629936`, including the corrected
+### Accepted-spelling repair: completed acceptance
+
+The new verifier suppresses only spellings already accepted in its current
+batch. It preserves failed retries and the first accepted candidate's own
+evidence, without refilling the bounded input prefix.
+
+Production revision `043a6a3d1562578f9aee8ad73ada4e02ddd4a52d` passed
+**all 578 tests serially in 533.23 seconds** and built the executable
+successfully. Its SHA-256 is
+`42c0c9c0a46a35302a04691a93fc68099c5e80bd91305e9a927ba9de9cec5cae`.
+`quality-results/dedup-build-acceptance.json` records zero test/build exits
+and source hashes, with logs in `quality-results/build-leant-dedup-02.log`
+and `quality-results/build-executable-dedup-02.log`.
+
+The following fresh checks used that same unchanged executable. Receipt paths
+in the table are relative to `test-church/quality-results/`.
+
+| Gate | Completed result | Receipt |
+| --- | --- | --- |
+| Unit suite and executable build | 578 tests passed serially in 533.23 seconds; both process exits zero | `dedup-build-acceptance.json` |
+| Full live compatibility run | 30 fixtures, 265 synthesis commands, 1,124.61 seconds; 29 original golden matches and one expected duplicate-removal drift | `dedup-compatibility/results.json` |
+| Independent compatibility review | 132 input artifacts checked; no lost successes, changed first results, new spellings, remaining exact duplicates, or control/proof changes | `dedup-independent-review.json` |
+| Exact changed-query replay | Both retained `Gap.Token` terms passed the kernel, with exactly `Gap.Token` and `Gap.polyGlobal` as axioms | `dedup-gap-replay/results.json` |
+| Final golden comparison | All 30 files and 265 commands match after the single duplicate-line update; offline only, original runner exit 1 preserved | `dedup-final-comparison/results.json` |
+| Fresh policy matrix | 84 queries and 136 exact terms passed live synthesis and independent kernel replay; 112 empty inventories and 24 within declared premises | `matrix-dedup-complete.json` |
+
+The ordinary run used a 30-second configured synthesis timeout. Independent
+review found no lost success or changed proof/control output, so no retry at
+the previous 600-second ordinary setting was needed. The sole transcript
+change removed Exference's repeated `Gap.polyGlobal` application from `it3`;
+the retained `it1` and `it2` were independently replayed. The original live
+runner exit remains 1. The final comparison uses the production normalizer
+on preserved captures; it is neither a second live run nor a kernel rerun.
+
+The matrix consists of two disjoint completed runs: **56 queries/87 terms**
+for Djinn and Exference in `matrix-dedup/results.json`, and **28 queries/49
+terms** for combined mode in `matrix-dedup-both/results.json`. Both retain
+window 12, shown 4, 10,000 Exference steps, an explicit 10,000-choice Djinn
+budget, and a 30-second synthesis timeout. All three paired Exference `nil`
+improvements and three projection-diversity proofs passed; every type and
+ordered term list is unchanged from E0. The aggregate itself ran no synthesis
+or kernel. The full 700-term Church replay below remains historical E0
+evidence; it was not rerun on `42c0c9c0…`.
+
+### Historical E0 baseline
+
+The E0 acceptance checkout was Leant `5629936`, including the corrected
 test assertion and reviewed goldens. It retains unchanged production code
 from `a970d1f`, vendored Djex
 `ae986bf5` (unchanged synthesis code `2954b6d2`), and executable SHA-256
 `e0b9c87cae0bc34d59c8d5a34a58fdd5005676913969a80d5503d7281081d025`.
 Each completed live run verified that the executable remained unchanged.
 
-| Gate | Current result | Receipt |
+| Gate | Historical E0 result | Receipt |
 | --- | --- | --- |
 | Leant unit suite | 569 tests passed serially at unchanged limits, 389.71 seconds | `quality-results/build-leant-06.log` |
 | Four profiles across Djinn, Exference, and combined mode | 84/84 queries; all 136 displayed terms independently kernel-replayed | `quality-results/matrix-final/results.json` |
@@ -162,7 +211,10 @@ Each completed live run verified that the executable remained unchanged.
 | Church corpus, Exference | 350/350 candidates; all 350 independently kernel-replayed with empty axiom inventories | `quality-results/church-exference-final/results.json` |
 | Four compact fixtures | 90/90 live and kernel successes; 78 empty inventories and 12 exact declared-premise inventories | `quality-results/fixtures-repair/results.json` |
 | Compact golden comparison | All four reviewed goldens match preserved live captures; no synthesis or kernel rerun | `quality-results/compact-comparison/results.json` |
-| Remaining 26 ordinary fixtures | Compatibility validation running; no completed acceptance yet | `quality-results/ordinary-final/` |
+| Remaining 26 ordinary fixtures | All 26 completed live; six original matches and 20 reviewed golden drifts; original runner exit 1 | `quality-results/ordinary-final/results.json` |
+| Ordinary changed-term review | 99 exact changed terms independently kernel-replayed; source, capture, and axiom-policy correspondence audited | `quality-results/ordinary-review/results.json`, `quality-results/ordinary-review-audit.json` |
+| Separate proof review | Six proof terms and two exact tactic applications checked in their original contexts | `quality-results/synth-prove-review/review.json` |
+| Composite golden comparison | 30/30 files and 265 synthesis commands match preserved captures; no synthesis or kernel rerun | `quality-results/composite-comparison/results.json` |
 
 The policy matrix contains 112 closed terms with empty axiom inventories and
 24 provider terms whose dependencies stay within the fixture's declared
@@ -193,6 +245,18 @@ confirmed complete eight- and twelve-argument provider vectors, exact allowed
 premises, valid projection changes, and expected cutoff diagnostics. Only the
 three reviewed baselines were updated; the separate offline comparison closes
 their transcript differences without changing the original receipt.
+
+The 26-file ordinary run completed in 98 minutes 45 seconds. After independent
+term, proof, control, and diagnostic review, 20 further goldens were updated;
+`quality-results/ordinary-golden-application/application.json` preserves their
+before/after hashes. The final composite comparison combines those live
+captures with the four compact fixtures: **263 explicit-type queries and two
+proof-mode commands, 265 in total**. It uses the production normalizer and
+preserves the original ordinary runner's exit 1; it is not a second live run.
+The [quality guide](quality.md#completed-e0-ordinary-compatibility-review)
+records the review boundary, including the observed two-to-three-match
+first-result regression in manual query 20 and the duplicate presentation
+addressed by the subsequent repair.
 
 The preceding quality executable, Leant `fb84b96` with Djex `2954b6d2` and
 SHA-256 `dab110ad2a7903ac4ef4883898d48532c00cc8c3b1b8d8748aac7744eedffb61`,

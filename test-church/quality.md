@@ -1,12 +1,14 @@
 # Focused candidate-quality acceptance
 
 See the [policy guide](../docs/candidate-quality.md) for the score, legacy
-behavior, and raw candidate observation contract. The repaired executable has
-passed the fresh **84-query policy matrix and all 136 displayed terms**, plus
-independent replay of all 90 broader fixture terms and all **700 Church
-terms**, on the unchanged `e0b9…` executable. The remaining 26 ordinary
-compatibility fixtures are still being validated. Earlier matrix, corpus,
-and full ordinary-suite receipts remain separately historical.
+behavior, and raw candidate observation contract. The historical E0 executable
+(`e0b9…`) passed the **84-query/136-term policy matrix**, all 90 broader fixture
+terms, and all **700 Church terms**. Its 26 ordinary fixtures also completed;
+reviewed captures now match all 30 goldens in a separate offline comparison.
+The subsequent accepted-spelling repair passed **578 unit tests**, a fresh
+**30-fixture/265-command** live compatibility run with one reviewed
+duplicate-removal drift, and a fresh **84-query/136-term** kernel-replayed
+matrix. Historical Church receipts remain separate from these new checks.
 
 The standalone runner compares all four ranking policies under identical
 settings and independently kernel-replays every displayed alternative:
@@ -126,7 +128,59 @@ The executable hash covers its exact file bytes.
 - Paired `nil` checks requiring actual before and after witnesses, with zero
   comparisons when no legacy baseline was run.
 
-## Current provider-repair acceptance
+## Accepted-spelling repair: completed acceptance
+
+Verification now suppresses only exact, case-sensitive spellings already
+accepted in the same batch. Failed spellings remain retryable. Skipping a
+previously accepted spelling creates no attempt, failure, or extra success,
+and the first accepted candidate retains its ordinal, route, and evidence.
+This filter does not borrow a later typed receipt or refill the caller's
+bounded group prefix. Raw candidate charges and resource settings stay fixed.
+
+Production revision `043a6a3d` passed **all 578 tests serially in 533.23
+seconds**, and its executable build passed. The new executable SHA-256 is
+`42c0c9c0a46a35302a04691a93fc68099c5e80bd91305e9a927ba9de9cec5cae`.
+`quality-results/dedup-build-acceptance.json` records zero test/build exits,
+source hashes, and the logs `build-leant-dedup-02.log` and
+`build-executable-dedup-02.log`.
+
+The fresh full live run completed **30 fixtures and 265 synthesis commands**
+in **1,124.61 seconds**, with all executable, source, and runner identities
+stable. It used a 30-second synthesis timeout. Twenty-nine original goldens
+matched; the sole drift removed Exference's duplicate contextual
+`Gap.polyGlobal` application from `it3`. Independent review of 132 input
+artifacts found no lost successes, changed first results, new spellings,
+remaining exact duplicates, or control/proof changes. No 600-second retry
+was required. The two retained terms passed fresh exact kernel replay with
+only `Gap.Token` and `Gap.polyGlobal` in their axiom inventories.
+
+Receipts are `quality-results/dedup-compatibility/results.json`,
+`quality-results/dedup-independent-review.json`, and
+`quality-results/dedup-gap-replay/results.json`. After the single reviewed
+golden-line removal, `quality-results/dedup-final-comparison/results.json`
+matched all 30 files and 265 commands using the production normalizer. This
+offline comparison reran neither synthesis nor the kernel and preserves the
+original live runner exit **1**.
+
+The fresh matrix passed in **two disjoint live and kernel runs**:
+
+| Engines | Queries | Exact terms | Receipt under `quality-results/` |
+| --- | ---: | ---: | --- |
+| Djinn and Exference | 56 | 87 | `matrix-dedup/results.json` |
+| Combined | 28 | 49 | `matrix-dedup-both/results.json` |
+| Aggregate | **84** | **136** | `matrix-dedup-complete.json` |
+
+Both runs used the same executable and settings: window 12, shown 4,
+10,000 Exference steps, explicit Djinn budget 10,000, and synthesis timeout
+30 seconds. All live and kernel exits were zero. Of the 136 terms, **112 have
+empty axiom inventories and 24 use only declared provider premises**. All
+three paired Exference `nil` improvements and three projection-diversity
+proofs passed. Every query type and ordered term list is unchanged from E0;
+the aggregate only checks the two completed runs and does not execute a new
+one. The [acceptance table](README.md#accepted-spelling-repair-completed-acceptance)
+keeps these fresh receipts separate from the historical 700-term Church run.
+
+## Historical E0 provider-repair acceptance
 
 Leant acceptance checkout `5629936` includes the corrected test assertion and
 reviewed goldens. Its production code is unchanged from `a970d1f`, with
@@ -158,7 +212,7 @@ passed. Live synthesis and kernel replay exited zero, and the executable hash
 remained unchanged. Settings and canonical input hash match the earlier matrix.
 Only the second provider alternative under each structural combined profile
 disappeared: every first result and all 81 other query term lists are unchanged.
-The current 136-term result remains separate from the earlier 139-term receipt.
+The E0 136-term result remains separate from the earlier 139-term receipt.
 
 The original fixture runner exited 1 because three reviewed golden files
 differed. After those baseline changes were applied,
@@ -177,8 +231,34 @@ The runs retain the default `balanced` profile, window one, a configured
 `synth-budget off` under the shared deadline and intrinsic finite planning
 caps. Each engine covers 315 total, 16 integer-provider, and 19 explicit-default
 cases, with the scope and universe qualifications in the
-[corpus guide](README.md#current-quality-policy-acceptance). The remaining 26
-ordinary compatibility fixtures are still being validated.
+[corpus guide](README.md#current-quality-policy-acceptance).
+
+### Completed E0 ordinary compatibility review
+
+`quality-results/ordinary-final/results.json` records **26/26 live fixtures**
+completed in 98 minutes 45 seconds: six original matches and 20 golden drifts,
+with the original runner exit **1** preserved. Their source inputs and E0
+executable remained unchanged. Review checked controls and diagnostics as
+well as candidate text. `quality-results/ordinary-review/results.json` and
+`quality-results/ordinary-review-audit.json` retain independent kernel replay
+and provenance checks for **99 exact changed terms**. The separate
+`quality-results/synth-prove-review/review.json` records **six proof terms and
+two exact tactic applications**, including their original proof contexts and
+the fixture's expected error.
+
+After the 20 reviewed goldens were applied,
+`quality-results/ordinary-golden-application/application.json` preserved their
+before/after hashes. `quality-results/composite-comparison/results.json`
+then matched **30/30 files and 265 synthesis commands** from the ordinary and
+compact capture groups using the production normalizer. This comparison ran
+neither synthesis nor the kernel and did not change the original exit code.
+
+Acceptance does not mean monotonic first-result quality: `synth-manual` query
+20 grew from two to three `match` expressions. The
+[policy guide](../docs/candidate-quality.md#historical-e0-baseline) records
+the precise observation and why it establishes neither a score inversion nor
+budget exhaustion. E0 also retains the duplicate presentation which motivated
+the subsequently validated accepted-spelling repair.
 
 ## Recorded policy matrix before the provider repairs
 

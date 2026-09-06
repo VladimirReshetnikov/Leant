@@ -162,6 +162,19 @@ had a graph. They are not mislabeled as the graph-absence compatibility route.
 Lean still checks every resulting spelling before display, and Length cannot
 obtain a certificate by transferring the bare graph to a reconstructed vector.
 
+The motivating E0 failure was a `Gap.Token` query under Exference: the same
+contextual `Gap.polyGlobal` application appeared as both `it1` and `it3`,
+consuming two success slots. Verification now suppresses a spelling only after
+Lean has accepted that exact, case-sensitive text in the current batch. A rejected spelling may be
+retried; a later group containing only already accepted spellings consumes
+neither another success nor a verification attempt or failure. The first
+accepted variant retains its original ordinal, route, and evidence. This
+verification-time filter neither borrows a later candidate's typed receipt
+nor changes the earlier combined-engine origin-association rules.
+
+The caller still supplies the same bounded group prefix. Skipped duplicates
+do not refill it, refund raw search work, or enlarge any search or display
+limit; fresh alternatives can be tried only within that existing prefix.
 Length assessment still receives the exact verified batch. Its behavioral
 ordering and authorized filtering are applied after this structural selection,
 with the same failure-preservation rules. A preference for a smaller inhabitant
@@ -169,8 +182,45 @@ does not establish that it implements an intended operation such as reversal.
 
 ## Validation status
 
-The provider repairs compiled successfully and passed all **90 broader fixture
-queries**. Acceptance checkout `5629936` includes the corrected test assertion
+### Accepted-spelling repair: completed acceptance
+
+The accepted-only verification filter described above is newer than the E0
+receipts below. Production revision `043a6a3d` passed **all 578 tests serially
+in 533.23 seconds**, and its executable build passed. The executable SHA-256 is
+`42c0c9c0a46a35302a04691a93fc68099c5e80bd91305e9a927ba9de9cec5cae`.
+`test-church/quality-results/dedup-build-acceptance.json` binds the source
+hashes, test/build exits, and executable hash; its logs are
+`build-leant-dedup-02.log` and `build-executable-dedup-02.log` in the same
+directory.
+
+Fresh live compatibility validation completed **30 fixtures and 265 synthesis
+commands** in 1,124.61 seconds at a 30-second synthesis timeout. Twenty-nine
+original goldens matched; one differed only by removal of the duplicate
+`Gap.polyGlobal` result. Independent review checked 132 input artifacts and
+found no lost successes, changed first results, new spellings, remaining
+exact duplicates, or control/proof changes. No 600-second retry was needed.
+Both retained terms in the changed query passed independent kernel replay
+with exactly `Gap.Token` and `Gap.polyGlobal` as axioms. After the sole
+golden-line update, an offline production-normalizer comparison matched all
+30 files; the original live runner exit **1** remains preserved.
+
+The fresh policy matrix also passed: **84 queries and 136 exact terms**, with
+112 empty axiom inventories and 24 confined to declared premises. It combines
+two disjoint live/kernel runs, 56 queries/87 terms for the individual engines
+and 28 queries/49 terms for combined mode. Both used window 12, shown 4,
+10,000 Exference steps, explicit Djinn budget 10,000, and a 30-second timeout.
+All three paired Exference `nil` improvements and three projection-diversity
+proofs passed; every type and ordered term list is unchanged from E0.
+The [final acceptance table](../test-church/README.md#accepted-spelling-repair-completed-acceptance)
+links the live, independent-review, kernel, offline-comparison, and matrix
+receipts. The full 700-term Church replay remains historical E0 evidence,
+not a new-executable replay.
+
+### Historical E0 baseline
+
+Before the accepted-spelling repair, the provider repairs compiled successfully
+and passed all **90 broader fixture queries**. Acceptance checkout `5629936`
+includes the corrected test assertion
 and reviewed goldens, with unchanged production code from `a970d1f`, vendored
 Djex `ae986bf5` (synthesis code
 `2954b6d2`) and unchanged executable SHA-256
@@ -217,8 +267,28 @@ retains `synth-budget off`, subject to the shared deadline and intrinsic
 finite planning caps. The 315 total, 16 integer-provider, and 19
 explicit-default cases per engine retain the
 [corpus guide's](../test-church/README.md) scope and predicative-universe
-qualifications. The remaining 26 ordinary compatibility fixtures are still
-being validated.
+qualifications.
+
+The E0 ordinary run subsequently completed **26/26 fixtures**. Six matched
+their original goldens and 20 required reviewed updates; the original runner
+exit remains **1**. Independent replay checked **99 exact changed terms**,
+plus **six proof terms and two exact tactic applications** in a separate
+proof-context check. Combining these preserved captures with the four compact
+fixtures produced a **30/30 offline comparison covering 265 synthesis
+commands**, using the production normalizer. This was not another live run.
+The [corpus acceptance table](../test-church/README.md#current-quality-policy-acceptance)
+links the distinct live, replay, baseline-application, and comparison receipts.
+
+This historical baseline also records a quality counterexample. In
+`synth-manual` query 20, of type
+`∀ p q : Prop, Decidable p → Decidable q → Decidable (p ∧ q)`, the first
+result grew from **two to three `match` expressions**. Both terms type-check;
+the new negative branch performs an additional elimination of the second
+decision. Structural ranking therefore does not promise a better first
+result for every query. The transcript does not show whether the older term
+entered the same selected pool, so it proves neither a final-score inversion
+nor budget exhaustion. The observed regression remains documented rather
+than being presented as an improvement.
 
 ### Recorded acceptance before the provider repairs
 

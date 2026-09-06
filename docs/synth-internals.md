@@ -11,7 +11,7 @@ verification, and Length boundaries below consume that selected order.
 The default profile is `balanced`. Descriptions of legacy candidate prefixes
 or the distinct-rendered-group window apply to `legacy`; the structural
 profiles can choose another checked order under the same resource settings.
-Current validation uses Leant acceptance checkout `5629936`, with unchanged
+The historical E0 baseline uses Leant acceptance checkout `5629936`, with unchanged
 production code from `a970d1f`, vendored Djex `ae986bf5` (synthesis code
 `2954b6d2`), and the unchanged `e0b9…` executable. All **569 unit tests**
 passed serially at unchanged limits. Both engines passed **350/350 Church
@@ -25,8 +25,32 @@ with 78 empty inventories and 12 exact declared-premise inventories.
 The [current acceptance table](../test-church/README.md#current-quality-policy-acceptance)
 and [quality probes](../test-church/quality.md) retain executable hashes,
 receipt paths, universe/default qualifications, and the distinction between
-live validation and reviewed offline golden comparison. The remaining 26
-ordinary compatibility fixtures are still being validated. Earlier receipts
+live validation and reviewed offline golden comparison. E0's remaining 26
+ordinary fixtures completed with six original matches and 20 reviewed golden
+drifts; the original runner exit remains 1. Independent replay checked 99
+exact changed terms and, separately, six proof terms and two exact tactic
+applications. The preserved ordinary and compact captures then matched all
+30 goldens offline, covering 265 synthesis commands. Manual query 20's first
+result nevertheless grew from two to three matches; neither a final-score
+inversion nor budget exhaustion has been established.
+
+The accepted-spelling verification repair described below is newer than E0.
+Production revision `043a6a3d` passed **all 578 tests serially in 533.23
+seconds** and built executable `42c0c9c0…` successfully. Its fresh full
+30-fixture/265-command live run completed at a 30-second synthesis timeout:
+29 original golden matches and one expected duplicate-line removal, with
+no lost successes, changed first results, new spellings, remaining exact
+duplicates, or control/proof changes. Two retained `Gap.Token` terms passed
+fresh exact kernel replay. All 30 reviewed goldens then matched offline;
+the original live runner exit 1 is preserved.
+
+The fresh 84-query matrix passed in two disjoint runs with all 136 terms
+kernel-replayed, 112 empty inventories and 24 within declared premises.
+All three paired nil checks and three projection-diversity proofs passed,
+with every type and ordered term list unchanged from E0. The
+[final acceptance table](../test-church/README.md#accepted-spelling-repair-completed-acceptance)
+pins the executable hash, settings, and distinct receipts. The 700-term
+Church replay remains historical E0 evidence. Earlier receipts
 remain separately identified under
 [historical acceptance](../test-church/README.md#historical-acceptance-before-the-quality-profiles).
 
@@ -200,6 +224,22 @@ Wrappers such as
 `Classical.byContradiction` discard both direct and recovered authority because
 they denote a new term.
 This is deliberately a solver-neutral identity seam, not behavioral evidence.
+
+`synthVerify` uses `verifyDistinctCandidateGroupsBy` to keep at most one
+accepted representative of each exact, case-sensitive text in its batch.
+Only an actual `VariantAccepted` inserts a key. Failed spellings can be
+retried, including in another group; duplicate-only nonempty groups add no
+attempt, failure, or success. An originally empty group retains its existing
+failed-group semantics. A fresh alternative within a later group may still
+be tried. Quota checks precede observation of later groups or variants.
+
+This verification filter returns the first accepted callback candidate
+unchanged, including its ordinal, route, and existing origin. It does not
+borrow an origin or Length receipt from a skipped later duplicate; the
+earlier combined-engine origin association above is a separate boundary.
+`verifySynthLane` still takes the same bounded group prefix before flattening
+variants. Skips do not request a refill or refund raw search work, and the
+generic `verifyCandidateGroups` API retains its earlier behavior.
 
 ## Length handoff and problem sealing
 
