@@ -46,14 +46,14 @@ preparing synthesis environment (session imports + Lean)...
   it1  fun f g x => match f x with | ⟨y, z⟩ => g y z
   it2  fun f g x => match f x with | ⟨y, _⟩ => g y x
   it3  fun f g x => match f x with | ⟨y, z⟩ => (match g y x with | ⟨w, _⟩ => ⟨w, z⟩)
-  it4  fun f g x => match f x with | ⟨y, z⟩ => (match g y z with | ⟨w, _⟩ => ⟨w, x⟩)
-  it5  fun f g x => match f x with | ⟨y, z⟩ => (match g y z with | ⟨w, _⟩ => ⟨w, z⟩)
+  it4  fun f g x => match f x with | ⟨y, _⟩ => (match g y x with | ⟨z, _⟩ => ⟨z, x⟩)
+  it5  fun f g x => match f x with | ⟨y, z⟩ => (match g y z with | ⟨w, _⟩ => ⟨w, x⟩)
 λ> :synth ((A → R) → R) → (A → (B → R) → R) → (B → R) → R
   it1  fun f g h => f (fun x => g x h)
-  it2  fun f g h => f (fun x => f (fun _ => g x h))
-  it3  fun f g h => f (fun x => g x (fun y => f (fun _ => h y)))
-  it4  fun f g h => f (fun x => g x (fun y => g x (fun _ => h y)))
-  it5  fun f g h => f (fun x => f (fun _ => g x (fun y => f (fun _ => h y))))
+  it2  fun f g h => f (fun x => g x (fun y => f (fun _ => h y)))
+  it3  fun f g h => f (fun x => f (fun _ => g x h))
+  it4  fun f g h => f (fun x => f (fun _ => g x (fun y => f (fun _ => h y))))
+  it5  fun f g h => f (fun x => g x (fun y => g x (fun _ => h y)))
 λ> :synth (∀ a b : Type, Option a → (a → Option b) → Option b)
   it1  fun _ _ _ _ => .none
   it2  fun _ _ x f => match x with | .none => (.none) | .some y => f y
@@ -74,13 +74,13 @@ note: search truncated: candidate limit reached (60)
 synth engine: exference
 λ> :synth (∀ (F : Type 1 → Type), (∀ a : Type 1, F a) → F (∀ b : Type, b → b))
   it1  fun _ x => x _
-  it2  fun _ x => match Sum.inr (x _) with | .inl a => a | .inr b => b
-  it3  fun _ x => match Sum.inl (x _) with | .inl a => a | .inr b => b
-note: search truncated: step limit reached, queue limit pruned 23355
+  it2  fun _ x => match Sum.inl (x _) with | .inl a => a | .inr b => b
+  it3  fun _ x => match Sum.inr (x _) with | .inl a => a | .inr b => b
+note: search truncated: step limit reached, queue limit pruned 23557
 λ> :set synth-engine djinn
 synth engine: djinn
 λ> :synth (∀ p q : Prop, Decidable p → Decidable q → Decidable (p ∧ q))
-  it1  fun _ _ x y => match x with | .isFalse k => .isFalse (fun ⟨z, _⟩ => k z) | .isTrue w => (match y with | .isFalse k1 => .isFalse (fun ⟨_, x1⟩ => k1 x1) | .isTrue x2 => .isTrue ⟨w, x2⟩)
+  it1  fun _ _ x y => match x with | .isFalse k => (match y with | .isFalse k1 => .isFalse (fun ⟨_, z⟩ => k1 z) | .isTrue _ => .isFalse (fun ⟨w, _⟩ => k w)) | .isTrue x1 => (match y with | .isFalse k2 => .isFalse (fun ⟨_, x2⟩ => k2 x2) | .isTrue x3 => .isTrue ⟨x1, x3⟩)
 λ> :synth (∀ p q : Prop, Decidable p → Decidable q → Decidable (p → q))
   it1  fun _ _ x y => match x with | .isFalse k => .isTrue (fun z => absurd z k) | .isTrue w => (match y with | .isFalse k1 => .isFalse (fun f => k1 (f w)) | .isTrue x1 => .isTrue (fun _ => x1))
 note: search truncated: candidate limit reached (60)
@@ -117,9 +117,5 @@ note: search truncated: candidate limit reached (60)
 synth engine: both
 λ> :synth ((A → B → C) → (A → B) → A → C)
   it1  fun f g x => f x (g x)
-  it2  fun f g x => f x (g (match Sum.inl x with | .inl a => a | .inr b => b))
-  it3  fun f g x => f x (g (match Sum.inr x with | .inl a => a | .inr b => b))
-  it4  fun f g x => f x (match Sum.inr (g x) with | .inl a => a | .inr b => b)
-  it5  fun f g x => f x (match Sum.inr (g x) with | .inl a => g a | .inr b => b)
-note: exference: search truncated: step limit reached, queue limit pruned 36194
+note: exference: search truncated: step limit reached, queue limit pruned 35792
 λ> :quit

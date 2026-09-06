@@ -29,7 +29,7 @@ note: search truncated: candidate limit reached (60)
   it2  fun _ x => x
   it3  fun x _ => List.reverse x
   it4  fun x y => List.append x y
-  it5  fun x y => List.append y x
+  it5  fun x _ => List.append x x
 note: search truncated: candidate limit reached (60)
 λ> :synth (∀ a : Type, a → List a)
   it1  fun _ _ => .nil

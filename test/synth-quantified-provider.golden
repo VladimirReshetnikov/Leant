@@ -24,23 +24,19 @@ synth steps: 1024
 synth engine: djinn
 λ> :synth Gap.Token
 preparing synthesis environment (session imports + Lean)...
-  it1  Gap.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
-  it2  Gap.polyGlobal («a» := (∀ {a0_0 : Type _}, [@Inhabited a0_0] → a0_0))
+  it1  Gap.polyGlobal («a» := (∀ {a0_0 : Type _}, [@Inhabited a0_0] → a0_0))
+  it2  Gap.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
 λ> :set synth-engine exference
 synth engine: exference
 λ> :synth Gap.Token
   it1  Gap.polyGlobal («a» := (∀ {a0_0 : Type _}, [@Inhabited a0_0] → a0_0))
   it2  Gap.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
-note: search truncated: step limit reached, queue limit pruned 10285
+note: search truncated: step limit reached, queue limit pruned 14478
 λ> :set synth-engine both
 synth engine: both
 λ> :synth Gap.Token
-  it1  Gap.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
-  it2  Gap.polyGlobal («a» := (∀ {a0_0 : Type _}, [@Inhabited a0_0] → a0_0))
-  it3  match Sum.inr (Gap.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))) with | .inl a => a | .inr b => b
-  it4  match Sum.inr (Gap.polyGlobal («a» := (∀ {a0_0 : Type _}, [@Inhabited a0_0] → a0_0))) with | .inl a => a | .inr b => b
-  it5  match Sum.inl (Gap.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))) with | .inl a => a | .inr b => b
-note: exference: search truncated: step limit reached, queue limit pruned 6179
+  it1  Gap.polyGlobal («a» := (∀ {a0_0 : Type _}, [@Inhabited a0_0] → a0_0))
+  it2  Gap.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
 λ> :set synth-engine djinn
 synth engine: djinn
 λ> :synth ((∀ x : Type, x → x) → Demo.Token)
@@ -53,18 +49,13 @@ synth engine: exference
   it1  fun f => f _ (Demo.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0)))
   it2  fun f => f _ (f _ (Demo.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))))
   it3  fun f => f _ (f _ (f _ (Demo.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0)))))
-  it4  fun f => f _ (f _ (f _ (f _ (Demo.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))))))
-note: search truncated: step limit reached, queue limit pruned 13610
+note: search truncated: candidate limit reached (60)
 λ> :set synth-engine both
 synth engine: both
 λ> :synth ((∀ x : Type, x → x) → Demo.Token)
   it1  fun _ => Demo.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
   it2  fun f => f _ (Demo.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0)))
-  it3  fun f => f _ (f _ (Demo.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))))
-  it4  fun f => f _ (f _ (f _ (Demo.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0)))))
-  it5  fun f => f _ (f _ (f _ (f _ (Demo.polyGlobal («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))))))
 note: search truncated: candidate limit reached (60)
-note: exference: search truncated: step limit reached, queue limit pruned 8506
 λ> :set synth-engine djinn
 synth engine: djinn
 λ> :synth ((∀ x : Type, x → x) → ({a : Type 1} → Demo.Token) → Demo.Token)
@@ -75,9 +66,7 @@ synth engine: exference
   it1  fun f x => f _ (@x (∀ (a0_0 : Type _), a0_0 → a0_0))
   it2  fun f x => f _ (f _ (@x (∀ (a0_0 : Type _), a0_0 → a0_0)))
   it3  fun f x => f _ (f _ (f _ (@x (∀ (a0_0 : Type _), a0_0 → a0_0))))
-  it4  fun f x => f _ (f _ (f _ (f _ (@x (∀ (a0_0 : Type _), a0_0 → a0_0)))))
-  it5  fun f x => f _ (f _ (f _ (f _ (f _ (@x (∀ (a0_0 : Type _), a0_0 → a0_0))))))
-note: search truncated: step limit reached, queue limit pruned 7371
+note: search truncated: step limit reached, queue limit pruned 7968
 λ> :set synth-engine both
 synth engine: both
 λ> :synth ((∀ x : Type, x → x) → ({a : Type 1} → Demo.Token) → Demo.Token)
@@ -86,5 +75,5 @@ synth engine: both
   it3  fun f x => f _ (f _ (@x (∀ (a0_0 : Type _), a0_0 → a0_0)))
   it4  fun f x => f _ (f _ (f _ (@x (∀ (a0_0 : Type _), a0_0 → a0_0))))
   it5  fun f x => f _ (f _ (f _ (f _ (@x (∀ (a0_0 : Type _), a0_0 → a0_0)))))
-note: exference: search truncated: step limit reached, queue limit pruned 7371
+note: exference: search truncated: step limit reached, queue limit pruned 7968
 λ> :quit

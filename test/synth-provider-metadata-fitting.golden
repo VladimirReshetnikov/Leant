@@ -34,6 +34,4 @@ note: search truncated: step limit reached
 synth engine: both
 λ> :synth MetadataFitting.Marker (∀ (A : Type), A → A)
   it1  MetadataFitting.make (fun _ x => x)
-  it2  MetadataFitting.make («a» := (∀ (a0_0 : Type _), a0_0 → a0_0)) (fun _ x => x)
-note: exference: search truncated: step limit reached
 λ> :quit

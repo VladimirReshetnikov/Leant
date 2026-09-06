@@ -15,14 +15,10 @@ synth engine: exference
 λ> :synth ProviderLambda.Result
 preparing synthesis environment (session imports + Lean)...
   it1  ProviderLambda.consume (fun _ x => x)
-  it2  match Sum.inl (ProviderLambda.consume (fun _ x => x)) with | .inl a => a | .inr b => b
-  it3  match Sum.inr (ProviderLambda.consume (fun _ x => x)) with | .inl a => a | .inr b => b
 note: search truncated: step limit reached
 λ> :set synth-engine both
 synth engine: both
 λ> :synth ProviderLambda.Result
   it1  ProviderLambda.consume (fun _ x => x)
-  it2  match Sum.inl (ProviderLambda.consume (fun _ x => x)) with | .inl a => a | .inr b => b
-  it3  match Sum.inr (ProviderLambda.consume (fun _ x => x)) with | .inl a => a | .inr b => b
 note: exference: search truncated: step limit reached
 λ> :quit

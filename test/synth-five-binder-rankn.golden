@@ -27,8 +27,7 @@ synth steps: 128
 synth engine: exference
 λ> :synth FiveBinder.Token
   it1  FiveBinder.chosen («one» := (∀ (a0_0 : Type _), a0_0 → a0_0)) («two» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0)) («three» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0)) («four» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («five» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0))
-  it2  match Sum.inl (FiveBinder.chosen («one» := (∀ (a0_0 : Type _), a0_0 → a0_0)) («two» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0)) («three» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0)) («four» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («five» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0))) with | .inl a => a | .inr b => b
-note: search truncated: step limit reached, queue limit pruned <machine-dependent>
+note: search truncated: step limit reached, queue limit pruned 747
 λ> :synth (∀ A B C D E : Type, (∀ a b c d e : Type, FiveBinder.Five a b c d e) → FiveBinder.Five E D C B A)
   it1  fun _ _ _ _ _ x => x _ _ _ _ _
 note: search truncated: step limit reached
@@ -36,9 +35,6 @@ note: search truncated: step limit reached
 synth engine: both
 λ> :synth FiveBinder.Token
   it1  FiveBinder.chosen («one» := (∀ (a0_0 : Type _), a0_0 → a0_0)) («two» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0)) («three» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0)) («four» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («five» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0))
-  it2  match Sum.inl (FiveBinder.chosen («one» := (∀ (a0_0 : Type _), a0_0 → a0_0)) («two» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0)) («three» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0)) («four» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («five» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0))) with | .inl a => a | .inr b => b
-  it3  match Sum.inr (FiveBinder.chosen («one» := (∀ (a0_0 : Type _), a0_0 → a0_0)) («two» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0)) («three» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0)) («four» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0)) («five» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0 → a0_0 → a0_0 → a0_0))) with | .inl a => a | .inr b => b
-note: exference: search truncated: step limit reached
 λ> :synth (∀ A B C D E : Type, (∀ a b c d e : Type, FiveBinder.Five a b c d e) → FiveBinder.Five E D C B A)
   it1  fun _ _ _ _ _ x => x _ _ _ _ _
 note: exference: search truncated: step limit reached

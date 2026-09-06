@@ -43,19 +43,12 @@ preparing synthesis environment (session imports + Lean)...
   it2  fun _ => Demo.sealedBox (fun _ x => x)
 λ> :synth (Demo.Input Demo.Index → Demo.Output Demo.Index)
   it1  fun x => Demo.consume (Demo.produce x)
-note: search truncated: candidate limit reached (60)
 λ> :set synth-engine both
 synth engine: both
 λ> :synth (Demo.Input Demo.Index → Demo.Output Demo.Index)
   it1  fun x => Demo.consume (Demo.produce x)
-note: search truncated: candidate limit reached (60)
 λ> :synth (Demo.Seed → Demo.SealedBox Demo.Seed)
   it1  Demo.sealedBox
-  it2  fun x => match Sum.inl x with | .inl a => Demo.sealedBox a | .inr b => b
-  it3  fun x => match Sum.inr x with | .inl a => a | .inr b => Demo.sealedBox b
-  it4  fun x => Demo.sealedBox (match Sum.inl x with | .inl a => a | .inr b => b)
-  it5  fun x => Demo.sealedBox (match Sum.inr x with | .inl a => a | .inr b => b)
-note: exference: search truncated: step limit reached, queue limit pruned <machine-dependent>
 λ>
 λ> :set synth-steps 1024
 synth steps: 1024
@@ -63,11 +56,7 @@ synth steps: 1024
 synth engine: exference
 λ> :synth (Nat → Demo.Token)
   it1  fun x => match x with | .zero => Demo.global («a» := Nat) | .succ _ => Demo.global («a» := Nat)
-  it2  fun x => match x with | Nat.zero => Demo.global («a» := Nat) | Nat.succ y => (match Nat.succ y with | Nat.zero => Demo.global («a» := Nat) | Nat.succ _ => Demo.global («a» := Nat))
-  it3  fun x => match x with | Nat.zero => (match Sum.inr x with | .inl a => a | .inr _ => Demo.global («a» := Nat)) | Nat.succ _ => Demo.global («a» := Nat)
-  it4  fun x => match x with | Nat.zero => (match Nat.succ x with | Nat.zero => Demo.global («a» := Nat) | Nat.succ _ => Demo.global («a» := Nat)) | Nat.succ _ => Demo.global («a» := Nat)
-  it5  fun x => match x with | Nat.zero => Demo.global («a» := Nat) | Nat.succ _ => (match Nat.succ x with | Nat.zero => Demo.global («a» := Nat) | Nat.succ _ => Demo.global («a» := Nat))
-note: search truncated: step limit reached, queue limit pruned <machine-dependent>
+note: search truncated: step limit reached, queue limit pruned 48947
 λ> :set synth-engine djinn
 synth engine: djinn
 λ> :synth (Nat → Demo.Token)
@@ -76,9 +65,4 @@ synth engine: djinn
 synth engine: both
 λ> :synth (Nat → Demo.Token)
   it1  fun _ => Demo.global («a» := Nat)
-  it2  fun x => match x with | .zero => Demo.global («a» := Nat) | .succ _ => Demo.global («a» := Nat)
-  it3  fun x => match x with | Nat.zero => Demo.global («a» := Nat) | Nat.succ y => (match Nat.succ y with | Nat.zero => Demo.global («a» := Nat) | Nat.succ _ => Demo.global («a» := Nat))
-  it4  fun x => match x with | Nat.zero => (match Sum.inr x with | .inl a => a | .inr _ => Demo.global («a» := Nat)) | Nat.succ _ => Demo.global («a» := Nat)
-  it5  fun x => match x with | Nat.zero => (match Nat.succ x with | Nat.zero => Demo.global («a» := Nat) | Nat.succ _ => Demo.global («a» := Nat)) | Nat.succ _ => Demo.global («a» := Nat)
-note: exference: search truncated: step limit reached, queue limit pruned <machine-dependent>
 λ> :quit

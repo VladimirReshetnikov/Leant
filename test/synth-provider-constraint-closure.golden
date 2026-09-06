@@ -24,9 +24,7 @@ preparing synthesis environment (session imports + Lean)...
 synth engine: exference
 λ> :synth ClosureGood.Token
   it1  ClosureGood.global («a» := (∀ (a0_0 : Type _), a0_0 → a0_0)) («b» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0))
-  it2  match Sum.inl (ClosureGood.global («a» := (∀ (a0_0 : Type _), a0_0 → a0_0)) («b» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0))) with | .inl a => a | .inr b => b
-  it3  match Sum.inr (ClosureGood.global («a» := (∀ (a0_0 : Type _), a0_0 → a0_0)) («b» := (∀ (a0_0 : Type _), a0_0 → a0_0 → a0_0))) with | .inl a => a | .inr b => b
-note: search truncated: step limit reached, queue limit pruned 6556
+note: search truncated: step limit reached, queue limit pruned 6780
 λ> :reset
 session reset
 λ>
@@ -50,9 +48,7 @@ preparing synthesis environment (session imports + Lean)...
 synth engine: exference
 λ> :synth ClosureSubgoal.Token
   it1  ClosureSubgoal.global («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))
-  it2  match Sum.inl (ClosureSubgoal.global («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))) with | .inl a => a | .inr b => b
-  it3  match Sum.inr (ClosureSubgoal.global («a» := (∀ (a0_0 : Type _), a0_0 → a0_0))) with | .inl a => a | .inr b => b
-note: search truncated: step limit reached, queue limit pruned 6556
+note: search truncated: step limit reached, queue limit pruned 6451
 λ> :reset
 session reset
 λ>
@@ -98,7 +94,5 @@ preparing synthesis environment (session imports + Lean)...
 synth engine: exference
 λ> :synth ClosureControl.Token
   it1  ClosureControl.global («a» := (∀ (a0_0 : Type _), (a0_0 → a0_0) → a0_0 → a0_0)) («b» := (∀ (a0_0 : Type _), (a0_0 → a0_0 → a0_0) → a0_0 → a0_0))
-  it2  match Sum.inl (ClosureControl.global («a» := (∀ (a0_0 : Type _), (a0_0 → a0_0) → a0_0 → a0_0)) («b» := (∀ (a0_0 : Type _), (a0_0 → a0_0 → a0_0) → a0_0 → a0_0))) with | .inl a => a | .inr b => b
-  it3  match Sum.inr (ClosureControl.global («a» := (∀ (a0_0 : Type _), (a0_0 → a0_0) → a0_0 → a0_0)) («b» := (∀ (a0_0 : Type _), (a0_0 → a0_0 → a0_0) → a0_0 → a0_0))) with | .inl a => a | .inr b => b
-note: search truncated: step limit reached, queue limit pruned 6556
+note: search truncated: step limit reached, queue limit pruned 6780
 λ> :quit

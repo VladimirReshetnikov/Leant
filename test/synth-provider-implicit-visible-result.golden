@@ -32,21 +32,17 @@ preparing synthesis environment (session imports + Lean)...
 synth engine: exference
 λ> :synth ImplicitVisible.Token
   it1  ImplicitVisible.token («a» := (∀ {a0_0 : Prop} (a0_1 : Type _), a0_0 → a0_1 → (ImplicitVisible.Result)))
-  it2  match Sum.inl (ImplicitVisible.token («a» := (∀ {a0_0 : Prop} (a0_1 : Type _), a0_0 → a0_1 → (ImplicitVisible.Result)))) with | .inl a => a | .inr b => b
-note: search truncated: step limit reached, queue limit pruned 26211
+note: search truncated: step limit reached, queue limit pruned 28147
 λ> :synth ∀ (P : Prop), P → ImplicitVisible.Source → ImplicitVisible.Result
   it1  fun _ x y => let ⟨f, z⟩ := ImplicitVisible.box («a» := (∀ {a0_0 : Prop} (a0_1 : Type _), a0_0 → a0_1 → (ImplicitVisible.Result))); let w := z; match w with | _ => f _ x y
-note: search truncated: step limit reached, queue limit pruned 20672
+note: search truncated: candidate limit reached (60)
 λ> :set synth-engine both
 synth engine: both
 λ> :synth ImplicitVisible.Token
   it1  ImplicitVisible.token («a» := (∀ {a0_0 : Prop} (a0_1 : Type _), a0_0 → a0_1 → (ImplicitVisible.Result)))
-  it2  match Sum.inl (ImplicitVisible.token («a» := (∀ {a0_0 : Prop} (a0_1 : Type _), a0_0 → a0_1 → (ImplicitVisible.Result)))) with | .inl a => a | .inr b => b
-  it3  match Sum.inr (ImplicitVisible.token («a» := (∀ {a0_0 : Prop} (a0_1 : Type _), a0_0 → a0_1 → (ImplicitVisible.Result)))) with | .inl a => a | .inr b => b
-note: exference: search truncated: step limit reached, queue limit pruned 13547
 λ> :synth ∀ (P : Prop), P → ImplicitVisible.Source → ImplicitVisible.Result
   it1  fun _ x y => let ⟨f, z⟩ := ImplicitVisible.box («a» := (∀ {a0_0 : Prop} (a0_1 : Type _), a0_0 → a0_1 → (ImplicitVisible.Result))); let w := z; match w with | _ => f _ x y
-note: exference: search truncated: step limit reached, queue limit pruned 14153
+note: exference: search truncated: candidate limit reached (60)
 λ>
 λ> namespace DomainCollision
 λ>
@@ -76,19 +72,12 @@ synth engine: djinn
 λ> :set synth-engine exference
 synth engine: exference
 λ> :synth DomainCollision.Box (∀ {P : Prop} (A : Type), (P → A) → DomainCollision.Result)
-  it1  DomainCollision.selected («a» := (∀ {a0_0 : Prop} (a0_1 : Type _), (a0_0 → a0_1) → (DomainCollision.Result)))
-  it2  DomainCollision.selected
-  it3  match Sum.inr (DomainCollision.selected («a» := (∀ {a0_0 : Prop} (a0_1 : Type _), (a0_0 → a0_1) → (DomainCollision.Result)))) with | .inl a => a | .inr b => b
-  it4  match Sum.inr DomainCollision.selected with | .inl a => a | .inr b => b
-  it5  match Sum.inl DomainCollision.selected with | .inl a => a | .inr b => b
-note: search truncated: step limit reached, queue limit pruned 22296
+  it1  DomainCollision.selected
+  it2  DomainCollision.selected («a» := (∀ {a0_0 : Prop} (a0_1 : Type _), (a0_0 → a0_1) → (DomainCollision.Result)))
+note: search truncated: step limit reached, queue limit pruned 23123
 λ> :set synth-engine both
 synth engine: both
 λ> :synth DomainCollision.Box (∀ {P : Prop} (A : Type), (P → A) → DomainCollision.Result)
   it1  DomainCollision.selected
   it2  DomainCollision.selected («a» := (∀ {a0_0 : Prop} (a0_1 : Type _), (a0_0 → a0_1) → (DomainCollision.Result)))
-  it3  match Sum.inr DomainCollision.selected with | .inl a => a | .inr b => b
-  it4  match Sum.inr (DomainCollision.selected («a» := (∀ {a0_0 : Prop} (a0_1 : Type _), (a0_0 → a0_1) → (DomainCollision.Result)))) with | .inl a => a | .inr b => b
-  it5  match Sum.inl DomainCollision.selected with | .inl a => a | .inr b => b
-note: exference: search truncated: step limit reached, queue limit pruned 12646
 λ> :quit

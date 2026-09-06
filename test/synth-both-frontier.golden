@@ -26,6 +26,4 @@ synth steps: 1
 λ> :synth (Demo.A1 → Demo.A2 → Demo.A3 → Demo.A4 → Demo.A5 → Demo.A6 → Demo.A7 → Demo.Good → Demo.Token)
 preparing synthesis environment (session imports + Lean)...
   it1  fun x y z w x1 x2 x3 x4 => match x with | ⟨⟩ => (match y with | ⟨⟩ => (match z with | ⟨⟩ => (match w with | ⟨⟩ => (match x1 with | ⟨⟩ => (match x2 with | ⟨⟩ => (match x3 with | ⟨⟩ => (match x4 with | ⟨⟩ => Demo.global («a» := Demo.Good))))))))
-note: search truncated: candidate limit reached (60)
-note: exference: search truncated: step limit reached
 λ> :quit

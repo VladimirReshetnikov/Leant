@@ -21,31 +21,21 @@ synth engine: exference
 λ> :synth ((∀ a : Type 1, Option a) → Option (∀ b : Type, b → b))
 preparing synthesis environment (session imports + Lean)...
   it1  fun x => x _
-  it2  fun x => match Sum.inr (x _) with | .inl a => a | .inr b => b
-  it3  fun x => match Sum.inr (x _) with | .inl a => Option.some a | .inr b => b
-  it4  fun x => match Sum.inl (x _) with | .inl a => a | .inr b => b
-  it5  fun x => match Sum.inl (x _) with | .inl a => a | .inr b => Option.some b
-note: search truncated: step limit reached, queue limit pruned 27140
+note: search truncated: step limit reached, queue limit pruned 28179
 λ> :synth ((∀ a b : Type 1, Demo.Phantom2 a b) → Demo.Phantom2 (∀ x : Type, x → x) (∀ y : Type, y → y))
   it1  fun x => x _ _
-  it2  fun x => match Sum.inr (x _ _) with | .inl a => a | .inr b => b
-  it3  fun x => match Sum.inl (x _ _) with | .inl a => a | .inr b => b
-note: search truncated: step limit reached, queue limit pruned 25137
+note: search truncated: step limit reached, queue limit pruned 25619
 λ> :synth ((∀ a : Type 1, Demo.Guard a) → Demo.Guard (∀ b : Type, b → b))
   it1  fun x => x _
   it2  fun x => match Sum.inr (x _) with | .inl a => a | .inr b => b
   it3  fun x => match Sum.inl (x _) with | .inl a => a | .inr b => b
-note: search truncated: step limit reached, queue limit pruned 26798
+note: search truncated: step limit reached, queue limit pruned 26513
 λ> :synth Demo.Secret
   it1  Demo.secretValue
-  it2  match Sum.inl Demo.secretValue with | .inl a => a | .inr b => b
-  it3  match Sum.inr Demo.secretValue with | .inl a => a | .inr b => b
-note: search truncated: step limit reached, queue limit pruned 48982
+note: search truncated: step limit reached, queue limit pruned 50506
 λ> :synth (Unit → Demo.Secret)
   it1  fun x => let y := x; match y with | _ => Demo.secretValue
-  it2  fun x => let y := x; match y with | _ => (match Sum.inr Demo.secretValue with | .inl a => a | .inr b => b)
-  it3  fun x => let y := x; match y with | _ => (match Sum.inl Demo.secretValue with | .inl a => a | .inr b => b)
-note: search truncated: step limit reached, queue limit pruned 46362
+note: search truncated: step limit reached, queue limit pruned 52351
 λ> :set synth-engine djinn
 synth engine: djinn
 λ> :synth ((∀ a : Type 1, Option a) → Option (∀ b : Type, b → b))

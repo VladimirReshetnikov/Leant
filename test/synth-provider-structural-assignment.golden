@@ -64,28 +64,23 @@ note: search truncated: candidate limit reached (60)
 λ> :set synth-engine exference
 synth engine: exference
 λ> :synth StructuralDirect.Goal
-  it1  fun x y => let _ := x; match y with | .inl _ => StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType))) x y | .inr _ => StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType))) x y
-  it2  fun x y => let ⟨z, _⟩ := x; match y with | .inl _ => StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType))) x y | .inr _ => StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType))) x (.inl z)
-  it3  fun x y => let _ := x; match y with | .inl _ => StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType))) x y | .inr z => StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType))) x (.inr z)
-  it4  fun x y => let ⟨_, z⟩ := x; match y with | .inl _ => StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType))) x y | .inr _ => StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType))) x (.inr z)
-  it5  fun x y => let _ := x; match y with | .inl z => StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType))) x (.inl z) | .inr _ => StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType))) x y
-note: search truncated: step limit reached, queue limit pruned 46332
+  it1  fun x y => let _ := x; match y with | .inl _ => StructuralDirect.consume x y | .inr _ => StructuralDirect.consume x y
+  it2  fun x y => let _ := x; match y with | .inl _ => StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType))) x y | .inr _ => StructuralDirect.consume x y
+  it3  fun x y => let ⟨z, w⟩ := x; match y with | .inl _ => StructuralDirect.consume x y | .inr _ => StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType))) ⟨z, w⟩ y
+  it4  fun x y => let ⟨z, _⟩ := x; match y with | .inl _ => StructuralDirect.consume x y | .inr w => StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType))) ⟨z, w⟩ y
+  it5  fun x y => let ⟨_, z⟩ := x; match y with | .inl _ => StructuralDirect.consume x y | .inr _ => StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType))) x (.inr z)
+note: search truncated: step limit reached, queue limit pruned 46636
 λ> :synth StructuralContext.Token
   it1  StructuralContext.choose («selected» := (∀ {a0_0 : Type _}, [@StructuralContext.Binary Prod] → [@StructuralContext.Unary (Sum (StructuralContext.Fixed))] → a0_0 → a0_0))
-note: search truncated: step limit reached, queue limit pruned 17029
+note: search truncated: step limit reached, queue limit pruned 20228
 λ> :set synth-engine both
 synth engine: both
 λ> :synth StructuralDirect.Goal
   it1  StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType)))
   it2  fun ⟨x, y⟩ => StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType))) ⟨x, y⟩
-  it3  fun x y => let _ := x; match y with | .inl _ => StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType))) x y | .inr _ => StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType))) x y
-  it4  fun x y => let _ := x; match y with | .inl _ => StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType))) x y | .inr z => StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType))) x (.inr z)
-  it5  fun x y => let ⟨_, z⟩ := x; match y with | .inl _ => StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType))) x y | .inr _ => StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType))) x (.inr z)
+  it3  fun ⟨x, y⟩ _ => StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType))) ⟨x, y⟩ (.inl x)
+  it4  fun ⟨x, y⟩ _ => StructuralDirect.consume («F» := Prod) («G» := (Sum (StructuralDirect.LeftType))) ⟨x, y⟩ (.inr y)
 note: search truncated: candidate limit reached (60)
-note: exference: search truncated: step limit reached, queue limit pruned 7774
 λ> :synth StructuralContext.Token
   it1  StructuralContext.choose («selected» := (∀ {a0_0 : Type _}, [@StructuralContext.Binary Prod] → [@StructuralContext.Unary (Sum (StructuralContext.Fixed))] → a0_0 → a0_0))
-  it2  match Sum.inl (StructuralContext.choose («selected» := (∀ {a0_0 : Type _}, [@StructuralContext.Binary Prod] → [@StructuralContext.Unary (Sum (StructuralContext.Fixed))] → a0_0 → a0_0))) with | .inl a => a | .inr b => b
-  it3  match Sum.inr (StructuralContext.choose («selected» := (∀ {a0_0 : Type _}, [@StructuralContext.Binary Prod] → [@StructuralContext.Unary (Sum (StructuralContext.Fixed))] → a0_0 → a0_0))) with | .inl a => a | .inr b => b
-note: exference: search truncated: step limit reached, queue limit pruned 6556
 λ> :quit
