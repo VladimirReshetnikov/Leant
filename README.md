@@ -76,8 +76,8 @@ Companion documents:
   `:synth f : TYPE where PROP` entrance, exact candidate checks, and bounded
   Djinn search for reusable higher-order compositions;
 - **[Next synthesis priorities](lib/Djex/docs/reports/2026-09-06-synthesis-next-priorities.md)**
-  — recursive-data cases, contextual evidence, broader behavioral specifications,
-  and the separate native Windows Length work;
+  — source-aware Haskell elaboration, recursive-data cases, contextual evidence,
+  broader behavioral specifications, and the separate native Windows Length work;
 - **[docs/synth-internals.md](docs/synth-internals.md)** — the design
   boundaries and dated-report index behind `:synth`;
 - **[Lean from First Principles](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Lean_from_First_Principles/Lean_from_First_Principles.pdf)**
@@ -465,6 +465,10 @@ unobserved. Djinn's named queries use deterministic discovery order; ordinary
 queries retain their existing batch ranking. The
 [behavioral guide](docs/behavioral-synthesis.md#validation-status) explains
 the streaming and evidence boundaries.
+The [streaming acceptance report](lib/Djex/docs/reports/2026-09-06-djinn-behavioral-streaming.md)
+records all six behavioral operations in Djinn, Exference, and Both, independent
+kernel replay, 615 current Leant tests, and live quota and deadline-retention
+controls. Its paired measurements distinguish query latency from cold startup.
 
 Explicit `synth-djinn-strategy interleave` adds reusable normal-form term
 alternatives and resumable plan scheduling under the configured budgets. The
@@ -476,12 +480,12 @@ scope, and source-instantiation checks. The ordinary strategy remains
 All six Church operations (`not`, `swap`, `map`, `append`, `reverse`, and
 `filter`) passed their finite assertions under each Lean engine mode: **18
 exact synthesized terms**, independently kernel-replayed with their assertion
-proofs and empty axiom inventories. The [current acceptance table](docs/behavioral-synthesis.md#current-lean-six-operation-acceptance)
+proofs and empty axiom inventories. The [current acceptance record](docs/behavioral-synthesis.md#current-djinn-streaming-acceptance)
 records the distinct engine budgets, rejection controls, and executable-pinned
 receipts; these finite checks do not establish universal behavioral equivalence.
 Together with the 12 Haskell cells, this closes the **30-cell behavioral corpus**.
-The fresh Leant unit suite also passed **600/600 tests** serially; the
-[final validation receipt](test-church/receipts/behavior-validation-final.json)
+The current Leant unit suite also passed **615/615 tests** serially; the
+[paired validation receipt](lib/Djex/test-church/receipts/behavior-streaming-final.json)
 keeps that aggregate evidence separate from synthesis and kernel replay.
 
 This checks the assertion as written: finite examples do not establish a

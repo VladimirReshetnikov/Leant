@@ -110,6 +110,16 @@ the selected group. Failure in such a context cannot establish noninhabitation.
 Every resulting proof still passes the original plan's proof and scope checks
 before conversion, followed by Lean's exact type and behavioral checks.
 
+Named Djinn queries give historical plans, exact-result specializations, and
+other carrier plans separate FIFO turns. Each turn ends after a raw proof or
+64 charged choices; adding plans in one family cannot dilute another family's
+turn frequency. Focused carrier plans ending at the demanded result give the
+increasing-size normal-form branch a larger finite turn. A singleton bridge
+also stays available when several quantified inputs can reuse the same exact
+specialization. The original batch schedule remains in place for unnamed
+queries. The [streaming implementation report](../lib/Djex/docs/reports/2026-09-06-djinn-behavioral-streaming.md)
+records the scheduling rules and acceptance evidence.
+
 ## Six-operation Church corpus
 
 The shared specification in
@@ -231,7 +241,38 @@ unnamed synthesis retains its existing finite-pool selection policy. Search
 errors and completion evidence are reported only when their observation is
 reached; a passing prefix is not a claim that the search finished.
 
-### Current Lean six-operation acceptance
+### Current Djinn streaming acceptance
+
+The final streaming executable, SHA-256
+`9a55eb231c5dd6608eb6750e87a5f05e2dad76cae98e20be197d2e9cf5d94424`,
+passed all 18 Lean behavioral cells at unchanged per-engine limits. Each of
+Djinn, Exference, and Both passed six operations, 626 finite observations, an
+actual false-predicate control, and independent exact-term kernel replay with
+45 empty axiom inventories. All accepted spellings matched the frozen baseline.
+The strict build and all 615 Leant tests passed with canonical Djex source
+revision `6a964389`; later documentation-only vendor updates retain that tested
+implementation.
+
+Separate live controls passed ten quota/inconclusive queries and both
+ten-second deadline-retention cases. Djinn retained 75 accepted results below
+quota 256; Both retained one below quota two. Both sessions then recovered.
+Including warmup and recovery, the three control runs independently replayed
+89 retained candidate occurrences with 180 empty axiom inventories. The opaque
+assertion control established semantic inconclusiveness through separate
+preflight and positive/negative decision attempts. Both-mode acceptance does
+not assert that both constituent engines independently reached every outcome.
+
+The [paired compact receipt](../lib/Djex/test-church/receipts/behavior-streaming-final.json)
+pins the five Haskell/Lean profiles, build/source associations, full affected
+unit suites, and live controls. The
+[implementation and measurement report](../lib/Djex/docs/reports/2026-09-06-djinn-behavioral-streaming.md)
+explains the initial deadline regression and repair. Djinn's median
+query-to-result visibility improved from 30.752 to 7.497 seconds, but its first
+cold result remained near 94 seconds from process entry. Exference and Both
+had higher medians in these single-run controls; no general cross-engine
+speedup is claimed.
+
+### Earlier source-evidence six-operation acceptance
 
 The executable with SHA-256
 `baa4fb4ce1cc27f49900f0ded27f4b64468d00b29b57bbc3bc2e204ef1ff408a`,
@@ -282,7 +323,7 @@ sources and reparsed the captures before accepting the compact projections; it
 was not another live or kernel run. These new Lean receipts do not repeat the
 earlier streaming or quota claims below.
 
-### Unit and cross-language closure
+### Earlier unit and cross-language closure
 
 The fresh complete Leant unit suite passed **600/600 tests** serially (`-j1`)
 in 308.18 seconds, with process exit 0 after 308.41 seconds. The
