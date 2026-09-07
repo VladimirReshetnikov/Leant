@@ -1,0 +1,541 @@
+{
+  "status": "passed",
+  "runner_sha256": "ebb3e47a3eb5d1e7d4fda08ba90a7fbb7309525df071006481d0fdc06c2d8865",
+  "commands_sha256": "3845d1eb0ab288bdbda6be0c9abe08ce767a021bd34f7b375cb118baa9229584",
+  "cases": [
+    {
+      "engine": "djinn",
+      "operation": "null",
+      "name": "recursive_djinn_null",
+      "type": "{α : Type} → List α → Bool",
+      "predicate": "{f} ([] : List Nat) = true ∧ {f} [11] = false ∧ {f} [true, false] = false",
+      "command": ":synth recursive_djinn_null : {α : Type} → List α → Bool where recursive_djinn_null ([] : List Nat) = true ∧ recursive_djinn_null [11] = false ∧ recursive_djinn_null [true, false] = false",
+      "expected": "candidate"
+    },
+    {
+      "engine": "djinn",
+      "operation": "headOr",
+      "name": "recursive_djinn_headOr",
+      "type": "{α : Type} → α → List α → α",
+      "predicate": "{f} 91 ([] : List Nat) = 91 ∧ {f} 91 [11, 29] = 11 ∧ {f} false [true] = true",
+      "command": ":synth recursive_djinn_headOr : {α : Type} → α → List α → α where recursive_djinn_headOr 91 ([] : List Nat) = 91 ∧ recursive_djinn_headOr 91 [11, 29] = 11 ∧ recursive_djinn_headOr false [true] = true",
+      "expected": "candidate"
+    },
+    {
+      "engine": "djinn",
+      "operation": "tailOr",
+      "name": "recursive_djinn_tailOr",
+      "type": "{α : Type} → List α → List α → List α",
+      "predicate": "{f} [91] ([] : List Nat) = [91] ∧ {f} [91] [11] = [] ∧ {f} [91] [11, 29, 37] = [29, 37] ∧ {f} [false] [true, true] = [true]",
+      "command": ":synth recursive_djinn_tailOr : {α : Type} → List α → List α → List α where recursive_djinn_tailOr [91] ([] : List Nat) = [91] ∧ recursive_djinn_tailOr [91] [11] = [] ∧ recursive_djinn_tailOr [91] [11, 29, 37] = [29, 37] ∧ recursive_djinn_tailOr [false] [true, true] = [true]",
+      "expected": "candidate"
+    },
+    {
+      "engine": "djinn",
+      "operation": "tree",
+      "name": "recursive_djinn_tree",
+      "type": "{α : Type} → α → RecursiveCases.Tree α → α",
+      "predicate": "{f} 91 (.leaf 11) = 11 ∧ {f} 91 (.branch (.leaf 11) (.leaf 29)) = 91 ∧ {f} false (.leaf true) = true",
+      "command": ":synth recursive_djinn_tree : {α : Type} → α → RecursiveCases.Tree α → α where recursive_djinn_tree 91 (.leaf 11) = 11 ∧ recursive_djinn_tree 91 (.branch (.leaf 11) (.leaf 29)) = 91 ∧ recursive_djinn_tree false (.leaf true) = true",
+      "expected": "candidate"
+    },
+    {
+      "engine": "djinn",
+      "operation": "alias",
+      "name": "recursive_djinn_alias",
+      "type": "{α : Type} → α → RecursiveCases.Sequence α → α",
+      "predicate": "{f} 91 ([] : List Nat) = 91 ∧ {f} 91 [11, 29] = 11 ∧ {f} false [true] = true",
+      "command": ":synth recursive_djinn_alias : {α : Type} → α → RecursiveCases.Sequence α → α where recursive_djinn_alias 91 ([] : List Nat) = 91 ∧ recursive_djinn_alias 91 [11, 29] = 11 ∧ recursive_djinn_alias false [true] = true",
+      "expected": "candidate"
+    },
+    {
+      "engine": "djinn",
+      "operation": "unconsOr",
+      "name": "recursive_djinn_unconsOr",
+      "type": "{α : Type} → α → List α → α × List α",
+      "predicate": "{f} 91 ([] : List Nat) = (91, []) ∧ {f} 91 [11, 29] = (11, [29]) ∧ {f} false [true, false] = (true, [false])",
+      "command": ":synth recursive_djinn_unconsOr : {α : Type} → α → List α → α × List α where recursive_djinn_unconsOr 91 ([] : List Nat) = (91, []) ∧ recursive_djinn_unconsOr 91 [11, 29] = (11, [29]) ∧ recursive_djinn_unconsOr false [true, false] = (true, [false])",
+      "expected": "candidate"
+    },
+    {
+      "engine": "djinn",
+      "operation": "tupleField",
+      "name": "recursive_djinn_tupleField",
+      "type": "{α : Type} → α → RecursiveCases.Payload α → α",
+      "predicate": "{f} 91 (.pairLeaf (11, 29)) = 11 ∧ {f} 91 (.next (.pairLeaf (11, 29))) = 91 ∧ {f} false (.pairLeaf (true, false)) = true",
+      "command": ":synth recursive_djinn_tupleField : {α : Type} → α → RecursiveCases.Payload α → α where recursive_djinn_tupleField 91 (.pairLeaf (11, 29)) = 11 ∧ recursive_djinn_tupleField 91 (.next (.pairLeaf (11, 29))) = 91 ∧ recursive_djinn_tupleField false (.pairLeaf (true, false)) = true",
+      "expected": "candidate"
+    },
+    {
+      "engine": "djinn",
+      "operation": "independent",
+      "name": "recursive_djinn_independent",
+      "type": "{α β : Type} → α → β → List α → List β → α × β",
+      "predicate": "{f} 91 false ([] : List Nat) [] = (91, false) ∧ {f} 91 false [11, 29] [true] = (11, true) ∧ {f} 91 false [] [true] = (91, true)",
+      "command": ":synth recursive_djinn_independent : {α β : Type} → α → β → List α → List β → α × β where recursive_djinn_independent 91 false ([] : List Nat) [] = (91, false) ∧ recursive_djinn_independent 91 false [11, 29] [true] = (11, true) ∧ recursive_djinn_independent 91 false [] [true] = (91, true)",
+      "expected": "candidate"
+    },
+    {
+      "engine": "djinn",
+      "operation": "reject_all",
+      "name": "recursive_djinn_reject_all",
+      "type": "Nat → Nat",
+      "predicate": "False",
+      "command": ":synth recursive_djinn_reject_all : Nat → Nat where False",
+      "expected": "no_candidate"
+    }
+  ],
+  "settings": {
+    "window": 1024,
+    "steps": 100000,
+    "budget": 100000,
+    "timeout": 90,
+    "process_timeout": 1200,
+    "strategy": "interleave"
+  },
+  "named_synthesis_providers": [],
+  "scope": "finite ordinary-data observations; explicit defaults; no recursion synthesis",
+  "source_hashes": {
+    "src\\Main.hs": "293d51484f2bdb5395594eb834c78378b1cfd7e8dbb4b2aa14c4b09cb19a7343",
+    "src\\Leant\\Synth\\Engine.hs": "3fd680a78ef212e5ff6c6193df8ecd60e5bcc09a3fe81619ffe50f5bd4799f19",
+    "src\\Leant\\Synth\\Behavioral.hs": "df5117bf817b765aa7bd8517e8f9f09b23b0d747d31a897f5d90c848f8b34da6",
+    "lib\\Djex\\djinn\\src-core\\Djinn\\Core.hs": "dd83580c9b7932907e0e7d202c3eaae544f68f00df957e80764f61681a9156ec",
+    "lib\\Djex\\djinn\\src-core\\Djinn\\Internal\\TypeFormula.hs": "09d240ea1b774cec054384df7e0435df9a20b62577880a2d4bda1bd80bda846a",
+    "lib\\Djex\\djinn\\src-core\\Djinn\\Internal\\LJT.hs": "970c2fa05a9cf8537de3a09076b14477986aa9e3cbf979bc280b176a07885ac2"
+  },
+  "executable": "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+  "executable_sha256": "055019752063173e7aa10fe1396c6c48576de60066a22fb86e76179e2932f127",
+  "results": [
+    {
+      "engine": "djinn",
+      "operation": "null",
+      "name": "recursive_djinn_null",
+      "type": "{α : Type} → List α → Bool",
+      "predicate": "{f} ([] : List Nat) = true ∧ {f} [11] = false ∧ {f} [true, false] = false",
+      "command": ":synth recursive_djinn_null : {α : Type} → List α → Bool where recursive_djinn_null ([] : List Nat) = true ∧ recursive_djinn_null [11] = false ∧ recursive_djinn_null [true, false] = false",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun x => (fun a => match a with | .nil => (.true) | .cons _ _ => (.false)) x",
+      "observations": {
+        "passed": 1,
+        "falsified": 6,
+        "inconclusive": 0
+      },
+      "output": "recursive_djinn_null : {α : Type} → List α → Bool where recursive_djinn_null ([] : List Nat) = true ∧ recursive_djinn_null [11] = false ∧ recursive_djinn_null [true, false] = false\npreparing synthesis environment (session imports + Lean)...\n  it1  fun x => (fun a => match a with | .nil => (.true) | .cons _ _ => (.false)) x\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 6 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "djinn",
+      "operation": "headOr",
+      "name": "recursive_djinn_headOr",
+      "type": "{α : Type} → α → List α → α",
+      "predicate": "{f} 91 ([] : List Nat) = 91 ∧ {f} 91 [11, 29] = 11 ∧ {f} false [true] = true",
+      "command": ":synth recursive_djinn_headOr : {α : Type} → α → List α → α where recursive_djinn_headOr 91 ([] : List Nat) = 91 ∧ recursive_djinn_headOr 91 [11, 29] = 11 ∧ recursive_djinn_headOr false [true] = true",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun x y => (fun a => match a with | .nil => x | .cons b _ => b) y",
+      "observations": {
+        "passed": 1,
+        "falsified": 1,
+        "inconclusive": 0
+      },
+      "output": "recursive_djinn_headOr : {α : Type} → α → List α → α where recursive_djinn_headOr 91 ([] : List Nat) = 91 ∧ recursive_djinn_headOr 91 [11, 29] = 11 ∧ recursive_djinn_headOr false [true] = true\n  it1  fun x y => (fun a => match a with | .nil => x | .cons b _ => b) y\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 1 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "djinn",
+      "operation": "tailOr",
+      "name": "recursive_djinn_tailOr",
+      "type": "{α : Type} → List α → List α → List α",
+      "predicate": "{f} [91] ([] : List Nat) = [91] ∧ {f} [91] [11] = [] ∧ {f} [91] [11, 29, 37] = [29, 37] ∧ {f} [false] [true, true] = [true]",
+      "command": ":synth recursive_djinn_tailOr : {α : Type} → List α → List α → List α where recursive_djinn_tailOr [91] ([] : List Nat) = [91] ∧ recursive_djinn_tailOr [91] [11] = [] ∧ recursive_djinn_tailOr [91] [11, 29, 37] = [29, 37] ∧ recursive_djinn_tailOr [false] [true, true] = [true]",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun x y => (fun a => match a with | .nil => x | .cons _ b => b) y",
+      "observations": {
+        "passed": 1,
+        "falsified": 7,
+        "inconclusive": 0
+      },
+      "output": "recursive_djinn_tailOr : {α : Type} → List α → List α → List α where recursive_djinn_tailOr [91] ([] : List Nat) = [91] ∧ recursive_djinn_tailOr [91] [11] = [] ∧ recursive_djinn_tailOr [91] [11, 29, 37] = [29, 37] ∧ recursive_djinn_tailOr [false] [true, true] = [true]\n  it1  fun x y => (fun a => match a with | .nil => x | .cons _ b => b) y\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 7 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "djinn",
+      "operation": "tree",
+      "name": "recursive_djinn_tree",
+      "type": "{α : Type} → α → RecursiveCases.Tree α → α",
+      "predicate": "{f} 91 (.leaf 11) = 11 ∧ {f} 91 (.branch (.leaf 11) (.leaf 29)) = 91 ∧ {f} false (.leaf true) = true",
+      "command": ":synth recursive_djinn_tree : {α : Type} → α → RecursiveCases.Tree α → α where recursive_djinn_tree 91 (.leaf 11) = 11 ∧ recursive_djinn_tree 91 (.branch (.leaf 11) (.leaf 29)) = 91 ∧ recursive_djinn_tree false (.leaf true) = true",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun x y => (fun a => match a with | .leaf b => b | .branch _ _ => x) y",
+      "observations": {
+        "passed": 1,
+        "falsified": 1,
+        "inconclusive": 0
+      },
+      "output": "recursive_djinn_tree : {α : Type} → α → RecursiveCases.Tree α → α where recursive_djinn_tree 91 (.leaf 11) = 11 ∧ recursive_djinn_tree 91 (.branch (.leaf 11) (.leaf 29)) = 91 ∧ recursive_djinn_tree false (.leaf true) = true\n  it1  fun x y => (fun a => match a with | .leaf b => b | .branch _ _ => x) y\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 1 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "djinn",
+      "operation": "alias",
+      "name": "recursive_djinn_alias",
+      "type": "{α : Type} → α → RecursiveCases.Sequence α → α",
+      "predicate": "{f} 91 ([] : List Nat) = 91 ∧ {f} 91 [11, 29] = 11 ∧ {f} false [true] = true",
+      "command": ":synth recursive_djinn_alias : {α : Type} → α → RecursiveCases.Sequence α → α where recursive_djinn_alias 91 ([] : List Nat) = 91 ∧ recursive_djinn_alias 91 [11, 29] = 11 ∧ recursive_djinn_alias false [true] = true",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun x y => (fun a => match a with | .nil => x | .cons b _ => b) y",
+      "observations": {
+        "passed": 1,
+        "falsified": 1,
+        "inconclusive": 0
+      },
+      "output": "recursive_djinn_alias : {α : Type} → α → RecursiveCases.Sequence α → α where recursive_djinn_alias 91 ([] : List Nat) = 91 ∧ recursive_djinn_alias 91 [11, 29] = 11 ∧ recursive_djinn_alias false [true] = true\n  it1  fun x y => (fun a => match a with | .nil => x | .cons b _ => b) y\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 1 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "djinn",
+      "operation": "unconsOr",
+      "name": "recursive_djinn_unconsOr",
+      "type": "{α : Type} → α → List α → α × List α",
+      "predicate": "{f} 91 ([] : List Nat) = (91, []) ∧ {f} 91 [11, 29] = (11, [29]) ∧ {f} false [true, false] = (true, [false])",
+      "command": ":synth recursive_djinn_unconsOr : {α : Type} → α → List α → α × List α where recursive_djinn_unconsOr 91 ([] : List Nat) = (91, []) ∧ recursive_djinn_unconsOr 91 [11, 29] = (11, [29]) ∧ recursive_djinn_unconsOr false [true, false] = (true, [false])",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun x y => ⟨(fun a => match a with | .nil => x | .cons b _ => b) y, (fun c => match c with | .nil => y | .cons _ d => d) y⟩",
+      "observations": {
+        "passed": 1,
+        "falsified": 14,
+        "inconclusive": 0
+      },
+      "output": "recursive_djinn_unconsOr : {α : Type} → α → List α → α × List α where recursive_djinn_unconsOr 91 ([] : List Nat) = (91, []) ∧ recursive_djinn_unconsOr 91 [11, 29] = (11, [29]) ∧ recursive_djinn_unconsOr false [true, false] = (true, [false])\n  it1  fun x y => ⟨(fun a => match a with | .nil => x | .cons b _ => b) y, (fun c => match c with | .nil => y | .cons _ d => d) y⟩\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 14 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "djinn",
+      "operation": "tupleField",
+      "name": "recursive_djinn_tupleField",
+      "type": "{α : Type} → α → RecursiveCases.Payload α → α",
+      "predicate": "{f} 91 (.pairLeaf (11, 29)) = 11 ∧ {f} 91 (.next (.pairLeaf (11, 29))) = 91 ∧ {f} false (.pairLeaf (true, false)) = true",
+      "command": ":synth recursive_djinn_tupleField : {α : Type} → α → RecursiveCases.Payload α → α where recursive_djinn_tupleField 91 (.pairLeaf (11, 29)) = 11 ∧ recursive_djinn_tupleField 91 (.next (.pairLeaf (11, 29))) = 91 ∧ recursive_djinn_tupleField false (.pairLeaf (true, false)) = true",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun x y => (fun a => match a with | .pairLeaf ⟨b, _⟩ => b | .next _ => x) y",
+      "observations": {
+        "passed": 1,
+        "falsified": 1,
+        "inconclusive": 0
+      },
+      "output": "recursive_djinn_tupleField : {α : Type} → α → RecursiveCases.Payload α → α where recursive_djinn_tupleField 91 (.pairLeaf (11, 29)) = 11 ∧ recursive_djinn_tupleField 91 (.next (.pairLeaf (11, 29))) = 91 ∧ recursive_djinn_tupleField false (.pairLeaf (true, false)) = true\n  it1  fun x y => (fun a => match a with | .pairLeaf ⟨b, _⟩ => b | .next _ => x) y\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 1 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "djinn",
+      "operation": "independent",
+      "name": "recursive_djinn_independent",
+      "type": "{α β : Type} → α → β → List α → List β → α × β",
+      "predicate": "{f} 91 false ([] : List Nat) [] = (91, false) ∧ {f} 91 false [11, 29] [true] = (11, true) ∧ {f} 91 false [] [true] = (91, true)",
+      "command": ":synth recursive_djinn_independent : {α β : Type} → α → β → List α → List β → α × β where recursive_djinn_independent 91 false ([] : List Nat) [] = (91, false) ∧ recursive_djinn_independent 91 false [11, 29] [true] = (11, true) ∧ recursive_djinn_independent 91 false [] [true] = (91, true)",
+      "expected": "candidate",
+      "status": "candidate",
+      "candidate": "fun x y z w => ⟨(fun a => match a with | .nil => x | .cons b _ => b) z, (fun c => match c with | .nil => y | .cons d _ => d) w⟩",
+      "observations": {
+        "passed": 1,
+        "falsified": 8,
+        "inconclusive": 0
+      },
+      "output": "recursive_djinn_independent : {α β : Type} → α → β → List α → List β → α × β where recursive_djinn_independent 91 false ([] : List Nat) [] = (91, false) ∧ recursive_djinn_independent 91 false [11, 29] [true] = (11, true) ∧ recursive_djinn_independent 91 false [] [true] = (91, true)\n  it1  fun x y z w => ⟨(fun a => match a with | .nil => x | .cons b _ => b) z, (fun c => match c with | .nil => y | .cons d _ => d) w⟩\nnote: search reported more batches to come\nsupplied behavioral assertion: 1 passed, 8 falsified, 0 inconclusive (checks concern only the supplied assertion)\n"
+    },
+    {
+      "engine": "djinn",
+      "operation": "reject_all",
+      "name": "recursive_djinn_reject_all",
+      "type": "Nat → Nat",
+      "predicate": "False",
+      "command": ":synth recursive_djinn_reject_all : Nat → Nat where False",
+      "expected": "no_candidate",
+      "status": "no_candidate",
+      "observations": {
+        "passed": 0,
+        "falsified": 87,
+        "inconclusive": 0
+      },
+      "output": "recursive_djinn_reject_all : Nat → Nat where False\nthe engine proposed 67 candidate(s) but none passed both Lean verification and the supplied assertion\nnote: search truncated: candidate limit reached (1024)\nsupplied behavioral assertion: 0 passed, 87 falsified, 0 inconclusive (checks concern only the supplied assertion)"
+    }
+  ],
+  "kernel_replays": [
+    {
+      "source_sha256": "31dc4cd5d9fa080e6c5d91bb5c95c604f8ea75ab35ea78853d34195ead81893e",
+      "case": "recursive_djinn_null",
+      "status": "passed",
+      "axiom_inventories": {
+        "RecursiveReplay.accepted": [],
+        "RecursiveReplay.accepted_passes": []
+      }
+    },
+    {
+      "source_sha256": "c2dc1a789d90a072fc81c42a4de0c6379a0cfd39932463d02cfc063a63e0651d",
+      "case": "recursive_djinn_headOr",
+      "status": "passed",
+      "axiom_inventories": {
+        "RecursiveReplay.accepted": [],
+        "RecursiveReplay.accepted_passes": []
+      }
+    },
+    {
+      "source_sha256": "2b77053e273fc55aa59cb699cc1adc2ef61bfe3624b5b15a8c23f4a01dac9b3e",
+      "case": "recursive_djinn_tailOr",
+      "status": "passed",
+      "axiom_inventories": {
+        "RecursiveReplay.accepted": [],
+        "RecursiveReplay.accepted_passes": []
+      }
+    },
+    {
+      "source_sha256": "b6b74a484c84e81c6a520be60f682e09e4c4d51ce33cfae5764843b5ba620898",
+      "case": "recursive_djinn_tree",
+      "status": "passed",
+      "axiom_inventories": {
+        "RecursiveReplay.accepted": [],
+        "RecursiveReplay.accepted_passes": []
+      }
+    },
+    {
+      "source_sha256": "76627ffaf4c4f7b70c997316e968a710dae6658f2dd2ca6234298a9979d79fab",
+      "case": "recursive_djinn_alias",
+      "status": "passed",
+      "axiom_inventories": {
+        "RecursiveReplay.accepted": [],
+        "RecursiveReplay.accepted_passes": []
+      }
+    },
+    {
+      "source_sha256": "8da76088968db94febf2b27f1509f274e85b0542014352eb20c8cf2961b1fe81",
+      "case": "recursive_djinn_unconsOr",
+      "status": "passed",
+      "axiom_inventories": {
+        "RecursiveReplay.accepted": [],
+        "RecursiveReplay.accepted_passes": []
+      }
+    },
+    {
+      "source_sha256": "1c0379a814ebf273b44d50685c8fa9d689fb3a0751ea3ebee760552f426c4b89",
+      "case": "recursive_djinn_tupleField",
+      "status": "passed",
+      "axiom_inventories": {
+        "RecursiveReplay.accepted": [],
+        "RecursiveReplay.accepted_passes": []
+      }
+    },
+    {
+      "source_sha256": "397e6999868b43e1f91188bf6b566cee886ca640fc47db8ab440e2a03a4ead5b",
+      "case": "recursive_djinn_independent",
+      "status": "passed",
+      "axiom_inventories": {
+        "RecursiveReplay.accepted": [],
+        "RecursiveReplay.accepted_passes": []
+      }
+    }
+  ],
+  "candidate_count": 8,
+  "false_control_count": 1,
+  "executable_unchanged": true,
+  "sources_unchanged": true,
+  "processes": [
+    {
+      "label": "live",
+      "command": [
+        "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+        "--plain"
+      ],
+      "process_timeout_seconds": 1200,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T19:18:16Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "input_path": "C:\\Leant\\dist-newstyle\\recursive-acceptance\\djinn-v1\\live.input.txt",
+      "input_sha256": "3845d1eb0ab288bdbda6be0c9abe08ce767a021bd34f7b375cb118baa9229584",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\recursive-acceptance\\djinn-v1\\live.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\recursive-acceptance\\djinn-v1\\live.stderr.txt",
+      "owned_root_pid": 14912,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 33.35804610000923,
+      "finished_utc": "2026-09-07T19:18:50Z",
+      "stdout_sha256": "4ff6ca5d84727840623979f5294dfff740318d696cb383102e85f3b530ed3ee2",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "kernel-0",
+      "command": [
+        "lean",
+        "+leanprover/lean4:v4.32.0",
+        "C:\\Leant\\dist-newstyle\\recursive-acceptance\\djinn-v1\\Candidate0.lean"
+      ],
+      "process_timeout_seconds": 1200,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T19:18:50Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\recursive-acceptance\\djinn-v1\\kernel-0.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\recursive-acceptance\\djinn-v1\\kernel-0.stderr.txt",
+      "owned_root_pid": 6944,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 0.8621961000026204,
+      "finished_utc": "2026-09-07T19:18:51Z",
+      "stdout_sha256": "678d499d38e6886b83b6751616c9b675015d230afe2c85901628981652454007",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "kernel-1",
+      "command": [
+        "lean",
+        "+leanprover/lean4:v4.32.0",
+        "C:\\Leant\\dist-newstyle\\recursive-acceptance\\djinn-v1\\Candidate1.lean"
+      ],
+      "process_timeout_seconds": 1200,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T19:18:51Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\recursive-acceptance\\djinn-v1\\kernel-1.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\recursive-acceptance\\djinn-v1\\kernel-1.stderr.txt",
+      "owned_root_pid": 28092,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 0.7417155000148341,
+      "finished_utc": "2026-09-07T19:18:51Z",
+      "stdout_sha256": "678d499d38e6886b83b6751616c9b675015d230afe2c85901628981652454007",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "kernel-2",
+      "command": [
+        "lean",
+        "+leanprover/lean4:v4.32.0",
+        "C:\\Leant\\dist-newstyle\\recursive-acceptance\\djinn-v1\\Candidate2.lean"
+      ],
+      "process_timeout_seconds": 1200,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T19:18:51Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\recursive-acceptance\\djinn-v1\\kernel-2.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\recursive-acceptance\\djinn-v1\\kernel-2.stderr.txt",
+      "owned_root_pid": 42240,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 0.7407486000156496,
+      "finished_utc": "2026-09-07T19:18:52Z",
+      "stdout_sha256": "678d499d38e6886b83b6751616c9b675015d230afe2c85901628981652454007",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "kernel-3",
+      "command": [
+        "lean",
+        "+leanprover/lean4:v4.32.0",
+        "C:\\Leant\\dist-newstyle\\recursive-acceptance\\djinn-v1\\Candidate3.lean"
+      ],
+      "process_timeout_seconds": 1200,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T19:18:52Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\recursive-acceptance\\djinn-v1\\kernel-3.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\recursive-acceptance\\djinn-v1\\kernel-3.stderr.txt",
+      "owned_root_pid": 39428,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 0.8656023000075947,
+      "finished_utc": "2026-09-07T19:18:53Z",
+      "stdout_sha256": "678d499d38e6886b83b6751616c9b675015d230afe2c85901628981652454007",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "kernel-4",
+      "command": [
+        "lean",
+        "+leanprover/lean4:v4.32.0",
+        "C:\\Leant\\dist-newstyle\\recursive-acceptance\\djinn-v1\\Candidate4.lean"
+      ],
+      "process_timeout_seconds": 1200,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T19:18:53Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\recursive-acceptance\\djinn-v1\\kernel-4.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\recursive-acceptance\\djinn-v1\\kernel-4.stderr.txt",
+      "owned_root_pid": 9792,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 0.8930840000102762,
+      "finished_utc": "2026-09-07T19:18:54Z",
+      "stdout_sha256": "678d499d38e6886b83b6751616c9b675015d230afe2c85901628981652454007",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "kernel-5",
+      "command": [
+        "lean",
+        "+leanprover/lean4:v4.32.0",
+        "C:\\Leant\\dist-newstyle\\recursive-acceptance\\djinn-v1\\Candidate5.lean"
+      ],
+      "process_timeout_seconds": 1200,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T19:18:54Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\recursive-acceptance\\djinn-v1\\kernel-5.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\recursive-acceptance\\djinn-v1\\kernel-5.stderr.txt",
+      "owned_root_pid": 6404,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 0.8082981000188738,
+      "finished_utc": "2026-09-07T19:18:55Z",
+      "stdout_sha256": "678d499d38e6886b83b6751616c9b675015d230afe2c85901628981652454007",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "kernel-6",
+      "command": [
+        "lean",
+        "+leanprover/lean4:v4.32.0",
+        "C:\\Leant\\dist-newstyle\\recursive-acceptance\\djinn-v1\\Candidate6.lean"
+      ],
+      "process_timeout_seconds": 1200,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T19:18:55Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\recursive-acceptance\\djinn-v1\\kernel-6.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\recursive-acceptance\\djinn-v1\\kernel-6.stderr.txt",
+      "owned_root_pid": 23888,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 0.7646288999821991,
+      "finished_utc": "2026-09-07T19:18:56Z",
+      "stdout_sha256": "678d499d38e6886b83b6751616c9b675015d230afe2c85901628981652454007",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "kernel-7",
+      "command": [
+        "lean",
+        "+leanprover/lean4:v4.32.0",
+        "C:\\Leant\\dist-newstyle\\recursive-acceptance\\djinn-v1\\Candidate7.lean"
+      ],
+      "process_timeout_seconds": 1200,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T19:18:56Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\recursive-acceptance\\djinn-v1\\kernel-7.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\recursive-acceptance\\djinn-v1\\kernel-7.stderr.txt",
+      "owned_root_pid": 40624,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 0.8076220999937505,
+      "finished_utc": "2026-09-07T19:18:56Z",
+      "stdout_sha256": "678d499d38e6886b83b6751616c9b675015d230afe2c85901628981652454007",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

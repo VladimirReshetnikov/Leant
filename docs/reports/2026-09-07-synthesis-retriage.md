@@ -11,9 +11,43 @@ are maintained in the pinned Djex dependency.
 Leant `aab110e99e3c3d96549a05d3975b26bea93dc6ef` pins Djex
 `6890bb5a8a56902c2baf137581e23c25a376fad0`. Integration of the Haskell
 elaboration checkpoint is accepted at the receipt boundaries below. First/best
-selection of a repaired candidate remains outstanding. The canonical Djex
-worktree also contains an uncommitted recursive-case experiment; it has not
-been integrated into this dependency.
+selection of a repaired candidate remains outstanding.
+
+The newer working integration pins Djex
+`3ce26cfd966ea4da2300028880c71ddaae50596d`. Djinn now passes all eight ordinary
+recursive-data behavioral queries and independent Lean replay, with sixteen
+empty axiom inventories and one actually falsified control. The
+[`test-recursive` runner](../../test-recursive/README.md) covers `null`,
+`headOr`, `tailOr`, shallow tree inspection, aliases, a unary tuple field,
+an `unconsOr` pair, and two independently typed inputs. Library and named
+provider discovery are disabled; partial cases use explicit defaults.
+
+The [successful Djinn receipt](../../test-recursive/receipts/djinn-cases.json)
+is retained from `dist-newstyle/recursive-acceptance/djinn-v1/results.json`. It records a
+1,024-candidate/verification window, 100,000 choices/steps, interleaving,
+a 90-second command deadline, exact displayed terms, and unchanged source
+and executable hashes. These are finite observations, not universal laws.
+
+The [mixed-engine receipt](../../test-recursive/receipts/other-engines-incomplete.json)
+at the same source revision failed; its original location is
+`dist-newstyle/recursive-acceptance/other-engines-v1/results.json`.
+Exference did not find `tailOr` within 100,000 steps and timed out on the
+tuple-payload case. Both also timed out on that payload despite the successful
+Djinn-only result. The failed run performed no independent kernel replays.
+Canonical Djex has an unaccepted fix in progress for optional recursive input
+splitting and finite payload inspection. It also exposed an unused-binder
+graph projection mismatch and the narrower graph boundary that accepts only
+zero/step recursive cases returning the scrutinee's type. Extend declaration-
+backed complete-case evidence, including finite tuple fields, while retaining
+exact association, exhaustiveness, and lexical scope. Search improvements alone
+cannot close this evidence gap.
+
+The strict Leant build passed at the corrected dependency revision. A full
+post-correction boundary run remains required: the earlier run had 55 failures
+from missing fake-Z3 setup and two real positive-construction-bound failures.
+Djex `3ce26cfd` fixes the latter by enabling case plans only when recursive
+types occur negatively. The Djinn-only live receipt does not close the full
+integration gate.
 
 The initial positive GHC repair fixture exercises a graph-rendered impredicative
 let. A subsequent public Exference query now demonstrates live repair under
@@ -24,7 +58,7 @@ not authorize an annotation retry. Keep those two failure classes separate.
 
 ## Delivery order
 
-The dependency has now been advanced to
+The earlier accepted elaboration integration advanced the dependency to
 `6890bb5a8a56902c2baf137581e23c25a376fad0`, including the Haskell elaboration
 renderer, behavioral retry, and Exference implicit local graph evidence.
 The GHC 9.12.4 `-Werror` build passed for `exe:leant` and
@@ -46,14 +80,13 @@ it does not complete priority 4's broader corpus.
 This is integration evidence for the dependency checkpoint; remaining priority
 1 acceptance and priorities 2–4 below still apply.
 
-1. **Close priority 2's failing one-layer case experiment.** Canonical Djex's
-   latest public synthesis/GHC execution fixture finds matching `headOr` and
-   shallow tree implementations, but fails for `null` and `tailOr`. The focused
-   strict build passes; full affected-suite acceptance and Lean replay are
-   outstanding. Fix compatible input/result views and then require all four
-   behaviors, exact family/constructor evidence, and independent Lean replay.
-   Checked case graphs alone did not catch the earlier constant-scrutinee
-   failure. Keep the accepted dependency until this bounded milestone passes.
+1. **Close Exference case parity and full Leant integration.** Retain the eight
+   accepted Djinn cases; fix Exference's supplied-list default and unary tuple
+   field, with complete graphs and actual Haskell execution. Require all eight
+   cases in each engine mode, independent Lean replay, false controls, and the
+   full boundary suite with its fake-Z3 helper configured. Preserve the existing
+   positive-only constructor bounds. Check Both explicitly: a slow engine has
+   already delayed an otherwise accepted Djinn result beyond the deadline.
 2. **Close priority 1's remaining acceptance.** Require live first/best
    selection of a repaired candidate, exact checked/displayed text, retained
    missing-authority and scope controls, and the original resource bounds.
@@ -78,7 +111,7 @@ This is integration evidence for the dependency checkpoint; remaining priority
 
 None of the four priorities is complete. Moving the smaller simplification
 delivery earlier changes scheduling, not the required contextual capability.
-Moving the active failing case experiment first does not authorize postponing
+Keeping the active cross-engine case failures first does not authorize postponing
 the small selection-mode closure until after general recursive synthesis.
 All test results above are inspected prior receipts, not tests rerun for this
 documentation update. The dependency's linked execution report reflects its
@@ -86,11 +119,11 @@ pinned checkpoint; this companion records the newer canonical-worktree triage.
 
 ## Why these boundaries matter in Leant
 
-[`ExactFamilyPlan`](../../src/Leant/Synth/Engine.hs) currently documents Djinn's
-bounded positive recursive construction and Exference's one-layer elimination.
+[`ExactFamilyPlan`](../../src/Leant/Synth/Engine.hs) now documents Djinn's
+bounded positive recursive construction and checked one-layer input cases.
 The same module's `djinnRecursiveProjection` uses `EraseProviderContexts`.
-Both are implementation boundaries to address explicitly, rather than evidence
-that the requested input cases or contextual Djinn synthesis already work.
+Context erasure remains a boundary to address explicitly; successful ordinary
+input cases do not establish contextual Djinn synthesis.
 
 [`Leant.Synth.Behavioral`](../../src/Leant/Synth/Behavioral.hs) currently uses
 `by decide` for the proposition and its negation. Simplification is proposed
@@ -101,8 +134,10 @@ Native Windows Length support remains a separate platform milestone:
 `LengthFilePlatformUnsupported`. Its acceptance needs acquisition, configured
 solver execution, and independent replay together.
 
-Measure cold startup, first accepted result, search work, checking cost, and
-memory before choosing a performance change. Semantic provider retrieval is a
+Promote the observed Both-mode delay into the current case acceptance. Fix the
+concrete Exference search cases first, then change scheduling only if the delay
+persists. Measure cold startup, first accepted result, search work, checking
+cost, and memory before choosing other performance changes. Semantic provider retrieval is a
 useful later scaling investigation when a real query misses a relevant
 provider. Shared subgoal graphs, persistent caches, internal cooperative
 search, dependent/indexed refinement, and induction remain behind the current

@@ -1,0 +1,217 @@
+{
+  "status": "failed",
+  "runner_sha256": "ebb3e47a3eb5d1e7d4fda08ba90a7fbb7309525df071006481d0fdc06c2d8865",
+  "commands_sha256": "54ab1513a49a7a2ee59858b2fb80ec0dd72916ebf8ac86f284a48eb72e831ee7",
+  "cases": [
+    {
+      "engine": "exference",
+      "operation": "null",
+      "name": "recursive_exference_null",
+      "type": "{α : Type} → List α → Bool",
+      "predicate": "{f} ([] : List Nat) = true ∧ {f} [11] = false ∧ {f} [true, false] = false",
+      "command": ":synth recursive_exference_null : {α : Type} → List α → Bool where recursive_exference_null ([] : List Nat) = true ∧ recursive_exference_null [11] = false ∧ recursive_exference_null [true, false] = false",
+      "expected": "candidate"
+    },
+    {
+      "engine": "exference",
+      "operation": "headOr",
+      "name": "recursive_exference_headOr",
+      "type": "{α : Type} → α → List α → α",
+      "predicate": "{f} 91 ([] : List Nat) = 91 ∧ {f} 91 [11, 29] = 11 ∧ {f} false [true] = true",
+      "command": ":synth recursive_exference_headOr : {α : Type} → α → List α → α where recursive_exference_headOr 91 ([] : List Nat) = 91 ∧ recursive_exference_headOr 91 [11, 29] = 11 ∧ recursive_exference_headOr false [true] = true",
+      "expected": "candidate"
+    },
+    {
+      "engine": "exference",
+      "operation": "tailOr",
+      "name": "recursive_exference_tailOr",
+      "type": "{α : Type} → List α → List α → List α",
+      "predicate": "{f} [91] ([] : List Nat) = [91] ∧ {f} [91] [11] = [] ∧ {f} [91] [11, 29, 37] = [29, 37] ∧ {f} [false] [true, true] = [true]",
+      "command": ":synth recursive_exference_tailOr : {α : Type} → List α → List α → List α where recursive_exference_tailOr [91] ([] : List Nat) = [91] ∧ recursive_exference_tailOr [91] [11] = [] ∧ recursive_exference_tailOr [91] [11, 29, 37] = [29, 37] ∧ recursive_exference_tailOr [false] [true, true] = [true]",
+      "expected": "candidate"
+    },
+    {
+      "engine": "exference",
+      "operation": "tree",
+      "name": "recursive_exference_tree",
+      "type": "{α : Type} → α → RecursiveCases.Tree α → α",
+      "predicate": "{f} 91 (.leaf 11) = 11 ∧ {f} 91 (.branch (.leaf 11) (.leaf 29)) = 91 ∧ {f} false (.leaf true) = true",
+      "command": ":synth recursive_exference_tree : {α : Type} → α → RecursiveCases.Tree α → α where recursive_exference_tree 91 (.leaf 11) = 11 ∧ recursive_exference_tree 91 (.branch (.leaf 11) (.leaf 29)) = 91 ∧ recursive_exference_tree false (.leaf true) = true",
+      "expected": "candidate"
+    },
+    {
+      "engine": "exference",
+      "operation": "alias",
+      "name": "recursive_exference_alias",
+      "type": "{α : Type} → α → RecursiveCases.Sequence α → α",
+      "predicate": "{f} 91 ([] : List Nat) = 91 ∧ {f} 91 [11, 29] = 11 ∧ {f} false [true] = true",
+      "command": ":synth recursive_exference_alias : {α : Type} → α → RecursiveCases.Sequence α → α where recursive_exference_alias 91 ([] : List Nat) = 91 ∧ recursive_exference_alias 91 [11, 29] = 11 ∧ recursive_exference_alias false [true] = true",
+      "expected": "candidate"
+    },
+    {
+      "engine": "exference",
+      "operation": "unconsOr",
+      "name": "recursive_exference_unconsOr",
+      "type": "{α : Type} → α → List α → α × List α",
+      "predicate": "{f} 91 ([] : List Nat) = (91, []) ∧ {f} 91 [11, 29] = (11, [29]) ∧ {f} false [true, false] = (true, [false])",
+      "command": ":synth recursive_exference_unconsOr : {α : Type} → α → List α → α × List α where recursive_exference_unconsOr 91 ([] : List Nat) = (91, []) ∧ recursive_exference_unconsOr 91 [11, 29] = (11, [29]) ∧ recursive_exference_unconsOr false [true, false] = (true, [false])",
+      "expected": "candidate"
+    },
+    {
+      "engine": "exference",
+      "operation": "tupleField",
+      "name": "recursive_exference_tupleField",
+      "type": "{α : Type} → α → RecursiveCases.Payload α → α",
+      "predicate": "{f} 91 (.pairLeaf (11, 29)) = 11 ∧ {f} 91 (.next (.pairLeaf (11, 29))) = 91 ∧ {f} false (.pairLeaf (true, false)) = true",
+      "command": ":synth recursive_exference_tupleField : {α : Type} → α → RecursiveCases.Payload α → α where recursive_exference_tupleField 91 (.pairLeaf (11, 29)) = 11 ∧ recursive_exference_tupleField 91 (.next (.pairLeaf (11, 29))) = 91 ∧ recursive_exference_tupleField false (.pairLeaf (true, false)) = true",
+      "expected": "candidate"
+    },
+    {
+      "engine": "exference",
+      "operation": "independent",
+      "name": "recursive_exference_independent",
+      "type": "{α β : Type} → α → β → List α → List β → α × β",
+      "predicate": "{f} 91 false ([] : List Nat) [] = (91, false) ∧ {f} 91 false [11, 29] [true] = (11, true) ∧ {f} 91 false [] [true] = (91, true)",
+      "command": ":synth recursive_exference_independent : {α β : Type} → α → β → List α → List β → α × β where recursive_exference_independent 91 false ([] : List Nat) [] = (91, false) ∧ recursive_exference_independent 91 false [11, 29] [true] = (11, true) ∧ recursive_exference_independent 91 false [] [true] = (91, true)",
+      "expected": "candidate"
+    },
+    {
+      "engine": "exference",
+      "operation": "reject_all",
+      "name": "recursive_exference_reject_all",
+      "type": "Nat → Nat",
+      "predicate": "False",
+      "command": ":synth recursive_exference_reject_all : Nat → Nat where False",
+      "expected": "no_candidate"
+    },
+    {
+      "engine": "both",
+      "operation": "null",
+      "name": "recursive_both_null",
+      "type": "{α : Type} → List α → Bool",
+      "predicate": "{f} ([] : List Nat) = true ∧ {f} [11] = false ∧ {f} [true, false] = false",
+      "command": ":synth recursive_both_null : {α : Type} → List α → Bool where recursive_both_null ([] : List Nat) = true ∧ recursive_both_null [11] = false ∧ recursive_both_null [true, false] = false",
+      "expected": "candidate"
+    },
+    {
+      "engine": "both",
+      "operation": "headOr",
+      "name": "recursive_both_headOr",
+      "type": "{α : Type} → α → List α → α",
+      "predicate": "{f} 91 ([] : List Nat) = 91 ∧ {f} 91 [11, 29] = 11 ∧ {f} false [true] = true",
+      "command": ":synth recursive_both_headOr : {α : Type} → α → List α → α where recursive_both_headOr 91 ([] : List Nat) = 91 ∧ recursive_both_headOr 91 [11, 29] = 11 ∧ recursive_both_headOr false [true] = true",
+      "expected": "candidate"
+    },
+    {
+      "engine": "both",
+      "operation": "tailOr",
+      "name": "recursive_both_tailOr",
+      "type": "{α : Type} → List α → List α → List α",
+      "predicate": "{f} [91] ([] : List Nat) = [91] ∧ {f} [91] [11] = [] ∧ {f} [91] [11, 29, 37] = [29, 37] ∧ {f} [false] [true, true] = [true]",
+      "command": ":synth recursive_both_tailOr : {α : Type} → List α → List α → List α where recursive_both_tailOr [91] ([] : List Nat) = [91] ∧ recursive_both_tailOr [91] [11] = [] ∧ recursive_both_tailOr [91] [11, 29, 37] = [29, 37] ∧ recursive_both_tailOr [false] [true, true] = [true]",
+      "expected": "candidate"
+    },
+    {
+      "engine": "both",
+      "operation": "tree",
+      "name": "recursive_both_tree",
+      "type": "{α : Type} → α → RecursiveCases.Tree α → α",
+      "predicate": "{f} 91 (.leaf 11) = 11 ∧ {f} 91 (.branch (.leaf 11) (.leaf 29)) = 91 ∧ {f} false (.leaf true) = true",
+      "command": ":synth recursive_both_tree : {α : Type} → α → RecursiveCases.Tree α → α where recursive_both_tree 91 (.leaf 11) = 11 ∧ recursive_both_tree 91 (.branch (.leaf 11) (.leaf 29)) = 91 ∧ recursive_both_tree false (.leaf true) = true",
+      "expected": "candidate"
+    },
+    {
+      "engine": "both",
+      "operation": "alias",
+      "name": "recursive_both_alias",
+      "type": "{α : Type} → α → RecursiveCases.Sequence α → α",
+      "predicate": "{f} 91 ([] : List Nat) = 91 ∧ {f} 91 [11, 29] = 11 ∧ {f} false [true] = true",
+      "command": ":synth recursive_both_alias : {α : Type} → α → RecursiveCases.Sequence α → α where recursive_both_alias 91 ([] : List Nat) = 91 ∧ recursive_both_alias 91 [11, 29] = 11 ∧ recursive_both_alias false [true] = true",
+      "expected": "candidate"
+    },
+    {
+      "engine": "both",
+      "operation": "unconsOr",
+      "name": "recursive_both_unconsOr",
+      "type": "{α : Type} → α → List α → α × List α",
+      "predicate": "{f} 91 ([] : List Nat) = (91, []) ∧ {f} 91 [11, 29] = (11, [29]) ∧ {f} false [true, false] = (true, [false])",
+      "command": ":synth recursive_both_unconsOr : {α : Type} → α → List α → α × List α where recursive_both_unconsOr 91 ([] : List Nat) = (91, []) ∧ recursive_both_unconsOr 91 [11, 29] = (11, [29]) ∧ recursive_both_unconsOr false [true, false] = (true, [false])",
+      "expected": "candidate"
+    },
+    {
+      "engine": "both",
+      "operation": "tupleField",
+      "name": "recursive_both_tupleField",
+      "type": "{α : Type} → α → RecursiveCases.Payload α → α",
+      "predicate": "{f} 91 (.pairLeaf (11, 29)) = 11 ∧ {f} 91 (.next (.pairLeaf (11, 29))) = 91 ∧ {f} false (.pairLeaf (true, false)) = true",
+      "command": ":synth recursive_both_tupleField : {α : Type} → α → RecursiveCases.Payload α → α where recursive_both_tupleField 91 (.pairLeaf (11, 29)) = 11 ∧ recursive_both_tupleField 91 (.next (.pairLeaf (11, 29))) = 91 ∧ recursive_both_tupleField false (.pairLeaf (true, false)) = true",
+      "expected": "candidate"
+    },
+    {
+      "engine": "both",
+      "operation": "independent",
+      "name": "recursive_both_independent",
+      "type": "{α β : Type} → α → β → List α → List β → α × β",
+      "predicate": "{f} 91 false ([] : List Nat) [] = (91, false) ∧ {f} 91 false [11, 29] [true] = (11, true) ∧ {f} 91 false [] [true] = (91, true)",
+      "command": ":synth recursive_both_independent : {α β : Type} → α → β → List α → List β → α × β where recursive_both_independent 91 false ([] : List Nat) [] = (91, false) ∧ recursive_both_independent 91 false [11, 29] [true] = (11, true) ∧ recursive_both_independent 91 false [] [true] = (91, true)",
+      "expected": "candidate"
+    },
+    {
+      "engine": "both",
+      "operation": "reject_all",
+      "name": "recursive_both_reject_all",
+      "type": "Nat → Nat",
+      "predicate": "False",
+      "command": ":synth recursive_both_reject_all : Nat → Nat where False",
+      "expected": "no_candidate"
+    }
+  ],
+  "settings": {
+    "window": 1024,
+    "steps": 100000,
+    "budget": 100000,
+    "timeout": 90,
+    "process_timeout": 1200,
+    "strategy": "interleave"
+  },
+  "named_synthesis_providers": [],
+  "scope": "finite ordinary-data observations; explicit defaults; no recursion synthesis",
+  "source_hashes": {
+    "src\\Main.hs": "293d51484f2bdb5395594eb834c78378b1cfd7e8dbb4b2aa14c4b09cb19a7343",
+    "src\\Leant\\Synth\\Engine.hs": "3fd680a78ef212e5ff6c6193df8ecd60e5bcc09a3fe81619ffe50f5bd4799f19",
+    "src\\Leant\\Synth\\Behavioral.hs": "df5117bf817b765aa7bd8517e8f9f09b23b0d747d31a897f5d90c848f8b34da6",
+    "lib\\Djex\\djinn\\src-core\\Djinn\\Core.hs": "dd83580c9b7932907e0e7d202c3eaae544f68f00df957e80764f61681a9156ec",
+    "lib\\Djex\\djinn\\src-core\\Djinn\\Internal\\TypeFormula.hs": "09d240ea1b774cec054384df7e0435df9a20b62577880a2d4bda1bd80bda846a",
+    "lib\\Djex\\djinn\\src-core\\Djinn\\Internal\\LJT.hs": "970c2fa05a9cf8537de3a09076b14477986aa9e3cbf979bc280b176a07885ac2"
+  },
+  "executable": "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+  "executable_sha256": "055019752063173e7aa10fe1396c6c48576de60066a22fb86e76179e2932f127",
+  "failure": "expected one behaviorally accepted output for recursive_exference_tailOr: []",
+  "executable_unchanged": true,
+  "sources_unchanged": true,
+  "processes": [
+    {
+      "label": "live",
+      "command": [
+        "C:\\Leant\\dist-newstyle\\build\\x86_64-windows\\ghc-9.12.4\\leant-0.1.0\\x\\leant\\build\\leant\\leant.exe",
+        "--plain"
+      ],
+      "process_timeout_seconds": 1200,
+      "cwd": "C:\\Leant",
+      "status": "completed",
+      "started_utc": "2026-09-07T19:19:28Z",
+      "capture_format": "raw child bytes; returned text decodes UTF-8 with universal newlines",
+      "input_path": "C:\\Leant\\dist-newstyle\\recursive-acceptance\\other-engines-v1\\live.input.txt",
+      "input_sha256": "54ab1513a49a7a2ee59858b2fb80ec0dd72916ebf8ac86f284a48eb72e831ee7",
+      "stdout_path": "C:\\Leant\\dist-newstyle\\recursive-acceptance\\other-engines-v1\\live.stdout.txt",
+      "stderr_path": "C:\\Leant\\dist-newstyle\\recursive-acceptance\\other-engines-v1\\live.stderr.txt",
+      "owned_root_pid": 30596,
+      "exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 803.4264149999944,
+      "finished_utc": "2026-09-07T19:32:52Z",
+      "stdout_sha256": "299e66f03a32475d8f87329b7669199b68938c596eba2c809177323369809044",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}
