@@ -119,6 +119,15 @@ def isolated_kernel_sources(spec, results):
     return sources
 
 
+def latency_observer(runtime, cases):
+    """Echo boundaries associate accepted lines with the actual query."""
+    return runtime.OutputMilestones([{
+        "id": case["name"],
+        "start_pattern": "^λ> " + re.escape(case["command"]) + "$",
+        "success_pattern": r"^[ \t]+it[0-9]+[ \t]+" if case["expected"] == "candidate" else None,
+    } for case in cases])
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--leant", type=Path)
@@ -136,6 +145,8 @@ def main():
     parser.add_argument("--budget", type=int, default=100000, help="explicit Djinn choice-point budget")
     parser.add_argument("--timeout", type=int, default=30, help="shared synthesis command timeout, not end-to-end")
     parser.add_argument("--process-timeout", type=float, default=900, help="separate live/kernel process wall guard")
+    parser.add_argument("--observe-latency", action="store_true",
+                        help="observe query echoes and accepted output by 20 ms monotonic file polling; process and query timing plus observer overhead are recorded")
     parser.add_argument("--lean", default="lean")
     parser.add_argument("--toolchain", default="leanprover/lean4:v4.32.0")
     parser.add_argument("--prepare-only", action="store_true")
@@ -174,6 +185,7 @@ def main():
                            "verify": args.window, "exference_steps": args.steps,
                            "djinn_choice_budget": args.budget, "synthesis_timeout_seconds": args.timeout,
                            "separate_process_guard_seconds": args.process_timeout},
+              "latency_observation_enabled": args.observe_latency,
               "named_synthesis_providers": [],
               "universe_policy": "element and eliminator-result Type0; predicative Church encodings live in Type1",
               "oracle_control_source": str(control_path.resolve()),
@@ -188,13 +200,17 @@ def main():
                   executable_path=str(args.leant.resolve()), executable_sha256=digest)
     processes = runtime.Processes(args.output, args.process_timeout)
     try:
+        observer = latency_observer(runtime, cases) if args.observe_latency else None
         live = processes.run("live", [args.leant.resolve(), "--plain"], source=source, cwd=ROOT,
-                             env=dict(os.environ, LEANT_SYNTH_TIMEOUT=str(args.timeout)))
+                             env=dict(os.environ, LEANT_SYNTH_TIMEOUT=str(args.timeout)), observe=observer)
         output = live.stdout + live.stderr
         if live.returncode:
             raise ValueError("live Leant exited unsuccessfully")
         validate_settings(output, source)
         results = parse_output(output, cases)
+        if observer is not None:
+            observer.validate_counts({result["name"]: int(result["status"] == "candidate")
+                                      for result in results})
         report["results"] = results
         expected_cells = {(engine, operation) for engine in engines for operation in operations}
         candidates = [row for row in results if row["status"] == "candidate"]

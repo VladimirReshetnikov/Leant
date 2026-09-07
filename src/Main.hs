@@ -113,7 +113,7 @@ import Leant.Synth.Engine
   , SynthEngine (..)
   , detailedCandidateBatchGroups
   , detailedCandidateBatchNotes
-  , detailedCandidateGroupRoute
+  , detailedCandidateGroupObservations
   , detailedCandidateGroupVariants
   , detailedCandidateGroupVerificationVariants
   , detailedVerificationVariantText
@@ -230,7 +230,6 @@ import Leant.Synth.Length.Where
 import Leant.Synth.Observability
   ( LeantObservations
   , VerificationFailureClass (..)
-  , candidateRenderingRouteObservations
   , leantObservationCodeEntries
   )
 import Leant.Synth.ProviderCache
@@ -3789,8 +3788,7 @@ verifySynthLane behavioral assessmentContext groupLimit st goal notes groups =
         Nothing -> synthVerify successQuota st goal variants
         Just active -> synthVerifyBehavioral active successQuota st goal variants
       let observations =
-            candidateRenderingRouteObservations
-              (map detailedCandidateGroupRoute boundedGroups)
+            detailedCandidateGroupObservations boundedGroups
             <> verificationObservations verification
       assessment <-
         assessLengthVerificationContext assessmentContext verification

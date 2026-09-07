@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 from behavior_probe import (commands, isolated_kernel_sources, kernel_source,
-                            main, parse_output, validate_settings)
+                            latency_observer, main, parse_output, validate_settings)
 
 
 def case(name="test", expected="candidate"):
@@ -19,6 +19,21 @@ def output(item, body):
 
 
 class BehavioralTranscriptTests(unittest.TestCase):
+    def test_latency_queries_retain_exact_echoes_and_false_boundaries(self):
+        factory = mock.Mock(return_value="observer")
+        first = case("first")
+        second = case("second")
+        negative = case("negative", "no_candidate")
+        self.assertEqual(latency_observer(SimpleNamespace(OutputMilestones=factory),
+                                         [first, second, negative]), "observer")
+        queries = factory.call_args.args[0]
+        self.assertEqual([query["id"] for query in queries], ["first", "second", "negative"])
+        import re
+        for query, item in zip(queries, [first, second, negative]):
+            self.assertRegex("λ> " + item["command"], re.compile(query["start_pattern"]))
+        self.assertIsNone(queries[-1]["success_pattern"])
+        self.assertIsNotNone(queries[0]["success_pattern"])
+
     def test_strategy_setting_is_explicit_and_its_acknowledgment_is_checked(self):
         spec = SimpleNamespace(lean_prelude=lambda: [], lean_predicate=lambda operation, name: "True",
                                OBSERVATIONS={"not": 2})

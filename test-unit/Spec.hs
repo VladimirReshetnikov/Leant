@@ -193,6 +193,7 @@ import Leant.Synth.Engine
   , DetailedCandidateGroup
   , DetailedSynthOutcome (..)
   , streamDetailedQueryResults
+  , streamDetailedQueryResultsWithEvidence
   , deferDetailedOutcome
   , prependBehavioralLibraryOutcome
   , DetailedSynthCursor
@@ -210,6 +211,7 @@ import Leant.Synth.Engine
   , TranslatedPremise (..)
   , detailedCandidateGroup
   , detailedCandidateGroupRoute
+  , detailedCandidateGroupObservations
   , detailedCandidateGroupSemanticSidecar
   , detailedCandidateGroupSourceAuthority
   , detailedVerificationVariantSourceAuthority
@@ -253,6 +255,7 @@ import Leant.Synth.Engine
   , synthesizeWithProviders
   , synthesizeWithProvidersSkippingDetailed
   , synthesizeWithProvidersSkippingDetailedWith
+  , synthesizeBehavioralWithProvidersSkippingDetailedWith
   , synthesizeWithProvidersSkippingDetailedWithMultiConstructorPatterns
   , synthesizeTunedDetailed
   , startDetailedSynthCursor
@@ -615,10 +618,16 @@ import qualified Leant.Synth.Length.SpinePair.Selection.Internal
   as LengthSpinePairSelectionInternal
 import Leant.Synth.Observability
   ( CandidateRenderingRoute (..)
+  , CandidateGraphObservation (..)
+  , SourceGraphAbsenceReason (..)
   , LeantSynthesisMetric (..)
   , VerificationFailureClass (..)
   , candidateRenderingRouteMetric
   , candidateRenderingRouteObservations
+  , candidateGraphObservation
+  , candidateGraphObservations
+  , djinnSourceGraphAbsenceReason
+  , exferenceSourceGraphAbsenceReason
   , leantObservationCodeEntries
   , leantSynthesisMetricCode
   )
@@ -2757,7 +2766,115 @@ hostBehavioralTests = testGroup "host behavioral synthesis"
 
 behavioralStreamingTests :: TestTree
 behavioralStreamingTests = testGroup "named behavioral candidate streaming"
-  [ testCase "force the first group and observed notes without a future result" $ do
+  [ testCase "Djinn's first observed candidate leaves terminal evidence and failure untouched" $ do
+      let first = cursorFixtureGroup 1
+          outcome = streamDetailedQueryResultsWithEvidence 8 id
+            (error "first Djinn candidate demanded terminal evidence")
+            (Right (batch Djex.Continuing [Just first])
+              : error "first Djinn candidate demanded future results")
+      (selected, _) <- expectDetailedCandidateBatch 1 $ startDetailedSynthCursor $ Right outcome
+      detailedCandidateBatchGroups selected @?= [first]
+      detailedCandidateBatchNotes selected @?= ["search reported more batches to come"]
+      evaluate (forceDetailedOutcome 1 $ Right outcome) >>= \forced ->
+        assertBool "Djinn observation was not forced" (forced > 0)
+      (verified, _) <- verifyBehavioralCandidateGroupsBy detailedVerificationVariantText 1
+        (const $ pure VariantAccepted) (const $ pure BehavioralSatisfied)
+        (variantsFromCursor $ startDetailedSynthCursor $ Right outcome)
+      map detailedVerificationVariantText (verifiedCandidates verified) @?= ["candidate-1"]
+  , testCase "Djinn trace failure is delivered only when its continuation is selected" $ do
+      let outcome = streamDetailedQueryResultsWithEvidence 8 id terminal
+            [ Right $ batch Djex.Continuing [Just $ cursorFixtureGroup 1]
+            , Left "late Djinn validation failure"
+            , error "Djinn failure demanded later results"
+            ]
+      (selected, rest) <- expectDetailedCandidateBatch 1 $ startDetailedSynthCursor $ Right outcome
+      detailedCandidateBatchGroups selected @?= [cursorFixtureGroup 1]
+      ended <- expectDetailedSynthCursorStep 1 rest
+      case ended of
+        DetailedSynthCursorEngineFailed failure -> failure @?= "late Djinn validation failure"
+        other -> assertFailure $ "Djinn failure lost its meaning: " ++ detailedSynthCursorStepTag other
+  , testCase "Djinn terminal evidence retains refutation and truncation distinctions" $ do
+      refutation <- expectRight $ Djex.mkQueryResult Djex.ProvedUninhabitable
+        $ Djex.SearchBatch (Djex.Completed Djex.Finished) () []
+      recursive <- expectRight $ Djex.mkQueryResult Djex.RequiresTargetReference
+        $ Djex.SearchBatch (Djex.Completed Djex.Finished) () []
+      bounded <- expectRight $ Djex.mkQueryResult Djex.NoEvidence
+        $ Djex.SearchBatch (Djex.Completed $ Djex.truncated Djex.ChoicePointLimitReached) () []
+      let run result = expectDetailedSynthCursorStep 1 $ startDetailedSynthCursor $ Right $
+            streamDetailedQueryResultsWithEvidence 8 id terminal
+              (Right result : error "terminal Djinn evidence demanded its tail")
+      ended <- run refutation
+      case ended of
+        DetailedSynthCursorRefuted True -> pure ()
+        other -> assertFailure $ "Djinn refutation was lost: " ++ detailedSynthCursorStepTag other
+      recursiveEnd <- run recursive
+      case recursiveEnd of
+        DetailedSynthCursorNaturallyExhausted notes -> notes @?= ["recursive target required"]
+        other -> assertFailure $ "recursive target became refutation: " ++ detailedSynthCursorStepTag other
+      boundedEnd <- run bounded
+      case boundedEnd of
+        DetailedSynthCursorNaturallyExhausted notes ->
+          assertBool "choice truncation diagnostic was lost" $ any (isInfixOf "choice-point") notes
+        other -> assertFailure $ "bounded Djinn miss became refutation: " ++ detailedSynthCursorStepTag other
+  , testCase "Djinn rendering misses and duplicates cannot refill the observed raw cap" $ do
+      let first = cursorFixtureGroup 1
+          outcome = streamDetailedQueryResultsWithEvidence 3 id
+            (error "raw cap demanded Djinn terminal evidence")
+            [ Right $ batch Djex.Continuing [Nothing]
+            , Right $ batch Djex.Continuing [Just first]
+            , Right $ batch Djex.Continuing [Just first]
+            , error "raw Djinn cap demanded a replacement"
+            ]
+      (selected, rest) <- expectDetailedCandidateBatch 1 $ startDetailedSynthCursor $ Right outcome
+      detailedCandidateBatchGroups selected @?= [first]
+      ended <- expectDetailedSynthCursorStep 1 rest
+      case ended of
+        DetailedSynthCursorNaturallyExhausted notes ->
+          assertBool "Djinn raw cap lost truncation" $ any (isInfixOf "candidate limit reached (3)") notes
+        other -> assertFailure $ "Djinn raw cap changed taxonomy: " ++ detailedSynthCursorStepTag other
+      zero <- expectDetailedSynthCursorStep 1 $ startDetailedSynthCursor $ Right $
+        streamDetailedQueryResultsWithEvidence 0
+          (error "zero Djinn cap rendered") (error "zero Djinn cap consulted evidence")
+          (error "zero Djinn cap inspected a result")
+      case zero of
+        DetailedSynthCursorNaturallyExhausted notes ->
+          assertBool "zero Djinn cap lost truncation" $ any (isInfixOf "candidate limit reached (0)") notes
+        other -> assertFailure $ "zero Djinn cap changed taxonomy: " ++ detailedSynthCursorStepTag other
+  , testCase "real Djinn and Both streams retain each accepted candidate's own source graph" $ do
+      let token = FAtom False "Demo.StreamToken"
+          goal = FArr token $ FArr token token
+          bounds = defaultSynthLimits { synthLimitWindow = 32 }
+      forM_ [EngineDjinn, EngineBoth] $ \engine -> do
+        outcome <- expectRight $ synthesizeBehavioralWithProvidersSkippingDetailedWith
+          bounds engine 128 Set.empty [] goal
+        (verified, verdicts) <- verifyBehavioralCandidateGroupsBy detailedVerificationVariantText 2
+          (const $ pure VariantAccepted) (const $ pure BehavioralSatisfied)
+          (variantsFromCursor $ startDetailedSynthCursor $ Right outcome)
+        let values = verifiedCandidates verified
+        length values @?= 2
+        length verdicts @?= 2
+        Set.size (Set.fromList $ map detailedVerificationVariantText values) @?= 2
+        forM_ values $ \variant -> do
+          detailedVerificationVariantRoute variant @?= RouteTypedCandidate
+          fmap candidateSourceAuthorityEngine
+            (detailedVerificationVariantSourceAuthority variant) @?= Just EngineDjinn
+          case detailedVerificationVariantSourceAuthority variant >>= candidateSourceAuthorityDjinn of
+            Nothing -> assertFailure "streamed Djinn candidate lost its source owner"
+            Just authority -> do
+              graph <- expectRight $ typedCandidateTermGraph $ djinnSourceCandidate authority
+              root <- case Djex.lookupTermNode (Djex.termGraphRoot graph) graph of
+                Nothing -> assertFailure "streamed Djinn graph has no root" >> error "unreachable"
+                Just node -> pure node
+              assertBool "streamed Djinn graph belongs to a different request"
+                $ Djex.alphaEquivalentClosedTypes
+                  (Djex.requestGoal $ djinnSourceRequest authority) (Djex.termNodeType root)
+          case detailedVerificationVariantExactTypedOrigin variant of
+            Nothing -> assertFailure "streamed Djinn variant lost its exact renderer origin"
+            Just origin -> do
+              rendered <- expectRight $ renderExactTypedVariantOrigin origin
+              assertBool "streamed Djinn exact origin changed the accepted spelling"
+                $ detailedVerificationVariantText variant `elem` rendered
+  , testCase "force the first group and observed notes without a future result" $ do
       let first = detailedCandidateGroup RouteLegacyCandidateFallback ["first", "alternate"]
           outcome = streamDetailedQueryResults 8 id
             (batch Djex.Continuing [Just first] : error "stream forced future progress")
@@ -2776,8 +2893,8 @@ behavioralStreamingTests = testGroup "named behavioral candidate streaming"
       (selected, afterFirst) <- expectDetailedCandidateBatch 1 $
         startDetailedSynthCursor $ Right outcome
       detailedCandidateBatchGroups selected @?= [first]
-      terminal <- expectDetailedSynthCursorStep 1 afterFirst
-      case terminal of
+      terminalStep <- expectDetailedSynthCursorStep 1 afterFirst
+      case terminalStep of
         DetailedSynthCursorNaturallyExhausted notes ->
           assertBool "the raw cap was mistaken for complete search"
             $ any (isInfixOf "candidate limit reached (3)") notes
@@ -2870,6 +2987,10 @@ behavioralStreamingTests = testGroup "named behavioral candidate streaming"
   ]
  where
   batch progress values = Djex.queryResultFromCandidates $ Djex.SearchBatch progress () values
+  terminal evidence notes = case evidence of
+    Djex.ProvedUninhabitable -> DetailedSynthRefuted True
+    Djex.RequiresTargetReference -> DetailedSynthNoTerm $ "recursive target required" : notes
+    _ -> DetailedSynthNoTerm notes
   -- Exercise the real cursor forcing boundary while feeding its lazy groups
   -- to the same quota-aware behavioral verifier used by Main.
   variantsFromCursor cursor = case advanceDetailedSynthCursor 1 cursor of
@@ -2894,6 +3015,8 @@ verificationObservabilityTests = testGroup "verification observability"
             ]
             ++ map LeanVerificationFailure failures
             ++ [LeanCandidateVerified]
+            ++ map SourceGraphAbsent [minBound .. maxBound]
+            ++ [TargetOnlyReconstructed]
           codes = map leantSynthesisMetricCode metrics
       codes @?=
         [ "legacy-candidate-fallback"
@@ -2904,8 +3027,66 @@ verificationObservabilityTests = testGroup "verification observability"
         , "lean-verification-failure.error-diagnostic"
         , "lean-verification-failure.contains-sorry"
         , "lean-candidate-verified"
+        , "source-graph-absent.djinn.source-context-unavailable"
+        , "source-graph-absent.djinn.source-typing-failure"
+        , "source-graph-absent.exference.implicit-local-specialization"
+        , "source-graph-absent.exference.subsumed-local-specialization"
+        , "source-graph-absent.exference.nested-forall-introduction"
+        , "source-graph-absent.exference.nominal-constructor-pattern"
+        , "source-graph-absent.exference.unsupported-structural-constructor-pattern"
+        , "source-graph-absent.exference.unsupported-contextual-visible-application"
+        , "source-graph-absent.exference.evidence-mismatch"
+        , "source-graph-absent.exference.construction-limit"
+        , "source-graph-absent.exference.sealing-failure"
+        , "source-graph-absent.exference.certificate-association-failure"
+        , "source-graph-absent.exference.projection-mismatch"
+        , "target-only-reconstructed"
         ]
       Set.size (Set.fromList codes) @?= length codes
+  , testCase "graph absence categories inspect constructor tags without diagnostic payloads" $ do
+      djinnSourceGraphAbsenceReason Djex.DjinnTermGraphSourceTypingContextUnavailable
+        @?= DjinnSourceContextUnavailable
+      djinnSourceGraphAbsenceReason (Djex.DjinnTermGraphSourceTypingFailure
+        $ error "graph observations demanded a Djinn diagnostic") @?= DjinnSourceTypingFailed
+      let poison = error "graph observations demanded Exference diagnostic evidence"
+      map exferenceSourceGraphAbsenceReason
+        [ Djex.ImplicitLocalSpecialization poison poison poison
+        , Djex.SubsumedLocalSpecialization poison poison poison
+        , Djex.NestedForallIntroduction poison
+        , Djex.NominalConstructorPattern poison
+        , Djex.UnsupportedStructuralConstructorPattern poison
+        , Djex.UnsupportedContextualVisibleApplication poison poison poison
+        , Djex.TermGraphEvidenceMismatch
+        , Djex.TermGraphConstructionLimit poison
+        , Djex.TermGraphSealingFailure poison
+        , Djex.TermGraphCertificateAssociationFailure poison
+        , Djex.TermGraphProjectionMismatch
+        ] @?= [ExferenceImplicitLocalSpecialization .. ExferenceProjectionMismatch]
+  , testCase "graph absence and target reconstruction add observations without changing routes" $ do
+      let absent = candidateGraphObservation djinnSourceGraphAbsenceReason
+            (Left $ Djex.DjinnTermGraphSourceTypingFailure $ error "diagnostic was forced") True
+          present = candidateGraphObservation djinnSourceGraphAbsenceReason
+            (Right $ error "observations demanded a present graph") True
+          ordinary = candidateGraphObservation djinnSourceGraphAbsenceReason
+            (Right $ error "ordinary observations demanded a present graph") False
+      ordinary @?= Nothing
+      leantObservationCodeEntries (candidateGraphObservations absent) @?=
+        [ ("source-graph-absent.djinn.source-typing-failure", 1)
+        , ("target-only-reconstructed", 1)
+        ]
+      leantObservationCodeEntries (candidateGraphObservations present) @?=
+        [("target-only-reconstructed", 1)]
+      leantObservationCodeEntries
+        (candidateRenderingRouteObservations [RouteLegacyCandidateFallback]
+          <> candidateGraphObservations [CandidateGraphObservation
+            (Just ExferenceNestedForallIntroduction) False]) @?=
+        [ ("legacy-candidate-fallback", 1)
+        , ("source-graph-absent.exference.nested-forall-introduction", 1)
+        ]
+      leantObservationCodeEntries (detailedCandidateGroupObservations $ take 1 $
+        detailedCandidateGroup RouteTypedCandidate ["selected"]
+          : error "group observation demanded the unselected stream tail") @?=
+        [("typed-candidate-rendered", 1)]
   , testCase "classify rejections exactly once before a success" $ do
       let verdict candidate = pure $ case candidate of
             "request" -> VariantRejected BackendRequestFailure
@@ -5693,8 +5874,8 @@ djinnStrategyIntegrationTests = testGroup "Djinn strategy integration"
         ":set synth-djinn-strategy S depth-first (default) | interleave"
       engine <- lines <$> readFile "src/Leant/Synth/Engine.hs"
       mapM_ (assertMainSourceContains "common Djinn strategy request" engine)
-        [ "outcome <- djinnRun limits djinnLimits prepared"
-        , "djinn <- djinnRun limits djinnLimits djinnPrepared"
+        [ "outcome <- djinnRun streaming limits djinnLimits prepared"
+        , "djinn <- djinnRun streaming limits djinnLimits djinnPrepared"
         , "requestOptions = djinnQueryOptionsForLimits limits laneBounds"
         ]
   ]
@@ -24291,6 +24472,11 @@ typedCandidateRoutingTests = testGroup "typed candidate rendering routes"
                 ((== RouteLegacyCandidateFallback)
                   . detailedCandidateGroupRoute)
                 groups))
+          let observed = leantObservationCodeEntries $ detailedCandidateGroupObservations groups
+          assertBool "the actual fallback lost its source graph absence reason"
+            $ any (("source-graph-absent.exference." `isPrefixOf`) . fst) observed
+          assertBool "the additional graph observation replaced the historical fallback counter"
+            $ any ((== "legacy-candidate-fallback") . fst) observed
         Right other -> assertFailure $
           "expected a fallback Exference candidate, got: " ++ show other
         Left err -> assertFailure err
@@ -26526,6 +26712,9 @@ typeApplicationTests = testGroup "retained type applications"
                     detailedCandidateGroupRoute group @?= RouteUnobserved
                     assertBool "reconstructed provider acquired an unrelated typed origin"
                       $ isNothing (detailedCandidateGroupSemanticSidecar group)
+                    assertBool "target-only reconstruction was not observed"
+                      $ ("target-only-reconstructed", 1) `elem`
+                          leantObservationCodeEntries (detailedCandidateGroupObservations [group])
                 other -> assertFailure $ "expected one complete exact vector at cutoff one: "
                   ++ show engine ++ ", arity " ++ show arity ++ ": " ++ show other
       mapM_ checkArity [8, 12]

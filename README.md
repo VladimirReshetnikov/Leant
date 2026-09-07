@@ -75,6 +75,9 @@ Companion documents:
 - **[Behavioral assertions](docs/behavioral-synthesis.md)** — the new
   `:synth f : TYPE where PROP` entrance, exact candidate checks, and bounded
   Djinn search for reusable higher-order compositions;
+- **[Next synthesis priorities](lib/Djex/docs/reports/2026-09-06-synthesis-next-priorities.md)**
+  — recursive-data cases, contextual evidence, broader behavioral specifications,
+  and the separate native Windows Length work;
 - **[docs/synth-internals.md](docs/synth-internals.md)** — the design
   boundaries and dated-report index behind `:synth`;
 - **[Lean from First Principles](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Lean_from_First_Principles/Lean_from_First_Principles.pdf)**
@@ -455,9 +458,13 @@ pass. The query works with Djinn, Exference, and `both`.
 Named queries accumulate successful groups up to `synth-shown`, while respecting
 the existing search window, verification allowance, and timeout. Exference keeps
 its structural search ranking and can check assertions before collecting the
-full frontend candidate pool. Djinn still prepares its bounded backend batch
-before delivering the first group; Both mode can encounter this boundary when
-it observes its Djinn lane.
+full frontend candidate pool. Djinn now delivers checked typed candidates
+incrementally as well, and Both mode resumes each engine only when another
+group is needed. Reaching the success quota leaves the remaining search
+unobserved. Djinn's named queries use deterministic discovery order; ordinary
+queries retain their existing batch ranking. The
+[behavioral guide](docs/behavioral-synthesis.md#validation-status) explains
+the streaming and evidence boundaries.
 
 Explicit `synth-djinn-strategy interleave` adds reusable normal-form term
 alternatives and resumable plan scheduling under the configured budgets. The

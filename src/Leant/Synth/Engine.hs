@@ -48,6 +48,7 @@ module Leant.Synth.Engine
   , djinnSourcePreparation
   , detailedCandidateGroup
   , detailedCandidateGroupRoute
+  , detailedCandidateGroupObservations
   , detailedCandidateGroupVariants
   , detailedCandidateGroupVerificationVariants
   , detailedCandidateGroupSemanticSidecar
@@ -68,6 +69,7 @@ module Leant.Synth.Engine
   , mapDetailedCandidateGroupVariantsDroppingSemanticSidecar
   , DetailedSynthOutcome (..)
   , streamDetailedQueryResults
+  , streamDetailedQueryResultsWithEvidence
   , deferDetailedOutcome
   , prependBehavioralLibraryOutcome
   , projectDetailedSynthOutcome
@@ -223,6 +225,7 @@ import Language.Haskell.Djex
   , resultEvidence
   , resultSearch
   , runDjinnTypedQueryWithKindedInstantiationAssignments
+  , runDjinnTypedQueryStreamWithKindedInstantiationAssignments
   , runExferenceTypedQueryWithKindedInstantiationAssignments
   , selectQueryResults
   , selectQualityQueryResults
@@ -244,6 +247,13 @@ import Leant.Synth.Observability
       , RouteTypedCandidate
       , RouteUnobserved
       )
+  , CandidateGraphObservation
+  , LeantObservations
+  , candidateGraphObservation
+  , candidateGraphObservations
+  , candidateRenderingRouteObservations
+  , djinnSourceGraphAbsenceReason
+  , exferenceSourceGraphAbsenceReason
   )
 
 import Leant.Synth.Fragment
@@ -495,19 +505,20 @@ data DetailedCandidateGroup = DetailedCandidateGroup
   CandidateRenderingRoute
   [DetailedCandidateVariant]
   (Maybe CandidateSourceAuthority)
+  (Maybe CandidateGraphObservation)
 
 -- Compare the observable checked-candidate and run authority.  The custom
 -- 'Show' instance keeps routine diagnostics independent of the retained
 -- session authority.
 instance Eq DetailedCandidateGroup where
-  DetailedCandidateGroup leftRoute leftVariants leftSidecar
-      == DetailedCandidateGroup rightRoute rightVariants rightSidecar =
+  DetailedCandidateGroup leftRoute leftVariants leftSidecar _
+      == DetailedCandidateGroup rightRoute rightVariants rightSidecar _ =
     leftRoute == rightRoute
       && leftVariants == rightVariants
       && leftSidecar == rightSidecar
 
 instance Show DetailedCandidateGroup where
-  showsPrec precedence (DetailedCandidateGroup route variants _) =
+  showsPrec precedence (DetailedCandidateGroup route variants _ _) =
     showParen (precedence > 10) $
       showString "DetailedCandidateGroup "
         . showsPrec 11 route
@@ -521,17 +532,32 @@ detailedCandidateGroup
   -> [String]
   -> DetailedCandidateGroup
 detailedCandidateGroup route variants =
-  DetailedCandidateGroup route (indexDetailedCandidateVariants variants) Nothing
+  DetailedCandidateGroup route (indexDetailedCandidateVariants variants) Nothing Nothing
 
 -- | Rendering-route sidecar for one semantic group.
 detailedCandidateGroupRoute
   :: DetailedCandidateGroup
   -> CandidateRenderingRoute
-detailedCandidateGroupRoute (DetailedCandidateGroup route _ _) = route
+detailedCandidateGroupRoute (DetailedCandidateGroup route _ _ _) = route
+
+-- | Observe only the caller-selected group prefix. Diagnostic graph facts
+-- accompany the display owner and never inspect recovered opposite-engine
+-- origins, acquire source authority, or demand an unselected group tail.
+detailedCandidateGroupObservations
+  :: Foldable collection
+  => collection DetailedCandidateGroup
+  -> LeantObservations
+detailedCandidateGroupObservations = foldMap $ \group ->
+  candidateRenderingRouteObservations [detailedCandidateGroupRoute group]
+    <> candidateGraphObservations (detailedCandidateGroupGraphObservation group)
+
+detailedCandidateGroupGraphObservation
+  :: DetailedCandidateGroup -> Maybe CandidateGraphObservation
+detailedCandidateGroupGraphObservation (DetailedCandidateGroup _ _ _ observed) = observed
 
 -- | Ordered textual variants of one semantic group.
 detailedCandidateGroupVariants :: DetailedCandidateGroup -> [String]
-detailedCandidateGroupVariants (DetailedCandidateGroup _ variants _) =
+detailedCandidateGroupVariants (DetailedCandidateGroup _ variants _ _) =
   map detailedCandidateVariantText variants
 
 -- | Verification-facing candidates retain the displayed spelling, its
@@ -571,7 +597,7 @@ detailedCandidateGroupVerificationVariants
   :: DetailedCandidateGroup
   -> [DetailedVerificationVariant]
 detailedCandidateGroupVerificationVariants
-    (DetailedCandidateGroup route variants sidecar) =
+    (DetailedCandidateGroup route variants sidecar _) =
   map (verificationVariant route sidecar) variants
 
 verificationVariant
@@ -635,7 +661,7 @@ detailedCandidateGroupSemanticSidecar
 detailedCandidateGroupSourceAuthority
   :: DetailedCandidateGroup -> Maybe CandidateSourceAuthority
 detailedCandidateGroupSourceAuthority
-    (DetailedCandidateGroup _ _ authority) = authority
+    (DetailedCandidateGroup _ _ authority _) = authority
 
 -- | Apply an arbitrary textual wrapper. Such a wrapper denotes a new term and
 -- possibly a new target (notably @Classical.byContradiction@), so retaining the
@@ -649,6 +675,7 @@ mapDetailedCandidateGroupVariantsDroppingSemanticSidecar transform group =
     (detailedCandidateGroupRoute group)
     (map mapVariant $ detailedCandidateGroupVariantRecords group)
     Nothing
+    (detailedCandidateGroupGraphObservation group)
  where
   mapVariant (DetailedCandidateVariant ordinal text _) =
     DetailedCandidateVariant ordinal (transform text) Nothing
@@ -664,12 +691,13 @@ retainDetailedCandidateGroupVariants variants group = DetailedCandidateGroup
   (detailedCandidateGroupRoute group)
   variants
   (detailedCandidateGroupSourceAuthority group)
+  (detailedCandidateGroupGraphObservation group)
 
 detailedCandidateGroupVariantRecords
   :: DetailedCandidateGroup
   -> [DetailedCandidateVariant]
 detailedCandidateGroupVariantRecords
-    (DetailedCandidateGroup _ variants _) = variants
+    (DetailedCandidateGroup _ variants _ _) = variants
 
 detailedCandidateVariantOrdinal :: DetailedCandidateVariant -> Natural
 detailedCandidateVariantOrdinal
@@ -831,6 +859,46 @@ streamDetailedQueryResults window render = DetailedSynthStreaming
               else (Just rendered, Set.insert key seen)
     in StreamObserved group observedNotes $
       candidates (remaining - 1) seen' observedNotes rest results
+
+-- | Admit one Djinn trace without collecting its candidate pool or demanding
+-- its final verdict. Each observed candidate spends a raw slot before its
+-- rendering and duplicate checks, and the terminal evidence is interpreted
+-- only when the cursor reaches that result. The evidence callback keeps the
+-- translation's refutation-completeness policy at the engine boundary.
+streamDetailedQueryResultsWithEvidence
+  :: Int
+  -> (candidate -> Maybe DetailedCandidateGroup)
+  -> (QueryEvidence -> [String] -> DetailedSynthOutcome)
+  -> [Either String (QueryResult metadata candidate)]
+  -> DetailedSynthOutcome
+streamDetailedQueryResultsWithEvidence window render finish =
+  DetailedSynthStreaming . batches (max 0 window) Set.empty []
+ where
+  capped notes = nub $ notes ++
+    ["search truncated: candidate limit reached (" ++ show window ++ ")"]
+  batches 0 _ notes _ = StreamFinished $ capped notes
+  batches _ _ notes [] = StreamFinished notes
+  batches _ _ _ (Left failure : _) = StreamFailed failure
+  batches remaining seen _ (Right result : rest) =
+    let batch = resultSearch result
+        progress = batchProgress batch
+        notes = progressNotesWith window progress
+    in candidates remaining seen notes (batchCandidates batch) progress
+      (resultEvidence result) rest
+  candidates 0 _ notes _ _ _ _ = StreamFinished $ capped notes
+  candidates remaining seen notes [] progress evidence rest = case progress of
+    Continuing -> batches remaining seen notes rest
+    Completed _ -> outcomeStream $ finish evidence notes
+  candidates remaining seen notes (candidate : rest) progress evidence results =
+    let observedNotes = if remaining == 1 then capped notes else notes
+        (group, seen') = case render candidate of
+          Nothing -> (Nothing, seen)
+          Just rendered ->
+            let key = detailedCandidateGroupVariants rendered
+            in if key `Set.member` seen then (Nothing, seen)
+              else (Just rendered, Set.insert key seen)
+    in StreamObserved group observedNotes $
+      candidates (remaining - 1) seen' observedNotes rest progress evidence results
 
 outcomeStream :: DetailedSynthOutcome -> DetailedCandidateStream
 outcomeStream outcome = case outcome of
@@ -1213,7 +1281,7 @@ forceDetailedSynthCursorStep step = case step of
 detailedGroupSize :: [DetailedCandidateGroup] -> Int
 detailedGroupSize = sum . map groupSize
  where
-  groupSize (DetailedCandidateGroup route variants _) =
+  groupSize (DetailedCandidateGroup route variants _ _) =
     route `seq` sum (map (length . detailedCandidateVariantText) variants)
 
 detailedNoteSize :: [String] -> Int
@@ -1474,7 +1542,7 @@ runTunedSynthesisWithCollection streaming limits
     EngineDjinn -> do
       prepared <- prepareSynthesis djinnRecursiveProjection
         providers extras engineFrag fitFrag
-      outcome <- djinnRun limits djinnLimits prepared
+      outcome <- djinnRun streaming limits djinnLimits prepared
       pure
         (withoutCheckedDetailedCandidates checked
           (asCollection outcome))
@@ -1486,7 +1554,7 @@ runTunedSynthesisWithCollection streaming limits
     EngineBoth -> do
       djinnPrepared <- prepareSynthesis djinnRecursiveProjection
         providers extras engineFrag fitFrag
-      djinn <- djinnRun limits djinnLimits djinnPrepared
+      djinn <- djinnRun streaming limits djinnLimits djinnPrepared
       exferencePrepared <- prepareSynthesis exferenceRecursiveProjection
         providers extras engineFrag fitFrag
       exference <- exferenceRun streaming limits multiConstructorPatterns steps
@@ -1635,11 +1703,12 @@ prepareProviderGroundFactTranslation recursiveProjection providers extras
 -- | LJT search with bounded higher-rank extensions: candidates, or a
 -- refutation whose soundness depends on the translation having hidden nothing.
 djinnRun
-  :: SynthLimits
+  :: Bool
+  -> SynthLimits
   -> (Int, Maybe Integer)
   -> PreparedSynthesis
   -> Either String DetailedSynthOutcome
-djinnRun limits laneBounds@(cutoff, budget) prepared = do
+djinnRun streaming limits laneBounds@(cutoff, budget) prepared = do
   let origin = preparedSemanticOrigin prepared
       frag = semanticOriginFitFragment origin
       projection = semanticOriginProjectionCompleteness origin
@@ -1667,21 +1736,10 @@ djinnRun limits laneBounds@(cutoff, budget) prepared = do
         , requestOptions = djinnQueryOptionsForLimits limits laneBounds
         }
   request <- viaDiagnostic (mkDjinnRequest query)
-  result <- viaDiagnostic
-    (runDjinnTypedQueryWithKindedInstantiationAssignments
-      session instantiations request)
   let window = synthLimitWindow limits
       ranking = synthLimitRanking limits
-      batch = resultSearch result
-      notes = progressNotesWith window (batchProgress batch)
-      -- Preserve Leant's historical size tie-break only in legacy mode.
-      -- Structural policies already selected and ordered the checked Djex
-      -- candidates before the result cutoff; sorting again here would erase
-      -- their elimination, provider-cost, and diversity preferences.
-      rendered =
-        [ (expressionSize expression, group)
-        | candidate <- take cutoff (batchCandidates batch)
-        , let availability = typedCandidateTermGraph candidate
+      renderCandidate candidate =
+          let availability = typedCandidateTermGraph candidate
               compatibility = typedCandidateCompatibility candidate
               fallback = functionClauseExpression . candidateOutput
               expression = candidateQualityExpressionByAvailability
@@ -1703,29 +1761,50 @@ djinnRun limits laneBounds@(cutoff, budget) prepared = do
                 Right _ | not reconstructed -> Just $ DjinnSourceAuthority
                   $ DjinnCandidateSourceAuthority candidate origin session request
                 _ -> Nothing
-        , Right variants <- [alternatives]
-        , let group = DetailedCandidateGroup route
+          in case alternatives of
+            Left _ -> Nothing
+            Right variants -> Just (expressionSize expression,
+              DetailedCandidateGroup route
                 (indexDetailedCandidateVariants variants) authority
-        ]
-      terms = map snd $ case ranking of
-        LegacyCandidateRanking -> sortOn fst rendered
-        StructuralCandidateRanking _ -> rendered
-  pure $ case resultEvidence result of
-    ValidatedCandidates -> DetailedSynthCandidates terms notes
-    ProvedUninhabitable
-      | not (projectionFamiliesComplete projection) -> DetailedSynthNoTerm
-          ("an exact Lean family stayed opaque because its constructor schema \
-           \was ambiguous or incompatible" : notes)
-      | otherwise ->
-          DetailedSynthRefuted
-            ( isNothing budget
-              && projectionFragmentsComplete projection
-              && fragmentProjectionComplete frag
-            )
-    RequiresTargetReference -> DetailedSynthNoTerm
-      ("only a recursive reference to the definition itself would inhabit \
-       \this type" : notes)
-    NoEvidence -> DetailedSynthNoTerm notes
+                (candidateGraphObservation djinnSourceGraphAbsenceReason availability reconstructed))
+      terminal evidence notes = case evidence of
+        ValidatedCandidates -> DetailedSynthNoTerm notes
+        ProvedUninhabitable
+          | not (projectionFamiliesComplete projection) -> DetailedSynthNoTerm
+              ("an exact Lean family stayed opaque because its constructor schema \
+               \was ambiguous or incompatible" : notes)
+          | otherwise -> DetailedSynthRefuted
+              ( isNothing budget
+                && projectionFragmentsComplete projection
+                && fragmentProjectionComplete frag
+              )
+        RequiresTargetReference -> DetailedSynthNoTerm
+          ("only a recursive reference to the definition itself would inhabit \
+           \this type" : notes)
+        NoEvidence -> DetailedSynthNoTerm notes
+  if streaming
+    then do
+      results <- viaDiagnostic
+        (runDjinnTypedQueryStreamWithKindedInstantiationAssignments
+          session instantiations request)
+      pure $ streamDetailedQueryResultsWithEvidence (min cutoff window)
+        (fmap snd . renderCandidate) terminal (map (first renderDiagnostic) results)
+    else do
+      result <- viaDiagnostic
+        (runDjinnTypedQueryWithKindedInstantiationAssignments
+          session instantiations request)
+      let batch = resultSearch result
+          notes = progressNotesWith window (batchProgress batch)
+          rendered = mapMaybe renderCandidate $ take cutoff $ batchCandidates batch
+          -- Ordinary synthesis retains its historical size tie-break. Named
+          -- queries instead check the next encountered candidate immediately;
+          -- no pool-wide ranking may demand an unobserved continuation.
+          terms = map snd $ case ranking of
+            LegacyCandidateRanking -> sortOn fst rendered
+            StructuralCandidateRanking _ -> rendered
+      pure $ case resultEvidence result of
+        ValidatedCandidates -> DetailedSynthCandidates terms notes
+        evidence -> terminal evidence notes
 
 -- | The ranked heuristic search: the same shared environment and goal,
 -- converted to Exference's integer variable domain.  Candidates keep
@@ -1866,6 +1945,7 @@ exferenceRun streaming limits multiConstructorPatterns steps prepared = do
                   Left _ -> Nothing
                   Right group -> Just $ DetailedCandidateGroup route
                     (indexDetailedCandidateVariants group) sidecar
+                    (candidateGraphObservation exferenceSourceGraphAbsenceReason availability reconstructed)
             notes = maybe [] (progressNotesWith (synthLimitWindow limits))
               (selectionProgress selection)
         pure $ if streaming
@@ -2148,6 +2228,7 @@ retainExactExferenceVariantOrigins exference group
       (detailedCandidateGroupRoute group)
       (map retainOrigin $ detailedCandidateGroupVariantRecords group)
       Nothing
+      (detailedCandidateGroupGraphObservation group)
  where
   retainOrigin variant = DetailedCandidateVariant
     (detailedCandidateVariantOrdinal variant)

@@ -211,9 +211,10 @@ without running synthesis or the kernel.
 Named behavioral queries check rendered groups one group at a time. Exference
 retains its structural frontier ranking but does not wait for the ordinary
 command's complete frontend quality pool before trying the predicate. Djinn
-still collects and ranks its bounded backend batch before returning the first
-group. Both mode defers unused engine work, but observing its Djinn lane can
-encounter the same collection boundary. Each selected backend lane retains its
+also yields checked typed candidates incrementally, preserving each one's own
+source graph and rendering authority. Both mode defers unused engine work,
+including each Djinn continuation. Once the displayed-success quota is met,
+neither backend's unobserved tail is forced. Each selected backend lane retains its
 bounded trace: raw
 candidates remain charged before rendering or duplicate rejection, and checking
 a false predicate does not refill or restart that trace. Existing
@@ -224,7 +225,11 @@ apply. Several accepted groups accumulate in encounter order with their own
 verification receipts. Both mode retains its reserved engine order and each
 group's own semantic authority; it does not inspect a later opposite-engine
 candidate to borrow typed metadata. Progress notes describe only observed work.
-Ordinary unnamed synthesis retains its existing finite-pool selection policy.
+Djinn's named-query stream uses deterministic discovery order, so its first
+accepted result can differ from earlier complete-pool ranking. Ordinary
+unnamed synthesis retains its existing finite-pool selection policy. Search
+errors and completion evidence are reported only when their observation is
+reached; a passing prefix is not a claim that the search finished.
 
 ### Current Lean six-operation acceptance
 

@@ -1359,6 +1359,43 @@ deduplication, note-presentation policy, survivor quota, `ReplState` field, or
 counterexample-directed engine request; those private orchestration choices
 remain in Main.
 
+## Incremental Djinn behavioral candidates
+
+Named behavioral queries use Djex's
+`runDjinnTypedQueryStreamWithKindedInstantiationAssignments`. Request and
+provider validation precede the lazy stream. Each continuing observation
+contains one checked typed candidate; terminal completion or failure is a
+separate observation. The existing Main cursor verifies and checks one group
+at a time, and stops without inspecting the continuation after `synth-shown`
+successful groups. Both mode retains its established engine ordering and each
+candidate's own source authority.
+
+The Djinn stream delivers deterministic discovery order. Its existing local
+search strategy and provider costs still apply, but the named route does not
+wait for whole-pool ranking. Ordinary unnamed synthesis keeps its batch
+runner and ranking. Raw proofs, rejected conversions and duplicates spend the
+one backend cutoff and choice allowance. Leant additionally charges its raw
+observation window before rendering and duplicate suppression; predicate
+rejection cannot refill either allowance. Final logical evidence is interpreted
+only when the corresponding terminal observation is reached.
+
+The selected rendered groups also carry diagnostic source-graph observations.
+`source-graph-absent.<engine>.<reason>` distinguishes finite backend absence
+categories, and `target-only-reconstructed` identifies target-side type-choice
+reconstruction. Both observations can apply to the same group. They supplement
+the existing typed/fallback rendering counters without changing route tags or
+granting source authority. In particular, Djinn's detailed source-typing error
+remains one coarse failure category rather than being classified by parsing
+its diagnostic string.
+
+Main aggregates these observations over its already bounded group prefix.
+Classification observes only existing absence constructors and never forces
+their diagnostic strings, graph payloads, or an unused stream tail. These are
+counts of selected successfully rendered groups; they do not count raw
+candidates discarded before rendering. Textual transformations preserve the
+original rendering observations while retaining their existing rule of
+discarding unavailable source authority.
+
 ## Scoped parallel initial structural schedules
 
 The concurrency checkpoints live in Main rather than in the pure Engine API.
