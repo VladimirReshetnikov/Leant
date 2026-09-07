@@ -75,9 +75,9 @@ Companion documents:
 - **[Behavioral assertions](docs/behavioral-synthesis.md)** — the new
   `:synth f : TYPE where PROP` entrance, exact candidate checks, and bounded
   Djinn search for reusable higher-order compositions;
-- **[Next synthesis priorities](lib/Djex/docs/reports/2026-09-06-synthesis-next-priorities.md)**
-  — source-aware Haskell elaboration, recursive-data cases, contextual evidence,
-  broader behavioral specifications, and the separate native Windows Length work;
+- **[Current synthesis re-triage](docs/reports/2026-09-07-synthesis-retriage.md)**
+  — elaboration acceptance and integration, recursive-data cases and recursors,
+  bounded Lean simplification, contextual evidence, and broader behavioral coverage;
 - **[docs/synth-internals.md](docs/synth-internals.md)** — the design
   boundaries and dated-report index behind `:synth`;
 - **[Lean from First Principles](https://raw.githubusercontent.com/VladimirReshetnikov/Leant/main/docs/Lean_from_First_Principles/Lean_from_First_Principles.pdf)**
